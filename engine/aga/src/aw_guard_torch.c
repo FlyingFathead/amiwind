@@ -370,8 +370,15 @@ static void flame_particle(const vec3_t origin,int k,float scale,int core,int ma
 void AW_GuardTorchDraw(void)
 {
     int i,k,core;
+    vec3_t player_flame;
     if(!flame_pixels || !vid.buffer || !d_pzbuffer || d_zwidth<vid.width)return;
     core=AW_TorchFlameCoreColor();
+    /* The player's held alias uses the same original flame pixels, world
+     * projection and depth test. Its light keeps the existing player key. */
+    if(aw_view_torch_emitter && aw_view_torch_emitter(player_flame)){
+        for(k=0;k<3;k++)flame_particle(player_flame,k,1,core,16,1,1,0);
+        if((rand()&1023)<(int)(host_frametime*6*1024))AW_EmberSpawn(player_flame,.8f,18);
+    }
     for(i=0;i<visible_count;i++){
         if(!guards[i].active)continue;
         for(k=0;k<3;k++)flame_particle(guards[i].flame,k,1,core,16,1,1,0);

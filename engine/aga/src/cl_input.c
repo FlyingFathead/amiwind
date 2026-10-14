@@ -53,6 +53,7 @@ kbutton_t	in_strafe, in_speed, in_fastflight, in_use, in_jump, in_attack;
 kbutton_t	in_up, in_down;
 int (*aw_companion_buttons)(int bits);	/* aw_companion.c */
 int (*aw_combat_buttons)(int bits);	/* aw_combat.c: no swing while guarding */
+int (*aw_inspect_buttons)(int bits);  /* explicit HUD inspection consumes attack */
 
 int			in_impulse;
 
@@ -402,6 +403,8 @@ void CL_SendMove (usercmd_t *cmd)
 		bits |= 2;
 	in_jump.state &= ~2;
 
+    if (aw_inspect_buttons)
+        bits = aw_inspect_buttons (bits);
     if (aw_companion_buttons)
         bits = aw_companion_buttons (bits);	/* pick mode takes the attack */
     if (aw_combat_buttons)

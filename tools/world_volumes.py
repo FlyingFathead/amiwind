@@ -340,12 +340,14 @@ def write_partitions(batches, out, xdftool, jobs=1):
     return list(ordered_map(_pack_batch,tasks,max(1,min(jobs,len(tasks) or 1))))
 
 
-def pack(id1, out, version, xdftool, rdbtool=None, jobs=1):
+def pack(id1, out, version, xdftool, rdbtool=None, jobs=1, omitted=()):
     """Verify each temporary partition before removing redundant staging maps.
 
     Partitions are independent FFS volumes: up to `jobs` are written and read
     back at once (shared pool); the receipt keeps partition order. Staging maps
-    are removed only after every partition verified.
+    are removed only after every partition verified. OMITTED is the explicit
+    id1-relative removal/checklist list already validated by the fingerprint;
+    stable routing rows do not imply that their superseded BSPs exist.
     """
     directory=id1/'world/regions.awr'
     if not directory.exists():return []
@@ -360,6 +362,11 @@ def pack(id1, out, version, xdftool, rdbtool=None, jobs=1):
     aliases=alias_rows(raw)
     paths=[map_file(id1/'maps',f'vf{i:04d}') for i in range(count)]
     paths=[p for i,p in enumerate(paths) if f'vf{i:04d}' not in aliases or p.is_file()]
+    omitted=set(omitted)
+    for path in paths:
+        if path.relative_to(id1).as_posix() in omitted and path.exists():
+            raise ValueError('Omitted exterior map remains at packing: '+path.name)
+    paths=[p for p in paths if p.relative_to(id1).as_posix() not in omitted]
     # Preserve the original two-partition layout when it fits. Larger worlds
     # use additional bounded partitions discovered through volumes.awv.
     terrain_bytes=sum(p.stat().st_size for p in paths)

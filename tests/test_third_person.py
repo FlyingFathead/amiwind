@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import test_aga_native_source as native
 
@@ -41,8 +42,8 @@ def body(text, name):
 @unittest.skipUnless(shutil.which('cc'), 'a host C compiler is required')
 class ViewRulesNativeTests(unittest.TestCase):
     def test_toggle_orbit_vanity_zoom_obstacle_and_death_sequence(self):
-        native.NativeSourceTests().compile_run('aga_view_test.c', [SRC / 'aw_view_rules.c'],
-                                               defines=('AW_VIEW_HOST_TEST',), cflags=UBSAN)
+        native.NativeSourceTests().compile_run('aga_view_test.c', [SRC / 'aw_view_rules.c', SRC / 'aw_anim.c'],
+                                               defines=('AW_VIEW_HOST_TEST', 'AW_ANIM_HOST_TEST'), cflags=UBSAN)
 
     def test_player_dead_predicate(self):
         native.NativeSourceTests().compile_run('aga_player_dead_test.c', [], cflags=UBSAN)
@@ -369,6 +370,200 @@ class PlayerViewBuilderTests(unittest.TestCase):
                      'engine/aga/src/aw_view.h', 'tests/aga_view_test.c', 'tests/test_third_person.py',
                      'docs/THIRD_PERSON.md'):
             self.assertIn('"' + name + '"', files)
+
+
+class PlayerBodyBudgetTests(unittest.TestCase):
+    """Small synthetic geometry; the real byte fitter runs at a controlled test limit."""
+    def groups(self):
+        groups, base = [], 0
+        for name, count, kind in (('idle', 8, 'loop'), ('walk', 6, 'loop'),
+                                  ('jump', 4, 'hold'), ('land', 4, 'hold')):
+            groups.append(dict(name=name, count=count, kind=kind, base=base, step=0.1, events=[]))
+            base += count
+        return groups
+
+    def mesh(self, vertices):
+        import numpy as np
+        return (np.zeros((22, vertices, 3)), np.array([[0, 1, 2]]),
+                np.zeros((vertices, 2)), SimpleNamespace(size=(128, 128)))
+
+    def fit(self, attempts, byte_limit):
+        import npc_anim as anim
+        import prepare_player_view as view
+        real_fit = anim.fit
+        def limited_fit(groups, nv, nt, sw, sh):
+            return real_fit(groups, nv, nt, sw, sh, budget=byte_limit)
+        source = iter(attempts)
+        def labeled_bake(*args, **kwargs):
+            result = next(source)
+            if isinstance(result, Exception):
+                raise result
+            kwargs['face_parts'].extend([17] * len(result[1]))
+            return result
+        with patch('npc_geometry.bake', side_effect=labeled_bake) as bake, \
+             patch('npc_anim.fit', side_effect=limited_fit):
+            result = view._fit_body('synthetic body', [], [], [], b'', self.groups())
+        budget, frames, faces, _, skin, groups, index = result
+        self.assertLessEqual(anim.alias_bytes(len(index), frames.shape[1], len(faces), *skin.size), byte_limit)
+        self.assertEqual(frames[index].shape[0], sum(g['count'] for g in groups))
+        self.assertEqual([g['count'] for g in groups if g['name'] == 'idle'], [8])
+        self.assertTrue(all(g['count'] >= 2 for g in groups if g['name'] in ('jump', 'land')))
+        return budget, groups, bake
+
+    def test_minimum_frames_overflow_tries_smaller_mesh_and_stops_at_full_fit(self):
+        import prepare_player_view as view
+        budget, groups, bake = self.fit([self.mesh(600), self.mesh(100)], 48 * 1024)
+        self.assertEqual(budget, view.BUDGETS[1])
+        self.assertEqual([g['count'] for g in groups], [8, 6, 4, 4])
+        self.assertEqual([c.kwargs['budget'] for c in bake.call_args_list], list(view.BUDGETS[:2]))
+
+    def test_first_valid_body_is_kept_without_reducing_geometry_further(self):
+        from npc_geometry import AliasOverflow
+        import prepare_player_view as view
+        attempts = [self.mesh(600)] + [AliasOverflow('Alias vertex budget exceeded')] * 3
+        budget, groups, bake = self.fit(attempts, 64 * 1024)
+        self.assertEqual(budget, view.BUDGETS[0])
+        self.assertLess(sum(g['count'] for g in groups), 22)
+        self.assertEqual(bake.call_count, 1)
+
+    def test_leg_section_guard_checks_union_not_hidden_fragment(self):
+        import numpy as np
+        from npc_geometry import player_leg_section_ok
+        points = np.array([[x, y, z] for z in (0., 1.) for x, y in
+                           ((-2., -1.), (-1., -1.), (-1., 1.), (-2., 1.))])
+        faces = np.array([[0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5],
+                          [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7]])
+        right = points.copy(); right[:, 0] += 3
+        hidden = points.copy(); hidden[:, 0] = -1.4 + .1 * (hidden[:, 0] + 2)
+        # A complete mesh keeps the visible outer trouser outline even when
+        # an inner fragment is reduced. The validator sees the complete union.
+        def joined(*meshes):
+            return np.concatenate(meshes), np.concatenate([faces + 8 * i for i in range(len(meshes))])
+        original, original_faces = joined(points, right, hidden)
+        self.assertTrue(player_leg_section_ok(original, original_faces, original, original_faces))
+        # The inner fragment can collapse without changing the outer outline.
+        collapsed = hidden.copy(); collapsed[:, 0] = -1.45
+        candidate, candidate_faces = joined(points, right, collapsed)
+        self.assertTrue(player_leg_section_ok(original, original_faces, candidate, candidate_faces))
+        thin = points.copy(); thin[:, 0] = -1.5 + .6 * (thin[:, 0] + 1.5)
+        candidate, candidate_faces = joined(thin, right, collapsed)
+        self.assertFalse(player_leg_section_ok(original, original_faces, candidate, candidate_faces))
+
+    def test_leg_guard_ignores_tail_but_still_catches_narrowed_leg(self):
+        import numpy as np
+        from npc_geometry import player_leg_section_ok
+        cube = np.array([[x,y,z] for z in (0.,1.) for x,y in
+                         ((-2.,-1.),(-1.,-1.),(-1.,1.),(-2.,1.))])
+        quads = np.array([[0,1,5],[0,5,4],[1,2,6],[1,6,5],
+                          [2,3,7],[2,7,6],[3,0,4],[3,4,7]])
+        right=cube.copy();right[:,0]+=3
+        tail=cube.copy();tail[:,1]-=5
+        def joined(left, tailpiece):
+            return (np.concatenate((left,right,tailpiece)),
+                    np.concatenate((quads,quads+8,quads+16)))
+        original,faces=joined(cube,tail)
+        tailgone=tail.copy();tailgone[:,1]+=4
+        candidate,candidate_faces=joined(cube,tailgone)
+        labels=np.array([17]*8+[22]*8+[26]*8)
+        self.assertTrue(player_leg_section_ok(original,faces,candidate,candidate_faces,
+            reference_parts=labels,candidate_parts=labels))
+        thin=cube.copy();thin[:,0]=-1.5+.6*(thin[:,0]+1.5)
+        candidate,candidate_faces=joined(thin,tailgone)
+        self.assertFalse(player_leg_section_ok(original,faces,candidate,candidate_faces,
+            reference_parts=labels,candidate_parts=labels))
+
+    def test_vertex_overflow_also_retries_a_smaller_mesh(self):
+        from npc_geometry import AliasOverflow
+        import prepare_player_view as view
+        budget, _, bake = self.fit([AliasOverflow('Alias vertex budget exceeded'), self.mesh(100)], 48 * 1024)
+        self.assertEqual(budget, view.BUDGETS[1])
+        self.assertEqual(bake.call_count, 2)
+
+    def test_compact_contour_fallback_only_after_plain_paths_fail(self):
+        from npc_geometry import AliasOverflow
+        import prepare_player_view as view
+        unavailable = AliasOverflow('Player visible leg silhouette narrowed')
+        attempts = [self.mesh(600)] + [unavailable] * (2 * len(view.BUDGETS) - 1)
+        attempts += [unavailable, self.mesh(100)]
+        budget, groups, bake = self.fit(attempts, 48 * 1024)
+        self.assertEqual(budget, view.BUDGETS[1])
+        self.assertEqual(bake.call_count, 2 * len(view.BUDGETS) + 2)
+        self.assertTrue(bake.call_args.kwargs['body_leg_contour'])
+        self.assertEqual(bake.call_args.kwargs['body_skin_rows'], 80)
+        self.assertEqual([g['count'] for g in groups], [8, 6, 4, 4])
+
+    def test_upper_thigh_fallback_runs_only_after_knee_path_fails(self):
+        from npc_geometry import AliasOverflow
+        import prepare_player_view as view
+        unavailable=AliasOverflow('Player visible leg silhouette narrowed')
+        attempts=[self.mesh(600)]+[unavailable]*(3*len(view.BUDGETS)-1)
+        attempts += [unavailable,self.mesh(100)]
+        budget,_,bake=self.fit(attempts,48*1024)
+        self.assertEqual(budget,view.BUDGETS[1])
+        self.assertEqual(bake.call_count,3*len(view.BUDGETS)+2)
+        self.assertEqual(bake.call_args.kwargs['body_leg_contour'],2)
+
+    def test_all_budget_failures_report_appearance_and_attempts(self):
+        import npc_anim as anim
+        import prepare_player_view as view
+        real_fit = anim.fit
+        def labeled_bake(*args, **kwargs):
+            result=self.mesh(600)
+            kwargs['face_parts'].extend([17] * len(result[1]))
+            return result
+        with patch('npc_geometry.bake', side_effect=labeled_bake) as bake, \
+             patch('npc_anim.fit', side_effect=lambda *args: real_fit(*args, budget=48 * 1024)):
+            with self.assertRaisesRegex(ValueError, 'synthetic body: no body fits') as caught:
+                view._fit_body('synthetic body', [], [], [], b'', self.groups())
+        self.assertEqual(bake.call_count, 4 * len(view.BUDGETS))
+        for budget in view.BUDGETS:
+            self.assertIn('%d/96/plain: Alias byte budget exceeded' % budget, str(caught.exception))
+        self.assertEqual([c.kwargs['body_skin_rows'] for c in bake.call_args_list],
+                         [96] * len(view.BUDGETS) + [80] * (3 * len(view.BUDGETS)))
+        self.assertEqual([c.kwargs['body_leg_contour'] for c in bake.call_args_list],
+                         [0] * (2 * len(view.BUDGETS)) + [1] * len(view.BUDGETS) +
+                         [2] * len(view.BUDGETS))
+
+    def test_unrelated_geometry_error_aborts_before_a_later_fit(self):
+        import npc_anim as anim
+        import prepare_player_view as view
+        real_fit = anim.fit
+        with patch('npc_geometry.bake', side_effect=[ValueError('malformed source'), self.mesh(600)]) as bake, \
+             patch('npc_anim.fit', side_effect=lambda *args: real_fit(*args, budget=64 * 1024)):
+            with self.assertRaisesRegex(ValueError, 'synthetic body: malformed source'):
+                view._fit_body('synthetic body', [], [], [], b'', self.groups())
+        self.assertEqual(bake.call_count, 1)
+
+
+class PlayerTorchDataTests(unittest.TestCase):
+    def test_paths_and_frame_aligned_fixed_point_emitters(self):
+        import numpy as np
+        import prepare_player_view as view
+        self.assertEqual(view.torch_paths('progs/body/nord_m.mdl'),
+                         ('progs/body/nord_m_t.mdl', 'progs/body/nord_m_h.mdl',
+                          'progs/body/nord_m_t.awt'))
+        raw = view.torch_emitters([[1.25, -2.5, 0], [0, 3, 127.5]])
+        self.assertEqual(raw[:8], struct.pack('>4sHH', b'AWBT', 2, 0))
+        self.assertEqual(len(raw), 8 + 2 * 12)
+        self.assertEqual(np.frombuffer(raw[8:], dtype='>i4').reshape(-1, 3).tolist(),
+                         [[81920, -163840, 0], [0, 196608, 8355840]])
+
+    def test_emitter_bounds_are_rejected_before_pack(self):
+        import prepare_player_view as view
+        for points in ([], [[float('nan'), 0, 0]], [[129, 0, 0]], [[0, 0]],
+                       [[0, 0, 0]] * 257):
+            with self.subTest(points=len(points)), self.assertRaises(ValueError):
+                view.torch_emitters(points)
+
+
+class PlayerSwimDataTests(unittest.TestCase):
+    def test_water_alias_path_and_full_original_groups(self):
+        import prepare_player_view as view
+        self.assertEqual(view.swim_path('progs/body/nord_m.mdl'), 'progs/body/nord_m_w.mdl')
+        self.assertEqual(view.BODY_SWIM, (('idle', 8), ('swimidle', 8), ('swim', 8), ('death', 2)))
+        for invalid in ('progs/other/nord_m.mdl', 'progs/body/nord_m.anm'):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                view.swim_path(invalid)
 
 
 if __name__ == '__main__':

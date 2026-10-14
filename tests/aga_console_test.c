@@ -327,7 +327,7 @@ int main(int count,char **values){
  assert(AW_DebugTranslate(4,fog,output,sizeof(output))==1);assert(!strcmp(output,"aw_fog_distance 400\n"));
  assert(AW_DebugTranslate(4,distance,output,sizeof(output))==1);assert(!strcmp(output,"aw_fog_distance 500\n"));
  assert(AW_DebugTranslate(3,hud,output,sizeof(output))==1);
- assert(!strcmp(output,"amiwind_show_debug on\n"));
+ assert(!strcmp(output,"aw_debug_hud on\n"));
  assert(AW_DebugTranslate(4,hud_type,output,sizeof(output))==1 && !strcmp(output,"aw_debug_hud_type 2\n"));
  assert(AW_DebugTranslate(4,hors,output,sizeof(output))==1 && !strcmp(output,"aw_debug_hors 0\n"));
  assert(AW_ParseBoolean("TRUE")==1 && AW_ParseBoolean("on")==1 && AW_ParseBoolean("1")==1);

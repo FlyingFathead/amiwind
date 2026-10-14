@@ -1,4 +1,4 @@
-# Keyboard and command reference — v0.0.25-rc7
+# Keyboard and command reference
 
 <!-- contents start -->
 ## Contents
@@ -15,11 +15,12 @@
 
 ## v0.0.29 F/V regression gate
 
-The 4 October owner playtest reports F no longer raising hands and V printing
+The 4 October owner playtest reported F no longer raising hands and V printing
 torch on/off without visible hands or a working torch, especially in debug play.
-The cause is unconfirmed. Controls below remain the required behavior, not an
-acceptance claim. See [TORCH-INPUT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open)
-and the [full input/state/visibility/light matrix](TORCH.md#v0029-required-hands-and-light-acceptance-matrix).
+The [canonical bug register](BUGS.md#fix-index) holds the current evidence and
+status for TORCH-INPUT-29. This historical report is not the current diagnosis.
+Controls below describe the required behavior; acceptance uses the
+[full input/state/visibility/light matrix](TORCH.md#v0029-required-hands-and-light-acceptance-matrix).
 Do not replace personal bindings or bypass intentional story restrictions to
 hide the failure. Capture the active bindings and input destination first.
 
@@ -51,6 +52,13 @@ and the steps for adding one are documented in `engine/aga/src/aw_menu.c`.
 
 ## Configurable gameplay bindings
 
+The dev1 help-screen candidate reads current bindings and uses readable action
+labels. It fits two columns with the compact console font and one with the
+larger font at 320 by 200. Reserved shortcuts remain listed after the
+configurable keys; both console keys stay in the footer. Rebinding, font-size
+changes and clearing bindings update its page count. Native layout verification
+is tracked in [UI-KEY-HELP-STALE-38](bugs/UI-KEY-HELP-STALE-38.md).
+
 | Default key | Command | Action / condition |
 | --- | --- | --- |
 | W / S, Up / Down | `+forward` / `+back` | Forward / backward |
@@ -64,7 +72,9 @@ and the steps for adding one are documented in `engine/aga/src/aw_menu.c`.
 | Mouse 1 | `+attack` | Attack |
 | Right mouse (Amiga sends it as `MOUSE3`) | `+aw_alt` | Block: hold to raise your shield (`aw_combat_block 1`, an AmiWind extension and the default; the original blocks automatically, docs/COMBAT.md "Blocking"). In pick mode (`dbg companion pick`) it picks a companion, like the left button. Older saved key files get it if `MOUSE3` is unbound. |
 | F | `impulse 202` | Draw / lower hands |
-| V | `aw_torch` | Toggle the placeholder torch while hands are raised |
+| V | `aw_torch` | Toggle the carried torch while hands are raised |
+| Tab | `+aw_pov` | Tap to change first/third person; hold to orbit the camera |
+| Mouse wheel up / down | `aw_view_zoom 1` / `aw_view_zoom -1` | Third-person camera zoom in / out; see [camera behavior](THIRD_PERSON.md) |
 | M | `aw_worldmap` | Open world map, including debug/noclip |
 | J | `aw_journal` | Open journal |
 | T | `aw_wait` | Wait panel |

@@ -1,7 +1,5 @@
 # Bug journal
 
-13 October 2026 - BUILD-SHADOWED-WORLD-MAPS-38: Final routing audit flagged 135 retained maps; dependency review and used-map-only acceptance remain open.
-
 <!-- contents start -->
 ## Contents
 
@@ -157,8 +155,108 @@
 - [2026-10-12 — TOOLKIT-CULL-DIAGNOSTICS-38](#2026-10-12--toolkit-cull-diagnostics-38)
 - [2026-10-12 — CHIM-TERRAIN-ROCK-EXEMPT-38](#2026-10-12--chim-terrain-rock-exempt-38)
 - [STAIRS-MOLAG-ACCESS-38, 13 October 2026](#stairs-molag-access-38-13-october-2026)
+- [BUILD-SHADOWED-WORLD-MAPS-38, 13 October 2026](#build-shadowed-world-maps-38-13-october-2026)
+- [SAVE-TELEPORT-CHECKPOINT-38, 13 October 2026](#save-teleport-checkpoint-38-13-october-2026)
+- [SAVE-LAVA-DEATH-LOOP-38, 13 October 2026](#save-lava-death-loop-38-13-october-2026)
+- [UI-DEATH-DAMAGE-TINT-38, 13 October 2026](#ui-death-damage-tint-38-13-october-2026)
+- [DOCS-CHIM-PROGRESS-STALE-38, 13 October 2026](#docs-chim-progress-stale-38-13-october-2026)
+- [SAVE-LAVA-DEATH-LOOP-38, candidate 13 October 2026](#save-lava-death-loop-38-candidate-13-october-2026)
+- [SAVE-TELEPORT-CHECKPOINT-38, candidate 13 October 2026](#save-teleport-checkpoint-38-candidate-13-october-2026)
+- [UI-DEATH-DAMAGE-TINT-38, candidate 13 October 2026](#ui-death-damage-tint-38-candidate-13-october-2026)
+- [BUILD-CHECKLIST-JSON-CELLS-39 and RELEASE-PATCH-TARGET-VERSION-39, 13 October 2026](#build-checklist-json-cells-39-and-release-patch-target-version-39-13-october-2026)
+- [DOCS-CHANGELOG-STALE-39 and DOCS-RC1-PREFLIGHT-39, 13 October 2026](#docs-changelog-stale-39-and-docs-rc1-preflight-39-13-october-2026)
+- [DOCS-RELEASE-EVIDENCE-SCOPE-39 - final source reconciliation, 14 October 2026](#docs-release-evidence-scope-39---final-source-reconciliation-14-october-2026)
 
 <!-- contents end -->
+
+- 2026-10-14: [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md): Target compilation and scoped Nord native F-then-V, hold/walk/run, torch-off and first-person control pass; an unaltered game/audio clip shows the carried mesh and raised arm. All 20 companions pass bake/readback. Matched original, complete image/package and owner acceptance remain pending.
+- 2026-10-14: [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): All 20 third-person swim companions bake successfully; target native ordinary-collision water selects the swimming body and shows changing swim poses. It also reproduces no-input descent at 42 units/second. Remove inherited Quake artificial idle drift while retaining pitch-directed movement, friction and acceleration; the new behavior and both-view dive/reference/package checks remain pending.
+
+
+MESH-VIVEC-CAP-GAP-38: 13 October 2026, RC1 owner report and private evidence reviewed. Still visible in RC1: three newly inspected views in cell2,-10 show separated Vivec mushroom cap/rim seams. Exact variants and packaged model identities need binding; prior cell5,-10 evidence remains. No closure repair accepted.
+
+NPC-ORDINATOR-APPEARANCE-39: 13 October 2026, RC1 owner report and private evidence reviewed. Open RC1 report; RC2 follow-up. The targeted actor is labelled Ordinator but appears unhelmeted, pointed-eared and brown/red-clothed. The owner compares the appearance to Fargoth. Exact actor/model identity is not yet established; no intentional placeholder is claimed.
+
+PLAYER-MOVEMENT-FRAME-SKIP-39: 13 October 2026, RC1 owner report and private evidence reviewed. Open RC1 report; RC2 follow-up. Fast third-person movement no longer has the earlier quick foot animation and looks like skipped frames. The owner additionally describes the run as two frames.
+
+WATER-GAMEPLAY-PARITY-38: 13 October 2026, RC1 owner report and private evidence reviewed. Still incomplete in RC1: owner reports absent third-person swimming/diving and sinking, with an inspected upright underwater pose at Vivec Hlaalu. Missing swim groups are source-confirmed; exact physical failure, breath/drowning and matched original behavior remain open.
+
+PLAYER-PUNCH-THIRDPERSON-39: 13 October 2026, RC1 report / RC2 follow-up: Open RC2 release blocker reported on 13 October 2026. Drawing the fists animates, but pressing default attack LMB shows no third-person punching animation. The owner corrected the initial input-failure report: the punch apparently executes; missing body animation is the confirmed symptom. Actual hit/damage behavior is not independently verified.
+
+PLAYER-BODY-LEG-SHAPE-39: 13 October 2026, RC1 report / RC2 follow-up: Open RC2 release blocker reported on 13 October 2026. The owner reports abnormally thin, distorted-looking legs on a Nord player body. Sex, exact pose and selected appearance were not specified. Shape and animation causes remain separate possibilities.
+
+NPC-SPEAR-ATTACK-REGRESSION-39: 13 October 2026, RC1 report / RC2 follow-up: Open RC2 release blocker reported on 13 October 2026. In first-person view the owner no longer sees the guard spear-attack animation that worked before. The owner separately confirms the guard can kill the player; missing attack animation and actual combat damage are different observations.
+
+COMBAT-FATIGUE-HEALTH-DAMAGE-39: 13 October 2026, RC1 report / RC2 follow-up: Closed as expected behavior for the clarified observation; no damage-rule repair claimed. The owner observes Eldafire bare-fist hits lowering the green fatigue bar while the red health bar remains unchanged, and confirms the armed guard can kill the player. Upright unarmed fatigue damage is expected; this observation does not prove a health-damage regression.
+
+NPC-NO-RUN-ANIM-35: 13 October 2026, RC1 report / RC2 follow-up: Still present in v0.0.39-rc1 (owner, 13 October 2026): Seyda Neen guards and other NPCs chase without running animation. Repeated report, RC2 release blocker. Earlier source/default-profile changes did not establish this exact packaged chase behavior; cause and repair verification pending.
+
+ANIMKIT-COVERAGE-35: 13 October 2026, RC1 report / RC2 follow-up: Still present in v0.0.39-rc1 (owner, 13 October 2026): Seyda Neen guards and other NPCs chase without running animation. Repeated report, RC2 release blocker. Earlier source/default-profile changes did not establish this exact packaged chase behavior; cause and repair verification pending.
+
+DOCS-CHIM-PROGRESS-STALE-38: 13 October 2026, v0.0.39: the standard Toolkit release check required metadata version 0.1.3 and the AmiWind v0.0.39 last-update label because its documentation and inclusion data changed. Existing controls are unchanged; no native acceptance follows from version labels.
+
+DOCS-CHIM-PROGRESS-STALE-38: 13 October 2026, v0.0.39 final preparation: the owner approved RC1 as the final-release basis. The main README, Toolkit imagery labels, dated CHIM map and exact RC1 package/native findings are reconciled. Final source and image checks remain separate. No issue is closed and no cell-wide or all-appearance acceptance is inferred from release approval.
+
+BUILD-SHADOWED-WORLD-MAPS-38: 13 October 2026: RC1 finalization still demanded the 135 intentionally uncompiled town-owned exterior maps during sky preparation. The shared sky, cull, hand-metadata, always-included and night-lighting classifier now excludes only checklist-validated omissions, bound to the validated CHIM town plan before frame generation. Other missing maps still fail. Final fingerprint and packing still require actual CHIM owner frames. Engine and converted content are unchanged; exact-image checks remain required.
+
+CHIM-CHUNK-LOAD-FAIL-33: 13 October 2026: owner reports heavy but working Dwemer access; cell (9,2), global 77750,20044,1980 shows chunk 116 zone-full retries. Evidence OWNER-20261013-DWEMER-CHUNK116; cause, recovery and costs remain open.
+
+DOCS-CHIM-PROGRESS-STALE-38: 13 October 2026: the current 14:04 UTC reference records 1190 converted cells including 15 failing audits, 99 empty-sea cells, 3 not converted and a 1274/1292 audit milestone. Earlier counts stay dated history; native/package states are separate.
+
+SAVE-TELEPORT-CHECKPOINT-38, SAVE-LAVA-DEATH-LOOP-38 and UI-DEATH-DAMAGE-TINT-38: 13 October 2026: unknown image metadata no longer labels reports legacy-only. Compiled source evidence is distinct from target acceptance.
+
+INTRO-CAMERA-GATING-38, PLAYER-JUMP-THIRDPERSON-38, PLAYER-READY-THIRDPERSON-38 and UI-KEY-HELP-STALE-38: 13 October 2026: reconciled completed RC1 source suite/Amiga compilation with pending body/readback/native evidence. No new runtime scope; unfinished work continues in v0.0.40.
+
+SAVE-TELEPORT-CHECKPOINT-38, SAVE-LAVA-DEATH-LOOP-38 and UI-DEATH-DAMAGE-TINT-38: 13 October 2026: exact RC1 registered arrival save/lava/death/reload session and post-exit AWS decode reviewed; health 55 checkpoint survives reload. Untinted prompt observed; immediate key-selection frame black, selection acceptance pending. Old unsafe saves and wider coverage remain open.
+
+PLAYER-JUMP-THIRDPERSON-38, PLAYER-READY-THIRDPERSON-38 and BUILD-PLAYER-BODY-BUDGET-FALLBACK-39: 13 October 2026: twenty actual model/layout readbacks pass; 1,751 non-body assets unchanged. One Nord male motion/camera session inspected; broader motion, memory/performance and matched reference acceptance remain open.
+
+ANIMKIT-ACTOR-ABI-SITES-35, BUILD-SHADOWED-WORLD-MAPS-38, BUILD-WORLD-FINGERPRINT-RETIRED-38 and BUILD-WORLD-PACK-RETIRED-38: 13 October 2026: normal RC1 image finalization, complete HDF ownership readback and independent ZIP extraction pass. Final v0.0.39 rebinding remains required.
+
+DOCS-CHIM-PROGRESS-STALE-38: 13 October 2026: unchanged 14:04 UTC conversion/audit snapshot, separate 17:45 UTC RC1 package layer: 360 whole regional cells, six partial town overlaps excluded. Local served data readback matches; per-type converted/packaged actor/gameplay counts remain unknown.
+
+CHIM-SEYDA-HUNK-GAP-33 and CHIM-ZONE-RESERVE-EARLY-33: 13 October 2026: exact RC1 native logs retain sub-2-MiB gaps, Seyda 2,091,392 bytes and Balmora 2,063,344. Reserve safety remains open.
+
+CHIM-CHUNK-LOAD-FAIL-33 and CHIM-GRAFT-REPACK-EMPTY-33: 13 October 2026: vf1703 chunk20 allocation retries and nonempty fallback repacks remain. The historical zero-chunk collapse is not reproduced by these logs; full residency/visual/performance acceptance remains open.
+
+
+ANIMKIT-ACTOR-ABI-SITES-35: 13 October 2026: RC1 full-image preflight rejected all twenty expanded bodies because its reader confused the 64-frame per-group limit with the existing 256-frame model limit. Reopened with a bounded reader correction and multi-group payload regression; image/native verification pending.
+
+AUDIO-STOP-CHANNEL-RANGE-39: 13 October 2026: source review found S_StopSound scanning 0..7 while the allocator uses dynamic slots 4..11. Prepared the matching interval and extended the real-mixer fixture for every slot, exact matching, ambient/static controls and mixed PCM. Tests and native audio remain pending.
+
+COMBAT-AMBIENT-SPEECH-GATING-38: 13 October 2026: traced ungated greeting/manual/idle paths and separate audio/subtitle lifetimes. The opponent's idle think stops, but bystanders can still speak. Recorded the original actor-local rule and the owner's broader combat policy; full suppression and native verification remain pending.
+
+WATER-GAMEPLAY-PARITY-38: 13 October 2026: source review confirms player swim groups are absent and the inherited drowning routine is excluded by QUAKE2 and unused by the active player callbacks. Recorded OpenMW 0.48 breath and depth rules for comparison. No water behavior changed; matched native checks remain pending.
+
+PLAYER-READY-WATER-MOVEMENT-38: 13 October 2026: inspected AmiQuake contents sampling and water movement dispatch; neither depends on equipment. Missing swim poses explain an animation gap but do not prove the physical cause of the reported water-walking. Issue remains open.
+
+PLAYER-TORCH-THIRDPERSON-38: 13 October 2026: source review found no swimming/submersion restriction in player torch equip/toggle or hand updates. Recorded the original equipped-light transition for a matched comparison; no repaired behavior or native acceptance claimed.
+
+UI-KEY-HELP-STALE-38: 13 October 2026: completed source coverage for fixed Escape, Shift+V, music and photo-mode shortcuts. The fixed console footer remains on every page. Conflicting saved bindings for reserved keys are no longer advertised as reachable actions; bindings themselves are untouched. Extended the unexecuted C fixture; native layout and the separate blank-frame report remain open.
+
+DOCS-ROADMAP-IMPLEMENTATION-39: 13 October 2026: compared the roadmap with published v0.0.38 and current source. Corrected the stale noclip implementation claim, separated the existing console music switch from unfinished settings work, and labelled the old all-green-zone promise as a target. Kept the native CHIM frame-map header planned and player jump as a candidate. No new runtime or package acceptance.
+
+UI-KEY-HELP-STALE-38: 13 October 2026: prepared font-aware help rows and columns, per-column clipping and page clamping when bindings or display settings change. Extended the existing wait/help C fixture; execution, compilation and native captures remain pending. The owner's separate blank-frame report still has no confirmed cause. No input bindings changed.
+
+UI-KEY-HELP-STALE-38: 13 October 2026: prepared readable labels for default POV, zoom, movement, block/context and music bindings, and clarified both console keys in the footer. Updated the keyboard reference's stale version heading, missing camera defaults and historical torch-report wording. Layout and blank-frame reproduction remain open; compile and native checks pending.
+
+PLAYER-READY-THIRDPERSON-38: 13 October 2026: original source-data review confirmed human/beast fists-ready idle, walk, run and jump sections, with female fallback to the base clips. Recorded the requirement to preserve locomotion during ready/equip states. No ready-pose repair or native acceptance is claimed.
+
+BUILD-PLAYER-BODY-BUDGET-FALLBACK-39: 13 October 2026: source review found that an animation byte-budget failure aborts player-body conversion before smaller meshes are tried, and that a later vertex-budget failure can discard an earlier valid fit. Registered before repair. Bounded retry and five boundary regressions prepared; none executed, no affected race/sex bake demonstrated and no runtime acceptance claimed.
+
+RELEASE-WORKING-VERSION-ISOLATION-39: 13 October 2026: source inspection found the final publication wrapper used the next development version record. Optional per-release argument forwarding and rejection regressions prepared; execution and upload validation pending.
+
+DOCS-RELEASE-EVIDENCE-SCOPE-39: 13 October 2026: release guard rejected the rewritten known-issues heading. Restored its required heading and ID-labelled bullets; failed receipt retained.
+
+DOCS-RELEASE-EVIDENCE-SCOPE-39: 13 October 2026: corrected release-note evidence scope and links to open animation issues. Prior image checks remain historical; compact-image and native gates remain pending.
+
+13 October 2026 - BUILD-WORLD-PACK-RETIRED-38: Source audit found that disk packing still opens omitted routing-only BSPs after the fingerprint passes. The validated omission list now reaches partition selection; additional integration and refusal cases are prepared. Tests and full-image acceptance pending.
+
+13 October 2026 - BUILD-WORLD-FINGERPRINT-RETIRED-38: Prebuild-skipped exterior maps now carry verified omission records into the final fingerprint. 65 focused checks, including the real image CLI, pass; duplicate maps, unused catalogues and missing CHIM owners fail. Full image pending.
+
+13 October 2026 - BUILD-WORLD-FINGERPRINT-RETIRED-38: Full-image fingerprint failed after correct exterior BSP retirement; explicit removal filtering and a combined regression prepared. HDF/native validation pending.
+
+13 October 2026 - BUILD-SHADOWED-WORLD-MAPS-38: Final routing audit flagged 135 retained maps; dependency review and used-map-only acceptance remain open.
 
 13 October 2026 - RELEASE-LAVA-IMAGE-ALLOWLIST-38: Source preflight caught two unapproved image types; narrow allowlist repair prepared before packaging.
 
@@ -1540,3 +1638,148 @@ CHIM-MOLAG-MEMORY-38: 13 October 2026: reconciled 1 owner screenshot(s) with evi
 - BUILD-SHADOWED-WORLD-MAPS-38 (13 October 2026): implemented candidate default pruning with explicit dependency retention. Exact HDF audit identifies 135 removable BSP maps (141,790,676 bytes); four focused Docker tests pass. Fresh assembly and native routing remain pending.
 
 - BUILD-SHADOWED-WORLD-MAPS-38 (13 October 2026): full gate caught direct CHIM filename construction in the new helper. Reused the canonical map resolver and extension list; eleven map-helper tests pass. Stopped the superseded build and suite, retaining failure evidence.
+
+## BUILD-SHADOWED-WORLD-MAPS-38, 13 October 2026
+
+BUILD-SHADOWED-WORLD-MAPS-38: Full clean build reached the final heap check and failed on an orphan harvest catalogue. Map/corresponding-catalogue retirement is now coupled in the candidate; real catalogue validation regression added. Image and native gates pending.
+
+## SAVE-TELEPORT-CHECKPOINT-38, 13 October 2026
+
+SAVE-TELEPORT-CHECKPOINT-38: Owner reported successful teleport needs a safe destination checkpoint. Recorded separately for v0.0.39-dev1; cause, reproduction and repair pending.
+
+## SAVE-LAVA-DEATH-LOOP-38, 13 October 2026
+
+SAVE-LAVA-DEATH-LOOP-38: Owner reported lava fall can leave an autosave that reloads into repeated death. Recorded separately for v0.0.39-dev1; cause, reproduction and repair pending.
+
+## UI-DEATH-DAMAGE-TINT-38, 13 October 2026
+
+UI-DEATH-DAMAGE-TINT-38: Owner reported lava damage tint also colours the death menu and selection. Recorded separately for v0.0.39-dev1; cause, reproduction and repair pending.
+
+## DOCS-CHIM-PROGRESS-STALE-38, 13 October 2026
+
+DOCS-CHIM-PROGRESS-STALE-38: Owner reports the main README map is stale. Confirmed v0.0.36 image and caption remain. Refresh queued for v0.0.39-dev1; audit and packaged coverage remain separate.
+
+## SAVE-LAVA-DEATH-LOOP-38, candidate 13 October 2026
+
+SAVE-LAVA-DEATH-LOOP-38: v0.0.39-dev1 source repair and compiled regression recorded in the issue report; native acceptance pending.
+
+## SAVE-TELEPORT-CHECKPOINT-38, candidate 13 October 2026
+
+SAVE-TELEPORT-CHECKPOINT-38: v0.0.39-dev1 source repair and compiled regression recorded in the issue report; native acceptance pending.
+
+## UI-DEATH-DAMAGE-TINT-38, candidate 13 October 2026
+
+UI-DEATH-DAMAGE-TINT-38: v0.0.39-dev1 source repair and compiled regression recorded in the issue report; native acceptance pending.
+
+- BUILD-DEV1-EMULATOR-PRESETS-39 (2026-10-13): Full dev1 suite caught the missing versioned emulator presets; added both matching preset candidates. Launcher and full-gate verification pending.
+- BUILD-SHADOWED-WORLD-MAPS-38 (2026-10-13): Added the pre-conversion exterior ownership candidate: source LAND inventory, exact CHIM selection, town-core subtraction, shared terrain/scenery/flora checklist. Tests and exact-output comparison in progress; interiors unchanged.
+
+- PLAYER-JUMP-THIRDPERSON-38 (2026-10-13): Found omitted body jump groups and missing ground-state selection. Candidate adds original takeoff/air hold and landing alias frames, preserving physics and model limits. Regression execution, converted-body budgets and matched native evidence pending.
+- PLAYER-READY-THIRDPERSON-38 (2026-10-13): Source diagnosis confirms the body ignores QuakeC ready state and omits the original ready/equip/unequip groups. Repair remains open.
+- PLAYER-TORCH-THIRDPERSON-38 (2026-10-13): Source diagnosis confirms third-person flame suppression and missing player equipment/pose. Guard torch attachment is a reuse candidate, but its idle-only kit frame contract needs adaptation. Repair remains open.
+
+- DOCS-CHIM-PROGRESS-STALE-38 (2026-10-13): prepared a current reference-derived README map and coherent coverage guide; corrected historical plan/lava/lighting figures. Audit, native and package evidence remain separate; delivery pending.
+
+- PLAYER-READY-THIRDPERSON-38 (2026-10-13): prepared original bare-hand ready idle/walk/run/jump selection from existing hand state, female fallback and mid-air stance continuity. Reuses alias frame playback; unchanged file budget. Equip/lower, punches, weapons and torch remain separate. Added regression sources; compilation, body bakes, target memory and native comparison pending. Issue remains open.
+- PLAYER-READY-THIRDPERSON-38 (2026-10-13): extracted the guard's offline bone overlay for future upper-body equip/lower over moving legs, preserving female boundary transforms and guard timing. Added layer and conversion-fingerprint regression sources. Player transition frame planning is unfinished; tests, old/new guard asset comparison and native checks remain pending. No new transition is enabled in the game.
+- PLAYER-READY-THIRDPERSON-38 (2026-10-13): connected a source candidate for bare-hand draw/lower using a budgeted grid of arm and movement poses, the QuakeC action clock, body-only layout validation and retained normal/ready gait phase. Frame plan requests253/minimum93; no raised alias budget. Regression sources prepared, not run. All20 body bakes, Amiga compile, native comparison and cost measurement remain pending; punches/weapons/torch still open.
+
+- SAVE-TELEPORT-CHECKPOINT-38 (2026-10-13): RC1 source integrates settled-arrival autosaving and retention of the prior safe checkpoint. Compiled save regressions and Amiga compilation passed; exact RC1 character teleport/save/reload acceptance pending. Not shipped.
+- SAVE-LAVA-DEATH-LOOP-38 (2026-10-13): RC1 source defers automatic saves during falls, damaging/deep liquid, combat, loading and modal menus. Compiled save regressions passed. Existing unsafe saves are not rewritten; exact RC1 lava/fall/reload native checks pending. Not shipped.
+- UI-DEATH-DAMAGE-TINT-38 (2026-10-13): RC1 source requests an untinted death-prompt palette and freezes world clocks after the death animation. Palette and host/client regressions and Amiga compilation passed; exact native death-choice visual acceptance pending. Not shipped.
+- PLAYER-JUMP-THIRDPERSON-38 (2026-10-13): Jump takeoff, airborne and landing groups and movement-state selection are integrated in RC1 source. Amiga compilation passed. All-appearance bake/readback and matched native/reference checks pending; not shipped.
+- PLAYER-READY-THIRDPERSON-38 (2026-10-13): RC1 source integrates bare-hand ready idle/walk/run and offline upper-body draw/lower over moving legs, using the action clock and retained gait phase. Amiga compilation passed. All-appearance model readback, guard asset identity, native/reference checks and performance pending; complete punches/weapons/torch remain separate. Not shipped.
+- BUILD-PLAYER-BODY-BUDGET-FALLBACK-39 (2026-10-13): Bounded mesh retry within unchanged alias/frame budgets is integrated in RC1 source. All 20 actual race/sex bakes, readbacks and native memory checks remain pending. Not shipped.
+- AUDIO-STOP-CHANNEL-RANGE-39 (2026-10-13): RC1 integrates cancellation over the allocator dynamic interval (4..11), retaining entity/channel matching and music controls. Amiga compilation passed. Exact RC1 native listening remains pending; combat greeting/subtitle policy is separate. Not shipped.
+- UI-KEY-HELP-STALE-38 (2026-10-13): RC1 integrates current labels, reserved-shortcut contexts, font/viewport-aware page capacity and live paging clamps. Amiga compilation passed. Exact native readability and reported blank-frame reproduction pending; not shipped.
+- BUILD-SHADOWED-WORLD-MAPS-38 (2026-10-13): RC1 source integrates the pre-conversion ownership checklist and excludes the identified 135 redundant town-owned BSP cores while retaining partial cores and dependencies. Old v0.0.38 correction delivery cancelled. RC1 full image, ownership/readback, routing and measured archive size pending; not shipped.
+
+- BUILD-WORLD-PACK-RETIRED-38 (2026-10-13): Full RC1 conversion completed, but the early image disk-layout preflight still expected the deliberately absent vf0302 BSP. Extended the validated ownership handoff to that preflight, retaining strict final owner-frame and unexpected-missing-map checks. Thirty focused Docker regressions pass; repaired image and native acceptance remain pending.
+- BUILD-WORLD-FINGERPRINT-RETIRED-38 (2026-10-13): RC1 integrates validated retirement and never-built omissions into content fingerprinting without allowing undeclared missing maps. Prior focused regression passed; full RC1 image/readback and native routing pending. Not shipped.
+- BUILD-WORLD-PACK-RETIRED-38 (2026-10-13): RC1 integrates the same validated omission list into world-disk packing after fingerprinting. Exact full-image and package readback and native routing remain pending. Not shipped.
+- DOCS-CHIM-PROGRESS-STALE-38 (2026-10-13): RC1 source contains the 12 October reference-derived map, 1265/1292 conversion/audit milestone and separate 360-cell v0.0.38 package record. Added the generated image gitignore exception and restored the totals label after first RC1 preflight. RC1 package coverage and public delivery remain pending.
+- RELEASE-WORKING-VERSION-ISOLATION-39 (2026-10-13): Per-release version record support is prepared in the publication wrapper. Four isolated wrapper regression checks passed; RC1 exact publication guard/finalization still required. Public publishing remains separate from private delivery.
+- TEST-RC1-INTEGRATION-CONTRACTS-39 (2026-10-13): The first exact RC1 suite at 88aba74 fails four image-wiring checks and the guard cache-key assertion. Follow the wrapper while retaining worker-count forwarding and pass-order assertions. Check that the guard reaches module import code, then mutate the real shared layer in a temporary fixture and require a changed worker key. The production cache algorithm is unchanged. Exact-source rerun pending.
+- DOCS-RC1-PREFLIGHT-39 (2026-10-13): RC1 preflight rejects the new generated progress PNG; suite checks reject its missing totals label and stale contents lists. Add only the generated map image exception, restore the totals label without changing coverage counts, and regenerate affected document contents. Owner screenshots remain private. Exact-source rerun pending.
+
+## BUILD-CHECKLIST-JSON-CELLS-39 and RELEASE-PATCH-TARGET-VERSION-39, 13 October 2026
+
+BUILD-CHECKLIST-JSON-CELLS-39: the full RC1 build exposed a serialized cell-list
+failure before scenery conversion. A disk-round-trip regression reproduces it;
+tuple normalization passes all 21 world-manifest tests while altered ownership
+still fails. Complete image and target acceptance remain pending.
+
+RELEASE-PATCH-TARGET-VERSION-39: the Linux kit's successful dry run explicitly
+remained unsuitable for publication because the baseline omitted its target
+version. Metadata is corrected; a newly pinned strict kit is still required.
+
+## DOCS-CHANGELOG-STALE-39 and DOCS-RC1-PREFLIGHT-39, 13 October 2026
+
+DOCS-CHANGELOG-STALE-39: owner requested a maintained changelog and mandatory
+synchronization with bug tracking, CHIM coverage and release notes. Backfilled
+v0.0.36-38 and recorded RC1 implemented work, findings and pending acceptance.
+
+DOCS-RC1-PREFLIGHT-39: exported-source validation caught two new issue reports
+missing from the allowlist. Added their paths with the changelog report and
+strengthened the workflow to verify actual exported records before freezing.
+
+- PLAYER-TORCH-THIRDPERSON-38 (2026-10-13, RC2 follow-up): Still present in RC1: F draws the fists in third person, but V after F lights the world without a visible third-person torch, holding pose or torch animation. World lighting and fist readiness do not establish carried-torch completion. Source implementation and native acceptance remain pending.
+- WATER-GAMEPLAY-PARITY-38 (2026-10-13, RC2 follow-up): Still incomplete in RC1: the owner reports missing swimming AND diving animation in both first-person and third-person views, with reported third-person sinking. Missing third-person swim groups are source-confirmed; each view/action presentation, physical behavior, breath/drowning and matched original behavior remain open.
+- PLAYER-MOVEMENT-FRAME-SKIP-39 (2026-10-13, RC2 follow-up): Open RC1 repeat and RC2 blocker: fast movement appears to use only a couple of poses rather than the earlier rapid foot animation; the owner explicitly identifies v0.0.38 as the last known good comparison. Actual frame-fitter replay reduces normal Nord/Khajiit walk/run to two/two samples. A fuller-gait source candidate is being prepared; speed-linked playback, baked pose coverage and exact native/package verification remain pending.
+- PLAYER-MOVEMENT-STATS-PARITY-39 (2026-10-13, RC2 follow-up): Open owner report: default walking/running feels overpowered. Faithful gameplay should use the original Speed, Athletics, encumbrance and running-fatigue formulas. The latest clarification retains convenient fast, less strict debug builds; no immediate replacement of the debug preset or movement repair is claimed.
+- DBG-ENTITY-INSPECT-39 (2026-10-13, RC2 follow-up): Requested during RC1 appearance investigation. Source candidate adds explicit dbg hud on/off click-to-pin entity/reference/model/position inspection; target compilation, candidate native checks and delivery remain pending. Ordinary overlay controls retain their previous combat behavior.
+- NPC-ORDINATOR-APPEARANCE-39 (2026-10-13, RC2 follow-up): Open RC1 appearance/target identity investigation. All four original Hlaalu Waistworks Ordinators are male Dark Elves with Indoril helmets and armor; exact packaged vhi015 references, labels and model mappings agree. Nearby Eloroth is a male Wood Elf. The actor in the owner screenshot is not bound to a raw reference/model; the foreground Eloroth explanation remains a hypothesis, not a finding or repair.
+- NPC-NO-RUN-ANIM-35 (2026-10-13, RC2 follow-up): RC1 recurrence reproduced after same-map reload: actual packaged Seyda run/attack mover assets exist, but mover registration is lost when server precaches reset while the world-model pointer is reused. Source candidate resets animation scene caches at each server spawn and warns on declared mover fallback. Focused7 animation,21 combat and42 NPC checks pass; new target/native/package verification and owner acceptance remain pending.
+- ANIMKIT-COVERAGE-35 (2026-10-13, RC2 follow-up): RC1 recurrence reproduced after same-map reload: actual packaged Seyda run/attack mover assets exist, but mover registration is lost when server precaches reset while the world-model pointer is reused. Source candidate resets animation scene caches at each server spawn and warns on declared mover fallback. Focused7 animation,21 combat and42 NPC checks pass; new target/native/package verification and owner acceptance remain pending.
+- NPC-SPEAR-ATTACK-REGRESSION-39 (2026-10-13, RC2 follow-up): Same-map mover activation and authored guard spear stance are separate checks. Runtime reset is a source candidate; exact spear animation remains open.
+- DBG-ENTITY-INSPECT-39 (2026-10-13): Seventeen focused automated checks pass, including real C identity/occlusion/click/reset/viewport integration. Target/native/package verification remains pending.
+- PLAYER-PUNCH-THIRDPERSON-39 (2026-10-13, RC2 source candidate): Authored punch-clock/layer source candidate and two male body bakes/readbacks pass; 83 affected checks pass. Target/native/all-appearance/package acceptance pending; preserve approved RC1 ready posture.
+- PLAYER-BODY-LEG-SHAPE-39 (2026-10-13, RC2 source candidate): Combined-section fallback guard and two male body bakes/readbacks pass; 83 affected checks pass. Budget-480 proxy and exact old/new measurements are diagnostics, not an appearance fix; native acceptance pending.
+- PLAYER-MOVEMENT-FRAME-SKIP-39 (2026-10-13, RC2 source candidate): Compact source action grids retain actual isolated normal/ready walk8/run6 plus punch; 83 affected checks pass. Owner-reported v0.0.38 control, native speed-linked smoothness and complete package checks pending.
+- PLAYER-READY-THIRDPERSON-38 (2026-10-13): The owner explicitly confirms that the RC1 fight-ready posture is good and must be preserved. This is a scoped posture control; torch holding, leg shape, fast gait and punch acceptance remain separate.
+- DBG-ENTITY-INSPECT-39 (2026-10-13): First RC2 target compile rejects implicit AW_CharacterActive declaration. Source includes existing aw_character.h; exact corrected-source retry pending. Prior17 focused checks do not establish target/native/package acceptance.
+- DBG-ENTITY-INSPECT-39 (2026-10-13, scoped RC2 evidence): Corrected target compile passes; native HUD pins background Ord201385 through the foreground actor because whole-model bounds include other poses. Visible identity selection remains open.
+- NPC-ORDINATOR-APPEARANCE-39 (2026-10-13, scoped RC2 evidence): Native owner-pose view repeats foreground elf/background armored actor; coarse bounds choose background Ord201385. Original/package identities agree; foreground reference remains unbound.
+- NPC-NO-RUN-ANIM-35 (2026-10-13, scoped RC2 evidence): Scoped native reload now activates full guard mover and changing chase/attack poses with health damage. Authored spear, other NPCs, complete RC2 package and owner acceptance pending.
+- ANIMKIT-COVERAGE-35 (2026-10-13, scoped RC2 evidence): Scoped native reload now activates full guard mover and changing chase/attack poses with health damage. Authored spear, other NPCs, complete RC2 package and owner acceptance pending.
+- BUILD-PLAYER-BODY-BUDGET-FALLBACK-39 (2026-10-13, scoped RC2 evidence): RC2 all-body run fails Breton female:480 exceeds alias budget;384/320/256 trip leg guard. Two controls plus Argonian male/female and Breton male read back; remaining set incomplete.
+- CHIM-SEYDA-HUNK-GAP-33 (2026-10-13, scoped repeat/documentation correction): Scoped corrected-engine diagnostic repeats existing gap warnings: initial gap2091392B; post-reload stable2113264B but first-presented peak1586032B. No new regression or memory acceptance.
+- DEBUG-MAP-SAVE-VALIDATION-32 (2026-10-13, scoped repeat/documentation correction): Scoped corrected-engine diagnostic map-load vhi015 repeats save validation refusal; previous saves retained. No normal-transition/save acceptance or new regression claimed.
+- PLAYER-MOVEMENT-STATS-PARITY-39 (2026-10-13, scoped repeat/documentation correction): Suite catalogue coverage rejects roadmap wording that resembles an implemented maxstats command. Corrected to explicitly proposed option; no command or godmode-speed implementation added.
+- DBG-ENTITY-INSPECT-39 (2026-10-13): Current client-frame box/pose source candidate passes the real C UBSan death-envelope/stale-client/cache/pitch-scale and prior control regression. Corrected selector target/native/package acceptance pending.
+- PLAYER-MOVEMENT-STATS-PARITY-39 (2026-10-13): One affected catalogue-doc check passes after roadmap maxstats wording becomes explicitly proposed. Failed full suite retained; no catalogue handler, speed or fatigue implementation added.
+- PLAYER-TORCH-THIRDPERSON-38 (2026-10-13, original-key/source finding): Original human/beast and common first-person torch groups confirmed. Player companion/pose remains unwired; guard overlay has layout limits. No torch/native acceptance.
+- WATER-GAMEPLAY-PARITY-38 (2026-10-13, original-key/source finding): Original third-person swim families confirmed; no dedicated dive key in16 base NIF/KF members. First-person visuals need state/camera/fallback parity; local0.52 source is not native0.48 acceptance.
+- ANIMKIT-COVERAGE-35 (2026-10-13, original-key/source finding): Original group availability confirmed; full NPC mapping includes swim/idle while player move profile excludes them. This source finding does not implement or accept player water/torch.
+- DBG-ENTITY-INSPECT-39 (2026-10-13, original-key/source finding): Latest source explicitly labels server runtime/position separate from rendered client selection. One actual C UBSan check passes differing-frame assertion; corrected target/native acceptance pending.
+- BUILD-PLAYER-BODY-BUDGET-FALLBACK-39 (2026-10-13, corrected RC2 body-file evidence): RC2 body checks pass 20/20: 16 prior pairs reused, four female models newly baked below 512 KiB. Tail excluded from leg guard; 33 checks pass. Native/package acceptance pending.
+- PLAYER-BODY-LEG-SHAPE-39 (2026-10-13, corrected RC2 body-file evidence): All 20 bodies pass binary checks. Section audits flag possible knee/calf gaps, mostly simplification. Metrics do not prove visible holes; native/original and owner acceptance pending.
+- PLAYER-PUNCH-THIRDPERSON-39 (2026-10-13, corrected RC2 body-file evidence): All 20 body pairs pass binary checks with gait/punch declarations; 33 guard checks pass, earlier 83 retained. Visible punch, seams and native/package/owner acceptance pending.
+- PLAYER-MOVEMENT-FRAME-SKIP-39 (2026-10-13, corrected RC2 body-file evidence): All 20 body pairs pass binary checks; prior bake failure retained. Full 8/6 gait declarations do not establish speed-linked smoothness or native/package/owner acceptance.
+- RELEASE-PATCH-TARGET-VERSION-39 (2026-10-13, RC2 metadata preparation): RC2 metadata prepared: target version matches VERSION, published baseline retained and known issues use canonical IDs. Pre-pin completion only; exact guard/export/strict kit still pending.
+- TRACKER-REGISTER-SIZE-36 (2026-10-13, RC2 size recurrence): RC2 suite catches 896,776B above 85% warning. Canonical live JSON now stores one complete issue per line, without fact/history loss or archive/guard changes. Focused checks pending.
+- PLAYER-PUNCH-THIRDPERSON-39 (2026-10-13, scoped candidate native observation): Scoped Nord male/Orc female candidate footage shows torso/arm punch motion and ready movement. Display only: damage, LMB, all appearances, matched A/B, seams, package/owner acceptance pending.
+- TRACKER-REGISTER-SIZE-36 (2026-10-13, focused validation): 56 tracker/export checks pass with exact source ZIP readback; lossless compact JSON and unchanged archive/guard verified. Failed full suite retained; fresh integrated pin/gates pending.
+- PLAYER-TORCH-THIRDPERSON-38 (2026-10-13, owner RC2 scope override): Owner now requires third-person torch holding in RC2. Source integration IN PROGRESS; exact bake/tests/native/package/owner acceptance pending. Swimming scope unchanged.
+- PLAYER-TORCH-THIRDPERSON-38 (2026-10-13, implemented RC2 source candidate): RC2 torch source candidate implemented. All 20 companion bake/readbacks, 35 converter and 36 runtime checks pass. Exact target/native, matched original, package/owner acceptance pending.
+- WATER-GAMEPLAY-PARITY-38 (2026-10-13, owner RC2 scope override): Owner requires reported swimming/diving in RC2. Both-view original 0.48 reference and source integration in progress; original clip inventory is separate. Native/package/owner acceptance pending.
+- NPC-SPEAR-ATTACK-REGRESSION-39 (2026-10-14, RC2): Use original two-hand-wide attack/hit poses for spear-equipped residents; preserve mover frame counts and damage. 43 focused checks pass. Target asset/native/package verification pending.
+- PLAYER-PUNCH-THIRDPERSON-39 (14 October 2026, post-pin RC2): The independently extracted RC2 package shows Nord third-person torso/arm punch changes in an unaltered native clip. Post-exit readback preserves exact assets. Console attack control does not prove physical LMB input or damage; all appearances, matched original comparison, seams and owner acceptance remain pending.
+- PLAYER-TORCH-THIRDPERSON-38 (14 October 2026, post-pin RC2): The independently extracted RC2 package shows a raised left arm and carried torch on Nord, then torch-off and water/land model selection. Full disk readback verifies all 20 body/held-torch companions. Scoped native evidence is not all-appearance or matched-original visual acceptance; owner acceptance remains pending.
+- WATER-GAMEPLAY-PARITY-38 (14 October 2026, post-pin RC2): The extracted RC2 package holds origin (704, -320, -25) for a four-second no-input water control after noclip is disabled. Pitch45 with forward movement descends to origin (832.7, -320, -153.7) at waterlevel 3 and shows changing swim poses. Both readied first-person fists remain visible at default horizontal FOV 90/viewsize 100. Actual OpenMW0.48 reference holds depth and retains first-person fists; no dedicated first-person stroke or blanket body pitch is established. Broader drowning, fatigue, combat, all appearances and owner acceptance remain pending.
+- PLAYER-READY-WATER-MOVEMENT-38 (14 October 2026, post-pin RC2): RC2 package native water/land selection and changing swim poses are verified in the scoped Nord control, with both default-camera first-person fists visible. This does not close the historical water-walking report or establish all states, appearances and original behavior parity.
+- BUILD-PLAYER-BODY-BUDGET-FALLBACK-39 (14 October 2026, post-pin RC2): Full RC2 disk readback and independent package extraction verify all 20 declared base bodies and140 torch/held/swim companion files within the unchanged 512 KiB model cap. Exact played readback preserves186 engine/metadata/body files. Binary coverage does not certify all 20 visual appearances, native memory, leg seams or owner acceptance.
+- PLAYER-BODY-LEG-SHAPE-39 (14 October 2026, post-pin RC2): All 20 body and companion sets are present in the exact RC2 package. The scoped Nord package footage does not establish knee/calf continuity or fix the owner-reported thin legs. Prior section metrics and possible simplification gaps remain diagnostic; matched original/v0.0.38, all-appearance and owner acceptance remain pending.
+- PLAYER-MOVEMENT-FRAME-SKIP-39 (14 October 2026, post-pin RC2): Full gait samples are present in the read-back RC2 body assets, but package presence and scoped punch/water footage do not establish normal-speed fast-gait timing, original speed-linked playback or owner acceptance. Preserve the owner-reported v0.0.38 comparison and good RC1 ready posture.
+- NPC-SPEAR-ATTACK-REGRESSION-39 (14 October 2026, post-pin RC2): Exact-source 690 staged diagnostic footage shows guard pursuit and changing strike poses, with hits reducing health 995 to 899 then 882.3. Post-exit readback verifies 21 movers plus engine, bootcheck and catalogue (24 files). This supports scoped chase/attack and preserved damage, not damage balance or complete spear attachment alignment. Final RC2 disk readback separately verifies the 21 equipped-resident files and palette binding; it does not turn the staged diagnostic into final-package guard native acceptance. Matched OpenMW and owner acceptance remain pending.
+- NPC-NO-RUN-ANIM-35 (14 October 2026, post-pin RC2): Exact-source 690 staged diagnostic footage shows guard pursuit and multiple strike poses, with health 995 to 899 then 882.3. Guest exit reaches AmigaDOS and 24 played-file hashes pass. This extends scoped mover evidence after the same-map reset; all-NPC, matched original, final-package guard and owner acceptance remain separate.
+- ANIMKIT-COVERAGE-35 (14 October 2026, post-pin RC2): Exact RC2 package readback covers all 20 player appearances and their torch/held/swim companions. Scoped Nord package native footage verifies punch changes, carried torch, swim poses and underwater first-person fists. Original group availability and binary declarations still do not establish every actor/equipment animation or all-appearance acceptance.
+- CHIM-SEYDA-HUNK-GAP-33 (14 October 2026, post-pin RC2): Exact RC2 package native inspection repeats startup hunk-reserve warnings and zone-full chunks 100/107 retries after water and land return. A playable scene and successful guest exit do not prove complete chunk recovery, memory headroom or performance acceptance. This remains an existing open finding.
+- ENGINE-SYNC-IO-MAIN-LOOP-36 (14 October 2026, post-pin RC2): Exact RC2 package native inspection repeats zone-full chunks 100/107 retries after water and land return. Scoped gameplay and successful AmigaDOS exit do not clear blocking streaming, heavy loading, memory/performance or all-cell traversal issues.
+- DOCS-CHIM-PROGRESS-STALE-38 (14 October 2026, post-pin RC2): RC2 full disk readback and independent extraction verify360 whole regional CHIM cells; six partial town overlaps remain excluded. The exact inspection package and matching source artifacts were finalized at 2026-10-13T22:15:44Z. Conversion/audit/native-cell coverage and owner acceptance are unchanged. Historical empty RC1 plan remains incorrectly selected as next by the existing selector; no supported historical flag permits a truthful metadata-only correction.
+
+## DOCS-RELEASE-EVIDENCE-SCOPE-39 - final source reconciliation, 14 October 2026
+
+14 October 2026: Final v0.0.39 source packaging authorized from delivered RC2. README and release notes distinguish RC2 checks from final-source validation. No individual issue acceptance, new cell coverage or final artifact shipment is inferred.
+
+DOCS-CHIM-PROGRESS-STALE-38: final source retains the exact RC2 coverage and remaining tracker display limitation.

@@ -16,8 +16,31 @@
  */
 #ifndef AW_VIEW_H
 #define AW_VIEW_H
+#include "aw_anim.h"
 
 enum {AW_VIEW_FIRST, AW_VIEW_THIRD, AW_VIEW_PREVIEW, AW_VIEW_VANITY, AW_VIEW_DEATH};
+
+/* Player-only alias grids: five movement groups for draw/lower/punch.
+ * No additions to the shared NPC layout or per-vertex renderer. */
+#define AW_VIEW_LAYER_ROWS 15
+typedef struct {
+    short motion, base;
+    unsigned char count, phases, action, grid_count;
+    unsigned short hit_permille;
+} aw_view_layer_t;
+typedef struct {aw_view_layer_t rows[AW_VIEW_LAYER_ROWS];int count;} aw_view_layers_t;
+/* Optional $action:motion_base:motion_count:grid_base:arm_phases[:grid_count[:hit_permille]] ANM words.
+ * Five-field rows retain the original one-grid-pose-per-motion-frame rule.
+ * Malformed or incomplete tables clear the entire table and return 0. */
+int AW_ViewLayersParse(aw_view_layers_t *out,const char *text,int frames);
+/* Bind each normal action row to normal motion, punch rows to ready motion. */
+int AW_ViewLayersBind(const aw_view_layers_t *layers,const aw_anim_t *anim);
+int AW_ViewLayerFrame(const aw_view_layers_t *layers,int action,int motion_frame,float fraction);
+
+/* Original carried-torch emitter, one bounded point per companion alias frame. */
+#define AW_VIEW_TORCH_FRAMES 256
+typedef struct {int count;float point[AW_VIEW_TORCH_FRAMES][3];} aw_view_torch_t;
+int AW_ViewTorchParse(aw_view_torch_t *out,const unsigned char *bytes,int size,int frames);
 
 typedef struct {
     float switch_limit;   /* camera.lua updatePOV switchLimit: a shorter Toggle POV press switches, a longer one orbits */

@@ -15,9 +15,6 @@ the generated [CHIM cell tracker](CELL_TRACKER.md).
 - [What CHIM does instead](#what-chim-does-instead)
 - [Reading the map](#reading-the-map)
 - [Green: done](#green-done)
-  - [Cell complete and terrain complete](#cell-complete-and-terrain-complete)
-  - [Awaiting lighting (green with cyan stripes)](#awaiting-lighting-green-with-cyan-stripes)
-  - [Passed, something still deferred (plain green)](#passed-something-still-deferred-plain-green)
 - [Violet: hull policy pending](#violet-hull-policy-pending)
 - [Red: failing a check](#red-failing-a-check)
 - [Magenta: not converted](#magenta-not-converted)
@@ -29,6 +26,7 @@ the generated [CHIM cell tracker](CELL_TRACKER.md).
 - [Problems that are not a colour](#problems-that-are-not-a-colour)
 - [Who decides what](#who-decides-what)
 - [Package inclusion](#package-inclusion)
+- [Reproducing the current image](#reproducing-the-current-image)
 
 <!-- contents end -->
 
@@ -79,263 +77,196 @@ island. The documented problems for an open world are:
 
 ## Reading the map
 
-Each square is one map cell, north up. The colours are the statuses of the tracker, drawn by the Toolkit and by
-`tools/cell_progress_map.py` for the README. The table is a snapshot of the tracker data of 11 October 2026 (the
-v0.0.36 development line); the live numbers are on the [CHIM cell tracker](CELL_TRACKER.md).
+The current README map uses the public reference generated **13 October 2026,
+14:04:49 UTC**. The [cell tracker](CELL_TRACKER.md) records the matching audit
+totals and a separate package ledger. These figures describe Vvardenfell only.
 
-| Colour | Status | Cells | Counted as done |
-| --- | --- | ---: | --- |
-| Green | Terrain complete, awaiting lighting | 367 | yes |
-| Green | Cell complete, awaiting lighting | 96 | yes |
-| Green | Passed, something still deferred | 456 | yes |
-| Blue | Empty sea | 103 | yes |
-| Violet | Hull policy pending | 218 | no |
-| Red | Converted, failing a check | 23 | no |
-| Magenta | Not converted | 29 | no |
-| Dark grey | Not started (Solstheim and 8 cells outside both island maps) | 152 | no |
-| Silver | Open ocean | 867 | no |
-| | **TOTALS** | **2,311** | **1,022 done** |
+| Status | Cells | Included in audit milestone |
+| --- | ---: | --- |
+| Cell complete, awaiting lighting | 11 | yes |
+| Terrain complete, awaiting lighting | 762 | yes |
+| Passed, something still deferred | 402 | yes |
+| Empty sea | 99 | yes |
+| Converted, failing a check | 15 | no |
+| Not converted | 3 | no |
+| Hull policy pending | 0 | no |
+| **TOTALS** (land and empty sea) | **1,292** | **1,274 (98.6%)** |
+| Open ocean, outside that denominator | 865 | no |
 
-The Done figure is 1,022 of 1,292 Vvardenfell land and empty-sea cells (79.1 %); the open ocean is counted on its
-own line and is not part of it (see [Silver](#silver-open-ocean)). The 2,311 cells above are 2,158 map cells of
-Vvardenfell, with its 866 open-ocean cells, 145 of Solstheim and 8 that belong to neither island's map. Gold is not a status of its own: it is a
-second layer, the release plan, drawn over the statuses ([Gold](#gold-planned-for-a-release)).
+There are **1,190 converted cells**, including the 15 failing cells. Empty-sea
+cells do not require placed-object conversion. A successful geometry audit is
+not proof of original actors, gameplay, lighting, native traversal or inclusion
+in an image. Keep those checks separate for each original reference type.
+
+The compact README image groups audit milestones in green and failures or
+unfinished conversions in red. The Toolkit distinguishes more states, including
+lighting stripes, blue empty sea and magenta unconverted cells. The counts above
+use the statuses in the data, not the number of colour shades in the PNG.
 
 ## Green: done
 
-A green cell is converted to CHIM and every audit that has been measured has passed. Green has three shades of
-meaning, from most to least finished.
+The tracker's historical internal name is `done`; on the current image the label
+is **audit milestone**. Every measured required check passed, or the cell is
+empty sea. Unmeasured checks and deferred features remain unresolved.
 
 ### Cell complete and terrain complete
 
-**What it means.** The terrain and every placed object of the cell are converted, all audits passed and the cell is
-lit like the original. *Terrain complete* is the same except that characters (NPCs and creatures) may still be
-deferred. Today the map has no cell in either state: the lighting audit has not passed anywhere yet (see below).
-
-**What fixes it.** Lighting that matches the original, and converting the characters. Both are code work, not
-decisions; the owner decides when the lighting is "like the original".
+These statuses require lighting as well as the geometry checks. Terrain-complete
+cells may defer actors. The current Vvardenfell reference has zero cells in
+either fully lit status; awaiting-lighting statuses are listed separately.
 
 ### Awaiting lighting (green with cyan stripes)
 
-**What it means.** Everything a complete cell needs except the lighting audit, which counts the cell as done anyway.
-Today 463 cells are here (96 cell-complete-but-unlit, 367 terrain-complete-but-unlit).
-
-**What it usually is.** The lighting audit looks at whether light reaches the frame and whether the surfaces carry
-real light data. Of the 463 cells, 420 are *unlit* (no light source reaches the frame and no surface carries real
-light data: the terrain has a constant light and models have no lightmaps) and 43 are *partial* (some lights only
-as night lamps, others not represented, some without a mesh). Of the 1,436 land cells, 276 have no lighting
-measurement yet, and no cell is lit yet.
-
-| Lighting state of the awaiting-lighting cells | Cells |
-| --- | ---: |
-| Unlit | 420 |
-| Partial | 43 |
-| **TOTALS** | **463** |
-
-**What fixes it.** The lighting work ([lighting](LIGHTING.md), [lighting roadmap](LIGHTING_ROADMAP.md)): baking the
-lights of a cell into its CHIM pieces so that terrain and models are lit the way the original game lights them. The
-decision about what "lit like the original" means is the owner's; the baking is code.
+The Toolkit marks **548 cells** here: 98 cell-complete-but-unlit and 450
+terrain-complete-but-unlit. The README's compact map groups them in green.
+Across the 1,292-cell tracker denominator, lighting is partial in 133 cells,
+unlit in 1,052 and not measured in 107. No cell is recorded fully lit.
 
 ### Passed, something still deferred (plain green)
 
-**What it means.** Converted, and every audit that was measured passed, but something placed in the cell was
-deferred or skipped on purpose: the converter lists each one with its reason ([what is in a converted cell](CHIMPORT.md#what-is-in-a-converted-cell)).
-Today: 456 cells.
-
-**What it usually is.** The deferred things are the same kinds everywhere: light emitters (the cell counts
-"lights converted" below the total), creatures, NPCs and, rarely, statics. Cells can appear in several rows:
-
-| What is still deferred in a passed cell | Cells |
-| --- | ---: |
-| Lights not all converted | 453 |
-| Creatures not all converted | 423 |
-| NPCs not all converted | 43 |
-| Statics not all converted | 4 |
-| **Passed cells (each counted once)** | **456** |
-
-**What fixes it.** Characters are placed by the character pipeline (their behaviour is never invented: it follows the
-local reference sources and OpenMW); light emitters without a mesh need the lighting work above. These are code
-fixes made once at the shared layer and then applied to every cell.
+There are **614** cells in this state. Inspect the cell's deferred reference
+types and unmeasured checks before treating it as a complete scene. Converted
+terrain and objects do not establish NPC or creature presence, dialogue,
+combat, quests or other gameplay.
 
 ## Violet: hull policy pending
 
-**What it means.** The cell converted, and every audit passes (format, memory, stairs, doors and the rest) except
-one: the *hull chain* check. It is neither passed nor failed: it waits for one shared rule. Today: 218 cells.
+The current reference has **zero** cells in this status. This does not establish
+that every collision defect is fixed: failing collision checks and cells held
+from a particular build remain separate.
 
-**What a hull chain is.** Every model that something can bump into has a collision shape, a tree of tests the engine
-walks when a player or character moves near it. Written as a **chain**, the model's convex collision pieces are tested
-one after another, so a house made of a few hundred pieces is a chain a few hundred tests deep; every step of a
-character near it pays for all of them. Written as **routed**, the pieces are sorted into a nested tree and a step
-visits only a few. The rule is `CHAIN_DEPTH_LIMIT`: a chain deeper than **256** is reported. Details and the
-measured costs are in [hull policy pending](CHIMPORT.md#hull-policy-pending).
-
-**Why the router cannot just split every chain.** Two reasons. A chain of overlapping pieces (the blades of a plant) cannot
-be cut into a tree of non-overlapping cuts. And routing costs memory. The extra nodes eat into the memory the
-engine reserves for a frame's models and flora, and a frame whose ring of chunks already uses its whole budget has
-none to spare. So the builder routes every chain over the limit and, where the frame would no longer fit, keeps the
-fewest-node mesh as a chain and builds again; that is "kept as chain for memory". On Balmora's tightest ring, a
-limit of 256 without that fallback was 1,920 bytes over the budget; with it, 240 bytes to spare. A model that is both
-deep and unroutable in the available memory stays pending.
-
-**What actually blocks the 218 cells.** Measured on the tracker data of 11 October 2026: every violet cell is blocked by
-**plants**, not by buildings. A plant's collision is one chain of overlapping blades (many thin pieces, one after
-another), which the router cannot split into a tree because the pieces overlap each other; each is over the 256 limit
-of the audit. The depth is the longest path of the chain in clipnodes.
-
-| Plant (type) | Cells blocked | Chain depth |
-| --- | ---: | ---: |
-| Kelp (two variants) | 65 | about 305 |
-| Kreshweed | 80 | 280 |
-| Grass | 37 | 348 |
-| Gold kanet | 29 | 267 |
-| Willow flower | 25 | 362 |
-| Fire fern (variant 2) | 16 | 317 |
-| Tree, Grazelands (variant 8) | 12 | 285 |
-| Fire fern (variant 1) | 6 | 496 |
-| Black anther | 1 | 484 |
-| Emperor parasol | 1 | 486 |
-| **Violet cells (each counted once)** | **218** | |
-
-A cell can contain several of these plants, so the rows add up to more than 218. Counted once: **65 cells are blocked by
-kelp alone**, and the other **153 by the nine other plants**: 116 by one plant, 20 by two and 17 by three.
-
-The kelp case has a decision already: the owner accepted the kelp chain on 11 October 2026 (12:01), and those 65 cells
-clear on their next run. For the nine other plants, the choice below is open.
-
-**What fixes it, and who decides.** Two things, one of each kind. A **code fix**: split or simplify the collision of
-the thin plants so that it is no longer a chain (for example fewer, fatter collision pieces), or a router that can
-cut an overlapping chain. A **policy choice** by the owner: whether a thin plant may be **kept as a chain** and
-counted as passed (the audit records the outcome as `kept_as_chain`), or whether the cells keep waiting until
-the collision is rebuilt. The mechanism does not decide that: a chain costs every collision trace near the plant (the measured cost per
-clipnode is in [hull policy pending](CHIMPORT.md#hull-policy-pending)), and the owner weighs that against the memory and
-the work spent on the model. Until the choice is made the cells
-are counted apart, not as failures.
+A hull-policy hold means the collision chain requires an explicit policy or a
+converter repair. The older 11 October snapshot had 218 such cells, mostly
+plants; that is historical evidence, not today's count. Retain the established
+mesh optimization, collision, memory and native traversal checks when repairing
+a cell. Do not raise budgets or add a duplicate BSP to hide a CHIM failure.
 
 ## Red: failing a check
 
-**What it means.** The cell converted, but at least one audit failed or the conversion reported an error. Today: 23
-cells. These are real problems, each one mechanism fixed once and then re-run for every cell of its class.
+There are **23 converted cells** with failed checks. The tracker lists 12
+memory-fit failures, 12 hull-bevel/chain failures and 11 stair-walk failures;
+these overlap and must not be added into a count of distinct cells.
 
-| Audit that failed | What it means | Cells |
-| --- | --- | ---: |
-| Memory fit | The ring of chunks around a point does not fit the CHIM zone; the frame ran out of heap | 12 |
-| Hull bevels (hull chain, old strict check) | Models over the chain-depth limit, judged by the stricter check of an earlier run | 12 |
-| Stair walk | Steps that the standing box of a character cannot walk (a stair a character could not climb) | 11 |
-| **Failing cells (each counted once)** | A cell can fail more than one audit | **23** |
-
-**What usually causes each.**
-
-- *Memory fit* means a frame's ring of chunks does not fit the CHIM zone (the large-model cut and the zone budget).
-  It is fixed at the shared layer, not cell by cell.
-- *Stair walk* is a geometry problem in the converted steps. The audit walks every flight and reports the steps the
-  standing box cannot walk; the cause is traced and fixed at the shared layer, never one flight at a time.
-- *Hull bevels* failing in a red cell is the same chain-depth question as violet, judged here as a failure.
-
-**Who decides.** Almost always a code fix. The exception is a failure the owner accepts for a development build
-(a cell marked *accepted*, see below).
+Trace the failed mechanism, repair it, and rerun the affected cells. Offline
+audit results do not replace matched original-game comparisons and actual
+walking/collision checks in the target engine.
 
 ## Magenta: not converted
 
-**What it means.** The conversion was tried and could not finish the cell. A failure state, never counted as done.
-Today: 29 cells.
-
-| Reason the conversion stopped | Cells |
-| --- | ---: |
-| A stale source stage predates the lava conversion and its town has lava pools | 25 |
-| A window has no supporting façade within mounting range | 4 |
-| **TOTALS** | **29** |
-
-- **Lava, stale source (25 cells).** The cells were violet before. A re-run used an older source stage that was
-  built before lava pools were converted, and the builder refuses to mix them: "use a new work folder (or
-  `--lava static`)". It is a tooling problem, not a problem of the cells
-  ([CHIMPORT-RETRY-LAVA-STALE-SOURCE-36](../bugs/CHIMPORT-RETRY-LAVA-STALE-SOURCE-36.md)). Fix: start the re-run in a
-  new work folder; it is the first item of the v0.0.37 plan.
-- **Window mounted across a cell border (4 cells).** A window whose façade is placed in the next cell cannot find
-  its wall inside its own cell. Four exterior cells are affected, in four different towns of the island
-  ([CHIM-WINDOW-MOUNT-CROSS-CELL-33](../bugs/CHIM-WINDOW-MOUNT-CROSS-CELL-33.md)). Fix: a code change in the window
-  mounting so that it may look into the neighbouring cell.
-
-**Who decides.** Code fixes. The re-run is mechanical once the fix is in.
+There are **4** unconverted Vvardenfell cells. The current remaining class is
+window mounting across a cell border; see
+[CHIM-WINDOW-MOUNT-CROSS-CELL-33](../bugs/CHIM-WINDOW-MOUNT-CROSS-CELL-33.md).
+The older count of 29 included 25 stale-source lava reruns. It must not be used
+as the current count or as evidence that lava is still wholly unconverted.
 
 ## Dark grey: not started
 
-**What it means.** The conversion has not reached the cell. Today: 152 cells, 144 of them on Solstheim and 8 outside both island maps; the whole of
-Vvardenfell has been reached. Nothing is wrong with them; they simply wait for their turn in the order (coast first,
-inward).
+The public reference includes **144 Solstheim land cells** as not started.
+Vvardenfell has been reached throughout. These are separate island totals;
+Solstheim is not in the 1,292-cell Vvardenfell denominator.
 
 ## Blue: empty sea
 
-**What it means.** A land-record cell with nothing placed in it: just terrain and the water. It passes as it is and
-counts as done, because the open world needs the water around the coast. Today: 103 cells (the seabed cells next to
-the coast).
+There are **103** land-record cells containing terrain and water without placed
+objects. They count toward the audit milestone. The Toolkit uses blue; the
+compact README image groups them with the green milestone cells.
 
 ## Silver: open ocean
 
-**What it means.** A map cell with **no land record at all**: open sea. All of them refer to one shared ocean
-piece, stored once ([open sea](CHIMPORT.md#open-sea-one-shared-ocean-chunk)). Today: 867 cells (866 around
-Vvardenfell, 1 at Solstheim).
-
-**Why it is not done.** The piece is made and checked, but the engine does not place it yet; it will once the
-open-world frames read it. Counting these cells as done would have shown progress the game does not have, so they
-have their own colour, their own line in the figures and their own totals row, and are left out of Done
-([TRACKER-OCEAN-COUNTED-DONE-36](../bugs/TRACKER-OCEAN-COUNTED-DONE-36.md)).
-
-**What changes it.** Engine work: reading the ocean piece in the open-world frames. When that lands, the ocean moves
-into the done figure in one place (`DONE_SEA` in the tracker's ingester).
+The **865 Vvardenfell open-ocean cells** are counted separately. A shared ocean
+piece or ocean-coloured square does not establish runtime placement. Keep them
+outside the land and empty-sea denominator until the tracker policy and evidence
+support a change.
 
 ## Gold: planned for a release
 
-**What it means.** Gold is not a state of the conversion. It is the **release plan**: the cells the project intends
-to ship in a release, a layer drawn over the status colours (it never changes them). The next release is gold; later
-planned releases are a paler gold; a shipped release goes back to its status colours. The plan is data, so the next
-release becomes gold by itself when the current one is published
-([the release plan](PROGRESS_TRACKER.md#the-release-plan-gold-for-the-next-release)).
+Gold is a planning overlay, never evidence of packaged content. The public
+reference used by the current image has no release-plan layer, so the image
+shows no gold outlines. The old v0.0.36/v0.0.37 plans are historical and are not
+automatically reassigned to v0.0.39.
 
-| Plan | Cells | Scope |
-| --- | ---: | --- |
-| v0.0.36 (gold) | 368 | the coast (outer ring and seabed), Seyda Neen, Balmora, all of Vivec |
-| v0.0.37 (pale gold) | 670 | all green zones on CHIM |
-| **TOTALS** | **1,038** | |
-
-A gold cell can be any status. A gold cell that is violet or red is a gap between what is planned and what is
-finished, which is exactly what the layer is for. **Who decides:** the owner makes the plan; nothing in the code
-changes it.
+The current target is all **exterior** cells in rings 0, 1 and 2. Record excluded,
+failed and held cells explicitly. The ring table contains 5 open-ocean cells in
+ring 0, 171 cells in ring 1 and 160 in ring 2; this membership is not an inclusion
+claim. Interiors may independently remain BSP, CHIM or a mixture.
 
 ## Owner marks: approved, playtested, accepted
 
-Three marks are set by the owner and never by a tool.
-
-- **Approved** and **playtested** (gold-yellow and teal in the Toolkit): the owner looked at a converted cell that
-  passes and approved it or played it. Today: none.
-- **Accepted:** an audit failure the owner accepted for a development build, labelled as such. A failure is never
-  accepted silently. Today: none.
+These are explicit review states. A conversion, a green colour or a packaged
+file cannot set them. An accepted failure remains labelled as a failure accepted
+for a particular development build, with its scope and evidence retained.
 
 ## Problems that are not a colour
 
-Some problems keep a cell from being converted or from switching to CHIM without having a colour of their own.
-
-- **Divided cells.** The legacy builder sometimes split one cell over several map files, and a CHIM region frame
-  replaces exactly one. Such a cell converts fine but cannot switch to CHIM inside the open world until the frame is
-  allowed to own the whole cell. Repaired in source, build verification pending (the image step's handling of the alias map rows of a divided cell is
-  being fixed on the same branch)
-  ([CHIM-REGION-DIVIDED-CELLS-36](../bugs/CHIM-REGION-DIVIDED-CELLS-36.md)).
-- **Lava.** 27 cells hold 349 lava pools; none is converted yet, so lava stays "mapped, not converted". It is a
-  separate layer in the Toolkit ([lava](../LAVA.md)).
-- **Audits never measured.** Several audits have no result for any cell yet (character grounding, hidden faces,
-  sprite shape); they show as "not measured" and are never counted as passed.
-- **Lighting not measured.** 276 land cells have no lighting measurement yet.
+- **Lava:** the v0.0.38 conversion includes the 27 lava-bearing exterior cells
+  and 349 original lava references. Legacy BSP and CHIM paths both matter.
+  Scoped lava-contact tests do not establish every pool's traversal, audio or
+  safe-save behavior; see [LAVA.md](../LAVA.md) and the open bug reports.
+- **Exterior ownership:** each exterior location has one selected terrain and
+  scenery format. Superseded BSP maps must not be compiled or packaged alongside
+  CHIM. Routing aliases do not require duplicate legacy geometry.
+- **Actors and gameplay:** original reference types, converted geometry,
+  deferred actors and implemented interactions need independent accounting;
+  see [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](../bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md).
+- **Unmeasured checks:** an absent result is unknown, not passed.
+- **Lighting:** 107 cells in the Vvardenfell denominator lack a measurement.
 
 ## Who decides what
 
-| Kind of problem | Decided by | Example |
-| --- | --- | --- |
-| A mechanism that is wrong or missing in the converter or the builder | Code fix, once at the shared layer, then every affected cell is re-run | Stair walk, memory fit, window mounting, the lava re-run folder |
-| A rule that trades memory for speed or cells against each other | Owner policy | The hull chain limit and whether a cell may keep a chain for memory |
-| What counts as done | Owner policy, written into the tracker's definitions | Open ocean is not done until the engine places it |
-| What ships in which release | Owner (the release plan, gold) | The v0.0.36 and v0.0.37 plans |
-| Playtested, approved, accepted | Owner only | An accepted audit failure in a development build |
-| The engine does not use the output yet | Engine work | Placing the ocean piece |
+Converter and engine defects need code repairs and verification. Policies that
+trade collision detail, CPU cost or memory require an explicit documented
+decision. Release selection and acceptance are recorded independently of
+conversion. The bug register remains the single source of current issue status.
 
 ## Package inclusion
 
-Use **Included in build** in the Toolkit to view verified package coverage independently of plans. Green marks region frames whose files match final HDF readback. Amber marks selected cells of an unfinished build. Grey means coverage is not established in the displayed dataset, not necessarily absent from the game. The initial verified record covers 325 region cells in v0.0.36; town-frame boundaries and earlier releases remain to be reconciled. Conversion, actors, lighting and traversal are separate checks.
+Post-pin RC2 evidence, 14 October: 360 regional whole cells are verified by
+full disk readback and independent package extraction. Six selected town
+overlaps remain partial and are excluded. The exact inspection artifacts were
+finalized at 2026-10-13T22:15:44Z. Conversion/audit/native-cell counts are unchanged;
+artifact shipment does not certify every actor, gameplay feature or route.
+Owner acceptance remains separate.
+
+**Historical RC1 package check, 13 October 2026:** the exact image and
+independently extracted package contain 360 verified
+whole regional cells, including Tel Uvirith (10,1). Six selected cells
+(-3,-11), (-2,-11), (-1,-11), (0,-11), (5,-14) and (6,-14) overlap packaged
+town frames only partially and are excluded from that whole-cell count.
+All 9,360 frame/chunk files for the 360 cells and all 9,774 CHIM payload files
+remain byte-identical to the verified predecessor. The index and four named
+town frame maps are present; town coverage and interiors are separate counts.
+The 135 town-owned routing-only BSPs are absent under the validated checklist;
+required map/dependency readback passed. Native boundary routing remains open.
+
+The exact HDF comparison removes 142,235,493 payload bytes across 212 files:
+135 redundant BSP maps and 77 orphan harvest catalogues. No map additions or
+unexpected map removals are reported. The independently extracted RC1
+playtest ZIP is 2,060,379,345 bytes. Payload savings and compressed archive
+size are distinct measurements; these figures do not identify a final039 ZIP.
+
+RC1 package and matching source delivery finalized on 13 October 2026 at
+18:06:05 UTC (21:06 in Finland), with source `57a8699` and image `fbf9a6c`
+kept distinct. The six partial overlaps remain outside the shipped whole-cell
+count. Final v0.0.39 remains in preparation pending explicit owner inspection
+approval; RC1 shipment does not supply owner or universal gameplay acceptance.
+
+Conversion/audit data is the unchanged 13 October 2026, 14:04:49 UTC snapshot:
+1,190 converted cells including 15 failed audits, 99 empty sea, three not
+converted, and 1,274/1,292 audit milestones. The package layer was reconciled
+at 17:45 UTC and its local served data was read back. The 865 ocean cells are
+outside the denominator. Converted and packaged per-type actor/gameplay
+counts remain unknown; the original reference census is preserved. Planned
+cells are not included cells and package presence does not prove gameplay.
+
+
+## Reproducing the current image
+
+The image uses only the sanitized public cell reference and flat colours, with
+no game textures or screenshot material:
+
+```sh
+python3 tools/cell_progress_map.py --data docs/chim/cell-progress-reference.json --out docs/images/amiwind-v0.0.39-dev1-progress-map.png --date "2026-10-13 14:04 UTC"
+```
+
+Update the image, caption and evidence counts together when the reference or
+package ledger changes. Keep historical images and published packages intact.

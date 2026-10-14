@@ -33,9 +33,22 @@ Seyda Neen combat, ambient speech and subtitles.
 
 ## How it happened
 
-Cause unknown. Inspect the combat predicate, ambient greeting poller,
-voice selection, active speech and subtitle lifetime together. Existing combat
-bark support does not prove ambient greetings are gated.
+Source review, 13 October 2026: world.qc's aw_npc_idle, aw_greet and manual
+aw_interact paths do not check AW_PlayerInCombat. AW_VoiceSay's idle path checks
+distance and visibility but not combat. AW_CombatEngage stops the engaged
+opponent's QuakeC idle think, but nearby residents continue polling. That is a
+confirmed policy gap; the owner clip's exact speaker remains unknown.
+
+Greetings use sound plus centerprint, while combat barks use the same entity
+voice channel through a separate playback path. Generic centerprint does not
+carry an actor or ambient-speech identity; its voiced label is inferred from
+remaining speech time. Thus clearing every voice or text panel would also risk
+unrelated combat, story or pickup feedback. Cancellation needs explicit ownership.
+
+OpenMW 0.48 rejects greetings and idle lines for actors in combat. The owner's
+requested suppression of unrelated nearby speech throughout the player's fight
+is a wider AmiWind policy, not a claim that the original globally silences every
+bystander. See the original [greeting and idle rules](https://raw.githubusercontent.com/OpenMW/openmw/openmw-0.48.0/apps/openmw/mwmechanics/actors.cpp).
 
 ## Why it was not caught
 
@@ -51,6 +64,14 @@ Introduce a coherent combat speech policy using the existing combat and
 speech machinery. Verify original/OpenMW behavior before fixing policy details;
 cover entering/leaving combat, opponent barks, other nearby actors and matching
 subtitle suppression. Preserve ordinary speech after combat ends.
+
+Reuse AW_PlayerInCombat for the encounter gate and the AmiQuake entity/channel
+sound machinery. Track ambient audio and its own subtitle separately; reject
+new ambient starts and cancel only owned ambient playback at combat entry,
+while preserving opponent barks and other UI messages. Review queued server
+sound/centerprint delivery as well as already playing channels. A prerequisite
+[sound-stop indexing defect](AUDIO-STOP-CHANNEL-RANGE-39.md) was found in source;
+its narrow candidate does not implement this full policy.
 
 ## Verification
 
@@ -76,6 +97,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - AUDIO-LOAD-29 (no report page): OST crackles under heavy loading
 - [AUDIO-LOGO-31](AUDIO-LOGO-31.md): Music crackles while the startup logo plays (WinUAE)
 - [AUDIO-NEWGAME-30](AUDIO-NEWGAME-30.md): Music crackles when confirming New Game (WinUAE)
+- [AUDIO-STOP-CHANNEL-RANGE-39](AUDIO-STOP-CHANNEL-RANGE-39.md): Stopping an entity sound skips half the dynamic mixer slots
 - [AW-20260928-02](AW-20260928-02.md): Dock/menu freeze and looping audio
 - AW-20260928-15 (no report page): Prison wave ambience masks dialogue
 - AW-20260929-03 (no report page): Music cuts during loading

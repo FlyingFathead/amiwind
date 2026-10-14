@@ -3,8 +3,12 @@
 <!-- contents start -->
 ## Contents
 
-- [v0.0.39 - Cell By Cell, Piece By Piece (working title)](#v0039---cell-by-cell-piece-by-piece-working-title)
-- [v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith) (in preparation)](#v0038---lava-is-all-you-need-and-a-hint-of-tel-uvirith-in-preparation)
+- [Additional RC1 inspection findings, 13 October 2026](#additional-rc1-inspection-findings-13-october-2026)
+- [Release hold and RC2 request, 13 October 2026](#release-hold-and-rc2-request-13-october-2026)
+- [v0.0.39 - Cell By Cell, Piece By Piece](#v0039---cell-by-cell-piece-by-piece)
+- [Movement presets and all eight attributes, 13 October 2026](#movement-presets-and-all-eight-attributes-13-october-2026)
+- [v0.0.40 - Unfinished work and new features](#v0040---unfinished-work-and-new-features)
+- [v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)](#v0038---lava-is-all-you-need-and-a-hint-of-tel-uvirith)
 - [v0.0.37 - Proofreading the Cantons (fix release)](#v0037---proofreading-the-cantons-fix-release)
 - [v0.0.36 - 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines) (released)](#v0036---36-lessons-of-vivecs-cantons-and-vvardenfell-shorelines-released)
 - [v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore (released)](#v0035---chimporting-it-all-gathering-up-the-loose-branches-from-the-seashore-released)
@@ -154,17 +158,121 @@
 
 <!-- contents end -->
 
-## v0.0.39 - Cell By Cell, Piece By Piece (working title)
+## Additional RC1 inspection findings, 13 October 2026
 
-Tentative title for the release following completion of v0.0.38, primarily focused on bugfixes. Included cells remain to be confirmed from build and package evidence. Landmark debug teleports should make reproduction easier; Tel Uvirith has the source aliases `dbg tp tel_uvirith` and `dbg tp teluvirith`, with native arrival verification pending.
+Vivec mushroom seams and missing swimming remain open. The owner also reports
+coarse Nord/Khajiit third-person gait and an Ordinator appearance mismatch.
+Five original screenshots were inspected and retained privately. No new cell
+conversion, native coverage or packaged coverage follows from these reports.
 
+- [MESH-VIVEC-CAP-GAP-38](bugs/MESH-VIVEC-CAP-GAP-38.md): Vivec giant mushroom cap has a visible opening.
+- [NPC-ORDINATOR-APPEARANCE-39](bugs/NPC-ORDINATOR-APPEARANCE-39.md): Vivec Hlaalu Ordinator has an unhelmeted Fargoth-like appearance.
+- [PLAYER-MOVEMENT-FRAME-SKIP-39](bugs/PLAYER-MOVEMENT-FRAME-SKIP-39.md): Third-person Nord and Khajiit fast movement loses smooth foot animation.
+- [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification.
 
-## v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith) (in preparation)
+## Release hold and RC2 request, 13 October 2026
 
-Finish the full-game image with both lava conversion paths and the completed
-Tel Uvirith stronghold in cell (10,1). The full-world conversion includes all
-27 original lava-bearing cells and the optimized stronghold; final HDF readback,
-native checks and delivery remain pending. See the
+Post-pin evidence, 14 October: exact RC2 package/readback and scoped Nord
+punch/torch/water inspection passed; inspection artifacts were finalized at
+2026-10-13T22:15:44Z. Final source packaging was authorized on 14 October; individual gameplay acceptance remains separate. Leg/seam,
+fast-gait, actor/equipment, memory/streaming and wider gameplay acceptance remain
+open in the [register](BUGS.md#fix-index). This continuation records observations
+after the immutable RC2 source/package pin; it does not rewrite those artifacts.
+
+The [spear-resident candidate](bugs/NPC-SPEAR-ATTACK-REGRESSION-39.md) now selects the authored attack from equipped weapon type; affected asset/native/package checks are pending.
+
+RC2 update, 14 October: [third-person torch](bugs/PLAYER-TORCH-THIRDPERSON-38.md) has scoped native holding/movement evidence. All 20 [swim companions](bugs/WATER-GAMEPLAY-PARITY-38.md) are built and select in water; inherited idle sinking is repaired in source with target/reference checks pending. RC2 package/readback and scoped water checks have passed. Final packaging is authorized; CHIM coverage and individual owner acceptance are unchanged.
+
+The owner stopped final preparation after RC1 playtest reports. RC2 must
+address the third-person punch animation, reported Nord leg shape, recurring
+NPC chase animation and guard spear-attack regression before final delivery.
+Earlier RC1 release approval does not clear these newly reported blockers.
+The canonical reports and corrected fatigue observation are linked below.
+
+All 20 candidate body model/layout pairs now pass offline binary checks within
+the unchanged 512 KiB limit, superseding the earlier incomplete bake set.
+Possible knee/calf section gaps remain under
+[PLAYER-BODY-LEG-SHAPE-39](bugs/PLAYER-BODY-LEG-SHAPE-39.md); numeric fitting does
+not establish visible seams, gait, punch, memory or owner acceptance. Complete RC2 package readback and scoped native checks passed; wider visual acceptance remains open.
+
+- [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation.
+- [PLAYER-BODY-LEG-SHAPE-39](bugs/PLAYER-BODY-LEG-SHAPE-39.md): Nord player legs appear abnormally thin in RC1.
+- [NPC-SPEAR-ATTACK-REGRESSION-39](bugs/NPC-SPEAR-ATTACK-REGRESSION-39.md): Seyda Neen guard spear attack animation is missing in first-person view.
+- [COMBAT-FATIGUE-HEALTH-DAMAGE-39](bugs/COMBAT-FATIGUE-HEALTH-DAMAGE-39.md): Clarify Eldafire bare-fist fatigue damage versus armed guard health damage.
+- [NPC-NO-RUN-ANIM-35](bugs/NPC-NO-RUN-ANIM-35.md): Companions and hostile NPCs walk but never run, and the walk looks wrong: release residents had only idle frames.
+- [ANIMKIT-COVERAGE-35](bugs/ANIMKIT-COVERAGE-35.md): NPCs that move or fight have no walk, run or attack animation: Fargoth and other Seyda Neen villagers glitch toward the player.
+
+## v0.0.39 - Cell By Cell, Piece By Piece
+
+v0.0.39 keeps the implemented RC1 scope: safer automatic checkpoints and death
+UI, third-person jump and bare-hand ready/draw/lower source work, body budget
+fallback, current help, sound cancellation and exclusive exterior ownership.
+The owner initially approved RC1 on 13 October 2026, then stopped final
+preparation and requested RC2 after the additional playtest reports above.
+On 14 October the owner authorized the final release package from RC2.
+Exact-source checks, image readback, native acceptance and publication remain
+separate gates; only the agreed repair/diagnostic scope enters RC2.
+
+The README map uses the sanitized 13 October 2026 reference snapshot.
+Converted, audited, native-checked and packaged coverage remain separate;
+planned or converted cells do not count as included. The [bug register](BUGS.md#fix-index)
+retains all unresolved findings.
+
+## Movement presets and all eight attributes, 13 October 2026
+
+The owner requests faithful normal-game movement using original Speed, Athletics,
+encumbrance and running-fatigue rules. Keep convenient fast, less strict debug
+builds distinct: this report does not authorize silently slowing the current
+debug preset. A proposed maxstats option would accept on/off, true/false and1/0.
+The requested future maxstats/godmode speed extension would provide maximum debug
+walking/running while enabled; disabling both would restore normal effective
+values without destroying real character stats. These movement extensions are
+not implemented; the existing godmode immunity toggle is separate. See
+[PLAYER-MOVEMENT-STATS-PARITY-39](bugs/PLAYER-MOVEMENT-STATS-PARITY-39.md).
+Movement and the [speed-linked body animation](bugs/PLAYER-MOVEMENT-FRAME-SKIP-39.md)
+need separate original/native comparisons and actual baked pose checks.
+
+All eight attributes must eventually have their original gameplay effects:
+Strength, Intelligence, Willpower, Agility, Speed, Endurance, Personality and Luck.
+Maintain a mechanics matrix with original formula/settings, implemented consumers,
+remaining unsupported rules, automated checks and native evidence for each.
+Required coverage includes Strength for melee/carrying/fatigue; Intelligence
+for magicka; Willpower for spell checks/fatigue; Agility for combat/balance/fatigue;
+Speed for movement; Endurance for health progression/fatigue recovery; Personality
+for disposition/persuasion; and Luck for the original skill-check modifiers.
+Verify the original consumers and exceptions rather than applying one universal
+bonus. Displaying or saving a stat is not proof that its gameplay effects are complete.
+Reuse existing combat/stat consumers and Quake physics before adding new work;
+this roadmap requirement does not claim new attribute implementation in RC2.
+
+The requested [raw identity inspector](bugs/DBG-ENTITY-INSPECT-39.md) is a source
+candidate to bind reports to entities/references. Its ordinary overlays remain
+separate from click interception. Torch equipment and both-view swimming repeats
+remain open; no broader mechanics acceptance follows from the RC1 inspection.
+
+The latest owner instruction makes
+[third-person torch holding](bugs/PLAYER-TORCH-THIRDPERSON-38.md) required for RC2.
+Its source candidate is implemented; all 20 isolated companion bake/readbacks,
+35 converter and 36 runtime focused checks pass. Fresh target/native, matched
+original, complete image/package and owner checks remain pending. This supersedes
+the earlier player-torch deferral.
+
+## v0.0.40 - Unfinished work and new features
+
+The owner's reported swimming/diving, gait and combat repairs are required for
+RC2. Their source, matched original reference, native/package and owner gates
+remain open; this future-feature milestone does not defer them. v0.0.40 retains
+new extensions such as optional cloud/lava effects and terrain texture fidelity.
+Existing open issues retain their IDs/evidence and require scoped acceptance;
+no broad closure or new gameplay completion is claimed here.
+
+## v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)
+
+v0.0.38 is published. Its full-world conversion includes both lava paths, all
+27 lava-bearing exterior cells and the optimized completed-stage Tel Uvirith
+stronghold in cell (10,1). The compact replacement passed exact RC1 HDF/package
+readback, scoped native inspection and delivery. Final v0.0.39 retains that
+implemented scope and requires its own final-source and image checks. See the
 [release checklist](RELEASE-v0.0.38.md) for acceptance requirements and the
 [bug register](BUGS.md) for current issue status.
 
@@ -195,9 +303,11 @@ v0.0.36 starts moving the open world onto CHIM inside the game itself. Converted
 the legacy island, the border between the two is measured and made seamless, and CHIM takes over
 cell by cell, from the sea and the coast inward. Draft notes: [release notes](RELEASE-v0.0.36.md).
 
-Scope: v0.0.36 = the whole coastline on CHIM (every cell of the outer ring and every passing cell of the second ring),
+Historical target: v0.0.36 = the whole coastline on CHIM (every cell of the outer ring and every passing cell of the second ring),
 the open ocean placed in the game (one shared ocean chunk), the whole city of Vivec by default, and Seyda Neen and
-Balmora. After v0.0.36 comes v0.0.38, which moves every green zone on the map onto CHIM (see below).
+Balmora. The earlier plan assigned every green zone on the map to v0.0.38.
+That was a target, not a record of shipped coverage; use the release's package
+evidence and the current coverage explanation above for actual inclusion.
 
 Steps, each one a playtest build:
 
@@ -316,18 +426,19 @@ A better pipeline for finding and removing slow or idle build sections:
 
 ### Gameplay
 
-- [ ] Small improvement: add a saved noclip-only walking-bob control,
-  `dbg noclipwobble [on|off]` with alias `dbg noclipbob`, default **off**
-  (`0` / `false`). Noclip should
-  provide a steady inspection view by default; walking outside noclip keeps
-  its existing behavior. Reuse AmiQuake's view-bob machinery in `view.c` and
-  the existing debug command dispatcher. Verify off/on and return to normal
-  walking. Requested; not yet implemented.
+- Implemented in published v0.0.38 source: saved noclip-only walking bob and
+  movement roll, `dbg noclipwobble [on|off]` with alias `dbg noclipbob`, default
+  **off** (`0` / `false`). It reuses AmiQuake's view-bob and roll paths in
+  `view.c`; ordinary walking retains its existing behavior. Photo mode
+  temporarily disables it and restores the previous setting. Preserve the
+  existing off/on, normal-walking and photo-restoration checks in later builds;
+  source presence alone does not establish native acceptance for a new image.
 
 - Combat and companion leftovers: hit chance, block, voices, death animation and sound,
   first-person weapons.
-- Background music on/off in the audio settings menu (and dbg / config), saved with the settings (later, not
-  v0.0.36; ENGINE-MUSIC-NO-OFF-SWITCH-36).
+- Background music: the `dbg music on/off` / `aw_music` switch already exists.
+  The audio settings menu, saved setting and builder option remain follow-up
+  work ([ENGINE-MUSIC-NO-OFF-SWITCH-36](bugs/ENGINE-MUSIC-NO-OFF-SWITCH-36.md)).
 - More of Morrowind's animation groups wired ([ANIMKIT.md](ANIMKIT.md) lists them).
 - Modular NPCs: a shared parts library converted once, with per-character recipes.
 - A third-person view, following the original game's camera (the original and OpenMW as the references),
@@ -364,10 +475,14 @@ A better pipeline for finding and removing slow or idle build sections:
 
 ### CHIM maps become their own format (approved 10 October 2026)
 
-CHIM maps are `.chim` files and never Quake `.bsp` maps. Next, after v0.0.36-dev3: a `.chim` gets its own header
+CHIM frame maps are named `.chim`, separately from legacy `.bsp` maps. Their
+current shell still uses the BSP29 binary layout and decoder; the streamed
+world already has its separate container format. The next format step remains
+planned: a `.chim` gets its own header
 (CHIM magic, map version, world format) and its own loader in the engine, a CHIM major-version step; then its
 contents leave BSP29 one measured step at a time: entities as a compact binary table, no dummy BSP parts, no BSP29
-limits where CHIM needs more, precomputed tables. Interiors stay Quake `.bsp` maps until they move to CHIM. Design and
+limits where CHIM needs more, precomputed tables. An interior's format is
+independent of exterior replacement and may remain BSP29 or move to CHIM. Design and
 measurements: [.chim map format](chim/CHIM_MAP_FORMAT.md).
 
 ### Tiny squeezes: memory that stays resident
@@ -3046,8 +3161,9 @@ and source-asset discovery remain pending.
 
 ## Owner-reported follow-up queue, 13 October 2026
 
-Finish v0.0.38 delivery first. Then work through these reports; current status
-remains in the bug register, and this list does not claim repairs or acceptance.
+The v0.0.39 final release keeps its implemented scope. Unfinished parts of
+these reports and new features continue in v0.0.40; current status remains in
+the bug register. This list does not claim repairs or acceptance.
 
 - [INTRO-CAMERA-GATING-38](bugs/INTRO-CAMERA-GATING-38.md): Race selection / vanity and third-person gating.
 - [COMBAT-AMBIENT-SPEECH-GATING-38](bugs/COMBAT-AMBIENT-SPEECH-GATING-38.md): Suppress unrelated greetings and subtitles during combat.

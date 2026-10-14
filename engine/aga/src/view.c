@@ -71,6 +71,7 @@ cvar_t	v_idlescale = {"v_idlescale", "0", false};
 
 cvar_t	crosshair = {"crosshair", "0", true};
 int (*aw_companion_crosshair)(int x, int y);	/* aw_companion.c */
+int (*aw_inspect_crosshair)(void);
 cvar_t	cl_crossx = {"cl_crossx", "0", false};
 cvar_t	cl_crossy = {"cl_crossy", "0", false};
 
@@ -692,6 +693,7 @@ void V_UpdatePalette (void)
     qboolean	new;
     byte	*basepal, *newpal, *menupal;
     static byte *previous_palette;
+    static qboolean previous_menu;
     static qboolean frozen_palette;
     byte	pal[768];
     int		r,g,b;
@@ -733,6 +735,9 @@ void V_UpdatePalette (void)
     if(frozen_palette){force=true;frozen_palette=false;}
     menupal=AW_MoviePalette();if(!menupal)menupal=AW_UIMenuPalette();basepal=menupal?menupal:host_basepal;
     if(basepal!=previous_palette){force=true;previous_palette=basepal;}
+    /* A death prompt uses host_basepal itself: pointer identity alone cannot
+     * detect entering/leaving the unshifted UI palette. */
+    if((menupal!=NULL)!=previous_menu){force=true;previous_menu=menupal!=NULL;}
     if (!new && !force)return;
     newpal = pal;
 
@@ -1167,7 +1172,13 @@ void V_RenderView (void)
          * (crosshair shown even when off), 0 = normal (aw_companion.c). */
         int x = scr_vrect.x + scr_vrect.width/2 + cl_crossx.value;
         int y = scr_vrect.y + scr_vrect.height/2 + cl_crossy.value;
-        int pick = aw_companion_crosshair ? aw_companion_crosshair (x, y) : 0;
+        int inspect = aw_inspect_crosshair && aw_inspect_crosshair ();
+        int pick = inspect ? 2 : aw_companion_crosshair ? aw_companion_crosshair (x, y) : 0;
+        /* Inspection uses the rendered camera centre, in either perspective.
+         * Cosmetic crosshair offsets must not move its selection indicator. */
+        if (inspect)
+            Draw_Character (scr_vrect.x + scr_vrect.width/2 - 4,
+                            scr_vrect.y + scr_vrect.height/2 - 4, '+');
         /* No crosshair while dead (PLAYER-DEATH-LIMBO-35) or behind the player (chase camera:
          * OpenMW camera.lua updateCrosshair shows it in first person only). */
         if (!AW_PlayerDead () && !chase_active.value)

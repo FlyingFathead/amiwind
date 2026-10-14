@@ -295,10 +295,13 @@ class ImageHooks(unittest.TestCase):
         # Baked mushrooms go before the final map passes; catalogues after the
         # last map change, before the entity tracker, heap audit and fingerprint.
         self.assertLess(image.index('clear_baked('), image.index("qc=out/'qc'"))
-        for later in ('entity_gate(', 'audit_world_map_heap_with_receipt(', 'write_content_fingerprint('):
+        for later in ('entity_gate(', 'audit_world_map_heap_with_receipt(', 'image_content_fingerprint('):
             self.assertLess(final.index('optimize_maps(boot'), final.index('harvest_image_step('))
             self.assertLess(final.index('harvest_image_step('), final.index(later))
         self.assertIn("build_record['harvest'] = harvest", final)
+        import inspect
+        import build_aga
+        self.assertIn('write_content_fingerprint(', inspect.getsource(build_aga.image_content_fingerprint))
 
     def test_image_step_without_source_warns(self):
         import argparse

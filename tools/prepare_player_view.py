@@ -8,13 +8,21 @@ death scene read, and the player's body for the third-person view, one per playa
                           death prompt, '%s' = the save; newlines written as \\n), sYes, sNo
   id1/view/bodies.txt     AWPB1, then RACE<TAB>0|1<TAB>MODEL lines (1 = female)
   id1/progs/body/*.mdl    the bodies; *.anm beside each: the animation kit's layout (tools/npc_anim.py)
+  id1/progs/body/*_t.mdl torch-pose body; *_h.mdl original held torch; both have matching *.anm;
+  id1/progs/body/*_t.awt frame-aligned emitter points
+  id1/progs/body/*_w.mdl water-only body; *_w.anm original swimidle/swim motion
 
 The body (a stand-in for the full player appearance): the original's new-game player record ('player' in
 Morrowind.esm: a common shirt, pants and shoes) worn by the race's own skin parts, with the race and sex's
 first head and hair (by record ID), baked through the same resident pipeline as the town NPCs
 (npc_geometry.assemble/bake, npc_anim.plan, the 'move' profile plus block: idle, walk, run, hit, death, block from the
 skeleton's own text keys; female humans take base_anim_female.nif's overrides; beast races their own
-skeleton). Not yet: the character's chosen head and hair, the inventory's worn equipment, the jump group.
+skeleton). Jump takeoff/air hold and landing use the original jump text keys.
+Bare-hand ready idle/walk/run/jump use the corresponding original hh sections;
+equip/lower and punch are baked over independently advancing movement poses.
+A separate torch-held body overlays the original left-clavicle torch pose on locomotion.
+A separate water body carries the original idle-swim and forward-swim groups without reducing their frames.
+Not yet: the character's chosen head and hair and the inventory's worn equipment.
 
 Build switches (tools/build.py): --player-body on|off (default on; off bakes no body: third person is then
 refused in game) and --death-retry on|off (default on; off writes aw_death_retry 0 into default-game.cfg).
@@ -37,9 +45,13 @@ PLAYER_RECORD = 'player'
 BODY_PROFILE = 'move'
 # Plus the shield block (COMBAT-BLOCKING-36): base_anim 'shield: block start..stop', played while the player
 # guards (hold to block, an AmiWind extension) and after a blocked blow (OpenMW refreshHitRecoilAnims).
-BODY_EXTRA = (('block', 5),)
+BODY_EXTRA = (('block', 5), ('jump', 4), ('land', 4))
+BODY_READY = (('ready', 8), ('readywalk', 8), ('readyrun', 6), ('readyjump', 4), ('readyland', 4))
+BODY_SWIM = (('idle', 8), ('swimidle', 8), ('swim', 8), ('death', 2))
 BODY_DIR = 'progs/body/'
 BUDGETS = (480, 384, 320, 256)
+TORCH_FORMAT = b'AWBT'
+TORCH_FRAME_MAX = 256
 OPTIONS = {'player_body': '--player-body', 'death_retry': '--death-retry'}
 DEATH_RETRY_OFF_LINES = (b'// --death-retry off: no quick retry after a lost fight (the original choices only)\n'
                          b'aw_death_retry 0\n')
@@ -210,11 +222,53 @@ def _sources(data):
     return _cache[key]
 
 
+def _fit_body(identifier, shapes, materials, textures, palette, groups):
+    """Keep the first model that fits full normal and ready gait plus actions.
+
+    The original 96-row path is tried in full before body-only atlas/contour
+    fallbacks. A fallback never replaces a body that already fits. Its leg
+    section is checked against the same untouched budget-480 reference.
+    """
+    import npc_anim
+    from npc_geometry import AliasOverflow, bake, player_leg_section_ok
+    failures = []
+    reference = None
+    for rows, contour in ((96, 0), (80, 0), (80, 1), (80, 2)):
+        for budget in BUDGETS:
+            try:
+                face_parts = []
+                frames, faces, uv, skin = bake(shapes, materials, textures, palette, budget=budget,
+                                              reference_frames=8, body_skin_rows=rows,
+                                              body_leg_contour=contour, face_parts=face_parts)
+                if len(face_parts) != len(faces):
+                    raise ValueError('Player body bake omitted face-part labels')
+                if reference is None:
+                    reference = (frames[0], faces, face_parts)
+                elif not player_leg_section_ok(reference[0], reference[1], frames[0], faces,
+                                               reference_parts=reference[2],candidate_parts=face_parts):
+                    raise AliasOverflow('Player visible leg silhouette narrowed versus budget-480 body')
+                nv, nt, (sw, sh) = frames.shape[1], len(faces), skin.size
+                fitted, index = npc_anim.fit(groups, nv, nt, sw, sh)
+            except npc_anim.AliasBudgetError as error:
+                mode='thigh' if contour==2 else 'knee' if contour else 'plain'
+                failures.append('%d/%d/%s: %s (%d vertices, %d triangles)' %
+                                (budget,rows,mode,error,nv,nt))
+                continue
+            except AliasOverflow as error:
+                mode='thigh' if contour==2 else 'knee' if contour else 'plain'
+                failures.append('%d/%d/%s: %s' % (budget,rows,mode,error))
+                continue
+            except ValueError as error:
+                raise ValueError(identifier + ': ' + str(error)) from error
+            return budget, frames, faces, uv, skin, fitted, index
+    raise ValueError(identifier + ': no body fits the existing budgets (' + '; '.join(failures) + ')')
+
+
 def bake_body(task):
     """Worker: one race/sex body. (path, model bytes, layout, report)."""
     data, palette, race, female = task
     import npc_anim
-    from npc_geometry import Skeleton, assemble, bake, animated_mdl
+    from npc_geometry import Skeleton, assemble, animated_mdl
     kinds, assets, rigs = _sources(data)
     appearance = body_appearance(kinds, race, female)
     if appearance['skeleton'] not in rigs:
@@ -225,37 +279,235 @@ def bake_body(task):
         if npc_anim.FEMALE_SKELETON not in rigs:
             rigs[npc_anim.FEMALE_SKELETON] = Skeleton(assets, npc_anim.FEMALE_SKELETON)
         female_rig = rigs[npc_anim.FEMALE_SKELETON]
-    profile = list(npc_anim.profiles()[BODY_PROFILE]) + [list(g) for g in BODY_EXTRA]
+    profile = list(npc_anim.profiles()[BODY_PROFILE]) + [list(g) for g in BODY_EXTRA + BODY_READY]
     kit, groups = npc_anim.plan(skeleton, profile, female_rig, appearance.get('weight', 1.))
+    required = set(npc_anim.AIR_GROUPS) | {name for name, _ in BODY_READY}
+    missing = [g['name'] for g in groups if g['name'] in required and g['source'] == 'idle']
+    if missing:
+        raise ValueError(appearance['id'] + ': missing original player sections: ' + ', '.join(missing))
+    kit, groups = npc_anim.player_layers(kit, groups, compact=True)
     times = npc_anim.idle_compatible_times(groups)
     shapes, materials, textures = assemble(assets, appearance, kit, times)
-    # The largest vertex budget whose model keeps every group's frames within the alias byte budget
-    # (npc_anim.fit), else the smallest tried with the frames fit() keeps: the body is seen up close and
-    # moving, so smooth walk and run cycles outrank a few hundred vertices.
-    best = None
-    for budget in BUDGETS:
-        try:
-            frames, faces, uv, skin = bake(shapes, materials, textures, palette, budget=budget, reference_frames=8)
-        except ValueError as error:
-            if str(error) != 'Alias vertex budget exceeded' or budget == BUDGETS[-1]:
-                raise ValueError(appearance['id'] + ': ' + str(error)) from error
-            continue
-        nv, nt, (sw, sh) = frames.shape[1], len(faces), skin.size
-        fitted, index = npc_anim.fit(groups, nv, nt, sw, sh)
-        best = (budget, frames, faces, uv, skin, fitted, index)
-        if [g['count'] for g in fitted] == [g['count'] for g in groups]:
-            break
-    budget, frames, faces, uv, skin, fitted, index = best
+    # Keep the first geometry budget that fits: normal and ready walk/run keep
+    # their full authored frame counts. Temporary arm actions use small grids.
+    budget, frames, faces, uv, skin, fitted, index = _fit_body(
+        appearance['id'], shapes, materials, textures, palette, groups)
     nv, nt = frames.shape[1], len(faces)
-    names = [g['name'] + '%02d' % i for g in fitted for i in range(g['count'])]
+    # Alias frame labels are diagnostic only; ANM owns full group names and
+    # indices. Reserve two of the format's 15 ASCII bytes for the frame index.
+    names = [g['name'][:13] + '%02d' % i for g in fitted for i in range(g['count'])]
     raw = animated_mdl(frames[index], faces, uv, skin, names=names)
-    layout = npc_anim.layout(fitted)
+    layout = npc_anim.player_layout(fitted)
     path = body_path(race, female)
     report = {'race': race, 'female': female, 'model': path, 'bytes': len(raw),
               'sha256': hashlib.sha256(raw).hexdigest(), 'frames': len(index), 'triangles': nt, 'vertices': nv,
               'budget': budget, 'skeleton': appearance['skeleton'], 'head': appearance.get('head'),
               'hair': appearance.get('hair'), 'parts': [p['id'] for p in appearance['parts']],
-              'groups': {g['name']: g['count'] for g in fitted}, 'layout': layout}
+              'groups': {g['name']: g['count'] for g in fitted}, 'layout': layout,
+              'group_sources': {g['name']: g['source'] for g in fitted}}
+    return path, raw, layout, report
+
+
+def torch_paths(base):
+    """Derive the torch assets from an unchanged AWPB1 body path."""
+    if not base.startswith(BODY_DIR) or not base.endswith('.mdl'):
+        raise ValueError('Invalid player body path for torch companion')
+    stem = base[:-4]
+    return stem + '_t.mdl', stem + '_h.mdl', stem + '_t.awt'
+
+
+def swim_path(base):
+    """Derive the water-only body from an unchanged AWPB1 body path."""
+    if not base.startswith(BODY_DIR) or not base.endswith('.mdl'):
+        raise ValueError('Invalid player body path for water companion')
+    return base[:-4] + '_w.mdl'
+
+
+def torch_emitters(positions):
+    """AWBT: BE frame count and one signed 16.16 XYZ emitter per frame."""
+    import numpy as np
+    points = np.asarray(positions, dtype=float)
+    if (points.ndim != 2 or points.shape[1] != 3 or
+            not 1 <= len(points) <= TORCH_FRAME_MAX or not np.isfinite(points).all() or
+            np.max(np.abs(points)) > 128):
+        raise ValueError('Player torch emitter count or coordinates outside bounds')
+    return struct.pack('>4sHH', TORCH_FORMAT, len(points), 0) + np.rint(points * 65536).astype('>i4').tobytes()
+
+
+class PlayerTorchLayer:
+    """Original left-clavicle torch hold over each ordinary body motion pose."""
+    def __init__(self, base, normal, count):
+        import numpy as np
+        from npc_anim import BoneLayer
+        self.N, self.normal = base.N, normal
+        self.times = np.arange(count)
+        start, stop = (base.events.get('torch: ' + key) for key in ('start', 'stop'))
+        if start is None or stop is None or not np.isfinite((start, stop)).all() or not 0 < stop-start < 60:
+            raise ValueError('Missing or invalid original third-person torch section')
+        # The guard companion samples this same authored torch range. Its last
+        # eighth is a stable grip; locomotion still supplies the moving legs.
+        self.torch_time = start + .875*(stop-start)
+        self.layer = BoneLayer(base, ('bip01 l clavicle',))
+
+    def pose(self, index):
+        i = int(index)
+        if i != index or not 0 <= i < len(self.times):
+            raise ValueError('Invalid player torch frame')
+        return self.layer.pose(self.normal.pose(i), self.torch_time)
+
+
+class SelectedTorchLayer:
+    """The same torch pose restricted to the fitted body's ordered frames."""
+    def __init__(self, layer, index):
+        import numpy as np
+        self.N, self.layer, self.index = layer.N, layer, tuple(index)
+        self.times = np.arange(len(index))
+
+    def pose(self, index):
+        i = int(index)
+        if i != index or not 0 <= i < len(self.index):
+            raise ValueError('Invalid selected player torch frame')
+        return self.layer.pose(self.index[i])
+
+
+def bake_torch_body(task):
+    """Worker: frame-aligned body and original Shield Bone torch companions."""
+    data, palette, race, female, base_row = task
+    import npc_anim
+    from npc_geometry import AliasOverflow, Skeleton, assemble, bake, animated_mdl, player_leg_section_ok
+    from prepare_guard_torches import _equipment, _source_records
+    from mwad.npc import text
+    from mwad.paths import child_ci
+    kinds, assets, rigs = _sources(data)
+    appearance = body_appearance(kinds, race, female)
+    if appearance['skeleton'] not in rigs:
+        rigs[appearance['skeleton']] = Skeleton(assets, appearance['skeleton'])
+    skeleton = rigs[appearance['skeleton']]
+    female_rig = None
+    if female and appearance['skeleton'] == 'meshes/base_anim.nif':
+        if npc_anim.FEMALE_SKELETON not in rigs:
+            rigs[npc_anim.FEMALE_SKELETON] = Skeleton(assets, npc_anim.FEMALE_SKELETON)
+        female_rig = rigs[npc_anim.FEMALE_SKELETON]
+    profile = list(npc_anim.profiles()[BODY_PROFILE]) + [list(g) for g in BODY_EXTRA + BODY_READY]
+    kit, groups = npc_anim.plan(skeleton, profile, female_rig, appearance.get('weight', 1.))
+    keep = {g['name']: base_row['groups'][g['name']] for g in groups}
+    fitted, index = npc_anim.select(groups, keep)
+    if len(fitted) != len(groups) or any(g['count'] != keep[g['name']] for g in fitted):
+        raise ValueError('Player torch motion groups differ from base body')
+    layer = PlayerTorchLayer(skeleton, kit, sum(g['count'] for g in groups))
+    shapes, materials, textures = assemble(assets, appearance, layer, npc_anim.idle_compatible_times(groups))
+    reference = fit = None
+    for rows, contour in ((96, 0), (80, 0), (80, 1), (80, 2)):
+        for budget in BUDGETS:
+            parts = []
+            try:
+                frames, faces, uv, skin = bake(shapes, materials, textures, palette,
+                    budget=budget, reference_frames=8, body_skin_rows=rows,
+                    body_leg_contour=contour, face_parts=parts)
+                if reference is None:
+                    reference = (frames[0], faces, parts)
+                elif not player_leg_section_ok(reference[0], reference[1], frames[0], faces,
+                                              reference_parts=reference[2], candidate_parts=parts):
+                    raise AliasOverflow('Player torch visible leg silhouette narrowed')
+                if npc_anim.alias_bytes(len(index), frames.shape[1], len(faces), *skin.size) > npc_anim.ALIAS_BYTE_BUDGET:
+                    continue
+                fit = (budget, rows, contour, frames, faces, uv, skin)
+                break
+            except AliasOverflow:
+                continue
+        if fit is not None:
+            break
+    if fit is None:
+        raise ValueError(appearance['id'] + ': original torch pose body exceeds alias/leg budget')
+    budget, rows, contour, frames, faces, uv, skin = fit
+    names = [g['name'][:13] + '%02d' % i for g in fitted for i in range(g['count'])]
+    held_body = animated_mdl(frames[index], faces, uv, skin, names=names)
+    if len(held_body) > npc_anim.ALIAS_BYTE_BUDGET:
+        raise ValueError('Player torch body exceeded alias byte budget')
+    lights = _source_records(child_ci(Path(data), 'Morrowind.esm'))
+    mesh = text(lights['torch'], 'MODL')
+    # The guard converter preserves the original 238 visible torch triangles,
+    # the Shield Bone rigid attachment and the flame emitter geometry.
+    selected_layer = SelectedTorchLayer(layer, index)
+    held_item, emitters = _equipment(assets, appearance, selected_layer, None, mesh, palette)
+    if len(held_item) > npc_anim.ALIAS_BYTE_BUDGET:
+        raise ValueError('Player held torch exceeded alias byte budget')
+    metadata = torch_emitters(emitters)
+    body_path_, held_path, metadata_path = torch_paths(base_row['model'])
+    layout = npc_anim.player_layout(fitted)
+    report = {'race': race, 'female': female, 'base_model': base_row['model'],
+              'body_model': body_path_, 'held_model': held_path, 'metadata': metadata_path,
+              'frames': len(index), 'body_bytes': len(held_body), 'held_bytes': len(held_item),
+              'triangles': len(faces), 'budget': budget, 'skin_rows': rows, 'contour': contour,
+              'source_torch_triangles': 238,
+              'source_torch_key_seconds': [float(skeleton.events['torch: start']),
+                                           float(skeleton.events['torch: stop'])],
+              'pose': 'original left-clavicle torch hold over normal/ready movement',
+              'groups': {g['name']: g['count'] for g in fitted},
+              'body_sha256': hashlib.sha256(held_body).hexdigest(),
+              'held_sha256': hashlib.sha256(held_item).hexdigest(),
+              'metadata_sha256': hashlib.sha256(metadata).hexdigest()}
+    return body_path_, held_body, layout, held_path, held_item, metadata_path, metadata, report
+
+
+def bake_swim_body(task):
+    """Worker: original full swim loops in a separate bounded water-only alias."""
+    data, palette, race, female, base_row = task
+    import npc_anim
+    from npc_geometry import AliasOverflow, Skeleton, assemble, bake, animated_mdl, player_leg_section_ok
+    kinds, assets, rigs = _sources(data)
+    appearance = body_appearance(kinds, race, female)
+    if appearance['skeleton'] not in rigs:
+        rigs[appearance['skeleton']] = Skeleton(assets, appearance['skeleton'])
+    skeleton = rigs[appearance['skeleton']]
+    female_rig = None
+    if female and appearance['skeleton'] == 'meshes/base_anim.nif':
+        if npc_anim.FEMALE_SKELETON not in rigs:
+            rigs[npc_anim.FEMALE_SKELETON] = Skeleton(assets, npc_anim.FEMALE_SKELETON)
+        female_rig = rigs[npc_anim.FEMALE_SKELETON]
+    kit, groups = npc_anim.plan(skeleton, BODY_SWIM, female_rig, appearance.get('weight', 1.))
+    missing = [g['name'] for g in groups if g['name'] in ('swimidle', 'swim') and g['source'] == 'idle']
+    if missing:
+        raise ValueError(appearance['id'] + ': missing original swim sections: ' + ', '.join(missing))
+    shapes, materials, textures = assemble(assets, appearance, kit, npc_anim.idle_compatible_times(groups))
+    reference = fit = None
+    for rows, contour in ((96, 0), (80, 0), (80, 1), (80, 2)):
+        for budget in BUDGETS:
+            parts = []
+            try:
+                frames, faces, uv, skin = bake(shapes, materials, textures, palette,
+                    budget=budget, reference_frames=8, body_skin_rows=rows,
+                    body_leg_contour=contour, face_parts=parts)
+                if reference is None:
+                    reference = (frames[0], faces, parts)
+                elif not player_leg_section_ok(reference[0], reference[1], frames[0], faces,
+                                               reference_parts=reference[2], candidate_parts=parts):
+                    raise AliasOverflow('Player swim visible leg silhouette narrowed')
+                if npc_anim.alias_bytes(sum(g['count'] for g in groups), frames.shape[1], len(faces),
+                                        *skin.size) > npc_anim.ALIAS_BYTE_BUDGET:
+                    continue
+                fit = (budget, rows, contour, frames, faces, uv, skin)
+                break
+            except AliasOverflow:
+                continue
+        if fit is not None:
+            break
+    if fit is None:
+        raise ValueError(appearance['id'] + ': original swim body exceeds alias/leg budget')
+    budget, rows, contour, frames, faces, uv, skin = fit
+    names = [g['name'][:13] + '%02d' % i for g in groups for i in range(g['count'])]
+    raw = animated_mdl(frames, faces, uv, skin, names=names)
+    if len(raw) > npc_anim.ALIAS_BYTE_BUDGET:
+        raise ValueError('Player swim body exceeded alias byte budget')
+    path = swim_path(base_row['model'])
+    layout = npc_anim.player_layout(groups)
+    report = {'race': race, 'female': female, 'base_model': base_row['model'],
+              'model': path, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+              'frames': len(frames), 'triangles': len(faces), 'vertices': frames.shape[1],
+              'budget': budget, 'skin_rows': rows, 'contour': contour,
+              'groups': {g['name']: g['count'] for g in groups},
+              'group_sources': {g['name']: g['source'] for g in groups},
+              'scope': 'water-only original swim loops; not native or matched-reference acceptance'}
     return path, raw, layout, report
 
 
@@ -279,8 +531,10 @@ def prepare(data_files, id1, jobs=None, bodies=True):
     text = settings_text(kinds)
     (id1 / 'view/settings.txt').write_text(text, encoding='ascii', newline='\n')
     report = {'settings': text.splitlines()[1:], 'settings_sha256': hashlib.sha256(text.encode()).hexdigest(),
-              'bodies': [], 'scope': 'stand-in body: the new-game player record (clothes) over the race skin, '
-                                      'first head and hair of the race and sex; groups idle, walk, run, hit, death, block'}
+              'bodies': [], 'torch_bodies': [], 'swim_bodies': [], 'scope': 'stand-in body: the new-game player record (clothes) over the race skin, '
+                                      'first head and hair of the race and sex; idle, walk, run, hit, death, block, jump, land '
+                                      'and hand-to-hand ready locomotion with equip/lower/punch arm layers; '
+                                      'original left-arm torch hold and held torch companion; original swim loops in a water-only body'}
     if not bodies:
         report['bodies_off'] = '--player-body off: no body; the game stays in first person'
         return report
@@ -298,6 +552,19 @@ def prepare(data_files, id1, jobs=None, bodies=True):
         (id1 / (path[:-4] + '.anm')).write_text(layout + '\n', encoding='ascii', newline='\n')
         entries.append((row['race'], row['female'], path))
         report['bodies'].append(row)
+    torch_tasks = [(str(data), palette, row['race'], row['female'], row) for row in report['bodies']]
+    for body_path_, body_raw, layout, held_path, held_raw, metadata_path, metadata, row in \
+            ordered_map(bake_torch_body, torch_tasks, max(1, min(resolve_jobs(jobs), len(torch_tasks)))):
+        for path, raw in ((body_path_, body_raw), (held_path, held_raw), (metadata_path, metadata)):
+            (id1 / path).write_bytes(raw)
+        (id1 / body_path_[:-4]).with_suffix('.anm').write_text(layout + '\n', encoding='ascii', newline='\n')
+        (id1 / held_path[:-4]).with_suffix('.anm').write_text(layout + '\n', encoding='ascii', newline='\n')
+        report['torch_bodies'].append(row)
+    for path, raw, layout, row in ordered_map(bake_swim_body, torch_tasks,
+            max(1, min(resolve_jobs(jobs), len(torch_tasks)))):
+        (id1 / path).write_bytes(raw)
+        (id1 / path[:-4]).with_suffix('.anm').write_text(layout + '\n', encoding='ascii', newline='\n')
+        report['swim_bodies'].append(row)
     catalogue = bodies_text(entries)
     (id1 / 'view/bodies.txt').write_text(catalogue, encoding='ascii', newline='\n')
     report['catalogue_sha256'] = hashlib.sha256(catalogue.encode()).hexdigest()

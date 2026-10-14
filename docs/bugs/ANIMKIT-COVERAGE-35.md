@@ -1,5 +1,16 @@
 # ANIMKIT-COVERAGE-35: NPCs that move or fight have no walk, run or attack animation
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 4 times; something has to be done
+
+- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Repeated owner report: Seyda Neen guards and other NPCs chase without running animation.
+- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Exact RC1 reload loses registered movers while damage continues. Source reset and real mover regression pass focused checks; repaired target/native/image pending.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Scoped native reload now activates full guard mover and changing chase/attack poses with health damage. Authored spear, other NPCs, complete RC2 package and owner acceptance pending.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Original group availability confirmed; full NPC mapping includes swim/idle while player move profile excludes them. This source finding does not implement or accept player water/torch.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,7 +20,7 @@
 | Where | animation kit profile assignment (react standing vs full movers), Seyda Neen residents |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35 (last seen) |
+| Persists in | v0.0.35, v0.0.39-rc1 (last seen) |
 | Severity | high: Any resident who turns hostile or follows looks broken; the kit is meant to cover every NPC |
 | Family | Actors and NPCs (`actors-npc`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -17,6 +28,29 @@
 | CHIM engine version | CHIM 0.1.0, engine 3cbe85a, world format 0.5 |
 
 <!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Status: 10 October 2026](#status-10-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Swimming follow-up, 12 October 2026](#swimming-follow-up-12-october-2026)
+- [Repeated owner report, 13 October 2026](#repeated-owner-report-13-october-2026)
+- [RC1 reload reproduction and source candidate, 13 October 2026](#rc1-reload-reproduction-and-source-candidate-13-october-2026)
+- [Scoped native reload improvement, 13 October 2026](#scoped-native-reload-improvement-13-october-2026)
+- [Original water and equipment group audit, 13 October 2026](#original-water-and-equipment-group-audit-13-october-2026)
+- [Post-pin RC2 package observation, 14 October 2026](#post-pin-rc2-package-observation-14-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 10 October 2026
 
@@ -72,6 +106,38 @@ state selection for the player and relevant NPCs, including companion movement.
 See WATER-GAMEPLAY-PARITY-38 for movement and breath/damage verification; visual
 pose alone does not establish missing swimming physics. No repair accepted.
 
+## Repeated owner report, 13 October 2026
+
+In v0.0.39-rc1, Seyda Neen guards and other NPCs chase the player without a
+running animation. The owner identifies this as a repeated flaw. This remains
+open and blocks RC2 acceptance; no new duplicate chase ID is created. Verify
+the exact packaged resident/mover models and layouts, runtime chase group,
+phase advancement and normal-speed in-game motion. A movement or damage check
+alone does not establish visible animation. The guard spear regression is
+recorded separately as [NPC-SPEAR-ATTACK-REGRESSION-39](NPC-SPEAR-ATTACK-REGRESSION-39.md).
+
+## RC1 reload reproduction and source candidate, 13 October 2026
+
+Exact RC1 model/layout readback confirms all eight distinct ordinary Seyda resident movers include run and attack groups. In the diagnostic same-map reload, animation state survived because the world-model pointer was reused, while SV_SpawnServer cleared precache names. AW_AnimPrep then returned for the old model slot and failed to register the mover; combat printed `mover not registered` and the guard still delivered health damage using its standing model. Intro boat/dock guards are separate legacy assets.
+
+The source candidate calls AW_AnimSceneReset immediately after server state clearing and before actor spawning, clearing parsed layouts, worn mappings and lazy mover names. It reuses Quake server-spawn lifecycle and lazy model loading without eager bakes or per-frame allocation. A real engine-glue mover fixture reproduces the old same-pointer/fresh-precache failure, then checks lazy registration, run/attack frame advancement, cache release and repeated reloads with the reset. Seven animation,21 combat and42 NPC focused checks pass, including UBSAN native fixtures. This is source/focused validation only: new Amiga compilation, native repaired chase/attack, exact RC2 model readback and owner acceptance remain pending. Guard spear stance is a separate open check.
+
+## Scoped native reload improvement, 13 October 2026
+
+Source4b968c2 passes the Amiga compile gate. After the same-map reload that failed in RC1, the guard now uses progs/a_40c7bfe774f5_m.mdl (entity10, reference128967), with the full run4/attack5 layout and changing attack frames36 and35. The earlier mover-not-registered/fallback warning is absent. Original footage shows the guard changing leg/body pose while closing the gap and attacking, and the console records continuing health damage. First/third-person camera switches and the actual AmigaDOS exit were observed; post-exit engine/bootcheck/catalogue hashes match.
+
+This is the new runtime engine with unchanged exact RC1 NPC assets, not a complete RC2 image or package. It supports the specific reload/mover repair; it does not establish original authored spear stance, all NPCs, normal-speed performance or owner acceptance. The previous RC1 failure and receipts remain historical evidence.
+
+## Original water and equipment group audit, 13 October 2026
+
+Original human/beast swim and torch groups are confirmed. npc_anim already maps swimwalkforward and idleswim, with base fallback for missing female overrides; a full NPC mover can declare these while the player move profile omits them. Therefore original clip presence, sampled NPC layout, player-body bake, runtime state and native gameplay must remain separate coverage facts. The source availability audit does not repair or accept first/third-person water mechanics, player torch equipment or authored spear animation; existing issue IDs retain their open status.
+
+## Post-pin RC2 package observation, 14 October 2026
+
+Exact RC2 package readback covers all 20 player appearances and their torch/held/swim companions. Scoped Nord package native footage verifies punch changes, carried torch, swim poses and underwater first-person fists. Original group availability and binary declarations still do not establish every actor/equipment animation or all-appearance acceptance.
+
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -99,6 +165,8 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-IDLE-ONLY-ANIM-33](NPC-IDLE-ONLY-ANIM-33.md): NPCs play only their idle animation: no walking, running, turning or other animation groups
 - [NPC-NEAR-SKIN-TEXELS-33](NPC-NEAR-SKIN-TEXELS-33.md): Original-head models had blurrier bodies than the budget model
 - [NPC-NO-RUN-ANIM-35](NPC-NO-RUN-ANIM-35.md): Companions and hostile NPCs walk but never run, and the walk looks wrong: release residents had only idle frames
+- [NPC-ORDINATOR-APPEARANCE-39](NPC-ORDINATOR-APPEARANCE-39.md): Vivec Hlaalu Ordinator has an unhelmeted Fargoth-like appearance
+- [NPC-SPEAR-ATTACK-REGRESSION-39](NPC-SPEAR-ATTACK-REGRESSION-39.md): Seyda Neen guard spear attack animation is missing in first-person view
 - [NPC-WANDER-NOT-EXECUTED-35](NPC-WANDER-NOT-EXECUTED-35.md): Residents stand still: the original's Wander AI packages (radius, duration, idles) are decoded but not executed
 - [NPC-WEAPON-MESH-33](NPC-WEAPON-MESH-33.md): NPCs hold no weapons or shields; combat uses them unseen
 

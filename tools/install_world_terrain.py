@@ -52,7 +52,7 @@ def install(terrain, id1):
                                *row['coverage'][0], *row['coverage'][1])
         if packet[64+i*52:64+(i+1)*52] != expected:
             raise ValueError('Terrain row differs from runtime directory: '+name)
-        if row.get('chim_region'):
+        if row.get('chim_region') or row.get('routing_only'):
             # a CHIM region cell: the directory row only, no map (docs/BUILD_MANIFEST.md step 2); a legacy map of the
             # cell in the stage would be a second owner
             if (id1/'maps'/(name+'.bsp')).exists():
@@ -84,6 +84,7 @@ def install(terrain, id1):
     (id1/'world/regions.awr').write_bytes(packet)
     return {'regions':len(rows),'replaced_maps':len(replacements),
             'chim_region_maps_not_made':sorted(r['name'] for r in rows if r.get('chim_region')),
+            'routing_only_maps_not_made':sorted(r['name'] for r in rows if r.get('routing_only')),
             'directory_sha256':hashlib.sha256(packet).hexdigest(),
             'terrain_receipt_sha256':digest(receipt_path),
             'target_validation':'pending'}

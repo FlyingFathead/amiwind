@@ -144,7 +144,7 @@ class ImageCallSiteTests(unittest.TestCase):
 
     def test_every_per_map_pass_receives_jobs(self):
         seen = set()
-        for function in ('image', 'finalize_image'):
+        for function in ('image', 'finalize_image', 'image_content_fingerprint'):
             for call in self.calls(function):
                 keywords = {k.arg: k.value for k in call.keywords}
                 if call.func.id in self.PASSES:
@@ -155,6 +155,11 @@ class ImageCallSiteTests(unittest.TestCase):
                 if call.func.id == 'repair_balmora_maps':
                     self.assertEqual(keywords['threads'].id, 'jobs')
         self.assertEqual(seen, self.PASSES)
+        # The wrapper forwards the image's worker count to fingerprinting.
+        wrappers = [c for c in self.calls('finalize_image') if c.func.id == 'image_content_fingerprint']
+        self.assertEqual(len(wrappers), 1)
+        self.assertIsInstance(wrappers[0].args[2], ast.Name)
+        self.assertEqual(wrappers[0].args[2].id, 'jobs')
 
     def test_no_hard_coded_worker_counts_in_the_builder(self):
         pattern = re.compile(r'\b(?:jobs|threads|max_workers|workers)\s*=\s*(?:[2-9]|\d{2,})\b|optimizer_jobs')

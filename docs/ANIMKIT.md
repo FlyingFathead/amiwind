@@ -34,15 +34,24 @@ Examples: `dbg animkit play run`, `dbg animkit play death1`, `dbg animkit speed 
 
 ## Morrowind's groups: wired and not wired yet
 
+A player-body candidate adds `jump` takeoff/held-air and landing sections, plus
+bare-hand `idlehh`, `walkforwardhh`, `runforwardhh` and `jumphh`. It
+is separate from the NPC profiles below: compilation, body bakes, model-budget
+gates and native comparison remain pending. Bare-hand equip/lower now has source
+wiring through offline movement/arm grids and the authoritative QuakeC clock;
+its appearance and cost remain unverified. Punch overlays, other weapon variants
+and torch-holding poses remain open. See [player-body coverage](THIRD_PERSON.md#the-players-body)
+and [PLAYER-JUMP-THIRDPERSON-38](bugs/PLAYER-JUMP-THIRDPERSON-38.md).
+
 Wired (Morrowind group -> engine group): `idle` -> idle, `walkforward` -> walk, `runforward` -> run,
 `swimwalkforward` -> swim, `idleswim` -> swimidle, `hit1` -> hit, `knockdown` -> knock, `death1` -> death, `handtohand` -> attack,
 `shield` -> block. The sidesteps `dodgel` / `dodger` are an AmiWind extension sampled from `walkleft` /
 `walkright` (Morrowind has no dodge group).
 
-Present in the data, not wired yet: the idle variants (`idle2` to `idle9`, `idlehh`, `idle1h`, `idle2c`,
+Present in the data, not wired yet: the idle variants (`idle2` to `idle9`, `idle1h`, `idle2c`,
 `idle2w`, `idlespell`, `idlecrossbow`, `idlesneak`, `idlestorm`, `torch`), `hit2` to `hit5`,
 the swimming hits, `death2` to `death5` and the knockdown, knockout and swimming deaths, `knockout`,
-`jump`, walking and running backwards and sideways, turning, sneaking, swimming in other directions,
+walking and running backwards and sideways, turning, sneaking, swimming in other directions,
 the weapon attack sets (`weapononehand`, `weapontwohand`, `weapontwowide`, `bowandarrow`, `crossbow`,
 `throwweapon`), `spellcast` and the inventory poses. `dbg animkit list` prints the full table; the
 engine table is `engine/aga/src/aw_animkit_rules.c`.

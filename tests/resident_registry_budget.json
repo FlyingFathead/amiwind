@@ -3,8 +3,8 @@
  "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, owner-approved reason.",
  "totals": {
   "commands": {
-   "count": 266,
-   "hunk_bytes": 8512
+   "count": 268,
+   "hunk_bytes": 8576
   },
   "cvars": {
    "count": 326,
@@ -22,7 +22,8 @@
   "2026-10-11: aw_vanity_fullview, the owner-requested saved switch for the vanity camera full view (owner request 14:15)",
   "2026-10-11: aw_combat_block, the saved Blocking option (hold to block / automatic), COMBAT-BLOCKING-36",
   "2026-10-12: Owner-requested persistent independent LAND fill toggle, enabled by default; aw_land_fill adds one cvar, 24 structure bytes and 32 zone bytes. Debug aliases use the on-disk catalogue. These are registry accounting costs, not measured native frame-time costs.",
-  "2026-10-13: Owner-requested saved noclip wobble control, disabled by default and suppressed during photo mode; aw_noclipwobble adds one cvar, 24 structure bytes and 32 zone bytes. Debug aliases reuse the on-disk catalogue. This records registry costs and does not increase the CHIM heap cap."
+  "2026-10-13: Owner-requested saved noclip wobble control, disabled by default and suppressed during photo mode; aw_noclipwobble adds one cvar, 24 structure bytes and 32 zone bytes. Debug aliases reuse the on-disk catalogue. This records registry costs and does not increase the CHIM heap cap.",
+  "2026-10-13: requested click-to-pin entity HUD inspection adds two commands (64 bytes of command records); no new cvars."
  ],
  "entries": {
   "commands": [
@@ -104,6 +105,7 @@
    "aw_daycycle_gallery",
    "aw_daynight_set",
    "aw_debug_hors",
+   "aw_debug_hud",
    "aw_debug_hud_type",
    "aw_demo_start",
    "aw_desktop",
@@ -124,6 +126,7 @@
    "aw_help",
    "aw_horizon_migrate",
    "aw_horizon_stats",
+   "aw_inspect",
    "aw_interiorluma_set",
    "aw_intro_status",
    "aw_journal",

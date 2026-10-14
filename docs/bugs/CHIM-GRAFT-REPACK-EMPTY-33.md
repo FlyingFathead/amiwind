@@ -32,6 +32,7 @@
 - [Verification](#verification)
 - [Prevention](#prevention)
 - [Safety net: the terrain floor (second layer)](#safety-net-the-terrain-floor-second-layer)
+- [Exact RC1 evidence, 13 October 2026](#exact-rc1-evidence-13-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -151,6 +152,14 @@ no walking body may fall below the terrain at its X/Y.
   back ends the hold; the world's ground 100 units below the layer's is never lifted from; noclip
   and flight pass below; an actor's trial step never uses it; a free-falling body is lifted; with
   the floor off the fall has no end; walking, a cliff and a jump are unchanged with it on).
+
+## Exact RC1 evidence, 13 October 2026
+
+13 October 2026, v0.0.39-rc1: scoped native inspection shows nonempty fallback
+repacks, including24 of37 chunks during the Nord body run and26–27 chunks in
+repeated save-session repacks. Complete requested residency is not established.
+These logs do not reproduce the historical zero-chunk world collapse; ongoing
+allocation retries are tracked separately as CHIM-CHUNK-LOAD-FAIL-33. No normal-speed loading/performance result is established by this scoped inspection.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

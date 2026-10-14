@@ -15,6 +15,7 @@
 #include "aw_quickchar.h"
 #include "aw_testbox.h"
 #include "aw_view.h"
+#include "aw_inspect.h"
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
     if(!sv.active || svs.maxclients!=1 || cls.state!=ca_connected) {
@@ -226,6 +227,7 @@ static void godmode_command(void)
     else Con_Printf("godmode %s\n",on?"ON":"OFF");
 }
 void AW_DebugInit(void) {
+    AW_InspectInit();
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
     AW_GalleryInit();AW_WorldUIInit();
     AW_StreamInit();AW_PhotoInit();Chim_Init();

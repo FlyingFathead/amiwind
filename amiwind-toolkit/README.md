@@ -7,6 +7,10 @@ ships with the Toolkit.
 
 Full guide: [docs/AMIWIND_TOOLKIT.md](../docs/AMIWIND_TOOLKIT.md).
 
+Final v0.0.39 updates historical-image labels and verified RC1 inclusion data.
+The Toolkit metadata is version 0.1.3 and its header names AmiWind v0.0.39;
+the inspection controls below retain their v0.0.38 behavior.
+
 ## v0.0.38 inspection controls
 
 The public Toolkit includes the same inspection controls used with local build
@@ -31,6 +35,10 @@ or BSA as a 3D scene.
   Successful copying shows a green **Copied** confirmation for four seconds;
   clipboard denial offers selectable JSON instead. Preview-only counts do not
   imply the compiled map changed.
+- **Inspector layout and face budget:** the sidebar can be hidden while
+  From above, Fly view and Orbit stay in the toolbar. The budget display counts
+  loaded placed polygon faces, including hidden objects, rather than native
+  memory. Yellow starts at 80%, orange at 90%, red above the chosen budget.
 - **Textures and heatmap** can be shown together. Load an owned palette for
   original indexed colors; the built-in grayscale preview is labelled. These
   are unlit base textures, not a native lighting comparison.
@@ -64,6 +72,10 @@ Or open `index.html` straight from disk in a desktop browser and pick your files
 (a page opened from disk cannot read other files by itself, so each one has to be chosen).
 
 ## The pages
+
+The screenshots below show the historical v0.0.36 interface and its data.
+Current controls are described above; screenshot totals are not current
+conversion, native or packaged coverage.
 
 ![World: the whole island with the CHIM progress tracker, each cell coloured by its conversion status](../docs/images/amiwind-v0.0.36-toolkit-world-chim-tracker.png)
 

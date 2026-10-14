@@ -105,6 +105,20 @@ class PlanTests(unittest.TestCase):
         self.assertIs(kit.samples[8][0], female)
         self.assertAlmostEqual(groups[1]['speed'], 20.0)
 
+    def test_spear_attack_uses_authored_two_hand_wide_section_only_when_selected(self):
+        keys = dict(KEYS)
+        keys.update({'weapontwowide: chop start': 40., 'weapontwowide: chop hit': 40.6,
+                     'weapontwowide: chop large follow stop': 41.})
+        ordinary, _ = npc_anim.plan(FakeSkeleton(keys), [('idle', 8), ('attack', 4)])
+        spear, groups = npc_anim.plan(FakeSkeleton(keys), [('idle', 8), ('attack', 4)],
+                                      attack_stance='weapontwowide')
+        self.assertEqual([ordinary.samples[i][1] for i in range(8, 12)], [30., 30.25, 30.5, 30.75])
+        self.assertEqual([spear.samples[i][1] for i in range(8, 12)], [40., 40.25, 40.5, 40.75])
+        self.assertAlmostEqual(groups[1]['hit'], .6)
+        with self.assertRaises(ValueError):
+            npc_anim.plan(FakeSkeleton(KEYS), [('idle', 8), ('attack', 4)],
+                          attack_stance='weapontwowide')
+
     def test_in_place_helper_for_other_group_tables(self):
         kit = npc_anim.in_place(skeleton(), [(10.5, True), (30.0, False)])
         self.assertEqual(tuple(kit.pose(0)('bip01')[3, :2]), (1.0, 2.0))
@@ -223,6 +237,256 @@ class ActorCacheTests(unittest.TestCase):
         self.assertFalse(r['fits_gap'])
 
 
+class BoneLayerTests(unittest.TestCase):
+    class Rig:
+        N = None
+        parents = {'base file root': None, 'bip01': 'base file root',
+                   'hips': 'bip01', 'left leg': 'hips', 'right leg': 'hips',
+                   'bip01 spine1': 'hips', 'head': 'bip01 spine1',
+                   'bip01 l clavicle': 'bip01 spine1', 'left hand': 'bip01 l clavicle',
+                   'shield bone': 'left hand', 'right hand': 'bip01 spine1'}
+        nodes = parents
+
+        def local(self, name, time):
+            # Rotation and translation do not commute: catch reversed matrix
+            # composition, not just the translation-only guard fixture case.
+            a = float(time) * .1
+            matrix = np.eye(4)
+            matrix[:2, :2] = ((np.cos(a), -np.sin(a)), (np.sin(a), np.cos(a)))
+            matrix[3, :3] = (len(name), 2 * time, 3)
+            return matrix
+
+    def normal(self, phase):
+        matrices = {}
+        for i, name in enumerate(self.Rig.nodes):
+            m = np.eye(4)
+            m[:2, :2] = ((0, 1), (-1, 0))
+            m[3, :3] = (i, phase + i, 40)
+            matrices[name] = m
+
+        def world(name):
+            if name == 'base file root':
+                raise AssertionError('Female underlying pose must not traverse the base file root')
+            return matrices[name]
+        return world
+
+    def test_upper_body_retains_moving_lower_body_and_uses_underlying_boundary(self):
+        rig = self.Rig()
+        layer = npc_anim.BoneLayer(rig, ('Bip01 Spine1',))
+        for phase in (0., .25, .75, 1.):
+            normal = self.normal(phase)
+            for clip_time in (10., 10.5, 11.):
+                pose = layer.pose(normal, clip_time)
+                for name in ('bip01', 'hips', 'left leg', 'right leg'):
+                    # Unmasked transforms are returned intact, with the current
+                    # movement phase even when the upper-body phase is held.
+                    self.assertIs(pose(name), normal(name))
+                spine = rig.local('bip01 spine1', clip_time) @ normal('hips')
+                np.testing.assert_array_equal(pose('Bip01 Spine1'), spine)
+                np.testing.assert_array_equal(pose('right hand'), rig.local('right hand', clip_time) @ spine)
+                hand = (rig.local('left hand', clip_time) @ rig.local('bip01 l clavicle', clip_time) @ spine)
+                np.testing.assert_allclose(pose('left hand'), hand, atol=1e-12)
+                np.testing.assert_allclose(pose('shield bone'), rig.local('shield bone', clip_time) @ hand, atol=1e-12)
+
+    def test_torch_priority_changes_only_left_arm_over_a_ready_upper_body(self):
+        rig = self.Rig()
+        normal = self.normal(.5)
+        upper = npc_anim.BoneLayer(rig, ('bip01 spine1',)).pose(normal, 10.)
+        torch = npc_anim.BoneLayer(rig, ('bip01 l clavicle',)).pose(upper, 20.)
+        for name in ('left leg', 'right leg', 'bip01 spine1', 'head', 'right hand'):
+            self.assertIs(torch(name), upper(name))
+        expected = rig.local('left hand', 20.) @ rig.local('bip01 l clavicle', 20.) @ upper('bip01 spine1')
+        np.testing.assert_allclose(torch('left hand'), expected, atol=1e-12)
+
+    def test_missing_mask_root_broken_hierarchy_and_nonfinite_time_are_refused(self):
+        rig = self.Rig()
+        for roots in ((), ('absent',)):
+            with self.assertRaisesRegex(ValueError, 'layer root'):
+                npc_anim.BoneLayer(rig, roots)
+        layer = npc_anim.BoneLayer(rig, ('bip01 spine1',))
+        for value in (float('nan'), float('inf'), -float('inf')):
+            with self.assertRaisesRegex(ValueError, 'Non-finite'):
+                layer.pose(self.normal(0), value)
+        rig.parents = dict(rig.parents, hips='left leg')
+        with self.assertRaisesRegex(ValueError, 'Cyclic'):
+            npc_anim.BoneLayer(rig, ('bip01 spine1',))
+        rig.parents = dict(self.Rig.parents, hips='missing parent')
+        with self.assertRaisesRegex(ValueError, 'Missing animation layer parent'):
+            npc_anim.BoneLayer(rig, ('bip01 spine1',))
+
+
+class PlayerLayerTests(unittest.TestCase):
+    class Rig(FakeSkeleton):
+        def __init__(self, keys, speed=100.):
+            super().__init__(keys, speed)
+            self.parents = {'bip01': None, 'leg': 'bip01', 'bip01 spine1': 'bip01', 'hand': 'bip01 spine1'}
+            self.nodes = self.parents
+
+        def local(self, name, time):
+            matrix = super().local(name, time)
+            if name == 'leg': matrix[3, 0] = np.sin(time)
+            if name == 'bip01 spine1': matrix[3, 2] = time
+            return matrix
+
+    def plan(self):
+        keys = dict(KEYS, **{'runforward: loop start': 12., 'runforward: loop stop': 13.,
+                    'jump: start': 14., 'jump: loop start': 14.3,
+                    'jump: loop stop': 14.3, 'jump: stop': 14.9,
+                    'handtohand: equip start': 50., 'handtohand: equip stop': 51.,
+                    'handtohand: unequip start': 60., 'handtohand: unequip stop': 61.})
+        female = self.Rig({'walkforward: loop start': 5., 'walkforward: loop stop': 6.}, 80.)
+        normal, groups = npc_anim.plan(self.Rig(keys), [('idle', 8), ('walk', 4), ('run', 4),
+                       ('jump', 3), ('land', 3), ('death', 2)], female)
+        return normal, groups, npc_anim.player_layers(normal, groups)
+
+    def test_authored_arm_endpoints_are_independent_of_female_leg_phase(self):
+        normal, base, (kit, groups) = self.plan()
+        walk = next(g for g in base if g['name'] == 'walk')
+        self.assertEqual(walk['source'], 'female')
+        overlay = next(g for g in groups if g['name'] == 'draw_walk')
+        self.assertEqual(overlay['count'], 12)
+        for arm, time in enumerate((50., 50.5, 51.)):
+            for motion in range(4):
+                index = overlay['base'] + arm*4 + motion
+                self.assertEqual(kit.samples[index], (walk['base']+motion, time))
+                pose = kit.pose(index)
+                np.testing.assert_array_equal(pose('leg'), normal.pose(walk['base']+motion)('leg'))
+                self.assertAlmostEqual(pose('hand')[3, 2], 70.+time)
+        self.assertNotEqual(kit.pose(overlay['base'])('leg')[3, 0], kit.pose(overlay['base']+1)('leg')[3, 0])
+
+    def test_budget_fits_whole_grid_rows_and_retains_each_action_endpoint(self):
+        normal, base, (kit, groups) = self.plan()
+        budget = npc_anim.alias_bytes(81, 100, 32, 32, 32)
+        fitted, indices = npc_anim.fit(groups, 100, 32, 32, 32, budget)
+        self.assertEqual(len(indices), 81)  # 17 ordinary + 2 actions x 2 endpoints x 16 leg poses
+        self.assertEqual(len(set(indices)), len(indices))
+        motions = {g['name']: g for g in fitted if 'layer_action' not in g}
+        for row in fitted:
+            if 'layer_action' not in row: continue
+            self.assertEqual(row['phases'], 2)
+            motion = motions[row['motion_name']]
+            kept = indices[motion['base']:motion['base']+motion['count']]
+            a, b = (50., 51.) if row['layer_action'] == 1 else (60., 61.)
+            self.assertEqual([kit.samples[i] for i in indices[row['base']:row['base']+row['count']]],
+                             [(i, t) for t in (a, b) for i in kept])
+        text = npc_anim.player_layout(fitted)
+        self.assertEqual(sum(w.startswith('$') for w in text.split()), 10)
+        self.assertNotIn('draw_walk:', text)
+        with self.assertRaises(npc_anim.AliasBudgetError):
+            npc_anim.fit(groups, 100, 32, 32, 32, budget-1)
+
+    def test_frame_and_file_limits_are_both_kept_and_missing_keys_are_not_idle(self):
+        normal, base, (kit, groups) = self.plan()
+        # A roomy file budget must not override the alias decoder's frame cap.
+        _, many = npc_anim.player_layers(normal, base, phases=8)
+        fitted, indices = npc_anim.fit(many, 8, 8, 8, 8, 512*1024)
+        self.assertLessEqual(len(indices), 256)
+        del normal.base.events['handtohand: equip stop']
+        with self.assertRaisesRegex(ValueError, 'handtohand equip'):
+            npc_anim.player_layers(normal, base)
+
+    def test_compact_actions_keep_gait_and_authored_punch_hit(self):
+        normal, base, _ = self.plan()
+        keys = dict(normal.base.events, **{'idlehh: start': 70., 'idlehh: stop': 71.,
+                    'walkforwardhh: loop start': 72., 'walkforwardhh: loop stop': 73.,
+                    'runforwardhh: loop start': 74., 'runforwardhh: loop stop': 75.,
+                    'jumphh: start': 76., 'jumphh: loop start': 76.3,
+                    'jumphh: loop stop': 76.3, 'jumphh: stop': 76.9})
+        normal, base = npc_anim.plan(self.Rig(keys), [(g['name'], g['count']) for g in base] +
+                                     [('ready', 8), ('readywalk', 8), ('readyrun', 6),
+                                      ('readyjump', 4), ('readyland', 4)])
+        kit, groups = npc_anim.player_layers(normal, base, compact=True)
+        fitted, indices = npc_anim.fit(groups, 100, 32, 32, 32, 512*1024)
+        kept = {g['name']: g['count'] for g in fitted if 'layer_action' not in g}
+        self.assertEqual(kept, {g['name']: g['count'] for g in base})
+        self.assertEqual(len([g for g in fitted if 'layer_action' in g]), 15)
+        self.assertEqual(len(indices), sum(kept.values()) + 49)
+        punch = next(g for g in fitted if g['name'] == 'punch_readywalk')
+        self.assertEqual((punch['count'], punch['motion_count'], punch['hit_permille']), (6, 2, 600))
+        walk = next(g for g in base if g['name'] == 'readywalk')
+        self.assertEqual([kit.samples[i] for i in indices[punch['base']:punch['base']+6]],
+                         [(walk['base']+j, t) for t in (30., 30.6, 31.) for j in (0, 4)])
+        self.assertIn('$3:%d:8:%d:3:2:600' % (walk['base'], punch['base']),
+                      npc_anim.player_layout(fitted))
+        del normal.base.events['handtohand: chop hit']
+        with self.assertRaisesRegex(ValueError, 'chop hit'):
+            npc_anim.player_layers(normal, base, compact=True)
+
+
+class PlayerJumpTests(unittest.TestCase):
+    def groups(self):
+        # The original human and beast rigs use coincident loop markers.
+        keys = dict(KEYS, **{'jump: start': 40.0, 'jump: loop start': 40.3,
+                            'jump: loop stop': 40.3, 'jump: stop': 40.9})
+        return npc_anim.plan(FakeSkeleton(keys), [['idle', 8], ['jump', 4], ['land', 4]])
+
+    def test_original_sections_share_the_airborne_endpoint(self):
+        kit, groups = self.groups()
+        self.assertEqual([g['source'] for g in groups], ['base'] * 3)
+        self.assertEqual([round(s[1], 2) for s in kit.samples[8:]],
+                         [40, 40.1, 40.2, 40.3, 40.3, 40.5, 40.7, 40.9])
+        self.assertEqual([g['kind'] for g in groups[1:]], ['hold', 'hold'])
+        self.assertAlmostEqual(groups[1]['step'], .1)
+        self.assertAlmostEqual(groups[2]['step'], .2)
+
+    def test_reduced_sections_preserve_duration_and_endpoints(self):
+        _, groups = self.groups()
+        reduced, indices = npc_anim.select(groups, {'idle': 8, 'jump': 2, 'land': 2})
+        self.assertEqual(indices[8:], [8, 11, 12, 15])
+        self.assertAlmostEqual(reduced[1]['step'], .3)
+        self.assertAlmostEqual(reduced[2]['step'], .6)
+
+    def test_budget_never_erases_the_jump_or_landing_endpoints(self):
+        _, groups = self.groups()
+        budget = npc_anim.alias_bytes(12, 100, 32, 32, 32)
+        fitted, _ = npc_anim.fit(groups, 100, 32, 32, 32, budget=budget)
+        self.assertEqual([g['count'] for g in fitted], [8, 2, 2])
+        with self.assertRaises(ValueError):
+            npc_anim.fit(groups, 100, 32, 32, 32, budget=budget - 1)
+
+    def test_player_body_requests_both_sections(self):
+        import prepare_player_view
+        self.assertIn(('jump', 4), prepare_player_view.BODY_EXTRA)
+        self.assertIn(('land', 4), prepare_player_view.BODY_EXTRA)
+
+
+class PlayerReadyTests(unittest.TestCase):
+    def plan(self):
+        import prepare_player_view
+        keys = dict(KEYS, **{'idlehh: start': 50., 'idlehh: stop': 52.,
+            'walkforwardhh: loop start': 60., 'walkforwardhh: loop stop': 61.,
+            'runforwardhh: loop start': 70., 'runforwardhh: loop stop': 70.5,
+            'jumphh: start': 80., 'jumphh: loop start': 80.3,
+            'jumphh: loop stop': 80.3, 'jumphh: stop': 80.9})
+        female = FakeSkeleton({'walkforward: loop start': 5., 'walkforward: loop stop': 6.}, speed=80.)
+        return npc_anim.plan(FakeSkeleton(keys), [('idle', 8), ('walk', 8)] +
+                             list(prepare_player_view.BODY_READY), female=female)
+
+    def test_ready_groups_fall_back_to_base_without_replacing_female_normal_walk(self):
+        kit, groups = self.plan()
+        self.assertEqual([g['source'] for g in groups], ['base', 'female'] + ['base'] * 5)
+        by_name = {g['name']: g for g in groups}
+        self.assertAlmostEqual(by_name['walk']['speed'], 20.)
+        self.assertAlmostEqual(by_name['readywalk']['speed'], 25.)
+        start = by_name['readywalk']['base']
+        self.assertEqual(kit.samples[start][1], 60.)
+        self.assertEqual(tuple(kit.pose(start + 2)('bip01')[3, :2]), (1., 2.))
+        self.assertNotEqual(kit.samples[start + 2][1], kit.samples[start][1])
+
+    def test_ready_air_sections_keep_endpoints_and_duration_when_fitted(self):
+        kit, groups = self.plan()
+        reduced, indices = npc_anim.select(groups, {'idle': 8, 'readyjump': 2, 'readyland': 2})
+        self.assertEqual([round(kit.samples[i][1], 2) for i in indices[8:]], [80., 80.3, 80.3, 80.9])
+        self.assertAlmostEqual(reduced[1]['step'], .3)
+        self.assertAlmostEqual(reduced[2]['step'], .6)
+        air = [g for g in groups if g['name'] in ('idle', 'readyjump', 'readyland')]
+        budget = npc_anim.alias_bytes(12, 100, 32, 32, 32)
+        fitted, _ = npc_anim.fit(air, 100, 32, 32, 32, budget=budget)
+        self.assertEqual([g['count'] for g in fitted], [8, 2, 2])
+        with self.assertRaises(npc_anim.AliasBudgetError):
+            npc_anim.fit(air, 100, 32, 32, 32, budget=budget - 1)
+
+
 class BlockDodgeTests(unittest.TestCase):
     def test_block_from_the_shield_group_and_dodges_in_place(self):
         keys = dict(KEYS, **{'shield: block start': 40.0, 'shield: block hit': 40.4, 'shield: block stop': 41.0,
@@ -313,7 +577,12 @@ class MoverTests(unittest.TestCase):
         self.assertIn('AW_AnimSaveSwap (1);', (SRC / 'host_cmd.c').read_text(encoding='latin-1'))
         self.assertIn('AW_AnimMover(e,1);', (SRC / 'aw_companion.c').read_text(encoding='utf-8'))
         combat = (SRC / 'aw_combat.c').read_text(encoding='utf-8')
-        self.assertIn('if(!layout)AW_AnimMover(e,1);', combat)
+        engage = combat[combat.index('int AW_CombatEngage('):combat.index('void AW_CombatClear(')]
+        # Resident activation precedes reading the worn model's layout; an
+        # unavailable declared mover must identify its reactive fallback.
+        self.assertLess(engage.index('AW_AnimMover(e,1);'), engage.index('layout_default(s);'))
+        self.assertIn('if(declared && !AW_AnimMoving(e))', engage)
+        self.assertIn('standing animation fallback', engage)
         self.assertIn('AW_AnimMover(s->e,0)', combat)
 
 

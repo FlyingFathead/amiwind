@@ -27,6 +27,28 @@ class CellProgressMapTest(unittest.TestCase):
         s = M.summarize(data)
         self.assertEqual((s['land'], s['done'], s['planned'], s['ocean'], s['solstheim']), (2, 1, 1, 1, 1))
 
+    def test_reference_keeps_audits_separate_from_release_assignment(self):
+        ref = {'format': 'aw-cell-reference-1', 'generated': '2026-10-12T22:32:16+00:00', 'cells': {
+            '0,0': {'status': 'audits_passed', 'island': 1, 'release': 'v0.0.38'},
+            '1,0': {'status': 'empty_sea', 'island': 1},
+            '2,0': {'status': 'ocean', 'island': 1},
+            '3,0': {'status': 'not_converted', 'island': 1},
+            '4,0': {'status': 'not_started', 'island': 2}}}
+        data = M.map_data(ref)
+        s = M.summarize(data)
+        self.assertEqual((s['land'], s['done'], s['planned'], s['ocean'], s['solstheim']), (3, 2, 0, 1, 1))
+        self.assertEqual(data['generated'], ref['generated'])
+        self.assertEqual(data['cells']['4,0']['x'], 4)
+        self.assertEqual(ref['cells']['0,0']['release'], 'v0.0.38')
+
+    def test_tracker_plan_is_preserved_and_unknown_input_rejected(self):
+        data = {'format': 'aw-cell-progress-1', 'cells': {
+            '0,0': cell(0, 0, 'converted_failing', plan={'state': 'planned'})}}
+        self.assertIs(M.map_data(data), data)
+        self.assertEqual(M.summarize(M.map_data(data))['planned'], 1)
+        with self.assertRaises(ValueError):
+            M.map_data({'format': 'unrecognized', 'cells': {}})
+
 
 if __name__ == '__main__':
     unittest.main()

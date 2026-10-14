@@ -32,6 +32,15 @@ class BuilderSwitch(unittest.TestCase):
 
 
 class Console(unittest.TestCase):
+    def test_same_world_reload_reregisters_real_movers_and_plays_run_attack(self):
+        # Link the actual engine glue, not AW_ANIM_HOST_TEST or a mover stub.
+        native.NativeSourceTests().compile_run('aga_anim_scene_test.c',
+                                               [SRC / 'aw_anim.c', SRC / 'mathlib.c'], cflags=UBSAN)
+        server = (SRC / 'sv_main.c').read_text(encoding='utf-8')
+        start = server.index('memset (&sv, 0, sizeof(sv));')
+        reset = server.index('AW_AnimSceneReset();', start)
+        self.assertLess(reset, server.index('ED_LoadFromFile (sv.worldmodel->entities);', start))
+
     def test_parser_table_and_kit_switch(self):
         native.NativeSourceTests().compile_run('aga_animkit_test.c', [SRC / 'aw_animkit_rules.c', SRC / 'aw_anim.c'],
                                                defines=['AW_ANIM_HOST_TEST'], cflags=UBSAN)

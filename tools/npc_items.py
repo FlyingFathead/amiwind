@@ -190,6 +190,14 @@ def attach_items(kinds, identifier, appearance):
     items = carried_items(kinds, identifier)
     if items:
         appearance['carried_parts'] = {p['carried']: p for p in carried_parts(kinds, items, appearance.get('female', False))}
+        # Weapon type 6 is the original spear stance. The same selected weapon
+        # supplies the item and combat rules, so its attack pose stays aligned.
+        import struct
+        from prepare_combat import equipment, first
+        npc = kinds['NPC_'][identifier.casefold()]
+        weapon, _ = equipment(kinds, npc, struct.unpack_from('<h', first(npc, 'NPDT'))[0])
+        if weapon and weapon[2] == 6:
+            appearance['attack_stance'] = 'weapontwowide'
     return appearance
 
 

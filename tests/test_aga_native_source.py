@@ -91,6 +91,11 @@ def includes_aw_log(fixture, seen=None):
 @unittest.skipIf(os.name == 'nt', 'native helper fixtures run on Linux, including the Docker gate')
 @unittest.skipUnless(shutil.which('cc'), 'install a host C compiler')
 class NativeSourceTests(unittest.TestCase):
+    def test_swimming_idle_and_pitch_directed_motion(self):
+        self.compile_run('aga_water_move_test.c', [Path(SOURCE)/'src'/n for n in
+            ('sv_user.c', 'mathlib.c')],
+            cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+
     def test_brightness_controls_six_steps_independent_sliders_and_return(self):
         self.compile_run('aga_brightness_menu_test.c', [Path(SOURCE)/'src/aw_menu.c'],
             defines=['AMIWIND_DEBUG_LUMA=1'],
@@ -117,6 +122,11 @@ class NativeSourceTests(unittest.TestCase):
     def test_first_save_description_loads_character_catalogue(self):
         self.compile_run('aga_save_frontmenu_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_save.c', 'aw_save_codec.c')])
+
+    def test_autosave_preserves_safe_checkpoint_through_lava_and_arrival(self):
+        self.compile_run('aga_autosave_safety_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_save.c', 'aw_save_codec.c', 'mathlib.c')],
+            cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
 
     def test_harvest_original_loot_transaction_capacity_and_save_persistence(self):
         self.compile_run('aga_harvest_test.c', [Path(SOURCE)/'src'/n for n in
@@ -555,6 +565,10 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_coordinate_toggle_and_reserved_strip(self):
         self.compile_run("aga_hud_test.c", [ROOT/"engine/aga/src/aw_hud.c"])
+
+    def test_inspection_click_identity_occlusion_and_attack_restore(self):
+        self.compile_run("aga_inspect_test.c", [ROOT/"engine/aga/src/aw_inspect.c", Path(SOURCE)/"src/mathlib.c"],
+                         cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_photo_mode_hides_restores_and_returns_player(self):
         self.compile_run("aga_photo_test.c", [ROOT/"engine/aga/src/aw_photo.c"])

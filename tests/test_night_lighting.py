@@ -194,7 +194,9 @@ class BuilderWiringTests(unittest.TestCase):
         tables = finalize.index('stage_night_lighting(boot/')
         self.assertLess(finalize.rindex('verify_optimized_maps(boot/', 0, tables), tables)
         self.assertLess(finalize.index('optimize_maps(boot/'), tables)
-        self.assertLess(tables, finalize.index('write_content_fingerprint(boot/'))
+        self.assertLess(tables, finalize.index('image_content_fingerprint(args, boot/'))
+        import inspect
+        self.assertIn('write_content_fingerprint(', inspect.getsource(build_aga.image_content_fingerprint))
         self.assertLess(tables, finalize.index('pack_world_volumes(boot'))
         self.assertIn("'night_lighting':night_lighting,", finalize)
 

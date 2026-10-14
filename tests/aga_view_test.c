@@ -8,6 +8,8 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
+#include "aw_anim.h"
 #include "aw_view.h"
 
 static int near(float a,float b){return fabsf(a-b)<.001f;}
@@ -122,8 +124,89 @@ static void tap(void) {
     assert(v.mode==AW_VIEW_FIRST && v.primary==AW_VIEW_FIRST && v.pov_held==0);
     v.mode=AW_VIEW_DEATH;AW_ViewPOVTap(&v,&r);assert(v.mode==AW_VIEW_DEATH);
 }
+static void body_layers(void) {
+    const char *text="idle:0:8:0.25 $1:0:8:20:2 $1:8:4:36:2 $1:12:4:44:2 $1:16:2:52:2 $1:18:2:56:2 "
+        "$4:0:8:60:2 $4:8:4:76:2 $4:12:4:84:2 $4:16:2:92:2 $4:18:2:96:2";
+    aw_view_layers_t layers;int i,j,k;char bad[512],*p;
+    assert(AW_ViewLayersParse(&layers,text,100) && layers.count==10);
+    for(i=0;i<layers.count;i++){
+        const aw_view_layer_t *r=&layers.rows[i];
+        for(j=0;j<r->count;j++)for(k=0;k<2;k++)
+            assert(AW_ViewLayerFrame(&layers,r->action,r->motion+j,(float)k)==r->base+k*r->count+j);
+    }
+    assert(AW_ViewLayerFrame(&layers,2,0,0)==-1);
+    assert(AW_ViewLayerFrame(&layers,1,20,0)==-1); /* no recursive overlay */
+    assert(AW_ViewLayerFrame(&layers,1,0,-.1f)==-1);
+    assert(AW_ViewLayerFrame(&layers,1,0,1.1f)==-1);
+    assert(AW_ViewLayerFrame(&layers,1,0,NAN)==-1);
+    assert(!AW_ViewLayersParse(&layers,text,99) && layers.count==0);
+    assert(!AW_ViewLayersParse(&layers,"idle:0:8:0.25",100) && layers.count==0);
+    assert(!AW_ViewLayersParse(&layers,NULL,100) && layers.count==0);
+    strcpy(bad,text);p=strstr(bad,"$1:8:4:36:2");p[7]='2';p[8]='0'; /* overlap first grid */
+    assert(!AW_ViewLayersParse(&layers,bad,100) && layers.count==0);
+    strcpy(bad,text);p=strstr(bad,"$4:18:2:96:2");p[3]='0'; /* unpaired movement */
+    assert(!AW_ViewLayersParse(&layers,bad,100) && layers.count==0);
+    strcpy(bad,text);strcat(bad," $1:0:8:20:2");
+    assert(!AW_ViewLayersParse(&layers,bad,100) && layers.count==0);
+    strcpy(bad,text);strcat(bad," $9999:0:8:20:2");
+    assert(!AW_ViewLayersParse(&layers,bad,100) && layers.count==0);
+    assert(AW_ViewLayersParse(&layers,text,100)); /* failure cannot poison a later valid load */
+}
+static void compact_body_layers(void) {
+    const char *text="idle:0:8:0.25 walk:8:4:0.1:20 run:12:4:0.1:60 jump:16:2:0.2 land:18:2:0.2 "
+        "ready:20:8:0.25 readywalk:28:4:0.1:20 readyrun:32:4:0.1:60 "
+        "readyjump:36:2:0.2 readyland:38:2:0.2 "
+        "$1:0:8:40:2:1 $1:8:4:42:2:2 $1:12:4:46:2:2 $1:16:2:50:2:1 $1:18:2:52:2:1 "
+        "$4:0:8:54:2:1 $4:8:4:56:2:2 $4:12:4:60:2:2 $4:16:2:64:2:1 $4:18:2:66:2:1 "
+        "$3:20:8:68:3:1:600 $3:28:4:71:3:2:600 $3:32:4:77:3:2:600 "
+        "$3:36:2:83:3:1:600 $3:38:2:86:3:1:600";
+    aw_view_layers_t layers;aw_anim_t anim;aw_anim_play_t play={0};aw_anim_air_t air={0};
+    char bad[1024],*p;float rate;int group,frame;
+    assert(AW_AnimParse(&anim,text,89));
+    assert(AW_ViewLayersParse(&layers,text,89) && layers.count==15);
+    assert(AW_ViewLayersBind(&layers,&anim));
+    assert(AW_ViewLayerFrame(&layers,1,8,0)==42);
+    assert(AW_ViewLayerFrame(&layers,1,11,1)==45);
+    assert(AW_ViewLayerFrame(&layers,3,28,0)==71);
+    assert(AW_ViewLayerFrame(&layers,3,31,.29f)==72);
+    assert(AW_ViewLayerFrame(&layers,3,31,.3f)==74); /* source hit at 60% of punch */
+    assert(AW_ViewLayerFrame(&layers,3,31,.8f)==76);
+    group=AW_AnimPlayerMoveGroup(&anim,0,0,1,&rate);
+    assert(group==AW_ANIM_READY);
+    frame=AW_AnimPlayerAdvance(&anim,&play,group,0,rate);
+    assert(AW_ViewLayerFrame(&layers,3,frame,.6f)>=68);
+    group=AW_AnimPlayerMoveGroup(&anim,55,0,1,&rate);
+    assert(group==AW_ANIM_READYRUN);
+    frame=AW_AnimPlayerAdvance(&anim,&play,group,.1f,rate);
+    assert(frame>=32 && frame<36 && AW_ViewLayerFrame(&layers,3,frame,.6f)>=77);
+    frame=AW_AnimAirFrame(&anim,&air,1,1,1,1,.1f);
+    assert(frame>=36 && frame<38 && AW_ViewLayerFrame(&layers,3,frame,.6f)>=83);
+    assert(!AW_ViewLayersParse(&layers,text,88));
+    strcpy(bad,text);p=strstr(bad,"$3:28:4:71:3:2:600");p[15]='0';
+    assert(!AW_ViewLayersParse(&layers,bad,89)); /* hit is strictly between endpoints */
+    assert(AW_ViewLayersParse(&layers,text,89));
+    anim.g[AW_ANIM_READYRUN].base++;
+    assert(!AW_ViewLayersBind(&layers,&anim)); /* bound to the ready run, not normal run */
+}
+static void player_torch_emitters(void) {
+    unsigned char p[33]={ 'A','W','B','T',0,2,0,0 };aw_view_torch_t out;
+    /* Two actual signed 16.16 positions, including both allowed endpoints. */
+    p[8]=255;p[9]=254;p[10]=128; /* -1.5 */
+    p[17]=128;                 /* frame0 Z +128 */
+    p[20]=255;p[21]=128;       /* frame1 X -128 */
+    assert(AW_ViewTorchParse(&out,p,32,2) && out.count==2);
+    assert(out.point[0][0]==-1.5f && out.point[0][2]==128 && out.point[1][0]==-128);
+    assert(!AW_ViewTorchParse(&out,p,31,2) && !out.count);
+    assert(!AW_ViewTorchParse(&out,p,33,2) && !out.count);
+    assert(!AW_ViewTorchParse(&out,p,32,3) && !out.count);
+    p[7]=1;assert(!AW_ViewTorchParse(&out,p,32,2));p[7]=0;
+    p[0]='X';assert(!AW_ViewTorchParse(&out,p,32,2));p[0]='A';
+    p[4]=1;p[5]=1;assert(!AW_ViewTorchParse(&out,p,32,257));p[4]=0;p[5]=2;
+    p[19]=1;assert(!AW_ViewTorchParse(&out,p,32,2) && !out.count && out.point[0][0]==0);
+    assert(!AW_ViewTorchParse(&out,NULL,0,0));
+}
 int main(void) {
-    defaults();toggle();tap();vanity();zoom();death();
+    defaults();toggle();tap();vanity();zoom();death();body_layers();compact_body_layers();player_torch_emitters();
     puts("view rules ok");
     return 0;
 }

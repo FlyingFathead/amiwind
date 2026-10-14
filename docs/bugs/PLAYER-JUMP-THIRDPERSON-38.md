@@ -31,9 +31,12 @@ were not supplied with this report.
 
 ## How it happened
 
-Cause unknown. Inspect existing AmiQuake jump/ground state and the player model
-animation selector before designing a repair. Distinguish absent source groups,
-conversion omissions, missing packaged frames and runtime selection failures.
+Source diagnosis, 13 October 2026: the body converter requested the move profile
+and shield block only. The engine's body selector used horizontal speed and water
+state, with death and block overrides; it never read ground contact or selected a
+jump. The original human and beast skeletons contain jump start, coincident loop
+start/stop, and stop keys. This is both a conversion omission and a missing
+runtime selection path, rather than evidence that the original lacks the group.
 
 ## Why it was not caught
 
@@ -47,19 +50,45 @@ Owner report only; native reproduction remains pending.
 
 ## Repair
 
-Pending diagnosis. Reuse existing movement state and animation machinery and
-measure baseline CPU/memory impact. Preserve jump physics unless separately
-demonstrated incorrect. Coordinate swim/dive transitions with animation coverage.
+Candidate source adds two optional alias-frame sections: takeoff ending at the
+airborne pose, and landing ending at the standing pose. The existing AmiQuake
+FL_ONGROUND and vertical velocity select them; the animation kit advances frames
+through the same entity.frame/R_AliasSetupFrame mechanism. A ledge fall starts at
+the held airborne pose, and contact plays landing once. Re-jumping interrupts
+landing. Swimming, noclip, death, changing scenes and leaving third person clear
+the transient visual state. No jump velocity or collision rule changes.
+
+The converter preserves both section endpoints under the existing 512 KiB model
+cap and records each group's source; missing original jump keys fail the player
+body build instead of substituting idle. Old models without both sections retain
+their previous locomotion. The two added group IDs follow all existing IDs.
+Readied-weapon jump variants, equipment and sneak-specific behavior remain outside
+this candidate. Model bytes, native frame cost and appearance need measurement.
 
 ## Verification
 
-Open, no candidate or independently verified repair.
+Open. The integrated RC1 source completed its automated suite and Amiga
+compilation on 13 October 2026. Regenerated bodies, all-appearance readback
+and matched native/OpenMW acceptance remain required.
+Cases cover takeoff, held air, landing, ledge falls, repeated jumps, disabled
+animation, missing legacy groups and frame-budget endpoint retention. Original
+OpenMW refreshJumpAnims separates start/loop and landing in the same way; that
+source comparison does not replace actual matched captures.
 
 ## Prevention
 
 Include third-person jump and landing in player animation coverage, with
 equipment variants and supported appearances. Keep visual and physics checks
 separate and compare matched original behavior.
+
+## Exact RC1 evidence, 13 October 2026
+
+The exact RC1 package was independently extracted and read back. All 20 body
+models and layouts passed their actual-format checks; 1,751 existing non-body
+model/animation assets remained byte-identical. A Nord male session exercised
+third-person ready/lower, movement, jump and camera changes. This is one
+appearance and scene; matched original-game views, all-appearance motion,
+loaded memory and performance acceptance remain separate.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -75,6 +104,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [CHIM-COURT-BARREL-USE-33](CHIM-COURT-BARREL-USE-33.md): Census courtyard on CHIM: Fargoth's ring barrel cannot be used, so the opening cannot proceed
 - CLOCK-01 (no report page): Automatic clock dropped fractional milliseconds each frame
 - [COMBAT-BLOCKING-36](COMBAT-BLOCKING-36.md): Requested: blocking in combat - NPCs block by their Block skill with a block animation, the player blocks with the right mouse button
+- [COMBAT-FATIGUE-HEALTH-DAMAGE-39](COMBAT-FATIGUE-HEALTH-DAMAGE-39.md): Clarify Eldafire bare-fist fatigue damage versus armed guard health damage
 - [COMBAT-FIST-BLOCK-33](COMBAT-FIST-BLOCK-33.md): A fighter with a shield blocks while fighting with fists
 - [COMBAT-HIT-RECOVERY-33](COMBAT-HIT-RECOVERY-33.md): Fatigue hits did not stagger, and knockdowns lasted half a second too long
 - [COMBAT-NO-CONDITION-33](COMBAT-NO-CONDITION-33.md): Weapon and shield condition were ignored in combat
@@ -89,10 +119,13 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [INTRO-CAMERA-GATING-38](INTRO-CAMERA-GATING-38.md): Opening vanity and third-person cameras expose an unselected default race
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
 - [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry
+- [PLAYER-MOVEMENT-STATS-PARITY-39](PLAYER-MOVEMENT-STATS-PARITY-39.md): Walking/running use fixed debug speeds and do not apply original stats or running fatigue
 - [PLAYER-READY-WATER-MOVEMENT-38](PLAYER-READY-WATER-MOVEMENT-38.md): Readied weapon or torch appears to allow walking on water
 - [QC-AW-FLAME-SPAWN-32](QC-AW-FLAME-SPAWN-32.md): Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields
 - RENDER-METADATA-29 (no report page): Native renderer metadata warns as an unknown QuakeC field
 - SAVE-EQUIPMENT-29 (no report page): Quickload returns with hands and torch put away
+- [SAVE-LAVA-DEATH-LOOP-38](SAVE-LAVA-DEATH-LOOP-38.md): Lava fall can leave an autosave that reloads into repeated death
+- [SAVE-TELEPORT-CHECKPOINT-38](SAVE-TELEPORT-CHECKPOINT-38.md): Successful teleport needs a safe destination checkpoint
 - [SERVER-FRAME-ARRIVAL-33](SERVER-FRAME-ARRIVAL-33.md): The server frame costs about 226 ms per frame at the Balmora arrival camera on a slow 68040
 - [WAIT-DURING-COMBAT-36](WAIT-DURING-COMBAT-36.md): Waiting is allowed in the middle of a fight
 - [WAIT-FEET-IN-WATER-36](WAIT-FEET-IN-WATER-36.md): Waiting is allowed with the feet in water (the original refuses it)

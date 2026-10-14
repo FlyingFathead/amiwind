@@ -215,7 +215,8 @@ class ImageWiringTests(unittest.TestCase):
                        'optimize_maps'):
             at = final.index(writer)
             self.assertTrue(any(c > at for c in checks), writer)
-        self.assertLess(max(checks), final.index('write_content_fingerprint'))
+        self.assertLess(max(checks), final.index('image_content_fingerprint'))
+        self.assertIn('write_content_fingerprint', [row[2] for row in self.calls('image_content_fingerprint')])
         self.assertGreater(max(checks), final.index('stage_night_lighting'))
 
     def test_fallback_alias_copy_is_not_applied_to_recorded_maps(self):

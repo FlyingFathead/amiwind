@@ -82,6 +82,9 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - HAND-IDLE-BLINK-29 (no report page): Fists disappear once per idle breathing cycle
 - HAND-PUNCH-COVERAGE-29 (no report page): Near-plane opening at maximum punch extension
 - HAND-PUNCH-TRANSITION-29 (no report page): Hands briefly disappear when changing into the punch animation
+- [PLAYER-BODY-LEG-SHAPE-39](PLAYER-BODY-LEG-SHAPE-39.md): Nord player legs appear abnormally thin in RC1
+- [PLAYER-MOVEMENT-FRAME-SKIP-39](PLAYER-MOVEMENT-FRAME-SKIP-39.md): Third-person Nord and Khajiit fast movement loses smooth foot animation
+- [PLAYER-PUNCH-THIRDPERSON-39](PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation
 - [PLAYER-READY-THIRDPERSON-38](PLAYER-READY-THIRDPERSON-38.md): Third-person player lacks fists-up and weapon-draw animation
 - [PLAYER-TORCH-THIRDPERSON-38](PLAYER-TORCH-THIRDPERSON-38.md): Player torch and holding pose disappear in third person while light remains
 - TORCH-FLAME-VISIBILITY-29 (no report page): Torch flame not visible after changing styles

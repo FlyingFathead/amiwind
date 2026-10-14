@@ -14,14 +14,16 @@
 
 const aw_animkit_group_t aw_animkit_groups[]={
     {"idle",AW_ANIM_IDLE},{"idle2",-1},{"idle3",-1},{"idle4",-1},{"idle5",-1},{"idle6",-1},{"idle7",-1},
-    {"idle8",-1},{"idle9",-1},{"idlehh",-1},{"idle1h",-1},{"idle2c",-1},{"idle2w",-1},{"idleswim",AW_ANIM_SWIMIDLE},
+    {"idle8",-1},{"idle9",-1},{"idlehh",AW_ANIM_READY},{"idle1h",-1},{"idle2c",-1},{"idle2w",-1},{"idleswim",AW_ANIM_SWIMIDLE},
     {"idlespell",-1},{"idlecrossbow",-1},{"idlesneak",-1},{"idlestorm",-1},{"torch",-1},
     {"hit1",AW_ANIM_HIT},{"hit2",-1},{"hit3",-1},{"hit4",-1},{"hit5",-1},
     {"swimhit1",-1},{"swimhit2",-1},{"swimhit3",-1},
     {"death1",AW_ANIM_DEATH},{"death2",-1},{"death3",-1},{"death4",-1},{"death5",-1},
     {"deathknockdown",-1},{"deathknockout",-1},{"swimdeath",-1},{"swimdeath2",-1},{"swimdeath3",-1},
     {"knockdown",AW_ANIM_KNOCK},{"knockout",-1},{"swimknockdown",-1},{"swimknockout",-1},
-    {"jump",-1},
+    {"jump",AW_ANIM_JUMP}, /* player takeoff/air hold; land is the second section */
+    {"jumphh",AW_ANIM_READYJUMP},
+    {"walkforwardhh",AW_ANIM_READYWALK},{"runforwardhh",AW_ANIM_READYRUN},
     {"walkforward",AW_ANIM_WALK},{"walkback",-1},{"walkleft",-1},{"walkright",-1},
     {"turnleft",-1},{"turnright",-1},
     {"runforward",AW_ANIM_RUN},{"runback",-1},{"runleft",-1},{"runright",-1},

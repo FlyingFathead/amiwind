@@ -633,12 +633,13 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
         raise ValueError('Flora source master/palette differs from retained world')
     # CHIM region cells (docs/BUILD_MANIFEST.md step 2): no map was made for them, so none is made here; their
     # flora is in the CHIM world.
-    chim_rows = [e for e in directory['regions'] if e.get('chim_region')]
-    chim_cells = {tuple(e['cell']) for e in chim_rows}
-    entries = [e for e in directory['regions'] if not e.get('chim_region')]
+    from exterior_plan import no_legacy_map, skipped_row, reference_in_chim_town
+    chim_rows = [e for e in directory['regions'] if no_legacy_map(e)]
+    chim_cells = {tuple(e['cell']) for e in chim_rows if e.get('chim_region')}
+    entries = [e for e in directory['regions'] if not no_legacy_map(e)]
     expected_base = {r['name']: r for r in base_receipt['regions']}
     for row in chim_rows:
-        if not expected_base.get(row['name'], {}).get('chim_region'):
+        if skipped_row(expected_base.get(row['name'], {})) != skipped_row(row):
             raise ValueError('CHIM region cell map differs between terrain and scenery: ' + row['name'])
     for entry in entries:
         if entry['name'] not in expected_base or digest(base / entry['name'] / 'scene.bsp') != expected_base[entry['name']]['sha256']:
@@ -711,7 +712,7 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
         raise FloraBudgetError(str(error)+' ('+str(out/'conversion-status.json')+')',error.failures,error.converted,
                                error.not_started) from None
     results+=converted;failures+=failed
-    results += [{'name': e['name'], 'chim_region': True, 'source_references': []} for e in chim_rows]
+    results += [{'name': e['name'], **skipped_row(e), 'source_references': []} for e in chim_rows]
     results.sort(key=lambda r:r['name'])
     status={'completed_regions':len(results),'failed_regions':len(failures),'reused_regions':len(adoption['reused']),
             'input_contract_sha256':contract['sha256'],'failures':failures}
@@ -720,6 +721,9 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
     covered = {identity(r['source_key']) for e in results for r in e['source_references']}
     expected = {identity(r['source_key']) for r in receipt['placements']}
     in_chim = {identity(r['source_key']) for r in receipt['placements'] if tuple(r.get('cell') or ()) in chim_cells}
+    checklist = directory.get('exterior_checklist')
+    if checklist:
+        in_chim |= {identity(r['source_key']) for r in receipt['placements'] if reference_in_chim_town(r, checklist)}
     if not only and (covered - expected or (expected - covered) - in_chim):
         raise ValueError('Full-world flora overlay omitted/invented source references')
     for asset in receipt['assets']:
@@ -760,6 +764,7 @@ def check_chim_cells(text, terrain):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--exterior-plan', type=Path)
     for name in ('terrain', 'base', 'flora', 'palette', 'out'):
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--resume-from',type=Path)
@@ -770,6 +775,8 @@ def main():
     parser.add_argument('--chim-regions-cells', metavar='CELLS', help='CHIM region cells ("x,y:k ...", tools/build.py): checked against the terrain stage\'s receipt, which made no map for them (docs/BUILD_MANIFEST.md)')
     parser.add_argument('--only', nargs='+');add_jobs(parser);args = parser.parse_args()
     check_chim_cells(args.chim_regions_cells, args.terrain)
+    from exterior_plan import verify_stage
+    verify_stage(args.exterior_plan, args.terrain)
     result = prepare(args.terrain, args.base, args.flora, args.palette, args.out, args.jobs, args.only, args.aggregate_sprite_collision, args.collision_packing,args.resume_from,args.adopt_legacy_resume_inputs,args.resume_unchanged_regions)
     print('WORLD FLORA SOURCE COVERAGE', result['covered_unique_original_refs'], 'original refs; runtime acceptance pending')
 

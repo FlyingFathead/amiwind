@@ -5,6 +5,7 @@
 #include "aw_clock.h"
 #include "aw_npc_lod.h"
 int sb_lines;
+void (*aw_inspect_draw)(void);
 /* Set by Chim_Init: original coordinates on an active CHIM frame. */
 int (*aw_chim_source)(const float *local,float *world);
 /* GLOBAL position for the debug readouts: the world directory's transform,
@@ -212,6 +213,7 @@ void Sbar_Draw(void) {
     AW_UIHud();
     compass();
     AW_NpcLodDrawLabels();
+    if(aw_inspect_draw)aw_inspect_draw();
     /* Its strip replaces the bottom HUD. Photo mode hides it like everything
      * else over the view; Ctrl+H (dbg hud) brings it back with the debug HUD.
      * Its keys keep working while hidden (AW_WaitKey). */

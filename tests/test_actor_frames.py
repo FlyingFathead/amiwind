@@ -19,6 +19,7 @@ from player_hull import pack_lumps
 
 ROOT = Path(__file__).resolve().parents[1]
 KIT = 'idle:0:8:0.3333 walk:8:8:0.1333:24.63 run:16:6:0.1556:50.56 @walk:2:right ~left:a.wav:b.wav:c.wav !attack:0123456789012345:rg80'
+PLAYER = 'idle:0:8:0.3333 walk:8:8:0.1333 attack:16:64:0.1 $1:8:8:80:3'
 
 
 def header_only(frames):
@@ -69,21 +70,49 @@ class LayoutTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'run group outside'):
             of_model(20, KIT)
         with self.assertRaisesRegex(ValueError, 'frame count outside'):
+            of_model(257, PLAYER)
+        with self.assertRaisesRegex(UndeclaredLayout, 'Undeclared'):
             of_model(65)
         with self.assertRaisesRegex(ValueError, 'repeats'):
             parse('idle:0:8:1 idle:8:8:1')
 
     def test_kit_profiles_fit_the_helper(self):
-        # Every configured kit profile: idle first, 8 frames (the QuakeC idle cycle), at most MAX_FRAMES.
+        # NPC profiles retain their own 64-frame total budget; player layers do not enlarge it.
         import npc_anim
         for name, groups in npc_anim.profiles().items():
             self.assertEqual(tuple(groups[0]), ('idle', actor_frames.IDLE_FRAMES), name)
-            self.assertLessEqual(sum(c for _, c in groups), actor_frames.MAX_FRAMES, name)
+            self.assertLessEqual(sum(c for _, c in groups), actor_frames.MAX_GROUP_FRAMES, name)
             layout = ' '.join('%s:%d:%d:0.1' % (g, sum(c for _, c in groups[:i]), c) for i, (g, c) in enumerate(groups))
             self.assertEqual(of_model(sum(c for _, c in groups), layout).idle, (0, 8))
 
+    def test_player_total_frames_and_runtime_group_limit_are_distinct(self):
+        from npc_geometry import ALIAS_MAX_FRAMES
+        self.assertEqual(actor_frames.MAX_FRAMES, ALIAS_MAX_FRAMES)
+        layout = of_model(ALIAS_MAX_FRAMES, PLAYER)
+        self.assertEqual(layout.frames, 256)
+        self.assertEqual(layout.idle, (0, 8))
+        self.assertEqual(layout.group('attack'), (16, 64))
+        self.assertEqual(set(layout.groups), {'idle', 'walk', 'attack'})
+        with self.assertRaisesRegex(ValueError, 'attack group exceeds 64'):
+            of_model(256, 'idle:0:8:0.3 attack:8:65:0.1')
+        for frames in (65, 256):
+            with self.assertRaises(UndeclaredLayout):
+                of_model(frames)
+
 
 class GroundCheckTests(unittest.TestCase):
+    def test_generated_player_model_above_64_frames_decodes_for_idle_contact(self):
+        from check_actor_ground import model_frames, contact_samples
+        from npc_geometry import animated_mdl, ALIAS_MAX_FRAMES
+        points = np.zeros((ALIAS_MAX_FRAMES, 3, 3))
+        points[:, 1, 0] = 1; points[:, 2, 1] = 1
+        raw = animated_mdl(points, np.array([[0, 1, 2]]),
+                           np.array([[0, 0], [8, 0], [0, 8]]), Image.new('P', (16, 16)))
+        frames = model_frames(raw)
+        self.assertEqual(len(frames), ALIAS_MAX_FRAMES)
+        self.assertEqual(contact_samples(frames, (0, 0, 0), layout=PLAYER),
+                         contact_samples(frames[:8], (0, 0, 0)))
+
     def test_contact_samples_take_the_idle_group_of_every_layout(self):
         from check_actor_ground import contact_samples
         idle = [[(0, 0, 0), (2, 0, 0), (0, 2, 0)]] * 8
@@ -165,6 +194,14 @@ class PayloadAuditTests(unittest.TestCase):
                                                   npc('progs/intro.mdl', intro='1') + npc('progs/old.mdl', 'aw_corpse') +
                                                   npc('progs/dead.mdl', 'aw_corpse')))
         self.assertEqual(audit_payload(self.id1), {'actor_models': 4, 'layouts': 2, 'item_tags': 3, 'other_maps': 0})
+
+    def test_layered_player_body_preflight_accepts_total_but_enforces_group_budget(self):
+        self.put('progs/player.mdl', 256, PLAYER, tag=256)
+        self.assertEqual(audit_payload(self.id1),
+                         {'actor_models': 0, 'layouts': 1, 'item_tags': 1, 'other_maps': 0})
+        (self.id1 / 'progs/player.anm').write_text('idle:0:8:0.3 attack:8:65:0.1\n')
+        with self.assertRaisesRegex(ValueError, 'attack group exceeds 64'):
+            audit_payload(self.id1)
 
     def test_every_problem_is_listed(self):
         self.put('progs/kit.mdl', 17, 'idle:0:8:0.3 hit:8:3:0.3 death:11:6:0.3 >progs/gone_m.mdl', tag=64)

@@ -97,6 +97,7 @@ DOCUMENTATION_IMAGES.add("docs/images/amiwind-builder-savings.png")
 # Build Timeline example (docs/BUILD_PROFILE.md), drawn by tools/build_profile.py timeline from one build run.
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.36-build-timeline.png")
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.36-progress-map.png")
+DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.39-dev1-progress-map.png")
 # Toolkit screenshots (amiwind-toolkit/README.md): World with the CHIM progress tracker, the 3D Inspector on a .chim map
 # and on a CHIM world with the memory overlay.
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.36-toolkit-{name}.png" for name in ("world-chim-tracker", "inspector-chim-map", "inspector-chim-world-memory", "monitor"))

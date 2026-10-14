@@ -604,10 +604,14 @@ def compile_region(task):
     return result
 
 
-def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=None,chim_cells=None):
+def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=None,chim_cells=None,exterior_plan=None):
     survey=survey.resolve();out=ensure_external(out,'world terrain').resolve();out.mkdir(parents=True,exist_ok=True)
     scene=ensure_external(scene,'private scene').resolve();bindir=bindir.resolve()
     report, entries=plan(survey)
+    from exterior_plan import read as read_checklist, classify_regions
+    checklist = read_checklist(exterior_plan) if exterior_plan else None
+    ownership = classify_regions(checklist, entries, report['master_sha256'], set(chim_cells or ())) if checklist else {}
+    routing_only = {name for name, kind in ownership.items() if kind == 'routing-only'}
     if digest(child_ci(data,'Morrowind.esm'))!=report['master_sha256'] or digest(child_ci(data,'Morrowind.bsa'))!=report['bsa_sha256']:
         raise ValueError('Original inputs differ from the measured survey')
     if (out/'world-regions.json').exists():
@@ -640,7 +644,7 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     if cells and found!=cells:
         raise ValueError('CHIM region cells without an open-world map: %s'
                          %' '.join('%d,%d'%c for c in sorted(cells-found)))
-    compiled=[e for e in entries if e['name'] not in skipped]
+    compiled=[e for e in entries if e['name'] not in skipped | routing_only]
     for e in compiled:
         local = region_lava(e, pools)
         if local:
@@ -662,6 +666,11 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
         divided+=len(by_cell[cell])>1
         for result in merge_chim_rows(by_cell[cell]):
             rows[result['name']]=result
+    # Fully town-owned cores are directory metadata only. Their BSP compiler is
+    # never invoked. Interiors are not part of this exterior region inventory.
+    for e in entries:
+        if e['name'] in routing_only:
+            rows[e['name']] = dict(e, converted=None, routing_only=True)
     if skipped:
         print('World terrain: %d maps of %d CHIM region cells not made (their CHIM frames own the cells; %d divided '
               'cells: one directory row owns each, the other rows are its aliases)'%(len(skipped),len(by_cell),divided),
@@ -677,13 +686,16 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
         lava=dict(mode=lava.lava_mode(), source_pools=len(pools), sounds=sound_receipts,
                   references=sorted({p['reference'] for e in compiled for p in e.get('lava_pools',())})),
         diagnostic_subset=bool(only),regions=results)
+    if checklist:
+        receipt['exterior_checklist'] = checklist
+        receipt['routing_only_maps_not_made'] = sorted(routing_only)
     if skipped:
         receipt['chim_region_cells']=sorted([list(c) for c in cells])
     if not only:
         receipt['town_handoffs'] = town_handoffs(report)
         packet = region_directory(report, results)
         for e in results:
-            if e.get('chim_region'):
+            if e.get('chim_region') or e.get('routing_only'):
                 continue
             shutil.copyfile(out/e['name']/'scene.bsp',scene/'id1/maps'/f"{e['name']}.bsp")
         (scene/'id1/world').mkdir(parents=True,exist_ok=True)
@@ -694,6 +706,7 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--exterior-plan', type=Path)
     for name in ('survey','data-files','scene','out','bindir'):p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--only',nargs='+',help='Diagnostic subset; never publishes a partial world directory')
     p.add_argument('--cache',type=Path,help='Verified per-map cache across builds (development builds); '
@@ -709,4 +722,4 @@ if __name__=='__main__':
     if a.chim_regions_cells:
         from chim.regions import decode_cells
         cells=set(decode_cells(a.chim_regions_cells))
-    prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only,a.vis_mode,a.cache,cells)
+    prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only,a.vis_mode,a.cache,cells,a.exterior_plan)

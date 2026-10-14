@@ -9,7 +9,7 @@
 | Where | CHIM frame map of Seyda Neen (tools/chim/frame_map.py) and the engine's CHIM zone (chim_world.c) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | v0.0.33-dev, v0.0.39-rc1 (last seen) |
 | Severity | high: Below the 2 MiB Hunk-gap safety, a larger load or a later allocation can run the Hunk out on Seyda Neen. |
 | Family | Map heap and memory budget (`heap-memory`) |
 | CHIM | Performance ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -19,6 +19,25 @@
 | Unknown because | found in source on a CHIM branch; no CHIM world build recorded with the finding |
 
 <!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [Status: 9 October 2026](#status-9-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Exact RC1 evidence, 13 October 2026](#exact-rc1-evidence-13-october-2026)
+- [Scoped corrected-engine repeat, 13 October 2026](#scoped-corrected-engine-repeat-13-october-2026)
+- [Post-pin RC2 package observation, 14 October 2026](#post-pin-rc2-package-observation-14-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 9 October 2026
 
@@ -108,6 +127,24 @@ Pending.
 
 The builder's heap gate checks the whole map's Hunk against the 2 MiB safety, not only the zone
 (stated through `tools/engine_limits.py`), and an FS-UAE load of every CHIM town reads the audit.
+
+## Exact RC1 evidence, 13 October 2026
+
+13 October 2026, v0.0.39-rc1: exact-package FS-UAE inspection still reports a
+Seyda Hunk gap of 2,091,392 bytes, 5,760 bytes below the 2 MiB safety. The
+reported post-zone map use exceeds its stated figure by 5,808 bytes. Load and
+scoped gameplay completed, but reserve safety remains open; no universal
+memory/performance or owner acceptance is established.
+
+## Scoped corrected-engine repeat, 13 October 2026
+
+The two isolated diagnostics at corrected source4b968c2 use unchanged RC1 assets. Initial Seyda first presentation reports current gap2,091,392 bytes and peak gap2,090,672, both under the2,097,152-byte safety target. After the same-map development restart, current gap2,113,264 is above the target, while first-presented peak gap1,586,032 is below it and the safety warning remains. Distinguish stable and peak values; gameplay and observed AmigaDOS exit do not establish reserve safety or normal-speed performance. Record this under the existing issue without claiming a new regression, new world coverage or owner acceptance.
+
+## Post-pin RC2 package observation, 14 October 2026
+
+Exact RC2 package native inspection repeats startup hunk-reserve warnings and zone-full chunks 100/107 retries after water and land return. A playable scene and successful guest exit do not prove complete chunk recovery, memory headroom or performance acceptance. This remains an existing open finding.
+
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

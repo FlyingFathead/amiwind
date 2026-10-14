@@ -5,6 +5,18 @@ Toggle POV key, a slow orbit around the character after a while without input (t
 death the camera moves behind the falling body, the death music plays and the game asks whether to load the
 most recent save. AmiWind adds one choice to that question: **Retry fight** after a lost fight.
 
+<!-- contents start -->
+## Contents
+
+- [Keys](#keys)
+- [The death scene](#the-death-scene)
+- [Sources](#sources)
+- [The player's body](#the-players-body)
+- [Console](#console)
+- [Build switches](#build-switches)
+
+<!-- contents end -->
+
 ## Keys
 
 | Key | What it does |
@@ -85,10 +97,41 @@ and sex (20 models, about 0.5 MB each): the original's new-game player record (a
 shoes) over the race's own skin, the race and sex's first head and hair, and the animation kit's groups from
 the skeleton's own text keys (idle, walk, run, hit, death and the shield block; female humans take the female skeleton's walk,
 beast races their own skeleton). The engine picks the model of the character's race and sex and plays walk
-or run by the real speed, and death when the player dies.
+or run by the real speed, and death when the player dies. A candidate adds the
+original jump takeoff/held-air and landing sections from ground and velocity
+state. All twenty regenerated models/layouts passed RC1 readback; matched
+original-game and broader native verification remain pending under
+[PLAYER-JUMP-THIRDPERSON-38](bugs/PLAYER-JUMP-THIRDPERSON-38.md).
+
+A source candidate also selects original `idlehh`, `walkforwardhh`,
+`runforwardhh` and `jumphh` clips from the first-person rules' bare-hand ready
+state. Their own movement speeds drive playback; female normal walking keeps
+its override while missing female ready sections use the base skeleton. Changing
+stance in the air preserves takeoff/landing progress. Swimming, torch carrying,
+death and an old model without the ready groups retain their separate paths.
+The RC1 source passed Amiga compilation on 13 October 2026. This does not
+establish an accepted visual fix. All 20 actual RC1 body models/layouts passed readback within the existing
+alias budgets. Loaded memory and matched original-game views still need
+verification. Five extra layout groups model 3,900 bytes across the
+64 model entries plus the player layout at 12 bytes/group; target layout size,
+stack and frame costs still require target measurement.
+
+Bare-hand draw/lower is connected in the source candidate through an offline
+grid of original upper-body poses and independently advancing leg poses. It uses
+the existing QuakeC hand-state clock, with no runtime skeletal blending. The
+normal/ready gait fraction is retained across stance changes. Its body-only ANM
+words are `$ACTION:MOTION_BASE:MOTION_COUNT:GRID_BASE:ARM_PHASES` (actions 1 draw,
+4 lower); the loader requires both actions for all five movement groups, checks
+frame bounds/overlap and binds each row to the normal animation layout. Old or
+invalid layouts retain ordinary body playback. Requested/minimum frame counts
+are 253/93; fitting retains arm endpoints within the unchanged alias budgets.
+All twenty actual RC1 body models/layouts passed readback. Nord male
+ready/lower, movement, jump and camera changes were inspected in one scene.
+Other appearances, matched original-game motion, memory and performance
+acceptance remain unverified.
 
 Not yet (the next steps): the character's own chosen head and hair, the clothes and armour actually worn,
-a jump group, and more walk/run frames (the 512 KB model budget is mostly the skin page, so the walk and run
+punch transitions, armed-weapon and torch poses, verified equip/lower playback, other weapon-specific jump variants, and more walk/run frames (the 512 KB model budget is mostly the skin page, so the walk and run
 cycles keep 3 to 5 frames).
 
 ## Console

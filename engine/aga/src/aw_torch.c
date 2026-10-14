@@ -77,6 +77,8 @@ static int use_hand_torch_assets;
 static model_t *torch_model;
 static unsigned int torch_duration;
 static double torch_animation_offset;
+int (*aw_view_torch_emitter)(vec3_t out);
+int (*aw_view_torch_light)(vec3_t out);
 double AW_TorchAnimationTime(void)
 {
     double now=cl.time+torch_animation_offset;
@@ -192,6 +194,8 @@ void AW_TorchUpdate(void)
      * point light toward a drawn hand could put it through a nearby wall.
      * The headlamp alone is the same light without the flame's flicker. */
     VectorCopy(r_refdef.vieworg,light->origin);
+    if(torch && aw_view_torch_light){vec3_t emitter;
+        if(aw_view_torch_light(emitter))VectorCopy(emitter,light->origin);}
     light->radius=AW_TorchLightRadius()+(torch?radius[phase()]-144:0);light->minlight=16;
     light->die=cl.time+.1;light->decay=0;
 }

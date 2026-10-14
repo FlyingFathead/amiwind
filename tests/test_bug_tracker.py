@@ -85,6 +85,30 @@ def bug(**kw):
 
 
 class BugTrackerTest(unittest.TestCase):
+    def test_live_register_round_trips_complete_issue_history(self):
+        records = [bug(title='A "quoted" Nord and Khajiit',
+                       status='Preserve source checks, native limits and owner acceptance.',
+                       reports=[{'version': 'v0.0.32', 'at': '2026-10-09', 'note': 'First finding'},
+                                {'version': 'v0.0.39-rc2', 'at': '2026-10-13',
+                                 'note': 'Repeated finding: ääkköset and a \\ path are data.'}],
+                       tags=['performance']),
+                   bug(id='TEST-SECOND-32', state='closed', fixed_in=None,
+                       owner_accepted=None, status='Expected behavior; retain its evidence.')]
+        text = bug_register.live_text(records)
+        self.assertEqual(json.loads(text), records)
+        self.assertEqual(list(json.loads(text)[0]), list(records[0]))
+        self.assertEqual(len(text.splitlines()), len(records) + 2)
+        self.assertTrue(text.endswith('\n'))
+        self.assertNotIn('\r', text)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'bugs.json'
+            bug_register.save(records, path=path)
+            loaded = bug_register.load(path=path)
+            self.assertEqual(loaded, records)
+            self.assertEqual(path.read_bytes(), text.encode('utf-8'))
+            self.assertEqual(bug_register.live_text(loaded), text)
+        self.assertEqual(bug_register.live_text([]), '[]\n')
+
     def test_bugs_json_is_valid(self):
         self.assertEqual(bug_register.validate(bug_register.load()), [])
 

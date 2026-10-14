@@ -148,18 +148,20 @@ Type: "dbg help" for help.
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
-| `dbg all` | `dbg hud`, `dbg overlay` | on/off |
+| `dbg all` | `dbg overlay` | on/off |
 | `dbg blockers` | - | - |
 | `dbg cell` | - | (original Morrowind cell here: exterior grid CELL x,y, or interior INT n with its full cell ID; the debug HUD shows the same at the end of its shorter row) |
 | `dbg compass` | - | on/off true/false 1/0 (default off) |
 | `dbg coords` | - | on/off |
 | `dbg dimensions` | - | - |
+| `dbg ent` | - | print and pin the current crosshair target; raw entity, source id/ref when retained, model and position. Snapshot, not live; merged scenery may have no source identity. |
 | `dbg eyeheight` | - | [offset above player origin] |
 | `dbg fps` | - | on/off |
 | `dbg fpu` | - | (CPU and FPU support library status: 68040.library/68060.library resident or none) |
 | `dbg fpucount` | - | [0/1] once a second: per-frame counts of brush model rotations (and rebuilds), direction vectors, table sine/cosine lookups and NPC targeting (average/peak) |
 | `dbg hands` | - | - |
 | `dbg heap` | - | (current hunk clearance and load peak) |
+| `dbg hud` | - | on/off true/false 1/0; click-to-pin raw target identity on the HUD (not saved). Attack selects while on; off restores attacks after releasing the button. Use dbg overlay for overlays without inspection. |
 | `dbg hud type` | - | 1 original / 2 compact (default) |
 | `dbg logs live` | - | [on/off, true/false or 1/0] write the diagnostic logs (DEBUG.TXT, walk-profile.csv, frame-stalls.csv, heap-audit.log, cell-load-profile.tsv, music-events.csv, ...) as they happen, for benchmarks; default off: kept in memory (oldest lines drop) and written at Exit game or with dbg savelogs (saved once set) |
 | `dbg npcfloors` | - | (read-only ground-contact report) |

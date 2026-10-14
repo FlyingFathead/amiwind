@@ -23,7 +23,8 @@ import struct
 IDLE_FRAMES = 8                     # the previous resident model: the idle cycle only
 ACTOR_FRAMES = 21                   # the previous town actor
 ACTOR_GROUPS = {'idle': (0, 8), 'talk': (8, 4), 'blink': (12, 1), 'walk': (13, 8)}
-MAX_FRAMES = 64                     # npc_anim.profiles(): a kit profile has at most 64 frames
+MAX_FRAMES = 256                    # generated alias model ceiling (npc_geometry.ALIAS_MAX_FRAMES)
+MAX_GROUP_FRAMES = 64               # AW_AnimParse: each ordinary animation group, not the whole model
 LEGACY_FRAME_COUNTS = (IDLE_FRAMES, ACTOR_FRAMES)
 DEAD_FRAMES = 1                     # an initially dead resident (aw_corpse): its final death pose (prepare_area.py)
 
@@ -91,6 +92,8 @@ def of_model(frames, layout=None, intro=False, dead=False):
         for name, (base, count) in groups.items():
             if base < 0 or count < 1 or base + count > frames:
                 raise ValueError('Animation kit %s group outside the model frames' % name)
+            if count > MAX_GROUP_FRAMES:
+                raise ValueError('Animation kit %s group exceeds %d frames' % (name, MAX_GROUP_FRAMES))
         return Layout('kit', frames, groups, mover)
     if dead and frames == DEAD_FRAMES:
         return Layout('dead', frames, {'idle': (0, DEAD_FRAMES)})

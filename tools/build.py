@@ -663,6 +663,19 @@ def prerequisites(args, interactive=False):
     if errors:
         raise ValueError("Game inputs need attention before tool setup:\n  - " + "\n  - ".join(errors))
     args.data_files = data
+    exterior_checklist = None
+    if not getattr(args, 'dry_run', False) and args.stage == 'aga' and not getattr(args, 'miniwind', False):
+        import exterior_plan
+        from chim.regions import decode_cells
+        cells, master_sha = exterior_plan.source_cells(child_ci(args.data_files, 'Morrowind.esm'))
+        selected = decode_cells(getattr(args, 'chim_regions_cells', None) or '')
+        if selected and (getattr(args, 'chim_region_rows', None) or 'game-data') != 'game-data':
+            raise ValueError('Full builds require CHIM rows from game data: no duplicate legacy conversion')
+        exterior_checklist = exterior_plan.make(cells, selected,
+            exterior_plan.town_cores(chim_native_towns(args, args.builder_options)), master_sha)
+        print('Exterior checklist before conversion: ' + ', '.join(
+            '%d %s' % (n, kind) for kind, n in exterior_checklist['summary'].items()), flush=True)
+    args.exterior_checklist = exterior_checklist
     if args.stage == "aga":
         prepare_dependencies(args, interactive)
         for module, package in (("setuptools", "setuptools>=68 (provides distutils for PyFFI)"),
@@ -2661,6 +2674,7 @@ def main(argv=None):
             print("Extra towns: " + town_selection(args)['status'])
             print("Content: " + __import__('build_exclusions').summary(args.exclude_groups))
         tools =(dry_run_prerequisites if args.dry_run else prerequisites)(args, interactive=sys.stdin.isatty())
+        exterior_checklist = getattr(args, 'exterior_checklist', None)
         if not args.dry_run and args.stage == 'aga':
             # The direct start against the owner's masters: the cell exists, the character is playable.
             import direct_start
@@ -2682,6 +2696,9 @@ def main(argv=None):
         if run.exists():
             raise ValueError(f"Build already exists: {run}; choose a new --name")
         steps = dry_run_commands(args, run) if args.dry_run else commands(args, tools, run)
+        if exterior_checklist is not None:
+            import exterior_plan
+            steps = exterior_plan.bind_steps(steps, run / 'exterior-checklist.json')
         if recovery:
             from recover_image import recovery_commands
             steps = recovery_commands(steps, args.recover_image_from.resolve(), run)
@@ -2702,6 +2719,10 @@ def main(argv=None):
         with Progress("Recording input, tool and source checksums"):
             metadata = provenance(args, tools)
         metadata['build_started_at'] = summary.started_at
+        if exterior_checklist is not None:
+            metadata.setdefault('_run_files', {})['exterior-checklist.json'] = (
+                json.dumps(exterior_checklist, indent=2, sort_keys=True) + '\n')
+            metadata['exterior_checklist'] = exterior_checklist['summary']
         # Who wrote every cache entry of this run (tools/cache_provenance.py; bookkeeping, never part of a key).
         os.environ['AMIWIND_RUN_TOOLS_SHA256'] = hashlib.sha256(json.dumps(metadata.get('tool_sha256') or {}, sort_keys=True).encode()).hexdigest()
         os.environ['AMIWIND_RUN_CHIM_VERSION'] = str(metadata.get('chim_version') or '')

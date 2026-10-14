@@ -164,7 +164,15 @@ def archive_text(old):
 
 
 def live_text(live):
-    return json.dumps(live, indent=2, ensure_ascii=False) + '\n'
+    """Keep every issue intact on one line, without repeated nesting whitespace.
+
+    The live register is near its release size warning. Its format remains an
+    ordinary JSON array; field order, values and report history are unchanged.
+    """
+    if not live:
+        return '[]\n'
+    return '[\n' + ',\n'.join('  ' + json.dumps(b, ensure_ascii=False, separators=(',', ':'))
+                               for b in live) + '\n]\n'
 
 
 def load_families(path=FAMILIES):

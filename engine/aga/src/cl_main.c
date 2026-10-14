@@ -436,6 +436,7 @@ CL_RelinkEntities
 */
 /* aw_view.c: the drawn player body for the view entity, or NULL (nothing drawn). */
 entity_t *(*aw_view_body)(entity_t *ent);
+entity_t *(*aw_view_held)(entity_t *ent);
 
 void CL_RelinkEntities (void)
 {
@@ -628,6 +629,14 @@ void CL_RelinkEntities (void)
 		}
 		else
 			AW_VisedictDropped ();
+		/* A player-only equipment proxy; never change this loop's entity cursor. */
+		if (i == cl.viewentity && aw_view_held && (draw = aw_view_held (draw)))
+		{
+			if (cl_numvisedicts < MAX_VISEDICTS)
+				cl_visedicts[cl_numvisedicts++] = draw;
+			else
+				AW_VisedictDropped ();
+		}
 	}
 
 }

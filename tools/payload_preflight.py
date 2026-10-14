@@ -207,6 +207,7 @@ def check_disk_layout(boot, removed, music_files, chim_world):
             raise ValueError('Invalid region directory count')
         from map_files import map_file
         paths = [map_file(id1/'maps', f'vf{i:04d}') for i in range(count)]
+        paths = [p for p in paths if p.relative_to(id1).as_posix() not in removed]
         # a CHIM region cell's map is its frame map, written later in the image step: no legacy map is made for it
         # (docs/BUILD_MANIFEST.md step 2); any other missing map stays an error
         if chim_world:
@@ -271,7 +272,7 @@ def check_music(music):
 
 
 def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=None, report_path=None,
-        pending=None, chim_towns=(), chim_town_dirs=()):
+        pending=None, chim_towns=(), chim_town_dirs=(), exterior_terrain=None):
     """Run every check over the staged payload OUT (OUT/boot). Prints one summary line; raises
     ValueError listing every error together. Returns the report. pending: files the image step still
     writes before its frame maps (check_chim_inputs)."""
@@ -285,6 +286,11 @@ def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=No
     errors, results = [], {}
     try:
         added, removed, not_on_chim = planned_maps(id1, chim_world)
+        if exterior_terrain:
+            from build_aga import chim_world_receipt
+            from exterior_plan import omitted_paths
+            owners = set(chim_world_receipt(chim_world)[1]) if chim_world else set()
+            removed.update(omitted_paths(exterior_terrain, id1, planned_towns=owners))
     except (OSError, ValueError, KeyError) as exc:
         added, removed, not_on_chim = [], set(), []
         errors.append(('chim-receipt', exc))

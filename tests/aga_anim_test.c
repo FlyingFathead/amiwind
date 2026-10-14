@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "aw_anim.h"
+#include "aw_animkit.h"
 
 static const char *layout =
     "idle:0:8:0.3333 walk:8:8:0.1250:38.52 run:16:6:0.1556:55.71 swim:22:6:0.2778:26.25 "
@@ -17,6 +18,76 @@ static const char *layout =
 
 static int heard[2];
 static void emit(void *context,int kind) {(void)context;heard[kind]++;}
+
+static void player_jump(void) {
+    aw_anim_t a;aw_anim_air_t s;int i;
+    memset(&s,0,sizeof(s));
+    assert(AW_AnimParse(&a,"idle:0:8:0.3 jump:8:4:0.1 land:12:4:0.2",16));
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,.1f)==-1); /* standing never lands */
+    assert(AW_AnimAirFrame(&a,&s,1,1,1,0,.1f)==8);  /* takeoff */
+    assert(AW_AnimAirFrame(&a,&s,1,1,1,0,.11f)==9);
+    assert(AW_AnimAirFrame(&a,&s,1,1,1,0,.11f)==10);
+    for(i=0;i<12;i++)assert(AW_AnimAirFrame(&a,&s,1,1,0,0,.11f)==11); /* hold in air */
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,.1f)==12); /* contact starts landing */
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,.21f)==13);
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,.21f)==14);
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,.21f)==15);
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,.21f)==-1); /* locomotion returns */
+    assert(AW_AnimAirFrame(&a,&s,1,1,0,0,.1f)==11);  /* step off a ledge: no push-off */
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,.1f)==12);
+    assert(AW_AnimAirFrame(&a,&s,1,1,1,0,.1f)==8);   /* re-jump interrupts landing */
+    assert(AW_AnimAirFrame(&a,&s,0,1,1,0,.1f)==-1);  /* swimming/noclip/death resets */
+    assert(!s.airborne && !s.landing);
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,.1f)==-1);  /* no stale landing on exit */
+    aw_anim_kit_enabled=0;
+    assert(AW_AnimAirFrame(&a,&s,1,1,1,0,.1f)==-1);
+    aw_anim_kit_enabled=1;
+    assert(AW_AnimParse(&a,"idle:0:8:0.3",8));
+    assert(AW_AnimAirFrame(&a,&s,1,1,1,0,.1f)==-1);  /* old images retain locomotion */
+    assert(AW_AnimParse(&a,"idle:0:8:0.3 jump:8:4:0.1",12));
+    assert(AW_AnimAirFrame(&a,&s,1,1,1,0,.1f)==-1);  /* incomplete pair refused */
+}
+
+static void player_ready(void) {
+    aw_anim_t a;aw_anim_air_t s;aw_anim_play_t p;float rate;
+    assert(AW_AnimParse(&a,"idle:0:8:0.3 walk:8:4:0.1:30 run:12:4:0.1:90 swim:16:4:0.1:20 "
+        "jump:20:4:0.1 land:24:4:0.2 ready:28:4:0.2 readywalk:32:4:0.2:40 readyrun:36:4:0.1:80 "
+        "readyjump:40:2:0.3 readyland:42:2:0.6",44));
+    assert(AW_AnimPlayerMoveGroup(&a,0,0,1,&rate)==AW_ANIM_READY);
+    assert(AW_AnimPlayerMoveGroup(&a,55,0,1,&rate)==AW_ANIM_READYWALK && rate==1.375f);
+    assert(AW_AnimPlayerMoveGroup(&a,65,0,1,&rate)==AW_ANIM_READYRUN && rate==.8125f);
+    assert(AW_AnimPlayerMoveGroup(&a,0,0,0,&rate)==AW_ANIM_IDLE);
+    assert(AW_AnimPlayerMoveGroup(&a,20,1,1,&rate)==AW_ANIM_SWIM && rate==1);
+    assert(AW_AnimMoveGroup(&a,55,0,&rate)==AW_ANIM_WALK); /* NPC selector unchanged */
+    memset(&p,0,sizeof(p));p.group=AW_ANIM_IDLE;p.phase=6;p.index=6;
+    assert(AW_AnimPlayerAdvance(&a,&p,AW_ANIM_READY,0,1)==31);
+    assert(p.phase==3); /* 6/8 normal idle becomes 3/4 ready, not frame zero */
+    assert(AW_AnimPlayerAdvance(&a,&p,AW_ANIM_IDLE,0,1)==6 && p.phase==6);
+    p.group=AW_ANIM_WALK;p.phase=2;p.index=2;
+    assert(AW_AnimPlayerAdvance(&a,&p,AW_ANIM_READYWALK,0,1)==34 && p.phase==2);
+    assert(AW_AnimPlayerAdvance(&a,&p,AW_ANIM_WALK,0,1)==10 && p.phase==2);
+    assert(AW_AnimPlayerAdvance(&a,&p,AW_ANIM_RUN,0,1)==12 && p.phase==0); /* different gait keeps old policy */
+    aw_anim_kit_enabled=0;
+    assert(AW_AnimPlayerMoveGroup(&a,55,0,1,&rate)==AW_ANIM_IDLE);
+    aw_anim_kit_enabled=1;
+    memset(&s,0,sizeof(s));
+    assert(AW_AnimAirFrame(&a,&s,1,1,1,0,0)==20);
+    assert(AW_AnimAirFrame(&a,&s,1,1,1,0,.15f)==21);
+    assert(AW_AnimAirFrame(&a,&s,1,1,1,1,0)==40);
+    assert(s.play.phase>.49f && s.play.phase<.51f); /* changing stance keeps takeoff progress */
+    assert(AW_AnimAirFrame(&a,&s,1,1,0,1,.16f)==41);
+    assert(AW_AnimAirFrame(&a,&s,1,1,0,0,0)==23);    /* lowering aloft cannot restart takeoff */
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,1,0)==42);
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,1,.31f)==42);
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,0)==25);    /* likewise part-way through landing */
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,.3f)==27);
+    assert(AW_AnimAirFrame(&a,&s,1,0,0,0,0)==-1);
+    assert(AW_AnimAirFrame(&a,&s,1,1,0,1,0)==41);    /* ready ledge fall starts held pose */
+    a.g[AW_ANIM_READYRUN].present=0;
+    assert(AW_AnimPlayerMoveGroup(&a,55,0,1,&rate)==AW_ANIM_WALK); /* incomplete old kit */
+    a.g[AW_ANIM_READYLAND].present=0;
+    assert(AW_AnimAirFrame(&a,&s,1,1,0,1,0)==23);    /* incomplete pair uses normal jump */
+}
 
 int main(void) {
     aw_anim_t a;aw_anim_play_t p;float rate;unsigned long crossed;int g,f,i;
@@ -97,6 +168,8 @@ int main(void) {
     /* a missing group plays idle */
     assert(AW_AnimParse(&a,"idle:0:8:0.3",8));
     f=AW_AnimAdvance(&a,&p,AW_ANIM_RUN,.1f,1,&crossed);assert(f==0 && p.group==AW_ANIM_IDLE);
+    player_jump();
+    player_ready();
     puts("aga_anim_test: ok");
     return 0;
 }

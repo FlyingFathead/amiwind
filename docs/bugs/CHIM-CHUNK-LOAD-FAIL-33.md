@@ -6,10 +6,10 @@
 | --- | --- |
 | Reported by | owner |
 | First noticed | 9 October 2026, in v0.0.33-dev |
-| Where | CHIM chunk loader and zone (chim_chunks.c, chim_zone.c), Balmora CHIM world |
+| Where | CHIM chunk loading and zone: earlier Balmora cases; Dwemer exterior cell (9,2) follow-up |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | v0.0.33-dev, v0.0.38, v0.0.39-rc1 (last seen) |
 | Severity | high: Whole areas of Balmora are missing and the player falls through the ground. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Stairs and collision on CHIM worlds ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -33,13 +33,16 @@
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
+- [Owner follow-up, 13 October 2026: Dwemer exterior cell (9,2)](#owner-follow-up-13-october-2026-dwemer-exterior-cell-92)
+- [Exact RC1 evidence, 13 October 2026](#exact-rc1-evidence-13-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
 
 ## Status: 9 October 2026
 
-Open; cause measured, repaired in source on v0.0.33-chim-chunkload (see Repair), not yet in a build. Present in the private CHIM preview (the v0.0.32
+Historical 9 October checkpoint: cause measured, repaired in source on
+v0.0.33-chim-chunkload (see Repair), not in a build at that checkpoint. Present in the private CHIM preview (the v0.0.32
 disks with the CHIM engine of v0.0.33-chim-engine 0d8bf4f and a format 0.4 Balmora world) and in the
 v0.0.33-dev engine source up to the repair.
 
@@ -195,6 +198,32 @@ Remaining: the owner's playtest of a build with the repaired engine.
   when there is room, no thrash; the first methods leave the hole) in `tests/aga_chim_world_test.c`; the
   zone's failure count, largest unlocked run and layout in `tests/aga_chim_zone_test.c`;
   `tests/test_chim_zone_sim.py`.
+
+## Owner follow-up, 13 October 2026: Dwemer exterior cell (9,2)
+
+An owner screenshot shows a visible Dwemer structure and `CHIM: chunk 116 not
+loaded: zone full ... retrying` at global XYZ (77750,20044,1980), exterior cell
+(9,2). Its receipt identifies the v0.0.38 full-image WinUAE playtest. Evidence
+`OWNER-20261013-DWEMER-CHUNK116` binds the private original, SHA-256
+`4dab41e7209ea102524a6718089b4ab94f01088652aa63890e619a06e03ba173`.
+Other warning numbers overlap text and are not reliably transcribed.
+
+The owner reports heavy loading but working access. That does not establish
+complete geometry, a measured load time or recovery of every chunk. The warning
+does not prove the earlier Balmora fragmentation cause. Reproduce the exact
+image at normal speed; record allocation details, recovery, visible/collision
+coverage, loading time and audio service separately. Keep the issue open for
+v0.0.40 work.
+
+## Exact RC1 evidence, 13 October 2026
+
+13 October 2026, v0.0.39-rc1: exact-package save/death inspection of vf1703
+still logs repeated chunk20 zone-full retries for model4251 (314,736 bytes).
+Later reports show 389,616 bytes free but largest free block 59,184, with
+5,694,976 of 7,025,392 bytes locked. This is current allocation/retry evidence
+under the existing streaming issue. It does not alone prove a visible hole,
+ground loss or eventual recovery. Scoped save/reload survival and package
+inclusion do not close streaming/residency or performance coverage.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

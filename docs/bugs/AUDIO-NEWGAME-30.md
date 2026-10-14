@@ -76,6 +76,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [AUDIO-HOST-LOAD-33](AUDIO-HOST-LOAD-33.md): Music and sound crackle when the emulator shares a fully loaded host CPU
 - AUDIO-LOAD-29 (no report page): OST crackles under heavy loading
 - [AUDIO-LOGO-31](AUDIO-LOGO-31.md): Music crackles while the startup logo plays (WinUAE)
+- [AUDIO-STOP-CHANNEL-RANGE-39](AUDIO-STOP-CHANNEL-RANGE-39.md): Stopping an entity sound skips half the dynamic mixer slots
 - [AW-20260928-02](AW-20260928-02.md): Dock/menu freeze and looping audio
 - AW-20260928-15 (no report page): Prison wave ambience masks dialogue
 - AW-20260929-03 (no report page): Music cuts during loading

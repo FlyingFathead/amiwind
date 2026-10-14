@@ -56,10 +56,13 @@ def install(overlay, id1, scenery_acceptance, jobs=1):
     chim = {row['name'] for row in rows if row.get('chim_region')}
     if chim != set(scenery_acceptance.get('chim_region_maps_not_made') or ()):
         raise ValueError('CHIM region cells differ between the scenery and flora overlays')
-    for name in sorted(chim):
+    routing_only = {row['name'] for row in rows if row.get('routing_only')}
+    if routing_only != set(scenery_acceptance.get('routing_only_maps_not_made') or ()):
+        raise ValueError('Routing-only maps differ between the scenery and flora overlays')
+    for name in sorted(chim | routing_only):
         if (id1 / 'maps' / (name + '.bsp')).exists() or (overlay / name / 'scene.bsp').exists():
             raise ValueError('A legacy map of a CHIM region cell is staged: ' + name)
-    rows = [row for row in rows if row['name'] not in chim]
+    rows = [row for row in rows if row['name'] not in chim | routing_only]
     names = [row['name'] for row in rows]
     installed = hash_existing([id1 / 'maps' / (name + '.bsp') for name in names], jobs)
     overlays = hash_existing([overlay / name / 'scene.bsp' for name in names], jobs)

@@ -11,6 +11,8 @@ static cvar_t *freeze,*black,*mode;
 static int character,reader,gallery,movie,clears,extra_audio;
 static int physics,network,commands,presentation,audio,music,intro,waits,saves,scenes;
 static int scenery,harvest,speech,tempents,packets,parsed;
+static int death_prompt;
+static int prompt_active(void){return death_prompt;}
 
 int AW_CharacterActive(void){return character;}
 int AW_ReaderActive(void){return reader;}
@@ -110,18 +112,23 @@ static void policy(void){
     cls.state=ca_disconnected;assert(!AW_ModalWorldFrozen());cls.state=ca_connected;
     key_dest=key_game;scr_fullupdate=7;AW_ModalFrame();assert(!scr_fullupdate && sv.paused);
     assert(!AW_ModalWorldFrozen());sv.paused=false;
+    aw_death_prompt_active=prompt_active;death_prompt=1;
+    freeze->value=0;black->value=1;
+    assert(AW_ModalWorldFrozen() && !AW_ModalWorldHidden());
+    cls.signon=3;assert(!AW_ModalWorldFrozen());cls.signon=SIGNONS;
+    death_prompt=0;assert(!AW_ModalWorldFrozen());freeze->value=1;
 }
 void AW_RemotePoll(void){}
 int main(void){
     int i,f,b;double before;
-    policy();character=1;sv.time=7;cl.time=7;
+    policy();death_prompt=1;freeze->value=0;sv.time=7;cl.time=7;
 #ifdef MODAL_CLIENT
     cl.mtime[0]=7;cl.mtime[1]=6.98;
     for(i=0;i<200;i++){black->value=i&1;realtime+=host_frametime;packets=1;CL_ReadFromServer();}
     assert(cl.time==7 && cl.oldtime==7 && parsed==200);
     assert(!scenery && !harvest && !speech && !tempents);
     /* Resume uses one frame, never the four elapsed seconds spent in UI. */
-    character=0;sv.time=7.02;packets=1;CL_ReadFromServer();
+    death_prompt=0;sv.time=7.02;packets=1;CL_ReadFromServer();
     assert(fabs(cl.time-7.02)<.00001 && cl.oldtime==7 && parsed==201);
     assert(scenery==1 && harvest==1 && speech==1 && tempents==1);
     character=1;freeze->value=0;sv.time=7.04;packets=1;CL_ReadFromServer();
@@ -131,7 +138,7 @@ int main(void){
     assert(!physics && sv.time==7 && !intro && !waits && !scenes);
     assert(presentation==200 && audio==200 && extra_audio==200 && music==400 && saves==200);
     assert(commands==200 && network==200 && realtime>3.99);
-    character=0;before=sv.time;_Host_Frame(.02f);
+    death_prompt=0;freeze->value=1;before=sv.time;_Host_Frame(.02f);
     assert(physics==1 && fabs(sv.time-before-.02)<.00001);
     assert(intro==1 && waits==1 && scenes==1 && presentation==201);
     character=1;sv.paused=true;_Host_Frame(.02f);character=0;_Host_Frame(.02f);

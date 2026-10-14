@@ -1,66 +1,86 @@
 # AmiWind v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)
 
-Release preparation for the complete current game, with normal
-startup, supported interiors, NPC assets and the updated AmiWind Toolkit.
-The full image passed build, performance and HDF readback checks. Native smoke
-checks verified completed-stage Tel Uvirith arrival and lava contact damage;
-sealed-package validation and delivery remain pending.
+v0.0.38 restores exterior lava and expands the playable CHIM world, including
+completed-stage Tel Uvirith in cell (10,1). It keeps the full game's normal
+startup and supported towns and interiors. The public source release is
+published; the refreshed private playtest image is still under validation.
 
-## Changes under validation
+## Lava and Tel Uvirith
 
-- Lava coverage and terrain repair: restore missing exterior lava conversion,
-  preserve original lava elevation and retain LAND detail around pool footprints.
-  [BUILD-LAVA-COVERAGE-38](bugs/BUILD-LAVA-COVERAGE-38.md) records
-  208 exposed-pool and 467 buried-pool checks, plus native contact damage.
-  The final image shows lava contact damage with god mode and noclip off;
-  matched-reference and sound checks remain pending.
-- CHIM conversion of exterior cells exceeding BSP storage limits.
-- Original nonsolid mesh collision markers are preserved, including fire ferns.
-  Empty point hulls receive an explicit empty node instead of being interpreted
-  as solid. Scoped collision checks pass; remaining cell holds stay open.
-- Quick-character startup audio scratch is included in CHIM memory accounting,
-  and debug recovery reuses checked arrival placement.
-- Third-person and vanity camera availability respects introductory permissions.
-- LAND fill has a separate saved control, independent of fog.
-- Noclip walking bob and movement roll default off, with saved
-  `dbg noclipwobble` / `dbg noclipbob` controls. Photo mode temporarily disables
-  this bob and restores the prior setting. Source regression checks pass;
-  target-native validation of this addition remains pending.
-- Toolkit map names toggle, resizable map view and per-panel inspection copy.
-- Optional MiniWind map inspection startup for development builds. Regular
-  gameplay defaults are unchanged; MiniWind remains unavailable in RC builds.
-- Opt-in terrain-aware render clipping, with shared-placement and collision
-  safeguards. Full-world enablement is not established by isolated tests.
+Lava conversion preserves the original pool elevation and the surrounding
+LAND detail. Both legacy BSP and CHIM conversion paths are supported. The
+full-world conversion accounts for 349 original lava references in 27 exterior
+cells. Scoped native runs observed lava shorelines and contact damage; matched
+original comparisons, sound and wider traversal remain incomplete. See
+[lava coverage](bugs/BUILD-LAVA-COVERAGE-38.md) and
+[lava terrain budgets](bugs/BUILD-LAVA-TERRAIN-BUDGET-38.md).
+
+Tel Uvirith uses the selected completed stronghold stage, optimized geometry
+and sprite details. The preceding full image passed sprite readback and native
+arrival checks. Modeled active/load rings were 5,596,320 / 5,767,824 bytes
+against a 6,242,304-byte budget. Those estimates do not establish smooth
+traversal or complete collision coverage. Normal staircase traversal remains
+open ([memory](bugs/CHIM-MOLAG-MEMORY-38.md),
+[stairs](bugs/STAIRS-MOLAG-ACCESS-38.md)).
+
+## Exterior CHIM coverage and compact images
+
+The preceding full image has readback evidence for 360 whole regional CHIM
+exterior cells. Six partially overlapping town cells are counted separately;
+they do not increase that whole-cell count. These are packaged geometry counts,
+not complete original-reference coverage, native checks of every cell, or
+implemented actors and gameplay.
+
+The refreshed builder preserves that CHIM selection. Its prebuild ownership
+checklist excludes 135 redundant town-owned BSP map cores before terrain,
+scenery and flora conversion. The same verified omissions now reach content
+fingerprinting and world-disk packing. Required map dependencies and interiors
+remain. Full-image assembly, readback and routing checks for this correction
+are still pending; planned removal is not a measured final-image saving.
+
+## Other changes
+
+- Original nonsolid mesh markers, including fire ferns, are preserved. Empty
+  point hulls get an explicit empty node. Scoped checks pass; other collision
+  holds remain open.
+- Quick-character audio scratch is counted in CHIM memory budgets, and debug
+  recovery uses checked arrival placement.
+- Third-person and vanity camera availability respects opening permissions.
+- LAND fill has a saved control independent of fog. Noclip bob and roll default
+  off, with saved controls; photo mode restores the previous bob setting.
+- The Toolkit adds a map-name toggle, resizable map view and inspection copy.
+- Opt-in terrain-aware render clipping and MiniWind inspection remain
+  development tools; they do not establish full-world enablement or acceptance.
 
 ## Known in this build
 
-- [BUILD-LAVA-TERRAIN-BUDGET-38](bugs/BUILD-LAVA-TERRAIN-BUDGET-38.md): the full image contains all 349 original lava references across 27 CHIM cells. Scoped native shoreline and contact checks passed; wider traversal and sound remain open.
-- [CHIM-MOLAG-MEMORY-38](bugs/CHIM-MOLAG-MEMORY-38.md): completed-stage Tel Uvirith is integrated in the full-world conversion. Its active-ring estimate is 5,596,320 bytes and load-ring estimate is 5,767,824 bytes against a 6,242,304-byte budget. Final HDF sprite readback and native arrival passed; normal staircase traversal remains open.
-- [BUILD-SCRATCH-DISK-GROWTH-32](bugs/BUILD-SCRATCH-DISK-GROWTH-32.md): image assembly completed after the storage guard was resolved. Final delivery remains pending.
-- [STAIRS-MOLAG-ACCESS-38](bugs/STAIRS-MOLAG-ACCESS-38.md): owner-reported walkway and door stair obstructions need normal-walking comparison and repair.
-- [CHIM-TERRAIN-ROCK-EXEMPT-38](bugs/CHIM-TERRAIN-ROCK-EXEMPT-38.md): native terrain-contact and matched original comparison remain pending.
-- [CHIM-COAST-OBJECTS-MISSING-36](bugs/CHIM-COAST-OBJECTS-MISSING-36.md): source-reference and packaged coverage remain incomplete.
-- [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md): converted geometry does not imply implemented actors or gameplay.
-- [CHIM-FERN-NCO-SOLID-38](bugs/CHIM-FERN-NCO-SOLID-38.md): scoped fern checks do not close every collision hold.
-- [ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md): streaming and measured performance work remain open.
+- [SAVE-LAVA-DEATH-LOOP-38](bugs/SAVE-LAVA-DEATH-LOOP-38.md): a lava fall can leave an unsafe autosave; existing unsafe saves are not automatically repaired.
+- [SAVE-TELEPORT-CHECKPOINT-38](bugs/SAVE-TELEPORT-CHECKPOINT-38.md): safe destination saving needs target-native verification.
+- [UI-DEATH-DAMAGE-TINT-38](bugs/UI-DEATH-DAMAGE-TINT-38.md): lava damage tint can colour the death prompt.
+- [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md): the carried torch and pose can disappear while its light remains.
+- [PLAYER-READY-THIRDPERSON-38](bugs/PLAYER-READY-THIRDPERSON-38.md): fists-up and weapon-draw animation are missing.
+- [PLAYER-JUMP-THIRDPERSON-38](bugs/PLAYER-JUMP-THIRDPERSON-38.md): jump animation needs repair.
+- [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): swimming and surface behavior need comparison with the original.
+- [STAIRS-MOLAG-ACCESS-38](bugs/STAIRS-MOLAG-ACCESS-38.md): walkway and door stairs need normal-walking checks and repair.
+- [CHIM-COAST-OBJECTS-MISSING-36](bugs/CHIM-COAST-OBJECTS-MISSING-36.md): original-reference and packaged coast coverage are incomplete.
+- [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md): converted geometry is separate from complete actors and gameplay.
+- [COMBAT-AMBIENT-SPEECH-GATING-38](bugs/COMBAT-AMBIENT-SPEECH-GATING-38.md): ambient greetings and subtitles can interrupt combat.
+- [ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md): loading and streaming can stall play; measured performance work remains open.
 
-Complete refers to the full-game package scope, not complete CHIM coverage or
-the absence of known issues. No full-traversal acceptance is claimed.
+## Next playtest and validation
 
-## Release completion checklist
+Lava falls can leave unsafe autosaves, teleport checkpoints need verification,
+and the damage tint can colour the death prompt. Candidate repairs are being
+tested for v0.0.39-dev1, **Cell By Cell, Piece By Piece**; they are not v0.0.38
+fixes. Third-person torch/readied/jump animations, swimming, combat speech,
+stairs, coast-object coverage and loading/streaming performance also remain in
+the [bug register](BUGS.md) and [roadmap](ROADMAP.md).
 
-- [x] Verify scoped lava shoreline and contact damage in the final image.
-- [ ] Complete final-image lava sound and wider traversal checks.
-- [x] Integrate optimized completed-stage Tel Uvirith into the full-world conversion.
-- [x] Verify Tel Uvirith sprites, modeled memory use and arrival in the finished image.
-- [x] Read back all 360 regional CHIM cells from the final image.
-- [x] Separate six partially overlapping town cells from the 360 whole regional cells.
-- [ ] Check native boundary routing for those six overlaps.
-- [ ] Verify superseded unused exterior BSP maps are absent.
-- [ ] Pass final-source gates and exact-package native smoke tests.
-- [x] Capture HUD/crosshair-off lava views and finish release illustrations.
-- [ ] Validate the Linux release kit and matching public source ZIP.
-- [ ] Verify package delivery and provide the release kit and WinUAE runner.
+The prior image's native observations and HUD/crosshair-off lava captures are
+preserved as evidence. They do not pass the refreshed image's remaining gates:
+complete HDF readback, map exclusivity, town-boundary routing, exact-package
+native smoke and verified delivery. The completed public release and its Linux
+publishing kit remain separate from this pending private-image correction.
 
-Other owner-reported bugs remain in the roadmap and canonical fix index; this
-release checklist does not mark them fixed or defer its own unfinished gates.
+Full-game describes package scope. It does not mean every original feature or
+exterior cell is complete.

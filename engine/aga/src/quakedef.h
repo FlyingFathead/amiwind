@@ -467,6 +467,7 @@ int AW_HandSpritesValidate(byte *data,unsigned long bytes);
 /* Original-style private-asset UI, independent of the console. */
 void AW_UIInit(void);
 int AW_ModalWorldFrozen(void);
+extern int (*aw_death_prompt_active)(void); /* aw_view: finished death animation, choice still open */
 int AW_ModalWorldHidden(void);
 int AW_ModalBlackBackground(void);
 int AW_UIMode(void);

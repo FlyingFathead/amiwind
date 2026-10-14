@@ -22,10 +22,12 @@
 #include "quakedef.h"
 #include "aw_view.h"
 #include "aw_anim.h"
+#include "aw_animkit.h"
 #include "aw_character.h"
 #include "aw_save.h"
 #include "aw_combat.h"
 #include "aw_story.h"
+#include "aw_torch.h"
 
 extern cvar_t chase_active;
 /* The hooks (defined beside their callers, NULL in fixtures without this file). */
@@ -33,6 +35,7 @@ extern int (*aw_death_input_locked)(void);
 extern void (*aw_view_frame)(void);
 extern int (*aw_view_camera)(void);
 extern entity_t *(*aw_view_body)(entity_t *ent);
+extern entity_t *(*aw_view_held)(entity_t *ent);
 extern int (*aw_view_hide_hands)(void);
 extern void (*aw_view_input)(int key,int down);
 extern int (*aw_view_key)(int key);
@@ -103,9 +106,19 @@ static edict_t *local_player(void) {
 static struct {char race[32],path[48];int female;} bodies[BODIES];
 static int body_count=-1,body_race=-2,body_female=-1;
 static model_t *body_model;
+static model_t *held_model;
+static int body_torch,body_water,torch_failed,water_failed,held_visible;
+static aw_view_torch_t body_emitter;
+static entity_t held_body;
 static aw_anim_t body_anim;
 static aw_anim_play_t body_play;
+static aw_anim_air_t body_air;
+static aw_view_layers_t body_layers;
 static entity_t body;
+static void body_layers_read(const char *text,int frames) {
+    if(!AW_ViewLayersParse(&body_layers,text,frames))return;
+    if(!AW_ViewLayersBind(&body_layers,&body_anim))memset(&body_layers,0,sizeof(body_layers));
+}
 static void load_bodies(void) {
     byte *raw;int mark=Hunk_LowMark();char *p,*e,race[32],path[48];int female;
     body_count=0;
@@ -128,25 +141,79 @@ static void load_bodies(void) {
 /* The body of the character's race and sex (the original's player record, a Dark Elf man,
  * before a character exists). 1 = a body is ready. */
 static int body_ready(void) {
-    const char *race="dark elf";int female=0,i,mark;char anm[64];byte *text;size_t n;
+    const char *race="dark elf";int female=0,i,mark,carried,swimming,changed;char anm[64],path[64],held[64];byte *text;size_t n;
+    edict_t *player=local_player();
     if(!body_cvar.value)return 0;
     if(body_count<0)load_bodies();
     if(!body_count)return 0;
     if(aw_character.valid && aw_character.race>=0 && aw_character.race<aw_race_count){
         race=aw_races[aw_character.race].id;female=aw_character.female?1:0;
     }
-    if(body_model && body_race==(aw_character.valid?aw_character.race:-1) && body_female==female)return 1;
-    body_model=NULL;body_race=aw_character.valid?aw_character.race:-1;body_female=female;
+    changed=body_race!=(aw_character.valid?aw_character.race:-1) || body_female!=female;
+    if(changed)torch_failed=water_failed=0;
+    swimming=player && player->v.health>0 && player->v.waterlevel>=2 && death.stage==AW_DEATH_NONE && !water_failed;
+    carried=AW_TorchEquipped() && player && player->v.waterlevel<2 && death.stage==AW_DEATH_NONE && !torch_failed;
+    if(body_model && !changed && body_torch==carried && body_water==swimming)return 1;
+    /* These player-only aliases are alternatives, not three resident bodies.
+     * Relinking has discarded last frame's draw list before this switch. */
+    if(body_model && body_model->type==mod_alias && body_model->cache.data)Cache_Free(&body_model->cache);
+    if(held_model && held_model->type==mod_alias && held_model->cache.data)Cache_Free(&held_model->cache);
+    body_model=NULL;held_model=NULL;body_emitter.count=0;held_visible=0;
+    body_race=aw_character.valid?aw_character.race:-1;body_female=female;body_torch=body_water=0;
     for(i=0;i<body_count;i++)if(bodies[i].female==female && !Q_strcasecmp(bodies[i].race,(char *)race))break;
     if(i==body_count)for(i=0;i<body_count && bodies[i].female!=female;i++);
     if(i==body_count)return 0;
-    body_model=Mod_ForName(bodies[i].path,false);
+    strcpy(path,bodies[i].path);n=strlen(path);
+    if(swimming){
+        model_t *candidate;aw_anim_t water_anim;
+        strcpy(path+n-4,"_w.mdl");candidate=Mod_ForName(path,false);
+        strcpy(anm,path);strcpy(anm+strlen(anm)-4,".anm");
+        mark=Hunk_LowMark();text=COM_LoadHunkFile(anm);
+        if(candidate && candidate->type==mod_alias && Cache_Check(&candidate->cache) && text &&
+           AW_AnimParse(&water_anim,(const char *)text,candidate->numframes) &&
+           water_anim.g[AW_ANIM_SWIM].present && water_anim.g[AW_ANIM_SWIMIDLE].present){
+            body_model=candidate;body_water=1;
+        }
+        Hunk_FreeToLowMark(mark);
+        if(!body_water){
+            if(candidate && candidate->type==mod_alias && candidate->cache.data)Cache_Free(&candidate->cache);
+            water_failed=1;strcpy(path,bodies[i].path);
+            Con_Printf("Player swim companion unavailable; original body retained.\n");
+        }
+    }
+    if(carried){
+        model_t *candidate,*equipment;extern int hunk_size,hunk_low_used,hunk_high_used;
+        strcpy(path+n-4,"_t.mdl");strcpy(held,bodies[i].path);strcpy(held+n-4,"_h.mdl");
+        candidate=equipment=NULL;
+        /* Same bounded optional-alias admission used by guard equipment. */
+        if(hunk_size-hunk_low_used-hunk_high_used>=2*1024*1024){
+            candidate=Mod_ForName(path,false);equipment=Mod_ForName(held,false);
+        }
+        strcpy(anm,path);strcpy(anm+strlen(anm)-4,".awt");
+        mark=Hunk_LowMark();text=COM_LoadHunkFile(anm);
+        if(candidate && equipment && candidate->type==mod_alias && equipment->type==mod_alias &&
+           candidate->numframes==equipment->numframes && Cache_Check(&candidate->cache) && Cache_Check(&equipment->cache) &&
+           AW_ViewTorchParse(&body_emitter,text,com_filesize,candidate->numframes)){
+            body_model=candidate;held_model=equipment;body_torch=1;
+        }
+        Hunk_FreeToLowMark(mark);
+        if(!body_torch){
+            torch_failed=1;strcpy(path,bodies[i].path);
+            Con_Printf("Player torch companion unavailable; original body retained.\n");
+        }
+    }
+    if(!body_model)body_model=Mod_ForName(path,false);
     if(!body_model || body_model->type!=mod_alias){body_model=NULL;return 0;}
-    n=strlen(bodies[i].path);memcpy(anm,bodies[i].path,n-4);strcpy(anm+n-4,".anm");
+    n=strlen(path);memcpy(anm,path,n-4);strcpy(anm+n-4,".anm");
     mark=Hunk_LowMark();text=COM_LoadHunkFile(anm);
-    if(!text || !AW_AnimParse(&body_anim,(const char *)text,body_model->numframes))AW_AnimDefault(&body_anim,body_model->numframes);
+    if(!text || !AW_AnimParse(&body_anim,(const char *)text,body_model->numframes)){
+        AW_AnimDefault(&body_anim,body_model->numframes);memset(&body_layers,0,sizeof(body_layers));
+    }else body_layers_read((const char *)text,body_model->numframes);
     Hunk_FreeToLowMark(mark);
-    memset(&body_play,0,sizeof(body_play));body_play.group=255;
+    if(changed){
+        memset(&body_play,0,sizeof(body_play));body_play.group=255;
+        memset(&body_air,0,sizeof(body_air));
+    }
     return 1;
 }
 static float death_seconds(void) {
@@ -177,18 +244,53 @@ static int body_block_frame(float dt) {
     i=g->count-1-(int)(left/g->step);if(i<hold)i=hold;if(i>g->count-1)i=g->count-1;
     return g->base+i;
 }
+static int body_fists_ready(edict_t *p) {
+    eval_t *v;
+    if(!p || p->v.health<=0 || p->v.waterlevel>=2)return 0;
+    v=GetEdictFieldValue(p,"aw_hand_goal");if(!v || v->_float!=1)return 0;
+    v=GetEdictFieldValue(p,"aw_hand_state");
+    if(!v || (v->_float!=2 && v->_float!=3))return 0;
+    /* The carried-light pose is separate; do not show two fists around a
+     * missing torch. Attack overlays and carried equipment are separate. */
+    v=GetEdictFieldValue(p,"aw_torch");return !v || v->_float!=1;
+}
+static int body_hand_layer(edict_t *p,int frame) {
+    eval_t *v;int state;float started,duration,fraction;
+    if(!AW_ANIMKIT || !aw_anim_kit_enabled || !body_layers.count || !p || p->v.health<=0 ||
+       p->v.waterlevel>=2 || p->v.movetype!=MOVETYPE_WALK)return -1;
+    v=GetEdictFieldValue(p,"aw_hand_state");if(!v || (v->_float!=1 && v->_float!=3 && v->_float!=4))return -1;
+    state=(int)v->_float;
+    v=GetEdictFieldValue(p,"aw_torch");if(v && v->_float==1)return -1;
+    v=GetEdictFieldValue(p,"aw_hand_started");if(!v)return -1;started=v->_float;
+    v=GetEdictFieldValue(EDICT_NUM(0),state==1?"aw_hand_draw":state==3?"aw_hand_punch":"aw_hand_lower");
+    if(!v || !(v->_float>0 && v->_float<=60))return -1;
+    duration=v->_float;
+    /* The authoritative QuakeC state owns this clock; never restart it when
+     * switching camera, gait or landing. The legs retain their own frame. */
+    fraction=((float)sv.time-started)/duration;
+    if(fraction>1)fraction=1;
+    return AW_ViewLayerFrame(&body_layers,state,frame,fraction);
+}
 entity_t *AW_ViewBody(entity_t *ent) {
-    float speed,rate=1,dt=(float)host_frametime;int group,block=-1;edict_t *p=local_player();
+    float speed,rate=1,dt=(float)host_frametime;int group,block=-1,air,fists,layer;edict_t *p=local_player();
+    held_visible=0;
     if(!owned || !body_ready())return NULL;
+    fists=body_fists_ready(p);
     if(dt<0)dt=0;
     if(dt>.25f)dt=.25f;
     if(death.stage!=AW_DEATH_NONE)group=AW_ANIM_DEATH;
     else{
-        speed=(float)sqrt(cl.velocity[0]*cl.velocity[0]+cl.velocity[1]*cl.velocity[1]);
-        group=AW_AnimMoveGroup(&body_anim,speed,p && p->v.waterlevel>=2,&rate);
+        speed=(float)sqrt(cl.velocity[0]*cl.velocity[0]+cl.velocity[1]*cl.velocity[1]+
+            (p && p->v.waterlevel>=2?cl.velocity[2]*cl.velocity[2]:0));
+        group=AW_AnimPlayerMoveGroup(&body_anim,speed,p && p->v.waterlevel>=2,fists,&rate);
     }
     body=*ent;body.model=body_model;
-    body.frame=AW_AnimAdvance(&body_anim,&body_play,group,dt,rate,NULL);
+    body.frame=AW_AnimPlayerAdvance(&body_anim,&body_play,group,dt,rate);
+    air=AW_AnimAirFrame(&body_anim,&body_air,
+        death.stage==AW_DEATH_NONE && p && p->v.movetype==MOVETYPE_WALK && p->v.waterlevel<2,
+        p && !((int)p->v.flags&FL_ONGROUND),p && p->v.velocity[2]>0,fists,dt);
+    if(air>=0)body.frame=air;
+    if(death.stage==AW_DEATH_NONE && (layer=body_hand_layer(p,body.frame))>=0)body.frame=layer;
     if(death.stage==AW_DEATH_NONE && (block=body_block_frame(dt))>=0)body.frame=block;
     if(body.frame<0 || body.frame>=body_model->numframes)body.frame=0;
     /* Converted characters face local +Y; Quake yaw 0 is +X (world.qc aw_npc_idle). */
@@ -197,6 +299,30 @@ entity_t *AW_ViewBody(entity_t *ent) {
     body.origin[2]=ent->origin[2]-feet();
     body.colormap=vid.colormap;body.skinnum=0;body.efrag=NULL;body.topnode=NULL;body.aw_sprite_scale=1;
     return &body;
+}
+
+static entity_t *view_held(entity_t *draw) {
+    if(draw!=&body || !body_torch || !held_model || !AW_TorchEquipped() ||
+       !Cache_Check(&body.model->cache) || !Cache_Check(&held_model->cache) ||
+       body.frame<0 || body.frame>=body_emitter.count)return NULL;
+    held_body=body;held_body.model=held_model;
+    held_visible=1;return &held_body;
+}
+static int view_torch_emitter(vec3_t out) {
+    vec3_t forward,right,up;int j;edict_t *p=local_player();
+    if(!owned || !chase_active.value || !held_visible || !body_torch || !p || p->v.waterlevel>=2 ||
+       !AW_TorchEquipped() || !body.model || !held_model || !Cache_Check(&body.model->cache) ||
+       !Cache_Check(&held_model->cache) || body.frame<0 || body.frame>=body_emitter.count)return 0;
+    AngleVectors(body.angles,forward,right,up);
+    for(j=0;j<3;j++)out[j]=body.origin[j]+body_emitter.point[body.frame][0]*forward[j]-
+        body_emitter.point[body.frame][1]*right[j]+body_emitter.point[body.frame][2]*up[j];
+    return 1;
+}
+static int view_torch_light(vec3_t out) {
+    edict_t *p=local_player();trace_t t;
+    if(!p || !view_torch_emitter(out) || SV_PointContents(out)!=CONTENTS_EMPTY)return 0;
+    t=SV_Move(p->v.origin,vec3_origin,vec3_origin,out,MOVE_NOMONSTERS,p);
+    return !t.startsolid && !t.allsolid && t.fraction==1;
 }
 
 /* ---- the camera ---- */
@@ -240,6 +366,7 @@ int AW_ViewThirdPerson(void) {return owned;}
 
 /* ---- the death scene ---- */
 int AW_DeathLocked(void) {return death.stage!=AW_DEATH_NONE || AW_PlayerDead();}
+static int death_prompt_active(void) {return death.stage==AW_DEATH_ASK && !acted && key_dest==key_game;}
 static void begin_death(void) {
     int retry,saved;
     death_arena=AW_ArenaActive();
@@ -317,7 +444,7 @@ void AW_ViewDraw(void) {
 /* ---- the frame ---- */
 static void set_chase(int on) {
     if(on && !owned){owned=1;Cvar_SetValue("chase_active",1);}
-    else if(!on && owned){owned=0;Cvar_SetValue("chase_active",0);}
+    else if(!on && owned){owned=0;memset(&body_air,0,sizeof(body_air));Cvar_SetValue("chase_active",0);}
 }
 static int playing(void) {
     return key_dest==key_game && !cl.paused && !con_forcedup && !AW_IntroUse();
@@ -396,8 +523,9 @@ void AW_ViewInput(int key,int down) {
     if(down && key_dest==key_game)input_seen=1;
 }
 void AW_ViewSceneSpawn(void) {
+    memset(&body_air,0,sizeof(body_air));
     if(death.stage!=AW_DEATH_NONE)end_death();
-    body_model=NULL;body_race=-2;
+    body_model=held_model=NULL;body_race=-2;body_torch=body_water=held_visible=torch_failed=water_failed=0;body_emitter.count=0;
 }
 
 /* The vanity orbit now, until any input (dbg vanitycamera on, dbg camera vanity now). */
@@ -511,7 +639,9 @@ void AW_ViewInit(void) {
     Cmd_AddCommand("aw_view_zoom",zoom_command);Cmd_AddCommand("aw_camera",command);
     Cmd_AddCommand("aw_vanitycam",vanity_command);
     aw_death_input_locked=AW_DeathLocked;
+    aw_death_prompt_active=death_prompt_active;
     aw_view_frame=AW_ViewFrame;aw_view_camera=AW_ViewCamera;aw_view_body=AW_ViewBody;aw_view_hide_hands=AW_ViewThirdPerson;
+    aw_view_held=view_held;aw_view_torch_emitter=view_torch_emitter;aw_view_torch_light=view_torch_light;
     aw_view_input=AW_ViewInput;aw_view_key=AW_ViewKey;aw_view_draw=AW_ViewDraw;aw_view_fullscreen=AW_ViewVanityFullscreen;
     combat_scene=aw_combat_scene;aw_combat_scene=scene_spawn;   /* after AW_CombatInit (aw_debug.c) */
 }

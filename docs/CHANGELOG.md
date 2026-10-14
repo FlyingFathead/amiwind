@@ -1,8 +1,28 @@
-# Development history
+# Changelog
+
+This is the maintained history of implemented changes, grouped by version.
+Entries link to issue reports; current issue status belongs only in the
+[bug register](BUGS.md#fix-index). Candidate implementation, automated checks,
+native verification, packaging and shipment are separate claims. Update this
+file with each change under the [release workflow](RELEASE_WORKFLOW.md#mandatory-change-records).
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.39 - final source package, 14 October 2026](#v0039---final-source-package-14-october-2026)
+- [v0.0.39-rc2 - candidate repairs and open findings, 13 October 2026](#v0039-rc2---candidate-repairs-and-open-findings-13-october-2026)
+  - [Post-pin package and shipment evidence, 14 October 2026](#post-pin-package-and-shipment-evidence-14-october-2026)
+- [v0.0.39: Cell By Cell, Piece By Piece - final preparation, 13 October 2026](#v0039-cell-by-cell-piece-by-piece---final-preparation-13-october-2026)
+- [v0.0.39-rc1: Cell By Cell, Piece By Piece - in preparation, 13 October 2026](#v0039-rc1-cell-by-cell-piece-by-piece---in-preparation-13-october-2026)
+  - [Saves and death UI](#saves-and-death-ui)
+  - [Exact RC1 package and scoped native evidence, 13 October 2026](#exact-rc1-package-and-scoped-native-evidence-13-october-2026)
+  - [Third-person animation, controls and sound](#third-person-animation-controls-and-sound)
+  - [Exterior ownership and compact images](#exterior-ownership-and-compact-images)
+  - [CHIM progress and release records](#chim-progress-and-release-records)
+  - [Findings and work still open](#findings-and-work-still-open)
+- [v0.0.38: Lava Is All You Need (And A Hint Of Tel Uvirith)](#v0038-lava-is-all-you-need-and-a-hint-of-tel-uvirith)
+- [v0.0.37: Proofreading the Cantons](#v0037-proofreading-the-cantons)
+- [v0.0.36: 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines)](#v0036-36-lessons-of-vivecs-cantons-and-vvardenfell-shorelines)
 - [v0.0.35: CHIMporting It All: Gathering Up The Loose Branches From The Seashore](#v0035-chimporting-it-all-gathering-up-the-loose-branches-from-the-seashore)
 - [v0.0.34: CHIM: Tightening the Bolts](#v0034-chim-tightening-the-bolts)
 - [v0.0.33: Towards CHIM: Replacing the Engine Block](#v0033-towards-chim-replacing-the-engine-block)
@@ -80,7 +100,7 @@
 - [Runtime v0.0.10 / source 0.8.2 — 27 September 2026](#runtime-v0010--source-082--27-september-2026)
 - [Runtime v0.0.9 / source 0.8.1 — 27 September 2026](#runtime-v009--source-081--27-september-2026)
 - [Runtime v0.0.8 / source 0.8.0 — 27 September 2026](#runtime-v008--source-080--27-september-2026)
-- [Changelog](#changelog)
+- [Changelog](#changelog-1)
 - [0.7.0 source / AmiWind v0.0.6 checkpoint-005](#070-source--amiwind-v006-checkpoint-005)
 - [0.6.0 source / demo v0.0.5 checkpoint-004](#060-source--demo-v005-checkpoint-004)
 - [0.5.0 source / demo v0.0.4 checkpoint-003](#050-source--demo-v004-checkpoint-003)
@@ -94,6 +114,305 @@
   - [rc6 image recovery follow-up](#rc6-image-recovery-follow-up)
 
 <!-- contents end -->
+
+## v0.0.39 - final source package, 14 October 2026
+
+- Combine RC1 and RC2 source changes into the final version, with a direct
+  update from public v0.0.38. Refresh README and final release notes with the
+  scoped RC2 evidence and remaining limitations.
+  [DOCS-RELEASE-EVIDENCE-SCOPE-39](bugs/DOCS-RELEASE-EVIDENCE-SCOPE-39.md).
+- Carry forward verified RC2 package coverage: 360 whole regional CHIM cells;
+  six partial town overlaps remain excluded. No new conversion, cell audit,
+  native coverage or gameplay acceptance follows from final packaging.
+  [DOCS-CHIM-PROGRESS-STALE-38](bugs/DOCS-CHIM-PROGRESS-STALE-38.md).
+
+## v0.0.39-rc2 - candidate repairs and open findings, 13 October 2026
+
+RC1 inspection stopped final preparation and requested RC2. The changes below
+are candidate repairs or confirmed findings, with their checks scoped explicitly.
+Final release remains held for fresh owner inspection. Post-pin checks on
+14 October verify the assembled RC2 package and scoped native behavior; its
+inspection artifacts were finalized at 2026-10-13T22:15:44Z. This is not owner
+acceptance or stable v0.0.39 clearance.
+
+Candidate repairs:
+
+- [NPC-NO-RUN-ANIM-35](bugs/NPC-NO-RUN-ANIM-35.md) and [ANIMKIT-COVERAGE-35](bugs/ANIMKIT-COVERAGE-35.md): Reset animation scene caches on server spawn so same-map reload registers resident movers again, and report declared mover fallback. Seven animation, 21 combat and 42 NPC focused checks pass. The corrected Amiga target compiles; scoped native reload shows changing guard chase/attack poses and continuing damage with unchanged RC1 NPC assets. Actual AmigaDOS exit and post-exit engine, bootcheck and command-catalogue readbacks pass. Authored spear stance, all NPCs, performance and complete RC2 package acceptance remain separate.
+- [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md) and [PLAYER-MOVEMENT-FRAME-SKIP-39](bugs/PLAYER-MOVEMENT-FRAME-SKIP-39.md): Compact action grids bind authored punch timing and preserve normal/ready walk 8/run 6 instead of losing gait samples. Isolated Nord and Khajiit male bakes/readbacks contain 105 frames with 512x96 atlases, 357/358 triangles and 520,564/521,876 bytes, within the unchanged 512 KiB limit; 83 affected automated checks pass. Scoped Nord male/Orc female candidate footage shows torso/arm punch motion and ready movement. Damage, LMB input, matched A/B, leg seams, speed-linked gait and all-appearance/package/owner acceptance remain unverified. The owner reports v0.0.38 as the last known good fast-gait comparison; that is not independent native acceptance.
+- [PLAYER-BODY-LEG-SHAPE-39](bugs/PLAYER-BODY-LEG-SHAPE-39.md): All 20 body and companion sets are present in the exact RC2 package. The scoped Nord package footage does not establish knee/calf continuity or fix the owner-reported thin legs. Prior section metrics and possible simplification gaps remain diagnostic; matched original/v0.0.38, all-appearance and owner acceptance remain pending.
+- [DBG-ENTITY-INSPECT-39](bugs/DBG-ENTITY-INSPECT-39.md): Add an explicitly enabled click-to-pin identity HUD, default off and separate from ordinary overlays; clicking consumes attack while active. Seventeen focused automated checks pass. Correct the missing character declaration exposed by the first target gate; corrected source 4b968c2 compiles. Its native view exposes a broad all-pose bounds false pick. The subsequent source repair uses the current resident client-frame box and rendered pose, reusing renderer bounds/pitch/scale without disk loads, and labels printed server frame/positions separately. Actual C UBSan regressions cover the false pick, differing client/server frames and prior controls. Grouped boxes remain approximate; the corrected selector's target/native/package acceptance is pending.
+
+- [RELEASE-PATCH-TARGET-VERSION-39](bugs/RELEASE-PATCH-TARGET-VERSION-39.md): Prepare the RC2 published-file baseline with matching target version, linked canonical known issues and release allowlist entry. Exact pinned guard/export/strict kit checks remain pending; candidate release hold is preserved.
+
+- [TRACKER-REGISTER-SIZE-36](bugs/TRACKER-REGISTER-SIZE-36.md): The RC2 suite catches the live register above its unchanged 85% size warning. Store one complete issue per line without dropping any fact/history/order or changing archive bytes/limits; add save/load round-trip coverage. Fifty-six focused tracker/export checks pass with independent source ZIP readback; the failed full-suite snapshot remains historical and fresh integrated gates remain required.
+
+Remaining findings and limits:
+
+- [BUILD-PLAYER-BODY-BUDGET-FALLBACK-39](bugs/BUILD-PLAYER-BODY-BUDGET-FALLBACK-39.md): Full RC2 disk readback and independent package extraction verify all 20 declared base bodies and140 torch/held/swim companion files within the unchanged 512 KiB model cap. Exact played readback preserves186 engine/metadata/body files. Binary coverage does not certify all 20 visual appearances, native memory, leg seams or owner acceptance.
+- [NPC-SPEAR-ATTACK-REGRESSION-39](bugs/NPC-SPEAR-ATTACK-REGRESSION-39.md): Exact-source 690 staged diagnostic footage shows guard pursuit and changing strike poses, with hits reducing health 995 to 899 then 882.3. Post-exit readback verifies 21 movers plus engine, bootcheck and catalogue (24 files). This supports scoped chase/attack and preserved damage, not damage balance or complete spear attachment alignment. Final RC2 disk readback separately verifies the 21 equipped-resident files and palette binding; it does not turn the staged diagnostic into final-package guard native acceptance. Matched OpenMW and owner acceptance remain pending.
+- [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md): The independently extracted RC2 package shows a raised left arm and carried torch on Nord, then torch-off and water/land model selection. Full disk readback verifies all 20 body/held-torch companions. Scoped native evidence is not all-appearance or matched-original visual acceptance; owner acceptance remains pending.
+- [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): The extracted RC2 package holds origin (704, -320, -25) for a four-second no-input water control after noclip is disabled. Pitch45 with forward movement descends to origin (832.7, -320, -153.7) at waterlevel 3 and shows changing swim poses. Both readied first-person fists remain visible at default horizontal FOV 90/viewsize 100. Actual OpenMW0.48 reference holds depth and retains first-person fists; no dedicated first-person stroke or blanket body pitch is established. Broader drowning, fatigue, combat, all appearances and owner acceptance remain pending.
+- [PLAYER-MOVEMENT-STATS-PARITY-39](bugs/PLAYER-MOVEMENT-STATS-PARITY-39.md): Fixed debug speed lacks original Speed/Athletics/encumbrance integration and running-fatigue debit. Faithful gameplay formulas, transient maxstats/godmode speed and all eight attribute effects are future work while convenient debug defaults are preserved. Correct roadmap wording that made a proposed maxstats option look implemented. The affected catalogue-doc check passes; retain the full suite's 1824-test result with one documentation failure/two skips, without promoting it to a full pass or inventing a handler.
+- [NPC-ORDINATOR-APPEARANCE-39](bugs/NPC-ORDINATOR-APPEARANCE-39.md): Original and exact packaged Ordinators are male Dark Elves with Indoril helmets; nearby Eloroth is Wood Elf. The native view reproduces a foreground unhelmeted elf, but the coarse background bounds pin does not bind that actor's identity. Collision restoration was refused at the requested pose, so it remains a noclip diagnostic; no cast substitution or appearance repair is established.
+- [MESH-VIVEC-CAP-GAP-38](bugs/MESH-VIVEC-CAP-GAP-38.md): Owner inspection repeats the visible giant mushroom cap opening. [CHIM-SEYDA-HUNK-GAP-33](bugs/CHIM-SEYDA-HUNK-GAP-33.md): Corrected-engine diagnostics repeat existing reserve warnings with inconsistent current/peak presentation; reserve and performance acceptance remain open. [DEBUG-MAP-SAVE-VALIDATION-32](bugs/DEBUG-MAP-SAVE-VALIDATION-32.md): Direct diagnostic vhi015 loading repeats save-validation refusal while retaining previous saves; ordinary transitions/save contents are unverified, with no new regression or lost-save claim.
+
+The source audit exports no original game content. Converted, audited, native-cell
+and packaged coverage are unchanged. Current status remains in the bug register;
+these scoped findings do not promote issue-specific owner acceptance.
+
+### Post-pin package and shipment evidence, 14 October 2026
+
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+
+- [BUILD-PLAYER-BODY-BUDGET-FALLBACK-39](bugs/BUILD-PLAYER-BODY-BUDGET-FALLBACK-39.md): Full RC2 disk readback and independent package extraction verify all 20 declared base bodies and140 torch/held/swim companion files within the unchanged 512 KiB model cap. Exact played readback preserves186 engine/metadata/body files. Binary coverage does not certify all 20 visual appearances, native memory, leg seams or owner acceptance.
+- [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md): The independently extracted RC2 package shows Nord third-person torso/arm punch changes in an unaltered native clip. Post-exit readback preserves exact assets. Console attack control does not prove physical LMB input or damage; all appearances, matched original comparison, seams and owner acceptance remain pending.
+- [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md): The independently extracted RC2 package shows a raised left arm and carried torch on Nord, then torch-off and water/land model selection. Full disk readback verifies all 20 body/held-torch companions. Scoped native evidence is not all-appearance or matched-original visual acceptance; owner acceptance remains pending.
+- [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): The extracted RC2 package holds origin (704, -320, -25) for a four-second no-input water control after noclip is disabled. Pitch45 with forward movement descends to origin (832.7, -320, -153.7) at waterlevel 3 and shows changing swim poses. Both readied first-person fists remain visible at default horizontal FOV 90/viewsize 100. Actual OpenMW0.48 reference holds depth and retains first-person fists; no dedicated first-person stroke or blanket body pitch is established. Broader drowning, fatigue, combat, all appearances and owner acceptance remain pending.
+- [DOCS-CHIM-PROGRESS-STALE-38](bugs/DOCS-CHIM-PROGRESS-STALE-38.md): RC2 full disk readback and independent extraction verify360 whole regional CHIM cells; six partial town overlaps remain excluded. The exact inspection package and matching source artifacts were finalized at 2026-10-13T22:15:44Z. Conversion/audit/native-cell coverage and owner acceptance are unchanged. Historical empty RC1 plan remains incorrectly selected as next by the existing selector; no supported historical flag permits a truthful metadata-only correction.
+- [ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md): Exact RC2 package native inspection repeats zone-full chunks 100/107 retries after water and land return. Scoped gameplay and successful AmigaDOS exit do not clear blocking streaming, heavy loading, memory/performance or all-cell traversal issues.
+
+## v0.0.39: Cell By Cell, Piece By Piece - final preparation, 13 October 2026
+
+Final preparation retains the implemented RC1 scope below. Exact RC1
+package/readback and scoped inspection evidence now accompany that scope. New features and
+unfinished repairs continue in v0.0.40. Source checks, image assembly, native
+checks and publication remain separate gates. The owner approved RC1 on
+13 October 2026 as the final-release basis; issue-specific acceptance and
+open statuses are preserved.
+
+- Reconcile the README, dated CHIM counts and historical Toolkit imagery.
+  Advance Toolkit metadata to 0.1.3 and its last-update label to AmiWind v0.0.39
+  for the changed documentation and verified RC1 inclusion data; controls retain
+  their existing behavior.
+  [DOCS-CHIM-PROGRESS-STALE-38](bugs/DOCS-CHIM-PROGRESS-STALE-38.md).
+- Record the Dwemer loading warning under the existing streaming issue,
+  without treating visible access as complete chunk recovery.
+  [CHIM-CHUNK-LOAD-FAIL-33](bugs/CHIM-CHUNK-LOAD-FAIL-33.md).
+- Correct unknown save/death image metadata and stale source-check prose;
+  preserve native acceptance limits.
+  [SAVE-TELEPORT-CHECKPOINT-38](bugs/SAVE-TELEPORT-CHECKPOINT-38.md),
+  [SAVE-LAVA-DEATH-LOOP-38](bugs/SAVE-LAVA-DEATH-LOOP-38.md),
+  [UI-DEATH-DAMAGE-TINT-38](bugs/UI-DEATH-DAMAGE-TINT-38.md),
+  [PLAYER-JUMP-THIRDPERSON-38](bugs/PLAYER-JUMP-THIRDPERSON-38.md),
+  [PLAYER-READY-THIRDPERSON-38](bugs/PLAYER-READY-THIRDPERSON-38.md),
+  [UI-KEY-HELP-STALE-38](bugs/UI-KEY-HELP-STALE-38.md).
+
+## v0.0.39-rc1: Cell By Cell, Piece By Piece - in preparation, 13 October 2026
+
+Changes since published v0.0.38 (`d40fa70b4787da09b8a6d5006f46ef6fb7e56c6f`),
+including the dev1 development work. Running on CHIM Engine v0.2.0.
+These are implemented source changes. Complete image assembly, exact-package
+readback and target gameplay acceptance remain pending at this checkpoint.
+See [RC1 release notes](RELEASE-v0.0.39-rc1.md) for the detailed scope and
+[the bug register](BUGS.md#fix-index) for current issue status.
+
+### Saves and death UI
+
+- Teleport autosaves wait for a settled, grounded arrival; loading, falling,
+  damage, combat and modal menus defer the save while retaining the previous
+  safe checkpoint. [SAVE-TELEPORT-CHECKPOINT-38](bugs/SAVE-TELEPORT-CHECKPOINT-38.md).
+- Automatic saves reject lava and slime to prevent new reload/death loops.
+  Existing unsafe saves are not repaired automatically.
+  [SAVE-LAVA-DEATH-LOOP-38](bugs/SAVE-LAVA-DEATH-LOOP-38.md).
+- Death-menu choices request an untinted palette over the frozen world view.
+  Actual lava-death menu acceptance remains pending.
+  [UI-DEATH-DAMAGE-TINT-38](bugs/UI-DEATH-DAMAGE-TINT-38.md).
+
+### Exact RC1 package and scoped native evidence, 13 October 2026
+
+The exact RC1 image and independently extracted package contain 360 verified
+whole regional cells, including Tel Uvirith (10,1). Six selected cells
+(-3,-11), (-2,-11), (-1,-11), (0,-11), (5,-14) and (6,-14) overlap packaged
+town frames only partially and are excluded from that whole-cell count.
+All 9,360 frame/chunk files for the 360 cells and all 9,774 CHIM payload files
+remain byte-identical to the verified predecessor. The index and four named
+town frame maps are present; town coverage and interiors are separate counts.
+The 135 town-owned routing-only BSPs are absent under the validated checklist;
+required map/dependency readback passed. Native boundary routing remains open.
+
+The exact HDF comparison removes 142,235,493 payload bytes across 212 files:
+135 redundant BSP maps and 77 orphan harvest catalogues. No map additions or
+unexpected map removals are reported. The independently extracted RC1
+playtest ZIP is 2,060,379,345 bytes. Payload savings and compressed archive
+size are distinct measurements; these figures do not identify a final039 ZIP.
+
+RC1 package and matching source delivery finalized on 13 October 2026 at
+18:06:05 UTC (21:06 in Finland), with source `57a8699` and image `fbf9a6c`
+kept distinct. The six partial overlaps remain outside the shipped whole-cell
+count. The owner approved RC1 on 13 October 2026 as the basis for final
+v0.0.39. This release-level approval does not supply universal gameplay
+acceptance or close unrelated issues; final-image checks remain separate.
+
+Conversion/audit data is the unchanged 13 October 2026, 14:04:49 UTC snapshot:
+1,190 converted cells including 15 failed audits, 99 empty sea, three not
+converted, and 1,274/1,292 audit milestones. The package layer was reconciled
+at 17:45 UTC and its local served data was read back. The 865 ocean cells are
+outside the denominator. Converted and packaged per-type actor/gameplay
+counts remain unknown; the original reference census is preserved. Planned
+cells are not included cells and package presence does not prove gameplay.
+
+The exact RC1 package was independently extracted and read back. All 20 body
+models and layouts passed their actual-format checks; 1,751 existing non-body
+model/animation assets remained byte-identical. A Nord male session exercised
+third-person ready/lower, movement, jump and camera changes. This is one
+appearance and scene; matched original-game views, all-appearance motion,
+loaded memory and performance acceptance remain separate.
+
+A registered Hors save session wrote the settled vf1703 arrival checkpoint,
+then entered lava, took damage and died without subsequent save messages.
+The untinted death prompt was observed. Reload returned to the same checkpoint
+at health 55 and subsequent observation retained health 55. Three AWS saves
+decoded against the exact catalogue/content, with the highest sequence
+selecting that arrival checkpoint. Guest-exit frames showed AmigaDOS and the
+played disks read back. The immediate keyboard-selection screenshot was black;
+highlight/selection acceptance is not claimed. Existing unsafe saves remain.
+
+Hunk reserve warnings and repeated chunk20 allocation/repack warnings remain.
+No complete cell-wide native, streaming, actor, lighting, gameplay or
+performance acceptance is established. Owner approval and final-image checks
+remain separate; RC1 evidence does not identify a final v0.0.39 executable.
+
+[CHIM-SEYDA-HUNK-GAP-33](bugs/CHIM-SEYDA-HUNK-GAP-33.md),
+[CHIM-ZONE-RESERVE-EARLY-33](bugs/CHIM-ZONE-RESERVE-EARLY-33.md),
+[CHIM-CHUNK-LOAD-FAIL-33](bugs/CHIM-CHUNK-LOAD-FAIL-33.md),
+[CHIM-GRAFT-REPACK-EMPTY-33](bugs/CHIM-GRAFT-REPACK-EMPTY-33.md).
+
+### Third-person animation, controls and sound
+
+- Correct final actor-layout preflight to distinguish the existing 256-frame model limit from 64 frames per animation group. The alias byte budget is unchanged. [ANIMKIT-ACTOR-ABI-SITES-35](bugs/ANIMKIT-ACTOR-ABI-SITES-35.md).
+
+- Player body profiles and runtime selection add jump takeoff, airborne and
+  landing groups. [PLAYER-JUMP-THIRDPERSON-38](bugs/PLAYER-JUMP-THIRDPERSON-38.md).
+- Add bare-handed ready idle/walk/run groups and layered draw/lower motion.
+  Action timing and leg phase remain independent across movement and camera
+  changes; female movement overrides are preserved.
+  [PLAYER-READY-THIRDPERSON-38](bugs/PLAYER-READY-THIRDPERSON-38.md).
+- Body generation retries within existing mesh/animation budgets when extra
+  frames overflow. All twenty race/sex bodies still require actual bake,
+  readback and native coverage.
+  [BUILD-PLAYER-BODY-BUDGET-FALLBACK-39](bugs/BUILD-PLAYER-BODY-BUDGET-FALLBACK-39.md).
+- Sound cancellation scans all eight dynamic channels while preserving
+  entity/channel matching, unrelated sounds and music. This alone does not
+  implement combat greeting policy.
+  [AUDIO-STOP-CHANNEL-RANGE-39](bugs/AUDIO-STOP-CHANNEL-RANGE-39.md).
+- Keyboard help matches current controls and reserved shortcuts; page size
+  follows the live font/viewport and clamps navigation after layout changes.
+  [UI-KEY-HELP-STALE-38](bugs/UI-KEY-HELP-STALE-38.md).
+
+### Exterior ownership and compact images
+
+- Sky, cull, hand-metadata and night-lighting passes follow the same validated
+  omission checklist before CHIM frames are generated; unexpected missing maps
+  still fail. [BUILD-SHADOWED-WORLD-MAPS-38](bugs/BUILD-SHADOWED-WORLD-MAPS-38.md).
+
+- A prebuild checklist assigns each exterior cell to legacy BSP, regional
+  CHIM or a named town. The current selection excludes 135 redundant town
+  BSP cores before terrain, scenery or flora conversion. Partial cores and
+  required dependencies remain; interiors retain independent format choices.
+  [BUILD-SHADOWED-WORLD-MAPS-38](bugs/BUILD-SHADOWED-WORLD-MAPS-38.md).
+- The same declared omission list reaches the early disk-layout preflight,
+  image assembly, save fingerprints
+  and disk packing, including matching orphan catalogues. Undeclared missing
+  maps still fail. Exact payload savings await final image readback.
+  [BUILD-WORLD-FINGERPRINT-RETIRED-38](bugs/BUILD-WORLD-FINGERPRINT-RETIRED-38.md),
+  [BUILD-WORLD-PACK-RETIRED-38](bugs/BUILD-WORLD-PACK-RETIRED-38.md).
+- Correct checklist comparison after JSON turns coordinate pairs into lists.
+  The reproduced failure and changed-ownership rejection are covered by the
+  world-manifest regression; retained full-build plan/terrain verification
+  passes. [BUILD-CHECKLIST-JSON-CELLS-39](bugs/BUILD-CHECKLIST-JSON-CELLS-39.md).
+- Provide matching FS-UAE and WinUAE presets.
+  [BUILD-DEV1-EMULATOR-PRESETS-39](bugs/BUILD-DEV1-EMULATOR-PRESETS-39.md).
+
+### CHIM progress and release records
+
+- Refresh the CHIM reference, map and coverage page from the 13 October
+  conversion/audit receipts: 1,190 converted cells, including 15 with failing
+  audits; 99 empty-sea cells and three not converted. The audit milestone is
+  1,274 of 1,292 (98.6%), not a percentage of playable or accepted content.
+  Packaged and native coverage remain separate. All 349 lava references in
+  27 cells are converted; that is not native acceptance of all pools.
+  [DOCS-CHIM-PROGRESS-STALE-38](bugs/DOCS-CHIM-PROGRESS-STALE-38.md).
+- Preserve v0.0.38's BSP/CHIM lava paths, completed-stage Tel Uvirith (10,1),
+  360 regional CHIM cells and approved horizon silhouettes as regression
+  targets. RC1's own inclusion must be proved by its image receipt.
+  [BUILD-LAVA-COVERAGE-38](bugs/BUILD-LAVA-COVERAGE-38.md),
+  [CHIM-MOLAG-MEMORY-38](bugs/CHIM-MOLAG-MEMORY-38.md).
+- Correct release ancestry, source/version isolation documentation, generated
+  document contents, source export entries and image-wrapper/cache checks.
+  [RELEASE-WORKING-VERSION-ISOLATION-39](bugs/RELEASE-WORKING-VERSION-ISOLATION-39.md),
+  [DOCS-RC1-PREFLIGHT-39](bugs/DOCS-RC1-PREFLIGHT-39.md),
+  [TEST-RC1-INTEGRATION-CONTRACTS-39](bugs/TEST-RC1-INTEGRATION-CONTRACTS-39.md).
+- Declare the RC1 target version in the publication baseline. A successful
+  dry-run kit remains distinct from strict final validation.
+  [RELEASE-PATCH-TARGET-VERSION-39](bugs/RELEASE-PATCH-TARGET-VERSION-39.md).
+- Restore this changelog's missing v0.0.36-38 history and require changelog,
+  bug register/reports/journal, CHIM coverage and release notes to accompany
+  each relevant change. [DOCS-CHANGELOG-STALE-39](bugs/DOCS-CHANGELOG-STALE-39.md).
+
+### Findings and work still open
+
+The following are recorded findings, not completed repairs. The full backlog
+remains in [the register](BUGS.md#fix-index) and [roadmap](ROADMAP.md).
+
+- Carried third-person torches, complete punch/weapon animation, swimming
+  poses, drowning, water/torch behavior and the reported readied water-walking
+  remain unresolved or incomplete.
+  [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md),
+  [PLAYER-READY-THIRDPERSON-38](bugs/PLAYER-READY-THIRDPERSON-38.md),
+  [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md),
+  [PLAYER-READY-WATER-MOVEMENT-38](bugs/PLAYER-READY-WATER-MOVEMENT-38.md).
+- Ambient combat greetings, bystander policy and subtitle ownership need
+  further work. [COMBAT-AMBIENT-SPEECH-GATING-38](bugs/COMBAT-AMBIENT-SPEECH-GATING-38.md).
+- NPC/player animation and voice coverage, blocking, stairs/collision,
+  coast objects, original reference types, deferred actors and gameplay,
+  cache/streaming and measured performance remain tracked individually.
+  [STAIRS-MOLAG-ACCESS-38](bugs/STAIRS-MOLAG-ACCESS-38.md),
+  [CHIM-COAST-OBJECTS-MISSING-36](bugs/CHIM-COAST-OBJECTS-MISSING-36.md),
+  [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md),
+  [ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md).
+
+## v0.0.38: Lava Is All You Need (And A Hint Of Tel Uvirith)
+
+Public source published 13 October 2026 at
+`d40fa70b4787da09b8a6d5006f46ef6fb7e56c6f`.
+
+- Restore exterior lava conversion in legacy BSP and CHIM paths, preserving
+  original pool elevation and surrounding terrain. The full conversion
+  accounts for 349 original lava references across 27 exterior cells.
+  [BUILD-LAVA-COVERAGE-38](bugs/BUILD-LAVA-COVERAGE-38.md),
+  [BUILD-LAVA-TERRAIN-BUDGET-38](bugs/BUILD-LAVA-TERRAIN-BUDGET-38.md).
+- Include optimized completed-stage Tel Uvirith (10,1). Scoped arrival and
+  sprite readback evidence does not establish complete stair/collision coverage.
+  [CHIM-MOLAG-MEMORY-38](bugs/CHIM-MOLAG-MEMORY-38.md),
+  [STAIRS-MOLAG-ACCESS-38](bugs/STAIRS-MOLAG-ACCESS-38.md).
+- The recorded full image contains 360 whole regional CHIM cells; six town
+  overlap selections are separate. The player observed new Dwemer ruin
+  content, with heavy loading. Geometry inclusion does not complete all
+  original actors or gameplay.
+- Unsafe lava autosaves, teleport checkpoint behavior, tinted death menus,
+  third-person animation, water, combat speech and loading remain issues
+  recorded for follow-up. The RC1 repairs above are not retroactive v0.0.38 fixes.
+- Full details and issue links: [v0.0.38 notes](RELEASE-v0.0.38.md).
+
+## v0.0.37: Proofreading the Cantons
+
+- Documentation correction for v0.0.36: align the release recipe, default
+  shared terrain/world format, repaired Vivec stairs and death/retry behavior
+  with the existing implementation. No new gameplay change is claimed.
+- Correct main-page release wording and media assets; add the real Amiga
+  hardware guide and regenerate the dated CHIM coverage reference.
+- Full details: [v0.0.37 notes](RELEASE-v0.0.37.md).
+
+## v0.0.36: 36 Lessons of Vivec's Cantons (And Vvardenfell Shorelines)
+
+- CHIM Engine v0.2.0 brings the coast release recipe, including 325 regional
+  cells plus six town-overlap cells, Vivec city frames, compiled terrain hulls
+  and shared terrain references. These historical inclusion counts are not
+  complete original-reference or native acceptance claims.
+- Add wider coordinates, third-person/vanity camera behavior, a player death
+  scene and retry-fight option, and optional hold-to-block behavior.
+- Add build performance guards, shared resource leases and cache provenance.
+- Full changes, linked fixes and limitations: [v0.0.36 notes](RELEASE-v0.0.36.md).
 
 ## v0.0.35: CHIMporting It All: Gathering Up The Loose Branches From The Seashore
 

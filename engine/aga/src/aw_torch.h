@@ -33,4 +33,7 @@ static float AW_TorchLightGain(int key,float radius,int surface)
 int AW_TorchLoadHandAssets(void);
 void AW_TorchUseHandAssets(int enabled);
 void AW_TorchReleaseLegacyCache(void);
+/* Optional player-body emitter; NULL in first-person-only builds/fixtures. */
+extern int (*aw_view_torch_emitter)(vec3_t out);
+extern int (*aw_view_torch_light)(vec3_t out);
 #endif

@@ -229,7 +229,8 @@ def build_resident(task):
             rig=(key,npc_anim.FEMALE_SKELETON)
             if rig not in _resident_rigs:_resident_rigs[rig]=Skeleton(assets,npc_anim.FEMALE_SKELETON)
             female=_resident_rigs[rig]
-        kit,groups=npc_anim.plan(skeleton,profile,female,appearance.get('weight',1.))
+        kit,groups=npc_anim.plan(skeleton,profile,female,appearance.get('weight',1.),
+                                 attack_stance=appearance.get('attack_stance'))
         times=npc_anim.idle_compatible_times(groups);step=groups[0]['step']
     anim={}
     item_times=times;mover_item_times=None

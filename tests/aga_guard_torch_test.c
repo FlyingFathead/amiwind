@@ -5,6 +5,7 @@
 #include <assert.h>
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
 entity_t cl_entities[MAX_EDICTS],*cl_visedicts[MAX_VISEDICTS];int cl_numvisedicts;
+int (*aw_view_torch_emitter)(vec3_t out);
 dlight_t cl_dlights[MAX_DLIGHTS];viddef_t vid;refdef_t r_refdef;
 vec3_t vpn,vup,vright;float aliasxcenter,aliasycenter,aliasxscale,aliasyscale;
 short *d_pzbuffer;unsigned int d_zwidth;aw_state_t aw_state;

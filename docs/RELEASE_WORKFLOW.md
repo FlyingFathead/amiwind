@@ -5,6 +5,7 @@ Official project: https://github.com/FlyingFathead/amiwind/
 <!-- contents start -->
 ## Contents
 
+- [Mandatory change records](#mandatory-change-records)
 - [Historical rc1 handoff (published)](#historical-rc1-handoff-published)
 - [Historical v0.0.25 complete update package](#historical-v0025-complete-update-package)
 - [Release gate: the build tool must match the release](#release-gate-the-build-tool-must-match-the-release)
@@ -26,14 +27,46 @@ Official project: https://github.com/FlyingFathead/amiwind/
 
 <!-- contents end -->
 
-Current published release: **[v0.0.27 — Rocks, Mushrooms, and Then Some](RELEASE-v0.0.27.md)**,
-3 October 2026, commit `8da838784efa619a12da39d29095be4c0fe6e44d`.
-Exact-commit Docker, Linux/Windows launcher parity and source/asset-free CI passed;
-the Linux publisher completed release creation and downloaded-asset verification.
-Known gameplay issues remain documented. Publication does not establish a complete
-Morrowind implementation, target heap certification or an exhaustive playthrough.
-The owner performs Git/GitHub publishing. Existing tags and release archives stay
-immutable; later source/documentation corrections use normal follow-up commits.
+Published public-source base for the current v0.0.39 final preparation:
+**[v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)](RELEASE-v0.0.38.md)**,
+13 October 2026, commit `d40fa70b4787da09b8a6d5006f46ef6fb7e56c6f`.
+The owner performs Git/GitHub publishing from Linux. Release archives and tags
+remain immutable; source/documentation corrections use follow-up commits.
+Public source publication and private image validation/delivery are separate.
+
+## Mandatory change records
+
+Changelog, bug tracking and CHIM coverage maintenance are required parts of
+development, integration and release preparation. A change is incomplete
+until its affected records agree with the code and actual verification.
+
+1. Update [CHANGELOG.md](CHANGELOG.md) in the same change as a fix, feature,
+   regression or confirmed finding, under the current version and date. State
+   the player-visible result or build effect and link the issue ID. Keep
+   implemented changes separate from findings and unfinished work.
+2. Update [bugs.json](bugs/bugs.json), the issue report and [BUG_JOURNAL.md](BUG_JOURNAL.md)
+   together; render the generated register and related pages. The register
+   alone owns current status. Record regressions immediately. Source-only
+   work does not set shipped/fixed or owner-accepted status.
+3. Update the [CHIM cell tracker](chim/PROGRESS_TRACKER.md) whenever conversion,
+   audits, native checks or package inclusion change. Bind each state to its
+   source/build and receipt. Keep failed, excluded and held cells, original
+   reference types, deferred actors and unimplemented gameplay explicit.
+   Converted, audited, native-checked and packaged are separate states;
+   planned cells do not count as included cells.
+4. When coverage changes, regenerate the sanitized reference, cell-tracker
+   page and progress map together and update their captions/date/counts. Keep
+   the served tracker current from the same evidence. Do not expose private
+   receipts or source assets, edit historical releases or invent acceptance.
+5. Before freezing source or preparing a handoff, reconcile the changelog,
+   linked release notes, register, roadmap and coverage snapshot. Include
+   every new report/document in the public source allowlist. Check links,
+   generated sections, whitespace and the actual exported source, not only
+   the working directory. Missing or contradictory records block the handoff.
+6. At verification and delivery, update the affected records using exact
+   results and version IDs. Preserve historical entries and failed receipts.
+   Rerun checks affected by changes; reuse unchanged valid evidence. Never
+   turn an old image's successful check into acceptance of a new image.
 
 ## Historical rc1 handoff (published)
 

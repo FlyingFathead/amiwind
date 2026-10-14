@@ -13,6 +13,7 @@ import time
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
 from world_scenery import region_references
+from exterior_plan import no_legacy_map, skipped_row, reference_in_chim_town, verify_stage
 
 _INDEX = None
 _MODELS = {}
@@ -159,22 +160,25 @@ def prepare(terrain, scenery, palette, out, jobs, only=None):
     # CHIM region cells (docs/BUILD_MANIFEST.md step 2): the terrain stage made no map for them, so neither does this
     # stage; their placements are in the CHIM world.
     chim_cells = chim_cells_of(baseline)
-    made = [e for e in entries if not e.get('chim_region')]
+    made = [e for e in entries if not no_legacy_map(e)]
     rows = {}
     for result in ordered_map(convert_region_cached, [(terrain, scenery, palette, out, e, cache, shared)
                                                       for e in made], jobs):
         rows[result['name']] = result
         print(f"REGION {len(rows)}/{len(made)} {result['name']} references={result['instances']}", flush=True)
     for e in entries:
-        if e.get('chim_region'):
-            rows[e['name']] = {'name': e['name'], 'chim_region': True, 'instances': 0, 'source_references': []}
+        if no_legacy_map(e):
+            rows[e['name']] = {'name': e['name'], **skipped_row(e), 'instances': 0, 'source_references': []}
     results = [rows[e['name']] for e in entries]
     if chim_cells:
         print('World scenery: %d maps of CHIM region cells not made' % (len(entries) - len(made)), flush=True)
     covered = {(tuple(r['cell']), r['number']) for result in results for r in result['source_references']}
     expected = {(tuple(r['cell']), r['number']) for r in index['references']}
     # placements of CHIM region cells may be missing (the CHIM world places them); every other one must be covered
-    if not only and (covered - expected or {k for k in expected - covered if k[0] not in chim_cells}):
+    checklist = baseline.get('exterior_checklist')
+    on_chim = {(tuple(r['cell']), r['number']) for r in index['references']
+               if checklist and reference_in_chim_town(r, checklist)}
+    if not only and (covered - expected or {k for k in expected - covered - on_chim if k[0] not in chim_cells}):
         raise ValueError('Full-world overlay omitted source references')
     receipt = {'format': 'AmiWind world scenery overlay 1', 'diagnostic_subset': bool(only),
                'terrain_directory_sha256': hashlib.sha256((terrain / 'world-regions.json').read_bytes()).hexdigest(),
@@ -203,6 +207,7 @@ def check_chim_cells(text, terrain):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--exterior-plan', type=Path)
     for name in ('terrain', 'scenery', 'palette', 'out'):
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--only', nargs='+')
@@ -215,6 +220,7 @@ def main():
     import build_profile
     build_profile.instrument('world-scenery')
     check_chim_cells(args.chim_regions_cells, args.terrain)
+    verify_stage(args.exterior_plan, args.terrain)
     result = prepare(args.terrain, args.scenery, args.palette, args.out, resolve_jobs(args.jobs), args.only)
     print('OVERLAY PASSED', len(result['regions']), 'regions;', result['covered_source_references'], 'source references', flush=True)
 

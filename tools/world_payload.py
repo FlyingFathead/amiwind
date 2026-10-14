@@ -110,7 +110,8 @@ def prune(id1, report_path, towns=None):
     """Default image cleanup, only after frame generation; report every decision.
 
     Older external saves are not included in a fresh image and are not migrated
-    here. Directory metadata remains for coordinate conversion and harvesting.
+    here. Directory indices remain for coordinate conversion. Catalogues of
+    retired maps leave with them; retained town-region dependencies stay intact.
     """
     from town_config import runtime_towns
     id1 = Path(id1)
@@ -127,6 +128,16 @@ def prune(id1, report_path, towns=None):
             removed.append({'file': 'maps/' + path.name, 'bytes': len(data),
                             'sha256': hashlib.sha256(data).hexdigest(),
                             'reason': 'routing core fully shadowed; no explicit payload dependency'})
+            # AW_HarvestBegin loads by the active map name. These unreachable
+            # legacy maps cannot use their catalogue; keeping it also makes the
+            # heap/fingerprint validators reject the final payload. Town region
+            # tables are explicit dependencies above, so their catalogues stay.
+            catalogue = id1 / ('harvest-' + name + '.txt')
+            if catalogue.is_file():
+                data = catalogue.read_bytes()
+                removed.append({'file': catalogue.name, 'bytes': len(data),
+                                'sha256': hashlib.sha256(data).hexdigest(),
+                                'reason': 'catalogue of a fully shadowed retired map'})
     report = {'removed': removed, 'retained_dependencies': retained,
               'removed_bytes': sum(row['bytes'] for row in removed),
               'scope': 'Fresh image routing and explicit payload references; external saves not migrated.'}

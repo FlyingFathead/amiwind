@@ -1,6 +1,8 @@
 # AmiWind Toolkit
 
-![AmiWind Toolkit, last updated with AmiWind v0.0.31](images/amiwind-v0.0.31-toolkit-header.png)
+Current controls are documented below. The Toolkit header currently names
+v0.0.38, its last update; that label is independent of the game release.
+Screenshots in this guide are historical and do not supply current coverage totals.
 
 <!-- contents start -->
 ## Contents
@@ -32,13 +34,15 @@ shows how much of Morrowind's world has been converted to the Amiga, what is
 missing and where, and lets you open any built map in 3D to see its actual
 polygons. It runs entirely on your machine; nothing is uploaded.
 
-Nothing in the public repository shows the game world. Every view of it is
-made on your machine from your own Morrowind files and your own AmiWind build
-output, and stays there.
+The public viewer contains no preloaded game world. Its views use your own
+Morrowind files and AmiWind build output. Documentation includes selected
+historical screenshots; those are illustrations, not distributable game data.
 
-The header line "Last updated with AmiWind v..." names the AmiWind version the
-Toolkit was last updated and tested with. It is changed by hand when the
-Toolkit itself is next worked on, not with every release.
+The header line "Last updated with AmiWind v..." names the AmiWind release
+containing the latest Toolkit changes. The release check requires an update
+when Toolkit files change. Final v0.0.39 updates the documentation and verified
+RC1 inclusion data, with Toolkit metadata version 0.1.3; inspection controls
+remain those introduced in v0.0.38. This label is not native gameplay acceptance.
 
 ## v0.0.38 controls
 
@@ -94,7 +98,13 @@ by itself, so each one has to be chosen.
 
 ![World view: the whole island on the topomap, with Balmora and Seyda Neen outlined as full town maps and named places and interior entrances shown](images/amiwind-v0.0.31-toolkit-world.png)
 
+Historical interface and data; these totals are not current coverage. See the
+[dated coverage guide](chim/CHIM_PROGRESS_MAP.md) for separate audit, native and package records.
+
 ![World view in v0.0.36 with the CHIM progress tracker: each cell coloured by its conversion status, the headline and the legend](images/amiwind-v0.0.36-toolkit-world-chim-tracker.png)
+
+Historical interface and data; these totals are not current coverage. See the
+[dated coverage guide](chim/CHIM_PROGRESS_MAP.md) for separate audit, native and package records.
 
 Vvardenfell's exterior cells, one square per cell, north up.
 

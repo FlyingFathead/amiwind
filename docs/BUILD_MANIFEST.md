@@ -15,6 +15,7 @@ Status: default build policy, updated 13 October 2026. The historical measuremen
 - [Step 3: Seyda Neen CHIM-native (done, v0.0.36-dev5)](#step-3-seyda-neen-chim-native-done-v0036-dev5)
 - [Collision check (before any stage)](#collision-check-before-any-stage)
 - [Order of work](#order-of-work)
+- [Complete exterior checklist (v0.0.39-dev1 candidate)](#complete-exterior-checklist-v0039-dev1-candidate)
 
 <!-- contents end -->
 
@@ -198,3 +199,11 @@ reason (v0.0.36-dev5): a CHIM area's legacy chain without a retired flag is refu
 3. Done (v0.0.36-dev5): Seyda Neen CHIM-native; its legacy chain leaves the build (the old method stays selectable as
    a labelled regression build: `--legacy-area seyda --override legacy-area`). See "Step 3" below.
 4. Per-map units of every stage in one pool.
+
+## Complete exterior checklist (v0.0.39-dev1 candidate)
+
+`exterior-checklist.json` is resolved before any full-build stage. It inventories original exterior CELL and height-bearing LAND identities, pins the source master hash, and lists every cell as BSP, CHIM region or fully CHIM-town-owned. A partly covered cell lists its remaining BSP core separately from its town owners. Interior maps are outside this checklist.
+
+Every terrain/scenery/flora stage receives this same file. Before compiling, terrain classifies its subdivided regions: BSP work is scheduled only for required cores; CHIM regions and fully town-owned routing rows produce no BSP. Directory indices remain stable. Scenery and flora verify the ownership receipt before work and preserve required source placements. Stale source hashes, missing cells, overlapping CHIM region/town claims or changed stage selections fail.
+
+The checklist supplements final-image duplicate, orphan-catalogue and dependency checks. It does not remove rendering aprons needed at map boundaries or required interior and gameplay assets. Build artifacts and caches are separate from the packaged image.

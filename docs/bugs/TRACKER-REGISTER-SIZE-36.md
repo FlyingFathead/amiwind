@@ -79,6 +79,18 @@ Not yet.
 
 Plan an archive rotation at each release, before the register reaches the warning line.
 
+## RC2 size recurrence and lossless representation, 13 October 2026
+
+The exact RC2 full-suite snapshot stops after 402 tests because the live register is 896,776 bytes, above the existing 85% warning line (891,289.6 bytes) of its unchanged 1 MiB hard limit. Preserve that failed snapshot and receipt.
+
+The current rotation rule already moved all eligible fixed/closed, non-persisting issues first found through v0.0.33. Only one additional fixed/non-persisting v0.0.34–v0.0.35 record is currently eligible for the planned second archive; moving it cannot solve this growth without changing the status or history of open issues. No open/persisting record is archived and the existing archive remains byte-identical.
+
+Instead, the canonical live writer emits one complete issue object per line in the same JSON array. Only indentation/nesting whitespace changes: every field, value, array/issue order and report history round-trips unchanged. Readable status remains in the generated register and reports. Add a real save/load Unicode and nested-history regression, retain the size guard and hard limit unchanged, and require exact focused tracker/export/link checks. The archive remains on its existing format and rotation rule; future legitimate rotations remain separate work. This is a tooling source candidate, not game/owner acceptance.
+
+## Focused validation, 13 October 2026
+
+The isolated corrected snapshot passes 56 tracker/export tests with zero failures, errors or skips, including the actual size guard and save/load history regression. Its independently read-back source ZIP contains all 2,871 allowlisted files and the exact compact register bytes. Existing archive bytes remain unchanged. The earlier full-suite failure is retained; this focused result is not a full-suite, game build, native or owner acceptance claim. Final integrated source pin and its gates remain required.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -95,13 +107,19 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [BUILD-SCRATCH-DISK-GROWTH-32](BUILD-SCRATCH-DISK-GROWTH-32.md): Build scratch volumes grow the container disk image on the system drive
 - [CHIMPORT-DOOR-MARKER-AUDIT-36](CHIMPORT-DOOR-MARKER-AUDIT-36.md): The CHIMport door audit counted marker DOOR records (PrisonMarker) as missing door links: 6 cells failed door_links, Seyda Neen among them
 - DOC-STATE-01 (no report page): Published release documentation retained stale candidate/current-version claims
+- [DOCS-CHANGELOG-STALE-39](DOCS-CHANGELOG-STALE-39.md): Maintained changelog stops at v0.0.35 while current development reaches v0.0.39-rc1
+- [DOCS-CHIM-PROGRESS-STALE-38](DOCS-CHIM-PROGRESS-STALE-38.md): Main README CHIM progress map still shows the v0.0.36 snapshot
 - [DOCS-DEAD-ANCHORS-32](DOCS-DEAD-ANCHORS-32.md): Seven documentation links point at headings that no longer exist
+- [DOCS-RC1-PREFLIGHT-39](DOCS-RC1-PREFLIGHT-39.md): RC1 documentation changes omit export and generated-document requirements
+- [DOCS-RELEASE-EVIDENCE-SCOPE-39](DOCS-RELEASE-EVIDENCE-SCOPE-39.md): Release notes conflate earlier image evidence and open bug identities
+- [DOCS-ROADMAP-IMPLEMENTATION-39](DOCS-ROADMAP-IMPLEMENTATION-39.md): Roadmap retains obsolete implementation and coverage claims
 - [DOCS-TOC-RENDER-FIGHT-33](DOCS-TOC-RENDER-FIGHT-33.md): The contents-list writer and the bug register renderer move each other's blocks on bug pages
 - [DRYRUN-LIBS-LABEL-32](DRYRUN-LIBS-LABEL-32.md): A dry-run image built with --amiga-libs still says it contains no game assets or ROMs only
 - [ESTIMATE-EVR-BELOW-CUR-31](ESTIMATE-EVR-BELOW-CUR-31.md): World estimate: "everything" comes out below "current content" in some regions
 - HANDOFF-WRAPPER-01 (no report page): Source handoff wrapper reused an existing extraction directory
 - PACKAGE-PORTABILITY-28 (no report page): Rebundled ZIPs lost exec modes; Windows path aliases accepted
 - [PKG-STALE-RUNTIME-32](PKG-STALE-RUNTIME-32.md): The sealed v0.0.31 playtest contains a stale launcher preset folder
+- [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [TOOLING-HEADLESS-BROWSER-31](TOOLING-HEADLESS-BROWSER-31.md): No headless browser in the Docker images: Toolkit screenshots cannot be made in Docker
 - [TOOLKIT-CULL-DIAGNOSTICS-38](TOOLKIT-CULL-DIAGNOSTICS-38.md): Collision-only diagnostics disable terrain culling preview

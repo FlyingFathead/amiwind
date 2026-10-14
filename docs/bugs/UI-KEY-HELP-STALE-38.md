@@ -31,7 +31,7 @@ Current keys help screen. The surrounding playtest reports identify dev2;
 the menu-only images do not independently display a build version.
 
 ## How it happened
-Source inspection: aw_wait.c uses seven rows, scans raw binding order, and
+Source inspection of the reported version: aw_wait.c uses seven rows, scans raw binding order, and
 falls back to command strings when its action-name table lacks a binding.
 The table omits +aw_pov. keys.c explicitly handles grave and F10 before ordinary
 bindings. F10 is already mentioned in the footer but must stay represented
@@ -47,14 +47,43 @@ page, return to gameplay, and repeat. Inspect friendly action labels, fixed
 console keys, paging, text clipping and any persistent blank page.
 
 ## Repair
-Pending. Reuse AmiQuake Key_KeynumToString and the existing live keybindings
-table plus explicit fixed-key handlers. Group readable actions and evaluate
-two columns at the actual low-resolution font size before considering three.
-Preserve rebinding and show the current controls, not a stale static key list.
+A partial source correction adds readable labels for the default POV, camera
+zoom, jump, run, block/context, music, downward movement and debug actions.
+Command and label share one entry, so the label count cannot drift from the
+command count. The existing AmiQuake `Key_KeynumToString` and live keybindings
+table still supply the actual assigned keys; unknown custom commands remain
+visible. The footer names both fixed console keys and their Shift modifier.
+
+A further source correction calculates row count from the viewport height and
+current console font. Compact glyphs at 320 by 200 use two columns of ten rows;
+the larger glyphs use one column of eight rows. A wider viewport can fit two
+columns with the larger font. Each entry is clipped to its own column, with an
+ellipsis for a long custom command. Bindings remain live, rather than a second
+copy of the configured keys. Page numbers are clamped when the binding count,
+font or viewport changes.
+The existing AmiQuake console glyph renderer draws the text; no new font atlas
+or runtime text buffer is added.
+
+The list now also includes fixed Escape, Shift+V, Shift+F5/F6 and photo-mode
+Ctrl+F/H shortcuts from their actual input handlers. Both console keys and
+their Shift behavior remain in the footer on every page. A stale binding for
+Escape, F10 or grave is omitted because those handlers consume the key before
+the bound command. These edits do not change the bindings themselves. Fixed
+shortcuts remain visible even after all configurable bindings are cleared.
+
+The reported blank frame still has no established cause or repair; page
+clamping is a safeguard, not a diagnosis of that image.
 
 ## Verification
-Owner screenshots and source diagnosis only. No repaired build or native
-acceptance. The second image does not alone prove a persistent blank-page bug.
+Owner screenshots and source diagnosis; label and layout corrections prepared
+on 13 October 2026. The existing wait/help C fixture now exercises both font
+sizes, column boundaries, all bindings across page changes, a long custom
+command, rebound keys, a shrinking or empty binding table and a wider viewport.
+It also checks fixed shortcuts and conflicting bindings for reserved keys.
+The integrated RC1 source completed its automated suite and Amiga
+compilation on 13 October 2026. Native readability and the blank-page trigger
+remain unverified. Capture default and rebound controls with both font sizes.
+The second image does not alone prove a persistent blank-page bug.
 
 ## Prevention
 Check every supported action and fixed key against runtime handlers, including
@@ -99,6 +128,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [TOOLKIT-INCLUSION-PACKAGE-38](TOOLKIT-INCLUSION-PACKAGE-38.md): CHIM inclusion metadata omitted from Toolkit packaging rules
 - [TOOLKIT-TEXT-ENCODING-38](TOOLKIT-TEXT-ENCODING-38.md): Toolkit labels contain corrupted Unicode characters
 - UI-ACCEPT-29 (no report page): Character selection lacks a visible OK button
+- [UI-DEATH-DAMAGE-TINT-38](UI-DEATH-DAMAGE-TINT-38.md): Lava damage tint also colours the death menu and selection
 - [UI-MENU-LOGO-32](UI-MENU-LOGO-32.md): The menu logo has a line above the name and reddish-pink letters instead of gold
 - UI-OPTIONS-WRAP-29 (no report page): Setup selection wraps despite a bounded scrollbar
 - [WAIT-NOCLIP-MESSAGE-32](WAIT-NOCLIP-MESSAGE-32.md): Wait refusal names registration, dry ground and speech together instead of the reason that applied (noclip)

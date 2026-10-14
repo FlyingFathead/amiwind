@@ -5,9 +5,15 @@
 #include "aw_sky.h"
 #include <assert.h>
 viddef_t vid;
-int AW_ConsoleCharWidth(void){return 8;}int AW_ConsoleCharHeight(void){return 8;}
-void AW_ConsoleCharacter(int x,int y,int c){assert(x>=0 && y>=0 && x+8<=320 && y+8<=200);}
-char *Key_KeynumToString(int k){return "F1";}int AW_UILogo(int x,int y){return 1;}
+static int glyph_width=8,glyph_height=8,capture_help;
+static char help_glyphs[480][640];
+int AW_ConsoleCharWidth(void){return glyph_width;}int AW_ConsoleCharHeight(void){return glyph_height;}
+void AW_ConsoleCharacter(int x,int y,int c){
+    assert(x>=0 && y>=0 && x+glyph_width<=vid.width && y+glyph_height<=vid.height);
+    if(capture_help){assert(x<640 && y<480);help_glyphs[y][x]=(char)c;}
+}
+char *Key_KeynumToString(int k){static char name[16];snprintf(name,sizeof(name),"KEY%03d",k);return name;}
+int AW_UILogo(int x,int y){assert(x>=0 && y>=0 && x+200<=vid.width && y+40<=vid.height);return 1;}
 client_state_t cl;refdef_t r_refdef;
 static model_t world;static vec3_t seen_origin,seen_angles;
 void R_RenderView(void){memcpy(seen_origin,r_refdef.vieworg,sizeof seen_origin);memcpy(seen_angles,r_refdef.viewangles,sizeof seen_angles);}
@@ -39,9 +45,88 @@ cvar_t *Cvar_FindVar(char *n){if(!strcmp(n,"aw_night_light"))return &night_light
 void Cvar_SetValue(char *n,float v){cvar_t *c=Cvar_FindVar(n);if(c)c->value=v;}
 void Cvar_Set(char *n,char *v){(void)n;(void)v;}
 int Cmd_Argc(void){return argc;}char *Cmd_Argv(int i){return arg;}int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
-void AW_UIBox(int x,int y,int w,int h){}void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
-void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
+void AW_UIBox(int x,int y,int w,int h){assert(x>=0 && y>=0 && x+w<=vid.width && y+h<=vid.height);}
+void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
+void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(x>=0 && y>=0 && x+w<=vid.width && y+h<=vid.height);}
 static void date(int year,int month,int day,int hour,int minute){int y,m,d,h,n;AW_ClockDate(&y,&m,&d,&h,&n);assert(y==year && m==month && d==day && h==hour && n==minute);}
+static void help_draw(void){
+    memset(help_glyphs,0,sizeof help_glyphs);capture_help=1;
+    assert(AW_WaitDraw());capture_help=0;
+}
+static const char *help_line(int x,int y){
+    static char text[161];int n=0;
+    while(x<vid.width && n<160 && help_glyphs[y][x]){text[n++]=help_glyphs[y][x];x+=glyph_width;}
+    text[n]=0;return text;
+}
+static void help_paging(void){
+    aw_state_t before=aw_state;int i,x,y;char long_command[120];
+    memset(keybindings,0,sizeof keybindings);
+    for(i=32;i<67;i++)keybindings[i]="+jump";
+    keybindings[32]="+aw_pov";
+    help();assert(key_dest==key_menu);help_draw();
+    /* Normal glyphs: eight rows, all 35 bindings and six fixed shortcuts. */
+    assert(!strcmp(help_line(12,48),"Current keys - page 1/6"));
+    assert(!strcmp(help_line(12,66),"KEY032: POV / hold to orbit"));
+    assert(!strcmp(help_line(12,143),"KEY039: Jump"));
+    assert(AW_WaitKey(K_LEFTARROW));help_draw();
+    assert(!strcmp(help_line(12,48),"Current keys - page 6/6"));
+    assert(!strcmp(help_line(12,66),"Ctrl+H: Debug HUD (photo mode)"));
+    /* A font change reduces page count; drawing clamps the old last page. */
+    glyph_width=4;glyph_height=6;help_draw();
+    assert(!strcmp(help_line(12,48),"Current keys - page 3/3"));
+    assert(!strcmp(help_line(12,66),"Ctrl+H: Debug HUD (photo mode)"));
+    assert(AW_WaitKey(K_TAB));help_draw();
+    assert(!strcmp(help_line(12,48),"Current keys - page 1/3"));
+    assert(!strcmp(help_line(12,147),"KEY041: Jump"));
+    assert(!strcmp(help_line(166,66),"KEY042: Jump"));
+    assert(!strcmp(help_line(166,147),"KEY051: Jump"));
+    assert(!strcmp(help_line(12,165),"F10 / `: console (Shift: full)"));
+    /* Unknown custom commands remain visible, bounded to their own column. */
+    memset(long_command,'x',sizeof long_command-1);long_command[sizeof long_command-1]=0;
+    keybindings[32]=long_command;help_draw();
+    assert(strlen(help_line(12,66))==35 && !strcmp(help_line(12,66)+32,"..."));
+    for(y=66;y<155;y++)for(x=154;x<166;x++)assert(!help_glyphs[y][x]);
+    assert(!strcmp(help_line(166,66),"KEY042: Jump"));
+    assert(AW_WaitKey(K_PGDN));
+    help_draw();
+    assert(!strcmp(help_line(12,66),"KEY052: Jump"));
+    assert(!strcmp(help_line(166,102),"KEY066: Jump"));
+    assert(!strcmp(help_line(166,111),"Esc: Pause / back"));
+    assert(!strcmp(help_line(166,147),"Ctrl+F: Fog (photo mode)"));
+    memset(keybindings,0,sizeof keybindings);keybindings[250]="aw_torch";keybindings[251]="custom_command";
+    help_draw();
+    assert(!strcmp(help_line(12,48),"Current keys - page 1/1"));
+    assert(!strcmp(help_line(12,66),"KEY250: Toggle torch"));
+    assert(!strcmp(help_line(12,75),"KEY251: custom_command"));
+    memset(keybindings,0,sizeof keybindings);
+    /* Unbindall cannot remove fixed controls; contradictory saved bindings
+     * must not advertise actions that the input handlers never execute. */
+    keybindings[K_ESCAPE]="unreachable";keybindings[K_F10]="unreachable";keybindings['`']="unreachable";
+    help_draw();
+    assert(!strcmp(help_line(12,66),"Esc: Pause / back"));
+    assert(!strcmp(help_line(12,75),"Shift+V: Draw distance"));
+    assert(!strcmp(help_line(12,84),"Shift+F5: Previous music"));
+    assert(!strcmp(help_line(12,93),"Shift+F6: Next music"));
+    assert(!strcmp(help_line(12,102),"Ctrl+F: Fog (photo mode)"));
+    assert(!strcmp(help_line(12,111),"Ctrl+H: Debug HUD (photo mode)"));
+    assert(AW_WaitKey(K_PGUP) && AW_WaitKey(K_PGDN));help_draw();
+    assert(!strcmp(help_line(12,48),"Current keys - page 1/1"));
+    /* Navigation also clamps after a binding change, before the next draw. */
+    memset(keybindings,0,sizeof keybindings);
+    for(i=32;i<67;i++)keybindings[i]="+jump";
+    assert(AW_WaitKey(K_PGDN));
+    memset(keybindings,0,sizeof keybindings);keybindings[32]="+jump";
+    assert(AW_WaitKey(K_PGUP));help_draw();
+    assert(!strcmp(help_line(12,48),"Current keys - page 1/1"));
+    /* Wider viewports can retain two columns with the normal glyphs. */
+    for(i=32;i<67;i++)keybindings[i]="+jump";
+    vid.width=640;vid.height=200;glyph_width=8;glyph_height=8;help_draw();
+    assert(!strcmp(help_line(12,48),"Current keys - page 1/3"));
+    assert(!strcmp(help_line(326,66),"KEY040: Jump"));
+    assert(AW_WaitKey(K_ENTER) && key_dest==key_game && !AW_WaitDraw());
+    assert(!memcmp(&before,&aw_state,sizeof before));
+    memset(keybindings,0,sizeof keybindings);vid.width=320;vid.height=200;
+}
 static void tour_camera(void){
     static const float expected[8][3]={{10,135,0},{-5,348,0},{-65,270,0},
         {-10,180,0},{-20,190,0},{-20,190,0},{-10,180,0},{10,135,0}};
@@ -224,6 +309,7 @@ int main(void){
     saved=aw_state;keybindings[K_F1]="aw_quick_help";assert(AW_WaitKey(K_F1));assert(AW_WaitDraw());
     AW_WaitTick();AW_WaitKey(K_ESCAPE);assert(!memcmp(&saved,&aw_state,sizeof(saved)));
     keybindings[K_F1]="other";assert(!AW_WaitKey(K_F1));
+    help_paging();
     /* Preview clock is presentation-only: every phase, cancel, invalid input,
      * console pause, map change and disconnection preserve persistent state. */
     saved=aw_state;assert(gallery);strcpy(sv.name,"sn045");argc=1;host_frametime=.25;

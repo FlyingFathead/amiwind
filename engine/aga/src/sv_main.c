@@ -21,10 +21,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "aw_mappath.h"
+#include "aw_anim.h"
 #include "amiwind_version.h"
 
 server_t		sv;
 server_static_t	svs;
+void (*aw_inspect_reset)(void);
 
 char	localmodels[MAX_MODELS][5];			// inline model names for precache
 
@@ -1109,6 +1111,8 @@ void SV_SpawnServer (char *server)
     AW_HeapAuditPhase(server,"after-unload");
 
     memset (&sv, 0, sizeof(sv));
+    AW_AnimSceneReset();   /* same-map reloads also need fresh mover precaches */
+    if(aw_inspect_reset)aw_inspect_reset();
 
     COM_FormatPath (sv.name, sizeof(sv.name), "%s", server);	/* fits: SV_MapNameFits */
 #ifdef QUAKE2

@@ -168,7 +168,7 @@ SRCS = \
 	r_sprite.c \
 	r_surf.c \
 	r_vars.c \
-	aw_hud.c \
+	aw_hud.c aw_inspect.c \
 	aw_c2p.c \
 	screen.c \
 	snd_dma.c \

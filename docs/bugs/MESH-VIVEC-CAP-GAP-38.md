@@ -9,8 +9,8 @@
 | Where | Vivec exterior cell 5,-10, global 46983,-81758,835 |
 | Reproduction | once |
 | Duplicate of | no |
-| Persists in | unknown |
-| Severity | medium: Visible opening in scenery; extent across placements unknown |
+| Persists in | v0.0.39-rc1 (last seen) |
+| Severity | high: Repeated owner-visible failure in RC1; exact repair remains unverified. |
 | Family | Mesh converter geometry (`converter-geometry`) |
 
 <!-- END GENERATED FACTS -->
@@ -73,6 +73,15 @@ or runtime acceptance. Missing build or pose information remains unknown.
 
 - `OWNER-20261012-191710`: SHA-256 `ba11a8c78d05dc88dfb17459ec15729916a8adb882ad79553e527efb22d99839`. Screenshot association checked; no repair or behavioral acceptance inferred.
 - `OWNER-20261012-191925`: SHA-256 `70c2351f5d3d94f81b68192544c981323be3596ad8f9fd779197fd4168919688`. Screenshot association checked; no repair or behavioral acceptance inferred.
+
+## RC1 owner evidence, 13 October 2026
+
+The original images remain private. Rounded HUD readings are location aids,
+not exact source/package bindings or proof of motion.
+
+- `OWNER-20261013-214618`, SHA-256 `b4c3b49b91d1d9cb2d9131b78b59c1b18aadcdbaf560b647dbd23a62cf3ea3f3`: Large mushroom cap has an open band along its rim. HUD RC1, cell 2,-10; global 21519,-78784,184; local -2812,3343,46; heading120, pitch-35, game time11:04.
+- `OWNER-20261013-214647`, SHA-256 `26fdc285e6b41b67d57c523b76d7375dfb96478a6a91016f26a63a347a98f0f5`: Two large mushroom caps show open seams. HUD RC1, cell2,-10; global20788,-78832,173; local-2994,3331,43; heading356, pitch-49, time11:31.
+- `OWNER-20261013-214728`, SHA-256 `f120705fd04455c475ec9d974dca1840f6e38f3520c52991e92d980596ec68de`: Large cap has a broad opening along its top/rim. HUD RC1, cell2,-10; global19845,-77331,425; local-3230,3707,106; heading136, pitch-27, time11:50.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

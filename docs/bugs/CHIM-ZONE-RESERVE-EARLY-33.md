@@ -9,7 +9,7 @@
 | Where | CHIM engine zone allocation (chim_world.c MapBegin) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | v0.0.33-dev, v0.0.39-rc1 (last seen) |
 | Severity | medium: The engine's own Hunk safety margin is not enforced on CHIM maps; the heap audit only warns afterwards. |
 | Family | Map heap and memory budget (`heap-memory`) |
 | CHIM | Performance ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -83,6 +83,14 @@ Pending.
 ## Prevention
 
 A host test that the zone leaves the stated room, and the FS-UAE heap audit on every CHIM town.
+
+## Exact RC1 evidence, 13 October 2026
+
+13 October 2026, v0.0.39-rc1: exact-package inspection logs Balmora's post-load
+Hunk gap at 2,063,344 bytes, below the 2 MiB safety by 33,808. The map's stated
+post-zone use is 1,613,920 bytes and observed use is 1,647,776. A smaller next-
+load zone is proposed by the running engine. First-load reserve safety remains
+open; the scoped successful load is not a general memory or performance pass.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

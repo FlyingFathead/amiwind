@@ -1,5 +1,17 @@
 # WATER-GAMEPLAY-PARITY-38: Water gameplay completeness and original behavior audit
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 5 times; something has to be done
+
+- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): RC1: absent swimming/diving, owner reports sinking; underwater upright pose inspected. Missing swim groups source-confirmed; physics/reference comparison pending.
+- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Owner repeats missing swimming AND diving animation in BOTH first-person and third-person views. Keep four view/action acceptance items distinct; no repaired water candidate.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Original third-person swim families confirmed; no dedicated dive key in16 base NIF/KF members. First-person visuals need state/camera/fallback parity; local0.52 source is not native0.48 acceptance.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Owner requires reported swimming/diving in RC2. Both-view original 0.48 reference and source integration in progress; original clip inventory is separate. Native/package/owner acceptance pending.
+- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): 20 swim companions built; native water selects and animates them. No-input sinking reproduced at 42 units/s. Remove Quake idle descent in source; native/reference repair checks pending.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,8 +21,8 @@
 | Where | Surface, swimming and submerged gameplay; screenshot in Grazelands cell 12,6 |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev2 (last seen) |
-| Severity | medium: Missing state-transition coverage can conceal equipment and movement faults. |
+| Persists in | v0.0.38-dev2, v0.0.39-rc1 (last seen) |
+| Severity | high: Repeated owner-visible failure in RC1; exact repair remains unverified. |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.38-dev2 |
 | From commit | source c2eaa5a, engine c2eaa5a, CHIM world c2eaa5a |
@@ -19,6 +31,31 @@
 | Platform or emulator | unknown (Screenshot does not identify emulator.) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Related reports](#related-reports)
+- [Owner follow-up, 12 October 2026](#owner-follow-up-12-october-2026)
+- [Owner evidence reconciliation, 13 October 2026](#owner-evidence-reconciliation-13-october-2026)
+- [RC1 owner evidence, 13 October 2026](#rc1-owner-evidence-13-october-2026)
+- [Both-view swimming and diving follow-up, 13 October 2026](#both-view-swimming-and-diving-follow-up-13-october-2026)
+- [Original clip inventory and both-view reference limits, 13 October 2026](#original-clip-inventory-and-both-view-reference-limits-13-october-2026)
+- [Required RC2 swimming and diving scope, 13 October 2026](#required-rc2-swimming-and-diving-scope-13-october-2026)
+- [Native candidate findings, 14 October 2026](#native-candidate-findings-14-october-2026)
+- [Post-pin RC2 package observation, 14 October 2026](#post-pin-rc2-package-observation-14-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Symptom
 
@@ -34,10 +71,25 @@ Grazelands cell 12,6, global position 99333,49260,-466, time 02:37.
 
 ## How it happened
 
-Cause unknown. AmiQuake SV_CheckWater in sv_phys.c already samples feet, body
-and view height to set waterlevel and watertype using SV_PointContents. Begin
-with this existing mechanism and movement machinery before adding new checks.
-The behavior of equipment, effects and damage across these states needs tracing.
+Source review, 13 October 2026: AmiQuake SV_CheckWater in sv_phys.c samples feet,
+body and view height through SV_PointContents. SV_ClientThink in sv_user.c uses
+SV_WaterMove when waterlevel is at least two, except for lava and noclip. This
+movement dispatch does not depend on the readied equipment state.
+
+The player-body profiles in prepare_player_view.py do not request swim or
+swimidle groups. aw_anim.c falls back to walk or idle when those groups are
+absent. This explains a source-level animation gap, not physical water-walking.
+The active world.qc player callbacks have no drowning update. The inherited
+PF_WaterMove drowning code is behind QUAKE2 in pr_cmds.c, which the normal Amiga
+build does not enable; these callbacks do not invoke it either. Its breath
+duration and damage rules must not be enabled blindly as Morrowind behavior.
+
+OpenMW 0.48 tracks breath while submerged or knocked out underwater, exempts
+Water Breathing, and uses game settings for breath time and suffocation damage.
+Recovery resets breath. Its swimming and submerged tests use different height
+thresholds, so neither should be equated with an AmiQuake waterlevel without
+scene calibration. See the original [actor rules](https://raw.githubusercontent.com/OpenMW/openmw/openmw-0.48.0/apps/openmw/mwmechanics/actors.cpp)
+and [water-depth tests](https://raw.githubusercontent.com/OpenMW/openmw/openmw-0.48.0/apps/openmw/mwworld/worldimp.cpp).
 
 ## Why it was not caught
 
@@ -58,14 +110,19 @@ water behavior alone is not lava acceptance.
 
 ## Repair
 
-Pending diagnosis and original-game comparison. Preserve the current underwater
+The missing animation and active drowning paths are identified in source;
+implementation and original-game comparison remain pending. Reuse SV_CheckWater,
+SV_WaterMove and the existing player damage path. Establish breath timing,
+effects, equipment transitions and save/load behavior from the matched reference
+before choosing state or damage rules. Preserve the current underwater
 visual effects: the owner explicitly approves their appearance and requests no
 changes to them. Reuse existing contents and movement state, avoid redundant
 per-frame work and allocations, and measure CPU/memory on the baseline target.
 
 ## Verification
 
-Open. Owner screenshot preserved; independent reproduction, matched reference
+Open. Source paths reviewed; no runtime change or executed water regression is
+claimed. Owner screenshot preserved; independent reproduction, matched reference
 matrix and measured candidate acceptance remain pending. The screenshot alone
 does not establish movement physics, spell state or torch fuel behavior.
 
@@ -103,6 +160,52 @@ or runtime acceptance. Missing build or pose information remains unknown.
 
 - `OWNER-20261012-152017`: SHA-256 `e53bd537e39bdae534cd1a83ca7e5c3d3093ef284a94a760eaa18654becaea8e`. Underwater view shows a torch. Still frame cannot establish swimming animation.
 
+## RC1 owner evidence, 13 October 2026
+
+The original images remain private. Rounded HUD readings are location aids,
+not exact source/package bindings or proof of motion.
+
+- `OWNER-20261013-214815`, SHA-256 `066e1372444d81eb6b40067597bfc5a45b7c5c49d57ca74a023bf93902a54e11`: Third-person player stands upright underwater beside a sloping wall. HUD RC1, Vivec Hlaalu, cell2,-11; global18800,-83022,-480; local-3491,2284,-120; heading160, pitch-8, time12:10. A still does not prove sinking velocity or absence of controls.
+- Text report: third-person swimming/diving absent and player sinks. Movement and effects require exact native reproduction.
+
+## Both-view swimming and diving follow-up, 13 October 2026
+
+The latest owner report explicitly covers missing swimming animation AND missing diving animation in both first-person and third-person views. The earlier third-person sinking report remains. Verify swimming and diving separately in each view against the original: appropriate first-person hands/equipment and action feedback, third-person body swim/dive poses, actual surface/submerged movement, breath and damage. Do not use a still frame or the existing water-movement dispatch as evidence that swimming or diving gameplay is implemented or accepted. Underwater visual effects remain an approved visual control, not mechanics acceptance.
+
+## Original clip inventory and both-view reference limits, 13 October 2026
+
+The original human/beast third-person sources contain idleswim, swimwalk/swimrun forward/back/left/right, swim turns and water knockdown/knockout/death families. The female override contributes selected locomotion groups; absent swim groups use the common base. npc_anim maps swimwalkforward/idleswim and the full NPC profile includes them, but prepare_player_view selects the move profile, which omits both. This is a player bake/wiring gap despite available original clips, not a lack of original swim assets.
+
+All16 original base-animation NIF/KF members were read without conversion. None contains a standalone dive/diving group. The common first-person source has torch and water knockout groups, but no ordinary swimidle/walk/run loop; beast first-person overrides include ordinary hand-to-hand locomotion, and female first-person overrides are limited. This does not prove that original first-person swimming/diving has no visible movement. Reused idle/movement/weapon groups, camera/arm orientation and water physics can provide that feedback; do not invent a dedicated source dive clip.
+
+The locally available pinned OpenMW source declares0.52-dev. It is distinct from the installed headless0.48 reference binary, and no local0.48 source ref was available. The0.52 source selects swimming movement/idle states, falls back from absent swim groups to available ordinary/weapon movement and idle, and updates first-person neck/camera orientation. Its third-person swim pitch and optional upward corrections have conditional/settings behavior; they must not be transplanted as blanket original0.48 rules. Those source findings are design guidance, not behavioral acceptance.
+
+AmiQuake already provides SV_CheckWater and pitch-directed SV_WaterMove. The latter also applies inherited no-input downward drift; its existence is not Morrowind parity. Preserve these reusable mechanisms while calibrating original water depth, look/up/down inputs and idle behavior. The existing owner reports remain open in both views, including diving as a distinct transition/action.
+
+Before acceptance, capture matched installed0.48 and target surface entry, idle swim, forward/back/side swim, look-up/down movement, dive/submerge, surface and land exit at the same scene/pose/clock. Cover human/beast/female, fists/torch states and view switches. Compare first-person camera/hand/equipment feedback and third-person actual pose/orientation separately from movement, fatigue, breath/damage and save/load. Read back baked group coverage and measure baseline costs. No new native comparison, water gameplay implementation or RC2 scope expansion follows from this audit.
+
+## Required RC2 swimming and diving scope, 13 October 2026
+
+The latest owner instruction requires reported swimming/diving, gait and combat
+repairs in RC2; swimming/diving is no longer deferred by the earlier scope note.
+Player water-pose integration and matched installed OpenMW 0.48 reference work
+are in progress. Both first-person and third-person visual/state behavior need
+actual reference captures; the 0.52 source inventory cannot replace that evidence.
+Original clip availability and absence of a standalone dive key do not establish
+first-person visual behavior, gameplay parity or repaired native acceptance.
+Keep the complete reported water requirements open until exact source, automated,
+target/native, package and owner evidence is supplied. Release hold remains.
+
+## Native candidate findings, 14 October 2026
+
+All 20 third-person swim companions bake successfully; target native ordinary-collision water selects the swimming body and shows changing swim poses. It also reproduces no-input descent at 42 units/second. Remove inherited Quake artificial idle drift while retaining pitch-directed movement, friction and acceleration; the new behavior and both-view dive/reference/package checks remain pending.
+
+## Post-pin RC2 package observation, 14 October 2026
+
+The extracted RC2 package holds origin (704, -320, -25) for a four-second no-input water control after noclip is disabled. Pitch45 with forward movement descends to origin (832.7, -320, -153.7) at waterlevel 3 and shows changing swim poses. Both readied first-person fists remain visible at default horizontal FOV 90/viewsize 100. Actual OpenMW0.48 reference holds depth and retains first-person fists; no dedicated first-person stroke or blanket body pitch is established. Broader drowning, fatigue, combat, all appearances and owner acceptance remain pending.
+
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -117,6 +220,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [CHIM-COURT-BARREL-USE-33](CHIM-COURT-BARREL-USE-33.md): Census courtyard on CHIM: Fargoth's ring barrel cannot be used, so the opening cannot proceed
 - CLOCK-01 (no report page): Automatic clock dropped fractional milliseconds each frame
 - [COMBAT-BLOCKING-36](COMBAT-BLOCKING-36.md): Requested: blocking in combat - NPCs block by their Block skill with a block animation, the player blocks with the right mouse button
+- [COMBAT-FATIGUE-HEALTH-DAMAGE-39](COMBAT-FATIGUE-HEALTH-DAMAGE-39.md): Clarify Eldafire bare-fist fatigue damage versus armed guard health damage
 - [COMBAT-FIST-BLOCK-33](COMBAT-FIST-BLOCK-33.md): A fighter with a shield blocks while fighting with fists
 - [COMBAT-HIT-RECOVERY-33](COMBAT-HIT-RECOVERY-33.md): Fatigue hits did not stagger, and knockdowns lasted half a second too long
 - [COMBAT-NO-CONDITION-33](COMBAT-NO-CONDITION-33.md): Weapon and shield condition were ignored in combat
@@ -132,10 +236,13 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
 - [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry
 - [PLAYER-JUMP-THIRDPERSON-38](PLAYER-JUMP-THIRDPERSON-38.md): Third-person player jump animation is missing
+- [PLAYER-MOVEMENT-STATS-PARITY-39](PLAYER-MOVEMENT-STATS-PARITY-39.md): Walking/running use fixed debug speeds and do not apply original stats or running fatigue
 - [PLAYER-READY-WATER-MOVEMENT-38](PLAYER-READY-WATER-MOVEMENT-38.md): Readied weapon or torch appears to allow walking on water
 - [QC-AW-FLAME-SPAWN-32](QC-AW-FLAME-SPAWN-32.md): Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields
 - RENDER-METADATA-29 (no report page): Native renderer metadata warns as an unknown QuakeC field
 - SAVE-EQUIPMENT-29 (no report page): Quickload returns with hands and torch put away
+- [SAVE-LAVA-DEATH-LOOP-38](SAVE-LAVA-DEATH-LOOP-38.md): Lava fall can leave an autosave that reloads into repeated death
+- [SAVE-TELEPORT-CHECKPOINT-38](SAVE-TELEPORT-CHECKPOINT-38.md): Successful teleport needs a safe destination checkpoint
 - [SERVER-FRAME-ARRIVAL-33](SERVER-FRAME-ARRIVAL-33.md): The server frame costs about 226 ms per frame at the Balmora arrival camera on a slow 68040
 - [WAIT-DURING-COMBAT-36](WAIT-DURING-COMBAT-36.md): Waiting is allowed in the middle of a fight
 - [WAIT-FEET-IN-WATER-36](WAIT-FEET-IN-WATER-36.md): Waiting is allowed with the feet in water (the original refuses it)

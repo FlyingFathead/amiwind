@@ -434,7 +434,14 @@ int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
     AW_ItemsHide(s->item);      /* a re-engaged NPC: its items again from the start */
     memset(s,0,sizeof(*s));s->e=e;s->f=*fighter;s->f.aware=1;
     s->think=e->v.think;s->nextthink=e->v.nextthink;e->v.nextthink=0;    /* its QuakeC idle stops */
-    if(!layout)AW_AnimMover(e,1);   /* a resident fights in its full-kit model (aw_anim.c) */
+    if(!layout){
+        /* A resident fights in its full-kit model. Never silently present a
+         * declared mover's standing-only poses as run/attack animation. */
+        int declared=AW_AnimOf(e)->mover[0]!=0;
+        AW_AnimMover(e,1);
+        if(declared && !AW_AnimMoving(e))
+            Con_Printf("Combat: %s mover unavailable; standing animation fallback\n",s->f.name);
+    }
     if(!layout || !layout_parse(s,layout))layout_default(s);
     AW_PathReset(&s->path,(int)floor(e->v.origin[0]),(int)floor(e->v.origin[1]));
     s->next_think=s->last_think=(float)sv.time;s->cooldown=.5f;

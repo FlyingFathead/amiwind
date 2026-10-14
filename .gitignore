@@ -188,6 +188,7 @@ AmiWind-launcher.json
 !docs/images/amiwind-builder-savings.png
 !docs/images/amiwind-v0.0.36-build-timeline.png
 !/docs/images/amiwind-v0.0.36-progress-map.png
+!/docs/images/amiwind-v0.0.39-dev1-progress-map.png
 # Toolkit screenshots (amiwind-toolkit/README.md, docs/AMIWIND_TOOLKIT.md), one exception per published image.
 !/docs/images/amiwind-v0.0.36-toolkit-world-chim-tracker.png
 !/docs/images/amiwind-v0.0.36-toolkit-inspector-chim-map.png

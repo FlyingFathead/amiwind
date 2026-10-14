@@ -9,7 +9,7 @@
 | Where | prepare_guard_torches.py, check_actor_ground.py, chim/frame_map.py; fix: tools/actor_frames.py |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
+| Persists in | v0.0.35-dev1, v0.0.39-rc1 (last seen) |
 | Severity | high: Three default image builds in a row stopped about 10 minutes in, each on the next tool that hard-coded the previous frame counts |
 | Family | Actors and NPCs (`actors-npc`) |
 | Playtest version | v0.0.35-dev1 MiniWind animkit companion run c2b7a3e |
@@ -17,6 +17,44 @@
 | CHIM engine version | CHIM 0.1.0, engine c2b7a3e, world format 0.5 |
 
 <!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [Recurrence: 13 October 2026](#recurrence-13-october-2026)
+- [Status: 10 October 2026](#status-10-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Sweep](#sweep)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Exact RC1 evidence, 13 October 2026](#exact-rc1-evidence-13-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Recurrence: 13 October 2026
+
+The v0.0.39-rc1 image preflight rejected all twenty newly baked player bodies:
+the shared reader still limited total model frames to 64. The existing model
+writer permits 256 total frames under the unchanged alias byte budget; the
+AmiQuake-derived engine's `AW_AnimParse` limits each animation group to 64.
+`Mod_LoadAliasModel` and the existing pose table remain unchanged.
+
+The candidate reader distinguishes total frames from frames per group. It
+continues to reject undeclared layouts, groups outside the model and groups
+larger than the runtime limit. Legacy NPC profiles and first-person hand-sprite
+limits are unchanged. Payload regression covers a multi-group model above 64
+total frames, the 256 boundary, an oversized group and a missing layout.
+
+Why this escaped: earlier tests exercised the old NPC profiles, all at most
+64 total frames, but did not pass expanded player bodies through final payload
+preflight. Full-image readback and target gameplay checks remain required;
+source tests alone do not establish a shipped repair.
 
 ## Status: 10 October 2026
 
@@ -111,6 +149,10 @@ failed run's staged files: the guard companion of the kit guard reproduces its b
 One helper for actor frame layouts, a sweep test against new hard-coded counts, and the `actor-frames` payload
 preflight check before the image work.
 
+## Exact RC1 evidence, 13 October 2026
+
+The corrected total-frame reader passed normal RC1 finalization and independent package/body readback for all twenty expanded bodies. The 256 total / 64 per ordinary group distinction preserves byte and layer budgets and legacy refusal. This resolves the observed preflight rejection in the exact RC1 image, while broader native motion/memory and final-version binding remain separate.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -138,6 +180,8 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-IDLE-ONLY-ANIM-33](NPC-IDLE-ONLY-ANIM-33.md): NPCs play only their idle animation: no walking, running, turning or other animation groups
 - [NPC-NEAR-SKIN-TEXELS-33](NPC-NEAR-SKIN-TEXELS-33.md): Original-head models had blurrier bodies than the budget model
 - [NPC-NO-RUN-ANIM-35](NPC-NO-RUN-ANIM-35.md): Companions and hostile NPCs walk but never run, and the walk looks wrong: release residents had only idle frames
+- [NPC-ORDINATOR-APPEARANCE-39](NPC-ORDINATOR-APPEARANCE-39.md): Vivec Hlaalu Ordinator has an unhelmeted Fargoth-like appearance
+- [NPC-SPEAR-ATTACK-REGRESSION-39](NPC-SPEAR-ATTACK-REGRESSION-39.md): Seyda Neen guard spear attack animation is missing in first-person view
 - [NPC-WANDER-NOT-EXECUTED-35](NPC-WANDER-NOT-EXECUTED-35.md): Residents stand still: the original's Wander AI packages (radius, duration, idles) are decoded but not executed
 - [NPC-WEAPON-MESH-33](NPC-WEAPON-MESH-33.md): NPCs hold no weapons or shields; combat uses them unseen
 

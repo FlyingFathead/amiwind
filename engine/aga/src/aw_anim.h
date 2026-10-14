@@ -21,7 +21,11 @@ enum {AW_ANIM_IDLE, AW_ANIM_WALK, AW_ANIM_RUN, AW_ANIM_SWIM, AW_ANIM_SWIMIDLE,
       AW_ANIM_HIT, AW_ANIM_KNOCK, AW_ANIM_DEATH, AW_ANIM_ATTACK,
       /* combat (aw_combat.c): the original shield block; the dodge sidesteps are an
        * AmiWind extension (no original dodge group exists) */
-      AW_ANIM_BLOCK, AW_ANIM_DODGEL, AW_ANIM_DODGER, AW_ANIM_GROUPS};
+      AW_ANIM_BLOCK, AW_ANIM_DODGEL, AW_ANIM_DODGER,
+      /* Player-only takeoff/air hold and landing; append to preserve existing group IDs. */
+      AW_ANIM_JUMP, AW_ANIM_LAND,
+      AW_ANIM_READY, AW_ANIM_READYWALK, AW_ANIM_READYRUN,
+      AW_ANIM_READYJUMP, AW_ANIM_READYLAND, AW_ANIM_GROUPS};
 enum {AW_ANIM_LEFT, AW_ANIM_RIGHT, AW_ANIM_EVENT_KINDS};
 enum {AW_ANIM_DRY, AW_ANIM_WADE, AW_ANIM_SWIMMING, AW_ANIM_MEDIA};
 #define AW_ANIM_EVENTS 24
@@ -59,6 +63,12 @@ typedef struct {
     unsigned char group, index;
 } aw_anim_play_t;
 
+/* Player visual state only: no movement, velocity or collision changes. */
+typedef struct {
+    aw_anim_play_t play;
+    unsigned char airborne, landing;
+} aw_anim_air_t;
+
 extern const char *const aw_anim_group_names[AW_ANIM_GROUPS];
 
 /* Pure parts (host-tested): */
@@ -67,10 +77,19 @@ int AW_AnimParse(aw_anim_t *a,const char *layout,int numframes);
 /* Movement group for a horizontal speed: walk or run by the nearer own speed,
  * swim in water; *rate = speed / own speed (clamped 0.25..4); idle below 1 u/s. */
 int AW_AnimMoveGroup(const aw_anim_t *a,float speed,int swimming,float *rate);
+/* The player's bare-hand ready stance. Missing variants and swimming retain
+ * normal locomotion; NPC selection and first-person hand state are unchanged. */
+int AW_AnimPlayerMoveGroup(const aw_anim_t *a,float speed,int swimming,int ready,float *rate);
 /* Advance by dt seconds at rate; returns the frame. *crossed gets a bit per
  * group frame index entered (loop groups wrap; one-shot groups hold the last). */
 int AW_AnimAdvance(const aw_anim_t *a,aw_anim_play_t *p,int group,float dt,float rate,unsigned long *crossed);
+/* Preserve the leg-cycle fraction when switching normal/ready player stance. */
+int AW_AnimPlayerAdvance(const aw_anim_t *a,aw_anim_play_t *p,int group,float dt,float rate);
 int AW_AnimDone(const aw_anim_t *a,const aw_anim_play_t *p);
+/* -1 leaves the normal body animation visible. enabled excludes swimming,
+ * noclip, death and disabled animation. Rising starts takeoff; a ledge fall
+ * starts at the airborne pose. Ground contact plays landing once. */
+int AW_AnimAirFrame(const aw_anim_t *a,aw_anim_air_t *s,int enabled,int airborne,int rising,int ready,float dt);
 /* The voice line to say for a topic, or -1: the first line whose conditions hold (OpenMW Filter::search),
  * or with pick_random a random one of them (an AmiWind option). random100: a roll 0..100. */
 int AW_VoicePick(const aw_anim_t *a,int topic,int speaker_health,int player_health,int random100,int pick_random,int roll);
@@ -79,6 +98,9 @@ void AW_AnimEvents(const aw_anim_t *a,int group,unsigned long crossed,void (*emi
 
 /* Engine part (aw_anim.c without AW_ANIM_HOST_TEST): */
 struct edict_s;
+/* A new server clears precaches even when model.c reuses the same world-model
+ * pointer. Reset before spawning actors so their layouts/movers register again. */
+void AW_AnimSceneReset(void);
 /* Spawn time (aw_animprep, #81): load <model>.anm once per model, precache its sounds. */
 void AW_AnimPrep(struct edict_s *e);
 /* The layout of an edict's model (default layout when it has none). */

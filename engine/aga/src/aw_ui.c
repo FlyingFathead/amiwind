@@ -68,13 +68,15 @@ static cvar_t ui_frame={"aw_ui_frame","0",true};
 static cvar_t modal_freeze={"aw_modal_freeze","1",true};
 static cvar_t modal_black={"aw_modal_black","1",true};
 static cvar_t ui_mode={"aw_ui_mode","2",true};
+int (*aw_death_prompt_active)(void);
+static int death_prompt(void) {return aw_death_prompt_active && aw_death_prompt_active();}
 
 /* Inspect current ownership instead of setting sv.paused: nested menus and an
  * existing explicit pause survive close/cancel/load. Original name entry,
  * follow-guard prompts, subtitles and the sky gallery keep their world context. */
 static int modal_world_active(void) {
     return key_dest==key_menu || AW_CharacterActive() || AW_QuickCharActive() || AW_ReaderActive() ||
-        AW_GalleryModal();
+        AW_GalleryModal() || death_prompt();
 }
 static int modal_world_ready(void) {
     /* Sign-on and remote/demo traffic must keep progressing. */
@@ -83,7 +85,7 @@ static int modal_world_ready(void) {
         !cls.demoplayback && !AW_MovieActive();
 }
 int AW_ModalWorldFrozen(void) {
-    return modal_freeze.value!=0 && modal_world_ready();
+    return (modal_freeze.value!=0 || death_prompt()) && modal_world_ready();
 }
 /* Only the explicit legacy value selects V1; invalid values use V2. */
 int AW_UIMode(void) {return ui_mode.value==1?1:2;}
@@ -92,7 +94,7 @@ int AW_ModalWorldHidden(void) {
     /* Blackout is independent of simulation pause. An opaque background can
      * skip world drawing without a saved framebuffer; with black disabled,
      * draw the existing background using the selected world-clock policy. */
-    return AW_ModalBlackBackground() && modal_world_ready() && !cl.intermission;
+    return AW_ModalBlackBackground() && modal_world_ready() && !cl.intermission && !death_prompt();
 }
 void AW_ModalFrame(void) {
     static int was_frozen,was_hidden;
@@ -261,6 +263,9 @@ byte *AW_UIMenuPalette(void){
         if(background_state==1)return background+8;
     }
     else loading_state=0;
+    /* Indexed AGA colour shifts affect UI pixels too. The settled death
+     * prompt uses the scene's unshifted palette over its frozen world. */
+    if(death_prompt())return host_basepal;
     return background_state==1 && AW_MenuFrontEnd()?background+8:NULL;
 }
 static void initialize(void) {

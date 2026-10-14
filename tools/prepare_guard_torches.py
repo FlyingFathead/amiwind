@@ -15,6 +15,7 @@ from mwad.npc import load_master, outfit, text, first
 from mwad.paths import child_ci, ensure_external
 from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl, rigid_attachment
 from npc_faces import ActorSkeleton, actor_samples
+from npc_anim import BoneLayer
 from prepare_hand_sprites import decode_mdl
 from prepare_torch import source_nodes
 import actor_frames
@@ -95,6 +96,7 @@ class TorchLayer:
             raise ValueError('Invalid third-person torch key range')
         if 'bip01 l clavicle' not in base.nodes:
             raise ValueError('Missing authored left arm root')
+        self.layer = BoneLayer(base, ('bip01 l clavicle',))
 
     def pose(self, time):
         index = int(time)
@@ -103,25 +105,7 @@ class TorchLayer:
         normal = self.normal.pose(float(self.times[index]))
         phase = index if index < 8 else index-13 if index >= 13 else 0
         torch_time = self.start + phase/8*(self.stop-self.start)
-        matrices, left = {}, {}
-        def is_left(name):
-            if name not in left:
-                parent = self.base.parents[name]
-                left[name] = name == 'bip01 l clavicle' or bool(parent and is_left(parent))
-            return left[name]
-        def world(name):
-            name = name.casefold()
-            if name not in matrices:
-                if is_left(name):
-                    parent = self.base.parents[name]
-                    up = world(parent) if parent else np.eye(4)
-                    matrices[name] = self.base.local(name, torch_time) @ up
-                else:
-                    # Female walk override has a different file-root name.
-                    # Unchanged bones use its complete original world pose.
-                    matrices[name] = normal(name)
-            return matrices[name]
-        return world
+        return self.layer.pose(normal, torch_time)
 
 
 def _source_records(master):

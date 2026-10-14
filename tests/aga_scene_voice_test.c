@@ -91,6 +91,32 @@ static void cancellation(void){
     reset();source(0,1000,1,"npc/test.wav",0);S_BeginSceneVoice();
     S_CancelSceneVoice();assert(AW_SpeechRemaining()==0); /* Failed map/disconnect. */
 }
+static void stop_entity_channels(void){
+    int target,k,i;channel_t *ch;
+    for(target=0;target<MAX_DYNAMIC_CHANNELS;target++){
+        reset();
+        for(k=0;k<MAX_DYNAMIC_CHANNELS;k++)source(k,1000,1,"npc/test.wav",0);
+        ch=&channels[NUM_AMBIENTS+target];
+        AW_SpeechStart(ch->entnum,2,"npc/test.wav",paintedtime,1000,dma.speed,0);
+        S_StopSound(ch->entnum,7); /* Different channel on the same entity. */
+        assert(ch->sfx && AW_SpeechRemaining()>0);
+        S_StopSound(ch->entnum,2);
+        assert(!ch->sfx && ch->end==0 && AW_SpeechRemaining()==0);
+        for(k=0;k<MAX_DYNAMIC_CHANNELS;k++)
+            if(k!=target)assert(channels[NUM_AMBIENTS+k].sfx);
+    }
+    /* The dynamic interval excludes ambient and static slots, even if their
+     * entity/channel fields happen to match the stopped voice. */
+    reset();ch=source(0,1000,1,"npc/test.wav",0);
+    channels[0]=*ch;channels[NUM_AMBIENTS+MAX_DYNAMIC_CHANNELS]=*ch;
+    S_StopSound(ch->entnum,2);
+    assert(!ch->sfx && channels[0].sfx && channels[NUM_AMBIENTS+MAX_DYNAMIC_CHANNELS].sfx);
+
+    /* Actual mixed PCM: stopping the last slot leaves only the music control. */
+    reset();ch=source(MAX_DYNAMIC_CHANNELS-1,1000,2,"npc/test.wav",0);
+    S_StopSound(ch->entnum,2);S_PaintChannels(300);
+    for(i=400;i<600;i+=2)assert(dma_samples[i]==17 && dma_samples[i+1]==-19);
+}
 static void limits(void){
     int i;channel_t *ch;sfxcache_t *sc;
     reset();ch=source(0,140000,1,"npc/long.wav",0);S_BeginSceneVoice();
@@ -165,6 +191,6 @@ static void late_clock(void){
     paintedtime=1500;S_PaintChannels(1600);soundtime=1500;assert(AW_SpeechRemaining()==0);
 }
 int main(void){
-    SND_InitScaletable();continuity(1);continuity(2);cancellation();limits();late_clock();movie_isolation();
+    SND_InitScaletable();continuity(1);continuity(2);cancellation();stop_entity_channels();limits();late_clock();movie_isolation();
     reset();discard_sources();S_CancelSceneVoice();return 0;
 }

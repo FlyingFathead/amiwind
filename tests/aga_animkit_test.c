@@ -26,9 +26,15 @@ int main(void) {
     assert(parse("aw_animkit","speed","0.5",&c) && c.kind==AW_ANIMKIT_SPEED && c.speed==.5f);
     assert(!parse("aw_animkit","speed","9",&c) && !parse("aw_animkit","speed","x",&c));
     assert(!parse("aw_animkit","dance",NULL,&c) && c.kind==AW_ANIMKIT_HELP);
-    /* Every engine group but the AmiWind dodge extension has its original group in the table. */
+    assert(parse("aw_animkit","play","jump",&c) && c.group==AW_ANIM_JUMP);
+    assert(parse("aw_animkit","play","land",&c) && c.group==AW_ANIM_LAND);
+    assert(parse("aw_animkit","play","idlehh",&c) && c.group==AW_ANIM_READY);
+    assert(parse("aw_animkit","play","walkforwardhh",&c) && c.group==AW_ANIM_READYWALK);
+    assert(parse("aw_animkit","play","runforwardhh",&c) && c.group==AW_ANIM_READYRUN);
+    assert(parse("aw_animkit","play","jumphh",&c) && c.group==AW_ANIM_READYJUMP);
+    /* Dodge is an extension; land/readyland are second sections of jump/jumphh. */
     for(i=0;i<aw_animkit_group_count;i++)if(aw_animkit_groups[i].engine>=0)wired++;
-    assert(wired==AW_ANIM_GROUPS-2 && aw_animkit_group_count>70);
+    assert(wired==AW_ANIM_GROUPS-4 && aw_animkit_group_count>70);
     assert(AW_AnimKitFind("WalkForward")>=0 && AW_AnimKitFind("dodgel")<0);
     /* The kit switch: off = idle (the previous method); speed scales the rate. */
     memset(&a,0,sizeof(a));

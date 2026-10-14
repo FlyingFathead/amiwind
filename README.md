@@ -30,15 +30,41 @@ Have a real Amiga? [Running AmiWind on real hardware](docs/REAL_HARDWARE.md).
 
 More in the [gallery](docs/GALLERY.md).
 
+## v0.0.39 - Cell By Cell, Piece By Piece
+
+Running on CHIM Engine v0.2.0. This release brings together the RC1 changes
+and RC2 repairs: safer teleport autosaves, an untinted death menu, third-person
+ready/jump/punch and torch poses, swimming and diving, fuller movement pose
+sampling, body budget checks, NPC animation registration and guard spear poses.
+It also includes current keyboard help, sound cancellation and exterior
+ownership checks that exclude redundant BSP conversion and packaging.
+
+The RC2 source passed 4,043 automated tests (four skips and three expected
+failures), Amiga compilation, full disk readback and package extraction. Scoped
+emulator checks observed punch motion, a carried torch, stable water idle,
+pitch-directed diving and visible first-person fists. These are RC2 observations;
+they do not establish every appearance, physical LMB hit/damage, leg seams or
+fast-gait quality. Memory/streaming warnings and broader gameplay gaps remain open.
+
+CHIM content is unchanged from the inspected RC2: 360 whole regional cells,
+with six partial town overlaps excluded from that count. Conversion and audit
+progress are separate from packaged or fully playable coverage.
+
+See the [release notes](docs/RELEASE-v0.0.39.md),
+[changelog](docs/CHANGELOG.md) and [bug register](docs/BUGS.md#fix-index).
+Unfinished work and new features continue in
+[v0.0.40](docs/ROADMAP.md#v0040---unfinished-work-and-new-features).
+
 <!-- v0.0.38 preview -->
-## v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)
+## Previous public source release: v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)
 
 See the [v0.0.38 release notes](docs/RELEASE-v0.0.38.md) for changes and remaining verification limits.
 
-Release preparation brings lava conversion repairs, reduced Tel Uvirith geometry,
-collision fixes and updated Toolkit inspection controls together. The full image has passed build and readback checks, with native lava contact
-and Tel Uvirith arrival verified. Package validation remains in progress;
-known issues remain in the [bug tracker](docs/BUGS.md).
+Published v0.0.38 brings lava conversion repairs, new CHIM exterior areas,
+reduced Tel Uvirith geometry, collision fixes and updated Toolkit inspection
+controls. Scoped native checks verified lava contact damage and Tel Uvirith
+arrival. Known issues remain in the [bug tracker](docs/BUGS.md); the
+candidate source update above continues the repair and coverage work.
 
 ![Tel Uvirith lantern and arched walkway in the v0.0.38 development playtest](docs/images/amiwind-v0.0.38-molag-lantern-arch.png)
 
@@ -65,15 +91,47 @@ These views do not establish sound or complete world-traversal acceptance.
 
 **v0.0.37 - Proofreading the Cantons:** a small fix release: the v0.0.36 release notes and this page now match the released code, and the logo images are fixed. Release notes: [docs/RELEASE-v0.0.37.md](docs/RELEASE-v0.0.37.md).
 
-**v0.0.36, running on CHIM Engine v0.2.0:** the whole coastline and the next ring inland are on CHIM, all of Vivec is one CHIM map with 130 of its rooms, Seyda Neen and Balmora are CHIM-native, terrain is stored once, and the engine gets wider coordinates, third person, blocking and a death scene. Release notes: [docs/RELEASE-v0.0.36.md](docs/RELEASE-v0.0.36.md).
+**v0.0.36, running on CHIM Engine v0.2.0:** introduced CHIM coverage along the coastline and the next ring inland, all of Vivec is one CHIM map with 130 of its rooms, Seyda Neen and Balmora are CHIM-native, terrain is stored once, and the engine gets wider coordinates, third person, blocking and a death scene. Release notes: [docs/RELEASE-v0.0.36.md](docs/RELEASE-v0.0.36.md).
 
 ### CHIM progress map
 
-![CHIM progress map of Vvardenfell, 2026-10-11: green cells are done, gold rings are planned for v0.0.36](docs/images/amiwind-v0.0.36-progress-map.png)
+![CHIM conversion and audit snapshot: 1,274 of 1,292 Vvardenfell land and empty-sea cells reached an audit milestone; this is not packaged coverage](docs/images/amiwind-v0.0.39-dev1-progress-map.png)
 
-Each square is one map cell, north up: the map at the v0.0.36 release freeze (2026-10-11). Done means converted to CHIM and audited, not yet in the game: v0.0.36 runs the coast rings and the named CHIM areas, and the next releases bring the other done cells in. The current count is on the [cell tracker](docs/chim/CELL_TRACKER.md). **Green:** converted to CHIM with every measured check passed, or open coast with nothing to place. **Violet:** converted, hull policy still pending. **Red:** failing a check, or not converted yet. **Dark grey:** not started (Solstheim). **Silver:** open ocean. **Gold rings:** planned for v0.0.36 (367 cells: the whole coastline ring, all of Vivec, Seyda Neen and Balmora). Done: 1,021 of 1,292 Vvardenfell land cells (79.0 %). The map is drawn by `tools/cell_progress_map.py` from the progress tracker data. What every colour means: [the CHIM progress map](docs/chim/CHIM_PROGRESS_MAP.md).
+Snapshot: **13 October 2026, 14:04 UTC** (17:04 in Finland), from the
+[public cell reference](docs/chim/cell-progress-reference.json). Each square is
+one exterior cell, north up. **Green** means a conversion/audit milestone;
+lighting, actors and gameplay can still be deferred. **Red** means an audit
+failure or an unfinished conversion. **Violet** is a hull-policy hold, **dark
+grey** is not started, and **silver** is open ocean. This snapshot has no gold
+release-plan overlay.
 
-**Previous release, v0.0.35:** walk and run for NPCs, combat with weapons and shields, lava, Seyda Neen from your own data, about 30 engine crash fixes and a faster, resumable builder. Details: [docs/RELEASE-v0.0.35.md](docs/RELEASE-v0.0.35.md).
+| Evidence | Recorded coverage |
+| --- | --- |
+| Converted cells | 1,190, including 15 with failed audits; 99 empty-sea cells are counted separately |
+| Conversion/audit milestone | 1,274 of 1,292 land and empty-sea cells (98.6%); 15 failed and 3 not converted |
+| Native-checked cells | No complete island-wide count established; scene checks remain scoped |
+| Packaged region cells | 360 whole cells in the exact RC2 package, verified 14 October; six partial town overlaps remain outside this count |
+
+The 865 open-ocean cells are outside the 1,292-cell denominator. Packaged
+region coverage is not a total for named town frames or interiors, and green
+cells do not establish actor presence or working gameplay. RC2's package
+layer was verified on 14 October from full disk readback and independent
+extraction. All 9,774 CHIM files retain the verified RC1 bytes; no new cells
+were imported. Converted and packaged per-type actor/gameplay counts remain
+unknown; original reference types are retained. Scoped Nord package checks
+show punch, torch, swim and dive behavior, while all-appearance, cell-wide
+native and owner acceptance remain separate. RC2 inspection package and matching source artifacts finalized at 2026-10-13T22:15:44Z.
+Final v0.0.39 remains held for owner inspection.
+
+Historical RC1 package/source delivery finalized on 13 October at 18:06 UTC;
+its 360 whole-cell check and six partial overlaps remain dated historical
+evidence. Later RC1 regression reports stopped final preparation and led to
+RC2. See the [cell tracker](docs/chim/CELL_TRACKER.md) and
+[map guide](docs/chim/CHIM_PROGRESS_MAP.md) for separate evidence states.
+The [11 October v0.0.36 map](docs/images/amiwind-v0.0.36-progress-map.png)
+is retained as a historical snapshot.
+
+**Earlier release, v0.0.35:** walk and run for NPCs, combat with weapons and shields, lava, Seyda Neen from your own data, about 30 engine crash fixes and a faster, resumable builder. Details: [docs/RELEASE-v0.0.35.md](docs/RELEASE-v0.0.35.md).
 
 ## v0.0.35 - CHIMporting It All: Gathering Up The Loose Branches From The Seashore
 
@@ -300,21 +358,25 @@ stay visible as a whole.) Details: [Town visibility](docs/performance/TOWN-VISIB
 
 ### AmiWind Toolkit
 
-![AmiWind Toolkit](docs/images/amiwind-v0.0.31-toolkit-header.png)
+The browser Toolkit inspects your own converted data: **World** shows cell
+coverage and reference counts, **Local** shows a cell's maps, **3D Inspector**
+opens BSP maps, CHIM maps and whole CHIM worlds, and **Monitor** follows builds.
+It runs locally; game data and inspection exports are not uploaded.
 
-A browser toolkit for anyone working on AmiWind, built from your own converted
-data (nothing is uploaded): the **World** map shows every cell's coverage,
-original versus placed entities, places and interior entrances, with heat maps;
-**Local** shows a cell's maps; the **3D Inspector** opens any converted map to
-look at its geometry, polygon density and planning zones. Shift-click or
-shift-drag selects several cells, and the selection copies out as JSON for
-planning work such as the next town to import. See
-[AmiWind Toolkit](docs/AMIWIND_TOOLKIT.md).
-The [v0.0.38 controls](amiwind-toolkit/README.md#v0038-inspection-controls)
-add remembered Names on/off, per-panel inspection JSON and direct scene links;
-the public viewer uses the same features with your own converted data.
+The current [inspection controls](amiwind-toolkit/README.md#v0038-inspection-controls)
+include remembered Names on/off, direct cell links with an optional highlighted
+selection, per-panel Copy JSON, textures with a density heatmap, direct scene
+and CHIM archive links, a collapsible sidebar and a placed-face budget display.
+Stored, placed and preview counts remain distinct from native memory or speed.
 
-![AmiWind Toolkit world map](docs/images/amiwind-v0.0.31-toolkit-world.png)
+World's **Included in build** view is separate from conversion colours and
+release plans. It uses verified final-image readback; selected or planned cells
+are not included cells. Inclusion alone does not verify lighting, actors,
+interactions or traversal. See the [Toolkit guide](docs/AMIWIND_TOOLKIT.md) and
+[CHIM coverage guide](docs/chim/CHIM_PROGRESS_MAP.md).
+
+The guide retains historical v0.0.31 and v0.0.36 screenshots. Their headers,
+controls and coverage totals describe those snapshots, not the current build.
 
 ## v0.0.30 - The Temple
 
@@ -944,8 +1006,8 @@ For manual setup or WinUAE, use the guides and steps below.
 
 | Emulator / official homepage | Host platforms | AmiWind setup | Historical v0.0.28-rc1 template |
 | --- | --- | --- | --- |
-| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.28-rc1-FS-UAE.fs-uae) |
-| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.28-rc1-WinUAE.uae) |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](docs/FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](resources/emulators/AmiWind-v0.0.39-rc2-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](docs/WINUAE.md) | [Download/view `.uae` preset](resources/emulators/AmiWind-v0.0.39-rc2-WinUAE.uae) |
 
 1. Build the current source from your own Morrowind installation using the guide
    above. Keep every HDF listed in the build summary together. The source ZIP

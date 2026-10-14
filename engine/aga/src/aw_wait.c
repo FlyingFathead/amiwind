@@ -10,17 +10,59 @@
 #include "aw_sky.h"
 #include "aw_mappath.h"
 static int modal,hours=1,help_page;
-static const char *help_commands[]={"+forward","+back","+moveleft","+moveright","+attack","+aw_use","impulse 202","aw_torch","aw_wait","aw_quicksave","aw_quickload","toggleconsole","aw_quick_help","togglemenu","aw_worldmap","aw_journal"};
-static const char *help_actions[]={"Move forward","Move back","Move left","Move right","Attack","Activate","Ready hands","Toggle torch","Wait","Quicksave","Quickload","Console","Quick help","Pause menu","World map","Journal"};
-#define HELP_COUNT 16
-#define HELP_ROWS 7
-static void help_text(int x,int y,const char *s) {
-    int w=AW_ConsoleCharWidth();
-    for(;*s && x+w<=vid.width-12;s++,x+=w)AW_ConsoleCharacter(x,y,(unsigned char)*s);
+static const struct {const char *command,*action;} help_bindings[]={
+    {"+forward","Move forward"},{"+back","Move back"},
+    {"+moveleft","Move left"},{"+moveright","Move right"},
+    {"+left","Turn left"},{"+right","Turn right"},{"+jump","Jump"},{"+speed","Run"},
+    {"+movedown","Move down"},{"+attack","Attack"},{"+aw_use","Activate"},
+    {"+aw_alt","Block / context action"},{"impulse 202","Ready / lower hands"},
+    {"aw_torch","Toggle torch"},{"+aw_pov","POV / hold to orbit"},
+    {"aw_view_zoom 1","Camera zoom in"},{"aw_view_zoom -1","Camera zoom out"},
+    {"aw_wait","Wait"},{"aw_quicksave","Quicksave"},{"aw_quickload","Quickload"},
+    {"toggleconsole","Console"},{"aw_quick_help","Quick help"},{"togglemenu","Pause menu"},
+    {"aw_worldmap","World map"},{"aw_journal","Journal"},
+    {"aw_music_next","Next music track"},{"aw_music_previous","Previous music track"},
+    {"aw_music_mode","Music mode"},{"+aw_fastflight","Fast flight (debug)"},
+    {"aw_desktop","Desktop (debug)"}
+};
+#define HELP_COUNT ((int)(sizeof(help_bindings)/sizeof(help_bindings[0])))
+/* keys.c and AW_PhotoKey handle these before ordinary bindings. Console
+ * keys stay in the footer on every page. Keep photo-only scope explicit. */
+static const struct {const char *key,*action;} help_fixed[]={
+    {"Esc","Pause / back"},{"Shift+V","Draw distance"},
+    {"Shift+F5","Previous music"},{"Shift+F6","Next music"},
+    {"Ctrl+F","Fog (photo mode)"},{"Ctrl+H","Debug HUD (photo mode)"}
+};
+#define HELP_FIXED_COUNT ((int)(sizeof(help_fixed)/sizeof(help_fixed[0])))
+#define HELP_TOP 66
+typedef struct {int rows,columns,column_width,count,pages;} help_layout_t;
+static int help_bound(int key) {
+    /* These fixed handlers consume the key even if a stale/custom config
+     * assigns another command. Do not advertise an unreachable binding. */
+    return key!=K_ESCAPE && key!=K_F10 && key!='`' && keybindings[key] && *keybindings[key];
 }
-static int help_pages(void) {
-    int k,n=0;for(k=0;k<256;k++)if(keybindings[k] && *keybindings[k])n++;
-    return n?(n+HELP_ROWS-1)/HELP_ROWS:1;
+static void help_text(int x,int y,int right,const char *s) {
+    int i,w=AW_ConsoleCharWidth(),chars=(right-x)/w,n=(int)strlen(s);
+    if(y<0 || y+AW_ConsoleCharHeight()>vid.height-4 || chars<=0)return;
+    for(i=0;i<n && i<chars;i++,x+=w)
+        AW_ConsoleCharacter(x,y,n>chars && chars>=3 && i>=chars-3?'.':(unsigned char)s[i]);
+}
+static void help_layout(help_layout_t *layout) {
+    int k,capacity,ch=AW_ConsoleCharHeight();
+    layout->column_width=(vid.width-36)/2;
+    /* Compact text fits two readable columns at 320 pixels. Keep larger
+     * glyphs in one column unless the viewport has room for both. */
+    layout->columns=layout->column_width>=34*AW_ConsoleCharWidth()?2:1;
+    if(layout->columns==1)layout->column_width=vid.width-24;
+    layout->rows=(vid.height-45-HELP_TOP+3)/(ch+3);
+    if(layout->rows<1)layout->rows=1;
+    layout->count=HELP_FIXED_COUNT;
+    for(k=0;k<256;k++)if(help_bound(k))layout->count++;
+    capacity=layout->rows*layout->columns;
+    layout->pages=layout->count?(layout->count+capacity-1)/capacity:1;
+    /* Bindings and font size can change while the help modal is open. */
+    if(help_page>=layout->pages)help_page=layout->pages-1;
+    if(help_page<0)help_page=0;
 }
 static keydest_t return_dest;
 static cvar_t timescale={"aw_timescale","30",true};
@@ -411,7 +453,8 @@ int AW_WaitKey(int key) {
     if(key_dest!=key_menu){modal=0;return 0;}
     if(key==K_ESCAPE || (modal==2 && (key==K_ENTER || key==K_F1))){close_modal();return 1;}
     if(modal==2){
-        if(key==K_LEFTARROW || key==K_RIGHTARROW || key==K_PGDN || key==K_PGUP || key==K_TAB)help_page=(help_page+(key==K_LEFTARROW || key==K_PGUP?-1:1)+help_pages())%help_pages();
+        help_layout_t layout;help_layout(&layout);
+        if(key==K_LEFTARROW || key==K_RIGHTARROW || key==K_PGDN || key==K_PGUP || key==K_TAB)help_page=(help_page+(key==K_LEFTARROW || key==K_PGUP?-1:1)+layout.pages)%layout.pages;
         return 1;
     }
     if(key==K_LEFTARROW || key==K_DOWNARROW || key=='a' || key=='s'){if(hours>1)hours--;}
@@ -429,8 +472,8 @@ int AW_WaitKey(int key) {
 int AW_WaitDraw(void) {
     int y,m,d,h,n;char line[96];
     if(!modal || key_dest!=key_menu)return 0;
-    AW_UIBox(18,24,284,152);AW_UISmallBegin();
     if(modal==1){
+        AW_UIBox(18,24,284,152);AW_UISmallBegin();
         AW_ClockDate(&y,&m,&d,&h,&n);
         AW_UITextBox(26,32,268,20,"Wait",-1);
         sprintf(line,"%02ld:%02ld  %02ld/%02ld/%ld",(long)h,(long)n,(long)d,(long)m,(long)y);
@@ -439,19 +482,24 @@ int AW_WaitDraw(void) {
         AW_UITextBox(26,116,268,20,"Arrows / A D: 1 to 24 hours",-1);
         AW_UITextBox(26,143,268,20,"Enter: wait   Esc: cancel",-1);
     }else{
-        int i,k,row=0,skip=help_page*HELP_ROWS,ch=AW_ConsoleCharHeight();const char *action;
-        AW_UISmallEnd();AW_UIBox(2,2,316,196);
-        if(!AW_UILogo(60,6))AW_UITextBox(10,6,300,36,"AmiWind",-1);
-        sprintf(line,"Current keys - page %ld/%ld",(long)help_page+1,(long)help_pages());help_text(12,48,line);
-        for(k=0;k<256 && row<HELP_ROWS;k++)if(keybindings[k] && *keybindings[k]){
+        int i,k,x,row=0,skip,ch=AW_ConsoleCharHeight();const char *action,*keyname;
+        help_layout_t layout;help_layout(&layout);skip=help_page*layout.rows*layout.columns;
+        AW_UIBox(2,2,vid.width-4,vid.height-4);
+        if(!AW_UILogo((vid.width-200)/2,6))AW_UITextBox(10,6,vid.width-20,36,"AmiWind",-1);
+        sprintf(line,"Current keys - page %ld/%ld",(long)help_page+1,(long)layout.pages);help_text(12,48,vid.width-12,line);
+        for(k=0;k<256+HELP_FIXED_COUNT && row<layout.rows*layout.columns;k++){
+            if(k<256 && !help_bound(k))continue;
             if(skip){skip--;continue;}
-            action=keybindings[k];
-            for(i=0;i<HELP_COUNT;i++)if(!strcmp(action,help_commands[i])){action=help_actions[i];break;}
-            snprintf(line,sizeof(line),"%s: %s",Key_KeynumToString(k),action);
-            help_text(12,66+row*(ch+3),line);row++;
+            if(k<256){
+                keyname=Key_KeynumToString(k);action=keybindings[k];
+                for(i=0;i<HELP_COUNT;i++)if(!strcmp(action,help_bindings[i].command)){action=help_bindings[i].action;break;}
+            }else{keyname=help_fixed[k-256].key;action=help_fixed[k-256].action;}
+            snprintf(line,sizeof(line),"%s: %s",keyname,action);
+            x=12+(row/layout.rows)*(layout.column_width+12);
+            help_text(x,HELP_TOP+(row%layout.rows)*(ch+3),x+layout.column_width,line);row++;
         }
-        help_text(12,165,"F10: console half / full / closed");
-        help_text(12,180,"Arrows: page  Enter/Esc: return");
+        help_text(12,vid.height-35,vid.width-12,"F10 / `: console (Shift: full)");
+        help_text(12,vid.height-20,vid.width-12,"Arrows: page  Enter/Esc: return");
         scr_copyeverything=1;return 1;
     }
     AW_UISmallEnd();scr_copyeverything=1;return 1;

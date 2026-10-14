@@ -315,6 +315,66 @@ def simplify_shape(points, faces, quota, preserve_shell=False):
         failed=quota;quota=max(quota+1,quota*2)
     return points, faces
 
+
+def player_leg_section_ok(reference, reference_faces, candidate, candidate_faces, minimum=.75,
+                          reference_parts=None, candidate_parts=None):
+    """Check the rest-pose visible leg union against the earlier body mesh.
+
+    Both models are complete, equivalently posed alias surfaces. When per-face
+    body-part labels are supplied, only lower/upper leg parts participate. A
+    Khajiit tail must not inflate the reference leg width if it later decimates.
+    This still checks the union of overlapping trouser/limb fragments.
+    It is a numeric candidate gate, not visual acceptance.
+    """
+    if (reference_parts is None) != (candidate_parts is None):
+        raise ValueError('Player leg section labels must cover both models')
+    if reference_parts is not None:
+        if len(reference_parts)!=len(reference_faces) or len(candidate_parts)!=len(candidate_faces):
+            raise ValueError('Player leg section labels must cover every face')
+        leg_parts=np.arange(17,23)
+        reference_faces=reference_faces[np.isin(reference_parts,leg_parts)]
+        candidate_faces=candidate_faces[np.isin(candidate_parts,leg_parts)]
+        if not len(reference_faces) or not len(candidate_faces):
+            return False
+    lo, hi = float(reference[:, 2].min()), float(reference[:, 2].max())
+    mid = float(reference[:, 0].min() + reference[:, 0].max()) / 2
+    def widths(points, faces, height, side):
+        edges = ((0, 1), (1, 2), (2, 0))
+        cuts = []
+        tri = points[faces]
+        tri = tri[(tri[:, :, 0].mean(axis=1) < mid) if side < 0 else
+                  (tri[:, :, 0].mean(axis=1) >= mid)]
+        for a, b in edges:
+            za, zb = tri[:, a, 2], tri[:, b, 2]
+            crossing = ((za <= height) & (zb >= height) | (zb <= height) & (za >= height))
+            crossing &= np.abs(zb - za) > 1e-6
+            if np.any(crossing):
+                t = ((height - za[crossing]) / (zb[crossing] - za[crossing]))[:, None]
+                cuts.append(tri[crossing, a, :2] + t * (tri[crossing, b, :2] - tri[crossing, a, :2]))
+        if not cuts:
+            return None
+        xy = np.concatenate(cuts)
+        return np.ptp(xy, axis=0) if len(xy) >= 2 else None
+    if hi - lo < 1e-4:
+        return True
+    for side in (-1, 1):
+        valid = 0
+        for share in (.25, .35, .45):
+            height = lo + (hi - lo) * share
+            original = widths(reference, reference_faces, height, side)
+            if original is None or max(original) < .02 * (hi - lo):
+                continue
+            valid += 1
+            after_widths = widths(candidate, candidate_faces, height, side)
+            if after_widths is None:
+                return False
+            for before, after in zip(original, after_widths):
+                if before >= .02 * (hi - lo) and after < minimum * before:
+                    return False
+        if valid < 2:
+            return False
+    return True
+
 # Heads keep their original geometry (owner decision 2026-10-09, NPC-HEAD-DECIMATION-33).
 # The whole-model bake used to fit a humanoid into 480 triangles; the head got at
 # most 120 of them and was decimated with the rest, which left faces
@@ -454,7 +514,8 @@ def bake_quotas(shapes,budget=480,face_limit=666,minimum_faces=None,reference_fr
     return head_plan(shapes,budget,face_limit,minimum_faces,reference_frames,head_detail)['quotas']
 
 def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None,reference_frames=None,
-         quotas=None,shell_height=None,head_detail=None,lod_only='budget',preserve=None):
+         quotas=None,shell_height=None,head_detail=None,lod_only='budget',preserve=None,body_skin_rows=None,
+         body_leg_contour=False,face_parts=None):
     """One topology shared by every frame, per-face tiny UV atlas patches.
 
     Default: quotas from head_plan (the whole-appearance bake). Heads (body part
@@ -480,8 +541,10 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
             raise ValueError('Invalid explicit part quotas')
         protected=frozenset() if npc_head_detail(head_detail)=='budget' else frozenset(
             i for i,s in enumerate(shapes) if s['part'] in HEAD_SLOTS and quotas[i]>=len(s['faces']))
+        if face_parts is not None:face_parts.clear()
         return _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shell_height,protected,False,
-                     preserve=preserve)
+                     preserve=preserve,body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,
+                     face_parts=face_parts)
     mode=npc_head_detail(head_detail)
     floors=classes=None;shell_set=None
     if mode=='original' and any(s['part'] in HEAD_SLOTS for s in shapes):
@@ -502,11 +565,13 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
         if plan['lod_only'] and lod_only=='raise':
             raise ValueError('Original head does not fit the alias face limit (lod_only)')
         try:
+            if face_parts is not None:face_parts.clear()
             result=_bake(shapes,materials,textures,palette,plan['face_limit'],minimum_faces,plan['quotas'],
                          shell_height,plan['protected'],plan['face_limit']!=face_limit,
-                         None if plan['mode']=='budget' else shell_set,preserve=preserve)
+                         None if plan['mode']=='budget' else shell_set,preserve=preserve,
+                         body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,face_parts=face_parts)
         except AliasOverflow as overflow:
-            if plan['mode']=='budget':raise
+            if plan['mode']=='budget' or str(overflow).startswith('Player leg'):raise
             extra+=overflow.over+2;continue
         LAST_PLAN.clear()
         LAST_PLAN.update(mode=plan['mode'],face_limit=plan['face_limit'],head_faces=plan['head_faces'],
@@ -516,7 +581,7 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
     raise ValueError('Original head does not fit the alias face limit')
 
 def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shell_height,protected,raised,
-          shell_set=None,preserve=None):
+          shell_set=None,preserve=None,body_skin_rows=None,body_leg_contour=False,face_parts=None):
     """shell_set None: the previous rule (large torso panels keep their shell); else the
     shape indices whose reduction keeps its silhouette (original-head bake)."""
     from scipy.spatial import cKDTree
@@ -540,7 +605,24 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
             preserve_shell = bool(preserve[index]) if preserve is not None else \
                 (shape['part']==3 and np.ptp(p[:,2]) >= .2*actor_height) if shell_set is None \
                 else index in shell_set
+            source_points=points
             points,ff=simplify_shape(points,ff.astype(np.int32),int(quota),preserve_shell)
+            if body_leg_contour and (shape['part'] in (19,20) or
+                                     (body_leg_contour==2 and shape['part'] in (21,22))):
+                # Player-body fallback only: a tiny knee quota can keep the
+                # triangle count yet pull the visible trouser contour inward.
+                # Restore 90% of each knee's authored side-to-side extent;
+                # the later fallback also restores the upper thigh's extent.
+                # The complete assembled leg must still pass its 75% section
+                # guard before the model is accepted. No NPC bake opts in.
+                source_lo,source_hi=np.min(source_points[:,0]),np.max(source_points[:,0])
+                reduced_lo,reduced_hi=np.min(points[:,0]),np.max(points[:,0])
+                required=(1.0 if body_leg_contour==2 and shape['part'] in (21,22) else .9)*(source_hi-source_lo)
+                width=reduced_hi-reduced_lo
+                if 1e-6<width<required:
+                    points=points.copy()
+                    pivot=np.mean(source_points[:,0])
+                    points[:,0]=(points[:,0]-pivot)*(required/width)+pivot
         reduced.append((exact,points,ff))
     total=sum(len(ff) for _,_,ff in reduced)
     if total>face_limit:raise AliasOverflow('Alias vertex budget exceeded',total-face_limit)
@@ -602,10 +684,12 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                 # the renderer's 480-row skin bound even for extended models.
                 larger=Image.new('RGB',(512,((face_limit+31)//32)*16));larger.paste(skin,(0,0));skin=larger
             tx=fi%32*16;ty=fi//32*16;skin.paste(Image.fromarray(tile),(tx,ty));outuv.extend([(tx,ty),(tx+15,ty),(tx,ty+15)])
-            if raised:tiles.append((tile,shape['part']))
+            if raised or body_skin_rows:tiles.append((tile,shape['part']))
             outfaces.append([fi*3,fi*3+2,fi*3+1]);fi+=1
+            if face_parts is not None:face_parts.append(shape['part'])
     outuv=np.array(outuv)
     if raised:skin,outuv=mixed_tile_skin(tiles)
+    elif body_skin_rows:skin,outuv=mixed_tile_skin(tiles,rows=body_skin_rows)
     pal=Image.new('P',(1,1));pal.putpalette(palette)
     return np.concatenate(allframes,axis=1),np.array(outfaces),outuv,skin.quantize(palette=pal,dither=Image.Dither.NONE)
 

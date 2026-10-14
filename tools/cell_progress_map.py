@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Draw the CHIM progress map of the island as one PNG (for the README and release notes).
 
-Reads the tracker data (format aw-cell-progress-1, written by tools/cell_progress.py ingest) and draws one square
+Reads tracker data (aw-cell-progress-1) or its public reference (aw-cell-reference-1) and draws one square
 per map cell, north up. No game textures and no names beyond a few place labels are used; the picture is made of
 flat colours only.
 
-  green     done: converted to CHIM and every measured check passed (or an empty sea cell)
+  green     conversion/audit milestone, including empty sea; not proof of packaged or native coverage
   violet    converted, a check is still pending (hull policy)
   red       converted but failing a check, or not converted yet
   dark      not started (Solstheim)
@@ -32,6 +32,21 @@ GOLD = (240, 192, 48)
 BG = (18, 22, 30)
 LABELS = ['Seyda Neen', 'Balmora', 'Vivec', 'Ald-ruhn', 'Sadrith Mora', 'Gnisis', 'Pelagiad', 'Ebonheart',
           'Solstheim']
+
+
+def map_data(data):
+    """Render the sanitized public reference without inventing plans or package coverage."""
+    if data.get('format') == 'aw-cell-progress-1':
+        return data
+    if data.get('format') != 'aw-cell-reference-1':
+        raise ValueError('Expected a cell-progress file or public cell reference')
+    cells = {}
+    for key, row in data['cells'].items():
+        x, y = (int(v) for v in key.split(','))
+        cells[key] = {'x': x, 'y': y, 'name': row.get('name', ''),
+                      'island': row.get('island'), 'land': row['status'] != 'ocean',
+                      'chim': {'bucket': row['status']}, 'plan': None}
+    return {'format': 'aw-cell-progress-1', 'generated': data.get('generated'), 'cells': cells}
 
 
 def category(cell):
@@ -71,13 +86,14 @@ def label_positions(cells):
 
 def draw(data, out, font_path=None, scale=16, date=''):
     from PIL import Image, ImageDraw, ImageFont
+    data = map_data(data)
     cells = data['cells']
     xs = [c['x'] for c in cells.values()]
     ys = [c['y'] for c in cells.values()]
     x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
     w = (x1 - x0 + 1) * scale
     h = (y1 - y0 + 1) * scale
-    top, bottom = 64, 74
+    top, bottom = 84, 84
     img = Image.new('RGB', (w, h + top + bottom), BG)
     d = ImageDraw.Draw(img)
 
@@ -108,11 +124,13 @@ def draw(data, out, font_path=None, scale=16, date=''):
     s = summarize(data)
     title = 'AmiWind CHIM progress map'
     d.text((8, 6), title, fill=(255, 255, 255), font=f_big)
-    sub = 'Done: %s of %s Vvardenfell land cells (%.1f %%)%s' % (
+    sub = 'Audit milestones: %s / %s land and empty-sea cells (%.1f %%)%s' % (
         format(s['done'], ','), format(s['land'], ','), 100.0 * s['done'] / max(1, s['land']),
         (' - ' + date) if date else '')
     d.text((8, 6 + int(scale * 1.8)), sub, fill=(210, 214, 222), font=f_mid)
-    items = [('done', 'done'), ('pending', 'converted, hull policy pending'), ('failing', 'failing a check / not converted'),
+    d.text((8, 6 + int(scale * 3.2)), 'Conversion evidence only; native checks and packaged coverage are separate.',
+           fill=(210, 214, 222), font=f_small)
+    items = [('done', 'audit milestone'), ('pending', 'hull policy pending'), ('failing', 'failing / not converted'),
              ('not_started', 'not started (Solstheim)'), ('ocean', 'open ocean')]
     lx, ly = 8, top + h + 10
     for key, text in items:
@@ -122,9 +140,13 @@ def draw(data, out, font_path=None, scale=16, date=''):
         if lx > w - 200 and key != items[-1][0]:
             lx, ly = 8, ly + scale + 8
     ly2 = ly + scale + 10
-    d.rectangle([8, ly2, 8 + scale, ly2 + scale], outline=GOLD, width=max(2, scale // 8))
-    d.text((8 + scale + 6, ly2), 'gold ring: planned for the next release (%d cells)' % s['planned'],
-           fill=(235, 238, 244), font=f_small)
+    if s['planned']:
+        d.rectangle([8, ly2, 8 + scale, ly2 + scale], outline=GOLD, width=max(2, scale // 8))
+        d.text((8 + scale + 6, ly2), 'gold ring: release plan (%d cells), not packaged coverage' % s['planned'],
+               fill=(235, 238, 244), font=f_small)
+    else:
+        d.text((8, ly2), 'No release plan in this input; see the cell tracker for package coverage.',
+               fill=(235, 238, 244), font=f_small)
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     img.save(out, optimize=True)
     return s
@@ -132,15 +154,15 @@ def draw(data, out, font_path=None, scale=16, date=''):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--data', required=True, help='cell-progress.json from tools/cell_progress.py ingest')
+    ap.add_argument('--data', required=True, help='Tracker JSON or docs/chim/cell-progress-reference.json')
     ap.add_argument('--out', required=True)
     ap.add_argument('--font')
     ap.add_argument('--scale', type=int, default=16)
     ap.add_argument('--date', default='')
     a = ap.parse_args(argv)
     data = json.loads(Path(a.data).read_text(encoding='utf-8'))
-    if data.get('format') != 'aw-cell-progress-1':
-        print('not a cell-progress file', file=sys.stderr)
+    if data.get('format') not in ('aw-cell-progress-1', 'aw-cell-reference-1'):
+        print('not a cell-progress file or public cell reference', file=sys.stderr)
         return 2
     print(json.dumps(draw(data, a.out, a.font, a.scale, a.date)))
     return 0

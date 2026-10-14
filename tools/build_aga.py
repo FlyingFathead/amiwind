@@ -654,13 +654,15 @@ def install_world_scenery(overlay, id1, jobs=1):
     replacements = []
     # CHIM region cells (docs/BUILD_MANIFEST.md step 2): no map was made for them; their rows carry no map
     chim = [r['name'] for r in regions if r.get('chim_region')]
-    for name in chim:
+    routing_only = [r['name'] for r in regions if r.get('routing_only')]
+    not_made = set(chim + routing_only)
+    for name in not_made:
         if (id1 / 'maps' / f'{name}.bsp').exists() or (overlay / name / 'scene.bsp').exists():
             raise ValueError('A legacy map of a CHIM region cell is staged: ' + name)
-    made = [name for name in expected_names if name not in set(chim)]
+    made = [name for name in expected_names if name not in not_made]
     retained = hash_existing([id1 / 'maps' / f'{name}.bsp' for name in made], jobs)
     overlays = hash_existing([overlay / name / 'scene.bsp' for name in made], jobs)
-    for region, source_sha, baked_sha in zip([r for r in regions if not r.get('chim_region')], retained, overlays):
+    for region, source_sha, baked_sha in zip([r for r in regions if r['name'] not in not_made], retained, overlays):
         name = region['name']
         if not re.fullmatch(r'vf\d{4}', name):
             raise ValueError('Invalid world scenery region name')
@@ -699,6 +701,7 @@ def install_world_scenery(overlay, id1, jobs=1):
     copy_files(replacements, jobs)
     result = {'status': 'passed', 'format': receipt['format'], 'regions': count,
               'chim_region_maps_not_made': chim,
+              'routing_only_maps_not_made': routing_only,
               'covered_source_references': len(unique_references),
               'palette_sha256': receipt['palette_sha256'],
               'terrain_directory_sha256': receipt.get('terrain_directory_sha256'),
@@ -895,6 +898,10 @@ def write_content_fingerprint(id1, jobs=1, partial=False, removed=(), excluded=(
         aliases=alias_rows(raw)
         world=[map_rel(id1,f'vf{index:04d}') for index in range(struct.unpack_from('<I',raw,4)[0])
                if f'vf{index:04d}' not in aliases or (Path(id1)/map_rel(id1,f'vf{index:04d}')).is_file()]
+        # Routing rows retain stable indices after a higher-priority town
+        # replaces their entire core. Only explicitly retired payload paths
+        # may be absent; an undeclared missing map must still fail this gate.
+        world=[name for name in world if name not in removed]
         for name,value in zip(world,hash_files([Path(id1)/name for name in world],jobs)):
             fingerprint.update(name.encode('ascii')+b'\0'+bytes.fromhex(value))
     from prepare_guard_torches import fingerprint_entries
@@ -1112,7 +1119,7 @@ def chim_region_placements(args, id1):
     return {name: set(chim_placements(args.chim_world, cell, world=world)) for name, cell in sorted(owned.items())}
 
 
-def never_built_maps(id1, towns):
+def never_built_maps(id1, towns, world_terrain=None):
     """id1-relative legacy exterior maps of CHIM towns built without them (their region tables name them;
     Seyda Neen's special scenes too: the intro docks and the Census courtyard)."""
     from town_config import runtime_towns
@@ -1126,6 +1133,9 @@ def never_built_maps(id1, towns):
             table=Path(id1)/town['regions']
             if table.is_file():
                 names+=town_region_map_names(table,town['prefix'])
+    if world_terrain:
+        from exterior_plan import omitted_paths
+        names += omitted_paths(world_terrain, id1)
     return names
 
 
@@ -1152,6 +1162,19 @@ def chim_world_receipt(chim_world):
         ids = {f['id'] for f in regions['frames']}
         areas = [a for a in areas if a not in ids]
     return receipt, areas
+
+
+def image_content_fingerprint(args, id1, jobs, removed_files, excluded):
+    """Bind content and return validated omissions for the disk packer."""
+    omitted = removed_files + never_built_maps(
+        id1, chim_native_towns(args), getattr(args, 'exterior_terrain', None)
+        or getattr(args, 'world_terrain', None))
+    write_content_fingerprint(id1, jobs=jobs, partial=getattr(args, 'miniwind', False) and
+                              ((getattr(args, 'miniwind_scope', None) or 'full', args.miniwind_town)
+                               if getattr(args, 'miniwind_town', None) else
+                               (getattr(args, 'miniwind_scope', None) or True)), removed=omitted,
+                              excluded=excluded, kept_extra=mini_start_maps(args))
+    return omitted
 
 
 def chim_region_table(chim_world):
@@ -1897,7 +1920,7 @@ def miniwind_receipt(args, out, boot):
             'interiors_missing': prune['interiors_missing']}
 
 
-def staged_exterior_map_names(id1, chim_world=None):
+def staged_exterior_map_names(id1, chim_world=None, exterior_terrain=None):
     """Explicit runtime directories identify exterior cells; sky is not a classifier. chim_world: the build's CHIM
     world; the open-world maps its region frames own have no legacy map (docs/BUILD_MANIFEST.md step 2) and are left
     out until their frame maps exist; any other missing map stays listed (and fails the passes)."""
@@ -1926,6 +1949,13 @@ def staged_exterior_map_names(id1, chim_world=None):
             owned = region_map_names(id1, chim_world)
         names.update(name for name in (f'vf{index:04d}' for index in range(count))
                      if name not in owned or (id1 / 'maps' / (name + '.bsp')).is_file())
+    if exterior_terrain:
+        from exterior_plan import omitted_paths
+        # These passes precede frame generation. Bind omissions to validated
+        # town plans now; the final fingerprint requires actual owner frames.
+        planned = set(chim_world_receipt(chim_world)[1]) if chim_world else None
+        names.difference_update(Path(name).stem for name in
+                                omitted_paths(exterior_terrain, id1, planned_towns=planned))
     return names
 
 
@@ -2019,7 +2049,8 @@ def payload_preflight(args, out, excluded, jobs, pending=None):
                          music=None if 'music' in excluded else getattr(args, 'music', None), jobs=jobs,
                          harvest=getattr(args, 'harvest', None), data_files=getattr(args, 'data_files', None),
                          report_path=None if getattr(args, 'payload_preflight_only', False) else out/'payload-preflight.json',
-                         chim_towns=chim_native_towns(args), chim_town_dirs=getattr(args, 'chim_town', None) or ())
+                         chim_towns=chim_native_towns(args), chim_town_dirs=getattr(args, 'chim_town', None) or (),
+                         exterior_terrain=getattr(args, 'exterior_terrain', None) or getattr(args, 'world_terrain', None))
 
 def finalize_image(args):
     """Finalize an already prepared private image stage through every normal gate.
@@ -2092,7 +2123,7 @@ def finalize_image(args):
     from exterior_sky_build import configure_staged_maps
     exterior_sky_path = out / 'exterior-sky' / 'exterior-sky.json'
     exterior_sky = configure_staged_maps(boot / 'id1',
-        exterior_maps=staged_exterior_map_names(boot / 'id1', getattr(args, 'chim_world', None)),
+        exterior_maps=staged_exterior_map_names(boot / 'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)),
         interior_maps=staged_interior_map_names(boot / 'id1'),
         local_skybox=getattr(args, 'local_skybox', 'false'),
         shared_sky_source=sky_asset_preparation['shared_sky_source'],
@@ -2105,7 +2136,7 @@ def finalize_image(args):
         # Quick test build: the shared assets maps and the engine find by name (the sky,
         # palette, fonts, menus) are kept by every exclusion (build_exclusions.ALWAYS_INCLUDED).
         from build_exclusions import check_always_included, worldspawn_sky_keys
-        always_included=check_always_included(boot/'id1', exterior=bool(staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None)))
+        always_included=check_always_included(boot/'id1', exterior=bool(staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)))
                                               or bool(getattr(args, 'chim_world', None)),
                                               maps=worldspawn_sky_keys(boot/'id1/maps'))
         (out/'always-included.json').write_text(json.dumps(always_included,indent=2)+'\n',encoding='utf-8',newline='\n')
@@ -2113,7 +2144,7 @@ def finalize_image(args):
     from hidden_surface_build import cull_staged_maps, enabled_value
     hidden_surface_path = out / 'hidden-surface-cull' / 'hidden-surfaces.json'
     hidden_surfaces = cull_staged_maps(boot / 'id1/maps', hidden_surface_path.parent,
-        staged_exterior_map_names(boot / 'id1', getattr(args, 'chim_world', None)),
+        staged_exterior_map_names(boot / 'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)),
         enabled=enabled_value(getattr(args, 'hidden_surface_cull', 'true')),
         jobs=jobs)
     check_recorded(boot/'id1', out/'bounded-seyda', 'hidden-surface cull', jobs=jobs)
@@ -2122,7 +2153,7 @@ def finalize_image(args):
     from hand_metadata import stamp_staged_hands
     hand_source = json.loads((Path(args.scene)/'scene-ready.json').read_text())['hands']
     hand_metadata = stamp_staged_hands(boot/'id1', hand_source,
-        staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None)) | staged_interior_map_names(boot/'id1'), jobs=jobs)
+        staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)) | staged_interior_map_names(boot/'id1'), jobs=jobs)
     (out/'hand-metadata.json').write_text(json.dumps(hand_metadata,indent=2)+'\n', newline='\n')
     check_recorded(boot/'id1', out/'bounded-seyda', 'first-person hand metadata', jobs=jobs)
     # Stable interior cell numbers + full cell IDs for the debug HUD and `dbg cell`;
@@ -2184,7 +2215,7 @@ def finalize_image(args):
     # removes the CHIM towns' legacy maps below).
     from night_lighting import stage as stage_night_lighting, image_sources
     night_lighting = stage_night_lighting(boot/'id1', master=child_ci(args.data_files,'Morrowind.esm'),
-        maps=staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None)), sources=image_sources(args),
+        maps=staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)), sources=image_sources(args),
         palette=boot/'id1/gfx/palette.lmp', data_files=args.data_files, work_dir=out/'night-lighting',
         lighting_type=getattr(args, 'chim_lighting_type', None))
     # Pure CHIM (--builder chim): each CHIM town's frame maps are written and checked against its
@@ -2290,11 +2321,7 @@ def finalize_image(args):
     removed_files = [row['file'] for row in removed_legacy]
     recorded_stage = check_recorded(boot/'id1', out/'bounded-seyda', 'final image payload', jobs=jobs,
                                     removed=removed_files)
-    write_content_fingerprint(boot/'id1', jobs=jobs, partial=getattr(args, 'miniwind', False) and
-                              ((getattr(args, 'miniwind_scope', None) or 'full', args.miniwind_town)
-                               if getattr(args, 'miniwind_town', None) else
-                               (getattr(args, 'miniwind_scope', None) or True)), removed=removed_files+never_built_maps(boot/'id1', chim_native_towns(args)),
-                              excluded=excluded, kept_extra=mini_start_maps(args))
+    omitted_maps = image_content_fingerprint(args, boot/'id1', jobs, removed_files, excluded)
     if 'music' in excluded:
         # Quick test build without music (--exclude music): no soundtrack, no playlist;
         # the game stays silent and says so once (aw_excluded.c).
@@ -2348,7 +2375,8 @@ def finalize_image(args):
     if legacy_summary['shipped']:
         raise ValueError('Legacy maps of CHIM cells in the payload: ' + ', '.join(legacy_summary['shipped'][:8]))
     from world_volumes import pack as pack_world_volumes
-    world_images=pack_world_volumes(boot/'id1',out,VERSION,args.xdftool,args.rdbtool,jobs=jobs)
+    world_images=pack_world_volumes(boot/'id1',out,VERSION,args.xdftool,args.rdbtool,jobs=jobs,
+                                   omitted=omitted_maps)
     chim_world={'status':'not_requested'}
     if getattr(args,'chim_world',None):
         volume,chim_world=add_chim_volume(args.chim_world,boot/'id1',out,len(world_images),args.xdftool,
@@ -2530,6 +2558,7 @@ def main():
     i.add_argument('--seyda-recorded',type=Path,help='Optional: owner-provided recorded v0.0.31 Seyda Neen maps (tools/recorded_stage.py, BUILD-SEYDA-REGEN-30), kept byte for byte by every later pass; without it Seyda Neen is converted from the data files')
     i.add_argument('--canonical-land-source',type=Path,help='World-survey terrain-source.npz (survey_vvardenfell.py); required while Seyda terrain culling is enabled')
     i.add_argument('--world-terrain',type=Path,help='Complete validated refined terrain receipt and runtime directory, staged before scenery')
+    i.add_argument('--exterior-terrain',type=Path,help='Prebuild ownership terrain receipt, required to bind never-compiled exterior maps at image finalization')
     i.add_argument('--world-scenery',type=Path,help='Complete validated full-world rock and giant-mushroom overlay directory; required except with --miniwind')
     i.add_argument('--miniwind',action='store_true',help='AmiWind "MiniWind" Playtester Build (tools/miniwind.py; tools/build.py --miniwind): a PARTIAL-AREA test image of Balmora on CHIM; private -devN versions only')
     i.add_argument('--miniwind-features',help='With --miniwind: the boot notice feature line tools/build.py generated from its stage plan ("FEATURES ONLY: ...")')

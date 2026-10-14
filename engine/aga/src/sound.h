@@ -146,8 +146,8 @@ void SNDDMA_Shutdown(void);
 
 
 extern	channel_t   channels[MAX_CHANNELS];
-// 0 to MAX_DYNAMIC_CHANNELS-1	= normal entity sounds
-// MAX_DYNAMIC_CHANNELS to MAX_DYNAMIC_CHANNELS + NUM_AMBIENTS -1 = water, etc
+// 0 to NUM_AMBIENTS-1 = water, etc
+// NUM_AMBIENTS to NUM_AMBIENTS + MAX_DYNAMIC_CHANNELS-1 = normal entity sounds
 // MAX_DYNAMIC_CHANNELS + NUM_AMBIENTS to total_channels = static sounds
 
 extern	int			total_channels;

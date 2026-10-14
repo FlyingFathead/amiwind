@@ -17,7 +17,8 @@
  * rate multiplier. Defaults: the kit on, rate x1. */
 int aw_anim_kit_enabled=1;
 float aw_anim_kit_speed=1;
-const char *const aw_anim_group_names[AW_ANIM_GROUPS]={"idle","walk","run","swim","swimidle","hit","knock","death","attack","block","dodgel","dodger"};
+const char *const aw_anim_group_names[AW_ANIM_GROUPS]={"idle","walk","run","swim","swimidle","hit","knock","death","attack","block","dodgel","dodger","jump","land",
+    "ready","readywalk","readyrun","readyjump","readyland"};
 static const char *const event_names[AW_ANIM_EVENT_KINDS]={"left","right"};
 static const char *const voice_topics[AW_VOICE_TOPICS]={"attack","hit","flee","idle"};
 static int hexval(int c) {return c>='0' && c<='9'?c-'0':c>='a' && c<='f'?c-'a'+10:-1;}
@@ -127,18 +128,18 @@ int AW_AnimParse(aw_anim_t *a,const char *p,int numframes) {
     return 1;
 }
 
-int AW_AnimMoveGroup(const aw_anim_t *a,float speed,int swimming,float *rate) {
-    int g;const aw_anim_group_t *w=&a->g[AW_ANIM_WALK],*r=&a->g[AW_ANIM_RUN];
+static int move_group(const aw_anim_t *a,float speed,int swimming,int idle,int walk,int run,float *rate) {
+    int g;const aw_anim_group_t *w=&a->g[walk],*r=&a->g[run];
     *rate=1;
     if(!AW_ANIMKIT || !aw_anim_kit_enabled)return AW_ANIM_IDLE;
     if(swimming){
         if(speed<1)return a->g[AW_ANIM_SWIMIDLE].present?AW_ANIM_SWIMIDLE:AW_ANIM_IDLE;
-        g=a->g[AW_ANIM_SWIM].present?AW_ANIM_SWIM:w->present?AW_ANIM_WALK:AW_ANIM_IDLE;
+        g=a->g[AW_ANIM_SWIM].present?AW_ANIM_SWIM:w->present?walk:AW_ANIM_IDLE;
     }else{
-        if(speed<1 || !w->present)return AW_ANIM_IDLE;
-        g=AW_ANIM_WALK;
+        if(speed<1 || !w->present)return idle;
+        g=walk;
         /* nearer own speed (OpenMW falls back from run to walk when run is missing) */
-        if(r->present && r->x>0 && w->x>0 && speed>(w->x+r->x)*.5f)g=AW_ANIM_RUN;
+        if(r->present && r->x>0 && w->x>0 && speed>(w->x+r->x)*.5f)g=run;
     }
     if(g!=AW_ANIM_IDLE && a->g[g].x>0){
         *rate=speed/a->g[g].x;
@@ -149,8 +150,19 @@ int AW_AnimMoveGroup(const aw_anim_t *a,float speed,int swimming,float *rate) {
     return g;
 }
 
+int AW_AnimMoveGroup(const aw_anim_t *a,float speed,int swimming,float *rate) {
+    return move_group(a,speed,swimming,AW_ANIM_IDLE,AW_ANIM_WALK,AW_ANIM_RUN,rate);
+}
+int AW_AnimPlayerMoveGroup(const aw_anim_t *a,float speed,int swimming,int ready,float *rate) {
+    if(ready && !swimming && a->g[AW_ANIM_READY].present &&
+       a->g[AW_ANIM_READYWALK].present && a->g[AW_ANIM_READYRUN].present)
+        return move_group(a,speed,0,AW_ANIM_READY,AW_ANIM_READYWALK,AW_ANIM_READYRUN,rate);
+    return AW_AnimMoveGroup(a,speed,swimming,rate);
+}
+
 static int one_shot(int g) {return g==AW_ANIM_HIT || g==AW_ANIM_KNOCK || g==AW_ANIM_DEATH || g==AW_ANIM_ATTACK ||
-    g==AW_ANIM_BLOCK || g==AW_ANIM_DODGEL || g==AW_ANIM_DODGER;}
+    g==AW_ANIM_BLOCK || g==AW_ANIM_DODGEL || g==AW_ANIM_DODGER || g==AW_ANIM_JUMP || g==AW_ANIM_LAND ||
+    g==AW_ANIM_READYJUMP || g==AW_ANIM_READYLAND;}
 
 int AW_AnimAdvance(const aw_anim_t *a,aw_anim_play_t *p,int group,float dt,float rate,unsigned long *crossed) {
     const aw_anim_group_t *g;int before,after,count,steps;
@@ -174,8 +186,71 @@ int AW_AnimAdvance(const aw_anim_t *a,aw_anim_play_t *p,int group,float dt,float
     return g->base+p->index;
 }
 
+int AW_AnimPlayerAdvance(const aw_anim_t *a,aw_anim_play_t *p,int group,float dt,float rate) {
+    int other=-1;
+    switch(group){
+    case AW_ANIM_IDLE:other=AW_ANIM_READY;break;
+    case AW_ANIM_READY:other=AW_ANIM_IDLE;break;
+    case AW_ANIM_WALK:other=AW_ANIM_READYWALK;break;
+    case AW_ANIM_READYWALK:other=AW_ANIM_WALK;break;
+    case AW_ANIM_RUN:other=AW_ANIM_READYRUN;break;
+    case AW_ANIM_READYRUN:other=AW_ANIM_RUN;break;
+    }
+    if(other>=0 && p->group==other && a->g[other].present && a->g[group].present &&
+       a->g[other].count && a->g[group].count){
+        p->phase=p->phase/a->g[other].count*a->g[group].count;
+        p->group=(unsigned char)group;p->index=(unsigned char)p->phase;
+    }
+    return AW_AnimAdvance(a,p,group,dt,rate,NULL);
+}
 int AW_AnimDone(const aw_anim_t *a,const aw_anim_play_t *p) {
     return one_shot(p->group) && p->index+1>=a->g[p->group].count;
+}
+
+/* PLAYER-JUMP-THIRDPERSON-38. OpenMW refreshJumpAnims: start -> loop start
+ * in air, loop stop -> stop on landing. The owned human/beast jump loop
+ * markers coincide, so an alias frame holds that pose. Quake still owns
+ * ground contact and vertical velocity; these fields only select frames. */
+static void air_variant(const aw_anim_t *a,aw_anim_play_t *p,int group,int normal,int ready) {
+    float progress;
+    if(p->group==group || (p->group!=normal && p->group!=ready))return;
+    progress=a->g[p->group].count>1?p->phase/(a->g[p->group].count-1):1;
+    if(progress<0)progress=0;
+    if(progress>1)progress=1;
+    p->group=(unsigned char)group;p->phase=progress*(a->g[group].count-1);
+    p->index=(unsigned char)p->phase;
+}
+int AW_AnimAirFrame(const aw_anim_t *a,aw_anim_air_t *s,int enabled,int airborne,int rising,int ready,float dt) {
+    int frame,jump=AW_ANIM_JUMP,land=AW_ANIM_LAND;
+    if(ready && a->g[AW_ANIM_READYJUMP].present && a->g[AW_ANIM_READYLAND].present){
+        jump=AW_ANIM_READYJUMP;land=AW_ANIM_READYLAND;
+    }
+    if(!enabled || !AW_ANIMKIT || !aw_anim_kit_enabled ||
+       !a->g[jump].present || !a->g[land].present){
+        memset(s,0,sizeof(*s));return -1;
+    }
+    if(airborne){
+        if(!s->airborne){
+            s->play.group=255;s->landing=0;
+            AW_AnimAdvance(a,&s->play,jump,0,1,NULL);
+            /* Falling off an edge must not replay a push-off that never happened. */
+            if(!rising){
+                s->play.index=a->g[jump].count-1;
+                s->play.phase=(float)s->play.index;
+            }
+            dt=0;
+        }
+        s->airborne=1;
+        air_variant(a,&s->play,jump,AW_ANIM_JUMP,AW_ANIM_READYJUMP);
+        return AW_AnimAdvance(a,&s->play,jump,dt,aw_anim_kit_speed,NULL);
+    }
+    if(s->airborne){
+        s->airborne=0;s->landing=1;s->play.group=255;
+    }else if(s->landing && AW_AnimDone(a,&s->play))s->landing=0;
+    if(!s->landing)return -1;
+    air_variant(a,&s->play,land,AW_ANIM_LAND,AW_ANIM_READYLAND);
+    frame=AW_AnimAdvance(a,&s->play,land,dt,aw_anim_kit_speed,NULL);
+    return frame;
 }
 
 static int holds(const aw_voice_line_t *l,int speaker,int player,int r) {
@@ -231,6 +306,14 @@ static char lazy[MOVERS][AW_ANIM_MOVER_NAME];
 static int lazies;
 static struct {edict_t *e;short base,mover;string_t model;} worn[MOVERS];
 static cvar_t movers_on={"aw_npc_movers","1",true};
+void AW_AnimSceneReset(void) {
+    /* SV_SpawnServer has cleared its precache bank. Mod_FindName may retain
+     * the same world/base-model pointers on a same-map reload; they are not a
+     * scene identity. No old edict or precache name is retained in our tables. */
+    level_world=NULL;used=0;named=0;lazies=0;
+    memset(table,0,sizeof(table));memset(worn,0,sizeof(worn));
+    memset(names,0,sizeof(names));memset(lazy,0,sizeof(lazy));
+}
 static void level_check(void) {
     if(level_world!=sv.worldmodel){
         level_world=sv.worldmodel;used=0;named=0;lazies=0;memset(table,0,sizeof(table));memset(worn,0,sizeof(worn));

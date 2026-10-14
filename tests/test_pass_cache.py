@@ -306,6 +306,25 @@ class PassKeyTests(unittest.TestCase):
         index.entry_digest(ROOT / 'tools' / 'optimize_world_maps.py', 'prepare_candidate')
         key = '%s::prepare_candidate' % (ROOT / 'tools' / 'optimize_world_maps.py').resolve()
         self.assertNotIn('rebind_chim_maps', index._reached[key].get('tools/optimize_world_maps.py', set()))
+        # Classes run on import and are hashed in <top>, not separate units.
+        # Verify the reached unit here and actual rekeying below.
+        key = '%s::_convert_guard' % (ROOT / 'tools' / 'prepare_guard_torches.py').resolve()
+        self.assertIn('<top>', index._reached[key].get('tools/npc_anim.py', set()))
+
+    def test_guard_worker_rekeys_when_shared_bone_layer_changes(self):
+        import build_cache
+        for name in ('prepare_guard_torches.py', 'npc_anim.py'):
+            self.write(name, (ROOT / 'tools' / name).read_text(encoding='utf-8'))
+        script = self.root / 'tools/prepare_guard_torches.py'
+        before, _, uncertain = build_cache.SourceIndex(self.root).entry_digest(script, '_convert_guard')
+        self.assertFalse(uncertain)
+        animation = (self.root / 'tools/npc_anim.py').read_text(encoding='utf-8')
+        line = 'self.mask[name] = name in roots or inherited'
+        self.assertEqual(animation.count(line), 1)
+        self.write('npc_anim.py', animation.replace(line, 'self.mask[name] = name in roots and inherited'))
+        after, _, uncertain = build_cache.SourceIndex(self.root).entry_digest(script, '_convert_guard')
+        self.assertFalse(uncertain)
+        self.assertNotEqual(before, after)
 
 CACHE_MODULE = """def source_digest(*scripts):
     return 'key'

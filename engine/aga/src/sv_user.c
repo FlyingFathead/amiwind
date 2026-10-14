@@ -258,10 +258,9 @@ void SV_WaterMove (void)
 	for (i=0 ; i<3 ; i++)
 		wishvel[i] = forward[i]*cmd.forwardmove + right[i]*cmd.sidemove;
 
-	if (!cmd.forwardmove && !cmd.sidemove && !cmd.upmove)
-		wishvel[2] -= 60;		// drift towards bottom
-	else
-		wishvel[2] += cmd.upmove;
+	/* Keep the existing pitch-directed swim, friction and acceleration. An
+	 * idle swimmer must not receive Quake's artificial downward command. */
+	wishvel[2] += cmd.upmove;
 
 	wishspeed = Length(wishvel);
 	if (wishspeed > sv_maxspeed.value)

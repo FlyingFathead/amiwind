@@ -22,9 +22,120 @@
  *   opens the main menu at once.
  */
 #include <string.h>
+#include <stdint.h>
 #include "aw_view.h"
 
 #define SCALE .25f
+
+int AW_ViewTorchParse(aw_view_torch_t *out,const unsigned char *p,int size,int frames) {
+    int count,i,k;uint32_t value;int32_t signed_value;
+    if(!out)return 0;
+    memset(out,0,sizeof(*out));
+    if(!p || size<8 || memcmp(p,"AWBT",4) || p[6] || p[7])return 0;
+    count=((int)p[4]<<8)|p[5];
+    if(count<1 || count>AW_VIEW_TORCH_FRAMES || count!=frames || size!=8+12*count)return 0;
+    p+=8;
+    for(i=0;i<count;i++)for(k=0;k<3;k++,p+=4){
+        value=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+        signed_value=(int32_t)value;
+        if(signed_value < -8388608 || signed_value>8388608){memset(out,0,sizeof(*out));return 0;}
+        out->point[i][k]=signed_value/65536.0f;
+    }
+    out->count=count;return 1;
+}
+
+static int layer_number(const char **text,int *out) {
+    const char *p=*text;int v=0,n=0;
+    while(*p>='0' && *p<='9'){
+        if(++n>3)return 0;
+        v=v*10+(*p++-'0');
+    }
+    if(!n)return 0;
+    *out=v;*text=p;return 1;
+}
+static int layer_space(char c){return c==' ' || c=='\t' || c=='\n' || c=='\r';}
+int AW_ViewLayersParse(aw_view_layers_t *out,const char *p,int frames) {
+    aw_view_layers_t t;int v[7],i,j,lo=256,seen,actions[5]={0};
+    memset(out,0,sizeof(*out));memset(&t,0,sizeof(t));
+    if(!p || frames<1 || frames>256)return 0;
+    while(*p){
+        while(layer_space(*p))p++;
+        if(!*p)break;
+        if(*p!='$'){while(*p && !layer_space(*p))p++;continue;}
+        p++;
+        for(i=0;i<5;i++){
+            if(!layer_number(&p,&v[i]))return 0;
+            if(i<4){if(*p!=':')return 0;p++;}
+        }
+        v[5]=v[2];
+        if(*p==':'){p++;if(!layer_number(&p,&v[5]))return 0;}
+        v[6]=0;
+        if(*p==':'){p++;if(!layer_number(&p,&v[6]))return 0;}
+        if((*p && !layer_space(*p)) || t.count==AW_VIEW_LAYER_ROWS ||
+           (v[0]!=1 && v[0]!=3 && v[0]!=4) || v[1]>255 || v[2]<1 || v[2]>16 ||
+           v[3]>255 || v[4]<2 || v[4]>8 || v[5]<1 || v[5]>v[2] ||
+           (v[0]==3 ? (v[4]!=3 || v[6]<1 || v[6]>999) : v[6]!=0) ||
+           v[1]+v[2]>v[3] || v[3]+v[5]*v[4]>frames)return 0;
+        t.rows[t.count].action=(unsigned char)v[0];t.rows[t.count].motion=(short)v[1];
+        t.rows[t.count].count=(unsigned char)v[2];t.rows[t.count].base=(short)v[3];
+        t.rows[t.count].phases=(unsigned char)v[4];
+        t.rows[t.count].hit_permille=(unsigned short)v[6];
+        t.rows[t.count++].grid_count=(unsigned char)v[5];if(v[3]<lo)lo=v[3];
+    }
+    if(t.count!=10 && t.count!=AW_VIEW_LAYER_ROWS)return 0;
+    for(i=0;i<t.count;i++)actions[t.rows[i].action]++;
+    if(actions[1]!=5 || actions[4]!=5 || actions[3]!=(t.count==15?5:0))return 0;
+    for(i=0;i<t.count;i++){
+        const aw_view_layer_t *a=&t.rows[i];
+        if(a->motion+a->count>lo)return 0; /* never sample another overlay as legs */
+        seen=0;
+        for(j=0;j<t.count;j++){
+            const aw_view_layer_t *b=&t.rows[j];
+            if(i==j)continue;
+            if(a->base<b->base+b->grid_count*b->phases && b->base<a->base+a->grid_count*a->phases)return 0;
+            if(a->action==b->action && a->motion<b->motion+b->count && b->motion<a->motion+a->count)return 0;
+            if(a->action!=b->action && a->motion==b->motion && a->count==b->count){
+                if(a->action==3 || b->action==3)return 0; /* punch follows ready gait */
+                seen++;
+            }
+        }
+        if(seen!=(a->action==3?0:1))return 0;
+    }
+    *out=t;return 1;
+}
+int AW_ViewLayerFrame(const aw_view_layers_t *layers,int action,int motion_frame,float fraction) {
+    int i,phase;
+    if(!layers || layers->count<1 || layers->count>AW_VIEW_LAYER_ROWS ||
+       (action!=1 && action!=3 && action!=4) || !(fraction>=0 && fraction<=1))return -1;
+    for(i=0;i<layers->count;i++){
+        const aw_view_layer_t *r=&layers->rows[i];
+        if(r->action!=action || motion_frame<r->motion || motion_frame>=r->motion+r->count)continue;
+        if(action==3){
+            float hit=r->hit_permille*.001f;
+            phase=fraction<(hit*.5f)?0:fraction<((hit+1)*.5f)?1:2;
+        }else phase=(int)(fraction*(r->phases-1)+.5f);
+        return r->base+phase*r->grid_count+(motion_frame-r->motion)*r->grid_count/r->count;
+    }
+    return -1;
+}
+
+int AW_ViewLayersBind(const aw_view_layers_t *layers,const aw_anim_t *anim) {
+    static const int normal[5]={AW_ANIM_IDLE,AW_ANIM_WALK,AW_ANIM_RUN,AW_ANIM_JUMP,AW_ANIM_LAND};
+    static const int ready[5]={AW_ANIM_READY,AW_ANIM_READYWALK,AW_ANIM_READYRUN,
+                               AW_ANIM_READYJUMP,AW_ANIM_READYLAND};
+    int i,j;
+    if(!layers || !anim || (layers->count!=10 && layers->count!=15))return 0;
+    for(i=0;i<layers->count;i++){
+        const aw_view_layer_t *row=&layers->rows[i];
+        const int *groups=row->action==3?ready:normal;
+        for(j=0;j<5;j++){
+            const aw_anim_group_t *g=&anim->g[groups[j]];
+            if(g->present && g->base==row->motion && g->count==row->count)break;
+        }
+        if(j==5)return 0;
+    }
+    return 1;
+}
 
 void AW_ViewRulesDefault(aw_view_rules_t *r) {
     r->switch_limit=.25f;

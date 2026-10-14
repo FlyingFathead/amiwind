@@ -8,11 +8,11 @@ double host_frametime;
 static byte base[768], output[768];
 byte *host_basepal=base;
 static int reads;
-static byte menu[768];static int menu_active;
+static byte menu[768];static int menu_active,scene_menu;
 static int frozen,shifts;
 int AW_LoadingFrozen(void){return frozen;}
 byte *AW_MoviePalette(void){return NULL;}
-byte *AW_UIMenuPalette(void){return menu_active?menu:NULL;}
+byte *AW_UIMenuPalette(void){return scene_menu?base:menu_active?menu:NULL;}
 int MSG_ReadByte(void){return reads++ ? 40 : 0;}
 float MSG_ReadCoord(void){return 0;}
 void VID_ShiftPalette(unsigned char *pal){memcpy(output,pal,768);shifts++;}
@@ -57,6 +57,12 @@ int main(void) {
  /* Lava: the blood-red contents shift replaces id's orange preset; green and blue fall far below red. */
  V_SetContentsColor(CONTENTS_LAVA);V_UpdatePalette();
  assert(cl.cshifts[CSHIFT_CONTENTS].destcolor[0]==128 && cl.cshifts[CSHIFT_CONTENTS].destcolor[1]==4);
+ assert(output[0]>output[1]+40 && output[1]==output[2]);
+ /* The death prompt and the world share the same base palette pointer.
+  * Changing only UI ownership must remove and restore the contents tint. */
+ scene_menu=1;V_UpdatePalette();
+ assert(output[0]==128 && output[1]==128 && output[2]==128);
+ scene_menu=0;V_UpdatePalette();
  assert(output[0]>output[1]+40 && output[1]==output[2]);
  V_SetContentsColor(CONTENTS_EMPTY);V_UpdatePalette();
  assert(output[0]==128 && output[1]==128 && output[2]==128);

@@ -256,10 +256,32 @@ int AW_SaveRead(uint32_t profile,int slot)
     snprintf(map,sizeof(map),"map %s\n",candidate.scene);Cbuf_InsertText(map);return 1;
 }
 void AW_SaveSchedule(void){if(aw_story.stage==AW_STAGE_RELEASED){scheduled=1;settle=realtime+3;}}
+int AW_PlayerInCombat(void);
+static int autosave_safe(void)
+{
+    edict_t *p;
+    if(!AW_SaveAllowed() || cls.state!=ca_connected || cls.signon!=SIGNONS ||
+       key_dest!=key_game || sv.paused || AW_ModalWorldFrozen() || AW_LoadingScreen() ||
+       AW_PhotoModeActive() || AW_PlayerInCombat())return 0;
+    p=svs.clients[0].edict;
+    /* Use the same ground/liquid state maintained by Quake's player physics.
+     * Being alive is insufficient: a falling or burning save can be lethal
+     * on every reload. Keep the previous safe generation in those states. */
+    return ((int)p->v.flags&FL_ONGROUND) && p->v.waterlevel<2 &&
+        (p->v.waterlevel==0 || p->v.watertype==CONTENTS_WATER) &&
+        fabs(p->v.velocity[2])<1;
+}
 void AW_SaveTick(void)
 {
     int n,slot;aw_save_t info;uint32_t oldest=0xffffffffU;
-    if(!AW_SaveAllowed() || key_dest!=key_game || sv.paused || !AW_AutosaveCount())return;
+    if(!AW_AutosaveCount())return;
+    if(!scheduled && realtime-last_auto<300)return;
+    if(!autosave_safe()){
+        /* Loading/menu time and time spent falling into danger do not count
+         * towards the three seconds of settled arrival needed for a save. */
+        if(scheduled)settle=realtime+3;
+        return;
+    }
     if(!scheduled && realtime-last_auto>=300)AW_SaveSchedule();
     if(!scheduled || realtime<settle || AW_SpeechRemaining()>0)return;
     slot=5;

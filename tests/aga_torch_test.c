@@ -9,6 +9,8 @@ qboolean r_fov_greater_than_90;keydest_t key_dest;int r_framecount;
 byte *host_basepal;
 static edict_t player;static client_t client;
 static eval_t goal,state,torch;static int gallery,locked,torch_test;
+static int player_emitter_clear;
+static int player_emitter(vec3_t out){out[0]=12;out[1]=34;out[2]=56;return player_emitter_clear;}
 static void (*command)(void);
 static cvar_t *radius_setting,*flame_setting;
 static int setting_argc=1;static char *setting_value="";
@@ -131,6 +133,11 @@ int main(void)
     state._float=2;r_refdef.vieworg[2]=24;AW_TorchUpdate();assert(lights()==1);
     light=torchlight();assert(light && light->radius>=141 && light->radius<=148);
     assert(light->origin[2]==24 && light->minlight==16 && light->die>cl.time && light->decay==0);
+    aw_view_torch_light=player_emitter;player_emitter_clear=1;AW_TorchUpdate();
+    assert(torchlight()==light && lights()==1 && light->origin[0]==12 && light->origin[1]==34 && light->origin[2]==56);
+    player_emitter_clear=0;AW_TorchUpdate();
+    assert(torchlight()==light && light->origin[2]==24); /* blocked tip keeps the safe eye light */
+    aw_view_torch_light=NULL;
     AW_TorchViewModel();assert(cl.viewent.model==&torch_model && cl.viewent.frame==AW_TorchFrame());
     for(i=0;i<10000;i++){cl.time=i*.007;assert(AW_TorchFrame()>=0 && AW_TorchFrame()<8);}
     cl.time=1;

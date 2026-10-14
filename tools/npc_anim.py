@@ -61,7 +61,19 @@ GROUPS = {
     # walk-right loops sampled in place; the combat code moves the actor sideways through collision.
     'dodgel': ('walkleft: loop start', 'walkleft: loop stop', 'once', True),
     'dodger': ('walkright: loop start', 'walkright: loop stop', 'once', True),
+    # Player jump sections. The owned human/beast loop markers coincide:
+    # takeoff holds loop start until contact, then landing plays to stop.
+    'jump': ('jump: start', 'jump: loop start', 'hold', False),
+    'land': ('jump: loop stop', 'jump: stop', 'hold', False),
+    # The player's hand-to-hand stance has its own authored locomotion. Keep
+    # the complete moving pose; a standing upper-body pose cannot replace it.
+    'ready': ('idlehh: start', 'idlehh: stop', 'loop', False),
+    'readywalk': ('walkforwardhh: loop start', 'walkforwardhh: loop stop', 'loop', True),
+    'readyrun': ('runforwardhh: loop start', 'runforwardhh: loop stop', 'loop', True),
+    'readyjump': ('jumphh: start', 'jumphh: loop start', 'hold', False),
+    'readyland': ('jumphh: loop stop', 'jumphh: stop', 'hold', False),
 }
+AIR_GROUPS = ('jump', 'land', 'readyjump', 'readyland')
 ATTACK_HIT = 'handtohand: chop hit'
 BLOCK_HIT = 'shield: block hit'
 # Sound events an NPC uses (OpenMW Npc::getSoundIdFromSndGen: NPCs ignore
@@ -120,15 +132,69 @@ class KitSkeleton:
         return world
 
 
-def _window(skeleton, group):
+class BoneLayer:
+    """Offline local-bone overlay, keeping the underlying pose outside a mask.
+
+    This is the guard torch's left-clavicle method generalized to other masks
+    (for example Bip01 Spine1 for equip/lower). It only bakes alias vertices;
+    no skeletal evaluation is added to the engine. `normal` is a world-pose
+    callable, so a female override's different file root remains untouched.
+    """
+
+    def __init__(self, skeleton, roots):
+        self.skeleton = skeleton
+        roots = frozenset(name.casefold() for name in roots)
+        if not roots or not roots <= skeleton.nodes.keys():
+            raise ValueError('Missing animation layer root')
+        self.mask = {}
+        active = set()
+
+        def includes(name):
+            if name not in self.mask:
+                if name in active:
+                    raise ValueError('Cyclic animation layer hierarchy')
+                if name not in skeleton.parents:
+                    raise ValueError('Missing animation layer parent: ' + name)
+                active.add(name)
+                parent = skeleton.parents[name]
+                inherited = includes(parent) if parent else False
+                self.mask[name] = name in roots or inherited
+                active.remove(name)
+            return self.mask[name]
+        for name in skeleton.nodes:
+            includes(name)
+
+    def pose(self, normal, time):
+        if not np.isfinite(time):
+            raise ValueError('Non-finite animation layer time')
+        matrices = {}
+
+        def world(name):
+            name = name.casefold()
+            if name not in matrices:
+                if self.mask.get(name, False):
+                    parent = self.skeleton.parents[name]
+                    matrices[name] = self.skeleton.local(name, time) @ (world(parent) if parent else np.eye(4))
+                else:
+                    # At the mask boundary retain the entire underlying world
+                    # matrix, not the layer skeleton's file-root transform.
+                    matrices[name] = normal(name)
+            return matrices[name]
+        return world
+
+
+def _window(skeleton, group, attack_stance=None):
     start, stop, _, _ = GROUPS[group]
+    if group == 'attack' and attack_stance:
+        start = attack_stance + ': chop start'
+        stop = attack_stance + ': chop large follow stop'
     ev = skeleton.events
     if start in ev and stop in ev and ev[stop] > ev[start]:
         return ev[start], ev[stop]
     return None
 
 
-def plan(base, profile, female=None, weight=1.0):
+def plan(base, profile, female=None, weight=1.0, attack_stance=None):
     """Sample plan for one skeleton and profile.
 
     base: npc_geometry.Skeleton of the actor's skeleton file; female: the female
@@ -137,6 +203,8 @@ def plan(base, profile, female=None, weight=1.0):
     loops), hit (attack), events [(offset, event)], source ('base'|'female'|
     'idle' when the skeleton lacks the group and idle frames stand in)."""
     idle = _window(base, 'idle')
+    if attack_stance not in (None, 'weapontwowide'):
+        raise ValueError('Unsupported resident attack stance')
     if idle is None:
         raise ValueError('Skeleton has no idle group')
     root_xy = base.local(ROOT_BONE, idle[0])[3, :2].copy() if ROOT_BONE in base.nodes else None
@@ -145,9 +213,11 @@ def plan(base, profile, female=None, weight=1.0):
         count = int(count)
         kind, moves = GROUPS[name][2], GROUPS[name][3]
         skeleton, source = base, 'base'
-        if female is not None and _window(female, name) is not None:
+        if female is not None and _window(female, name, attack_stance) is not None:
             skeleton, source = female, 'female'
-        window = _window(skeleton, name)
+        window = _window(skeleton, name, attack_stance)
+        if name == 'attack' and attack_stance and window is None:
+            raise ValueError('Missing authored resident attack stance: ' + attack_stance)
         entry = {'name': name, 'base': len(samples), 'count': count, 'kind': kind, 'source': source, 'events': []}
         if window is None:
             # A missing group repeats the idle start (OpenMW falls back to idle).
@@ -168,7 +238,8 @@ def plan(base, profile, female=None, weight=1.0):
                 yb = skeleton.local(ROOT_BONE, b)[3, :2]
                 entry['speed'] = float(np.linalg.norm(yb - ya) / (b - a) * SCALE * weight)
             if name in ('attack', 'block'):
-                hit = skeleton.events.get(ATTACK_HIT if name == 'attack' else BLOCK_HIT)
+                hit = skeleton.events.get((attack_stance + ': chop hit' if attack_stance else ATTACK_HIT)
+                                          if name == 'attack' else BLOCK_HIT)
                 entry['hit'] = (hit - a) / (b - a) if hit is not None and a <= hit <= b else .5
             for t, line in skeleton.keys:
                 if not a <= t < b + 1e-6:
@@ -193,6 +264,79 @@ def plan(base, profile, female=None, weight=1.0):
 def idle_compatible_times(groups):
     """Times for assemble(): sample indices."""
     return np.arange(sum(g['count'] for g in groups), dtype=float)
+
+
+PLAYER_LAYER_MOTION = ('idle', 'walk', 'run', 'jump', 'land')
+PLAYER_READY_MOTION = ('ready', 'readywalk', 'readyrun', 'readyjump', 'readyland')
+PLAYER_LAYER_ACTIONS = ((1, 'draw', 'equip'), (4, 'lower', 'unequip'))
+PLAYER_COMPACT_ACTIONS = ((1, 'draw', 'equip'), (4, 'lower', 'unequip'), (3, 'punch', 'chop'))
+
+
+class PlayerLayerSkeleton:
+    """Prebaked movement x arm-phase grid; the runtime still selects one alias frame."""
+    def __init__(self, normal, samples):
+        self.N = normal.N
+        self.normal = normal
+        self.samples = samples
+        self.layer = BoneLayer(normal.base, ('bip01 spine1',))
+
+    def pose(self, index):
+        motion, time = self.samples[int(index)]
+        normal = self.normal.pose(motion)
+        return normal if time is None else self.layer.pose(normal, time)
+
+
+def player_layers(normal, groups, phases=3, compact=False):
+    """Append original bare-hand draw/lower over each normal movement pose.
+
+    Both arm endpoints are retained. QuakeC owns the elapsed action fraction;
+    movement uses its own advancing frame, including takeoff/landing. No root
+    motion, legs, collision or first-person timing is replaced by the overlay.
+    """
+    if not 2 <= phases <= 8:
+        raise ValueError('Player layer needs 2..8 arm phases')
+    by_name = {g['name']: g for g in groups}
+    required = PLAYER_LAYER_MOTION + (PLAYER_READY_MOTION if compact else ())
+    if any(n not in by_name or by_name[n]['source'] == 'idle' for n in required):
+        raise ValueError('Player layer missing original movement section')
+    samples = [(i, None) for i in range(sum(g['count'] for g in groups))]
+    out = list(groups)
+    for action, name, section in (PLAYER_COMPACT_ACTIONS if compact else PLAYER_LAYER_ACTIONS):
+        ev = normal.base.events
+        stop = 'handtohand: chop large follow stop' if action == 3 else 'handtohand: ' + section + ' stop'
+        a, b = ev.get('handtohand: ' + section + ' start'), ev.get(stop)
+        if a is None or b is None or not np.isfinite((a, b)).all() or not 0 < b-a <= 60:
+            raise ValueError('Missing or invalid original handtohand ' + section)
+        hit = ev.get(ATTACK_HIT) if action == 3 else None
+        if action == 3 and (hit is None or not a < hit < b):
+            raise ValueError('Missing or invalid original handtohand chop hit')
+        arm_times = (a, hit, b) if action == 3 else ((a, b) if compact else np.linspace(a, b, phases))
+        for motion in (PLAYER_READY_MOTION if action == 3 else PLAYER_LAYER_MOTION):
+            g = by_name[motion]
+            motion_samples = (min(2, g['count']) if motion in ('walk', 'run', 'readywalk', 'readyrun') else 1) if compact else g['count']
+            motion_indices = [i*g['count']//motion_samples for i in range(motion_samples)]
+            out.append(dict(name=name+'_'+motion, base=len(samples), count=len(arm_times)*motion_samples,
+                            kind='hold', step=(b-a)/(len(arm_times)-1), source='base-layer', events=[],
+                            layer_action=action, motion_name=motion, motion_count=motion_samples,
+                            phases=len(arm_times), compact_grid=compact,
+                            hit_permille=round(1000*(hit-a)/(b-a)) if action == 3 else None))
+            samples.extend((g['base']+i, float(t)) for t in arm_times for i in motion_indices)
+    return PlayerLayerSkeleton(normal, samples), out
+
+
+def player_layout(groups):
+    """Normal ANM words plus body-only $action:motion_base:count:grid_base:phases."""
+    base = [g for g in groups if 'layer_action' not in g]
+    by_name = {g['name']: g for g in base}
+    words = [layout(base).strip()]
+    for g in groups:
+        if 'layer_action' in g:
+            motion = by_name[g['motion_name']]
+            words.append('$%d:%d:%d:%d:%d%s%s' % (g['layer_action'], motion['base'],
+                         motion['count'], g['base'], g['phases'],
+                         ':' + str(g['motion_count']) if g.get('compact_grid') else '',
+                         ':' + str(g['hit_permille']) if g.get('hit_permille') is not None else ''))
+    return ' '.join(words)
 
 
 def _gmst(kinds, name, default):
@@ -374,6 +518,10 @@ ALIAS_BYTE_BUDGET = 512 * 1024      # the engine's alias stream staging limit (m
 MOVER_SUFFIX = '_m'
 
 
+class AliasBudgetError(ValueError):
+    """Even the minimum animation frames exceed the model byte budget."""
+
+
 def split_profile(name):
     """'react+full' -> ('react', 'full'): standing model and mover model; 'react' -> ('react', None)."""
     standing, _, mover = name.partition('+')
@@ -416,6 +564,10 @@ def select(groups, keep):
             picks = [int(i * c // k) for i in range(k)]
         k = len(picks)
         n = dict(g, base=len(index), count=k, step=g['step'] * c / k)
+        if g['name'] in AIR_GROUPS:
+            # These endpoint-sampled sections retain their authored duration.
+            # The existing death/other-group timing policy is unchanged.
+            n['step'] = g['step'] * (c - 1) / max(1, k - 1)
         n['events'] = [(min(k - 1, int(off * k // c)), e) for off, e in g['events']]
         index.extend(g['base'] + p for p in picks)
         out.append(n)
@@ -425,14 +577,84 @@ def select(groups, keep):
 def fit(groups, vertices, triangles, skin_width, skin_height, budget=ALIAS_BYTE_BUDGET):
     """Fewer frames until the model fits the byte budget: idle stays whole; the largest other group loses a
     frame first (loops keep 2, others 1). Returns (groups, frame indices) as select()."""
+    if any('layer_action' in g for g in groups):
+        return fit_player_layers(groups, vertices, triangles, skin_width, skin_height, budget)
     keep = {g['name']: g['count'] for g in groups}
     floor = {g['name']: (g['count'] if g['name'] == 'idle' else 2 if g['kind'] == 'loop' else 1) for g in groups}
+    for name in AIR_GROUPS:
+        if name in keep:
+            floor[name] = min(2, keep[name])   # preserve takeoff/landing endpoints
     while alias_bytes(sum(keep.values()), vertices, triangles, skin_width, skin_height) > budget:
         name = max((n for n in keep if keep[n] > floor[n]), key=lambda n: (keep[n], n), default=None)
         if name is None:
-            raise ValueError('Alias byte budget exceeded even at the smallest frame counts')
+            raise AliasBudgetError('Alias byte budget exceeded even at the smallest frame counts')
         keep[name] -= 1
     return select(groups, keep)
+
+
+def fit_player_layers(groups, vertices, triangles, skin_width, skin_height, budget):
+    """Reduce grid dimensions, never flatten/resample across movement/arm rows."""
+    base = [g for g in groups if 'layer_action' not in g]
+    overlays = [g for g in groups if 'layer_action' in g]
+    by_name = {g['name']: g for g in base}
+    if overlays and all(g.get('compact_grid') for g in overlays):
+        keep = {g['name']: g['count'] for g in base}
+        floor = {g['name']: g['count'] for g in base}
+        for name, minimum in (('hit', 1), ('death', 2), ('block', 2), ('jump', 2),
+                              ('land', 2), ('readyjump', 2), ('readyland', 2), ('ready', 6)):
+            if name in floor:
+                floor[name] = min(floor[name], minimum)
+        # The ordinary and ready gait loops keep every authored sample. The
+        # transient draw/lower/punch grids have their own small leg sample count.
+        def count():
+            return sum(keep.values()) + sum(g['count'] for g in overlays)
+        def fits():
+            nf = count()
+            return (nf <= 256 and nf*frame_bytes(vertices) <= 64*(28+4*1999)
+                    and alias_bytes(nf, vertices, triangles, skin_width, skin_height) <= budget)
+        for name in ('hit', 'death', 'block', 'jump', 'land', 'readyjump', 'readyland', 'ready'):
+            while not fits() and name in keep and keep[name] > floor[name]:
+                keep[name] -= 1
+        if not fits():
+            raise AliasBudgetError('Player body exceeds alias budget with full normal and ready gait')
+        fitted, index = select(base, keep)
+        for g in overlays:
+            fitted.append(dict(g, base=len(index)))
+            index.extend(range(g['base'], g['base']+g['count']))
+        return fitted, index
+    keep = {g['name']: g['count'] for g in base}
+    floor = {g['name']: (g['count'] if g['name'] == 'idle' else
+                       min(2, g['count']) if g['kind'] == 'loop' or g['name'] in AIR_GROUPS else 1) for g in base}
+    phases = {g['layer_action']: g['phases'] for g in overlays}
+    def count():
+        return sum(keep.values()) + sum(keep[g['motion_name']]*phases[g['layer_action']] for g in overlays)
+    def fits():
+        nf = count()
+        return (nf <= 256 and nf*frame_bytes(vertices) <= 64*(28+4*1999)
+                and alias_bytes(nf, vertices, triangles, skin_width, skin_height) <= budget)
+    while not fits():
+        # Choose the dimension that saves most frames. Preserve two arm
+        # endpoints and each movement's normal floor; fail if those cannot fit.
+        choices = [(1+sum(phases[g['layer_action']] for g in overlays if g['motion_name']==name),
+                    'motion', name) for name in keep if keep[name] > floor[name]]
+        choices += [(sum(keep[g['motion_name']] for g in overlays if g['layer_action']==action),
+                     'arm', action) for action in phases if phases[action] > 2]
+        if not choices:
+            raise AliasBudgetError('Player layers exceed alias budget at minimum movement and arm phases')
+        _, kind, name = max(choices, key=lambda x:(x[0], x[1], str(x[2])))
+        (keep if kind == 'motion' else phases)[name] -= 1
+    fitted, index = select(base, keep)
+    motion_indices = {g['name']: [i-by_name[g['name']]['base'] for i in index[g['base']:g['base']+g['count']]]
+                      for g in fitted}
+    for g in overlays:
+        steps = phases[g['layer_action']]
+        arm_indices = sorted({int(round(x)) for x in np.linspace(0, g['phases']-1, steps)})
+        picks = [g['base'] + arm*g['motion_count'] + motion for arm in arm_indices
+                 for motion in motion_indices[g['motion_name']]]
+        fitted.append(dict(g, base=len(index), count=len(picks), phases=steps,
+                           motion_count=keep[g['motion_name']], step=g['step']*(g['phases']-1)/(steps-1)))
+        index.extend(picks)
+    return fitted, index
 
 
 def mover_path(model):
