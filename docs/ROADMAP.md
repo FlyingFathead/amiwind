@@ -1,17 +1,18 @@
 # Roadmap and implementation options
 
-Release preparation, 15 October 2026: the v0.0.40 source update uses the
-published v0.0.39 main HEAD as its baseline. The earlier combined world failed
-six ownership checks. A source repair passed focused and full-suite checks;
-the successor world is still being checked. Complete CHIM rings 0, 1 and 2,
-original-cell ownership, actor contact, reference accounting and visual/collision
-seams remain required alongside gameplay repairs. See the
-[final release preparation](RELEASE-v0.0.40.md) and
-[boundary dependencies](bugs/CHIM-FRAME-DEPENDENCY-OWNERSHIP-40.md).
+[CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.41 candidate - visibility aprons, 15 October 2026](#v0041-candidate---visibility-aprons-15-october-2026)
+- [v0.0.41 candidate - window support, 15 October 2026](#v0041-candidate---window-support-15-october-2026)
+- [v0.0.41 candidate - lava coverage, 15 October 2026](#v0041-candidate---lava-coverage-15-october-2026)
+- [Compiled apron selection, 15 October 2026](#compiled-apron-selection-15-october-2026)
+- [Paired boundary validation, 15 October 2026](#paired-boundary-validation-15-october-2026)
+- [Owner apron follow-up, 15 October 2026](#owner-apron-follow-up-15-october-2026)
+- [Combined-world gate update, 15 October 2026](#combined-world-gate-update-15-october-2026)
+- [v0.0.41-dev1: ring3 feasibility after v0.0.40 delivery](#v0041-dev1-ring3-feasibility-after-v0040-delivery)
 - [v0.0.40 release scope - 15 October 2026](#v0040-release-scope---15-october-2026)
 - [v0.0.40-dev1 gameplay priority, 14 October 2026](#v0040-dev1-gameplay-priority-14-october-2026)
 - [Additional RC1 inspection findings, 13 October 2026](#additional-rc1-inspection-findings-13-october-2026)
@@ -176,6 +177,197 @@ seams remain required alongside gameplay repairs. See the
 
 <!-- contents end -->
 
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1: whole-world metadata binding failed because tutorial barrel reference 172851 lacked its original CELL, while the original audit records [-2,-9]. A narrow source correction restores only that missing field before capture, rejecting nonempty wrong cells and every other identity/transform mismatch. Fifty focused Seyda/ownership checks pass, including three new semantic regressions. The preceding 4,247-test full-suite pass remains historical; the repaired world is pending. The prepared Linux source kit is held and undelivered. Native, image/package and playtest acceptance remain pending; coverage states are unchanged.
+
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1 image integration follow-up: added Seyda dependency numbers and model digests are checked against the world-index-bound source manifest before source-carrier static parity includes them. Frames without supplements retain prior behavior. The focused ownership/apron module now passes 33 checks, including five new semantic regressions and missing/rebound-model rejection. The issue remains OPEN; exact world rebuild, held-boundary/native and image/package checks remain pending.
+
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1: a source repair supplements only missing Seyda apron dependencies using the included original-cell owner's exact compiled mesh and textures, preserving original identity and unique ownership while translating frame-local origins. It targets rock reference 251397 and shell reference 461804; 32 focused ownership/apron checks pass. The rebuilt world and held boundary/native checks remain pending. Separately, independent normal interior/actor/UI conversion completed 2,451 files with unchanged source and inputs; it is not image, native or package acceptance. CHIM coverage states are unchanged. Earlier full-suite and world results remain bound to their preceding source; changed apron acceptance is pending.
+
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1: exact source validation completed 4,242 tests (4,236 passed, three Windows-only skips and three Census expected failures), with zero failures/errors; the matching engine compiled. The completed 369-frame world passed structural/source, modeled heap, host zone-walk and scoped stair gates. Of 547 boundary comparisons, 544 measured agreement and three remain held (237, 241, 242). Of 36 sampled models, 22 have matching face counts and unique face correspondence; 14 differ in collision-only versus visual representation and require payload/sprite/native review. These measurements do not establish visual severity or universal equivalence. Native captures, independent interior conversion, image assembly/readback and package acceptance remain pending; coverage states are unchanged. Stair evidence retains 15,348 advisory findings despite zero blocking failures.
+
+15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See the [current development candidate](RELEASE-v0.0.41-dev1.md).
+
+[BUILD-INVENTORY-PALETTE-41](bugs/BUILD-INVENTORY-PALETTE-41.md) — 15 October 2026, v0.0.41 source candidate: image assembly prepares inventory before the sky palette pass, which rejected current AWIC icons and AWI2/AWST metadata as unknown images. The source repair validates each inventory format at its exact path, remaps only icon pixels and preserves metadata bytes. Scoped evidence contains 15 passing palette checks and 2 passing inventory-asset checks on matching unchanged source. Actual image assembly, native verification, packaging and shipment remain pending.
+
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or owner acceptance is promoted.
+
+[CHIM-MODEL-ARENA-RESERVE-41](bugs/CHIM-MODEL-ARENA-RESERVE-41.md) — 15 October 2026: exact allocation and predecessor-world checks remain separately recorded. The later 941 world stopped at its ownership guard because named aprons bypassed ten existing deferred-owner dispositions. The source-only disposition repair passes 38 focused checks; fresh world, boundary/model review and native/package acceptance remain pending.
+
+[CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) — 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
+
+15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
+
+## v0.0.41 candidate - visibility aprons, 15 October 2026
+
+[CHIM-VISIBILITY-APRON-SCOPE-41](bugs/CHIM-VISIBILITY-APRON-SCOPE-41.md) - The combined world stopped at Tel Uvirith, original cell (10, 1), because
+its approved fixed stronghold snapshot required a source radius of zero.
+Regional frames now audit neighbouring cells for separate aprons. The repair
+keeps visibility snapshots bound to each original cell across all frames that
+audit it. Unknown scripts and unaudited references remain visible. Runtime
+quest progression is still deferred; complete conversion and native/package
+acceptance remain pending. Coverage counts are unchanged.
+
+## v0.0.41 candidate - window support, 15 October 2026
+
+[CHIM-WINDOW-TOWER-SUPPORT-41](bugs/CHIM-WINDOW-TOWER-SUPPORT-41.md) - The combined v0.0.41 world build stopped while mounting four Nordic windows
+from original cell (7, 22) into the adjacent frame apron. Their supporting
+thatched tower was present, but the facade search accepted only model names
+containing "house". Exact source triangles support all four windows under the
+existing distance and outward-normal checks.
+
+The candidate recognizes the original thatched-tower model in both local and
+neighbouring facade searches. It keeps original reference ownership, geometry,
+collision, mounting range and clearance. Arbitrary props are still rejected.
+The failing build is preserved; complete conversion, native comparison and
+fresh package readback remain pending. Coverage counts are not promoted.
+
+
+15 October 2026, v0.0.41 candidate: 50 focused lava/polygon/terrain checks
+and 47 emulator preset/launcher checks pass. Both original failing chunks pass
+coverage against the unchanged cached geometry. Full combined-world, exact
+source suite, native, package and shipment checks remain pending.
+
+## v0.0.41 candidate - lava coverage, 15 October 2026
+
+[CHIM-LAVA-DUPLICATE-VERTEX-40](bugs/CHIM-LAVA-DUPLICATE-VERTEX-40.md) - The v0.0.40 combined-world build stopped on two chunks in cell (2, -2).
+Readback of the exact cached units found five affected coverage samples:
+each has one lava surface and lava contents (-5) at the required depth.
+A tiny edge collapses to identical adjacent vertices when the chunk is
+translated into float32 frame coordinates. The polygon test mistook this
+zero-length edge for a boundary through every sample.
+
+The v0.0.41 candidate skips only exactly identical adjacent XY vertices.
+It preserves edge ambiguity, outside rejection and empty/degenerate rejection;
+no geometry, collision, pool height, tolerance or engine format is changed.
+Full-world validation, native checks, fresh package readback and delivery
+remain separate and pending. No coverage count is promoted.
+
+## Compiled apron selection, 15 October 2026
+
+CHIM-FRAME-STATIC-SEAM-40 — The full combined conversion found a conservative
+source box overlapping an apron although the compiled rock footprint ends
+0.83 game units outside it. The selection now records and excludes only external
+references whose compiled pieces all miss that apron. Owned originals, reaching
+pieces and missing-piece failures remain protected. The original reference and
+compiled boxes remain in the source receipt. All 68 focused checks pass.
+The preceding source passed 4,218 tests: 4,212 passed, three Windows checks
+skipped and three tracked Census cases were expected failures. The later source
+requires its own full suite and combined validation. Native, package and shipment
+acceptance remain pending; no converted or accepted coverage count is promoted.
+
+[Canonical report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+## Paired boundary validation, 15 October 2026
+
+CHIM-FRAME-STATIC-SEAM-40 — The latest v0.0.40 paired conversion passes structural, heap, zone-walk and
+stair validation. The 3,836 tested steps and ramps pass; 610 advisory results
+remain recorded. Across 2,816 paired positions, full-static support states agree
+and the maximum supported-height difference is 0.000077 game units. Terrain,
+water and common standing-hull controls agree. The complete 369-frame successor
+is being built from the same converter source; its acceptance remains pending.
+The exact source full suite is running. Native gameplay, other boundary segments,
+fresh package readback and shipment remain separate unfinished gates.
+
+[Canonical report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+Release preparation, 15 October 2026: all 369 combined candidate frames pass
+conversion and structural, heap, zone-walk and stair validation. A later
+combined ownership failure keeps the candidate held; corrected compiled-world,
+native and package acceptance remain pending. Complete rings 0, 1 and 2, original
+references, actors, horizons and visual/collision seams remain release gates.
+See [release preparation](RELEASE-v0.0.40.md) and
+[the static seam report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+## Owner apron follow-up, 15 October 2026
+
+The source owner check found twelve additional references in the sampled
+regional apron: four placements of the fourth kelp mesh, four objects already
+deferred by Seyda, and four nonsolid grasses represented by existing sprites.
+The successor retains all four original kelp models. Regional aprons now honor
+the included town's exact declared deferrals; nonsolid grasses retain the same
+hash-verified sprite bytes and original transforms instead of duplicate meshes.
+Unrecorded missing owners, changed original identities and corrupt sprite assets
+still fail. The existing ownership validator is unchanged. Forty-seven focused
+checks pass, including serialized ownership and sprite corruption controls.
+
+The earlier authored-collision source passed 4,213 tests: 4,207 passed, three
+Windows-only checks skipped, and three tracked Census expected failures. This
+does not certify the later source. Combined conversion, native seams, gameplay,
+fresh packaging and delivery remain pending; no coverage acceptance is promoted.
+
+[Canonical report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+
+## Combined-world gate update, 15 October 2026
+
+All 369 frames in the combined candidate passed conversion, structural,
+heap, zone-walk and stair validation on 15 October 2026. This establishes a
+conversion result for that exact source, not native or packaged acceptance.
+The initial comparison measured six of 547 original-cell boundary segments:
+five agreed, while southern Seyda between (-2,-12) and (-2,-11) had 477
+full-static support disagreements. Later scoped results are recorded below;
+the remaining 541 segments are unmeasured.
+
+The regional scenery apron first reduced the southern Seyda comparison from
+477 to 69 support-status disagreements. Original reference 463188 had identical
+63 rendered faces but 40 collision hit-presence disagreements in 588 rays:
+the regional path retained the authored RootCollisionNode while the legacy
+Seyda carrier omitted it. A CHIM-only supplement verifies the original NIF and
+visual hashes, preserves carrier bytes and appends the original authored hulls.
+
+The corrected Seyda frame now compiles with zero structural failures and passes
+heap and zone-walk checks. Compared with the repaired regional frame, the same
+boundary has zero full-static support-status disagreements across 2,816 samples
+(5,632 queries); terrain and water controls also agree. Its complete stair gate
+is unfinished: the parallel run exceeded its memory limit and was stopped by
+out-of-memory termination. A passing boundary sample is not a complete stair,
+combined-world, native or package pass.
+
+The combined attempt then stopped at ownership validation before packing:
+original kelp references, including 463098, were omitted from the Seyda frame.
+These references are present in the original source carrier and absent from the
+existing flora sprite receipt; a legacy dressing filter removed them. The next
+source correction retains only the three known original kelp meshes 01/02/03,
+binds additions to the original scenery index and leaves unrelated deferred
+dressing unchanged. All 43 focused Seyda, town and ownership checks pass.
+Compiled verification of this later correction, native checks and packaging
+remain pending. The earlier source's running full suite does not certify it.
+[Static seam](bugs/CHIM-FRAME-STATIC-SEAM-40.md) and
+[boundary ownership](bugs/CHIM-FRAME-DEPENDENCY-OWNERSHIP-40.md).
+
+
+## v0.0.41-dev1: ring3 feasibility after v0.0.40 delivery
+
+Current work remains v0.0.40; no v0.0.41 version switch has begun.
+Begin this expansion after the v0.0.40 playtest and matching source are delivered.
+The 15 October tracker identifies 149 Vvardenfell ring3 cells. Seventeen already
+lie within the current town ownership cores; none is an existing regional core.
+The provisional extension therefore needs 132 regional frames: 129 currently
+eligible by offline status and three held cells. Retaining the current frames
+would give 501 frames before pocket and routing reconciliation. These are
+feasibility counts, not new converted, native-checked or packaged coverage.
+
+| Held ring3 cell | Retained failed checks |
+| --- | --- |
+| Ald Velothi (-11,15) | Hull-chain limit and memory fit; headroom -280,976 bytes |
+| Ald Daedroth (11,20) | Hull-chain limit and memory fit; headroom -206,256 bytes |
+| Tel Mora (13,14) | Memory fit; headroom -2,641,936 bytes |
+
+Reassess those older per-cell findings on the next pinned source. Keep all holds
+explicit; excluding a cell must also pass the enclosed-pocket check. Reuse the
+existing original-cell selection, ownership/dependency records, palette, source
+archives, compiled hulls, shared terrain and far horizon layer. Preserve separate
+aprons and exclude replaced legacy terrain/scenery from compilation and payloads.
+Resolve the current static seam before extending its boundary checks inward.
+
+Across these 149 cells the original-reference accounting includes 8,430 statics,
+4,511 flora, 63 activators, 1,308 containers, 62 doors, 16 items and 318 lights.
+It separately defers 37 NPCs, 455 creature references and 280 meshless lights.
+Flora placements do not by themselves establish their runtime conversion policy.
+Retain original reference types, dependency copies and all unimplemented gameplay.
+Solstheim is outside this ring3 scope. Revalidate compiled contact, memory,
+stairs, horizons and both sides of each handover before native and package gates.
+
 ## v0.0.40 release scope - 15 October 2026
 
 **v0.0.40: Rings 0, 1 and 2 of Vvardenfell in Full CHIM** is the selected title. Rings 0-2
@@ -184,8 +376,9 @@ legacy route except already converted CHIM towns. Door-entered interiors remain
 independent. All 336 ring cells appear in the 435-cell spatial plan; that plan
 is not a package manifest. The combined 369-frame world, preserved horizons,
 original references, deferred features and adjacent visual/collision seams must
-pass their gates before release. The current source suite passes, while the
-combined-world retry is running. See [coverage](chim/CELL_TRACKER.md) and
+pass their gates before release. The combined conversion has passed; the later
+source repair needs its own checks and compiled boundary verification. See
+[coverage](chim/CELL_TRACKER.md) and
 [ownership](bugs/CHIM-FRAME-DEPENDENCY-OWNERSHIP-40.md).
 
 Public gameplay images must be actual AmiWind captures. Original-game reference
@@ -193,7 +386,7 @@ images remain private; the previous exception is removed and the export
 regression passes. See [public image selection](bugs/PUBLIC-REFERENCE-SCREENSHOT-40.md).
 
 
-Current source checkpoint, 15 October 2026: boundary ownership repair passes
+Earlier source checkpoint, 15 October 2026: boundary ownership repair passed
 37 focused checks and the source contract for all 369 frames. Combined-world
 readback, split-model/sprite dependencies, seams, native gameplay and full
 package gates remain pending. Converted, audited, native-checked and packaged

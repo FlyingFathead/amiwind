@@ -223,5 +223,111 @@ class OriginalReferenceMetadataTest(unittest.TestCase):
             self.assertFalse((root/'out').exists())
 
 
+
+
+class AuthoredCollisionSupplement(unittest.TestCase):
+    def test_appended_authored_hull_keeps_carrier_and_visual_bytes(self):
+        import hashlib
+        import tempfile
+        import copy
+        from unittest.mock import patch
+        from mwad.scene import pack_geometry, read_asset
+        import numpy as np
+        from types import SimpleNamespace
+        packet = pack_geometry([(*v, 0., 0., 255, 255, 255, 255)
+                                for v in ((0., 0., 0.), (1., 0., 0.), (0., 1., 0.))],
+                               [(0, 1, 2, 0)], 1)
+        model = {'source': 'meshes/f/rock.nif', 'source_sha256': 'source',
+                 'sha256': 'visual', 'collision': None,
+                 'skipped_shapes': [{'reason': 'collision_node'}]}
+        index = {'models': [model]}; original = copy.deepcopy(index)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); archive = root/'carrier.mwpak'; archive.write_bytes(b'original visual bytes')
+            with patch('mwad.paths.child_ci', return_value=root/'Morrowind.bsa'), \
+                 patch('mwad.audit.BSA', return_value=SimpleNamespace(path='original', entries={model['source']: {}})), \
+                 patch.object(seyda, '_authored_collision_packet', return_value=(packet, [], [[0,0,0],[1,1,0]], [])):
+                args = (root, index, archive, [{'model_index': 0}], root/'work', 1)
+                result, out = seyda.retain_authored_collision(*args)
+                self.assertEqual(index, original)
+                self.assertEqual(archive.read_bytes(), b'original visual bytes')
+                self.assertTrue(out.read_bytes().startswith(archive.read_bytes()))
+                with out.open('rb') as stream:
+                    self.assertEqual(read_asset(stream, result['models'][0]['collision']), packet)
+                self.assertEqual(seyda.retain_authored_collision(*args), (result, out))
+                out.write_bytes(b'corrupt')
+                with self.assertRaisesRegex(ValueError, 'supplement differs'):
+                    seyda.retain_authored_collision(*args)
+
+    def test_source_identity_mismatch_fails_before_output(self):
+        import hashlib
+        from unittest.mock import patch
+        packet = b'visual'
+        model = {'source': 'meshes/f/rock.nif', 'source_sha256': hashlib.sha256(b'original').hexdigest(),
+                 'sha256': hashlib.sha256(packet).hexdigest()}
+        response = (model['source'], b'changed', ((packet, [], [], []), []), (b'collision', [], [], []), None)
+        with patch('prepare_scenery._read_model', return_value=response):
+            with self.assertRaisesRegex(ValueError, 'source differs'):
+                seyda._authored_collision_packet((model, 'source', {}))
+
+
+class OriginalKelpOwnership(unittest.TestCase):
+    def test_kelp_retained_but_other_deferred_dressing_stays_deferred(self):
+        from unittest.mock import patch
+        models = [{'source': name, 'triangles': 20} for name in
+                  ('meshes/f/flora_kelp_01.nif', 'meshes/f/flora_bc_lilypad_01.nif',
+                   'meshes/x/marker_01.nif', 'meshes/f/terrain_rock_bc_14.nif')]
+        refs = [{'number': n+1, 'model_index': n} for n in range(4)]
+        index = {'models': models, 'references': refs}
+        with patch('scenery_selection.select_runtime_refs', return_value=(refs, {'selected_groups': [], 'omitted': []})), \
+             patch('surface_flatten.load_profiles', return_value={}):
+            selected, omitted, _ = seyda.placements(index)
+            self.assertEqual([r['number'] for r in selected], [1, 4])
+            self.assertEqual([r['reference'] for r in omitted['omitted']], [2, 3])
+            self.assertEqual(seyda.check_dressing_additions(index, [1]), [1])
+            for invalid in ([], [1, 1], [2], [1, 4]):
+                with self.assertRaisesRegex(ValueError, 'differ'):
+                    seyda.check_dressing_additions(index, invalid)
+        import chim_town
+        refused, record = chim_town.seyda_static_check({'region': []}, ['region'], [1],
+                                                      {'source_dressing_added': [1]})
+        self.assertEqual(refused, [])
+        self.assertEqual(record['chim_only'], [])
+
+
+
+
+class OpeningOriginalCellTests(unittest.TestCase):
+    def original(self):
+        return dict(number=172851, cell=[-2, -9], id='tutorial barrel', type='CONT',
+                    model='o/barrel.nif', position=[-12000., -71000., 40.],
+                    rotation_radians=[0., 0., 1.], scale=1.)
+
+    def test_missing_cell_is_recovered_before_ownership_capture(self):
+        from chim.ownership import capture
+        authored = self.original()
+        exported = dict(authored, model_index=3, scene_groups=['opening_barrel'])
+        del exported['cell']
+        bound = seyda.opening_reference(exported, authored)
+        self.assertEqual(capture(bound)['_chim_original']['cell'], [-2, -9])
+        self.assertEqual(bound['model_index'], 3)
+        self.assertEqual(bound['scene_groups'], ['opening_barrel'])
+        self.assertNotIn('cell', exported)
+        self.assertEqual(seyda.opening_reference(bound, authored), bound)
+
+    def test_different_originals_and_transforms_are_rejected(self):
+        authored = self.original()
+        for field, value in [('cell', [1, -10]), ('number', 172852),
+                             ('position', [-12001., -71000., 40.]),
+                             ('model', 'o/different.nif'), ('scale', 2.)]:
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ValueError, 'original audit'):
+                    seyda.opening_reference(dict(authored, **{field: value}), authored)
+
+    def test_missing_audited_cell_is_rejected(self):
+        authored = self.original(); authored['cell'] = []
+        with self.assertRaisesRegex(ValueError, 'original audit'):
+            seyda.opening_reference(authored, authored)
+
+
 if __name__ == '__main__':
     unittest.main()

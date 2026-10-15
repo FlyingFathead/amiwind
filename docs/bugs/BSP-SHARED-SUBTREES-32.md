@@ -61,6 +61,7 @@ A test map with shared subtrees for tree-walking tools.
 Family: World storage and duplication (`world-storage`). Every asset stored once and placed by reference (world streamer); map lumps carry only what the engine uses. See [families](README.md#families).
 
 - [CHIM-FRAME-DEPENDENCY-OWNERSHIP-40](CHIM-FRAME-DEPENDENCY-OWNERSHIP-40.md): Boundary scenery dependencies are treated as duplicate frame owners
+- [CHIM-FRAME-STATIC-SEAM-40](CHIM-FRAME-STATIC-SEAM-40.md): Static scenery collision differs across the southern Seyda frame boundary
 - [CONVERT-VARIANTS-32](CONVERT-VARIANTS-32.md): Objects are converted once per mesh, scale and tilt: 4-7 times more models than meshes
 - [INTERIOR-HULLS-HEAVY-32](INTERIOR-HULLS-HEAVY-32.md): Interior collision hulls are bigger than the interior geometry they belong to
 - [MAP-TEXTURE-COPIES-32](MAP-TEXTURE-COPIES-32.md): Every map carries its own copy of every texture it uses

@@ -76,6 +76,7 @@ Family: World storage and duplication (`world-storage`). Every asset stored once
 
 - [BSP-SHARED-SUBTREES-32](BSP-SHARED-SUBTREES-32.md): Converted maps share node subtrees between submodels; naive tree walks explode
 - [CHIM-FRAME-DEPENDENCY-OWNERSHIP-40](CHIM-FRAME-DEPENDENCY-OWNERSHIP-40.md): Boundary scenery dependencies are treated as duplicate frame owners
+- [CHIM-FRAME-STATIC-SEAM-40](CHIM-FRAME-STATIC-SEAM-40.md): Static scenery collision differs across the southern Seyda frame boundary
 - [INTERIOR-HULLS-HEAVY-32](INTERIOR-HULLS-HEAVY-32.md): Interior collision hulls are bigger than the interior geometry they belong to
 - [MAP-TEXTURE-COPIES-32](MAP-TEXTURE-COPIES-32.md): Every map carries its own copy of every texture it uses
 - [REGION-PLACEMENT-FORMS-32](REGION-PLACEMENT-FORMS-32.md): The same placement is stored in different forms from region to region

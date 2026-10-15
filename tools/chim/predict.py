@@ -101,7 +101,7 @@ def fit(worlds, sizes):
                 continue
             lumps = F.read_brush_image(m['image'])
             xs.append(tris[mesh])
-            ys.append(image_bytes(lumps, sizes))
+            ys.append(image_bytes(lumps, sizes, point_hull_only=True))
             refs = F.read_texture_refs(lumps[2])
             tex_per_model.append(sum(texture_bytes(textures[t]['width'], textures[t]['height'], sizes)
                                      for t in refs) / max(1, len(refs)) * min(len(refs), 2))

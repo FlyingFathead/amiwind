@@ -2014,7 +2014,7 @@ int AW_BrushHeader (dheader_t *out, const void *raw, long bytes)
  * are bounded by their lump, which holds each texture once; a malformed lump
  * that overruns its arena stops with an error instead of overwriting memory. */
 #define AW_ARENA16(n) ((((long)(n))+15)&~15L)
-int AW_BrushBound (const dheader_t *h, int texture_refs)
+int AW_BrushBound (const dheader_t *h, int texture_refs, int point_hull_only)
 {
     const lump_t *l = h->lumps;
     long total = 0, n, k;
@@ -2045,7 +2045,11 @@ int AW_BrushBound (const dheader_t *h, int texture_refs)
     /* Nodes: the direct hull-0 attempt (clipnodes + nodes), or after its
      * rollback the full node array plus Mod_MakeHull0's clipnodes. */
     n = l[LUMP_NODES].filelen/(long)sizeof(dnode_t);
-    total += AW_ARENA16 (n*(long)sizeof(dclipnode_t)) + AW_ARENA16 (n*(long)sizeof(mnode_t));
+    total += AW_ARENA16 (n*(long)sizeof(dclipnode_t));
+    /* Placed CHIM models take the unconditional direct hull-0 path in
+     * Mod_LoadNodes: no renderer node array and no fallback allocation. */
+    if (!point_hull_only)
+        total += AW_ARENA16 (n*(long)sizeof(mnode_t));
     return total > INT_MAX ? -1 : (int)total;
 }
 

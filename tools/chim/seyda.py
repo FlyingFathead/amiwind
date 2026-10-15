@@ -141,6 +141,24 @@ def ground_triangles(grids, low, high, canonical=None):
     return out
 
 
+KELP_MESHES = frozenset('meshes/f/flora_kelp_%02d.nif' % i for i in (1, 2, 3, 4))
+
+
+def added_dressing_refs(index, selected):
+    """Original kelp retained in CHIM; these meshes have no flora sprite overlay."""
+    return sorted(r['number'] for r in selected
+                  if index['models'][r['model_index']]['source'].replace(chr(92), '/').casefold() in KELP_MESHES)
+
+
+def check_dressing_additions(index, declared):
+    """Bind the entity-stage parity additions to the same original carrier selection."""
+    selected, _, _ = placements(index)
+    expected = added_dressing_refs(index, selected)
+    if sorted(declared) != expected:
+        raise ValueError('CHIM kelp additions differ from original scenery selection')
+    return expected
+
+
 def placements(index):
     """The bsp stage's placed meshes: (selected references, omitted record, profiles by mesh)."""
     from prepare_mesh_bsp import DRESSING_EXCLUDED
@@ -153,7 +171,7 @@ def placements(index):
     for ref in selected:
         source = index['models'][ref['model_index']]['source']
         term = next((t for t in DRESSING_EXCLUDED if t in source), None)
-        if term:
+        if term and source.replace(chr(92), '/').casefold() not in KELP_MESHES:
             omitted.append({'reference': ref['number'], 'model': source,
                             'reason': 'dressing excluded by the mesh converter (%s)' % term})
         else:
@@ -184,6 +202,22 @@ def ground_textures(town_wad, materials, data=None, palette=None):
         from prepare_world_regions import ground_textures as world_ground
         out.update(world_ground(data, missing, palette))
     return out
+
+
+def opening_reference(ref, audited):
+    """Bind the opening exporter to its exact original CELL before capture.
+
+    Older barrel source indices omit CELL. Recover only that missing field
+    from the original audit; every other identity and transform must agree.
+    """
+    from chim.ownership import original
+    expected = original(audited)
+    actual = original(ref)
+    if not actual['cell']:
+        actual['cell'] = expected['cell']
+    if actual != expected or len(expected['cell']) != 2:
+        raise ValueError('Opening reference differs from original audit')
+    return dict(ref, cell=list(expected['cell']))
 
 
 def opening_barrel(data, work, barrel):
@@ -262,6 +296,79 @@ def write_source_metadata(legacy, work, selected, harvest_set=(), settings=None)
     return receipt, catalogue
 
 
+
+def _authored_collision_packet(task):
+    """Read the same original NIF as the carrier, retaining its authored hull."""
+    import hashlib
+    from prepare_scenery import _read_model
+    model, path, extent = task
+    name, raw, result, collision, error = _read_model((model['source'], path, extent, 'root_node'))
+    if error or collision is None:
+        raise ValueError('Missing authored CHIM collision: %s: %s' % (name, error))
+    if hashlib.sha256(raw).hexdigest() != model['source_sha256'] or \
+            hashlib.sha256(result[0][0]).hexdigest() != model['sha256']:
+        raise ValueError('Authored CHIM collision source differs from scenery: ' + name)
+    return collision
+
+
+def retain_authored_collision(data, index, archive, selected, work, jobs):
+    """Supplement a legacy carrier's omitted RootCollisionNode for CHIM only.
+
+    A source carrier can have exported the visible mesh without its authored
+    collision. Adjacent CHIM frames retain that collision, so the same original
+    reference must do so here too. Original carrier bytes and visual packets
+    remain unchanged; a separate private archive appends only verified hulls.
+    """
+    import copy
+    import hashlib
+    from build_parallel import ordered_map
+    from mwad.audit import BSA
+    from mwad.paths import child_ci, ensure_external
+    from mwad.scene import unpack_geometry
+    used = sorted({r['model_index'] for r in selected})
+    missing = [i for i in used if not index['models'][i].get('collision') and
+               any(s.get('reason') == 'collision_node' for s in index['models'][i].get('skipped_shapes', []))]
+    if not missing:
+        return index, Path(archive)
+    bsa = BSA(child_ci(data, 'Morrowind.bsa'))
+    tasks = [(index['models'][i], bsa.path, bsa.entries[index['models'][i]['source']]) for i in missing]
+    packets = list(ordered_map(_authored_collision_packet, tasks, min(max(1, jobs), len(tasks))))
+    raw = bytearray(Path(archive).read_bytes())
+    base_hash = hashlib.sha256(raw).hexdigest()
+    result = copy.deepcopy(index)
+    appended = []
+    for i, (packet, _, bounds, skipped) in zip(missing, packets):
+        v, faces, _ = unpack_geometry(packet)
+        raw.extend(bytes((-len(raw)) % 512))
+        record = {'source': 'NIF RootCollisionNode', 'bounds': bounds,
+                  'vertices': len(v), 'triangles': len(faces), 'skipped_shapes': skipped,
+                  'offset': len(raw), 'bytes': len(packet), 'sha256': hashlib.sha256(packet).hexdigest()}
+        raw.extend(packet)
+        result['models'][i]['collision'] = record
+        appended.append({'source': result['models'][i]['source'], **record})
+    digest = hashlib.sha256(raw).hexdigest()
+    out = ensure_external(Path(work) / ('authored-collision-' + digest[:16]), 'CHIM authored collision')
+    out.mkdir(parents=True, exist_ok=True)
+    target = out / 'scenery.mwpak'
+    if target.exists():
+        if hashlib.sha256(target.read_bytes()).hexdigest() != digest:
+            raise ValueError('Existing CHIM collision supplement differs')
+    else:
+        with target.open('xb') as stream:
+            stream.write(raw)
+    receipt = {'format': 'aw-chim-authored-collision-1', 'carrier_sha256': base_hash,
+               'archive_sha256': digest, 'models': appended,
+               'scope': 'Original source hulls only; native and package acceptance are separate.'}
+    receipt_path = out / 'source.json'
+    text = json.dumps(receipt, indent=2) + '\n'
+    if receipt_path.exists():
+        if receipt_path.read_text(encoding='utf-8') != text:
+            raise ValueError('Existing CHIM collision supplement receipt differs')
+    else:
+        receipt_path.write_text(text, encoding='utf-8', newline='\n')
+    return result, target
+
+
 def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settings_override, rebuild_meshes,
                  mesh_occluders, harvest_set, flora):
     """Seyda Neen's frame input, source section, parity record and mesh count (chim.build.build_areas)."""
@@ -292,6 +399,8 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
         from chim.ownership import capture
         selected = [capture(r) for r in selected]
     archive = legacy / 'scenery/scenery.mwpak'
+    with timer.section('authored collision source'):
+        index, archive = retain_authored_collision(data, index, archive, selected, work, jobs)
     items = []
     used = list(dict.fromkeys(r['model_index'] for r in selected))
     for mi in used:
@@ -309,7 +418,8 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
     mesh_fps = {mi: fp for mi, (fp, _) in zip(used, items)}
     mount_references(index, selected, prepared, CENTRE, SCALE)
     apply_visual_offsets(index, selected)
-    parity = {'harvest_removed': [], 'town_flora_added': [], 'omitted': omitted['omitted']}
+    parity = {'harvest_removed': [], 'town_flora_added': [], 'omitted': omitted['omitted'],
+              'source_dressing_added': added_dressing_refs(index, selected)}
     # Town flora as the image installs it into the region maps (install_town_flora with the region
     # layout's entries at the town origin): meshes and the solid sprites' collision as placements;
     # the sprites themselves are point entities of the region maps that the frame map carries.
@@ -341,7 +451,10 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
             for (fp, task), result in zip(items, run_units('mesh', items, mesh_unit, jobs, cache)):
                 prepared[added[task[0]]] = result
                 mesh_fps[added[task[0]]] = fp
+            audit = json.loads((legacy / 'work/generated/seyda-neen/placements.json').read_text())
+            originals = {r['number']: r for r in audit}
             for ref in bindex['references']:
+                ref = opening_reference(ref, originals[ref['number']])
                 selected.append(dict(capture(ref), model_index=added[ref['model_index']]))
         parity['opening'] = {'story_hidden': sorted(hidden & {r['number'] for r in selected}),
                              'barrel': barrel['number']}

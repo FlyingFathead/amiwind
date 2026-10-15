@@ -320,14 +320,14 @@
     return out;
   }
   // One zone block for a brush image (chunk terrain or placed model): heap.image_bytes.
-  function imageBytes(lumpLengths, sizes) {
+  function imageBytes(lumpLengths, sizes, pointHullOnly = false) {
     const count = (k, probe) => Math.floor(lumpLengths[k] / sizes[probe]);
     const nodes = count(5, 'dnode');
     const parts = [count(3, 'dvertex') * sizes.mvertex, (count(12, 'dedge') + 1) * sizes.medge,
       count(13, 'int') * sizes.int, lumpLengths[2] ? Math.floor(lumpLengths[2] / 4) * sizes.pointer : 0,
       lumpLengths[8], lumpLengths[4], lumpLengths[0], lumpLengths[9], count(1, 'dplane') * sizes.mplane,
       count(6, 'texinfo') * sizes.mtexinfo, count(7, 'dface') * sizes.msurface, count(11, 'short') * sizes.pointer,
-      count(10, 'dleaf') * sizes.mleaf, count(14, 'dmodel') * sizes.dmodel, nodes * sizes.dclipnode, nodes * sizes.mnode];
+      count(10, 'dleaf') * sizes.mleaf, count(14, 'dmodel') * sizes.dmodel, nodes * sizes.dclipnode, pointHullOnly ? 0 : nodes * sizes.mnode];
     const arena = parts.reduce((s, x) => s + a16(x), 0);
     return sizes.hunk + a16(sizes.model + arena);
   }
@@ -487,7 +487,7 @@
       for (const t of refs) needTextures.add(t);
       const lens = lumps.map(l => l.length);
       models.set(m, {id: m, name: e.name, bytes: e.bytes, render: e.render, image: rec.data, textures: refs,
-        file: idx.files[e.file].path, lump_lengths: lens, heap_bytes: sizes ? imageBytes(lens, sizes) : null});
+        file: idx.files[e.file].path, lump_lengths: lens, heap_bytes: sizes ? imageBytes(lens, sizes, true) : null});
     }
     for (const t of [...needTextures].sort((p, q) => p - q)) {
       const e = idx.textures[t];

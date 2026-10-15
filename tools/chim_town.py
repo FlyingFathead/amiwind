@@ -321,6 +321,8 @@ def seyda_static_check(maps, names, placed, parity):
                if e.get('classname') == 'func_wall' and e.get('model', '').startswith('*')
                and str(e.get('aw_ref', '')).isdigit() and int(e['aw_ref']) < TERRAIN_REF}
     statics |= set(parity.get('town_flora_added') or [])
+    statics |= set(parity.get('source_dressing_added') or [])
+    statics |= set(parity.get('apron_owner_added') or [])
     statics -= set(parity.get('harvest_removed') or [])
     placed = {int(r) for r in placed if str(r).isdigit()}
     maps_only = sorted(statics - placed)
@@ -403,6 +405,18 @@ def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_in
     world, index = frame_world(chim_world, cell)
     placed = chim_placements(chim_world, cell)
     parity = chim_parity(chim_world, SEYDA)
+    from chim.apron_policy import checked_seyda_supplements
+    source = json.loads((chim_world / 'chim-source.json').read_text())
+    section = next(s for s in source.get('frames', [source]) if s['town'] == SEYDA)
+    if section.get('apron_owner_supplements') and source.get('ownership_index_sha256') != hashlib.sha256((chim_world / 'chim/world.cwi').read_bytes()).hexdigest():
+        raise ValueError('Seyda apron source is not bound to this world')
+    parity = dict(parity, apron_owner_added=checked_seyda_supplements(section, placed))
+    if parity.get('source_dressing_added'):
+        from chim.seyda import check_dressing_additions
+        if town_source_index is None:
+            raise ValueError('CHIM kelp additions require their original scenery index')
+        check_dressing_additions(json.loads(Path(town_source_index).read_text(encoding='utf-8')),
+                                 parity['source_dressing_added'])
     refused, statics = seyda_static_check(maps, region_names, placed, parity)
     if statics['chim_only']:       # the town frame holds the whole town: both ways
         refused.append('%d CHIM statics are not in the town (first: %s)'

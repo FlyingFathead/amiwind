@@ -20,10 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-Location correction, 13 October 2026: the inspected cell (10,1) is Tel Uvirith
-at Uvirith's Grave in Molag Amur, not Molag Mar. The established bug ID and
-diagnostic filenames are retained for traceability. This correction does not
-change the issue status or establish package/native acceptance.
+15 October 2026 current checkpoint: 15 October 2026: the complete 369-frame successor passes structural, active-heap, scoped stair and exact 928 zone-recheck gates; 17 serialized actor contacts also pass their scoped check. Model measurements, 14 sprite provenance bindings and nine Vivec boundary findings remain under review. Native and package acceptance remain pending. See [CHIM-MODEL-ARENA-RESERVE-41](CHIM-MODEL-ARENA-RESERVE-41.md#zone-actor-and-model-checkpoint-15-october-2026).
 
 <!-- contents start -->
 ## Contents
@@ -39,6 +36,17 @@ change the issue status or establish package/native acceptance.
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+15 October 2026: complete369-frame successor structural/source and active-heap checks pass after recipe and point-hull allocation repairs. Maximum active heap6,072,752 of6,242,304bytes. Scoped369-frame stair gate also passes with14,960advisory failures retained. Updated zone recheck, actor/seam/model/sprite equivalence, native and package gates remain pending. See [CHIM-MODEL-ARENA-RESERVE-41](CHIM-MODEL-ARENA-RESERVE-41.md#complete-suite-and-world-checkpoint-15-october-2026).
+
+15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending. See [CHIM-MODEL-ARENA-RESERVE-41](CHIM-MODEL-ARENA-RESERVE-41.md).
+
+15 October 2026: 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending. See [CHIM-RECIPE-APRON-SCOPE-41](CHIM-RECIPE-APRON-SCOPE-41.md).
+
+Location correction, 13 October 2026: the inspected cell (10,1) is Tel Uvirith
+at Uvirith's Grave in Molag Amur, not Molag Mar. The established bug ID and
+diagnostic filenames are retained for traceability. This correction does not
+change the issue status or establish package/native acceptance.
 
 ## Symptom and location
 Tel Uvirith exterior cell (10,1) converts to CHIM but fails the active-ring heap gate: 11,970,016 bytes against 6,242,304 bytes, a 5,727,712-byte shortfall. The sampled peak is frame-local (352,-352). The load-ring estimate is 12,262,160 bytes. No native crash is established.
@@ -283,6 +291,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-MEASURE-EMPTY-FRAME-33](CHIM-MEASURE-EMPTY-FRAME-33.md): CHIM world measurement stops on a frame without models (every empty sea cell)
 - [CHIM-MESH-PROFILE-SPLIT-36](CHIM-MESH-PROFILE-SPLIT-36.md): Seyda Neen converts the same meshes with other profiles than the other CHIM areas (texture size 64 against 32, no surface collision rule), so they are stored twice
 - [CHIM-MIPTEX-OFFSET-UNCHECKED-35](CHIM-MIPTEX-OFFSET-UNCHECKED-35.md): CHIM texture mip offsets are taken from disk unchecked: a wrong offset makes the rasterizer read past its block
+- [CHIM-MODEL-ARENA-RESERVE-41](CHIM-MODEL-ARENA-RESERVE-41.md): Placed CHIM models reserve renderer nodes that their point-hull loader never allocates
 - [CHIM-PACK-DIRS-33](CHIM-PACK-DIRS-33.md): CHIM pack directories are fully resident and would grow to about 400 KB for the island
 - [CHIM-PACK-LRU-STREAM-35](CHIM-PACK-LRU-STREAM-35.md): A streamed model keeps a sector file handle the four-file cache may close: the next stream step reads a closed file
 - [CHIM-PAYLOAD-PARITY-33](CHIM-PAYLOAD-PARITY-33.md): The CHIM world misses the image step's edits to Balmora (harvest mushrooms, town flora)
@@ -291,6 +300,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-READ-BUDGET-33](CHIM-READ-BUDGET-33.md): CHIM per-frame read budget can be exceeded by a whole lump
 - [CHIM-REBUILD-COST-33](CHIM-REBUILD-COST-33.md): Each CHIM crossing rebuilds the whole frame world; the cost is not measured
 - [CHIM-RECEIPT-COMMIT-33](CHIM-RECEIPT-COMMIT-33.md): CHIM world receipts do not record the commit the world was built from
+- [CHIM-RECIPE-APRON-SCOPE-41](CHIM-RECIPE-APRON-SCOPE-41.md): Regional aprons lose original-cell visual recipes and regress the memory gate
 - [CHIM-REGION-DIVIDED-CELLS-36](CHIM-REGION-DIVIDED-CELLS-36.md): Most converted land cells cannot switch to CHIM inside the open world: the legacy builder split them over several maps and a region frame replaces exactly one
 - [CHIM-REGION-MARGIN-STORAGE-36](CHIM-REGION-MARGIN-STORAGE-36.md): One-cell CHIM region frames store about 3.5 times their cell's terrain (the terrain-only margin)
 - [CHIM-SEYDA-ACTOR-CONTACT-33](CHIM-SEYDA-ACTOR-CONTACT-33.md): rc1 image step refuses Seyda Neen's CHIM frame map: six actors stand 0.8-3.3 units off the CHIM ground

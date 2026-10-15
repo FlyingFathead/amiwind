@@ -76,17 +76,21 @@ def residual(box, towns):
     return parts
 
 
-def make(cells, chim_cells, towns=(), master_sha256=None):
+def make(cells, chim_cells, towns=(), master_sha256=None, *, ocean_cells=()):
     """One row per original exterior LAND; partially covered cells name the BSP remainder."""
     cells = [tuple(c) for c in cells]
     selected = [tuple(c) for c in chim_cells]
     if len(cells) != len(set(cells)) or len(selected) != len(set(selected)):
         raise ValueError('Duplicate exterior cell owner')
-    if set(selected) - set(cells):
+    ocean = {tuple(c) for c in ocean_cells}
+    if not ocean <= set(selected):
+        raise ValueError('Ocean routing must be explicitly selected for CHIM')
+    extra_ocean = ocean - set(cells)
+    if set(selected) - set(cells) != extra_ocean:
         raise ValueError('CHIM selection contains cells absent from the source LAND inventory')
     selected = set(selected)
     rows = []
-    for x, y in sorted(cells):
+    for x, y in sorted(set(cells) | extra_ocean):
         box = (x * 2048, y * 2048, (x + 1) * 2048, (y + 1) * 2048)
         overlaps = [t['owner'] for t in towns if subtract(box, t['core']) != [box]]
         rest = residual(box, towns)
@@ -96,6 +100,7 @@ def make(cells, chim_cells, towns=(), master_sha256=None):
         rows.append({'cell': [x, y], 'format': kind, 'town_owners': overlaps,
                      'bsp_core': [list(p) for p in rest] if kind == 'bsp' else []})
     return {'format': FORMAT, 'master_sha256': master_sha256, 'towns': list(towns), 'cells': rows,
+            **({'ocean_cells': [list(c) for c in sorted(extra_ocean)]} if extra_ocean else {}),
             'summary': {kind: sum(r['format'] == kind for r in rows)
                         for kind in ('bsp', 'chim-region', 'chim-town')},
             'interiors': 'Independent; no interior is selected, retired or converted by this checklist.'}
@@ -110,9 +115,10 @@ def validate(value):
     """Check an embedded checklist by the same rules as the prebuild file."""
     if value.get('format') != FORMAT:
         raise ValueError('Invalid exterior checklist format')
-    expected = make([r['cell'] for r in value['cells']],
+    ocean = {tuple(c) for c in value.get('ocean_cells', [])}
+    expected = make([r['cell'] for r in value['cells'] if tuple(r['cell']) not in ocean],
                     [r['cell'] for r in value['cells'] if r['format'] == 'chim-region'],
-                    value['towns'], value['master_sha256'])
+                    value['towns'], value['master_sha256'], ocean_cells=ocean)
     if value != expected:
         raise ValueError('Exterior checklist is inconsistent')
     return value
@@ -184,12 +190,15 @@ def bind_steps(steps, path):
             for name, command in steps]
 
 
-def classify_regions(plan, entries, master_sha256, chim_cells):
+def classify_regions(plan, entries, master_sha256, chim_cells, *, before_ocean_routing=False):
     """Resolve subdivided map cores before a compiler starts; keep directory rows for save IDs."""
     if master_sha256 != plan['master_sha256']:
         raise ValueError('Exterior checklist master differs from the terrain survey')
     planned = {tuple(r['cell']): r for r in plan['cells']}
-    if {tuple(e['cell']) for e in entries} != set(planned):
+    expected_cells = set(planned)
+    if before_ocean_routing:
+        expected_cells -= {tuple(c) for c in plan.get('ocean_cells', [])}
+    if {tuple(e['cell']) for e in entries} != expected_cells:
         raise ValueError('Terrain survey cells differ from the exterior checklist')
     selected = {c for c, row in planned.items() if row['format'] == 'chim-region'}
     if selected != {tuple(cell) for cell in chim_cells}:

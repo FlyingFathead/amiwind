@@ -131,6 +131,14 @@ def mounting_shift(origin, normal, triangles, reach=16.0, clearance=0.5):
     return float(reach-distance[valid].min()+clearance)
 
 
+def window_facade_model(source):
+    """Known building meshes supporting the approved exterior window panels."""
+    source = source.replace('\\', '/').casefold()
+    # Nordic windows also mount on the original thatched tower. Keep this
+    # explicit: nearby props must not become a guessed supporting wall.
+    return 'house' in source or source == 'meshes/x/ex_common_tower_thatch.nif'
+
+
 class NeighboringFacadeSupport:
     """Lazy source-only wall dependencies; never add a runtime placement.
 
@@ -175,7 +183,7 @@ class NeighboringFacadeSupport:
                     continue
                 obj = esm['objects'].get(ref.get('id', '').casefold(), {})
                 source = 'meshes/' + normpath(obj.get('model', ''))
-                if obj.get('type') != 'STAT' or 'house' not in source:
+                if obj.get('type') != 'STAT' or not window_facade_model(source):
                     continue
                 if source not in geometry:
                     raw = bsa_read(bsa, source)
@@ -201,7 +209,7 @@ class NeighboringFacadeSupport:
                 continue
             matches.append((shift, dependency))
         if not matches:
-            raise ValueError('Window has no parallel supporting façade within mounting range, including neighbouring cells')
+            raise ValueError('Window %s has no parallel supporting façade within mounting range, including neighbouring cells' % window['number'])
         # The inward ray's nearest hit has the largest outward shift.
         # Break exact ties by the original reference ID.
         shift, dependency = max(matches, key=lambda row: (row[0], -row[1]['number']))
@@ -215,7 +223,7 @@ def mount_references(index, references, models, centre, scale, support=None):
     walls=[]
     for ref in references:
         mi=ref['model_index']
-        if mi not in models or 'house' not in index['models'][mi]['source'].casefold():continue
+        if mi not in models or not window_facade_model(index['models'][mi]['source']):continue
         vertices,faces,*_=models[mi]
         origin=(np.asarray(ref['position'])-np.array([*centre,0]))*scale
         points=vertices[:,:3]@reference_rotation(ref).T*(scale*ref['scale'])+origin

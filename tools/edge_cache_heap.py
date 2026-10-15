@@ -41,9 +41,11 @@ import struct
 # Re-pinned 2026-10-10 for crash paths (model.c; ENGINE-MODEL-NAME-SYSERROR-35, ENGINE-LEAF-LIMIT-UNCHECKED-35,
 # ENGINE-ENTITY-TEXT-UNBOUNDED-35): name length checks, a leaf-count check, a bounded frame name; edge-cache
 # allocation is unchanged.
+# Re-pinned 2026-10-15 for CHIM-MODEL-ARENA-RESERVE-41: only placed-model
+# arena bounds change; all edge-cache code and legacy loaders are byte-identical.
 SOURCE_HASHES={
-    'model.c':'b1fce5b1b8dff4ef5ec84a20580ae8dec034e7e95c85b3ec1af5169d60d164f5',
-    'model.h':'519e133b4506d831c671f6ec9eac8cc901af808d2c5f2d969d5438d3f621a404',
+    'model.c':'cc088069ea0b78537a4cdeb3177705933247a1bf26f3bb66c78ba22d70eea137',
+    'model.h':'6ca2bae523261a81ad9613620e84af3dfb355551ee4fc64fb9644fe435e28f3c',
     'r_draw.c':'1e26849d022fa219adfd399f8863118b72e34daab4b6e2b588e22ed8c53c8232',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',
 }

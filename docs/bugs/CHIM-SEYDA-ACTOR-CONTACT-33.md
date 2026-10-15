@@ -22,6 +22,7 @@
 <!-- contents start -->
 ## Contents
 
+- [Combined-world readback, 15 October 2026](#combined-world-readback-15-october-2026)
 - [Expanded-cell contact findings: 15 October 2026](#expanded-cell-contact-findings-15-october-2026)
 - [Original height comparison: 15 October 2026](#original-height-comparison-15-october-2026)
 - [Terrain repair and remaining grounding check: 15 October 2026](#terrain-repair-and-remaining-grounding-check-15-october-2026)
@@ -37,6 +38,16 @@
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## Combined-world readback, 15 October 2026
+
+The successor completes structural, heap, zone-walk and stair validation with
+source and inputs unchanged. Six paired boundaries agree for terrain/water;
+static scenery differs at the southern Seyda boundary. Model/sprite, final
+actor contact, native and package acceptance remain pending.
+[Static boundary finding](CHIM-FRAME-STATIC-SEAM-40.md).
+Earlier failed or pending checkpoints below remain historical evidence.
+
 
 ## Expanded-cell contact findings: 15 October 2026
 
@@ -207,6 +218,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-MEASURE-EMPTY-FRAME-33](CHIM-MEASURE-EMPTY-FRAME-33.md): CHIM world measurement stops on a frame without models (every empty sea cell)
 - [CHIM-MESH-PROFILE-SPLIT-36](CHIM-MESH-PROFILE-SPLIT-36.md): Seyda Neen converts the same meshes with other profiles than the other CHIM areas (texture size 64 against 32, no surface collision rule), so they are stored twice
 - [CHIM-MIPTEX-OFFSET-UNCHECKED-35](CHIM-MIPTEX-OFFSET-UNCHECKED-35.md): CHIM texture mip offsets are taken from disk unchecked: a wrong offset makes the rasterizer read past its block
+- [CHIM-MODEL-ARENA-RESERVE-41](CHIM-MODEL-ARENA-RESERVE-41.md): Placed CHIM models reserve renderer nodes that their point-hull loader never allocates
 - [CHIM-MOLAG-MEMORY-38](CHIM-MOLAG-MEMORY-38.md): Tel Uvirith exterior cell (10,1) exceeds the CHIM active-ring memory budget
 - [CHIM-PACK-DIRS-33](CHIM-PACK-DIRS-33.md): CHIM pack directories are fully resident and would grow to about 400 KB for the island
 - [CHIM-PACK-LRU-STREAM-35](CHIM-PACK-LRU-STREAM-35.md): A streamed model keeps a sector file handle the four-file cache may close: the next stream step reads a closed file
@@ -216,6 +228,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-READ-BUDGET-33](CHIM-READ-BUDGET-33.md): CHIM per-frame read budget can be exceeded by a whole lump
 - [CHIM-REBUILD-COST-33](CHIM-REBUILD-COST-33.md): Each CHIM crossing rebuilds the whole frame world; the cost is not measured
 - [CHIM-RECEIPT-COMMIT-33](CHIM-RECEIPT-COMMIT-33.md): CHIM world receipts do not record the commit the world was built from
+- [CHIM-RECIPE-APRON-SCOPE-41](CHIM-RECIPE-APRON-SCOPE-41.md): Regional aprons lose original-cell visual recipes and regress the memory gate
 - [CHIM-REGION-DIVIDED-CELLS-36](CHIM-REGION-DIVIDED-CELLS-36.md): Most converted land cells cannot switch to CHIM inside the open world: the legacy builder split them over several maps and a region frame replaces exactly one
 - [CHIM-REGION-MARGIN-STORAGE-36](CHIM-REGION-MARGIN-STORAGE-36.md): One-cell CHIM region frames store about 3.5 times their cell's terrain (the terrain-only margin)
 - [CHIM-STATIC-PLACE-HOST-ERROR-35](CHIM-STATIC-PLACE-HOST-ERROR-35.md): Bad flora data at CHIM chunk activation ended the session with zone locks held; the next map then stopped the program

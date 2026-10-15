@@ -107,3 +107,45 @@ class SourceStageResumeTests(unittest.TestCase):
             path.write_text(json.dumps(dict(report, **{key: value})))
             with self.assertRaisesRegex(ValueError, 'does not match'):
                 import_town.fixed_state_references(self.work, self.settings, refs)
+
+    def test_apron_snapshot_follows_original_cell_on_both_sides(self):
+        recipe = lambda cell: {'fixed_visibility_state': {'stronghold': 6}} if tuple(cell) == (10, 1) else {}
+        refs = [{'number': 100}, {'number': 101}, {'number': 200}]
+        def audit(raw, cell, state):
+            self.assertEqual(raw, b'synthetic')
+            return dict(cell=list(cell), requested_state=state, references=[
+                {'reference': 100, 'enabled_at_requested_state': False},
+                {'reference': 101, 'enabled_at_requested_state': None}])
+        with patch('visual_recipes.cell_settings', side_effect=recipe), patch('mwad.script_visibility.audit_cell', side_effect=audit) as reader:
+            for centre in ((9, 1), (10, 1), (11, 2)):
+                settings = dict(self.settings, source_cell=list(centre), source_radius=1)
+                import_town.write_fixed_visibility(self.data, self.work, settings)
+                self.assertEqual(import_town.fixed_state_references(self.work, settings, refs), refs[1:])
+            self.assertEqual(reader.call_count, 3)
+            self.assertTrue(all(call.args[1] == [10, 1] for call in reader.call_args_list))
+        self.assertEqual(refs, [{'number': 100}, {'number': 101}, {'number': 200}])
+
+    def test_neighbour_snapshot_is_in_source_receipt(self):
+        recipe = lambda cell: {'fixed_visibility_state': {'stronghold': 6}} if tuple(cell) == (3, 8) else {}
+        self.settings['source_radius'] = 1
+        with patch('visual_recipes.cell_settings', return_value={}):
+            old = self.receipt()
+        with patch('visual_recipes.cell_settings', side_effect=recipe):
+            new = self.receipt()
+        self.assertNotEqual(old, new)
+        self.assertEqual(new['fixed_visibility_cells'], [{'cell': [3, 8], 'requested_state': {'stronghold': 6}}])
+
+    def test_apron_snapshot_rejects_wrong_or_missing_cell_receipt(self):
+        recipe = lambda cell: {'fixed_visibility_state': {'stronghold': 6}} if tuple(cell) == (3, 8) else {}
+        self.settings['source_radius'] = 1
+        with patch('visual_recipes.cell_settings', side_effect=recipe):
+            for reports in ([], [{'cell': [2, 8], 'requested_state': {'stronghold': 6}, 'references': []}],
+                            [{'cell': [3, 8], 'requested_state': {'stronghold': 1}, 'references': []}]):
+                (self.work / 'fixed-visibility.json').write_text(json.dumps({'schema':'source-cell-visibility-1','reports':reports}))
+                with self.assertRaisesRegex(ValueError, 'does not match'):
+                    import_town.fixed_state_references(self.work, self.settings, [{'number': 1}])
+
+    def test_explicit_visibility_state_guards_stay_strict(self):
+        for state in ({}, {'stage': True}, {'stage': float('inf')}, {'stage': float('nan')}, {'': 6}):
+            with self.subTest(state=state), self.assertRaisesRegex(ValueError, 'finite explicit globals'):
+                import_town.fixed_visibility_cells(dict(self.settings, fixed_visibility_state=state))

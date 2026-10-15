@@ -377,17 +377,24 @@ def decode_cells(text):
 
 
 def frame_settings(frame, margin=TERRAIN_MARGIN):
-    """Converter settings of a frame (the town settings shape, docs/TOWN_IMPORT.md): one cell, a terrain-only
-    margin and an explicit handoff core (the cell box), as the stitcher's margin rule asks."""
+    """One owned cell, with separate terrain/scenery apron and unchanged handoff core.
+
+    Audit adjacent source cells too: a rock whose origin belongs to the next
+    cell can cross this core and its handoff band. Whole-object footprint
+    selection keeps needed apron copies; owned_cells keeps logical ownership
+    and source-receipt identity separate (CHIM-FRAME-STATIC-SEAM-40).
+    """
     x, y = frame['cell']
     name = frame['id']
     from visual_recipes import cell_settings
     return {
         **cell_settings((x, y)),
-        **({'missing_land': 'flat', 'ocean_runtime': True} if frame.get('kind') == 'ocean' else {}),
-        'format': 1, 'source_cell': [x, y], 'source_radius': 0,
+        'missing_land': 'flat', 'region_source_apron': True,
+        **({'ocean_runtime': True} if frame.get('kind') == 'ocean' else {}),
+        'format': 1, 'source_cell': [x, y], 'source_radius': 1,
+        'owned_cells': [[x, y], [x + 1, y + 1]],
         'centre': [x * CELL_UNITS + CELL_UNITS // 2, y * CELL_UNITS + CELL_UNITS // 2], 'scale': SCALE,
-        'bounds': [[-HALF, -HALF], [HALF, HALF]], 'reference_margin': 0,
+        'bounds': [[-HALF, -HALF], [HALF, HALF]], 'reference_margin': margin,
         'terrain_margin': margin, 'handoff_core': [[-HALF, -HALF], [HALF, HALF]],
         'core_size': 1024, 'overlap': 896, 'hysteresis': 96, 'draw_distance': 540, 'terrain_step': 128,
         'terrain_material_repairs': [], 'entity_budget': 1000, 'model_budget': 220, 'collision_margin': 224,
@@ -398,6 +405,25 @@ def frame_settings(frame, margin=TERRAIN_MARGIN):
                  'arrival': {'source_position': [x * CELL_UNITS + 4096.0, y * CELL_UNITS + 4096.0, 0.0],
                              'reason': 'CHIM region frame (open world; no arrival of its own)'}, 'return': None},
     }
+
+
+
+def check_source_land(settings, audit):
+    """Allow heightless ocean in an apron, never a missing owned land cell.
+
+    The wider reference survey must cross coastline cells with no LAND. Its
+    fallback is recorded by mwad.audit; runtime terrain still follows the
+    existing LAND/ocean terrain path. Explicit ocean cores retain admit_cell.
+    """
+    if not settings.get('region_source_apron'):
+        return
+    area = audit['area']
+    cell = tuple(settings['source_cell'])
+    if (list(area['center']) != list(cell) or area['radius_cells'] != settings['source_radius']
+            or cell not in {(r['x'], r['y']) for r in area['cells']}):
+        raise ValueError('Regional scenery source audit has a different owned cell or scope')
+    if not settings.get('ocean_runtime') and cell in {tuple(c) for c in area['default_land_cells']}:
+        raise ValueError('Regional owned cell has no original LAND; explicit ocean admission required')
 
 
 def town_boxes(towns, root=None):

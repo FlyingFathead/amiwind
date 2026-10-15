@@ -24,6 +24,7 @@
 <!-- contents start -->
 ## Contents
 
+- [Combined-world readback, 15 October 2026](#combined-world-readback-15-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -35,6 +36,16 @@
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## Combined-world readback, 15 October 2026
+
+The successor completes structural, heap, zone-walk and stair validation with
+source and inputs unchanged. Six paired boundaries agree for terrain/water;
+static scenery differs at the southern Seyda boundary. Model/sprite, final
+actor contact, native and package acceptance remain pending.
+[Static boundary finding](CHIM-FRAME-STATIC-SEAM-40.md).
+Earlier failed or pending checkpoints below remain historical evidence.
+
 
 ## Symptom
 

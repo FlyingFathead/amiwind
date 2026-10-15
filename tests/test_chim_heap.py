@@ -46,6 +46,16 @@ class ChimHeapGateTests(unittest.TestCase):
         bigger = heap.ring_peak(self.world, dict(SIZES, scenery=SIZES['scenery'] + 1000))['frames'][0]
         self.assertGreater(bigger['peak_bytes'], f['peak_bytes'])
 
+    def test_placed_model_bound_omits_only_unallocated_renderer_nodes(self):
+        from chim import format as F
+        lumps = F.read_brush_image(self.world['models'][0]['image'])
+        nodes = len(lumps[5]) // SIZES['dnode']
+        self.assertGreater(nodes, 0)
+        terrain = heap.image_bytes(lumps, SIZES)
+        model = heap.image_bytes(lumps, SIZES, point_hull_only=True)
+        self.assertEqual(terrain-model, heap._a16(nodes*SIZES['mnode']))
+        self.assertGreater(model, heap.collision_bytes(lumps, SIZES))
+
     def test_gate_is_strict_and_names_the_frame(self):
         r = heap.ring_peak(self.world, SIZES)
         need_kib = r['frames'][0]['peak_bytes'] // 1024

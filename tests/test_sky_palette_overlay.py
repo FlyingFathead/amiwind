@@ -80,6 +80,39 @@ class Tests(unittest.TestCase):
         self.assertEqual(spans(b'AWH1'+struct.pack('<H',1)+bytes(82),'a.awh')[0],[(24,64)])
         raw=struct.pack('>4s4H2I',b'AWS1',4,1,1,0,20,30)+struct.pack('>3H',1,0,4)+bytes(4)
         self.assertEqual(spans(raw,'a.aws')[0],[(26,4)])
+    def test_inventory_formats_remap_only_icon_pixels(self):
+        icon=b'AWIC'+bytes([83,140,255,42])*256
+        items=b'AWI2'+struct.pack('<I',1)+bytes([83])*512
+        initial=b'AWST'+struct.pack('<I',1)+bytes([140])*72
+        fixtures={'gfx/inv/test.awi':icon,'inventory/items.awi':items,'inventory/initial.awi':initial}
+        self.assertEqual(spans(icon,'gfx/inv/test.awi')[0],[(4,1024)])
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);source=root/'source';(source/'gfx').mkdir(parents=True)
+            palette=bytearray(v for i in range(256) for v in (i,i,i))
+            for i,(target,_) in BANK.items():palette[i*3:i*3+3]=palette[target*3:target*3+3]
+            (source/'gfx/palette.lmp').write_bytes(palette)
+            for name,raw in fixtures.items():
+                path=source/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(raw)
+            convert(source,root/'output',jobs=1)
+            self.assertEqual((root/'output/gfx/inv/test.awi').read_bytes(),b'AWIC'+bytes([82,138,255,42])*256)
+            for name in ('inventory/items.awi','inventory/initial.awi'):
+                self.assertEqual(spans(fixtures[name],name)[0],[])
+                self.assertEqual((root/'output'/name).read_bytes(),fixtures[name])
+            for name,raw in fixtures.items():self.assertEqual((source/name).read_bytes(),raw)
+
+    def test_inventory_format_validation_before_overlay(self):
+        cases=[('gfx/inv/a.awi',b'AWIC'+bytes(1024)),
+               ('inventory/items.awi',b'AWI2'+struct.pack('<I',1)+bytes(512)),
+               ('inventory/initial.awi',b'AWST'+struct.pack('<I',1)+bytes(72))]
+        for name,raw in cases:
+            for bad in (raw[:-1],raw+b'!',b'XXXX'+raw[4:]):
+                with self.subTest(path=name,size=len(bad)),self.assertRaises(ValueError):spans(bad,name)
+        for name,raw in [('inventory/items.awi',b'AWI2'+struct.pack('<I',0)),
+                         ('inventory/initial.awi',b'AWST'+struct.pack('<I',33)+bytes(33*72)),
+                         ('reading/a.awi',b'AWIC'+bytes(1024))]:
+            with self.subTest(path=name),self.assertRaises(ValueError):spans(raw,name)
+        self.assertEqual(spans(b'AWST'+struct.pack('<I',0),'inventory/initial.awi')[0],[])
+
     def test_wad_qpic(self):
         raw=struct.pack('<4sii',b'WAD2',1,24)+struct.pack('<2i',2,2)+bytes(4)+struct.pack('<iiiBBH16s',12,12,12,66,0,0,b'pic')
         self.assertEqual(spans(raw,'gfx.wad')[0],[(20,4)])

@@ -673,7 +673,8 @@ def prerequisites(args, interactive=False):
         if selected and (getattr(args, 'chim_region_rows', None) or 'game-data') != 'game-data':
             raise ValueError('Full builds require CHIM rows from game data: no duplicate legacy conversion')
         exterior_checklist = exterior_plan.make(cells, selected,
-            exterior_plan.town_cores(chim_native_towns(args, args.builder_options)), master_sha)
+            exterior_plan.town_cores(chim_native_towns(args, args.builder_options)), master_sha,
+            ocean_cells=[c for c, kind in selected.items() if kind == 'ocean'])
         print('Exterior checklist before conversion: ' + ', '.join(
             '%d %s' % (n, kind) for kind, n in exterior_checklist['summary'].items()), flush=True)
     args.exterior_checklist = exterior_checklist

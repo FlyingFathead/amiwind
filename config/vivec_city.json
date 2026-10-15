@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "comment": "Original CELL-owned Vivec core x1..6,y-14..-9 at the unchanged centre/save origin. bounds and handoff_core own those36cells; terrain_margin768 is terrain-only apron beyond them. core_size1536 yields64 runtime directory rows. Existing district interior/map/save IDs, detail budget and unavailable-room policy remain. Enlarged payload/residency and native seam acceptance are pending.",
+  "comment": "Original CELL-owned Vivec core x1..6,y-14..-9 at the unchanged centre/save origin. bounds and handoff_core own those 36 cells; separate 768-unit terrain and scenery aprons preserve objects across frame transitions. Source radius 4 includes every apron cell. core_size1536 retains64 runtime directory rows, district interior/map/save IDs, detail budget and unavailable-room policy. The expanded source survey records original heightless coast cells using the existing default seabed policy.",
   "source_cell": [
     4,
     -12
   ],
-  "source_radius": 3,
+  "source_radius": 4,
   "centre": [
     32768,
     -92160
@@ -21,7 +21,7 @@
       6656
     ]
   ],
-  "reference_margin": 0,
+  "reference_margin": 768,
   "handoff_core": [
     [
       -6144,
@@ -91,5 +91,6 @@
       -8
     ]
   ],
-  "terrain_margin": 768
+  "terrain_margin": 768,
+  "missing_land": "flat"
 }

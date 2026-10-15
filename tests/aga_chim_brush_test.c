@@ -189,7 +189,7 @@ static dump_t load_hunk(void){
 static dump_t load_image(int refs,int *used){
     aw_brush_arena_t a;model_t mod;dheader_t h;byte *copy=malloc(image_bytes);dump_t d;int bound;
     memcpy(copy,image,image_bytes);assert(AW_BrushHeader(&h,copy,image_bytes));
-    bound=AW_BrushBound(&h,refs);assert(bound>0);arena_init(&a,bound,refs);
+    bound=AW_BrushBound(&h,refs,0);assert(bound>0);arena_init(&a,bound,refs);
     memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:image");resolved=0;
     assert(AW_BrushImage(&mod,copy,image_bytes,&a));
     assert(!mod.edgecache && !mod.edgecache_count && mod.type==mod_brush && mod.needload==NL_PRESENT);
@@ -201,7 +201,7 @@ static dump_t load_image(int refs,int *used){
 static dump_t load_stream(const char *path,int refs,int interleave){
     aw_brush_arena_t a;aw_brush_stream_t s;model_t mod;dheader_t h;FILE *f;dump_t d;int steps=0,bound;
     byte *before;
-    assert(AW_BrushHeader(&h,image,image_bytes));bound=AW_BrushBound(&h,refs);arena_init(&a,bound,refs);
+    assert(AW_BrushHeader(&h,image,image_bytes));bound=AW_BrushBound(&h,refs,0);arena_init(&a,bound,refs);
     memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:stream");
     /* The image sits 1000 bytes into a larger "pack" file. */
     f=fopen("pack.bin","w+b");assert(f);
@@ -250,7 +250,11 @@ int main(int argc,char **argv){
              * would visit 6^40 paths; the first real Balmora run hung so). */
             dheader_t h;aw_brush_arena_t a;model_t mod;int k,n,inside;
             assert(AW_BrushHeader(&h,image,image_bytes));
-            arena_init(&a,AW_BrushBound(&h,1),1);a.point_hull_only=1;
+            int bound=AW_BrushBound(&h,1,1), generic=AW_BrushBound(&h,1,0);
+            dump_t image_dump,stream_dump;aw_brush_arena_t stream_arena;
+            aw_brush_stream_t stream;model_t stream_model;FILE *file;int steps=0;
+            assert(generic-bound==AW_ARENA16(240*(long)sizeof(mnode_t)));
+            arena_init(&a,bound,1);a.point_hull_only=1;
             memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:chain");
             assert(AW_BrushImage(&mod,image,image_bytes,&a));
             assert(!mod.nodes && !mod.numnodes && mod.hulls[0].clipnodes && mod.hulls[0].lastclipnode==239);
@@ -264,11 +268,23 @@ int main(int argc,char **argv){
                 inside=k<40;
                 assert(n==(inside?CONTENTS_SOLID:CONTENTS_EMPTY));
             }
-            printf("%s chain decoded\n",argv[i]);
+            assert(a.used<=bound);
+            image_dump=dump(&mod,header_leafs(),1);
+            arena_init(&stream_arena,bound,1);stream_arena.point_hull_only=1;
+            memset(&stream_model,0,sizeof(stream_model));strcpy(stream_model.name,"chim:chainstream");
+            file=fopen(argv[i],"rb");assert(file);
+            assert(AW_BrushStreamBegin(&stream,&stream_model,file,0,image_bytes,&stream_arena));
+            while(!AW_BrushStreamStep(&stream))assert(++steps<AW_BRUSH_SECTIONS);
+            assert(stream_arena.used<=bound && !stream_model.nodes);
+            stream_dump=dump(&stream_model,header_leafs(),1);
+            assert(same(&image_dump,&stream_dump));
+            fclose(file);free(image_dump.data);free(stream_dump.data);
+            printf("%s chain decoded; exact bound=%d generic=%d used=%d streamed=%d\n",
+                   argv[i],bound,generic,a.used,stream_arena.used);
         }else if(!strcmp(argv[1],"overflow")){
             dheader_t h;aw_brush_arena_t a;model_t mod;
             assert(AW_BrushHeader(&h,image,image_bytes));
-            arena_init(&a,AW_BrushBound(&h,0)/2,0);memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:small");
+            arena_init(&a,AW_BrushBound(&h,0,0)/2,0);memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:small");
             /* Sys_Error would abort here (expect_error 0): the load says why and returns 0. */
             assert(!AW_BrushImage(&mod,image,image_bytes,&a));
             assert(!aw_brush_arena && !aw_brush_catch && a.used<=a.size);
@@ -280,12 +296,12 @@ int main(int argc,char **argv){
             assert(bad && AW_BrushHeader(&h,image,image_bytes) && h.lumps[LUMP_NODES].filelen>=(int)sizeof(dnode_t));
             /* the first node's plane far outside the plane lump */
             memcpy(bad,image,image_bytes);memcpy(bad+h.lumps[LUMP_NODES].fileofs,&p,4);
-            arena_init(&a,AW_BrushBound(&h,0),0);memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:bad");said[0]=0;
+            arena_init(&a,AW_BrushBound(&h,0,0),0);memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:bad");said[0]=0;
             assert(!AW_BrushImage(&mod,bad,image_bytes,&a));
             assert(!aw_brush_arena && !aw_brush_catch && strstr(said,"Invalid BSP node data"));
             /* The same image streamed from a file: the failing step returns -1, then 1 (finished). */
             f=fopen("bad.bin","w+b");assert(f);fwrite(bad,1,image_bytes,f);
-            arena_init(&a,AW_BrushBound(&h,0),0);memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:badstream");said[0]=0;
+            arena_init(&a,AW_BrushBound(&h,0,0),0);memset(&mod,0,sizeof(mod));strcpy(mod.name,"chim:badstream");said[0]=0;
             assert(AW_BrushStreamBegin(&st,&mod,f,0,image_bytes,&a));
             while(!(r=AW_BrushStreamStep(&st)))steps++;
             assert(r==-1 && steps<AW_BRUSH_SECTIONS && AW_BrushStreamStep(&st)==1);

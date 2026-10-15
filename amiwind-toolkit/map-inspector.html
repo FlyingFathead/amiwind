@@ -906,7 +906,7 @@ function chimHeapUpdate(){
   const R=chimReader(),fd=chim.frameData;if(!R||!fd){chimInfoUpdate();return;}
   const sizes=chimSizes();
   for(const c of fd.chunks)c.heap_bytes=R.imageBytes(c.lump_lengths,sizes);
-  for(const m of fd.models.values())m.heap_bytes=R.imageBytes(m.lump_lengths,sizes);
+  for(const m of fd.models.values())m.heap_bytes=R.imageBytes(m.lump_lengths,sizes,true);
   chim.chunkAt=new Map(fd.chunks.map(c=>[c.cx+','+c.cy,c]));
   chim.tables=R.ringTables(fd,sizes);
   const row=chim.heap?chim.heap.frames.get(fd.path.replace(/\/frame\.ccf$/,'')):null,st=chim.world.index.settings;

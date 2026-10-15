@@ -65,6 +65,51 @@ def intersects(a, b):
     return a[0] <= b[2] and b[0] <= a[2] and a[1] <= b[3] and b[1] <= a[3]
 
 
+
+def select_compiled_apron(spec, references):
+    """Remove only external apron selections with no actual compiled footprint.
+
+    Source bounds conservatively transform the original box. A rotated compiled
+    mesh can be smaller; keep every owned original and every piece reaching the
+    apron, and record exact excluded originals and boxes for source accounting.
+    The unchanged manifest guard still rejects missing pieces and bad ownership.
+    """
+    from chim.world import frame_box, f32, placed_box
+    frame = spec['frame']; centre = frame['centre']
+    core = list(frame_box(frame))
+    coverage = [centre[k] + 4*frame['low'][k] for k in range(2)]
+    coverage += [coverage[k] + 4*frame['span'][k] for k in range(2)]
+    footprints = {}
+    for p in spec['placements']:
+        v = spec['variants'][p['variant']]
+        if not all(math.isfinite(x) for x in [*p['origin'], p['yaw'], *v['lo'], *v['hi']]):
+            raise ValueError('Nonfinite compiled apron transform or bounds')
+        lo, hi = placed_box([f32(x) for x in p['origin']], f32(p['yaw']),
+                            [f32(x) for x in v['lo']], [f32(x) for x in v['hi']])
+        box = [centre[k] + 4*lo[k] for k in range(2)] + [centre[k] + 4*hi[k] for k in range(2)]
+        if not all(math.isfinite(x) for x in box):
+            raise ValueError('Nonfinite compiled apron footprint')
+        footprints.setdefault(source_ref(p['ref']), []).append(box)
+    selected, excluded, seen = [], [], set()
+    for ref in references:
+        src = original(ref['_chim_original']); number = src['number']
+        if number in seen:
+            raise ValueError('Repeated source reference in compiled apron selection')
+        seen.add(number)
+        boxes = footprints.get(number, [])
+        if not contains(core, src['position']) and boxes and not any(intersects(coverage, b) for b in boxes):
+            excluded.append({'original': src, 'compiled_footprints': boxes,
+                             'coverage': coverage, 'reason': 'compiled footprint outside this apron'})
+        else:
+            selected.append(ref)
+    removed = {r['original']['number'] for r in excluded}
+    if removed:
+        spec['placements'] = [p for p in spec['placements'] if source_ref(p['ref']) not in removed]
+        used = {p['variant'] for p in spec['placements']}
+        spec['variants'] = {k: v for k, v in spec['variants'].items() if k in used}
+    return selected, excluded
+
+
 def manifest(spec, references):
     """Bind each original to its exact converted pieces before packing."""
     from chim.world import frame_box, f32, placed_box

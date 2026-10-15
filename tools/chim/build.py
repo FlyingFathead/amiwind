@@ -207,7 +207,8 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
         firsts.setdefault(variant_key(ref), ref)
     order = list(firsts)
     clip_spec = None
-    if (settings or {}).get('clip_to_terrain', False):
+    if any(models[r['model_index']].get('_clip_to_terrain', (settings or {}).get('clip_to_terrain', False))
+           for r in references):
         if (settings or {}).get('cut_models_over', 0):
             raise ValueError('Terrain clipping requires whole shared models')
         triangles = []
@@ -267,7 +268,7 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                 # vertices shared as in the base (chim.models.base_frame, CHIM-STRIDER-SCALED-SEAMS-36): other bytes
                 # than the placed-position sharing for most scaled and tilted variants, so another key
                 fp = fingerprint('variant', fp, 'weld-base-1')
-            if clip_spec is not None:
+            if clip_spec is not None and model.get('_clip_to_terrain', (settings or {}).get('clip_to_terrain', False)):
                 poses = [(tuple(float(v) for v in (np.array(r['position'])-np.array([*centre,0]))*.25), yaw_degrees(r))
                          for r in references if variant_key(r)==k]
                 task['terrain_clip'] = dict(clip_spec, placements=poses)
@@ -850,6 +851,26 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
         specs.append(spec)
         sections.append(section)
         meshes += count
+    from chim.apron_policy import reconcile
+    apron_dispositions = reconcile(specs, sections, out, set(regional), flora)
+    from chim.apron_policy import supplement_seyda
+    supplied = supplement_seyda(specs, sections)
+    apron_dispositions += supplied
+    if supplied:
+        from chim.seyda import write_source_metadata, _config
+        from town_grid import reference_ownership
+        from chim.ownership import original
+        section = next(s for s in sections if s['town'] == 'seyda')
+        audited = json.loads((Path(legacy_run) / 'work/generated/seyda-neen/placements.json').read_text())
+        by_number = {r['number']: r for r in audited}
+        selected = []
+        for row in section['frame_ownership']['references']:
+            ref = by_number[row['original']['number']]
+            if original(ref) != row['original']:
+                raise ValueError('Seyda apron owner differs from original audit')
+            selected.append(ref)
+        write_source_metadata(legacy_run, out / 'work/seyda', selected, harvest_set)
+        section['reference_ownership'] = reference_ownership(selected, _config())
     from chim.ownership import source_failures
     ownership_errors = source_failures(sections)
     if ownership_errors:
@@ -860,6 +881,7 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
         spec['textures'], record = apply_effects(spec['textures'], effects, pal_bytes)
         applied.append(record)
     receipt = build_frames(out, specs, settings_override, TERRAIN_LIGHT, jobs=jobs, cache=cache, timer=timer)
+    receipt['apron_dispositions'] = apron_dispositions
     receipt['collision_union_fallbacks'] = sorted({m for s in specs for m in s['fallbacks']})
     # models whose standing hull is routed (routed_hull): the heap fallback's candidates (chim_build)
     receipt['routed_hulls'] = sorted({m for s in specs for m in s.get('routed_hulls', [])})
@@ -1093,6 +1115,11 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         write_json(work / 'ocean-source.json', ocean_source)
     with timer.section('source stage'):
         index = source_stage(data, work, jobs, settings)
+        if settings.get('region_source_apron'):
+            from chim.regions import check_source_land
+            check_source_land(settings, json.loads((work / 'audit/audit.json').read_text()))
+    from visual_recipes import scope_reference_recipes
+    index = scope_reference_recipes(index, settings)
     centre = settings['centre']
     # Profiles exactly as import_town.prepare and _append_meshes choose them.
     group = index['groups'][town_field(settings, 'visual_group')]['visual_profiles']
@@ -1100,7 +1127,7 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     profiles, items = {}, []
     from visual_recipes import load_recipes, apply_recipe
     recipe_name = settings.get('visual_recipe')
-    recipes = load_recipes() if recipe_name else None
+    recipes = load_recipes()
     archive = work / 'scenery/scenery.mwpak'
     budget = detail_budget(area_cut_settings(settings, settings_override).get('detail_budget'))
     for mi, model in enumerate(index['models']):
@@ -1119,8 +1146,10 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
                            lod_preserve_border=True)
         # the mesh's CHIM mesh method (config/mesh-methods.json; build setting mesh_method)
         profile = apply_mesh_method(profile, model['source'], settings_override)
-        if recipe_name:
-            profile = apply_recipe(profile, model, recipe_name, recipes)
+        model_recipe = model.get('_visual_recipe', recipe_name)
+        if model_recipe:
+            profile = apply_recipe(profile, model, model_recipe, recipes)
+        model['_profile'] = profile
         profiles[model['source']] = profile
         fp = mesh_fingerprint(model, profile, index['textures'])
         if model['source'] in rebuild_meshes:
@@ -1234,6 +1263,10 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
                        collision_cache=work / 'collision-cache', jobs=jobs, cache=cache, timer=timer,
                        settings=area_cut_settings(settings, settings_override), mesh_occluders=mesh_occluders,
                        liquids=frame_liquids(pools, centre), ground=tri_ground, height_at=height_at)
+    outside_apron = []
+    if settings.get('region_source_apron'):
+        from chim.ownership import select_compiled_apron
+        selected, outside_apron = select_compiled_apron(spec, selected)
     doors = [[(r['position'][0] - centre[0]) * SCALE, (r['position'][1] - centre[1]) * SCALE]
              for r in selected if r.get('type') == 'DOOR' and r.get('destination')]
     section = {'town': town, 'cell': list(frame['cell']),
@@ -1262,5 +1295,7 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
             'heights': [[height_at(x, y) for x in range(low[0] - step, high[0] + step + 1, step)]
                         for y in range(low[1] - step, high[1] + step + 1, step)]}
     from chim.ownership import manifest
+    if outside_apron:
+        section['outside_apron'] = outside_apron
     section['frame_ownership'] = manifest(spec, selected)
     return spec, section, parity, len(prepared)

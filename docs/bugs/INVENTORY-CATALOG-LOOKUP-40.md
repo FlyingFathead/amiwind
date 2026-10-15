@@ -169,4 +169,8 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [WAIT-FEET-IN-WATER-36](WAIT-FEET-IN-WATER-36.md): Waiting is allowed with the feet in water (the original refuses it)
 - [WATER-GAMEPLAY-PARITY-38](WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification
 
+Related bugs in other categories:
+
+- [BUILD-INVENTORY-PALETTE-41](BUILD-INVENTORY-PALETTE-41.md): Inventory icons and metadata stop the sky palette image pass
+
 <!-- END GENERATED CATEGORY -->

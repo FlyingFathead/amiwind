@@ -18,7 +18,7 @@ Distance is the distance to the box). The ring then needs:
 Every terrain or model block is one zone allocation: the model header plus
 the decoded arena. AW_BrushBound (model.c) gives the arena size from the
 image's lump sizes: each lump rounded to 16 bytes, placed models keep their
-node tree as the point hull (dclipnode + mnode per node), and the standing
+node tree as the point hull (dclipnode only per node; terrain also keeps mnode), and the standing
 hull's clipnodes stay as stored. The target ABI sizes are the strict
 world-map heap gate's own, probed with the Amiga compiler from the engine
 headers (check_world_map_heap.compile_target_sizes). A texture is one block:
@@ -56,9 +56,10 @@ def _a16(n):
     return (int(n) + 15) & ~15
 
 
-def image_bytes(lumps, sizes):
+def image_bytes(lumps, sizes, point_hull_only=False):
     """One zone block for a brush image (a chunk's terrain or a placed model): the allocation header,
-    the model header and the arena AW_BrushBound gives for it (texture references, not miptex)."""
+    the model header and the arena AW_BrushBound gives for it (texture references, not miptex).
+    Placed models use the unconditional direct hull-0 path; terrain retains renderer nodes."""
     def count(k, probe):
         return len(lumps[k]) // sizes[probe]
     nodes = count(5, 'dnode')
@@ -74,7 +75,7 @@ def image_bytes(lumps, sizes):
         count(11, 'short') * sizes['pointer'],
         count(10, 'dleaf') * sizes['mleaf'],
         count(14, 'dmodel') * sizes['dmodel'],
-        nodes * sizes['dclipnode'], nodes * sizes['mnode']))
+        nodes * sizes['dclipnode'], 0 if point_hull_only else nodes * sizes['mnode']))
     return sizes['hunk'] + _a16(sizes['model'] + arena)
 
 
@@ -120,7 +121,7 @@ def ring_peak_whole(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, p
     model_tex = []
     for i, m in enumerate(models):
         lumps = F.read_brush_image(m['image'])
-        model_size[i] = image_bytes(lumps, sizes)
+        model_size[i] = image_bytes(lumps, sizes, point_hull_only=True)
         model_coll[i] = collision_bytes(lumps, sizes)
         model_tex.append(F.read_texture_refs(lumps[2]))
     tex_size = np.array([texture_bytes(t['width'], t['height'], sizes) for t in world['textures']], float)
@@ -271,7 +272,7 @@ def ring_peak(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=
     def model(i):
         if i not in model_size:
             lumps = F.read_brush_image(models[i]['image'])
-            model_size[i] = image_bytes(lumps, sizes)
+            model_size[i] = image_bytes(lumps, sizes, point_hull_only=True)
             model_coll[i] = collision_bytes(lumps, sizes)
             model_tex[i] = sorted(set(F.read_texture_refs(lumps[2])))
         return model_size[i], model_tex[i]

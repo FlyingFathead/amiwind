@@ -125,6 +125,18 @@ def spans(raw,rel):
         add(28,1)  # Validated uint32 index: its other three bytes are zero.
         add(start,w*h)
         if magic==b'AWM2':add(end+12,1)  # the lava colour index (uint32, other bytes zero)
+    elif ext=='.awi' and rel.lower().startswith('gfx/inv/'):
+        # AWIC uses the same 256-colour palette as the world (aw_worldui.c).
+        need(raw[:4]==b'AWIC' and n==1028,'Invalid inventory icon');add(4,1024)
+    elif rel.lower() in ('inventory/items.awi','inventory/initial.awi'):
+        # Inventory records contain identities, paths and numbers, never pixels.
+        # Match the AWI2/AWST framing consumed by aw_inventory.c.
+        items=rel.lower()=='inventory/items.awi'
+        magic,count=get('<4sI',0);row=512 if items else 72
+        need(magic==(b'AWI2' if items else b'AWST') and
+             (1 if items else 0)<=count<=(65536 if items else 32) and n==8+count*row,
+             'Invalid inventory metadata')
+        return [],'inventory metadata (no pixels)'
     elif ext in ('.awi','.awu'):
         need(raw[:4]==(b'AWI1' if ext=='.awi' else b'AWU1'),'Unknown image version');w,h=get('<2H',4);need(n==8+w*h,'Image size mismatch');add(8,w*h)
     elif rel.lower()=='gfx/hand-models.awh':

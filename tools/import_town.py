@@ -63,6 +63,7 @@ def source_receipt(data, settings):
         geometry.update({k: settings[k] for k in ('bounds', 'reference_margin', 'owned_cells') if k in settings})
     return {'geometry': geometry,
             'fixed_visibility_state': settings.get('fixed_visibility_state'),
+            'fixed_visibility_cells': fixed_visibility_cells(settings),
             'visibility_code_sha256': hashlib.sha256(
                 (ROOT / 'src/mwad/script_visibility.py').read_bytes()).hexdigest(),
             'files': {p.relative_to(data).as_posix(): input_sha256(p) for p in sorted(files)},
@@ -119,15 +120,55 @@ def frame_references(out, settings):
     return fixed_state_references(out, settings, references)
 
 
+def fixed_visibility_cells(settings):
+    """Explicit snapshots stay bound to original CELLs, including apron copies."""
+    from visual_recipes import cell_settings
+    radius = settings['source_radius']
+    if isinstance(radius, bool) or not isinstance(radius, int) or radius < 0:
+        raise ValueError('Fixed visibility needs an integer source radius')
+    x, y = settings['source_cell']
+    rows = []
+    for cx in range(x - radius, x + radius + 1):
+        for cy in range(y - radius, y + radius + 1):
+            state = cell_settings((cx, cy)).get('fixed_visibility_state')
+            if (cx, cy) == (x, y) and settings.get('fixed_visibility_state') is not None:
+                state = settings['fixed_visibility_state']
+            if state is None:
+                continue
+            if (not isinstance(state, dict) or not state
+                    or any(not isinstance(k, str) or not k or isinstance(v, bool)
+                           or not isinstance(v, (int, float)) or not math.isfinite(v)
+                           for k, v in state.items())):
+                raise ValueError('Fixed visibility needs finite explicit globals')
+            rows.append({'cell': [cx, cy], 'requested_state': dict(state)})
+    return rows
+
+
+def write_fixed_visibility(data, out, settings):
+    from mwad.script_visibility import audit_cell
+    requested = fixed_visibility_cells(settings)
+    if not requested:
+        return
+    raw = child_ci(data, 'Morrowind.esm').read_bytes()
+    reports = [audit_cell(raw, row['cell'], row['requested_state']) for row in requested]
+    write_json(out / 'fixed-visibility.json', {'schema': 'source-cell-visibility-1', 'reports': reports})
+
+
 def fixed_state_references(out, settings, references):
-    if settings.get('fixed_visibility_state') is None:
+    requested = fixed_visibility_cells(settings)
+    if not requested:
         return references
     from mwad.script_visibility import filter_references
-    report = json.loads((out / 'fixed-visibility.json').read_text())
-    if (report['requested_state'] != settings['fixed_visibility_state']
-            or report['cell'] != list(settings['source_cell'])):
-        raise ValueError('Fixed visibility receipt does not match the requested state')
-    return filter_references(references, report)
+    document = json.loads((out / 'fixed-visibility.json').read_text())
+    # Retain compatibility with a single-cell receipt; every expected CELL and
+    # explicit state must still match, with no missing or extra reports.
+    reports = document['reports'] if document.get('schema') == 'source-cell-visibility-1' else [document]
+    actual = [{'cell': row['cell'], 'requested_state': row['requested_state']} for row in reports]
+    if actual != requested:
+        raise ValueError('Fixed visibility receipt does not match the requested cells and states')
+    for report in reports:
+        references = filter_references(references, report)
+    return references
 
 
 def split_references(references):
@@ -212,17 +253,8 @@ def collect(data, out, jobs, settings):
     footprint = (footprint_references(data, out, placements, settings, jobs)
                  if settings.get('reference_margin') is not None else set())
     references = [r for r in placements if in_frame(r, settings) or r['number'] in footprint]
-    state = settings.get('fixed_visibility_state')
-    if state is not None:
-        from mwad.script_visibility import audit_cell
-        if (settings['source_radius'] != 0 or not isinstance(state, dict) or not state
-                or any(not isinstance(k, str) or not k or isinstance(v, bool)
-                       or not isinstance(v, (int, float)) or not math.isfinite(v)
-                       for k, v in state.items())):
-            raise ValueError('Fixed visibility needs one source cell and finite explicit globals')
-        report = audit_cell(child_ci(data, 'Morrowind.esm').read_bytes(), settings['source_cell'], state)
-        write_json(out / 'fixed-visibility.json', report)
-        references = fixed_state_references(out, settings, references)
+    write_fixed_visibility(data, out, settings)
+    references = fixed_state_references(out, settings, references)
     selected, deferred = split_references(references)
     selected, deferred, pools = lava_split(data, selected, deferred)
     import lava

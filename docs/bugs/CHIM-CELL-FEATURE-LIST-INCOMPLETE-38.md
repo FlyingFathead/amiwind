@@ -16,7 +16,7 @@
 | Playtest version | source-only |
 | From commit | source c2eaa5a, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
-| Unknown because | Source and tracker audit; no exact-package native reproduction. |
+| Unknown because | Source ocean checklist integration has98targeted passes. Actual successor conversion/final routing/native/package remain pending; original LAND and routing-only cells stay distinct. |
 | Platform or emulator | not in game (Original master and source audit.) |
 
 <!-- END GENERATED FACTS -->
@@ -24,6 +24,7 @@
 <!-- contents start -->
 ## Contents
 
+- [Explicit ocean checklist integration, 15 October 2026](#explicit-ocean-checklist-integration-15-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -43,6 +44,45 @@
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## Explicit ocean checklist integration, 15 October 2026
+
+15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
+
+The failed dependency preparation is preserved. The full build selected all
+365 regional cells, including five explicit ocean cells without original
+CELL/LAND inventory rows. exterior_plan.make required every selected cell to
+exist in that source inventory, while terrain preparation classified rows
+before its existing verified ocean-routing append step. No legacy compilation
+or native ocean check completed in this failed preparation.
+
+The checklist now accepts an explicit ocean_cells selection and records only
+additional routing cells absent from the original source inventory separately.
+They are never relabelled as original LAND. The full builder forwards ocean
+kinds; terrain preparation uses before_ocean_routing=True only before
+append_routing_rows. Undeclared or unselected missing cells remain rejected.
+Default/final classify_regions and verify_stage remain strict: every final
+row must exist with required CHIM routing flags. Original ocean admission,
+engine behavior and rendering are unchanged; no new runtime mechanism is added.
+
+Three semantic regressions cover the pre-routing/final-row boundary and
+refusal of invalid selections or missing final rows. Actual five-module run
+(test_chim_seyda, test_chim_ownership, test_world_payload, test_world_manifest
+and test_chim_ocean_runtime) passes 98 checks. Current source SHA-256:
+
+- tools/exterior_plan.py: `4ed46d1a56628b94bd7feae9221a814171cd685d5b1f9715fb819d7dd75ebda8`.
+- tools/build.py: `dc22c5251ffd65a746a8344ba2b75ab8b4192331eded6507a2e377daa833d6e4`.
+- tools/prepare_world_regions.py: `761c0648a87c98234ba2c3aff21bc577f43e196e558c46048dd1be9c32b9cc68`.
+- tests/test_world_payload.py: `f04d27fe7ae09b8aa5e66a79023401b9a590e636244717049108d2bf710a7efe`.
+
+This targeted pass also covers the separately recorded opening-barrel missing
+CELL correction under [CHIM-FRAME-STATIC-SEAM-40](CHIM-FRAME-STATIC-SEAM-40.md).
+The preceding full-suite result remains bound to its earlier snapshot. New
+exact world/dependency conversion, final routing readback, native ocean and
+boundary checks, image finalization, packaging and delivery remain pending.
+The prepared Linux source kit remains held for successor source and undelivered.
+Original source cells, routing-only ocean cells, planned coverage and included
+payload remain distinct; no tracker state is promoted by this source repair.
 
 ## Symptom
 

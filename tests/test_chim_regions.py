@@ -173,6 +173,65 @@ class Selection(unittest.TestCase):
 
 
 class FrameSettings(unittest.TestCase):
+    def test_subcell_union_keeps_apron_without_expanding_logical_core(self):
+        from town_regions import regions, audit_coverage, select_references
+        s = R.frame_settings(R.frame_row((0, 0)))
+        def ref(n, x, y):
+            p = [(v + s['centre'][i] * s['scale']) / s['scale'] for i, v in enumerate((x, y))]
+            return {'number': n, 'bounds': [p, p]}
+        index = {'references': [ref(1, 0, 0), ref(2, -1900, -1900),
+                                ref(3, 1900, 1900), ref(4, 2000, 2000)]}
+        rows = regions(s)
+        self.assertEqual(audit_coverage(index, rows, s)['covered_references'], 3)
+        self.assertEqual(set().union(*(set(select_references(index, e, s)) for e in rows)), {1, 2, 3})
+        self.assertEqual(min(e['core'][0][0] for e in rows), -1024)
+        self.assertEqual(max(e['core'][1][0] for e in rows), 1024)
+        baseline = regions(dict(s, reference_margin=0))
+        self.assertEqual([e['core'] for e in rows], [e['core'] for e in baseline])
+        self.assertEqual(audit_coverage(index, baseline, dict(s, reference_margin=0))['covered_references'], 1)
+        with self.assertRaisesRegex(ValueError, 'apron must fit'):
+            regions(dict(s, reference_margin=897))
+
+    def test_heightless_apron_does_not_admit_a_missing_owned_land_cell(self):
+        s = R.frame_settings(R.frame_row((0, 0)))
+        area = {'center': [0, 0], 'radius_cells': 1,
+                'cells': [{'x': 0, 'y': 0}, {'x': 0, 'y': 1}],
+                'default_land_cells': [[0, 1]]}
+        R.check_source_land(s, {'area': area})
+        area['default_land_cells'].append([0, 0])
+        with self.assertRaisesRegex(ValueError, 'owned cell has no original LAND'):
+            R.check_source_land(s, {'area': area})
+        ocean = R.frame_settings(dict(R.frame_row((0, 0)), kind='ocean'))
+        R.check_source_land(ocean, {'area': area})
+        area['center'] = [1, 1]
+        with self.assertRaisesRegex(ValueError, 'different owned cell or scope'):
+            R.check_source_land(ocean, {'area': area})
+
+    def test_neighboring_static_footprint_survives_source_and_frame_selection(self):
+        # Empty cell next to a town: the neighbor owns the rock, while this
+        # frame needs its overhang and a second object just past the core.
+        import import_town
+        from town_grid import audit_radius, reference_ownership
+        from town_regions import town_references
+        s = R.frame_settings(R.frame_row((0, 0)))
+        audit_radius(s)
+        self.assertGreaterEqual(s['source_radius'], 1)
+        self.assertEqual(s['owned_cells'], [[0, 0], [1, 1]])
+        def ref(n, x, lo, hi):
+            return {'number': n, 'position': [x, 4096, 0], 'cell': [1, 0],
+                    'bounds': [[lo, 4000, -32], [hi, 4200, 32]]}
+        refs = [ref(1, 8256, 8000, 8512), ref(2, 8448, 8400, 8512),
+                ref(3, 12288, 12200, 12400)]
+        self.assertTrue(import_town.footprint_in_frame(refs[0], s))
+        self.assertTrue(import_town.footprint_in_frame(refs[1], s))
+        self.assertFalse(import_town.footprint_in_frame(refs[2], s))
+        self.assertEqual(town_references({'references': refs}, s), [1, 2])
+        own = reference_ownership(refs[:2], s)
+        self.assertEqual(own['owned_references'], [])
+        self.assertEqual([x['reference'] for x in own['dependency_references']], [1, 2])
+        self.assertGreaterEqual(s['reference_margin'], s['draw_distance'] + R.LEAVE_MARGIN)
+        self.assertEqual(s['handoff_core'], [[-1024, -1024], [1024, 1024]])
+
     def test_margin_rule_and_sectors(self):
         import town_config
         frame = R.frame_row((-7, 2))

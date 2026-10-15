@@ -1,5 +1,16 @@
 # AmiWind v0.0.40-dev2 inspection candidate
 
+## Combined-world gate update, 15 October 2026
+
+All 369 frames complete conversion and structural, heap, zone-walk and stair
+validation. Five adjacent boundary segments agree; the southern Seyda segment
+fails full-static support and 541 segments remain unmeasured. Repair and
+native capture are pending. No new native, packaged or shipped coverage is
+promoted. [Static seam](bugs/CHIM-FRAME-STATIC-SEAM-40.md) and
+[boundary ownership](bugs/CHIM-FRAME-DEPENDENCY-OWNERSHIP-40.md).
+Earlier preparation checkpoints below retain their original scope.
+
+
 Final release title: **v0.0.40: Rings 0, 1 and 2 of Vvardenfell in Full CHIM**.
 This development candidate is still undergoing the required release checks.
 The remaining exterior world retains its existing legacy representation, except

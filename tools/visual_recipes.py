@@ -70,12 +70,14 @@ def prepare_sprite_replacements(recipe, index, archive, palette, references,
     from prepare_tree_sprites import validate_sprite
     from prepare_world_flora import sprite_entity
     from world_flora_policy import stable_sprite_name
-    entries = load_recipes()['recipes'][recipe].get('sprites', {}) if recipe else {}
+    recipes = load_recipes()['recipes']
     prepared, mesh_fps = dict(prepared), dict(mesh_fps)
     rows, assets = [], []
     with Path(archive).open('rb') as source:
         for mi, model in enumerate(index['models']):
             key = model['source'].replace(chr(92), '/').lower()
+            selected_recipe = model.get('_visual_recipe', recipe)
+            entries = recipes[selected_recipe].get('sprites', {}) if selected_recipe else {}
             wanted = entries.get(key)
             refs = [r for r in references if r['model_index'] == mi]
             if wanted is None or not refs:
@@ -116,3 +118,41 @@ def cell_settings(cell):
     """Explicit per-cell conversion recipes; other cells retain their settings."""
     key = '%d,%d' % tuple(cell)
     return load_recipes().get('cell_settings', {}).get(key, {})
+
+
+def scope_reference_recipes(index, settings, document=None):
+    """Bind conversion policy to the original CELL, including its apron copies.
+
+    A shared source mesh may be placed in cells with different policies. Split
+    only that in-memory model binding; retain original references and packets.
+    Undeclared cells keep their ordinary profiles, even in a recipe frame.
+    """
+    document = load_recipes() if document is None else document
+    cells = document.get('cell_settings', {})
+    home = tuple(settings.get('source_cell', ()))
+    if not settings.get('visual_recipe') and not settings.get('clip_to_terrain') and not any(
+            cells.get('%d,%d' % tuple(ref['cell']), {})
+            for ref in index['references'] if len(ref.get('cell') or []) == 2):
+        return index
+    bindings, references, assigned = {}, [], set()
+    models = [dict(model, _visual_recipe=None, _clip_to_terrain=False) for model in index['models']]
+    for ref in index['references']:
+        cell = tuple(ref.get('cell') or home)
+        policy = cells.get('%d,%d' % cell, {}) if len(cell) == 2 else {}
+        if cell == home:
+            policy = dict(policy, **{k: settings[k] for k in ('visual_recipe', 'clip_to_terrain') if k in settings})
+        recipe = policy.get('visual_recipe')
+        clip = bool(policy.get('clip_to_terrain', False))
+        key = (ref['model_index'], recipe, clip)
+        if key not in bindings:
+            mi = ref['model_index']
+            model = dict(index['models'][mi], _visual_recipe=recipe, _clip_to_terrain=clip)
+            if mi not in assigned:
+                bindings[key] = mi
+                models[mi] = model
+                assigned.add(mi)
+            else:
+                bindings[key] = len(models)
+                models.append(model)
+        references.append(dict(ref, model_index=bindings[key]))
+    return dict(index, models=models, references=references)

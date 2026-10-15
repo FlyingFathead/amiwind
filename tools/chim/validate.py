@@ -173,6 +173,10 @@ def inside_convex_xy(poly, x, y, eps=1e-6):
     for i in range(n):
         ax, ay = poly[i][0], poly[i][1]
         bx, by = poly[(i + 1) % n][0], poly[(i + 1) % n][1]
+        # Chunk translation stores float32 vertices. Two adjacent corners can
+        # round to the same XY point; that zero-length edge has no boundary.
+        if ax == bx and ay == by:
+            continue
         c = (bx - ax) * (y - ay) - (by - ay) * (x - ax)
         if abs(c) <= eps:
             return None          # on an edge: sample points avoid edges
@@ -180,7 +184,7 @@ def inside_convex_xy(poly, x, y, eps=1e-6):
         if sign and s != sign:
             return False
         sign = s
-    return True
+    return bool(sign)
 
 
 # ---------------------------------------------------------------- terrain coverage

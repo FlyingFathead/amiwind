@@ -270,7 +270,7 @@ static int Begin (int kind, unsigned id, chim_user_t *user, chim_pack_t *pack, l
 		!Chim_PackRead (pack, offset, head, sizeof(head)))
 		return -1;
 	if (!AW_BrushHeader (&header, image ? chim_world.buffer : head, bytes) ||
-		(bound = AW_BrushBound (&header, 1)) < 0 || bound > 0x7fffffff - (int)sizeof(*cm))
+		(bound = AW_BrushBound (&header, 1, kind == CHIM_KIND_MODEL)) < 0 || bound > 0x7fffffff - (int)sizeof(*cm))
 		return -1;
 	cm = ChimZone_Alloc (user, sizeof(*cm) + bound, kind, id);
 	if (!cm)

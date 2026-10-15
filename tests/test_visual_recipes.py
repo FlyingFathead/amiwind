@@ -71,3 +71,46 @@ class RecipeIdentity(unittest.TestCase):
         self.model['source'] = 'meshes/x/other.nif'
         with self.assertRaises(ValueError):
             apply_recipe(self.profile, self.model, 'trial', self.data)
+
+
+class OriginalCellRecipes(unittest.TestCase):
+    def setUp(self):
+        self.document = {'cell_settings': {'10,1': {'visual_recipe': 'trial', 'clip_to_terrain': True}}}
+        self.index = {'models': [{'source': 'meshes/x/root.nif', 'sha256': 'a' * 64}],
+                      'references': [{'number': 1, 'cell': [10, 1], 'model_index': 0, 'position': [10, 20, 30]},
+                                     {'number': 2, 'cell': [10, 0], 'model_index': 0, 'position': [40, 50, 60]}]}
+
+    def bind(self, home):
+        from visual_recipes import scope_reference_recipes
+        return scope_reference_recipes(self.index, {'source_cell': home}, self.document)
+
+    def test_original_policy_matches_on_both_sides(self):
+        home, apron = self.bind([10, 1]), self.bind([10, 0])
+        self.assertEqual(home, apron)
+        ref = apron['references'][0]
+        model = apron['models'][ref['model_index']]
+        self.assertEqual(model['_visual_recipe'], 'trial')
+        self.assertTrue(model['_clip_to_terrain'])
+
+    def test_shared_mesh_keeps_unrelated_placement_ordinary(self):
+        out = self.bind([10, 1])
+        a, b = out['references']
+        self.assertNotEqual(a['model_index'], b['model_index'])
+        self.assertIsNone(out['models'][b['model_index']]['_visual_recipe'])
+        self.assertFalse(out['models'][b['model_index']]['_clip_to_terrain'])
+        self.assertEqual([x['position'] for x in out['references']], [[10, 20, 30], [40, 50, 60]])
+        self.assertEqual(self.index['references'][1]['model_index'], 0)
+        self.assertNotIn('_visual_recipe', self.index['models'][0])
+
+    def test_explicit_recipe_does_not_leak_to_foreign_cell(self):
+        from visual_recipes import scope_reference_recipes
+        out = scope_reference_recipes(self.index, {'source_cell': [10, 1], 'visual_recipe': 'trial'}, self.document)
+        b = out['references'][1]
+        self.assertIsNone(out['models'][b['model_index']]['_visual_recipe'])
+
+    def test_empty_reference_set_preserves_mount_models(self):
+        from visual_recipes import scope_reference_recipes
+        index = dict(self.index, references=[])
+        out = scope_reference_recipes(index, {'source_cell': [10, 0]}, self.document)
+        self.assertEqual(out['models'][0]['sha256'], 'a' * 64)
+        self.assertEqual(out['references'], [])

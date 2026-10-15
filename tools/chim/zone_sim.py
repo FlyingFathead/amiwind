@@ -137,7 +137,7 @@ def block_sizes(world, sizes):
     model_bytes, model_tex = [], []
     for m in world['models']:
         lumps = F.read_brush_image(m['image'])
-        model_bytes.append(H.image_bytes(lumps, sizes) - hunk + 64)       # + chim_model_t's arena record
+        model_bytes.append(H.image_bytes(lumps, sizes, point_hull_only=True) - hunk + 64)       # + chim_model_t's arena record
         model_tex.append(F.read_texture_refs(lumps[2]))
     tex_bytes = [H.texture_bytes(t['width'], t['height'], sizes) - hunk for t in world['textures']]
     entry = sizes.get('scenery', sizes['entity'])

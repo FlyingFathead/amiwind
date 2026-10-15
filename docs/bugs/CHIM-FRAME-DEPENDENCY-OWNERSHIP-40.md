@@ -24,6 +24,7 @@
 <!-- contents start -->
 ## Contents
 
+- [Combined-world readback, 15 October 2026](#combined-world-readback-15-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -36,6 +37,16 @@
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## Combined-world readback, 15 October 2026
+
+The successor completes structural, heap, zone-walk and stair validation with
+source and inputs unchanged. Six paired boundaries agree for terrain/water;
+static scenery differs at the southern Seyda boundary. Model/sprite, final
+actor contact, native and package acceptance remain pending.
+[Static boundary finding](CHIM-FRAME-STATIC-SEAM-40.md).
+Earlier failed or pending checkpoints below remain historical evidence.
+
 
 ## Symptom
 
@@ -180,6 +191,7 @@ package checks remain pending.
 Family: World storage and duplication (`world-storage`). Every asset stored once and placed by reference (world streamer); map lumps carry only what the engine uses. See [families](README.md#families).
 
 - [BSP-SHARED-SUBTREES-32](BSP-SHARED-SUBTREES-32.md): Converted maps share node subtrees between submodels; naive tree walks explode
+- [CHIM-FRAME-STATIC-SEAM-40](CHIM-FRAME-STATIC-SEAM-40.md): Static scenery collision differs across the southern Seyda frame boundary
 - [CONVERT-VARIANTS-32](CONVERT-VARIANTS-32.md): Objects are converted once per mesh, scale and tilt: 4-7 times more models than meshes
 - [INTERIOR-HULLS-HEAVY-32](INTERIOR-HULLS-HEAVY-32.md): Interior collision hulls are bigger than the interior geometry they belong to
 - [MAP-TEXTURE-COPIES-32](MAP-TEXTURE-COPIES-32.md): Every map carries its own copy of every texture it uses

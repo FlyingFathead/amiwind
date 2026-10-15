@@ -73,6 +73,9 @@ def local_bounds(reference, centre, scale):
 def regions(settings):
     size = settings['core_size']
     low, high = settings['bounds']
+    apron = settings.get('reference_margin', 0)
+    if not 0 <= apron <= settings['overlap']:
+        raise ValueError('Scenery apron must fit the sub-cell overlap')
     if size <= 0 or any((high[i] - low[i]) % size for i in range(2)):
         raise ValueError('Sub-cell bounds must contain complete cores')
     if settings['overlap'] < math.sqrt(2) * settings['draw_distance'] + settings['hysteresis'] + 32:
@@ -84,8 +87,8 @@ def regions(settings):
             name = f'{prefix}{len(out):03d}'
             core = settings.get('region_core_overrides', {}).get(name, [[x, y], [x + size, y + size]])
             margin = settings['overlap']
-            coverage = [[max(low[i], core[0][i] - margin) for i in range(2)],
-                        [min(high[i], core[1][i] + margin) for i in range(2)]]
+            coverage = [[max(low[i] - apron, core[0][i] - margin) for i in range(2)],
+                        [min(high[i] + apron, core[1][i] + margin) for i in range(2)]]
             out.append({'name': name, 'core': core, 'coverage': coverage})
     if len(out) > cap:
         raise ValueError('Region directory exceeds native capacity')
@@ -142,10 +145,17 @@ def select_references(index, entry, settings):
 
 
 def town_references(index, settings):
-    """The town's placements: converted bounds reaching into its bounds (the union of its sub-cell
-    coverages; the legacy region maps and the CHIM world hold exactly these)."""
+    """Placements whose footprint reaches the core or its explicit scenery apron.
+
+    Source collection already measures reference_margin. Retain that same
+    selection here instead of silently dropping apron objects before packing.
+    The core and logical original-cell ownership remain unchanged.
+    """
+    margin = settings.get('reference_margin', 0)
+    low, high = settings['bounds']
+    coverage = [[v - margin for v in low], [v + margin for v in high]]
     return [r['number'] for r in index['references']
-            if intersects(local_bounds(r, settings['centre'], settings['scale']), settings['bounds'])]
+            if intersects(local_bounds(r, settings['centre'], settings['scale']), coverage)]
 
 
 def audit_coverage(index, entries, settings):

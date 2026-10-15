@@ -31,7 +31,7 @@ class TownGrid(unittest.TestCase):
 
     def test_selection_audit_and_apron_cover_the_owned_core(self):
         for name in ('seyda_area.json','vivec_city.json'):
-            s=cfg(name);self.assertEqual(town_grid.audit_radius(s),3)
+            s=cfg(name);self.assertEqual(town_grid.audit_radius(s), 4 if name == 'vivec_city.json' else 3)
             self.assertGreaterEqual(s['terrain_margin'],s['draw_distance']+32)
         s=cfg('seyda_area.json');self.assertGreater(town_grid.scenery_radius(s,[-11200,-71504,400],11500),11500)
 
@@ -74,12 +74,36 @@ class TownGrid(unittest.TestCase):
         rows=regions(cfg('vivec_city.json'));self.assertEqual(len(rows),64)
         self.assertEqual([r['name'] for r in rows],[f'vc{i:03d}' for i in range(64)])
 
-    def test_new_core_points_use_half_open_source_filter(self):
-        from import_town import in_frame
-        s=cfg('vivec_city.json')
-        self.assertTrue(in_frame({'position':[8192,-114688,0]},s))
-        self.assertFalse(in_frame({'position':[57344,-114688,0]},s))
-        self.assertFalse(in_frame({'position':[8192,-65536,0]},s))
+    def test_vivec_scenery_apron_keeps_neighbor_objects_without_taking_ownership(self):
+        import math
+        from import_town import in_frame, footprint_in_frame
+        from town_regions import town_references
+        from chim.regions import LEAVE_MARGIN
+        s = cfg('vivec_city.json')
+        self.assertEqual(s['missing_land'], 'flat')
+        self.assertGreaterEqual(s['reference_margin'], s['draw_distance'] + LEAVE_MARGIN)
+        self.assertLessEqual(s['reference_margin'], s['terrain_margin'])
+        # Four objects outside each logical edge but visible during handoff.
+        points = [[7936, -97008, 0], [57600, -112368, 0],
+                  [18704, -114944, 0], [32768, -65280, 0]]
+        refs = [dict(number=n + 1, cell=[math.floor(p[k]/8192) for k in range(2)],
+                     position=p, bounds=[p, p]) for n, p in enumerate(points)]
+        for ref in refs:
+            self.assertTrue(in_frame(ref, s))
+            self.assertTrue(footprint_in_frame(ref, s))
+        self.assertEqual(town_references({'references': refs}, s), [1, 2, 3, 4])
+        own = town_grid.reference_ownership(refs, s)
+        self.assertEqual(own['owned_references'], [])
+        self.assertEqual(len(own['dependency_references']), 4)
+        # Audit covers the apron in all directions, including its corners.
+        low, high = s['bounds']; margin = s['reference_margin']
+        for edge in range(2):
+            for k in range(2):
+                local = (low[k] - margin) if edge == 0 else (high[k] + margin - 1)
+                cell = math.floor((s['centre'][k] + local/s['scale']) / 8192)
+                self.assertLessEqual(abs(cell-s['source_cell'][k]), s['source_radius'])
+        outside = [s['centre'][k] + (high[k]+margin)/s['scale'] for k in range(2)]
+        self.assertFalse(in_frame({'position': outside + [0]}, s))
 
     def test_reference_origin_ownership_keeps_dependency_copies_and_rejects_duplicates(self):
         s=cfg('seyda_area.json')

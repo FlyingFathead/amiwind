@@ -625,7 +625,8 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     report, entries=plan(survey)
     from exterior_plan import read as read_checklist, classify_regions
     checklist = read_checklist(exterior_plan) if exterior_plan else None
-    ownership = classify_regions(checklist, entries, report['master_sha256'], set(chim_cells or ())) if checklist else {}
+    ownership = classify_regions(checklist, entries, report['master_sha256'], set(chim_cells or ()),
+                                 before_ocean_routing=True) if checklist else {}
     routing_only = {name for name, kind in ownership.items() if kind == 'routing-only'}
     if digest(child_ci(data,'Morrowind.esm'))!=report['master_sha256'] or digest(child_ci(data,'Morrowind.bsa'))!=report['bsa_sha256']:
         raise ValueError('Original inputs differ from the measured survey')

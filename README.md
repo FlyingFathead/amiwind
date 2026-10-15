@@ -2,6 +2,15 @@
   <img src="resources/media/AmiWind_logo.png" width="900" alt="AmiWind: an open-source RPG engine for the Commodore Amiga">
 </p>
 
+15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See [v0.0.41-dev1 preparation notes](docs/RELEASE-v0.0.41-dev1.md).
+
+The earlier v0.0.41 source candidate corrects a false lava coverage failure caused by duplicate
+float32 vertices. Focused tests and unchanged cached-chunk checks pass. The
+combined world, native checks and private package remain pending. See the
+[current lava report](docs/bugs/CHIM-LAVA-DUPLICATE-VERTEX-40.md) and
+[boundary report](docs/bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+
 # AmiWind
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
@@ -127,7 +136,7 @@ These views do not establish sound or complete world-traversal acceptance.
 
 ![CHIM conversion and audit snapshot: 1,275 of 1,292 Vvardenfell land and empty-sea cells reached an audit milestone; this is not packaged coverage](docs/images/amiwind-v0.0.40-rings-progress-map.png)
 
-Snapshot: **15 October 2026, 06:48 UTC**, from the
+Snapshot: **15 October 2026, 10:50 UTC**, from the
 [public cell reference](docs/chim/cell-progress-reference.json). Each square is
 one exterior cell, north up. **Green** means a conversion/audit milestone;
 lighting, actors and gameplay can still be deferred. **Red** means an audit
@@ -141,6 +150,19 @@ release-plan overlay.
 | Conversion/audit milestone | 1,275 of 1,292 land and empty-sea cells (98.7%); 15 failed and 2 not converted |
 | Native-checked cells | No complete island-wide count established; scene checks remain scoped |
 | Packaged region cells | 360 whole cells in the exact RC2 package, verified 14 October; six partial town overlaps remain outside this count |
+
+The earlier combined v0.0.40 candidate passed conversion and structural, heap,
+zone-walk and stair checks for all 369 frames. Subsequent boundary repairs now
+produce zero full-static support-status disagreements across 2,816 samples
+(5,632 queries) at southern Seyda; terrain and water controls agree. The corrected
+Seyda frame passes structural, heap and zone-walk checks, but its full stair run
+ended in memory exhaustion. The later combined attempt failed ownership before
+packing because original kelp references were omitted by a legacy dressing filter.
+A correction retains the three known original kelp meshes and passes 43 focused
+source checks; its compiled, native and package gates remain pending. Other
+541 original boundary segments remain unmeasured. Work continues on v0.0.40. See the
+[static seam report](docs/bugs/CHIM-FRAME-STATIC-SEAM-40.md) and
+[tracker guide](docs/chim/PROGRESS_TRACKER.md#current-mapping-evidence-15-october-2026).
 
 The 865 open-ocean cells are outside the 1,292-cell denominator. Packaged
 region coverage is not a total for named town frames or interiors, and green

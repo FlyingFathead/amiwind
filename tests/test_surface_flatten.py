@@ -43,6 +43,28 @@ class NeighboringFacadeTests(unittest.TestCase):
         np.testing.assert_array_equal(model[0],self.wall()[0])
         self.assertEqual(support.report['used'][0]['support']['number'],20)
 
+    def test_known_tower_is_a_local_facade_without_changing_reference_ownership(self):
+        from unittest.mock import Mock
+        refs=[self.ref(10),self.ref(20,1,position=(0,0,0))]
+        v,f=self.wall()
+        models={0:(v,f,None,None,{'flatten':{'axis':1,'facing':-1,'mounting_plane':0}}),
+                1:(v,f,None,None,{})}
+        support=Mock(side_effect=AssertionError('unnecessary neighbour read'))
+        mount_references({'models':[{'source':'window.nif'},
+                                    {'source':'Meshes/X/EX_COMMON_TOWER_THATCH.NIF'}]},
+                         refs,models,(0,0),1,support=support)
+        support.assert_not_called()
+        self.assertEqual([r['number'] for r in refs],[10,20])
+        self.assertAlmostEqual(refs[0]['_flatten_shift'],-1.5)
+
+    def test_facade_selection_does_not_accept_arbitrary_towers_or_props(self):
+        from surface_flatten import window_facade_model
+        self.assertTrue(window_facade_model('Meshes\\X\\Ex_Common_Tower_Thatch.NIF'))
+        self.assertTrue(window_facade_model('meshes/x/ex_nord_house_01.nif'))
+        for name in ('meshes/x/unknown_tower.nif','meshes/x/ex_common_tower_thatch_fake.nif',
+                     'meshes/x/ex_nord_win_01.nif','meshes/x/contain_barrel_01.nif'):
+            self.assertFalse(window_facade_model(name),name)
+
     def test_supported_local_window_never_loads_neighbours(self):
         from unittest.mock import Mock
         refs=[self.ref(10),self.ref(20,1,position=(0,0,0))]
@@ -59,11 +81,13 @@ class NeighboringFacadeTests(unittest.TestCase):
         from mwad.scene import pack_geometry
         settings={'source_cell':[0,0],'source_radius':0,'centre':[0,0],'scale':1}
         master={'sha256':'master-hash','objects':{'house':{'type':'STAT','model':'x/house.nif'},
-                                               'container':{'type':'CONT','model':'x/house.nif'}},
+                                               'container':{'type':'CONT','model':'x/house.nif'},
+                                               'tower':{'type':'STAT','model':'x/ex_common_tower_thatch.nif'}},
                 'cells':{(0,0):{'refs':[self.ref(10)]},
                          (-1,0):{'refs':[self.ref(20,position=(0,0,0)),
                                          self.ref(21,deleted=True),
-                                         dict(self.ref(22),id='container')]},
+                                         dict(self.ref(22),id='container'),
+                                         dict(self.ref(23,position=(0,0,0)),id='tower')]},
                          (2,0):{'refs':[self.ref(30)]}}}
         v,f=self.wall();packet=pack_geometry([list(point)+[0.,0.,255,255,255,255] for point in v],f.tolist(),1)
         support=NeighboringFacadeSupport('/owned',settings,[10])
@@ -74,8 +98,10 @@ class NeighboringFacadeTests(unittest.TestCase):
              patch('prepare_scenery.model_geometry',return_value=(packet,[],[],[])) as geometry:
             self.assertAlmostEqual(support(self.ref(10),[1,0,1],[0,-1,0]),-1.5)
             self.assertAlmostEqual(support(self.ref(11),[1,0,1],[0,-1,0]),-1.5)
-        read.assert_called_once();geometry.assert_called_once()
-        self.assertEqual(len(support.walls),1)
+        self.assertEqual(read.call_count,2);self.assertEqual(geometry.call_count,2)
+        self.assertEqual(len(support.walls),2)
+        self.assertEqual({d['model'] for _,d in support.walls},
+                         {'meshes/x/house.nif','meshes/x/ex_common_tower_thatch.nif'})
         self.assertEqual(support.report['source_esm_sha256'],'master-hash')
         self.assertEqual(support.report['used'][0]['support']['cell'],[-1,0])
         self.assertEqual(support.report['used'][0]['support']['position'],[0,0,0])

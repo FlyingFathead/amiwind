@@ -266,5 +266,53 @@ class PayloadTests(unittest.TestCase):
             self.assertTrue((root / 'maps/vf0002.bsp').exists())
 
 
+
+
+class OceanChecklistTests(unittest.TestCase):
+    def fixture(self):
+        import exterior_plan as E
+        plan = E.make([(0, 0)], [(1, 0)], master_sha256='master', ocean_cells=[(1, 0)])
+        rows = [dict(name='vf%04d' % i, cell=[i, 0], origin=[i*2048+1024, 1024, 0],
+                     core=[[-1024]*2, [1024]*2]) for i in range(2)]
+        return E, plan, rows
+
+    def test_explicit_ocean_is_separate_from_the_source_inventory(self):
+        E, plan, rows = self.fixture()
+        self.assertEqual(plan['ocean_cells'], [[1, 0]])
+        self.assertEqual(E.validate(plan), plan)
+        self.assertEqual(E.classify_regions(plan, rows[:1], 'master', {(1, 0)},
+                                           before_ocean_routing=True), {'vf0000': 'bsp'})
+        self.assertEqual(E.classify_regions(plan, rows, 'master', {(1, 0)}),
+                         {'vf0000': 'bsp', 'vf0001': 'chim-region'})
+
+    def test_missing_final_ocean_and_undeclared_cells_are_rejected(self):
+        E, plan, rows = self.fixture()
+        with self.assertRaisesRegex(ValueError, 'survey cells'):
+            E.classify_regions(plan, rows[:1], 'master', {(1, 0)})
+        with self.assertRaisesRegex(ValueError, 'absent'):
+            E.make([(0, 0)], [(1, 0)], master_sha256='master')
+        with self.assertRaisesRegex(ValueError, 'explicitly selected'):
+            E.make([(0, 0)], [], master_sha256='master', ocean_cells=[(1, 0)])
+        with self.assertRaisesRegex(ValueError, 'selection differs'):
+            E.classify_regions(plan, rows, 'master', set())
+
+    def test_completed_stage_requires_ocean_routing_and_no_bsp(self):
+        E, plan, rows = self.fixture()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td); path = root/'checklist.json'
+            path.write_text(json.dumps(plan))
+            def write(selected):
+                (root/'world-regions.json').write_text(json.dumps(
+                    dict(master_sha256='master', regions=selected)))
+            write(rows[:1])
+            with self.assertRaisesRegex(ValueError, 'survey cells'):
+                E.verify_stage(path, root)
+            write(rows)
+            with self.assertRaisesRegex(ValueError, 'ownership changed'):
+                E.verify_stage(path, root)
+            rows[1]['chim_region'] = True; write(rows)
+            E.verify_stage(path, root)
+
+
 if __name__ == '__main__':
     unittest.main()

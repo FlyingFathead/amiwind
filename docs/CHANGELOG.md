@@ -1,14 +1,22 @@
 # Changelog
 
-This is the maintained history of implemented changes, grouped by version.
-Entries link to issue reports; current issue status belongs only in the
-[bug register](BUGS.md#fix-index). Candidate implementation, automated checks,
-native verification, packaging and shipment are separate claims. Update this
-file with each change under the [release workflow](RELEASE_WORKFLOW.md#mandatory-change-records).
+[CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.41 candidate - visibility aprons, 15 October 2026](#v0041-candidate---visibility-aprons-15-october-2026)
+- [v0.0.41 candidate - window support, 15 October 2026](#v0041-candidate---window-support-15-october-2026)
+- [v0.0.41 candidate - lava coverage, 15 October 2026](#v0041-candidate---lava-coverage-15-october-2026)
+- [Compiled apron selection, 15 October 2026](#compiled-apron-selection-15-october-2026)
+- [Paired boundary validation, 15 October 2026](#paired-boundary-validation-15-october-2026)
+- [v0.0.40 - owner apron policy, 15 October 2026](#v0040---owner-apron-policy-15-october-2026)
+- [v0.0.40 - original kelp ownership, 15 October 2026](#v0040---original-kelp-ownership-15-october-2026)
+- [v0.0.40 - retain authored boundary collision, 15 October 2026](#v0040---retain-authored-boundary-collision-15-october-2026)
+- [v0.0.40 - sub-cell scenery apron parity, 15 October 2026](#v0040---sub-cell-scenery-apron-parity-15-october-2026)
+- [v0.0.40 - coastal scenery apron guard, 15 October 2026](#v0040---coastal-scenery-apron-guard-15-october-2026)
+- [v0.0.40 - regional scenery apron repair, 15 October 2026](#v0040---regional-scenery-apron-repair-15-october-2026)
+- [v0.0.40 - combined conversion and static seam finding, 15 October 2026](#v0040---combined-conversion-and-static-seam-finding-15-october-2026)
 - [v0.0.40 - final-version source preparation, 15 October 2026](#v0040---final-version-source-preparation-15-october-2026)
 - [v0.0.40-dev2 - ring plan and public images, 15 October 2026](#v0040-dev2---ring-plan-and-public-images-15-october-2026)
 - [v0.0.40-dev2 - boundary ownership source repair, 15 October 2026](#v0040-dev2---boundary-ownership-source-repair-15-october-2026)
@@ -65,9 +73,9 @@ file with each change under the [release workflow](RELEASE_WORKFLOW.md#mandatory
 - [v0.0.30-dev4: The Temple](#v0030-dev4-the-temple)
 - [v0.0.30-dev3: The Temple](#v0030-dev3-the-temple)
 - [v0.0.29-rc2: Let There Be (Just a Bit More) Light](#v0029-rc2-let-there-be-just-a-bit-more-light)
-- [0.0.28 — Trees and Grass, Day and Night — in preparation, 4 October 2026](#0028--trees-and-grass-day-and-night--in-preparation-4-october-2026)
-- [0.0.28-rc1 — Trees and Grass, Day and Night — candidate, 4 October 2026](#0028-rc1--trees-and-grass-day-and-night--candidate-4-october-2026)
-- [0.0.27 — Rocks, Mushrooms, and Then Some — 3 October 2026](#0027--rocks-mushrooms-and-then-some--3-october-2026)
+- [0.0.28 â€” Trees and Grass, Day and Night â€” in preparation, 4 October 2026](#0028-â-trees-and-grass-day-and-night-â-in-preparation-4-october-2026)
+- [0.0.28-rc1 â€” Trees and Grass, Day and Night â€” candidate, 4 October 2026](#0028-rc1-â-trees-and-grass-day-and-night-â-candidate-4-october-2026)
+- [0.0.27 â€” Rocks, Mushrooms, and Then Some â€” 3 October 2026](#0027-â-rocks-mushrooms-and-then-some-â-3-october-2026)
 - [0.0.26](#0026)
 - [0.0.26-rc1](#0026-rc1)
 - [0.0.25](#0025)
@@ -75,42 +83,42 @@ file with each change under the [release workflow](RELEASE_WORKFLOW.md#mandatory
 - [v0.0.25-rc9](#v0025-rc9)
 - [v0.0.25-rc8](#v0025-rc8)
 - [v0.0.25-rc7](#v0025-rc7)
-- [v0.0.25-rc6 — 1 October 2026](#v0025-rc6--1-october-2026)
-- [v0.0.25-rc5 — 1 October 2026](#v0025-rc5--1-october-2026)
-- [v0.0.25-rc4 — 1 October 2026](#v0025-rc4--1-october-2026)
-- [v0.0.25-rc3 — 1 October 2026](#v0025-rc3--1-october-2026)
-- [v0.0.25-rc2 — 1 October 2026](#v0025-rc2--1-october-2026)
-- [v0.0.25-rc1 — 1 October 2026](#v0025-rc1--1-october-2026)
-- [v0.0.25-dev1 — 1 October 2026](#v0025-dev1--1-october-2026)
+- [v0.0.25-rc6 â€” 1 October 2026](#v0025-rc6-â-1-october-2026)
+- [v0.0.25-rc5 â€” 1 October 2026](#v0025-rc5-â-1-october-2026)
+- [v0.0.25-rc4 â€” 1 October 2026](#v0025-rc4-â-1-october-2026)
+- [v0.0.25-rc3 â€” 1 October 2026](#v0025-rc3-â-1-october-2026)
+- [v0.0.25-rc2 â€” 1 October 2026](#v0025-rc2-â-1-october-2026)
+- [v0.0.25-rc1 â€” 1 October 2026](#v0025-rc1-â-1-october-2026)
+- [v0.0.25-dev1 â€” 1 October 2026](#v0025-dev1-â-1-october-2026)
 - [v0.0.24 - Welcome to Balmora (and Vvardenfell!) - 1 October 2026](#v0024---welcome-to-balmora-and-vvardenfell---1-october-2026)
-- [v0.0.24-rc4 — 1 October 2026](#v0024-rc4--1-october-2026)
-- [v0.0.24-rc3 — 1 October 2026](#v0024-rc3--1-october-2026)
-- [v0.0.24-rc2 — 1 October 2026](#v0024-rc2--1-october-2026)
-- [v0.0.24-rc1 — 30 September 2026](#v0024-rc1--30-september-2026)
-- [v0.0.24-dev4 — 30 September 2026](#v0024-dev4--30-september-2026)
-- [v0.0.24-dev3 — 30 September 2026](#v0024-dev3--30-september-2026)
-- [v0.0.24-dev2 — 30 September 2026](#v0024-dev2--30-september-2026)
-- [v0.0.24-dev1 — 30 September 2026](#v0024-dev1--30-september-2026)
-- [v0.0.23-dev4 — 29 September 2026](#v0023-dev4--29-september-2026)
-- [0.0.23-dev2 — 29 September 2026](#0023-dev2--29-september-2026)
+- [v0.0.24-rc4 â€” 1 October 2026](#v0024-rc4-â-1-october-2026)
+- [v0.0.24-rc3 â€” 1 October 2026](#v0024-rc3-â-1-october-2026)
+- [v0.0.24-rc2 â€” 1 October 2026](#v0024-rc2-â-1-october-2026)
+- [v0.0.24-rc1 â€” 30 September 2026](#v0024-rc1-â-30-september-2026)
+- [v0.0.24-dev4 â€” 30 September 2026](#v0024-dev4-â-30-september-2026)
+- [v0.0.24-dev3 â€” 30 September 2026](#v0024-dev3-â-30-september-2026)
+- [v0.0.24-dev2 â€” 30 September 2026](#v0024-dev2-â-30-september-2026)
+- [v0.0.24-dev1 â€” 30 September 2026](#v0024-dev1-â-30-september-2026)
+- [v0.0.23-dev4 â€” 29 September 2026](#v0023-dev4-â-29-september-2026)
+- [0.0.23-dev2 â€” 29 September 2026](#0023-dev2-â-29-september-2026)
 - [v0.0.23-dev1 - parallel builds, 29 September 2026](#v0023-dev1---parallel-builds-29-september-2026)
 - [v0.0.22 - normal public source release, 29 September 2026](#v0022---normal-public-source-release-29-september-2026)
 - [v0.0.21-dev8 - reconciled boot/launcher and paper-font sources, 29 September 2026](#v0021-dev8---reconciled-bootlauncher-and-paper-font-sources-29-september-2026)
 - [v0.0.21-dev7 - visible five-second preflight and dry-run boot order, 29 September 2026](#v0021-dev7---visible-five-second-preflight-and-dry-run-boot-order-29-september-2026)
 - [v0.0.21-dev6 - versioned boot/environment preflight, 29 September 2026](#v0021-dev6---versioned-bootenvironment-preflight-29-september-2026)
-- [v0.0.21-dev5 — GOG TTF preference and Steam font fallback, 28 September 2026](#v0021-dev5--gog-ttf-preference-and-steam-font-fallback-28-september-2026)
-- [v0.0.21-dev4 — evening world-mapping checkpoint, 28 September 2026](#v0021-dev4--evening-world-mapping-checkpoint-28-september-2026)
-- [v0.0.21-dev3 — opening maintenance and interaction hints, 28 September 2026](#v0021-dev3--opening-maintenance-and-interaction-hints-28-september-2026)
-- [v0.0.21-dev2 — opening barrier correction, 28 September 2026](#v0021-dev2--opening-barrier-correction-28-september-2026)
-- [Portable launcher helper — 28 September 2026](#portable-launcher-helper--28-september-2026)
-- [v0.0.20 — 28 September 2026](#v0020--28-september-2026)
-- [v0.0.19 — 28 September 2026](#v0019--28-september-2026)
-- [v0.0.18-dev5 — 28 September 2026](#v0018-dev5--28-september-2026)
-- [v0.0.18-dev4 — 28 September 2026](#v0018-dev4--28-september-2026)
-- [v0.0.18-dev3 — 28 September 2026](#v0018-dev3--28-september-2026)
-- [v0.0.18-dev2 — 28 September 2026](#v0018-dev2--28-september-2026)
-- [v0.0.18-dev1 — 28 September 2026](#v0018-dev1--28-september-2026)
-- [v0.0.17 — 28 September 2026](#v0017--28-september-2026)
+- [v0.0.21-dev5 â€” GOG TTF preference and Steam font fallback, 28 September 2026](#v0021-dev5-â-gog-ttf-preference-and-steam-font-fallback-28-september-2026)
+- [v0.0.21-dev4 â€” evening world-mapping checkpoint, 28 September 2026](#v0021-dev4-â-evening-world-mapping-checkpoint-28-september-2026)
+- [v0.0.21-dev3 â€” opening maintenance and interaction hints, 28 September 2026](#v0021-dev3-â-opening-maintenance-and-interaction-hints-28-september-2026)
+- [v0.0.21-dev2 â€” opening barrier correction, 28 September 2026](#v0021-dev2-â-opening-barrier-correction-28-september-2026)
+- [Portable launcher helper â€” 28 September 2026](#portable-launcher-helper-â-28-september-2026)
+- [v0.0.20 â€” 28 September 2026](#v0020-â-28-september-2026)
+- [v0.0.19 â€” 28 September 2026](#v0019-â-28-september-2026)
+- [v0.0.18-dev5 â€” 28 September 2026](#v0018-dev5-â-28-september-2026)
+- [v0.0.18-dev4 â€” 28 September 2026](#v0018-dev4-â-28-september-2026)
+- [v0.0.18-dev3 â€” 28 September 2026](#v0018-dev3-â-28-september-2026)
+- [v0.0.18-dev2 â€” 28 September 2026](#v0018-dev2-â-28-september-2026)
+- [v0.0.18-dev1 â€” 28 September 2026](#v0018-dev1-â-28-september-2026)
+- [v0.0.17 â€” 28 September 2026](#v0017-â-28-september-2026)
 - [v0.0.16](#v0016)
 - [0.12.1.dev1 / runtime source still v0.0.15-dev2](#0121dev1--runtime-source-still-v0015-dev2)
 - [0.12.0.dev2 / runtime v0.0.15-dev2](#0120dev2--runtime-v0015-dev2)
@@ -122,9 +130,9 @@ file with each change under the [release workflow](RELEASE_WORKFLOW.md#mandatory
 - [0.8.3.dev4 / runtime v0.0.11-dev4](#083dev4--runtime-v0011-dev4)
 - [0.8.3.dev3 / runtime v0.0.11-dev3](#083dev3--runtime-v0011-dev3)
 - [Development source 0.8.3.dev1 / runtime v0.0.11-dev1](#development-source-083dev1--runtime-v0011-dev1)
-- [Runtime v0.0.10 / source 0.8.2 — 27 September 2026](#runtime-v0010--source-082--27-september-2026)
-- [Runtime v0.0.9 / source 0.8.1 — 27 September 2026](#runtime-v009--source-081--27-september-2026)
-- [Runtime v0.0.8 / source 0.8.0 — 27 September 2026](#runtime-v008--source-080--27-september-2026)
+- [Runtime v0.0.10 / source 0.8.2 â€” 27 September 2026](#runtime-v0010--source-082-â-27-september-2026)
+- [Runtime v0.0.9 / source 0.8.1 â€” 27 September 2026](#runtime-v009--source-081-â-27-september-2026)
+- [Runtime v0.0.8 / source 0.8.0 â€” 27 September 2026](#runtime-v008--source-080-â-27-september-2026)
 - [Changelog](#changelog-1)
 - [0.7.0 source / AmiWind v0.0.6 checkpoint-005](#070-source--amiwind-v006-checkpoint-005)
 - [0.6.0 source / demo v0.0.5 checkpoint-004](#060-source--demo-v005-checkpoint-004)
@@ -132,15 +140,198 @@ file with each change under the [release workflow](RELEASE_WORKFLOW.md#mandatory
 - [0.4.0 source / demo v0.0.3 checkpoint-002](#040-source--demo-v003-checkpoint-002)
 - [0.3.0 source / opening and terrain walk v0.0.2](#030-source--opening-and-terrain-walk-v002)
 - [0.2.0 source / opening v0.0.1](#020-source--opening-v001)
-- [0.1.3 — 27 September 2026](#013--27-september-2026)
-- [0.1.2 — 27 September 2026](#012--27-september-2026)
-- [0.1.1 — 27 September 2026](#011--27-september-2026)
-- [0.1.0 — 27 September 2026](#010--27-september-2026)
+- [0.1.3 â€” 27 September 2026](#013-â-27-september-2026)
+- [0.1.2 â€” 27 September 2026](#012-â-27-september-2026)
+- [0.1.1 â€” 27 September 2026](#011-â-27-september-2026)
+- [0.1.0 â€” 27 September 2026](#010-â-27-september-2026)
   - [rc6 image recovery follow-up](#rc6-image-recovery-follow-up)
-- [Validation finding — 14 October 2026, v0.0.40-dev1](#validation-finding--14-october-2026-v0040-dev1)
+- [Validation finding â€” 14 October 2026, v0.0.40-dev1](#validation-finding-â-14-october-2026-v0040-dev1)
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1: whole-world metadata binding failed because tutorial barrel reference 172851 lacked its original CELL, while the original audit records [-2,-9]. A narrow source correction restores only that missing field before capture, rejecting nonempty wrong cells and every other identity/transform mismatch. Fifty focused Seyda/ownership checks pass, including three new semantic regressions. The preceding 4,247-test full-suite pass remains historical; the repaired world is pending. The prepared Linux source kit is held and undelivered. Native, image/package and playtest acceptance remain pending; coverage states are unchanged.
+
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1 image integration follow-up: added Seyda dependency numbers and model digests are checked against the world-index-bound source manifest before source-carrier static parity includes them. Frames without supplements retain prior behavior. The focused ownership/apron module now passes 33 checks, including five new semantic regressions and missing/rebound-model rejection. The issue remains OPEN; exact world rebuild, held-boundary/native and image/package checks remain pending.
+
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1: a source repair supplements only missing Seyda apron dependencies using the included original-cell owner's exact compiled mesh and textures, preserving original identity and unique ownership while translating frame-local origins. It targets rock reference 251397 and shell reference 461804; 32 focused ownership/apron checks pass. The rebuilt world and held boundary/native checks remain pending. Separately, independent normal interior/actor/UI conversion completed 2,451 files with unchanged source and inputs; it is not image, native or package acceptance. CHIM coverage states are unchanged. Earlier full-suite and world results remain bound to their preceding source; changed apron acceptance is pending.
+
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1: exact source validation completed 4,242 tests (4,236 passed, three Windows-only skips and three Census expected failures), with zero failures/errors; the matching engine compiled. The completed 369-frame world passed structural/source, modeled heap, host zone-walk and scoped stair gates. Of 547 boundary comparisons, 544 measured agreement and three remain held (237, 241, 242). Of 36 sampled models, 22 have matching face counts and unique face correspondence; 14 differ in collision-only versus visual representation and require payload/sprite/native review. These measurements do not establish visual severity or universal equivalence. Native captures, independent interior conversion, image assembly/readback and package acceptance remain pending; coverage states are unchanged. Stair evidence retains 15,348 advisory findings despite zero blocking failures.
+
+15 October 2026 — The preceding v0.0.41 source snapshot completed 4,242 tests: 4,236 passed, zero failures/errors, three Windows-only skips and three exact Census expected failures; source was unchanged. This does not validate the subsequent v0.0.41-dev1 version alignment or establish image/native/package acceptance.
+
+15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See the [current development candidate](RELEASE-v0.0.41-dev1.md).
+
+[BUILD-INVENTORY-PALETTE-41](bugs/BUILD-INVENTORY-PALETTE-41.md) — 15 October 2026, v0.0.41 source candidate: image assembly prepares inventory before the sky palette pass, which rejected current AWIC icons and AWI2/AWST metadata as unknown images. The source repair validates each inventory format at its exact path, remaps only icon pixels and preserves metadata bytes. Scoped evidence contains 15 passing palette checks and 2 passing inventory-asset checks on matching unchanged source. Actual image assembly, native verification, packaging and shipment remain pending.
+
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or owner acceptance is promoted.
+
+15 October 2026, v0.0.41: Toolkit own version advances to 0.1.4 for the placed-model heap mirror correction; its header names AmiWind v0.0.41. See [CHIM-MODEL-ARENA-RESERVE-41](bugs/CHIM-MODEL-ARENA-RESERVE-41.md).
+
+[CHIM-MODEL-ARENA-RESERVE-41](bugs/CHIM-MODEL-ARENA-RESERVE-41.md) — 15 October 2026: exact allocation and predecessor-world checks remain separately recorded. The later 941 world stopped at its ownership guard because named aprons bypassed ten existing deferred-owner dispositions. The source-only disposition repair passes 38 focused checks; fresh world, boundary/model review and native/package acceptance remain pending.
+
+[CHIM-MODEL-ARENA-RESERVE-41](bugs/CHIM-MODEL-ARENA-RESERVE-41.md) — 15 October 2026: exact allocation and predecessor-world checks remain separately recorded. The later 941 world stopped at its ownership guard because named aprons bypassed ten existing deferred-owner dispositions. The source-only disposition repair passes 38 focused checks; fresh world, boundary/model review and native/package acceptance remain pending.
+
+[CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) â€” 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
+
+15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
+
+## v0.0.41 candidate - visibility aprons, 15 October 2026
+
+[CHIM-VISIBILITY-APRON-SCOPE-41](bugs/CHIM-VISIBILITY-APRON-SCOPE-41.md) - The combined world stopped at Tel Uvirith, original cell (10, 1), because
+its approved fixed stronghold snapshot required a source radius of zero.
+Regional frames now audit neighbouring cells for separate aprons. The repair
+keeps visibility snapshots bound to each original cell across all frames that
+audit it. Unknown scripts and unaudited references remain visible. Runtime
+quest progression is still deferred; complete conversion and native/package
+acceptance remain pending. Coverage counts are unchanged.
+
+## v0.0.41 candidate - window support, 15 October 2026
+
+[CHIM-WINDOW-TOWER-SUPPORT-41](bugs/CHIM-WINDOW-TOWER-SUPPORT-41.md) - The combined v0.0.41 world build stopped while mounting four Nordic windows
+from original cell (7, 22) into the adjacent frame apron. Their supporting
+thatched tower was present, but the facade search accepted only model names
+containing "house". Exact source triangles support all four windows under the
+existing distance and outward-normal checks.
+
+The candidate recognizes the original thatched-tower model in both local and
+neighbouring facade searches. It keeps original reference ownership, geometry,
+collision, mounting range and clearance. Arbitrary props are still rejected.
+The failing build is preserved; complete conversion, native comparison and
+fresh package readback remain pending. Coverage counts are not promoted.
+
+
+15 October 2026, v0.0.41 candidate: 50 focused lava/polygon/terrain checks
+and 47 emulator preset/launcher checks pass. Both original failing chunks pass
+coverage against the unchanged cached geometry. Full combined-world, exact
+source suite, native, package and shipment checks remain pending.
+
+## v0.0.41 candidate - lava coverage, 15 October 2026
+
+[CHIM-LAVA-DUPLICATE-VERTEX-40](bugs/CHIM-LAVA-DUPLICATE-VERTEX-40.md) - The v0.0.40 combined-world build stopped on two chunks in cell (2, -2).
+Readback of the exact cached units found five affected coverage samples:
+each has one lava surface and lava contents (-5) at the required depth.
+A tiny edge collapses to identical adjacent vertices when the chunk is
+translated into float32 frame coordinates. The polygon test mistook this
+zero-length edge for a boundary through every sample.
+
+The v0.0.41 candidate skips only exactly identical adjacent XY vertices.
+It preserves edge ambiguity, outside rejection and empty/degenerate rejection;
+no geometry, collision, pool height, tolerance or engine format is changed.
+Full-world validation, native checks, fresh package readback and delivery
+remain separate and pending. No coverage count is promoted.
+
+## Compiled apron selection, 15 October 2026
+
+CHIM-FRAME-STATIC-SEAM-40 â€” The full combined conversion found a conservative
+source box overlapping an apron although the compiled rock footprint ends
+0.83 game units outside it. The selection now records and excludes only external
+references whose compiled pieces all miss that apron. Owned originals, reaching
+pieces and missing-piece failures remain protected. The original reference and
+compiled boxes remain in the source receipt. All 68 focused checks pass.
+The preceding source passed 4,218 tests: 4,212 passed, three Windows checks
+skipped and three tracked Census cases were expected failures. The later source
+requires its own full suite and combined validation. Native, package and shipment
+acceptance remain pending; no converted or accepted coverage count is promoted.
+
+[Canonical report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+## Paired boundary validation, 15 October 2026
+
+CHIM-FRAME-STATIC-SEAM-40 â€” The latest v0.0.40 paired conversion passes structural, heap, zone-walk and
+stair validation. The 3,836 tested steps and ramps pass; 610 advisory results
+remain recorded. Across 2,816 paired positions, full-static support states agree
+and the maximum supported-height difference is 0.000077 game units. Terrain,
+water and common standing-hull controls agree. The complete 369-frame successor
+is being built from the same converter source; its acceptance remains pending.
+The exact source full suite is running. Native gameplay, other boundary segments,
+fresh package readback and shipment remain separate unfinished gates.
+
+[Canonical report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+This is the maintained history of implemented changes, grouped by version.
+Entries link to issue reports; current issue status belongs only in the
+[bug register](BUGS.md#fix-index). Candidate implementation, automated checks,
+native verification, packaging and shipment are separate claims. Update this
+file with each change under the [release workflow](RELEASE_WORKFLOW.md#mandatory-change-records).
+
+## v0.0.40 - owner apron policy, 15 October 2026
+
+The source owner check found twelve additional references in the sampled
+regional apron: four placements of the fourth kelp mesh, four objects already
+deferred by Seyda, and four nonsolid grasses represented by existing sprites.
+The successor retains all four original kelp models. Regional aprons now honor
+the included town's exact declared deferrals; nonsolid grasses retain the same
+hash-verified sprite bytes and original transforms instead of duplicate meshes.
+Unrecorded missing owners, changed original identities and corrupt sprite assets
+still fail. The existing ownership validator is unchanged. Forty-seven focused
+checks pass, including serialized ownership and sprite corruption controls.
+
+The earlier authored-collision source passed 4,213 tests: 4,207 passed, three
+Windows-only checks skipped, and three tracked Census expected failures. This
+does not certify the later source. Combined conversion, native seams, gameplay,
+fresh packaging and delivery remain pending; no coverage acceptance is promoted.
+
+[Canonical report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+
+## v0.0.40 - original kelp ownership, 15 October 2026
+
+CHIM-FRAME-STATIC-SEAM-40: Authored collision removes support-state mismatches
+at2,816compiled boundary samples. The combined gate finds omitted original
+kelp; the successor retains three source meshes and verifies their parity
+against the original scenery index.43focusedchecks pass. Stair-gate memory
+failure is preserved; full combined/native/package acceptance remains pending.
+[Report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+
+## v0.0.40 - retain authored boundary collision, 15 October 2026
+
+CHIM-FRAME-STATIC-SEAM-40: Compiled apron repair reduces mismatches477to69;
+remaining rock disagreement comes from an authored collision shape omitted
+by the Seyda carrier. A CHIM-only supplement verifies original source and
+visible geometry hashes, preserves the carrier and retains the original
+collision. Nineteen focused checks pass; compiled/native/package acceptance
+remains pending. [Report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+
+## v0.0.40 - sub-cell scenery apron parity, 15 October 2026
+
+CHIM-FRAME-STATIC-SEAM-40: Sub-cell coverage now retains the explicit scenery
+apron without enlarging logical cores. 75 focused checks pass, including the
+exact coverage union. Compiled, native and package verification remain pending.
+[Report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+
+## v0.0.40 - coastal scenery apron guard, 15 October 2026
+
+CHIM-FRAME-STATIC-SEAM-40: The expanded scenery survey permits heightless
+ocean neighbors while rejecting missing owned-cell terrain. 74 focused checks
+pass; compiled successor, native and package acceptance remain pending.
+[Report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+
+## v0.0.40 - regional scenery apron repair, 15 October 2026
+
+CHIM-FRAME-STATIC-SEAM-40: Proposed source repair retains adjacent scenery
+dependencies without enlarging owned cells. 73 focused checks pass; compiled
+paired readback, native and package acceptance remain pending.
+[Report](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+
+
+## v0.0.40 - combined conversion and static seam finding, 15 October 2026
+
+- Combined conversion and its structural, heap, zone-walk and stair gates pass.
+  Boundary ownership repair is structurally verified; model/sprite equivalence
+  remains pending. [Ownership](bugs/CHIM-FRAME-DEPENDENCY-OWNERSHIP-40.md).
+- Paired collision readback finds missing or differing scenery support at the
+  southern Seyda crossing. Five boundary segments agree; one fails and 541
+  remain unmeasured. Native and package acceptance remain held.
+  [Static seam](bugs/CHIM-FRAME-STATIC-SEAM-40.md).
+- Terrain/water agree across the six measured boundaries; this limited result
+  does not close [terrain](bugs/CHIM-TERRAIN-DIAGONAL-40.md) or
+  [actor contact](bugs/CHIM-SEYDA-ACTOR-CONTACT-33.md).
+
 
 ## v0.0.40 - final-version source preparation, 15 October 2026
 
@@ -464,7 +655,7 @@ gates pass; native checks and packaging remain pending. Four original
 leveled-creature references remain deferred; packaged coverage is unchanged.
 [Coverage and required original-cell town boundaries](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md).
 
-- BUILD-PLAYER-BODY-BUDGET-FALLBACK-39 — 15 October 2026, v0.0.40-dev2:
+- BUILD-PLAYER-BODY-BUDGET-FALLBACK-39 â€” 15 October 2026, v0.0.40-dev2:
   continue past reduced animation fits to seek full action sampling under
   unchanged geometry and memory guards. The canonical Argonian diagnostic
   fits122 frames; production and native verification remain pending.
@@ -737,13 +928,13 @@ shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
   third-person start-pose failure remains open.
   [COMBAT-BLOCKING-36](bugs/COMBAT-BLOCKING-36.md).
 
-- Scoped female-Nord WALK3 shore entry and depth control: z39.5→-66.4, idle5s
+- Scoped female-Nord WALK3 shore entry and depth control: z39.5â†’-66.4, idle5s
   holds depth; pitch45+forward descends to-175.3 and settles, pitch-45+forward
   ascends to-37.9. Upright-body/surface-entry/original parity and owner acceptance
   remain open. [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md).
 
 - Scope native Nord male-to-female confirmation: same world point, expected
-  health55→50 stat rebuild, equipped clothes1/gold87/picked Russula1 retained.
+  health55â†’50 stat rebuild, equipped clothes1/gold87/picked Russula1 retained.
   Appearance-menu head distortion remains unbound and unaccepted; a valid
   inventory body display does not accept full appearance quality.
   [Head quality](bugs/NPC-HEAD-DECIMATION-33.md),
@@ -1624,7 +1815,7 @@ RC2 keeps the original RC1 Balmora Temple map. A narrowly scoped converter corre
 This is a release candidate for continued playtesting. Final source, package checksums, and delivery status belong with the completed release artifacts. Remote public-source publication is not claimed by this draft.
 
 
-## 0.0.28 — Trees and Grass, Day and Night — in preparation, 4 October 2026
+## 0.0.28 â€” Trees and Grass, Day and Night â€” in preparation, 4 October 2026
 
 - Selected stable release identity 0.0.28; scoped local native acceptance passed. Public publication remains pending.
 - V3 is default: stronger red/gold twilight, purple/blue hour, two original-cloud
@@ -1668,7 +1859,7 @@ This is a release candidate for continued playtesting. Final source, package che
   Historical rc1/V1 captures retain attribution; v0.0.27 is still published.
   See [stable preparation](RELEASE-v0.0.28.md).
 
-## 0.0.28-rc1 — Trees and Grass, Day and Night — candidate, 4 October 2026
+## 0.0.28-rc1 â€” Trees and Grass, Day and Night â€” candidate, 4 October 2026
 
 - Prepared original-placement world foliage with 76 shared sprite types;
   preserved rocks, giant mushrooms and detailed Balmora mesh foliage.
@@ -1684,7 +1875,7 @@ This is a release candidate for continued playtesting. Final source, package che
   for byte. New HDF assembly/readback passed. Independent gameplay acceptance
   and publication remain pending. See [candidate scope](RELEASE-v0.0.28-rc1.md).
 
-## 0.0.27 — Rocks, Mushrooms, and Then Some — 3 October 2026
+## 0.0.27 â€” Rocks, Mushrooms, and Then Some â€” 3 October 2026
 
 - Published stable source release with 37,960 exterior rock placements and 816
   giant mushrooms across 2,526 world regions; joined mushroom caps preserve
@@ -1778,7 +1969,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   [rc7 release notes](RELEASE-v0.0.25-rc7.md).
 
 
-## v0.0.25-rc6 — 1 October 2026
+## v0.0.25-rc6 â€” 1 October 2026
 
 - Default compass/heading HUD to hidden; add saved `aw_compass` and
   `dbg compass on/off`, `1/0`, `true/false`.
@@ -1803,7 +1994,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Include matching rc6 emulator templates, source receipt and direct-update
   metadata. Preserve all earlier source and release records.
 
-## v0.0.25-rc5 — 1 October 2026
+## v0.0.25-rc5 â€” 1 October 2026
 
 - Add a terminal-width completion footer with local start/end timestamps and
   timezone offsets, monotonic elapsed time, final file size in GiB/bytes and SHA-256.
@@ -1819,7 +2010,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   and asset-free test image on Linux. Full game conversion and Windows remain
   separate, incomplete acceptance work.
 
-## v0.0.25-rc4 — 1 October 2026
+## v0.0.25-rc4 â€” 1 October 2026
 
 - Add host-aware executable and virtual-environment discovery plus a read-only
   `--host-plan` inventory. Windows automatic setup remains unimplemented.
@@ -1834,7 +2025,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Record the prior rc3 full-build disk exhaustion separately from native
   compilation. Full image and native Windows acceptance remain open.
 
-## v0.0.25-rc3 — 1 October 2026
+## v0.0.25-rc3 â€” 1 October 2026
 
 - Restrict exterior window flattening to exterior scenes. Preserve the original
   window mesh and collision when the same asset is placed inside an interior.
@@ -1846,7 +2037,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Document the generic installed-game layout and remove account-specific path
   examples from maintained documentation. Deliver public source only.
 
-## v0.0.25-rc2 — 1 October 2026
+## v0.0.25-rc2 â€” 1 October 2026
 
 - Reconcile original rc1 and checkpoints 001/004/006 without losing later modifier,
   launcher and configurable five-autosave fixes.
@@ -1855,7 +2046,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Retain only the current dev1 journal screenshot; preserve owner cleanup.
 - Source-only handoff for local compilation; native rc2 acceptance remains open.
 
-## v0.0.25-rc1 — 1 October 2026
+## v0.0.25-rc1 â€” 1 October 2026
 
 - Move Seyda Neen's island handoff inside actual ground coverage; retain both
   detailed town conversions and the frozen polymap's 2,526 region divisions.
@@ -1868,7 +2059,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Separate editable keymaps from settings and maintain [KEYMAPS.md](KEYMAPS.md).
 - Defer unexplored-map masking; retain the 23 existing contact findings.
 
-## v0.0.25-dev1 — 1 October 2026
+## v0.0.25-dev1 â€” 1 October 2026
 
 - Convert the surveyed island footprint into 2,526 terrain/water regions, using
   the recovered polymap subdivisions and preserving detailed Seyda Neen and Balmora.
@@ -1897,7 +2088,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   release approval does not change the automated audit result.
 - [Release notes](RELEASE-v0.0.24.md).
 
-## v0.0.24-rc4 — 1 October 2026
+## v0.0.24-rc4 â€” 1 October 2026
 
 Whole-base-master terrain/geometry survey, private interactive atlas and terrain
 inspection mesh; native M map and J two-page journal with earned dated history,
@@ -1906,7 +2097,7 @@ Includes screenshot-tracking validation. Whole-island 3D traversal, inventory
 and complete quest scripting remain future work; the 23 placement findings
 remain open. See [scope and evidence](RELEASE-v0.0.24-rc4.md).
 
-## v0.0.24-rc3 — 1 October 2026
+## v0.0.24-rc3 â€” 1 October 2026
 
 Owner-requested recovery candidate: complete gallery conversion, bounded exact-model
 allowances up to 1,024 triangles, preserved Dagoth mask detail, two authored airborne
@@ -1915,7 +2106,7 @@ collision-trace correction for the three RC2 walking stalls. Adds the island
 terrain/polygon-density plan and M/I/J interface roadmap. The 23 strict ground
 contact findings remain open. See [scope and evidence](RELEASE-v0.0.24-rc3.md).
 
-## v0.0.24-rc2 — 1 October 2026
+## v0.0.24-rc2 â€” 1 October 2026
 
 Interim owner-testing checkpoint: gallery browser/help/return, bounded per-model
 geometry allowances, canonical ground placement and independent contact audit,
@@ -1923,9 +2114,9 @@ close NPC targeting, birthsign ordering, guarded hill-material repair, Options
 scrolling and measured experimental read-ahead. The strict contact and walking
 findings remain open. See [full scope and limits](RELEASE-v0.0.24-rc2.md).
 
-## v0.0.24-rc1 — 30 September 2026
+## v0.0.24-rc1 â€” 30 September 2026
 
-**AmiWind v0.0.24-rc1 — candidate for Welcome to Balmora.**
+**AmiWind v0.0.24-rc1 â€” candidate for Welcome to Balmora.**
 
 Balmora now includes 43 destination interiors (42 city interiors plus Tharys
 Ancestral Tomb), 93 NPC placements (90 living and three authored corpses), and
@@ -1954,7 +2145,7 @@ v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
 [conversion lessons](BALMORA_CONVERSION_LESSONS.md) and
 [Amiga naming constraints](RELEASE_WORKFLOW.md#amiga-limitations).
 
-## v0.0.24-dev4 — 30 September 2026
+## v0.0.24-dev4 â€” 30 September 2026
 
 - Add `dbg tp` for the existing destination menu, and direct `balmora`,
   `seydaneen`, `prisonship` and converted-map shortcuts. Retain `dbg scene`.
@@ -1973,11 +2164,11 @@ v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
   whole-map polygon-density study to the next version.
 - See [scope and validation](RELEASE-v0.0.24-dev4.md).
 
-## v0.0.24-dev3 — 30 September 2026
+## v0.0.24-dev3 â€” 30 September 2026
 
 - Share Seyda Neen's inspected Strider profile in Balmora; rebuild the 16 affected
   regions. Collision, entities and the other 48 maps remain unchanged.
-- Add Options → Area loading: Freeze frame / Black screen. Freeze is the default
+- Add Options â†’ Area loading: Freeze frame / Black screen. Freeze is the default
   for region crossings; hold the displayed image and palette with a small top
   Loading box. Reuse the existing loading-art storage; retain music servicing.
 - Record positive dev2 exterior feedback, missing Balmora interiors, the reported
@@ -1985,7 +2176,7 @@ v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
 - Pass 279 host tests; native warning review remains 82, with no new diagnostics.
   See [validation and limitations](RELEASE-v0.0.24-dev3.md).
 
-## v0.0.24-dev2 — 30 September 2026
+## v0.0.24-dev2 â€” 30 September 2026
 
 - Restore original Balmora architectural geometry after generic reduction
   destroyed open facades; rebuild all 64 regions with bounded 896-unit overlap.
@@ -2000,19 +2191,19 @@ v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
   [the investigation](INVESTIGATION-v0.0.24-dev2.md) and the existing mesh notes.
 - Pass 278 host tests. Review native warnings: 85 to 82, no added diagnostic.
 
-## v0.0.24-dev1 — 30 September 2026
+## v0.0.24-dev1 â€” 30 September 2026
 
 Initial Balmora exterior, 64 overlapping regions, 1,488 scenery placements,
 18 residents and return Strider travel. See [original scope](BALMORA-v0.0.24-dev1.md).
 Its generic architectural reduction was defective; dev2 corrects that conversion.
 
-## v0.0.23-dev4 — 29 September 2026
+## v0.0.23-dev4 â€” 29 September 2026
 
 Padded content-sized dialogue and caret/rotation regressions; 2/5/1-second logo
 with continuous title music; optional opening quote overlay; sprite background
 depth and deferred NPC floor placement. See [release notes](RELEASE-v0.0.23-dev4.md).
 
-## 0.0.23-dev2 — 29 September 2026
+## 0.0.23-dev2 â€” 29 September 2026
 
 - Expand the exterior beyond the port; retain crossing object bounds, the missing
   rock mound, original Silt Strider and Darvame.
@@ -2105,7 +2296,7 @@ See RELEASE-v0.0.21-dev7.md for scope and validation.
 
 See RELEASE-v0.0.21-dev6.md for scope and validation.
 
-## v0.0.21-dev5 — GOG TTF preference and Steam font fallback, 28 September 2026
+## v0.0.21-dev5 â€” GOG TTF preference and Steam font fallback, 28 September 2026
 
 - Prefer the GOG GOTY `BookArt/*.ttf` font sources for host-side AmiWind
   rasterization when present. GOG GOTY remains the recommended source edition.
@@ -2121,7 +2312,7 @@ See RELEASE-v0.0.21-dev6.md for scope and validation.
 
 See RELEASE-v0.0.21-dev5.md for validation and the remaining real-install test.
 
-## v0.0.21-dev4 — evening world-mapping checkpoint, 28 September 2026
+## v0.0.21-dev4 â€” evening world-mapping checkpoint, 28 September 2026
 
 - Record Horstator's optional polygonal POI-region fallback if cell streaming
   cannot meet the Amiga's measured budgets, starting with Seyda Neen.
@@ -2133,7 +2324,7 @@ See RELEASE-v0.0.21-dev5.md for validation and the remaining real-install test.
 
 See RELEASE-v0.0.21-dev4.md for validation and save compatibility.
 
-## v0.0.21-dev3 — opening maintenance and interaction hints, 28 September 2026
+## v0.0.21-dev3 â€” opening maintenance and interaction hints, 28 September 2026
 
 - Two-line lower-right NPC hints: 12 px Morrowind name and current console-font
   action (`npc_interaction_layout_template_001`); matching opening aim/use query.
@@ -2150,7 +2341,7 @@ Highlight New Game when opening its confirmation dialog, so Enter starts the
 intro immediately. Esc and explicit Cancel return to the menu. The hidden mouse
 position starts over the selected button as well. See RELEASE-v0.0.21-dev3.md.
 
-## v0.0.21-dev2 — opening barrier correction, 28 September 2026
+## v0.0.21-dev2 â€” opening barrier correction, 28 September 2026
 
 Correct compound rotations of the 22 collision-only opening references. Preserve
 the original positions, dimensions and CharGenState lifetime. Add converter and
@@ -2158,7 +2349,7 @@ state regression coverage, an indexed journal incident, and persistent opening
 access/research priorities. See RELEASE-v0.0.21-dev2.md for exact validation
 coverage and pending owner acceptance.
 
-## Portable launcher helper — 28 September 2026
+## Portable launcher helper â€” 28 September 2026
 
 Add `tools/AmiWind-FS-UAE-launcher.py` for existing local images: numeric release
 and development-version selection, date tie-breaking, saved ROM/settings,
@@ -2166,7 +2357,7 @@ non-blocking ROM checksum warnings and automatic FS-UAE configuration with
 backups. Enter accepts the suggested image; `--yes` launches immediately.
 This host-tool follow-up leaves runtime v0.0.20 unchanged. See FS-UAE-LAUNCHER.md.
 
-## v0.0.20 — 28 September 2026
+## v0.0.20 â€” 28 September 2026
 
 Prison-ship hull ambience reduced by 5 dB per static mixer channel; audio files
 and other uses remain unchanged. Enabling debug overlays also enables coordinates.
@@ -2175,7 +2366,7 @@ array-row bounds violations. Recorded intermittent ship-exit/menu freezes and
 the persistent Silt Strider-port report; their causes remain unresolved.
 See RELEASE-v0.0.20.md and BUGS.md.
 
-## v0.0.19 — 28 September 2026
+## v0.0.19 â€” 28 September 2026
 
 Public release of the accumulated 0.0.18 checkpoints: intro/movie, UI/menus,
 loading screens, entrance prompts and parallel builds.
@@ -2183,7 +2374,7 @@ Routine soundtrack notices now obey the debug-overlay switch at their source.
 Music events still log privately, and explicit status queries still work.
 See RELEASE-v0.0.19.md.
 
-## v0.0.18-dev5 — 28 September 2026
+## v0.0.18-dev5 â€” 28 September 2026
 
 Original main-menu art with bottom-right version, centered Esc menu and New Game
 confirmation, larger logo/movie frames and readable private title cards. Original
@@ -2192,7 +2383,7 @@ default off. Deck guard greeting/reminder, visible town entrance names and safe
 missing-interior feedback, private source layout reference, automatic compiler
 jobs with explicit overrides. See RELEASE-v0.0.18-dev5.md.
 
-## v0.0.18-dev4 — 28 September 2026
+## v0.0.18-dev4 â€” 28 September 2026
 
 Project-logo startup fade and upper-menu/README branding, main-menu title music,
 reset of the selected New Game track,
@@ -2201,14 +2392,14 @@ ship NPC body collision and escort waiting, default-off disk indicator,
 actor-cache staging correction and three-line loading credits. See
 RELEASE-v0.0.18-dev4.md for validation and unfinished work.
 
-## v0.0.18-dev3 — 28 September 2026
+## v0.0.18-dev3 â€” 28 September 2026
 
 Original main-menu background with a separate palette, distinct return-to-game
 and main-menu flows, disabled Load, and New Game into the ship. Conservative
 animated alias bounds permit rejecting off-screen actors before disk-cache
 loads. See RELEASE-v0.0.18-dev3.md for verification and remaining work.
 
-## v0.0.18-dev2 — 28 September 2026
+## v0.0.18-dev2 â€” 28 September 2026
 
 First ship-script adapter, original introductory voices/name entry, talking and
 blinking head poses, female appearances, path-grid escort movement, ship ambience
@@ -2216,14 +2407,14 @@ and darker hold lighting. Distinct HUD colors, optional outer frame off by defau
 New Game entry and integrated private conversion. See RELEASE-v0.0.18-dev2.md for
 verification and remaining dock/Census work. Journal filename corrected.
 
-## v0.0.18-dev1 — 28 September 2026
+## v0.0.18-dev1 â€” 28 September 2026
 
 Original proportional Magic Cards UI, private original border/bar conversion,
 black lower-strip sliding subtitles, font selection with preserved console, and
 native font/clipping validation. See RELEASE-v0.0.18-dev1.md for the exact scope;
 this checkpoint does not claim the completed intro or gameplay resource systems.
 
-## v0.0.17 — 28 September 2026
+## v0.0.17 â€” 28 September 2026
 
 One-command confirmed dependency setup and continuation, isolated fresh tools,
 bounded game-directory discovery, actionable download failures, corrected tool
@@ -2272,7 +2463,7 @@ See REPOSITORY_LAYOUT.md for migration and verification.
 
 - Preserve structural ship-interior source surfaces and UVs to repair hull intrusion.
 - Add a scene-picker popup via `dbg scene change`, retaining direct commands.
-- Add live fog/draw-distance commands and Options → Graphics slider; replace
+- Add live fog/draw-distance commands and Options â†’ Graphics slider; replace
   floating-point depth-table rebuilds with integer threshold bands.
 - Add default-off FPS HUD using existing profiler timing.
 - Add a private base-master NPC/door/container audit and synthetic deletion tests.
@@ -2389,7 +2580,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
 - 47 host tests passed; full guided HDF build/readback passed. Native acceptance pending.
 - See [development record](DEVELOPMENT_011.md); v0.0.10 remains the latest released playable checkpoint.
 
-# Runtime v0.0.10 / source 0.8.2 — 27 September 2026
+# Runtime v0.0.10 / source 0.8.2 â€” 27 September 2026
 
 - Reproduced the reported 80000027 failure with 4 MiB Fast RAM.
 - Added a small 68000 preflight before the engine: OS, CPU/FPU, AGA, free and contiguous memory checks.
@@ -2398,7 +2589,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
 - Scene, textures and all 18 music streams remain byte-identical to checkpoint-007.
 - Owner reports v0.0.9 boots in WinUAE after complete-ROM selection, and that selecting maximum CPU speed resolved the slow/glitching run; corrected config preserves that setting. No new hardware-performance claim.
 
-# Runtime v0.0.9 / source 0.8.1 — 27 September 2026
+# Runtime v0.0.9 / source 0.8.1 â€” 27 September 2026
 
 - Fixed the missing icon.library requester on bare-ROM boot by removing unused
   Workbench tooltype/icon handling and desktop close/reopen code.
@@ -2410,7 +2601,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
   native executable changes in the filesystem payload.
 - Added startup regression tests and separate 3.1/3.1.4 ROM validation records.
 
-# Runtime v0.0.8 / source 0.8.0 — 27 September 2026
+# Runtime v0.0.8 / source 0.8.0 â€” 27 September 2026
 
 - First AGA HDF checkpoint: bounded walkable Seyda Neen, static BSP proxies,
   baked facade textures, foliage sprites, palette fog and distance controls.
@@ -2501,23 +2692,23 @@ Earlier checkpoint notes follow unchanged.
 - Keep all game-derived assets and the optional private ROM out of source releases.
 - Free movement is the next requested renderer milestone, not part of this vignette.
 
-## 0.1.3 — 27 September 2026
+## 0.1.3 â€” 27 September 2026
 
 - Specified OpenMW itself as the intended host character-rendering backend.
 - Documented capture integration work and the verified engine licence reference.
 
-## 0.1.2 — 27 September 2026
+## 0.1.2 â€” 27 September 2026
 
 - Documented the host-side reduce/bake/map/pack pipeline and final image assembly.
 - Distinguished implemented terrain conversion from the planned native build.
 
-## 0.1.1 — 27 September 2026
+## 0.1.1 â€” 27 September 2026
 
 - Added humanoid body/appearance template design configuration.
 - Separated body rig, equipment, combat style and animation state in the design.
 - Kept the previously packaged source version immutable.
 
-## 0.1.0 — 27 September 2026
+## 0.1.0 â€” 27 September 2026
 
 - Created the named proof-of-concept repository from the initial extraction tools.
 - Added the user-supplied game-folder setup and external-workspace conversion flow.
@@ -2539,7 +2730,7 @@ Earlier checkpoint notes follow unchanged.
 - Record owner-reported successful rc3 private assembly; retain rc6 game/runtime
   validation limits. Include both rc3 hotfixes in the complete rc6 overlay.
 
-## Validation finding — 14 October 2026, v0.0.40-dev1
+## Validation finding â€” 14 October 2026, v0.0.40-dev1
 
 The full integration gate failed. Its fixture write errors repeat [GATE-SUITE-WRITABLE-32](bugs/GATE-SUITE-WRITABLE-32.md): copied read-only permissions blocked temporary test edits. A hash-matched writable test copy is required. This setup finding does not dismiss separate inventory, blocking, documentation and version-resource failures, and establishes no native or release acceptance.
 

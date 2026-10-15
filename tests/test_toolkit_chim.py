@@ -77,7 +77,7 @@ def python_frames(out):
             'models': len(used_m), 'model_bytes': sum(models[m]['bytes'] for m in used_m),
             'textures': len(used_t), 'texture_bytes': sum(textures[t]['bytes'] for t in used_t),
             'chunk_heap': [heap.image_bytes(F.read_brush_image(c['image']), SIZES) for c in chunks],
-            'model_heap': [[m, heap.image_bytes(F.read_brush_image(models[m]['image']), SIZES)] for m in used_m],
+            'model_heap': [[m, heap.image_bytes(F.read_brush_image(models[m]['image']), SIZES, point_hull_only=True)] for m in used_m],
             'geometry': {'terrain_faces': sum(faces(c['image']) for c in chunks),
                          'placement_faces': sum(faces(models[r['model']]['image']) for c in chunks for r in c['owned'])},
             'scan': {'peak_bytes': r['peak_bytes'], 'peak_position': r['peak_position'], 'positions': r['positions'],
