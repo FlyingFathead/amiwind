@@ -379,12 +379,6 @@
    "contains": "Was 4096 in the engine while this writer had no limit",
    "class": "unrelated",
    "note": "the CHIM world index file-row limit (CHIM-WORLD-INDEX-FILE-LIMIT-36), a count, not a position"
-  },
-  {
-   "file": "engine/aga/src/aw_town_table.h",
-   "contains": "{-4096,-4608,4096,4608}",
-   "class": "kept",
-   "note": "generated core box of the whole-city Vivec frame (vivec_city): frame-local core, inside the wide bound (tools/town_table.py FRAME_BOUND = coord_range.WIDE_BOUND); a narrow engine drops the row and the builder refuses the area with --coord-range narrow"
   }
  ]
 }

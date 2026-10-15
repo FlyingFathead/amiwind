@@ -122,6 +122,10 @@ extern aw_combat_settings_t aw_combat_settings;
 int AW_CombatSettingsLoad(void);
 int AW_CombatActorLoad(const char *id,aw_fighter_t *out);
 void AW_CombatPlayerSheet(aw_fighter_t *out);
+extern void (*aw_combat_equipment)(aw_fighter_t *sheet);
+extern void (*aw_combat_equipment_store)(const aw_fighter_t *sheet);
+void AW_CombatEquipmentStore(void);
+void AW_CombatEquipmentChanged(void);
 int AW_CombatLoadout(const char *loadout,aw_fighter_t *out,char *chosen);
 extern int (*aw_combat_input_locked)(void);
 /* The held block (AmiWind extension, aw_combat_block 1, docs/COMBAT.md "Blocking"): 1 while the player

@@ -96,10 +96,10 @@ class Selection(unittest.TestCase):
                                               statuses, {})
         # a cell the tracker lists with several legacy maps (a divided cell, or maps whose apron holds its objects)
         # is taken: its one frame owns the whole cell (CHIM-REGION-DIVIDED-CELLS-36)
-        self.assertEqual(kept, [(9, 8), (0, 0)])
+        self.assertEqual(kept, [(9, 9), (9, 8), (0, 0)])
         text = '\n'.join(problems)
         self.assertIn('2,2: CHIMport status hull_policy_pending', text)
-        self.assertIn('9,9: open sea', text)
+        self.assertNotIn('9,9', text)
         self.assertNotIn('9,8', text)
         # the earlier method (--chim-region-rows legacy) copies one legacy map: it still refuses such a cell
         kept, problems, dropped = R.preflight([(9, 8), (0, 0)], set(), statuses, {}, one_map_only=True)

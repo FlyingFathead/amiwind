@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <stdarg.h>
 #include "aw_save.c"
+static int equipment_stores;
+void AW_CombatEquipmentStore(void){equipment_stores++;}
 server_t sv;server_static_t svs;client_state_t cl;
 double realtime;char com_gamedir[MAX_OSPATH];int pr_edict_size;
 char *pr_strings;vec3_t vec3_origin;
@@ -87,7 +89,7 @@ int main(int argc,char **argv){int n;char filename[512];assert(argc==2);
  pr_strings=strings_a;npc.v.classname=42;npc_ref._float=221999;npc_hello._float=7;
  npc.v.health=43;npc.v.origin[0]=-150;npc.v.origin[1]=1088;npc.v.origin[2]=-192;
  sv.num_edicts=3;strcpy(sv.name,"mi5b8154939f7aa");world=original;
- world.actor_count=0;AW_SaveCapture();assert(world.actor_count==1 && world.actors[0].scene==8252);
+ world.actor_count=0;equipment_stores=0;AW_SaveCapture();assert(equipment_stores==1);assert(world.actor_count==1 && world.actors[0].scene==8252);
  strcpy(sv.name,"mi5b8154939f7ab");npc.v.health=1;npc_hello._float=0;
  loading=0;AW_SaveSpawn();assert(npc.v.health==43 && npc_hello._float==7);
  npc_hello._float=8;AW_SaveCapture();assert(world.actor_count==1 && world.actors[0].hello_count==8);

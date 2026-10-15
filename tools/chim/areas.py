@@ -24,8 +24,8 @@ def area_problems(areas, root=None):
             problems.append('Unknown CHIM area %s: not a town of config/towns.json nor a CHIM region frame' % area)
             continue
         if area == 'seyda':
-            from chim.seyda import world_box
-            boxes[area] = world_box(root=root)
+            from chim.seyda import owned_world_box
+            boxes[area] = owned_world_box(root=root)
             continue
         try:
             settings = load_settings(area, root)

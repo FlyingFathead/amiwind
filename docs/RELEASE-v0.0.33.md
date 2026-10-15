@@ -229,12 +229,11 @@ than the original, the lantern above Jiub gave no warm light and hid its candle,
 characters were lit by the floor below them. The ship now has its own light profile,
 the lantern's glass and candle show with warm light, and characters take the light
 where they stand. The prison ship, the start position looking at Jiub, headlamp off.
-Before: v0.0.32; after: the repaired build; right: the original game in OpenMW at the
-same spot, for reference.
+Before: v0.0.32; after: the repaired AmiWind build. Both images show AmiWind.
 
-| Before (v0.0.32) | After | Reference (OpenMW) |
-| --- | --- | --- |
-| ![The prison ship hold, evenly grey and bright, Jiub in front (before)](images/amiwind-v0.0.33-fix-ship-light-before.png) | ![The same view, darker, with the lantern glowing warm (after)](images/amiwind-v0.0.33-fix-ship-light-after.png) | ![The same view in the original game](images/amiwind-v0.0.33-fix-ship-light-openmw.png) |
+| Before (v0.0.32) | After |
+| --- | --- |
+| ![The prison ship hold, evenly grey and bright, Jiub in front (before)](images/amiwind-v0.0.33-fix-ship-light-before.png) | ![The same view, darker, with the lantern glowing warm (after)](images/amiwind-v0.0.33-fix-ship-light-after.png) |
 
 **Balmora's holes** ([CHIM-CHUNK-LOAD-FAIL-33](bugs/CHIM-CHUNK-LOAD-FAIL-33.md)):
 in CHIM Preview 1, houses near you could be missing. The chunk zone filled with locked

@@ -299,7 +299,12 @@ int AW_OpeningUse(void)
         return 1;
     }
     v=GetEdictFieldValue(target,"aw_ref");ref=(int)v->_float;
-    if(ref==AW_REF_CENSUS_PAPERS){AW_ReaderOpen("papers",1);return 1;}
+    if(ref==AW_REF_CENSUS_PAPERS){
+        if(!AW_StoryPapersRead()){
+            AW_UISubtitle("","Cannot record registration. Papers retained.",4);return 1;
+        }
+        AW_ReaderOpen("papers",1);return 1;
+    }
     if(ref==AW_REF_CENSUS_HALL_DOOR){
         if(aw_story.hall){
             if(!hall_door_can_open(target)){

@@ -902,6 +902,16 @@ def validate(out, source=None, palette=None, jobs=1):
     if source is not None:
         fails.check(len(sections) == len(frames) and (len(frames) == 1 or len(source.get('frames', [])) == len(frames)),
                     'source manifest: %d frame sections for %d frames' % (len(sections), len(frames)))
+    # Older worlds retain the strict duplicate guard. New source-aware worlds
+    # can share a reference only after original ownership and exact piece
+    # readback both pass. Local chunk/reach validation below remains unchanged.
+    ownership_verified = False
+    if source is not None and ('ownership_index_sha256' in source or
+                               any('frame_ownership' in s for s in sections.values())):
+        from chim.ownership import binary_failures
+        ownership_errors = binary_failures(out, source, sections, frames, models)
+        fails.extend('source ownership: ' + e for e in ownership_errors)
+        ownership_verified = not ownership_errors
     met_models, met_textures = [], []
     # the per-chunk checks of every frame on the worker pool, a frame per task, largest first
     tasks = []
@@ -1006,7 +1016,8 @@ def validate(out, source=None, palette=None, jobs=1):
                         'placement %d: a reach copy differs from the owner record' % ref)
         fails.check(not set(copies) - set(owners), 'reach copies without an owner record: %s'
                     % sorted(set(copies) - set(owners))[:5])
-        fails.check(not all_refs & set(owners), 'placements owned by two frames')
+        if not ownership_verified:
+            fails.check(not all_refs & set(owners), 'placements owned by two frames')
         # cluster PVS rows: itself and its neighbours, symmetric, nothing beyond the ring
         from asset_census import ring_offsets
         offs = ring_offsets(g, settings['draw_distance'] + settings['hysteresis'])
@@ -1318,7 +1329,7 @@ def measure(world, source=None, legacy_maps=None, legacy_regions=None, cost=None
     by_kind['INDX'] += world['sizes'].get('world.cwi', 0)
     chunks = world['chunks']
     biggest = max(chunks, key=lambda c: c['render'] + c['collision'])
-    big_model = max(world['models'], key=lambda m: m['bytes'])
+    big_model = max(world['models'], key=lambda m: m['bytes'], default=None)
     records = sum(len(c['records']) for c in chunks)
     res = {'bytes_total': sum(by_kind.values()), 'bytes_by_kind': dict(by_kind),
            'models': len(world['models']), 'textures': len(world['textures']), 'chunks': len(chunks),
@@ -1326,7 +1337,8 @@ def measure(world, source=None, legacy_maps=None, legacy_regions=None, cost=None
            'reach_copies': records - world['settings']['placements'],
            'largest_chunk': {'cell': list(biggest['cell']), 'render': biggest['render'],
                              'collision': biggest['collision']},
-           'largest_model': {'name': big_model['name'], 'bytes': big_model['bytes'], 'render': big_model['render']},
+           'largest_model': ({'name': big_model['name'], 'bytes': big_model['bytes'], 'render': big_model['render']}
+                             if big_model is not None else None),
            'model_bytes': {'render': sum(m['render'] for m in world['models']),
                            'collision': sum(m['bytes'] - m['render'] for m in world['models'])},
            'chunk_bytes': {'render': sum(c['render'] for c in chunks), 'collision': sum(c['collision'] for c in chunks)},

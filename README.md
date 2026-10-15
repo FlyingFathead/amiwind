@@ -4,12 +4,14 @@
 
 # AmiWind
 
-An unofficial, experimental project bringing Morrowind to the Commodore Amiga: an
-AmiQuake-based engine and an asset conversion pipeline that builds the game from your own
-legally obtained copy of Morrowind, and, in time, a base for your own Amiga RPG adventures.
+An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
+to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
+conversion pipeline that builds the game from your own legally obtained copy of
+Morrowind, and, in time, a base for your own Amiga RPG adventures.
+
 Like community projects such as
 [OpenMW](https://openmw.org), [MGE XE](https://github.com/Hrnchamd/MGE-XE) and
-[MWSE](https://github.com/MWSE/MWSE), it ships no game data.
+[MWSE](https://github.com/MWSE/MWSE), AmiWind ships with no game data or proprietary assets.
 
 *Not affiliated with or endorsed by Bethesda Softworks or ZeniMax. Please support the original creators: buy Morrowind.*
 
@@ -29,6 +31,34 @@ Have a real Amiga? [Running AmiWind on real hardware](docs/REAL_HARDWARE.md).
 <p align="center">Not painted backdrops: every frame is rendered in real time by the engine.</p>
 
 More in the [gallery](docs/GALLERY.md).
+
+## Upcoming: v0.0.40: Rings 0, 1 and 2 of Vvardenfell in Full CHIM
+
+The final release targets CHIM rings 0, 1 and 2 around Vvardenfell. Other
+exterior areas keep their existing legacy representation, apart from named CHIM
+towns; interiors remain separate. Complete candidate, native and package checks
+are still required.
+
+Running on CHIM Engine v0.2.0. The current candidate adds inventory layout and
+preview corrections, original opening HUD activation, and an offline fix for
+limb deformation during animation conversion. Rebuilt models pass serialized checks; package checks remain pending.
+Original-spacing terrain diagonals and two local detail repairs are integrated
+with source edge checks and a passing complete automated suite (explicit skips
+and expected failures). Compiled/native seams and actor contact remain open. Combat, swimming, gait and appearance reports remain open.
+See the [release preparation notes](docs/RELEASE-v0.0.40.md) and
+[bug register](docs/BUGS.md#fix-index) for the exact scope and remaining gates.
+
+### Along the coast: ring 2
+
+| Grytewake, cell (-7,-6) | Shunned Shipwreck, cell (-10,1) |
+| --- | --- |
+| ![Grytewake ship exterior rendered by AmiWind v0.0.40-dev1 in ring 2](docs/images/amiwind-v0.0.40-dev1-grytewake.png) | ![Shunned Shipwreck exterior rendered by AmiWind v0.0.40-dev1 in ring 2](docs/images/amiwind-v0.0.40-dev1-shunned-shipwreck.png) |
+
+Actual AmiWind **v0.0.40-dev1** captures, taken on 15 October 2026. These are
+ship exteriors with cabin entrances in ring 2. Photo mode hides the HUD and
+uses a free camera; the images preserve the rendered viewport pixels and
+normal fog. They show the existing playtest, while the final release checks
+above remain pending. Public gameplay screenshots show AmiWind itself.
 
 ## v0.0.39 - Cell By Cell, Piece By Piece
 
@@ -95,9 +125,9 @@ These views do not establish sound or complete world-traversal acceptance.
 
 ### CHIM progress map
 
-![CHIM conversion and audit snapshot: 1,274 of 1,292 Vvardenfell land and empty-sea cells reached an audit milestone; this is not packaged coverage](docs/images/amiwind-v0.0.39-dev1-progress-map.png)
+![CHIM conversion and audit snapshot: 1,275 of 1,292 Vvardenfell land and empty-sea cells reached an audit milestone; this is not packaged coverage](docs/images/amiwind-v0.0.40-rings-progress-map.png)
 
-Snapshot: **13 October 2026, 14:04 UTC** (17:04 in Finland), from the
+Snapshot: **15 October 2026, 06:48 UTC**, from the
 [public cell reference](docs/chim/cell-progress-reference.json). Each square is
 one exterior cell, north up. **Green** means a conversion/audit milestone;
 lighting, actors and gameplay can still be deferred. **Red** means an audit
@@ -107,8 +137,8 @@ release-plan overlay.
 
 | Evidence | Recorded coverage |
 | --- | --- |
-| Converted cells | 1,190, including 15 with failed audits; 99 empty-sea cells are counted separately |
-| Conversion/audit milestone | 1,274 of 1,292 land and empty-sea cells (98.6%); 15 failed and 3 not converted |
+| Converted cells | 1,191, including 15 with failed audits; 99 empty-sea cells are counted separately |
+| Conversion/audit milestone | 1,275 of 1,292 land and empty-sea cells (98.7%); 15 failed and 2 not converted |
 | Native-checked cells | No complete island-wide count established; scene checks remain scoped |
 | Packaged region cells | 360 whole cells in the exact RC2 package, verified 14 October; six partial town overlaps remain outside this count |
 
@@ -117,11 +147,16 @@ region coverage is not a total for named town frames or interiors, and green
 cells do not establish actor presence or working gameplay. RC2's package
 layer was verified on 14 October from full disk readback and independent
 extraction. All 9,774 CHIM files retain the verified RC1 bytes; no new cells
-were imported. Converted and packaged per-type actor/gameplay counts remain
-unknown; original reference types are retained. Scoped Nord package checks
-show punch, torch, swim and dive behavior, while all-appearance, cell-wide
-native and owner acceptance remain separate. RC2 inspection package and matching source artifacts finalized at 2026-10-13T22:15:44Z.
-Final v0.0.39 remains held for owner inspection.
+were imported into RC2. The later v0.0.40-dev1 Pelagiad (0,-7) conversion passed
+its measured offline audits and remains outside that package. Converted and packaged per-type actor/gameplay counts remain
+unknown; original reference types are retained. Historical scoped Nord package diagnostics recorded punch, torch, swim and
+dive behavior; those observations do not establish current gameplay acceptance.
+Playtesting findings for [third-person punching](docs/bugs/PLAYER-PUNCH-THIRDPERSON-39.md), [movement with fists drawn](docs/bugs/PLAYER-READY-MOVEMENT-39.md), [blocking](docs/bugs/COMBAT-BLOCKING-36.md) and [swimming](docs/bugs/WATER-GAMEPLAY-PARITY-38.md) remain open.
+RC2 inspection package and matching source artifacts finalized at
+2026-10-13T22:15:44Z. Final v0.0.39 private playtest and matching public source
+delivery finalized at 2026-10-14T07:15:35Z. Shipment does not close those
+gameplay reports or establish gameplay acceptance; independent fresh-download
+verification remains separate.
 
 Historical RC1 package/source delivery finalized on 13 October at 18:06 UTC;
 its 360 whole-cell check and six partial overlaps remain dated historical
@@ -1067,3 +1102,26 @@ Read [Hidden in Dirt: Seyda Neen's graphics performance bottlenecks](docs/HIDDEN
 ---
 
 <p align="center"><i>AmiWind is brought to you by <a href="https://github.com/FlyingFathead/">FlyingFathead</a></i></p>
+
+The 14 October 2026, 22:19 UTC tracker refresh records offline checks for five
+ring-0 ocean frames. Their four original leveled-creature spawns remain deferred.
+Runtime placement, native seams and package inclusion are pending, so the map
+colours and milestone totals are unchanged.
+
+The 14 October 2026, 23:45 UTC refresh records the expanded Vivec conversion
+as 36 original core cells and 28 apron-only dependencies. It retains 6,039
+owned references, 33 external dependencies and 297 deferred references.
+Global converted and packaged counts are unchanged. Native seams and the
+combined candidate remain pending.
+
+The 15 October 2026 Seyda update records the completed offline conversion:
+16 original core cells, 20 apron cells, 3,724 stair walks with zero blocking
+failures and 532 advisory results. The earlier stair failures remain preserved.
+The four Seyda and two Vivec ring-2 overlaps now have offline conversion evidence.
+The corrected source carrier passes independent resident, voice and reference
+checks. Expanded CHIM integration has two
+[actor contact findings](docs/bugs/CHIM-SEYDA-ACTOR-CONTACT-33.md) that remain
+after the final bounded refit. Original-height comparison identifies coarse
+terrain distortion; repair and native checks remain open.
+Runtime placement of the five ring-0 ocean frames, matched native seams and
+complete package inclusion remain pending; dev2 has not shipped.

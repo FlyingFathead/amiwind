@@ -1,8 +1,8 @@
 {
-  "version": "0.0.38",
-  "published": "d40fa70b4787da09b8a6d5006f46ef6fb7e56c6f",
+  "version": "0.0.39",
+  "published": "751e1efa6b28e7fc58453fc81c73100715b88195",
   "commits": [
-    "d40fa70b4787da09b8a6d5006f46ef6fb7e56c6f"
+    "751e1efa6b28e7fc58453fc81c73100715b88195"
   ],
-  "note": "The previous published release is v0.0.38. Every release candidate and final must contain this exact published commit; advance this pin only after publication."
+  "note": "The previous published release is v0.0.39. Every release candidate and final must contain this exact published commit; advance this pin only after publication."
 }

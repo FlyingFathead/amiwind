@@ -85,6 +85,19 @@ class Release(unittest.TestCase):
             (root/'.gitignore').write_text('*.png\n!/'+name+'\n')
             inspect_source(root)
 
+    def test_original_reference_screenshot_is_not_public_documentation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'repo'
+            fixture(root)
+            name = 'docs/images/amiwind-v0.0.33-fix-ship-light-openmw.png'
+            (root / name).parent.mkdir(parents=True)
+            (root / name).write_bytes(b'\x89PNG\r\n\x1a\n')
+            (root / '.gitignore').write_text('*.png\n!/' + name + '\n')
+            listing = root / 'tools/release-files.json'
+            listing.write_text(json.dumps(json.loads(listing.read_text()) + [name, '.gitignore']) + '\n')
+            with self.assertRaisesRegex(ValueError, 'Unexpected distributable'):
+                inspect_source(root)
+
     def test_unknown_content_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)/"repo"

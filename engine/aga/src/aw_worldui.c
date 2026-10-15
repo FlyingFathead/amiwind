@@ -6,6 +6,8 @@
 #include "aw_state.h"
 #include "aw_story.h"
 #include "aw_character.h"
+#include "aw_inventory.h"
+#include "aw_combat.h"
 #include "aw_maps.h"
 #include "aw_world.h"
 #include <stdint.h>
@@ -29,6 +31,30 @@ static const char *const marker_keys[3]={"amiwind:map:marker:x","amiwind:map:mar
 #define CLEAR_Y 174
 #define CLEAR_W 72
 #define CLEAR_H 10
+#define INV_VISIBLE 6
+#define INV_LIST_Y 54
+#define INV_ROW_H 16
+#define INV_SCROLL_X 304
+#define INV_SCROLL_H (INV_VISIBLE*INV_ROW_H)
+#define INV_DETAILS_Y 152
+#define INV_STATUS_Y 160
+#define INV_CONTROLS_Y 176
+#define INV_CLOSE_X 132
+#define INV_CLOSE_W 44
+typedef struct {
+    aw_inventory_item_t item[AW_STATE_VALUES];
+    unsigned char known[AW_STATE_VALUES];
+    int rows[AW_STATE_VALUES],count,selected,top,category,sort,context,context_x,context_y;
+    int icon_row[INV_VISIBLE],icon_ok[INV_VISIBLE];
+    byte icons[INV_VISIBLE][1024];
+    char message[96];float angle;
+} inventory_panel_t;
+static inventory_panel_t *inventory;
+int AW_InventoryActive(void){return modal==3;}
+static const char *const inventory_categories[]={"All","Weapons","Armour","Clothing","Potions","Ingredients","Books","Misc"};
+static void inventory_refresh(void);
+static void inventory_key(int key);
+static void inventory_draw(void);
 static byte *map_data,*map_pixels;
 static int map_w,map_h,map_bounds[4],area_count,marker,map_ocean;
 static float map_x,map_y,player_x,player_y,player_z,map_step;
@@ -66,6 +92,7 @@ static void cursor(void){
     AW_UIFill(x+1,y+1,1,6,c);AW_UIFill(x+1,y+1,6,1,c);
 }
 static void close_panel(void){
+    free(inventory);inventory=NULL;AW_InventoryPreviewClear();
     free(map_data);map_data=map_pixels=NULL;lava_pools=lava_points=NULL;lava_count=0;free(book);book=NULL;
     if(modal && key_dest==key_menu)key_dest=key_game;
     modal=drag=marker_click=teleport_mode=teleport_selected=0;teleport_message=marker_message=NULL;IN_AWClearButtons();
@@ -81,6 +108,249 @@ static int allowed(void){
 static void opened(int kind){
     strncpy(opened_scene,sv.name,sizeof(opened_scene)-1);opened_scene[sizeof(opened_scene)-1]=0;
     modal=kind;key_dest=key_menu;IN_AWClearButtons();
+}
+void AW_InventoryOpen(void){
+    int i;
+    if(!allowed() || svs.clients[0].edict->v.health<=0)return;
+    inventory=(inventory_panel_t *)calloc(1,sizeof(*inventory));
+    if(!inventory){Con_Printf("Inventory: not enough memory.\n");return;}
+    for(i=0;i<INV_VISIBLE;i++)inventory->icon_row[i]=-1;
+    inventory->angle=(float)M_PI;opened(3);
+    if(!AW_InventoryBootstrap())strcpy(inventory->message,"Initial item catalogue unavailable.");
+    inventory_refresh();
+}
+static void inventory_refresh(void){
+    int i,j,n,order[AW_STATE_VALUES];
+    if(!inventory)return;
+    n=0;memset(inventory->known,0,sizeof(inventory->known));
+    for(i=0;i<aw_state.count[AW_ITEM] && i<AW_STATE_VALUES;i++){
+        aw_value_t *v=&aw_state.values[AW_ITEM][i];
+        if(v->value<=0)continue;
+        memset(&inventory->item[i],0,sizeof(inventory->item[i]));
+        inventory->known[i]=AW_InventoryRead(v->id,&inventory->item[i]);
+        if(!inventory->known[i]){
+            strcpy(inventory->item[i].id,v->id);strcpy(inventory->item[i].name,v->id);
+            inventory->item[i].category=AW_INV_MISC;
+        }
+        if(!inventory->category || inventory->item[i].category==inventory->category)order[n++]=i;
+    }
+    for(i=1;i<n;i++){
+        int value=order[i];j=i;
+        while(j>0){
+            int previous=order[j-1],cmp;
+            if(inventory->sort==1)cmp=inventory->item[previous].value<inventory->item[value].value?1:inventory->item[previous].value>inventory->item[value].value?-1:0;
+            else if(inventory->sort==2)cmp=inventory->item[previous].weight<inventory->item[value].weight?1:inventory->item[previous].weight>inventory->item[value].weight?-1:0;
+            else cmp=AW_InventoryCompare(inventory->item[previous].name,inventory->item[value].name);
+            if(cmp<=0)break;
+            order[j]=order[j-1];j--;
+        }
+        order[j]=value;
+    }
+    inventory->count=n;
+    for(i=0;i<n;i++)inventory->rows[i]=order[i];
+    inventory->selected=minmax(inventory->selected,0,n?n-1:0);
+    inventory->top=minmax(inventory->top,0,n>INV_VISIBLE?n-INV_VISIBLE:0);
+    for(i=0;i<INV_VISIBLE;i++)inventory->icon_row[i]=-1;
+}
+static aw_inventory_item_t *inventory_selected(void){
+    return inventory && inventory->count?&inventory->item[inventory->rows[inventory->selected]]:NULL;
+}
+static int inventory_equippable(const aw_inventory_item_t *item){
+    if(item && AW_InventoryEquipped(&aw_state,item->id) && (item->flags&AW_INV_EQUIP_SUPPORTED))return 1;
+    return AW_InventoryCanEquip(item);
+}
+static int inventory_droppable(const aw_inventory_item_t *item){
+    return item && (item->flags&AW_INV_DROP) &&
+        (!AW_InventoryEquipped(&aw_state,item->id) || inventory_equippable(item));
+}
+static void inventory_action(int action){
+    aw_inventory_item_t *item=inventory_selected();int ok=0;
+    if(!item)return;
+    if(action==1 && inventory_equippable(item)){
+        AW_CombatEquipmentStore();
+        if(AW_InventoryEquipped(&aw_state,item->id))ok=AW_InventoryUnequip(&aw_state,item->id);
+        else ok=AW_InventoryEquip(&aw_state,item);
+        if(ok)AW_CombatEquipmentChanged();
+        strcpy(inventory->message,ok?"Equipment updated.":"Cannot equip this item.");
+    }else if(action==2 && inventory_droppable(item)){
+        /* First stage drops one real item; repeated actions preserve stack count.
+         * No deletion occurs when the world placement/model/entity is refused. */
+        ok=AW_InventoryDropHere(item,1);
+        strcpy(inventory->message,ok?"Dropped one item.":AW_InventoryDropReason());
+    }
+    inventory->context=0;inventory_refresh();
+}
+/* Use the same bounded scrollbar as the journal. Keep a visible selection so
+ * Equip/Drop still act on a displayed row; scrolling never changes ownership. */
+static int inventory_list_right(void){
+    return inventory->count>INV_VISIBLE?INV_SCROLL_X-2:312;
+}
+static void inventory_scroll(int top){
+    inventory->top=minmax(top,0,inventory->count>INV_VISIBLE?inventory->count-INV_VISIBLE:0);
+    inventory->selected=minmax(inventory->selected,inventory->top,
+        minmax(inventory->top+INV_VISIBLE-1,0,inventory->count?inventory->count-1:0));
+    inventory->context=0;
+}
+static void inventory_key(int key){
+    int i,x,y,row,top;aw_inventory_item_t *item=inventory_selected();
+    if(!inventory)return;
+    drag=0;
+    if(key==K_LEFTARROW){inventory->angle-=.25f;return;}
+    if(key==K_RIGHTARROW){inventory->angle+=.25f;return;}
+    if(key==K_UPARROW || key=='w' || key==K_MWHEELUP)inventory->selected--;
+    if(key==K_DOWNARROW || key=='s' || key==K_MWHEELDOWN)inventory->selected++;
+    if(key==K_PGUP)inventory->selected-=INV_VISIBLE;
+    if(key==K_PGDN)inventory->selected+=INV_VISIBLE;
+    if(key==K_HOME)inventory->selected=0;
+    if(key==K_END)inventory->selected=inventory->count-1;
+    if(key==K_TAB){inventory->category=(inventory->category+1)%8;inventory->selected=inventory->top=0;inventory_refresh();}
+    if(key=='o'){inventory->sort=(inventory->sort+1)%3;inventory_refresh();}
+    if(key==K_ENTER || key=='e'){inventory_action(1);return;}
+    if(key=='d'){inventory_action(2);return;}
+    if(key==K_MOUSE3 || key==K_MOUSE2){
+        if(mouse_x<128 || mouse_x>=inventory_list_right() || mouse_y<INV_LIST_Y || mouse_y>=INV_LIST_Y+INV_VISIBLE*INV_ROW_H)return;
+        row=inventory->top+(mouse_y-INV_LIST_Y)/INV_ROW_H;if(row>=inventory->count)return;
+        inventory->selected=row;
+        inventory->context=inventory->count!=0;
+        inventory->context_x=minmax(mouse_x,128,206);inventory->context_y=minmax(mouse_y,50,INV_CONTROLS_Y-2*16-4);
+        return;
+    }
+    if(key==K_MOUSE1){
+        if(inventory->context){
+            x=inventory->context_x;y=inventory->context_y;row=0;
+            if(inventory_equippable(item)){
+                if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(1);return;}
+                row++;
+            }
+            if(inventory_droppable(item)){
+                if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(2);return;}
+            }
+            inventory->context=0;return;
+        }
+        top=AW_UIScrollHit(mouse_x,mouse_y,INV_SCROLL_X,INV_LIST_Y,
+            INV_SCROLL_H,inventory->count,INV_VISIBLE,inventory->top);
+        if(top>=0){
+            inventory_scroll(top);
+            /* Arrow clicks step once; only the inner rail starts a drag. */
+            if(mouse_y>=INV_LIST_Y+10 && mouse_y<INV_LIST_Y+INV_SCROLL_H-10)drag=K_MOUSE1;
+            return;
+        }
+        if(mouse_y>=20 && mouse_y<44 && mouse_x>=128){
+            row=(mouse_y-20)/12;x=130;
+            for(i=row*4;i<row*4+4;i++){
+                int width=i==0?28:i==1?48:i==2?48:i==3?60:i==4?44:i==5?66:i==6?40:30;
+                if(mouse_x>=x && mouse_x<x+width){inventory->category=i;inventory->selected=inventory->top=0;inventory_refresh();return;}x+=width;
+            }
+        }
+        if(mouse_x>=128 && mouse_x<inventory_list_right() && mouse_y>=INV_LIST_Y && mouse_y<INV_LIST_Y+INV_VISIBLE*INV_ROW_H){
+            row=inventory->top+(mouse_y-INV_LIST_Y)/INV_ROW_H;
+            if(row<inventory->count)inventory->selected=row;
+        }
+        /* Close only over its displayed hint; the lower navigation row is
+         * no longer an invisible full-width close target. */
+        if(mouse_x>=INV_CLOSE_X && mouse_x<INV_CLOSE_X+INV_CLOSE_W &&
+           mouse_y>=INV_CONTROLS_Y && mouse_y<INV_CONTROLS_Y+8){close_panel();return;}
+    }
+    inventory->selected=minmax(inventory->selected,0,inventory->count?inventory->count-1:0);
+    if(inventory->selected<inventory->top)inventory->top=inventory->selected;
+    if(inventory->selected>=inventory->top+INV_VISIBLE)inventory->top=inventory->selected-INV_VISIBLE+1;
+}
+static void inventory_icon(int slot,int index,int x,int y){
+    FILE *f=NULL;int size,xx,yy;byte raw[1028];
+    if(inventory->icon_row[slot]!=index){
+        inventory->icon_row[slot]=index;inventory->icon_ok[slot]=0;
+        if(inventory->item[index].icon[0]){
+            size=COM_FOpenFile(inventory->item[index].icon,&f);
+            if(f){if(size==1028 && fread(raw,1,sizeof(raw),f)==sizeof(raw) && !memcmp(raw,"AWIC",4)){
+                memcpy(inventory->icons[slot],raw+4,1024);inventory->icon_ok[slot]=1;
+            }fclose(f);}
+        }
+    }
+    AW_UIBox(x,y,16,16);
+    if(inventory->icon_ok[slot])for(yy=0;yy<14;yy++)for(xx=0;xx<14;xx++)
+        vid.buffer[(y+1+yy)*vid.rowbytes+x+1+xx]=inventory->icons[slot][(yy*32/14)*32+xx*32/14];
+}
+/* Fixed console-derived glyphs fit the 320x200 fields. Menu TextBox centres
+ * but does not clip: using it for long item names painted across other panels. */
+static void inventory_text(int x,int y,int width,int height,const char *value,int color){
+    char clipped[160];int n=(int)strlen(value),limit=width/4;
+    if(limit<1)return;
+    if(limit>(int)sizeof(clipped)-1)limit=sizeof(clipped)-1;
+    if(n>limit)n=limit;
+    memcpy(clipped,value,n);clipped[n]=0;
+    if(value[n] && n>=3)memcpy(clipped+n-3,"...",3);
+    AW_SmallStringColor(x,y+(height-5)/2,width,clipped,color);
+}
+/* Two fixed-size status lines share the existing 3x5 glyph helper. Prefer a
+ * word boundary, with the second line retaining the helper's bounded ellipsis. */
+static void inventory_status(const char *value,int color){
+    char first[46];int n=(int)strlen(value),split,i;
+    if(n<=45){inventory_text(132,INV_STATUS_Y,180,5,value,color);return;}
+    split=45;
+    for(i=44;i>0;i--)if(value[i]==' '){split=i;break;}
+    memcpy(first,value,split);first[split]=0;
+    inventory_text(132,INV_STATUS_Y,180,5,first,color);
+    value+=split;while(*value==' ')value++;
+    inventory_text(132,INV_STATUS_Y+8,180,5,value,color);
+}
+static void inventory_draw(void){
+    int i,j,x,row,index,frame,right=inventory_list_right();model_t *model=NULL;aw_inventory_item_t *item;char line[160];
+    int gold=AW_UIColor(223,199,144),muted=AW_UIColor(150,135,104);
+    AW_UIFill(0,0,320,200,AW_UIColor(0,0,0));AW_UIBox(2,2,316,196);
+    AW_UIBox(4,18,122,178);AW_UIBox(128,18,188,178);
+    AW_UISmallBegin();
+    AW_UITextBox(6,4,308,12,"Inventory",gold);
+    AW_UISmallEnd();
+    if(AW_ViewInventoryBody(&model,&frame)){
+        if(!AW_InventoryPreviewDraw(model,frame,7,22,116,168,inventory->angle))
+            inventory_text(10,80,108,40,"Character preview unavailable",muted);
+    }else inventory_text(10,80,108,40,"Character preview unavailable",muted);
+    for(row=0;row<2;row++){
+        x=130;
+        for(i=row*4;i<row*4+4;i++){
+            int width=i==0?28:i==1?48:i==2?48:i==3?60:i==4?44:i==5?66:i==6?40:30;
+            if(i==inventory->category)AW_UIFill(x,20+row*12,width,11,AW_UIColor(48,39,22));
+            inventory_text(x+1,20+row*12,width-2,11,inventory_categories[i],gold);x+=width;
+        }
+    }
+    sprintf(line,"Sort: %s (O)",inventory->sort==1?"Value":inventory->sort==2?"Weight":"Name");
+    inventory_text(132,44,180,10,line,muted);
+    if(!inventory->count)inventory_text(134,73,174,38,"No carried items in this category.",muted);
+    for(i=0;i<INV_VISIBLE && (row=inventory->top+i)<inventory->count;i++){
+        index=inventory->rows[row];item=&inventory->item[index];
+        if(row==inventory->selected)AW_UIFill(130,INV_LIST_Y+i*INV_ROW_H,right-130,INV_ROW_H,AW_UIColor(44,36,20));
+        inventory_icon(i,index,132,INV_LIST_Y+i*INV_ROW_H);
+        sprintf(line,"%s%s",AW_InventoryEquipped(&aw_state,item->id)?"* ":"",item->name);
+        inventory_text(151,INV_LIST_Y+i*INV_ROW_H,right-24-151,11,line,gold);
+        sprintf(line,"%ld",(long)AW_StateGet(&aw_state,AW_ITEM,item->id));inventory_text(right-22,INV_LIST_Y+i*INV_ROW_H,22,11,line,gold);
+    }
+    if(inventory->count>INV_VISIBLE)
+        AW_UIScrollbar(INV_SCROLL_X,INV_LIST_Y,INV_SCROLL_H,inventory->count,INV_VISIBLE,inventory->top);
+    item=inventory_selected();
+    if(item){
+        index=inventory->rows[inventory->selected];
+        if(inventory->known[index])sprintf(line,"Weight %.2f  Value %ld",item->weight,(long)item->value);
+        else strcpy(line,"Item details unavailable");
+        inventory_text(132,INV_DETAILS_Y,180,8,line,muted);
+        inventory_status(inventory->message[0]?inventory->message:
+            inventory_equippable(item)?"E/Enter equip  D drop  RMB actions":
+            inventory_droppable(item)?"D drop  RMB actions":"Actions unavailable for this item",muted);
+    }
+    if(inventory->context && item){
+        x=inventory->context_x;j=inventory->context_y;row=0;
+        if(inventory_equippable(item))row++;
+        if(inventory_droppable(item))row++;
+        if(row){
+            AW_UIFill(x,j,110,row*16,AW_UIColor(10,9,7));AW_UIBox(x,j,110,row*16);row=0;
+            if(inventory_equippable(item)){inventory_text(x+4,j+row*16+2,102,13,AW_InventoryEquipped(&aw_state,item->id)?"Unequip":"Equip",gold);row++;}
+            if(inventory_droppable(item))inventory_text(x+4,j+row*16+2,102,13,"Drop one",gold);
+        }else inventory->context=0;
+    }
+    /* Frame bottom pixels are 192..195: all footer glyphs finish by188. */
+    AW_UIFill(132,INV_CONTROLS_Y-2,180,1,muted);
+    inventory_text(INV_CLOSE_X,INV_CONTROLS_Y,INV_CLOSE_W,5,"I/Esc close",gold);
+    inventory_text(192,INV_CONTROLS_Y,120,5,"Tab category",gold);
+    inventory_text(132,INV_CONTROLS_Y+8,180,5,"Up/Down select   Left/Right turn",gold);
 }
 static void map_fit(void){
     float sx=(float)map_w/310,sy=(float)map_h/150;
@@ -369,8 +639,11 @@ static void open_journal(void){
     quest_titles();book->filter=-1;load_entry(aw_state.journal_count-1);opened(2);
     Con_Printf("Journal: %ld earned entries; reader %ld bytes.\n",(long)aw_state.journal_count,(long)sizeof(*book));
 }
-void AW_WorldUIInit(void){Cvar_RegisterVariable(&aw_map_mode);Cvar_RegisterVariable(&aw_map_debug_available);
-    Cvar_RegisterVariable(&aw_map_lava);Cvar_RegisterVariable(&aw_map_format);Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);}
+static void inventory_command(void){
+    if(Cmd_Argc()==1)AW_InventoryOpen();else AW_InventoryGrantCommand();
+}
+void AW_WorldUIInit(void){AW_InventoryInit();Cvar_RegisterVariable(&aw_map_mode);Cvar_RegisterVariable(&aw_map_debug_available);
+    Cvar_RegisterVariable(&aw_map_lava);Cvar_RegisterVariable(&aw_map_format);Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);Cmd_AddCommand("aw_inventory",inventory_command);}
 void AW_WorldUIMouse(int dx,int dy){
     int top;
     if(!modal || key_dest!=key_menu)return;
@@ -383,6 +656,11 @@ void AW_WorldUIMouse(int dx,int dy){
         }else{map_x-=dx*map_step;map_y-=dy*map_step;}
     }
     mouse_x=minmax(mouse_x+dx,0,319);mouse_y=minmax(mouse_y+dy,0,199);
+    if(modal==3 && inventory && drag==K_MOUSE1){
+        top=AW_UIScrollHit(INV_SCROLL_X+2,minmax(mouse_y,INV_LIST_Y+10,INV_LIST_Y+INV_SCROLL_H-11),
+            INV_SCROLL_X,INV_LIST_Y,INV_SCROLL_H,inventory->count,INV_VISIBLE,inventory->top);
+        if(top>=0)inventory_scroll(top);
+    }
     if(modal==2 && book->index_mode && drag){
         top=AW_UIScrollHit(306,minmax(mouse_y,40,165),304,40,126,aw_state.count[AW_JOURNAL],(book->index_end-book->index_top),book->index_top);
         if(top>=0){book->index_top=top;book->selection=top;AW_UIBookBegin();index_layout();AW_UIBookEnd();}
@@ -403,11 +681,12 @@ int AW_WorldUIKey(int key,int down){
         if(modal==1 && key==K_MOUSE1 && marker_click){
             marker_click=0;if(!teleport_mode && !teleport_button_hit())place_marker();
         }
-        if((modal==1 && key==drag) || (modal==2 && (key==K_MOUSE1 || key==K_MOUSE2)))drag=0;
+        if((modal==1 && key==drag) || (modal==2 && (key==K_MOUSE1 || key==K_MOUSE2)) || (modal==3 && key==K_MOUSE1))drag=0;
         return 1;
     }
     if(key==K_F10 || key=='`'){close_panel();return 0;}
-    if(key==K_ESCAPE || (modal==1 && (key=='m' || key=='M')) || (modal==2 && (key=='j' || key=='J'))){close_panel();return 1;}
+    if(key==K_ESCAPE || (modal==1 && (key=='m' || key=='M')) || (modal==2 && (key=='j' || key=='J')) || (modal==3 && (key=='i' || key=='I'))){close_panel();return 1;}
+    if(modal==3){inventory_key(key);return 1;}
     if(modal==1){
         if(key!=K_MOUSE1 && key!=K_MOUSE2 && key!=K_MOUSE3)marker_click=0;
         if(key==K_MOUSE1 && !teleport_mode && mouse_y>=1 && mouse_y<16){
@@ -718,5 +997,5 @@ int AW_WorldUIDraw(void){
         if(map_y<-map_h)map_y=-map_h;
         if(map_y>2*map_h)map_y=2*map_h;
         map_draw();
-    }else journal_draw();cursor();scr_copyeverything=1;return 1;
+    }else if(modal==3)inventory_draw();else journal_draw();cursor();scr_copyeverything=1;return 1;
 }

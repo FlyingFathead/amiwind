@@ -1,8 +1,19 @@
 # Roadmap and implementation options
 
+Release preparation, 15 October 2026: the v0.0.40 source update uses the
+published v0.0.39 main HEAD as its baseline. The earlier combined world failed
+six ownership checks. A source repair passed focused and full-suite checks;
+the successor world is still being checked. Complete CHIM rings 0, 1 and 2,
+original-cell ownership, actor contact, reference accounting and visual/collision
+seams remain required alongside gameplay repairs. See the
+[final release preparation](RELEASE-v0.0.40.md) and
+[boundary dependencies](bugs/CHIM-FRAME-DEPENDENCY-OWNERSHIP-40.md).
+
 <!-- contents start -->
 ## Contents
 
+- [v0.0.40 release scope - 15 October 2026](#v0040-release-scope---15-october-2026)
+- [v0.0.40-dev1 gameplay priority, 14 October 2026](#v0040-dev1-gameplay-priority-14-october-2026)
 - [Additional RC1 inspection findings, 13 October 2026](#additional-rc1-inspection-findings-13-october-2026)
 - [Release hold and RC2 request, 13 October 2026](#release-hold-and-rc2-request-13-october-2026)
 - [v0.0.39 - Cell By Cell, Piece By Piece](#v0039---cell-by-cell-piece-by-piece)
@@ -155,8 +166,292 @@
   - [Optional cloud-horizon experiment](#optional-cloud-horizon-experiment)
   - [Optional rising lava smoke and plumes](#optional-rising-lava-smoke-and-plumes)
 - [Owner-reported follow-up queue, 13 October 2026](#owner-reported-follow-up-queue-13-october-2026)
+- [Bounded CHIM follow-up - 14 October 2026](#bounded-chim-follow-up---14-october-2026)
+  - [Inventory scrollbar source follow-up, 14 October 2026](#inventory-scrollbar-source-follow-up-14-october-2026)
+  - [Opening HUD channel parity, 14 October 2026](#opening-hud-channel-parity-14-october-2026)
+- [Dedicated pose source progress, 14 October 2026](#dedicated-pose-source-progress-14-october-2026)
+- [Selected punch evidence, 14 October 2026](#selected-punch-evidence-14-october-2026)
+- [Inventory native checkpoint, 14 October 2026](#inventory-native-checkpoint-14-october-2026)
+- [Original-cell coverage reporting - 15 October 2026](#original-cell-coverage-reporting---15-october-2026)
 
 <!-- contents end -->
+
+## v0.0.40 release scope - 15 October 2026
+
+**v0.0.40: Rings 0, 1 and 2 of Vvardenfell in Full CHIM** is the selected title. Rings 0-2
+are the complete planned CHIM conversion scope; other exterior cells retain the
+legacy route except already converted CHIM towns. Door-entered interiors remain
+independent. All 336 ring cells appear in the 435-cell spatial plan; that plan
+is not a package manifest. The combined 369-frame world, preserved horizons,
+original references, deferred features and adjacent visual/collision seams must
+pass their gates before release. The current source suite passes, while the
+combined-world retry is running. See [coverage](chim/CELL_TRACKER.md) and
+[ownership](bugs/CHIM-FRAME-DEPENDENCY-OWNERSHIP-40.md).
+
+Public gameplay images must be actual AmiWind captures. Original-game reference
+images remain private; the previous exception is removed and the export
+regression passes. See [public image selection](bugs/PUBLIC-REFERENCE-SCREENSHOT-40.md).
+
+
+Current source checkpoint, 15 October 2026: boundary ownership repair passes
+37 focused checks and the source contract for all 369 frames. Combined-world
+readback, split-model/sprite dependencies, seams, native gameplay and full
+package gates remain pending. Converted, audited, native-checked and packaged
+coverage retain their previous receipts.
+[Ownership repair](bugs/CHIM-FRAME-DEPENDENCY-OWNERSHIP-40.md).
+
+
+Scoped combat follow-up, 14 October 2026: Khajiit female physical ready movement
+and stationary/strafe punches are positive controls. Keep the reported
+[movement](bugs/PLAYER-READY-MOVEMENT-39.md) and
+[attack](bugs/PLAYER-PUNCH-THIRDPERSON-39.md) cases open. Next acceptance work
+must resolve the failing character/context and compare motion with the original;
+these controls do not establish hit/damage or gait quality. Preserve the
+[Seyda allocation retry](bugs/CHIM-CHUNK-LOAD-FAIL-33.md) separately from cell
+conversion, inclusion and visual/collision coverage.
+
+15 October 2026 terrain follow-up: original-spacing diamond topology and two
+local LAND-detail repairs are integrated. Source coordinates and affected edges
+agree; the dreamer contact issue remains open. The complete source gate now
+passes with explicit skips and expected failures. Original ray measurements
+are distinguished from rendered/contact triangles. Complete the original
+foot-pose comparison, compiled contact and native cell/chunk
+crossings before accepting rings 0-2 or packaging dev2. Existing conversion and
+package counts remain separate and unchanged.
+[Diagonals](bugs/CHIM-TERRAIN-DIAGONAL-40.md),
+[contact](bugs/CHIM-SEYDA-ACTOR-CONTACT-33.md).
+
+
+- BUILD-PLAYER-BODY-BUDGET-FALLBACK-39 — 15 October 2026, v0.0.40-dev2:
+  continue past reduced animation fits to seek full action sampling under
+  unchanged geometry and memory guards. The canonical Argonian diagnostic
+  fits122 frames; production and native verification remain pending.
+  [Report](bugs/BUILD-PLAYER-BODY-BUDGET-FALLBACK-39.md).
+
+
+v0.0.40-dev2 candidate preparation, 15 October 2026: the animation correction
+passes 115 shared converter checks. Regenerated assets, full release gates and
+shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
+
+
+Animation follow-up, 15 October 2026: the
+[rotating-offset converter correction](bugs/NPC-ANIMATION-OFFSET-40.md)
+has nine focused checks. Rebuild affected player bodies and compare gait,
+limb shape, ready movement and combat before the next v0.0.40-dev2 inspection
+candidate. Keep original-asset, native, packaging and shipment gates separate.
+CHIM cell ownership and coverage are unchanged by this converter work.
+
+
+
+Original gait reference, 14 October2026: Nord male/Barbarian/Steed controls now
+cover physical lowered/ready W and Shift+W. Correct camera-eye/actor labels
+before measuring movement. Resolve the measured eye-height residual and compare
+actual speed/phase with current and v0.0.38 motion before closing
+[gait](bugs/PLAYER-MOVEMENT-FRAME-SKIP-39.md) or
+[ready movement](bugs/PLAYER-READY-MOVEMENT-39.md). Head and scene differences
+remain explicit; reference evidence is not repaired-game acceptance.
+
+
+Nord gait follow-up, 14 October2026: physical ready walking and running have a
+scoped positive control, with changing limb poses in retained original frames.
+Complete the matched original and historical v0.0.38 motion comparison before
+accepting [gait quality](bugs/PLAYER-MOVEMENT-FRAME-SKIP-39.md). Keep the
+[reported ready-movement failure](bugs/PLAYER-READY-MOVEMENT-39.md) and
+[terrain allocation retries](bugs/CHIM-CHUNK-LOAD-FAIL-33.md) open; initial
+blocked-endpoint controls are excluded and no cell coverage is promoted.
+
+
+## v0.0.40-dev1 gameplay priority, 14 October 2026
+
+The unreleased dev2 documentation rotates selected older journal entries before
+adding further findings; keep the existing size guards and preserve archive
+links in the next source export. [Tracker maintenance](bugs/TRACKER-REGISTER-SIZE-33.md).
+
+Selected actual item lookup/icons and physical sword/shield equip are observed in native diagnostics. The exact later target/FPU and full suite pass; actual Nord steel-weapon/shield blocking credits two incoming blocks. Normal HUD Guard text is absent with target names retained, and live no-dice health/fatigue readouts are correct. Selected legacy Argonian held/released shield and fists-readied movement are scoped positive controls; closer pose, anatomy, jump/death, matched gait and all-appearance acceptance remain pending. [Catalogue](bugs/INVENTORY-CATALOG-LOOKUP-40.md), [blocking](bugs/COMBAT-BLOCKING-36.md), [HUD](bugs/HUD-STATS-29.md).
+
+The selected dev1 body payload retains the previously packaged 122-frame
+Argonian male and matching tags alongside nineteen current bodies, preserving
+hit/death/jump sampling. Its legacy block holds a sample about 67 ms before the
+authored hit, and current anatomy/quality limits remain open. Selected-payload native held/released shield and movement are observed;
+closer pose, anatomy and jump/death checks remain pending. Do not infer
+complete Argonian acceptance from Nord controls. [Body fitting](bugs/BUILD-PLAYER-BODY-BUDGET-FALLBACK-39.md).
+
+The bounded dev1 gameplay inspection candidate is delivered. Continue dev2.
+Dev2's primary objective is CHIM mapping for rings 0, 1 and 2, with separate
+conversion, audit, native, packaging and acceptance records. The inventory
+requirements below remain planned follow-up work.
+
+CHIM static-mesh performance remains a measured dev2 audit even in already
+mapped areas. Playtesting reports occasional exterior Dwemer FPS drops; exact
+site/build/cause and measurements remain unknown, with no reproduced repair.
+After selecting an exact scene, profile static meshes, visibility, transforms,
+clipping, surface-cache/overdraw, server/collision and streaming costs separately.
+Compare fixed pose and route with warp off and controlled settings, then preserve
+original geometry/gameplay through matched OpenMW and native before/after checks.
+Mapping alone does not establish an FPS budget, and an optimizer is not assumed
+to fix the report. Rings 0, 1 and 2 remain dev2's primary objective.
+[CHIM-VIEW-FACES-33](bugs/CHIM-VIEW-FACES-33.md).
+
+
+Plan compact lookup tables for all original item identities, properties and
+effects, with explicit support states and bounded on-demand resources. Preserve
+original typed effect, enchantment/charge, equip/use and save semantics; do not
+substitute default values for unsupported records. Current basic AWI2 rows and
+ten selected asset pairs are incomplete: actual picked Luminous Russula resolves
+name/count/weight/value but has no converted icon/model or admitted action.
+Keep authoritative carried IDs, counts, condition and equipped state reliable.
+Quest logic must query actual AW_ITEM inventory, not a hot-swap list or the UI's
+visible rows. A bounded hotbar/equipped asset cache may stay resident for fast
+use; other descriptors, icons and models load on demand. Full-catalogue lookup
+coverage does not require full-catalogue residency. This is a cache plan, not
+an implemented optimization or measured speed/memory saving.
+
+Original UI textures must be derived from the locally supplied owned game
+during conversion and excluded from public source. The fixed right-hand corner
+must mirror the left border pattern, with no movable-window or resize control.
+Interim authored placeholders do not establish original artwork parity.
+
+Require original golden title/tab frames and font, with no movable-window
+top-right corner decoration in the full-screen modal. Add actual carried-weight/
+capacity and Armor-rating readouts from game state, plus a mouse-operable
+vertical scrollbar on the right and keyboard navigation. These readouts and
+visual refinements remain planned. The dev2 scrollbar source follow-up below
+has focused automated checks; native acceptance remains pending.
+
+Reserve an inset, readable bottom control/status area in inventory, with
+enough vertical margin and wrapping to keep hints away from the screen edge and
+item details. A new supplied image confirms crowded bottom hints; its exact
+running binary is unverified. This spacing refinement and the original-style UI
+features above remain planned, with actual native/reference checks required.
+[UI-INVENTORY-LAYOUT-40](bugs/UI-INVENTORY-LAYOUT-40.md).
+
+14 October post-dev1 source follow-up: inset inventory status/control rows and
+literal Inventory heading pass executable bounds/actions and map/journal
+checks. Target/native visual comparison, original plaque/artwork/pose and the
+remaining inventory requirements stay pending; delivered dev1 is unchanged.
+
+Add a persistent View option for item list versus icon grid, reusing the same
+actual carried selection, category/filter/sort, equip/use/drop admission and
+keyboard/mouse actions. Persisting a view must not duplicate inventory state
+or change item ownership. This list/grid option remains planned follow-up.
+
+Plan E or a double-click on the actual selected carried item to open its
+context actions: equip/unequip, consume/use and read books or papers as the item
+supports. Share the existing action admission and authoritative ownership state;
+unsupported effects or reading paths must be labelled unavailable rather than
+simulated. These expanded shortcuts/use/read actions are planned, not dev1
+implementation.
+
+Equipped items also require a thin golden outline. Dedicated original inventory
+poses, the original inset black name plaque and camera parity remain planned;
+none of these additions is implemented by this roadmap update.
+
+The inventory title must read the literal "Inventory" in the original inset
+black plaque/golden border. The planned attributes/stats panel uses the actual
+player name as its header. Keep title content distinct from player identity;
+these refinements remain planned and must follow the supplied original UI.
+
+The planned dev2 [inventory follow-up](INVENTORY.md#next-inventory-pass-v0040-dev2-14-october-2026)
+requires the actual race/sex/head/hair/clothing/equipment appearance, full original
+item icons and original equip/use/drop, ownership, save and effect rules.
+Drag-to-character equip/use, category/value/weight/item-stat sorting and filters,
+a black full-screen paused backdrop, original golden borders, the original inset black
+title plaque within the gold top border reading "Inventory" and a readable F10 console-font hover-detail variant remain
+required. The preview posture still needs original-reference refinement; neither
+that posture nor the inset plaque is implemented by this plan. The dedicated
+original inventory pose (fixed time zero), rather than a rotated live idle,
+remains required; selected male-Nord modal pause evidence is scoped. Minimize RAM
+through compact item lookup tables (LUTs), on-demand disk
+assets and measured cache/preview choices. Give inventory preparation an explicit
+master-builder phase, monitor build/runtime performance, and keep the producer,
+consumer and public source export synchronized. Plan a controlled MiniWind
+`--inventory-test` scene with explicitly tracked original test items. The linked
+inventory page owns the detailed requirements and verification gates. These
+additions and the planned ring/town/seam expansion are not included in dev1.
+
+Reconcile the three experimental quick-character expected failures under
+[TEST-CENSUS-CONTRACTS-40](bugs/TEST-CENSUS-CONTRACTS-40.md): meaningful source
+routing checks, supported debug aliases and direct-start documentation. Keep
+these open contracts separate from native menu/gameplay acceptance; remove each
+decorator only after its replacement passes. This follows the urgent physical
+combat and inventory gates.
+
+
+Spell follow-up: magicka use, shield effects, destruction types and player
+casting animations remain required gameplay work. Inspect existing AmiQuake
+projectile movement/collision, damage, particles and lighting before designing
+new effects; compare spell costs, eligibility, delivery and effects against the
+original. Reusable projectile machinery is not complete spell-system parity.
+No spell implementation is included in this roadmap update.
+
+The v0.0.40 exterior target is CHIM coverage of rings 0, 1 and 2, with every failed, held, partial or excluded cell explicit. The shipped v0.0.40-dev1 gameplay inspection candidate omitted the town-boundary/seam expansion; dev2 requires the approved original-cell ownership and full rings 0, 1 and 2. For each included CHIM owner, exclude its replaced legacy BSP29 map before compilation and from the final payload. Preserve independently selected interior formats and required nonduplicate dependencies; conversion/audit alone does not prove runtime inclusion. Adjacent-cell acceptance must cover shared border heights/coordinates, water and surface continuity, collision crossings in both directions, and unique edge-object ownership.
+
+Keep a per-reference entrance ledger for converted CHIM cells: original location/type/destination, visible geometry, activation bank, configured target, actual packaged destination and native entry/return states. Reuse the existing unavailable-interior handler for registered entrances with deferred destinations. Actual interior implementation follows in the next pass. Resolve the six partial town overlaps in dev2 through the approved original-cell-aligned town ownership and complete reference-band conversion, with separate terrain aprons.
+
+Ring 0 needs five runtime core owners and a compatible shared ocean terrain path before inclusion. Preserve four original deferred LEVC references. Plan outward grid-aligned CHIM town frames at Vivec x=1..6, y=-14..-9 and Seyda Neen x=-3..0, y=-11..-8; audit overlap ownership and boundaries before conversion. No frame expansion or new native coverage is implemented by this plan.
+
+Movement parity: use the [source speed study](MOVEMENT_SPEED_STUDY.md) and [PLAYER-MOVEMENT-STATS-PARITY-39](bugs/PLAYER-MOVEMENT-STATS-PARITY-39.md). Next quantify forward walk/run/level-swim in matched scenes with effective stats, load/effects, race/sex, original race-speed setting and simulation time recorded. Then verify direction, readied states and save/load. Keep faithful gameplay and convenient fast debug policy distinct; no tuning or proposed maximum-stat option is implemented by the study.
+
+The inventory's current safe placement boundary is plain BSP. Active CHIM,
+captured scenery and restricted story contexts refuse drops and retain the
+item; full-game CHIM/scenery placement is required next under
+[UI-INVENTORY-INTEGRATION-40](bugs/UI-INVENTORY-INTEGRATION-40.md). Keep the
+distinct limits visible: 32 carried IDs, 32 persistent ground records and 16
+distinct new inventory model precaches per loaded level. Repeated models reuse
+a slot and scene changes reset that cache. Expanding the model limit requires
+explicit table-budget validation. Target compilation and selected native lookup,
+physical equip and first-person RMB raising are observed. The repaired complete
+suite, full native modal, third-person block pose, plain-BSP transfer/save/load
+and CHIM-refusal gates remain pending.
+
+
+Owner-published v0.0.39 source is commit
+`751e1efa6b28e7fc58453fc81c73100715b88195`; the owner reports the same gameplay
+in inspected RC2 and final. The current bounded priority is the renewed
+[physical-LMB punch](bugs/PLAYER-PUNCH-THIRDPERSON-39.md),
+[ready-state inability to move](bugs/PLAYER-READY-MOVEMENT-39.md),
+[both-view blocking presentation](bugs/COMBAT-BLOCKING-36.md) and
+[sinking/upright swim body](bugs/WATER-GAMEPLAY-PARITY-38.md) failures.
+
+For punch acceptance captures, drain diagnostic commands before physical input
+and avoid a wait/readout burst ahead of that input. A later state-2-only capture
+is inconclusive because its wait/readout burst can defer physical LMB execution;
+exact guest timing and Preview-specific suppression are unproven. Keep original footage and actual
+state transitions with event timing. This is a measurement correction, not a
+gameplay fix. [Punch record](bugs/PLAYER-PUNCH-THIRDPERSON-39.md).
+
+Reproduce owner input/state first, repair the diagnosed paths, then check the
+exact target and package with ordinary physical input, matched original views
+and owner inspection. A successful Nord ready-movement or input/damage control
+is scoped evidence; it does not accept the owner failure. Preserve good ready
+posture, original shield eligibility and earlier historical receipts.
+
+The requested `dbg characterchange` testing command is implemented in source:
+it reuses the existing pier race/gender/head/hair appearance menu by default;
+`all` selects the full quick-character page sequence. Two focused C/console
+checks pass. Native Nord-male to Orc-female menu/confirmation/reopen and exact
+engine readback pass. Story-registration restrictions remain in place. Package
+and owner acceptance remain pending; it is a diagnostic aid,
+with no gameplay repair claimed.
+The new source race-testing shortcut dbg set race/playerrace accepts a strict
+zero-based loaded ID or normalized race name, with no-value/list output for
+IDs/names/current selection. The refined contract preserves stats/level/current
+health, gender/name/class/birth and equipment while changing only validated
+race/head/hair and live eye height. It reuses the existing character builder on
+a temporary copy, without reapplying racial stats. A same-race request preserves
+head/hair; another race selects its first valid gender-compatible pair.
+Invalid/context-restricted changes are refused. Fourteen final focused checks
+pass; new target/native/package verification remains pending, with no gameplay
+repair inferred.
+[Contract](CHARACTER_CREATION.md#diagnostic-race-shortcut-14-october-2026).
+The complete candidate gate rejects a direct resident registration at270 versus
+269commands (+32B). Reuse existing on-demand AWDC1 dbg routing without raising
+the budget. Twenty focused actual character/console/catalogue/registry checks
+pass after correction; new target/full-gate/native/package remain pending under
+[ENGINE-RESIDENT-REGISTRY-GROWTH-36](bugs/ENGINE-RESIDENT-REGISTRY-GROWTH-36.md).
+
+CHIM remains 360 whole cells plus six excluded partial overlaps; no new cell
+coverage is established by this follow-up.
 
 ## Additional RC1 inspection findings, 13 October 2026
 
@@ -234,6 +529,12 @@ need separate original/native comparisons and actual baked pose checks.
 
 All eight attributes must eventually have their original gameplay effects:
 Strength, Intelligence, Willpower, Agility, Speed, Endurance, Personality and Luck.
+Require matched original shield-block balance/stagger/knockdown/recovery checks,
+including return to control and distinct incoming weapon cases. A successful
+block or raised shield alone does not establish those reactions. The applicable
+original rule/formula still needs audit; this requirement adds no implementation
+or native acceptance. See [COMBAT-BLOCKING-36](bugs/COMBAT-BLOCKING-36.md).
+
 Maintain a mechanics matrix with original formula/settings, implemented consumers,
 remaining unsupported rules, automated checks and native evidence for each.
 Required coverage includes Strength for melee/carrying/fatigue; Intelligence
@@ -1481,11 +1782,28 @@ ship-exit scene. Performance observations remain separate from measured claims.
 
 The post-RC3 world/map/journal pass has started at the owner's request.
 [Current implementation and limits](WORLD_MAP_AND_JOURNAL.md).
+14 October 2026, v0.0.40-dev1: the [inventory source candidate](INVENTORY.md)
+implements the requested full-screen paused modal, real item list, supported
+equip/unequip and persistent world drops. Host transactions/UI checks and selected
+asset readback pass. The checklist remains open for integrated/native verification,
+mutable clothing/head/hair, item use and target budgets; the existing baked outfit
+does not establish arbitrary equipment composition.
+
 
 - [x] **M: basic full-screen Vvardenfell map.** Show Morrowind and the player's current
   position. Reuse the verified local-to-world transform described above; define
   how interior locations appear without inventing exterior coordinates. Provide
   a clear return to play, keyboard navigation and mouse pan/zoom where practical.
+- [ ] **O: planned attributes/stats modal.** Provide a rebindable gameplay action,
+  a full-screen black backdrop with world simulation paused and world input
+  captured like I/M, safe close/return and an actual player-name header.
+  Show real character statistics and source-derived values, with original-style
+  frames/font. The installed OpenMW 0.51 reference has no default O action,
+  and the inspected current gameplay keymap leaves O unbound. The original
+  base-game manual's O binding has not been verified; do not claim an original
+  default. Inside inventory, O retains its existing name/value/weight sort
+  cycle. This gameplay/modal distinction is required; no O stats screen exists
+  in the current implementation.
 - [ ] **I: inventory.** Show the player character beside their items, with
   readable names, quantities, icons and equipment slots. Support mouse selection
   and equipping/unequipping, with a visible cursor and keyboard alternatives,
@@ -1495,6 +1813,33 @@ The post-RC3 world/map/journal pass has started at the owner's request.
   equipment changes; opening either screen must capture input from the world.
 - [ ] Measure the map, preview model, item icons and UI memory on the reference
   Amiga profile. Load their resources on demand and release them on close.
+- [ ] Plan the original active-effect HUD as a bounded AGA row above the
+  resource bars and beneath the world viewport; tile rows when needed. Group displayed effect
+  types while retaining every contributing source, argument, magnitude and
+  individual remaining duration in the complete paused detail list; permanent
+  effects get no invented countdown. Use explicit +N overflow access, and never
+  cap gameplay effects to the visible grid. Convert original icons locally with
+  a bounded on-demand cache; do not feed every possible icon into Quake's finite
+  global picture registry. Measure RAM/frame/disk cost and verify stacking,
+  recasts, expiry, unequip, pause and saves against the original. This grid is
+  a planned AGA adaptation; original OpenMW uses a right-side row, not this grid.
+  See [Active-effect HUD findings and plan](HUD_ACTIVE_EFFECTS.md) for source
+  limits, original icon conversion, charge/condition and acceptance.
+- [ ] Add a clearly labelled, bounded dbg teststatuseffects display-only
+  preview of the effect-icon catalogue, stacking/duration labels and overflow.
+  Clear it automatically after a short bounded real-time interval independent
+  of game pause, never save it, and never change actual effects, statistics,
+  random-number state or gameplay. Do not assume a fixed
+  gameplay effect cap; real stacking/expiry/save behavior needs separate tests.
+- [ ] Complete the already planned original HUD: actual health/magicka/fatigue,
+  equipped weapon or bare-fists box, selected spell/enchantment box and
+  applicable condition/charge indicators. Read real current equipment/selected
+  magic state, not a guessed off-hand slot. Preserve independent current/max
+  bars and use bounded on-demand original icon assets. See
+  [HUD-STATS-29](bugs/HUD-STATS-29.md). The integrated dev1 slice uses authored
+  fist/generic-weapon and explicitly empty magic placeholders from actual
+  admitted equipment; original icons, selected-magic game logic and matched
+  original/native acceptance remain pending.
 - [x] **J: basic dated progression journal and quest links.** Present an open book with a central
   fold and two facing pages, page turning, dated entries and clickable topic/quest
   links. Provide keyboard navigation and a visible pointer, with a route back
@@ -3186,3 +3531,145 @@ Additional improvements: optional, measured cloud-horizon fading; terrain-textur
 fidelity measured for CPU and memory; preserve approved distant-tree silhouettes;
 continue exterior CHIM coverage with exact packaged inclusion; retain the
 requested debug landmark teleports, inspection startup and noclip bob controls.
+
+## Bounded CHIM follow-up - 14 October 2026
+
+Continue bounded CHIM conversions alongside the gameplay repairs. The next source candidate addresses [Pelagiad's cross-cell window mounting](bugs/CHIM-WINDOW-MOUNT-CROSS-CELL-33.md), then runs cell (0,-7) alone through the existing conversion and audit gates. Its source geometry checks do not establish a converted, native-checked or packaged cell.
+
+The six ring-2 partial town overlaps (-3,-11), (-2,-11), (-1,-11), (0,-11), (5,-14) and (6,-14) are required dev2 work: expand Vivec ownership to x=1..6, y=-14..-9 and Seyda ownership to x=-3..0, y=-11..-8, fill the original reference bands, preserve stable origins and separate terrain aprons, and verify seams. The earlier next-batch deferral is superseded. They remain excluded from the whole-cell packaged count. Ring 0's five open-ocean cells still require runtime placement. Neither deferred set expands the current package footprint.
+
+### Inventory scrollbar source follow-up, 14 October 2026
+
+The unreleased dev2 source adds the shared journal scrollbar to inventory
+lists longer than six rows, reserving the right rail without shrinking the
+character preview. Selected items stay visible and actual ownership remains
+unchanged. Mouse arrows/rail/drag, release, focus loss, category changes,
+keyboard navigation and close/reopen have focused executable coverage, along
+with real equip targeting, empty/six/twelve-item lists and map/journal controls.
+The actual shared UI-helper test also passes. The full suite and Amiga/FPU
+build subsequently passed with the counts in the dedicated-pose section below.
+Original/native visual comparison and packaging remain required. The ordinary
+standing preview is still reported in dev1; dedicated inventory poses are now
+converted but await native review. Original artwork remains unfinished.
+No CHIM coverage changes.
+[Inventory layout](bugs/UI-INVENTORY-LAYOUT-40.md).
+
+### Opening HUD channel parity, 14 October 2026
+
+The unreleased dev2 source restores separate stats, weapon and magic HUD
+permissions, including paper activation before pickup and persistent ring
+permission. Paper pickup now enables fighting before the hall guard. Seven
+focused executable fixtures pass. The full suite and Amiga/FPU target now also
+pass with the counts in the dedicated-pose section. Scoped original/native
+review and paper checks now confirm that taking the papers enables fists before
+the hall guard; reading alone does not. Full normal-route checks remain pending,
+and the native diagnostic exit gate failed separately. Original artwork and
+remaining map/menu admission work are unfinished; inventory posture has its own
+scoped evidence and remaining checks below. Keep actual weapon readiness separate from its HUD
+icon, preserve debug-test bypasses, and do not infer punch/block/swim acceptance
+from these source checks. [HUD](bugs/HUD-STATS-29.md).
+
+## Dedicated pose source progress, 14 October 2026
+
+The unreleased source selects dedicated original START poses for unarmed and
+melee-equipped inventory bodies, with matching attachment tags and two-handed
+left hiding. Six converter checks and the before/after runtime regression pass;
+original human/female/beast keys and matrices resolve. Gameplay frame counts and
+animation clocks are unchanged. All twenty race/sex companions have converted
+with ten frames each; independent binary/tag readback passes (8,286,220 bytes).
+The exact implementation passes the Amiga/FPU build and the full 4,086-test suite:
+4,080 passes, three Windows-only skips and three tracked expected failures.
+Matched native visuals remain pending. Torch-specific posture, full chosen head/hair
+and changing worn body parts are unfinished; starting clothing is still used.
+The optional modal alias is released on close. No measured target cost or
+complete appearance/visual acceptance is claimed. CHIM coverage is unchanged.
+[Inventory layout](bugs/UI-INVENTORY-LAYOUT-40.md).
+
+## Selected punch evidence, 14 October 2026
+
+Unchanged delivered dev1 now has scoped physical-LMB/visible-motion evidence for
+stationary male Argonian in ordinary third person and separate side Preview.
+Normal-dice damage, moving transitions, all appearances and animation quality
+still need verification. This does not accept new inventory source, blocking,
+swimming or gait. The strict closure failure is retained separately from normal
+exit and diagnostic resource readback. CHIM coverage is unchanged.
+[Canonical punch report](bugs/PLAYER-PUNCH-THIRDPERSON-39.md).
+
+## Inventory native checkpoint, 14 October 2026
+
+The corrected candidate shows the dedicated male Nord unarmed, steel longsword
+and steel shield preview through physical inventory controls and close/reopen.
+The initial missing-model-allowance refusal is preserved in the report. Original
+OpenMW appearance/equipment match is scoped; full appearance, torch, all-race
+visuals and remaining UI work are still open. No new shipment or CHIM coverage.
+[UI-INVENTORY-LAYOUT-40](bugs/UI-INVENTORY-LAYOUT-40.md).
+
+Dev2 preparation, 15 October 2026: the five remaining ring-0 ocean frames pass
+offline structural/statistics/memory/allocator checks. They have no original
+static scenery placements; four leveled-creature spawns remain deferred.
+Actual routing, native seams and package inclusion remain pending. Approved
+original-cell town bounds and source selection are implemented. Vivec offline
+conversion and ownership ingestion passed; Seyda conversion is blocked by 15 failed stair probes at two references. [Coverage](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md).
+
+Dev2 preparation, 15 October 2026: the expanded Seyda source export contains
+2,792 selected scenery references (2,205 owned origins and 587 footprint
+dependencies), with unique original IDs. This is source coverage, not native or
+packaged coverage. The explicit conversion palette and stale test records are
+being validated before the combined candidate gate; see
+[palette compatibility](bugs/BUILD-DIAGNOSTIC-PALETTE-38.md) and
+[town test records](bugs/TEST-TOWN-BOUNDS-40.md). Full rings 0, 1 and 2 remain required.
+
+15 October 2026: the expanded town carrier exposed a fixed-seal ocean-floor
+assumption. Original terrain is retained; the hidden base correction passes
+18 affected checks. Actual compilation and native seams remain required.
+[Ocean floor](bugs/BUILD-SEYDA-OCEAN-FLOOR-40.md).
+
+## Original-cell coverage reporting - 15 October 2026
+
+Expanded towns must distinguish original owned cores from terrain aprons and
+shared object dependencies. The corrected offline reader reports 36 Vivec core
+cells and 28 apron-only cells, now recorded in the canonical tracker. This does
+not complete playable rings 0-2. Retain
+original reference types, deferred actors and unimplemented gameplay alongside
+conversion, native and package states.
+[Tracker finding](bugs/CHIM-TRACKER-APRON-40.md).
+
+15 October 2026, v0.0.40-dev2: the fresh expanded Seyda CHIM frame passes
+structure, active-heap/zone and 3,724 stair probes with zero blocking failures;
+532 advisory and 29 zone chunk loads without room remain explicit. Sixteen
+owned core cells and twenty apron cells are separate. The four Seyda and two
+Vivec ring-2 overlaps now have original-cell offline conversion evidence.
+The five ring-0 ocean frames pass scoped offline checks. Ring 1 retains prior
+171-cell package coverage; ring 2 retains 154/160 historical whole-cell coverage
+until the newly converted six cells pass integration and package readback.
+[Stairs](bugs/CHIM-SEYDA-EXPANDED-STAIRS-40.md),
+[source accounting](bugs/CHIM-TRACKER-APRON-40.md).
+
+The corrected source carrier completes and passes independent resident,
+animation, voice, reference and palette readback
+([NPC-BAKE-VERTEX-32](bugs/NPC-BAKE-VERTEX-32.md),
+[voice prerequisite](bugs/BUILD-SEYDA-CARRIER-VOICE-DIR-40.md)).
+Expanded CHIM integration matches all statics; two actor contact findings
+remain after the final frame-map refit and need original-terrain/model-contact
+diagnosis and native checks
+([CHIM-SEYDA-ACTOR-CONTACT-33](bugs/CHIM-SEYDA-ACTOR-CONTACT-33.md)).
+Three portable receipt writers
+are corrected with 24 affected checks and unchanged Linux metadata bytes;
+the corrected complete suite passes 4,181 tests with three Windows-only skips
+and three tracked Census expected failures, and no unexpected failure or error.
+[Writer regression](bugs/CHIM-SEYDA-RECEIPT-TEXT-40.md).
+Matched native visual/collision seams, routing, actor/gameplay checks and
+package readback are still required for complete playable rings 0-2.
+
+The complete source suite also caught two new NPC fallback helpers missing
+from the model cache key. Their source correction is separate from carrier
+completion and native acceptance.
+[Cache dependency regression](bugs/BUILD-NPC-BAKE-CACHE-KEY-40.md).
+
+Both source carrier voice-directory and NPC cache-key corrections now pass
+112 integrated affected checks without skips. The complete actor build and
+serialized readback pass; the corrected full suite passes as recorded above.
+Combined-world routing, native seams and package gates remain pending.
+A separate [terrain diagonal mismatch](bugs/CHIM-TERRAIN-DIAGONAL-40.md) against
+OpenMW 0.48 is now tracked; matching height samples alone does not prove
+interior surface or collision parity.

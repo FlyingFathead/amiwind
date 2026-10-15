@@ -194,7 +194,7 @@ def _window(skeleton, group, attack_stance=None):
     return None
 
 
-def plan(base, profile, female=None, weight=1.0, attack_stance=None):
+def plan(base, profile, female=None, weight=1.0, attack_stance=None, player_block_hit=False):
     """Sample plan for one skeleton and profile.
 
     base: npc_geometry.Skeleton of the actor's skeleton file; female: the female
@@ -241,6 +241,14 @@ def plan(base, profile, female=None, weight=1.0, attack_stance=None):
                 hit = skeleton.events.get((attack_stance + ': chop hit' if attack_stance else ATTACK_HIT)
                                           if name == 'attack' else BLOCK_HIT)
                 entry['hit'] = (hit - a) / (b - a) if hit is not None and a <= hit <= b else .5
+                if name == 'block' and player_block_hit:
+                    # The player fitter explicitly retains START and exact HIT.
+                    # NPC plans keep their historical sampling unchanged.
+                    if count != 5 or hit is None or not a < hit < b:
+                        raise ValueError('Player block pair requires five source slots and an authored hit')
+                    times[1] = hit
+                    entry['player_block_hit_source'] = 1
+                    entry['player_block_hit_time'] = float(hit)
             for t, line in skeleton.keys:
                 if not a <= t < b + 1e-6:
                     continue
@@ -563,6 +571,15 @@ def select(groups, keep):
         else:
             picks = [int(i * c // k) for i in range(k)]
         k = len(picks)
+        if 'player_block_hit_source' in g:
+            if k < 2:
+                raise ValueError('Player block requires START and HIT frames')
+            hold = int(g['hit'] * (k - 1) + .5) if k > 2 else 1
+            if hold < 1 or hold >= k:
+                raise ValueError('Player block hit cannot be represented')
+            picks[hold] = g['player_block_hit_source']
+            if picks != sorted(set(picks)):
+                raise ValueError('Player block hit selection is not ordered')
         n = dict(g, base=len(index), count=k, step=g['step'] * c / k)
         if g['name'] in AIR_GROUPS:
             # These endpoint-sampled sections retain their authored duration.

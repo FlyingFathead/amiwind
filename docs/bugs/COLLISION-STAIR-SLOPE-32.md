@@ -9,7 +9,7 @@
 | Where | converted stairs and slopes; staircases listed on the page |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.24, v0.0.32 (last seen) |
+| Persists in | v0.0.24, v0.0.32, v0.0.40-dev2 (last seen) |
 | Severity | medium: Blocked stairs. |
 | Family | Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`) |
 | Playtest version | v0.0.24 |
@@ -31,6 +31,7 @@
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
+- [Two original Imperial stair models, 15 October 2026](#two-original-imperial-stair-models-15-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -106,6 +107,11 @@ interiors).
 
 ## Verification
 
+Fresh full conversion at source a4a475b: 3,724 walked probes pass with zero
+blocking failures and 532 advisory. Native traversal and package checks remain
+pending. The original fifteen-failure result remains historical evidence.
+
+
 Owner's data, inside Docker, 8 October 2026:
 
 | Map family | Flight steps (dev2 image) | Failing before | Failing with this branch |
@@ -165,6 +171,23 @@ step rows, 1,643 -> 1,565 on the rebuilt maps; ramp rows unchanged. Regression f
 
 The image-step gate on every build's final maps, on by default with the stair rules.
 
+## Two original Imperial stair models, 15 October 2026
+
+15 October 2026, v0.0.40-dev2: fresh complete Seyda conversion at a4a475b passes structure, active-heap/zone and stair checks: 18,024 candidates, 3,724 walked, zero blocking failures, 532 advisory. Two Imperial stairs use original authored collision; render geometry is unchanged. Sixteen original owned cells and twenty apron cells are tracked separately. The 29 zone chunk loads without room remain explicit. Matched native traversal, adjacent-cell visual/collision seams and package acceptance are pending; issue remains open.
+
+The previous export ignored 76 authored collision triangles per model and built
+collision from the 447 visible triangles. A generated steep support face
+blocked the centre route. The narrow repair reuses the existing strict
+RootCollisionNode extractor and ordinary collision producer. AmiQuake
+SV_WalkMove stepping, player dimensions and the 0.69 walkable-normal threshold
+are unchanged. Missing or malformed authored collision is an error, rather
+than permission to recreate the failing visual proxy.
+
+The first of the 15 centre probes still meets neighbouring reference 3329;
+the existing lateral sample at -4 passes. This is the normal gate rule, not
+a new exception. Full-town gates and original/native comparisons remain required.
+See [expanded Seyda finding](CHIM-SEYDA-EXPANDED-STAIRS-40.md).
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -177,6 +200,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-ROUTED-FLORA-RESERVE-33](BUILD-ROUTED-FLORA-RESERVE-33.md): Routed standing hulls push a legacy open-world map past the flora collision reserve: the full build stops in world-flora (vf0779)
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
+- [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
 - [COLLISION-NC-FLAGS-32](COLLISION-NC-FLAGS-32.md): Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters

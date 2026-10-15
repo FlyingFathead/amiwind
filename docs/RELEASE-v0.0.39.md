@@ -4,9 +4,9 @@
 
 This final source release combines the RC1 changes and RC2 repairs. The release
 was authorized on 14 October after RC2 delivery. This decision does not close
-individual gameplay issues or claim new visual acceptance. Public publication
-is performed separately; neither RC1 nor RC2 needs to be installed or published
-first when updating the public v0.0.38 source.
+individual gameplay issues or claim new visual acceptance. The owner published public source at commit
+`751e1efa6b28e7fc58453fc81c73100715b88195`; neither RC1 nor RC2 needs to be
+installed or published first when updating public v0.0.38 source.
 
 The exact RC2 source passed 4,043 tests with four skips and three expected
 failures, Amiga compilation, package extraction and full disk readback. Scoped
@@ -19,6 +19,23 @@ autosaves, untinted death-menu rendering, ready/jump animation work, keyboard
 help, sound cancellation and exclusive CHIM exterior ownership. Existing unsafe
 saves are not repaired automatically. See the [changelog](CHANGELOG.md) and
 [RC1 history](RELEASE-v0.0.39-rc1.md).
+
+## Renewed gameplay findings, 14 October 2026
+
+The owner reports the same gameplay in inspected RC2 and final: physical LMB
+still lacks a third-person punch, movement fails with fists drawn, block
+presentation is missing in both views, and swimming still sinks with an upright
+submerged body. See [punch](bugs/PLAYER-PUNCH-THIRDPERSON-39.md),
+[ready movement](bugs/PLAYER-READY-MOVEMENT-39.md),
+[blocking](bugs/COMBAT-BLOCKING-36.md) and
+[water](bugs/WATER-GAMEPLAY-PARITY-38.md). All remain open. Earlier scoped native
+controls, successful input/damage or model presence do not accept these owner
+scenarios. Follow-up repair and package acceptance remain pending.
+
+The mutable follow-up source also adds `dbg characterchange` as a testing aid
+using the existing pier appearance menu. Two focused C/console checks pass;
+target/native menu and package checks remain pending. This command is not part
+of the sealed source history and does not establish a gameplay repair.
 
 ## Repairs carried forward from RC2
 

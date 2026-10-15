@@ -56,6 +56,25 @@ prior colour comparisons are not accepted as palette parity.
 Bind conversion and runtime palette hashes separately. Use production remapping
 and reject mixed-palette layer inputs before diagnostic captures.
 
+### 15 October 2026: explicit conversion-palette input
+
+Expanding source scenery changes the automatically sampled scene palette.
+Reusing earlier indexed assets could then display different colours. Scene
+conversion now accepts an optional 768-byte RGB palette before encoding assets,
+rejects malformed input before creating output, and records the input hash.
+The full builder forwards the palette and its cache fingerprints the file bytes.
+The default sampled result remains unchanged.
+
+The selected input must match the conversion stage: UI and sky palette
+reservations occur later. The existing indexed-palette machinery is reused;
+there is no engine rendering change. Six focused synthetic checks pass.
+Converted dependencies, native colours and package verification remain pending.
+
+
+### 15 October 2026: actual gate follow-up
+
+Exact pre-quantization palette passes focused checks and actual alias readback. Missing builder option-history/classification records are corrected with unchanged default. Affected record tests ran 171: 168 passed, three Node.js-dependent checks skipped. Native colours, complete carrier and package compatibility remain pending.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

@@ -33,3 +33,40 @@ WEAK int AW_MenuHeaderLines(const char *text,int width,char lines[2][AW_MINIWIND
 /* The animation kit console (aw_animkit.c): nothing to drive in fixtures without it. */
 WEAK void AW_AnimKitTick(void) {}
 WEAK void AW_AnimKitInit(void) {}
+
+/* Inventory dependencies are inactive only in fixtures which omit that module.
+ * Dedicated inventory fixtures link its real rules/UI/decoder instead. */
+#include "aw_inventory.h"
+WEAK int AW_InventoryActive(void){return 0;}
+WEAK void AW_InventoryInit(void){}
+WEAK int AW_InventoryBootstrap(void){return 0;}
+WEAK int AW_InventoryEquippedItem(int slot,aw_inventory_item_t *out){(void)slot;(void)out;return 0;}
+WEAK int AW_InventoryRead(const char *id,aw_inventory_item_t *out){(void)id;(void)out;return 0;}
+WEAK int AW_InventoryCanEquip(const aw_inventory_item_t *item){(void)item;return 0;}
+WEAK int AW_InventoryEquipped(const aw_state_t *state,const char *id){(void)state;(void)id;return 0;}
+WEAK int AW_InventoryEquip(aw_state_t *state,const aw_inventory_item_t *item){(void)state;(void)item;return 0;}
+WEAK int AW_InventoryUnequip(aw_state_t *state,const char *id){(void)state;(void)id;return 0;}
+WEAK int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){(void)item;(void)count;return 0;}
+WEAK int AW_InventoryUse(void){return 0;}
+WEAK const char *AW_InventoryHint(void){return NULL;}
+WEAK void AW_InventorySpawn(void){}
+WEAK void AW_InventoryPreviewClear(void){}
+WEAK void AW_ViewInventoryClear(void){}
+WEAK int AW_ViewInventoryBody(model_t **model,int *frame){(void)model;(void)frame;return 0;}
+WEAK int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angles[2][3]){(void)models;(void)origins;(void)angles;return 0;}
+WEAK int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int w,int h,float angle){(void)model;(void)frame;(void)x;(void)y;(void)w;(void)h;(void)angle;return 0;}
+WEAK void AW_CombatEquipmentStore(void){}
+WEAK void AW_CombatEquipmentChanged(void){}
+
+WEAK void AW_UIBox(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;}
+WEAK void AW_UISmallBegin(void){}
+WEAK void AW_UISmallEnd(void){}
+WEAK int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
+
+/* Lighting/renderer fixtures which omit real hand runtime have no active block.
+ * Dedicated block fixtures supply strong real functions. */
+WEAK int AW_HandBlockApply(void){return 0;}
+WEAK int AW_HandBlockItemApply(void){return 0;}
+WEAK const char *AW_InventoryDropReason(void){return "Cannot place item here; kept.";}
+
+WEAK void AW_InventoryGrantCommand(void){}

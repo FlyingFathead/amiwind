@@ -247,7 +247,11 @@ AmiWind-launcher.json
 !/docs/images/amiwind-v0.0.33-fix-strider-after.png
 !/docs/images/amiwind-v0.0.33-fix-ship-light-before.png
 !/docs/images/amiwind-v0.0.33-fix-ship-light-after.png
-!/docs/images/amiwind-v0.0.33-fix-ship-light-openmw.png
 
 !docs/images/amiwind-v0.0.38-lava-east-clean.png
 !docs/images/amiwind-v0.0.38-lava-pool-clean.png
+!/docs/images/amiwind-v0.0.40-rings-progress-map.png
+
+# Selected AmiWind dev1 ring-2 documentation captures.
+!/docs/images/amiwind-v0.0.40-dev1-grytewake.png
+!/docs/images/amiwind-v0.0.40-dev1-shunned-shipwreck.png

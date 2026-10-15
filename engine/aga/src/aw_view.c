@@ -28,6 +28,8 @@
 #include "aw_combat.h"
 #include "aw_story.h"
 #include "aw_torch.h"
+#include "aw_items.h"
+#include "aw_inventory.h"
 
 extern cvar_t chase_active;
 /* The hooks (defined beside their callers, NULL in fixtures without this file). */
@@ -104,7 +106,7 @@ static edict_t *local_player(void) {
 /* ---- the body ---- */
 #define BODIES 32
 static struct {char race[32],path[48];int female;} bodies[BODIES];
-static int body_count=-1,body_race=-2,body_female=-1;
+static int body_count=-1,body_race=-2,body_female=-1,body_index=-1;
 static model_t *body_model;
 static model_t *held_model;
 static int body_torch,body_water,torch_failed,water_failed,held_visible;
@@ -163,6 +165,7 @@ static int body_ready(void) {
     for(i=0;i<body_count;i++)if(bodies[i].female==female && !Q_strcasecmp(bodies[i].race,(char *)race))break;
     if(i==body_count)for(i=0;i<body_count && bodies[i].female!=female;i++);
     if(i==body_count)return 0;
+    body_index=i;
     strcpy(path,bodies[i].path);n=strlen(path);
     if(swimming){
         model_t *candidate;aw_anim_t water_anim;
@@ -216,6 +219,77 @@ static int body_ready(void) {
     }
     return 1;
 }
+/* Modal-only alias: original inventory frames do not replace locomotion or
+ * advance its animation clock. One optional model, released on panel close. */
+static model_t *inventory_model;
+static char inventory_body_path[64];
+static int inventory_failed,inventory_left=1;
+void AW_ViewInventoryClear(void){
+    if(inventory_model && inventory_model->type==mod_alias && inventory_model->cache.data)
+        Cache_Free(&inventory_model->cache);
+    inventory_model=NULL;inventory_body_path[0]=0;inventory_failed=0;inventory_left=1;
+    AW_ItemsAliasClear();
+}
+static entity_t inventory_held[2];
+static entity_t *held_draws[2];
+static int held_cursor,held_draw_count;
+int AW_ViewEquipmentReady(void){
+    return body_ready() && !body_water && AW_ItemsAliasTag(body_model,-1,0,NULL);
+}
+int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angles[2][3]){
+    int kind,n=0,frame;model_t *actual;aw_inventory_item_t item;float tag[6];
+    if(!AW_ViewInventoryBody(&actual,&frame) || !AW_ItemsAliasTag(actual,-1,0,NULL))return 0;
+    for(kind=0;kind<2;kind++){
+        int slot=kind?AW_SLOT_LEFT:AW_SLOT_RIGHT;
+        if(kind && !inventory_left)continue;
+        if(!AW_InventoryEquippedItem(slot,&item) || !item.model[0] ||
+           (kind && (item.category!=AW_INV_ARMOUR || item.subtype!=8)))continue;
+        models[n]=Mod_ForName(item.model,false);
+        if(!models[n] || models[n]->type!=mod_alias || !Cache_Check(&models[n]->cache) ||
+           !AW_ItemsAliasTag(actual,frame,kind,tag))continue;
+        memcpy(origins[n],tag,3*sizeof(float));memcpy(angles[n],tag+3,3*sizeof(float));n++;
+    }
+    return n;
+}
+/* Ten companion frames: unarmed, then original melee weapon types 0..8.
+ * The builder samples each original inventory group at its START key. */
+int AW_ViewInventoryBody(model_t **model,int *frame){
+    aw_inventory_item_t item;char path[64];int type=-1;
+    extern int hunk_size,hunk_low_used,hunk_high_used;
+    if(!model || !frame || !body_ready() || body_index<0)return 0;
+    inventory_left=1;
+    /* Torch preview retains its existing companion until its dedicated
+     * inventory left-arm layer and held resource are converted together. */
+    if(body_torch){
+        *model=body_model;*frame=body.model==body_model?body.frame:0;
+        if(*frame<0 || *frame>=body_model->numframes)*frame=0;
+        return 1;
+    }
+    if(AW_InventoryEquippedItem(AW_SLOT_RIGHT,&item)){
+        if(item.category!=AW_INV_WEAPON || item.subtype<0 || item.subtype>8)return 0;
+        type=item.subtype;
+    }
+    inventory_left=type!=2 && type!=4 && type!=5 && type!=6 && type!=8;
+    strcpy(path,bodies[body_index].path);strcpy(path+strlen(path)-4,"_i.mdl");
+    if(strcmp(path,inventory_body_path)){
+        AW_ViewInventoryClear();strcpy(inventory_body_path,path);
+        inventory_left=type!=2 && type!=4 && type!=5 && type!=6 && type!=8;
+    }
+    if(inventory_failed)return 0;
+    if(!inventory_model || !Cache_Check(&inventory_model->cache)){
+        if(hunk_size-hunk_low_used-hunk_high_used<2*1024*1024)goto unavailable;
+        inventory_model=Mod_ForName(path,false);
+        if(!inventory_model || inventory_model->type!=mod_alias ||
+           inventory_model->numframes!=10 || !Cache_Check(&inventory_model->cache))goto unavailable;
+    }
+    *model=inventory_model;*frame=type+1;return 1;
+ unavailable:
+    if(inventory_model && inventory_model->type==mod_alias && inventory_model->cache.data)
+        Cache_Free(&inventory_model->cache);
+    inventory_model=NULL;inventory_failed=1;
+    Con_Printf("Original inventory poses unavailable; rebuild player view assets.\n");
+    return 0;
+}
 static float death_seconds(void) {
     const aw_anim_group_t *g=&body_anim.g[AW_ANIM_DEATH];
     if(body_model && g->present && g->count>1)return (g->count-1)*g->step;
@@ -234,9 +308,25 @@ static float guard_time;
 static int body_block_frame(float dt) {
     const aw_anim_group_t *g=&body_anim.g[AW_ANIM_BLOCK];int hold,i;float left;
     if(!g->present || g->count<1){guard_time=0;return -1;}
+    /* Compact player block pairs are START/HIT, not two uniform clip
+     * samples. STEP*COUNT remains the authored clip duration; X is its
+     * original hit fraction. Retain larger legacy groups below. */
+    if(g->count==2 && g->x>0 && g->x<1){
+        if(AW_CombatGuarding()){
+            guard_time+=dt;
+            return g->base+(guard_time>=g->x*g->step*g->count?1:0);
+        }
+        guard_time=0;
+        return AW_CombatBlockShown()>0?g->base+1:-1;
+    }
     hold=g->x>0 && g->x<1?(int)(g->x*(g->count-1)+.5f):g->count/2;
     if(AW_CombatGuarding()){
-        guard_time+=dt;i=(int)(guard_time/g->step);if(i>hold)i=hold;
+        guard_time+=dt;i=(int)(guard_time/g->step);
+        if(g->x>0 && g->x<1){
+            if(guard_time>=g->x*g->step*g->count)i=hold;
+            else if(i>=hold)i=hold>0?hold-1:0;
+        }
+        if(i>hold)i=hold;
         return g->base+i;
     }
     guard_time=0;left=AW_CombatBlockShown();
@@ -273,7 +363,7 @@ static int body_hand_layer(edict_t *p,int frame) {
 }
 entity_t *AW_ViewBody(entity_t *ent) {
     float speed,rate=1,dt=(float)host_frametime;int group,block=-1,air,fists,layer;edict_t *p=local_player();
-    held_visible=0;
+    held_visible=0;held_cursor=held_draw_count=0;
     if(!owned || !body_ready())return NULL;
     fists=body_fists_ready(p);
     if(dt<0)dt=0;
@@ -302,12 +392,38 @@ entity_t *AW_ViewBody(entity_t *ent) {
 }
 
 static entity_t *view_held(entity_t *draw) {
-    if(draw!=&body || !body_torch || !held_model || !AW_TorchEquipped() ||
-       !Cache_Check(&body.model->cache) || !Cache_Check(&held_model->cache) ||
-       body.frame<0 || body.frame>=body_emitter.count)return NULL;
-    held_body=body;held_body.model=held_model;
-    held_visible=1;return &held_body;
+    edict_t *p=local_player();eval_t *goal;int kind;float tag[6];aw_inventory_item_t item,right;
+    if(draw!=&body)return NULL;
+    if(!held_cursor){
+        held_draw_count=0;
+        goal=p?GetEdictFieldValue(p,"aw_hand_goal"):NULL;
+        if(p && goal && goal->_float==1 && p->v.health>0 && p->v.waterlevel<2 && AW_ViewEquipmentReady()){
+            int have_right=AW_InventoryEquippedItem(AW_SLOT_RIGHT,&right);
+            for(kind=0;kind<2 && held_draw_count<2;kind++){
+                model_t *model;entity_t *out=&inventory_held[kind];
+                if(kind && (body_torch || !have_right || AW_TWO_HANDED(right.weapon)))continue;
+                if(!AW_InventoryEquippedItem(kind?AW_SLOT_LEFT:AW_SLOT_RIGHT,&item) || !item.model[0] ||
+                   !AW_ItemsAliasTag(body_model,body.frame,kind,tag))continue;
+                model=Mod_ForName(item.model,false);
+                if(!model || model->type!=mod_alias || !Cache_Check(&model->cache))continue;
+                *out=body;out->model=model;out->frame=0;
+                AW_ItemsPose(tag,body.origin,body.angles[YAW],out->origin,out->angles);
+                held_draws[held_draw_count++]=out;
+            }
+        }
+        if(held_draw_count<2 && body_torch && held_model && AW_TorchEquipped() &&
+           Cache_Check(&body.model->cache) && Cache_Check(&held_model->cache) &&
+           body.frame>=0 && body.frame<body_emitter.count){
+            held_body=body;held_body.model=held_model;
+            held_body.frame=body.frame;
+            VectorCopy(body.origin,held_body.origin);VectorCopy(body.angles,held_body.angles);
+            held_visible=1;held_draws[held_draw_count++]=&held_body;
+        }
+    }
+    if(held_cursor>=held_draw_count){held_cursor=2;return NULL;}
+    return held_draws[held_cursor++];
 }
+
 static int view_torch_emitter(vec3_t out) {
     vec3_t forward,right,up;int j;edict_t *p=local_player();
     if(!owned || !chase_active.value || !held_visible || !body_torch || !p || p->v.waterlevel>=2 ||
@@ -523,6 +639,8 @@ void AW_ViewInput(int key,int down) {
     if(down && key_dest==key_game)input_seen=1;
 }
 void AW_ViewSceneSpawn(void) {
+    AW_ViewInventoryClear();
+    AW_ItemsAliasClear();held_cursor=held_draw_count=0;
     memset(&body_air,0,sizeof(body_air));
     if(death.stage!=AW_DEATH_NONE)end_death();
     body_model=held_model=NULL;body_race=-2;body_torch=body_water=held_visible=torch_failed=water_failed=0;body_emitter.count=0;
@@ -605,6 +723,14 @@ static void command(void) {
             mode_name(view.mode),mode_name(view.primary),view.distance,rules.min_distance,rules.max_distance,
             vanity_cvar.value?"on":"off",rules.vanity_delay,view.idle,death_cvar.value?"on":"off",retry_cvar.value?"on":"off");
         Con_Printf("Body: %s%s\n",body_ready()?body_model->name:"none",body_cvar.value?"":" (aw_player_body 0)");
+        if(body_model){
+            edict_t *p=local_player();
+            Con_Printf("Body animation: frame %d/%d, group %d, layers %d, kit %d, water %d, torch %d\n",
+                body.frame,body_model->numframes,body_play.group,body_layers.count,
+                aw_anim_kit_enabled,body_water,body_torch);
+            if(p)Con_Printf("Player state: waterlevel %.0f, movetype %.0f, velocity %.1f %.1f %.1f\n",
+                p->v.waterlevel,p->v.movetype,p->v.velocity[0],p->v.velocity[1],p->v.velocity[2]);
+        }
         return;
     }
     if(!Q_strcasecmp(a,"first")){view.primary=view.mode=AW_VIEW_FIRST;Cvar_SetValue(view_cvar.name,0);last_view=0;return;}

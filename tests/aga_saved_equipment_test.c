@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <stdarg.h>
 #include "aw_save.c"
+static int equipment_stores;
+void AW_CombatEquipmentStore(void){equipment_stores++;}
 server_t sv;server_static_t svs;client_state_t cl;
 double realtime;char com_gamedir[MAX_OSPATH];int pr_edict_size;
 char *pr_strings;vec3_t vec3_origin;

@@ -115,6 +115,37 @@ static void animation_boundaries(edict_t *p,edict_t *world,int fn)
         assert(*field(p,"aw_hand_state")==2);
     }
 }
+/* Holding LMB while F is still raising the hands must reach one attack.
+ * A released click, a carried torch or lowering must not synthesize attacks. */
+static void held_attack_during_draw(edict_t *p,edict_t *world,int fn)
+{
+    int mode,tick;
+    *field(world,"aw_hand_draw")=.4f;*field(world,"aw_hand_idle")=2;
+    *field(world,"aw_hand_lower")=.3f;*field(world,"aw_hand_punch")=.5f;
+    for(mode=0;mode<4;mode++){
+        memset(&p->v,0,progs->entityfields*4);p->v.health=100;
+        *field(p,"aw_hand_goal")=1;*field(p,"aw_hand_state")=1;
+        *field(p,"aw_hand_started")=40;
+        *field(p,"aw_torch")=mode==2;p->v.button0=1;
+        pr_global_struct->time=40.1f;PR_ExecuteProgram(fn);
+        assert(*field(p,"aw_hand_state")==1);
+        if(mode==1)p->v.button0=0; /* released before hands are ready */
+        if(mode==3)*field(p,"aw_hand_goal")=0; /* cancelled draw */
+        pr_global_struct->time=40.45f;PR_ExecuteProgram(fn);
+        pr_global_struct->time=40.47f;PR_ExecuteProgram(fn);
+        if(!mode){
+            assert(*field(p,"aw_hand_state")==3);
+            assert(*field(p,"aw_attack_latched")==1);
+            for(tick=0;tick<100;tick++){
+                pr_global_struct->time=41+tick*.02f;PR_ExecuteProgram(fn);
+                assert(*field(p,"aw_hand_state")==2); /* no held autofire */
+            }
+            p->v.button0=0;PR_ExecuteProgram(fn);
+            p->v.button0=1;PR_ExecuteProgram(fn);
+            assert(*field(p,"aw_hand_state")==3); /* next real press */
+        }else assert(*field(p,"aw_hand_state")!=3);
+    }
+}
 static void transition_states(edict_t *p,int fn)
 {
     static const int states[6]={0,1,2,2,3,4};
@@ -248,6 +279,7 @@ int main(int argc,char **argv)
     *field(p,"aw_torch")=1;p->v.health=0;PR_ExecuteProgram(fn);assert(!*field(p,"aw_torch"));
     animation_boundaries(p,world,fn);
     transition_states(p,fn);
+    held_attack_during_draw(p,world,fn);
     /* A resumed/transitioned state with a missing idle stamp must be rejected
      * before raise completion can divide by an invalid next-state duration. */
     p->v.health=100;*field(p,"aw_hand_goal")=1;*field(p,"aw_hand_state")=1;

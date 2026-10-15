@@ -546,7 +546,7 @@ def levels_check(raws):
 # any of them never reuses an older bake; before, only npc_geometry and this module counted
 # (BUILD-POOL-ARG-UNFINGERPRINTED-35; tests/test_build_pool_arg.py checks the list against the imports).
 BAKE_MODULES = ('npc_geometry', 'npc_faces', 'prepare_scenery', 'nif_common', 'mesh_geometry_env', 'mwad.audit', 'mwad.esm',
-                'mwad.paths')
+                'mwad.paths', 'mesh_geometry', 'npc_anim')
 BAKE_PACKAGES = ('numpy', 'scipy', 'Pillow', 'PyFFI', 'fast-simplification')
 
 
@@ -560,7 +560,9 @@ def code_identity():
         return _CODE_IDENTITY[0]
     import importlib.metadata
     # Static imports: a computed import_module() name would make every stage's code closure uncertain.
+    import mesh_geometry
     import mesh_geometry_env
+    import npc_anim
     import mwad.audit
     import mwad.esm
     import mwad.paths
@@ -570,7 +572,8 @@ def code_identity():
     import prepare_scenery
     modules = {'npc_geometry': npc_geometry, 'npc_faces': npc_faces, 'prepare_scenery': prepare_scenery,
                'nif_common': nif_common, 'mesh_geometry_env': mesh_geometry_env, 'mwad.audit': mwad.audit,
-               'mwad.esm': mwad.esm, 'mwad.paths': mwad.paths}
+               'mwad.esm': mwad.esm, 'mwad.paths': mwad.paths,
+               'mesh_geometry': mesh_geometry, 'npc_anim': npc_anim}
     texts = [inspect.getsource(modules[name]) for name in BAKE_MODULES]
     texts.append(inspect.getsource(sys.modules[__name__]))
     versions = []

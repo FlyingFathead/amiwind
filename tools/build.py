@@ -98,6 +98,7 @@ def parser():
     p.add_argument("--versions", action="store_true", help="Compare available tools/packages with the recorded build reference, then exit")
     p.add_argument("--host-plan", action="store_true", help="Read-only OS-specific tool inventory; no installation, tool execution or game data required")
     p.add_argument("--fallback-font", type=Path, help="DejaVuSansMono.ttf for generated console graphics (default: tools/fonts or Linux system font)")
+    p.add_argument("--palette", type=Path, help="Optional exact 768-byte conversion RGB palette for the scene; default derives scene colours")
     p.add_argument("--check-inputs", action="store_true", help="Check the game installation without requiring build tools, then exit")
     p.add_argument("--layout-selftest", action="store_true",
                    help="Prove the disk-layout gate refuses every Amiga disk limit through the image step's packing "
@@ -1197,16 +1198,21 @@ def commands(args, tools, run):
     def tool(name, *items):
         return [py, str(ROOT / "tools" / name), *map(str, items)]
     work = run / "work"
+    seyda_source = json.loads((ROOT / "config/seyda_area.json").read_text())
+    from town_grid import audit_radius
+    audit_radius(seyda_source)
     steps = [
         ("setup", tool("mwad.py", "setup", "--data-files", args.data_files, "--workspace", work, "--target", "a1200" if args.stage == "aga" else "a500")),
-        ("terrain", tool("mwad.py", "convert", "--workspace", work)),
+        ("terrain", tool("mwad.py", "convert", "--workspace", work,
+                         "--center", *seyda_source["source_cell"], "--radius", seyda_source["source_radius"])),
     ]
     if args.stage == "aga":
         binary = run / "engine" / RUNTIME_BUILD_DIR / "build/AmiQuakeGCC"
         steps += [
             ("scenery", tool("prepare_scenery.py", "--workspace", work, "--out", run / "scenery", "--jobs", jobs)),
             ("scene", tool("prepare_quake.py", "--workspace", work, "--scene", run / "scenery", "--out", run / "alias-scene", "--jobs", jobs,
-                           *(['--fallback-font', args.fallback_font] if args.fallback_font else []))),
+                           *(['--fallback-font', args.fallback_font] if args.fallback_font else []),
+                           *(['--palette', args.palette] if getattr(args, 'palette', None) else []))),
             ("bsp", tool("prepare_mesh_bsp.py", "--scene", run / "alias-scene", "--scenery", run / "scenery", "--out", run / "bsp-scene", "--jobs", jobs,
                 *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
             ("npcs", tool("prepare_npcs.py", "--data-files", args.data_files, "--scene", run / "bsp-scene", "--out", run / "npc-scene", "--ffmpeg", tools["ffmpeg"])),
@@ -1662,9 +1668,9 @@ def resolve_chim_regions(args, builder=None):
     args.chim_regions_cells = chim_regions.encode_cells(chim_regions.table_kinds(table))
     args.chim_regions_table = (table, chim_regions.load_status(args.chim_regions_status))  # the world manifest
     c = table['counts']
-    print('EXPERIMENTAL --chim-regions %s: %d cells on CHIM (%d seabed, %d land) in %d frames, %d groups; %d '
+    print('EXPERIMENTAL --chim-regions %s: %d cells on CHIM (%s) in %d frames, %d groups; %d '
           'dropped (inside a town frame); their open-world maps are replaced by CHIM frame maps'
-          % (', '.join(args.chim_regions), c['cells'], c['seabed'], c['land'], c['frames'], c['components'],
+          % (', '.join(args.chim_regions), c['cells'], chim_regions.kind_summary(c), c['frames'], c['components'],
              len(table['dropped'])), flush=True)
     return {'selection': table['selection'], 'counts': c, 'dropped': table['dropped']}
 

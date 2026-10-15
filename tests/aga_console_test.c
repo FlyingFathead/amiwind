@@ -71,7 +71,9 @@ static void every_entry_translates(void){
   *bar2=0;*bar3=0;snprintf(words,sizeof words,"%s",bar1+1);snprintf(handler,sizeof handler,"%s",bar2+1);
   argv[0]="dbg";argc=1;
   for(w=strtok(words," ");w && argc<16;w=strtok(NULL," "))argv[argc++]=w;
-  snprintf(expect,sizeof expect,"%s\n",handler);
+  snprintf(expect,sizeof expect,"%s%s\n",handler,
+       !strcmp(bar1+1,"characterchange")?" appearance":!strcmp(bar1+1,"inventory grant")?" grant":
+       (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
   if(AW_DebugTranslate(argc,argv,output,sizeof(output))!=1 || strcmp(output,expect)){
    printf("catalogue entry does not reach its handler: dbg %s -> %s (got %s)\n",bar1+1,handler,output);assert(0);
   }
@@ -85,6 +87,15 @@ int main(int count,char **values){
  char *compass[]={"dbg","compass","true"};
  assert(count==2);catalogue_path=values[1];
  every_entry_translates();
+ { /* Numeric/name race aliases use one handler; quoted names retain one argument. */
+   char *race[]={"dbg","set","race","1"};
+   char *alias[]={"dbg","set","playerrace","High Elf"};
+   char *split[]={"debug","set","race","High","Elf"};
+   assert(AW_DebugTranslate(4,race,output,sizeof output)==1 && !strcmp(output,"aw_quickchar_set playerrace 1\n"));
+   assert(AW_DebugTranslate(4,alias,output,sizeof output)==1 && !strcmp(output,"aw_quickchar_set playerrace \"High Elf\"\n"));
+   assert(AW_DebugTranslate(5,split,output,sizeof output)==1 && !strcmp(output,"aw_quickchar_set playerrace High Elf\n"));
+   alias[3]="Nord;quit";assert(AW_DebugTranslate(4,alias,output,sizeof output)==0);
+ }
  {
   char *tracker[]={"dbg","shroomtracker","reset"};
   assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1 && !strcmp(output,"aw_shroomtracker\n"));
@@ -350,6 +361,15 @@ int main(int count,char **values){
   assert(AW_DebugTranslate(2,legacy,output,sizeof(output))==1 && !strcmp(output,"aw_interiorluma_set\n"));
   assert(AW_DebugTranslate(3,legacy,output,sizeof(output))==1 && !strcmp(output,"aw_interiorluma_set 1.2\n"));
  }
+ {
+  char *change[]={"dbg","characterchange"},*all[]={"dbg","characterchange","all"};
+  char *grant[]={"dbg","inventory","grant","steel longsword","1"};
+  assert(AW_DebugTranslate(2,change,output,sizeof(output))==1 && !strcmp(output,"aw_quickchar appearance\n"));
+  assert(AW_DebugTranslate(3,all,output,sizeof(output))==1 && !strcmp(output,"aw_quickchar all\n"));
+  assert(AW_DebugTranslate(5,grant,output,sizeof(output))==1 && !strcmp(output,"aw_inventory grant \"steel longsword\" 1\n"));
+  grant[3]="steel;quit";assert(!AW_DebugTranslate(5,grant,output,sizeof(output)));
+  grant[3]="steel\"quit";assert(!AW_DebugTranslate(5,grant,output,sizeof(output)));
+ }
  i=catalogue_opens;
  AW_ConsoleInit();assert(colour->value==255);assert(dbg_command==debug_command);
  assert(i==catalogue_opens); /* Registering/opening does not load a catalogue. */
@@ -428,6 +448,25 @@ int main(int count,char **values){
  AW_ConsoleSetSmall(0);AW_SmallString(-1,-1,"oooo");
  for(i=0;i<64;i++)if(i<4 || i>=48 || (i-4)%12>=8)assert(pixels[i]==17);
  assert(AW_ConsoleCharWidth()==8); /* HUD cannot change console mode. */
+ /* Inventory ink and field bounds reuse real glyph pixels without touching
+  * console mode, surrounding pixels, or the framebuffer row padding. */
+ memset(pixels,17,sizeof(pixels));
+ AW_SmallStringColor(2,0,4,"MMMMMMMM",71);
+ {int painted=0;
+  for(i=0;i<64;i++){
+   if(pixels[i]!=17){
+    int local=i-4;assert(local>=0 && local/12<4 && local%12>=2 && local%12<5);
+    assert(pixels[i]==71);painted++;
+   }
+  }
+  assert(painted>0);
+ }
+ memset(pixels,17,sizeof(pixels));AW_SmallStringColor(0,0,3,"M",71);
+ for(i=0;i<64;i++)assert(pixels[i]==17);
+ AW_SmallStringColor(-2,-2,40,"MMMMMMMM",71);
+ for(i=0;i<64;i++)if(i<4 || i>=48 || (i-4)%12>=8)assert(pixels[i]==17);
+ assert(AW_ConsoleCharWidth()==8);
+
  return 0;
 }
 

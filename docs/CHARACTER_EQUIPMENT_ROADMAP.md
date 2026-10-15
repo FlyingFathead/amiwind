@@ -20,6 +20,17 @@ data can be converted once into Amiga-ready assets. The important distinction is
 retaining their identities and composition rules instead of baking away every
 relationship into a permanently clothed actor.
 
+
+## Player inventory candidate, 14 October 2026
+
+The [v0.0.40-dev1 inventory](INVENTORY.md) adds real player ownership, persistent
+slots and ground drops, ring/amulet admission, actual melee weapon/shield combat
+and held aliases. The modal preview uses the existing gameplay body and real
+held attachments. This does not implement arbitrary clothing/armour layers,
+selected full-body head/hair, NPC partial looting or corpse composition.
+Unsupported worn clothing actions remain unavailable until appearance changes
+can be represented. Host checks and selected assets are separate from the pending
+integrated target/native and memory gates.
 ## Required data and runtime behavior
 
 - Preserve source IDs for body parts and equipment, skeleton attachments,

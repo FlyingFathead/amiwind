@@ -10,7 +10,7 @@ from prepare_scenery import bsa_read
 from preview_scenery import render
 from debug_font import readable_atlas
 from build_jobs import add_jobs, resolve_jobs
-from area_config import BOUNDS
+from area_config import AREA, BOUNDS
 from build_parallel import ordered_map
 
 CENTRE=(-11264,-71680)
@@ -136,6 +136,22 @@ def _preview_model(task):
     return mi,raw,(path,[0,0],len(faces)),{'model':name,'kind':'mesh','source_triangles':len(f),'triangles':len(faces),'bytes':len(raw)}
 
 
+def terrain_detail_tiles(settings=None):
+    """Explicit LAND preservation; port extent/density stay, full-detail diagonals share the sampler."""
+    rows=(AREA if settings is None else settings).get('terrain_detail_tiles',[])
+    if not isinstance(rows,list):raise ValueError('Terrain detail tiles must be a list')
+    tiles=set()
+    for row in rows:
+        if not isinstance(row,list) or len(row)!=2 or any(type(v) is not int or v%128 for v in row):
+            raise ValueError('Terrain detail tiles require two integer 128-unit anchors')
+        tile=tuple(row)
+        if tile in tiles:raise ValueError('Duplicate terrain detail tile')
+        if any(not GROUND_BOUNDS[0][k]<=row[k]<GROUND_BOUNDS[1][k] for k in range(2)):
+            raise ValueError('Terrain detail tile is outside the town ground')
+        tiles.add(tile)
+    return frozenset(tiles)
+
+
 def town_ground_triangles(grids):
     """Use the world sampler/grid at the handoff, retaining fine port ground."""
     from prepare_world_regions import Terrain, terrain_triangles
@@ -145,36 +161,65 @@ def town_ground_triangles(grids):
     terrain.heights = np.asarray([g['heights'] for g in grids], dtype=float)
     terrain.materials = np.asarray([g['materials'] for g in grids], dtype=int)
     ox, oy = (v*SCALE for v in CENTRE)
+    detailed=terrain_detail_tiles()
     def fine_port_patch(x, y):
         return 0 <= x < 896 and 256 <= y < 1024
 
     for y in range(GROUND_BOUNDS[0][1], GROUND_BOUNDS[1][1], 128):
         for x in range(GROUND_BOUNDS[0][0], GROUND_BOUNDS[1][0], 128):
-            if fine_port_patch(x, y):
-                triangles = []
-                for yy in range(y, y+128, 32):
-                    for xx in range(x, x+128, 32):
-                        points = [[xx+ox+dx, yy+oy+dy, terrain.sample(xx+ox+dx, yy+oy+dy)[0]]
-                                  for dx,dy in ((0,0),(32,0),(32,32),(0,32))]
-                        triangles.extend([[points[i] for i in ids] for ids in ((0,1,2),(0,2,3))])
-            else:
-                neighbours = ((x, y-128), (x+128, y), (x, y+128), (x-128, y))
-                required_edges = {edge for edge, neighbour in enumerate(neighbours)
-                                  if fine_port_patch(*neighbour)}
-                triangles = terrain_triangles(terrain, x+ox, y+oy,
-                                              required_edge_samples=required_edges)
+            neighbours = ((x, y-128), (x+128, y), (x, y+128), (x-128, y))
+            required_edges = {edge for edge, neighbour in enumerate(neighbours)
+                              if fine_port_patch(*neighbour) or neighbour in detailed}
+            triangles = terrain_triangles(terrain, x+ox, y+oy,
+                                          required_edge_samples=required_edges,
+                                          full_detail=fine_port_patch(x,y) or (x,y) in detailed)
             for tri in triangles:
                 material = terrain.sample(*(sum(p[k] for p in tri)/3 for k in (0,1)))[1]
                 yield [[p[0]-ox,p[1]-oy,p[2]] for p in tri], material
 
 
+def town_ground_base(grids):
+    """Place the hidden seal below every source LAND height, including ocean."""
+    heights = [float(z)*SCALE for g in grids for row in g['heights'] for z in row]
+    if not heights or not all(math.isfinite(z) for z in heights):
+        raise ValueError('Town LAND heights must be nonempty and finite')
+    # MAP coordinates have three decimals. Keep the historical floor where it
+    # leaves solid thickness; deep seabeds need a lower, grid-aligned seal.
+    lowest = min(round(z, 3) for z in heights)
+    return -512 if lowest > -512 else math.floor(lowest/32)*32-32
+
+
 def town_ground_brushes(grids):
-    return [brush(tri+[[p[0],p[1],-512] for p in tri],
+    bottom = town_ground_base(grids)
+    return [brush(tri+[[p[0],p[1],bottom] for p in tri],
                   [(0,1,2),(3,4,5),(0,1,4),(1,2,5),(2,0,3)], 'g'+str(material))
             for tri,material in town_ground_triangles(grids)]
 
 
-def prepare(workspace,scene,out,jobs=None,fallback_font_path=None):
+def read_palette_input(path):
+    """Optional conversion palette, checked before creating any output."""
+    if path is None:
+        return None
+    raw = Path(path).read_bytes()
+    if len(raw) != 768:
+        raise ValueError('Conversion palette must contain exactly 768 RGB bytes')
+    return raw
+
+
+def scene_palette(samples, supplied=None):
+    """Keep the historical sampled default; an explicit palette owns all indices."""
+    if supplied is not None:
+        if len(supplied) != 768:
+            raise ValueError('Conversion palette must contain exactly 768 RGB bytes')
+        return list(supplied)
+    import numpy as np
+    from PIL import Image
+    strip=Image.fromarray(samples.astype(np.uint8).reshape(1,-1,3),'RGB').quantize(colors=224)
+    return strip.getpalette()[:672]+[102,119,136]*30+[238,221,170,0,0,0]
+
+
+def prepare(workspace,scene,out,jobs=None,fallback_font_path=None,palette_path=None):
+    supplied_palette=read_palette_input(palette_path)
     import numpy as np
     from PIL import Image,ImageDraw,ImageFont
     import fast_simplification
@@ -196,8 +241,7 @@ def prepare(workspace,scene,out,jobs=None,fallback_font_path=None):
         ground[int(key)]=Image.open(io.BytesIO(bsa_read(bsa,source))).convert('RGB').resize((32,32),Image.Resampling.BOX)
     ground[0]=Image.open(io.BytesIO(bsa_read(bsa,'textures/_land_default.dds'))).convert('RGB').resize((32,32),Image.Resampling.BOX)
     samples=np.concatenate([t[:,:,:3].reshape(-1,3)[::4] for t in textures.values()]+[np.array(i).reshape(-1,3) for i in ground.values()])
-    strip=Image.fromarray(samples.astype(np.uint8).reshape(1,-1,3),'RGB').quantize(colors=224)
-    palette=strip.getpalette()[:672]+[102,119,136]*30+[238,221,170,0,0,0]
+    palette=scene_palette(samples,supplied_palette)
     pal=Image.new('P',(1,1));pal.putpalette(palette)
     def quantize(im):return im.convert('RGB').quantize(palette=pal,dither=Image.Dither.NONE)
     (game/'gfx/palette.lmp').write_bytes(bytes(palette))
@@ -261,14 +305,15 @@ def prepare(workspace,scene,out,jobs=None,fallback_font_path=None):
     # The ground apron overlaps the world map beyond the unchanged town core.
     # Keep the sky enclosure outside that real LAND, never in the view radius.
     sea=SEA_EXTENT
+    bottom=town_ground_base(grids)
     sky_top=max(512,max(p[2] for tri,_ in town_ground_triangles(grids) for p in tri)+256)
-    brushes.append(box([-sea,-sea,-500],[sea,sea,0],'*water'))
-    brushes+= [box([-sea-32,-sea-32,-544],[sea+32,sea+32,-512],'stone'),
+    brushes.append(box([-sea,-sea,bottom+12],[sea,sea,0],'*water'))
+    brushes+= [box([-sea-32,-sea-32,bottom-32],[sea+32,sea+32,bottom],'stone'),
                box([-sea-32,-sea-32,sky_top],[sea+32,sea+32,sky_top+32],'sky'),
-               box([-sea-32,-sea-32,-512],[-sea,sea+32,sky_top],'sky'),
-               box([sea,-sea-32,-512],[sea+32,sea+32,sky_top],'sky'),
-               box([-sea,-sea-32,-512],[sea,-sea,sky_top],'sky'),
-               box([-sea,sea,-512],[sea,sea+32,sky_top],'sky')]
+               box([-sea-32,-sea-32,bottom],[-sea,sea+32,sky_top],'sky'),
+               box([sea,-sea-32,bottom],[sea+32,sea+32,sky_top],'sky'),
+               box([-sea,-sea-32,bottom],[sea,-sea,sky_top],'sky'),
+               box([-sea,sea,bottom],[sea,sea+32,sky_top],'sky')]
     entities=[];refs=0
     for r in index['references']:
         mi=r['model_index']
@@ -326,11 +371,14 @@ r_maxedges 24576
 map seyda
 '''
     (game/'quake.rc').write_text('exec default.cfg\nexec autoexec.cfg\n');(game/'default.cfg').write_text(config);(game/'autoexec.cfg').write_text('')
-    report={'format':'AmiWind Quake scene experiment','scale':SCALE,'centre':CENTRE,'extent':extent,'bounds':BOUNDS,'ground_bounds':GROUND_BOUNDS,'sea_extent':SEA_EXTENT,'references':refs,'models':reports,'spawn':spawn,
+    report={'format':'AmiWind Quake scene experiment','scale':SCALE,'centre':CENTRE,'extent':extent,'bounds':BOUNDS,'ground_bounds':GROUND_BOUNDS,'sea_extent':SEA_EXTENT,'ground_base':bottom,'references':refs,'models':reports,'spawn':spawn,
             'scope':'bounded LAND + reduced alias meshes + alpha tree sprites + approximate building clip brushes; no actors/interiors/quests; non-unit scale references currently omitted'}
+    if supplied_palette is not None:
+        report['palette_source']={'kind':'explicit RGB palette','bytes':768,'sha256':hashlib.sha256(supplied_palette).hexdigest()}
     (out/'scene-report.json').write_text(json.dumps(report,indent=2)+'\n');print('references',refs,'brushes',len(brushes));return report
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--workspace',type=Path,required=True);p.add_argument('--scene',type=Path,required=True);p.add_argument('--out',type=Path,required=True)
     p.add_argument('--fallback-font',type=Path,help='Explicit DejaVuSansMono.ttf path for generated console graphics')
-    add_jobs(p);a=p.parse_args();prepare(a.workspace,a.scene,a.out,a.jobs,a.fallback_font)
+    p.add_argument('--palette',type=Path,help='Optional exact 768-byte conversion RGB palette; default derives colours from scene samples')
+    add_jobs(p);a=p.parse_args();prepare(a.workspace,a.scene,a.out,a.jobs,a.fallback_font,a.palette)

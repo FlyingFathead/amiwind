@@ -51,12 +51,14 @@ CLIENT_SLOTS = 1            # host.c Host_FindMaxClients: single player has one 
 
 def runtime_edicts(source=None):
     src = source or engine_limits.SOURCE
-    return 2 + engine_limits.define('aw_combat.c', 'SLOTS', src) * engine_limits.define('aw_items.h', 'AW_ITEMS_KINDS', src)
+    return (2 + engine_limits.define('aw_combat.c', 'SLOTS', src) * engine_limits.define('aw_items.h', 'AW_ITEMS_KINDS', src)
+            + engine_limits.define('aw_state.h', 'AW_INVENTORY_DROPS', src))
 
 
+# Inventory retains up to AW_INVENTORY_DROPS persistent world entities.
 # Model precache slots engine code may add at run time: the arena opponent's model (aw_arena.c; it
 # reports "model table full" instead of failing, but the gate keeps its slot free).
-RUNTIME_MODELS = 1
+RUNTIME_MODELS = 1 + engine_limits.define('aw_inventory.h', 'AW_INVENTORY_MODELS')
 TOWN_TABLE = ROOT / 'engine/aga/src/aw_town_table.h'
 ENTITY = re.compile(r'\{([^{}]*)\}')
 FIELD = re.compile(r'"([^"\n]*)"\s+"([^"\n]*)"')

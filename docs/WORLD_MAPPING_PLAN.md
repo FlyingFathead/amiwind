@@ -286,3 +286,5 @@ stock A1200 and the preserved A500 experiment have separate budgets and evidence
 Storage profiles and conservative legacy image limits remain in STORAGE.md
 and ROADMAP.md where applicable; validate the actual driver/filesystem path before
 larger images. No raw asset archive design bypasses its device-offset limits.
+
+- 2026-10-14: Existing Toolkit owner-data overlay routing validated with synthetic HTTP checks. Reuse the PNG/sidecar loader and independent data/progress directories. Next acceptance: verify actual served binding, load the exact private image/sidecar in a browser, and check calibrated bounds plus known landmarks. No original-save FMAP importer or textured local-map render was added. [Usage](ORIGINAL_MAP_DATA.md#load-an-owner-supplied-reference-background).

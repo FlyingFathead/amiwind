@@ -245,9 +245,10 @@ def build_resident(task):
         shapes,materials,textures=assemble(assets,appearance,kit or skeleton,times)
         for budget in (480,384,320,256,192):
             # reference_frames=8: the face quotas of the idle-only model (head topology unchanged).
-            try:frames,faces,uv,skin=bake(shapes,materials,textures,palette,budget=budget,reference_frames=8 if kit else None);break
+            try:frames,faces,uv,skin=bake(shapes,materials,textures,palette,budget=budget,reference_frames=8 if kit else None,
+                                               full_frame_budget=npc_anim.ALIAS_BYTE_BUDGET if kit else None);break
             except ValueError as error:
-                if str(error)!='Alias vertex budget exceeded' or budget==192:
+                if str(error) not in ('Alias vertex budget exceeded','Alias byte budget exceeded with full samples') or budget==192:
                     raise ValueError(appearance['id']+': '+str(error)) from error
         if kit:
             # One bake gives both models: the standing model is a subset of the mover's frames (react+full).
@@ -378,7 +379,10 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         replace_bytes(scene/'id1'/record['model'],raw)
         publish_anim(scene/'id1',record)
         npc_items.publish(scene/'id1',record)
-        if voice:replace_bytes(scene/'id1/sound'/record['voice'],voice)
+        if voice:
+            target=scene/'id1/sound'/record['voice']
+            target.parent.mkdir(parents=True,exist_ok=True)
+            replace_bytes(target,voice)
         behavior=behavior_record(kinds['NPC_'][identifier],SCALE)
         record['behavior']=behavior;record['settings']=greeting_settings(kinds,behavior,SCALE)
         models[identifier]=record

@@ -150,14 +150,16 @@ void AW_QuickCharTick(void){
 static void on_debug_done(int accepted){
     if(!accepted)Con_Printf("Quick character: cancelled; character unchanged.\n");
 }
-/* dbg quickchar [pages]: the screen over the current scene (default: all pages). */
+/* Both commands reuse the registration menus over the current scene.
+ * characterchange defaults to the pier appearance page; quickchar to all pages. */
 static void quickchar_command(void){
     char *argv[8];int i,n=Cmd_Argc(),wanted;
+    const char *command="quickchar";
     if(cmd_source!=src_command)return;
-    if(n>8){Con_Printf("Usage: dbg quickchar [name race class birthsign review | all]\n");return;}
+    if(n>8){Con_Printf("Usage: dbg %s [name race class birthsign review | all]\n",command);return;}
     for(i=0;i<n;i++)argv[i]=Cmd_Argv(i);
     wanted=n>1?AW_QuickCharPages(n,argv,1):AW_QC_ALL;
-    if(!wanted){Con_Printf("Usage: dbg quickchar [name race class birthsign review | all]\n");return;}
+    if(!wanted){Con_Printf("Usage: dbg %s [name race class birthsign review | all]\n",command);return;}
     if(key_dest==key_console)Con_ToggleConsole_f();
     if(!AW_QuickCharOpen(wanted|AW_QC_VOICE,on_debug_done) && key_dest==key_game && !sv.active)Cbuf_AddText("aw_main_menu\n");
 }
@@ -165,8 +167,10 @@ static void quickchar_command(void){
  * scripted tests (test.cfg, the command mailbox): race/class/birthsign/sex VALUE first,
  * then attribute NAME N, skill NAME N, level N, name TEXT. Works before a world exists;
  * the player gets the health on the next arrival (or now, in a world). */
+static void race_command(void);
 static void set_command(void){
     edict_t *p;
+    if(Cmd_Argc()>=2 && !Q_strcasecmp(Cmd_Argv(1),"playerrace")){race_command();return;}
     if(Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"clear")){scripted=0;Con_Printf("Scripted character cleared.\n");return;}
     if(Cmd_Argc()<3 || Cmd_Argc()>4){
         Con_Printf("Usage: aw_quickchar_set race|class|birthsign|sex|name VALUE, attribute|skill NAME N, level N\n");return;
@@ -182,6 +186,76 @@ static void set_command(void){
     }
     scripted=1;
     if(sv.active && svs.maxclients==1 && svs.clients && (p=svs.clients[0].edict))p->v.health=aw_character.current[0];
+}
+/* Fast appearance inspection uses the loaded catalogue, not a second race list.
+ * Reuse Quake's existing quickchar setter through the on-disk dbg catalogue;
+ * no additional resident command registration is needed. */
+static int race_name_equal(const char *a,const char *b){
+    int x,y;
+    for(;;){
+        while(*a==' ' || *a=='_' || *a=='-')a++;
+        while(*b==' ' || *b=='_' || *b=='-')b++;
+        x=*a++;y=*b++;
+        if(x>='A' && x<='Z')x+=32;
+        if(y>='A' && y<='Z')y+=32;
+        if(x!=y)return 0;
+        if(!x)return 1;
+    }
+}
+static void race_list(void){
+    int i;
+    Con_Printf("Player races (zero-based catalogue IDs):\n");
+    for(i=0;i<aw_race_count;i++)Con_Printf(" %ld: %s%s\n",(long)i,aw_races[i].name,
+        aw_character.valid && aw_character.race==i?" [current]":"");
+    Con_Printf("Usage: dbg set race ID|NAME (alias: dbg set playerrace); no value or list shows races.\n");
+}
+static void race_command(void){
+    char value[64];int i,n=0,index=-1,numeric=1;size_t used=0,len;edict_t *p;aw_character_t trial;
+    if(cmd_source!=src_command)return;
+    if(!AW_CharacterLoad() || aw_race_count<1 || aw_race_count>16){
+        Con_Printf("Character catalogue unavailable.\n");return;
+    }
+    if(Cmd_Argc()==2 || (Cmd_Argc()==3 && !Q_strcasecmp(Cmd_Argv(2),"list"))){race_list();return;}
+    value[0]=0;
+    for(i=2;i<Cmd_Argc();i++){
+        len=strlen(Cmd_Argv(i));
+        if(!len || used+len+(i>2?1:0)>=sizeof(value)){
+            Con_Printf("Race name is empty or too long.\n");return;
+        }
+        if(i>2)value[used++]=' ';
+        memcpy(value+used,Cmd_Argv(i),len+1);used+=len;
+    }
+    for(i=0;value[i];i++)if(value[i]<'0' || value[i]>'9'){numeric=0;break;}
+    if(numeric){
+        for(i=0;value[i];i++){
+            n=n*10+value[i]-'0';
+            if(n>=aw_race_count){Con_Printf("Race ID must be 0..%ld.\n",(long)aw_race_count-1);return;}
+        }
+        index=n;
+    }else for(i=0;i<aw_race_count;i++){
+        if(race_name_equal(value,aw_races[i].id) || race_name_equal(value,aw_races[i].name)){index=i;break;}
+    }
+    if(index<0){Con_Printf("Unknown race: %s.\n",value);race_list();return;}
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) ||
+       cls.state!=ca_connected || !aw_character.valid){
+        Con_Printf("Start or load a local character first.\n");return;
+    }
+    if(AW_StoryRestricted() || active || AW_CharacterActive()){
+        Con_Printf("Finish character registration or close its menu first.\n");return;
+    }
+    if(p->v.health<=0){Con_Printf("Race cannot change while the player is dead.\n");return;}
+    if(index==aw_character.race){Con_Printf("Player race: %ld: %s (unchanged).\n",(long)index,aw_races[index].name);return;}
+    trial=aw_character;
+    if(!AW_CharacterSet(&trial,"race",aw_races[index].id,NULL)){
+        Con_Printf("Race cannot be applied: character data or appearance is incomplete.\n");return;
+    }
+    /* Validate appearance with the existing builder, but preserve the test
+     * character's level, stats and current vitals instead of rebuilding them. */
+    aw_character.race=trial.race;aw_character.head=trial.head;aw_character.hair=trial.hair;
+    p->v.view_ofs[2]=AW_CharacterEyeHeight()+p->v.mins[2];
+    IN_AWClearButtons();
+    Con_Printf("Player race: %ld: %s. Gender, class, birthsign, name, equipment, level and stats retained.\n",
+        (long)index,aw_races[index].name);
 }
 /* aw_quickchar_show: the current character as one console line per group (read-back for tests). */
 static void show_command(void){

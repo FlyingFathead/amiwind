@@ -178,4 +178,41 @@ void AW_ItemsHide(edict_t *items[AW_ITEMS_KINDS]) {
     int k;
     for(k=0;k<AW_ITEMS_KINDS;k++){if(items[k] && !items[k]->free)ED_Free(items[k]);items[k]=NULL;}
 }
+/* A single active player alias: optional per-frame tags use the same parser
+ * and bounds as NPC attachments. Storage is released on model/scene change. */
+static model_t *player_tag_model;
+static float *player_tag_rows;
+static int player_tag_frames,player_tag_failed;
+void AW_ItemsAliasClear(void){
+    free(player_tag_rows);player_tag_rows=NULL;player_tag_model=NULL;
+    player_tag_frames=player_tag_failed=0;
+}
+int AW_ItemsAliasTag(model_t *model,int frame,int kind,float tag[6]){
+    FILE *f=NULL;int size,n;char path[96],paths[AW_ITEMS_KINDS][AW_ITEMS_PATH],*text;
+    if(!model || model->type!=mod_alias || kind<0 || kind>=AW_ITEMS_KINDS)return 0;
+    if(player_tag_model!=model){AW_ItemsAliasClear();player_tag_model=model;}
+    if(player_tag_failed)return 0;
+    if(!player_tag_rows){
+        n=(int)strlen(model->name);
+        if(n<5 || n>80 || model->numframes<1 || model->numframes>AW_ITEMS_MAX_FRAMES)goto unavailable;
+        strcpy(path,model->name);strcpy(path+n-4,".tag");
+        size=COM_FOpenFile(path,&f);
+        if(!f || size<20 || size>AW_ITEMS_MAX_FRAMES*AW_ITEMS_ROW*16+256)goto unavailable;
+        text=(char *)malloc(size+1);if(!text)goto unavailable;
+        if(fread(text,1,size,f)!=(size_t)size){free(text);goto unavailable;}
+        fclose(f);f=NULL;text[size]=0;
+        player_tag_rows=(float *)malloc(model->numframes*AW_ITEMS_ROW*sizeof(float));
+        if(!player_tag_rows){free(text);goto unavailable;}
+        player_tag_frames=AW_ItemsParse(text,model->numframes,player_tag_rows,model->numframes,paths);
+        free(text);
+        if(player_tag_frames!=model->numframes){free(player_tag_rows);player_tag_rows=NULL;goto unavailable;}
+    }
+    if(frame<0)return 1;
+    if(frame>=player_tag_frames || !tag)return 0;
+    memcpy(tag,player_tag_rows+frame*AW_ITEMS_ROW+kind*6,6*sizeof(float));return 1;
+ unavailable:
+    if(f)fclose(f);
+    player_tag_failed=1;
+    Con_Printf("Player equipment tags unavailable for %s; item pose not substituted.\n",model->name);return 0;
+}
 #endif

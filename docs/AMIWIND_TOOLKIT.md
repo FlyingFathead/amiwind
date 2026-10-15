@@ -639,3 +639,12 @@ one view and a statistics table.
 | Trackers | Entity tracker (original against placed, with reasons) and world progress table, written by every image build; POI checklist. | [trackers](trackers/README.md), [world progress](trackers/WORLD_PROGRESS.md) |
 | Map optimisation | Map inspection, conversion and verification tools for reducing compiled-world costs. | [Map Optimization Toolkit](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md) |
 | Console commands | Every `dbg` command in the game's own catalogue. | [console commands](AMIWIND_CONSOLE_COMMANDS.md) |
+
+The private Game world map background can be preloaded with
+`tools/toolkit_serve.py --data PRIVATE_MAP_DIRECTORY --progress TRACKER_DIRECTORY`.
+Keep `island-world.png` and matching `island-world.json` in the data directory;
+choose **Bottom layer > Game world map**. The tracker directory is independent.
+A PNG alone has no geographic bounds. See
+[owner-supplied reference background](ORIGINAL_MAP_DATA.md#load-an-owner-supplied-reference-background)
+for sidecar format, local file selection and acceptance limits. Keep game-derived
+backgrounds outside public source and source exports.

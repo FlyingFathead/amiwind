@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): RC2 all-body run fails Breton female:480 exceeds alias budget;384/320/256 trip leg guard. Two controls plus Argonian male/female and Breton male read back; remaining set incomplete.
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): RC2 body checks pass 20/20: 16 prior pairs reused, four female models newly baked below 512 KiB. Tail excluded from leg guard; 33 checks pass. Native/package acceptance pending.
+- Reported with v0.0.40-dev2 at 2026-10-15 (time not recorded): Fresh Argonian fit stopped at105frames. A later guarded320 mesh fits122frames in511392B with head/hair intact. Fitter now searches for full sampling; production/native pending.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -18,7 +19,7 @@
 | Where | Player-body converter mesh and animation byte-budget selection |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.39-dev1 (last seen) |
+| Persists in | v0.0.39-dev1, v0.0.40-dev1, v0.0.40-dev2 (last seen) |
 | Severity | medium: A recoverable model-budget overflow can abort conversion instead of using an existing smaller mesh budget. |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -31,7 +32,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -44,6 +45,9 @@
 - [Earlier RC2 all-appearance bake failure, 13 October 2026](#earlier-rc2-all-appearance-bake-failure-13-october-2026)
 - [Corrected RC2 all-body binary result, 13 October 2026](#corrected-rc2-all-body-binary-result-13-october-2026)
 - [Post-pin RC2 package observation, 14 October 2026](#post-pin-rc2-package-observation-14-october-2026)
+- [Selected legacy Argonian male payload, 14 October 2026](#selected-legacy-argonian-male-payload-14-october-2026)
+- [Selected legacy native scope, 14 October 2026](#selected-legacy-native-scope-14-october-2026)
+- [Full action sampling search, 15 October 2026](#full-action-sampling-search-15-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -136,6 +140,68 @@ Read-only section audits still identify possible knee/calf gaps in five fallback
 Full RC2 disk readback and independent package extraction verify all 20 declared base bodies and140 torch/held/swim companion files within the unchanged 512 KiB model cap. Exact played readback preserves186 engine/metadata/body files. Binary coverage does not certify all 20 visual appearances, native memory, leg seams or owner acceptance.
 
 These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+
+## Selected legacy Argonian male payload, 14 October 2026
+
+The selected v0.0.40-dev1 payload consists of nineteen current normal bodies
+and the previously packaged Argonian male body/layout with its matching
+122-row equipment tags. This is an explicit retained-asset choice, not a new
+bake, anatomy repair or proof of twenty newly generated exact-hit bodies.
+
+The retained Argonian model is 515,488 bytes with 122 frames; its animation
+layout is 639 bytes. Retaining hit 3, death 5 and jump 4 samples avoids the
+fresh fit's reductions to 1, 2 and 2. Normal and ready gait counts/timing stay
+preserved. Never pair this model with a fresh 105-row tag table.
+
+Its legacy block group has five uniformly spaced samples. The current hold
+chooses frame 31, sampled about 66.7 milliseconds before the authored hit.
+This is a known exact-hit fidelity limit, although start and held geometry and
+shield tags differ. The retained mesh also fails the unchanged current anatomy
+guard in the historical control. No guard bypass or fresh producer pass is
+claimed. Current Khajiit quality and other appearance checks stay separately
+scoped.
+
+The exact selected-payload Amiga target passes. Native verification of this
+legacy selection is active/pending; no positive Nord result from the preceding
+diagnostic establishes Argonian acceptance. Texture, jump/death, matched original
+pose, full payload readback, packaging and owner acceptance remain pending.
+
+## Selected legacy native scope, 14 October 2026
+
+The exact later target/FPU and nonroot 4,079-check full suite pass, with no
+unexpected failure/error, three Windows skips and three tracked expected
+failures. The actual character menu confirms male Argonian. The selected legacy
+122-frame body with matching attachment tags shows a raised shield while held
+and a separate release pose; ordinary fists-readied WALK3 movement changes
+position. This is selected-body diagnostic evidence.
+
+Closer punch/pose review, texture quality, death/jump, complete anatomy and
+matched original gait remain pending. The known approximately 66.7 ms early
+legacy block sample and unchanged anatomy-guard failure are not repaired.
+Earlier Nord evidence is not used as Argonian acceptance, and retained clips
+must not be described as a newly baked all-appearance exact-hit result.
+
+## Full action sampling search, 15 October 2026
+
+The new candidate exposed a second early exit: the fitter returned the first
+valid reduced-frame mesh before considering a smaller guarded mesh with all
+requested animation samples. A focused test reproduces this using the real
+animation byte fitter.
+
+The corrected selection returns the first full-frame fit. If none exists, it
+retains the valid candidate with the most animation samples; ties preserve
+the earlier mesh. Typed budget refusals continue the search, while malformed
+input still aborts. The 512 KiB cap, frame staging bound and 75 percent leg
+section guard remain unchanged. AmiQuake's alias loader and runtime allocation
+are unchanged; this correction is offline selection only.
+
+A canonical male Argonian diagnostic, including its original first head and
+hair, fits all122 samples at511392 bytes using the existing320 mesh budget.
+This retains hit3, death5, block5, jump4 and the full ordinary/ready gait loops.
+It is a bounded diagnostic, not yet a production bake or gameplay acceptance.
+A preliminary diagnostic with a differently cased race ID omitted head/hair;
+that result is excluded. The corrected source must reproduce the complete
+model and matching attachment rows before package selection.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

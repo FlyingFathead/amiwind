@@ -89,8 +89,8 @@ DOCUMENTATION_IMAGES.update({'docs/images/amiwind-v0.0.32-vivec-bridge-pillar.pn
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-chim-specks-{name}.png" for name in ("before", "after", "autumn-glitter-leaves"))
 # v0.0.33 release notes: graphs drawn by tools/release_graphs.py from docs/performance/CHIM-v0.0.33-MEASUREMENTS.json.
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-chim-{name}.png" for name in ("disk", "island", "loading", "frame-jit", "frame-slow", "counters", "memory", "build", "chunkload"))
-# v0.0.33 release notes, "Let's fix those bugs": before/after frames (FS-UAE, headlamp off) and one OpenMW reference.
-DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-fix-{name}.png" for name in ("strider-before", "strider-after", "ship-light-before", "ship-light-after", "ship-light-openmw"))
+# v0.0.33 release notes, "Let's fix those bugs": AmiWind before/after frames (FS-UAE, headlamp off). Original-game reference images stay private.
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.33-fix-{name}.png" for name in ("strider-before", "strider-after", "ship-light-before", "ship-light-after"))
 # Builder profile: fixes and time savings since v0.0.33, drawn by tools/builder_savings_chart.py from
 # docs/performance/builder-savings.json.
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-builder-savings.png")
@@ -98,6 +98,8 @@ DOCUMENTATION_IMAGES.add("docs/images/amiwind-builder-savings.png")
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.36-build-timeline.png")
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.36-progress-map.png")
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.39-dev1-progress-map.png")
+DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.40-rings-progress-map.png")
+DOCUMENTATION_IMAGES.update({"docs/images/amiwind-v0.0.40-dev1-grytewake.png", "docs/images/amiwind-v0.0.40-dev1-shunned-shipwreck.png"})
 # Toolkit screenshots (amiwind-toolkit/README.md): World with the CHIM progress tracker, the 3D Inspector on a .chim map
 # and on a CHIM world with the memory overlay.
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.36-toolkit-{name}.png" for name in ("world-chim-tracker", "inspector-chim-map", "inspector-chim-world-memory", "monitor"))

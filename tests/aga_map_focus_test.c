@@ -48,6 +48,13 @@ void AW_UIBookBegin(void){}
 void AW_UIBookEnd(void){}
 int AW_UIWidth(const char *s){return (int)strlen(s)*6;}
 void AW_UIText(int x,int y,const char *s,int c){strcat(drawn,s);}
+/* This input fixture records drawing only. Inventory ordering links the real
+ * pure rules; glyph rasterization is covered by the actual console fixture. */
+void AW_SmallStringColor(int x,int y,int width,const char *s,int c){
+    assert(x>=0 && width>=0 && x+width<=320 && y>=0 && y+5<=200);
+    assert((int)strlen(s)*4<=width);
+    assert(strlen(drawn)+strlen(s)<sizeof(drawn));strcat(drawn,s);
+}
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){
     assert((x>=10 && x+w<=154) || (x>=166 && x+w<=302));
     assert(AW_UIWidth(s)<=w);assert(y>=5 && y+h<=188);

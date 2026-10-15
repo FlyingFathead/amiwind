@@ -417,14 +417,31 @@ class PlayerBodyBudgetTests(unittest.TestCase):
         self.assertEqual([g['count'] for g in groups], [8, 6, 4, 4])
         self.assertEqual([c.kwargs['budget'] for c in bake.call_args_list], list(view.BUDGETS[:2]))
 
-    def test_first_valid_body_is_kept_without_reducing_geometry_further(self):
+    def test_reduced_fit_keeps_searching_for_full_action_sampling(self):
+        import prepare_player_view as view
+        budget, groups, bake = self.fit([self.mesh(600), self.mesh(100)], 64 * 1024)
+        self.assertEqual(budget, view.BUDGETS[1])
+        self.assertEqual([g['count'] for g in groups], [8, 6, 4, 4])
+        self.assertEqual(bake.call_count, 2)
+
+    def test_valid_reduced_fit_survives_all_later_geometry_failures(self):
         from npc_geometry import AliasOverflow
         import prepare_player_view as view
-        attempts = [self.mesh(600)] + [AliasOverflow('Alias vertex budget exceeded')] * 3
+        attempts = [self.mesh(600)] + [AliasOverflow('Alias vertex budget exceeded')] * 15
         budget, groups, bake = self.fit(attempts, 64 * 1024)
         self.assertEqual(budget, view.BUDGETS[0])
         self.assertLess(sum(g['count'] for g in groups), 22)
-        self.assertEqual(bake.call_count, 1)
+        self.assertEqual(bake.call_count, 4 * len(view.BUDGETS))
+
+    def test_fallback_keeps_more_animation_samples_then_first_equal_fit(self):
+        from npc_geometry import AliasOverflow
+        import prepare_player_view as view
+        attempts = [self.mesh(600), self.mesh(550), self.mesh(550)]
+        attempts += [AliasOverflow('Alias vertex budget exceeded')] * 13
+        budget, groups, bake = self.fit(attempts, 64 * 1024)
+        self.assertEqual(budget, view.BUDGETS[1])
+        self.assertEqual(sum(g['count'] for g in groups), 19)
+        self.assertEqual(bake.call_count, 4 * len(view.BUDGETS))
 
     def test_leg_section_guard_checks_union_not_hidden_fragment(self):
         import numpy as np

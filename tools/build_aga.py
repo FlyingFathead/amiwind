@@ -1725,6 +1725,10 @@ def image(args):
     print('Converting the player view data (camera settings, player bodies)...',flush=True)
     view_report=prepare_player_view(args.data_files,boot/'id1',jobs=jobs,bodies=not getattr(args,'no_player_body',False))
     (out/'player-view.json').write_text(json.dumps(view_report,indent=2)+'\n',encoding='utf-8',newline='\n')
+    from prepare_inventory import prepare as prepare_inventory
+    print('Converting original inventory metadata and selected item resources...',flush=True)
+    inventory_report=prepare_inventory(args.data_files,boot/'id1')
+    (out/'inventory-data.json').write_text(json.dumps(inventory_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     from prepare_world_ui import prepare as prepare_world_ui, validate as validate_world_ui
     if args.data_files:prepare_world_ui(args.data_files,None,boot)
     validate_world_ui(boot/'id1')

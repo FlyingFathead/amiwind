@@ -58,9 +58,18 @@ void AW_UIBookBegin(void){}
 void AW_UIBookEnd(void){}
 int AW_UIWidth(const char *s){return (int)strlen(s)*6;}
 void AW_UIText(int x,int y,const char *s,int c){strcat(drawn,s);}
+void AW_SmallStringColor(int x,int y,int width,const char *s,int c){
+    assert(x>=128 && x+width<=316 && y>=20 && y+5<=194);
+    assert((int)strlen(s)*4<=width);
+    strcat(drawn,s);
+}
+
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){
-    assert((x>=10 && x+w<=154) || (x>=166 && x+w<=302));
-    assert(AW_UIWidth(s)<=w);assert(y>=5 && y+h<=188);
+    if(AW_InventoryActive()){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
+    else {
+        assert((x>=10 && x+w<=154) || (x>=166 && x+w<=302));
+        assert(AW_UIWidth(s)<=w);assert(y>=5 && y+h<=188);
+    }
     if(x==14 && y>=26 && y<110 && h==14)heading_rows++;
     strcat(drawn,s);
 }

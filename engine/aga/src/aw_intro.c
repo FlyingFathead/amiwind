@@ -248,6 +248,13 @@ int (*aw_death_input_locked)(void);
 static int dead_locked(void){return aw_death_input_locked && aw_death_input_locked();}
 /* Character panels: the census menus and the quick character screen (aw_quickchar.c). */
 static int character_modal(void){return AW_CharacterActive() || AW_QuickCharActive();}
+/* On-demand only: bind a failed physical-input report to its actual gates. */
+void AW_IntroInputReport(void) {
+    Con_Printf("Input gates: combat %d death %d intro %d failed %d unlocked %d opening %d character %d quickchar %d debug %d story %d fighting %d restricted %d\n",
+        aw_combat_input_locked && aw_combat_input_locked(),dead_locked(),
+        active,failed,unlocked,AW_OpeningLocked(),AW_CharacterActive(),AW_QuickCharActive(),
+        AW_DebugTestInputActive(),aw_story.stage,AW_StoryFighting(),AW_StoryRestricted());
+}
 void AW_IntroMove(usercmd_t *cmd) {
     if((aw_combat_input_locked && aw_combat_input_locked()) || dead_locked()){cmd->forwardmove=cmd->sidemove=cmd->upmove=0;return;}
     if(AW_DebugTestInputActive() && !character_modal())return;

@@ -164,17 +164,19 @@ class PoolKeyCoverageTests(unittest.TestCase):
         first = npc_lod.code_identity()
         original = inspect.getsource
 
-        def edited(item):
-            text = original(item)
-            return text + '\n# edited\n' if getattr(item, '__name__', '') == 'nif_common' else text
-        npc_lod._CODE_IDENTITY.clear()
-        try:
-            with patch.object(inspect, 'getsource', edited):
-                second = npc_lod.code_identity()
-        finally:
-            npc_lod._CODE_IDENTITY.clear()
-        self.assertNotEqual(first, second)
-        self.assertEqual(first, npc_lod.code_identity())
+        for name in ('nif_common', 'mesh_geometry', 'npc_anim'):
+            with self.subTest(module=name):
+                def edited(item):
+                    text = original(item)
+                    return text + '\n# edited\n' if getattr(item, '__name__', '') == name else text
+                npc_lod._CODE_IDENTITY.clear()
+                try:
+                    with patch.object(inspect, 'getsource', edited):
+                        second = npc_lod.code_identity()
+                finally:
+                    npc_lod._CODE_IDENTITY.clear()
+                self.assertNotEqual(first, second)
+                self.assertEqual(first, npc_lod.code_identity())
 
 
 class PoolReadTraceTests(unittest.TestCase):

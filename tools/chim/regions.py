@@ -35,7 +35,8 @@ TERRAIN_MARGIN = 896
 LEAVE_MARGIN = 64                 # the engine leaves an open-world map 64 units past its core (aw_world.c)
 HOLE_MAX = 8                      # an enclosed unselected pocket of up to this many cells is refused
 # Cell kinds by tracker status (the tracker's ELIGIBLE set, tools/cell_progress.py). The open sea (no LAND)
-# is not taken yet: no legacy map covers it to replace, and the engine does not read the shared ocean chunk.
+# is taken only by an explicit cell selection: normal CHIM terrain references and appended routing rows.
+# Named coast/region sets retain their existing footprint.
 SEABED = ('empty_sea',)
 LAND_DONE = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved',
              'playtested', 'audits_passed')
@@ -44,7 +45,7 @@ NAMED = ('seabed', 'coast', 'sea-ring', 'coast2')
 # The v0.0.36 coastline (owner decision 2026-10-11: "the entire coastline, all 1's, all possible 2's ... as CHIM"):
 # every cell of rings 1 and 2 from the sea; a cell that cannot go on CHIM is dropped with its reason, not refused.
 COAST2_RINGS = (1, 2)
-KIND_CODES = {'seabed': 's', 'land': 'l'}
+KIND_CODES = {'seabed': 's', 'land': 'l', 'ocean': 'o'}
 
 
 def frame_id(cell):
@@ -282,10 +283,9 @@ def preflight(cells, explicit, statuses, town_boxes, one_map_only=False):
         rec = statuses.get(cell)
         status = rec['status'] if rec else None
         kind = kind_of(status)
-        if kind is None or kind == 'ocean':
+        if kind is None or (kind == 'ocean' and cell not in explicit):
             reason = ('CHIMport status %s, not finished (taken: %s)' % (status or 'unknown', ', '.join(SEABED + LAND_DONE))
-                      if kind is None else 'open sea (no LAND): no legacy map to replace and the engine does not read '
-                      'the shared ocean chunk yet')
+                      if kind is None else 'open sea requires an explicit cell selection and original-source admission checks')
             if cell in explicit:
                 problems.append('cell %s: %s' % (cell_key(cell), reason))
             else:                     # a named set (coast2) or region name: left out with its reason, listed
@@ -325,15 +325,21 @@ def frame_row(cell, margin=TERRAIN_MARGIN):
 def ownership(kinds, selection=None, dropped=(), margin=TERRAIN_MARGIN):
     """The ownership table (aw-chim-ownership-1) of preflighted cells. kinds: {(x, y): 'seabed' | 'land'}."""
     cells = sorted(kinds)
-    frames = [frame_row(c, margin) for c in cells]
+    frames = [dict(frame_row(c, margin), **({'kind': 'ocean'} if kinds[c] == 'ocean' else {})) for c in cells]
     table = {'format': FORMAT, 'cell_map_units': CELL_MAP, 'leave_margin': LEAVE_MARGIN, 'terrain_margin': margin,
              'cells': {cell_key(c): {'frame': frame_id(c), 'kind': kinds[c]} for c in cells},
              'frames': frames, 'dropped': list(dropped), 'selection': selection or {}}
     table['counts'] = {'cells': len(cells), 'frames': len(frames),
                        'seabed': sum(1 for k in kinds.values() if k == 'seabed'),
                        'land': sum(1 for k in kinds.values() if k == 'land'),
+                       **({'ocean': sum(k == 'ocean' for k in kinds.values())} if 'ocean' in kinds.values() else {}),
                        'components': components(cells)}
     return table
+
+
+def kind_summary(counts):
+    text = '%d seabed, %d land' % (counts['seabed'], counts['land'])
+    return text + (', %d ocean' % counts['ocean'] if counts.get('ocean') else '')
 
 
 def check_table(table):
@@ -365,7 +371,7 @@ def decode_cells(text):
     for token in text.split():
         cell, _, code = token.partition(':')
         if code not in codes:
-            raise ValueError('CHIM region cell %r: kind must be s (seabed) or l (land)' % token)
+            raise ValueError('CHIM region cell %r: kind must be s (seabed), l (land) or o (ocean)' % token)
         out[parse_cell(cell)] = codes[code]
     return out
 
@@ -378,6 +384,7 @@ def frame_settings(frame, margin=TERRAIN_MARGIN):
     from visual_recipes import cell_settings
     return {
         **cell_settings((x, y)),
+        **({'missing_land': 'flat', 'ocean_runtime': True} if frame.get('kind') == 'ocean' else {}),
         'format': 1, 'source_cell': [x, y], 'source_radius': 0,
         'centre': [x * CELL_UNITS + CELL_UNITS // 2, y * CELL_UNITS + CELL_UNITS // 2], 'scale': SCALE,
         'bounds': [[-HALF, -HALF], [HALF, HALF]], 'reference_margin': 0,
@@ -455,8 +462,8 @@ def main(argv=None):
     for p in problems:
         print('CHIM regions preflight: ' + p)
     c = table['counts']
-    print('CHIM regions: %d cells (%d seabed, %d land) in %d frames, %d groups; %d dropped'
-          % (c['cells'], c['seabed'], c['land'], c['frames'], c['components'], len(table['dropped'])))
+    print('CHIM regions: %d cells (%s) in %d frames, %d groups; %d dropped'
+          % (c['cells'], kind_summary(c), c['frames'], c['components'], len(table['dropped'])))
     if a.cells:
         print(encode_cells(table_kinds(table)))
     if a.out:

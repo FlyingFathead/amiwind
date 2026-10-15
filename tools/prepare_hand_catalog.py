@@ -116,11 +116,17 @@ def prepare(data_files,palette_path,out,budget=320,topology='reduced',normal_mod
         entries.append(entry)
     (out/'gfx/hand-torch.awt').write_bytes(common_torch)
     catalog=pack_catalog(entries);(out/'gfx/hand-models.awh').write_bytes(catalog)
+    # The normal 3D hand stage also owns its matching first-person block arms.
+    # Use these exact final palette bytes, rather than the earlier scene palette.
+    from prepare_block_view import prepare as prepare_block_view
+    block_palette=out/'reports/block-palette.lmp';block_palette.write_bytes(palette)
+    block_view=prepare_block_view(data_files,out,block_palette)
+    (out/'reports/block-view.json').write_text(json.dumps(block_view,indent=2)+'\n',encoding='utf-8',newline='\n')
     result={'format':'AWH1','budget':budget,'topology':topology,'normal_mode':'surface' if surface_normals else 'legacy','entries':entries,'clips':common_clips,
             'catalog_sha256':hashlib.sha256(catalog).hexdigest(),'torch_metadata_sha256':hashlib.sha256(common_torch).hexdigest(),
             'torch_metadata':'gfx/hand-torch.awt',
             'palette_sha256':hashlib.sha256(palette).hexdigest(),'scene_palette_sha256':scene_palette_sha256,
-            'runtime_palette':bool(runtime),
+            'runtime_palette':bool(runtime),'block_view':block_view,
             'scope':'Owned race/sex 3D hand and torch models. Install matching models, catalogue and shared torch metadata together; legacy v_nord remains available.'}
     (out/'hand-catalog-report.json').write_text(json.dumps(result,indent=2)+'\n');return result
 
@@ -166,6 +172,20 @@ def install(catalog,id1):
             if not re.fullmatch(r'progs/hands/[a-z0-9_]{1,35}_[mf](?:_t)?\.mdl',path) or path in files:
                 raise ValueError('Invalid hand catalogue model path')
             files[path]=entry[kind+'_sha256']
+    block=report.get('block_view')
+    if not isinstance(block,dict) or block.get('palette_sha256')!=palette:
+        raise ValueError('Hand catalogue lacks matching block assets; rebuild the 3D hand catalogue')
+    expected={(e['race'],e['female'],model_paths(e['race'],e['female'])[0][:-4]+'_b.mdl')
+              for e in report['entries']}
+    actual=[]
+    for entry in block.get('appearances',[]):
+        path=entry['model']
+        if not re.fullmatch(r'progs/hands/[a-z0-9_]{1,35}_[mf]_b\.mdl',path) or path in files:
+            raise ValueError('Invalid block appearance model path')
+        actual.append((entry['race'],entry['female'],path));files[path]=entry['sha256']
+    if len(actual)!=len(expected) or set(actual)!=expected:
+        raise ValueError('Block appearances differ from the hand catalogue')
+    files['gfx/block-models.awb']=block['metadata_sha256']
     files['gfx/hand-models.awh']=report['catalog_sha256'];files['gfx/hand-torch.awt']=report['torch_metadata_sha256']
     payload={}
     for path,digest in files.items():
@@ -177,7 +197,8 @@ def install(catalog,id1):
         (id1/path).parent.mkdir(parents=True,exist_ok=True);(id1/path).write_bytes(raw)
     return {'format':'AmiWind hand catalogue staging 1','files':len(payload),'entries':len(report['entries']),
             'palette_sha256':palette,'catalog_sha256':report['catalog_sha256'],
-            'torch_metadata_sha256':report['torch_metadata_sha256']}
+            'torch_metadata_sha256':report['torch_metadata_sha256'],
+            'block_appearances':len(actual),'block_metadata_sha256':block['metadata_sha256']}
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)

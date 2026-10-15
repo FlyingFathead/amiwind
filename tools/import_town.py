@@ -58,7 +58,10 @@ def source_receipt(data, settings):
     files = [child_ci(data, 'Morrowind.esm'), child_ci(data, 'Morrowind.bsa')]
     files += [p for p in data.rglob('*') if p.is_file() and p.relative_to(data).parts[0].casefold() in ('meshes', 'textures')]
     import lava
-    return {'geometry': {k: settings[k] for k in ('source_cell', 'source_radius', 'centre', 'scale')},
+    geometry = {k: settings[k] for k in ('source_cell', 'source_radius', 'centre', 'scale')}
+    if 'owned_cells' in settings:
+        geometry.update({k: settings[k] for k in ('bounds', 'reference_margin', 'owned_cells') if k in settings})
+    return {'geometry': geometry,
             'fixed_visibility_state': settings.get('fixed_visibility_state'),
             'visibility_code_sha256': hashlib.sha256(
                 (ROOT / 'src/mwad/script_visibility.py').read_bytes()).hexdigest(),
@@ -82,6 +85,10 @@ def in_frame(reference, settings):
         return True
     low, high = settings['bounds']
     point = [(reference['position'][i] - settings['centre'][i]) * settings['scale'] for i in range(2)]
+    if 'owned_cells' in settings:
+        from town_grid import owned_bounds
+        owned_bounds(settings)
+        return all(low[i] - margin <= point[i] < high[i] + margin for i in range(2))
     return all(low[i] - margin <= point[i] <= high[i] + margin for i in range(2))
 
 
@@ -196,6 +203,9 @@ def footprint_references(data, out, placements, settings, jobs):
 
 def collect(data, out, jobs, settings):
     title = town_field(settings, 'title')
+    if 'owned_cells' in settings:
+        from town_grid import audit_radius
+        audit_radius(settings)
     audit(data, out / 'audit', tuple(settings['source_cell']), settings['source_radius'], 2,
           missing_land=settings.get('missing_land'))
     placements = json.loads((out / 'audit/placements.json').read_text())
@@ -220,7 +230,11 @@ def collect(data, out, jobs, settings):
     groups = scenery_groups(settings, selected)
     report = export_refs(data, out / 'scenery', selected, groups, [*settings['centre'], 0],
                          metadata={'runtime_bounds': settings['bounds']}, jobs=jobs)
-    write_json(out / 'source-catalogue.json', {'references': references, 'deferred': deferred})
+    catalogue = {'references': references, 'deferred': deferred}
+    if 'owned_cells' in settings:
+        from town_grid import reference_ownership
+        catalogue['ownership'] = reference_ownership(references, settings)
+    write_json(out / 'source-catalogue.json', catalogue)
     if report['errors'] or report['converted_references'] != len(selected):
         raise ValueError(title + ' conversion incomplete; inspect scenery/conversion-errors.json')
     index = json.loads((out / 'scenery/scenery-index.json').read_text())

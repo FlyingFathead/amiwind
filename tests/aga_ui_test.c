@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include "aw_character.h"
+#include "aw_inventory.h"
+#include "aw_story.h"
 aw_character_t aw_character;
 #include <assert.h>
 #include <sys/stat.h>
@@ -9,20 +11,46 @@ viddef_t vid;refdef_t r_refdef;keydest_t key_dest;double realtime;double host_fr
 client_static_t cls;server_t sv;server_static_t svs;int scr_copyeverything;
 byte pal[768],glyphs[16384],frame[64004];byte *host_basepal=pal,*draw_chars=glyphs;
 static char *directory;
-static cvar_t *loading_parameter,*region_parameter,*delay_parameter;
+static int hud_tracking,hud_allocations,file_reads;
+void *__real_malloc(size_t size);
+void *__wrap_malloc(size_t size){if(hud_tracking)hud_allocations++;return __real_malloc(size);}
+static void item_u32(byte *p,unsigned n){int i;for(i=0;i<4;i++)p[i]=(n>>(8*i))&255;}
+static void item_float(byte *p,float f){unsigned bits;memcpy(&bits,&f,4);item_u32(p,bits);}
+static void item_row(FILE *f,const char *id,int shield){
+    byte row[512];memset(row,0,sizeof(row));
+    strcpy((char *)row,id);strcpy((char *)row+64,id);
+    item_u32(row+160,shield?AW_INV_ARMOUR:AW_INV_WEAPON);
+    item_u32(row+164,shield?8:1);item_float(row+172,12);
+    item_u32(row+176,1U<<(shield?AW_SLOT_LEFT:AW_SLOT_RIGHT));item_u32(row+180,7);
+    strcpy((char *)row+184,"progs/inv/fixture.mdl");
+    item_u32(row+440,shield?0:2);item_u32(row+444,26);
+    item_float(row+472,shield?0:1);item_float(row+476,shield?0:1.35f);
+    item_float(row+480,shield?300:900);item_float(row+484,shield?15:0);
+    item_u32(row+488,shield?2:0);item_u32(row+492,shield?30:0);
+    assert(fwrite(row,1,sizeof(row),f)==sizeof(row));
+}
+static void hud_box(byte *out,int x){
+    int y;for(y=0;y<24;y++)memcpy(out+y*24,vid.buffer+(174+y)*vid.rowbytes+x,24);
+}
+
+static int guard_state;static int test_guard(void){return guard_state;}
+static cvar_t *loading_parameter,*region_parameter,*delay_parameter,*hud_parameter;
 static double loading_clock;
 double Sys_FloatTime(void){return loading_clock;}
 static int queued_prison;
-void AW_StoryReset(int new_game){}
+static int hud_debug;
+int AW_DebugTestInputActive(void){return hud_debug;}
 void AW_CharacterReset(void){}
 void AW_SaveReset(void){}
 void IN_AWClearButtons(void){}
 int AW_MusicStartTrack(int track){assert(track==4);return 1;}
 void AW_MusicHold(void){}
 void Cbuf_AddText(char *text){assert(!strcmp(text,"map prison\n"));queued_prison=1;}
-int COM_FOpenFile(char *name,FILE **f){char p[1024];int n;sprintf(p,"%s/%s",directory,name);*f=fopen(p,"rb");if(!*f)return -1;fseek(*f,0,SEEK_END);n=ftell(*f);rewind(*f);return n;}
+int COM_FOpenFile(char *name,FILE **f){char p[1024];int n;file_reads++;sprintf(p,"%s/%s",directory,name);*f=fopen(p,"rb");if(!*f)return -1;fseek(*f,0,SEEK_END);n=ftell(*f);rewind(*f);return n;}
 void Con_Printf(char *fmt,...){}
-void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_loading_style"))loading_parameter=c;else if(!strcmp(c->name,"aw_region_loading"))region_parameter=c;else if(!strcmp(c->name,"aw_region_loading_delay"))delay_parameter=c;}
+void CDAudio_Update(void){}
+void S_ExtraUpdate(void){}
+void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_loading_style"))loading_parameter=c;else if(!strcmp(c->name,"aw_region_loading"))region_parameter=c;else if(!strcmp(c->name,"aw_region_loading_delay"))delay_parameter=c;else if(!strcmp(c->name,"aw_ui_hud"))hud_parameter=c;}
 int AW_LoadingScreen(void){return 1;}
 int AW_MenuFrontEnd(void){return 0;}
 void Cvar_SetValue(char *s,float v){if(region_parameter && !strcmp(s,region_parameter->name))region_parameter->value=v;}
@@ -49,6 +77,11 @@ int main(int argc,char **argv){
  sprintf(path,"%s/gfx",directory);assert(!mkdir(path,0700));
  memset(raw,0,sizeof(raw));memcpy(raw,"AWF1",4);raw[4]=14;raw[5]=16;raw[6]=1;
  raw[8+'A'*8+2]=3;raw[8+'A'*8+3]=1;raw[8+'A'*8+6]=3;raw[2056]=0x6c;
+ /* Visible masks for the actual Guard/name rendering controls. */
+ {const char *letters="GuardTarget";const char *c;
+  for(c=letters;*c;c++){raw[8+(unsigned char)*c*8+2]=1;
+   raw[8+(unsigned char)*c*8+3]=1;raw[8+(unsigned char)*c*8+6]=4;}}
+
  sprintf(path,"%s/gfx/magic14.awf",directory);f=fopen(path,"wb");assert(f);assert(fwrite(raw,1,sizeof(raw),f)==sizeof(raw));fclose(f);
  raw[4]=12;raw[5]=14;
  sprintf(path,"%s/gfx/book12.awf",directory);f=fopen(path,"wb");assert(f);assert(fwrite(raw,1,sizeof(raw),f)==sizeof(raw));fclose(f);
@@ -76,6 +109,96 @@ int main(int argc,char **argv){
   check_hud_bars(0,0,0);
   aw_character.valid=0;sv.active=false;check_hud_bars(71,71,71);
   svs.clients=NULL;cls.state=ca_disconnected;
+ }
+ /* Original opening channels: compare actual pixels, including clearing a
+  * formerly visible rail and preserving game state when toggling manual HUD. */
+ {
+  int stage,channel,x,y,painted;aw_state_t unchanged;
+  const int left[3]={8,88,116},width[3]={75,24,24},bit[3]={1,2,4};
+  cls.state=ca_connected;r_refdef.vrect.height=172;r_refdef.vrect.width=320;
+  AW_StoryReset(1);
+  for(stage=AW_STAGE_SHIP;stage<=AW_STAGE_PAPERS;stage++){
+   aw_story.stage=stage;unchanged=aw_state;memset(vid.buffer,137,64000);AW_UIHud();
+   for(channel=0;channel<3;channel++){
+    painted=0;for(y=174;y<198;y++)for(x=left[channel];x<left[channel]+width[channel];x++)
+     if(vid.buffer[y*320+x])painted++;
+    assert((painted>0)==(stage==AW_STAGE_PAPERS && channel==0));
+   }
+   assert(!memcmp(&unchanged,&aw_state,sizeof(unchanged)));
+  }
+  assert(AW_StoryPapersRead());assert(AW_StoryHudChannels()==(AW_HUD_STATS|AW_HUD_WEAPON));
+  for(stage=0;stage<3;stage++){
+   int mask=stage==2?AW_HUD_ALL:AW_HUD_STATS|AW_HUD_WEAPON;
+   if(stage==1){assert(AW_ItemAdd(&aw_state,"chargen statssheet",1));assert(AW_StoryTransition(AW_STAGE_COURTYARD));}
+   if(stage==2){assert(AW_CourtyardTakeRing());assert(AW_ItemAdd(&aw_state,"ring_keley",-1));}
+   AW_UIHud();
+   for(channel=0;channel<3;channel++){
+    painted=0;for(y=174;y<198;y++)for(x=left[channel];x<left[channel]+width[channel];x++)if(vid.buffer[y*320+x])painted++;
+    assert((painted>0)==((mask&bit[channel])!=0));
+   }
+  }
+  unchanged=aw_state;hud_parameter->value=0;AW_UIHud();
+  for(y=174;y<198;y++)for(x=8;x<140;x++)assert(vid.buffer[y*320+x]==0);
+  assert(!memcmp(&unchanged,&aw_state,sizeof(unchanged)));
+  hud_parameter->value=1;AW_UIHud();assert(vid.buffer[174*320+88]!=0);
+  AW_StoryReset(1);AW_UIHud();for(y=174;y<198;y++)for(x=8;x<140;x++)assert(vid.buffer[y*320+x]==0);
+  hud_debug=1;AW_UIHud();assert(vid.buffer[174*320+88]!=0);hud_debug=0;
+  AW_StoryReset(0);memset(&r_refdef.vrect,0,sizeof(r_refdef.vrect));cls.state=ca_disconnected;
+ }
+ /* Ordinary HUD must not paint Guard over the world. Compare real pixels
+  * while the guard callback/state toggles; target-name drawing stays alive. */
+ {
+  static byte unguarded[64000];int x,y,painted=0;
+  cls.state=ca_connected;r_refdef.vrect.x=r_refdef.vrect.y=0;
+  r_refdef.vrect.width=320;r_refdef.vrect.height=172;
+  aw_combat_guard_marker=test_guard;guard_state=0;
+  memset(vid.buffer,137,64000);AW_UIHud();memcpy(unguarded,vid.buffer,64000);
+  guard_state=1;memset(vid.buffer,137,64000);AW_UIHud();
+  assert(!memcmp(unguarded,vid.buffer,64000) && guard_state==1 && aw_combat_guard_marker());
+  for(y=50;y<120;y++)for(x=100;x<220;x++)assert(vid.buffer[y*320+x]==137);
+  AW_UITargetName("Target");
+  for(y=0;y<25;y++)for(x=200;x<320;x++)if(vid.buffer[y*320+x]!=137)painted++;
+  assert(painted>0); /* Ordinary target labels retain their original location. */
+  aw_combat_guard_marker=NULL;guard_state=0;
+  memset(&r_refdef.vrect,0,sizeof(r_refdef.vrect));cls.state=ca_disconnected;
+ }
+ /* Actual HUD pixels plus real inventory lookup/transactions. The generic
+  * weapon/fist mark follows carried state; left shield never becomes magic. */
+ {
+  byte fist[576],armed[576],empty_magic[576],again[576];aw_inventory_item_t item;
+  int reads,draws;char inventory_path[128];FILE *catalogue;
+  sprintf(inventory_path,"%s/inventory",directory);assert(!mkdir(inventory_path,0700));
+  strcat(inventory_path,"/items.awi");catalogue=fopen(inventory_path,"wb");assert(catalogue);
+  assert(fwrite("AWI2",1,4,catalogue)==4);
+  {byte count[4]={3,0,0,0};assert(fwrite(count,1,4,catalogue)==4);}
+  item_row(catalogue,"fixture_axe",0);item_row(catalogue,"fixture_shield",1);item_row(catalogue,"fixture_sword",0);
+  fclose(catalogue);memset(&aw_state,0,sizeof(aw_state));cls.state=ca_connected;
+  AW_UIHud();hud_box(fist,88);hud_box(empty_magic,116);
+  assert(AW_InventoryRead("fixture_sword",&item));
+  assert(AW_ItemAdd(&aw_state,item.id,1) && AW_InventoryEquip(&aw_state,&item));
+  AW_UIHud();hud_box(armed,88);assert(memcmp(fist,armed,sizeof(fist)));
+  reads=file_reads;hud_allocations=0;hud_tracking=1;
+  for(draws=0;draws<32;draws++)AW_UIHud();
+  hud_tracking=0;assert(!hud_allocations && file_reads==reads);
+  assert(AW_InventoryUnequip(&aw_state,item.id));AW_UIHud();hud_box(again,88);
+  assert(!memcmp(fist,again,sizeof(fist)));
+  assert(AW_InventoryRead("fixture_shield",&item));
+  assert(AW_ItemAdd(&aw_state,item.id,1) && AW_InventoryEquip(&aw_state,&item));
+  AW_UIHud();hud_box(again,116);assert(!memcmp(empty_magic,again,sizeof(again)));
+  hud_box(again,88);assert(!memcmp(fist,again,sizeof(again)));
+  assert(AW_InventoryRead("fixture_axe",&item));
+  assert(AW_ItemAdd(&aw_state,item.id,1) && AW_InventoryEquip(&aw_state,&item));
+  AW_UIHud();hud_box(again,88);assert(!memcmp(armed,again,sizeof(again)));
+  /* A stale slot without actual ownership cannot display an equipped weapon. */
+  assert(AW_StateSet(&aw_state,AW_ITEM,item.id,0));AW_UIHud();hud_box(again,88);
+  assert(!memcmp(fist,again,sizeof(again)));
+  assert(AW_ItemAdd(&aw_state,item.id,1));AW_UIHud();hud_box(again,88);
+  assert(!memcmp(armed,again,sizeof(again)));
+  assert(AW_InventoryUnequip(&aw_state,item.id));AW_UIHud();hud_box(again,88);
+  assert(!memcmp(fist,again,sizeof(again)));
+  hud_box(again,116);assert(!memcmp(empty_magic,again,sizeof(again)));
+  cls.state=ca_disconnected;unlink(inventory_path);
+  sprintf(inventory_path,"%s/inventory",directory);rmdir(inventory_path);
  }
  AW_UIScrollbar(276,54,133,9,7,0);AW_UIScrollbar(315,190,100,100,6,94);
  assert(AW_UIScrollHit(280,55,276,54,133,9,7,1)==0);

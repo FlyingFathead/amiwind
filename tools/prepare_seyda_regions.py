@@ -21,7 +21,8 @@ OVERLAP=896
 HYSTERESIS=96
 DRAW_DISTANCE=540
 # Include the existing world enclosure; partial edge cores remain explicit.
-BOUNDS=((-2079,-2079),(2079,2079))
+from area_config import BOUNDS as OWNED_BOUNDS
+BOUNDS=tuple(tuple(p) for p in OWNED_BOUNDS)
 COURTYARD=(-128,-384,512,256)
 # The special scenes after the regions: name and XY bounds (the intro docks' route, the Census courtyard).
 SPECIALS=(('intro_docks',(-240,-1100,1120,620)),('sncourt',COURTYARD))
@@ -35,8 +36,8 @@ def validate_layout(settings):
         raise ValueError('Unknown bounded Seyda layout')
     if (settings.get('overlap'), settings.get('hysteresis'), settings.get('draw_distance')) != (OVERLAP,HYSTERESIS,DRAW_DISTANCE):
         raise ValueError('Seyda visibility/hysteresis policy changed')
-    if settings.get('bounds') != [list(v) for v in BOUNDS]:
-        raise ValueError('Seyda ownership bounds changed')
+    from town_grid import extend_edge_layout
+    settings = extend_edge_layout(settings, BOUNDS, GROUND_BOUNDS)
     entries = settings['regions']
     if not 1 <= len(entries) <= 64:
         raise ValueError('Invalid native Seyda region count')

@@ -78,6 +78,15 @@ def world_box(grain=256, sector_chunks=3, root=None):
     return cx + 4 * lx, cy + 4 * ly, cx + 4 * hx, cy + 4 * hy
 
 
+def owned_world_box(root=None):
+    """Original-cell core, excluding terrain-only apron (unique owner selection)."""
+    settings = _config(root)
+    from town_grid import owned_bounds
+    low, high = owned_bounds(settings)
+    c = settings['centre']
+    return c[0]+4*low[0], c[1]+4*low[1], c[0]+4*high[0], c[1]+4*high[1]
+
+
 def source_cell(root=None):
     cx, cy = centre(root)
     return math.floor(cx / 8192), math.floor(cy / 8192)
@@ -190,6 +199,69 @@ def opening_barrel(data, work, barrel):
     return json.loads((parts / 'scenery-index.json').read_text(encoding='utf-8')), parts / 'scenery.mwpak'
 
 
+
+def write_source_metadata(legacy, work, selected, harvest_set=(), settings=None):
+    """Bind this direct source path to original core cells and audited references.
+
+    Scenery alone omits actors and other unsupported types. Retain every
+    original reference whose physical origin is in the core, plus selected
+    external dependencies. Separate harvest handling is not static placement
+    or proof of gameplay acceptance. This writes metadata, never geometry.
+    """
+    import hashlib
+    from town_grid import audit_radius, reference_ownership
+    settings = _config() if settings is None else settings
+    audit_radius(settings)
+    legacy, work = Path(legacy), Path(work)
+    names = ('work/generated/seyda-neen/audit.json',
+             'work/generated/seyda-neen/placements.json', 'scenery/scenery-index.json')
+    raw = {name: (legacy / name).read_bytes() for name in names}
+    area = json.loads(raw[names[0]])['area']
+    if (area.get('center') != settings['source_cell'] or
+            area.get('radius_cells') != settings['source_radius']):
+        raise ValueError('Seyda original-reference audit scope differs from the source config')
+    low, high = settings['owned_cells']
+    core = {(x, y) for x in range(low[0], high[0]) for y in range(low[1], high[1])}
+    audited = [(c['x'], c['y']) for c in area['cells']]
+    if len(set(audited)) != len(audited) or not core <= set(audited):
+        raise ValueError('Seyda original-reference audit omits or repeats a core cell')
+    original = json.loads(raw[names[1]])
+    identity = lambda ref: (ref.get('master', 'Morrowind.esm'), ref['number'])
+    refs = {identity(ref): ref for ref in original}
+    if len(refs) != len(original):
+        raise ValueError('Duplicate original reference in Seyda audit')
+    from collections import Counter
+    declared_counts = Counter(tuple(ref['cell']) for ref in original)
+    if not set(declared_counts) <= set(audited) or any(
+            type(cell.get('references')) is not int or cell['references'] < 0 or
+            cell['references'] != declared_counts[(cell['x'], cell['y'])] for cell in area['cells']):
+        raise ValueError('Seyda original-reference audit counts differ from the reference list')
+    selected_ids = {identity(ref) for ref in selected}
+    if len(selected_ids) != len(selected) or not selected_ids <= set(refs):
+        raise ValueError('Seyda placement has a duplicate or unaudited original identity')
+    physical = lambda ref: tuple(math.floor(ref['position'][k] / 8192) for k in range(2))
+    core_ids = {key for key, ref in refs.items() if physical(ref) in core}
+    retained = sorted(core_ids | selected_ids)
+    # harvest_set is the established master-reference-number set. Only core
+    # references participate here; unrelated outer audit cells are not owners.
+    harvest = {key for key in core_ids - selected_ids if key[1] in harvest_set}
+    catalogue = {'references': [refs[key] for key in retained],
+                 'deferred': [refs[key] for key in retained if key not in selected_ids | harvest],
+                 'separate_gameplay': {'harvest': [refs[key] for key in sorted(harvest)]},
+                 'deferred_basis': 'Original references not represented as static CHIM placements or separate harvest input; actor/gameplay acceptance is independent.'}
+    catalogue['ownership'] = reference_ownership(catalogue['references'], settings)
+    receipt = {'geometry': {key: settings[key] for key in
+                           ('source_cell', 'source_radius', 'centre', 'scale', 'bounds', 'owned_cells')},
+               'source_kind': 'seyda-audited-original-references',
+               'files': {name: hashlib.sha256(data).hexdigest() for name, data in raw.items()},
+               'selected_identity_sha256': hashlib.sha256(json.dumps(sorted(selected_ids)).encode()).hexdigest(),
+               'acceptance': 'Source metadata only; conversion gates, native play and shipment are separate.'}
+    work.mkdir(parents=True, exist_ok=True)
+    for name, value in (('source-receipt.json', receipt), ('source-catalogue.json', catalogue)):
+        (work / name).write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8', newline='\n')
+    return receipt, catalogue
+
+
 def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settings_override, rebuild_meshes,
                  mesh_occluders, harvest_set, flora):
     """Seyda Neen's frame input, source section, parity record and mesh count (chim.build.build_areas)."""
@@ -206,7 +278,9 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
         raise ValueError('The CHIM Seyda Neen frame needs the legacy run folder (--legacy-run): its terrain audit, '
                          'scenery and scene stage')
     legacy = Path(legacy)
-    for need in ('work/generated/seyda-neen/terrain-source.json', 'scenery/scenery-index.json',
+    for need in ('work/generated/seyda-neen/terrain-source.json',
+                 'work/generated/seyda-neen/audit.json', 'work/generated/seyda-neen/placements.json',
+                 'scenery/scenery-index.json',
                  'scenery/scenery.mwpak', 'alias-scene/town.wad', 'world-survey/terrain-source.npz'):
         if not (legacy / need).is_file():
             raise ValueError('Legacy run folder lacks %s (run the setup, terrain, scenery, scene and world-survey '
@@ -215,6 +289,8 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
     with timer.section('source stage'):
         index = json.loads((legacy / 'scenery/scenery-index.json').read_text(encoding='utf-8'))
         selected, omitted, profiles = placements(index)
+        from chim.ownership import capture
+        selected = [capture(r) for r in selected]
     archive = legacy / 'scenery/scenery.mwpak'
     items = []
     used = list(dict.fromkeys(r['model_index'] for r in selected))
@@ -266,7 +342,7 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
                 prepared[added[task[0]]] = result
                 mesh_fps[added[task[0]]] = fp
             for ref in bindex['references']:
-                selected.append(dict(ref, model_index=added[ref['model_index']]))
+                selected.append(dict(capture(ref), model_index=added[ref['model_index']]))
         parity['opening'] = {'story_hidden': sorted(hidden & {r['number'] for r in selected}),
                              'barrel': barrel['number']}
     with timer.section('town flora'):
@@ -291,7 +367,8 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
         ground = TriangleGround(ground_triangles(grids, low, high, canonical), TILE, low, size)
         materials = {m for items_ in ground.tiles.values() for _, m in items_}
         ground_tex = ground_textures(legacy / 'alias-scene/town.wad', materials, data, pal_bytes)
-    frame = {'cell': source_cell(), 'centre': tuple(float(v) for v in CENTRE),
+    from town_grid import owned_bounds
+    frame = {'owned': owned_bounds(_config()), 'cell': source_cell(), 'centre': tuple(float(v) for v in CENTRE),
              'low': (float(low[0]), float(low[1])), 'span': (high[0] - low[0], high[1] - low[1])}
     spec = frame_input(frame=frame, centre=CENTRE, models=models, references=selected,
                        prepared=prepared, profiles=profiles, mesh_fps=mesh_fps, texture_records=textures,
@@ -301,10 +378,15 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
                        settings=settings_override, mesh_occluders=mesh_occluders, ground=ground)
     doors = [[(r['position'][0] - CENTRE[0]) * SCALE, (r['position'][1] - CENTRE[1]) * SCALE]
              for r in selected if r.get('type') == 'DOOR' and r.get('destination')]
+    from town_grid import reference_ownership
     section = {'town': AREA, 'cell': list(frame['cell']),
+               'reference_ownership': reference_ownership(selected, _config()),
                'placements': [{'ref': r['number'], 'cell': list(r.get('cell') or [])} for r in selected],
                'doors': doors, 'terrain_step': TILE, 'terrain_low': [low[0], low[1]],
                'terrain_tiles': size[0] * size[1], 'water_level': WATER_LEVEL,
                'terrain_size': list(size), 'terrain_triangles': ground.rows(),
                'story_hidden': sorted(r['number'] for r in selected if r.get('_story_hidden'))}
+    from chim.ownership import manifest
+    section['frame_ownership'] = manifest(spec, selected)
+    write_source_metadata(legacy, work, selected, harvest_set)
     return spec, section, parity, len(prepared)

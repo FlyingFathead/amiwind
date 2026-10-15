@@ -84,6 +84,15 @@ All 20 body and companion sets are present in the exact RC2 package. The scoped 
 
 These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
 
+## Animation transfer defect, 15 October 2026
+
+A separate [converter defect](NPC-ANIMATION-OFFSET-40.md) is reproduced: a
+rest-pose simplification offset remains fixed in space while its source limb
+rotates. The source correction passes nine focused synthetic checks. This
+neither establishes the cause of this playtest report nor verifies a rebuilt
+body in game. Preserve the existing ready-pose control, original and historical
+comparisons, and the open visual acceptance gates.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -104,5 +113,9 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4
 - TORCH-HAND-SEPARATION-29 (no report page): Torch grip and hand appear to break during idle and running
 - TORCH-INPUT-29 (no report page): F cannot raise hands; V only prints torch state
+
+Related bugs in other categories:
+
+- [NPC-ANIMATION-OFFSET-40](NPC-ANIMATION-OFFSET-40.md): Simplified actor vertices keep a fixed offset while limbs rotate
 
 <!-- END GENERATED CATEGORY -->

@@ -62,12 +62,15 @@ class EngineLimitsTests(unittest.TestCase):
                 continue
             text = re.sub(r'/\*.*?\*/', '', path.read_text(encoding='utf-8', errors='replace'), flags=re.S)
             sites += [path.name] * len(re.findall(r'\bED_Alloc\s*\(\s*\)', text))
-        self.assertEqual(sorted(sites), ['aw_arena.c', 'aw_companion.c', 'aw_items.c'])
+        self.assertEqual(sorted(sites), ['aw_arena.c', 'aw_companion.c', 'aw_inventory.c', 'aw_inventory.c', 'aw_items.c'])
         # one each for the companion and the arena foe; aw_items.c one per carried item of every hostile
         items = (SRC / 'aw_items.c').read_text()
         self.assertRegex(items, r'for\(k=0;k<AW_ITEMS_KINDS;k\+\+\)\{\s*int i=table\[t\]\.item\[k\];[^}]*ED_Alloc\(\)')
         self.assertIn('AW_ItemsShow(e,s->item);', (SRC / 'aw_combat.c').read_text())
-        self.assertEqual(mel.runtime_edicts(), 2 + 4 * 2)
+        self.assertEqual(mel.runtime_edicts(), 2 + 4 * 2 + 32)
+        inventory = (SRC/'aw_inventory.c').read_text()
+        self.assertIn('j==AW_INVENTORY_DROPS', inventory)
+        self.assertIn('sv.time-e->freetime>.5', inventory)
         qc = (ROOT / 'engine/aga/qc/world.qc').read_text() + (ROOT / 'engine/aga/qc/defs.qc').read_text()
         self.assertNotRegex(qc, r'\bspawn\s*=\s*#14', 'QuakeC spawn() would allocate edicts at run time')
 
@@ -78,12 +81,15 @@ class EngineLimitsTests(unittest.TestCase):
                 continue
             if re.search(r'sv\.model_precache\[\w+\]\s*=', path.read_text(encoding='utf-8', errors='replace')):
                 writers.add(path.name)
-        self.assertEqual(writers, {'aw_arena.c', 'aw_items.c', 'aw_anim.c'})
+        self.assertEqual(writers, {'aw_arena.c', 'aw_items.c', 'aw_anim.c', 'aw_inventory.c'})
         # aw_anim.c registers a layout's mover model only while the map loads (model_extras reads '>PATH')
         self.assertIn("sv.state!=ss_loading || lazies>=MOVERS", (SRC / 'aw_anim.c').read_text())
         # aw_items.c precaches only while the map loads, from the .tag files model_extras reads
         self.assertIn("sv.state!=ss_loading", (SRC / 'aw_items.c').read_text())
-        self.assertEqual(mel.RUNTIME_MODELS, 1)
+        self.assertEqual(mel.RUNTIME_MODELS, 1 + 16)
+        inventory = (SRC/'aw_inventory.c').read_text()
+        self.assertIn('model_names_used>=AW_INVENTORY_MODELS', inventory)
+        self.assertIn('model_names[AW_INVENTORY_MODELS][64]', inventory)
 
     def test_spawn_rules_are_read_from_the_quakec(self):
         rules = mel.spawn_rules()
@@ -126,7 +132,7 @@ class MapCountTests(unittest.TestCase):
         self.assertEqual(c['edicts_kept'], 5)
         self.assertEqual(c['edicts_peak'], 1 + 1 + 5 + 1 + mel.runtime_edicts())
         # slot 0, world, *1, *2, player.mdl, v_nord.mdl, a.mdl, s.mdl, runtime
-        self.assertEqual(c['models'], 2 + 2 + 2 + 2 + 1)
+        self.assertEqual(c['models'], 2 + 2 + 2 + 2 + mel.RUNTIME_MODELS)
         self.assertEqual(c['sounds'], 2)
         self.assertEqual(c['static_entities'], 1)
         self.assertEqual(c['no_spawn_function'], {'light': 1})

@@ -113,7 +113,7 @@ static const control_t controls[]={
     {"Use","+aw_use"},{"Attack","+attack"},{"Block","+aw_alt"},{"Hands","impulse 202"},{"Torch","aw_torch"},
     {"Map","aw_worldmap"},{"Journal","aw_journal"},{"Wait","aw_wait"},
     {"Quick save","aw_quicksave"},{"Quick load","aw_quickload"},
-    {"Inventory",NULL,"I"},{"Quick keys",NULL,"1-9"},{"Ready magic",NULL,"R"},{"Cast spell",NULL,NULL}};
+    {"Inventory","aw_inventory"},{"Quick keys",NULL,"1-9"},{"Ready magic",NULL,"R"},{"Cast spell",NULL,NULL}};
 #define CONTROL_ACTIONS ((int)(sizeof(controls)/sizeof(controls[0])))
 /* Then the combat options (docs/COMBAT.md; saved with the game config):
  * Combat style: AmiWind (aw_combat_miss 1, AmiWind extension: a failed roll shows

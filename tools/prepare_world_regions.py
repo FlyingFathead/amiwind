@@ -56,16 +56,20 @@ def town_handoffs(report, root=None):
         bounds = config['bounds']
         if len(bounds) != 2 or any(len(p) != 2 for p in bounds):
             raise ValueError('Expected rectangular town ground coverage: ' + name)
-        lo = [v + 96 for v in bounds[0]]
-        hi = [v - 96 for v in bounds[1]]
+        from town_config import handoff_core, frame_ground_bounds
+        lo, hi = handoff_core(config)
+        if 'owned_cells' in config:
+            from town_grid import owned_bounds
+            owned_bounds(config)
         for k in range(2):
             covered_lo = min(r['core'][0][k] for r in area['regions']) * SCALE - config['centre'][k] * SCALE
             covered_hi = max(r['core'][1][k] for r in area['regions']) * SCALE - config['centre'][k] * SCALE
             # the build's coordinate bound (coord_range: 4,000 narrow, 32,000 wide; engine aw_world.c)
-            if not (-coord_bound() < covered_lo <= bounds[0][k] < lo[k] < hi[k] < bounds[1][k] <= covered_hi < coord_bound()):
+            if not (-coord_bound() < covered_lo <= bounds[0][k] <= lo[k] < hi[k] <= bounds[1][k] <= covered_hi < coord_bound()):
                 raise ValueError('Town handoff is outside converted ground/regions: ' + name)
         towns.append(dict(name=name, origin=[v * SCALE for v in config['centre']] + [0],
-                          core=[lo, hi], ground_bounds=bounds, exit_margin=32))
+                          core=[lo, hi], ground_bounds=frame_ground_bounds(config),
+                          owned_bounds=bounds, exit_margin=32))
     return towns
 
 
@@ -223,7 +227,7 @@ class Terrain:
         return False
 
 
-def terrain_triangles(terrain, x, y, required_edge_samples=(), full_detail=False):
+def terrain_triangles(terrain, x, y, required_edge_samples=(), full_detail=False, grid_origin=(0.,0.)):
     """Insert shoreline samples and required coarse/fine boundary samples.
 
     Required edges are south (0), east (1), north (2), and west (3).
@@ -238,12 +242,23 @@ def terrain_triangles(terrain, x, y, required_edge_samples=(), full_detail=False
         raise ValueError("Required terrain edges must be integers from 0 through 3")
     point = lambda xx, yy: [xx, yy, terrain.sample(xx, yy)[0]]
     if full_detail:
+        # CHIM-TERRAIN-DIAGONAL-40: original-spacing terrain uses the OpenMW
+        # diamond indices (even global grid parity AC, odd BD), for render
+        # and collision from these same triangles. Coarse/adaptive policy
+        # below is unchanged. grid_origin translates frame-local samplers.
+        if len(grid_origin)!=2 or any(not math.isfinite(v) for v in grid_origin):
+            raise ValueError('LAND detail requires a finite two-coordinate grid origin')
+        if any(abs(v/32-round(v/32))>1e-8 for v in (x+grid_origin[0],y+grid_origin[1])):
+            raise ValueError('LAND detail must align to the original sample grid')
         # Keep original LAND samples locally around elevated liquids. Sea-level
         # identity alone cannot protect a lava depression from coarse terrain.
         for dy in range(0, STEP, 32):
             for dx in range(0, STEP, 32):
                 q = [point(x+dx+u, y+dy+v) for u,v in ((0,0),(32,0),(32,32),(0,32))]
-                for ids in ((0,1,2),(0,2,3)):
+                ix=round((x+dx+grid_origin[0])/32)
+                iy=round((y+dy+grid_origin[1])/32)
+                faces=((0,1,2),(0,2,3)) if (ix+iy)%2==0 else ((0,1,3),(1,2,3))
+                for ids in faces:
                     yield [q[i] for i in ids]
         return
     corners = [point(x+dx, y+dy) for dx, dy in ((0,0),(STEP,0),(STEP,STEP),(0,STEP))]
@@ -604,7 +619,7 @@ def compile_region(task):
     return result
 
 
-def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=None,chim_cells=None,exterior_plan=None):
+def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=None,chim_cells=None,exterior_plan=None,ocean_cells=None):
     survey=survey.resolve();out=ensure_external(out,'world terrain').resolve();out.mkdir(parents=True,exist_ok=True)
     scene=ensure_external(scene,'private scene').resolve();bindir=bindir.resolve()
     report, entries=plan(survey)
@@ -641,16 +656,21 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     cells=set(chim_cells or ())
     skipped={e['name'] for e in entries if chim_region(e,cells)}
     found={tuple(e['cell']) for e in entries if e['name'] in skipped}
-    if cells and found!=cells:
+    ocean_cells = set(ocean_cells or ())
+    if not ocean_cells <= cells or ocean_cells & found:
+        raise ValueError('Ocean routing cells must be selected and have no existing core owner')
+    if cells - found != ocean_cells:
         raise ValueError('CHIM region cells without an open-world map: %s'
-                         %' '.join('%d,%d'%c for c in sorted(cells-found)))
-    compiled=[e for e in entries if e['name'] not in skipped | routing_only]
+                         %' '.join('%d,%d'%c for c in sorted(cells-found-ocean_cells)))
+    from chim.ocean_runtime import append_routing_rows
+    entries, ocean_rows = append_routing_rows(entries, ocean_cells, data)
+    compiled=[e for e in entries if e['name'] not in skipped | routing_only | {r['name'] for r in ocean_rows}]
     for e in compiled:
         local = region_lava(e, pools)
         if local:
             e['lava_pools'] = local
             e['lava_volumes'] = volumes
-    rows={}
+    rows={e['name']: e for e in ocean_rows}
     for result in costed_map('world-terrain-regions',compile_region,[(survey,out,e,bindir,threads,vis_mode,*extra) for e in compiled],
                              [e['name'] for e in compiled],jobs,fallback=triangles.get):
         action=result.pop('_unit_cache',None)
@@ -689,7 +709,9 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     if checklist:
         receipt['exterior_checklist'] = checklist
         receipt['routing_only_maps_not_made'] = sorted(routing_only)
-    if skipped:
+    if ocean_rows:
+        receipt['ocean_routing_rows'] = [dict(e) for e in ocean_rows]
+    if skipped or ocean_rows:
         receipt['chim_region_cells']=sorted([list(c) for c in cells])
     if not only:
         receipt['town_handoffs'] = town_handoffs(report)
@@ -721,5 +743,7 @@ if __name__=='__main__':
     cells=None
     if a.chim_regions_cells:
         from chim.regions import decode_cells
-        cells=set(decode_cells(a.chim_regions_cells))
-    prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only,a.vis_mode,a.cache,cells,a.exterior_plan)
+        kinds=decode_cells(a.chim_regions_cells)
+        cells=set(kinds)
+    prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only,a.vis_mode,a.cache,cells,a.exterior_plan,
+            {c for c,k in kinds.items() if k=='ocean'} if a.chim_regions_cells else None)

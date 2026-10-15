@@ -3,6 +3,7 @@
  * time. This is not inventory, quest persistence or original opening logic.
  */
 #include "quakedef.h"
+#include "aw_inventory.h"
 #include "aw_hand_state.h"
 #include <errno.h>
 #include "aw_save.h"
@@ -195,7 +196,7 @@ const char *AW_SceneTargetName(void) {
        AW_ReaderActive() || AW_IntroPromptActive() ||
        (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS))return NULL;
     driver=travel_target();if(driver)return pr_strings+driver->v.netname;
-    {const char *npc=npc_hint();return npc?npc:AW_HarvestHint();}
+    {const char *npc=npc_hint(),*item;item=AW_InventoryHint();return npc?npc:item?item:AW_HarvestHint();}
 }
 const char *AW_SceneWorldModel(const char *name) {
     FILE *f=NULL;const char *region;
@@ -409,7 +410,7 @@ int AW_TravelDraw(void) {
 int AW_SceneUse(void) {
     int i;float duration;char path[40];
     if(AW_PlayerDead())return 1;   /* dead: nothing is used (the key is spent) */
-    i=0;if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && AW_HarvestUse())return 1;i=aimed_door();if(i<0)return 0;
+    i=0;if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && (AW_InventoryUse() || AW_HarvestUse()))return 1;i=aimed_door();if(i<0)return 0;
     if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==119513?"Finish registration and leave through the courtyard.":links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
     if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
     if(!map_valid(links[i].target) || AW_SceneMapSize(links[i].target,path,sizeof(path))<0){
@@ -441,7 +442,7 @@ void AW_SceneDraw(void) {
        svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
     driver=travel_target();
     if(driver){name=pr_strings+driver->v.netname;action="E: Talk";npc=1;}
-    else if(!npc_hint() && (name=AW_HarvestHint())!=NULL){action="E: Pick";npc=1;}
+    else if(!npc_hint() && ((name=AW_InventoryHint())!=NULL || (name=AW_HarvestHint())!=NULL)){action="E: Pick";npc=1;}
     else if(!AW_OpeningHint(&name,&action)){
         i=aimed_door();
         if(i>=0){
@@ -654,7 +655,7 @@ void AW_SceneSpawn(edict_t *p) {
         if(AW_Interior() || AW_TownFlag(sv.name,AW_TOWN_GROUND_PLACE) || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }
-    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();if(!harvest_follow(p,1))AW_HarvestSpawn();
+    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_InventorySpawn();if(!harvest_follow(p,1))AW_HarvestSpawn();
     if(aw_combat_scene)aw_combat_scene();
     AW_GallerySpawn(p);if(aw_companion_scene)aw_companion_scene(p);region_crossing=map_jump=0;
     if(AW_CharacterLoad() && (eye=AW_CharacterEyeHeight())>0)p->v.view_ofs[2]=eye+p->v.mins[2];

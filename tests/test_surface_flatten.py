@@ -1,5 +1,6 @@
 """Panel projection preserves source geometry and supports an off switch."""
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -7,7 +8,114 @@ import unittest
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
-from surface_flatten import bake_panel, load_profiles, mounting_shift
+from surface_flatten import bake_panel, load_profiles, mounting_shift, mount_references, NeighboringFacadeSupport
+
+
+class NeighboringFacadeTests(unittest.TestCase):
+    @staticmethod
+    def ref(number, model_index=0, position=(1, 0, 1), **extra):
+        return dict(number=number, id='house', model_index=model_index,
+                    position=list(position), rotation_radians=[0, 0, 0], scale=1, **extra)
+
+    @staticmethod
+    def wall(y=2):
+        v=np.array([[0,y,0],[2,y,0],[2,y,2],[0,y,2]],float)
+        f=np.array([[0,1,2,0],[0,2,3,0]])
+        return v,f
+
+    def test_cross_cell_support_repairs_window_without_adding_placements(self):
+        from copy import deepcopy
+        window=self.ref(10)
+        selected=[window]
+        index={'models':[{'source':'window.nif'}], 'references':deepcopy(selected)}
+        model=(*self.wall(),None,None,{'flatten':{'axis':1,'facing':-1,'mounting_plane':0}})
+        models={0:model}
+        before=deepcopy(index)
+        with self.assertRaisesRegex(ValueError,'No supporting'):
+            mount_references(index,selected,models,(0,0),1)
+        support=NeighboringFacadeSupport(Path('/unused'),{},[10])
+        v,f=self.wall()
+        support.walls=[(v[f[:,:3]],{'number':20,'cell':[-1,0]})]
+        mount_references(index,selected,models,(0,0),1,support=support)
+        self.assertAlmostEqual(window['_flatten_shift'],-1.5)
+        self.assertEqual([r['number'] for r in selected],[10])
+        self.assertEqual(index,before)
+        np.testing.assert_array_equal(model[0],self.wall()[0])
+        self.assertEqual(support.report['used'][0]['support']['number'],20)
+
+    def test_supported_local_window_never_loads_neighbours(self):
+        from unittest.mock import Mock
+        refs=[self.ref(10),self.ref(20,1,position=(0,0,0))]
+        v,f=self.wall()
+        models={0:(v,f,None,None,{'flatten':{'axis':1,'facing':-1,'mounting_plane':0}}),
+                1:(v,f,None,None,{})}
+        support=Mock(side_effect=AssertionError('unnecessary owned input read'))
+        mount_references({'models':[{'source':'window.nif'},{'source':'house.nif'}]},refs,models,(0,0),1,support=support)
+        support.assert_not_called()
+        self.assertAlmostEqual(refs[0]['_flatten_shift'],-1.5)
+
+    def test_neighbour_loader_filters_cells_deleted_refs_types_and_selected_owners(self):
+        from unittest.mock import patch
+        from mwad.scene import pack_geometry
+        settings={'source_cell':[0,0],'source_radius':0,'centre':[0,0],'scale':1}
+        master={'sha256':'master-hash','objects':{'house':{'type':'STAT','model':'x/house.nif'},
+                                               'container':{'type':'CONT','model':'x/house.nif'}},
+                'cells':{(0,0):{'refs':[self.ref(10)]},
+                         (-1,0):{'refs':[self.ref(20,position=(0,0,0)),
+                                         self.ref(21,deleted=True),
+                                         dict(self.ref(22),id='container')]},
+                         (2,0):{'refs':[self.ref(30)]}}}
+        v,f=self.wall();packet=pack_geometry([list(point)+[0.,0.,255,255,255,255] for point in v],f.tolist(),1)
+        support=NeighboringFacadeSupport('/owned',settings,[10])
+        with patch('mwad.paths.child_ci',side_effect=lambda root,name:root/name), \
+             patch('mwad.audit.load_esm',return_value=master),patch('mwad.audit.BSA'), \
+             patch('prepare_scenery.nif_reader'), \
+             patch('prepare_scenery.bsa_read',return_value=b'owned-source') as read, \
+             patch('prepare_scenery.model_geometry',return_value=(packet,[],[],[])) as geometry:
+            self.assertAlmostEqual(support(self.ref(10),[1,0,1],[0,-1,0]),-1.5)
+            self.assertAlmostEqual(support(self.ref(11),[1,0,1],[0,-1,0]),-1.5)
+        read.assert_called_once();geometry.assert_called_once()
+        self.assertEqual(len(support.walls),1)
+        self.assertEqual(support.report['source_esm_sha256'],'master-hash')
+        self.assertEqual(support.report['used'][0]['support']['cell'],[-1,0])
+        self.assertEqual(support.report['used'][0]['support']['position'],[0,0,0])
+
+    def test_nearest_source_hit_wins_and_missing_support_still_fails(self):
+        support=NeighboringFacadeSupport('/unused',{},[])
+        a,f=self.wall(2);b,_=self.wall(4)
+        support.walls=[(b[f[:,:3]],{'number':20}), (a[f[:,:3]],{'number':21})]
+        # Ray starts at y=-16 and moves inward: the y=2 wall is first.
+        self.assertAlmostEqual(support(self.ref(10),[1,0,1],[0,-1,0]),-1.5)
+        self.assertEqual(support.report['used'][0]['support']['number'],21)
+        with self.assertRaisesRegex(ValueError,'including neighbouring'):
+            support(self.ref(10),[100,0,1],[0,-1,0])
+
+    @unittest.skipUnless(os.name == 'posix' and hasattr(os, 'geteuid') and os.geteuid() != 0,
+                         'real protected pool writes require a non-root POSIX user')
+    def test_source_support_receipt_survives_real_cell_pool_without_work_directory(self):
+        from chimport import CellPool
+        support=NeighboringFacadeSupport('/unused',{},[])
+        v,f=self.wall()
+        support.walls=[(v[f[:,:3]],{'number':20,'cell':[-1,0],
+                                  'model':'meshes/x/house.nif','source_sha256':'a'*64})]
+        support.report['source_esm_sha256']='b'*64
+        support(self.ref(10),[1,0,1],[0,-1,0])
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);out=root/'cell';out.mkdir();(out/'work').mkdir()
+            source={'frames':[{'placements':[{'ref':10,'cell':[0,0]}],
+                               'window_mount_support':support.report}]}
+            (out/'chim-source.json').write_text(json.dumps(source))
+            (out/'work/window-mount-support.json').write_text(json.dumps(support.report))
+            pool=CellPool(root/'pool',link=False)
+            pool.store(out,'c'*64,{'cell':[0,0],'converted':True,'errors':[]})
+            restored=root/'restored';restored.mkdir()
+            self.assertIsNotNone(pool.fetch('c'*64,restored))
+            self.assertFalse((restored/'work').exists())
+            got=json.loads((restored/'chim-source.json').read_text())
+            self.assertEqual(got,source)
+            self.assertEqual(got['frames'][0]['placements'],[{'ref':10,'cell':[0,0]}])
+            self.assertEqual(got['frames'][0]['window_mount_support']['used'][0]['support']['number'],20)
+
 
 class SurfaceFlattenTests(unittest.TestCase):
     def test_front_texture_winding_and_sources(self):

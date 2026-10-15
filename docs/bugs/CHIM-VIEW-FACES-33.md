@@ -6,7 +6,7 @@
 | --- | --- |
 | Reported by | audit |
 | First noticed | 8 October 2026, in v0.0.33-dev |
-| Where | CHIM Balmora placements, model faces per view |
+| Where | CHIM placed-model rendering; exterior Dwemer slowdown reported, exact site unknown |
 | Reproduction | always |
 | Duplicate of | no |
 | Persists in | v0.0.33-dev (last seen) |
@@ -32,6 +32,7 @@
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
+- [Exterior slowdown report and dev2 audit, 14 October 2026](#exterior-slowdown-report-and-dev2-audit-14-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -93,6 +94,56 @@ Pending.
 ## Prevention
 
 Face counts per view in the report; frame budget in the design.
+
+## Exterior slowdown report and dev2 audit, 14 October 2026
+
+The owner reports occasional severe FPS drops around exterior Dwemer ruins and
+asks whether CHIM mesh optimization is still needed where CHIM maps already
+exist. The exact ruin, cell, coordinates, viewing direction, running build,
+settings and frame-time measurements are unknown. This report is not yet
+reproduced. It does not establish that mesh cost, streaming, occlusion or any
+particular optimizer causes or repairs the slowdown.
+The requested first experiment is the existing mesh optimizer on a separate
+bounded copy of the affected Dwemer assets, with triangle counts and matched
+native before/after timing. Polygon volume is the proposed cause, not a
+confirmed diagnosis. Preserve the unoptimized control and all silhouette,
+material, placement and collision checks.
+
+Existing CHIM coverage does not certify an area's rendering cost. The earlier
+Balmora counts and timings above show why static-model work remains an audit
+target, but they are historical controls, not measurements of the reported
+Dwemer scene. CHIM's storage/streaming and per-model rendering costs must be
+measured separately.
+
+For dev2, keep CHIM mapping of rings 0, 1 and 2 as the primary objective. Add a
+bounded performance audit for an exact reported ruin and a nearby unaffected
+control before selecting any mesh optimization:
+
+- Bind source, engine and world/package identity; record cell, pose, FOV,
+  time/weather, effects, draw distance, emulator/CPU settings and warp off.
+- Compare fixed-camera idle and a repeatable approach/turn route, with cold and
+  warm residency separated. Record frame times and phase/counter evidence for
+  static models, transformed/clipped/submitted faces, visibility rejection,
+  surface-cache rebuilding, rasterized spans/overdraw, server/collision work,
+  chunk loads/reads, memory pressure and handoffs.
+- Inspect existing AmiQuake machinery first: r_main.c brush-model visibility
+  and clipping, r_bsp.c cached R_RotateBmodel transforms, r_surf.c surface/light
+  work and the existing renderer/profiler counters. Reuse these paths before
+  adding a new optimizer or instrumentation system.
+- Treat hidden faces, weak occlusion, transform/clip cost, detail levels,
+  overdraw, cache pressure and streaming stalls as hypotheses. Link any
+  confirmed cause to its canonical issue; the existing hidden-face, visibility
+  and slow-CPU reports do not prove this owner's cause.
+- Compare original geometry/appearance in headless OpenMW at the same cell,
+  position, heading and time. Preserve placements, silhouettes, UV/materials,
+  lighting, collision, actors and gameplay. OpenMW is a fidelity reference,
+  not an Amiga performance benchmark.
+- A proposed optimization needs the same native route/settings before and
+  after, with an unaffected control and memory/loading evidence. A smaller
+  mesh, converted CHIM map or new coverage count alone is not FPS acceptance.
+
+No new performance measurement, optimizer implementation, fixed version,
+native acceptance or CHIM coverage change is claimed by this report update.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -168,7 +219,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-VALIDATOR-ORDER-33](CHIM-VALIDATOR-ORDER-33.md): The CHIM validator walk depended on Python string hashing
 - [CHIM-VARIANT-YAW-DUPLICATES-36](CHIM-VARIANT-YAW-DUPLICATES-36.md): One CHIM model variant is stored several times: each frame builds it at the yaw of its own first placement
 - [CHIM-VIEW-LEAF-NO-PVS-35](CHIM-VIEW-LEAF-NO-PVS-35.md): A view leaf without a visibility row draws everything, with no counter saying so
-- [CHIM-WINDOW-MOUNT-CROSS-CELL-33](CHIM-WINDOW-MOUNT-CROSS-CELL-33.md): A one-cell CHIM frame stops when a window placed in it mounts on a faÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ade placed in the next cell
+- [CHIM-WINDOW-MOUNT-CROSS-CELL-33](CHIM-WINDOW-MOUNT-CROSS-CELL-33.md): A one-cell CHIM frame stops when a window placed in it mounts on a facade placed in the next cell
 - [CHIM-WORLD-AUDIT-SCALING-33](CHIM-WORLD-AUDIT-SCALING-33.md): The CHIM world audits grow much faster than the world: the heap gate took 3.6 s for 171 frames, 473 s for 331, and over an hour for 844
 - [CHIM-WORLD-INDEX-FILE-LIMIT-36](CHIM-WORLD-INDEX-FILE-LIMIT-36.md): The engine refuses a CHIM world index with more than 4096 file rows; the dev3 coast world has 7,236, so every CHIM frame map fails
 - [CHIM-ZONE-RING-THRASH-33](CHIM-ZONE-RING-THRASH-33.md): Balmora's chunk ring does not fit the default 6 MiB CHIM zone, so the cache thrashes

@@ -76,6 +76,28 @@ Read open-issue identities from the register, and keep historical evidence
 labelled when an image is replaced. Do not infer native acceptance from a
 planned map count or a source-only correction.
 
+## Shipment-status recurrence, 14 October 2026
+
+The main README and progress guide retained held/preparation wording after
+final v0.0.39 delivery finalized at 07:15:35 UTC. The obsolete lines survived
+because link, syntax and prior scoped scene checks did not compare current
+release prose against the completed shipment record.
+
+The documentation correction names that finalization and labels preceding
+RC1/RC2 scene diagnostics as historical. Renewed
+[third-person punching](PLAYER-PUNCH-THIRDPERSON-39.md),
+[movement with fists drawn](PLAYER-READY-MOVEMENT-39.md),
+[blocking](COMBAT-BLOCKING-36.md) and
+[swimming](WATER-GAMEPLAY-PARITY-38.md) remain open.
+Shipment, independent fresh-download verification and owner gameplay
+acceptance are distinct. No coverage count or runtime source changes.
+
+The correction is prepared for integration; this report's historical pending
+statements describe their dated checkpoints. Current status remains in the
+canonical register. Prevention: reconcile README, progress guide, release
+notes and issue status against the exact finalization receipt before each
+handoff, then check generated records and affected links.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -103,6 +125,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - HANDOFF-WRAPPER-01 (no report page): Source handoff wrapper reused an existing extraction directory
 - PACKAGE-PORTABILITY-28 (no report page): Rebundled ZIPs lost exec modes; Windows path aliases accepted
 - [PKG-STALE-RUNTIME-32](PKG-STALE-RUNTIME-32.md): The sealed v0.0.31 playtest contains a stale launcher preset folder
+- [PUBLIC-REFERENCE-SCREENSHOT-40](PUBLIC-REFERENCE-SCREENSHOT-40.md): Original-game reference screenshot included in the public source list
 - [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [TOOLING-HEADLESS-BROWSER-31](TOOLING-HEADLESS-BROWSER-31.md): No headless browser in the Docker images: Toolkit screenshots cannot be made in Docker

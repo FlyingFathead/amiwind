@@ -38,9 +38,24 @@ class SeydaFrameTests(unittest.TestCase):
         (lx, ly), (hx, hy) = seyda.frame_box()
         (gx0, gy0), (gx1, gy1) = GROUND_BOUNDS
         self.assertTrue(lx <= gx0 and ly <= gy0 and hx >= gx1 and hy >= gy1)
-        # whole sectors of 3 x 3 chunks of 256 units; at most 64 sector files + the frame file per folder
+        # Whole3x3 sectors; large frames already shard into groups of64.
+        # Preserve the real FFS72-per-directory and engine32-byte path limits.
+        from collections import Counter
+        from pathlib import PurePosixPath
+        from chim.world import sector_path, frame_dir
+        from chim import format as F
         self.assertEqual(((hx - lx) % 768, (hy - ly) % 768), (0, 0))
-        self.assertLessEqual(((hx - lx) // 768) * ((hy - ly) // 768) + 1, 72)
+        count=((hx-lx)//768)*((hy-ly)//768)
+        paths=[PurePosixPath(frame_dir(seyda.source_cell()))/sector_path(i,count) for i in range(count)]
+        self.assertEqual(len(set(paths)),count)
+        directories=Counter(str(p.parent) for p in paths)
+        frame=PurePosixPath(frame_dir(seyda.source_cell()))
+        directories[str(frame)]+=1+len({p.parent for p in paths if p.parent!=frame})
+        for entries in directories.values():self.assertLessEqual(entries,F.FFS_MAX_DIRECTORY_ENTRIES)
+        for path in paths:
+            self.assertLess(len(str(path).encode('ascii')),32)
+            self.assertTrue(all(len(part)<=F.FFS_NAME_CHARS for part in path.parts))
+        self.assertEqual({p.name for p in paths},{F.sector_name(i) for i in range(count)})
 
     def test_seyda_and_balmora_frames_do_not_overlap(self):
         from chim.areas import area_problems
@@ -116,6 +131,96 @@ class StoryHiddenTests(unittest.TestCase):
         import prepare_opening_refs as O
         self.assertIn('opening_references(data_files)', inspect.getsource(O.prepare))
         self.assertIn('opening_references', inspect.getsource(seyda.prepare_area))
+
+
+
+class OriginalReferenceMetadataTest(unittest.TestCase):
+    def fixture(self, root):
+        import json
+        settings = {'source_cell': [0, 0], 'source_radius': 1, 'centre': [0, 0], 'scale': .25,
+                    'bounds': [[0, 0], [4096, 2048]], 'handoff_core': [[0, 0], [4096, 2048]],
+                    'owned_cells': [[0, 0], [2, 1]]}
+        def ref(number, kind, position, cell):
+            return {'number': number, 'type': kind, 'position': position, 'cell': cell}
+        refs = [ref(1, 'STAT', [100, 100, 0], [0, 0]),
+                ref(2, 'NPC_', [8300, 100, 0], [1, 0]),
+                ref(3, 'STAT', [-10, 100, 0], [-1, 0]),
+                ref(4, 'LEVC', [-100, -100, 0], [-1, -1]),
+                ref(5, 'CONT', [200, 100, 0], [0, 0]),
+                ref(6, 'ACTI', [300, 100, 0], [0, 1])]
+        audit = {'area': {'center': [0, 0], 'radius_cells': 1,
+                         'cells': [{'x': x, 'y': y, 'references': sum(ref['cell'] == [x, y] for ref in refs)}
+                                   for x in range(-1, 2) for y in range(-1, 2)]}}
+        for path, value in [('work/generated/seyda-neen/audit.json', audit),
+                            ('work/generated/seyda-neen/placements.json', refs),
+                            ('scenery/scenery-index.json', {'references': [refs[0], refs[2]]})]:
+            p = root / path; p.parent.mkdir(parents=True, exist_ok=True); p.write_text(json.dumps(value))
+        return settings, refs
+
+    def test_original_types_physical_owners_dependencies_and_harvest_are_distinct(self):
+        import tempfile
+        import cell_progress_chim as CH
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); settings, refs = self.fixture(root / 'legacy')
+            receipt, cat = seyda.write_source_metadata(root/'legacy', root/'work/seyda',
+                                                      [refs[0], refs[2]], {5}, settings)
+            self.assertEqual([r['number'] for r in cat['references']], [1, 2, 3, 5, 6])
+            self.assertEqual([r['number'] for r in cat['deferred']], [2, 6])
+            self.assertEqual([r['number'] for r in cat['separate_gameplay']['harvest']], [5])
+            self.assertEqual(len(cat['ownership']['owned_references']), 4)
+            self.assertEqual(cat['ownership']['dependency_references'][0]['reference'], 3)
+            # Exercise the real tracker reader, including a declared-vs-physical CELL disagreement.
+            fr = {'cell': [0, 0], 'centre': [0, 0], 'low': [-256, -256], 'grain': 256,
+                  'nx': 18, 'ny': 10}
+            declared, counts, notes = CH._declared_ownership(root, {'areas': ['seyda'], 'frames': [{'frame': fr}]})
+            self.assertEqual(declared[(0, 0)], {(0, 0), (1, 0)})
+            self.assertEqual(counts[(0, 0)][(1, 0)]['deferred_by_type'], {'NPC_': 1})
+            self.assertEqual(counts[(0, 0)][(0, 0)]['owned_by_type']['ACTI'], 1)
+            self.assertEqual(notes[0]['dependency_references'], 1)
+            self.assertEqual(len(receipt['files']), 3)
+
+    def test_incomplete_audit_is_rejected_before_writing_receipts(self):
+        import tempfile, json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); settings, refs = self.fixture(root/'legacy')
+            p = root/'legacy/work/generated/seyda-neen/audit.json'; data = json.loads(p.read_text())
+            data['area']['cells'] = [c for c in data['area']['cells'] if (c['x'], c['y']) != (1, 0)]
+            p.write_text(json.dumps(data))
+            with self.assertRaisesRegex(ValueError, 'omits'):
+                seyda.write_source_metadata(root/'legacy', root/'out', [refs[0]], (), settings)
+            self.assertFalse((root/'out').exists())
+
+    def test_missing_unconverted_reference_cannot_be_reported_as_zero(self):
+        import tempfile, json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); settings, refs = self.fixture(root/'legacy')
+            p = root/'legacy/work/generated/seyda-neen/placements.json'
+            p.write_text(json.dumps([r for r in refs if r['number'] != 2]))
+            with self.assertRaisesRegex(ValueError, 'counts differ'):
+                seyda.write_source_metadata(root/'legacy', root/'out', [refs[0]], (), settings)
+            self.assertFalse((root/'out').exists())
+
+    def test_unaudited_or_duplicate_placement_cannot_be_counted(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); settings, refs = self.fixture(root/'legacy')
+            for selected in [[refs[0], refs[0]], [dict(refs[0], number=999)]]:
+                with self.assertRaisesRegex(ValueError, 'unaudited'):
+                    seyda.write_source_metadata(root/'legacy', root/'out', selected, (), settings)
+            self.assertFalse((root/'out').exists())
+
+    def test_audit_scope_and_duplicate_originals_cannot_silently_change_counts(self):
+        import tempfile, json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); settings, refs = self.fixture(root/'legacy')
+            with self.assertRaisesRegex(ValueError, 'scope differs'):
+                seyda.write_source_metadata(root/'legacy', root/'out', [refs[0]], (),
+                                            dict(settings, source_radius=2))
+            p = root/'legacy/work/generated/seyda-neen/placements.json'
+            p.write_text(json.dumps(refs+[refs[0]]))
+            with self.assertRaisesRegex(ValueError, 'Duplicate original'):
+                seyda.write_source_metadata(root/'legacy', root/'out', [refs[0]], (), settings)
+            self.assertFalse((root/'out').exists())
 
 
 if __name__ == '__main__':

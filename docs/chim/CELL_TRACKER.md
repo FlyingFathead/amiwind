@@ -4,30 +4,27 @@
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export.
 
-**Conversion/audit progress: 1,274 of 1,292 (98.6 %)**
+**Conversion/audit progress: 1,275 of 1,292 (98.7 %)**
 
 These audit totals do not count cells included in a playable build; see Included in builds below.
 
-Map cells 2,157: land and empty-sea cells 1,292 (done 1,274, 98.6 %) and open-ocean cells 865 (shared ocean chunk made, not yet placed in the game: not counted as done).
+Map cells 2,157: land and empty-sea cells 1,292 (done 1,275, 98.7 %) and open-ocean cells 865 (shared ocean chunk made, not yet placed in the game: not counted as done).
 
 - Cell complete: 0
 - Terrain complete: 0
 - Cell complete, awaiting lighting: 11
-- Terrain complete, awaiting lighting: 762
-- Passed (something still deferred): 402
+- Terrain complete, awaiting lighting: 758
+- Passed (something still deferred): 407
 - Empty sea: 99
 - Open ocean (silver, not counted as done): 865
 
-**Conversion-eligible: 1,274 of 1,292** (every audit-done cell, lighting done or not; this is not a release assignment).
+**Conversion-eligible: 1,275 of 1,292** (every audit-done cell, lighting done or not; this is not a release assignment).
 
-Lighting: lit 0, partial 134, unlit 1,056, not measured 102 (cells; lit is required for both completion levels).
+Lighting: lit 0, partial 135, unlit 1,056, not measured 101 (cells; lit is required for both completion levels).
 
-Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 660 night lamps only, 2,280 not represented.
+Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 670 night lamps only, 2,280 not represented.
 
-Generated 2026-10-13T22:17:39.397011+00:00. Tracker data generated 2026-10-13T14:04:49+00:00.
-
-
-Final source packaging, 14 October 2026: carry forward RC2 coverage without new conversion, audit or native-cell claims. The inspected RC2 contains 360 whole regional cells; six partial town overlaps remain excluded. Final artifact shipment is separate.
+Generated 2026-10-15T06:48:07.089021+00:00. Tracker data generated 2026-10-15T06:48:07.089021+00:00.
 
 ## Totals
 
@@ -36,13 +33,13 @@ Final source packaging, 14 October 2026: carry forward RC2 coverage without new 
 | Cell complete | 0 | 0.0 % |
 | Terrain complete | 0 | 0.0 % |
 | Cell complete, awaiting lighting | 11 | 0.9 % |
-| Terrain complete, awaiting lighting | 762 | 59.0 % |
-| Passed (something still deferred) | 402 | 31.1 % |
+| Terrain complete, awaiting lighting | 758 | 58.7 % |
+| Passed (something still deferred) | 407 | 31.5 % |
 | Empty sea | 99 | 7.7 % |
 | Open sea | 865 | 67.0 % |
 | Hull policy pending | 0 | 0.0 % |
 | Failed | 15 | 1.2 % |
-| Not converted | 3 | 0.2 % |
+| Not converted | 2 | 0.2 % |
 | Not started | 0 | 0.0 % |
 
 Definitions are in the import policy below.
@@ -70,11 +67,11 @@ No cells are assigned in this planning ledger. Packaged inclusion is recorded se
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 |
 | 1 | 171 | 0 | 0 | 3 | 0 | 70 | 98 | 0 | 0 | 0 | 0 | 0 |
-| 2 | 160 | 0 | 0 | 1 | 3 | 155 | 1 | 0 | 0 | 0 | 0 | 0 |
-| 3 | 149 | 0 | 0 | 3 | 77 | 66 | 0 | 0 | 0 | 3 | 0 | 0 |
-| 4 | 138 | 0 | 0 | 1 | 114 | 22 | 0 | 0 | 0 | 1 | 0 | 0 |
+| 2 | 160 | 0 | 0 | 1 | 1 | 157 | 1 | 0 | 0 | 0 | 0 | 0 |
+| 3 | 149 | 0 | 0 | 3 | 76 | 67 | 0 | 0 | 0 | 3 | 0 | 0 |
+| 4 | 138 | 0 | 0 | 1 | 113 | 23 | 0 | 0 | 0 | 1 | 0 | 0 |
 | 5 | 125 | 0 | 0 | 1 | 103 | 16 | 0 | 0 | 0 | 5 | 0 | 0 |
-| 6 | 114 | 0 | 0 | 0 | 102 | 10 | 0 | 0 | 0 | 1 | 1 | 0 |
+| 6 | 114 | 0 | 0 | 0 | 102 | 11 | 0 | 0 | 0 | 1 | 0 | 0 |
 | 7 | 104 | 0 | 0 | 1 | 96 | 6 | 0 | 0 | 0 | 1 | 0 | 0 |
 | 8 | 94 | 0 | 0 | 1 | 89 | 3 | 0 | 0 | 0 | 0 | 1 | 0 |
 | 9 | 81 | 0 | 0 | 0 | 65 | 13 | 0 | 0 | 0 | 2 | 1 | 0 |
@@ -97,22 +94,22 @@ A cell can fail more than one mechanism. Hull policy pending cells are not failu
 
 | Object type | Placed | Converted | Deferred | Skipped | Failed |
 | :-- | --: | --: | --: | --: | --: |
-| Statics | 74,784 | 74,763 | 0 | 21 | 0 |
-| Flora | 44,154 | in statics | - | - | - |
-| Lights | 1,731 | 374 | 1,357 | 0 | 0 |
-| Doors | 688 | 688 | 0 | 0 | 0 |
-| Containers | 19,018 | 19,018 | 0 | 0 | 0 |
-| Activators | 1,389 | 1,388 | 0 | 1 | 0 |
+| Statics | 74,400 | 74,374 | 0 | 26 | 0 |
+| Flora | 43,834 | in statics | - | - | - |
+| Lights | 1,722 | 384 | 1,338 | 0 | 0 |
+| Doors | 704 | 704 | 0 | 0 | 0 |
+| Containers | 18,937 | 18,937 | 0 | 0 | 0 |
+| Activators | 1,391 | 1,390 | 0 | 1 | 0 |
 | Items | 202 | 202 | 0 | 0 | 0 |
-| NPCs | 423 | 0 | 423 | 0 | 0 |
-| Creatures | 4,188 | 0 | 4,188 | 0 | 0 |
-| Markers | 10 | not drawn, not required | - | - | - |
+| NPCs | 428 | 0 | 428 | 0 | 0 |
+| Creatures | 4,167 | 0 | 4,167 | 0 | 0 |
+| Markers | 12 | not drawn, not required | - | - | - |
 
-- Statics, skipped: not in the frame (outside the cell bounds or removed by a selection) (21)
-- Lights, deferred: light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33) (1,357)
+- Statics, skipped: not in the frame (outside the cell bounds or removed by a selection) (26)
+- Lights, deferred: light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33) (1,338)
 - Activators, skipped: not in the frame (outside the cell bounds or removed by a selection) (1)
-- NPCs, deferred: resident conversion (423)
-- Creatures, deferred: creature simulation pending (4,188)
+- NPCs, deferred: resident conversion (428)
+- Creatures, deferred: creature simulation pending (4,167)
 
 Counts are every placed reference in converted cells, from the conversion job. Door and light figures in the Toolkit contents panel (original census) and the door audit (links per cell) are different measures. Light emitters without a mesh stay under Lights: they cast light, so the lighting audit keeps a cell from both completion levels until it is lit.
 

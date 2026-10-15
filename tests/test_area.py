@@ -26,7 +26,9 @@ class AreaTests(unittest.TestCase):
     def test_port_and_cave_approach_are_inside_playable_rectangle(self):
         self.assertTrue(inside([-8800,-70530,0]))
         self.assertTrue(inside([-6735,-67063,0]))
-        self.assertFalse(inside([-19517,-67530,0]))
+        self.assertTrue(inside([-19517,-67530,0]))  # newly owned western cell band
+        for point in [(-24577,-71680,0),(8193,-71680,0),(-11264,-90113,0),(-11264,-57343,0)]:
+            self.assertFalse(inside(point))
 
     def test_visible_planes_reordered_before_wide_collision_indices(self):
         lumps=[bytearray() for _ in range(15)]

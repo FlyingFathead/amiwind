@@ -67,10 +67,24 @@ int AW_JournalAdd(aw_state_t *state,const char *id,int32_t index)
 }
 int AW_ItemAdd(aw_state_t *state,const char *id,int32_t count)
 {
-    int32_t old=AW_StateGet(state,AW_ITEM,id);
+    char normalized[64];int32_t old;
+    if(!key(normalized,id))return 0;
+    id=normalized;
+    old=AW_StateGet(state,AW_ITEM,id);
     if(count>0 && old>INT32_MAX-count)return 0;
     if(count<0 && count < -old)return 0;
-    return AW_StateSet(state,AW_ITEM,id,old+count);
+    if(!AW_StateSet(state,AW_ITEM,id,old+count))return 0;
+    if(count<0){
+        int i,index=-1,used=0;
+        for(i=0;i<state->count[AW_ITEM];i++)if(!strcmp(state->values[AW_ITEM][i].id,id)){index=i;break;}
+        for(i=0;i<AW_INVENTORY_SLOTS;i++)if(!strcmp(state->inventory.equipped[i],id)){
+            if(++used>old+count)memset(state->inventory.equipped[i],0,64);
+        }
+        if(old+count==0 && index>=0){
+            state->inventory.condition_known&=~(1U<<index);state->inventory.condition[index]=0;
+        }
+    }
+    return 1;
 }
 int AW_CaptainDuties(void)
 {

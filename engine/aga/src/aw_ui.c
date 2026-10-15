@@ -5,6 +5,8 @@
 #include "quakedef.h"
 #include "aw_character.h"
 #include "aw_quickchar.h"
+#include "aw_inventory.h"
+#include "aw_story.h"
 extern byte *draw_chars;
 extern int scr_copyeverything;
 static byte font_storage[26624],book_font[26624],skin[4104];
@@ -85,7 +87,7 @@ static int modal_world_ready(void) {
         !cls.demoplayback && !AW_MovieActive();
 }
 int AW_ModalWorldFrozen(void) {
-    return (modal_freeze.value!=0 || death_prompt()) && modal_world_ready();
+    return (AW_InventoryActive() || modal_freeze.value!=0 || death_prompt()) && modal_world_ready();
 }
 /* Only the explicit legacy value selects V1; invalid values use V2. */
 int AW_UIMode(void) {return ui_mode.value==1?1:2;}
@@ -94,7 +96,7 @@ int AW_ModalWorldHidden(void) {
     /* Blackout is independent of simulation pause. An opaque background can
      * skip world drawing without a saved framebuffer; with black disabled,
      * draw the existing background using the selected world-clock policy. */
-    return AW_ModalBlackBackground() && modal_world_ready() && !cl.intermission && !death_prompt();
+    return (AW_InventoryActive() || AW_ModalBlackBackground()) && modal_world_ready() && !cl.intermission && !death_prompt();
 }
 void AW_ModalFrame(void) {
     static int was_frozen,was_hidden;
@@ -518,11 +520,35 @@ void AW_UIEnemyBar(float fraction,float alpha) {
         if(row>=2 && row<h-2 && fill>0)AW_UIFill(x+2,y+row,fill,1,bar_fallback(3));
     }
 }
+/* Functional placeholders until original item HUD artwork is converted.
+ * Read actual admitted carried equipment; never use a debug combat loadout or
+ * the off-hand as a selected spell. Inventory caches metadata after changes. */
+static void hud_equipment_boxes(int y,int channels) {
+    static const byte fist[8]={0x38,0x7c,0x7c,0x3e,0x3e,0x1c,0x18,0x18};
+    static const byte weapon[8]={0x03,0x06,0x0c,0x58,0x30,0x78,0x84,0x00};
+    aw_inventory_item_t item;
+    const byte *shape=fist;int xx,yy,color;
+    if(vid.width<140 || y<0 || y+24>vid.height)return;
+    color=AW_UIColor(210,184,121);
+    if(channels&AW_HUD_WEAPON){
+        if(AW_InventoryEquippedItem(AW_SLOT_RIGHT,&item) && item.category==AW_INV_WEAPON)
+            shape=weapon;
+        AW_UIBox(88,y,24,24);AW_UIFill(91,y+3,18,18,black);
+        for(yy=0;yy<8;yy++)for(xx=0;xx<8;xx++)
+            if(shape[yy]&(128>>xx))AW_UIFill(92+xx*2,y+4+yy*2,2,2,color);
+    }
+    if(channels&AW_HUD_MAGIC){
+        AW_UIBox(116,y,24,24);AW_UIFill(119,y+3,18,18,black);
+        /* No selected-spell/enchantment runtime state yet. The dash is empty,
+         * not an invented selection or charge. */
+        AW_UIFill(124,y+11,8,2,color);
+    }
+}
 int (*aw_combat_enemy_bar)(float *fraction,float *alpha);   /* aw_combat.c */
 int (*aw_combat_guard_marker)(void);   /* aw_combat.c: the player guards (hold to block) */
 void AW_UIHud(void) {
     float current[3]={100,100,100},maximum[3]={100,100,100};
-    int i,y=vid.height-26;
+    int i,channels,y=vid.height-26;
     initialize();if(cls.state!=ca_connected)return;
     if(r_refdef.vrect.y+r_refdef.vrect.height<vid.height)
         AW_UIFill(0,r_refdef.vrect.y+r_refdef.vrect.height,vid.width,vid.height,black);
@@ -534,10 +560,11 @@ void AW_UIHud(void) {
     }
     if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict)
         current[0]=svs.clients[0].edict->v.health;
-    for(i=0;i<3;i++)AW_UIBar(8,y+i*8,75,7,i,maximum[i]>0?current[i]/maximum[i]:0);
+    channels=AW_DebugTestInputActive()?AW_HUD_ALL:AW_StoryHudChannels();
+    if(channels&AW_HUD_STATS)
+        for(i=0;i<3;i++)AW_UIBar(8,y+i*8,75,7,i,maximum[i]>0?current[i]/maximum[i]:0);
+    hud_equipment_boxes(y,channels);
     {float fraction,alpha;if(aw_combat_enemy_bar && aw_combat_enemy_bar(&fraction,&alpha))AW_UIEnemyBar(fraction,alpha);}
-    /* The guard marker (COMBAT-BLOCKING-36): first person shows no shield yet, so a word under the crosshair. */
-    if(aw_combat_guard_marker && aw_combat_guard_marker())AW_UIText(r_refdef.vrect.x+(r_refdef.vrect.width-AW_UIWidth("Guard"))/2,r_refdef.vrect.y+r_refdef.vrect.height/2+12,"Guard",-1);
     scr_copyeverything=1;
 }
 /* Names are bounded text over the world, with no panel/background fill. */

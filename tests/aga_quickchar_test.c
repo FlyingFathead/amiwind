@@ -9,11 +9,16 @@
 #include "aw_character.h"
 #include "aw_quickchar.h"
 #include <assert.h>
+#include <stdarg.h>
 server_t sv;server_static_t svs;client_static_t cls;client_state_t cl;viddef_t vid;keydest_t key_dest;
 cmd_source_t cmd_source=src_command;vec3_t vec3_origin;
 aw_story_t aw_story;aw_character_t aw_character;aw_race_t aw_races[16];aw_class_t aw_classes[32];aw_birth_t aw_births[16];
 static client_t client;static edict_t player;
 static int menu,menu_done,restricted,opened[16][2],opens,sounds,callbacks[4],last_callback=-1,cleared,set_calls;
+int aw_race_count=3;
+static int fail_set;
+static char printed[4096],set_value[64];
+float AW_CharacterEyeHeight(void){return 51;}
 int AW_CharacterLoad(void){return 1;}
 void AW_CharacterReset(void){aw_character.valid=1;}
 int AW_CharacterOpenQuick(int kind,int confirm){opened[opens][0]=kind;opened[opens++][1]=confirm;menu=kind;return 1;}
@@ -21,7 +26,10 @@ int AW_CharacterActive(void){return menu!=0;}
 int AW_CharacterDone(void){int r=menu_done;menu_done=0;return r;}
 void AW_CharacterClose(void){menu=0;}
 int AW_CharacterSet(aw_character_t *c,const char *field,const char *value,const char *number){
-    (void)c;(void)value;(void)number;set_calls++;return strcmp(field,"bogus")!=0;
+    int i;(void)number;set_calls++;strcpy(set_value,value);
+    if(fail_set || !strcmp(field,"bogus"))return 0;
+    if(!strcmp(field,"race"))for(i=0;i<aw_race_count;i++)if(!strcmp(value,aw_races[i].id)){c->race=i;c->head=i*2;c->hair=i*2+1;c->level=1;c->attributes[0]=17;c->current[0]=99;break;}
+    return 1;
 }
 /* The census menu accepting its page (Enter, or Choose in its box). */
 static void accept_menu(void){menu_done=menu;menu=0;}
@@ -46,7 +54,10 @@ void AW_UIFill(int x,int y,int w,int h,int c){(void)x;(void)y;(void)w;(void)h;(v
 int AW_UIColor(int r,int g,int b){return r+g+b;}
 void AW_UIBox(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;}
 void AW_UITextBox(int x,int y,int w,int h,const char *t,int c){(void)x;(void)y;(void)w;(void)h;(void)t;(void)c;}
-void Con_Printf(char *fmt,...){(void)fmt;}
+void Con_Printf(char *fmt,...){
+    va_list args;size_t n=strlen(printed);va_start(args,fmt);
+    vsnprintf(printed+n,sizeof(printed)-n,fmt,args);va_end(args);
+}
 void Con_ToggleConsole_f(void){}
 void Cbuf_AddText(char *t){(void)t;}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
@@ -60,7 +71,7 @@ void Cmd_AddCommand(char *name,xcommand_t fn){commands[command_count].name=name;
 int Cmd_Argc(void){return arg_count;}
 char *Cmd_Argv(int i){return (char *)(i<arg_count?args[i]:"");}
 static void run(int n,const char **v){
-    int i;arg_count=n;for(i=0;i<n;i++)args[i]=v[i];
+    int i;printed[0]=0;arg_count=n;for(i=0;i<n;i++)args[i]=v[i];
     for(i=0;i<command_count;i++)if(!strcmp(commands[i].name,v[0])){commands[i].fn();return;}
     assert(!"registered");
 }
@@ -114,6 +125,16 @@ int main(void){
     assert(AW_QuickCharActive() && opens==1 && opened[0][0]==2);
     accept_menu();AW_QuickCharTick();assert(!AW_QuickCharActive());
     { const char *v[]={"aw_quickchar","nonsense"};opens=0;run(2,v);assert(!opens && !AW_QuickCharActive()); }
+    /* Appearance inspection defaults to the exact pier page and confirmation.
+     * Normal story registration still owns its own menu and cannot be bypassed. */
+    opens=0;{ const char *v[]={"aw_quickchar","appearance"};run(2,v); }
+    assert(AW_QuickCharActive() && opens==1 && opened[0][0]==1 && opened[0][1]==1);
+    accept_menu();AW_QuickCharTick();assert(!AW_QuickCharActive());
+    restricted=1;opens=0;{ const char *v[]={"aw_quickchar","appearance"};run(2,v); }
+    assert(!opens && !AW_QuickCharActive());restricted=0;
+    { const char *v[]={"aw_quickchar","class"};run(2,v); }
+    assert(AW_QuickCharActive() && opened[0][0]==2);
+    AW_QuickCharCancel();assert(!AW_QuickCharActive() && !menu);
     /* Scripted character: aw_quickchar_set marks it (a quick start keeps it); clear forgets. */
     assert(!AW_QuickCharScripted());
     { const char *v[]={"aw_quickchar_set","race","nord"};run(3,v); }
@@ -122,6 +143,43 @@ int main(void){
     assert(!AW_QuickCharScripted());
     { const char *v[]={"aw_quickchar_set","bogus","x"};run(3,v);assert(!AW_QuickCharScripted()); }
     { const char *v[]={"aw_quickchar_set","name","Tester"};run(3,v);assert(AW_QuickCharScripted() && !strcmp(aw_story.name,"Tester")); }
+    /* Race command resolves the loaded catalogue and forwards its canonical ID.
+     * Listing/invalid input/registration/death must not change the character. */
+    strcpy(aw_races[0].id,"nord");
+    strcpy(aw_races[1].id,"argonian");strcpy(aw_races[1].name,"Argonian");
+    strcpy(aw_races[2].id,"high elf");strcpy(aw_races[2].name,"High Elf");
+    aw_character.race=0;aw_character.female=1;aw_character.clas=2;aw_character.birth=3;
+    aw_character.level=7;aw_character.attributes[0]=88;aw_character.current[0]=55;
+    player.v.health=55;player.v.mins[2]=-24;
+    { const char *v[]={"aw_quickchar_set","clear"};run(2,v); }
+    { const char *v[]={"aw_quickchar_set","playerrace"};i=set_calls;run(2,v);
+      assert(set_calls==i && strstr(printed,"0: Nord [current]") && strstr(printed,"2: High Elf")); }
+    { const char *v[]={"aw_quickchar_set","playerrace","LIST"};run(3,v);assert(set_calls==i && strstr(printed,"1: Argonian")); }
+    { const char *v[]={"aw_quickchar_set","playerrace","1"};run(3,v);
+      assert(set_calls==i+1 && aw_character.race==1 && !strcmp(set_value,"argonian"));
+      assert(aw_character.female==1 && aw_character.clas==2 && aw_character.birth==3);
+      assert(player.v.health==55 && player.v.view_ofs[2]==27 && !AW_QuickCharScripted());
+      assert(aw_character.current[0]==55 && aw_character.level==7 && aw_character.attributes[0]==88);
+      assert(aw_character.head==2 && aw_character.hair==3); }
+    { const char *v[]={"aw_quickchar_set","playerrace","HiGh","ElF"};run(4,v);assert(aw_character.race==2 && !strcmp(set_value,"high elf")); }
+    { const char *v[]={"aw_quickchar_set","playerrace","argonian"};run(3,v);assert(aw_character.race==1); }
+    { const char *v[]={"aw_quickchar_set","playerrace","HIGH_ELF"};run(3,v);assert(aw_character.race==2); }
+    { const char *v[]={"aw_quickchar_set","playerrace","Argonian"};run(3,v);assert(aw_character.race==1); }
+    { const char *v[]={"aw_quickchar_set","playerrace","high-elf"};run(3,v);assert(aw_character.race==2); }
+    { const char *v[]={"aw_quickchar_set","playerrace","High Elf"};i=set_calls;run(3,v);assert(set_calls==i && strstr(printed,"unchanged")); }
+    { const char *bad[]={"-1","3","999999999999999999999999999999999999","1junk","1.0","imperial","","0 1"};
+      int b;aw_character_t before=aw_character;
+      for(b=0;b<8;b++){const char *v[]={"aw_quickchar_set","playerrace",bad[b]};run(3,v);assert(set_calls==i && !memcmp(&aw_character,&before,sizeof before));} }
+    { const char *v[]={"aw_quickchar_set","playerrace","0"};
+      restricted=1;run(3,v);restricted=0;assert(set_calls==i);
+      menu=1;run(3,v);menu=0;assert(set_calls==i);
+      sv.active=0;run(3,v);sv.active=1;assert(set_calls==i);
+      cls.state=ca_disconnected;run(3,v);cls.state=ca_connected;assert(set_calls==i);
+      svs.maxclients=2;run(3,v);svs.maxclients=1;assert(set_calls==i);
+      player.v.health=0;run(3,v);player.v.health=55;assert(set_calls==i);
+      cmd_source=src_client;run(3,v);cmd_source=src_command;assert(set_calls==i);
+      fail_set=1;run(3,v);fail_set=0;assert(set_calls==i+1 && aw_character.race==2 && strstr(printed,"cannot be applied"));
+      run(3,v);assert(aw_character.race==0 && strstr(printed,"Player race: 0: Nord")); }
     /* aw_skip_census: off by default (the normal game keeps the ship and the census). */
     assert(!AW_SkipCensus());
     for(i=0;i<cvar_count;i++)if(!strcmp(cvars[i]->name,"aw_skip_census"))cvars[i]->value=1;

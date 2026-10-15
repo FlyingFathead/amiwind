@@ -15,6 +15,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'src')]
@@ -54,8 +55,28 @@ def make_catalog(root, palette, races=('nord', 'orc')):
     (out / 'gfx/hand-torch.awt').write_bytes(b'emitter')
     report = {'format': 'AWH1', 'entries': entries, 'catalog_sha256': sha(awh),
               'torch_metadata_sha256': sha(b'emitter'), 'palette_sha256': sha(palette)}
+    report['block_view'] = make_block_assets(out, palette, entries)
     (out / 'hand-catalog-report.json').write_text(json.dumps(report), encoding='utf-8')
     return out
+
+
+def make_block_assets(out, palette, entries):
+    import prepare_block_view as block
+    appearances = []
+    paths = []
+    for entry in entries:
+        path = catalog.model_paths(entry['race'], entry['female'])[0][:-4]+'_b.mdl'
+        raw = ('synthetic-block-'+path).encode()
+        (out/path).parent.mkdir(parents=True, exist_ok=True)
+        (out/path).write_bytes(raw)
+        appearances.append({'race': entry['race'], 'female': entry['female'],
+                            'model': path, 'sha256': sha(raw)})
+        paths.append((entry['race'], entry['female'], path))
+    metadata = block.pack_metadata(paths, [0,.167,.333,.533,.733,.933,1.133,1.333],
+                                   (0,.333,1.333), [[0]*6]*8)
+    (out/'gfx/block-models.awb').write_bytes(metadata)
+    return {'appearances': appearances, 'metadata_sha256': sha(metadata),
+            'palette_sha256': sha(palette)}
 
 
 def stage(root, palette):
@@ -112,6 +133,11 @@ class RuntimePalette(unittest.TestCase):
             (stage / 'gfx/torch.awt').write_bytes(b'emitter')
             return {'files': {'progs/v_torch.mdl': sha(b'torch')}}
 
+        def block(data, output, palette_path):
+            used.append(palette_path.read_bytes())
+            entries = [{'race': 'nord', 'female': female} for female in (False, True)]
+            return make_block_assets(output, palette_path.read_bytes(), entries)
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / 'palette.lmp').write_bytes(scene_palette())
@@ -119,10 +145,14 @@ class RuntimePalette(unittest.TestCase):
                  patch.object(catalog, 'first', return_value=struct.pack('<16xI', 1)), \
                  patch.object(catalog, 'bake_appearance', side_effect=hands), \
                  patch.object(catalog, 'prepare_torch', side_effect=torch), \
+                 patch('prepare_block_view.prepare', side_effect=block) as block_bake, \
                  patch.object(catalog, 'runtime_palette', return_value=final):
                 source.return_value.kinds = {'RACE': {'nord': object()}}
                 result = catalog.prepare(root / 'owned', root / 'palette.lmp', root / 'out', runtime=True, jobs=1)
-        self.assertEqual(used, [final] * 4)
+        self.assertEqual(used, [final] * 5)
+        block_bake.assert_called_once()
+        self.assertEqual(len(result['block_view']['appearances']), 2)
+        self.assertEqual(result['block_view']['palette_sha256'], sha(final))
         self.assertEqual(result['palette_sha256'], sha(final))
         self.assertEqual(result['scene_palette_sha256'], sha(scene_palette()))
         self.assertTrue(result['runtime_palette'])
@@ -135,8 +165,9 @@ class Install(unittest.TestCase):
             out = make_catalog(root, scene_palette())
             id1 = stage(root, scene_palette())
             result = catalog.install(out, id1)
-            self.assertEqual((result['files'], result['entries']), (10, 4))
-            for path in ('progs/hands/nord_m.mdl', 'progs/hands/orc_f_t.mdl', 'gfx/hand-models.awh', 'gfx/hand-torch.awt'):
+            self.assertEqual((result['files'], result['entries'], result['block_appearances']), (15, 4, 4))
+            for path in ('progs/hands/nord_m.mdl', 'progs/hands/orc_f_t.mdl', 'gfx/hand-models.awh', 'gfx/hand-torch.awt',
+                         'progs/hands/orc_f_b.mdl', 'gfx/block-models.awb'):
                 self.assertEqual((id1 / path).read_bytes(), (out / path).read_bytes())
 
     def test_other_palette_installs_nothing(self):
@@ -175,6 +206,48 @@ class Install(unittest.TestCase):
             (out / 'hand-catalog-report.json').write_text(json.dumps(report))
             with self.assertRaisesRegex(ValueError, 'model path'):
                 catalog.install(out, stage(root, scene_palette()))
+
+    def test_missing_block_report_or_mismatched_appearance_installs_nothing(self):
+        for fault in ('missing', 'appearance', 'palette'):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                out = make_catalog(root, scene_palette())
+                report = json.loads((out/'hand-catalog-report.json').read_text())
+                if fault == 'missing':
+                    del report['block_view']
+                elif fault == 'appearance':
+                    report['block_view']['appearances'].pop()
+                else:
+                    report['block_view']['palette_sha256'] = sha(b'another palette')
+                (out/'hand-catalog-report.json').write_text(json.dumps(report))
+                id1 = stage(root, scene_palette())
+                with self.assertRaisesRegex(ValueError, 'block|Block'):
+                    catalog.install(out, id1)
+                self.assertFalse((id1/'progs').exists())
+
+    def test_changed_block_model_or_metadata_installs_nothing(self):
+        for path in ('progs/hands/nord_f_b.mdl', 'gfx/block-models.awb'):
+            with self.subTest(path=path), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                out = make_catalog(root, scene_palette())
+                (out/path).write_bytes(b'changed')
+                id1 = stage(root, scene_palette())
+                with self.assertRaisesRegex(ValueError, 'differs from its report'):
+                    catalog.install(out, id1)
+                self.assertFalse((id1/'progs').exists())
+
+
+class DisabledHandStage(unittest.TestCase):
+    def test_sprite_asset_free_terrain_and_recovery_do_not_request_3d_hand_assets(self):
+        import build
+        for options in ({'hands': 'sprites'}, {'dry_run': True}, {'stage': 'terrain'},
+                        {'recover_image_from': Path('old-image')}):
+            args = SimpleNamespace(dry_run=False, stage='aga', hands='3d', recover_image_from=None)
+            for key, value in options.items():
+                setattr(args, key, value)
+            with self.subTest(options=options), patch('prepare_block_view.prepare') as block:
+                self.assertFalse(build.hand_catalog_status(args)[0])
+                block.assert_not_called()
 
 
 class ImageOrder(unittest.TestCase):

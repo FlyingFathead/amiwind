@@ -11,6 +11,23 @@ typedef struct {
     uint32_t slots;unsigned char catalogue[32];
     uint32_t facts[AW_HARVEST_SLOTS];
 } aw_harvest_state_t;
+/* Runtime equipment and placed drops retain original item identity. Slots use
+ * original inventory semantics, independent of the ready-hand animation. */
+#define AW_INVENTORY_SLOTS 19
+#define AW_INVENTORY_DROPS 32
+typedef struct {
+    uint32_t serial;
+    char id[64],scene[16];
+    int32_t count;
+    float position[3],yaw,condition;
+    uint32_t condition_known;
+} aw_dropped_item_t;
+typedef struct {
+    char equipped[AW_INVENTORY_SLOTS][64];
+    uint32_t next_serial,initialized,condition_known;
+    float condition[AW_STATE_VALUES];
+    aw_dropped_item_t dropped[AW_INVENTORY_DROPS];
+} aw_inventory_state_t;
 enum aw_value_kind { AW_GLOBAL, AW_JOURNAL, AW_ITEM };
 enum aw_compare { AW_EQ, AW_NE, AW_GT, AW_GE, AW_LT, AW_LE };
 typedef struct {char id[64];int32_t value;} aw_value_t;
@@ -19,6 +36,7 @@ typedef struct {
     int count[3];aw_value_t values[3][AW_STATE_VALUES];
     int journal_count;aw_journal_entry_t journal[AW_JOURNAL_ENTRIES];
     aw_harvest_state_t harvest;
+    aw_inventory_state_t inventory;
 } aw_state_t;
 extern aw_state_t aw_state;
 void AW_StateReset(void);

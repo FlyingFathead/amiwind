@@ -9,7 +9,7 @@
 | Where | bsp stage, Seyda Neen full-town map (tools/prepare_quake.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.28, v0.0.32-dev (last seen) |
+| Persists in | v0.0.28, v0.0.32-dev, v0.0.40-dev2 (last seen) |
 | Severity | critical: From-scratch builds stop at qbsp because hull 2 exceeds the clipnode limit; release blocker for the builder. |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
 
@@ -65,6 +65,22 @@ clipnodes and 31,162 nodes, within the engine limits. Tests: `tests/test_engine_
 ## Prevention
 
 A periodic from-scratch build (mandatory project rule) and a builder test for hull limits.
+
+
+### 15 October 2026: actual gate follow-up
+
+Expanded dev2 town remains blocked at the complete-town legacy intermediate: actual floor-corrected compile exceeds BSP29 node/leaf limits (63,579 nodes). Prior standing-hull repair is preserved; no engine limit is raised. A CHIM-native source carrier retaining all original entity/reference semantics is required before rebuilding.
+
+## Source-only carrier, 15 October 2026
+
+The current dev2 source adds an optional original-source entity/model-bound
+carrier for Seyda CHIM. Canonical placement transforms, mounting, visual offsets,
+intro/exterior actors, activation bounds and original-reference checks remain.
+This avoids compiling a complete legacy town terrain map. The intermediate is
+marked non-runtime and must not enter an image; the existing CHIM frame-map
+writer supplies runtime maps. Forty-seven isolated checks pass. Original-data
+execution, combined-source validation, native seams/story/save behavior and
+packaging remain pending. No source-only check establishes shipment.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

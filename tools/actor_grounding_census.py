@@ -125,8 +125,8 @@ def npc_placements(cells, npcs):
 def area_box(area, root=None):
     """The CHIM area's frame in Morrowind units (x0, y0, x1, y1), as chim.areas compares frames."""
     if area == 'seyda':
-        from chim.seyda import world_box
-        return world_box(root=root)
+        from chim.seyda import owned_world_box
+        return owned_world_box(root=root)
     from town_config import load_settings
     settings = load_settings(area, root)
     (lx, ly), (hx, hy) = settings['bounds']

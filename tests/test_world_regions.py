@@ -117,13 +117,14 @@ class WorldRegionsTests(unittest.TestCase):
         areas=[]
         for name,file in [('Seyda Neen','seyda_area.json'),('Balmora','balmora.json')]:
             config=json.loads((root/'config'/file).read_text())
-            extent=2079 if name=='Seyda Neen' else 3072
             origin=config['centre']
-            core=[[origin[k]+sign*extent*4 for k in range(2)] for sign in (-1,1)]
+            core=[[origin[k]+p[k]/config['scale'] for k in range(2)] for p in config['bounds']]
             areas.append(dict(name=name,centre=origin,scale=.25,regions=[dict(core=core)]))
         report=dict(areas=areas)
         towns=town_handoffs(report)
-        self.assertEqual(towns[0]['core'],[[-1184,-1696],[1568,1440]])
+        self.assertEqual(towns[0]['core'],[[-3328,-4608],[4864,3584]])
+        self.assertEqual(towns[0]['owned_bounds'],towns[0]['core'])
+        self.assertEqual(towns[0]['ground_bounds'],[[-4096,-5376],[5632,4352]])
         self.assertEqual(towns[1]['core'],[[-2976,-2976],[2976,2976]])
         for town in towns:
             for k in range(2):
@@ -131,6 +132,9 @@ class WorldRegionsTests(unittest.TestCase):
                 self.assertLessEqual(town['core'][1][k]+32,town['ground_bounds'][1][k]-64)
         bad=copy.deepcopy(report);bad['areas'][0]['centre'][0]+=1
         with self.assertRaisesRegex(ValueError,'transform'):town_handoffs(bad)
+        short=copy.deepcopy(report)
+        short['areas'][0]['regions'][0]['core'][1][0]-=4
+        with self.assertRaisesRegex(ValueError,'outside converted ground'):town_handoffs(short)
 
     def test_two_partition_balance_includes_boot_content(self):
         with tempfile.TemporaryDirectory() as tmp:

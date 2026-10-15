@@ -2,13 +2,14 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 5 times; something has to be done
+## PERSISTING: reported 6 times; something has to be done
 
 - Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): RC1: absent swimming/diving, owner reports sinking; underwater upright pose inspected. Missing swim groups source-confirmed; physics/reference comparison pending.
 - Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Owner repeats missing swimming AND diving animation in BOTH first-person and third-person views. Keep four view/action acceptance items distinct; no repaired water candidate.
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Original third-person swim families confirmed; no dedicated dive key in16 base NIF/KF members. First-person visuals need state/camera/fallback parity; local0.52 source is not native0.48 acceptance.
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Owner requires reported swimming/diving in RC2. Both-view original 0.48 reference and source integration in progress; original clip inventory is separate. Native/package/owner acceptance pending.
 - Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): 20 swim companions built; native water selects and animates them. No-input sinking reproduced at 42 units/s. Remove Quake idle descent in source; native/reference repair checks pending.
+- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Owner repeats sinking and upright submerged body in RC2. Private screenshot retained; earlier short depth-hold/pose controls do not accept this scenario.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -21,7 +22,7 @@
 | Where | Surface, swimming and submerged gameplay; screenshot in Grazelands cell 12,6 |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev2, v0.0.39-rc1 (last seen) |
+| Persists in | v0.0.38-dev2, v0.0.39-rc1, v0.0.39-rc2 (last seen) |
 | Severity | high: Repeated owner-visible failure in RC1; exact repair remains unverified. |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.38-dev2 |
@@ -35,7 +36,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
+- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -53,6 +54,9 @@
 - [Required RC2 swimming and diving scope, 13 October 2026](#required-rc2-swimming-and-diving-scope-13-october-2026)
 - [Native candidate findings, 14 October 2026](#native-candidate-findings-14-october-2026)
 - [Post-pin RC2 package observation, 14 October 2026](#post-pin-rc2-package-observation-14-october-2026)
+- [Renewed owner sinking and upright-body report, 14 October 2026](#renewed-owner-sinking-and-upright-body-report-14-october-2026)
+- [Development audit, 14 October 2026](#development-audit-14-october-2026)
+- [Scoped female-Nord mechanical control, 14 October 2026](#scoped-female-nord-mechanical-control-14-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -206,6 +210,47 @@ The extracted RC2 package holds origin (704, -320, -25) for a four-second no-inp
 
 These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
 
+## Renewed owner sinking and upright-body report, 14 October 2026
+
+The owner again reports sinking and an upright submerged third-person body in
+RC2, whose gameplay is the same as final v0.0.39. The original supplied screenshot
+is retained privately; no public image or invented appearance/pose identity is
+added. The exact owner-running binary, depth, equipment, spell and input state
+remain to be bound in a repeatable reproduction.
+
+The earlier four-second no-input depth hold and changing swim-pose observations
+remain valid only for their recorded control. They do not establish that the
+owner scenario is repaired, that an upright body is appropriate at that depth,
+or that every race/equipment/view state matches the original.
+
+Reproduce surface entry, no-input depth, forward movement with pitch, dive,
+submerged idle and exit, with equipment lowered/readied and both camera views.
+Compare the same measured scene in the original reference and target before
+claiming a repair; keep depth behavior and visible animation acceptance separate.
+No new gameplay acceptance or CHIM cell coverage is recorded.
+
+
+## Development audit, 14 October 2026
+
+Fresh exact-RC2 Nord/Seyda controls explicitly verify WALK movetype 3, noclip off and waterlevel 3. At local 704,-320,-25, six seconds without input retain the same origin. Physical forward movement with downward pitch changes depth; after release velocity decays to zero and depth holds. Physical shore entry likewise reaches water and holds depth for six seconds. The swim companion is selected without a missing-companion warning. The upright-looking body, the owner's sinking scenario and matched original behavior remain unresolved. A failed Vivec destination attempt is not Vivec acceptance.
+
+## Scoped female-Nord mechanical control, 14 October 2026
+
+In the exact v0.0.40-dev1 female-Nord diagnostic, normal WALK movetype 3 with
+noclip off enters water from the Seyda shore using physical forward for three
+seconds. Height changes from about 39.5 to -66.4 with waterlevel 3. After release,
+five seconds without input retain height -66.4.
+
+Physical forward with view pitch 45 degrees descends to -175.3; after release
+velocity reaches zero. Forward at pitch -45 degrees ascends to -37.9.
+The exact original clips, state readbacks and engine/source binding are retained
+privately. These are positive scoped water-motion/depth-hold observations.
+
+The upright-looking submerged body, original inventory-independent swim posture,
+surface-entry behavior and matched original comparison remain open. This does
+not verify every appearance, the reported owner location/state, breath/drowning,
+complete gameplay parity or owner acceptance. It adds no CHIM cell coverage.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -224,6 +269,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [COMBAT-FIST-BLOCK-33](COMBAT-FIST-BLOCK-33.md): A fighter with a shield blocks while fighting with fists
 - [COMBAT-HIT-RECOVERY-33](COMBAT-HIT-RECOVERY-33.md): Fatigue hits did not stagger, and knockdowns lasted half a second too long
 - [COMBAT-NO-CONDITION-33](COMBAT-NO-CONDITION-33.md): Weapon and shield condition were ignored in combat
+- [COMBAT-NODICE-READOUT-40](COMBAT-NODICE-READOUT-40.md): No-dice combat readout labels living targets already down
 - [COMBAT-NOT-SAVED-33](COMBAT-NOT-SAVED-33.md): Combat state and NPC deaths are not saved
 - [COMBAT-PLAYER-ATTACK-TYPE-33](COMBAT-PLAYER-ATTACK-TYPE-33.md): The player's attack type and swing strength were random
 - [COMBAT-PLAYER-DEATH-FALL-33](COMBAT-PLAYER-DEATH-FALL-33.md): The player does not collapse on death
@@ -233,10 +279,12 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [ENGINE-ANGLEMOD-RANGE-35](ENGINE-ANGLEMOD-RANGE-35.md): anglemod returned 360 for -360 and passed NaN and out-of-range values on
 - [ENGINE-QC-ARGS-SYSERROR-35](ENGINE-QC-ARGS-SYSERROR-35.md): Bad QuakeC sound arguments stopped the program; lightstyle had no range check
 - [INTRO-CAMERA-GATING-38](INTRO-CAMERA-GATING-38.md): Opening vanity and third-person cameras expose an unselected default race
+- [INVENTORY-CATALOG-LOOKUP-40](INVENTORY-CATALOG-LOOKUP-40.md): Inventory catalogue lookup and name sorting use an equality-only comparison
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
 - [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry
 - [PLAYER-JUMP-THIRDPERSON-38](PLAYER-JUMP-THIRDPERSON-38.md): Third-person player jump animation is missing
 - [PLAYER-MOVEMENT-STATS-PARITY-39](PLAYER-MOVEMENT-STATS-PARITY-39.md): Walking/running use fixed debug speeds and do not apply original stats or running fatigue
+- [PLAYER-READY-MOVEMENT-39](PLAYER-READY-MOVEMENT-39.md): Third-person player cannot move with fists drawn
 - [PLAYER-READY-WATER-MOVEMENT-38](PLAYER-READY-WATER-MOVEMENT-38.md): Readied weapon or torch appears to allow walking on water
 - [QC-AW-FLAME-SPAWN-32](QC-AW-FLAME-SPAWN-32.md): Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields
 - RENDER-METADATA-29 (no report page): Native renderer metadata warns as an unknown QuakeC field
@@ -244,6 +292,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [SAVE-LAVA-DEATH-LOOP-38](SAVE-LAVA-DEATH-LOOP-38.md): Lava fall can leave an autosave that reloads into repeated death
 - [SAVE-TELEPORT-CHECKPOINT-38](SAVE-TELEPORT-CHECKPOINT-38.md): Successful teleport needs a safe destination checkpoint
 - [SERVER-FRAME-ARRIVAL-33](SERVER-FRAME-ARRIVAL-33.md): The server frame costs about 226 ms per frame at the Balmora arrival camera on a slow 68040
+- [UI-INVENTORY-INTEGRATION-40](UI-INVENTORY-INTEGRATION-40.md): Inventory integration and safe world placement remain incomplete
 - [WAIT-DURING-COMBAT-36](WAIT-DURING-COMBAT-36.md): Waiting is allowed in the middle of a fight
 - [WAIT-FEET-IN-WATER-36](WAIT-FEET-IN-WATER-36.md): Waiting is allowed with the feet in water (the original refuses it)
 

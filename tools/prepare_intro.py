@@ -146,6 +146,89 @@ def _actor(task):
     return identifier,role,raw,report
 
 
+INTRO_ACTORS=(('chargen name','jiub',1),('chargen boat guard 2','escort',2),('chargen boat guard 3','upper',3),
+              ('chargen boat guard 1','deck',4),('chargen dock guard','dock',5),('chargen class','census',6),
+              ('chargen captain','captain',7),('chargen door guard','hall',8),('fargoth','fargoth',0),('imperial guard','imperial_guard',0))
+INTRO_MAPS=('prison','seyda')
+
+
+def intro_references(identifier,prison,cells,map_names=None):
+    """Original full-intro placement predicate; optionally select destination maps."""
+    selected=set(INTRO_MAPS if map_names is None else map_names)
+    if not selected or not selected<=set(INTRO_MAPS):
+        raise ValueError('Intro actor maps must be prison and/or seyda')
+    refs=[(prison,r) for r in prison['refs'] if r['id'].casefold()==identifier]
+    refs.extend((c,r) for c in cells for r in c['refs'] if r['id'].casefold()==identifier)
+    result=[];seen=set()
+    for cell,ref in refs:
+        interior=bool(cell['flags']&1);name='prison' if interior else 'seyda'
+        if name not in selected:continue
+        if len(ref.get('position',()))!=3 or len(ref.get('rotation_radians',()))!=3 or not all(
+                math.isfinite(float(v)) for v in [*ref['position'],*ref['rotation_radians']]):
+            raise ValueError('Malformed original intro actor placement')
+        p=[(ref['position'][i]-(CENTRE[i] if not interior and i<2 else 0))*.25 for i in range(3)]
+        if not interior and (abs(p[0])>1024 or abs(p[1])>1024):continue
+        key=(name,ref['number'])
+        if key in seen:raise ValueError('Duplicate original intro actor reference')
+        seen.add(key);result.append((name,ref,p))
+    return result
+
+
+def intro_actor_rows(identifier,role,record,prison,cells,map_names=None):
+    """Serialize the same authored role, reference, grounding and transform fields."""
+    selected=set(INTRO_MAPS if map_names is None else map_names)
+    if not selected or not selected<=set(INTRO_MAPS):raise ValueError('Invalid intro actor maps')
+    rows={name:[] for name in INTRO_MAPS if name in selected}
+    if not role:return rows
+    model=record['model'];appearance=record['appearance'];step=record['idle_step'];walkstep=record['walk_step']
+    for name,ref,p in intro_references(identifier,prison,cells,selected):
+        fields={'classname':'aw_npc','model':model,'origin':' '.join(f'{v:.5f}' for v in p),
+            'angles':f"0 {-math.degrees(ref['rotation_radians'][2]):.5f} 0",'netname':appearance['name'],
+            'aw_intro_role':role,'aw_idle_step':f'{step:.7f}','aw_walk_step':f'{walkstep:.7f}'}
+        from actor_grounding import fields as grounding_fields
+        fields.update(grounding_fields(identifier));fields['aw_ref']=ref['number']
+        rows[name].append('{\n'+'\n'.join(quote(k)+' '+quote(v) for k,v in fields.items())+'\n}')
+    return rows
+
+
+def append_intro_rows(scene,entities):
+    """Validate all target maps first, then keep the original model-path substitutions."""
+    if not entities or not set(entities)<=set(INTRO_MAPS):raise ValueError('Invalid intro actor maps')
+    plans=[]
+    for name,rows in entities.items():
+        path=Path(scene)/f'id1/maps/{name}.bsp';b=lumps(path.read_bytes());ent=b[0].rstrip(b'\0').decode('cp1252')
+        existing=set(re.findall(r'"aw_ref"\s+"([^"\n]+)"',ent));seen=set()
+        for row in rows:
+            refs=re.findall(r'"aw_ref"\s+"([^"\n]+)"',row)
+            if len(refs)!=1 or refs[0] in seen or refs[0] in existing:
+                raise ValueError('Malformed or duplicate intro actor row reference')
+            seen.add(refs[0])
+        ent=ent.replace('"progs/fargoth.mdl"','"progs/np_fargoth.mdl"').replace('"progs/imperial_guard.mdl"','"progs/np_imperial_guard.mdl"')
+        b[0]=(ent+'\n'+'\n'.join(rows)+'\n\0').encode('cp1252');plans.append((path,pack_lumps(b),name))
+    for path,raw,name in plans:
+        path.write_bytes(raw);(Path(scene)/(name+'.bsp')).write_bytes(raw)
+
+
+def populate_intro_actors(data,scene,kinds,cells,prison,palette,jobs=None,map_names=None,include_prototypes=True):
+    """Shared actor bake/placement; selected maps skip irrelevant actor conversions."""
+    from build_jobs import resolve_jobs
+    selected=set(INTRO_MAPS if map_names is None else map_names)
+    if not selected or not selected<=set(INTRO_MAPS):raise ValueError('Invalid intro actor maps')
+    actors=[a for a in INTRO_ACTORS if (a[2]==0 and include_prototypes) or
+            (a[2]!=0 and intro_references(a[0],prison,cells,selected))]
+    # The full path historically baked every role, including unplaced roles.
+    if map_names is None and include_prototypes:actors=list(INTRO_ACTORS)
+    tasks=[(data,palette,identifier,stem,role,outfit(kinds,identifier)) for identifier,stem,role in actors]
+    entities={name:[] for name in INTRO_MAPS if name in selected};reports={}
+    workers=max(1,min(resolve_jobs(jobs),len(tasks)));print(f'Intro actor workers: {workers}',flush=True)
+    for identifier,role,raw,record in ordered_map(_actor,tasks,workers):
+        (Path(scene)/'id1'/record['model']).write_bytes(raw);reports[identifier]=record
+        print('actor',identifier,'talk',record['talk_displacement'],flush=True)
+        for name,rows in intro_actor_rows(identifier,role,record,prison,cells,selected).items():entities[name].extend(rows)
+    append_intro_rows(scene,entities)
+    return reports
+
+
 def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None,movie=True,cache=None,cache_report=None):
     """CACHE: a per-file cache folder for the movie (tools/file_cache.py); None converts it. movie=False: quick test build."""
     data=ensure_external(data,'owned data');scene=ensure_external(scene,'existing scene');out=ensure_external(out,'intro conversion')
@@ -156,34 +239,7 @@ def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None,movie=True,cache=None,cache
     kinds,cells,topics=load_master(data/'Morrowind.esm')
     palette=(out/'id1/gfx/palette.lmp').read_bytes();report={'actors':{},'speech':{},'scripts':{}}
     prison=read_interior(data/'Morrowind.esm','Imperial Prison Ship')
-    actors=[('chargen name','jiub',1),('chargen boat guard 2','escort',2),('chargen boat guard 3','upper',3),
-            ('chargen boat guard 1','deck',4),('chargen dock guard','dock',5),('chargen class','census',6),
-            ('chargen captain','captain',7),('chargen door guard','hall',8),('fargoth','fargoth',0),('imperial guard','imperial_guard',0)]
-    entities={'prison':[],'seyda':[]}
-    tasks=[(data,palette,identifier,stem,role,outfit(kinds,identifier)) for identifier,stem,role in actors]
-    workers=min(resolve_jobs(jobs),len(tasks));print(f'Intro actor workers: {workers}',flush=True)
-    for identifier,role,raw,record in ordered_map(_actor,tasks,workers):
-        model=record['model'];appearance=record['appearance'];step=record['idle_step'];walkstep=record['walk_step']
-        (out/'id1'/model).write_bytes(raw);report['actors'][identifier]=record
-        print('actor',identifier,'talk',report['actors'][identifier]['talk_displacement'],flush=True)
-        if not role:continue
-        refs=[(prison,r) for r in prison['refs'] if r['id'].casefold()==identifier]
-        refs.extend((c,r) for c in cells for r in c['refs'] if r['id'].casefold()==identifier)
-        for cell,ref in refs:
-            interior=bool(cell['flags']&1);name='prison' if interior else 'seyda'
-            p=[(ref['position'][i]-(CENTRE[i] if not interior and i<2 else 0))*.25 for i in range(3)]
-            if not interior and (abs(p[0])>1024 or abs(p[1])>1024):continue
-            fields={'classname':'aw_npc','model':model,'origin':' '.join(f'{v:.5f}' for v in p),
-                'angles':f"0 {-math.degrees(ref['rotation_radians'][2]):.5f} 0",'netname':appearance['name'],
-                'aw_intro_role':role,'aw_idle_step':f'{step:.7f}','aw_walk_step':f'{walkstep:.7f}'}
-            from actor_grounding import fields as grounding_fields
-            fields.update(grounding_fields(identifier));fields['aw_ref']=ref['number']
-            entities[name].append('{\n'+'\n'.join(quote(k)+' '+quote(v) for k,v in fields.items())+'\n}')
-    # Replace the bounded town actors' model paths; all older assets remain available.
-    for name in entities:
-        path=out/f'id1/maps/{name}.bsp';b=lumps(path.read_bytes());ent=b[0].rstrip(b'\0').decode('cp1252')
-        ent=ent.replace('"progs/fargoth.mdl"','"progs/np_fargoth.mdl"').replace('"progs/imperial_guard.mdl"','"progs/np_imperial_guard.mdl"')
-        b[0]=(ent+'\n'+'\n'.join(entities[name])+'\n\0').encode('cp1252');raw=pack_lumps(b);path.write_bytes(raw);(out/(name+'.bsp')).write_bytes(raw)
+    report['actors']=populate_intro_actors(data,out,kinds,cells,prison,palette,jobs)
     report['scripts'],report['navigation'],report['speech'],ambience=sounds.result()
     for identifier in ('fargoth','imperial_guard'):
         wav=out/f'id1/sound/npc/{identifier}.wav'

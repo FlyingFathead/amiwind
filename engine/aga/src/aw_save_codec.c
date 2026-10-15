@@ -153,13 +153,60 @@ static void harvest_fields(aw_harvest_state_t *h)
         previous=index;if(!writing)h->facts[index-1]=fact;
     }
 }
+/* AWS4 feature bit 2 adds bounded equipment and dropped-world identities.
+ * Older files remain byte-compatible; older readers reject this feature rather
+ * than silently discarding owned items. No pointers or transient edicts persist. */
+static int inventory_used(const aw_inventory_state_t *v){
+    int i;if(v->next_serial || v->initialized || v->condition_known)return 1;
+    for(i=0;i<AW_INVENTORY_SLOTS;i++)if(v->equipped[i][0])return 1;
+    for(i=0;i<AW_INVENTORY_DROPS;i++)if(v->dropped[i].count)return 1;
+    return 0;
+}
+static void inventory_fields(aw_state_t *s){
+    aw_inventory_state_t *v=&s->inventory;aw_dropped_item_t *d;
+    int i,j,k,used=0,index=0,previous=-1,n;
+    word(&v->next_serial);
+    word(&v->initialized);if(v->initialized>1){error=1;return;}
+    word(&v->condition_known);
+    for(i=0;i<AW_STATE_VALUES;i++){
+        if(v->condition_known&(1U<<i)){
+            if(i>=s->count[AW_ITEM] || s->values[AW_ITEM][i].value<1){error=1;return;}
+            floating(&v->condition[i],0,1);
+        }else if(writing && v->condition[i]!=0){error=1;return;}
+    }
+
+    for(i=0;i<AW_INVENTORY_SLOTS;i++){
+        string(v->equipped[i],64);if(error)return;
+        if(v->equipped[i][0]){
+            n=0;for(j=0;j<AW_INVENTORY_SLOTS;j++)if(!strcmp(v->equipped[i],v->equipped[j]))n++;
+            if(n>AW_StateGet(s,AW_ITEM,v->equipped[i]))error=1;
+        }
+    }
+    if(writing)for(i=0;i<AW_INVENTORY_DROPS;i++)if(v->dropped[i].count)used++;
+    integer(&used,0,AW_INVENTORY_DROPS);if(error)return;
+    for(i=0;i<used;i++){
+        if(writing)while(index<AW_INVENTORY_DROPS && !v->dropped[index].count)index++;
+        integer(&index,0,AW_INVENTORY_DROPS-1);
+        if(error || index<=previous){error=1;return;}
+        previous=index;d=&v->dropped[index];index++;
+        word(&d->serial);string(d->id,64);string(d->scene,16);
+        n=d->count;integer(&n,1,2147483647);d->count=n;
+        for(j=0;j<3;j++)floating(&d->position[j],-32767,32767);
+        floating(&d->yaw,-360,360);
+        word(&d->condition_known);if(d->condition_known>1){error=1;return;}
+        floating(&d->condition,0,1);
+        if(!d->id[0] || !d->serial || d->serial>v->next_serial || AW_MapId(d->scene)<0)error=1;
+        for(k=0;k<previous;k++)if(v->dropped[k].count && v->dropped[k].serial==d->serial)error=1;
+        if(error)return;
+    }
+}
 int AW_SaveEncode(unsigned char *out,int capacity,const aw_save_t *state)
 {
     aw_save_t copy=*state;uint32_t size=0,crc;
     if(capacity<12 || capacity>AW_SAVE_BYTES)return 0;
     writing=out;reading=NULL;at=12;end=capacity;error=0;
     memset(out,0,capacity);fields(&copy);if(!error)journal_fields(&copy.state);
-    {uint32_t features=copy.state.harvest.slots?1U:0U;word(&features);}
+    {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state.inventory)?2U:0U);word(&features);}
     if(!error && copy.state.harvest.slots)harvest_fields(&copy.state.harvest);
     if(!copy.state.harvest.slots){
         int i;for(i=0;i<32;i++)if(copy.state.harvest.catalogue[i])error=1;
@@ -168,6 +215,7 @@ int AW_SaveEncode(unsigned char *out,int capacity,const aw_save_t *state)
     word(&copy.equipment);
     if((copy.equipment&~AW_EQUIPMENT_MASK) ||
        ((copy.equipment&AW_EQUIPMENT_TORCH) && !(copy.equipment&AW_EQUIPMENT_DRAWN)))error=1;
+    if(!error && inventory_used(&copy.state.inventory))inventory_fields(&copy.state);
     if(error)return 0;
     size=at;memcpy(out,"AWS4",4);at=4;word(&size);
     crc=crc32(out+12,size-12);word(&crc);return size;
@@ -182,13 +230,14 @@ int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
     /* Older saves have quest indices but no chronological evidence. Do not
      * fabricate earlier entries or dates when decoding them. */
     if(!error && data[3]!='1')journal_fields(&candidate.state);
-    if(!error && data[3]=='4'){word(&features);if(features>1)error=1;}
+    if(!error && data[3]=='4'){word(&features);if(features>3)error=1;}
     if(!error && (data[3]=='3' || (data[3]=='4' && (features&1))))harvest_fields(&candidate.state.harvest);
     if(!error && data[3]=='4'){
         word(&candidate.equipment);
         if((candidate.equipment&~AW_EQUIPMENT_MASK) ||
            ((candidate.equipment&AW_EQUIPMENT_TORCH) && !(candidate.equipment&AW_EQUIPMENT_DRAWN)))error=1;
     }
+    if(!error && data[3]=='4' && (features&2))inventory_fields(&candidate.state);
     if(error || at!=size)return 0;
     *out=candidate;return 1;
 }

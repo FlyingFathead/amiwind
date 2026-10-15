@@ -400,6 +400,7 @@ int AW_ConsoleCharWidth(void);
 int AW_ConsoleCharHeight(void);
 void AW_ConsoleCharacter(int x,int y,int c);
 void AW_SmallString(int x,int y,const char *text);
+void AW_SmallStringColor(int,int,int,const char *,int);
 int AW_LightGalleryDraw(void);
 extern int con_fullscreen;
 int Con_ScrollPage(void);
@@ -635,6 +636,7 @@ byte *AW_MoviePalette(void);
 int AW_MovieKey(int key,int down);
 void AW_IntroBegin(void);
 void AW_IntroInit(void);
+void AW_IntroInputReport(void);
 void AW_UIBookBegin(void);
 int AW_UIFontSize(void);
 int AW_UISetFontSize(int size);
@@ -682,6 +684,14 @@ const char *AW_UIPage(const char *text,int width,int rows,char *out,int capacity
 const char *AW_SceneWorldModel(const char *name);
 
 /* On-demand map and earned journal. */
+int AW_ViewEquipmentReady(void);
+int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angles[2][3]);
+extern int (*aw_hand_block_item)(char id[64],char model[64]);
+int AW_ViewInventoryBody(model_t **model,int *frame);
+int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int height,float angle);
+void AW_InventoryPreviewClear(void);
+void AW_ViewInventoryClear(void);
+int AW_InventoryActive(void);
 void AW_WorldUIInit(void);
 int AW_WorldUIActive(void);
 void AW_WorldUICancelDrag(void);

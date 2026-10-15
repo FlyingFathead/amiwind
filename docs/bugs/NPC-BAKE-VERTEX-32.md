@@ -1,4 +1,4 @@
-# NPC-BAKE-VERTEX-32: NPC model bake exceeds the alias vertex budget for two Telvanni residents
+# NPC-BAKE-VERTEX-32: NPC resident baking can exceed the alias vertex budget
 
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -6,14 +6,58 @@
 | --- | --- |
 | Reported by | build |
 | First noticed | 8 October 2026, in v0.0.32-dev |
-| Where | NPC model baker (tools/npc_geometry.py), Telvanni residents |
+| Where | NPC model baker and exterior residents, including Seyda Neen |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
-| Severity | medium: Two residents exceed the vertex budget and stopped a town conversion. |
+| Persists in | v0.0.32-dev, v0.0.40-dev2 (last seen) |
+| Severity | critical: Original-data exterior resident conversion stops, blocking the complete dev2 playable. |
 | Family | Actors and NPCs (`actors-npc`) |
 
 <!-- END GENERATED FACTS -->
+
+## Overflow repair candidate - 15 October 2026
+
+Expanded original-cell coverage admitted Tarhiel at his original transform.
+His extravagant robe has disconnected panels: whole-shape reduction discarded
+complete panels, causing the existing shell guard to retain excessive geometry.
+
+After a real budget-mode overflow only, the candidate reuses the existing
+connected-component and simplification machinery. Every original component
+must retain the same 80% area and 70% extent guards, with the combined guard
+also enforced. Successful original bakes keep their path. Existing AmiQuake
+alias limits and the resident 512 KiB cap remain unchanged.
+
+The optional full-sample size check makes the existing geometry-budget ladder
+try smaller geometry before texture work. It preserves all 64 sample indices,
+group counts and stored timing in the original-data Tarhiel proof:
+432 triangles, 1,296 vertices, 487,192 bytes. Forty-nine isolated checks pass,
+including unchanged-success and rejected-collapsed-component controls.
+Fifty-two integrated NPC/writer checks also pass with unchanged source.
+The failed original carrier is preserved. The subsequent complete source-only
+carrier and independent resident/model/animation/voice readback pass.
+Native appearance/contact and package verification remain pending.
+
+## Original carrier failure: 15 October 2026
+
+The v0.0.40-dev2 original-data Seyda carrier build stops at the original NPC
+identifier agronian guy with Alias vertex budget exceeded. The original record
+belongs to Tarhiel, a male Wood Elf; the identifier does not name his race.
+The failure occurs in prepare_area.build_resident after its existing
+480-to-192 reduction ladder. Source and all original inputs stayed unchanged.
+Earlier Telvanni and Godros findings remain historical evidence.
+
+Severity is raised to critical because the complete playable cannot be built.
+No resident omission, animation-frame removal or engine-limit increase is
+accepted as a repair. Separate CHIM geometry conversion can continue.
+Carrier completion, original-reference readback and native checks are pending.
+
+## Source carrier completion: 15 October 2026
+
+The repaired source carrier now completes and preserves all original actors.
+Tarhiel's moving model is byte-identical to the 64-sample proof above; its
+standing model carries the expected 17 poses. All 13 resident model sets pass
+independent serialized model/animation/tag/voice checks under unchanged limits.
+This does not close broader appearance, contact or package acceptance.
 
 ## Status: 9 October 2026
 
@@ -50,8 +94,10 @@ Import the Telvanni canton without the exclusions.
 
 ## Repair
 
-Not yet: find what pushes them over and reduce generically; a failing resident should be
-reported and skipped by the importer, not stop the town.
+The earlier proposal to skip a failing resident is superseded for the complete
+candidate. Find the specific fitting failure and repair canonical model
+selection while preserving original identity, appearance and animation groups.
+Do not omit the resident or raise the runtime budget to clear the build.
 
 ## Verification
 
@@ -81,6 +127,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [COMBAT-RUN-ROOT-DRIFT-33](COMBAT-RUN-ROOT-DRIFT-33.md): Arena fighters' run frames carry the root's forward motion: the body slides ahead and snaps back each cycle
 - [COMPANION-NO-RUN-ANIM-33](COMPANION-NO-RUN-ANIM-33.md): The companion slides instead of walking or running, and mimic mode does not mirror the gait
 - [NPC-ANIM-IDLE-ONLY-33](NPC-ANIM-IDLE-ONLY-33.md): NPCs have only an 8-frame idle: walking, running, swimming, hit and death are not animated
+- [NPC-ANIMATION-OFFSET-40](NPC-ANIMATION-OFFSET-40.md): Simplified actor vertices keep a fixed offset while limbs rotate
 - [NPC-DAGOTH-BODY-DECIMATION-33](NPC-DAGOTH-BODY-DECIMATION-33.md): Dagoth Ur's body is decimated; his whole model exceeds the alias ceiling
 - [NPC-FEMALE-SKELETON-33](NPC-FEMALE-SKELETON-33.md): Female humans are posed on the male skeleton file (base_anim.nif), the original uses base_anim_female.nif
 - [NPC-FOLLOW-FLOORS-33](NPC-FOLLOW-FLOORS-33.md): The test companion cannot find stairs to another floor of an interior; it is placed beside the player after 6 seconds

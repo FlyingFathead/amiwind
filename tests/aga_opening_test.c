@@ -85,9 +85,12 @@ int main(void)
         player.v.view_ofs[2]=13;object.v.modelindex=1;
         object.v.absmin[0]=object.v.absmax[0]=30;
         object.v.absmin[2]=object.v.absmax[2]=13;
-        reference._float=172859;
+        reference._float=172859;aw_story.stage=AW_STAGE_PAPERS;
+        assert(AW_StoryHudChannels()==AW_HUD_STATS);
         assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Read: E"));
         assert(AW_OpeningUse() && reads==1);
+        assert(!AW_Papers() && !AW_StoryFighting());
+        assert(AW_StoryHudChannels()==(AW_HUD_STATS|AW_HUD_WEAPON));
         cl.viewangles[1]=180;assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());cl.viewangles[1]=0;
         occluded=1;assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());occluded=0;
         object.v.modelindex=0;assert(!AW_OpeningHint(&name,&action));object.v.modelindex=1;
@@ -157,6 +160,22 @@ int main(void)
         assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Talk: E") && !strcmp(name,"Socucius Ergalla"));
         speech=0;assert(AW_OpeningUse() && aw_story.census==10);
         assert(!AW_OpeningHint(&name,&action));
+    }
+    /* An old full global table cannot silently lose the activation permission.
+     * Refuse recording, retain all state, and do not admit an earlier stage. */
+    {
+        aw_state_t prior;char key[32];
+        AW_StoryReset(1);assert(!AW_StoryPapersRead());
+        aw_story.stage=AW_STAGE_PAPERS;
+        for(i=aw_state.count[AW_GLOBAL];i<AW_STATE_VALUES;i++){
+            sprintf(key,"full%d",i);assert(AW_StateSet(&aw_state,AW_GLOBAL,key,1));
+        }
+        prior=aw_state;assert(!AW_StoryPapersRead());assert(!memcmp(&prior,&aw_state,sizeof(prior)));
+        assert(AW_StoryHudChannels()==AW_HUD_STATS);
+        object.v.modelindex=1;clerk.v.modelindex=0;reference._float=172859;
+        {int before_reads=reads;assert(AW_OpeningUse());assert(reads==before_reads);}
+        assert(!memcmp(&prior,&aw_state,sizeof(prior)));
+        AW_StoryReset(0);assert(AW_StoryPapersRead() && AW_StoryHudChannels()==AW_HUD_ALL);
     }
     return 0;
 }

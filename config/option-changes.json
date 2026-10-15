@@ -511,6 +511,14 @@
       "change": "added",
       "to": false,
       "source": "tools/miniwind.py: optional direct map inspection startup"
+    },
+    {
+      "version": "0.0.40-dev2",
+      "option": "palette",
+      "flag": "--palette",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py 2ac9b4b; optional exact pre-quantization scene palette"
     }
   ],
   "current": {
@@ -614,7 +622,8 @@
       "with_video": false,
       "world_bounds": null,
       "world_map": null,
-      "miniwind_map_inspection": false
+      "miniwind_map_inspection": false,
+      "palette": null
     },
     "build_defaults": {
       "bitmap_paper_ink": "filled",

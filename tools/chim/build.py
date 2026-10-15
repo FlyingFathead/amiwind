@@ -684,7 +684,8 @@ def add_town_flora(found, flora, models, textures, prepared, mesh_fps, selected,
         prepared[fmodels[key]] = result
         mesh_fps[fmodels[key]] = fp
     for ref in frefs:
-        selected.append(dict(ref, model_index=fmodels[(ref['model_index'], modes[ref['number']])]))
+        from chim.ownership import capture
+        selected.append(dict(capture(ref), model_index=fmodels[(ref['model_index'], modes[ref['number']])]))
     return [r['number'] for r in frefs]
 
 
@@ -849,6 +850,10 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
         specs.append(spec)
         sections.append(section)
         meshes += count
+    from chim.ownership import source_failures
+    ownership_errors = source_failures(sections)
+    if ownership_errors:
+        raise ValueError('CHIM source ownership: ' + '; '.join(ownership_errors[:10]))
     effects = [load_effect(path) for path in texture_effects]
     applied = []
     for spec in specs:
@@ -871,8 +876,10 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
     with timer.section('far terrain'):
         from chim.far import write_layers
         receipt['far_terrain'] = write_layers(out, [s['frame'] for s in specs], data) if far_terrain else []
-    source = {'builder': BUILDER, 'chim_version': CHIM_VERSION, 'world_format': '%d.%d' % FORMAT_VERSION,
+    source = {'builder': BUILDER, 'chim_version': CHIM_VERSION, 'world_format': receipt['world_format'],
               'areas': areas, 'frames': sections}
+    from chim.ownership import bind_index
+    bind_index(out, source)
     write_json(out / 'chim-source.json', source)
     # Lava pools converted, by source cell (the trackers' converted status, tools/cell_lava.py).
     lava_cells = {}
@@ -903,6 +910,13 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
             area_cut[a] = dict(keys, applied=area_cut_settings(own, settings_override).get('cut_models_over'))
     if area_cut:
         receipt['area_cut'] = area_cut
+    ocean_sources = [s['ocean_runtime'] for s in sections if 'ocean_runtime' in s]
+    if ocean_sources:
+        receipt['ocean_runtime'] = {
+            'cells': [s['cell'] for s in ocean_sources],
+            'original_records': sum(len(s['references']) for s in ocean_sources),
+            'deferred_records': sum(len(s['references']) for s in ocean_sources),
+            'converted_records': 0, 'native_verified': False, 'packaged': False}
     write_json(out / 'chim-receipt.json', receipt)
     # Worker count, unit cache hits and wall time: a diagnostic beside the receipt, so the receipt is
     # byte-reproducible (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33); chim/stats.py reads it for its build figures.
@@ -932,7 +946,7 @@ def detail_budget(name):
 SHORELINE_MODES = ('on', 'off')   # chim_build.py --terrain-shoreline (CHIM-STITCH-SHORELINE-36)
 
 
-def shoreline_ground(sample, materials, low, high, step, liquids=(), shoreline=True):
+def shoreline_ground(sample, materials, low, high, step, liquids=(), shoreline=True, grid_origin=(0.,0.)):
     """The frame's ground as the legacy region maps triangulate it: every tile through
     prepare_world_regions.terrain_triangles (the shared sampler; Seyda Neen's frame uses it too), over
     sample(x, y) -> (height, material) in frame-local units. A tile where land and water flip between
@@ -975,7 +989,7 @@ def shoreline_ground(sample, materials, low, high, step, liquids=(), shoreline=T
                 refined.add((i, j))
             m = int(materials[j][i])
             tris.extend(([list(p) for p in tri], m)
-                        for tri in terrain_triangles(terrain, x, y, edges, full_detail))
+                        for tri in terrain_triangles(terrain, x, y, edges, full_detail, grid_origin))
     size = ((int(high[0]) - int(low[0])) // step, (int(high[1]) - int(low[1])) // step)
     ground = TriangleGround(tris, step, low, size)
     ground.refined = refined
@@ -1064,11 +1078,19 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     """One area's frame input, source section, parity record and mesh count (build_areas)."""
     from import_town import ground_assets, terrain_at, terrain_material, TERRAIN_CEILING, TERRAIN_FLOOR
     from prepare_quake import SCALE
-    from surface_flatten import load_profiles, mount_references
+    from surface_flatten import load_profiles, mount_references, NeighboringFacadeSupport
     from town_config import load_settings, town_field
     from town_regions import town_model_profile
     from visual_offsets import apply_visual_offsets
     settings = load_settings(town)
+    ocean_source = None
+    if settings.get('ocean_runtime'):
+        from chim.ocean_runtime import admit_cell
+        ocean_source = admit_cell(data, settings['source_cell'])
+        # Only these new frames require references; existing inline terrain stays inline.
+        settings_override = dict(settings_override or {}, terrain_refs='on')
+        work.mkdir(parents=True, exist_ok=True)
+        write_json(work / 'ocean-source.json', ocean_source)
     with timer.section('source stage'):
         index = source_stage(data, work, jobs, settings)
     centre = settings['centre']
@@ -1111,8 +1133,12 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     # frame centred off the cell grid (Vivec's Arena) audits whole cells around it (CHIM-PAYLOAD-PARITY-33).
     from town_regions import town_references
     inside = set(town_references(index, settings))
-    selected = [dict(r) for r in index['references'] if r['number'] in inside]
-    mount_references(index, selected, prepared, centre, SCALE)
+    from chim.ownership import capture
+    selected = [capture(r) for r in index['references'] if r['number'] in inside]
+    support = NeighboringFacadeSupport(data, settings, (r['number'] for r in selected))
+    mount_references(index, selected, prepared, centre, SCALE, support=support)
+    if support.report['used']:
+        write_json(work / 'window-mount-support.json', support.report)
     apply_visual_offsets(index, selected)
     # Payload parity with the image (CHIM-PAYLOAD-PARITY-33): the same selections it applies.
     models = list(index['models'])
@@ -1147,7 +1173,21 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         if [low, high] != [list(v) for v in settings['bounds']]:
             wide, audit_dir = margin_grids(data, work, settings, low, high)
             grids = {**wide, **grids}
+        ocean_materials = {}
+        if ocean_source is not None:
+            from chim.ocean_terrain import resolve_grids, ground_textures as ocean_ground_textures
+            original_grids, ocean_materials, ocean_terrain = resolve_grids(data, grids)
+            grids = {**grids, **original_grids}
+            if ocean_source['masters'] != ocean_terrain['masters']:
+                raise ValueError('Original ocean masters changed during preparation')
+            ocean_source['terrain_apron'] = ocean_terrain
         ground = wad_lumps(ground_assets(data, audit_dir, pal_bytes, pools))
+        if ocean_materials:
+            extra_ground, dependencies = ocean_ground_textures(data, ocean_materials, pal_bytes)
+            ground.update(extra_ground)
+            ocean_source['terrain_apron']['texture_assets'] = dependencies
+        if ocean_source is not None:
+            write_json(work / 'ocean-source.json', ocean_source)
         ground = {k: v for k, v in ground.items() if k.startswith('g') or k in ('*water', '*lava')}
         xs = range(low[0], high[0] + 1, step)
         ys = range(low[1], high[1] + 1, step)
@@ -1161,7 +1201,8 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         if mode not in SHORELINE_MODES:
             raise ValueError('Unknown terrain shoreline mode: %s' % mode)
         tri_ground = (shoreline_ground(lambda x, y: terrain_at(grids, settings, x, y), materials, low, high, step,
-                                       frame_liquids(pools, centre), shoreline=mode == 'on')
+                                       frame_liquids(pools, centre), shoreline=mode == 'on',
+                                       grid_origin=tuple(v*SCALE for v in centre))
                       if mode == 'on' or pools else None)
         if tri_ground is not None and not tri_ground.refined:
             tri_ground = None          # no shoreline tile: the plain grid is the same ground (frame unchanged)
@@ -1175,6 +1216,9 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
                 return terrain_at(wide, settings, x, y)[0]
     frame = {'cell': tuple(settings['source_cell']), 'centre': tuple(float(v) for v in centre),
              'low': (float(low[0]), float(low[1])), 'span': (high[0] - low[0], high[1] - low[1])}
+    if ocean_source is not None:
+        frame['ocean_runtime'] = True
+        frame['ocean_masters'] = ocean_source['masters']
     if [low, high] != [list(v) for v in settings['bounds']]:
         # the box the frame owns (its placements): frames may share terrain-only margins, never this box
         # (chim.world.frame_box; adjacent CHIM region frames, docs/chim/CHIM_REGIONS.md)
@@ -1201,6 +1245,11 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
                    'terrain_refined_tiles': len(tri_ground.refined)} if tri_ground is not None else {}),
                # lava pools carved into the chunks as Quake liquid (docs/LAVA.md), by source cell
                'lava': lava_section(pools), 'terrain_liquids': frame_liquids(pools, centre), 'lava_depth': 8.0}
+    if ocean_source is not None:
+        section['ocean_runtime'] = ocean_source
+    if support.report['used']:
+        # work/ is not pooled; retain source-only dependencies in chim-source.json.
+        section['window_mount_support'] = support.report
     if sprite_rows:
         section['sprite_entities'] = sprite_rows
         section['sprite_assets'] = [dict(a, file=(work / 'sprites' / a['path']).relative_to(work.parent.parent).as_posix())
@@ -1212,4 +1261,6 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
             'low': [low[0] - step, low[1] - step], 'chunks': spec['outer_ring_chunks'],
             'heights': [[height_at(x, y) for x in range(low[0] - step, high[0] + step + 1, step)]
                         for y in range(low[1] - step, high[1] + step + 1, step)]}
+    from chim.ownership import manifest
+    section['frame_ownership'] = manifest(spec, selected)
     return spec, section, parity, len(prepared)

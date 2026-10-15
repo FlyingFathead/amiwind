@@ -37,7 +37,8 @@ class CatalogNormalTests(unittest.TestCase):
                 (stage / 'gfx/torch.awt').write_bytes(b'fixture-emitter')
                 return {'files': {'progs/v_torch.mdl': original_hash}}
 
-            with patch.object(catalog, 'TorchSource') as source, \
+            with patch('prepare_block_view.prepare', return_value={'files':{},'appearances':[]}), \
+                 patch.object(catalog, 'TorchSource') as source, \
                  patch.object(catalog, 'first', return_value=struct.pack('<16xI', 1)), \
                  patch.object(catalog, 'bake_appearance', side_effect=hands), \
                  patch.object(catalog, 'prepare_torch', side_effect=torch), \
@@ -92,7 +93,8 @@ class CatalogNormalTests(unittest.TestCase):
             def pool(count):
                 sizes.append(count)
                 return ThreadPoolExecutor(max_workers=count)
-            with patch.object(catalog, 'TorchSource') as source, \
+            with patch('prepare_block_view.prepare', return_value={'files':{},'appearances':[]}), \
+                 patch.object(catalog, 'TorchSource') as source, \
                  patch.object(catalog, 'first', return_value=struct.pack('<16xI', 1)), \
                  patch.object(catalog, 'bake_appearance', side_effect=hands), \
                  patch.object(catalog, 'prepare_torch', side_effect=torch), \

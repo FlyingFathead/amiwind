@@ -13,6 +13,7 @@ The owner chose maintenance first on 28 September 2026, then this work. Keep
 ## Contents
 
 - [Original source audit](#original-source-audit)
+- [Diagnostic race shortcut, 14 October 2026](#diagnostic-race-shortcut-14-october-2026)
 - [Deliverable sequence](#deliverable-sequence)
 - [Character record and OpenMW comparison](#character-record-and-openmw-comparison)
 - [Acceptance before the next playable](#acceptance-before-the-next-playable)
@@ -96,6 +97,35 @@ For these placed objects the corrected column-vector transform is
 The regression test must use combined rotations: yaw-only fixtures cannot
 detect this error. Compare against OpenMW `Misc::Convert::makeOsgQuat` and its
 direct scene-node rotation, accounting for OSG quaternion multiplication order.
+
+## Diagnostic race shortcut, 14 October 2026
+
+The new source candidate accepts dbg set race or dbg set playerrace with a
+strict zero-based loaded-catalogue ID or a case-insensitive name, ignoring
+spaces/underscores/hyphens. No value or list prints IDs/names and the current
+race. Print the current catalogue before choosing an ID; the mapping is not a
+fixed original-game enumeration.
+
+The refined testing contract preserves gender, name, class, birthsign, level,
+attributes/skills, resource maxima/current health and equipment. It validates a
+temporary character through AW_CharacterSet, then changes only race and valid
+head/hair choices plus live eye height; body and hands use the existing race
+detection. Choose the first valid target race/gender head and hair. A same-race
+request does nothing and preserves the selected head/hair. This shortcut deliberately does not reapply racial statistics.
+Use normal character creation/review for a character with race-derived stats.
+
+A live local game and permitted story/menu/death state are required for a
+change; bad input and unavailable contexts are refused.
+Route this diagnostic through the existing on-demand AWDC1 dbg dispatcher;
+its first direct registration exceeded the resident budget and was rejected.
+The corrected existing setter dispatch and unchanged registry budget pass in
+twenty focused checks. New exact target/full-gate/native/package verification
+remains pending. Full selected-head/hair
+body composition remains a separate limitation. Fourteen final focused
+preservation/command checks pass; new target/native behavior and package
+acceptance remain pending. The existing
+[characterchange record](bugs/PLAYER-READY-MOVEMENT-39.md) separates older menu
+checks from this new shortcut.
 
 ## Deliverable sequence
 

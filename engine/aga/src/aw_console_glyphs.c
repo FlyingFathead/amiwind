@@ -115,6 +115,21 @@ void AW_SmallString(int x,int y,const char *text) {
         }
     }
 }
+/* Inventory reuses the console glyphs, with its own ink and strict field
+ * bounds. It never changes the console size or allocates another atlas. */
+void AW_SmallStringColor(int x,int y,int width,const char *text,int color) {
+    int r,col,c,bits,right=x+width;byte *p;
+    if(width<4 || !text)return;
+    for(;*text && x+4<=right;text++,x+=4){
+        c=(unsigned char)*text;if(c<32 || c>126)c='?';
+        for(r=0;r<5;r++){
+            if(y+r<0 || y+r>=vid.height)continue;
+            bits=glyphs[c-32][r];p=vid.buffer+(y+r)*vid.rowbytes;
+            for(col=0;col<3;col++)
+                if(x+col>=0 && x+col<vid.width && (bits&(4>>col)))p[x+col]=(byte)color;
+        }
+    }
+}
 void AW_ConsoleCharacter(int x,int y,int c) {
     int r,col,bits;byte *p;c&=127;
     if(!small){Draw_Character(x,y,c);return;}

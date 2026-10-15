@@ -630,12 +630,14 @@ void CL_RelinkEntities (void)
 		else
 			AW_VisedictDropped ();
 		/* A player-only equipment proxy; never change this loop's entity cursor. */
-		if (i == cl.viewentity && aw_view_held && (draw = aw_view_held (draw)))
+		if (i == cl.viewentity && aw_view_held)
 		{
-			if (cl_numvisedicts < MAX_VISEDICTS)
-				cl_visedicts[cl_numvisedicts++] = draw;
-			else
-				AW_VisedictDropped ();
+            entity_t *player_draw=draw;int held;
+            for(held=0;held<2;held++){
+                draw=aw_view_held(player_draw);if(!draw)break;
+                if(cl_numvisedicts<MAX_VISEDICTS)cl_visedicts[cl_numvisedicts++]=draw;
+                else AW_VisedictDropped();
+            }
 		}
 	}
 

@@ -146,6 +146,8 @@ stamps; any other difference blocks the release.
 
 ## Game version and engine version
 
+A change to `VERSION` also requires matching `resources/emulators/AmiWind-v<VERSION>-FS-UAE.fs-uae` and `AmiWind-v<VERSION>-WinUAE.uae` presets and their entries in `tools/release-files.json`. Preserve older presets. Run the emulator-config, FS-UAE keyboard-port and launcher tests against the new version before pinning source ([BUILD-VERSION-EMULATOR-PRESETS-38](bugs/BUILD-VERSION-EMULATOR-PRESETS-38.md)).
+
 From v0.0.33 the game and its engine carry separate version numbers. The
 streaming engine and its builder are the **CHIM engine**, with its own semantic
 version: the major number changes when the world format changes (the engine
@@ -261,7 +263,9 @@ Special thanks to: ChaosWhisperer
 
 Public source excludes original/converted game data, reusable extracted fonts,
 ROMs and private images. The explicitly allowlisted owner-approved README screenshots are a
-documentation exception. Preserve component licence notices and keep complete
+documentation exception. README/gameplay images must show AmiWind itself;
+OpenMW screenshots are private reference material and must never enter public
+source or documentation assets. Preserve component licence notices and keep complete
 development recovery sets separate from playable packages.
 
 Public documentation and release assets use generic example paths. Keep owner

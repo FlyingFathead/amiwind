@@ -106,7 +106,7 @@ def main(argv=None):
     ap.add_argument('--chim-regions-cells', metavar='CELLS',
                     help='CHIM regions (docs/chim/CHIM_REGIONS.md): exterior cells on CHIM inside the legacy open '
                          'world, one frame per cell, as tools/build.py resolves --chim-regions: "x,y:k ..." (k = s '
-                         'seabed, l land); none by default')
+                         'seabed, l land, o explicitly admitted ocean); none by default')
     ap.add_argument('--chim-regions', action='append', default=[], metavar='SET',
                     help='CHIM regions by name for a run of this tool alone: seabed, coast, sea-ring, a region name '
                          'or @FILE (CSV x,y / aw-chim-cells-1 JSON / Toolkit World Map state); needs '
@@ -141,8 +141,9 @@ def main(argv=None):
             ap.exit(1, 'Error: CHIM regions preflight:\n  %s\n' % '\n  '.join(problems))
         areas += register_generated([chim_regions.frame_settings(f, regions_table['terrain_margin'])
                                      for f in regions_table['frames']])
-        print('CHIM regions: %(cells)d cells (%(seabed)d seabed, %(land)d land) in %(frames)d frames'
-              % regions_table['counts'], flush=True)
+        print('CHIM regions: %d cells (%s) in %d frames'
+              % (regions_table['counts']['cells'], chim_regions.kind_summary(regions_table['counts']),
+                 regions_table['counts']['frames']), flush=True)
     if a.accept_known_stair_findings:
         from project_version import public_version, require_private_test_version
         from chim.known import known_stair_findings

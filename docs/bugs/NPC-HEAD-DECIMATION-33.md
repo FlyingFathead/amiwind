@@ -15,6 +15,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- contents start -->
+## Contents
+
+- [Status: 9 October 2026](#status-9-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bounded character-menu preview quality follow-up, 14 October 2026](#bounded-character-menu-preview-quality-follow-up-14-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 9 October 2026
 
 Fixed in source on v0.0.34-npc-heads, not shipped at the time of writing. Every humanoid model bake
@@ -97,6 +114,23 @@ were checked privately. An in-game check of an image built with the rule remains
 The rule lives in the one shared bake, so every humanoid path gets it; the tests above fail if a head loses a
 triangle under the default or if the previous method stops being reproducible.
 
+## Bounded character-menu preview quality follow-up, 14 October 2026
+
+The exact v0.0.40-dev1 native Nord-male to Nord-female character-change control
+shows a distorted head in the appearance-menu preview, while the subsequent
+inventory body display is valid as a limited rendering observation. The original
+snapshot is retained privately. This does not establish complete appearance
+quality or diagnose a new decimation failure: the selected head/hair identity,
+preview transform, camera, geometry and skin mapping still need comparison
+against the original. Relation to the historical whole-NPC reduction cause
+above is unproven; do not borrow its source repair as preview acceptance.
+
+The same control confirms and remains at the same world point. Health changes
+from 55 to 50 with the expected character-stat rebuild; carried original
+clothing remains equipped with quantity one, gold remains 87, and Luminous
+Russula quantity one remains in Ingredients. This is scoped state preservation,
+not verification of every character field, race, save/load path or visual.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -117,7 +151,8 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [COMBAT-RUN-ROOT-DRIFT-33](COMBAT-RUN-ROOT-DRIFT-33.md): Arena fighters' run frames carry the root's forward motion: the body slides ahead and snaps back each cycle
 - [COMPANION-NO-RUN-ANIM-33](COMPANION-NO-RUN-ANIM-33.md): The companion slides instead of walking or running, and mimic mode does not mirror the gait
 - [NPC-ANIM-IDLE-ONLY-33](NPC-ANIM-IDLE-ONLY-33.md): NPCs have only an 8-frame idle: walking, running, swimming, hit and death are not animated
-- [NPC-BAKE-VERTEX-32](NPC-BAKE-VERTEX-32.md): NPC model bake exceeds the alias vertex budget for two Telvanni residents
+- [NPC-ANIMATION-OFFSET-40](NPC-ANIMATION-OFFSET-40.md): Simplified actor vertices keep a fixed offset while limbs rotate
+- [NPC-BAKE-VERTEX-32](NPC-BAKE-VERTEX-32.md): NPC resident baking can exceed the alias vertex budget
 - [NPC-DAGOTH-BODY-DECIMATION-33](NPC-DAGOTH-BODY-DECIMATION-33.md): Dagoth Ur's body is decimated; his whole model exceeds the alias ceiling
 - [NPC-FEMALE-SKELETON-33](NPC-FEMALE-SKELETON-33.md): Female humans are posed on the male skeleton file (base_anim.nif), the original uses base_anim_female.nif
 - [NPC-FOLLOW-FLOORS-33](NPC-FOLLOW-FLOORS-33.md): The test companion cannot find stairs to another floor of an interior; it is placed beside the player after 6 seconds

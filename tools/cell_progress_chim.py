@@ -10,6 +10,8 @@ and what each audit found. It holds no game data beyond cell numbers and counts.
 digest per run, so later ingests need no access to the build folders.
 """
 import json
+import collections
+import hashlib
 import math
 from pathlib import Path
 
@@ -88,6 +90,118 @@ def _status(ok):
     return 'passed' if ok else 'failed'
 
 
+def _declared_ownership(base,receipt):
+    """Read declared town cores, never infer logical ownership from render copies.
+
+    Original source receipts/catalogues are optional for historical builds. When
+    a receipt declares owned_cells it must agree with the frame transform/grid.
+    """
+    frames={tuple(f['cell']):f for f in _frames(receipt)}
+    declared={};counts={};notes=[];seen_cells=set();reference_union={}
+    for area in receipt.get('areas',[]):
+        if not isinstance(area,str) or '/' in area or '\\' in area or area in ('.','..'):
+            raise ValueError('Invalid CHIM source area')
+        folder=Path(base)/'work'/area
+        source=_read(folder/'source-receipt.json')
+        geometry=(source or {}).get('geometry',{})
+        bounds=geometry.get('owned_cells')
+        if bounds is None:continue
+        if (not isinstance(bounds,list) or len(bounds)!=2 or
+                any(not isinstance(p,list) or len(p)!=2 or any(type(v) is not int for v in p) for p in bounds)):
+            raise ValueError('Malformed declared original-cell core')
+        low,high=bounds
+        if any(a>=b for a,b in zip(low,high)) or (high[0]-low[0])*(high[1]-low[1])>4096:
+            raise ValueError('Invalid declared original-cell core extent')
+        anchor=tuple(geometry.get('source_cell',()))
+        if anchor not in frames:raise ValueError('Declared core has no matching CHIM frame')
+        fr=frames[anchor];centre=geometry.get('centre');local=geometry.get('bounds');scale=geometry.get('scale')
+        if centre!=fr['centre'] or scale!=1/FRAME_LOCAL_SCALE or not local or len(local)!=2:
+            raise ValueError('Declared core frame transform differs')
+        expected=[[centre[i]+local[j][i]/scale for i in range(2)] for j in range(2)]
+        original=[[v*CELL_UNITS for v in p] for p in bounds]
+        if expected!=original:raise ValueError('Declared core bounds are not original-cell aligned')
+        grid=[[fr['centre'][i]+FRAME_LOCAL_SCALE*fr['low'][i] for i in range(2)],
+              [fr['centre'][i]+FRAME_LOCAL_SCALE*(fr['low'][i]+fr[n]*fr['grain']) for i,n in enumerate(('nx','ny'))]]
+        if any(grid[0][i]>original[0][i] or grid[1][i]<original[1][i] for i in range(2)):
+            raise ValueError('CHIM terrain grid does not cover the declared core')
+        core={(x,y) for x in range(low[0],high[0]) for y in range(low[1],high[1])}
+        if core&seen_cells:raise ValueError('Duplicate logical original-cell owner')
+        seen_cells|=core;declared[anchor]=core
+        note={'area':area,'frame':frame_path(anchor),'owned_cells':bounds,'cells':len(core),
+              'basis':'declared original-cell core; apron/render dependency copies do not own cells'}
+        catalogue=_read(folder/'source-catalogue.json')
+        if catalogue is not None:
+            refs={(r.get('master','Morrowind.esm'),r['number']):r for r in catalogue['references']}
+            if len(refs)!=len(catalogue['references']):raise ValueError('Duplicate original reference identity')
+            ownership=catalogue.get('ownership') or {};seen=set();totals=collections.Counter()
+            deferred={(r.get('master','Morrowind.esm'),r['number']):r for r in catalogue.get('deferred',[])}
+            if len(deferred)!=len(catalogue.get('deferred',[])) or not set(deferred)<=set(refs):
+                raise ValueError('Duplicate or unknown deferred original reference')
+            local_counts={}
+            for role in ('owned_references','dependency_references'):
+                if role not in ownership:raise ValueError('Original reference ownership missing')
+                for item in ownership[role]:
+                    ident=(item['master'],item['reference']);cell=tuple(item['physical_cell'])
+                    if ident in seen or ident not in refs:raise ValueError('Duplicate or missing original reference owner')
+                    if (cell in core)!=(role=='owned_references'):raise ValueError('Original reference core ownership differs')
+                    seen.add(ident);t=refs[ident].get('type','UNKNOWN');totals[t]+=1
+                    union=reference_union.setdefault(ident,{'cell':cell,'type':t,'owner':None,
+                                                           'dependency_frames':set(),'deferred':False})
+                    if (union['cell'],union['type'])!=(cell,t):
+                        raise ValueError('Original reference identity has inconsistent origin/type')
+                    if role=='owned_references':
+                        if union['owner'] is not None and union['owner']!=anchor:
+                            raise ValueError('Duplicate logical original reference owner')
+                        union['owner']=anchor
+                    else:union['dependency_frames'].add(frame_path(anchor))
+                    union['deferred'] |= ident in deferred
+                    c=local_counts.setdefault(cell,{'owned_by_type':{},'dependency_by_type':{}})
+                    group=c['owned_by_type' if role=='owned_references' else 'dependency_by_type']
+                    group[t]=group.get(t,0)+1
+                    if 'deferred' in catalogue:
+                        c.setdefault('deferred_by_type',{})
+                        if ident in deferred:
+                            d=c['deferred_by_type'];d[t]=d.get(t,0)+1
+            if seen!=set(refs):raise ValueError('Original reference ownership is incomplete')
+            for cell in core:
+                local_counts.setdefault(cell,{'owned_by_type':{},'dependency_by_type':{}})
+                if 'deferred' in catalogue:local_counts[cell].setdefault('deferred_by_type',{})
+            for cell,c in local_counts.items():
+                c['basis']='original source catalogue identities by physical origin; not rendered model counts'
+                counts.setdefault(anchor,{})[cell]=c
+            note['source_references_by_type']=dict(sorted(totals.items()))
+            note['owned_references']=len(ownership['owned_references'])
+            note['dependency_references']=len(ownership['dependency_references'])
+            note['deferred_by_type']=dict(sorted(collections.Counter(r.get('type','UNKNOWN') for r in deferred.values()).items())) if 'deferred' in catalogue else None
+        notes.append(note)
+    # Repeated footprint dependencies belong to their one logical owner, not
+    # to each frame that needs to render them. Keep copies as separate provenance.
+    merged={};dependency_ids={}
+    unknown_deferred={cell for per in counts.values() for cell,c in per.items() if 'deferred_by_type' not in c}
+    for ident,item in reference_union.items():
+        cell=item['cell'];t=item['type']
+        c=merged.setdefault(cell,{'owned_by_type':{},'dependency_by_type':{},'unique_by_type':{},
+                                  'deferred_by_type':{},'dependency_by_frame':{}})
+        group=c['owned_by_type' if item['owner'] is not None else 'dependency_by_type']
+        group[t]=group.get(t,0)+1;c['unique_by_type'][t]=c['unique_by_type'].get(t,0)+1
+        if item['deferred']:c['deferred_by_type'][t]=c['deferred_by_type'].get(t,0)+1
+        for frame in item['dependency_frames']:
+            per=c['dependency_by_frame'].setdefault(frame,{'by_type':{}})
+            per['by_type'][t]=per['by_type'].get(t,0)+1
+            dependency_ids.setdefault((cell,frame),set()).add(ident)
+    for (cell,frame),ids in dependency_ids.items():
+        per=merged[cell]['dependency_by_frame'][frame]
+        per['unique_reference_count']=len(ids)
+        per['identity_union_sha256']=hashlib.sha256(json.dumps(sorted(ids),separators=(',',':')).encode()).hexdigest()
+    for anchor,per_cell in counts.items():
+        for cell,old in per_cell.items():
+            if cell in merged:
+                current=dict(merged[cell]);current['basis']=old['basis']
+                if cell in unknown_deferred:current.pop('deferred_by_type',None)
+                per_cell[cell]=current
+    return declared,counts,notes
+
+
 def digest(name, base, label=None, commit=None, built_at=None):
     """The per-cell digest of one run, or raises ValueError when it has no receipt."""
     rep = {k: _read(report_path(base, k)) for k in REPORTS}
@@ -97,22 +211,34 @@ def digest(name, base, label=None, commit=None, built_at=None):
     frames = _frames(receipt)
     stats = rep['stats']
     cells, anchors = {}, set()
+    declared,source_counts,ownership_notes=_declared_ownership(base,receipt)
+    converted=set()
     for fr in frames:
         anchors.add(tuple(fr['cell']))
         got = _chunk_cells(fr, stats['chunks']['per_chunk']) if stats else {}
         if not got:
             got = {c: {'chunks': None, 'owned': None, 'terrain_faces': None, 'placed_faces': None, 'bytes': None}
                    for c in _footprint(fr)}
+        anchor=tuple(fr['cell'])
+        if anchor in declared:
+            converted.update(declared[anchor])
+        else:
+            converted.update(c for c,e in got.items() if ((e['owned'] or 0)>0 if stats else c==anchor))
         for c, e in got.items():
+            if c in source_counts.get(anchor,{}):e['source_references']=source_counts[anchor][c]
             cur = cells.get(c)
             if cur is None:
                 cells[c] = dict(e)
                 continue
             for k, v in e.items():
+                if k=='source_references':
+                    # Explicit source ownership is unique; never add dicts/render copies.
+                    if k in cur and cur[k]!=v:raise ValueError('Conflicting original source reference counts')
+                    cur[k]=v;continue
                 if v is not None:
                     cur[k] = (cur[k] or 0) + v
-    # A cell counts as converted when the frame owns placements in it (or, without stats, it is the frame's own cell).
-    converted = {c for c, e in cells.items() if (e['owned'] or 0) > 0} if stats else {c for c in cells if c in anchors}
+    # Declared complete cores include empty cells; apron placements are dependencies.
+    if not converted<=set(cells):raise ValueError('Declared core lacks measured terrain cell coverage')
     audits = {}
 
     def put(mech, cell, status, detail):
@@ -178,7 +304,7 @@ def digest(name, base, label=None, commit=None, built_at=None):
         'frames': [{'cell': fr['cell'], 'path': frame_path(fr['cell'])} for fr in frames],
         'placements': receipt.get('placements'), 'models': models,
         'cells': {key(c): dict(cells[c], converted=(c in converted)) for c in sorted(cells)},
-        'audits': audits, 'run_stats': run_stats,
+        'audits': audits, 'run_stats': run_stats, 'frame_ownership': ownership_notes,
         'lava': receipt.get('lava'),        # docs/LAVA.md: {mode, pools, cells: {cell: pools}}; None before the lava record
         'reports': sorted(k for k, v in rep.items() if v is not None),
     }

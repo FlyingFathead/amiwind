@@ -344,8 +344,8 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     # Terrain references (format 0.7): a chunk terrain unit with an 'offset' is chunk-local; its image is stored
     # once per content (a TERR record homed in the sector that first meets it) and placed by every chunk with it.
     refs = any('offset' in t for spec in frames for t in spec['terrain'].values())
-    if refs and not all('offset' in t for spec in frames for t in spec['terrain'].values()):
-        raise ValueError('Terrain references are all or nothing in one world')
+    # Format0.7 readers already accept both CHK0 inline and CHK1 referenced terrain.
+    # Keep earlier frames inline when new ocean frames use shared TERR records.
     version = REFS_FORMAT_VERSION if refs else FORMAT_VERSION
     terrain_content, terrain_records, terrain_at = {}, [], {}
 
@@ -447,7 +447,8 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                     info = terrain[c]['info']
                     image, image_render = resolved_image(terrain[c]['lumps'], terrain[c]['texture_keys'],
                                                          lambda k: texture_id_of(fi, k))
-                    if refs:
+                    referenced = 'offset' in terrain[c]
+                    if referenced:
                         shift = terrain[c]['offset']
                         why = F.refuse_shift(image, shift)
                         if why:
@@ -471,7 +472,7 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                     pbits = [False] * owned_total
                     for q in pvl[c]:
                         pbits[q - base] = True
-                    if refs:
+                    if referenced:
                         # the reference block is written with its record's place once the sector is laid out
                         tid, shift = ref_at[c]
                         data, render, collision = F.chunk_record_ref(
@@ -502,6 +503,8 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                     # every reference names its record's file row and offset (fixed size: the layout stays)
                     for k, (kind, cid, data) in enumerate(records):
                         if kind != b'CHNK':
+                            continue
+                        if world.order[cid] not in ref_at:
                             continue
                         tid, shift = ref_at[world.order[cid]]
                         at = len(data) - F.TERRAIN_REF.size

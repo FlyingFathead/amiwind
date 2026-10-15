@@ -7,12 +7,12 @@
   "scale": 0.25,
   "bounds": [
     [
-      -1280,
-      -1792
+      -3328,
+      -4608
     ],
     [
-      1664,
-      1536
+      4864,
+      3584
     ]
   ],
   "scenes": [
@@ -118,5 +118,42 @@
       "cell": "Balmora",
       "interior": false
     }
+  ],
+  "owned_cells": [
+    [
+      -3,
+      -11
+    ],
+    [
+      1,
+      -7
+    ]
+  ],
+  "handoff_core": [
+    [
+      -3328,
+      -4608
+    ],
+    [
+      4864,
+      3584
+    ]
+  ],
+  "terrain_margin": 768,
+  "draw_distance": 540,
+  "source_cell": [
+    -2,
+    -9
+  ],
+  "source_radius": 3,
+  "terrain_detail_tiles": [
+    [
+      4352,
+      640
+    ],
+    [
+      3072,
+      1280
+    ]
   ]
 }

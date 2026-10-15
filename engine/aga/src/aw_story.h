@@ -21,6 +21,11 @@ void AW_StoryReset(int new_game);
 int AW_StoryTransition(int next);
 int AW_StoryRestricted(void);
 int AW_StoryFighting(void);
+/* Original registration HUD channels, independent of manual HUD hiding and
+ * weapon readiness. The map/menu admission is a separate feature. */
+enum aw_story_hud { AW_HUD_STATS=1, AW_HUD_WEAPON=2, AW_HUD_MAGIC=4, AW_HUD_ALL=7 };
+int AW_StoryHudChannels(void);
+int AW_StoryPapersRead(void);
 int AW_StoryViewAllowed(void);
 int AW_StoryDoor(unsigned reference);
 void AW_ExpandPlayerName(char *out, unsigned capacity, const char *text);

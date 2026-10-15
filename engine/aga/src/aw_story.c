@@ -44,9 +44,32 @@ int AW_StoryDoor(unsigned reference)
 
 int AW_StoryFighting(void)
 {
-    /* CharGenDoorGuardTalker enables fighting when papers unlock the hall.
-     * This persistent permission is independent of the exterior enclosure. */
-    return !AW_StoryRestricted() || aw_story.hall;
+    /* CharGenStatsSheet OnPCAdd enables fighting before the hall guard.
+     * COURTYARD records successful paper pickup, even while still in Census.
+     * Hall permission is retained for older snapshots; doors remain separate. */
+    return !AW_StoryRestricted() || aw_story.stage>=AW_STAGE_COURTYARD || aw_story.hall;
+}
+
+int AW_StoryHudChannels(void)
+{
+    int channels=0;
+    if(!AW_StoryRestricted())return AW_HUD_ALL;
+    if(aw_story.stage>=AW_STAGE_PAPERS)channels|=AW_HUD_STATS;
+    if(aw_story.stage>=AW_STAGE_COURTYARD || aw_story.hall ||
+       (aw_story.stage>=AW_STAGE_PAPERS && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:opening:papers_read")))
+        channels|=AW_HUD_WEAPON;
+    /* The placed-container fact survives dropping/returning the ring. */
+    if(aw_story.stage>=AW_STAGE_CAPTAIN || !AW_CourtyardRingAvailable())channels|=AW_HUD_MAGIC;
+    return channels;
+}
+
+int AW_StoryPapersRead(void)
+{
+    if(!AW_StoryRestricted())return 1;
+    if(aw_story.stage<AW_STAGE_PAPERS)return 0;
+    /* Activation unlocks InventoryMenu even if the papers are left behind.
+     * Use the existing serialized global table, not a new save-layout field. */
+    return AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:opening:papers_read",1);
 }
 
 int AW_StoryViewAllowed(void)

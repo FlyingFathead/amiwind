@@ -115,6 +115,19 @@ static void write_actors(void){
 static void tick(int n){
     int i;for(i=0;i<n;i++){sv.time+=host_frametime;realtime=sv.time;host_framecount++;AW_CombatPhysics();}
 }
+static int equipment_stores;
+static aw_fighter_t equipment_saved;
+static void test_equipment_store(const aw_fighter_t *sheet) {
+    equipment_saved=*sheet;equipment_stores++;
+}
+static void test_equipment_apply(aw_fighter_t *sheet) {
+    sheet->weapon=2;sheet->weapon_skill=AW_SK_LONG;
+    sheet->shield=1;sheet->shield_class=2;sheet->armor=12;
+    sheet->weapon_health=123;sheet->weapon_health_max=900;
+    sheet->shield_health=45;sheet->shield_health_max=300;
+    /* A bad adapter must not let equipment refresh reset active combat. */
+    sheet->health=999;sheet->fatigue=999;sheet->knocked=0;sheet->dead=0;
+}
 int main(void){
     edict_t *p=&edicts[1],*npc=&edicts[2],*resident=&edicts[3];aw_fighter_t f;const aw_fighter_t *sheet;
     float fraction,alpha;int i,before;
@@ -306,6 +319,35 @@ int main(void){
         printf("blocking ok: held %lu, not held %lu, automatic %lu of 40 blows\n",held_blocks,free_blocks,auto_blocks);
     }
 
+    /* Actual equipment updates preserve live vital/status state and condition. */
+    {
+        aw_fighter_t *live;float hp,fp;int hostiles;
+        AW_CombatClear();p->v.health=60;
+        assert(AW_CombatActorLoad("mevil molor",&f));
+        assert(AW_CombatEngage(npc,&f,NULL));
+        live=(aw_fighter_t *)AW_CombatPlayer();assert(live);
+        live->health=37;live->fatigue=-5;live->knocked=2;
+        live->weapon_health=67;live->shield_health=12;
+        hp=live->health;fp=live->fatigue;hostiles=AW_CombatHostiles();
+        aw_combat_equipment_store=test_equipment_store;
+        aw_combat_equipment=test_equipment_apply;
+        AW_CombatEquipmentStore();
+        assert(equipment_stores==1 && equipment_saved.weapon_health==67 &&
+               equipment_saved.shield_health==12);
+        AW_CombatEquipmentChanged();
+        assert(live->health==hp && live->fatigue==fp && live->knocked==2 &&
+               AW_CombatHostiles()==hostiles && aw_combat_input_locked());
+        assert(live->weapon==2 && live->shield && live->armor==12 &&
+               live->weapon_health==123 && live->shield_health==45);
+        /* A disabled combat simulation must not retain its movement lock:
+         * recovery is suspended while the raw cvar is off. */
+        Cvar_SetValue("aw_combat",0);
+        assert(!aw_combat_input_locked());
+        Cvar_SetValue("aw_combat",1);
+        assert(aw_combat_input_locked());
+        aw_combat_equipment_store=NULL;aw_combat_equipment=NULL;
+        AW_CombatClear();
+    }
     /* commands and cost */
     run("aw_combat_cmd");run("aw_combat_cmd readout off");run("aw_combat_cmd calm");run("aw_combat_cmd off");
     assert(!AW_CombatEngage(npc,&f,NULL));

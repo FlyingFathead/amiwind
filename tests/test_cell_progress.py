@@ -249,7 +249,9 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(c['provenance']['source_commit'], 'abc1234')
         self.assertEqual(c['stats']['chunks'], {'count': 64, 'bytes': 6400})
         self.assertEqual(c['stats']['faces'], {'chim_terrain': 640, 'chim_placed': 1280})
-        self.assertEqual(c['stats']['memory']['frame_heap_peak_bytes'], 500)
+        self.assertNotIn('memory', c['stats'])
+        self.assertNotIn('time', c['stats'])
+        self.assertEqual(doc['runs'][0]['run_stats']['frame_heap_peak_bytes'], 500)
         self.assertEqual(c['stats']['meshes'], {'unique': 3, 'new': 3, 'reused': 0,
                                                 'source': 'derived from the original references, in conversion order'})
         h = doc['headline']

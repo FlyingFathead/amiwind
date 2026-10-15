@@ -77,6 +77,10 @@ void AW_SceneryLink(void)
     if(cl_numvisedicts+count>MAX_VISEDICTS)Host_Error("Balmora visible entity budget exceeded");
     for(i=0;i<count;i++)cl_visedicts[cl_numvisedicts++]=&placements[i].render;
 }
+/* Inventory's conservative BSP-only drop path cannot certify these captured
+ * architectural brushes until arbitrary-footprint collision is implemented. */
+int AW_SceneryCount(void){return count;}
+
 void AW_SceneryClip(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,trace_t *best)
 {
     int i,k;vec3_t low,high;edict_t solid;trace_t hit;aw_scenery_t *p;

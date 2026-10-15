@@ -33,6 +33,7 @@
 - [Prevention](#prevention)
 - [Exact RC1 evidence, 13 October 2026](#exact-rc1-evidence-13-october-2026)
 - [Post-pin RC2 package observation, 14 October 2026](#post-pin-rc2-package-observation-14-october-2026)
+- [Shipment-status recurrence, 14 October 2026](#shipment-status-recurrence-14-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -88,9 +89,10 @@ legend and bounds; the old image is retained. The package count comes from the
 separate existing ledger. Python syntax and diff formatting checks passed;
 the integrated RC1 source passed its reference-input and documentation checks
 on 13 October 2026. Final-source checks remain separate.
-The README correction is prepared for final publication. Exact RC1 compact-image
-checks passed; final-source publication and final-image validation remain pending. The issue stays open until
-the corrected documentation is delivered.
+At that earlier checkpoint the README correction was prepared for final publication.
+Exact RC1 compact-image checks had passed; final-source publication and final-image
+validation were still pending. The shipment-status recurrence below supersedes
+that dated pending state; current issue status remains in the register.
 
 ## Prevention
 
@@ -135,7 +137,30 @@ cells are not included cells and package presence does not prove gameplay.
 
 RC2 full disk readback and independent extraction verify360 whole regional CHIM cells; six partial town overlaps remain excluded. The exact inspection package and matching source artifacts were finalized at 2026-10-13T22:15:44Z. Conversion/audit/native-cell coverage and owner acceptance are unchanged. Historical empty RC1 plan remains incorrectly selected as next by the existing selector; no supported historical flag permits a truthful metadata-only correction.
 
-These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. At that RC2 checkpoint owner acceptance and final v0.0.39 clearance were pending;
+final shipment is recorded in the later recurrence below without inferring owner acceptance.
+
+## Shipment-status recurrence, 14 October 2026
+
+The main README and progress guide retained held/preparation wording after
+final v0.0.39 delivery finalized at 07:15:35 UTC. The obsolete lines survived
+because link, syntax and prior scoped scene checks did not compare current
+release prose against the completed shipment record.
+
+The documentation correction names that finalization and labels preceding
+RC1/RC2 scene diagnostics as historical. Renewed
+[third-person punching](PLAYER-PUNCH-THIRDPERSON-39.md),
+[movement with fists drawn](PLAYER-READY-MOVEMENT-39.md),
+[blocking](COMBAT-BLOCKING-36.md) and
+[swimming](WATER-GAMEPLAY-PARITY-38.md) remain open.
+Shipment, independent fresh-download verification and owner gameplay
+acceptance are distinct. No coverage count or runtime source changes.
+
+The correction is prepared for integration; this report's historical pending
+statements describe their dated checkpoints. Current status remains in the
+canonical register. Prevention: reconcile README, progress guide, release
+notes and issue status against the exact finalization receipt before each
+handoff, then check generated records and affected links.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -164,6 +189,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - HANDOFF-WRAPPER-01 (no report page): Source handoff wrapper reused an existing extraction directory
 - PACKAGE-PORTABILITY-28 (no report page): Rebundled ZIPs lost exec modes; Windows path aliases accepted
 - [PKG-STALE-RUNTIME-32](PKG-STALE-RUNTIME-32.md): The sealed v0.0.31 playtest contains a stale launcher preset folder
+- [PUBLIC-REFERENCE-SCREENSHOT-40](PUBLIC-REFERENCE-SCREENSHOT-40.md): Original-game reference screenshot included in the public source list
 - [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [TOOLING-HEADLESS-BROWSER-31](TOOLING-HEADLESS-BROWSER-31.md): No headless browser in the Docker images: Toolkit screenshots cannot be made in Docker

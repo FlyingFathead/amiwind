@@ -270,6 +270,9 @@ def prepare(workspace, out, radius=11500, texture_size=64, jobs=None, visibility
     data_files = resolve_data_files(state['data_files'])
     placements = json.loads((workspace / 'generated/seyda-neen/placements.json').read_text())
     centre = [-11200., -71504., 400.]
+    from area_config import AREA
+    from town_grid import scenery_radius
+    radius = scenery_radius(AREA, centre, radius)
     refs, groups = select_source_refs(placements, centre, radius, load_groups())
     # Keep a generous origin margin while the actual geometry bounds are not yet
     # known. Runtime selection intersects the converted bounds, including rocks
@@ -280,8 +283,23 @@ def prepare(workspace, out, radius=11500, texture_size=64, jobs=None, visibility
                        jobs=jobs,visibility_policy=visibility_policy)
 
 
+# COLLISION-STAIR-SLOPE-32: these original stair NIFs have an authored
+# walkable RootCollisionNode. Convex visual proxies close their upper flight.
+AUTHORED_COLLISION_REQUIRED = frozenset((
+    'meshes/x/ex_imp_wall_stairs_01.nif',
+    'meshes/x/ex_imp_wall_stairs_02.nif',
+))
+
+
+def authored_collision_required(name):
+    """Only measured original families opt in; never infer from a broad stairs name."""
+    return normpath(name) in AUTHORED_COLLISION_REQUIRED
+
+
 def _read_model(task):
     name, path, extent, collision = task
+    if authored_collision_required(name):
+        collision = 'root_node'  # strict: missing/malformed authored collision is an export error
     try:
         with Path(path).open('rb') as source:
             source.seek(extent['offset'])

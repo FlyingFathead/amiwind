@@ -9,7 +9,7 @@
 | Where | engine/aga/src: Cmd_AddCommand (low hunk) and Cvar_RegisterVariable (zone) registrations |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.36 |
+| Persists in | v0.0.40-dev1 (last seen) |
 | Severity | medium: Every registration costs memory for the whole session; unchecked growth eats heap a slow Amiga needs for the world |
 | Family | Engine table limits (`engine-limits`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -70,6 +70,33 @@ command fails with its name, comments and disabled code are not counted, and low
 ## Prevention
 
 The ratchet runs in every gate: the registries can only shrink unless the owner approves growth.
+
+## Race-command registration recurrence, 14 October 2026
+
+The complete v0.0.40-dev1 candidate gate rejects the new aw_set_playerrace
+Cmd_AddCommand entry: 270 commands exceed the unchanged 269-command budget;
+8,640 bytes exceed the unchanged 8,608-byte command hunk budget. The extra
+registration costs 32 bytes for the session through AmiQuake's existing command
+allocation path.
+
+The complete gate runs 4,079 checks: 4,072 pass, one fails, no errors, three
+Windows skips and three tracked expected failures. The failed assertion is
+test_resident_registry.Budget.test_the_engine_fits_its_resident_registry_budget.
+Functional race-command checks did not measure the resident registry; the full
+ratchet correctly caught the growth before adoption.
+
+This reopens the existing issue. Its earlier v0.0.36 fixed guard is historical
+evidence, not acceptance of the new registration. The failed candidate and its
+exact receipts remain preserved. The source correction now reuses the existing
+on-demand AWDC1 dbg dispatcher, routing to aw_quickchar_set playerrace instead
+of adding a resident command. The
+269/8,608-byte budget is unchanged; source code and handler cost are not claimed
+to be zero merely because a registration is removed.
+
+Twenty focused checks pass, including the actual executable character and
+console paths, generated command/help coverage and the unchanged resident
+budget. The exact new target/full gate, native command behavior, packaging and
+complete acceptance remain pending. The canonical recurrence remains open. This change does not affect CHIM coverage.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

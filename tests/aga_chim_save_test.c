@@ -9,6 +9,8 @@
 #include <assert.h>
 #include <stdarg.h>
 #include "aw_save.c"
+static int equipment_stores;
+void AW_CombatEquipmentStore(void){equipment_stores++;}
 #include "aw_region.h"
 #include "aw_world.h"
 #ifndef VectorSet

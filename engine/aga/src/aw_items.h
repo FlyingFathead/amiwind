@@ -22,6 +22,10 @@ void AW_ItemsPose(const float *tag6,const float origin[3],float yaw,float out_or
 
 #ifndef AW_ITEMS_HOST_TEST
 struct edict_s;
+struct model_s;
+/* Same AWTG1 rows, dynamically selected player weapon/shield paths. */
+int AW_ItemsAliasTag(struct model_s *model,int frame,int kind,float tag[6]);
+void AW_ItemsAliasClear(void);
 /* At spawn (level loading): read the model's tag file and precache its items. */
 void AW_ItemsPrep(struct edict_s *actor);
 /* Show the actor's items (allocates up to two entities into out; 0 = none). */

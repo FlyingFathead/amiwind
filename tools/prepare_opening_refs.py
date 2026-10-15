@@ -40,7 +40,7 @@ def opening_references(data_files):
 BARREL='chargen barrel fatigue'
 
 
-def prepare(data_files,scene):
+def prepare(data_files,scene,allow_append=True):
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'opening references')
     from mwad.paths import unshare_tree
     unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
@@ -62,9 +62,13 @@ def prepare(data_files,scene):
         block=re.sub(r'\n"aw_ref" "[^"]*"','',block)
         block=re.sub(r'\n"aw_story_hidden" "[^"]*"','',block)
         return block[:-1]+extra+'}'
-    # replaced whole: the area stage made this map (BUILD-POOL-READONLY-SCENE-WRITE-35)
-    ent=re.sub(r'\{[^{}]*\}',bind,ent);b[0]=(ent+'\0').encode('cp1252');replace_bytes(path,pack_lumps(b))
+    # Validate a direct source carrier before rewriting any entity bytes.
+    ent=re.sub(r'\{[^{}]*\}',bind,ent)
     barrel=next(r for r in wanted if r['id'].casefold()==BARREL)
+    if barrel['number'] not in found and not allow_append:
+        raise ValueError('Source-only carrier is missing the original tutorial barrel; geometry append refused')
+    # replaced whole: the area stage made this map (BUILD-POOL-READONLY-SCENE-WRITE-35)
+    b[0]=(ent+'\0').encode('cp1252');replace_bytes(path,pack_lumps(b))
     if barrel['number'] not in found:
         parts=scene/'opening-barrel-source';group='opening_barrel';barrel['scene_groups']=[group]
         export_refs(data_files,parts,[barrel],{group:{'references':[barrel['number']]}},[*CENTRE,0],4096,32,{'scope':'authored tutorial barrel'})

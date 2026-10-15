@@ -669,6 +669,8 @@ R_DrawViewModel
 int (*aw_view_hide_hands)(void);
 void R_DrawViewModel (void)
 {
+    entity_t saved_view;
+    entity_t *saved_current;
 // FIXME: remove and do real lighting
 	float		lightvec[3] = {-1, 0, 0};
 	int			j;
@@ -698,7 +700,7 @@ void R_DrawViewModel (void)
 #endif
     /* Resolve the optional current appearance before loading a legacy torch.
      * Other frames/equipment remain ordinary cache-reloadable model metadata. */
-    if(!AW_HandModelsApply())AW_TorchViewModel();
+    if(!AW_HandBlockApply() && !AW_HandModelsApply())AW_TorchViewModel();
 	VectorCopy (currententity->origin, r_entorigin);
 	VectorSubtract (r_origin, r_entorigin, modelorg);
 
@@ -748,6 +750,19 @@ void R_DrawViewModel (void)
 #endif
 
 	R_AliasDrawModel (&r_viewlighting);
+    /* Draw actual equipped equipment through cl.viewent too: the inherited
+     * alias renderer gives this entity its viewmodel depth scale. Restore all
+     * shared entity state before returning to the rest of the renderer. */
+    saved_view=cl.viewent;saved_current=currententity;
+    if(AW_HandBlockItemApply()){
+        currententity=&cl.viewent;
+        VectorCopy(currententity->origin,r_entorigin);
+        VectorSubtract(r_origin,r_entorigin,modelorg);
+        R_AliasDrawModel(&r_viewlighting);
+    }
+    cl.viewent=saved_view;currententity=saved_current;
+    VectorCopy(currententity->origin,r_entorigin);
+    VectorSubtract(r_origin,r_entorigin,modelorg);
 }
 
 

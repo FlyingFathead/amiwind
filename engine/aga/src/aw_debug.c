@@ -125,6 +125,11 @@ static void dimensions(void) {
 static void hands(void) {
     edict_t *p=player();if(!p)return;
     Con_Printf("hands state %ld goal %ld frame %ld torch %ld / time %ld\n",field(p,"aw_hand_state"),field(p,"aw_hand_goal"),(long)p->v.weaponframe,field(p,"aw_torch"),(long)(sv.time*1000));
+    Con_Printf("attack button %ld latched %ld; health %ld water %ld movetype %ld; sent move %ld %ld %ld\n",
+        (long)p->v.button0,field(p,"aw_attack_latched"),(long)p->v.health,
+        (long)p->v.waterlevel,(long)p->v.movetype,
+        (long)cl.cmd.forwardmove,(long)cl.cmd.sidemove,(long)cl.cmd.upmove);
+    AW_IntroInputReport();
 }
 static void npcs(void) {
     int i;edict_t *p;if(!player())return;

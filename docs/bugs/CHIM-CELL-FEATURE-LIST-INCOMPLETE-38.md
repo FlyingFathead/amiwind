@@ -9,7 +9,7 @@
 | Where | Exterior CHIM cell coverage and release feature lists |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev2 (last seen) |
+| Persists in | v0.0.38-dev2, v0.0.40-dev1 (last seen) |
 | Severity | medium: Coverage reporting can hide deferred authored features despite passed geometry audits. |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -20,6 +20,29 @@
 | Platform or emulator | not in game (Original master and source audit.) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Owner evidence reconciliation, 13 October 2026](#owner-evidence-reconciliation-13-october-2026)
+- [Entrance metadata audit, 14 October 2026](#entrance-metadata-audit-14-october-2026)
+- [Ring-0 runtime ownership, 14 October 2026](#ring-0-runtime-ownership-14-october-2026)
+- [Planned original map-reference views, 14 October 2026](#planned-original-map-reference-views-14-october-2026)
+- [Dev2 ocean source integration and town scope, 15 October 2026](#dev2-ocean-source-integration-and-town-scope-15-october-2026)
+- [Original-cell town source implementation, 15 October 2026](#original-cell-town-source-implementation-15-october-2026)
+- [Ocean validation and town corrections - 15 October 2026, v0.0.40-dev2](#ocean-validation-and-town-corrections---15-october-2026-v0040-dev2)
+- [Expanded conversion checkpoint, 15 October 2026](#expanded-conversion-checkpoint-15-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Symptom
 
@@ -98,6 +121,135 @@ or runtime acceptance. Missing build or pose information remains unknown.
 
 - `OWNER-20261012-184648`: SHA-256 `432c07a628db9bdc39ea69f33b68a21c4a55c225d37f60a8ae51ea48eca88ed9`. Gondolier and talk prompt visible; still frame does not prove absence of travel interaction.
 
+
+## Entrance metadata audit, 14 October 2026
+
+The owner requests recorded exterior entrance locations and original interior destinations even when the interior remains deferred to the next pass. The existing source census and compact entrance tree are useful, but the tree deduplicates destination interiors and does not retain every doorway location as a separate visible entrance. Nonvisual marker DOOR records must stay separate.
+
+A bounded original-master audit finds 19 visible directed teleport-door references in rings 0–2, with 19 destination labels; none has a configured destination map. Pelagiad (0,-7) has 22 visible directed doors to 11 interior cells plus one PrisonMarker. Its 22 door meshes convert in the new offline cell result, but no Pelagiad activation bank or interior payload is produced by that converter-only run.
+
+In the inspected RC2 image stage, one of these 42 original DOOR references has an activation row: Ansi reference 300699 in cell (6,-14), with target `-`; the remaining 18 ring-door references and 22 Pelagiad doors have no row in the scanned banks. Stage metadata is not exact-package/native verification. Ansi's cell remains a partial town overlap excluded from whole-cell packaged counts. The owner's unnamed Dwemer example still needs its exact cell/reference binding.
+
+The existing handler already shows `Interior not found.` on normal activation when a registered door's target is invalid or unavailable, and the normal invalid-target prompt is `Interior unavailable`. Quick-build exclusions and MiniWind use their own area-unavailable wording. This requires an aimed door-bank row; missing metadata never reaches the handler. Reuse the original-reference/bounds/label row generation with unavailable target `-` while interiors are deferred. No interior implementation is claimed here.
+
+Preserve per-reference statuses for geometry, activation metadata, destination configuration, actual payload, native entry/return and owner verification. The current `door_links` result measures converted door placements after marker exclusion; it does not establish playable interior links. Deferred interiors must not be described as implemented because a door mesh or label exists.
+
+## Ring-0 runtime ownership, 14 October 2026
+
+All five ring-0 cells lack LAND records and runtime core owners. Historical shared-ocean-template checks are retained, but converted/runtime-placed counts remain zero. Two cells contain four original Bloodmoon LEVC references to horkers; the other three have no original CELL or references in the audited three masters. Shared terrain references and ordinary region ownership are the proposed implementation path; no runtime placement, native cost or gameplay acceptance is established.
+
+The Pelagiad selection preserves seven outside-frame static references rather than silently treating them as complete. Windows3348/3350 belong to sourceCELL(0,-7) but their origins lie in(0,-8); they are also absent from the retained neighbouring frame. Preserve this per-reference coverage limitation for the later ownership audit. Source checks alone do not establish a visible missing-window reproduction.
+
+## Planned original map-reference views, 14 October 2026
+
+The owner requests original World/Local views at least in the progress tracker.
+Reuse existing local-input/background navigation and calibrate detailed local
+reference layers independently from the terrain/placement schematic. Original
+imagery and exploration never increase converted/audited/native/package counts;
+failed, held and excluded overlays remain distinct. This is planned reference
+work, not new imagery, cell coverage or native acceptance.
+
+## Dev2 ocean source integration and town scope, 15 October 2026
+
+The current converter candidate admits explicit no-LAND ocean cells and appends
+ordinary sequential AWR2 ownership rows without changing existing map or save
+identities. It uses the existing CHK1/TERR terrain-reference loader alongside
+inline terrain, with the normal AmiQuake world graft, standing hulls and traces.
+Original-master hashes bind admission, nearby LAND heights and master-local
+material indices. Unsupported or ambiguous source content is refused. Four
+original leveled creature references remain explicitly deferred; geometry does
+not implement their spawning. New ocean rows are excluded before legacy BSP
+compilation. CHIM remains 0.2.0.
+
+The original isolated implementation passed 64 focused synthetic checks.
+The integrated source passes 100 focused terrain, routing, far-terrain and
+tracker checks with no failures, errors or skips. Actual five-cell conversion,
+matched original/native water and seam checks, measured memory and final payload
+readback remain pending. These source changes do not increase converted,
+native-checked or packaged counts.
+
+The agreed dev2 town repair aligns owned boundaries with the original cell grid:
+Vivec x=1..6, y=-14..-9; Seyda Neen x=-3..0, y=-11..-8. It must fill the newly
+included reference bands, preserve origins and save IDs, keep terrain aprons
+separate from ownership, and verify adjacent terrain/water/collision in both
+directions. The older next-batch deferral for six partial overlaps is superseded
+by this dev2 requirement. Implementation and coverage acceptance remain open.
+
+## Original-cell town source implementation, 15 October 2026
+
+The dev2 source now owns Seyda Neen cells x=-3..0,y=-11..-8 and Vivec
+x=1..6,y=-14..-9, with a separate terrain apron and unchanged frame origins.
+Source terrain auditing and scenery selection expand together; old narrow
+source catalogues cannot satisfy the new cache fingerprint. Seyda extends
+outer edges while preserving all 64 region names, order and ownership of old
+points. Vivec uses 64 catalogue selectors; existing scene and interior IDs
+remain, but old-save and harvest behavior still needs runtime checks.
+
+Ten source tests and 18 bounded fixtures pass. The source-band audit accounts
+for 1,607 Seyda and 1,497 Vivec original references, including moved source-cell
+references. Emitted source catalogues classify owned origins separately from
+whole-object footprint dependencies and reject duplicate identities within
+one frame. Actual adjacent catalogues, resident budgets and original/native
+terrain, water and collision seams are still pending. These source fixtures do
+not establish converted, packaged or owner-accepted coverage.
+
+Five ocean frames were converted, but the reporting step failed on an empty
+scenery-model list. See [the reporting repair](CHIM-EMPTY-MODEL-REPORT-40.md).
+Original four leveled creature references remain deferred; no spawning or
+other unimplemented gameplay is implied by the converted ocean geometry.
+
+
+## Ocean validation and town corrections - 15 October 2026, v0.0.40-dev2
+
+The five ring-0 ocean cells (-19,14), (-19,15), (-18,15), (-6,26) and
+(12,23) contain no original static scenery placements. Their five frames
+contain 1,125 terrain chunks. Four original Bloodmoon leveled-creature
+references remain deferred because their spawning is not implemented.
+No scenery was removed to construct a test case.
+
+An empty-model reporting exception stopped the first validation. The corrected
+reporter passes structural/statistics, active-ring memory and zone-allocator
+checks against the same geometry. The original failure is retained. The
+canonical cell tracker records these scoped offline results and clears stale
+measurements from the older shared ocean chunk. Runtime routing, adjacent-cell
+visual/collision seams, final payload and native checks remain pending; these
+cells still do not count as complete or packaged coverage.
+
+The approved town source now distinguishes owned core from the actual terrain
+apron in handoff metadata. The generated engine town table matches the expanded
+configuration. The directory check enumerates the existing sector sharding and
+retains the 72-entry filesystem and 32-byte engine path limits. Eighty combined
+town/reporting tests pass. Actual source conversion, reference ownership,
+resource budgets and native save/load/seam checks are still required.
+
+15 October 2026 source follow-up: the fresh Seyda gameplay carrier uses shared
+original intro placement and validated hand timing. The full intro retains its
+default ten-actor path; the carrier selects exterior roles with original IDs,
+headings and grounding. It checks conversion/UI/runtime palette compatibility
+before cloning, then uses the existing exterior population and opening scripts.
+It rebuilds no unrelated interiors or movie. Seventeen focused checks pass;
+actual carrier conversion, original-reference parity, native seams and packaging
+remain pending. No converted or playable cell count is increased.
+
+15 October 2026: the expanded original-cell Vivec conversion completed with
+structural, active-heap, allocator and stair gates passing. The stair gate walked
+12,828 steps/ramps with zero failures and 1,464 advisory findings. Independent
+original-reference ownership and per-cell accounting are still under review;
+these full-frame results do not establish native seams or playable inclusion.
+The fresh Seyda carrier is blocked by the separately tracked
+[fixed ocean seal](BUILD-SEYDA-OCEAN-FLOOR-40.md).
+
+## Expanded conversion checkpoint, 15 October 2026
+
+Vivec conversion and canonical ingestion retain 36 original core cells and
+28 apron cells separately: 6,039 owned original references, 33 external
+dependencies and 297 deferred references. Seyda conversion has 594 models,
+1,390 placements and 1,638 chunks. Structure, active heap and allocator gates
+pass; 15 stair probes fail at references 3322 and 3324. See
+[CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md). The source-only carrier avoids the complete-town legacy
+terrain compiler; its original-data execution remains pending. Whole playable
+coverage, native seams and package inclusion are not promoted.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -126,6 +278,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-COAST-OBJECTS-MISSING-36](CHIM-COAST-OBJECTS-MISSING-36.md): Objects including Dwemer ruins are reported missing from the CHIM coast
 - [CHIM-LAVA-TERRAIN-SPIKES-38](CHIM-LAVA-TERRAIN-SPIKES-38.md): Angular terrain wedges cross a lava pool in the final-image inspection
 - [CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36](CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36.md): CHIM-native images with no legacy exterior (MiniWinds of one town) ship without the shared sky their frame maps name
+- [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
@@ -134,6 +287,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 
 Related bugs in other categories:
 
+- [BUILD-SEYDA-OCEAN-FLOOR-40](BUILD-SEYDA-OCEAN-FLOOR-40.md): Expanded Seyda ocean terrain collapses onto the fixed BSP seal
 - [CHIM-MOLAG-MEMORY-38](CHIM-MOLAG-MEMORY-38.md): Tel Uvirith exterior cell (10,1) exceeds the CHIM active-ring memory budget
 
 <!-- END GENERATED CATEGORY -->

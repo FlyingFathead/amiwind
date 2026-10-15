@@ -26,6 +26,7 @@ import time
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
 from engine_limits import limits as engine_limits
+from map_engine_limits import limits as map_table_limits
 from player_hull import lumps, pack_lumps
 from world_scenery import region_references
 from world_flora_policy import source_key
@@ -189,7 +190,7 @@ def aggregate_collision(index, refs, prepared, entry):
 
 # static_entities: the engine's budget (client.h MAX_STATIC_ENTITIES, tools/engine_limits.py) less 32
 # for the scene's own statics.
-RESERVES = {'models_plus_sprites': 240, 'entities': 550, 'static_entities': engine_limits()['max_static_entities'] - 32,
+RESERVES = {'models_plus_sprites': min(240, map_table_limits()['model_room']), 'entities': min(550, map_table_limits()['entity_room']), 'static_entities': engine_limits()['max_static_entities'] - 32,
             'nodes': 32767, 'clipnodes': 32767, 'bytes': 4 * 1024 * 1024}
 
 

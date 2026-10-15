@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.33 at 2026-10-09 (time not recorded): first: the register outgrew the 256 KiB release text limit (gate preflight)
 - Reported with v0.0.36-dev5 at 2026-10-11 14:55 +0300: bugs.json 789,008 of 1 MiB passed the 75 % warning again; follow-up TRACKER-REGISTER-SIZE-36 (second archive)
+- Reported with v0.0.40-dev2 at 2026-10-14 (time not recorded): Journal reached196510B,98B below its warning. Rotate133 older entries; preserve newer/CHIM entries, history, links and all limits. Unreleased documentation follow-up.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -23,6 +24,25 @@
 | Family | Development tooling, receipts and packaging (`tracker-tooling`) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Journal headroom follow-up, 14 October 2026](#journal-headroom-follow-up-14-october-2026)
+- [Focused journal validation, 14 October 2026](#focused-journal-validation-14-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 8 October 2026
 
@@ -77,6 +97,34 @@ Gate 256 passes with the limit in place. Not yet in a release preflight of a shi
 tracker file (register, journal, report pages) passes 75 % of its limit in `tools/release.py`, so
 the next step is taken before the preflight fails.
 
+## Journal headroom follow-up, 14 October 2026
+
+The v0.0.40-dev2 source journal reached 196,510 bytes, leaving 98 bytes below
+the existing 75% warning of 196,608 bytes. Continued short entries alone
+would soon fail the tracker gate. The hard text limit and warning are unchanged.
+
+Move 133 selected entries dated 9-11 October into the
+[v0.0.35-v0.0.36 archive](../journals/BUG_JOURNAL-v0.0.35-v0.0.36.md).
+Preserve every entry body and its order, changing only relative links for
+the new directory. Keep newer entries and the latest ten CHIM summary
+entries in the current journal. Existing frozen files remain unchanged.
+Register IDs, issue states, repair history and acceptance fields do not change.
+
+Validation must compare every moved entry with its original, verify prior
+archive hashes and unchanged CHIM summary links, check the tracker and
+documentation links, and confirm the archive is allowlisted and exported.
+This is unreleased documentation maintenance, not a game repair.
+
+## Focused journal validation, 14 October 2026
+
+The rotated source passes all 36 tracker tests, the 806-issue register check,
+1,051-document contents and anchor checks, and the 2,905-file source preflight.
+All prior frozen archive hashes match and the generated CHIM tracker is
+byte-identical. Every moved entry was checked against its original with only
+relative-link relocation permitted. No text limit or warning was increased.
+Full-suite, target and native results for the earlier game build do not
+validate this later source. Shipment remains separate.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -105,6 +153,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - HANDOFF-WRAPPER-01 (no report page): Source handoff wrapper reused an existing extraction directory
 - PACKAGE-PORTABILITY-28 (no report page): Rebundled ZIPs lost exec modes; Windows path aliases accepted
 - [PKG-STALE-RUNTIME-32](PKG-STALE-RUNTIME-32.md): The sealed v0.0.31 playtest contains a stale launcher preset folder
+- [PUBLIC-REFERENCE-SCREENSHOT-40](PUBLIC-REFERENCE-SCREENSHOT-40.md): Original-game reference screenshot included in the public source list
 - [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [TOOLING-HEADLESS-BROWSER-31](TOOLING-HEADLESS-BROWSER-31.md): No headless browser in the Docker images: Toolkit screenshots cannot be made in Docker

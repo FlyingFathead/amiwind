@@ -341,7 +341,30 @@ def seyda_frame_rows(maps, names, default):
     rows, report = frame_entities(points, set(), default)
     report['refused'] = [r for r in report['refused'] if 'CHIM statics are not in the final region maps' not in r]
     report.pop('chim_statics_not_in_maps', None)
+    rows[0].pop('aw_source_carrier', None)  # transport marker is never a runtime frame field
     return rows, report
+
+
+def source_carrier_record(scene, raw):
+    """Validate a marked source-only transport; ordinary complete-town BSPs stay unchanged."""
+    import hashlib
+    from player_hull import lumps
+    from prepare_seyda_source import MARKER, FORMAT as SOURCE_FORMAT
+    parts = lumps(raw)
+    fields = parse_entity(parts[0].decode('cp1252').split('}', 1)[0])
+    if 'aw_source_carrier' not in fields:
+        return None
+    scene = Path(scene)
+    receipt = json.loads((scene / 'seyda-carrier.json').read_text())
+    source_raw = (scene / 'source-entities.json').read_bytes()
+    source = json.loads(source_raw)
+    if fields['aw_source_carrier'] != MARKER or receipt.get('source_only') is not True or \
+            receipt.get('carrier_bsp_sha256') != hashlib.sha256(raw).hexdigest() or \
+            receipt.get('source_entities_sha256') != hashlib.sha256(source_raw).hexdigest() or \
+            source.get('format') != SOURCE_FORMAT or source.get('runtime_payload') is not False or \
+            any(parts[k] for k in (3, 7, 8)):
+        raise ValueError('Invalid non-runtime source carrier receipt or geometry')
+    return receipt
 
 
 def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_index=None, town_scene_report=None,
@@ -365,6 +388,7 @@ def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_in
     from harvest_build import town_origin
     scene, chim_world = Path(scene), Path(chim_world)
     raw = (scene / 'id1/maps/seyda.bsp').read_bytes()
+    source_record = source_carrier_record(scene, raw)
     out = ensure_external(Path(out), 'Seyda Neen CHIM town')
     out.mkdir(parents=True, exist_ok=False)
     (out / 'id1').mkdir()
@@ -410,6 +434,9 @@ def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_in
               'statics': statics, 'report': report, 'flora': flora_record,
               'source': 'game data: the scene stage\'s complete converted town maps/seyda.bsp (sha256 %s); '
                         'no legacy region maps' % hashlib.sha256(raw).hexdigest()}
+    if source_record is not None:
+        record['source'] = 'original source entity/model-box carrier; no complete town BSP compilation'
+        record['source_carrier_sha256'] = hashlib.sha256(raw).hexdigest()
     write_json(out / 'entities.json', record)
     print('Seyda Neen on CHIM: %d frame entities (%d actors fitted on the frame collision), special frames %s, '
           '%d statics checked against the CHIM frame; no legacy region maps'

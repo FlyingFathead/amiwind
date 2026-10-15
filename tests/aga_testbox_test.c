@@ -73,6 +73,9 @@ int main(int argc,char **argv){
     /* No drive: no test.cfg, the normal logo runs; the options stay off. */
     unsetenv("AW_TEST_DRIVE");
     assert(!AW_TestDrive(drive,sizeof(drive)) && !AW_TestBootExec() && !AW_TestBootSkipLogo() && !inserted[0]);
+    /* TEST-NATIVE-TMPDIR-32: overlong host prefixes remain refused, not truncated. */
+    memset(drive,'x',128);drive[128]=0;setenv("AW_TEST_DRIVE",drive,1);
+    assert(!AW_TestDrive(path,64) && !AW_TestBootExec() && !inserted[0]);
     /* The drive with test.cfg: its text, then aw_startup_continue. */
     sprintf(drive,"%s/",argv[1]);setenv("AW_TEST_DRIVE",drive,1);
     assert(!AW_TestBootExec());                   /* drive present, no test.cfg: normal start */

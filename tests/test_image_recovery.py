@@ -39,9 +39,11 @@ class ImageRecoveryTests(unittest.TestCase):
         (old/'build-state.json').write_text(json.dumps(state))
         (source/'docs/PATCH-v0.0.25-rc6.json').write_text(json.dumps({'base_files':{'tools/example.py':{'sha256':'a'*64}}}))
         areas=[]
-        for name,filename,extent in [('Seyda Neen','seyda_area.json',2079),('Balmora','balmora.json',3072)]:
+        for name,filename in [('Seyda Neen','seyda_area.json'),('Balmora','balmora.json')]:
             config=json.loads((build.ROOT/'config'/filename).read_text())
-            core=[[config['centre'][k]+sign*extent*4 for k in range(2)] for sign in (-1,1)]
+            # Retained survey coverage follows the current original-cell town bounds.
+            core=[[config['centre'][k]+edge[k]/config['scale'] for k in range(2)]
+                  for edge in config['bounds']]
             areas.append(dict(name=name,centre=config['centre'],scale=.25,regions=[dict(core=core)]))
         survey={'format':'AmiWind world survey 1','terrain':{'height_seams':[]},
                 'settings':{'overlap_runtime':896,'source_triangle_limit':layout_refinements()['survey_source_triangle_limit']},'areas':areas,

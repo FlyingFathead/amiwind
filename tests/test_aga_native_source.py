@@ -311,9 +311,35 @@ class NativeSourceTests(unittest.TestCase):
             ('view.c','r_alias.c','r_sprite.c','mathlib.c')],
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
+    def test_inventory_atomic_ownership_equipment_and_condition_save(self):
+        for fixture, extra in (('aga_inventory_test.c', ()), ('aga_inventory_save_test.c', ('aw_save_codec.c','aw_story.c'))):
+            self.compile_run(fixture, [Path(SOURCE)/'src'/n for n in ('aw_inventory.c','aw_state.c',*extra)],
+                defines=['AW_INVENTORY_RULES_ONLY'],
+                cflags=['-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-parameter',
+                        '-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_inventory_real_drop_placement_capacity_and_no_loss(self):
+        self.compile_run('aga_inventory_placement_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_inventory.c','aw_state.c','mathlib.c')],
+            cflags=['-fsanitize=address,undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
+    def test_inventory_actual_alias_preview_gear_depth_bounds_and_release(self):
+        self.compile_run('aga_inventory_preview_test.c', [Path(SOURCE)/'src'/n for n in ('aw_head.c','mathlib.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
+    def test_inventory_metadata_rejects_nonfinite_damage_and_path_escape(self):
+        self.compile_run('aga_inventory_metadata_test.c', [Path(SOURCE)/'src'/n for n in ('aw_inventory.c','common.c')],
+            cflags=['-Wl,--wrap=COM_FOpenFile','-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
+    def test_inventory_fullscreen_events_real_equip_atomic_drop_and_exit(self):
+        self.compile_run('aga_inventory_ui_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_worldui.c','aw_inventory.c','aw_harvest.c','aw_state.c','aw_save_codec.c','mathlib.c','common.c')],
+            defines=['AW_INVENTORY_RULES_ONLY'],
+            cflags=['-Wl,--wrap=COM_FOpenFile','-Werror=implicit-function-declaration','-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
     def test_world_map_journal_disk_bounds_navigation_and_modal_exit(self):
-        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_state.c','aw_save_codec.c','mathlib.c')],
-            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
+            defines=['AW_INVENTORY_RULES_ONLY'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_mouse_event_order_accumulation_modal_reset_and_signed_deltas(self):
         cases = ('same_batch_tabs', 'sequential_clamp', 'game_accumulation',
@@ -322,8 +348,8 @@ class NativeSourceTests(unittest.TestCase):
                                    ('gnu99', ('signed_game', 'filter', 'bounds'))):
             with self.subTest(standard=standard):
                 self.compile_run('aga_mouse_event_test.c', [Path(SOURCE)/'src'/n for n in
-                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_state.c', 'aw_save_codec.c', 'mathlib.c')],
-                    cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
+                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_inventory.c', 'aw_state.c', 'aw_save_codec.c', 'mathlib.c')],
+                    defines=['AW_INVENTORY_RULES_ONLY'], cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
                     standard=standard, argument_sets=[(case,) for case in selected])
 
     def test_world_ui_drag_cancels_on_focus_loss_without_lost_release(self):
@@ -343,8 +369,8 @@ class NativeSourceTests(unittest.TestCase):
                                + branches[0].strip() + '}\n')
             self.compile_run('aga_map_focus_test.c',
                 [*[Path(SOURCE)/'src'/n for n in
-                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_state.c', 'mathlib.c')], adapter],
-                cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
+                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_inventory.c', 'aw_state.c', 'mathlib.c')], adapter],
+                defines=['AW_INVENTORY_RULES_ONLY'], cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
                 argument_sets=[(case,) for case in cases])
 
     def test_journal_history_dates_duplicates_and_capacity_transaction(self):
@@ -527,8 +553,15 @@ class NativeSourceTests(unittest.TestCase):
                     cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all", "-Wl,--wrap=malloc"],
                     arguments=[mode])
 
+    def test_inventory_dedicated_pose_equipment_cache_and_refusal(self):
+        self.compile_run('aga_inventory_pose_test.c', [Path(SOURCE)/'src'/n for n in
+            ('aw_anim.c','aw_view_rules.c')],
+            cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
+
     def test_ui_bounds_and_corrupt_fonts(self):
-        self.compile_run("aga_ui_test.c", [ROOT/"engine/aga/src/aw_ui.c", ROOT/"engine/aga/src/aw_intro.c"])
+        self.compile_run("aga_ui_test.c", [Path(SOURCE)/'src'/n for n in
+            ('aw_ui.c','aw_intro.c','aw_inventory.c','aw_story.c','aw_state.c')],
+            cflags=['-Wl,--wrap=malloc','-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_underwater_palette_and_independent_damage(self):
         self.compile_run('aga_palette_test.c', [ROOT/'engine/aga/src/view.c', Path(SOURCE)/'src/mathlib.c'])
@@ -604,11 +637,15 @@ class NativeSourceTests(unittest.TestCase):
                                  '-fno-sanitize-recover=all'])
 
     def test_test_mailbox_drive_and_startup_options(self):
-        # aw_testbox.c: the AWCMDBOX mailbox, the AWTEST: drive (a host folder here), test.cfg and the poll.
-        with tempfile.TemporaryDirectory() as drive:
-            self.compile_run('aga_testbox_test.c', [Path(SOURCE)/'src/aw_testbox.c'],
-                             cflags=['-Wall', '-Wno-unused-function', '-Werror', '-fsanitize=undefined',
-                                     '-fno-sanitize-recover=all'], arguments=[drive])
+        # TEST-NATIVE-TMPDIR-32: compile_run executes in its private temp folder.
+        # Keep the AWTEST drive relative, even when that host folder is very long.
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory(prefix='aw-testbox-' + 'x' * 64) as host:
+            self.assertGreater(len(host), 64)
+            with patch.object(tempfile, 'tempdir', host):
+                self.compile_run('aga_testbox_test.c', [Path(SOURCE)/'src/aw_testbox.c'],
+                                 cflags=['-Wall', '-Wno-unused-function', '-Werror', '-fsanitize=undefined',
+                                         '-fno-sanitize-recover=all'], arguments=['.'])
 
     def test_balmora_region_round_trip(self):
         self.compile_run('aga_region_test.c', [Path(SOURCE)/'src/aw_region.c'])

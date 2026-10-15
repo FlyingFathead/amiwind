@@ -119,6 +119,10 @@ def standing_planes(points, equations, exact=False):
 def _prepare_model(task):
     mi, m, profile, archive_path, *extras = task
     name = m['source']
+    from prepare_scenery import authored_collision_required
+    if authored_collision_required(name) and (not m.get('collision') or
+                                              m['collision'].get('source') != 'NIF RootCollisionNode'):
+        raise ValueError('Required authored collision missing for '+name+'; regenerate its source export')
     with Path(archive_path).open('rb') as archive:
         vv,ff,_=unpack_geometry(read_asset(archive,m));v=np.array(vv);f=np.array(ff)
         visual_f=apply_exterior_selection(f,m)
@@ -215,6 +219,22 @@ def _bevels(lod, subset):
         return True
     wanted = set(lod.get('collision_bevels_pieces', ()))
     return frozenset(k for k, i in enumerate(subset) if i in wanted)
+
+
+def placement_entity(modelnum, origin, yaw, reference):
+    """The canonical placed static fields, shared by BSP and source-only carriers."""
+    return '{\n"classname" "func_wall"\n"aw_ref" "'+str(reference)+'"\n"model" "*'+str(modelnum)+'"\n"origin" "'+' '.join(f'{x:.5f}' for x in origin)+'"\n"angles" "0 '+str(yaw)+' 0"\n}'
+
+
+def placement_metadata(ref, prepared, centre=CENTRE, texture_size=64):
+    """Original placement fields and the BSP writer's exact model-local box.
+
+    Uses the same prepared geometry/transform as the normal writer. No faces,
+    collision nodes, textures or lightmaps are serialized by this helper.
+    """
+    origin, _ = _placement_frame(ref, centre)
+    _, _, low, high = _prepare_placement((ref, prepared, texture_size, centre, None))
+    return origin, -ref['rotation_radians'][2]*180/math.pi, low, high
 
 
 def _instance_key(ref, lighting):
@@ -536,8 +556,6 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
      if routed is not None:return noderoots[0],routed
      return noderoots[0],roots[0]
     entities=[];instance_models={};collision_models={};visual_models={};part_cache={}
-    def entity(modelnum,origin,yaw,reference):
-     return '{\n"classname" "func_wall"\n"aw_ref" "'+str(reference)+'"\n"model" "*'+str(modelnum)+'"\n"origin" "'+' '.join(f'{x:.5f}' for x in origin)+'"\n"angles" "0 '+str(yaw)+' 0"\n}'
 
     if references is None:
         selected, selection_report = select_runtime_refs(index, centre, SCALE, 736)
@@ -635,7 +653,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
         original=visual_models[key];header=bytearray(lumps[14][original*64:(original+1)*64])
         struct.pack_into('<4i',header,36,nroot,croot,croot,croot)
         instance_models[variant]=len(lumps[14])//64;lumps[14]+=header
-       entities.append(entity(instance_models[variant],origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre));continue
+       entities.append(placement_entity(instance_models[variant],origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre));continue
       surfaces,worldparts,lo,hi=next_placement();part_cache[key]=worldparts
       if terrain is not None and terrain.prisms:
        surfaces,cull_counts=cull_surfaces(surfaces,terrain,placement_groups[key])
@@ -728,7 +746,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
       nroot,croot=collision_models[collision_key]
       modelnum=len(lumps[14])//64;nf=len(lumps[7])//20-firstface
       lumps[14]+=struct.pack('<9f7i',*lo,*hi,0,0,0,nroot,croot,croot,croot,0,firstface,nf)
-      visual_models[key]=modelnum;instance_models[variant]=modelnum;entities.append(entity(modelnum,origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre))
+      visual_models[key]=modelnum;instance_models[variant]=modelnum;entities.append(placement_entity(modelnum,origin,yaw,ref['number']));entities.extend(flame_entities(ref,m,centre))
       report.append({'model':name,'faces':nf,'collision_parts':len(components),'scale':ref['scale'],'visual_lod':{k:v for k,v in lod.items() if not k.startswith('_')},'texture_size':texsize});print(len(report),name,nf,len(lumps[9])//8,len(lumps[5])//24,flush=True)
       if len(lumps[5])//24>32767 or len(lumps[9])//8>=65520:raise ValueError('Node budget exceeded')
     if rebakes:

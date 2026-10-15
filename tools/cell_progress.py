@@ -711,13 +711,9 @@ def assemble_stats(cells, cen_cells, met_cells, digest_cell, results):
                     st['chunks'] = {'count': e['chunks'], 'bytes': e.get('bytes')}
                     st['faces'] = {'chim_terrain': e.get('terrain_faces'), 'chim_placed': e.get('placed_faces')}
                     st['bytes'] = {'chim': e.get('bytes')}
-                rs = d.get('run_stats') or {}
-                mem = {m: rs[m] for m in ('frame_heap_peak_bytes', 'frame_heap_budget_bytes', 'zone_locked_peak_bytes',
-                                          'zone_failed_chunk_loads', 'model_zone_peak_bytes') if m in rs}
-                if mem:
-                    st['memory'] = dict(mem, basis='run-level: shared by the cells of the build')
-                if 'build_cpu_s' in rs:
-                    st['time'] = {'cpu_s': rs['build_cpu_s'], 'basis': 'run-level: the whole build'}
+                if e.get('source_references') is not None:
+                    st['source_references']=e['source_references']
+                # Whole frame/world memory and CPU metrics belong to runs, not cells.
                 lv = d.get('lava')
                 if lv:      # the build's lava record (chim.build lava_section): mode and pools by source cell
                     st['lava'] = {'mode': lv.get('mode'), 'pools': (lv.get('cells') or {}).get(k, 0)}
@@ -1149,7 +1145,8 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
                     for r in RESULTS} for m in MECHANISMS}
     runs_meta = [{'name': d['name'], 'label': d.get('label'), 'commit': d.get('commit'), 'chim_version': d.get('chim_version'),
                   'world_format': d.get('world_format'), 'areas': d['areas'], 'built_at': d.get('built_at'),
-                  'placements': d.get('placements'), 'models': d.get('models'), 'reports': d.get('reports')} for d in digests]
+                  'placements': d.get('placements'), 'models': d.get('models'), 'reports': d.get('reports'),
+                  'run_stats': d.get('run_stats') or {}, 'frame_ownership': d.get('frame_ownership') or []} for d in digests]
     history = update_history(out, head, [d['name'] for d in digests], now)
     rel_doc = RL.load(out)         # owner-set, never written by ingest
     RL.attach(cells, rel_doc)

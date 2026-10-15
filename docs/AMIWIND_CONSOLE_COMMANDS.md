@@ -49,15 +49,17 @@ Type: "dbg help" for help.
 | `dbg arena` | `dbg arenapit`, `dbg arenatest`, `dbg battlearena` | [opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved) |
 | `dbg aw charplane` | `dbg gallery`, `dbg modelgallery`, `dbg npcgallery` | [number/name/ID; next/previous/body/exit] |
 | `dbg aw hors` | - | 0 (new Hors, Nord / Barbarian / Steed, after Census) |
+| `dbg characterchange` | `dbg quickchar` | [race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration) |
 | `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
 | `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice on/off / style amiwind/original / block hold/auto / bestattack on/off / loadout NAME/off / calm] melee combat: no argument = status and costs; readout = a console line per swing; seed 0 = a new seed per fight; block hold = right button blocks (defaults: on, readout on, music on, block hold) |
 | `dbg combattest` | - | [opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit |
 | `dbg companion` | - | [pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on) |
 | `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
 | `dbg daycycle gallery` | - | [here/off] (eight-stage camera tour; here keeps this view; Esc returns) |
+| `dbg inventory grant` | - | <quoted source item ID> <1..999> explicit diagnostic grant of actual catalogue items (not saved defaults) |
 | `dbg lightgallery` | - | [off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done |
 | `dbg nightgallery` | - | [here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns) |
-| `dbg quickchar` | - | [name race class birthsign review / all] the quick character screen over the current scene (default: all pages; the New Game screen of --skip-census builds) |
+| `dbg set playerrace` | `dbg set race` | [ID / NAME / list] zero-based race list; switch appearance in place; retain gender/class/name/equipment/level/stats; choose valid head and hair |
 | `dbg shroompicker` | - | [1..10/list] (default 1; preserves inventory and picked state) |
 | `dbg shroomtracker` | - | (picked mushrooms in this save; excludes empty plants) |
 | `dbg torchgallery` | `dbg torchtest` | [npc ID/name] same as torchtest: one NPC in the dark room, V toggles your torch |

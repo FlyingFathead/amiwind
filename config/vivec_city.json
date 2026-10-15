@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "comment": "Vivec, the whole city in ONE CHIM frame (stage B, owner decision 2026-10-10 23:28 +0300: widen the coordinate range, then all of Vivec in one frame). handoff_core = the union of the eight district cores (cells 2..5 x -14..-10 on the original grid: 8,192 x 9,216 local units), centred on (32768, -92160), a point of the 512-unit terrain material grid; it needs wide coordinates (AW_COORD_BOUND 32,000; the narrow engine keeps player areas within +/-4,000). bounds = the core plus at least draw distance + 32 = 572 on every side, in whole sub-cell cores: core_size 1536 (768 would make 13 x 14 = 182 sub-cells, over the engine's 64-row region table, AW_REGION_MAX) gives +/-5,376 = 7 x 7 sub-cells and 42 x 42 chunks of 256. The eight district rows (vivec_arena ... vivec_temple) stay selectable; their rooms keep their map names and save IDs: this frame takes them through interiors_from, its doors lead into them and their exits lead back into this frame; a room past an engine limit ships as unavailable (room_failures), listed in the chim-rooms record. detail_budget 'vivec-deep' (owner decision 3, 2026-10-10: the Vivec default after its A/B shots and seam audit): the whole-city frame's active ring at the Temple plaza needs it to fit the CHIM zone (measured 2026-10-11: 7,836,560 B without, 6,195,920 B with, of 6,242,304).",
+  "comment": "Original CELL-owned Vivec core x1..6,y-14..-9 at the unchanged centre/save origin. bounds and handoff_core own those36cells; terrain_margin768 is terrain-only apron beyond them. core_size1536 yields64 runtime directory rows. Existing district interior/map/save IDs, detail budget and unavailable-room policy remain. Enlarged payload/residency and native seam acceptance are pending.",
   "source_cell": [
     4,
     -12
@@ -13,23 +13,23 @@
   "scale": 0.25,
   "bounds": [
     [
-      -5376,
-      -5376
+      -6144,
+      -5632
     ],
     [
-      5376,
-      5376
+      6144,
+      6656
     ]
   ],
   "reference_margin": 0,
   "handoff_core": [
     [
-      -4096,
-      -4608
+      -6144,
+      -5632
     ],
     [
-      4096,
-      4608
+      6144,
+      6656
     ]
   ],
   "core_size": 1536,
@@ -80,5 +80,16 @@
     "vivec_delyn",
     "vivec_olms"
   ],
-  "room_failures": "unavailable"
+  "room_failures": "unavailable",
+  "owned_cells": [
+    [
+      1,
+      -14
+    ],
+    [
+      7,
+      -8
+    ]
+  ],
+  "terrain_margin": 768
 }

@@ -1045,3 +1045,18 @@ Method: every build's per-stage profile (wall time, CPU seconds, cores used
 against workers given, idle core-seconds) goes into a ledger, and after every
 build an optimizer list ranks idle cores on the critical path and unexpected
 rebuilds (see [Optimizer](#optimizer)).
+
+An optional `build.py --palette FILE` supplies the exact 768-byte RGB palette
+to scene conversion before quantization. The stage cache fingerprints its bytes,
+so changing the same file invalidates scene reuse. Omit it for the historical
+scene-sampled palette. Use the palette from the matching conversion stage,
+before UI and sky reservations; a final runtime palette is not interchangeable.
+
+15 October 2026 source follow-up: the fresh Seyda gameplay carrier uses shared
+original intro placement and validated hand timing. The full intro retains its
+default ten-actor path; the carrier selects exterior roles with original IDs,
+headings and grounding. It checks conversion/UI/runtime palette compatibility
+before cloning, then uses the existing exterior population and opening scripts.
+It rebuilds no unrelated interiors or movie. Seventeen focused checks pass;
+actual carrier conversion, original-reference parity, native seams and packaging
+remain pending. No converted or playable cell count is increased.

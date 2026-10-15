@@ -316,6 +316,39 @@ def simplify_shape(points, faces, quota, preserve_shell=False):
     return points, faces
 
 
+def simplify_shell_components(points, faces, quota):
+    """Retain every disconnected panel under the existing shell tests.
+
+    Only the overflow retry uses this path. A whole-shape QEM reduction may
+    discard an entire disconnected robe panel before the shell check notices.
+    Give every original component a share, then require both its own shell and
+    the combined shell to retain the same area/extent fractions as before.
+    """
+    from mesh_geometry import connected_components
+    groups = connected_components(points, np.column_stack((faces, np.zeros(len(faces), dtype=int))))
+    if len(groups) < 2:
+        return None
+    def area(p, f):
+        return np.linalg.norm(np.cross(p[f[:, 1]]-p[f[:, 0]], p[f[:, 2]]-p[f[:, 0]]), axis=1).sum()
+    def valid(p, f, original, original_faces):
+        return len(f) and np.isfinite(p).all() and area(p, f) >= .8*area(original, original_faces) and \
+            np.all(np.ptp(p, axis=0) >= .7*np.ptp(original, axis=0))
+    vertices, triangles = [], []
+    for ids in groups:
+        used, remap = np.unique(faces[np.asarray(ids)], return_inverse=True)
+        original = points[used]; original_faces = remap.reshape(-1, 3)
+        share = max(4, int(round(quota*len(original_faces)/len(faces))))
+        p, f = simplify_shape(original, original_faces.astype(np.int32), share, True) \
+            if len(original_faces) > share else (original, original_faces)
+        if not valid(p, f, original, original_faces):
+            raise ValueError('Disconnected shell component lost its authored area or extent')
+        triangles.extend((f+len(vertices)).tolist()); vertices.extend(p.tolist())
+    p, f = np.asarray(vertices), np.asarray(triangles, dtype=int)
+    if not valid(p, f, points, faces):
+        raise ValueError('Combined shell lost its authored area or extent')
+    return p, f
+
+
 def player_leg_section_ok(reference, reference_faces, candidate, candidate_faces, minimum=.75,
                           reference_parts=None, candidate_parts=None):
     """Check the rest-pose visible leg union against the earlier body mesh.
@@ -515,7 +548,7 @@ def bake_quotas(shapes,budget=480,face_limit=666,minimum_faces=None,reference_fr
 
 def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None,reference_frames=None,
          quotas=None,shell_height=None,head_detail=None,lod_only='budget',preserve=None,body_skin_rows=None,
-         body_leg_contour=False,face_parts=None):
+         body_leg_contour=False,face_parts=None,full_frame_budget=None):
     """One topology shared by every frame, per-face tiny UV atlas patches.
 
     Default: quotas from head_plan (the whole-appearance bake). Heads (body part
@@ -534,6 +567,8 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
     would compute for that shape in its outfit), overriding shell_height.
     """
     from mesh_geometry_env import npc_head_detail
+    if full_frame_budget is not None and (type(full_frame_budget) is not int or full_frame_budget <= 0):
+        raise ValueError('Invalid full-frame byte budget')
     if quotas is not None:
         if face_limit not in ALIAS_FACE_LIMITS:raise ValueError('Unsupported alias face limit')
         quotas=np.array(quotas,int)
@@ -571,8 +606,17 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
                          None if plan['mode']=='budget' else shell_set,preserve=preserve,
                          body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,face_parts=face_parts)
         except AliasOverflow as overflow:
-            if plan['mode']=='budget' or str(overflow).startswith('Player leg'):raise
-            extra+=overflow.over+2;continue
+            if str(overflow).startswith('Player leg'):raise
+            if plan['mode']=='budget':
+                # NPC-BAKE-VERTEX-32: preserve every disconnected visible panel;
+                # successful normal bakes and all animation samples are unchanged.
+                if str(overflow) != 'Alias vertex budget exceeded':raise
+                result=_bake(shapes,materials,textures,palette,plan['face_limit'],minimum_faces,plan['quotas'],
+                             shell_height,plan['protected'],False,None,preserve=preserve,
+                             body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,
+                             face_parts=face_parts,shell_components=True,full_frame_budget=full_frame_budget)
+            else:
+                extra+=overflow.over+2;continue
         LAST_PLAN.clear()
         LAST_PLAN.update(mode=plan['mode'],face_limit=plan['face_limit'],head_faces=plan['head_faces'],
                          protected_shapes=len(plan['protected']),hair_reduced=plan['hair_reduced'],
@@ -580,8 +624,45 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
         return result
     raise ValueError('Original head does not fit the alias face limit')
 
+def transfer_vertex(point, triangles):
+    """Carry a simplified vertex's residual with its animated source triangle.
+
+    Clipped barycentric weights keep the surface anchor bounded. A proper
+    best-fit rotation and RMS triangle scale carry the residual, without the
+    large extrapolation coefficients of a nearly collinear triangle basis.
+    Rigid transforms and positive uniform scales are exact. General skinned
+    deformation is approximate; no three points determine off-surface skinning.
+    This is conversion only; the runtime still selects ordinary alias frames.
+    """
+    rest = triangles[0]
+    edges = (rest[1:] - rest[:1]).T
+    xy = np.linalg.pinv(edges) @ (point - rest[0])
+    weights = np.clip(np.array([1 - xy.sum(), *xy]), 0, 1)
+    weights /= weights.sum()
+    anchor = np.einsum('v,fvc->fc', weights, triangles)
+    residual = point - weights @ rest
+    centered = triangles - triangles.mean(axis=1, keepdims=True)
+    energy = np.einsum('fvc,fvc->f', centered, centered)
+    cross_length = np.linalg.norm(np.cross(edges[:, 0], edges[:, 1]))
+    edge_product = np.linalg.norm(edges[:, 0]) * np.linalg.norm(edges[:, 1])
+    if cross_length <= 1e-10 * edge_product:
+        # A collinear/point reference has no recoverable surface orientation.
+        result = anchor + residual
+    else:
+        covariance = np.einsum('vi,fvj->fij', centered[0], centered)
+        left, _, right = np.linalg.svd(covariance)
+        rotation = left @ right
+        # Reject reflection: the residual belongs to the same side of the limb.
+        left[:, :, -1] *= np.where(np.linalg.det(rotation) < 0, -1., 1.)[:, None]
+        rotation = left @ right
+        scale = np.sqrt(energy / energy[0])
+        result = anchor + np.einsum('i,fij->fj', residual, rotation) * scale[:, None]
+    result[0] = point  # preserve the simplifier's exact floating-point rest pose
+    return result
+
+
 def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shell_height,protected,raised,
-          shell_set=None,preserve=None,body_skin_rows=None,body_leg_contour=False,face_parts=None):
+          shell_set=None,preserve=None,body_skin_rows=None,body_leg_contour=False,face_parts=None,shell_components=False,full_frame_budget=None):
     """shell_set None: the previous rule (large torso panels keep their shell); else the
     shape indices whose reduction keeps its silhouette (original-head bake)."""
     from scipy.spatial import cKDTree
@@ -605,8 +686,12 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
             preserve_shell = bool(preserve[index]) if preserve is not None else \
                 (shape['part']==3 and np.ptp(p[:,2]) >= .2*actor_height) if shell_set is None \
                 else index in shell_set
-            source_points=points
+            source_points=points; source_faces=ff
             points,ff=simplify_shape(points,ff.astype(np.int32),int(quota),preserve_shell)
+            if shell_components and preserve_shell:
+                candidate=simplify_shell_components(source_points,source_faces,int(quota))
+                if candidate is not None and len(candidate[1]) < len(ff):
+                    points,ff=candidate
             if body_leg_contour and (shape['part'] in (19,20) or
                                      (body_leg_contour==2 and shape['part'] in (21,22))):
                 # Player-body fallback only: a tiny knee quota can keep the
@@ -626,6 +711,13 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
         reduced.append((exact,points,ff))
     total=sum(len(ff) for _,_,ff in reduced)
     if total>face_limit:raise AliasOverflow('Alias vertex budget exceeded',total-face_limit)
+    if full_frame_budget is not None:
+        # Overflow-only NPC retry: choose smaller geometry before atlas work,
+        # preserving the entire source sample list under the existing byte cap.
+        from npc_anim import alias_bytes
+        rows = 256 if total <= 512 else ((face_limit+31)//32)*16
+        if alias_bytes(len(shapes[0]['positions']),total*3,total,512,rows) > full_frame_budget:
+            raise AliasOverflow('Alias byte budget exceeded with full samples')
     for shape,(exact,points,ff) in zip(shapes,reduced):
         orig=shape['positions'];faces=shape['faces'];p=orig[0]
         old_tri=p[faces];centres=old_tri.mean(axis=1);tree=cKDTree(centres)
@@ -642,12 +734,11 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                 allframes.append(orig[:,face,:].copy())
             else:
                 # Transfer each decimated vertex via the nearest original triangle;
-                # retain the rest-pose residual instead of snapping away the silhouette.
+                # carry its rest-pose offset with that surface as the limb moves.
                 animated=[]
                 for point in triangle:
-                    ti=int(tree.query(point)[1]);t=old_tri[ti];xy=np.linalg.pinv(np.column_stack((t[1]-t[0],t[2]-t[0])))@(point-t[0])
-                    w=np.array([1-xy.sum(),*xy]);w=np.clip(w,0,1);w/=w.sum()
-                    animated.append(np.einsum('v,fvc->fc',w,orig[:,faces[ti]])+(point-w@t))
+                    ti=int(tree.query(point)[1])
+                    animated.append(transfer_vertex(point,orig[:,faces[ti]]))
                 allframes.append(np.stack(animated,axis=1))
             tile=np.zeros((16,16,3),np.uint8)
             yy,xx=np.mgrid[0:16,0:16];w=np.column_stack((np.maximum(0,1-(xx.ravel()+yy.ravel())/15),xx.ravel()/15,yy.ravel()/15));w/=w.sum(1)[:,None]

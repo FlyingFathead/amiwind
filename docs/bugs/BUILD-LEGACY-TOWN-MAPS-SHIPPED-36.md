@@ -44,6 +44,7 @@
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
+- [Source-only carrier, 15 October 2026](#source-only-carrier-15-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -131,6 +132,17 @@ To do: the next build's log shows 0 legacy maps of CHIM areas built, the Balmora
 
 A builder gate fails when a legacy map of a CHIM area is built or processed without a recorded reason.
 
+## Source-only carrier, 15 October 2026
+
+The current dev2 source adds an optional original-source entity/model-bound
+carrier for Seyda CHIM. Canonical placement transforms, mounting, visual offsets,
+intro/exterior actors, activation bounds and original-reference checks remain.
+This avoids compiling a complete legacy town terrain map. The intermediate is
+marked non-runtime and must not enter an image; the existing CHIM frame-map
+writer supplies runtime maps. Forty-seven isolated checks pass. Original-data
+execution, combined-source validation, native seams/story/save behavior and
+packaging remain pending. No source-only check establishes shipment.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -159,6 +171,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-COAST-OBJECTS-MISSING-36](CHIM-COAST-OBJECTS-MISSING-36.md): Objects including Dwemer ruins are reported missing from the CHIM coast
 - [CHIM-LAVA-TERRAIN-SPIKES-38](CHIM-LAVA-TERRAIN-SPIKES-38.md): Angular terrain wedges cross a lava pool in the final-image inspection
 - [CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36](CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36.md): CHIM-native images with no legacy exterior (MiniWinds of one town) ship without the shared sky their frame maps name
+- [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest

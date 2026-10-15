@@ -220,12 +220,16 @@ int AW_CombatLoadout(const char *loadout,aw_fighter_t *out,char *chosen) {
 }
 /* The arena's set fighter for the player (aw_arena.c), NULL = the character. */
 const aw_fighter_t *aw_combat_player_preset;
+/* Optional inventory adapter: source-derived equipment on the current sheet. */
+void (*aw_combat_equipment)(aw_fighter_t *sheet);
+void (*aw_combat_equipment_store)(const aw_fighter_t *sheet);
 void AW_CombatPlayerSheet(aw_fighter_t *o) {
     edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;int i;
     if(aw_combat_player_preset){
         *o=*aw_combat_player_preset;strcpy(o->name,"You");o->aware=1;o->knocked=o->dead=0;
         o->health=p?p->v.health:o->health_max;
         o->fatigue=aw_character.valid?aw_character.current[2]:o->fatigue_max;
+        if(aw_combat_equipment)aw_combat_equipment(o);
         return;
     }
     memset(o,0,sizeof(*o));strcpy(o->id,"player");strcpy(o->name,"You");o->aware=1;
@@ -239,8 +243,26 @@ void AW_CombatPlayerSheet(aw_fighter_t *o) {
     o->fatigue=aw_character.valid?aw_character.current[2]:o->fatigue_max;
     o->weapon_skill=AW_SK_H2H;
     o->armor=settings_ok?AW_CombatUnarmoredRating(&aw_combat_settings,o):0;
+    if(aw_combat_equipment)aw_combat_equipment(o);
+}
+/* Inventory transactions store condition before changing slots. Refresh only
+ * equipment fields: equipping must never heal or clear an active knockdown. */
+void AW_CombatEquipmentStore(void) {
+    if(you_valid && aw_combat_equipment_store)aw_combat_equipment_store(&you);
+}
+void AW_CombatEquipmentChanged(void) {
+    aw_fighter_t changed;
+    if(!you_valid || !aw_combat_equipment)return;
+    changed=you;aw_combat_equipment(&changed);
+    you.weapon=changed.weapon;you.weapon_skill=changed.weapon_skill;
+    memcpy(you.damage,changed.damage,sizeof(you.damage));
+    you.reach=changed.reach;you.speed=changed.speed;you.weight=changed.weight;
+    you.armor=changed.armor;you.shield=changed.shield;you.shield_class=changed.shield_class;
+    you.weapon_health=changed.weapon_health;you.weapon_health_max=changed.weapon_health_max;
+    you.shield_health=changed.shield_health;you.shield_health_max=changed.shield_health_max;
 }
 static void you_store(edict_t *p) {
+    AW_CombatEquipmentStore();
     if(p)p->v.health=you.health;
     if(aw_character.valid){aw_character.current[0]=you.health;aw_character.current[2]=you.fatigue;}
 }
@@ -272,7 +294,7 @@ static slot_t *slot_of(edict_t *e) {int i;for(i=0;i<SLOTS;i++)if(slots[i].e==e)r
 static void print_swing(const char *who,const char *whom,int attack,const aw_swing_t *s) {
     static const char *outcome[]={"miss","BLOCKED","fatigue","HIT"},*type[]={"chop","slash","thrust"};
     if(!readout.value)return;
-    if(s->roll<0){Con_Printf("Combat: %s swings at %s (already down)\n",who,whom);return;}
+    if(s->roll<0 && s->roll!=-2){Con_Printf("Combat: %s swings at %s (already down)\n",who,whom);return;}
     if(s->roll==-2)Con_Printf("Combat: %s -> %s: no dice %s%s",who,whom,outcome[s->outcome],s->critical?" CRITICAL":"");
     else Con_Printf("Combat: %s -> %s: chance %ld roll %ld %s%s",who,whom,(long)s->chance,(long)s->roll,outcome[s->outcome],
         s->critical?" CRITICAL":"");
@@ -607,7 +629,8 @@ static float player_strength(void) {
 }
 /* The player down (knockdown or knockout): controls locked, the view near the
  * floor, rising over the last 40 % of a knockdown or 0.8 s after a knockout. */
-static int player_locked(void) {return you_valid && !you.dead && you.knocked;}
+/* A paused combat simulation cannot recover knockdown; it must not lock input. */
+static int player_locked(void) {return combat_on.value && you_valid && !you.dead && you.knocked;}
 static void player_down_view(edict_t *p) {
     float low,base,t,f=1;
     if(!pv.view_saved){

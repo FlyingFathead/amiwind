@@ -165,5 +165,28 @@ class ChimStatsTests(unittest.TestCase):
         self.assertEqual(sorted(mine), sorted(doc))
 
 
+
+
+class EmptyModelWorldTests(unittest.TestCase):
+    def test_terrain_only_world_retains_validation_and_statistics(self):
+        for refs in (False, True):
+            with self.subTest(terrain_refs=refs), tempfile.TemporaryDirectory() as tmp:
+                out = Path(tmp)
+                receipt, source = fixture(out, placements=[], settings={
+                    'grain': 256, 'sector_chunks': 2,
+                    **({'terrain_refs': 'on'} if refs else {})})
+                failures, world = validate(out, source)
+                self.assertEqual(failures, [])
+                self.assertEqual(world['models'], [])
+                measured = measure(world, source)
+                self.assertIsNone(measured['largest_model'])
+                self.assertEqual(measured['model_bytes'], {'render': 0, 'collision': 0})
+                self.assertGreater(measured['chunk_bytes']['render'], 0)
+                stats = S.chim_stats(world, measured, receipt, ['fixture'])
+                self.assertEqual(stats['counts']['models'], 0)
+                self.assertEqual(stats['counts']['placements'], 0)
+                self.assertGreater(stats['faces']['terrain'], 0)
+
+
 if __name__ == '__main__':
     unittest.main()

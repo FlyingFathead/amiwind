@@ -6,10 +6,10 @@
 | --- | --- |
 | Reported by | owner |
 | First noticed | 9 October 2026, in v0.0.33-dev |
-| Where | CHIM chunk loading and zone: earlier Balmora cases; Dwemer exterior cell (9,2) follow-up |
+| Where | CHIM chunk loading/zone: Balmora, Dwemer follow-up and Seyda native terrain allocation |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev, v0.0.38, v0.0.39-rc1 (last seen) |
+| Persists in | v0.0.33-dev, v0.0.38, v0.0.39-rc1, v0.0.40-dev1 (last seen) |
 | Severity | high: Whole areas of Balmora are missing and the player falls through the ground. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Stairs and collision on CHIM worlds ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -35,6 +35,10 @@
 - [Prevention](#prevention)
 - [Owner follow-up, 13 October 2026: Dwemer exterior cell (9,2)](#owner-follow-up-13-october-2026-dwemer-exterior-cell-92)
 - [Exact RC1 evidence, 13 October 2026](#exact-rc1-evidence-13-october-2026)
+- [Seyda native allocation retry, 14 October 2026](#seyda-native-allocation-retry-14-october-2026)
+- [Repeated Seyda allocation failure, 14 October 2026](#repeated-seyda-allocation-failure-14-october-2026)
+- [Khajiit follow-up diagnostic, 14 October 2026](#khajiit-follow-up-diagnostic-14-october-2026)
+- [Nord gait diagnostic, 14 October 2026](#nord-gait-diagnostic-14-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -225,6 +229,44 @@ under the existing streaming issue. It does not alone prove a visible hole,
 ground loss or eventual recovery. Scoped save/reload survival and package
 inclusion do not close streaming/residency or performance coverage.
 
+## Seyda native allocation retry, 14 October 2026
+
+During normal male-Nord S/D movement in the exact v0.0.40-dev1 Seyda CHIM
+diagnostic, chunk 249 terrain (45,840 bytes) cannot load: the largest free run
+is 15,824 bytes despite 80,336 total free bytes, with 6,837,552 bytes locked
+of a 6,962,880-byte zone. The runtime reports zone full and retrying.
+
+This is allocation/residency evidence under the existing streaming issue.
+It does not alone establish a visible terrain hole, falling, eventual recovery,
+measured FPS impact or that inventory caused the pressure. Preserve the warning
+and exact native source/world binding for further investigation. No new cell
+coverage, memory repair or owner acceptance is claimed.
+
+## Repeated Seyda allocation failure, 14 October 2026
+
+The same exact native diagnostic later repeats chunk 107 allocation refusal
+during the Fargoth exchange: model 1408 requires 386,448 bytes; largest free
+block is 98,016 bytes, total free 173,648, with 6,559,152 of 6,962,880 bytes
+locked. The log explicitly retries. This is further evidence under the existing
+allocation/residency issue, without a new visible-hole, recovery, performance,
+cause or CHIM-coverage conclusion.
+
+## Khajiit follow-up diagnostic, 14 October 2026
+
+Test source `90ba44c2cc079de50e50b8e1a8cde76dd2bcf318`, engine SHA-256 `166ffbecbcd399f9d9fe3ed2d5f3bdc259bf17a0bfe7f1e933a1222bf264b2a2`, using the previously delivered v0.0.40-dev1 world. The post-Census diagnostic character was changed through the actual appearance menu. This is an unreleased diagnostic, not a new shipment.
+
+Seyda chunk 107 / model 1408 repeatedly refused a 386,448-byte allocation with 11,872 bytes in the largest free run, 138,672 bytes free overall and 6,691,616 bytes locked of 6,962,880. Gameplay continued. No specific missing face or original reference is identified by this warning alone. Existing coverage counts and failed/held states are retained; no cell completion or conversion is added.
+
+The separate normal shutdown check records actual emulator-parent and container exit status 0, followed by 194 resource checks, 33 key bindings and a valid bitmap. This does not retroactively repair the earlier failed shutdown receipt. Played disks remain diagnostic evidence only.
+
+## Nord gait diagnostic, 14 October 2026
+
+Test source `90ba44c2cc079de50e50b8e1a8cde76dd2bcf318`, engine SHA-256 `166ffbecbcd399f9d9fe3ed2d5f3bdc259bf17a0bfe7f1e933a1222bf264b2a2`, with the previously delivered v0.0.40-dev1 world. This is an unreleased diagnostic, not a new package or acceptance. The original emulator frames were retained; warp was visibly disabled before recording.
+
+Chunk224 requested 38,144 terrain bytes with 7,600 in the largest free run, 111,712 free overall and 6,631,168 locked of 6,962,880 bytes. Chunk248 requested 52,752 terrain bytes with 27,424 in the largest free run, 135,472 free overall and 6,826,736 locked. These repeated refusals do not identify an absent face or establish the cause of a blocked route. Existing failed/held cells and all coverage counts remain unchanged.
+
+The run closed normally and passed its separate post-exit resource readback. Its played disk is diagnostic evidence only. All related gameplay reports remain open.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -299,7 +341,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-VARIANT-YAW-DUPLICATES-36](CHIM-VARIANT-YAW-DUPLICATES-36.md): One CHIM model variant is stored several times: each frame builds it at the yaw of its own first placement
 - [CHIM-VIEW-FACES-33](CHIM-VIEW-FACES-33.md): Model faces dominate each Balmora view: the streamer alone does not fix frame rate
 - [CHIM-VIEW-LEAF-NO-PVS-35](CHIM-VIEW-LEAF-NO-PVS-35.md): A view leaf without a visibility row draws everything, with no counter saying so
-- [CHIM-WINDOW-MOUNT-CROSS-CELL-33](CHIM-WINDOW-MOUNT-CROSS-CELL-33.md): A one-cell CHIM frame stops when a window placed in it mounts on a faÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ade placed in the next cell
+- [CHIM-WINDOW-MOUNT-CROSS-CELL-33](CHIM-WINDOW-MOUNT-CROSS-CELL-33.md): A one-cell CHIM frame stops when a window placed in it mounts on a facade placed in the next cell
 - [CHIM-WORLD-AUDIT-SCALING-33](CHIM-WORLD-AUDIT-SCALING-33.md): The CHIM world audits grow much faster than the world: the heap gate took 3.6 s for 171 frames, 473 s for 331, and over an hour for 844
 - [CHIM-WORLD-INDEX-FILE-LIMIT-36](CHIM-WORLD-INDEX-FILE-LIMIT-36.md): The engine refuses a CHIM world index with more than 4096 file rows; the dev3 coast world has 7,236, so every CHIM frame map fails
 - [CHIM-ZONE-RING-THRASH-33](CHIM-ZONE-RING-THRASH-33.md): Balmora's chunk ring does not fit the default 6 MiB CHIM zone, so the cache thrashes

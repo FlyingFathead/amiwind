@@ -66,7 +66,7 @@ static int route_match(char *words,int argc,char **argv,int start) {
     return *words?0:j;
 }
 static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capacity) {
-    int used,n,k,setting;char *token;
+    int used,n,k,setting,quoted,spaced;char *token;
     if(!strcmp(r->command,"aw_teleport") && argc-j>3)return 0;   /* dbg tp X Y [Z] */
     if(!strcmp(r->command,"aw_shroomtracker") && argc!=j)return 0;
     if(!strcmp(r->command,"aw_shroompicker")){
@@ -82,7 +82,24 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
     }
     used=(int)strlen(r->command);if(used+2>capacity)return 0;
     strcpy(out,r->command);
+    /* The appearance-only alias reuses quickchar; no second resident command. */
+    if(!strcmp(r->words,"characterchange") && argc==j){
+        if(used+13>capacity)return 0;
+        strcpy(out+used," appearance\n");return 1;
+    }
+    if(!strcmp(r->command,"aw_inventory") && !strcmp(r->words,"inventory grant")){
+        if(used+7>capacity)return 0;
+        strcpy(out+used," grant");used+=6;
+    }
+    if(!strcmp(r->command,"aw_quickchar_set") &&
+       (!strcmp(r->words,"set race") || !strcmp(r->words,"set playerrace"))){
+        if(used+13>capacity)return 0;
+        strcpy(out+used," playerrace");used+=11;
+    }
     setting=Cvar_FindVar(r->command)!=NULL;
+    spaced=!strcmp(r->command,"aw_inventory") ||
+        (!strcmp(r->command,"aw_quickchar_set") &&
+         (!strcmp(r->words,"set race") || !strcmp(r->words,"set playerrace")));
     for(;j<argc;j++){
         token=argv[j];
         /* A route straight onto a setting gets 1/0 for the toggle words the
@@ -92,11 +109,14 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
             else if(!Q_strcasecmp(token,"off") || !Q_strcasecmp(token,"false") || !Q_strcasecmp(token,"no"))token="0";
         }
         n=(int)strlen(token);
-        if(!n || used+n+3>capacity)return 0;
+        quoted=spaced && strchr(token,' ')!=NULL;
+        if(!n || used+n+(quoted?5:3)>capacity)return 0;
         for(k=0;k<n;k++)if(!((token[k]>='a'&&token[k]<='z') ||
             (token[k]>='A'&&token[k]<='Z') || (token[k]>='0'&&token[k]<='9') ||
-            token[k]=='-' || token[k]=='+' || token[k]=='.' || token[k]=='_'))return 0;
-        out[used++]=' ';memcpy(out+used,token,n);used+=n;
+            token[k]=='-' || token[k]=='+' || token[k]=='.' || token[k]=='_' ||
+            (spaced && token[k]==' ')))return 0;
+        out[used++]=' ';if(quoted)out[used++]='"';
+        memcpy(out+used,token,n);used+=n;if(quoted)out[used++]='"';
     }
     out[used++]='\n';out[used]=0;return 1;
 }

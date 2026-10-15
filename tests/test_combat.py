@@ -39,6 +39,10 @@ class CombatNativeTests(unittest.TestCase):
             'aga_combat_test.c', [SRC / n for n in ('aw_combat.c', 'aw_combat_rules.c', 'aw_npcpath.c', 'mathlib.c', 'aw_anim.c')],
             defines=('AW_ANIM_HOST_TEST',), cflags=UBSAN)
 
+    def test_actual_no_dice_readout_and_negative_sentinels(self):
+        native.NativeSourceTests().compile_run(
+            'aga_combat_readout_test.c', [SRC / 'aw_combat_rules.c'], cflags=UBSAN)
+
     def test_carried_item_tags_parse_and_pose(self):
         native.NativeSourceTests().compile_run('aga_items_test.c', [SRC / 'aw_items.c'],
                                                defines=('AW_ITEMS_HOST_TEST',), cflags=UBSAN)
@@ -104,7 +108,12 @@ class CombatSourceContractTests(unittest.TestCase):
         self.assertIn('v->block_off', code('aw_combat_rules.c').split('int AW_CombatCanBlock')[1].split('}')[0])
         self.assertIn('bits = aw_combat_buttons (bits);', code('cl_input.c'))
         self.assertIn('AW_CombatGuarding()', code('aw_view.c'))      # the body's block group
-        self.assertIn('aw_combat_guard_marker()', code('aw_ui.c'))
+        # The normal HUD no longer paints temporary Guard telemetry; actual
+        # guard mechanics/readout and ordinary target-name drawing remain.
+        self.assertNotIn('aw_combat_guard_marker()', code('aw_ui.c'))
+        self.assertIn('aw_combat_guard_marker=AW_CombatGuarding', combat)
+        self.assertIn('blocks: you', combat)
+        self.assertIn('void AW_UITargetName', code('aw_ui.c'))
         menu = code('aw_menu.c')
         self.assertIn('{"Block","+aw_alt"}', menu)
         self.assertIn('"Blocking: Hold to block":"Blocking: Automatic"', menu)

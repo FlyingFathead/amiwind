@@ -171,7 +171,7 @@ OPTIONS = {
     'help': 'tooling', 'data_files': 'input', 'workspace': 'tooling', 'stage': 'mode', 'check': 'mode',
     'plan': 'mode', 'install_dependencies': 'mode', 'autoinstall': 'mode', 'yes': 'mode',
     'install_sdk': 'mode', 'tools_dir': 'tooling', 'versions': 'mode', 'host_plan': 'mode',
-    'fallback_font': 'input', 'check_inputs': 'mode', 'layout_selftest': 'mode', 'dry_run': 'mode',
+    'fallback_font': 'input', 'palette': 'input', 'check_inputs': 'mode', 'layout_selftest': 'mode', 'dry_run': 'mode',
     'recover_image_from': 'mode',
     'autorun_fs_uae': 'mode', 'kickstart_file': 'input', 'amiga_libs_policy': 'check',
     'game_data_policy': 'check', 'check_hashes': 'check', 'allow_data_differences': 'check',

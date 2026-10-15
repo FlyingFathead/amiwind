@@ -61,7 +61,10 @@ void() aw_hands_update = {
     if (self.aw_hand_state == 2 && !self.aw_hand_goal) aw_hand_begin(4);
     if (!self.button0) self.aw_attack_latched = 0;
     if (self.button0 && !self.aw_attack_latched) {
-        self.aw_attack_latched = 1;
+        // A held press during raising is still pending when the hands become
+        // ready. Releasing it cancels naturally above; never repeat a held
+        // attack once accepted, or turn a torch press into a later punch.
+        if (self.aw_hand_state != 1) self.aw_attack_latched = 1;
         if (self.aw_hand_state == 2 && !self.aw_torch) aw_hand_begin(3);
     }
     if (self.aw_hand_state == 0) { self.weaponmodel = ""; return; }

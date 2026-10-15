@@ -3,6 +3,7 @@
  * Writing the inactive generation never renames or truncates the active one. */
 #include "quakedef.h"
 #include "aw_save.h"
+#include "aw_combat.h"
 #include "aw_saved_equipment.h"
 #include "aw_region.h"
 #include "aw_maps.h"
@@ -78,6 +79,7 @@ void AW_SaveCapture(void)
 {
     int i,j,k,scene;uint32_t ref;edict_t *e;eval_t *v;aw_saved_actor_t *a;
     if(!sv.active || (scene=scene_id())<0)return;
+    AW_CombatEquipmentStore();
     for(i=1;i<sv.num_edicts;i++){
         e=EDICT_NUM(i);
         if(e->free || strcmp(pr_strings+e->v.classname,"aw_npc"))continue;

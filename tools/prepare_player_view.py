@@ -11,6 +11,7 @@ death scene read, and the player's body for the third-person view, one per playa
   id1/progs/body/*_t.mdl torch-pose body; *_h.mdl original held torch; both have matching *.anm;
   id1/progs/body/*_t.awt frame-aligned emitter points
   id1/progs/body/*_w.mdl water-only body; *_w.anm original swimidle/swim motion
+  id1/progs/body/*_i.mdl ten static inventory poses; *_i.tag matching melee/shield attachments
 
 The body (a stand-in for the full player appearance): the original's new-game player record ('player' in
 Morrowind.esm: a common shirt, pants and shoes) worn by the race's own skin parts, with the race and sex's
@@ -225,14 +226,17 @@ def _sources(data):
 def _fit_body(identifier, shapes, materials, textures, palette, groups):
     """Keep the first model that fits full normal and ready gait plus actions.
 
-    The original 96-row path is tried in full before body-only atlas/contour
-    fallbacks. A fallback never replaces a body that already fits. Its leg
-    section is checked against the same untouched budget-480 reference.
+    Search for a full-frame fit before accepting a reduced animation. If no
+    full fit exists, keep the valid candidate with most animation samples;
+    equal counts retain the earlier mesh. Every fallback passes the same leg
+    section check against the untouched budget-480 reference.
     """
     import npc_anim
     from npc_geometry import AliasOverflow, bake, player_leg_section_ok
     failures = []
     reference = None
+    best = None
+    full_count = sum(g['count'] for g in groups)
     for rows, contour in ((96, 0), (80, 0), (80, 1), (80, 2)):
         for budget in BUDGETS:
             try:
@@ -260,7 +264,13 @@ def _fit_body(identifier, shapes, materials, textures, palette, groups):
                 continue
             except ValueError as error:
                 raise ValueError(identifier + ': ' + str(error)) from error
-            return budget, frames, faces, uv, skin, fitted, index
+            candidate = (budget, frames, faces, uv, skin, fitted, index)
+            if len(index) == full_count:
+                return candidate
+            if best is None or len(index) > len(best[-1]):
+                best = candidate
+    if best is not None:
+        return best
     raise ValueError(identifier + ': no body fits the existing budgets (' + '; '.join(failures) + ')')
 
 
@@ -280,7 +290,7 @@ def bake_body(task):
             rigs[npc_anim.FEMALE_SKELETON] = Skeleton(assets, npc_anim.FEMALE_SKELETON)
         female_rig = rigs[npc_anim.FEMALE_SKELETON]
     profile = list(npc_anim.profiles()[BODY_PROFILE]) + [list(g) for g in BODY_EXTRA + BODY_READY]
-    kit, groups = npc_anim.plan(skeleton, profile, female_rig, appearance.get('weight', 1.))
+    kit, groups = npc_anim.plan(skeleton, profile, female_rig, appearance.get('weight', 1.), player_block_hit=True)
     required = set(npc_anim.AIR_GROUPS) | {name for name, _ in BODY_READY}
     missing = [g['name'] for g in groups if g['name'] in required and g['source'] == 'idle']
     if missing:
@@ -298,13 +308,19 @@ def bake_body(task):
     names = [g['name'][:13] + '%02d' % i for g in fitted for i in range(g['count'])]
     raw = animated_mdl(frames[index], faces, uv, skin, names=names)
     layout = npc_anim.player_layout(fitted)
+    from npc_items import bone_tags, tag_text
+    all_tags = bone_tags(kit, times, appearance, {'weapon': True, 'shield': True})
+    item_tags = tag_text([all_tags[int(i)] for i in index], {})
+    if len(index) != len(frames[index]):
+        raise ValueError('Player equipment tags changed body frame indexing')
     path = body_path(race, female)
     report = {'race': race, 'female': female, 'model': path, 'bytes': len(raw),
               'sha256': hashlib.sha256(raw).hexdigest(), 'frames': len(index), 'triangles': nt, 'vertices': nv,
               'budget': budget, 'skeleton': appearance['skeleton'], 'head': appearance.get('head'),
               'hair': appearance.get('hair'), 'parts': [p['id'] for p in appearance['parts']],
               'groups': {g['name']: g['count'] for g in fitted}, 'layout': layout,
-              'group_sources': {g['name']: g['source'] for g in fitted}}
+              'group_sources': {g['name']: g['source'] for g in fitted},
+              '_item_tags': item_tags, 'item_tags_sha256': hashlib.sha256(item_tags.encode('ascii')).hexdigest()}
     return path, raw, layout, report
 
 
@@ -550,6 +566,7 @@ def prepare(data_files, id1, jobs=None, bodies=True):
     for path, raw, layout, row in ordered_map(bake_body, tasks, max(1, min(resolve_jobs(jobs), len(tasks)))):
         (id1 / path).write_bytes(raw)
         (id1 / (path[:-4] + '.anm')).write_text(layout + '\n', encoding='ascii', newline='\n')
+        (id1 / path).with_suffix('.tag').write_text(row.pop('_item_tags'), encoding='ascii', newline='\n')
         entries.append((row['race'], row['female'], path))
         report['bodies'].append(row)
     torch_tasks = [(str(data), palette, row['race'], row['female'], row) for row in report['bodies']]
@@ -565,6 +582,13 @@ def prepare(data_files, id1, jobs=None, bodies=True):
         (id1 / path).write_bytes(raw)
         (id1 / path[:-4]).with_suffix('.anm').write_text(layout + '\n', encoding='ascii', newline='\n')
         report['swim_bodies'].append(row)
+    from player_inventory_pose import bake_body as bake_inventory_body
+    report['inventory_bodies'] = []
+    for path, raw, tags, row in ordered_map(bake_inventory_body, tasks,
+            max(1, min(resolve_jobs(jobs), len(tasks)))):
+        (id1 / path).write_bytes(raw)
+        (id1 / path).with_suffix('.tag').write_text(tags, encoding='ascii', newline='\n')
+        report['inventory_bodies'].append(row)
     catalogue = bodies_text(entries)
     (id1 / 'view/bodies.txt').write_text(catalogue, encoding='ascii', newline='\n')
     report['catalogue_sha256'] = hashlib.sha256(catalogue.encode()).hexdigest()

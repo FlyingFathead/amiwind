@@ -86,7 +86,9 @@ static void check_controls(void){
  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_dice==0 && combat_miss==1);
  M_Keydown(K_RIGHTARROW);assert(combat_dice==1);
  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_miss==0);M_Draw();M_Keydown(K_LEFTARROW);assert(combat_miss==1);
- M_Keydown(K_UPARROW);M_Draw(); /* over the planned rows */
+ M_Keydown(K_UPARROW);M_Draw(); /* Inventory is now an active gameplay binding. */
+ M_Keydown(K_ENTER);M_Keydown('i');assert(!strcmp(keybindings['i'],"aw_inventory"));
+ M_Keydown(K_UPARROW);M_Draw(); /* Quick load remains independently bindable. */
  M_Keydown(K_ENTER);M_Keydown('q');assert(!strcmp(keybindings['q'],"aw_quickload"));
  M_Keydown(K_ESCAPE);M_Draw();M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
  for(i=0;i<256;i++)keybindings[i]=NULL;

@@ -9,7 +9,7 @@
 | Where | image step, tools/chim/frame_map.py actor_contact, Seyda Neen frame |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-rc1 (last seen) |
+| Persists in | v0.0.33-rc1, v0.0.40-dev2 (last seen) |
 | Severity | critical: The release candidate build stops |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -22,6 +22,9 @@
 <!-- contents start -->
 ## Contents
 
+- [Expanded-cell contact findings: 15 October 2026](#expanded-cell-contact-findings-15-october-2026)
+- [Original height comparison: 15 October 2026](#original-height-comparison-15-october-2026)
+- [Terrain repair and remaining grounding check: 15 October 2026](#terrain-repair-and-remaining-grounding-check-15-october-2026)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -35,9 +38,75 @@
 
 <!-- contents end -->
 
+## Expanded-cell contact findings: 15 October 2026
+
+The v0.0.40-dev2 source-only actor carrier is integrated with the expanded
+Seyda CHIM frame. All 1,390 scenery references match in both directions.
+The canonical grounding pass records 13 supported placements and two held
+findings: Nels Llendo (original reference 204678, blocked) and the dreamer
+(reference 297837, unresolved mesh contact after the existing bounded search).
+Both retain authored positions; no tolerance or exclusion was changed.
+
+The subsequent final frame-map contact function also rejects both actors.
+Neither its height nor bounded horizontal refit resolves them. Nels starts
+inside collision even eight units above his authored origin. The dreamer has
+sole gaps spanning 0.419 to 3.468 units; no single vertical correction satisfies
+the unchanged -0.5 to 1.0 contact band.
+The failure is preserved; no position, tolerance or omission was changed.
+Matched original-game views, actual native contact and package checks remain
+pending; historical town results below do not cover the expanded frame.
+
+## Original height comparison: 15 October 2026
+
+The original LAND samples match the terrain-source audit. At the two actor
+centres inside cell (0, -9), the converted 128-unit triangles are approximately
+8.8 and 4.2 local units above the fine source-grid surfaces. Direct collision
+probes reproduce those converted heights. Coarse sampling therefore explains
+terrain distortion at these sites; a cell-edge offset has not been established.
+
+A local detail proposal is under review using existing terrain subdivision and
+shared-edge sampling. It must preserve source heights, coordinate scale,
+neighboring cell/chunk edges and the current contact guards. Exact original
+triangle topology and matched native views remain separate checks. The fine
+source slope under the dreamer still exceeds the whole-sole contact band, so
+restoring detail alone is not established as a complete actor-contact repair.
+
+The implementation reuses the existing terrain mesh and AmiQuake collision
+trace path. Actual-game suspect-geometry captures are pending a native build
+with the combined world and correct actor routing. No capture or seam acceptance
+is claimed. Converted-cell totals are unchanged; both contacts remain open.
+
+## Terrain repair and remaining grounding check: 15 October 2026
+
+The current source restores the two measured dry LAND tiles at original spacing
+and applies the reference diamond pattern. All 49 source cells and 207,025
+coordinate round trips agree exactly; 5,460 shared-cell samples agree. The
+26 port boundary segments and 68 affected chunk-edge subdivisions also agree
+in the source geometry. Compiled and native seams remain unverified.
+
+Nels has a feasible source-only origin height interval of approximately
+133.146 to 133.373 local units under the unchanged contact band. This does not
+yet establish final compiled collision support. The dreamer remains open:
+its original-grid surface produces a whole-sole gap spread of 2.024 units,
+exceeding the 1.5-unit band. Screening all 12,853 existing horizontal offsets
+with the unchanged vertical bound finds no feasible whole-sole interval.
+No actor positions were written and no path-clearance acceptance is implied.
+
+Original runtime observation finds both actors present and reports ground
+contact in six samples each, with natural horizontal and vertical position drift.
+Their authored origins are not their final observed positions. Final original
+views show the actors and slope, but rendered sole contact was not measured.
+LAND ray heights follow the reference's accelerated-ray diagonal, which differs
+from its render/contact triangle pattern; keep these measurements separate.
+
+Compare original runtime grounding, model bottom and idle foot pose before
+changing the actor policy. Keep source terrain correctness and actor contact
+as separate gates. No actor exclusion or contact tolerance change is included.
+
 ## Status: 9 October 2026
 
-Fixed in source on the v0.0.33 integration line, with a test. The next release candidate build verifies.
+Historical v0.0.33 correction and test; the expanded v0.0.40-dev2 findings
+above remain open in the canonical register.
 
 ## Symptom
 
@@ -79,6 +148,10 @@ farther still refuses the map.
 On the rc1 stage: Seyda Neen 12 of 12 actors grounded, 9 refitted (6 by height only, -4.19 to +0.34 units;
 3 moved 1.8 to 10.4 units); Balmora 18 of 18, none refitted. `tests/test_chim_frame_map.py` covers a refit
 and a refusal beyond the limits.
+
+Combined-world preparation stopped before a complete world and its validation
+were produced. Preserve the passing source checks separately; this incomplete
+output establishes no compiled contact, seam, native or package acceptance.
 
 ## Prevention
 
@@ -158,7 +231,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-VARIANT-YAW-DUPLICATES-36](CHIM-VARIANT-YAW-DUPLICATES-36.md): One CHIM model variant is stored several times: each frame builds it at the yaw of its own first placement
 - [CHIM-VIEW-FACES-33](CHIM-VIEW-FACES-33.md): Model faces dominate each Balmora view: the streamer alone does not fix frame rate
 - [CHIM-VIEW-LEAF-NO-PVS-35](CHIM-VIEW-LEAF-NO-PVS-35.md): A view leaf without a visibility row draws everything, with no counter saying so
-- [CHIM-WINDOW-MOUNT-CROSS-CELL-33](CHIM-WINDOW-MOUNT-CROSS-CELL-33.md): A one-cell CHIM frame stops when a window placed in it mounts on a faÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ade placed in the next cell
+- [CHIM-WINDOW-MOUNT-CROSS-CELL-33](CHIM-WINDOW-MOUNT-CROSS-CELL-33.md): A one-cell CHIM frame stops when a window placed in it mounts on a facade placed in the next cell
 - [CHIM-WORLD-AUDIT-SCALING-33](CHIM-WORLD-AUDIT-SCALING-33.md): The CHIM world audits grow much faster than the world: the heap gate took 3.6 s for 171 frames, 473 s for 331, and over an hour for 844
 - [CHIM-WORLD-INDEX-FILE-LIMIT-36](CHIM-WORLD-INDEX-FILE-LIMIT-36.md): The engine refuses a CHIM world index with more than 4096 file rows; the dev3 coast world has 7,236, so every CHIM frame map fails
 - [CHIM-ZONE-RING-THRASH-33](CHIM-ZONE-RING-THRASH-33.md): Balmora's chunk ring does not fit the default 6 MiB CHIM zone, so the cache thrashes
@@ -169,5 +242,6 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 Related bugs in other categories:
 
 - [CHIM-ACTOR-GROUNDING-POLICY-36](CHIM-ACTOR-GROUNDING-POLICY-36.md): A CHIM area outside the shipped towns stops at its chim-town stage: the NPC grounding policy lists only the shipped towns' NPCs, and the check runs 40 minutes into the build
+- [CHIM-TERRAIN-DIAGONAL-40](CHIM-TERRAIN-DIAGONAL-40.md): Terrain triangle diagonals differ from the OpenMW 0.48 reference
 
 <!-- END GENERATED CATEGORY -->

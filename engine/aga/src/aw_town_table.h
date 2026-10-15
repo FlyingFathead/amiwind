@@ -200,7 +200,7 @@
     {"vivec_delyn","Vivec, St. Delyn","vd","vivec_delyn-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{7168,-23552,0},{-1024,-1024,1024,1024}},\
     {"vivec_olms","Vivec, St. Olms","vo","vivec_olms-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{9216,-23552,0},{-1024,-1024,1024,1024}},\
     {"bcoast_x7y2","Bitter Coast (CHIMport test)","bc","bcoast_x7y2-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{-13312,5120,0},{-3072,-3072,3072,3072}},\
-    {"vivec_city","Vivec","vc","vivec_city-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{8192,-23040,0},{-4096,-4608,4096,4608}},\
+    {"vivec_city","Vivec","vc","vivec_city-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{8192,-23040,0},{-6144,-5632,6144,6656}},\
     {"lava_x1ym2","Molag Mar lava test","lv","lava_x1ym2-regions.txt","","",64,540,-1,AW_TOWN_OWN_DOORS|AW_TOWN_SCENERY|AW_TOWN_TELEPORT|AW_TOWN_GROUND_PLACE,0,1,{3072,-3072,0},{-1024,-1024,1024,1024}}\
 }
 #endif

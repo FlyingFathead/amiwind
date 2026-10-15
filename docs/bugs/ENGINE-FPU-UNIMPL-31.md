@@ -9,17 +9,34 @@
 | Where | engine maths (rotation, AngleVectors, libm trig) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31 (last seen) |
+| Persists in | v0.0.31, v0.0.40-dev1 (last seen) |
 | Severity | high: Thousands of 68040-unimplemented FPU instructions per frame would trap on real hardware, severe slowness. |
 | Family | FPU and CPU behaviour (68040/68060) (`fpu-cpu`) |
-| Playtest version | v0.0.31 |
-| From commit | source and engine unknown |
-| CHIM engine version | none: legacy engine |
-| Unknown because | the build receipt records no source commit (builds before v0.0.32-dev1 were assembled from earlier images, not by the repository builder) |
+| Playtest version | v0.0.40-dev1 |
+| From commit | source 7a783e0, engine unknown, CHIM world unknown |
+| CHIM engine version | CHIM 0.2.0, engine unknown, world format unknown |
+| Unknown because | Exact native diagnostic source and engine are hash-bound privately; separate engine/world commits are unknown. Later catalogue/layout repairs need a new target/native gate. |
 
 <!-- END GENERATED FACTS -->
 
-## Status: 8 October 2026
+<!-- contents start -->
+## Contents
+
+- [Historical source note, 8 October 2026](#historical-source-note-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Blocking orientation recurrence, 14 October 2026](#blocking-orientation-recurrence-14-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Historical source note, 8 October 2026
 
 Open; repaired in source on the FPU fixes branch (not yet released). Per-frame
 counts measured before and after; the C library's trigonometry is no longer
@@ -127,6 +144,47 @@ the drift of the reference reruns (the emulator never pays for a trap). Strict-m
 The builder check above runs in every 68040 engine build (result in
 `fpu-unimplemented.json` and `engine-build.json`); `dbg fpucount` for per-frame counts.
 
+## Blocking orientation recurrence, 14 October 2026
+
+The first v0.0.40-dev1 target linked, but the mandatory 68040 reachability gate rejected
+the first-person block composition path: R_DrawViewModel reaches
+AW_HandBlockItemApply and AW_BlockCompose, then the C library asin. The full
+report also reaches library sine/cosine range reduction; displaying only its
+first paths did not enumerate every unsafe call. The source also called library
+atan2 instead of the engine routine. This is a confirmed development regression
+caught before native testing, not an observed fault on real hardware.
+
+The [blocking candidate](COMBAT-BLOCKING-36.md) now reuses AmiQuake mathlib.c:
+Q_SinCosDeg for rotation bases and Q_atan2 for Euler extraction. Pitch uses
+atan2(vertical, horizontal forward length), retaining near-pole information
+that a float sine can round to one. The square root receives a nonnegative
+sum of squares. Near poles, roll is recovered from the stable right row;
+the exact-pole equivalent uses the existing zero-roll convention. No FPU
+allowlist is widened and no animation frames or assets are rebuilt.
+
+An executable independent matrix oracle fails against the preceding source and
+passes 1,925 translation/orientation cases with the repair, including positive
+and negative poles, near poles, composed cancellation and broad rotations.
+The actual block catalogue decodes, 21 focused block/hand/math/FPU checks pass,
+and one changed 68040 object compiles with safe engine trig references and no
+library asin/sin/cos/atan/atan2 references. Its isolated compile also reports the
+existing unused header helper under extra unused warnings; production already
+suppresses that category.
+
+The subsequent exact candidate passed the complete Amiga target build and
+mandatory linked 68040 instruction gate using the safe engine math, without
+widening the allowlist. Its full suite ran 4,072 checks: 4,066 passed, zero
+unexpected failures or errors, three Windows skips and three separately
+tracked expected failures. These are automated results, not real-hardware
+or owner acceptance. The native diagnostic exposed separate inventory
+catalogue and layout failures; refused actual shield grants mean it does not
+verify equipped-shield alignment. Repaired native blocking remains pending.
+
+Host orientation tests alone did not expose the target instruction trap path:
+they link the host maths library. Keep both the executable orientation oracle
+and a fast hot-path source guard, plus the mandatory final linked instruction
+gate. Do not describe the rejected executable as a playable accepted build.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -143,6 +201,7 @@ Family: FPU and CPU behaviour (68040/68060) (`fpu-cpu`). Results must not depend
 
 Related bugs in other categories:
 
+- [COMBAT-BLOCKING-36](COMBAT-BLOCKING-36.md): Requested: blocking in combat - NPCs block by their Block skill with a block animation, the player blocks with the right mouse button
 - [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
 - [REMOTE-STATE-WIDTH-31](REMOTE-STATE-WIDTH-31.md): Remote state file printed 51.*ld for fractional fields
 

@@ -259,9 +259,25 @@ def write_layers(out, frames, data_dir, margin=DEFAULT_MARGIN, step=DEFAULT_STEP
         boxes = placement_boxes(Path(out) / 'chim') if (Path(out) / 'chim').is_dir() else {}
     folder = Path(out) / 'far'
     folder.mkdir(parents=True, exist_ok=True)
+    # Explicit ocean frames keep expansion land in their original horizon/apron.
+    # Other frames retain the established base-master-only source policy.
+    ocean_frames = [f for f in frames if f.get('ocean_runtime')]
+    ocean_lands = dict(lands)
+    if ocean_frames:
+        from chim.ocean_terrain import resolve_grids
+        needed = cells_needed(ocean_frames, margin, step)
+        original_grids, _, ocean_sources = resolve_grids(data_dir, needed)
+        for frame in ocean_frames:
+            if frame.get('ocean_masters') != ocean_sources['masters']:
+                raise ValueError('Original ocean masters changed before far terrain')
+        ocean_lands.update({xy: np.asarray(g['heights'], dtype=np.float64)
+                            for xy, g in original_grids.items()})
     rows = []
     for frame in frames:
-        data, record = layer(lands, frame, margin, step, block, boxes.get(tuple(frame['cell']), ()))
+        data, record = layer(ocean_lands if frame.get('ocean_runtime') else lands, frame,
+                             margin, step, block, boxes.get(tuple(frame['cell']), ()))
+        if frame.get('ocean_runtime'):
+            record['original_terrain_sources'] = ocean_sources
         path = folder / file_name(frame['cell'])
         path.write_bytes(data)
         rows.append(dict(record, file='far/' + path.name, sha256=hashlib.sha256(data).hexdigest()))

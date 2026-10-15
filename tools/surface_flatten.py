@@ -131,7 +131,85 @@ def mounting_shift(origin, normal, triangles, reach=16.0, clearance=0.5):
     return float(reach-distance[valid].min()+clearance)
 
 
-def mount_references(index, references, models, centre, scale):
+class NeighboringFacadeSupport:
+    """Lazy source-only wall dependencies; never add a runtime placement.
+
+    A window and its supporting house can belong to different CELL records.
+    Read the same base-master transforms and full source geometry as the
+    scenery exporter, in the source square and its immediate neighbour ring.
+    Only a failed local mounting query reaches this loader. Its receipt names
+    the actual dependencies independently of runtime placement ownership.
+    """
+    def __init__(self, data, settings, selected_numbers):
+        self.data = Path(data)
+        self.settings = settings
+        self.selected_numbers = set(selected_numbers)
+        self.walls = None
+        self.report = {'format': 'aw-window-mount-support-1', 'used': []}
+
+    def _load(self):
+        import hashlib
+        from mwad.audit import load_esm, BSA, normpath
+        from mwad.paths import child_ci
+        from mwad.scene import unpack_geometry
+        from prepare_scenery import bsa_read, model_geometry, nif_reader, reference_rotation
+        radius = int(self.settings['source_radius']) + 1
+        if not 1 <= radius <= 9:
+            raise ValueError('Window support source radius outside bounds')
+        cx, cy = self.settings['source_cell']
+        esm = load_esm(child_ci(self.data, 'Morrowind.esm'))
+        bsa = BSA(child_ci(self.data, 'Morrowind.bsa'))
+        reader = nif_reader()
+        geometry = {}
+        self.walls = []
+        centre = np.array([*self.settings['centre'], 0])
+        scale = self.settings['scale']
+        self.report['source_esm_sha256'] = esm['sha256']
+        self.report['search_cells'] = []
+        for cell in sorted(esm['cells']):
+            if max(abs(cell[0] - cx), abs(cell[1] - cy)) > radius:
+                continue
+            self.report['search_cells'].append(list(cell))
+            for ref in esm['cells'][cell]['refs']:
+                if ref.get('deleted') or ref['number'] in self.selected_numbers:
+                    continue
+                obj = esm['objects'].get(ref.get('id', '').casefold(), {})
+                source = 'meshes/' + normpath(obj.get('model', ''))
+                if obj.get('type') != 'STAT' or 'house' not in source:
+                    continue
+                if source not in geometry:
+                    raw = bsa_read(bsa, source)
+                    packet, *_ = model_geometry(raw, reader)
+                    vertices, faces, _ = unpack_geometry(packet)
+                    geometry[source] = (np.asarray(vertices), np.asarray(faces),
+                                        hashlib.sha256(raw).hexdigest())
+                vertices, faces, digest = geometry[source]
+                origin = (np.asarray(ref['position']) - centre) * scale
+                points = vertices[:, :3] @ reference_rotation(ref).T * (scale * ref['scale']) + origin
+                dependency = {k: ref[k] for k in ('number', 'id', 'position', 'rotation_radians', 'scale')}
+                dependency.update(cell=list(cell), model=source, source_sha256=digest)
+                self.walls.append((points[faces[:, :3]], dependency))
+
+    def __call__(self, window, origin, normal):
+        if self.walls is None:
+            self._load()
+        matches = []
+        for triangles, dependency in self.walls:
+            try:
+                shift = mounting_shift(origin, normal, triangles)
+            except ValueError:
+                continue
+            matches.append((shift, dependency))
+        if not matches:
+            raise ValueError('Window has no parallel supporting façade within mounting range, including neighbouring cells')
+        # The inward ray's nearest hit has the largest outward shift.
+        # Break exact ties by the original reference ID.
+        shift, dependency = max(matches, key=lambda row: (row[0], -row[1]['number']))
+        self.report['used'].append({'window': window['number'], 'shift': shift, 'support': dependency})
+        return shift
+
+
+def mount_references(index, references, models, centre, scale, support=None):
     """Use full source house walls to mount selected visual window instances."""
     from prepare_scenery import reference_rotation
     walls=[]
@@ -150,5 +228,9 @@ def mount_references(index, references, models, centre, scale):
         normal=reference_rotation(ref)@normal
         origin=(np.asarray(ref['position'])-np.array([*centre,0]))*scale
         # Profiles initially project through the authored attachment origin.
-        shift=mounting_shift(origin,normal,walls)
+        try:
+            shift=mounting_shift(origin,normal,walls)
+        except ValueError:
+            if support is None:raise
+            shift=support(ref,origin,normal)
         ref['_flatten_shift']=shift-details['mounting_plane']*scale*ref['scale']*details['facing']
