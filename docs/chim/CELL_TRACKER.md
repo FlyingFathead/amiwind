@@ -4,27 +4,27 @@
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export.
 
-**Conversion/audit progress: 1,275 of 1,292 (98.7 %)**
+**Conversion/audit progress: 1,281 of 1,292 (99.1 %)**
 
 These audit totals do not count cells included in a playable build; see Included in builds below.
 
-Map cells 2,157: land and empty-sea cells 1,292 (done 1,275, 98.7 %) and open-ocean cells 865 (shared ocean chunk made, not yet placed in the game: not counted as done).
+Map cells 2,157: land and empty-sea cells 1,292 (done 1,281, 99.1 %) and open-ocean cells 865 (shared ocean chunk made, not yet placed in the game: not counted as done).
 
 - Cell complete: 0
 - Terrain complete: 0
 - Cell complete, awaiting lighting: 11
-- Terrain complete, awaiting lighting: 758
+- Terrain complete, awaiting lighting: 764
 - Passed (something still deferred): 407
 - Empty sea: 99
 - Open ocean (silver, not counted as done): 865
 
-**Conversion-eligible: 1,275 of 1,292** (every audit-done cell, lighting done or not; this is not a release assignment).
+**Conversion-eligible: 1,281 of 1,292** (every audit-done cell, lighting done or not; this is not a release assignment).
 
 Lighting: lit 0, partial 135, unlit 1,056, not measured 101 (cells; lit is required for both completion levels).
 
 Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 670 night lamps only, 2,280 not represented.
 
-Generated 2026-10-15T17:59:12.602502+00:00. Tracker data generated 2026-10-15T17:59:12.602502+00:00.
+Generated 2026-10-16 17:50 +0300. Tracker data generated 2026-10-16T14:50:42+00:00.
 
 ## Totals
 
@@ -33,12 +33,12 @@ Generated 2026-10-15T17:59:12.602502+00:00. Tracker data generated 2026-10-15T17
 | Cell complete | 0 | 0.0 % |
 | Terrain complete | 0 | 0.0 % |
 | Cell complete, awaiting lighting | 11 | 0.9 % |
-| Terrain complete, awaiting lighting | 758 | 58.7 % |
+| Terrain complete, awaiting lighting | 764 | 59.1 % |
 | Passed (something still deferred) | 407 | 31.5 % |
 | Empty sea | 99 | 7.7 % |
 | Open sea | 865 | 67.0 % |
 | Hull policy pending | 0 | 0.0 % |
-| Failed | 15 | 1.2 % |
+| Failed | 9 | 0.7 % |
 | Not converted | 2 | 0.2 % |
 | Not started | 0 | 0.0 % |
 
@@ -50,6 +50,11 @@ Included means verified in a packaged image. Packaged does not mean published or
 
 | Version | Evidence state | Included |
 | :-- | --: | --: |
+| v0.0.41 | packaged | 779 (60.3 %) |
+| v0.0.41-dev5 | packaged | 779 (60.3 %) |
+| v0.0.41-dev4 | packaged | 657 (50.9 %) |
+| v0.0.41-dev3 | packaged | 547 (42.3 %) |
+| v0.0.41-dev2 | packaged | 421 (32.6 %) |
 | v0.0.39-rc2 | released | 360 (27.9 %) |
 | v0.0.39-rc1 | released | 360 (27.9 %) |
 | v0.0.38 | packaged | 360 (27.9 %) |
@@ -59,7 +64,10 @@ Included means verified in a packaged image. Packaged does not mean published or
 
 Which cells are approved for which release (set by the owner with `cell_progress.py release`; conversion results never change it).
 
-No cells are assigned in this planning ledger. Packaged inclusion is recorded separately above.
+| Release | State | Cells | Complete | Awaiting lighting | Lit | Empty sea | Failing | Hull policy pending |
+| :-- | --: | --: | --: | --: | --: | --: | --: | --: |
+| v0.0.41-dev4 | shipped | 639 | 0 | 187 | 0 | 99 | 0 | 0 |
+| unassigned | - | 1,664 | 0 | 588 | 0 | 0 | 11 | 0 |
 
 ## Per ring (ring 1 touches the sea)
 
@@ -68,9 +76,9 @@ No cells are assigned in this planning ledger. Packaged inclusion is recorded se
 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 0 |
 | 1 | 171 | 0 | 0 | 3 | 0 | 70 | 98 | 0 | 0 | 0 | 0 | 0 |
 | 2 | 160 | 0 | 0 | 1 | 1 | 157 | 1 | 0 | 0 | 0 | 0 | 0 |
-| 3 | 149 | 0 | 0 | 3 | 76 | 67 | 0 | 0 | 0 | 3 | 0 | 0 |
-| 4 | 138 | 0 | 0 | 1 | 113 | 23 | 0 | 0 | 0 | 1 | 0 | 0 |
-| 5 | 125 | 0 | 0 | 1 | 103 | 16 | 0 | 0 | 0 | 5 | 0 | 0 |
+| 3 | 149 | 0 | 0 | 3 | 79 | 67 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 4 | 138 | 0 | 0 | 1 | 114 | 23 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 5 | 125 | 0 | 0 | 1 | 105 | 16 | 0 | 0 | 0 | 3 | 0 | 0 |
 | 6 | 114 | 0 | 0 | 0 | 102 | 11 | 0 | 0 | 0 | 1 | 0 | 0 |
 | 7 | 104 | 0 | 0 | 1 | 96 | 6 | 0 | 0 | 0 | 1 | 0 | 0 |
 | 8 | 94 | 0 | 0 | 1 | 89 | 3 | 0 | 0 | 0 | 0 | 1 | 0 |
@@ -84,9 +92,9 @@ No cells are assigned in this planning ledger. Packaged inclusion is recorded se
 
 | Mechanism | Cells |
 | :-- | --: |
-| Stair walk | 6 |
-| Memory fit (zone ring / heap) | 9 |
-| Hull bevels / hull chain length | 7 |
+| Stair walk | 5 |
+| Memory fit (zone ring / heap) | 4 |
+| Hull bevels / hull chain length | 3 |
 
 A cell can fail more than one mechanism. Hull policy pending cells are not failures; they have their own line.
 

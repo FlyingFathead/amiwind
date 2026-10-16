@@ -26,6 +26,15 @@ LEGACY_EXT = '.bsp'
 FRAME_EXT = '.chim'
 MAP_EXTS = (FRAME_EXT, LEGACY_EXT)          # resolution order: a frame map first, as the engine
 FRAME_KEY = '_chim_frame'
+STREAM_CHUNK_KEY = '_chim_chunk'               # chim/frame_map.py CHUNK_KEY
+STREAMED_CLASSES = ('aw_static', 'aw_flora')   # chim/frame_map.py STREAMED_CLASSES
+
+
+def is_streamed_static(row, frame_map):
+    """A frame map's static the engine streams with its chunk (chim/chim_statics.c): captured at load, kept in the
+    CHIM list (CHIM_MAX_STATICS), never a Quake static (no cl_static_entities slot, no signon message, its model
+    in the zone, not the Hunk). The one reading for every tool that counts statics."""
+    return bool(frame_map) and row.get('classname') in STREAMED_CLASSES and STREAM_CHUNK_KEY in row
 FRAME_EXT_VARIABLE = 'AMIWIND_CHIM_FRAME_EXT'
 FRAME_EXT_CHOICES = ('chim', 'bsp')
 DEFAULT_FRAME_EXT = 'chim'

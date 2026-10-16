@@ -17,6 +17,41 @@ MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
 OBJECT_TYPES = set('STAT DOOR MISC WEAP CONT CREA LIGH NPC_ ARMO CLOT REPA ACTI APPA LOCK PROB INGR BOOK ALCH LEVI LEVC'.split())
 
 
+def land_cells(data_files):
+    """{(x, y)} of every exterior cell with a live LAND record in the masters (MASTERS), in one pass: the
+    preflight's check that a cell taken as open ocean has no land (admit_cell refuses it later, after the
+    CHIM stage has started; CHIMPORT-OCEAN-LAND-41)."""
+    found = set()
+    for name in MASTERS:
+        try:
+            path = child_ci(Path(data_files), name)
+        except (FileNotFoundError, ValueError):
+            if name == MASTERS[0]:
+                raise
+            continue
+        if not path.is_file():
+            continue
+        with path.open('rb') as stream:
+            while True:
+                header = stream.read(16)
+                if not header:
+                    break
+                if len(header) != 16:
+                    raise ValueError('Truncated original record header')
+                raw_tag, size, _, flags = struct.unpack('<4sIII', header)
+                if raw_tag != b'LAND':
+                    stream.seek(size, 1)
+                    continue
+                payload = stream.read(size)
+                subs = list(subrecords(payload))
+                if is_deleted(flags, subs):
+                    continue
+                xy = dict(subs).get('INTV', b'')
+                if len(xy) == 8:
+                    found.add(struct.unpack('<ii', xy))
+    return found
+
+
 def admit_cell(data_files, cell):
     """Read/hash original masters; reject non-ocean/unsupported content, retain LEVC identity.
 

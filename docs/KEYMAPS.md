@@ -46,8 +46,9 @@ Changes use the same bindings as `bind` and are saved to `keymaps.cfg` on exit.
 F1-F12 and the console keys are handled before the menu and cannot be captured
 there; bind them with the console.
 
-Greyed rows are planned actions (inventory, quick keys, magic) with their
-intended keys. They become selectable when the action exists. The action table
+The inventory is bound to I by default (`aw_inventory`). Greyed rows are planned
+actions (quick keys, magic) with their intended
+keys. They become selectable when the action exists. The action table
 and the steps for adding one are documented in `engine/aga/src/aw_menu.c`.
 
 ## Configurable gameplay bindings

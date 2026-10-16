@@ -1,65 +1,78 @@
-# v0.0.41: Combined CHIM world repair
+# AmiWind v0.0.41: More Fixes, Fewer Planes (A Telvanni Root Story)
 
-15 October 2026 — The preceding v0.0.41 source snapshot completed 4,242 tests: 4,236 passed, zero failures/errors, three Windows-only skips and three exact Census expected failures; source was unchanged. This does not validate the subsequent v0.0.41-dev1 version alignment or establish image/native/package acceptance.
+Running on CHIM Engine v0.2.1, world format 0.7. Previous release: [v0.0.40](RELEASE-v0.0.40.md).
 
-15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See the [current development candidate](RELEASE-v0.0.41-dev1.md).
+The first regional CHIM release. Rings 0 to 4 of Vvardenfell, from the sea inwards, are on CHIM. So are two whole
+Morrowind regions, the Bitter Coast and Azura's Coast, with their towns: Seyda Neen, Balmora, the whole city of
+Vivec, Hla Oad, Sadrith Mora and Vos. "Fewer planes": the collision behind large irregular meshes now compiles into
+compact hulls instead of chains of thousands of separate planes. The Telvanni roots and towers that did not fit
+the memory budget fit now.
 
-[BUILD-INVENTORY-PALETTE-41](bugs/BUILD-INVENTORY-PALETTE-41.md) — 15 October 2026, v0.0.41 source candidate: image assembly prepares inventory before the sky palette pass, which rejected current AWIC icons and AWI2/AWST metadata as unknown images. The source repair validates each inventory format at its exact path, remaps only icon pixels and preserves metadata bytes. Scoped evidence contains 15 passing palette checks and 2 passing inventory-asset checks on matching unchanged source. Actual image assembly, native verification, packaging and shipment remain pending.
+## What is in this release
 
-[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or owner acceptance is promoted.
+- 723 cells on CHIM: 619 land cells, 99 seabed cells and 5 open-sea cells, each converted from your own copy of
+  Morrowind. The rest of the island is in the classic world as before; the [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md)
+  shows which cell is which.
+- Every CHIM cell passes the builder's checks before it ships. Those checks cover its memory budget, its stairs and
+  ramps (walked with the player's box), its seams to the neighbouring cells, the residents standing on the ground,
+  and the harvestable plants and other objects counted against the previous release.
 
-[CHIM-MODEL-ARENA-RESERVE-41](bugs/CHIM-MODEL-ARENA-RESERVE-41.md) — 15 October 2026: exact allocation and predecessor-world checks remain separately recorded. The later 941 world stopped at its ownership guard because named aprons bypassed ten existing deferred-owner dispositions. The source-only disposition repair passes 38 focused checks; fresh world, boundary/model review and native/package acceptance remain pending.
+## What changed since v0.0.40
 
-[CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) — 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
+- **Regions, not rings.** A build takes whole Morrowind regions (`tools/chim_cell_list.py --region`), so towns are
+  no longer cut at the edge of the CHIM area. Rings still set the order: the coast first, then inwards.
+- **Rings 3 and 4.** The cell list comes from the progress tracker. Cells not ready yet stay in the classic world
+  by name, together with the neighbours that keep them from being enclosed by CHIM cells (`--open-pockets`).
+- **Collision that compiles.** When the collision compiler refused a large irregular mesh (Ashurnibibi's ruins,
+  Telvanni roots, Dwemer ruins), the mesh kept a raw chain of collision pieces. The refusal is now retried with
+  coplanar facets merged, and every fallback is logged with its reason
+  ([CHIM-COLLISION-UNION-FALLBACK-41](bugs/CHIM-COLLISION-UNION-FALLBACK-41.md)).
+- **Telvanni towns on a memory budget.** A per-mesh recipe for Sadrith Mora and Vos and their surroundings reduces
+  the roots, the slave market, the boats, the doorways, the turret, the tower, the manors and the house pods; two
+  large roots get coarser collision.
+- **Vos.** A walkway stair that runs under the Velothi temple's base no longer starts inside the temple's collision:
+  the temple keeps its own collision surfaces ([CHIM-VOS-TEMPLE-WALKWAY-41](bugs/CHIM-VOS-TEMPLE-WALKWAY-41.md)).
+- **Harvestable plants on CHIM region cells.** Region cells now get and keep their own harvest catalogues; before,
+  their mushrooms were only placed while an old neighbouring map still carried them. 229 plants that were placed
+  nowhere are back, and an island-wide check fails the build if any plant is missing
+  ([HARVEST-CHIM-REGION-LOSS-41](bugs/HARVEST-CHIM-REGION-LOSS-41.md)).
+- **Residents at the edge of Vivec.** Each resident belongs to one town frame only (Nels Llendo was placed by both
+  Vivec and Seyda Neen); ground under residents keeps Morrowind's own height samples; an actor the normal search
+  cannot stand on the ground is searched a little wider, without moving anyone else
+  ([CHIM-VIVEC-FRAME-WIDE-41](bugs/CHIM-VIVEC-FRAME-WIDE-41.md)).
+- **The Dunmer streetlight** is replaced by a simple lantern model everywhere.
+- **Seabed cells.** Land records that lie entirely under water are converted as their own CHIM cells instead of being
+  taken for open sea, and the build names any such cell it cannot place
+  ([CHIMPORT-OCEAN-LAND-41](bugs/CHIMPORT-OCEAN-LAND-41.md)).
+- **Seyda Neen** builds as a CHIM town from your data, with its giant mushrooms and closed seams.
+- **Lava regions within the storage budget.** Two more lava terrain regions are split, and the scenery stage names
+  every over-budget region in one pass ([BUILD-LAVA-TERRAIN-BUDGET-38](bugs/BUILD-LAVA-TERRAIN-BUDGET-38.md)).
+- **Audits that say how old they are.** Every audit result records when it ran, with which AmiWind and CHIM version
+  and which converter. A build that refuses a cell says so and how to measure it again
+  ([CHIMPORT-STATUS-STALE-41](bugs/CHIMPORT-STATUS-STALE-41.md)).
+- **The builder names every frame over the memory budget**, and by how much.
+- **The Guard marker** is back at the lower right; `dbg landfill on/off` switches the distant land layer.
+- **Toolkit.** The World Map can paint and copy cell selections (shift-drag for a rectangle), and the toolkit server
+  can serve any built CHIM world to the map inspector.
 
-15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
+## Known in this build
 
-## v0.0.41 candidate - visibility aprons, 15 October 2026
+- [MESH-VIVEC-CAP-GAP-38](bugs/MESH-VIVEC-CAP-GAP-38.md): two banner-draped giant mushrooms at Vivec's entrance show
+  open cap bands.
+- [INTERIOR-CREATURES-MISSING-41](bugs/INTERIOR-CREATURES-MISSING-41.md): no creature is placed in any interior yet;
+  among others, the demigod Vivec is missing from his palace.
+- [CHIM-STATICS-FALLBACK-41](bugs/CHIM-STATICS-FALLBACK-41.md): if a town frame's CHIM world cannot load, the map
+  stops instead of running without its chunks.
+- [ENGINE-060-FSCC-41](bugs/ENGINE-060-FSCC-41.md): the engine is built for the 68040; on a 68060 some float
+  comparisons go through the CPU library, and their cost is not measured yet ([AmiWind on the 68060](68060.md)).
 
-[CHIM-VISIBILITY-APRON-SCOPE-41](bugs/CHIM-VISIBILITY-APRON-SCOPE-41.md) - The combined world stopped at Tel Uvirith, original cell (10, 1), because
-its approved fixed stronghold snapshot required a source radius of zero.
-Regional frames now audit neighbouring cells for separate aprons. The repair
-keeps visibility snapshots bound to each original cell across all frames that
-audit it. Unknown scripts and unaudited references remain visible. Runtime
-quest progression is still deferred; complete conversion and native/package
-acceptance remain pending. Coverage counts are unchanged.
+Fourteen of Vivec's 144 interiors are not in this build yet; their doors say the area is unavailable. They are the
+first item of [v0.0.42](PLAN-v0.0.42.md). See the [bug register](BUGS.md) for everything else.
 
+## Validation and delivery
 
-## v0.0.41 candidate - window support, 15 October 2026
-
-[CHIM-WINDOW-TOWER-SUPPORT-41](bugs/CHIM-WINDOW-TOWER-SUPPORT-41.md) - The combined v0.0.41 world build stopped while mounting four Nordic windows
-from original cell (7, 22) into the adjacent frame apron. Their supporting
-thatched tower was present, but the facade search accepted only model names
-containing "house". Exact source triangles support all four windows under the
-existing distance and outward-normal checks.
-
-The candidate recognizes the original thatched-tower model in both local and
-neighbouring facade searches. It keeps original reference ownership, geometry,
-collision, mounting range and clearance. Arbitrary props are still rejected.
-The failing build is preserved; complete conversion, native comparison and
-fresh package readback remain pending. Coverage counts are not promoted.
-
-
-15 October 2026, v0.0.41 candidate: 50 focused lava/polygon/terrain checks
-and 47 emulator preset/launcher checks pass. Both original failing chunks pass
-coverage against the unchanged cached geometry. Full combined-world, exact
-source suite, native, package and shipment checks remain pending.
-
-The v0.0.40 combined-world build stopped on two chunks in cell (2, -2).
-Readback of the exact cached units found five affected coverage samples:
-each has one lava surface and lava contents (-5) at the required depth.
-A tiny edge collapses to identical adjacent vertices when the chunk is
-translated into float32 frame coordinates. The polygon test mistook this
-zero-length edge for a boundary through every sample.
-
-The v0.0.41 candidate skips only exactly identical adjacent XY vertices.
-It preserves edge ambiguity, outside rejection and empty/degenerate rejection;
-no geometry, collision, pool height, tolerance or engine format is changed.
-Full-world validation, native checks, fresh package readback and delivery
-remain separate and pending. No coverage count is promoted.
-
-[Canonical issue](bugs/CHIM-LAVA-DUPLICATE-VERTEX-40.md).
-
-CHIM remains 0.2.0. The target retains rings 0, 1 and 2, separate aprons,
-original-cell ownership and legacy coverage outside the CHIM selection.
-The earlier published source and private release artifacts remain unchanged.
+One gate on the release commit: the full test suite, the Amiga engine build, and the host parity checks. Then a
+full build with the repository builder from the game data, with no private-test waivers. Every CHIM gate passes:
+memory, stairs, zone walk, seams, residents, and the entity tracker against the baseline of placed objects. Then a boot smoke of that
+image in the emulator: it boots, loads a map and plays. The public source contains no game data. See the
+[release workflow](RELEASE_WORKFLOW.md) and the [roadmap](ROADMAP.md).

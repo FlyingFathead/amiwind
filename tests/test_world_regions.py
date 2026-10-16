@@ -205,9 +205,9 @@ class ContentPreservingRefinementTests(unittest.TestCase):
         layout=layout_refinements()
         self.assertEqual(layout['survey_source_triangle_limit'],140801)
         self.assertEqual([r['parent'] for r in layout['regions']],
-                         ['vf0698','vf0791','vf1177','vf1179','vf1258','vf1457','vf1695','vf1696','vf1819'])
+                         ['vf0698','vf0791','vf1177','vf1179','vf1258','vf1457','vf1695','vf1696','vf1819','vf1697','vf2544'])
         self.assertEqual([(r.get('parent_divisions',1),r['divisions']) for r in layout['regions'][2:]],
-                         [(1,2),(2,4),(1,2),(1,2),(2,4),(2,4),(2,4)])
+                         [(1,2),(2,4),(1,2),(1,2),(2,4),(2,4),(2,4),(2,4),(4,8)])
 
 if __name__=='__main__':unittest.main()
 

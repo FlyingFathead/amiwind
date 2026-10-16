@@ -334,6 +334,40 @@ class InPlace(unittest.TestCase):
         self.assertEqual(FM.world_directory(self.id1)[0][1][2], 0.0)            # the row's origin z is now 0
         self.assertEqual(record['legacy_origin_z'], -384.0)
 
+    def test_the_harvest_steps_frame_catalogue_stays(self):
+        # HARVEST-CHIM-REGION-LOSS-41: the catalogue the harvest step wrote for the frame map (frame origin,
+        # AWH4 proxies) stays with it; the CHIM world leaves these plants out, so removing it lost them.
+        import hashlib
+        from chim import frame_map as FM
+        self.legacy_map()
+        sha = hashlib.sha256((self.id1 / 'harvest-vf0000.txt').read_bytes()).hexdigest()
+        patches = self.patch({42: (5.0, 5.0, -384.0)})
+        for p in patches:
+            p.start()
+        try:
+            record = FM.build_region(self.id1, self.frame, Path(self.tmp.name) / 'world',
+                                     keep_catalogues={'vf0000': sha})
+        finally:
+            for p in patches:
+                p.stop()
+        self.assertEqual([r['file'] for r in record['replaced']], ['maps/vf0000.bsp'])
+        self.assertEqual(record['harvest_catalogue'], {'file': 'harvest-vf0000.txt', 'bytes': 7, 'sha256': sha})
+        self.assertTrue((self.id1 / 'harvest-vf0000.txt').is_file())
+
+    def test_a_changed_frame_catalogue_is_refused(self):
+        from chim import frame_map as FM
+        self.legacy_map()
+        patches = self.patch({42: (5.0, 5.0, -384.0)})
+        for p in patches:
+            p.start()
+        try:
+            with self.assertRaisesRegex(ValueError, 'vf0000 .*harvest catalogue the harvest step wrote for it'):
+                FM.build_region(self.id1, self.frame, Path(self.tmp.name) / 'world',
+                                keep_catalogues={'vf0000': '0' * 64})
+        finally:
+            for p in patches:
+                p.stop()
+
     def test_the_earlier_form_replaces_the_bsp_under_its_own_name(self):
         # --chim-frame-ext bsp (DON'T DELETE ANY METHOD): the frame map takes maps/vf0000.bsp itself
         from unittest import mock
@@ -774,6 +808,50 @@ class Builder(unittest.TestCase):
             self.assertEqual(args.chim_regions_cells, '5,5:s 6,5:l')
             options = build.chim_stage_options(args)
             self.assertEqual(options[-2:], ['--chim-regions-cells', '5,5:s 6,5:l'])
+
+
+
+class StaleAuditRefusal(unittest.TestCase):
+    """CHIMPORT-STATUS-STALE-41: a cell refused on recorded audits names them, when and with what they were
+    measured, and the one command that measures them again with the current builder."""
+
+    def status(self, audited):
+        return {(17, 4): {'status': 'converted_failing', 'failing': ['memory_fit'], 'audited': audited,
+                          'name': 'Sadrith Mora', 'file_generated': '2026-10-15T17:59:12+00:00'}}
+
+    def test_refusal_names_audits_time_versions_and_command(self):
+        _, problems, _ = R.preflight([(17, 4)], {(17, 4)}, self.status(
+            {'run': 'chimport-x', 'at': '2026-10-11T08:00:00+00:00', 'amiwind_version': '0.0.36',
+             'chim_version': '0.2.0', 'converter_sha256': 'f' * 64}), {})
+        self.assertIn('Sadrith Mora: CHIMport audits failing: memory_fit (measured 2026-10-11T08:00:00+00:00 by run '
+                      'chimport-x with AmiWind 0.0.36, CHIM 0.2.0;', problems[0])
+        self.assertIn('older converter', problems[0])
+        self.assertIn('tools/chimport.py run --out RUN --cells "17,4"', problems[1])
+
+    def test_unrecorded_time_falls_back_to_the_status_file_creation(self):
+        _, problems, _ = R.preflight([(17, 4)], {(17, 4)}, self.status({}), {})
+        self.assertIn('before 2026-10-15T17:59:12+00:00 (when the status file was created)', problems[0])
+        self.assertIn('converter not recorded', problems[0])
+
+    def test_same_converter_is_said_so(self):
+        from chimport import code_identity
+        self.assertEqual(R.converter_note(code_identity()), 'the same converter as this build')
+
+
+
+class OceanLandPreflight(unittest.TestCase):
+    """CHIMPORT-OCEAN-LAND-41: a cell taken as open ocean with a LAND record is refused in the preflight."""
+
+    def test_ocean_cell_with_land_is_named(self):
+        from unittest import mock
+        with mock.patch('chim.ocean_runtime.land_cells', return_value={(5, 5)}):
+            problems = R.ocean_land_problems({(5, 5): 'ocean', (6, 5): 'ocean', (7, 5): 'land'}, '/data')
+        self.assertEqual(len(problems), 1)
+        self.assertIn('1 cell(s) the status file calls open ocean have LAND', problems[0])
+        self.assertIn('--cells "5,5"', problems[0])
+
+    def test_no_ocean_cells_reads_nothing(self):
+        self.assertEqual(R.ocean_land_problems({(1, 1): 'land'}, '/nowhere'), [])
 
 
 if __name__ == '__main__':

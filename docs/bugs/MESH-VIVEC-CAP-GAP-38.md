@@ -37,7 +37,11 @@ Load the reported location and look up at the cap with the recorded heading and 
 
 ## Repair
 
-None established. Inspect original and converted geometry before choosing a repair. Read existing AmiQuake rendering machinery before any renderer change.
+None established. Checked and ruled out, 16 October 2026: Vivec's detail budget (`vivec-deep`,
+`config/chim-detail-budgets.json`) lists no mushroom or banner mesh, so its unaudited reductions
+(CHIM-DETAIL-BUDGET-SEAM-UNAUDITED-36) are not the cause. Leading suspect now: the cap and the draped banner as
+separate materials whose vertices are not shared along their edge. Next (v0.0.42 plan 2.3): the exact mesh and
+placement identified, the seam audit run on its converted variants, compared with the original at the same pose. Inspect original and converted geometry before choosing a repair. Read existing AmiQuake rendering machinery before any renderer change.
 
 ## Verification
 
@@ -82,6 +86,14 @@ not exact source/package bindings or proof of motion.
 - `OWNER-20261013-214618`, SHA-256 `b4c3b49b91d1d9cb2d9131b78b59c1b18aadcdbaf560b647dbd23a62cf3ea3f3`: Large mushroom cap has an open band along its rim. HUD RC1, cell 2,-10; global 21519,-78784,184; local -2812,3343,46; heading120, pitch-35, game time11:04.
 - `OWNER-20261013-214647`, SHA-256 `26fdc285e6b41b67d57c523b76d7375dfb96478a6a91016f26a63a347a98f0f5`: Two large mushroom caps show open seams. HUD RC1, cell2,-10; global20788,-78832,173; local-2994,3331,43; heading356, pitch-49, time11:31.
 - `OWNER-20261013-214728`, SHA-256 `f120705fd04455c475ec9d974dca1840f6e38f3520c52991e92d980596ec68de`: Large cap has a broad opening along its top/rim. HUD RC1, cell2,-10; global19845,-77331,425; local-3230,3707,106; heading136, pitch-27, time11:50.
+
+## Location confirmed, 16 October 2026
+
+The generic giant mushroom caps were repaired long ago. This report is about two specific giant mushrooms near
+Vivec's entrance (cell 2,-10, the 13 October views) that have banners draped from them; those two still show open
+bands. No change to the giant mushroom profile of towns: the next step is to bind the placements at the reported
+poses to their exact models (the banner may be part of a Vivec-specific mesh or a separate static), compare with
+the original game at the same poses, and repair only those meshes.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

@@ -44,6 +44,10 @@ def main(argv=None):
     ap.add_argument('--terrain-shoreline', choices=('on', 'off'), default='on',
                     help='Town frames: triangulate the shoreline tiles with the sampler of the legacy region maps '
                          '(on, default; CHIM-STITCH-SHORELINE-36) or keep the plain tile grid (off)')
+    ap.add_argument('--terrain-resident-detail', choices=('on', 'off'), default='on',
+                    help='Town frames: terrain tiles under residents who stand on the ground keep the original '
+                         'LAND samples (on, default; CHIM-VIVEC-FRAME-WIDE-41) or the plain tile grid (off: the '
+                         'method before v0.0.41)')
     ap.add_argument('--terrain-hull', choices=('auto', 'routed', 'compiled'), default='auto',
                     help='Standing hull of chunk terrain: auto (default: compiled by qbsp for irregular ground, '
                          'routed chains for the regular grid), routed or compiled for every chunk')
@@ -135,6 +139,8 @@ def main(argv=None):
                 if not a.chim_regions_status:
                     raise ValueError('--chim-regions needs --chim-regions-status FILE')
                 regions_table, problems = chim_regions.plan(a.chim_regions, a.chim_regions_status, towns=areas)
+                kinds = chim_regions.table_kinds(regions_table)
+            problems += chim_regions.ocean_land_problems(kinds, a.data_files)
         except (OSError, ValueError) as exc:
             ap.exit(1, 'Error: CHIM regions: %s\n' % exc)
         if problems:
@@ -169,6 +175,7 @@ def main(argv=None):
                      **({'detail_budget': a.detail_budget} if a.detail_budget else {}),
                      **({'draw_distance': a.draw_distance} if a.draw_distance is not None else {}),
                      **({'terrain_shoreline': a.terrain_shoreline} if a.terrain_shoreline != 'on' else {}),
+                     **({'terrain_resident_detail': a.terrain_resident_detail} if a.terrain_resident_detail != 'on' else {}),
                      **({'terrain_hull': a.terrain_hull} if a.terrain_hull != 'auto' else {}),
                      **({'terrain_refs': a.terrain_refs} if a.terrain_refs != 'off' else {}),
                      **({'model_hull_patch': a.model_hull_patch} if a.model_hull_patch != 'on' else {}),

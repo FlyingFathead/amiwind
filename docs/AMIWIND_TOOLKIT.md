@@ -119,6 +119,11 @@ Vvardenfell's exterior cells, one square per cell, north up.
   BSP limits of every exterior cell; see [Map metrics layer](#map-metrics-layer).
 - **Grid: on | off** at the map's top left switches the cell grid, in step with
   the Cell grid layer.
+- **Paint: on | off** and the copy button next to it: with Paint on, a click or drag marks cells (a drag
+  that starts on a marked cell erases; Esc clears). Shift-drag, in any mode, selects the rectangle from the
+  start cell to the pointer (or erases it when it starts on a marked cell). The copy button puts the
+  marked cells on the clipboard as a CHIM cell list (`aw-chim-cells-1` JSON with place names), the format the
+  builder's `--chim-regions @FILE` reads.
 - **Zoom**: − / reset / + at the top right, the mouse wheel, or drag to pan.
 - **Keys**: while the map is active (clicked, or under the mouse), the arrow
   keys or WASD pan it: up/W north, down/S south, left/A west, right/D east.
@@ -363,6 +368,11 @@ cell's current one is shown as stale and counts as not measured.
 python3 tools/toolkit_serve.py --data DIR --maps MAPS_DIR --metrics world-metrics.json --progress DIR --open
 ```
 
+The **CHIM Progress Tracker** bar folds to its title with the arrow in front of it (the
+choice is remembered in the browser). To look at a build's CHIM world in the 3D Inspector, add
+`--chim-world NAME=DIR` (the build's `chim-world` folder) and open
+`amiwind-toolkit/map-inspector.html?world=/chim-world/NAME/` ([Polycount inspector](POLYCOUNT_INSPECTOR.md)).
+
 `--progress` takes the folder the ingester writes (or its `cell-progress.json`). The file is read again on every
 request: run `cell_progress.py` after a build and reload the page (or press **Reload progress**, or return to the window);
 the server does not need a restart. Without `--progress`, or when you open the pages from disk, use **Import progress**
@@ -427,7 +437,8 @@ pull-down (everything, eligible for the next release, awaiting lighting, problem
 content; a hand tick switches it to Custom) and a **Version** pull-down with a summary line per release. Your choices are
 remembered in the browser. The full explanation, every status and the owner's release commands are in the
 [CHIM Progress Tracker guide](chim/PROGRESS_TRACKER.md); the live figures are on the generated
-[CHIM cell tracker](chim/CELL_TRACKER.md).
+[CHIM cell tracker](chim/CELL_TRACKER.md). The **Included in build** pull-down shows what each packaged build really
+holds; how its data is made is in [Included in build](chim/PROGRESS_TRACKER.md#included-in-build-what-each-packaged-build-holds).
 
 ### One Toolkit, your data loaded locally
 

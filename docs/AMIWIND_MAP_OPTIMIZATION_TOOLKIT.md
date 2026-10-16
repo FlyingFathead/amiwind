@@ -106,6 +106,12 @@ it contains no original mesh arrays or texture pixels. Materials are read from
 the user's own game data. Collision preparation continues to use the original
 source geometry or its authored collision mesh.
 
+The top-level `everywhere` entry names a recipe applied in every CHIM cell and town frame
+(`everywhere-v1`): today the Dunmer streetlight `light_de_streetlight_01` becomes the procedural
+lantern shell everywhere, not only at Tel Uvirith. A cell's own recipe wins for the meshes it names;
+the everywhere recipe may not cap unnamed meshes. `AMIWIND_VISUAL_EVERYWHERE=off` keeps the original
+meshes (the method before).
+
 Eleven reduction rules reproduced the retained diagnostic geometry exactly;
 the procedural lantern reproduced its 32-triangle diagnostic shell, including
 UVs. Two door-panel rules also reproduced their baked pixels and two-sided

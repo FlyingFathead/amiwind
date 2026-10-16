@@ -119,6 +119,13 @@ def parser():
                         "without one the build continues and reports no FPU support library. See docs/FPU_SUPPORT_LIBRARY.md")
     p.add_argument("--seyda-recorded", type=Path, metavar="DIR",
                    help=retired_flags.help_text(SEYDA_RECORDED_HELP))
+    p.add_argument("--seyda-scene-source", choices=("auto", "carrier", "compiled"), default="auto",
+                   help="how the bsp stage makes Seyda Neen's scene map: auto (the default: the source-only "
+                        "entity/model-box carrier for a CHIM-native Seyda Neen, no BSP29 compile of its cell-aligned "
+                        "frame; the compiled town otherwise), carrier, or " + retired_flags.HELP_PREFIX
+                        + ": compiled for a CHIM-native Seyda Neen (the complete town compiled to BSP29, which exceeds the "
+                        "BSP29 node limit since the frame is cell-aligned, BUILD-SEYDA-HULL2-32; --override "
+                        "seyda-scene-compiled)")
     p.add_argument("--skip-dressing", action="store_true",
                    help="DEBUGGING ONLY: the earlier interior rule, leaving out lantern hooks, ropes, ferns and other "
                         "dressing in the Seyda Neen interiors (receipted); by default they are kept (BUILD-DRESSING-EXCLUDED-32)")
@@ -182,6 +189,7 @@ def parser():
                    help="NPC animation groups per resident model (config/npc-anim-kit.json, docs/ANIMATION.md); default from --anim-kit (on: react+full, off: idle): idle = the previous 8 idle frames; react adds hit and death; move adds walk and run; full adds swim, knockdown and a hand-to-hand attack; react+full (owner decision for the next release) = react standing models plus a full model each actor wears only while it moves")
     p.add_argument("--no-npc-gallery", action="store_true", help="DEBUGGING ONLY: omit inspection gallery, never required game NPCs; gallery included by default. The image says so in game: dbg npcgallery and the other gallery commands print a built-without-the-NPC-gallery notice. Same as --exclude npc-gallery")
     p.add_argument("--npc-root-rule", choices=("morrowind", "legacy"), default="legacy", help="NIF root node rule for NPC body parts and equipment: legacy (default; the full root transform, verified correct for rigid body parts) or morrowind (the root rotation is ignored exactly as for scenery; measured to break 35 rigid NPC part meshes). Part of every NPC stage's cache key (AMIWIND_NPC_ROOT_RULE)")
+    p.add_argument("--actor-search", choices=("wide", "near"), default="wide", help="Actor support search: wide (default; a ground actor that no spot within 32 units fits is also tried up to 48 units away, CHIM-VIVEC-FRAME-WIDE-41; an actor the 32-unit search places never moves) or near (32 units only: the method before v0.0.41). Part of the actor stages' cache keys (AMIWIND_ACTOR_SEARCH)")
     from build_exclusions import add_options as add_exclusion_options
     add_exclusion_options(p)
     p.add_argument('--with-video', action='store_true',
@@ -319,6 +327,10 @@ def parser():
                    help='CHIM builder: town frames triangulate the shoreline tiles as the legacy region maps do '
                         '(on, default: the CHIM/legacy border meets without steps, CHIM-STITCH-SHORELINE-36) or '
                         'keep the plain 128-unit tile grid (off: the method before v0.0.36)')
+    p.add_argument('--chim-terrain-resident-detail', choices=('on', 'off'), default='on',
+                   help='CHIM builder: town frames keep the original LAND samples on the terrain tiles under '
+                        'residents who stand on the ground (on, default, CHIM-VIVEC-FRAME-WIDE-41) or the plain '
+                        '128-unit tile grid there (off: the method before v0.0.41)')
     p.add_argument('--chim-terrain-hull', choices=('auto', 'routed', 'compiled'), default='compiled',
                    help='CHIM builder: standing hull of chunk terrain: compiled for every chunk (default from v0.0.36, '
                         'owner decision: a fraction of the bytes; CHIM-REGION-MARGIN-STORAGE-36, CHIM-BALMORA-RING-GROWTH-36), '
@@ -1129,6 +1141,33 @@ def seyda_source(args):
     return 'chim-native' if 'seyda' in chim_native_towns(args, builder) else 'converted'
 
 
+def seyda_scene_source(args):
+    """'carrier' or 'compiled': how the bsp stage makes Seyda Neen's scene map (tools/prepare_mesh_bsp.py
+    --seyda-source). A CHIM-native Seyda Neen takes the source-only carrier (entities and exact model boxes,
+    no qbsp/vis/light: its cell-aligned frame exceeds BSP29's node limit, BUILD-SEYDA-HULL2-32); the legacy
+    chains (converted, recorded), other builds and --seyda-scene-source compiled (A/B) compile the town.
+    A dry run plans what the real build would run."""
+    choice = getattr(args, 'seyda_scene_source', 'auto') or 'auto'
+    if choice == 'compiled':
+        return 'compiled'
+    import copy
+    real = copy.copy(args)
+    real.dry_run = False
+    native = seyda_source(real) == 'chim-native'
+    if choice == 'carrier' and not native:
+        raise ValueError('--seyda-scene-source carrier needs a CHIM-native Seyda Neen (--builder chim with Seyda '
+                         'Neen on CHIM, no --legacy-area seyda or --seyda-recorded)')
+    return 'carrier' if native else 'compiled'
+
+
+def seyda_scene_options(args):
+    """The bsp stage's options for seyda_scene_source: none for the compiled town (the default command line
+    of every other build stays unchanged), the carrier and the game data for a CHIM-native Seyda Neen."""
+    if seyda_scene_source(args) != 'carrier':
+        return []
+    return ['--seyda-source', 'carrier', '--data-files', args.data_files]
+
+
 def seyda_terrain_cull_options(args):
     """['--seyda-terrain-cull', 'off'] when a CHIM build converts Seyda Neen from the data files: those
     region maps are only the frame maps' check reference and leave the image, and the canonical terrain
@@ -1215,7 +1254,8 @@ def commands(args, tools, run):
                            *(['--fallback-font', args.fallback_font] if args.fallback_font else []),
                            *(['--palette', args.palette] if getattr(args, 'palette', None) else []))),
             ("bsp", tool("prepare_mesh_bsp.py", "--scene", run / "alias-scene", "--scenery", run / "scenery", "--out", run / "bsp-scene", "--jobs", jobs,
-                *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])])),
+                *[part for name in ("qbsp", "vis", "light") for part in ("--" + name, tools[name])],
+                *seyda_scene_options(args))),
             ("npcs", tool("prepare_npcs.py", "--data-files", args.data_files, "--scene", run / "bsp-scene", "--out", run / "npc-scene", "--ffmpeg", tools["ffmpeg"])),
             ("hands", tool("prepare_hands.py", "--data-files", args.data_files, "--scene", run / "npc-scene", "--out", run / "hands-scene", "--jobs", jobs)),
             ("interior", tool("prepare_interior.py", "--data-files", args.data_files, "--scene", run / "hands-scene", "--out", run / "interior-scene", "--jobs", jobs,
@@ -1617,6 +1657,8 @@ def chim_stage_options(args):
         out += ['--draw-distance', str(args.chim_draw_distance)]
     if getattr(args, 'chim_terrain_shoreline', 'on') != 'on':
         out += ['--terrain-shoreline', args.chim_terrain_shoreline]
+    if getattr(args, 'chim_terrain_resident_detail', 'on') != 'on':
+        out += ['--terrain-resident-detail', args.chim_terrain_resident_detail]
     if getattr(args, 'chim_terrain_hull', None) not in (None, 'auto'):
         out += ['--terrain-hull', args.chim_terrain_hull]
     if getattr(args, 'chim_terrain_refs', None) not in (None, 'off'):
@@ -1664,6 +1706,7 @@ def resolve_chim_regions(args, builder=None):
     one_map = (getattr(args, 'chim_region_rows', None) or 'game-data') == 'legacy'
     table, problems = chim_regions.plan(args.chim_regions, args.chim_regions_status, towns=builder['chim_areas'],
                                         one_map_only=one_map)
+    problems += chim_regions.ocean_land_problems(chim_regions.table_kinds(table), getattr(args, 'data_files', None))
     if problems:
         raise ValueError('CHIM regions preflight failed before any stage:\n  ' + '\n  '.join(problems))
     args.chim_regions_cells = chim_regions.encode_cells(chim_regions.table_kinds(table))
@@ -1863,6 +1906,7 @@ def provenance(args, tools):
         "world_format": builder["world_format"], "builder_options": builder,
         "input_check": getattr(args, "input_report", None),
         "npc_root_rule": getattr(args, "npc_root_rule", "legacy"),
+        "actor_search": getattr(args, "actor_search", "wide"),
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
         "input_sha256": {} if args.dry_run else input_hashes(args),
         "known_inputs": known_inputs_record(args),
@@ -2306,6 +2350,8 @@ def main(argv=None):
     os.environ['AMIWIND_LOG_LEVEL'] = args.log_level_record['level']
     # NPC root-node rule: stage code names AMIWIND_NPC_ROOT_RULE, so it is part of every NPC stage's key.
     os.environ['AMIWIND_NPC_ROOT_RULE'] = args.npc_root_rule
+    # Actor support search (tools/actor_grounding.py reads AMIWIND_ACTOR_SEARCH; part of the actor stages' keys).
+    os.environ['AMIWIND_ACTOR_SEARCH'] = getattr(args, 'actor_search', 'wide')
     # Resident animation kit profile (tools/npc_anim.py reads AMIWIND_NPC_ANIM; part of the stage cache identity).
     if getattr(args, 'npc_anim', 'idle') != 'idle':
         os.environ['AMIWIND_NPC_ANIM'] = args.npc_anim

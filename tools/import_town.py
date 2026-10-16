@@ -413,9 +413,36 @@ def return_point(kinds, settings):
     return travel_point(kinds, returning['travel_npc'], other)
 
 
-def residents(data, scene, out, references, settings, kinds, topics, palette, ffmpeg, jobs):
+def resident_cast(references, settings, foreign=None):
+    """(cast, left): the NPC references this town places, and those left to another town.
+
+    Residents the town excludes (resident_exclusions) are not placed. A resident
+    whose origin lies in another town's owned cells (town_grid.resident_owner) is
+    that town's resident: it is left out here and listed with its owner, so no
+    actor stands in two town frames (CHIM-VIVEC-FRAME-WIDE-41).
+    """
+    from town_grid import foreign_owned_cells, physical_cell, resident_owner
     skip = resident_exclusions(settings)
-    cast = [r for r in references if r['type'] == 'NPC_' and r['id'].casefold() not in skip]
+    if foreign is None:
+        foreign = foreign_owned_cells(town_field(settings, 'id'))
+    cast, left = [], []
+    for r in references:
+        if r['type'] != 'NPC_' or r['id'].casefold() in skip:
+            continue
+        owner_town = resident_owner(r, foreign)
+        if owner_town is None:
+            cast.append(r)
+        else:
+            left.append({'reference': r['number'], 'id': r['id'], 'cell': list(physical_cell(r)),
+                         'owner': owner_town})
+    return cast, left
+
+
+def residents(data, scene, out, references, settings, kinds, topics, palette, ffmpeg, jobs):
+    cast, left = resident_cast(references, settings)
+    for row in left:
+        print('%s resident left to %s (its cell %d,%d is owned there): %s (reference %s)'
+              % (town_field(settings, 'title'), row['owner'], *row['cell'], row['id'], row['reference']), flush=True)
     tasks, models = [], {}
     for identifier in sorted({r['id'].casefold() for r in cast}):
         appearance = npc_items.attach_items(kinds, identifier, outfit(kinds, identifier))
@@ -434,7 +461,8 @@ def residents(data, scene, out, references, settings, kinds, topics, palette, ff
         print(town_field(settings, 'title') + ' resident ready:', identifier, flush=True)
     # Near/far models (tools/npc_lod.py): near files and the pairing manifest.
     lod = npc_lod.publish(scene / 'id1', models, kinds)
-    write_json(out / 'residents.json', {'cast': cast, 'models': models, 'npc_lod': lod})
+    write_json(out / 'residents.json', {'cast': cast, 'models': models, 'npc_lod': lod,
+                                        **({'left_to_owner': left} if left else {})})
     return resident_entities(cast, models, settings)
 
 

@@ -21,6 +21,7 @@
 <!-- contents start -->
 ## Contents
 
+- [Status: 15 October 2026 (v0.0.41-dev1, PERSISTING)](#status-15-october-2026-v0041-dev1-persisting)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -33,6 +34,15 @@
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## Status: 15 October 2026 (v0.0.41-dev1, PERSISTING)
+
+Still open. The rings 0-2 build of v0.0.41-dev1 on 24 cores kept 9.6 of 24 cores busy on average in its first
+50 s (it then stopped at the bsp stage). Host samples of the build container: 5.9, 4.7, 1.9 and 1.0 cores.
+Per stage (cores used / workers held): setup 0.58 / 1, terrain 0.98 / 1, scenery 2.47 / 4, scene 4.53 / 8,
+bsp 1.23 / 8 (one large serial qbsp run, `seyda.map`), world-survey 2.5 / 4, seam-audit 4.67 / 4,
+world-scenery-assets 1.92 / 4, media 2.22 / 4, music 0.62 / 3, engine 2.46 / 3. The stages split the 24
+workers into fixed shares and a stage whose work is one long unit (one qbsp map) holds its share idle.
 
 ## Status: 9 October 2026
 
@@ -192,6 +202,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-SILENT-PHASES-36](BUILD-SILENT-PHASES-36.md): Builder phases run silent: no start/end timing, no progress, no heartbeat; the CHIM stats step is a single-core tail
 - [BUILD-STAGE-INTERRUPT-ABSORBED-36](BUILD-STAGE-INTERRUPT-ABSORBED-36.md): The stage wrapper absorbed Ctrl-C: a stage that handled the interrupt and returned 0 counted as passed, and the build went on
 - [BUILD-STAGE-START-SHARE-33](BUILD-STAGE-START-SHARE-33.md): A pooled stage that starts while others run gets one worker as its start value
+- [BUILD-STAIR-WALK-BORDER-COPIES-41](BUILD-STAIR-WALK-BORDER-COPIES-41.md): The CHIM stair gate walks every frame's whole border, so each cell's flights are walked many times and unreachable copies can fail a build
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them

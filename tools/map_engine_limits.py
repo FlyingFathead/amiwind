@@ -143,6 +143,7 @@ def limits(source=None):
               'max_models': engine_limits.define('quakedef.h', 'MAX_MODELS', src),
               'max_sounds': engine_limits.define('quakedef.h', 'MAX_SOUNDS', src),
               'max_static_entities': engine_limits.define('client.h', 'MAX_STATIC_ENTITIES', src),
+              'max_streamed_statics': engine_limits.define('chim/chim_statics.c', 'CHIM_MAX_STATICS', src),
               'max_scenery': engine_limits.define('aw_town.h', 'AW_SCENERY_MAX_PLACEMENTS', src),
               'max_leafs': engine_limits.define('bspfile.h', 'MAX_MAP_LEAFS', src)}
     values['max_visedicts'] = values['max_edicts'] + values['max_static_entities']
@@ -220,7 +221,9 @@ def count(data, rules=None, scenery=False, plants=0, id1=None, extras_cache=None
     rules = rules or spawn_rules()
     rows, models, leafs = _entities(data)
     functions = rules['functions']
-    kept = freed = statics = walls = 0
+    kept = freed = statics = walls = streamed = 0
+    from map_files import FRAME_KEY, is_streamed_static
+    frame_map = any(r.get('classname') == 'worldspawn' and FRAME_KEY in r for r in rows)
     model_names = {'*%d' % i for i in range(1, models)} | set(rules['worldspawn_models'])
     sound_names = set(rules['worldspawn_sounds'])
     unknown = {}
@@ -240,7 +243,10 @@ def count(data, rules=None, scenery=False, plants=0, id1=None, extras_cache=None
             kept += 1
         else:
             freed += 1
-        statics += rule['static']
+        if rule['static'] and is_streamed_static(row, frame_map):
+            streamed += 1               # the CHIM list, not cl_static_entities (chim/chim_statics.c)
+        else:
+            statics += rule['static']
         if rule['model_from_self'] and row.get('model'):
             model_names.add(row['model'])
         if rule.get('animprep') and row.get('model'):
@@ -256,7 +262,7 @@ def count(data, rules=None, scenery=False, plants=0, id1=None, extras_cache=None
     return {'entities': len(rows) - 1 if rows else 0, 'edicts_kept': kept, 'edicts_freed': freed,
             'scenery': walls - bound, 'visedicts_at_scenery_link': walls - bound + edicts if walls else 0,
             'edicts_peak': edicts, 'models': 1 + 1 + len(model_names) + RUNTIME_MODELS,
-            'inline_models': max(0, models - 1), 'leafs': leafs, 'sounds': 1 + len(sound_names), 'static_entities': statics,
+            'inline_models': max(0, models - 1), 'leafs': leafs, 'sounds': 1 + len(sound_names), 'static_entities': statics, 'streamed_statics': streamed,
             'no_spawn_function': dict(sorted(unknown.items()))}
 
 
@@ -272,7 +278,8 @@ def check(data, name='map', table=None, rules=None, scenery=None, plants=0, id1=
                               ('models', table['max_models'], 'MAX_MODELS'),
                               ('sounds', table['max_sounds'], 'MAX_SOUNDS'),
                               ('leafs', table['max_leafs'], 'MAX_MAP_LEAFS'),
-                              ('static_entities', table['max_static_entities'], 'MAX_STATIC_ENTITIES')):
+                              ('static_entities', table['max_static_entities'], 'MAX_STATIC_ENTITIES'),
+                              ('streamed_statics', table['max_streamed_statics'], 'CHIM_MAX_STATICS')):
         if counts[key] > limit:
             refused.append('%s: %d %s, the engine holds %d (%s)' % (name, counts[key], key.replace('_', ' '),
                                                                     limit, label))

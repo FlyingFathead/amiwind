@@ -373,7 +373,7 @@ Do not assume two complete regions fit in memory during handoff. Choose the
 approach from these measurements; no best method or speedup is established yet.
 
 Follow-up: [world mapping options](WORLD_MAPPING_PLAN.md#optional-polygonal-poi-regions)
-and [roadmap experiment](ROADMAP.md#optional-polygonal-poi-regions).
+and [roadmap experiment](ROADMAP_HISTORY.md#optional-polygonal-poi-regions).
 
 ### 20:36 Helsinki — open-world/topographic-map limitation and elevated mode
 

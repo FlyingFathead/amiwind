@@ -565,6 +565,14 @@ void AW_UIHud(void) {
         for(i=0;i<3;i++)AW_UIBar(8,y+i*8,75,7,i,maximum[i]>0?current[i]/maximum[i]:0);
     hud_equipment_boxes(y,channels);
     {float fraction,alpha;if(aw_combat_enemy_bar && aw_combat_enemy_bar(&fraction,&alpha))AW_UIEnemyBar(fraction,alpha);}
+    /* The guard marker (COMBAT-BLOCKING-36; dropped in v0.0.41-dev1, restored): first person shows no shield yet,
+     * so the word "Guard" at the lower right, on the bottom line of the strip under the viewport (object names use
+     * its top line), or inside the viewport's lower right corner when there is no strip. */
+    if(aw_combat_guard_marker && aw_combat_guard_marker()){
+        int bottom=r_refdef.vrect.y+r_refdef.vrect.height,gy;
+        gy=vid.height-bottom>=24?vid.height-AW_UIHeight()-2:bottom-AW_UIHeight()-4;
+        AW_UIText(vid.width-6-AW_UIWidth("Guard"),gy,"Guard",-1);
+    }
     scr_copyeverything=1;
 }
 /* Names are bounded text over the world, with no panel/background fill. */

@@ -13,6 +13,7 @@ run first, and which settings use more memory. Measurements from real machines a
 - [More Fast RAM: the memory settings that exist today](#more-fast-ram-the-memory-settings-that-exist-today)
 - [Disk buffers and RAM disks](#disk-buffers-and-ram-disks)
 - [A cache test plan](#a-cache-test-plan)
+- [Compatibility roadmap](#compatibility-roadmap)
 - [Not yet: automatic sizing and non-blocking disk reads](#not-yet-automatic-sizing-and-non-blocking-disk-reads)
 - [What to send back](#what-to-send-back)
 
@@ -91,9 +92,35 @@ On accelerators whose Fast RAM comes in more than one region, the regions may di
 controller can reach by DMA; if a large cache behaves oddly, note how much memory the card has and where.
 
 
+## Compatibility roadmap
+
+Planned (owner decisions, 16 October 2026; [roadmap](ROADMAP.md#near-future-one-game-for-the-68040-and-the-68060-16-october-2026)).
+The baseline stays: the game is built and checked for an accelerated Amiga with the reference memory, and
+everything below only adds to it.
+
+The 68060 part has its own page, with what is known, the rules and the steps: [AmiWind on the 68060](68060.md).
+
+- **One game for the 68040 and the 68060.** The engine reads the CPU and FPU type at start-up and picks its 68040 or
+  its 68060-tuned version of each hot routine; the 68060 path avoids the instructions the 68060 emulates in
+  software, and draws exactly the same picture.
+- **The CPU support library, two ways.** Your own `68040.library` or `68060.library` (never shipped with AmiWind):
+  put it in an `amiga-libs` folder next to your Morrowind `Data Files` folder before building, and the builder
+  installs it on the game disk (`--amiga-libs DIR` chooses another folder); or drop it into the game disk's
+  library folder after building. The boot script loads the one matching the CPU.
+- **A clear message instead of a crash.** If the CPU needs a library that is not on the disk, the game says which
+  file is missing and where to put it.
+- **A boot notice when a 68060 is found without its library** (owner, 16 October 2026): a field set apart by
+  dashed lines the width of the screen, saying that a 68060 was detected, that `68060.library` was not found, how
+  to get the most out of the CPU, where to put the library on the game disk, and how to build the game with it
+  (the `amiga-libs` folder next to `Data Files`). The notice waits a few seconds with a countdown and continues;
+  pressing S stops the countdown so it can be read in full, and any key then continues.
+- **Extra RAM as speed.** Today by hand, with `-chimcache` and `-heapmb` (above); planned: when much more Fast RAM
+  is free, the game asks once whether to use it, and yes turns on larger caches (surface cache, streamed chunks kept, prefetch, visited interiors kept, read caching)
+  ([the cache plan](ROADMAP.md#the-cache-plan-extra-ram-spent-on-not-doing-work-twice-16-october-2026)).
+
 ## Not yet: automatic sizing and non-blocking disk reads
 
-Planned for v0.0.38 ([roadmap](ROADMAP.md)):
+Planned ([roadmap](ROADMAP.md), the cache plan above):
 
 - The cache and heap sized automatically from the free Fast RAM at start, so a big-memory machine uses it without
   start arguments.

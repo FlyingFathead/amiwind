@@ -4,7 +4,7 @@
 
 What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, where it stands, the gain that was measured (what was compared, how and when) and how Quake's visibility culling still works with it. Generated from [`features.json`](features.json); a test fails when this page is stale. Bugs are on the [CHIM bug tracker](../bugs/CHIM_TRACKER.md); ideas and held-back work are collected in [CHIM ideas](IDEAS.md). How far the open world has been converted, cell by cell, is on the [CHIM cell tracker](CELL_TRACKER.md).
 
-CHIM version: 0.2.0. 38 features: 21 shipped, 11 in progress, 3 planned, 3 ideas. Updated 11 October 2026.
+CHIM version: 0.2.1. 38 features: 21 shipped, 11 in progress, 3 planned, 3 ideas. Updated 11 October 2026.
 
 ## What CHIM has done so far
 
@@ -24,14 +24,14 @@ The headline measured gains. Each links to its feature, which says what was comp
 - **Ground stored once:** Seven CHIM region cells (coast and sea floor): 9.0 MB of frames to 1.9 MB with references and the compiled terrain hull, 0.91 times the 2.1 MB of open-world maps they replace. *builder output, 10 October 2026.* [Details](#ground-stored-once)
 - **Fewer faces per mesh (planar merge, meshoptimizer for large shells):** Every mesh of the v0.0.36-dev3 world's CHIM areas: 101,153 to 99,052 faces with planar merge; the arrival ship 4,046 to 3,690 faces with closed seams (torn seam 2.2 % to 0) and about a seventh of the shape error. *exact counts, 11 October 2026.* [Details](#fewer-faces-per-mesh-planar-merge-meshoptimizer-for-large-shells)
 
-Several features also have a cost, listed under their caveats: CHIM leaves less of the Hunk free at the load peak, spends more time outside the 3D view and draws slightly more spans. Each shipped feature names the CHIM version it came with; the features marked "in this release" are in the development line of CHIM 0.2.0, not yet published.
+Several features also have a cost, listed under their caveats: CHIM leaves less of the Hunk free at the load peak, spends more time outside the 3D view and draws slightly more spans. Each shipped feature names the CHIM version it came with; the features marked "in this release" are in the development line of CHIM 0.2.1, not yet published.
 
 ## Features by status
 
 | Status | Meaning | Features |
 | --- | --- | --- |
 | Shipped | in a published release | 21 |
-| In this release (CHIM 0.2.0) | in the line that becomes the next release; not yet published | 0 |
+| In this release (CHIM 0.2.1) | in the line that becomes the next release; not yet published | 0 |
 | In progress | being built or measured; not finished | 11 |
 | Planned | decided; no finished design or code | 3 |
 | Idea | written down, not decided | 3 |

@@ -81,7 +81,7 @@ CHIM has its own version number, separate from AmiWind's:
 | | |
 | --- | --- |
 | First release | CHIM 0.1.0 with AmiWind v0.0.33 |
-| Current | CHIM 0.2.0 with AmiWind v0.0.36 (minor step: new features; world format major unchanged) |
+| Current | CHIM 0.2.1 with AmiWind v0.0.41 (patch step: fixes: compiled collision for non-convex pieces, recorded audit provenance; world format unchanged). 0.2.0 shipped with AmiWind v0.0.36 |
 | Where it is kept | the `CHIM_VERSION` file at the repository root, the one source for the builder receipts, the engine header and the boot check |
 | How it is shown | short form on the boot check, "AmiWind vX / CHIM vY"; long form "Running on CHIM Engine vY" in the README and release notes |
 | Numbering | semantic versions: a new world format major version is a new CHIM major version (the engine refuses a world of another major with a clear message); minor = features; patch = fixes |
@@ -172,7 +172,7 @@ Leary). The CHIM builder is GPLv3. Details and the reviewed upstream revision:
 | [World format](WORLD_FORMAT.md) | The files the CHIM builder writes, byte by byte (the file-type table at the top), the M3 and M4 designs, the heap gate, the version rules |
 | [.chim map format](CHIM_MAP_FORMAT.md) | CHIM maps as `.chim` files, never Quake `.bsp`; the planned own header, loader and contents (approved 10 October 2026) |
 | [CHIM engine](ENGINE.md) | How the engine loads, keeps, draws and collides with a CHIM world; memory and tests |
-| [CHIMport](CHIMPORT.md) | The whole island converted cell by cell from the sea inwards, every audit per cell |
+| [CHIMport](CHIMPORT.md) | The whole island converted cell by cell from the sea inwards, every audit per cell ; [when a cell does not fit the memory budget](CHIMPORT.md#when-a-cell-does-not-fit-the-memory-budget) |
 | [Border audit](STITCH_AUDIT.md) | Where a CHIM area meets the legacy world: heights, arrival, far layer and objects at its edges |
 | [Disk space](DISK_SPACE.md) | Amiga disk limits, what CHIM saves, and the size budget of the whole game |
 | [Mesh methods](MESH_METHODS.md) | How meshes become faces: planar merge for every mesh, meshoptimizer with locked borders for the large reduced shells, the method table and its rule |

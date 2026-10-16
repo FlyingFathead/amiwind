@@ -15,6 +15,22 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- contents start -->
+## Contents
+
+- [Status: 9 October 2026](#status-9-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 9 October 2026
 
 Repair in v0.0.33 development, not shipped at the time of writing.
@@ -64,6 +80,18 @@ fingerprint, its content is not.
 
 A new stage option that names a cache folder must be added to `CONTENT_ADDRESSED` together with a
 test; the prerendered store's measurement build (a hit in a fresh workspace) shows a missed one.
+
+### v0.0.41-dev2, 16 October 2026 (corrected the same night)
+
+A first reading of the rerun at 427e29b said that every area and model was converted again. That was wrong:
+the run's `chim-stats.json` shows every unit reused (texture 7,448, mesh 8,004, terrain 87,255, variant 27,685;
+0 built), and the CHIM world bytes equal the previous run's. The stage's 17 minutes went to walking the stairs
+of all 368 frames again: each stored walk was refused because "its stored walk has no check mark of a passed
+master build" (the earlier builds of the night failed late, so none passed). The stage's receipts
+(`chim-receipt.json`, `chim-stairs.json`, `chim-stats.json`, `chim-timing.json`) also record reuse counts and walk
+provenance, so they differ between runs with identical world bytes, and the stages after chim (cell-progress, the
+Vivec rooms) ran again. Repair items: trust a stored stair walk by its own frame hash and walk result, not only
+after a whole master build passed; keep reuse counts and provenance out of the output compared for early cutoff.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -124,6 +152,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-SILENT-PHASES-36](BUILD-SILENT-PHASES-36.md): Builder phases run silent: no start/end timing, no progress, no heartbeat; the CHIM stats step is a single-core tail
 - [BUILD-STAGE-INTERRUPT-ABSORBED-36](BUILD-STAGE-INTERRUPT-ABSORBED-36.md): The stage wrapper absorbed Ctrl-C: a stage that handled the interrupt and returned 0 counted as passed, and the build went on
 - [BUILD-STAGE-START-SHARE-33](BUILD-STAGE-START-SHARE-33.md): A pooled stage that starts while others run gets one worker as its start value
+- [BUILD-STAIR-WALK-BORDER-COPIES-41](BUILD-STAIR-WALK-BORDER-COPIES-41.md): The CHIM stair gate walks every frame's whole border, so each cell's flights are walked many times and unreachable copies can fail a build
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them

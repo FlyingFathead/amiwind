@@ -777,7 +777,7 @@ shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
   corner mirroring the left and no resize control. Plan bounded active-effect
   icons with complete per-source detail/overflow access, preserving all gameplay
   effects; original row versus AGA-grid adaptation and costs remain explicit.
-  [HUD/roadmap](ROADMAP.md#world-map-inventory-and-journal-todo-owner-request-1-october-2026).
+  [HUD/roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-owner-request-1-october-2026).
 
 - Clarify literal "Inventory" title and the actual player-name header on the
   planned full-black paused O stats modal. O is a planned rebindable gameplay
@@ -1082,7 +1082,7 @@ shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
   updates, preserving health, fatigue and knockdown. Saves capture wear before
   copying state. Combat and existing save fixtures pass; the complete inventory
   feature remains under development.
-  [Inventory roadmap](ROADMAP.md#world-map-inventory-and-journal-todo-owner-request-1-october-2026).
+  [Inventory roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-owner-request-1-october-2026).
 
 
 - The existing hands diagnostic now reports attack latch, last sent movement

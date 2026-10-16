@@ -683,7 +683,10 @@ in [CHIM world format: file types](chim/WORLD_FORMAT.md#file-types).
 - **Open CHIM world** takes the build's `chim-world` folder (or its `chim` folder, or a zip of either;
   zip64 archives are not read). Only the files a frame needs are read: the index, the frame file, its
   sector files and the sector files of other frames that hold its terrain records, models or textures.
-  `?world=<url>&frame=frames/x-03/y-02` opens a world served over HTTP.
+  `?world=<url>&frame=frames/x-03/y-02` opens a world served over HTTP. The Toolkit server serves a
+  build's world for this with `--chim-world NAME=DIR` (repeatable): it prints
+  `map-inspector.html?world=/chim-world/NAME/` for each, and the memory heatmap comes from the world's
+  own `chim-heap.json`.
 - **Frame** lists the frames, worst headroom first when a `chim-heap.json` is in the folder (or loaded
   with **Heap report**). **Show frame** draws each chunk's ground (terrain references placed where the
   engine grafts them) and every placement (owned records; a reach copy is the same placement), in

@@ -198,6 +198,18 @@ class MapCountTests(unittest.TestCase):
         refused, _ = mel.check(bsp(world(*statics)), 'vf0001')
         self.assertTrue(any('MAX_STATIC_ENTITIES' in r for r in refused))
 
+    def test_streamed_frame_statics_count_against_the_chim_list(self):
+        # a CHIM frame map's tagged statics (chim/chim_statics.c): the streamed list, not cl_static_entities
+        table = mel.limits()
+        tagged = [{'classname': 'aw_flora', 'model': 'f.spr', '_chim_chunk': '0'}] * (table['max_static_entities'] + 1)
+        frame = [{'classname': 'worldspawn', '_chim_frame': '0 0'}, {'classname': 'info_player_start', 'origin': '0 0 0'}]
+        refused, c = mel.check(bsp(frame + tagged), 'seyda')
+        self.assertEqual(refused, [], c)
+        self.assertEqual((c['static_entities'], c['streamed_statics']), (0, table['max_static_entities'] + 1))
+        # the same rows in an ordinary map (no _chim_frame) are Quake statics
+        refused, _ = mel.check(bsp(world(*tagged)), 'vf0001')
+        self.assertTrue(any('MAX_STATIC_ENTITIES' in r for r in refused))
+
     def test_check_maps_lists_every_refusal_and_skips_placeholders(self):
         with tempfile.TemporaryDirectory() as temp:
             maps = Path(temp) / 'id1/maps'

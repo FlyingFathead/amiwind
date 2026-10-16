@@ -86,6 +86,16 @@ class ChimHeapGateTests(unittest.TestCase):
 
 
 
+class OverBudgetTextTests(unittest.TestCase):
+    """The gate names how far over budget each frame is (owner 2026-10-16)."""
+
+    def test_amount_over_in_bytes_kib_and_percent(self):
+        text = heap.over_budget_text({'frame': 'frames/x+17/y+05/frame.ccf', 'peak_bytes': 7463936,
+                                      'budget_bytes': 6242304, 'peak_position': [1.0, 2.0]})
+        self.assertIn('over by 1221632 bytes (1193 KiB, 19.6 %)', text)
+        self.assertTrue(text.startswith('frames/x+17/y+05/frame.ccf needs 7463936 bytes'))
+
+
 class PerFrameAuditTests(unittest.TestCase):
     """CHIM-WORLD-AUDIT-SCALING-33: ring_peak audits each frame on what it uses (its own model and texture
     numbering), in parallel and cached by content, with the same report as the whole-world form."""

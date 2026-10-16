@@ -19,4 +19,4 @@ This is a post-release design task, after the initial combat work. Determine how
 to exclude the full NPC model and active simulation outside loaded cells while
 retaining a minimal persistent record for travel, pursuit and following. The
 representation, update schedule and safe re-entry method are not yet decided.
-See the [roadmap and acceptance questions](ROADMAP.md#deferred-minimal-npc-state-outside-loaded-cells).
+See the [roadmap and acceptance questions](ROADMAP_HISTORY.md#deferred-minimal-npc-state-outside-loaded-cells).

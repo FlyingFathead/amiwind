@@ -45,17 +45,21 @@ from pathlib import Path
 
 def planned_maps(id1, chim_world):
     """The image's final exterior map changes on CHIM, read only: (added frame map names,
-    removed id1-relative files, towns not on CHIM). Empty without a CHIM world."""
+    removed id1-relative files, towns not on CHIM). Empty without a CHIM world. The added frame maps
+    are the towns' (and Seyda Neen's special maps) and the CHIM region frame maps, which keep their
+    open-world map names (chim.frame_map.region_map_names, one per frame): the harvest step writes
+    their catalogues (HARVEST-CHIM-REGION-LOSS-41), so they must count as maps of the payload."""
     if not chim_world:
         return [], set(), []
     from build_aga import chim_world_receipt, staged_extra_towns
-    from chim.frame_map import SPECIALS, legacy_area_maps, map_name, town_files
+    from chim.frame_map import SPECIALS, legacy_area_maps, map_name, region_map_names, town_files
     from town_config import runtime_towns
     _, areas = chim_world_receipt(chim_world)
     rows = {t['id']: t for t in runtime_towns()}
     added = [map_name(rows[area]['name']) for area in areas if area in rows]
     if 'seyda' in areas:
         added += [map_name(name) for name in SPECIALS]
+    added += sorted(region_map_names(id1, chim_world, primary_only=True))
     removed = {rel for area in areas for rel in legacy_area_maps(id1, area)}
     not_on_chim = [town['id'] for town in staged_extra_towns(id1) if town['id'] not in areas]
     removed |= {rel for town in not_on_chim for rel in town_files(id1, town)}
@@ -123,16 +127,18 @@ def check_chim_native(id1, chim_world, town_dirs, installed=False):
     return len(town_dirs)
 
 
-def planned_catalogues(id1, harvest, data_files):
+def planned_catalogues(id1, harvest, data_files, chim_world=None):
     """The harvest catalogues the image step will write (harvest_build.install: one per shipped exterior map
-    with harvestable plants, before the heap admission drops some), read only. A superset: every map that
-    can get a catalogue must be one the final image can bind it to."""
-    from harvest_build import map_selections, source_placements
+    with harvestable plants, before the heap admission drops some; with a CHIM world also one per CHIM region
+    frame map with plants, HARVEST-CHIM-REGION-LOSS-41), read only. A superset: every map that can get a
+    catalogue must be one the final image can bind it to."""
+    from harvest_build import chim_regions, map_selections, source_placements
     _, _, refs = source_placements(harvest, data_files)
-    return sorted(map_selections(id1, refs)[1])
+    regions = chim_regions(id1, chim_world)
+    return sorted(map_selections(id1, refs, **({'regions': regions} if regions else {}))[1])
 
 
-def check_harvest(id1, added, removed, harvest=None, data_files=None):
+def check_harvest(id1, added, removed, harvest=None, data_files=None, chim_world=None):
     """harvest_fingerprint_entries on the planned final map set: maps after the frame maps are written
     and the removed files are gone, as empty placeholders; catalogues, region tables and harvest models
     copied (all small). Before the image step installs the catalogues (it does so late, after the BSP
@@ -142,7 +148,7 @@ def check_harvest(id1, added, removed, harvest=None, data_files=None):
     from build_aga import harvest_fingerprint_entries
     planned = []
     if not any(id1.glob('harvest-*.txt')) and harvest and data_files:
-        planned = planned_catalogues(id1, harvest, data_files)
+        planned = planned_catalogues(id1, harvest, data_files, chim_world)
     if not any(id1.glob('harvest-*.txt')) and not planned:
         return 0
     from build_scratch import scratch_dir
@@ -297,7 +303,7 @@ def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=No
     checks = [('payload-names', lambda: check_payload_names(boot)),
               ('file-formats', lambda: check_file_formats(id1)),
               ('host-paths', lambda: check_payload_host_paths(boot, [out.resolve()])),
-              ('harvest-catalogues', lambda: check_harvest(id1, added, removed, harvest, data_files)),
+              ('harvest-catalogues', lambda: check_harvest(id1, added, removed, harvest, data_files, chim_world)),
               ('interior-sections', lambda: check_interior_sections(id1, removed)),
               ('engine-map-limits', lambda: check_engine_map_limits(id1, removed)),
               ('actor-frames', lambda: check_actor_frames(id1, removed))]

@@ -400,6 +400,8 @@ class BugTrackerTest(unittest.TestCase):
         self.assertEqual(release.text_limit('docs/PATCH-v0.0.33-dev1.json'), 1048576)
         self.assertEqual(release.text_limit('docs/PATCH-v0.0.32.json'), 1048576)
         self.assertEqual(release.text_limit('docs/bugs/bugs.json'), 1048576)
+        # the CHIM inclusion ledger grows with every packaged build (287 KB on 16 October 2026)
+        self.assertEqual(release.text_limit('amiwind-toolkit/chim-inclusion.js'), 1048576)
         self.assertEqual(release.text_limit('docs/PATCH-NOTES.md'), release.TEXT_LIMIT)
         self.assertEqual(release.text_limit('tools/PATCH-v0.0.33.json'), release.TEXT_LIMIT)
         self.assertEqual(release.text_limit('README.md'), release.TEXT_LIMIT)

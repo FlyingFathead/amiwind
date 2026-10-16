@@ -61,6 +61,7 @@
     "stair_walk": {"type": "object", "description": "A passed build's stair-walk records marked master-checked (tools/stair_records.py promote): reports, marked, already, changed, missing, reused, walked"},
     "cores": {"type": "object", "description": "The build's machine-wide core lease (aw core leases): priority, wanted, leased (= --jobs and --cpus), host_threads, lease, rebalanced"},
     "perf_guard": {"type": "object", "description": "The perf guard's verdict on a build (tools/perf_guard.py show --json): verdict, failed, waived, busy, sections, failing, waivers"},
+    "over_budget": {"type": "array", "items": {"type": "object"}, "description": "Every CHIM frame over its memory budget in the run's heap reports (chim*/chim-heap.json), worst first: report, frame, needs, budget, over (bytes)"},
     "failed_stage": {"type": ["string", "null"]},
     "inputs": {"type": "array", "items": {"type": "object", "required": ["path"],
                                            "properties": {"path": {"type": "string"},

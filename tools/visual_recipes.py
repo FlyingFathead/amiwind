@@ -38,6 +38,16 @@ def apply_recipe(profile, model, recipe, document):
                      source, {'mesh_method': 'meshopt+merge'})
     if model.get('sha256') != entry['sha256']:
         return profile
+    if 'collision_tolerance' in entry:
+        # coarser collision pieces for this mesh only (mesh_geometry.collision_parts' tolerance, default 2 units of
+        # open space a convex piece may fill); its drawn mesh is unchanged unless the entry also reduces it
+        # (CHIM-COLLISION-UNION-FALLBACK-41: a gnarly Telvanni root's collision was ~95 % of its bytes)
+        tolerance = float(entry['collision_tolerance'])
+        if not 2 <= tolerance <= 32:
+            raise ValueError('Invalid collision tolerance (2-32 units): ' + source)
+        profile = dict(profile, collision_tolerance=tolerance)
+        if not any(k in entry for k in ('primitive', 'panel', 'ratio')):
+            return dict(profile, visual_recipe={'name': recipe, 'sha256': entry['sha256']})
     if 'primitive' in entry:
         return dict(profile, visual_primitive=dict(entry['primitive']),
                     visual_recipe={'name': recipe, 'sha256': entry['sha256']})
@@ -52,6 +62,22 @@ def apply_recipe(profile, model, recipe, document):
     result.update(meshopt_error_share=error, lod_preserve_border=True,
                   visual_recipe={'name': recipe, 'sha256': entry['sha256']})
     return result
+
+
+EVERYWHERE_VARIABLE = 'AMIWIND_VISUAL_EVERYWHERE'   # off: every mesh keeps its original visual (the method before)
+
+
+def everywhere_recipe(document):
+    """The recipe applied in every CHIM cell and town frame (document 'everywhere'), unless switched off with
+    AMIWIND_VISUAL_EVERYWHERE=off. A cell's own recipe wins for the meshes it names; an everywhere recipe has no
+    default ratio, so a mesh it does not name keeps its profile."""
+    import os
+    name = document.get('everywhere')
+    if not name or os.environ.get(EVERYWHERE_VARIABLE, 'on') == 'off':
+        return None
+    if name not in document['recipes'] or document['recipes'][name].get('default_visual_ratio') is not None:
+        raise ValueError('everywhere recipe %r must exist and must not cap unnamed meshes' % name)
+    return name
 
 
 def prepare_sprite_replacements(recipe, index, archive, palette, references,

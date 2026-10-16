@@ -38,6 +38,24 @@ class SpriteHeapTests(unittest.TestCase):
             r=inspect_sprites(entity+entity,root,SIZES)
             self.assertEqual(r['static_sprite_instances'],2);self.assertEqual(r['unique_sprite_models'],1)
             self.assertEqual(r['resident_hunk_bytes'],estimate_sprite(sprite(),SIZES)['resident_hunk_bytes'])
+    def test_streamed_frame_statics_leave_the_static_and_hunk_counts(self):
+        # a CHIM frame map's tagged statics live in the CHIM list and the zone (chim/chim_statics.c)
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);(root/'progs').mkdir();(root/'progs/tree.spr').write_bytes(sprite())
+            frame=b'{"classname" "worldspawn" "_chim_frame" "0 0"}\n'
+            tagged=b'{"classname" "aw_flora" "model" "progs/tree.spr" "aw_scale" "0.5" "_chim_chunk" "3"}\n'
+            r=inspect_sprites(frame+tagged*600,root,SIZES,static_limit=512)
+            self.assertEqual(r['static_sprite_instances'],0)
+            with self.assertRaises(ValueError):inspect_sprites(tagged*600,root,SIZES,static_limit=512)
+    def test_streamed_frame_statics_leave_the_efrag_estimate(self):
+        # streamed statics link from the CHIM efrag reserve while their chunk is active, not at map load
+        from sprite_heap import _static_bounds
+        entities=(b'{"classname" "worldspawn" "_chim_frame" "0 0"}\n'
+                  b'{"classname" "aw_flora" "model" "progs/aw_flora/x.spr" "aw_scale" "1" "_chim_chunk" "0"}\n')
+        self.assertEqual(_static_bounds({'entities':entities,'models':b''},{'sprite_assets':[]},{'max_statics':512}),[])
+        with self.assertRaisesRegex(ValueError,'Unsupported static model bounds'):
+            _static_bounds({'entities':entities.replace(b' "_chim_frame" "0 0"',b''),'models':b''},
+                           {'sprite_assets':[]},{'max_statics':512})
     def test_truncated_bad_group_or_extra_bytes_fail(self):
         raw=sprite()
         for bad in (raw[:-1],raw+b'x',raw[:36]+struct.pack('<i',2)+raw[40:]):

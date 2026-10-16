@@ -263,7 +263,9 @@ the result's `stair_walk` counts the records marked and the maps and frames the 
 reused and walked; `aw status` shows those counts with each recent build. The step `perf-guard` reads the
 verdict the builder's perf guard wrote (`tools/perf_guard.py show RUN --json`, result field `perf_guard`): a failed
 guard fails the result (failed stage `perf-guard`; the build's stages passed, so its stair walks are still marked),
-and `aw status` shows the verdict and the waivers ([Perf guard](BUILD_PROFILE.md#perf-guard)). Hashed stair walks
+and `aw status` shows the verdict and the waivers ([Perf guard](BUILD_PROFILE.md#perf-guard)). A run whose CHIM heap reports
+(`chim*/chim-heap.json`) hold frames over the memory budget lists every one of them in the result field
+`over_budget`, worst first, with how many bytes each is over; `aw submit` and `aw status` print them. Hashed stair walks
 are mandatory: once the published builder head has the records layer (`tools/stair_records.py`),
 a build of a commit without it is refused until the published builder is merged, and
 `--stair-walk-cache full` (every map and frame walked again) is refused unless the request

@@ -155,6 +155,10 @@ OPTIONS = {
     'chim_draw_distance': 'opt-in, not shipped', 'chim_terrain_shoreline': 'shipped default',
     # the compiled terrain hull and terrain references: defaults from v0.0.36 (owner decision 2026-10-11)
     'chim_terrain_hull': 'shipped default', 'chim_terrain_refs': 'shipped default',
+    # original LAND samples under ground residents (CHIM-VIVEC-FRAME-WIDE-41)
+    'chim_terrain_resident_detail': 'shipped default',
+    # the actor support search's wide ring (CHIM-VIVEC-FRAME-WIDE-41)
+    'actor_search': 'shipped default',
     'chim_model_hull_patch': 'shipped default',
     # how a CHIM model variant shares its vertices (base by default; placed = the earlier per-placement weld)
     'chim_model_weld': 'shipped default',
@@ -167,6 +171,7 @@ OPTIONS = {
     # Optional recorded input (BUILD-SEYDA-REGEN-30, not needed from v0.0.34): the owner's own recorded
     # v0.0.31 Seyda Neen maps, kept byte for byte (tests/test_recorded_stage.py).
     'seyda_recorded': 'recorded-stage exception input',
+    'seyda_scene_source': 'Seyda Neen scene source (auto: carrier for CHIM-native; compiled = retired A/B)',
     # Inputs, tools, modes and checks: no shipped content of their own.
     'help': 'tooling', 'data_files': 'input', 'workspace': 'tooling', 'stage': 'mode', 'check': 'mode',
     'plan': 'mode', 'install_dependencies': 'mode', 'autoinstall': 'mode', 'yes': 'mode',

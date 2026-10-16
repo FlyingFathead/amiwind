@@ -12,6 +12,7 @@ measuring them again.
 
 - [Modular NPCs](#modular-npcs)
 - [NPC pathfinding](#npc-pathfinding)
+- [The Ghostfence as a Quake turbulent surface](#the-ghostfence-as-a-quake-turbulent-surface)
 - [The distant view: far terrain and mold shells](#the-distant-view-far-terrain-and-mold-shells)
 - [M3: Vivec on CHIM](#m3-vivec-on-chim)
   - [M3 preflight (10 October 2026)](#m3-preflight-10-october-2026)
@@ -117,6 +118,16 @@ proposed limit 4) across the map change next to Quake's spawn parameters, and
 places them behind you at the door's arrival point on standing ground. Hostile
 pursuers stop at load doors, as in Morrowind
 ([traversal rules](../NPC_CELL_TRAVERSAL.md)).
+
+## The Ghostfence as a Quake turbulent surface
+
+**Status: idea (owner, 16 October 2026), with the Red Mountain region.** The Ghostfence and the Ghostgate show an
+upright, shimmering curtain between the pylons, like electricity and water at once. Quake already draws exactly
+this kind of surface: a texture whose name starts with `*` is drawn turbulent (`D_DrawTurbulent`, the warp that
+ripples water, slime, lava and the upright teleporter fields), and our lava already uses it. Plan: the fence's
+energy texture converted as a turbulent `*` texture on the fence walls, its glow given a flickering light style
+(Quake's animated light patterns) for the electric pulse; A/B against the original at the same pose. No new
+engine feature: the existing mechanism, mapped onto the Morrowind data.
 
 ## The distant view: far terrain and mold shells
 
@@ -322,6 +333,18 @@ Detail: [CHIM engine, "Memory"](ENGINE.md#memory) and the heap gate in the
   chunk room, at 661 of 9,216 positions. The heap gate reports the active
   ring, the load ring and the largest single block, and follows the engine's
   stated policy (`tools/engine_limits.py`) instead of keeping its own copy.
+- **Full rotation in the placement record. Status: measured, proposed (16 October 2026).** A placement
+  record holds a position and a yaw, so every tilted or scaled placement of a mesh is baked into a model of
+  its own. Morrowind tilts and scales a lot (Telvanni roots, kelp, shells, barnacles): in the 13 cells left
+  out of v0.0.41-dev4, 854 of 1,586 stored models are tilted copies, 20.6 of 41.5 MB. With the rotation in
+  the placement (one drawn model per mesh and scale) they need 836 models and 17 MB less (41 %); with scale
+  too, 427 models and 23.8 MB less (57 %). The renderer already draws a brush model at any rotation
+  (`R_RotateBmodel` uses all three angles), so drawing costs what it does now. Collision is the hard part:
+  the player's box is axis-aligned, so a tilted model keeps a small tilted collision hull of its own, and
+  scale needs renderer support. A world-format step (minor version) and an engine change; measured before
+  adopting on the cells over the memory budget. A builder-only table that merges near-identical tilts
+  saves little: 0.6 % exact (two placements share a model only when they differ by a world yaw, because
+  Morrowind applies its Z rotation first), 2 % with tilts snapped to 2 degrees.
 - **Fragmentation. Status: in source on a branch.** The zone never moves a
   block, so a ring that fits by the sum can still find no piece large enough
   for a house model once locked blocks split the room (at a dense Balmora
@@ -481,6 +504,9 @@ The short list, so nobody redoes them:
 | --- | --- |
 | Sharing texture mappings across models | Saves under 1 % of the ring's bytes in Balmora and Seyda Neen; see [Memory](#memory) |
 | Rounding texture mappings | Changes the pixels; saves little |
+| Cutting large models by chunk for the Telvanni towns | At 1,024 units no change; at 512 units five of six frames grew by up to 411 KB, Sadrith Mora gained 48 KB (16 October 2026); the pieces carry their own collision and records |
+| Merging near-identical tilted variants in the builder | 0.6 % exact, 2.1 % snapped to 2 degrees, and snapping moves objects; see full rotation in [Memory](#memory) |
+| The mesh optimizer on every mesh | Made Hla Oad's frames 1.5 MB larger (merged flora polygons become triangles); per-mesh recipes instead ([CHIMport](CHIMPORT.md#when-a-cell-does-not-fit-the-memory-budget)) |
 | NPC parts as follower entities | About 19 entity setups per actor per frame; see [Modular NPCs](#modular-npcs) |
 | A legacy and CHIM hybrid build | Dismissed: builds are pure CHIM; the legacy builder stays selectable on its own |
 | Town occluders and hints on legacy region maps | Negligible benefit with the current partitioning; town occlusion deferred pending a better approach ([TOWN-VIS-OCCLUSION-31](../bugs/TOWN-VIS-OCCLUSION-31.md)) |

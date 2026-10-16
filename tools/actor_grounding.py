@@ -2,6 +2,7 @@
 """Explicit NPC grounding policy and source identity for runtime release audits."""
 import json
 from pathlib import Path
+import os
 import re
 from mwad.audit import records, subrecords, cell_data
 from player_hull import lumps, pack_lumps
@@ -99,6 +100,27 @@ def contact_interval_choice(low, high, preferred):
 
 OFFSETS = sorted(((x*.5, y*.5) for x in range(-64, 65) for y in range(-64, 65)
                   if x*x+y*y <= 4096), key=lambda p: (p[0]*p[0]+p[1]*p[1], p))
+# The wide ring (CHIM-VIVEC-FRAME-WIDE-41, owner decision 2026-10-16): offsets past the 32-unit search, up to 48
+# units, nearest first. Tried only after every OFFSETS spot failed, so an actor the 32-unit search places never
+# moves; it serves ground residents on slopes too steep for any spot within 32 units (the Vivec frame's Dreamer,
+# reference 297836, on a 28-degree slope: nearest fitting spot 37.5 units away).
+WIDE_RING = sorted(((x*.5, y*.5) for x in range(-96, 97) for y in range(-96, 97)
+                    if 4096 < x*x+y*y <= 9216), key=lambda p: (p[0]*p[0]+p[1]*p[1], p))
+SEARCH_ENV = 'AMIWIND_ACTOR_SEARCH'
+SEARCH_MODES = ('wide', 'near')
+
+
+def search_mode():
+    """'wide' (default): OFFSETS, then WIDE_RING; 'near': OFFSETS only (the method before v0.0.41)."""
+    mode = os.environ.get(SEARCH_ENV, '').strip() or 'wide'
+    if mode not in SEARCH_MODES:
+        raise ValueError('%s takes %s, not %r' % (SEARCH_ENV, ' or '.join(SEARCH_MODES), mode))
+    return mode
+
+
+def search_offsets():
+    """The support search's offsets in try order (search_mode)."""
+    return OFFSETS + WIDE_RING if search_mode() == 'wide' else OFFSETS
 
 
 class _Fitter:
@@ -201,7 +223,7 @@ class _Fitter:
         """The first passing offset in OFFSETS[first:last]: (attempt, fields) or None."""
         import math
         samples, s, center = self._setup(name, e, authored, angles)
-        for attempt, (dx, dy) in enumerate(OFFSETS[first:last], first+1):
+        for attempt, (dx, dy) in enumerate(search_offsets()[first:last], first+1):
             candidate = [authored[0]+dx, authored[1]+dy, 0]
             if not self.owned(name, candidate): continue
             support = s.floor([*candidate[:2], authored[2]+8], 40)
@@ -232,7 +254,7 @@ class _Fitter:
     def fit(self, name, e, authored, angles):
         result, original = self.head(name, e, authored, angles)
         if original is None: return result
-        found = self.search(name, e, authored, angles, original, 0, len(OFFSETS))
+        found = self.search(name, e, authored, angles, original, 0, len(search_offsets()))
         return finish(result, found)
 
 
@@ -241,7 +263,7 @@ def finish(result, found):
     if found is not None:
         result.update(found[1])
     else:
-        result.update(status='unresolved-mesh-contact', attempts=len(OFFSETS))
+        result.update(status='unresolved-mesh-contact', attempts=len(search_offsets()))
     return result
 
 
@@ -329,14 +351,15 @@ def _fit_all(tasks, jobs):
     """
     from concurrent.futures import FIRST_COMPLETED, wait
     from build_parallel import live_jobs, process_pool, worker_environment
-    slices = -(-len(OFFSETS) // SEARCH_SLICE)
+    offsets = len(search_offsets())
+    slices = -(-offsets // SEARCH_SLICE)
     # The stage's current share, not its start value: actor-contact started with
     # one worker and so fitted every placement serially (BUILD-IDLE-STAGES-33).
     jobs = live_jobs(jobs)
 
     def search_task(index, number, head):
         first = number * SEARCH_SLICE
-        return (*tasks[index], head[1], first, min(first + SEARCH_SLICE, len(OFFSETS)))
+        return (*tasks[index], head[1], first, min(first + SEARCH_SLICE, offsets))
     if jobs <= 1 or not tasks:
         heads = [_fit_head(task) for task in tasks]
         found = {}

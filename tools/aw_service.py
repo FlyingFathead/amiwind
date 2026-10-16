@@ -152,6 +152,19 @@ else:
                rebuilt=len(cache.get("not_reused") or {}), failed_stage=failed[0] if failed else None,
                not_started=len(state.get("not_started") or []), elapsed_seconds=state.get("elapsed_seconds"),
                reuse_from=cache.get("reuse_from"), storage_pool=state.get("storage_pool"))
+    # every CHIM frame over its memory budget, worst first, with how much (owner 2026-10-16: "whenever something is
+    # over budget, I'd know how much over budget")
+    over = []
+    for report in sorted(run.glob("chim*/chim-heap.json")):
+        try:
+            frames = json.loads(report.read_text()).get("frames") or []
+        except (OSError, ValueError):
+            continue
+        for f in frames:
+            if isinstance(f, dict) and f.get("ok") is False and "peak_bytes" in f and "budget_bytes" in f:
+                over.append({"report": str(report.relative_to(run)), "frame": f.get("frame"), "needs": f["peak_bytes"],
+                             "budget": f["budget_bytes"], "over": f["peak_bytes"] - f["budget_bytes"]})
+    out["over_budget"] = sorted(over, key=lambda o: -o["over"])
     try:
         out["recipe"] = json.loads((run / "build-recipe.json").read_text())
     except (OSError, ValueError):
@@ -1138,6 +1151,7 @@ def submit_build(config, request, dry_run, runner):
                             'perf-guard' if steps.get('perf-guard', {}).get('ok') is False else None),
                         logs=[str(log_path)], artifacts=[commands['run_dir']], inputs=inputs, recipe=recipe_info,
                         **({'stair_walk': stair} if stair else {}), **({'perf_guard': guard} if guard else {}),
+                        **({'over_budget': summary['over_budget']} if summary.get('over_budget') else {}),
                         **({'cores': cores_info} if cores_info else {}))
 
 
@@ -1195,7 +1209,8 @@ def finish_build(config, request, run_name, lease, started, t0, facts, steps, no
     if saved:
         verify_recipe(saved, facts, run_name, path, recipe_path)
     print(f'aw submit: {run_name}: {status.upper()}'
-          + (f' (failed stage {fields.get("failed_stage")})' if fields.get('failed_stage') else ''))
+          + (f' (failed stage {fields.get("failed_stage")})' if fields.get('failed_stage') else '')
+          + aw.over_budget_text(fields.get('over_budget')))
     print(f'aw submit: result {path}')
     return aw.EXIT[status], path
 

@@ -815,10 +815,19 @@ from build_jobs import add_jobs, resolve_jobs
 from vis_options import light_args
 from build_parallel import live_jobs, ordered_map
 
-def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cull=None, terrain_cull_config=None, map_identity=None, cell_identity=None, subcell_identity=None, terrain_cull_overlap=None, vis_mode='fast'):
-    scene=ensure_external(scene,'source scene');out=ensure_external(out,'mesh BSP scene')
-    scenery=ensure_external(scenery,'scenery input')
-    copy_tree(scene,out)
+# The bsp stage's two ways to make Seyda Neen's scene map (BUILD-SEYDA-HULL2-32, v0.0.41-dev2):
+# 'compiled' = the complete town compiled to BSP29 (qbsp, vis, light, mesh append: the legacy chain and A/B
+# tests need its geometry); 'carrier' = the source-only entity/model-box carrier (prepare_seyda_source.seed:
+# no terrain compile, no faces), the default for a CHIM-native Seyda Neen, whose cell-aligned frame is too
+# big for one BSP29 map (61,981 split nodes on v0.0.41-dev1). Every later scene stage edits only the
+# entity lump, and the CHIM frame maps take the entities and model boxes (chim_town.prepare_seyda).
+SEYDA_SOURCES = ('compiled', 'carrier')
+CARRIER_SCENE_FORMAT = 'AmiWind Seyda source carrier scene 1'
+
+
+def strip_alias_statics(out):
+    """Remove the alias-mesh statics and the clip footprints from OUT/seyda.map (they become placed brush
+    models) and their .mdl files; both scene sources do this first. Returns the removed model names."""
     text=(out/'seyda.map').read_text()
     pattern=r'\{\n"classname" "aw_static"\n"model" "([^"\n]+\.mdl)"\n"origin" "[^"\n]+"\n"angles" "[^"\n]+"\n\}'
     removed=re.findall(pattern,text)
@@ -828,6 +837,54 @@ def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cul
     text=re.sub(r'\{[^{}]*\bclip\b[^{}]*\}', '', text)
     (out/'seyda.map').write_text(text)
     for name in set(removed):(out/'id1'/name).unlink()
+    return removed
+
+
+def prepare_carrier(scene, out, scenery, data_files, jobs=None):
+    """Seyda Neen's scene as a source-only carrier (SEYDA_SOURCES): the alias scene's point entities, every
+    placed static as a func_wall with its exact model-local box (the compiled writer's own metadata) and the
+    tutorial barrel from its own export (chim.seyda.opening_barrel) when the scenery selection lacks it.
+    No qbsp, vis or light runs, so the size of the town's frame does not matter. Refuses at once (named
+    reference and map) when an exterior object the engine activates is missing from the carrier."""
+    import hashlib
+    from mwad.paths import resolve_data_files
+    from prepare_seyda_source import seed, check_activated_present, MARKER
+    from prepare_opening_refs import BARREL, opening_references
+    from chim.seyda import placements, opening_barrel
+    scene=ensure_external(scene,'source scene');out=ensure_external(out,'carrier scene')
+    scenery=ensure_external(scenery,'scenery input');data=resolve_data_files(data_files)
+    copy_tree(scene,out)
+    strip_alias_statics(out)
+    exterior,wanted,_=opening_references(data)
+    barrel=next(r for r in wanted if r['id'].casefold()==BARREL)
+    index=json.loads((scenery/'scenery-index.json').read_text())
+    selected,_,_=placements(index)
+    opening=None
+    if barrel['number'] not in {r['number'] for r in selected}:
+        opening_barrel(data,out,barrel);opening=out/'opening-barrel-source'
+    raw,record=seed(out,scenery,barrel,opening,jobs=jobs)
+    presence=check_activated_present(raw,exterior,'seyda')
+    for name in ('seyda.bsp','id1/maps/seyda.bsp'):
+        target=out/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
+    source=(json.dumps(record,indent=2)+'\n').encode('utf-8');(out/'source-entities.json').write_bytes(source)
+    result={'format':CARRIER_SCENE_FORMAT,'seyda_source':'carrier','carrier_marker':MARKER,
+            'terrain_compiled':False,'rendered_faces':0,'placements':len(record['references']),
+            'opening_source':'separate export' if opening else 'scenery selection',
+            'activated':presence,'carrier_sha256':hashlib.sha256(raw).hexdigest(),
+            'source_entities_sha256':hashlib.sha256(source).hexdigest(),
+            'standing_hull_profile':PROFILE,'standing_hull':[MINS,MAXS]}
+    (out/'scene-ready.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8',newline='\n')
+    print('Seyda Neen scene: source-only carrier, %d placements, activated %s; no BSP29 compile of the town '
+          '(cell-aligned CHIM frame)'%(len(record['references']),', '.join(map(str,presence['present'])) or 'none'),
+          flush=True)
+    return result
+
+
+def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cull=None, terrain_cull_config=None, map_identity=None, cell_identity=None, subcell_identity=None, terrain_cull_overlap=None, vis_mode='fast'):
+    scene=ensure_external(scene,'source scene');out=ensure_external(out,'mesh BSP scene')
+    scenery=ensure_external(scenery,'scenery input')
+    copy_tree(scene,out)
+    strip_alias_statics(out)
     # The standing hull compiles from the map alone (its own standing-collision.* files), so it
     # runs beside qbsp, vis and light of the visible map instead of after them.
     from concurrent.futures import ThreadPoolExecutor
@@ -858,8 +915,17 @@ def main():
     p.add_argument('--subcell-identity')
     from vis_options import add_vis_option
     scenery_reduce.add_options(p)
+    p.add_argument('--seyda-source',choices=SEYDA_SOURCES,default='compiled',
+                   help='compiled (the complete town compiled to BSP29: the legacy chain, A/B tests) or carrier '
+                        '(source-only entity/model-box carrier, no compile: a CHIM-native Seyda Neen; needs --data-files)')
+    p.add_argument('--data-files',type=Path,help='the game data (--seyda-source carrier: the opening references)')
     add_jobs(p);add_vis_option(p);a=p.parse_args();scenery_reduce.apply_options(a)
     import build_profile; build_profile.instrument('bsp')  # sub-stage timers (docs/BUILD_PROFILE.md)
+    if a.seyda_source=='carrier':
+        if a.data_files is None:p.error('--seyda-source carrier needs --data-files')
+        try:print(json.dumps(prepare_carrier(a.scene,a.out,a.scenery,a.data_files,a.jobs),indent=2))
+        except (OSError,ValueError) as e:p.exit(1,'bsp stage, Seyda Neen source carrier (scene %s): %s\n'%(a.scene,e))
+        return
     try:print(json.dumps(prepare(a.scene,a.out,a.scenery,a.qbsp,a.vis,a.light,a.jobs,None if a.terrain_visual_cull is None else a.terrain_visual_cull=='true',json.loads(a.terrain_cull_config.read_text(encoding='utf-8')) if a.terrain_cull_config else None,a.map_identity,a.cell_identity,a.subcell_identity,a.terrain_cull_overlap,a.vis_mode),indent=2))
     except (OSError,ValueError,subprocess.CalledProcessError) as e:p.exit(1,str(e)+'\n')
 

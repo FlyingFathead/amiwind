@@ -31,7 +31,25 @@ def compile_standing(pieces,qbsp,cache,grid=64,check_box=None,patch=True,strict=
     return result
 
 
+MERGE_COPLANAR='Qt C-0.01'     # qhull: merge facets whose centrums lie within 0.01 units (one plane per flat side)
+
+
 def compile_standing_checked(pieces,qbsp,cache,grid=64,check_box=None,patch=True):
+    """compile_standing_checked_once; when qbsp refuses the brushes with a non-convex face (near-coplanar facets of a
+    piece's hull written as separate planes make sliver faces: Ashurnibibi's ruins, CHIM-COLLISION-UNION-FALLBACK-41),
+    once more with those facets merged (MERGE_COPLANAR). Hulls that compile today are unchanged: same brushes, same
+    cache key. The retry's result passes the same standing check."""
+    try:
+        return compile_standing_checked_once(pieces,qbsp,cache,grid,check_box,patch)
+    except ValueError as error:
+        if 'non-convex face' not in str(error):raise
+        try:
+            return compile_standing_checked_once(pieces,qbsp,cache,grid,check_box,patch,merge_coplanar=True)
+        except ValueError as again:
+            raise ValueError('%s | retried with coplanar facets merged: %s'%(str(error)[:300],str(again)[:300])) from again
+
+
+def compile_standing_checked_once(pieces,qbsp,cache,grid=64,check_box=None,patch=True,merge_coplanar=False):
     """grid: the expanded corners are merged on a 1/grid unit lattice (64, as for the models; a finer
     lattice leaves qbsp slivers, seam holes in the CHIM terrain hull: CHIM-SEYDA-MEMORY-33).
     The compiled hull is checked against the exact union of the pieces (standing_check over check_box, default
@@ -43,7 +61,8 @@ def compile_standing_checked(pieces,qbsp,cache,grid=64,check_box=None,patch=True
     for points,hull,ids,error in pieces:
         expanded=(points[:,None,:]-corners[None,:,:]).reshape(-1,3)
         expanded=np.unique(np.round(expanded*grid)/grid,axis=0)
-        convex=ConvexHull(expanded);seen=set();lines=['{']
+        convex=(ConvexHull(expanded,qhull_options=MERGE_COPLANAR) if merge_coplanar else ConvexHull(expanded))
+        seen=set();lines=['{']
         for equation in convex.equations:
             n=equation[:3];d=-equation[3]
             key=(*np.round(n,4),round(d,3))
@@ -67,7 +86,12 @@ def compile_standing_checked(pieces,qbsp,cache,grid=64,check_box=None,patch=True
     with tempfile.TemporaryDirectory(prefix='aw-collision-') as tmp:
         tmp=Path(tmp);(tmp/'collision.map').write_text(source)
         result=subprocess.run([str(compiler),'-noclip','-nofill','-nopercent','collision.map'],cwd=tmp,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-        if result.returncode:raise ValueError('Collision compiler failed: '+result.stdout.decode(errors='replace')[-2000:])
+        if result.returncode:
+            # the exit code and qbsp's own error lines first: its tail is often warning noise (CHIM-COLLISION-UNION-FALLBACK-41)
+            text=result.stdout.decode(errors='replace')
+            errors=[l.strip() for l in text.splitlines() if 'error' in l.lower() and 'warning' not in l.lower()]
+            raise ValueError('Collision compiler failed (exit %d%s): %s | output tail: %s'%(result.returncode,
+                ', signal %d'%-result.returncode if result.returncode<0 else '','; '.join(errors[-3:]) or 'no error line',text[-600:]))
         data=lumps((tmp/'collision.bsp').read_bytes())
     planes=list(struct.iter_unpack('<4fi',data[1]));nodes=list(struct.iter_unpack('<ihh6h2H',data[5]));leaves=list(struct.iter_unpack('<ii6h2H4B',data[10]))
     root=struct.unpack_from('<i',data[14],36)[0];found=set();order=[];stack=[root]

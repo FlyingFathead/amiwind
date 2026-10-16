@@ -2,15 +2,6 @@
   <img src="resources/media/AmiWind_logo.png" width="900" alt="AmiWind: an open-source RPG engine for the Commodore Amiga">
 </p>
 
-15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See [v0.0.41-dev1 preparation notes](docs/RELEASE-v0.0.41-dev1.md).
-
-The earlier v0.0.41 source candidate corrects a false lava coverage failure caused by duplicate
-float32 vertices. Focused tests and unchanged cached-chunk checks pass. The
-combined world, native checks and private package remain pending. See the
-[current lava report](docs/bugs/CHIM-LAVA-DUPLICATE-VERTEX-40.md) and
-[boundary report](docs/bugs/CHIM-FRAME-STATIC-SEAM-40.md).
-
-
 # AmiWind
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
@@ -41,7 +32,20 @@ Have a real Amiga? [Running AmiWind on real hardware](docs/REAL_HARDWARE.md).
 
 More in the [gallery](docs/GALLERY.md).
 
-## Upcoming: v0.0.40: Rings 0, 1 and 2 of Vvardenfell in Full CHIM
+## v0.0.41: More Fixes, Fewer Planes (A Telvanni Root Story)
+
+The first regional CHIM release. Rings 0 to 4 of Vvardenfell are on CHIM, and so are two whole Morrowind
+regions, the Bitter Coast and Azura's Coast, with Seyda Neen, Balmora, the whole city of Vivec, Hla Oad,
+Sadrith Mora and Vos: 723 cells, each converted from your own copy of Morrowind. The collision behind large
+irregular meshes (Telvanni roots and towers, Daedric and Dwemer ruins) now compiles into compact hulls instead
+of chains of thousands of planes, which is what lets the Telvanni towns fit the memory budget.
+
+Running on CHIM Engine v0.2.1. See the [release notes](docs/RELEASE-v0.0.41.md) for what changed and what is
+known in this build, and the [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md) for every cell.
+
+<!-- v0.0.41 gallery: photo-mode captures from the release build go here -->
+
+## v0.0.40: Rings 0, 1 and 2 of Vvardenfell in Full CHIM
 
 The final release targets CHIM rings 0, 1 and 2 around Vvardenfell. Other
 exterior areas keep their existing legacy representation, apart from named CHIM
@@ -829,7 +833,7 @@ The current world is a baseline for measuring and optimizing content, memory,
 loading time and frame cost. Town subdivisions remain necessary; their static
 heap estimates do not certify runtime safety or FPS. Future changes must retain
 closed mushroom seams, original placement and UVs, collision, and continuous
-terrain handoffs. See the [optimization roadmap](docs/ROADMAP.md#assemble-first-then-optimize-the-measured-world).
+terrain handoffs. See the [optimization roadmap](docs/ROADMAP_HISTORY.md#assemble-first-then-optimize-the-measured-world).
 
 Large outputs automatically split into simultaneously mounted HDFs, each below
 4 GiB with filesystem partitions below 2 GiB. This is not disk swapping, and more

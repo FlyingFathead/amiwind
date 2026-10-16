@@ -1106,7 +1106,9 @@ def chim_town_placements(args, id1):
 
 def chim_region_placements(args, id1):
     """{'vfNNNN': reference numbers} of each CHIM region cell whose legacy map no stage made (docs/BUILD_MANIFEST.md
-    step 2): the CHIM world's placements of its frame, which the entity tracker counts as the cell's map would have."""
+    step 2): the CHIM world's placements of its frame and the plants of the catalogue the harvest step wrote for its
+    frame map (harvest-vfNNNN.txt, HARVEST-CHIM-REGION-LOSS-41), which the entity tracker counts as the cell's map
+    would have."""
     if not getattr(args, 'chim_world', None):
         return {}
     from chim.frame_map import chim_placements, load, region_map_names
@@ -1115,8 +1117,16 @@ def chim_region_placements(args, id1):
              if not (Path(id1)/'maps'/(name+'.bsp')).is_file()}
     if not owned:
         return {}
+    from entity_tracker import harvest_refs
     world = load(args.chim_world)
-    return {name: set(chim_placements(args.chim_world, cell, world=world)) for name, cell in sorted(owned.items())}
+    out = {}
+    for name, cell in sorted(owned.items()):
+        refs = set(chim_placements(args.chim_world, cell, world=world))
+        catalogue = Path(id1)/('harvest-%s.txt' % name)
+        if catalogue.is_file():
+            refs |= harvest_refs(catalogue.read_bytes())
+        out[name] = refs
+    return out
 
 
 def never_built_maps(id1, towns, world_terrain=None):
@@ -1183,7 +1193,8 @@ def chim_region_table(chim_world):
     return read_table(Path(chim_world)/TABLE_FILE) if chim_world else None
 
 
-def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, special_rows=None, activated=None):
+def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, special_rows=None, activated=None,
+                    keep_catalogues=None):
     """Check a CHIM world's receipts and write its frame maps into id1: maps/<town>-chim.chim for each
     area (.bsp with chim_frame_ext bsp; tools/map_files.py; the engine loads it instead of the town's
     region maps when CHIM is on), and for Seyda Neen its special maps (format 0.5). Each is checked against the town's final legacy maps, which must
@@ -1194,6 +1205,8 @@ def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, s
     (chim.frame_map region_rows_mode, docs/BUILD_MANIFEST.md step 2); without them the legacy method is used.
     special_rows / activated: a CHIM-native Seyda Neen's special frame rows and the activated objects of its maps
     (chim_town_specials): those frame maps take them instead of legacy maps.
+    keep_catalogues: {map name: SHA-256} of the harvest step's catalogues for the region frame maps (they stay with
+    their frame map: chim.frame_map.install_region, HARVEST-CHIM-REGION-LOSS-41).
     Returns {'areas', 'receipt', 'frame_maps', 'region_maps', 'region_cache'}."""
     import build_profile
     import progress_line
@@ -1245,7 +1258,8 @@ def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, s
                                                           'reused' if reused else 'made',
                                                           (timer.count, timer.total, 'maps')))
             region_maps, reused = build_regions(id1, table['frames'], chim_world, world=world, jobs=workers,
-                                                cache=cache, progress=progress, rows=rows, hand_fields=hand_fields)
+                                                cache=cache, progress=progress, rows=rows, hand_fields=hand_fields,
+                                                keep_catalogues=keep_catalogues)
             region_cache = dict(cache.summary() if cache is not None else {'status': 'off'}, reused=reused,
                                 made=len(region_maps) - reused, rows=rows)
             timer.done('Image: CHIM region frame maps: %d written (%d from the pass cache, %d made)'
@@ -1608,7 +1622,13 @@ def image(args):
     if getattr(args, 'allow_known_actor_ground_findings', None):
         from check_actor_ground import load_approved_report
         args.allow_known_actor_ground_findings = args.allow_known_actor_ground_findings.resolve()
-        load_approved_report(args.allow_known_actor_ground_findings)
+        approved, _ = load_approved_report(args.allow_known_actor_ground_findings)
+        # the same owner-accepted findings reach the CHIM frame map writer's own actor check (private test only;
+        # require_private_test_version above): exactly these references, nothing else
+        import os
+        from chim.frame_map import ACCEPTED_ACTORS_VARIABLE
+        os.environ[ACCEPTED_ACTORS_VARIABLE] = ','.join(sorted({str(e['reference']) for e in approved['errors']
+                                                               if str(e.get('reference', '')).isdigit()}))
     if getattr(args, 'world_flora', None):
         for field in flora_image_inputs(args):
             value = getattr(args, field, None)
@@ -1782,7 +1802,16 @@ def image(args):
         for name in ['seyda.map','town.wad']:shutil.copyfile(scene/name,out/name)
     if (scene/'scene-ready.json').is_file():
         ready=json.loads((scene/'scene-ready.json').read_text())
-        if ready.get('format')!='AmiWind compiled mesh BSP29':raise ValueError('Unknown compiled scene format')
+        from prepare_mesh_bsp import CARRIER_SCENE_FORMAT
+        if ready.get('format')==CARRIER_SCENE_FORMAT:
+            # The bsp stage's source-only carrier (--seyda-source carrier, BUILD-SEYDA-HULL2-32): entities and
+            # model boxes, no geometry. Only a CHIM-native Seyda Neen takes it (chim_town.prepare_seyda); the
+            # legacy chain cuts region maps from the compiled town and refuses it.
+            if not seyda_native and not mini:
+                raise ValueError('Scene %s is a Seyda Neen source carrier (no compiled town): it needs a CHIM-native '
+                                 'Seyda Neen; build the scene with the bsp stage\'s --seyda-source compiled for the '
+                                 'legacy chain'%scene)
+        elif ready.get('format')!='AmiWind compiled mesh BSP29':raise ValueError('Unknown compiled scene format')
         from player_hull import PROFILE
         if ready.get('standing_hull_profile')!=PROFILE:raise ValueError('Rebuild the scene: standing collision hull does not match this runtime')
         if not ready.get('hands'):raise ValueError('Prepare first-person hands before building this runtime')
@@ -1862,7 +1891,8 @@ def image(args):
     if getattr(args,'harvest',None):
         # Harvestable mushrooms replace baked ones before the final map passes (BUILD-HARVEST-NOT-BUILT-32).
         from harvest_build import clear_baked
-        clear_baked(args.harvest,boot/'id1',out/'harvest',data_files=args.data_files,jobs=jobs,native=native)
+        clear_baked(args.harvest,boot/'id1',out/'harvest',data_files=args.data_files,jobs=jobs,native=native,
+                    chim_world=getattr(args,'chim_world',None))
     qc=out/'qc';qc.mkdir()
     for name in ['defs.qc','world.qc']:shutil.copyfile(ROOT/'engine/aga/qc'/name,qc/name)
     if args.hands=='sprites':
@@ -2229,9 +2259,13 @@ def finalize_image(args):
     chim_frames, removed_legacy, not_on_chim = None, [], []
     if getattr(args, 'chim_world', None):
         special_rows, activated_rows = chim_town_specials(args)
+        # the harvest step's catalogues for the region frame maps stay with them (HARVEST-CHIM-REGION-LOSS-41)
+        staging_path = out/'harvest'/'harvest-staging.json'
+        keep_catalogues = ({n: r['sha256'] for n, r in json.loads(staging_path.read_text(encoding='utf-8'))
+                            .get('chim_region_catalogues', {}).items()} if staging_path.is_file() else {})
         chim_frames = chim_frame_maps(args.chim_world, boot/'id1', town_rows=chim_town_rows(args), jobs=jobs,
                                       special_rows=special_rows, activated=activated_rows,
-                                      hand_fields=hand_metadata['worldspawn_fields'])
+                                      hand_fields=hand_metadata['worldspawn_fields'], keep_catalogues=keep_catalogues)
         from chim.frame_map import remove_legacy_areas, remove_towns_not_on_chim
         removed_legacy = remove_legacy_areas(boot/'id1', chim_frames['areas'], 'the town runs on CHIM')
         # Extra towns not on CHIM yet (the Vivec Arena) leave a CHIM image whole: exterior maps, region and
@@ -2246,6 +2280,17 @@ def finalize_image(args):
         # cores; record the remaining removals before image gates and packing.
         from world_payload import prune as prune_world_payload
         removed_legacy += prune_world_payload(boot/'id1', out/'world-payload-pruning.json')
+        if getattr(args, 'harvest', None):
+            # The final payload: every harvestable plant the CHIM world leaves out is in a shipped catalogue,
+            # each CHIM region cell's in its own frame map's (HARVEST-CHIM-REGION-LOSS-41).
+            from harvest_build import native_towns, require_chim_coverage
+            coverage = require_chim_coverage(args.harvest, boot/'id1', out/'harvest', data_files=args.data_files,
+                                             chim_world=args.chim_world, native=native_towns(args), frame_maps=True,
+                                             report_name='harvest-chim-coverage-final.json')
+            if coverage is not None:
+                harvest['chim_coverage_final'] = dict(plants=coverage['plants'], placed=coverage['placed'],
+                                                      missing=len(coverage['missing']),
+                                                      region_frame_catalogues=coverage['region_frame_catalogues'])
         if chim_frames['region_maps']:
             print('[chim] CHIM region frames: %d open-world maps replaced in place by CHIM frame maps (%d legacy '
                   'bytes out, %d frame-map bytes in)' % (len(chim_frames['region_maps']),

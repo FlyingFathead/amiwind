@@ -283,7 +283,7 @@ do not establish complete inventory or selected-body acceptance. Matched origina
 full-game drop placement, scene/save/load and target memory/performance remain
 separate pending checks. This is a source
 candidate, not a shipped or owner-accepted feature. No CHIM cell coverage changes
-are claimed. [Current roadmap](ROADMAP.md#world-map-inventory-and-journal-todo-owner-request-1-october-2026)
+are claimed. [Current roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-owner-request-1-october-2026)
 and [blocking issue](bugs/COMBAT-BLOCKING-36.md) retain their pending gates.
 
 ### Inventory scrollbar source follow-up, 14 October 2026

@@ -457,6 +457,14 @@ class GateCommandTests(unittest.TestCase):
         code, _, _ = self.run_gate('green', '--accept-version-mismatch', 'test')
         self.assertEqual(code, 0)
 
+class OverBudgetTextTests(unittest.TestCase):
+    def test_each_frame_with_how_much_over(self):
+        text = aw.over_budget_text([{'frame': 'frames/x+17/y+05/frame.ccf', 'over': 1221632},
+                                    {'frame': 'frames/x+12/y+13/frame.ccf', 'over': 384544}])
+        self.assertEqual(text, '; 2 frame(s) over the CHIM memory budget: frames/x+17/y+05/frame.ccf over by 1221632 '
+                               'bytes (1193 KiB), frames/x+12/y+13/frame.ccf over by 384544 bytes (376 KiB)')
+        self.assertEqual(aw.over_budget_text(None), '')
+
 
 if __name__ == '__main__':
     unittest.main()

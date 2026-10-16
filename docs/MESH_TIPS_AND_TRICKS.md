@@ -562,7 +562,7 @@ the owner's assessment of the resulting proportions remain open.
 The owner prefers **90-degree Quake FOV and Quake bob**. Both remain unchanged.
 A potential FOV slider is only a performance-gated roadmap option; it is not the
 physical-size fix. See [player movement](PLAYER_MOVEMENT.md) and
-[roadmap](ROADMAP.md#optional-field-of-view-control).
+[roadmap](ROADMAP_HISTORY.md#optional-field-of-view-control).
 
 ## Balmora Silt Strider — dev3 correction, 30 September 2026
 

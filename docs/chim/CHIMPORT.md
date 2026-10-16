@@ -20,7 +20,10 @@ recorded with the reason, and the run moves on.
 - [Hull policy pending](#hull-policy-pending)
 - [What a cell is](#what-a-cell-is)
 - [Order: from the sea inwards](#order-from-the-sea-inwards)
+  - [Builds go region by region (from 16 October 2026)](#builds-go-region-by-region-from-16-october-2026)
 - [Audits per cell](#audits-per-cell)
+- [When a cell does not fit the memory budget](#when-a-cell-does-not-fit-the-memory-budget)
+- [When a cell fails the stair gate](#when-a-cell-fails-the-stair-gate)
 - [Cell results](#cell-results)
 - [The growing world](#the-growing-world)
 - [Figures per cell](#figures-per-cell)
@@ -237,6 +240,29 @@ on ties, starting next to where the previous ring ended, so the converted area
 grows as one piece. This is the same rule as the CHIM Progress Tracker's
 spiral.
 
+### Builds go region by region (from 16 October 2026)
+
+Rings decide the order of conversion; the unit a build takes is a whole Morrowind
+region (the region each cell carries in the tracker data). Ring-by-ring cell lists
+cut towns at the CHIM edge: Sadrith Mora and Vos were half CHIM, half classic, their
+frames carried border copies of the classic half, and per-cell recipes missed them.
+A region converted in one step has no edge inside it.
+
+```bash
+python3 tools/chim_cell_list.py --progress cell-progress.json --rings 0-4     --region "Bitter Coast Region" --region "Azura's Coast Region"     --keep previous-cells.json --reason "..." --out cells.json
+```
+
+Within the regions, the order is by weight (from 16 October 2026): the lightest cells first, then the heavier,
+the heaviest last, by measured memory headroom (placed faces as the early warning for cells not yet measured).
+Light cells converted first make their heavy neighbours lighter: a frame on the CHIM edge carries copies of its
+classic neighbours' objects, and those copies go once the neighbours are CHIM. The heaviest cells, by then
+mostly surrounded by CHIM, go through [the over-budget procedure](#when-a-cell-does-not-fit-the-memory-budget).
+
+Before the full build, run the CHIM stage on the new cells alone
+(`tools/chim_build.py --chim-regions-cells ... --validate --sdk`): a frame over the
+memory budget or a failing audit shows in minutes, not at the end of the full build.
+A town's recipe covers the whole town and the cells around it.
+
 ## Audits per cell
 
 | Audit | What CHIMport runs | Failure means |
@@ -261,6 +287,66 @@ Errors are recorded with the stage they happened in and a mechanism class
 `heap-ring`, `measure-empty-world`, `timeout`). The run's summary counts cells
 per class, so a class is fixed once in the shared builder and every cell of
 that class is run again (`--retry-failed`), never patched one by one.
+
+## When a cell does not fit the memory budget
+
+A cell refused by the CHIM heap gate (`heap-ring`) stays in the classic world until it fits.
+Do not leave it and its neighbours out for good: like the lava fields, a problem cell is
+brought into CHIM, not routed around. Work through it in this order:
+
+1. **Measure the peak.** `chim-heap.json` gives each frame's peak, where it happens
+   (`peak_position`), what fills it (`peak_breakdown`) and the models in it (`peak_models`;
+   `chim-stats.json` names them with their bytes). Rank the models by bytes.
+2. **Look at it.** Serve the build's world with `tools/toolkit_serve.py --chim-world NAME=DIR`
+   and open `map-inspector.html?world=/chim-world/NAME/` (the [Polycount inspector](../POLYCOUNT_INSPECTOR.md)):
+   the memory heatmap shows where the ring overflows.
+3. **Check the collision first.** A model listed in the CHIM receipt's
+   `collision_union_fallbacks` lost its compact compiled collision and carries the raw chain
+   of its convex pieces: its planes and clipnodes can be most of its bytes (Ashurnibibi's
+   ruins, 31,000 planes for 1,750 faces: [CHIM-COLLISION-UNION-FALLBACK-41](../bugs/CHIM-COLLISION-UNION-FALLBACK-41.md)).
+   `collision_union_fallback_reasons` says why for each (the compiler's error first; a non-convex-face
+   refusal is already retried with merged facets). `hull_fallback.kept_as_chain` lists the models the
+   heap fallback kept as chains. Note:
+   the heap report's `models_drawn` includes planes and nodes, so a collision problem
+   looks like drawn geometry there; read the model's lumps before choosing a fix.
+4. **Then the drawn geometry, per mesh.** A visual recipe in `config/visual-recipes.json`,
+   bound to the mesh's SHA-256 and switched on for the cell in `cell_settings`: reduce it,
+   replace it with a procedural model (the lantern shell), turn it into a sprite (trees), or
+   a flat panel (doors). Tel Uvirith (`tel-uvirith-v1`) is the worked example. A replacement
+   good everywhere goes into the `everywhere` recipe. Collision always keeps the original mesh.
+5. **Count the tilted copies.** A model whose name carries `@t` is a tilted (and possibly scaled) copy
+   of its mesh, stored whole. Many of them in one ring (Telvanni roots: 19 copies of one root in Sadrith
+   Mora, 455 KB for a 24 KB mesh) are the case for full rotation in the placement record
+   ([IDEAS, Memory](IDEAS.md#memory)); until then, a recipe can reduce that mesh once for every copy.
+6. **Measure blanket methods before using them.** The mesh optimizer on every mesh made
+   Hla Oad's frames larger (merged flora polygons become triangles); cutting large models
+   into tiles raised Molag Amur's peak. Both stay selectable for a measured A/B.
+
+After the fix, the cell and the neighbours left out for it rejoin the cell list, and the
+CHIMport run reports the cell again.
+
+Interiors have their own limits and their own order of repairs (sprites, per-mesh reduction, sections cut
+at hallways and doorways, recentring): [Interior sections](../INTERIOR_SECTIONS.md#interiors-over-a-limit-the-order).
+
+## When a cell fails the stair gate
+
+The stair gate walks every step and ramp of a CHIM frame with the player's standing box (33.25 units tall) and fails
+a flight step the box cannot climb. In order (16 October 2026, [CHIM-VOS-TEMPLE-WALKWAY-41](../bugs/CHIM-VOS-TEMPLE-WALKWAY-41.md)):
+
+1. Read the failure in `chim-stairs.json`: frame, reference number, point, rise, and the detail (`start in solid`
+   names the placement whose collision the box starts in).
+2. Build only the failing frames (`tools/chim_build.py --chim-regions-cells ... --validate`, about 2 minutes) and
+   check that the failure repeats there.
+3. Compare collision with what you see at the step: the visible faces of both placements over the step's column,
+   and the point-hull solid at the same column. Collision that is solid where the visible mesh is open is a
+   converter fault (convex pieces closing space), not a stair to accept.
+4. Fix it in the shared converter, for every mesh it applies to (the collision profile of that mesh family, or a
+   general rule in `mesh_geometry.collision_parts`), with a regression test; never a per-cell exception.
+5. Rebuild the failing frames: the stair gate passes and the heap gate still fits; then the full build.
+
+A failure in a cell's border can come from a classic neighbour: the gate also walks border copies
+([BUILD-STAIR-WALK-BORDER-COPIES-41](../bugs/BUILD-STAIR-WALK-BORDER-COPIES-41.md)); fix the mesh all the same.
+Known-good stair records (planned, v0.0.42) will let a build skip every flight whose inputs are unchanged.
 
 ## Cell results
 

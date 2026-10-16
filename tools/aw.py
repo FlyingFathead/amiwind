@@ -1219,6 +1219,14 @@ def stair_walk_text(block):
             % (block.get('reused', '?'), block.get('walked', '?'), block.get('marked', '?')))
 
 
+def over_budget_text(rows):
+    """The CHIM frames over their memory budget in one phrase, worst first, with how much each is over."""
+    if not rows:
+        return ''
+    return '; %d frame(s) over the CHIM memory budget: %s' % (len(rows), ', '.join(
+        '%s over by %d bytes (%.0f KiB)' % (r.get('frame'), r.get('over', 0), r.get('over', 0) / 1024) for r in rows))
+
+
 def perf_guard_text(block):
     """The perf guard's verdict of a build result in one phrase (docs/BUILD_PROFILE.md "Perf guard")."""
     if not block:
@@ -1306,7 +1314,8 @@ def cmd_status(args, config):
                     + (' (dry run)' if result.get('dry_run') else
                        f' stages reused {n.get("reused_stages")} rebuilt {n.get("rebuilt_stages")}'
                        + (f' failed stage {result["failed_stage"]}' if result.get('failed_stage') else '')
-                       + stair_walk_text(result.get('stair_walk')) + perf_guard_text(result.get('perf_guard'))))
+                       + stair_walk_text(result.get('stair_walk')) + perf_guard_text(result.get('perf_guard'))
+                       + over_budget_text(result.get('over_budget'))))
         print(f'    {row["time"]}  {result.get("request_id")}  {result.get("status")}  {what}')
     return 0
 

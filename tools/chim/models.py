@@ -411,7 +411,7 @@ def variant_unit(task):
                     raise StandingHullInexact(hull_check)
         except ValueError as error:
             compiled = None
-            fallback = str(error)[-200:]
+            fallback = str(error)[:400]          # the head: exit code and error lines (collision_bsp)
     local = dict(ref, position=[*centre, 0.0])
     flames = variant_flames(flame_entities(local, model, centre), local, centre)
     form = {}

@@ -23,6 +23,7 @@
 - [The release plan: gold for the next release](#the-release-plan-gold-for-the-next-release)
 - [Legend checkboxes and presets](#legend-checkboxes-and-presets)
 - [The map view](#the-map-view)
+- [Included in build: what each packaged build holds](#included-in-build-what-each-packaged-build-holds)
 - [Track your own build and compare with the project](#track-your-own-build-and-compare-with-the-project)
 - [Command reference](#command-reference)
 
@@ -315,6 +316,33 @@ overview below the map has a chart that answers what storing every mesh once sav
 panel (a) shows meshes converted as cells are converted (store-once against every cell converting its own, log scale) and
 panel (b) compares the spiral order with the risk order. Every Toolkit page carries the same header; see the
 [Toolkit guide](../AMIWIND_TOOLKIT.md#chim-progress-tracker).
+
+## Included in build: what each packaged build holds
+
+The plan says what a release should hold; the **Included in build** pull-down on the map says what a packaged build
+really holds. With a build selected, its cells are drawn green (included), amber (listed but not included) or grey
+(not in that build); the line under it counts them.
+
+- The data is the inclusion ledger, `amiwind-toolkit/chim-inclusion.json` (format `aw-chim-inclusion-1`; the page
+  loads the same content from `chim-inclusion.js`). One entry per packaged build, newest first: version, state,
+  source commit, the SHA-256 of the package and of its disk readback, and per cell `{state, frame}`.
+- An entry is written from the build's own records, never by hand: `tools/chim_inclusion.py` reads the run's
+  `chim-world/chim-source.json` (every frame: region frames by cell, town frames by their ownership core, so the
+  cells of Vivec, Seyda Neen and Balmora count with their town frame), the cell list the build was given, the
+  package and the readback. An entry for the same version is replaced.
+
+```bash
+python3 tools/chim_inclusion.py --version v0.0.41-dev4 --state packaged --source-commit COMMIT \
+    --chim-source RUN/chim-world/chim-source.json --cells CELLS.json --archive PACKAGE.zip \
+    --readback READBACK.json --evidence "boot smoke PASS, readback OK" [--shipped]
+```
+
+The cell list a build is given comes from the tracker too: `tools/chim_cell_list.py` takes the rings from the tracker
+data, keeps every cell already on CHIM, and leaves cells out only by name with a reason (`--leave-out X,Y=REASON`);
+`--open-pockets` also leaves out the neighbours that would enclose a classic cell in CHIM cells.
+
+**After every packaged build:** re-ingest the tracker (the build's run as `--chim-run`), add the build to the ledger
+with `chim_inclusion.py`, and check that the map's pull-down lists it with the right count.
 
 ## Track your own build and compare with the project
 

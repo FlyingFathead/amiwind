@@ -76,7 +76,8 @@ class RetiredFlagTests(unittest.TestCase):
                 self.assertNotIn('--balmora-scenery', text)
 
     def test_the_table(self):
-        self.assertEqual(retired_flags.NAMES, ('legacy-area', 'chim-native-towns-off', 'vivec-districts', 'seyda-recorded'))
+        self.assertEqual(retired_flags.NAMES, ('legacy-area', 'chim-native-towns-off', 'vivec-districts', 'seyda-recorded',
+                                                'seyda-scene-compiled'))
         for row in retired_flags.RETIRED:
             self.assertTrue(row['source'] and row['why'] and row['replacement'], row)
 

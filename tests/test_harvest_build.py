@@ -201,8 +201,8 @@ class HarvestBuild(unittest.TestCase):
         real = harvest_build.map_selections
         seen = {}
 
-        def selections(id1_, refs, native=()):
-            rows, found = real(id1_, refs, native)
+        def selections(id1_, refs, native=(), **kw):
+            rows, found = real(id1_, refs, native, **kw)
             return [dict(r, chim=True) if r['name'] == 'vf0001' else r for r in rows], found
 
         def admission(id1_, names, sizes, jobs=None):
@@ -217,6 +217,100 @@ class HarvestBuild(unittest.TestCase):
         self.assertEqual(seen, {'names': ['vf0000'], 'files': ['harvest-vf0000.txt']})
         self.assertEqual(staging['admitted'], 2)
         self.assertTrue((id1 / 'harvest-vf0001.txt').is_file())
+
+    def regions(self, id1, cells=((0, 0), (1, 0)), z=7.0):
+        """vf0001 replaced by a CHIM region frame (no legacy map), vf0002 its divided cell's alias row."""
+        (id1 / 'maps/vf0001.bsp').unlink()
+        return {'vf0001': dict(frame='rc0_p0', cells=[list(c) for c in cells], origin=[0., 0., z], aliases=['vf0002'])}
+
+    def test_plan_rows_take_chim_region_frames(self):
+        # HARVEST-CHIM-REGION-LOSS-41: a CHIM region cell has no legacy map; its row stays, with the frame's origin
+        id1 = stage(self.root / 's')
+        rows = {r['name']: r for r in harvest_build.plan_rows(id1, regions=self.regions(id1))}
+        self.assertEqual(sorted(rows), ['vf0000', 'vf0001'])                    # the alias row is never loaded
+        self.assertEqual(rows['vf0001']['origin'], [0., 0., 7.])
+        self.assertEqual((rows['vf0001']['chim'], rows['vf0001']['frame']), (True, 'rc0_p0'))
+        self.assertNotIn('chim', rows['vf0000'])
+        self.assertEqual([r['name'] for r in harvest_build.plan_rows(id1)], ['vf0000', 'vf0002'])  # the earlier plan
+
+    def test_chim_region_frames_get_their_catalogue(self):
+        self.prepare()
+        id1 = stage(self.root / 's')
+        regions = self.regions(id1)
+        seen = {}
+
+        def admission(id1_, names, sizes, jobs=None):
+            seen['names'] = sorted(names)
+            return gates()(id1_, names, sizes, jobs)
+
+        work = id1.parent / 'work'
+        with patch('harvest_build.chim_regions', lambda id1_, world: regions), \
+                patch('harvest_build.heap_admission', admission):
+            harvest_build.clear_baked(self.root / 'harvest', id1, work, data_files=self.data, chim_world='w')
+            staging = harvest_build.install(self.root / 'harvest', id1, work, data_files=self.data, sizes={},
+                                            chim_world='w')
+        self.assertEqual(seen['names'], ['vf0000'])                              # no per-map heap check for a frame
+        self.assertEqual((staging['admitted'], staging['plants']), (2, 4))
+        raw = (id1 / 'harvest-vf0001.txt').read_bytes()
+        self.assertEqual(staging['chim_region_catalogues'],
+                         {'vf0001': dict(frame='rc0_p0', plants=3, sha256=hashlib.sha256(raw).hexdigest(),
+                                         bytes=len(raw))})
+        plan = {m['name']: m for m in json.loads((work / 'harvest-plan.json').read_text())['maps']}
+        self.assertEqual((plan['vf0001']['path'], plan['vf0001']['chim'], plan['vf0001']['frame'],
+                          plan['vf0001']['origin']), (None, True, 'rc0_p0', [0., 0., 7.]))
+        from entity_tracker import harvest_refs
+        self.assertEqual(harvest_refs(raw), {101, 102, 103})
+
+    def test_a_chim_map_over_the_runtime_bounds_stops_the_build(self):
+        self.prepare()
+        id1 = stage(self.root / 's')
+        regions = self.regions(id1)
+        limits = dict(harvest_build.runtime_limits(), plants=2)
+        with patch('harvest_build.chim_regions', lambda id1_, world: regions), \
+                patch('harvest_build.runtime_limits', lambda: limits), \
+                patch('harvest_build.heap_admission', gates()):
+            with self.assertRaisesRegex(ValueError, 'CHIM map.*over the runtime catalogue bounds.*vf0001: 3 plants'):
+                harvest_build.install(self.root / 'harvest', id1, id1.parent / 'work', data_files=self.data,
+                                      sizes={}, chim_world='w')
+
+    def test_chim_coverage_finds_plants_the_chim_world_left_out(self):
+        # The island-wide check: every plant the CHIM world leaves out (receipt parity harvest_removed) is in a
+        # shipped catalogue, a CHIM region cell's in the catalogue of its own frame map; the dev4 loss fails it.
+        self.prepare()
+        world = self.root / 'world'
+        world.mkdir()
+        (world / 'chim-receipt.json').write_text(json.dumps(
+            {'parity': {'rc0_p0': {'harvest_removed': [101, 102]}, 'rc1_p0': {'harvest_removed': [103]}}}))
+        _, _, refs = harvest_build.source_placements(self.root / 'harvest', self.data)
+        id1 = stage(self.root / 's')
+        regions = self.regions(id1)
+        # The earlier plan: no catalogue for the region frame; 101 lies in the coverage of vf0000 (legacy), the
+        # rest nowhere.
+        report = harvest_build.chim_coverage(id1, world, refs, harvest_build.plan_rows(id1))
+        self.assertEqual(([m['ref'] for m in report['missing']], report['placed']['legacy_map']), ([102, 103], 1))
+        # With the region frame in the plan but no catalogue: the plants of its own cells must be in its
+        # catalogue, whatever legacy overlap there is (101 too).
+        rows = harvest_build.plan_rows(id1, regions=regions)
+        report = harvest_build.chim_coverage(id1, world, refs, rows)
+        self.assertEqual([(m['ref'], m.get('map')) for m in report['missing']],
+                         [(101, 'vf0001'), (102, 'vf0001'), (103, 'vf0001')])
+        with patch('harvest_build.chim_regions', lambda id1_, world_: regions), \
+                patch('harvest_build.heap_admission', gates()):
+            harvest_build.install(self.root / 'harvest', id1, id1.parent / 'work', data_files=self.data, sizes={},
+                                  chim_world=world)
+            report = harvest_build.require_chim_coverage(self.root / 'harvest', id1, id1.parent / 'work',
+                                                         data_files=self.data, chim_world=world)
+            self.assertEqual((report['missing'], report['placed']), ([], dict(region_cell=3, catalogue=0,
+                                                                                legacy_map=0)))
+            # The final payload also needs the frame map of each catalogue.
+            with self.assertRaisesRegex(ValueError, 'vf0001: catalogue without its CHIM region frame map'):
+                harvest_build.require_chim_coverage(self.root / 'harvest', id1, id1.parent / 'work',
+                                                    data_files=self.data, chim_world=world, frame_maps=True)
+            (id1 / 'maps/vf0001.chim').write_bytes(b'')
+            self.assertEqual(harvest_build.require_chim_coverage(
+                self.root / 'harvest', id1, id1.parent / 'work', data_files=self.data, chim_world=world,
+                frame_maps=True, report_name='final.json')['missing'], [])
+        self.assertTrue((id1.parent / 'work/final.json').is_file())
 
     def test_heap_check_estimates_only_the_named_maps(self):
         from check_world_map_heap import inspect_maps
@@ -299,6 +393,12 @@ class ImageHooks(unittest.TestCase):
             self.assertLess(final.index('optimize_maps(boot'), final.index('harvest_image_step('))
             self.assertLess(final.index('harvest_image_step('), final.index(later))
         self.assertIn("build_record['harvest'] = harvest", final)
+        # HARVEST-CHIM-REGION-LOSS-41: the region frame maps keep the harvest step's catalogues, and the final
+        # payload is checked for every plant the CHIM world leaves out, before the gates and the fingerprint.
+        self.assertIn('keep_catalogues=keep_catalogues', final)
+        self.assertLess(final.index('chim_frame_maps(args.chim_world'), final.index('require_chim_coverage('))
+        self.assertLess(final.index('prune_world_payload(boot'), final.index('require_chim_coverage('))
+        self.assertLess(final.index('require_chim_coverage('), final.index('image_content_fingerprint('))
         import inspect
         import build_aga
         self.assertIn('write_content_fingerprint(', inspect.getsource(build_aga.image_content_fingerprint))

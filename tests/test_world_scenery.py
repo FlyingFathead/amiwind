@@ -149,3 +149,36 @@ class WorldSceneryTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SceneryBudgetCollectionTests(unittest.TestCase):
+    """One scenery pass names every over-budget region (BUILD-LAVA-TERRAIN-BUDGET-38), not only the first."""
+
+    def test_budget_failure_is_returned_with_unit_and_limits(self):
+        import prepare_world_scenery as stage
+        entry = dict(name='vf1181', cell=[2, -2], divisions=1, subcell=[0, 0])
+        report = dict(faces=100, clipnodes=10, bytes=4 * 1024 * 1024 + 5)
+
+        def over(task):
+            raise stage.BudgetExceeded('Scenery region storage/collision budget exceeded: ' + stage.budget_detail(
+                entry, report, dict(faces=30000, clipnodes=32767, bytes=4 * 1024 * 1024), Path('missing.bsp')))
+        original = stage.convert_region_cached
+        stage.convert_region_cached = over
+        try:
+            row = stage.convert_region_collecting((None, None, None, None, entry, None, None))
+        finally:
+            stage.convert_region_cached = original
+        self.assertEqual(row['name'], 'vf1181')
+        self.assertIn('cell [2, -2]', row['budget_exceeded'])
+        self.assertIn('bytes 4,194,309 > 4,194,304', row['budget_exceeded'])
+        self.assertNotIn('faces', row['budget_exceeded'])
+
+    def test_other_errors_still_raise(self):
+        import prepare_world_scenery as stage
+        original = stage.convert_region_cached
+        stage.convert_region_cached = lambda task: (_ for _ in ()).throw(ValueError('Retained terrain hash mismatch: vf0001'))
+        try:
+            with self.assertRaisesRegex(ValueError, 'hash mismatch'):
+                stage.convert_region_collecting((None, None, None, None, dict(name='vf0001'), None, None))
+        finally:
+            stage.convert_region_cached = original

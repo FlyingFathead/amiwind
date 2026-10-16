@@ -13,6 +13,7 @@ from pathlib import Path
 SOURCE = Path(__file__).resolve().parents[1] / 'engine/aga/src'
 DEFINES = {
     'max_static_entities': ('client.h', 'MAX_STATIC_ENTITIES'),
+    'max_streamed_statics': ('chim/chim_statics.c', 'CHIM_MAX_STATICS'),
     'max_edicts': ('quakedef.h', 'MAX_EDICTS'),
     'max_msglen': ('quakedef.h', 'MAX_MSGLEN'),
     'max_models': ('quakedef.h', 'MAX_MODELS'),

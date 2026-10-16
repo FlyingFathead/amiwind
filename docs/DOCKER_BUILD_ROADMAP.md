@@ -130,7 +130,7 @@ installation requirements. Do not promise that containerization reduces space.
 Container implementation and validation follow rc1. Preserve local conversion
 outputs and validated caches during provisioning; do not move active workspaces. The 40 GiB figure is a free-space
 budget, not the published image size or an automatically imposed VM disk cap.
-See the [main roadmap](ROADMAP.md#docker-builder-and-v0026-validation),
+See the [main roadmap](ROADMAP_HISTORY.md#docker-builder-and-v0026-validation),
 [capacity requirements](BUILD_TOOLKIT_ROADMAP.md#capacity-before-conversion) and
 Docker's [Windows WSL 2 backend](https://docs.docker.com/desktop/features/wsl/).
 

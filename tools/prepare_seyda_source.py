@@ -102,7 +102,7 @@ def model_row(low, high):
     return struct.pack('<9f7i', *low, *high, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 
-def seed(scene, scenery, barrel, opening_source=None):
+def seed(scene, scenery, barrel, opening_source=None, jobs=1):
     """Build source-only transport from actual fresh alias/scenery inputs.
 
     The optional opening source is the CHIM builder's canonical original barrel
@@ -145,11 +145,11 @@ def seed(scene, scenery, barrel, opening_source=None):
     metadata, headers, world_lows, world_highs = [], [], [], []
     seen = set()
     for source, refs, source_profiles, archive in sources:
-        prepared = {}
-        for mi in dict.fromkeys(r['model_index'] for r in refs):
-            model = source['models'][mi]
-            prepared[mi] = _prepare_model((mi, model, source_profiles.get(model['source'], {}),
-                                            archive, source['textures']))[1]
+        # the models prepare side by side (the bsp stage's worker pool); jobs=1 runs them here
+        from build_parallel import ordered_map
+        tasks = [(mi, source['models'][mi], source_profiles.get(source['models'][mi]['source'], {}),
+                  archive, source['textures']) for mi in dict.fromkeys(r['model_index'] for r in refs)]
+        prepared = dict(ordered_map(_prepare_model, tasks, jobs)) if tasks else {}
         mount_references(source, refs, prepared, CENTRE, SCALE)
         apply_visual_offsets(source, refs)
         for ref in refs:
@@ -188,3 +188,33 @@ def seed(scene, scenery, barrel, opening_source=None):
                  'source_inputs': {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
                                    for p in input_paths},
                  'opening_source': str(opening_source) if opening_source is not None else None}
+
+
+def is_source_carrier(raw):
+    """True when a BSP29 container is this source-only carrier (its worldspawn has the MARKER field)."""
+    from player_hull import lumps
+    head = lumps(raw)[0].split(b'}', 1)[0]
+    return re.search(rb'"aw_source_carrier"\s+"' + MARKER.encode('ascii') + rb'"', head) is not None
+
+
+def check_activated_present(raw, exterior, map_name, inside=None):
+    """Fail fast (seconds, before any later stage): every exterior reference the engine activates by aw_ref
+    (aw_activated.h) whose original position lies in the town area (area_config.inside) must be a func_wall
+    with a brush model in the carrier `raw`. `exterior`: prepare_opening_refs.opening_references' references.
+    Refuses naming the reference and the map; returns {'expected': [...], 'present': [...]}."""
+    from chim.frame_map import activated_missing, activated_refs
+    from player_hull import lumps
+    if inside is None:
+        from area_config import inside
+    refs = activated_refs()
+    expected = sorted({r['number'] for r in exterior if r['number'] in refs and inside(r['position'])})
+    parts = lumps(raw)
+    count = len(parts[14]) // 64
+    text = parts[0].rstrip(b'\0').decode('cp1252')
+    blocks = [dict(re.findall(r'"([^"\n]*)"\s+"([^"\n]*)"', b)) for b in re.findall(r'\{[^{}]*\}', text)]
+    rows = [e for e in blocks if e.get('classname') == 'func_wall'
+            and re.fullmatch(r'\*[0-9]+', e.get('model', '')) and 0 < int(e['model'][1:]) < count]
+    refused = activated_missing(map_name, expected, rows, refs)
+    if refused:
+        raise ValueError('; '.join(refused))
+    return {'expected': expected, 'present': expected}

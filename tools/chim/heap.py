@@ -727,10 +727,19 @@ def require_heap(out, sdk=None, sizes=None, report_path=None, zone_kib=None, poo
                          % (f['frame'], f['efrags']['ring_placements_peak'], f['efrags']['budget_links'],
                             report_path))
     if bad:
-        f = bad[0]
+        # every frame over the budget, worst first, each with how much it is over (owner 2026-10-16: "whenever
+        # something is over budget, I'd know how much over budget")
+        bad = sorted(bad, key=lambda f: f['budget_bytes'] - f['peak_bytes'])
         zone_kib, pool_kib = report['zone_kib'], report['pool_kib']
-        raise ValueError('CHIM heap gate failed: %s needs %d bytes at %s, the zone holds %d (%d KiB zone '
-                         'minus %d x %d KiB frame-world slots); see %s'
-                         % (f['frame'], f['peak_bytes'], f['peak_position'], f['budget_bytes'], zone_kib, POOL_SLOTS,
-                            pool_kib, report_path))
+        raise ValueError('CHIM heap gate failed: %d frame(s) over the zone of %d bytes (%d KiB zone minus %d x %d KiB '
+                         'frame-world slots): %s; see %s'
+                         % (len(bad), bad[0]['budget_bytes'], zone_kib, POOL_SLOTS, pool_kib,
+                            '; '.join(over_budget_text(f) for f in bad), report_path))
     return report
+
+
+def over_budget_text(f):
+    """'frames/x/y needs N bytes at [x, y], over by M bytes (K KiB, P %)' for one frame of the heap report."""
+    over = f['peak_bytes'] - f['budget_bytes']
+    return '%s needs %d bytes at %s, over by %d bytes (%.0f KiB, %.1f %%)' % (
+        f['frame'], f['peak_bytes'], f['peak_position'], over, over / 1024, 100.0 * over / f['budget_bytes'])

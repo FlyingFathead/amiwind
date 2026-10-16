@@ -270,6 +270,24 @@ class AuthoredCollisionSupplement(unittest.TestCase):
                 seyda._authored_collision_packet((model, 'source', {}))
 
 
+class GiantMushroomsKeptInTownFrame(unittest.TestCase):
+    def test_giant_mushrooms_are_placed_with_closed_seams_and_declared(self):
+        from unittest.mock import patch
+        models = [{'source': name, 'triangles': 428} for name in
+                  ('meshes/f/flora_emp_parasol_01.nif', 'meshes/f/flora_t_mushroom_02.nif',
+                   'meshes/f/flora_bc_fern_04.nif')]
+        refs = [{'number': n+1, 'model_index': n} for n in range(3)]
+        index = {'models': models, 'references': refs}
+        with patch('scenery_selection.select_runtime_refs', return_value=(refs, {'selected_groups': [], 'omitted': []})),              patch('surface_flatten.load_profiles', return_value={}):
+            selected, omitted, profiles = seyda.placements(index)
+            self.assertEqual([r['number'] for r in selected], [1, 2])
+            self.assertEqual([r['reference'] for r in omitted['omitted']], [3])
+            self.assertTrue(profiles['meshes/f/flora_emp_parasol_01.nif']['preserve_shared_seams'])
+            self.assertEqual(profiles['meshes/f/flora_emp_parasol_01.nif']['visual_triangle_target'], 160)
+            self.assertEqual(seyda.added_dressing_refs(index, selected), [1, 2])
+            self.assertEqual(seyda.check_dressing_additions(index, [1, 2]), [1, 2])
+
+
 class OriginalKelpOwnership(unittest.TestCase):
     def test_kelp_retained_but_other_deferred_dressing_stays_deferred(self):
         from unittest.mock import patch

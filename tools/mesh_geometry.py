@@ -291,14 +291,14 @@ def collision_pieces(v,f,profile,stairs=None):
  if limit is not None:
   # measured on the plain convex proxies: the plates below would hide the deep fill this test is for (the Vivec
   # palace stairs, ex_vivec_ps_01, close 9.05 units and keep all their authored surfaces)
-  fill=max((error for _,_,_,error in collision_parts(v,f,2)),default=0.)
+  fill=max((error for _,_,_,error in collision_parts(v,f,profile.get('collision_tolerance',2))),default=0.)
   if fill>limit:
    shell,toes=plate_toes(v,f,shell_collision_parts(v,f),mode)
    return shell,True,('authored collision surfaces: convex approximation closes '
                       f'{fill:.2f} units > {limit} step height'+(f'; {toes} steep toes cut to vertical steps' if toes else ''))
  plates=[]
  # the fill test of the stair rule only on meshes with stairs (mode on): every other mesh keeps its convex proxies
- pieces=collision_parts(v,f,2,plates=plates,fill_plates=mode!='off' and bool(len(stair_treads(v,f))))
+ pieces=collision_parts(v,f,profile.get('collision_tolerance',2),plates=plates,fill_plates=mode!='off' and bool(len(stair_treads(v,f))))
  own=[pieces[k] for k in plates]
  notes=[f'authored plates where the convex proxy filled open space ({len(own)} plates)'] if own else []
  stair_plates=frozenset()
@@ -396,7 +396,7 @@ def collision_pieces_classic(v,f,profile,stairs=None):
   if exact or mode=='off' or not len(stair_treads(v,f)):
    return shell_collision_parts(v,f),exact,None
   return shell_collision_parts(v,f),True,'stairs: exact bevels on the authored plates of a mesh with stairs'
- pieces=collision_parts(v,f,2)
+ pieces=collision_parts(v,f,profile.get('collision_tolerance',2))
  limit=profile.get('surface_collision_beyond')
  if limit is not None:
   fill=max((error for _,_,_,error in pieces),default=0.)

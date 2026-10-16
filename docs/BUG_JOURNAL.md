@@ -5,6 +5,25 @@
 <!-- contents start -->
 ## Contents
 
+- [CHIM-VIVEC-FRAME-WIDE-41: wide support ring, 16 October 2026](#chim-vivec-frame-wide-41-wide-support-ring-16-october-2026)
+- [CHIM-VIVEC-FRAME-WIDE-41: residents, 16 October 2026](#chim-vivec-frame-wide-41-residents-16-october-2026)
+- [HARVEST-CHIM-REGION-LOSS-41, 16 October 2026](#harvest-chim-region-loss-41-16-october-2026)
+- [BUILD-CACHE-PROVENANCE-41, 16 October 2026](#build-cache-provenance-41-16-october-2026)
+- [ENGINE-060-FSCC-41, 16 October 2026](#engine-060-fscc-41-16-october-2026)
+- [CHIM-OCEAN-ROUTING-UNNAMED-41, 16 October 2026](#chim-ocean-routing-unnamed-41-16-october-2026)
+- [CHIMPORT-OCEAN-LAND-41, 16 October 2026](#chimport-ocean-land-41-16-october-2026)
+- [INTERIOR-CREATURES-MISSING-41, 16 October 2026](#interior-creatures-missing-41-16-october-2026)
+- [CHIMPORT-STATUS-STALE-41, 16 October 2026](#chimport-status-stale-41-16-october-2026)
+- [CHIM-COLLISION-UNION-FALLBACK-41, 16 October 2026](#chim-collision-union-fallback-41-16-october-2026)
+- [CHIM-VOS-TEMPLE-WALKWAY-41, 16 October 2026](#chim-vos-temple-walkway-41-16-october-2026)
+- [BUILD-STAIR-WALK-BORDER-COPIES-41, 16 October 2026](#build-stair-walk-border-copies-41-16-october-2026)
+- [BUILD-STAIR-PASS-NOT-KEPT-41, 16 October 2026](#build-stair-pass-not-kept-41-16-october-2026)
+- [CHIM-STATICS-FALLBACK-41, 16 October 2026](#chim-statics-fallback-41-16-october-2026)
+- [CHIM-VIVEC-FRAME-WIDE-41, 16 October 2026](#chim-vivec-frame-wide-41-16-october-2026)
+- [BUILD-LAVA-TERRAIN-BUDGET-38, 16 October 2026](#build-lava-terrain-budget-38-16-october-2026)
+- [BUILD-SEYDA-HULL2-32, 16 October 2026](#build-seyda-hull2-32-16-october-2026)
+- [BUILD-SEYDA-HULL2-32, 15 October 2026](#build-seyda-hull2-32-15-october-2026)
+- [BUILD-IDLE-STAGES-33, 15 October 2026](#build-idle-stages-33-15-october-2026)
 - [v0.0.41 candidate - visibility aprons, 15 October 2026](#v0041-candidate---visibility-aprons-15-october-2026)
 - [v0.0.41 candidate - window support, 15 October 2026](#v0041-candidate---window-support-15-october-2026)
 - [v0.0.41 candidate - lava coverage, 15 October 2026](#v0041-candidate---lava-coverage-15-october-2026)
@@ -132,6 +151,129 @@
 [CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) — 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
+
+## CHIM-VIVEC-FRAME-WIDE-41: wide support ring, 16 October 2026
+
+[CHIM-VIVEC-FRAME-WIDE-41](bugs/CHIM-VIVEC-FRAME-WIDE-41.md): owner decision: the support search tries 32 to 48 units
+only after every spot within 32 units failed (--actor-search near keeps the old search). The Dreamer (297836) is
+placed 37.5 units from its authored spot; all 58 Vivec residents ground with no waiver, the other 57 and Balmora's
+18 unchanged; heap and stair gates pass. The game's Startup script disables this Dreamer until the Sixth House
+journal reaches 50.
+
+## CHIM-VIVEC-FRAME-WIDE-41: residents, 16 October 2026
+
+[CHIM-VIVEC-FRAME-WIDE-41](bugs/CHIM-VIVEC-FRAME-WIDE-41.md): measured per resident. Nels Llendo stands in Seyda Neen's
+cell 0,-9 and was placed by both town frames; a town frame now leaves a resident in another town's owned cells to
+that town. Pilus Amatius and the Dreamer stand on sloped terrain the 128-unit tiles misrepresent; town frames now keep
+the original LAND samples under ground residents (switch: --chim-terrain-resident-detail off). Vivec frame alone: 57 of
+58 residents grounded, heap and stair gates pass. The Dreamer (28-degree slope, nearest fitting spot 37.5 units away,
+search radius 32) stays open and needs an actor-policy decision. The report's "7x7" was wrong: the block is 6 x 6.
+
+## HARVEST-CHIM-REGION-LOSS-41, 16 October 2026
+
+[HARVEST-CHIM-REGION-LOSS-41](bugs/HARVEST-CHIM-REGION-LOSS-41.md): CHIM region cells got no harvest catalogue
+(the plan kept only maps with a legacy map file) while the CHIM world leaves the harvestable mushrooms out,
+so the plants of six cells were missing in v0.0.41-dev4 (413 island-wide by the new check). Each region
+frame map now gets its catalogue and keeps it; a coverage check of every plant the CHIM world leaves out
+stops the build. Replayed on the dev4 inputs: all six cells place every original plant.
+
+## BUILD-CACHE-PROVENANCE-41, 16 October 2026
+
+[BUILD-CACHE-PROVENANCE-41](bugs/BUILD-CACHE-PROVENANCE-41.md): CHIMport's pool keys, the world-terrain units and the stage
+records do not record when or with which builder they were made; one shared provenance writer planned.
+
+## ENGINE-060-FSCC-41, 16 October 2026
+
+[ENGINE-060-FSCC-41](bugs/ENGINE-060-FSCC-41.md): the engine holds 263 `fscc` instructions, which the 68060 traps to its
+support library; the build's FPU check covers the 68040 only. No 64-bit integer multiply or divide was found.
+
+## CHIM-OCEAN-ROUTING-UNNAMED-41, 16 October 2026
+
+[CHIM-OCEAN-ROUTING-UNNAMED-41](bugs/CHIM-OCEAN-ROUTING-UNNAMED-41.md): world terrain refused the ocean cells of a regional
+build without naming one. The error now names every cell and the rule it broke.
+
+## CHIMPORT-OCEAN-LAND-41, 16 October 2026
+
+[CHIMPORT-OCEAN-LAND-41](bugs/CHIMPORT-OCEAN-LAND-41.md): 98 seabed cells were marked open ocean and stopped the first
+regional build 6 minutes into its CHIM stage. The preflight now refuses such cells in seconds; v0.0.41 keeps them
+classic; v0.0.42 converts them as seabed cells.
+
+## INTERIOR-CREATURES-MISSING-41, 16 October 2026
+
+[INTERIOR-CREATURES-MISSING-41](bugs/INTERIOR-CREATURES-MISSING-41.md): the demigod Vivec is not in his palace. He is a
+creature record, and the interior resident stage places NPC records only, so every interior creature is left out
+without a log line. Planned for v0.0.42 (Complete Vivec): a creature branch, Vivec first, floating in his lotus pose.
+
+## CHIMPORT-STATUS-STALE-41, 16 October 2026
+
+[CHIMPORT-STATUS-STALE-41](bugs/CHIMPORT-STATUS-STALE-41.md): the first regional build's preflight refused six cells
+on CHIMport audits from the v0.0.36 line, without saying how old they were. Results now record their creation
+timestamp, AmiWind and CHIM versions and converter hash; the refusal names them and prints the command that
+measures the cells again.
+
+## CHIM-COLLISION-UNION-FALLBACK-41, 16 October 2026
+
+[CHIM-COLLISION-UNION-FALLBACK-41](bugs/CHIM-COLLISION-UNION-FALLBACK-41.md): five ring-3 cells near Hla Oad stay out of
+CHIM because Ashurnibibi's ruin meshes are over the memory budget. Their bytes are collision: the compact compiled
+hull failed for three of them and the raw chains of convex pieces were kept (about 31,000 planes for 1,750 faces).
+The mesh optimizer does not help here. Guide for such cells: CHIMport "When a cell does not fit the memory budget".
+
+## CHIM-VOS-TEMPLE-WALKWAY-41, 16 October 2026
+
+[CHIM-VOS-TEMPLE-WALKWAY-41](bugs/CHIM-VOS-TEMPLE-WALKWAY-41.md): the v0.0.41-dev5 build stopped at its CHIM
+stair gate after 1 h 35 min on one step in Vos: a walkway stair that runs under the Velothi temple's base slab starts
+inside the temple's convex collision, which reaches up to 5 units below the slab's visible underside. Vos had failed
+its own stair walk in the CHIMport run of 11 October. The temple now keeps its authored collision surfaces, as its
+sibling mesh already did; a two-frame test world passes the stair gate.
+
+## BUILD-STAIR-WALK-BORDER-COPIES-41, 16 October 2026
+
+[BUILD-STAIR-WALK-BORDER-COPIES-41](bugs/BUILD-STAIR-WALK-BORDER-COPIES-41.md): the CHIM stair gate walks every
+frame's whole border, so each cell's flights are walked several times (2.67 million steps and ramps in dev5), and
+a border copy of a classic neighbour that no player can reach from that frame stopped the build.
+
+## BUILD-STAIR-PASS-NOT-KEPT-41, 16 October 2026
+
+[BUILD-STAIR-PASS-NOT-KEPT-41](bugs/BUILD-STAIR-PASS-NOT-KEPT-41.md): dev5 reused none of its 726 frame walks, and
+its rerun will not reuse the 724 that passed: a stored walk only counts after a whole build passes, and the walker's
+key changed with collision compiler code it does not run. Persisting with BUILD-CHIM-STAIR-WALK-UNCACHED-36.
+
+## CHIM-STATICS-FALLBACK-41, 16 October 2026
+
+[CHIM-STATICS-FALLBACK-41](bugs/CHIM-STATICS-FALLBACK-41.md): source review. Seyda Neen's cell-aligned frame map holds
+1,012 streamed statics; if its CHIM world cannot load, the engine's fallback spawns them as Quake statics and stops at
+512 instead of running the map without its chunks. The builder now counts streamed statics against CHIM_MAX_STATICS.
+
+## CHIM-VIVEC-FRAME-WIDE-41, 16 October 2026
+
+[CHIM-VIVEC-FRAME-WIDE-41](bugs/CHIM-VIVEC-FRAME-WIDE-41.md): the v0.0.41-dev2 image actor gate stops on three Vivec
+frame residents. Cause: v0.0.40 (f73aaa6) gave the Vivec frame a 7x7 block of whole owned cells and a wider source
+radius, which takes in Ebonheart and reaches a Seyda Neen cell. The private playtest ships them as owner-accepted known
+findings; the frame is narrowed before the release candidate.
+
+## BUILD-LAVA-TERRAIN-BUDGET-38, 16 October 2026
+
+[BUILD-LAVA-TERRAIN-BUDGET-38](bugs/BUILD-LAVA-TERRAIN-BUDGET-38.md): PERSISTING. The v0.0.41-dev2 rings 0-2 build stopped
+in world terrain: two more lava regions of cell (9,0) are over the 4 MiB cap (vf1697 4,739,260 bytes, vf2544 4,352,800).
+Both are split with the existing refinement rules. The error now names the cell, the split and every exceeded limit.
+
+## BUILD-SEYDA-HULL2-32, 16 October 2026
+
+[BUILD-SEYDA-HULL2-32](bugs/BUILD-SEYDA-HULL2-32.md): repair in the v0.0.41-dev2 source. A CHIM-native Seyda Neen's
+scene is the source-only carrier (entities and exact model boxes, no BSP29 compile), so the cell-aligned frame
+stays; the opening objects the engine activates are checked at the bsp stage and per frame map (town frame,
+sncourt, intro_docks), naming reference and map. The compiled town stays selectable for A/B tests. Original-data
+check of the carrier and opening stages passed (9.2 s, barrel 172851 in sncourt); the end-to-end build is pending.
+
+## BUILD-SEYDA-HULL2-32, 15 October 2026
+
+[BUILD-SEYDA-HULL2-32](bugs/BUILD-SEYDA-HULL2-32.md): PERSISTING. The v0.0.41-dev1 rings 0-2 build stopped at the bsp
+stage: the Seyda Neen full-town source map is over the BSP29 node/leaf limit since the v0.0.40 frame widening.
+
+## BUILD-IDLE-STAGES-33, 15 October 2026
+
+[BUILD-IDLE-STAGES-33](bugs/BUILD-IDLE-STAGES-33.md): PERSISTING. The same build kept 9.6 of 24 cores busy on average;
+the bsp stage held 8 workers and used 1.2.
 
 ## v0.0.41 candidate - visibility aprons, 15 October 2026
 

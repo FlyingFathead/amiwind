@@ -21,7 +21,8 @@ class BalmoraTests(unittest.TestCase):
         self.assertEqual(visual_profile('meshes/t/terrain_rock_01.nif', 640)['ratio'], .1)
 
     def test_reported_underpasses_preserve_authored_collision_openings(self):
-        for source in ('meshes/x/ex_hlaalu_bridge_07.nif', 'X\\Ex_Velothi_Temple_02.NIF'):
+        for source in ('meshes/x/ex_hlaalu_bridge_07.nif', 'X\\Ex_Velothi_Temple_02.NIF',
+                       'meshes/x/ex_velothi_temple_01.nif'):     # Vos walkway, CHIM-VOS-TEMPLE-WALKWAY-41
             self.assertTrue(visual_profile(source, 735)['hollow_collision'])
 
     def test_every_core_crosses_both_directions_with_hysteresis(self):

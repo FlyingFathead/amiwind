@@ -122,7 +122,7 @@ The intended progression is:
 
 The specific minimum machines and acceptable performance will be established
 as those configurations are developed and tested. See the
-[assemble-first optimization roadmap](ROADMAP.md#assemble-first-then-optimize-the-measured-world).
+[assemble-first optimization roadmap](ROADMAP_HISTORY.md#assemble-first-then-optimize-the-measured-world).
 
 ## How do non-destructive conversion, fallback paths and versioning fit in?
 
@@ -622,7 +622,7 @@ Comparing the same route or view makes it possible to tell whether an
 optimization helped and what it cost elsewhere. Both measured successes and
 well-described limits move the project forward. The
 [memory notes](MEMORY_ALLOCATION.md), [cell-change checklist](CELL_CHANGING.md)
-and [optimization roadmap](ROADMAP.md#assemble-first-then-optimize-the-measured-world)
+and [optimization roadmap](ROADMAP_HISTORY.md#assemble-first-then-optimize-the-measured-world)
 describe the areas being investigated.
 
 The ambition is to find ways of bringing the experience to lower-spec Amigas

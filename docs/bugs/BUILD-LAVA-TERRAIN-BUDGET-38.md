@@ -20,6 +20,21 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- contents start -->
+## Contents
+
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Symptom
 The full v0.0.38-dev3 build stops with a terrain budget error at `vf1177`.
 The actor-contact and gallery stages passed, but this does not produce a complete playtest.
@@ -85,6 +100,22 @@ exposure, source heights, collision and final region storage as separate checks.
 
 Full image assembly completed with the overflowing regions converted to CHIM; production map-memory gate passes. All360 regional CHIM cells pass final HDF frame/chunk readback. Release delivery remains pending; conversion is not complete gameplay acceptance.
 
+### PERSISTING: v0.0.41-dev2 full build, 16 October 2026
+
+The rings 0-2 full build at source 585afff stopped in the world-terrain stage after 23 minutes. Two legacy BSP29 regions of
+cell (9,0), Molag Mar Region, were over the 4,194,304-byte region storage cap: vf1697 at 4,739,260 bytes (13,318 faces,
+13,665 clipnodes) and vf2544, a child of the earlier vf1695 split, at 4,352,800 bytes. Face and clipnode counts were within
+their limits. In v0.0.36 vf1697 was 549,140 bytes. In v0.0.38-dev3, with lava, it was 4,087,788 bytes, just under the cap,
+so it was not split with its siblings. It has grown past the cap since then.
+
+Repair: two more rules in the versioned refinement table. vf1697 goes from 2 to 4 divisions, like its siblings vf1695 and
+vf1696. vf2544 goes from 4 to 8 divisions. Original core triangles and the 896-unit apron are kept. The real survey now lays
+out 2,559 regions; earlier region names and indices are unchanged. The budget error now names the region, its cell and
+split, and every exceeded limit with the measured value and SHA-256. Earlier it named only the region.
+
+Still open: the remaining near-cap regions (vf1603 at 3,968,800 bytes, vf1821 at 3,951,208 bytes) have no headroom for
+further lava growth. A pre-build budget scan of every dense lava region would catch the next one before a full build.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -116,7 +147,9 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - [BUILD-XDFTOOL-ARGMAX-32](BUILD-XDFTOOL-ARGMAX-32.md): The image step fails at the end: xdftool argument list too long
 - [CHIM-IMAGE-OPTIMIZER-RECEIPT-33](CHIM-IMAGE-OPTIMIZER-RECEIPT-33.md): A pure CHIM image stops at the final heap gate: frame maps and removed legacy maps differ from the optimizer receipt
 - [CHIM-LAVA-DUPLICATE-VERTEX-40](CHIM-LAVA-DUPLICATE-VERTEX-40.md): Float32 duplicate vertices falsely fail lava surface coverage
+- [CHIM-OCEAN-ROUTING-UNNAMED-41](CHIM-OCEAN-ROUTING-UNNAMED-41.md): The world-terrain stage refused ocean routing cells without naming a cell or which rule failed
 - [CHIM-VISIBILITY-APRON-SCOPE-41](CHIM-VISIBILITY-APRON-SCOPE-41.md): Fixed stronghold visibility rejects regional aprons
+- [CHIM-VIVEC-FRAME-WIDE-41](CHIM-VIVEC-FRAME-WIDE-41.md): Vivec's CHIM frame owns a 7x7 block of whole cells: Ebonheart and Seyda-side land sit in the city frame, three residents unsupported
 - [CHIM-WINDOW-TOWER-SUPPORT-41](CHIM-WINDOW-TOWER-SUPPORT-41.md): Thatched tower omitted from decorative window facade support
 - [ENGINE-BUILD-REPRO-31](ENGINE-BUILD-REPRO-31.md): Engine builds from identical source give different binaries
 - [RELEASE-PREVIOUS-FIXES-MISSING-33](RELEASE-PREVIOUS-FIXES-MISSING-33.md): The next release line did not contain the previous release's last fixes, and no gate checked it

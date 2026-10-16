@@ -1974,7 +1974,12 @@ def feed(run_dir, build=None, all_cells=False):
         return None
     doc = {'format': TRACKER_RESULT, 'build': build or 'chimport-' + run_dir.name, 'generated': now_iso(),
            'provenance': {'builder': 'chimport', 'chim_version': CHIM_VERSION,
-                          'world_format': '%d.%d' % FORMAT_VERSION, 'run': run_dir.name},
+                          'world_format': '%d.%d' % FORMAT_VERSION, 'run': run_dir.name,
+                          # what the audits ran against (CHIMPORT-STATUS-STALE-41): a later build compares the
+                          # converter hash with its own and says when the results predate its converter
+                          'amiwind_version': (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+                          if (ROOT / 'VERSION').is_file() else None,
+                          'converter_sha256': code_identity()},
            'cells': cells}
     n = len(list((run_dir / 'tracker').glob('result-*.json'))) if (run_dir / 'tracker').is_dir() else 0
     path = run_dir / 'tracker' / ('result-%04d.json' % (n + 1))

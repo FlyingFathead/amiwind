@@ -46,7 +46,13 @@ def prepare(data_files,scene,allow_append=True):
     unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     refs,wanted,disabled=opening_references(data_files)
     def point(ref):return [(ref['position'][i]-(CENTRE[i] if i<2 else 0))*.25 for i in range(3)]
-    path=scene/'id1/maps/seyda.bsp';b=lumps(path.read_bytes());found=set();ent=b[0].rstrip(b'\0').decode('cp1252')
+    path=scene/'id1/maps/seyda.bsp';raw=path.read_bytes();b=lumps(raw);found=set();ent=b[0].rstrip(b'\0').decode('cp1252')
+    # A source-only carrier (the bsp stage's --seyda-source carrier, BUILD-SEYDA-HULL2-32) has no geometry: the
+    # barrel is already one of its placements, and appending meshes to it is refused.
+    from prepare_seyda_source import is_source_carrier
+    carrier=is_source_carrier(raw)
+    if carrier:allow_append=False
+    by_number={r['number']:r for r in wanted}
     def bind(match):
         block=match.group();f=dict(re.findall(r'"([^"]+)"\s+"([^"]*)"',block))
         if f.get('classname') not in ('func_wall','aw_npc') or 'origin' not in f:return block
@@ -54,6 +60,10 @@ def prepare(data_files,scene,allow_append=True):
         candidates=refs if f.get('classname')=='aw_npc' else wanted
         hits=[r for r in candidates if all(abs(a-b)<.002 for a,b in zip(pos,point(r)))
               and (f.get('classname')!='aw_npc' or r.get('type')=='NPC_')]
+        if carrier and not hits and f.get('classname')=='func_wall' and f.get('aw_ref','').isdigit() \
+                and int(f['aw_ref']) in by_number:
+            # the carrier's placement carries its original reference: identity by number, not by origin
+            hits=[by_number[int(f['aw_ref'])]]
         if len(hits)>1:raise ValueError('Ambiguous placed reference at '+str(pos))
         if not hits:return block
         ref=hits[0];found.add(ref['number'])
@@ -66,7 +76,7 @@ def prepare(data_files,scene,allow_append=True):
     ent=re.sub(r'\{[^{}]*\}',bind,ent)
     barrel=next(r for r in wanted if r['id'].casefold()==BARREL)
     if barrel['number'] not in found and not allow_append:
-        raise ValueError('Source-only carrier is missing the original tutorial barrel; geometry append refused')
+        raise ValueError('seyda: source-only carrier is missing the original tutorial barrel %d (AW_REF_COURTYARD_BARREL); geometry append refused'%barrel['number'])
     # replaced whole: the area stage made this map (BUILD-POOL-READONLY-SCENE-WRITE-35)
     b[0]=(ent+'\0').encode('cp1252');replace_bytes(path,pack_lumps(b))
     if barrel['number'] not in found:

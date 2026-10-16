@@ -144,10 +144,17 @@ def ground_triangles(grids, low, high, canonical=None):
 KELP_MESHES = frozenset('meshes/f/flora_kelp_%02d.nif' % i for i in (1, 2, 3, 4))
 
 
+def kept_dressing(source):
+    """A flora_ mesh the frame keeps as a placed model: original kelp (no flora sprite overlay) and giant mushrooms
+    (world scenery, which skips town-owned cells; same classifier as world_scenery)."""
+    from world_scenery import scenery_kind
+    return (source.replace(chr(92), '/').casefold() in KELP_MESHES
+            or scenery_kind(None, {'type': 'STAT', 'model': source}) == 'giant_mushroom')
+
+
 def added_dressing_refs(index, selected):
-    """Original kelp retained in CHIM; these meshes have no flora sprite overlay."""
-    return sorted(r['number'] for r in selected
-                  if index['models'][r['model_index']]['source'].replace(chr(92), '/').casefold() in KELP_MESHES)
+    """Original dressing retained in CHIM (kept_dressing): declared to the entity-stage parity check."""
+    return sorted(r['number'] for r in selected if kept_dressing(index['models'][r['model_index']]['source']))
 
 
 def check_dressing_additions(index, declared):
@@ -155,7 +162,7 @@ def check_dressing_additions(index, declared):
     selected, _, _ = placements(index)
     expected = added_dressing_refs(index, selected)
     if sorted(declared) != expected:
-        raise ValueError('CHIM kelp additions differ from original scenery selection')
+        raise ValueError('CHIM dressing additions (kelp, giant mushrooms) differ from original scenery selection')
     return expected
 
 
@@ -167,11 +174,15 @@ def placements(index):
     from static_lod import rock_profile
     from surface_flatten import load_profiles
     selected, report = select_runtime_refs(index, CENTRE, SCALE, 736)
+    from world_scenery import scenery_kind
     kept, omitted = [], []
     for ref in selected:
         source = index['models'][ref['model_index']]['source']
         term = next((t for t in DRESSING_EXCLUDED if t in source), None)
-        if term and source.replace(chr(92), '/').casefold() not in KELP_MESHES:
+        # Giant mushrooms (flora_emp_parasol_*, flora_t_mushroom_*) are world scenery, not dressing: the world scenery
+        # stage places them in legacy cells and skips town-owned cells, so the town frame keeps them (v0.0.41-dev2:
+        # eight were lost after Seyda's frame took cells 0,-9, -1,-8 and 0,-8). Kelp as before.
+        if term and not kept_dressing(source):
             omitted.append({'reference': ref['number'], 'model': source,
                             'reason': 'dressing excluded by the mesh converter (%s)' % term})
         else:
@@ -181,6 +192,9 @@ def placements(index):
     flatten = load_profiles(scene_kind='exterior')
     for mi in dict.fromkeys(r['model_index'] for r in kept):
         model = index['models'][mi]
+        if scenery_kind(None, {'type': 'STAT', 'model': model['source']}) == 'giant_mushroom':
+            from prepare_world_scenery import scenery_profile
+            profiles.setdefault(model['source'], scenery_profile(model['source'], model['triangles']))
         profiles.setdefault(model['source'], rock_profile(model['source'], model['triangles']))
         if model['source'] in flatten:
             profiles[model['source']] = {**profiles[model['source']], 'flatten': flatten[model['source']]}

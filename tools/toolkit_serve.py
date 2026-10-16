@@ -353,6 +353,7 @@ class Handler(SimpleHTTPRequestHandler):
     console_dir = None   # master builder console logs for the Monitor, or None
     mesh_cache = None   # Mesh Compare: the folder of mesh exports, or None
     mesh_exporter = None   # Mesh Compare: a MeshExporter when --mesh-data-files is given, or None
+    chim_worlds = {}   # --chim-world NAME=DIR: CHIM world folders served read-only at /chim-world/NAME/
 
     def log_message(self, fmt, *args):  # quiet: one line per request is noise here
         pass
@@ -510,6 +511,13 @@ class Handler(SimpleHTTPRequestHandler):
             from map_files import map_files
             names = sorted({p.stem.lower() for p in map_files(self.maps_dir)}) if self.maps_dir else []
             return self.send_bytes(json.dumps(names).encode(), 'application/json')
+        if parts == ['chim-world', 'index.json']:
+            return self.send_json(sorted(self.chim_worlds))
+        if len(parts) >= 3 and parts[0] == 'chim-world' and parts[1] in self.chim_worlds:
+            # a file of a served CHIM world (the Polycount inspector's ?world=/chim-world/NAME/), never outside it
+            root = self.chim_worlds[parts[1]]
+            f = root.joinpath(*parts[2:]).resolve()
+            return self.send_file(f) if f.is_relative_to(root) else self.send_error(400)
         from map_files import is_map_name
         if len(parts) == 2 and parts[0] == 'maps' and is_map_name(parts[1]) and self.maps_dir:
             # a map by name, resolved as the engine does (a frame map's .chim when there is one)
@@ -550,6 +558,10 @@ def main(argv=None):
     p.add_argument('--mesh-cache', type=Path, help='Mesh Compare: a folder of mesh exports (tools/mesh_export.py --out)')
     p.add_argument('--mesh-data-files', type=Path, help='Mesh Compare: your own Data Files, to export meshes into --mesh-cache')
     p.add_argument('--mesh-docker', metavar='IMAGE', help='Mesh Compare: export in a throwaway container of this image')
+    p.add_argument('--chim-world', action='append', default=[], metavar='NAME=DIR',
+                   help="a build's chim-world folder, served read-only at /chim-world/NAME/ (repeatable); the Polycount "
+                        'inspector opens it with map-inspector.html?world=/chim-world/NAME/ (memory heatmap from its '
+                        'chim-heap.json)')
     p.add_argument('--port', type=int, default=8031)
     p.add_argument('--open', action='store_true', help='open the toolkit in your browser')
     a = p.parse_args(argv)
@@ -560,7 +572,14 @@ def main(argv=None):
             p.error('no toolkit/cell-progress.json found under %s (build with the CHIM builder, or run cell_progress.py ingest)' % a.build)
     data = a.data or build_data
     monitor = a.builds or a.builds_command or a.monitor_docker or a.results or a.console_logs
-    if not data and not a.build and not monitor and not a.mesh_cache:
+    worlds = {}
+    for item in a.chim_world:
+        name, sep, folder = item.partition('=')
+        if not sep or not name or '/' in name or name in ('.', '..') or not Path(folder).is_dir():
+            p.error('--chim-world wants NAME=DIR with an existing folder: %s' % item)
+        worlds[name] = Path(folder).resolve()
+    Handler.chim_worlds = worlds
+    if not data and not a.build and not monitor and not a.mesh_cache and not worlds:
         p.error('give --data DIR or --build DIR (or the Monitor options --builds / --builds-command, or --mesh-cache DIR)')
     if (a.mesh_data_files or a.mesh_docker) and not a.mesh_cache:
         p.error('--mesh-data-files and --mesh-docker need --mesh-cache DIR (where the exports go)')
@@ -616,6 +635,8 @@ def main(argv=None):
         print('  Mesh Compare: %samiwind-toolkit/mesh-compare.html  exports: %s%s' %
               (url, Handler.mesh_cache, ' (export on request%s)' % (' in a container' if a.mesh_docker else '')
                if Handler.mesh_exporter else ''), flush=True)
+    for name in sorted(worlds):
+        print('  CHIM world %s: %samiwind-toolkit/map-inspector.html?world=/chim-world/%s/' % (name, url, name), flush=True)
     if a.open:
         webbrowser.open(url)
     try:

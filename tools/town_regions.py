@@ -36,7 +36,11 @@ def visual_profile(source, triangles):
     # Convex approximation closes these authored underpasses. Keep each
     # collision surface instead, independent of visible mesh reduction.
     if stem.startswith(('ex_hlaalu_b_', 'ex_hlaalu_bal_', 'ex_hlaalu_bridge_',
-                        'ex_hlaalu_dsteps_', 'ex_hlaalu_steps_', 'ex_hlaalu_wall_gate_')) or stem=='ex_velothi_temple_02.nif':
+                        'ex_hlaalu_dsteps_', 'ex_hlaalu_steps_', 'ex_hlaalu_wall_gate_')) or stem in (
+            'ex_velothi_temple_01.nif', 'ex_velothi_temple_02.nif'):
+        # ex_velothi_temple_01: its convex pieces reach 2-5 units below the slab a walkway runs under (Vos, the
+        # Vivec-style walkway into the temple base: 38 units of visible headroom over the top step, the
+        # proxies leave less than the standing box; CHIM-VOS-TEMPLE-WALKWAY-41)
         profile['hollow_collision'] = True
         profile['exact_collision_bevels'] = True
     elif source.replace('\\', '/').casefold().startswith('meshes/x/'):

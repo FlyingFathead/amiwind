@@ -43,7 +43,9 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.31-toolkit-{name}.png" fo
 DOCUMENTATION_CLIPS = {"docs/images/amiwind-v0.0.23-dev2-port.gif"}
 TEXT_LIMIT = 262144
 # The bug register grows with every bug: its JSON source and the generated table (docs/bugs/README.md).
-LARGE_TEXT = {"docs/bugs/bugs.json": 1048576, "docs/BUGS.md": 1048576, "docs/chim/cell-progress-reference.json": 1048576}
+# The CHIM inclusion ledger (tools/chim_inclusion.py) grows with every packaged build, like the register.
+LARGE_TEXT = {"docs/bugs/bugs.json": 1048576, "docs/BUGS.md": 1048576, "docs/chim/cell-progress-reference.json": 1048576,
+              "amiwind-toolkit/chim-inclusion.json": 1048576, "amiwind-toolkit/chim-inclusion.js": 1048576}
 # Whitespace baselines (docs/PATCH-v<version>.json) list every file of the published base release and
 # grow with the repository (RELEASE-PATCH-SIZE-33).
 LARGE_TEXT_PATTERNS = ((re.compile(r"docs/PATCH-v[0-9][0-9A-Za-z.-]*[.]json"), 1048576),)

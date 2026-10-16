@@ -181,7 +181,7 @@ A related future convenience is a translation from the current local XYZ display
 to original world coordinates and a clearly defined world-map coordinate view.
 Establish the transforms first, including interior limitations and negative cell
 boundaries. The proposed small upper-right display and `dbg global coords` switch
-belong in [the roadmap](ROADMAP.md#world-coordinate-hud),
+belong in [the roadmap](ROADMAP_HISTORY.md#world-coordinate-hud),
 not in this release's implementation queue.
 
 ### Meet the entire cast on a plain floor

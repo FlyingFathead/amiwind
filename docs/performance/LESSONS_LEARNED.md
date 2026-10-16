@@ -3,6 +3,24 @@
 Lessons from measuring AmiWind's loading on the emulated reference machine.
 Newest first.
 
+## The ruin that was mostly collision (16 October 2026)
+
+Five Bitter Coast cells near Hla Oad did not fit the CHIM memory budget (7.1-7.3 MB against 6.24 MB).
+The heap report put the blame on drawn geometry, and the mesh optimizer looked like the fix. It was
+not: Ashurnibibi's ruin meshes carried about 31,000 collision planes for 1,750 drawn faces, because
+their compact compiled collision had failed and the raw chain of convex pieces was kept. The compiler
+refused the pieces over sliver faces from near-identical planes; merging coplanar facets before
+writing them fixed it, and all five cells fit with 120-360 KB to spare
+([CHIM-COLLISION-UNION-FALLBACK-41](../bugs/CHIM-COLLISION-UNION-FALLBACK-41.md)).
+
+1. **Read the model's own bytes before choosing a fix.** A memory category in a report is a summary;
+   the lump sizes of the heaviest models (planes, clipnodes, nodes, faces) say what to change.
+2. **A fallback is a finding.** The build listed the meshes whose collision fell back, but not as a
+   problem and without the reason; 24 meshes across the island carried it.
+3. **Keep the error's head.** The stored message was the last 200 characters of the compiler's
+   output, which were warnings; the error line was earlier.
+4. **Measure blanket methods.** The mesh optimizer on every mesh made these frames 1.5 MB larger.
+
 ## What a town frame is spent on (8 October 2026)
 
 The engine now counts its own work per frame (`dbg rcount`: brush models in

@@ -73,12 +73,25 @@ def static_entity_limit():
     return limits()['max_static_entities']
 
 
-def static_check(rows, limit=None):
-    """(refusals, record): the frame map's static entities (STATIC_CLASSES) fit the engine's limit."""
-    limit = static_entity_limit() if limit is None else limit
+def streamed_static_limit():
+    """The engine's limit of streamed statics in one frame map (chim/chim_statics.c CHIM_MAX_STATICS): tagged
+    statics live in that list, built while their chunk is active, never in cl_static_entities."""
+    from engine_limits import define
+    return define('chim/chim_statics.c', 'CHIM_MAX_STATICS')
+
+
+def static_check(rows, limit=None, streamed=None):
+    """(refusals, record): the frame map's static entities (STATIC_CLASSES) fit the engine's limit. With static
+    streaming on (stream_enabled, the default build setting) every one of them is tagged and streamed
+    (STREAMED_CLASSES), so the limit is the streamed list's (CHIM_MAX_STATICS), not MAX_STATIC_ENTITIES
+    (v0.0.41-dev2: Seyda Neen's cell-aligned frame holds 1,012)."""
+    streamed = stream_enabled() if streamed is None else streamed
+    if limit is None:
+        limit = streamed_static_limit() if streamed else static_entity_limit()
+    label = 'CHIM_MAX_STATICS, streamed' if streamed else 'MAX_STATIC_ENTITIES'
     count = sum(1 for e in rows if e.get('classname') in STATIC_CLASSES)
-    refused = [] if count <= limit else ['%d static entities, the engine holds %d (MAX_STATIC_ENTITIES)' % (count, limit)]
-    return refused, {'static_entities': count, 'limit': limit, 'headroom': limit - count}
+    refused = [] if count <= limit else ['%d static entities, the engine holds %d (%s)' % (count, limit, label)]
+    return refused, {'static_entities': count, 'limit': limit, 'limit_name': label, 'headroom': limit - count}
 ORIGIN_TOLERANCE = 0.01
 EMPTY, SOLID = -1, -2
 
@@ -381,6 +394,11 @@ def stream_statics(id1, rows, chunks, frame_low, grain, nx, ny):
         e[BOX_KEY] = ' '.join('%d' % v for v in (math.floor(x - r), math.floor(y - r), math.floor(z - r),
                                                   math.ceil(x + r), math.ceil(y + r), math.ceil(z + r)))
         count += 1
+    # every static is tagged: an untagged one would become a Quake static (MAX_STATIC_ENTITIES, the engine's
+    # load-time fallback) while static_check counted it against the streamed list
+    total = sum(1 for e in rows if e.get('classname') in STREAMED_CLASSES)
+    if count != total:
+        raise ValueError('Frame map statics: %d of %d tagged for streaming' % (count, total))
     return count, sum(sizes.values())
 
 
@@ -479,6 +497,16 @@ def frame_world(world_dir, cell, world=None):
     return {'frames': frames, 'models': models}, index
 
 
+ACCEPTED_ACTORS_VARIABLE = 'AMIWIND_ACCEPTED_FRAME_ACTORS'
+
+
+def accepted_actor_refs():
+    """Original references of frame actors the owner accepted as known findings for a private test build
+    (build_aga.py exports them from --allow-known-actor-ground-findings; empty otherwise)."""
+    import os
+    return {r for r in os.environ.get(ACCEPTED_ACTORS_VARIABLE, '').split(',') if r.isdigit()}
+
+
 def actor_contact(id1, rows, world, index):
     """(refusals, record): every ground-resident actor the frame map carries stands on the frame's own
     collision as on the legacy maps. The legacy measurement (check_actor_ground: the lowest
@@ -526,7 +554,12 @@ def actor_contact(id1, rows, world, index):
                    samples=len(samples),
                    minimum_gap=round(min(gaps), 3) if gaps else None, maximum_gap=round(max(gaps), 3) if gaps else None,
                    failures=failures[:4])
-        if failures:
+        if failures and str(row['reference']) in accepted_actor_refs():
+            # an owner-accepted known finding of a private test build: recorded, not refused
+            row['status'] = 'owner-accepted-known-finding'
+            print('WARNING: PRIVATE TEST ONLY: frame actor %s does not stand on the CHIM frame (accepted): %s'
+                  % (row['reference'], failures[0]), flush=True)
+        elif failures:
             refused.append('actor %s (%s) does not stand on the CHIM frame: %s' % (row['reference'], name,
                                                                                failures[0]))
         record.append(row)
@@ -553,10 +586,10 @@ def contact(scene, point, samples):
 
 def refit(scene, point, samples):
     """A standing placement for a ground actor on the frame, by the legacy fitter's rules: the height
-    alone (refit_height), else the first offset (actor_grounding.OFFSETS, nearest first) whose sole
+    alone (refit_height), else the first offset (actor_grounding.search_offsets, nearest first) whose sole
     interval fits within REFIT_DZ of the baked height, whose support is within 16 units of the original
     spot's and which the actor can walk to (actor_grounding._Fitter.path_clear); None when none fits."""
-    from actor_grounding import OFFSETS, _Fitter, contact_interval_choice
+    from actor_grounding import _Fitter, contact_interval_choice, search_offsets
     z = refit_height(scene, point, samples)
     if z is not None:
         return (point[0], point[1], z)
@@ -564,7 +597,7 @@ def refit(scene, point, samples):
     if center['status'] != 'supported':
         return None
     original = (point[0], point[1], center['height'] + .25)
-    for dx, dy in OFFSETS:
+    for dx, dy in search_offsets():
         x, y = point[0] + dx, point[1] + dy
         support = scene.floor((x, y, point[2] + 8), 40)
         if support['status'] != 'supported' or abs(support['height'] - center['height']) > 16:
@@ -797,6 +830,30 @@ def region_map_names(id1, world_dir, primary_only=False):
         name, aliases = owned
         for n in [name] + ([] if primary_only else aliases):
             out[n] = tuple(frame['cell'])
+    return out
+
+
+def region_frame_rows(id1, world_dir):
+    """{open-world map name: row} of a CHIM world's region frames (chim-regions.json), one per frame under the name
+    its frame map is installed under (region_map_names primary_only): the frame's id, its owned cells, its origin
+    (the frame map's local coordinates are the game's x 0.25 minus it: x and y are the directory row's, z the
+    frame's, set_region_origins_z) and the divided cell's alias names (never loaded by the engine). The harvest step
+    writes each frame map's catalogue under that name (tools/harvest_build.py, HARVEST-CHIM-REGION-LOSS-41).
+    {} for a world without region frames."""
+    from chim.regions import TABLE_FILE, read_table
+    path = Path(world_dir) / TABLE_FILE if world_dir else None
+    if path is None or not path.is_file() or not (Path(id1) / 'world/regions.awr').is_file():
+        return {}
+    directory = world_directory(id1)
+    out = {}
+    for frame in read_table(path)['frames']:
+        owned = region_owned(region_sources(directory, frame), frame)
+        if owned is None:
+            continue
+        name, aliases = owned
+        out[name] = {'frame': frame['id'], 'cells': [list(c) for c in frame.get('cells') or [frame['cell']]],
+                     'origin': [float(frame['origin'][0]), float(frame['origin'][1]), float(frame['origin'][2])],
+                     'aliases': list(aliases)}
     return out
 
 
@@ -1193,12 +1250,24 @@ def _region_map_game_data(task):
                       tracker_refs=len(bsp_refs(data)), entities=len(rows), replaced=[], legacy_origin_z=task['origin'][2])
 
 
-def install_region(id1, task, data, record):
+def install_region(id1, task, data, record, keep_catalogues=None):
     """Write one region frame map (region_map's result) in place of its open-world map: the map's harvest
     catalogue leaves (recorded), the legacy map leaves (if a stage made it), maps/<name>.chim is written. The caller
-    sets the directory row's origin z (set_region_origins_z). Returns the record with every replaced file."""
+    sets the directory row's origin z (set_region_origins_z). keep_catalogues: {map name: SHA-256} of the catalogues
+    the harvest step wrote for the CHIM frame maps (tools/harvest_build.py: frame origin, AWH4 proxies that need no
+    map entity): a catalogue with exactly that content stays with the frame map (recorded as 'harvest_catalogue');
+    any other catalogue of the replaced map leaves as before (HARVEST-CHIM-REGION-LOSS-41). Returns the record with
+    every replaced file."""
     from map_files import frame_map_path, is_chim_frame
     id1, name, frame = Path(id1), task['name'], task['frame']
+    keep_catalogues = keep_catalogues or {}
+    kept = None
+    if name in keep_catalogues:
+        own = id1 / ('harvest-%s.txt' % name)
+        raw = own.read_bytes() if own.is_file() else b''
+        if _sha256(raw) != keep_catalogues[name] or not raw.startswith(b'AWH4 '):
+            raise ValueError('CHIM region frame map %s (frame %s): the harvest catalogue the harvest step wrote for it '
+                             '(SHA-256 %s) is missing or changed' % (name, frame['id'], keep_catalogues[name]))
     legacy_path = id1 / 'maps' / (name + '.bsp')
     replaced = list(record['replaced'])
     if replaced:
@@ -1222,6 +1291,9 @@ def install_region(id1, task, data, record):
         catalogue = id1 / ('harvest-%s.txt' % owner)
         if catalogue.is_file():
             raw = catalogue.read_bytes()
+            if owner == name and keep_catalogues.get(name) == _sha256(raw) and raw.startswith(b'AWH4 '):
+                kept = {'file': catalogue.name, 'bytes': len(raw), 'sha256': _sha256(raw)}
+                continue
             replaced.append({'file': catalogue.name, 'bytes': len(raw), 'sha256': _sha256(raw),
                              'town': frame['id'], 'reason': 'harvest catalogue of a replaced map (its plants are not '
                                                             'on the CHIM region frame map yet)'})
@@ -1232,10 +1304,10 @@ def install_region(id1, task, data, record):
     if frame_path.exists():
         raise ValueError('CHIM region frame map already present: ' + frame_path.name)
     frame_path.write_bytes(data)
-    return dict(record, replaced=replaced)
+    return dict(record, replaced=replaced, **({'harvest_catalogue': kept} if kept else {}))
 
 
-def build_region(id1, frame, world_dir, world=None, rows=None, hand_fields=None):
+def build_region(id1, frame, world_dir, world=None, rows=None, hand_fields=None, keep_catalogues=None):
     """Replace a cell's open-world map IN PLACE by the frame map of its CHIM region frame (chim.regions: one
     exterior cell on CHIM inside the open world): maps/vfNNNN.bsp of the cell gives way to maps/vfNNNN.chim
     (chim_frame_ext; with bsp the file is replaced under its own name), an empty world with the worldspawn
@@ -1250,7 +1322,7 @@ def build_region(id1, frame, world_dir, world=None, rows=None, hand_fields=None)
     build_regions makes many on the shared worker pool."""
     task = region_task(id1, frame, world_dir, world=world, rows=rows, hand_fields=hand_fields)
     data, record, _ = region_map(task)
-    record = install_region(id1, task, data, record)
+    record = install_region(id1, task, data, record, keep_catalogues)
     set_region_origins_z(id1, {n: frame['origin'][2] for n in [task['name']] + task['aliases']})
     return record
 
@@ -1267,12 +1339,13 @@ def region_source_sections(world_dir):
 
 
 def build_regions(id1, frames, world_dir, world=None, jobs=1, cache=None, progress=None, rows=None,
-                  hand_fields=None):
+                  hand_fields=None, keep_catalogues=None):
     """build_region for every CHIM region frame: the frame maps are made on the shared worker pool
     (build_parallel.ordered_map; independent read-only workers) and written here in table order, so the image
     is byte-identical with any worker count (BUILD-IMAGE-CHIM-MAPS-SERIAL-36). cache: a PassCache (region_cache):
     an unchanged frame map (region_inputs, by SHA-256) is taken from it. progress(record, reused): called after
-    each map is written. Returns (records, number taken from the cache)."""
+    each map is written. keep_catalogues: the harvest step's frame map catalogues (install_region). Returns
+    (records, number taken from the cache)."""
     from build_parallel import ordered_map
     id1 = Path(id1)
     directory = world_directory(id1)
@@ -1286,7 +1359,7 @@ def build_regions(id1, frames, world_dir, world=None, jobs=1, cache=None, progre
         tasks = [dict(t, cache=cache) for t in tasks]
     records, reused, heights = [], 0, {}
     for task, (data, record, hit) in zip(tasks, ordered_map(region_map, tasks, jobs)):
-        records.append(install_region(id1, task, data, record))
+        records.append(install_region(id1, task, data, record, keep_catalogues))
         for n in [task['name']] + task['aliases']:     # a divided cell's alias rows stay equal to its row
             heights[n] = task['frame']['origin'][2]
         reused += bool(hit)
@@ -1417,6 +1490,40 @@ def activated_check(rows, found):
     have = {e.get('aw_ref') for e in rows if e.get('classname') == 'func_wall' and e.get('model', '').startswith('*')}
     return ['activated object %s has no edict in the frame map' % r['aw_ref'] for r in found
             if r['aw_ref'] not in have]
+
+
+def activated_expected(exterior, bounds, polygon=None, centre=None, scale=0.25, refs=None):
+    """The activated objects (aw_activated.h) a map of a town must carry, from the game data alone: the
+    exterior references `exterior` (prepare_opening_refs.opening_references) whose original position, in
+    the town's units ((position - centre) * scale), lies in the map's XY bounds (x0, y0, x1, y1) and, for
+    a special map with a route polygon (prepare_seyda_regions.special_polygon), inside it. Any such object
+    is kept by the maps' selection rule (select_entities), so it must arrive. Sorted reference numbers."""
+    refs = activated_refs() if refs is None else refs
+    if centre is None:
+        from prepare_quake import CENTRE as centre
+    x0, y0, x1, y1 = bounds
+    out = set()
+    for r in exterior:
+        if r['number'] not in refs:
+            continue
+        x, y = ((r['position'][i] - centre[i]) * scale for i in (0, 1))
+        if not (x0 <= x <= x1 and y0 <= y <= y1):
+            continue
+        if polygon and any((q[0] - p[0]) * (y - p[1]) - (q[1] - p[1]) * (x - p[0]) < 0
+                           for p, q in zip(polygon, polygon[1:] + polygon[:1])):
+            continue
+        out.add(r['number'])
+    return sorted(out)
+
+
+def activated_missing(map_name, expected, rows, refs=None):
+    """Refusals, one per activated object of `expected` (reference numbers) that has no func_wall edict
+    with a brush model among `rows` (entity dicts), naming the reference, its AW_REF_ name and the map."""
+    refs = activated_refs() if refs is None else refs
+    have = {str(e.get('aw_ref')) for e in rows if e.get('classname') == 'func_wall'
+            and str(e.get('model', '*')).startswith('*')}
+    return ['%s: activated object %d (%s) is missing from the map\'s activated entities'
+            % (map_name, r, refs.get(r, 'AW_REF_?')) for r in expected if str(r) not in have]
 
 
 def wall_boxes(bounds, lo, hi, thick=DOCKS_WALL):

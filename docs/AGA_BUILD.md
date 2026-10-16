@@ -138,7 +138,7 @@ roll; placements carried position and yaw. That experiment used foliage
 sprites and reported 155 placements / 55 model variants, three NPCs and Nord
 hands. These are historical example counts, not current world/gallery coverage.
 The current planned foliage policy retains mesh foliage in detailed Balmora;
-see the [roadmap](ROADMAP.md#follow-up-static-asset-gallery-and-remaining-scenery).
+see the [roadmap](ROADMAP_HISTORY.md#follow-up-static-asset-gallery-and-remaining-scenery).
 An OpenMW-based backend remains future work. The guided build also exports a
 private ordered [voice lookup](DIALOGUE_LOOKUPS.md); it is not loaded by the runtime yet.
 

@@ -209,6 +209,14 @@ class GroundGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'only unresolved mesh-contact'):
             require(self.maps, self.id1/'new.json', approved)
 
+    def test_waivable_findings_are_mesh_contact_and_chim_frame_residents_only(self):
+        from check_actor_ground import waivable
+        self.assertTrue(waivable('Initial mesh contact outside support tolerance'))
+        self.assertTrue(waivable('CHIM frame resident not supported on the frame collision (blocked)'))
+        self.assertTrue(waivable('CHIM frame resident not supported on the frame collision (unresolved-mesh-contact)'))
+        self.assertFalse(waivable('No actor placements found'))
+        self.assertFalse(waivable('CHIM frame resident missing'))
+
     def test_baseline_cannot_be_overwritten_by_audit(self):
         approved = self.baseline(); before = approved.read_bytes()
         with self.assertRaisesRegex(ValueError, 'separate'):

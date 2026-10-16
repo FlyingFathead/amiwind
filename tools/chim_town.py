@@ -357,16 +357,49 @@ def source_carrier_record(scene, raw):
     if 'aw_source_carrier' not in fields:
         return None
     scene = Path(scene)
-    receipt = json.loads((scene / 'seyda-carrier.json').read_text())
     source_raw = (scene / 'source-entities.json').read_bytes()
     source = json.loads(source_raw)
-    if fields['aw_source_carrier'] != MARKER or receipt.get('source_only') is not True or \
-            receipt.get('carrier_bsp_sha256') != hashlib.sha256(raw).hexdigest() or \
+    if (scene / 'seyda-carrier.json').is_file():
+        # the standalone carrier tool (tools/prepare_seyda_carrier.py): its receipt binds the final carrier
+        receipt = json.loads((scene / 'seyda-carrier.json').read_text())
+        bound = receipt.get('source_only') is True and \
+            receipt.get('carrier_bsp_sha256') == hashlib.sha256(raw).hexdigest()
+    else:
+        # the builder's bsp stage (prepare_mesh_bsp --seyda-source carrier): the later scene stages edit the
+        # entity lump, so its scene record binds the source entities (SHA-256); no geometry may appear
+        from prepare_mesh_bsp import CARRIER_SCENE_FORMAT
+        receipt = json.loads((scene / 'scene-ready.json').read_text())
+        bound = receipt.get('format') == CARRIER_SCENE_FORMAT and receipt.get('seyda_source') == 'carrier'
+    if fields['aw_source_carrier'] != MARKER or not bound or \
             receipt.get('source_entities_sha256') != hashlib.sha256(source_raw).hexdigest() or \
             source.get('format') != SOURCE_FORMAT or source.get('runtime_payload') is not False or \
             any(parts[k] for k in (3, 7, 8)):
-        raise ValueError('Invalid non-runtime source carrier receipt or geometry')
+        raise ValueError('Invalid non-runtime source carrier receipt or geometry (scene %s, seyda.bsp sha256 %s)'
+                         % (scene, hashlib.sha256(raw).hexdigest()))
     return receipt
+
+
+def seyda_activated_check(data_files, maps, models, region_names):
+    """Fail fast, before the CHIM frame is read: every exterior object the engine activates (aw_activated.h)
+    whose original position lies in a Seyda Neen map's bounds arrives as an activated entity of that map's
+    frame map: the town frame (its whole area) and each special frame map (sncourt, intro_docks: bounds and
+    route polygon), expected from the game data (chim.frame_map.activated_expected). Refusals name the
+    reference and the map. Returns (refusals, {map: expected references})."""
+    from area_config import BOUNDS
+    from chim.frame_map import activated_expected, activated_missing
+    from mwad.paths import resolve_data_files
+    from prepare_opening_refs import opening_references
+    from prepare_seyda_regions import SPECIALS, special_polygon
+    exterior = opening_references(resolve_data_files(data_files))[0]
+    plan = [(SEYDA, region_names, (*BOUNDS[0], *BOUNDS[1]), None)]
+    plan += [(name, [name], tuple(bounds), special_polygon(name)) for name, bounds in SPECIALS]
+    refused, record = [], {}
+    for name, names, bounds, polygon in plan:
+        expected = activated_expected(exterior, bounds, polygon)
+        rows, _ = seyda_activated(maps, models, names)
+        refused += activated_missing(name, expected, rows)
+        record[name] = expected
+    return refused, record
 
 
 def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_index=None, town_scene_report=None,
@@ -395,12 +428,16 @@ def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_in
     out.mkdir(parents=True, exist_ok=False)
     (out / 'id1').mkdir()
     maps, entries, models = seyda_maps(raw)
+    layout = seyda_layout()
+    region_names = [e['name'] for e in layout]
+    # the opening objects first (seconds): a missing edict refuses before the CHIM frame is read
+    bad, expected_activated = seyda_activated_check(data_files, maps, models, region_names)
+    if bad:
+        raise ValueError('Seyda Neen on CHIM: ' + '; '.join(bad))
     origin = town_origin(SEYDA)
     flora_record = None
     if flora is not None:
         flora_record = seyda_flora(maps, entries, origin, flora, town_source_index, town_scene_report)
-    layout = seyda_layout()
-    region_names = [e['name'] for e in layout]
     cell = tuple(source_cell())
     world, index = frame_world(chim_world, cell)
     placed = chim_placements(chim_world, cell)
@@ -446,6 +483,7 @@ def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_in
     record = {'format': FORMAT, 'town': SEYDA, 'map': SEYDA, 'door_file': None, 'region_file': 'seyda-regions.txt',
               'rows': rows, 'activated': activated, 'grounding': grounding, 'specials': specials,
               'statics': statics, 'report': report, 'flora': flora_record,
+              'activated_expected': expected_activated,
               'source': 'game data: the scene stage\'s complete converted town maps/seyda.bsp (sha256 %s); '
                         'no legacy region maps' % hashlib.sha256(raw).hexdigest()}
     if source_record is not None:

@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.35-dev1 at 2026-10-10 (time not recorded): BUILD-REUSE-KEYS-TOO-BROAD-35: a whole build reused no stage
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: optimizer pass cache reused 13 of 2,658 maps
+- Reported with v0.0.41-dev2 at 2026-10-16 02:28 +0300: chim stage rebuilt (~24 min) for aw_ui.c + debug-commands.txt
 
 <!-- END GENERATED PERSISTING -->
 
@@ -30,7 +31,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 10 October 2026](#status-10-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -128,6 +129,15 @@ The preflight runs on every build with `--reuse-from`, so the cost of a change i
 stage runs, and a key that is too broad stops the build. The gallery key is derived from the code
 the converter reaches, not maintained by hand.
 
+### PERSISTING: v0.0.41-dev2, 16 October 2026
+
+The rings 0-2 build at 427e29b reran the whole chim stage (about 24 minutes on 12 workers) and the three CHIM town
+stages after it. The reuse plan named the cause itself: "input change: sources (config/debug-commands.txt,
+engine/aga/src/aw_ui.c)". Those are the HUD code (the Guard marker) and the debug command catalogue; the CHIM world
+conversion reads neither. The plan marked the rebuild EXPECTED, so the preflight did not stop it. Repair: the chim
+stage's key covers only the files the conversion reads, with a test that a HUD or debug-catalogue change does not
+rebuild it; the preflight should flag a source in a key that the stage never opens.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -187,6 +197,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-SILENT-PHASES-36](BUILD-SILENT-PHASES-36.md): Builder phases run silent: no start/end timing, no progress, no heartbeat; the CHIM stats step is a single-core tail
 - [BUILD-STAGE-INTERRUPT-ABSORBED-36](BUILD-STAGE-INTERRUPT-ABSORBED-36.md): The stage wrapper absorbed Ctrl-C: a stage that handled the interrupt and returned 0 counted as passed, and the build went on
 - [BUILD-STAGE-START-SHARE-33](BUILD-STAGE-START-SHARE-33.md): A pooled stage that starts while others run gets one worker as its start value
+- [BUILD-STAIR-WALK-BORDER-COPIES-41](BUILD-STAIR-WALK-BORDER-COPIES-41.md): The CHIM stair gate walks every frame's whole border, so each cell's flights are walked many times and unreachable copies can fail a build
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them
@@ -199,5 +210,9 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
+
+Related bugs in other categories:
+
+- [BUILD-STAIR-PASS-NOT-KEPT-41](BUILD-STAIR-PASS-NOT-KEPT-41.md): A frame's passed stair walk is not reused when the build it ran in failed, and the walker key changes with converter code
 
 <!-- END GENERATED CATEGORY -->

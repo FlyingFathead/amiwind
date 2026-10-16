@@ -73,6 +73,30 @@ class RecipeIdentity(unittest.TestCase):
             apply_recipe(self.profile, self.model, 'trial', self.data)
 
 
+class CollisionToleranceRecipes(unittest.TestCase):
+    """A recipe entry may coarsen one mesh's collision pieces (collision_tolerance, 2-32 units)."""
+
+    def doc(self, entry):
+        return {'format': 1, 'recipes': {'t': {'models': {'meshes/x/root.nif': dict(entry, sha256='a' * 64)}}}}
+
+    def test_tolerance_only_entry_keeps_the_drawn_mesh(self):
+        from visual_recipes import apply_recipe
+        out = apply_recipe({'ratio': 1}, {'source': 'meshes/x/root.nif', 'sha256': 'a' * 64}, 't',
+                           self.doc({'collision_tolerance': 8}))
+        self.assertEqual((out['collision_tolerance'], out['ratio']), (8.0, 1))
+
+    def test_tolerance_bounds(self):
+        from visual_recipes import apply_recipe
+        with self.assertRaises(ValueError):
+            apply_recipe({}, {'source': 'meshes/x/root.nif', 'sha256': 'a' * 64}, 't', self.doc({'collision_tolerance': 1}))
+
+    def test_other_mesh_hash_keeps_default_collision(self):
+        from visual_recipes import apply_recipe
+        out = apply_recipe({'ratio': 1}, {'source': 'meshes/x/root.nif', 'sha256': 'b' * 64}, 't',
+                           self.doc({'collision_tolerance': 8}))
+        self.assertNotIn('collision_tolerance', out)
+
+
 class OriginalCellRecipes(unittest.TestCase):
     def setUp(self):
         self.document = {'cell_settings': {'10,1': {'visual_recipe': 'trial', 'clip_to_terrain': True}}}

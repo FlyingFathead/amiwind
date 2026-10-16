@@ -182,7 +182,16 @@ def town_rows(table, prefix, origin):
     return rows
 
 
-def plan_rows(id1, native=()):
+def chim_regions(id1, chim_world):
+    """{map name: row} of the CHIM world's region frames (chim.frame_map.region_frame_rows): the open-world maps
+    the image replaces by CHIM frame maps. {} without a CHIM world or region frames."""
+    if not chim_world:
+        return {}
+    from chim.frame_map import region_frame_rows
+    return region_frame_rows(id1, chim_world)
+
+
+def plan_rows(id1, native=(), regions=None):
     """Every exterior map the image ships, with its origin and coverage.
 
     The world maps come from world/regions.awr, the Seyda Neen and Balmora
@@ -191,17 +200,34 @@ def plan_rows(id1, native=()):
     in `native`: towns on CHIM made from the game data (tools/chim_town.py), which
     have a region table and no region maps. Their rows say chim=True; the engine
     loads their catalogues by region on the CHIM frame (aw_harvest_runtime.c
-    AW_HarvestFollow). Sorted by name.
+    AW_HarvestFollow). `regions` (chim_regions): the open-world maps a CHIM region
+    frame replaces; their rows say chim=True with the frame's id, cells and origin
+    (the frame map's coordinates), whether or not a legacy map was made, and a
+    divided cell's alias rows are left out (the engine never loads them). The
+    engine loads such a catalogue with the frame map of the same name
+    (AW_HarvestBegin); the CHIM world leaves these plants out (chim.build
+    harvest_numbers), so without it they are nowhere (HARVEST-CHIM-REGION-LOSS-41).
+    Sorted by name.
     """
     id1 = Path(id1)
+    regions = regions or {}
+    aliases = {a for row in regions.values() for a in row['aliases']}
     rows = []
     directory = id1 / 'world/regions.awr'
+    chim = set()
     if directory.is_file():
         from prepare_harvest_room import world_directory
-        rows += [dict(name=r['name'], origin=r['origin'], coverage=r['coverage'])
-                 for r in world_directory(directory.read_bytes()) if not r['town']]
+        for r in world_directory(directory.read_bytes()):
+            if r['town'] or r['name'] in aliases:
+                continue
+            region = regions.get(r['name'])
+            if region is None:
+                rows.append(dict(name=r['name'], origin=r['origin'], coverage=r['coverage']))
+            else:
+                rows.append(dict(name=r['name'], origin=list(region['origin']), coverage=r['coverage'],
+                                 frame=region['frame'], cells=[list(c) for c in region['cells']]))
+                chim.add(r['name'])
     from town_config import runtime_towns
-    chim = set()
     for town in runtime_towns()[:2]:  # the fixed towns: Seyda Neen and Balmora
         table = id1 / town['regions']
         if table.is_file():
@@ -324,9 +350,9 @@ def source_placements(source, data_files):
     return receipt, context, refs
 
 
-def map_selections(id1, refs, native=()):
+def map_selections(id1, refs, native=(), regions=None):
     """(plan rows, {map: placements}) for every shipped exterior map with plants."""
-    rows = plan_rows(id1, native)
+    rows = plan_rows(id1, native, regions)
     return rows, {row['name']: selected for row in rows for selected in [select(row, refs)] if selected}
 
 
@@ -350,7 +376,7 @@ def _clear(task):
                                          removed=[str(r['number']) for r in targets])
 
 
-def clear_baked(source, id1, work, *, data_files, jobs=None, native=()):
+def clear_baked(source, id1, work, *, data_files, jobs=None, native=(), chim_world=None):
     """Image step, before the final passes: remove baked harvestable mushrooms.
 
     Some converters (Balmora) bake every mushroom as a brush entity bound to its
@@ -362,7 +388,8 @@ def clear_baked(source, id1, work, *, data_files, jobs=None, native=()):
     from build_parallel import ordered_map
     id1, work = Path(id1), Path(work)
     _, _, refs = source_placements(source, data_files)
-    rows, selections = map_selections(id1, refs, native)
+    regions = chim_regions(id1, chim_world)
+    rows, selections = map_selections(id1, refs, native, **({'regions': regions} if regions else {}))
     origins = {row['name']: row['origin'] for row in rows}
     chim = {row['name'] for row in rows if row.get('chim')}  # no map: the CHIM world leaves them out
     tasks = [(str(id1 / 'maps' / (name + '.bsp')), selections[name], origins[name]) for name in sorted(selections)
@@ -380,14 +407,16 @@ def clear_baked(source, id1, work, *, data_files, jobs=None, native=()):
     return receipt
 
 
-def install(source, id1, work, *, data_files, sizes, jobs=None, native=()):
+def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_world=None):
     """Image step: catalogues for the final maps, geometry gate, heap admission.
 
     ``sizes`` are the target ABI sizes of the heap check
     (check_world_map_heap.compile_target_sizes). Writes the admitted catalogues
     and the models they use into ``id1`` and the plan and receipt into ``work``.
     A geometry gate failure stops the build, and so does a map whose baked
-    mushrooms clear_baked removed but which the heap check then refuses.
+    mushrooms clear_baked removed but which the heap check then refuses, and a
+    CHIM map (town sub-cell or region frame, chim_world) over the runtime bounds:
+    the CHIM world leaves its plants out, so they would be lost.
     """
     import numpy as np
     from prepare_harvest import identity_key
@@ -408,7 +437,8 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=()):
     models = {row['packet_model']: row for row in receipt['models']}
     order = {row['packet_model']: i for i, row in enumerate(receipt['models'])}
     limits = runtime_limits()
-    rows, found = map_selections(id1, refs, native)
+    regions = chim_regions(id1, chim_world)
+    rows, found = map_selections(id1, refs, native, **({'regions': regions} if regions else {}))
     chim = {row['name'] for row in rows if row.get('chim')}
     candidates, selections, capacity = {}, {}, {}
     for row in rows:
@@ -424,6 +454,12 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=()):
         candidates[row['name']] = dict(row=row, raw=raw, plants=len(selected),
                                        models=[models[n]['path'] for n in used])
         selections[row['name']] = (selected, row['origin'])
+    over = sorted(n for n in capacity if n in chim)
+    if over:
+        raise ValueError('Harvest: CHIM map(s) over the runtime catalogue bounds (%d plants, %d models): the CHIM world '
+                         'leaves their plants out, so they would be lost: ' % (limits['plants'], limits['models']) +
+                         '; '.join('%s: %d plants, %d models' % (n, capacity[n]['plants'], capacity[n]['models'])
+                                   for n in over))
     # A CHIM town's sub-cells have no map: no baked mushroom to find (the CHIM world leaves the harvest
     # placements out, chim.build harvest_numbers) and no per-map heap check (the CHIM heap gate counts
     # the frame); the runtime capacity bounds above still apply.
@@ -468,7 +504,9 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=()):
                 intern_root_spans=settings['intern_root_spans'], compact_models=settings['compact_models'],
                 global_catalogue_sha256=receipt['global_catalogue_sha256'], global_slots=receipt['global_slots'],
                 inputs={k: receipt[k] for k in ('master', 'index', 'packet', 'palette')},
-                maps=[dict(name=n, **(dict(path=None, chim=True) if n in chim else
+                maps=[dict(name=n, **(dict(path=None, chim=True, **({'frame': candidates[n]['row']['frame']}
+                                                                    if 'frame' in candidates[n]['row'] else {}))
+                                       if n in chim else
                                        dict(path=f'maps/{n}.bsp', **pin((id1 / 'maps' / (n + '.bsp')).read_bytes()))),
                            origin=candidates[n]['row']['origin'], coverage=candidates[n]['row']['coverage'],
                            keys=[identity_key(r['source_key']) for r in selections[n][0]])
@@ -497,6 +535,9 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=()):
                                                                     'harvest')})
                                  for n in sorted(set(candidates) - set(admitted))},
                    over_runtime_capacity=capacity,
+                   chim_region_catalogues={n: dict(frame=candidates[n]['row']['frame'], plants=candidates[n]['plants'],
+                                                   **pin(candidates[n]['raw']))
+                                           for n in admitted if 'frame' in candidates[n]['row']},
                    catalogues=[dict(map=n, path='harvest-' + n + '.txt', **pin(candidates[n]['raw']),
                                     plants=candidates[n]['plants'], models=len(candidates[n]['models']),
                                     heap_clearance_bytes=heap[n]['estimated_clearance_bytes'])
@@ -506,6 +547,103 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=()):
                    plan=dict(path='harvest-plan.json', sha256=digest((work / 'harvest-plan.json').read_bytes())))
     (work / 'harvest-staging.json').write_text(json.dumps(staging, indent=2) + '\n', encoding='utf-8', newline='\n')
     return staging
+
+
+COVERAGE_FORMAT = 'AmiWind harvest CHIM coverage 1'
+COVERAGE_REPORT = 'harvest-chim-coverage.json'
+CELL_UNITS = 8192.0     # one Morrowind exterior cell, game units
+
+
+def chim_coverage(id1, chim_world, refs, rows, frame_maps=False):
+    """Every harvestable plant the CHIM world leaves out is placed by the image (HARVEST-CHIM-REGION-LOSS-41).
+
+    The CHIM world leaves every harvest placement out of its frames (chim.build harvest_numbers; its receipt lists
+    them per frame, parity harvest_removed), because the image installs them as catalogues. So each such plant must
+    be in the catalogue of a map the image ships (`rows`, plan_rows: legacy maps, CHIM town sub-cells, CHIM region
+    frame maps), or inside a legacy map's coverage (that map keeps it, catalogued or baked; the entity tracker and
+    the heap check judge it there). A plant inside a CHIM region frame's own cell must be in that frame map's
+    catalogue: that map is what the engine loads there. frame_maps: also require the frame map of each such
+    catalogue to be in id1/maps (the final payload). Returns the report; 'missing' names every plant left out
+    (empty: passed)."""
+    from entity_tracker import harvest_refs
+    from map_files import frame_map_path
+    id1 = Path(id1)
+    receipt_path = Path(chim_world) / 'chim-receipt.json'
+    parity = json.loads(receipt_path.read_text(encoding='utf-8')).get('parity') or {}
+    removed = {}
+    for frame, record in sorted(parity.items()):
+        for number in record.get('harvest_removed') or ():
+            removed.setdefault(int(number), []).append(frame)
+    by_number = {r['number']: r for r in refs}
+    catalogues = {}
+    for row in rows:
+        path = id1 / ('harvest-%s.txt' % row['name'])
+        if path.is_file():
+            catalogues[row['name']] = harvest_refs(path.read_bytes())
+    catalogued = set().union(*catalogues.values()) if catalogues else set()
+    legacy = [row for row in rows if not row.get('chim')]
+    own = {tuple(c): row for row in rows if 'frame' in row for c in row['cells']}
+    missing = []
+    counts = dict(region_cell=0, catalogue=0, legacy_map=0)
+    for number, frames in sorted(removed.items()):
+        ref = by_number.get(number)
+        if ref is None:
+            missing.append(dict(ref=number, frames=frames, reason='not a placement of the harvest source'))
+            continue
+        cell = [int(math.floor(ref['position'][k] / CELL_UNITS)) for k in range(2)]
+        region = own.get(tuple(cell))
+        if region is not None:
+            if number in catalogues.get(region['name'], ()):
+                counts['region_cell'] += 1
+            else:
+                missing.append(dict(ref=number, cell=cell, frames=frames, map=region['name'], frame=region['frame'],
+                                    reason="not in the catalogue of its own cell's CHIM region frame map"))
+        elif number in catalogued:
+            counts['catalogue'] += 1
+        elif any(select(row, [ref]) for row in legacy):
+            counts['legacy_map'] += 1
+        else:
+            missing.append(dict(ref=number, cell=cell, frames=frames,
+                                reason='in no shipped catalogue and inside no legacy map'))
+    without = []
+    if frame_maps:
+        without = sorted(row['name'] for row in rows if 'frame' in row and row['name'] in catalogues
+                         and not frame_map_path(id1, row['name']).is_file())
+    return dict(format=COVERAGE_FORMAT, chim_receipt_sha256=digest(receipt_path.read_bytes()),
+                frames=len(parity), plants=len(removed), placed=counts,
+                region_frame_catalogues=sum(1 for row in rows if 'frame' in row and row['name'] in catalogues),
+                missing=missing, catalogues_without_frame_map=without,
+                rule="every harvest placement the CHIM world leaves out is in a shipped catalogue (for a CHIM region "
+                     "cell: its own cell's frame map catalogue) or inside a legacy map")
+
+
+def require_chim_coverage(source, id1, work, *, data_files, chim_world, native=(), frame_maps=False,
+                          report_name=COVERAGE_REPORT):
+    """chim_coverage on the image's plan, written to work/<report_name>; a ValueError naming the plants
+    (reference, cell, frame, map) when any is left out. None without a CHIM world."""
+    if not chim_world or not (Path(chim_world) / 'chim-receipt.json').is_file():
+        return None
+    _, _, refs = source_placements(source, data_files)
+    rows = plan_rows(id1, native, chim_regions(id1, chim_world))
+    report = chim_coverage(id1, chim_world, refs, rows, frame_maps=frame_maps)
+    work = Path(work)
+    work.mkdir(parents=True, exist_ok=True)
+    (work / report_name).write_text(json.dumps(report, indent=1) + '\n', encoding='utf-8', newline='\n')
+    print('Harvest CHIM coverage%s: %d plants the CHIM world leaves out (%d frames): %d in their CHIM region frame '
+          'map catalogue, %d in another shipped catalogue, %d inside a legacy map; left out: %d; catalogues without '
+          'their frame map: %d.' % (' (final payload)' if frame_maps else '', report['plants'], report['frames'],
+                                    report['placed']['region_cell'], report['placed']['catalogue'],
+                                    report['placed']['legacy_map'], len(report['missing']),
+                                    len(report['catalogues_without_frame_map'])), flush=True)
+    problems = ['ref %s (cell %s, frame %s%s): %s' % (m['ref'], ','.join(map(str, m.get('cell') or ['?'])),
+                                                     m.get('frame') or '/'.join(m['frames'][:3]),
+                                                     ', map ' + m['map'] if m.get('map') else '', m['reason'])
+                for m in report['missing']]
+    problems += ['%s: catalogue without its CHIM region frame map' % n for n in report['catalogues_without_frame_map']]
+    if problems:
+        raise ValueError('Harvest CHIM coverage failed (HARVEST-CHIM-REGION-LOSS-41): %d plant(s) or catalogue(s) '
+                         'left out; see %s: %s' % (len(problems), report_name, '; '.join(problems[:12])))
+    return report
 
 
 def native_towns(args):
@@ -521,8 +659,10 @@ def image_step(args, id1, work, *, jobs=None):
               '(builder default is the harvest step; --no-harvest is for debugging only).', flush=True)
         return dict(status='not_requested')
     from check_world_map_heap import compile_target_sizes
+    chim_world = getattr(args, 'chim_world', None)
     staging = install(args.harvest, id1, work, data_files=args.data_files,
-                      sizes=compile_target_sizes(args.sdk)[0], jobs=jobs, native=native_towns(args))
+                      sizes=compile_target_sizes(args.sdk)[0], jobs=jobs, native=native_towns(args),
+                      chim_world=chim_world)
     print(f"Harvest: {staging['admitted']}/{staging['candidates']} maps with mushrooms admitted by the heap check, "
           f"{staging['plants']} plants, {staging['models']} shared models; not admitted: "
           f"{', '.join(staging['not_admitted']) or 'none'}.", flush=True)
@@ -539,13 +679,20 @@ def image_step(args, id1, work, *, jobs=None):
     if failures:
         raise ValueError('Harvest pick audit: %d placed plants cannot be picked (%s); see harvest-pick-audit.json'
                          % (len(failures), ', '.join(map(str, failures[:10]))))
+    # Fail fast, before the CHIM frame maps: every plant the CHIM world leaves out has a catalogue
+    # (HARVEST-CHIM-REGION-LOSS-41); finalize_image runs it again on the final payload (frame_maps=True).
+    coverage = require_chim_coverage(args.harvest, id1, work, data_files=args.data_files, chim_world=chim_world,
+                                     native=native_towns(args))
     report = Path(work) / 'harvest-staging.json'
     return dict(status='installed', pick_audit={k: (len(pick[k]) if isinstance(pick[k], list) else pick[k]) for k in
                                                 ('plants', 'maps', 'unpickable_before', 'unpickable_fixed', 'unreachable',
                                                  'catalogues_without_map')}, report=str(report.relative_to(Path(work).parent)), report_sha256=digest(report.read_bytes()),
                 **{k: staging[k] for k in ('maps_considered', 'candidates', 'admitted', 'plants', 'models', 'families',
                                            'baked_removal', 'geometry_gate')},
-                not_admitted=sorted(staging['not_admitted']), over_runtime_capacity=sorted(staging['over_runtime_capacity']))
+                not_admitted=sorted(staging['not_admitted']), over_runtime_capacity=sorted(staging['over_runtime_capacity']),
+                chim_region_catalogues=len(staging['chim_region_catalogues']),
+                chim_coverage=None if coverage is None else dict(plants=coverage['plants'], placed=coverage['placed'],
+                                                                 missing=len(coverage['missing'])))
 
 
 def main(argv=None):

@@ -104,9 +104,32 @@ class PayloadPreflightTests(unittest.TestCase):
             with patch.object(payload_preflight, 'planned_catalogues', return_value=['intro_docks', 'town']) as plan:
                 with self.assertRaisesRegex(ValueError, 'Harvest catalogue has no matching map: harvest-intro_docks.txt'):
                     payload_preflight.check_harvest(id1, [], removed, 'harvest-source', 'data')
-                plan.assert_called_once_with(id1, 'harvest-source', 'data')
+                plan.assert_called_once_with(id1, 'harvest-source', 'data', None)
                 self.assertEqual(payload_preflight.check_harvest(id1, [], set(), 'harvest-source', 'data'), 2)
             self.assertEqual(sorted(p.name for p in id1.glob('harvest-*')), [])        # placeholders never staged
+
+    def test_region_frame_maps_are_planned_maps(self):
+        """HARVEST-CHIM-REGION-LOSS-41: the harvest step writes a catalogue for each CHIM region frame map
+        (harvest-vfNNNN.txt, no legacy map); the planned map set must hold those frame maps, or the release
+        build stops at the preflight (harvest-vf0225.txt has no matching map)."""
+        from unittest.mock import patch
+        import build_aga
+        from chim import frame_map
+        with tempfile.TemporaryDirectory() as temp:
+            id1 = stage(temp)/'boot/id1'
+            for path in id1.glob('harvest-*.txt'):
+                path.unlink()
+            with patch.object(build_aga, 'chim_world_receipt', return_value=({}, [])), \
+                    patch.object(build_aga, 'staged_extra_towns', return_value=[]), \
+                    patch.object(frame_map, 'region_map_names', return_value={'vf0225': (-9, 1)}) as names:
+                added, removed, _ = payload_preflight.planned_maps(id1, Path(temp)/'world')
+                names.assert_called_once_with(id1, Path(temp)/'world', primary_only=True)
+            self.assertEqual(added, ['vf0225'])
+            with patch.object(payload_preflight, 'planned_catalogues', return_value=['vf0225']):
+                with self.assertRaisesRegex(ValueError, 'no matching map: harvest-vf0225.txt'):
+                    payload_preflight.check_harvest(id1, [], removed, 'harvest-source', 'data', 'world')
+                self.assertEqual(payload_preflight.check_harvest(id1, added, removed, 'harvest-source', 'data',
+                                                                 'world'), 1)
 
     def test_interior_sections_run_and_may_not_bind_removed_maps(self):
         from unittest.mock import patch

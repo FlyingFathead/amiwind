@@ -1,5 +1,6 @@
 {
   "format": 1,
+  "everywhere": "everywhere-v1",
   "recipes": {
     "tel-uvirith-v1": {
       "status": "Measured diagnostic reductions; full-world native acceptance pending. Requires explicit area visual_recipe selection. Collision remains original.",
@@ -113,6 +114,205 @@
       },
       "default_visual_ratio": 0.2,
       "default_error_share": 0.01
+    },
+    "everywhere-v1": {
+      "status": "Owner decision 2026-10-16: replacements applied in every CHIM cell and town frame (the original mesh stays the collision). AMIWIND_VISUAL_EVERYWHERE=off keeps the original meshes.",
+      "models": {
+        "meshes/l/light_de_streetlight_01.nif": {
+          "sha256": "263615adcaf6805ca408a9572c96c96aef8646b0798ae090d9b4e69057772d8a",
+          "primitive": {
+            "kind": "lantern_shell",
+            "half_width": 10.620099,
+            "top": 0.9711,
+            "bottom": -49.094872,
+            "body_bottom": -36.0,
+            "neck_z": -40.0,
+            "neck_half_width": 1.35,
+            "roof_width_ratio": 1.15,
+            "paper_material": 2,
+            "frame_material": 0
+          }
+        }
+      }
+    },
+    "telvanni-v1": {
+      "status": "Trial (16 October 2026): Tel Uvirith reductions plus roots and boats for the Telvanni towns over the CHIM memory budget, whole towns with their neighbouring cells (Sadrith Mora cells 16-19,3-6; Vos 11-14,12-15); per-mesh values pending owner inspection. Collision remains original.",
+      "models": {
+        "meshes/x/ex_t_housepod_01.nif": {
+          "sha256": "5aafbba6727de7df1e7345d07483a04ad3afec8a481b41d0b9d44e296e3f62a3",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_housepod_02.nif": {
+          "sha256": "c6d9e2f4dde564757441f5be1f314c81d90922584e45f72eeaf47fdf3cba473a",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_housepod_03.nif": {
+          "sha256": "c0a5f176d58858d98be44c54f3a238797c00e52c1c3790eacbe795af17ec4a57",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_housestem_02.nif": {
+          "sha256": "2b14e290860b344483cc6cfa014b438cde98f98a3e7f56f003b6da4000fb60b6",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_slavemarket.nif": {
+          "sha256": "eb824e7b583652852752d0d54c491b412f4ece8e17df0b9b829df07460c7131c",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_turret_01.nif": {
+          "sha256": "912e800f05152496757978d7ce0aea8601043c4bfdd6868d711b76a135f35bb9",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_turret_03.nif": {
+          "sha256": "c71f1702dc7c01511100f852c6f3b8464653df6cc1a49559f3afd0be0d27d03a",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_doorway_01.nif": {
+          "sha256": "dbc8772dfa7eeaa700b9da565fea1dc66815f0841e4681c355c5534a4ce2e1b2",
+          "ratio": 0.15,
+          "error_share": 0.05
+        },
+        "meshes/x/ex_t_root_spikes_01.nif": {
+          "sha256": "d7ad39350552abb73a3599aa2e0b2c1e1f4ead317f2fadeabb4e9ae8fb2cd44d",
+          "ratio": 0.1,
+          "error_share": 0.05
+        },
+        "meshes/x/ex_t_root_hook.nif": {
+          "sha256": "bbb5026d55823b7cc26f9de63f576db082970f8ecb76e3bac96af29f790ecda2",
+          "ratio": 0.2,
+          "error_share": 0.025
+        },
+        "meshes/d/ex_t_door_01.nif": {
+          "sha256": "be1c439b057414d78f98be273479224333ea8de6255dc229398788ddefdcdfd5",
+          "panel": {
+            "axis": 1,
+            "facing": -1,
+            "texture_size": 64,
+            "front_offset": -0.1,
+            "two_sided": true,
+            "type": "door-panel"
+          }
+        },
+        "meshes/d/ex_t_door_02.nif": {
+          "sha256": "58b339b10b25cd831cf25f5bc6bdbd873afca31d0cb653d8866b5317b6727ee0",
+          "panel": {
+            "axis": 1,
+            "facing": -1,
+            "texture_size": 64,
+            "front_offset": -0.1,
+            "two_sided": true,
+            "type": "door-panel"
+          }
+        },
+        "meshes/x/ex_t_root_xl_02.nif": {
+          "sha256": "16018614b51fa5f28e653340aca930ef185c5142cfbeb970c46c41eb681e987b",
+          "ratio": 0.25,
+          "error_share": 0.025,
+          "collision_tolerance": 8
+        },
+        "meshes/x/ex_t_root_xl_03.nif": {
+          "sha256": "932684a96ba8076fa9570e24af545e1a6f2ae3df96b8a0de3f03b0f2cf838434",
+          "ratio": 0.25,
+          "error_share": 0.025,
+          "collision_tolerance": 8
+        },
+        "meshes/x/ex_t_root_03.nif": {
+          "sha256": "57550d6043eb47f785236bbcb641c7a0373d1ac89a883377dc015e17580edf73",
+          "ratio": 0.25,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_root_04.nif": {
+          "sha256": "9c633281710c974571eff990bcbe59b461cb9f82697dd287ad45e682c15ee1d3",
+          "ratio": 0.25,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_bigroot_02.nif": {
+          "sha256": "e49366aa8c90e1460fbaef90a0ccf01bb5f7fe5172d2820a211730c7ad09cac6",
+          "ratio": 0.2,
+          "error_share": 0.025
+        },
+        "meshes/d/ex_t_door_slavepod_01.nif": {
+          "sha256": "fffeb16b955ad4aae739562b6212e9d418f1dda9faf42bec8363c911a57f9a48",
+          "ratio": 0.2,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_de_ship.nif": {
+          "sha256": "334203a20923ec6dafe8b2660bdd2cd56f2e21bb02ce5406f0da9ad91f54e9b0",
+          "ratio": 0.25,
+          "error_share": 0.01
+        },
+        "meshes/x/ex_longboat.nif": {
+          "sha256": "04a98d2463b54e1f4816bedddca68a97f89db23c893a49209108feb4d800e3cd",
+          "ratio": 0.3,
+          "error_share": 0.01
+        },
+        "meshes/x/ex_longboat01.nif": {
+          "sha256": "250f6fd3cae8b8352e7d71dcbeee4b2f505eb7da6f8b2ad61ef4be89afed5b7c",
+          "ratio": 0.3,
+          "error_share": 0.01
+        },
+        "meshes/x/ex_longboat02.nif": {
+          "sha256": "d7279a587800ee7ec101f1598e792de8bf257f2d2abf2dd6058c54cdbb1ba828",
+          "ratio": 0.3,
+          "error_share": 0.01
+        },
+        "meshes/x/ex_t_doorway_02.nif": {
+          "sha256": "0e09a87e16f01abceeafb10c9484817556a4ce30b6e43e1460f48a9f7a9e750e",
+          "ratio": 0.15,
+          "error_share": 0.05
+        },
+        "meshes/x/ex_t_housepod_04.nif": {
+          "sha256": "bd0dff5fdc0516e65a3a11b21b32fd7bc699bf17d7eda8c0eea326ebbf625965",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_manor_01.nif": {
+          "sha256": "038374bf3de6e911a6f7b3656d25a0688b96654eb4eb96cd64a81b9b670f644d",
+          "ratio": 0.15,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_manor_02.nif": {
+          "sha256": "b9e633ff39aa4c7e3b4295dc38f43adbd1a4391c5ae2fb9e4166605bda58bb0b",
+          "ratio": 0.15,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_tower_strght_lrg.nif": {
+          "sha256": "9acf6107b5f20d31ad854450b7435e304d21224606383ebeb0633fb94efd2e01",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/ex_t_turret_02.nif": {
+          "sha256": "dce850e4944a63c3fa5888e0770ffdd00082aaa27929d8c81a9d5d35aa854655",
+          "ratio": 0.1,
+          "error_share": 0.025
+        },
+        "meshes/x/flora_t_podbud_01.nif": {
+          "sha256": "19d8bb3ffc58bf12040139ed76c6591018be3dd888fce84108699022beedf4c8",
+          "ratio": 0.3,
+          "error_share": 0.025
+        },
+        "meshes/x/flora_t_podbud_02.nif": {
+          "sha256": "3c5791995a4304477b47d33b85de1054a657c2227624770be52093b58998158a",
+          "ratio": 0.3,
+          "error_share": 0.025
+        },
+        "meshes/x/flora_t_podbud_03.nif": {
+          "sha256": "1abd190077a4b7133f29f5e53b60c01346cda7d8e489ff76cefbeb59aef7005a",
+          "ratio": 0.3,
+          "error_share": 0.025
+        },
+        "meshes/x/flora_t_podbud_04.nif": {
+          "sha256": "bea4d8ca9fe8d071e04e78c193f2383382b50f748929d1b21d3369b44d28c8b9",
+          "ratio": 0.3,
+          "error_share": 0.025
+        }
+      }
     }
   },
   "cell_settings": {
@@ -122,6 +322,102 @@
         "stronghold": 6
       },
       "clip_to_terrain": true
+    },
+    "12,13": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "12,14": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "13,14": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "17,5": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "18,4": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "18,5": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "16,3": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "16,4": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "16,5": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "16,6": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "17,3": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "17,4": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "17,6": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "18,3": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "18,6": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "19,3": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "19,4": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "19,5": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "19,6": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "11,12": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "11,13": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "11,14": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "11,15": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "12,12": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "12,15": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "13,12": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "13,13": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "13,15": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "14,12": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "14,13": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "14,14": {
+      "visual_recipe": "telvanni-v1"
+    },
+    "14,15": {
+      "visual_recipe": "telvanni-v1"
     }
   }
 }

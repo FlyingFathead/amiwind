@@ -19,14 +19,38 @@ _INDEX = None
 _MODELS = {}
 
 
+def scenery_profile(source, triangles):
+    """The visual profile of one world scenery model: giant mushrooms keep 160 triangles and their shared seams
+    (cap rims stay closed), rocks 64. Town frames use the same profile for giant mushrooms (MESH-VIVEC-CAP-GAP-38)."""
+    mushroom = 'flora_emp_parasol_' in source or 'flora_t_mushroom_' in source
+    target = 160 if mushroom else 64
+    return {'texture_size': 64, 'ratio': min(1., target / max(1, triangles)),
+            'visual_triangle_target': target, 'preserve_shared_seams': mushroom}
+
+
 def visual_profiles(index):
-    profiles = {}
-    for model in index['models']:
-        mushroom = 'flora_emp_parasol_' in model['source'] or 'flora_t_mushroom_' in model['source']
-        target = 160 if mushroom else 64
-        profiles[model['source']] = {'texture_size': 64, 'ratio': min(1., target / max(1, model['triangles'])),
-                                     'visual_triangle_target': target, 'preserve_shared_seams': mushroom}
-    return profiles
+    return {model['source']: scenery_profile(model['source'], model['triangles']) for model in index['models']}
+
+
+class BudgetExceeded(ValueError):
+    """A region over a runtime budget: the stage finishes every other region, then names them all."""
+
+
+def budget_detail(entry, report, limits, path):
+    """Unit, cell, split, every exceeded limit with its measured value, and the output SHA-256 (verbose logs)."""
+    over = ['%s %s > %s' % (k, format(report[k], ','), format(v, ',')) for k, v in limits.items() if report.get(k, 0) > v]
+    digest = hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else 'none'
+    return '%s (cell %s, divisions %s, subcell %s): %s, sha256 %s' % (
+        entry['name'], entry.get('cell'), entry.get('divisions', 1), entry.get('subcell'), '; '.join(over), digest)
+
+
+def convert_region_collecting(task):
+    """Worker: convert_region_cached, but a budget failure is returned, not raised, so one pass finds every
+    over-budget region (finished regions are cached and reused on the next run)."""
+    try:
+        return convert_region_cached(task)
+    except BudgetExceeded as error:
+        return {'name': task[4]['name'], 'budget_exceeded': str(error)}
 
 
 def convert_region(task):
@@ -78,9 +102,11 @@ def convert_region(task):
         if report['instances'] != len(selected):
             raise ValueError('Scenery placement count mismatch: ' + entry['name'])
         if report['unique_models'] > 240 or report['instances'] > 550:
-            raise ValueError('Scenery runtime model/entity reserve exceeded: ' + entry['name'])
+            raise BudgetExceeded('Scenery runtime model/entity reserve exceeded: ' + budget_detail(
+                entry, report, dict(unique_models=240, instances=550), local / 'scene.bsp'))
         if report['faces'] > 30000 or report['clipnodes'] > 32767 or report['bytes'] > 4 * 1024 * 1024:
-            raise ValueError('Scenery region storage/collision budget exceeded: ' + entry['name'])
+            raise BudgetExceeded('Scenery region storage/collision budget exceeded: ' + budget_detail(
+                entry, report, dict(faces=30000, clipnodes=32767, bytes=4 * 1024 * 1024), local / 'scene.bsp'))
     else:
         shutil.copyfile(source, local / 'scene.bsp')
         report = {'instances': 0, 'unique_models': 0, 'retained_terrain_only': True}
@@ -162,10 +188,18 @@ def prepare(terrain, scenery, palette, out, jobs, only=None):
     chim_cells = chim_cells_of(baseline)
     made = [e for e in entries if not no_legacy_map(e)]
     rows = {}
-    for result in ordered_map(convert_region_cached, [(terrain, scenery, palette, out, e, cache, shared)
-                                                      for e in made], jobs):
+    over_budget = []
+    for result in ordered_map(convert_region_collecting, [(terrain, scenery, palette, out, e, cache, shared)
+                                                          for e in made], jobs):
         rows[result['name']] = result
+        if 'budget_exceeded' in result:
+            over_budget.append(result['budget_exceeded'])
+            print(f"REGION {len(rows)}/{len(made)} {result['name']} OVER BUDGET: {result['budget_exceeded']}", flush=True)
+            continue
         print(f"REGION {len(rows)}/{len(made)} {result['name']} references={result['instances']}", flush=True)
+    if over_budget:
+        raise BudgetExceeded('%d scenery region(s) over budget; split them in config/world-region-refinements.json '
+                             '(BUILD-LAVA-TERRAIN-BUDGET-38):\n  ' % len(over_budget) + '\n  '.join(over_budget))
     for e in entries:
         if no_legacy_map(e):
             rows[e['name']] = {'name': e['name'], **skipped_row(e), 'instances': 0, 'source_references': []}

@@ -585,6 +585,31 @@ class StaticLimitTests(unittest.TestCase):
         self.assertTrue(refused and 'MAX_STATIC_ENTITIES' in refused[0])
         self.assertEqual((record['static_entities'], record['headroom']), (5, -1))
 
+    def test_streamed_statics_use_the_streamed_list_limit(self):
+        from engine_limits import define
+        self.assertEqual(M.streamed_static_limit(), define('chim/chim_statics.c', 'CHIM_MAX_STATICS'))
+        self.assertGreater(M.streamed_static_limit(), M.static_entity_limit())
+        rows = [{'classname': 'worldspawn'}] + [{'classname': 'aw_flora'} for _ in range(5)]
+        refused, record = M.static_check(rows, streamed=True)
+        self.assertEqual(refused, [])
+        self.assertEqual(record['limit_name'], 'CHIM_MAX_STATICS, streamed')
+        refused, _ = M.static_check(rows, limit=4, streamed=True)
+        self.assertTrue(refused and 'CHIM_MAX_STATICS' in refused[0])
+        self.assertEqual(set(M.STATIC_CLASSES), set(M.STREAMED_CLASSES))   # every counted static is streamed
+
+    def test_accepted_frame_actors_come_only_from_the_private_waiver(self):
+        import os
+        from unittest.mock import patch
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(M.ACCEPTED_ACTORS_VARIABLE, None)
+            self.assertEqual(M.accepted_actor_refs(), set())
+            os.environ[M.ACCEPTED_ACTORS_VARIABLE] = '204678,297836,x,'
+            self.assertEqual(M.accepted_actor_refs(), {'204678', '297836'})
+        build_aga = (Path(M.__file__).resolve().parents[1] / 'build_aga.py').read_text(encoding='utf-8')
+        self.assertIn('os.environ[ACCEPTED_ACTORS_VARIABLE]', build_aga)
+        self.assertLess(build_aga.index('require_private_test_version(VERSION, image_waivers(args))'),
+                        build_aga.index('os.environ[ACCEPTED_ACTORS_VARIABLE]'))
+
     def test_sncourt_is_a_special_map_too(self):
         from prepare_seyda_regions import COURTYARD
         self.assertEqual(M.special_bounds('sncourt'), tuple(COURTYARD))

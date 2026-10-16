@@ -87,9 +87,15 @@ def inspect_sprites(entity_bytes,asset_root,sizes,static_limit=None):
     # origin goes as three MSG_WriteCoord); aw_flora sends floats and is the same in both ranges
     from coord_range import extra_baseline_bytes
     wide=extra_baseline_bytes()
-    for block in re.findall(rb'\{[^{}]*\}',entity_bytes):
-        ent={a.decode('cp1252'):b.decode('cp1252') for a,b in re.findall(rb'"([^"\n]+)"\s+"([^"\n]*)"',block)}
+    from map_files import FRAME_KEY, is_streamed_static
+    blocks=[{a.decode('cp1252'):b.decode('cp1252') for a,b in re.findall(rb'"([^"\n]+)"\s+"([^"\n]*)"',block)}
+            for block in re.findall(rb'\{[^{}]*\}',entity_bytes)]
+    frame_map=any(e.get('classname')=='worldspawn' and FRAME_KEY in e for e in blocks)
+    for ent in blocks:
         entity_count+=1
+        # a streamed frame-map static (chim/chim_statics.c): no signon message, no static slot, its model in the
+        # zone, not the Hunk (the frame map's _chim_hunk_rest states that)
+        if is_streamed_static(ent,frame_map):continue
         classname=ent.get('classname','')
         signon += 33 if classname=='aw_flora' else (14 if classname=='aw_static' else 16)+wide
         model=ent.get('model','')
@@ -163,11 +169,16 @@ def efrag_method(method=None):
     return method
 
 def _static_bounds(table,sprites,policy):
-    """[(lo, hi)] per static entity (float32 values as Python floats), in entity order."""
+    """[(lo, hi)] per static entity (float32 values as Python floats), in entity order. A frame map's streamed
+    statics are not Quake statics: they link their efrags from the CHIM reserve while their chunk is active
+    (chim/chim_chunks.c AddEfrags waits rather than fails), so they are not in this map-load estimate."""
+    from map_files import FRAME_KEY, is_streamed_static
     statics=[]
-    for block in re.findall(rb'\{[^{}]*\}',table['entities']):
-        ent={a.decode('cp1252'):b.decode('cp1252') for a,b in re.findall(rb'"([^"\n]+)"\s+"([^"\n]*)"',block)}
-        if ent.get('classname') in ('aw_static','aw_flora'):statics.append(ent)
+    blocks=[{a.decode('cp1252'):b.decode('cp1252') for a,b in re.findall(rb'"([^"\n]+)"\s+"([^"\n]*)"',block)}
+            for block in re.findall(rb'\{[^{}]*\}',table['entities'])]
+    frame_map=any(e.get('classname')=='worldspawn' and FRAME_KEY in e for e in blocks)
+    for ent in blocks:
+        if ent.get('classname') in ('aw_static','aw_flora') and not is_streamed_static(ent,frame_map):statics.append(ent)
     if len(statics)>policy['max_statics']:raise ValueError('Static entity limit exceeded')
     bounds=[]
     if not statics:

@@ -145,16 +145,20 @@ int main(int argc,char **argv){
   hud_debug=1;AW_UIHud();assert(vid.buffer[174*320+88]!=0);hud_debug=0;
   AW_StoryReset(0);memset(&r_refdef.vrect,0,sizeof(r_refdef.vrect));cls.state=ca_disconnected;
  }
- /* Ordinary HUD must not paint Guard over the world. Compare real pixels
-  * while the guard callback/state toggles; target-name drawing stays alive. */
+ /* Guard is painted at the lower right under the viewport, never over the world or the crosshair.
+  * Compare real pixels while the guard callback/state toggles; target-name drawing stays alive. */
  {
-  static byte unguarded[64000];int x,y,painted=0;
+  static byte unguarded[64000];int x,y,painted=0,changed=0;
   cls.state=ca_connected;r_refdef.vrect.x=r_refdef.vrect.y=0;
   r_refdef.vrect.width=320;r_refdef.vrect.height=172;
   aw_combat_guard_marker=test_guard;guard_state=0;
   memset(vid.buffer,137,64000);AW_UIHud();memcpy(unguarded,vid.buffer,64000);
   guard_state=1;memset(vid.buffer,137,64000);AW_UIHud();
-  assert(!memcmp(unguarded,vid.buffer,64000) && guard_state==1 && aw_combat_guard_marker());
+  assert(guard_state==1 && aw_combat_guard_marker());
+  for(y=0;y<200;y++)for(x=0;x<320;x++)if(vid.buffer[y*320+x]!=unguarded[y*320+x]){
+    assert(x>=200 && y>=172);changed++;   /* only the strip's lower right */
+  }
+  assert(changed>0);
   for(y=50;y<120;y++)for(x=100;x<220;x++)assert(vid.buffer[y*320+x]==137);
   AW_UITargetName("Target");
   for(y=0;y<25;y++)for(x=200;x<320;x++)if(vid.buffer[y*320+x]!=137)painted++;

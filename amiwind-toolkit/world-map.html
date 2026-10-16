@@ -67,6 +67,8 @@ aside{flex:0 1 300px;background:var(--panel);border:1px solid var(--line);border
 #gridtoggle{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:4px;z-index:2;background:#101923cc;border:1px solid #456;border-radius:6px;padding:3px 4px 3px 9px;font-size:13px;font-weight:600}
 #gridtoggle button{height:28px;padding:0 10px;font-size:13px;font-weight:600;background:#203346ee;border:1px solid #6a85a3;border-radius:5px;cursor:pointer;color:inherit}
 #gridtoggle button[aria-pressed="true"]{background:#2e4a66;border-color:#ffe28a;color:#ffe28a}
+#gridtoggle button#copycells{display:inline-flex;align-items:center;padding:0 7px;margin-left:4px}
+#gridtoggle button#copycells:disabled{opacity:.45;cursor:default}
 #ctaslot .cta{display:block;width:100%;margin:0 0 14px}
 .cta{margin:0;padding:9px 16px;font-size:15px;font-weight:700;border-radius:7px;cursor:pointer;background:#ffcf55;color:#101923;border:2px solid #fff3c4;box-shadow:0 0 12px #ffcf5580}
 .cta.pick{background:#203346;color:#ffe28a;border-color:#ffcf55}
@@ -96,6 +98,8 @@ body.embedded #localpanel{max-width:none;flex:1 1 100%}
 #chimbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);background:#13202d}
 #chimbar select{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px;max-width:260px}
 #chimbar button,#chimbar input[type=file]{cursor:pointer}
+#chimbar.folded>:not(.chimkeep){display:none}
+#chimfold{background:none;border:0;color:var(--ink);font-size:14px;padding:0 2px}
 #chimcount{color:#46c37b;font-weight:600}
 #chimpanel .meshtitle{font-size:20px;margin:14px 0 4px;color:var(--ink)}
 #chimpanel .meshsub{font-size:14px;margin:0 0 8px}
@@ -180,7 +184,8 @@ table.mt small{opacity:.8}
 </div>
 <p id="inclusionsummary" class="muted"></p>
 <div id="chimbar">
-  <label><input type="checkbox" id="layer-chim"> <b>CHIM Progress Tracker</b></label>
+  <button id="chimfold" class="chimkeep" aria-expanded="true" aria-controls="chimbar" title="Show or hide the tracker settings">&#9662;</button>
+  <label class="chimkeep"><input type="checkbox" id="layer-chim"> <b>CHIM Progress Tracker</b></label>
   <label>Included in build <select id="inclusionbuild" aria-label="Included in build"><option value="">Loading package coverage</option></select></label>
   <label>Colour by <select id="chimcolour" aria-label="Colour by"></select></label>
   <label>Sweep order <select id="chimorder" aria-label="Sweep order">
@@ -202,7 +207,7 @@ table.mt small{opacity:.8}
 <main>
   <div id="stage"><canvas id="map" width="820" height="820"></canvas><div id="cell-highlight" hidden aria-hidden="true"><div id="cell-highlight-box"></div></div><div id="tip"></div>
     <div id="hbar" class="sbar" title="Scroll west / east"><div></div></div><div id="vbar" class="sbar" title="Scroll north / south"><div></div></div>
-    <div id="gridtoggle" role="group" aria-label="Map grid and names">Grid:<button id="gridon" aria-pressed="false">on</button><button id="gridoff" aria-pressed="true">off</button><span style="margin-left:8px">Names:</span><button id="nameson" aria-label="Names on" aria-pressed="true">on</button><button id="namesoff" aria-label="Names off" aria-pressed="false">off</button></div>
+    <div id="gridtoggle" role="group" aria-label="Map grid and names">Grid:<button id="gridon" aria-pressed="false">on</button><button id="gridoff" aria-pressed="true">off</button><span style="margin-left:8px">Names:</span><button id="nameson" aria-label="Names on" aria-pressed="true">on</button><button id="namesoff" aria-label="Names off" aria-pressed="false">off</button><span style="margin-left:8px">Paint:</span><button id="painton" aria-label="Paint cells on" aria-pressed="false" title="Paint: click or drag over cells to mark them (a drag that starts on a marked cell erases); shift-drag selects a rectangle in any mode">on</button><button id="paintoff" aria-label="Paint cells off" aria-pressed="true">off</button><button id="copycells" title="Copy the painted cells (aw-chim-cells-1 JSON with place names)" aria-label="Copy painted cells" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button><span id="copycellsdone" role="status" aria-live="polite" style="margin-left:4px;color:#ffe28a"></span></div>
     <div id="zoom"><button id="zoomout" title="Zoom out">&minus;</button><button id="zoomfit" title="Fit the whole map to the window">fit</button><button id="zoomreset" title="Back to the fitted view">reset</button><button id="zoomin" title="Zoom in">+</button></div>
     <div id="picked" class="muted">Click a cell to show it here.</div></div>
   <aside>
@@ -398,6 +403,18 @@ $('ctltoggle').onclick = () => {
   draw();
 };
 ctlApply(ctlState());
+// The CHIM Progress Tracker bar folds to its title (the switch stays); the build summary line folds with it.
+function chimFoldApply(open) {
+  $('chimbar').classList.toggle('folded', !open); $('inclusionsummary').hidden = !open;
+  $('chimfold').setAttribute('aria-expanded', open ? 'true' : 'false'); $('chimfold').innerHTML = open ? '&#9662;' : '&#9656;';
+}
+$('chimfold').onclick = () => {
+  const open = $('chimbar').classList.contains('folded');
+  chimFoldApply(open);
+  try { window.localStorage.setItem('amiwind-map-chimbar-1', open ? 'open' : 'closed'); } catch (_) { /* no storage */ }
+  draw();
+};
+try { chimFoldApply(window.localStorage.getItem('amiwind-map-chimbar-1') !== 'closed'); } catch (_) { chimFoldApply(true); }
 const MIN_ZOOM = 0.2, MAX_ZOOM = 16, LABEL_MIN_PX = 16;
 // The map fills the stage: full width, and the window height below the controls (at least 420 px). chim-legend.js mapLayout.
 let layout = null;
@@ -745,20 +762,36 @@ canvas.addEventListener('wheel', e => {
   zoomAt(e.deltaY < 0 ? 1.25 : 1 / 1.25, (e.clientX - r.left) * k, (e.clientY - r.top) * k);
 }, {passive: false});
 let drag = null, dragMoved = false;
-// Multi-selection: shift-click toggles a cell, shift-drag paints cells in (or
-// erases them when the drag starts on a selected cell). Keys are "x,y".
+// Multi-selection: shift-click toggles a cell; shift-drag selects the RECTANGLE from the start cell to the
+// cell under the pointer (or erases it when the drag starts on a selected cell); with Paint on, a plain drag
+// paints the cells it passes over. Keys are "x,y".
 const multi = new Set();
-let paint = null;  // {add: true/false} while a shift-drag is painting
+let paint = null;  // {add: true/false} while a shift-drag (or a drag in paint mode) is painting
+let paintMode = false;  // the Paint toggle: a plain click or drag paints instead of panning
+function paintRect(e) {
+  // the rectangle from the start cell to the cell under the pointer, on top of the selection the drag started from
+  const {x, y} = cellAt(e), [x0, y0] = paint.start;
+  multi.clear(); for (const k of paint.base) multi.add(k);
+  const have = new Set(data.cells.map(c => c.x + ',' + c.y));
+  for (let i = Math.min(x0, x); i <= Math.max(x0, x); i++)
+    for (let j = Math.min(y0, y); j <= Math.max(y0, y); j++) {
+      const k = i + ',' + j;
+      if (!have.has(k)) continue;
+      if (paint.add) multi.add(k); else multi.delete(k);
+    }
+  showMulti(); draw();
+}
 function paintCell(e) {
+  if (paint.rect) return paintRect(e);
   const {x, y, c} = cellAt(e); if (!c) return;
   const k = x + ',' + y, had = multi.has(k);
   if (paint.add && !had) multi.add(k); else if (!paint.add && had) multi.delete(k); else return;
   showMulti(); draw();
 }
 canvas.addEventListener('mousedown', e => {
-  if (e.shiftKey && data && e.button === 0) {
+  if ((e.shiftKey || paintMode) && data && e.button === 0) {
     const {x, y, c} = cellAt(e);
-    if (c) { paint = {add: !multi.has(x + ',' + y), moved: false}; paintCell(e); }
+    if (c) { paint = {add: !multi.has(x + ',' + y), moved: false, rect: e.shiftKey, start: [x, y], base: new Set(multi)}; paintCell(e); }
     e.preventDefault(); return;
   }
   drag = {x: e.clientX, y: e.clientY, vx: view.x, vy: view.y}; dragMoved = false;
@@ -776,8 +809,28 @@ window.addEventListener('mouseup', () => {
 });
 function showMulti() {
   const n = multi.size;
-  $('multi').textContent = n ? n + ' cell' + (n === 1 ? '' : 's') + ' selected (shift-click / shift-drag to add or remove, Esc to clear)' : '';
+  $('multi').textContent = n ? n + ' cell' + (n === 1 ? '' : 's') + ' selected (' + (paintMode ? 'click / drag paints, ' : '') + 'shift-drag selects a rectangle, Esc clears)' : '';
+  $('copycells').disabled = !n;
 }
+function paintApply(on) {
+  paintMode = on; $('painton').setAttribute('aria-pressed', on ? 'true' : 'false'); $('paintoff').setAttribute('aria-pressed', on ? 'false' : 'true');
+  canvas.style.cursor = on ? 'crosshair' : ''; showMulti();
+}
+$('painton').onclick = () => paintApply(true);
+$('paintoff').onclick = () => paintApply(false);
+// The painted cells as a CHIM cell list (aw-chim-cells-1, the builder's --chim-regions @FILE format), with place names.
+function paintedCellsJson() {
+  const cells = [...multi].map(k => k.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const names = {};
+  for (const [x, y] of cells) { const n = placeName(x, y); if (n) names[x + ',' + y] = n; }
+  return {format: 'aw-chim-cells-1', cells, names, source: 'AmiWind Toolkit World Map, painted cells'};
+}
+$('copycells').onclick = async () => {
+  const doc = paintedCellsJson(), text = JSON.stringify(doc);
+  try { await navigator.clipboard.writeText(text); }
+  catch (_) { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); }
+  $('copycellsdone').textContent = 'Copied ' + doc.cells.length + ' cells'; setTimeout(() => { $('copycellsdone').textContent = ''; }, 3000);
+};
 // 3D inspectable: the cell has a map present in the chosen maps folder.
 function inspectable(c) { return !!(c && c.maps && c.maps.some(hasMap)); }
 function hasMap(m) { return !!mapFiles[m] || servedMaps.has(m); }

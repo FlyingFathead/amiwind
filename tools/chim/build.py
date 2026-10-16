@@ -175,6 +175,7 @@ def build_frame(out, **kw):
     receipt = build_frames(out, [spec], kw.get('settings'), TERRAIN_LIGHT, jobs=kw.get('jobs', 1),
                            cache=kw.get('cache'), timer=kw.get('timer'))
     receipt['collision_union_fallbacks'] = spec['fallbacks']
+    receipt['collision_union_fallback_reasons'] = spec.get('fallback_reasons', {})
     receipt['routed_hulls'] = spec.get('routed_hulls', [])
     return receipt
 
@@ -277,7 +278,7 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
         results = run_units('variant', items, variant_unit, jobs, cache)
         variant_fps = {k: fp for k, (fp, _) in zip(order, items)}
         variant_tasks = {k: task for k, (_, task) in zip(order, items)}
-    variants, names, fallbacks, routed, checks = {}, set(), [], [], []
+    variants, names, fallbacks, routed, checks, reasons = {}, set(), [], [], [], {}
     for k, res in zip(order, results):
         model = models[firsts[k]['model_index']]
         name = variant_name(model, k)
@@ -288,6 +289,11 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
         names.add(name)
         if res.get('collision_fallback'):
             fallbacks.append(model['source'])
+            # every failure names its unit and why (CHIM-COLLISION-UNION-FALLBACK-41): the raw piece chain kept
+            # instead of the compiled union can be most of a model's zone bytes
+            reasons.setdefault(model['source'], res['collision_fallback'])
+            _log('collision union fell back to the piece chain: %s (%s, packet %s): %s' % (
+                model['source'], name, str(model.get('sha256', '?'))[:16], res['collision_fallback']))
         if res.get('hull_form') == 'routed':
             routed.append(name)
         if res.get('hull_check'):
@@ -484,7 +490,8 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     used = {p['variant'] for p in placements}
     variants = {k: v for k, v in variants.items() if k in used}     # a model only its cut placements used
     return {'frame': frame, 'placements': placements, 'variants': variants, 'textures': textures,
-            'terrain': terrain, 'fallbacks': sorted(set(fallbacks)), 'routed_hulls': sorted(set(routed)),
+            'terrain': terrain, 'fallbacks': sorted(set(fallbacks)),
+            'fallback_reasons': dict(sorted(reasons.items())), 'routed_hulls': sorted(set(routed)),
             'outer_ring_chunks': outer_ring, 'hull_checks': checks,
             'visibility': ({'heights': heights, 'step': step, 'low': tuple(low), 'mesh_occluders': mesh_occluders}
                            if ground is None else
@@ -883,6 +890,8 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
     receipt = build_frames(out, specs, settings_override, TERRAIN_LIGHT, jobs=jobs, cache=cache, timer=timer)
     receipt['apron_dispositions'] = apron_dispositions
     receipt['collision_union_fallbacks'] = sorted({m for s in specs for m in s['fallbacks']})
+    receipt['collision_union_fallback_reasons'] = dict(sorted(
+        {m: r for s in specs for m, r in s.get('fallback_reasons', {}).items()}.items()))
     # models whose standing hull is routed (routed_hull): the heap fallback's candidates (chim_build)
     receipt['routed_hulls'] = sorted({m for s in specs for m in s.get('routed_hulls', [])})
     # compiled model hulls checked against their pieces (CHIM-COMPILED-HULL-SHORT-36): every one the compiler
@@ -968,14 +977,15 @@ def detail_budget(name):
 SHORELINE_MODES = ('on', 'off')   # chim_build.py --terrain-shoreline (CHIM-STITCH-SHORELINE-36)
 
 
-def shoreline_ground(sample, materials, low, high, step, liquids=(), shoreline=True, grid_origin=(0.,0.)):
+def shoreline_ground(sample, materials, low, high, step, liquids=(), shoreline=True, grid_origin=(0.,0.), detail=()):
     """The frame's ground as the legacy region maps triangulate it: every tile through
     prepare_world_regions.terrain_triangles (the shared sampler; Seyda Neen's frame uses it too), over
     sample(x, y) -> (height, material) in frame-local units. A tile where land and water flip between
     the 32-unit samples gets them inserted (shoreline refinement); every other tile is its two plain
     triangles 0-1-2, 0-2-3, exactly the corner grid. Each triangle takes its tile's material
     (materials: rows by y, one per tile, as the plain grid). Returns a chim.ground.TriangleGround
-    with .refined = {(i, j)} of the refined tiles."""
+    with .refined = {(i, j)} of the refined tiles. detail: further tiles (their low corners) that keep the
+    original 32-unit LAND samples, as the lava tiles do (resident_detail_tiles)."""
     from chim.ground import TriangleGround
     from prepare_world_regions import STEP, Terrain, terrain_triangles
     if step != STEP:
@@ -993,7 +1003,7 @@ def shoreline_ground(sample, materials, low, high, step, liquids=(), shoreline=T
         terrain.shoreline_detail = lambda x, y: False
     # CHIM-LAVA-TERRAIN-SPIKES-38: use the legacy lava sampler locally,
     # including intermediate samples on adjoining coarse tiles' edges.
-    detailed = set()
+    detailed = set(detail)
     for pool in liquids:
         xs, ys = zip(*pool['hull'])
         for y in range(math.floor(min(ys) / step) * step,
@@ -1016,6 +1026,59 @@ def shoreline_ground(sample, materials, low, high, step, liquids=(), shoreline=T
     ground = TriangleGround(tris, step, low, size)
     ground.refined = refined
     return ground
+
+
+RESIDENT_DETAIL_MODES = ('on', 'off')
+RESIDENT_DETAIL_REACH = 48      # actor_grounding's search radius (32) + the widest idle sole (~8) + a margin
+RESIDENT_GROUND_BAND = 32       # a resident within this height of the original ground stands on the terrain
+
+
+def resident_detail_on(settings_override):
+    mode = (settings_override or {}).get('terrain_resident_detail', 'on')
+    if mode not in RESIDENT_DETAIL_MODES:
+        raise ValueError('Unknown terrain resident detail mode: %s' % mode)
+    return mode == 'on'
+
+
+def resident_detail_tiles(work, settings, height, low, high, step, references=None):
+    """{(x, y)}: low corners of the frame's terrain tiles that keep the original LAND samples because a
+    resident of this town stands on the ground there (CHIM-VIVEC-FRAME-WIDE-41).
+
+    The residents are the ones the town stage places (import_town.resident_cast: not excluded, not another
+    town's) in ground mode (actor_grounding.initial_state). One counts when its authored feet lie within
+    RESIDENT_GROUND_BAND of the original ground (height(x, y): the original sample, frame-local) at any
+    corner of its 32-unit LAND square, so actors on walkways and roofs keep the plain tiles. Every tile
+    within RESIDENT_DETAIL_REACH of it (the support search and its soles) is listed, inside the ground box.
+    This is the frame-wide form of Seyda Neen's hand-listed terrain_detail_tiles."""
+    from actor_grounding import initial_state
+    from import_town import frame_references, resident_cast
+    if references is None:
+        references = frame_references(work, settings)
+    cast, _ = resident_cast(references, settings)
+    centre, scale = settings['centre'], settings['scale']
+    tiles = set()
+    for ref in cast:
+        if initial_state(ref['id']) != 'ground':
+            continue
+        x, y = [(ref['position'][k] - centre[k]) * scale for k in range(2)]
+        z = ref['position'][2] * scale
+        if not (low[0] <= x < high[0] and low[1] <= y < high[1]):
+            continue
+        gx, gy = math.floor(x / 32) * 32, math.floor(y / 32) * 32
+        try:
+            ground = [height(gx + u, gy + v) for u in (0, 32) for v in (0, 32)]
+        except KeyError:
+            continue
+        if not min(ground) - RESIDENT_GROUND_BAND <= z <= max(ground) + RESIDENT_GROUND_BAND:
+            continue
+        for tx in range(math.floor((x - RESIDENT_DETAIL_REACH - low[0]) / step),
+                        math.floor((x + RESIDENT_DETAIL_REACH - low[0]) / step) + 1):
+            for ty in range(math.floor((y - RESIDENT_DETAIL_REACH - low[1]) / step),
+                            math.floor((y + RESIDENT_DETAIL_REACH - low[1]) / step) + 1):
+                tile = (low[0] + tx * step, low[1] + ty * step)
+                if low[0] <= tile[0] < high[0] and low[1] <= tile[1] < high[1]:
+                    tiles.add(tile)
+    return tiles
 
 
 def margin_grids(data, work, settings, low, high):
@@ -1101,7 +1164,7 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     from import_town import ground_assets, terrain_at, terrain_material, TERRAIN_CEILING, TERRAIN_FLOOR
     from prepare_quake import SCALE
     from surface_flatten import load_profiles, mount_references, NeighboringFacadeSupport
-    from town_config import load_settings, town_field
+    from town_config import generated_areas, load_settings, town_field
     from town_regions import town_model_profile
     from visual_offsets import apply_visual_offsets
     settings = load_settings(town)
@@ -1125,9 +1188,10 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     group = index['groups'][town_field(settings, 'visual_group')]['visual_profiles']
     flatten = load_profiles(scene_kind='exterior')
     profiles, items = {}, []
-    from visual_recipes import load_recipes, apply_recipe
+    from visual_recipes import load_recipes, apply_recipe, everywhere_recipe
     recipe_name = settings.get('visual_recipe')
     recipes = load_recipes()
+    everywhere = everywhere_recipe(recipes)
     archive = work / 'scenery/scenery.mwpak'
     budget = detail_budget(area_cut_settings(settings, settings_override).get('detail_budget'))
     for mi, model in enumerate(index['models']):
@@ -1149,6 +1213,10 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         model_recipe = model.get('_visual_recipe', recipe_name)
         if model_recipe:
             profile = apply_recipe(profile, model, model_recipe, recipes)
+        # the everywhere recipe (owner 2026-10-16: the streetlight lantern replaced in every cell) for the meshes the
+        # cell's own recipe left as they were; AMIWIND_VISUAL_EVERYWHERE=off keeps the originals
+        if everywhere and 'visual_recipe' not in profile:
+            profile = apply_recipe(profile, model, everywhere, recipes)
         model['_profile'] = profile
         profiles[model['source']] = profile
         fp = mesh_fingerprint(model, profile, index['textures'])
@@ -1229,10 +1297,18 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         mode = (settings_override or {}).get('terrain_shoreline', 'on')
         if mode not in SHORELINE_MODES:
             raise ValueError('Unknown terrain shoreline mode: %s' % mode)
+        # Original LAND samples under the residents who stand on the ground (CHIM-VIVEC-FRAME-WIDE-41): the
+        # coarse 128-unit tiles bury or tilt them; 'off' keeps the plain tiles there (the method before v0.0.41).
+        detail = (resident_detail_tiles(work, settings, lambda x, y: terrain_at(grids, settings, x, y)[0],
+                                        low, high, step)
+                  if resident_detail_on(settings_override) and town not in generated_areas() else set())
+        if detail:
+            print('[chim] %s: %d terrain tiles keep the original LAND samples under ground residents'
+                  % (town, len(detail)), flush=True)
         tri_ground = (shoreline_ground(lambda x, y: terrain_at(grids, settings, x, y), materials, low, high, step,
                                        frame_liquids(pools, centre), shoreline=mode == 'on',
-                                       grid_origin=tuple(v*SCALE for v in centre))
-                      if mode == 'on' or pools else None)
+                                       grid_origin=tuple(v*SCALE for v in centre), detail=detail)
+                      if mode == 'on' or pools or detail else None)
         if tri_ground is not None and not tri_ground.refined:
             tri_ground = None          # no shoreline tile: the plain grid is the same ground (frame unchanged)
         height_at = None

@@ -43,9 +43,12 @@ only. Design: [BUILD_MANIFEST.md](../BUILD_MANIFEST.md) step 2b.
 What the frame map carries over from the legacy map (`chim.frame_map.build_region`): its worldspawn (sky and
 fog keys), its player start and its point entities inside the cell (flora sprites, sounds, as the legacy
 chain made them), moved to the frame's origin. Every static of the legacy map must be a CHIM placement of
-the frame (counted, refused otherwise), and an object the engine activates keeps its edict. The map's
-harvest catalogue leaves the image with it (recorded): harvesting on CHIM region cells is not carried over
-yet.
+the frame (counted, refused otherwise), and an object the engine activates keeps its edict. Harvestable
+plants: the CHIM world leaves them out, and the image step's harvest plan writes a catalogue for each region
+frame map under the cell's map name, in the frame's coordinates (`tools/harvest_build.py plan_rows`); the
+engine loads it with the frame map. That catalogue stays; any other catalogue of the replaced map leaves the
+image (recorded). A coverage check stops the build when a plant the CHIM world left out is in no catalogue,
+or a region cell's plant is not in its own frame map's catalogue (HARVEST-CHIM-REGION-LOSS-41).
 
 ## The frame and its margin
 

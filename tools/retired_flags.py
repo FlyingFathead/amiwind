@@ -44,6 +44,13 @@ RETIRED = (
      'replacement': 'Seyda Neen converted from the game data (the default)',
      'why': 'ships the recorded v0.0.31 Seyda Neen region maps: a legacy town chain (NOT RECOMMENDED since v0.0.31)',
      'source': 'owner decision 2026-10-10 (rules consolidation item 8: legacy only for A/B regression tests)'},
+    {'name': 'seyda-scene-compiled', 'flag': '--seyda-scene-source compiled', 'dest': 'seyda_scene_source',
+     'value': 'compiled',
+     'replacement': 'the source-only Seyda Neen scene carrier (the default for a CHIM-native Seyda Neen)',
+     'why': 'compiles the complete Seyda Neen town to BSP29 for a CHIM-native Seyda Neen, whose cell-aligned frame '
+            'exceeds the BSP29 node limit (BUILD-SEYDA-HULL2-32)',
+     'source': 'owner goal 2026-10-15 (the Seyda Neen frame stays cell-aligned; the whole area on CHIM without a '
+               'BSP29 compile of the widened box)'},
 )
 NAMES = tuple(row['name'] for row in RETIRED)
 

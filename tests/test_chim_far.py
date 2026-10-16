@@ -181,6 +181,10 @@ class FarLayerEngineContractTests(unittest.TestCase):
         # After the colour pass, controlled independently of fog. Behaviour of
         # both fog states and disabled fill is covered by aga_horizon_test.c.
         self.assertIn('if(aw_land_fill.value){', body)
+        # dbg landfill on/off (owner 2026-10-15: "a separate dbg on/off switch for land fills"); default stays 1.
+        self.assertIn('static cvar_t aw_land_fill={"aw_land_fill","1",true};', fog)
+        # Through the on-disk dbg catalogue (no new resident command): on/off become 1/0 there.
+        self.assertIn('VIDEO|landfill|aw_land_fill|', (ROOT / 'config/debug-commands.txt').read_text(encoding='utf-8'))
         self.assertGreater(body.index('if(aw_chim_far_draw)aw_chim_far_draw(ramp[15<<8],distance);'),
                            body.index('for(y=r_refdef.vrect.y;'))
         far_c = (SRC / 'chim/chim_far.c').read_text()

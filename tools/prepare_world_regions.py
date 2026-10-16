@@ -607,8 +607,13 @@ def compile_region(task):
                  vertices=len(data[3])//12,sha256=digest(target))
     # No wall time in the region receipt: a stage output is byte-reproducible (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33).
     print(f"Region {entry['name']}: {time.monotonic()-started:.1f} s",flush=True)
-    if metrics['bytes']>4*1024*1024 or metrics['faces']>30000 or metrics['clipnodes']>32767:
-        raise ValueError('Converted terrain budget exceeded: '+entry['name'])
+    limits=dict(bytes=4*1024*1024,faces=30000,clipnodes=32767)
+    over=[f'{k} {metrics[k]:,} > {v:,}' for k,v in limits.items() if metrics[k]>v]
+    if over:
+        # Name the unit, its cell and every exceeded limit (verbose logs: every failure names its unit).
+        raise ValueError('Converted terrain budget exceeded: %s (cell %s, divisions %d, subcell %s): %s, sha256 %s; '
+                         'split it in config/world-region-refinements.json (BUILD-LAVA-TERRAIN-BUDGET-38)'
+                         %(entry['name'],entry['cell'],entry.get('divisions',1),entry.get('subcell'),'; '.join(over),metrics['sha256']))
     result=dict(entry,converted=metrics,input_sha256=key,storage=storage)
     (root/'conversion.json').write_text(json.dumps(result,indent=2)+'\n')
     for path in root.iterdir():
@@ -659,7 +664,14 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     found={tuple(e['cell']) for e in entries if e['name'] in skipped}
     ocean_cells = set(ocean_cells or ())
     if not ocean_cells <= cells or ocean_cells & found:
-        raise ValueError('Ocean routing cells must be selected and have no existing core owner')
+        # every failure names its unit (CHIM-OCEAN-ROUTING-UNNAMED-41): which cells, and which of the two rules
+        owned = sorted(ocean_cells & found)
+        loose = sorted(ocean_cells - cells)
+        raise ValueError('Ocean routing cells must be selected and have no existing core owner: %s%s'
+                         % (('%d taken as ocean already have an open-world map of their own (%s)'
+                             % (len(owned), ' '.join('%d,%d' % c for c in owned))) if owned else '',
+                            ('%s%d taken as ocean are not selected (%s)' % ('; ' if owned else '', len(loose),
+                             ' '.join('%d,%d' % c for c in loose))) if loose else ''))
     if cells - found != ocean_cells:
         raise ValueError('CHIM region cells without an open-world map: %s'
                          %' '.join('%d,%d'%c for c in sorted(cells-found-ocean_cells)))

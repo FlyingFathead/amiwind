@@ -309,7 +309,7 @@ transitions that do not damage protected dawn/dusk or moon/star depth ordering.
 
 ## Later combat scope
 
-[Time to Fight!](ROADMAP.md#future-combat-milestone-time-to-fight) follows the
+[Time to Fight!](ROADMAP_HISTORY.md#future-combat-milestone-time-to-fight) follows the
 More Mushrooms release: build the Nerevarine combat arena first, then NPC aggro
 logic and a first sword-and-shield versus sword-and-shield encounter. The
 original Vivec Arena Pit is the source candidate for an isolated `dbg arena`

@@ -85,14 +85,22 @@ def load_status(path):
     if not isinstance(cells, dict):
         raise ValueError('%s: not a CHIM progress tracker file (no "cells" table)' % Path(path).name)
     out = {}
+    file_generated = data.get('generated')      # when the tracker file itself was written (every record is at least this old)
     for key, rec in cells.items():
         chim = rec.get('chim') if isinstance(rec.get('chim'), dict) else None
         status = chim.get('status') if chim is not None else rec.get('status')
         island = rec.get('set') or {1: 'vvardenfell', 2: 'bloodmoon'}.get(rec.get('island'), '')
         legacy = rec.get('legacy') if isinstance(rec.get('legacy'), dict) else {}
+        # the failing audits and the CHIMport run that measured them, for a refusal that says how old they are
+        audits = (rec.get('audits') if isinstance(rec.get('audits'), dict) else {})
+        failing = sorted(m for m, a in audits.items() if (a.get('status') if isinstance(a, dict) else a) == 'failed')
+        audited = rec.get('audited') if isinstance(rec.get('audited'), dict) else (
+            {'run': chim.get('build'), 'at': (chim.get('result_generated') or '')[:10] or None} if chim else {})
         out[parse_cell(key)] = {'status': status, 'ring': rec.get('ring'),
                                 'region': rec.get('region') or rec.get('name') or '', 'set': island,
-                                'legacy_maps': legacy.get('maps')}
+                                'legacy_maps': legacy.get('maps'), 'failing': failing, 'audited': audited or {},
+                                'file_generated': file_generated,
+                                'name': rec.get('name') or ''}
     return out
 
 
@@ -267,6 +275,20 @@ def components(cells):
     return n
 
 
+def converter_note(recorded):
+    """Whether recorded CHIMport audits ran on this converter (chimport.code_identity: tools/, src/, config/, VERSION,
+    CHIM_VERSION). Results from another converter may predate the fix that makes a cell pass."""
+    if not recorded:
+        return 'converter not recorded: measured before converter hashes were kept, so likely an older builder'
+    try:
+        from chimport import code_identity
+        current = code_identity()
+    except Exception:                         # a missing tool never fails the preflight; it only says so
+        return 'converter %s (current one not hashed here)' % recorded[:12]
+    return ('the same converter as this build' if recorded == current
+            else 'an older converter (%s, this build %s): measure again' % (recorded[:12], current[:12]))
+
+
 def preflight(cells, explicit, statuses, town_boxes, one_map_only=False):
     """(kept cells, problems, dropped): problems refuse the build; dropped = cells of named sets and regions
     left out with their reason (inside a town's frame). town_boxes: {town: (x0, y0, x1, y1) Morrowind units}.
@@ -278,6 +300,7 @@ def preflight(cells, explicit, statuses, town_boxes, one_map_only=False):
     more than one map; that list counts every map whose 896-unit apron holds an object of the cell, so it
     over-counts and is never used to judge the default method."""
     problems, dropped, kept = [], [], []
+    stale = []          # refused on recorded audits: measured again with the current builder by one command
     for cell in cells:
         cell = tuple(cell)
         rec = statuses.get(cell)
@@ -286,8 +309,21 @@ def preflight(cells, explicit, statuses, town_boxes, one_map_only=False):
         if kind is None or (kind == 'ocean' and cell not in explicit):
             reason = ('CHIMport status %s, not finished (taken: %s)' % (status or 'unknown', ', '.join(SEABED + LAND_DONE))
                       if kind is None else 'open sea requires an explicit cell selection and original-source admission checks')
+            if kind is None and rec and rec.get('failing'):
+                when = rec.get('audited') or {}
+                versions = ', '.join(v for v in (('AmiWind ' + when['amiwind_version']) if when.get('amiwind_version') else '',
+                                                 ('CHIM ' + when['chim_version']) if when.get('chim_version') else '') if v)
+                reason = ('CHIMport audits failing: %s (measured %s by run %s%s; %s)'
+                          % (', '.join(rec['failing']), when.get('at') or (
+                              'at an unrecorded time, before %s (when the status file was created)' % rec['file_generated']
+                              if rec.get('file_generated') else 'at an unrecorded time'), when.get('run') or 'unknown',
+                             ' with ' + versions if versions else '', converter_note(when.get('converter_sha256'))))
+                if rec.get('name'):
+                    reason = rec['name'] + ': ' + reason
             if cell in explicit:
                 problems.append('cell %s: %s' % (cell_key(cell), reason))
+                if kind is None and status in ('converted_failing', 'converted_unmeasured', 'hull_policy_pending'):
+                    stale.append(cell_key(cell))
             else:                     # a named set (coast2) or region name: left out with its reason, listed
                 dropped.append({'cell': list(cell), 'reason': reason})
             continue
@@ -307,6 +343,12 @@ def preflight(cells, explicit, statuses, town_boxes, one_map_only=False):
     for pocket in holes(kept):
         problems.append('cells %s: a legacy pocket enclosed by CHIM region cells (select them too, or leave out a '
                         'neighbour): every crossing there would load two maps' % ' '.join(map(cell_key, pocket)))
+    if stale:
+        # CHIMPORT-STATUS-STALE-41: recorded audits can predate the fix that makes the cell pass; say how to measure
+        # them again with the current builder instead of only refusing
+        problems.append('measure the %d refused cell(s) again with this builder: python3 tools/chimport.py run --out RUN '
+                        '--cells "%s", then feed the tracker and publish the reference (docs/chim/CHIMPORT.md, '
+                        '"Running CHIMport yourself")' % (len(stale), ' '.join(stale)))
     return kept, problems, dropped
 
 
@@ -448,6 +490,23 @@ def plan(specs, status_path, towns=(), root=None, read_file=read_cell_file, marg
         problems.append('the selection %s holds no cell' % ', '.join(specs))
     kinds = {c: kind_of(statuses[c]['status']) for c in kept}
     return ownership(kinds, record, dropped, margin), problems
+
+
+def ocean_land_problems(kinds, data_files):
+    """Cells taken as open ocean (the shared ocean chunk) that have a LAND record in the masters: refused in the
+    preflight, in seconds, instead of by the ocean admission inside the CHIM stage (CHIMPORT-OCEAN-LAND-41)."""
+    ocean = sorted(c for c, k in kinds.items() if k == 'ocean')
+    if not ocean or not data_files:
+        return []
+    from chim.ocean_runtime import land_cells
+    land = land_cells(data_files)
+    bad = [c for c in ocean if tuple(c) in land]
+    if not bad:
+        return []
+    return ['%d cell(s) the status file calls open ocean have LAND in the game data (seabed, not open sea): %s; '
+            'measure them again with this builder: python3 tools/chimport.py run --out RUN --cells "%s", then feed the '
+            'tracker and publish the reference' % (len(bad), ' '.join(cell_key(c) for c in bad),
+                                                   ' '.join(cell_key(c) for c in bad))]
 
 
 def table_kinds(table):

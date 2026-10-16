@@ -519,12 +519,37 @@
       "change": "added",
       "to": null,
       "source": "tools/build.py 2ac9b4b; optional exact pre-quantization scene palette"
+    },
+    {
+      "version": "0.0.41-dev1",
+      "option": "seyda_scene_source",
+      "flag": "--seyda-scene-source",
+      "change": "added",
+      "to": "auto",
+      "source": "tools/build.py: the bsp stage makes a CHIM-native Seyda Neen scene as the source-only carrier (BUILD-SEYDA-HULL2-32); compiled = retired A/B"
+    },
+    {
+      "version": "0.0.41-dev5",
+      "option": "chim_terrain_resident_detail",
+      "flag": "--chim-terrain-resident-detail",
+      "change": "added",
+      "to": "on",
+      "source": "tools/build.py: town frames keep the original LAND samples under residents who stand on the ground (CHIM-VIVEC-FRAME-WIDE-41); off = the plain tile grid"
+    },
+    {
+      "version": "0.0.41-dev5",
+      "option": "actor_search",
+      "flag": "--actor-search",
+      "change": "added",
+      "to": "wide",
+      "source": "tools/build.py: a ground actor that no spot within 32 units fits is also tried up to 48 units away (CHIM-VIVEC-FRAME-WIDE-41, owner decision); near = 32 units only"
     }
   ],
   "current": {
     "options": {
       "accept_entity_loss": null,
       "accept_known_stair_findings": [],
+      "actor_search": "wide",
       "allow_data_differences": false,
       "allow_known_actor_ground_findings": null,
       "amiga_libs": null,
@@ -550,6 +575,7 @@
       "chim_stream_statics": true,
       "chim_terrain_hull": "compiled",
       "chim_terrain_refs": "on",
+      "chim_terrain_resident_detail": "on",
       "chim_terrain_shoreline": "on",
       "chim_texture_effects": null,
       "coord_range": "wide",
@@ -579,6 +605,7 @@
       "miniwind_boot": null,
       "miniwind_debug": false,
       "miniwind_description": null,
+      "miniwind_map_inspection": false,
       "miniwind_scope": null,
       "miniwind_town": null,
       "model_hull": null,
@@ -603,12 +630,14 @@
       "npc_parts_policy": "exact",
       "npc_root_rule": "legacy",
       "only_core_towns": false,
+      "palette": null,
       "player_body": null,
       "quick_character": null,
       "quiet": false,
       "scenery_reduce": null,
       "scenery_reduce_texels": null,
       "seyda_recorded": null,
+      "seyda_scene_source": "auto",
       "shared_sky_source": null,
       "skip_census": null,
       "skip_dressing": false,
@@ -621,9 +650,7 @@
       "vis_mode": "fast",
       "with_video": false,
       "world_bounds": null,
-      "world_map": null,
-      "miniwind_map_inspection": false,
-      "palette": null
+      "world_map": null
     },
     "build_defaults": {
       "bitmap_paper_ink": "filled",

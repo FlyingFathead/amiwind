@@ -270,6 +270,13 @@ def audit(maps, jobs=1, chim_frames=None):
                 **({'chim_frame_actors': len(frame_rows)} if frame_rows else {}))
 
 
+def waivable(error):
+    """Findings an owner may accept for a private test: ordinary mesh contact, and a CHIM town frame resident not
+    supported on its frame collision (owner 2026-10-16, v0.0.41-dev2: three Vivec frame residents). Nothing else."""
+    return (error == 'Initial mesh contact outside support tolerance'
+            or error.startswith('CHIM frame resident not supported on the frame collision ('))
+
+
 def load_approved_report(path):
     """Read an explicit owner baseline; only ordinary contact findings qualify."""
     raw = Path(path).read_bytes()
@@ -278,8 +285,7 @@ def load_approved_report(path):
             or not report.get('errors') or not report.get('payload_sha256')
             or report.get('tolerance') != {'minimum_gap': -.5, 'maximum_gap': 1.0, 'sole_band': .5}
             or any(row.get('status') == 'invalid' for row in report.get('rows', []))
-            or any(error.get('error') != 'Initial mesh contact outside support tolerance'
-                   for error in report['errors'])):
+            or any(not waivable(error.get('error') or '') for error in report['errors'])):
         raise ValueError('Approved report must contain only unresolved mesh-contact findings')
     return report, hashlib.sha256(raw).hexdigest()
 

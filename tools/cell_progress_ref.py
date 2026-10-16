@@ -13,7 +13,7 @@ REFERENCE_FORMAT = 'aw-cell-reference-1'
 # Built from parts on purpose: the build cache reads every path-like string of a stage's modules as an input, and the CHIM
 # stage reaches this module through cell_progress; a published reference file is not an input of any build stage.
 REFERENCE_PATH = '/'.join(('docs', 'chim', 'cell-progress-reference.json'))
-CELL_KEYS = ('name', 'status', 'lighting', 'ring', 'island', 'release', 'audits', 'stats')
+CELL_KEYS = ('name', 'status', 'lighting', 'ring', 'island', 'release', 'audits', 'stats', 'audited')
 STAT_KEYS = ('records.refs_total', 'faces.chim_placed', 'bytes.chim', 'chunks.count')
 # Status order for the compare layer (higher = further along). Empty sea is as good as it gets.
 RANK = {'not_started': 0, 'not_converted': 1, 'converted_failing': 2, 'hull_policy_pending': 3, 'converted_unmeasured': 3,
@@ -41,6 +41,15 @@ def build(doc):
         if c['chim']['converted']:
             row['audits'] = {m: a['status'] for m, a in sorted(c['audits'].items()) if a['status'] != 'not_measured'}   # absent = not measured
             row['stats'] = {s: dotted(c.get('stats') or {}, s) for s in STAT_KEYS if dotted(c.get('stats') or {}, s) is not None}
+            # which CHIMport run audited the cell and when: a build that refuses a cell on these audits names how old
+            # they are and how to measure them again with the current builder (CHIMPORT-STATUS-STALE-41)
+            pv = c.get('provenance') or {}
+            audited = {'run': c['chim'].get('build'), 'at': c['chim'].get('result_generated') or None,   # the result's creation timestamp, ISO with zone
+                       'amiwind_version': pv.get('amiwind_version'), 'chim_version': pv.get('chim_version'),
+                       'converter_sha256': pv.get('converter_sha256')}
+            audited = {k: v for k, v in audited.items() if v}
+            if audited:
+                row['audited'] = audited
         cells[k] = row
     return {'format': REFERENCE_FORMAT, 'generated': doc.get('generated'), 'headline': {
                 i['name']: {'cells': i['cells'], 'done': i['done']} for i in doc['headline'].get('islands', [])},

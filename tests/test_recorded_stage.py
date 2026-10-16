@@ -242,7 +242,10 @@ class GuidedBuildTests(unittest.TestCase):
         # legacy chain instead, so that stage leaves the plan
         self.assertIn('chim-town-seyda', plain)
         self.assertNotIn('chim-town-seyda', given)
-        skip = ('actor-contact', 'image', 'chim-town-seyda')
+        # the recorded maps need the compiled town scene (the bsp stage's carrier is for a CHIM-native Seyda Neen)
+        self.assertIn('--seyda-source', plain['bsp'])
+        self.assertNotIn('--seyda-source', given['bsp'])
+        skip = ('actor-contact', 'image', 'chim-town-seyda', 'bsp')
         self.assertEqual({k: v for k, v in plain.items() if k not in skip},
                          {k: v for k, v in given.items() if k not in skip})
 

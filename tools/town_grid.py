@@ -108,3 +108,46 @@ def reference_ownership(references, settings):
             row['role']='footprint_or_assembly_dependency';dependencies.append(row)
     return {'owned_references':owned, 'dependency_references':dependencies,
             'adjacent_catalogue_comparison':'required after source export; dependency copies are not second logical owners'}
+
+
+def physical_cell(reference):
+    """The original exterior CELL holding a reference's origin."""
+    return tuple(math.floor(reference['position'][k] / CELL) for k in range(2))
+
+
+def foreign_owned_cells(town_id, root=None):
+    """[(town id, low, high)]: the owned_cells rectangles (half-open) of every OTHER registered town.
+
+    Only towns that declare owned_cells own cells; district rows without it
+    (the older Vivec districts) and generated CHIM region frames own none here.
+    """
+    import json
+    from pathlib import Path
+    from town_config import load_registry
+    base = Path(root) if root is not None else Path(__file__).resolve().parents[1]
+    out = []
+    for row in load_registry(root)['towns']:
+        if row['id'] == town_id:
+            continue
+        # the raw config: Seyda Neen's (a fixed town) has no town block for load_settings
+        other = json.loads((base / 'config' / row['config']).read_text(encoding='utf-8'))
+        if 'owned_cells' in other:
+            owned_bounds(other)
+            low, high = other['owned_cells']
+            out.append((row['id'], tuple(low), tuple(high)))
+    return out
+
+
+def resident_owner(reference, foreign):
+    """The other town (foreign_owned_cells) whose owned cells hold this resident, or None.
+
+    A resident belongs to one town frame: the frame whose owned cells hold its
+    origin. A frame's reference apron may reach into a neighbour's owned cells
+    (Vivec's into Seyda Neen's cell 0,-9); residents there are that neighbour's,
+    never a second copy (CHIM-VIVEC-FRAME-WIDE-41).
+    """
+    cell = physical_cell(reference)
+    for town, low, high in foreign:
+        if all(low[k] <= cell[k] < high[k] for k in range(2)):
+            return town
+    return None
