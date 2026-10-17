@@ -294,7 +294,8 @@ class FingerprintTests(unittest.TestCase):
         """Profiler/progress edits keep reuse; a converter edit does not (explicit, reviewed list)."""
         self.assertEqual(build_cache.INSTRUMENTATION_MODULES,
                          {'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
-                          'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py'})
+                          'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py',
+                          'tools/resource_plan.py'})
         tools = self.repository / 'tools'
         (tools / 'build_progress.py').write_text('def show(text):\n    print(text)\n')
         (tools / 'build_profile.py').write_text('from build_progress import show\ndef instrument(stage):\n    show(stage)\n')
@@ -1152,7 +1153,10 @@ class DiagnosticOutputTests(unittest.TestCase):
             'tools/build_profile.py': 'the builder heartbeat (Heartbeat.check) only stats the size of a stage log under RUN/logs (run-private) to see whether it is silent; it never reads it',
             'tools/build_progress.py': 'the live progress (in the builder, not a stage) reads the last counted progress line of a running stage log under RUN/logs (run-private) for the ETA; never a stage input or output',
             'tools/toolkit_serve.py':'the Toolkit Monitor (not a builder stage) shows logs to a person, read-only',
-            'tools/monitor_read.py': 'the Toolkit Monitor reader (not a builder stage) shows logs to a person, read-only'}
+            'tools/monitor_read.py': 'the Toolkit Monitor reader (not a builder stage) shows logs to a person, read-only',
+            'tools/resource_plan.py': 'the resource plan (in the builder before the first stage, not a stage) reads '
+                                      'the stair gate worker line in the log of an EARLIER run for its memory model; '
+                                      'never a stage input or output'}
         found = []
         for path in sorted((ROOT / 'tools').rglob('*.py')):
             relative = path.relative_to(ROOT).as_posix()

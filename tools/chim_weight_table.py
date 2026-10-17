@@ -211,8 +211,8 @@ def make(progress, kept, classes, runs=(), seabed=(), current=(), island=1, hold
     seabed = set(seabed)
     all_rows = {}
     for k, c in cells.items():
-        if c.get('island') != island:
-            continue
+        if c.get('island') != island and k not in seabed:
+            continue                # a seabed cell's tracker record has no island (no census row): the list names it
         if not c.get('land') and k not in seabed and k not in kept:
             continue
         r = tracker_row(k, c, current)
@@ -253,7 +253,7 @@ def make(progress, kept, classes, runs=(), seabed=(), current=(), island=1, hold
                 if k not in blockers:
                     held.setdefault(k, []).append(why)
     batch = sorted((k for k, r in all_rows.items() if not r['on_chim'] and k not in held and not r['hold'] and
-                    (r['class'] in easy or (r['class'] == seabed_id and r['converted']))), key=parse)
+                    (r['class'] in easy or (r['class'] == seabed_id and (r['converted'] or r['status'] == 'empty_sea')))), key=parse)
     order = {c['id']: i for i, c in enumerate(classes['classes'] + [classes[k] for k in ('seabed', 'over', 'unmeasured')])}
     todo_rows = sorted((r for r in all_rows.values() if not r['on_chim']),
                        key=lambda r: (order.get(r['class'], 99), -(r['headroom_bytes'] or -10 ** 12),
@@ -280,7 +280,7 @@ def make(progress, kept, classes, runs=(), seabed=(), current=(), island=1, hold
                                        'reason': '; '.join(r['held']) or reason_of(r, classes)}
                                       for r in rows if not r['batch']]})
     stale = collections.Counter((r['headroom_by'] or {}).get('build') for r in todo_rows
-                                if r['batch'] and not (r['headroom_by'] or {}).get('current'))
+                                if r['batch'] and not r.get('seabed') and not (r['headroom_by'] or {}).get('current'))
     return {'format': FORMAT, 'classes': classes, 'median_shipped_placed_faces': median,
             'shipped_cells': len(kept), 'current_builds': sorted(current),
             'totals': {'not_on_chim': len(todo_rows), 'batch': len(batch),

@@ -195,7 +195,10 @@ alpha. Empty black background is keyed transparent (maximum source RGB component
 16). Stars are background points, never foreground billboards.
 
 Some bright points have a cool-blue tint and gentle twinkle driven by the saved
-clock. Complete moon discs cover stars and nebula, including their dark phase
+clock (three stars of the dome, 10 to 25 degrees up, one step per 30 s of game time;
+visible once the midnight clearing opens the sky). `dbg startwinkle on/off`
+(saved as `aw_star_twinkle`, default on) switches the pulse; off keeps every star
+at its own steady colour. Complete moon discs cover stars and nebula, including their dark phase
 areas: an unlit moon is still solid, not a transparent hole. Both cloud layers
 and opaque scenery cover the night sky; foliage holes may reveal it only where
 the original sprite is transparent. The night layer is suppressed in interiors

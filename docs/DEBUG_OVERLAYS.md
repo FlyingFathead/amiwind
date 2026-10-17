@@ -501,7 +501,8 @@ restores the old speed. The sun and saved clock keep their existing rate. See [s
 the complete night layer including Masser and Secunda. Both also accept `1/0` and
 `true/false`, default on and save as `aw_starsky` and `aw_nightsky`. Query either
 without an argument. The master `dbg sky` switch and interior isolation still apply.
-Selected bright stars have gentle, sometimes cool-blue twinkle; the complete
+Selected bright stars have gentle, sometimes cool-blue twinkle (`dbg startwinkle
+on/off`, saved as `aw_star_twinkle`, default on; off = steady stars); the complete
 moon discs, including their unlit phases, occlude the stars.
 
 `dbg guardtorch on/off/auto` controls the current guard-torch candidate. On/off

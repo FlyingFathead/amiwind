@@ -15,7 +15,12 @@ char *pr_strings;
 int scr_copyeverything;
 int (*aw_inspect_buttons)(int);
 int (*aw_inspect_crosshair)(void);
-void (*aw_inspect_draw)(void),(*aw_inspect_reset)(void);
+void (*aw_inspect_reset)(void);
+const char *(*aw_inspect_hint)(void);
+int (*aw_inspect_strip)(char lines[][AW_INSPECT_LINE],int max,int width);
+int (*aw_inspect_key)(int key);
+int con_notify_quiet;
+static int quiet_prints;
 static edict_t entities[5];
 static model_t alias,world;
 static struct {aliashdr_t header;maliasframedesc_t extra;mdl_t mdl;} model_cache;
@@ -38,7 +43,7 @@ eval_t *GetEdictFieldValue(edict_t *e,char *field){
 int Cmd_Argc(void){return argc;}
 char *Cmd_Argv(int i){return i?arg:"aw_debug_hud";}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
-void Con_Printf(char *fmt,...){va_list args;size_t n=strlen(output);va_start(args,fmt);vsnprintf(output+n,sizeof(output)-n,fmt,args);va_end(args);}
+void Con_Printf(char *fmt,...){va_list args;size_t n=strlen(output);quiet_prints+=con_notify_quiet;va_start(args,fmt);vsnprintf(output+n,sizeof(output)-n,fmt,args);va_end(args);}
 void Cmd_AddCommand(char *name,void (*fn)(void)){
  if(!strcmp(name,"aw_debug_hud"))hud=fn;else if(!strcmp(name,"aw_inspect"))ent=fn;else assert(0);
 }
@@ -56,6 +61,16 @@ trace_t SV_Move(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,int type,edict_t
  trace_t tr;memset(&tr,0,sizeof(tr));traces++;assert(type==MOVE_NOMONSTERS && pass==entities+1);
  tr.fraction=wall;tr.ent=wall<1?entities:NULL;tr.allsolid=all!=0;return tr;
 }
+static int chim_hit;static float chim_fraction;
+static int chim_pick(const float *start,const float *end,aw_chim_pick_t *out){
+ memset(out,0,sizeof(*out));if(!chim_hit)return 0;
+ out->fraction=chim_fraction;out->pid=4242;out->ref=172013;out->model=77;out->cell_x=2;out->cell_y=-10;
+ out->origin[0]=-3968;out->origin[1]=3099;out->origin[2]=167;out->yaw=90;strcpy(out->name,"flora_emp_parasol_03");return 1;
+}
+/* Strip lines from the inspect module, as aw_hud.c asks for them under the view. */
+static char lines[4][AW_INSPECT_LINE];
+static int strip_lines(int max,int width){int i,n=aw_inspect_strip(lines,max,width);
+ for(i=0;i<n;i++)assert((int)strlen(lines[i])<=width);return n;}
 static int string(char *s){int n=used;strcpy(strings+n,s);used+=(int)strlen(s)+1;return n;}
 static void command(char *s){arg=s;argc=2;output[0]=0;hud();}
 static void click(void){aw_inspect_buttons(0);output[0]=0;assert(aw_inspect_buttons(3)==2);}
@@ -85,13 +100,18 @@ int main(void){
  cl_entities[2].origin[0]=20;cl_entities[3].origin[0]=40;
  vid.width=320;vid.height=200;
  AW_InspectInit();assert(hud && ent && aw_inspect_reset);
- assert(aw_inspect_buttons(3)==3 && !aw_inspect_crosshair());aw_inspect_draw();assert(!traces && !draws);
+ assert(aw_inspect_buttons(3)==3 && !aw_inspect_crosshair());assert(!aw_inspect_hint() && !strip_lines(3,76) && !traces);
  aw_inspect_buttons(0);command("on");assert(aw_inspect_crosshair() && overlay==1);
  memcpy(before,entities,sizeof(before));click();assert(strstr(output,"201388") && strstr(output,"eloroth"));
  assert(!memcmp(before,entities,sizeof(before))); /* selection never changes actors */
  assert(strstr(output,"entity 2") && strstr(output,"bounds pick") && strstr(output,"80.0 0.0 0.0"));
  prior=traces;aw_inspect_buttons(3);aw_inspect_buttons(3);assert(traces==prior); /* hold selects once */
- aw_inspect_draw();assert(draws>1 && traces==prior); /* draw does not trace */
+ /* INSPECT-OVER-VIEWPORT-42: the hint is one coordinate row (it fits the 42 characters right of
+  * the HUD boxes, with room for the cell), the pin is packed into the strip under the view. */
+ assert(aw_inspect_hint() && strlen(aw_inspect_hint())+11<=42 && strstr(aw_inspect_hint(),"right"));
+ {int n=strip_lines(3,76);assert(n>=1 && n<=3 && strstr(lines[0],"entity 2") && traces==prior); /* drawing does not trace */
+  n=strip_lines(1,76);assert(n==1 && strstr(lines[0],"...") && strlen(lines[0])<=76);}
+ assert(quiet_prints>0); /* the pin's console rows are no notify lines over the view */
  /* Off during a held click must not punch until release and a fresh press. */
  command("off");assert(aw_inspect_buttons(3)==2);aw_inspect_buttons(0);assert(aw_inspect_buttons(3)==3);
  aw_inspect_buttons(0);command("TRUE");click();command("false");assert(!aw_inspect_crosshair());
@@ -130,14 +150,29 @@ int main(void){
  click();assert(strstr(output,"static 0") && strstr(output,"source id: unavailable"));cl.num_statics=0;
  /* Scene reset clears even a same-name/same-pointer map, holding an attack. */
  aw_inspect_reset();prior=traces;assert(aw_inspect_buttons(1)==0 && traces==prior);
- draws=0;aw_inspect_draw();assert(draws==1);click();assert(strstr(output,"201388"));
+ assert(!strip_lines(3,76));click();assert(strstr(output,"201388"));
  /* No selection behind menus, during character UI, or while dead. */
  key_dest=key_menu;prior=traces;click();assert(traces==prior && !aw_inspect_crosshair());key_dest=key_game;
  characters=1;click();assert(traces==prior);characters=0;
  entities[1].v.health=0;click();assert(traces==prior && !aw_inspect_crosshair());entities[1].v.health=100;
  /* Missing field and narrow HUD stay safe; full identity is in the console. */
  ids[2].string=0;refs[2]._float=0;click();assert(strstr(output,"source id: unavailable"));
- vid.width=160;aw_inspect_draw();vid.width=8;aw_inspect_draw();
+ assert(strip_lines(3,36)>=1);assert(!strip_lines(3,4));
+ /* INSPECT-CHIM-PLACEMENT-UNNAMED-42: a CHIM placement under the crosshair (it collides as the world)
+  * is named from its placement record; a pick at another distance is the terrain, not it. */
+ r_refdef.vieworg[1]=20; /* beside both actors: the ray reaches the world */
+ aw_chim_pick=chim_pick;wall=100/2048.0f;chim_hit=1;chim_fraction=wall;click();
+ assert(strstr(output,"CHIM placement 4242") && strstr(output,"flora_emp_parasol_03") && strstr(output,"172013 / cell 2,-10"));
+ assert(!strstr(output,"worldspawn"));
+ chim_fraction=wall*0.5f;click();assert(!strstr(output,"CHIM placement") && strstr(output,"worldspawn"));
+ chim_hit=0;click();assert(strstr(output,"worldspawn"));aw_chim_pick=NULL;wall=1;r_refdef.vieworg[1]=0;
+ /* INSPECT-NO-RIGHT-CLICK-EXIT-42: the right (Amiga K_MOUSE3) or middle button leaves inspect mode
+  * like dbg hud off: pin cleared, overlays off, no block/attack leak; ignored while off. */
+ command("on");click();assert(aw_inspect_key('a')==0 && aw_inspect_crosshair());
+ assert(aw_inspect_key(K_MOUSE3)==1 && !aw_inspect_crosshair() && overlay==0 && !strip_lines(3,76) && !aw_inspect_hint());
+ assert(aw_inspect_key(K_MOUSE3)==0);
+ command("on");assert(aw_inspect_key(K_MOUSE2)==1 && !aw_inspect_crosshair());
+ assert(aw_inspect_buttons(1)==0);aw_inspect_buttons(0);command("on");
  command("off");output[0]=0;ent();assert(strstr(output,"entity 2") && !aw_inspect_crosshair());
  return 0;
 }

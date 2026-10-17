@@ -229,7 +229,7 @@ qboolean	Cvar_Command (void)
         if(*end || cap<666 || cap>1024){Con_Printf("aw_poly_budget_over_cap requires auto or an integer from 666 to 1024 triangles.\n");return true;}
     }
     /* aw_cull selects a far test 0..7 (aw_fog.c); on/off keep their meaning:
-     * on = the far plane alone (1, "Full", the default), off = none. */
+     * on = the far plane alone (1, "Full"), off = none; the default is 4 (Strong). */
     if(!strcmp(v->name,"aw_cull")) {
         char *s=Cmd_Argv(1);int value=AW_ParseBoolean(s);
         if(value<0 && s[0]>='0' && s[0]<='7' && !s[1])value=s[0]-'0';

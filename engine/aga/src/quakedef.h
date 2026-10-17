@@ -373,6 +373,8 @@ int AW_ModelVisible(vec3_t origin,float radius);
 enum {AW_FAR_DRAW,AW_FAR_SKIP,AW_FAR_SIZE,AW_FAR_FACES};
 int AW_BrushPassFar(vec3_t origin,float radius,const float *minmaxs);
 void AW_FarPassBegin(int result);
+void AW_FarDetailSavedBefore(int config_without_setting);
+int AW_ConfigWithout(const char *name);
 int AW_FogFullDepthValue(int distance);
 float AW_SizeCutShare(int preset,float radius);
 extern float aw_far_depth[4],aw_far_down[4],aw_far_view[4],aw_far_detail_pixels;
@@ -501,6 +503,10 @@ int AW_UIFrameEnabled(void);
 void AW_UIFrameToggle(void);
 void AW_UIText(int,int,const char *,int);
 void AW_UITextBox(int,int,int,int,const char *,int);
+void AW_UITextCentred(int,int,int,int,const char *,int);   /* centred by painted bounds */
+extern int (*aw_title_bar)(int x,int y,int w,const char *title);   /* aw_icons.c: the original title bar */
+extern const char *(*aw_hand_to_hand_name)(void);   /* aw_icons.c: GMST sSkillHandtohand */
+extern int (*aw_inventory_row_icon)(int slot,const char *id,int equipped,int x,int y);   /* aw_icons.c */
 int AW_UILogo(int,int);
 void AW_UILoading(void);
 int AW_LoadingScreen(void);

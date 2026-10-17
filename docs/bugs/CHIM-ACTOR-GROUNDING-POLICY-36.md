@@ -19,6 +19,22 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- contents start -->
+## Contents
+
+- [Status: 10 October 2026](#status-10-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 10 October 2026
 
 Fixed in v0.0.36-dev1. Every NPC placed in an exterior cell of the base master is now classified by
@@ -78,6 +94,18 @@ Two parts, both at the shared layer:
    image build before any stage) lists the NPC residents of every CHIM area of the build from the master's
    exterior cells (the area's frame, minus its documented resident exclusions) and refuses the build with the
    missing IDs. It takes about 2 seconds.
+
+### The seven candidates (decided for the project, 17 October 2026)
+
+The CHIMport run of 17 October 2026 stopped four cells on four of the seven candidates: (-7,9) Lucan Ostorius,
+(5,-8) Paur Maston, (-3,5) Viatrix Petilia and (7,-7) Umbra. Their feet stand 137 to 264 units above the support
+under them (the land; no static there), none levitates or swims. Decided for the project, 17 October 2026: these
+four and the other two placed above the ground (dreamer_talker07, Fjol) are `ground`. The rule comes from OpenMW:
+every actor that neither flies nor swims is dropped onto the first surface below on its first update after its
+cell loads (`apps/openmw/mwworld/worldimp.cpp` World::adjustPosition, called from
+`apps/openmw/mwmechanics/actors.cpp`), so in the game they stand where it drops them. Hentus Yansurnummu stands
+in the water (feet below sea level) and is `swimming`, as OpenMW decides from the water level
+(World::isSwimming). Recorded in `config/actor_grounding.json` (`decisions`, and the exception's source).
 
 ## Verification
 

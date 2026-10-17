@@ -5,6 +5,7 @@ import io
 from pathlib import Path
 import sys
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools'), str(ROOT / 'tests')]
@@ -18,15 +19,20 @@ import town_interiors  # noqa: E402
 from test_build_builder import RUN, TOOLS  # noqa: E402
 
 
+# MiniWind builds are -devN only: plan them as a development version of this line, whatever VERSION is
+# (an rc or final VERSION skipped these tests before; v0.0.42-rc1 gate 2923).
+DEV_VERSION = build.VERSION.split('-')[0] + '-dev1'
+
+
 def plan(argv):
-    with contextlib.redirect_stdout(io.StringIO()):
+    with contextlib.redirect_stdout(io.StringIO()), mock.patch.object(build, 'VERSION', DEV_VERSION):
         args = build.parser().parse_args(['--data-files', '/owned', '--jobs', '4', *argv])
-        build_recipe.configure(build.parser, args, ['--data-files', '/owned', '--jobs', '4', *argv], build.VERSION,
+        build_recipe.configure(build.parser, args, ['--data-files', '/owned', '--jobs', '4', *argv], DEV_VERSION,
                                out=io.StringIO())
         build.configure_miniwind(args)
         build.town_selection(args)
         build_exclusions.miniwind_defaults(args)
-        build_exclusions.resolve(args, build.VERSION, area_build=True)
+        build_exclusions.resolve(args, DEV_VERSION, area_build=True)
         build.configure_area_closure(args)
         build.configure_direct_start(args)
         build.configure_skip_census(args)
@@ -35,7 +41,6 @@ def plan(argv):
         return args, dict(build.commands(args, TOOLS, RUN))
 
 
-@unittest.skipUnless(build.VERSION.split('-')[-1].startswith('dev'), 'MiniWind builds are -devN only')
 class InteriorScopePlan(unittest.TestCase):
     def test_palace_preset_converts_its_room_only_and_leaves_out_island_checks(self):
         args, steps = plan(['--miniwind-preset', 'vivec-palace'])

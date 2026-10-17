@@ -52,6 +52,36 @@ class SeamGateTests(unittest.TestCase):
         report['ranked'][0]['rim_torn_share'] = .01
         self.assertEqual(len(check(report, {}, closed=closed)), 1)
 
+    def test_closed_row_with_space_covers_only_that_converter_path(self):
+        # MESH-VIVEC-CAP-GAP-38: the town/CHIM-area mushrooms must stay closed; their open-world profile is
+        # another converter path with its own row (or none).
+        from seam_audit import check
+        closed = [{'model': 'meshes/x/a.nif', 'space': 'town', 'bug': 'X-33'}]
+        report = self.report(.001, space='town')
+        self.assertIn('must stay closed', check(report, {}, closed=closed)[0]['reason'])
+        self.assertEqual(check(self.report(.001, space='world'), {}, closed=closed), [])
+
+    def test_town_mushrooms_are_reduced_with_the_boundary_lock(self):
+        # MESH-VIVEC-CAP-GAP-38: every town and CHIM area reduces mushroom caps with the boundary lock
+        # (rims and seams kept), and the seam gate keeps them closed in that space; other flora unchanged.
+        from town_regions import town_model_profile, MUSHROOM_CAP_PREFIXES
+        from seam_audit import load_known
+        for name in ('meshes/f/flora_emp_parasol_03.nif', 'meshes/x/flora_t_mushroom_01.nif',
+                     'meshes/f/flora_bc_mushroom_02.nif', 'meshes/x/flora_t_shelffungus_01.nif'):
+            profile = town_model_profile({}, name, 504)
+            self.assertTrue(profile.get('lock_boundaries'), name)
+            self.assertLess(profile['ratio'], 1)
+        self.assertFalse(town_model_profile({}, 'meshes/x/flora_ashtree_04.nif', 600).get('lock_boundaries'))
+        known, closed = load_known()
+        closed_town = {row['model'] for row in closed if row.get('space') == 'town'}
+        for model in ('meshes/f/flora_emp_parasol_01.nif', 'meshes/f/flora_emp_parasol_02.nif',
+                      'meshes/f/flora_emp_parasol_03.nif', 'meshes/x/flora_t_mushroom_01.nif',
+                      'meshes/x/flora_t_mushroom_02.nif'):
+            self.assertIn(model, closed_town)
+            self.assertNotIn('town', known.get(model, {}))
+        self.assertTrue(all(row['model'].rsplit('/', 1)[-1].startswith(MUSHROOM_CAP_PREFIXES) for row in closed
+                            if row.get('space') == 'town'))
+
     def test_strider_must_stay_closed(self):
         from seam_audit import load_known
         _, closed = load_known()

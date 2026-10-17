@@ -1,4 +1,4 @@
-# v0.0.42 working plan: 43 Bugs of Vivec (and a few more)
+# v0.0.42 working plan: Things Are Starting To Look Pretty Khuul
 
 The step-by-step checklist behind the [roadmap's v0.0.42 items](ROADMAP.md#v0042-complete-vivec-the-city-16-october-2026).
 Written 16 October 2026 from the maintainer's decisions of that day. A step is ticked only with its evidence (a commit,
@@ -320,6 +320,13 @@ the shot ends.
   17 October 2026: needed: every headroom figure of the easy candidates comes from the v0.0.36-v0.0.40 builders
   ([TRACKER-RELEASE-HEADROOM-MISSING-42](bugs/TRACKER-RELEASE-HEADROOM-MISSING-42.md)); the run waits for a quiet
   machine.
+  17 October 2026: done: one CHIMport run with the current builder (3aa9743) over the 611 cells not on CHIM
+  (26 minutes on 12 threads): 607 converted, 4 stopped on unclassified NPCs
+  ([CHIM-ACTOR-GROUNDING-POLICY-36](bugs/CHIM-ACTOR-GROUNDING-POLICY-36.md), decided for the project the same day:
+  ground by the OpenMW drop-to-ground rule; the four cells measured again and passing); all 98 seabed cells empty sea
+  ([CHIMPORT-SEABED-NO-ISLAND-42](bugs/CHIMPORT-SEABED-NO-ISLAND-42.md) fixed on the way); tracker fed and the
+  reference published. Classes now: featherweight 161, lightweight 326, middleweight 15, heavyweight 1, over or
+  failing 18 (14 hull policy pending, 4 stair walk), seabed 98.
 
 ### 3.2 The easy batch
 
@@ -329,6 +336,11 @@ the shot ends.
   plus 20 lava cells measured on 16 October); 316 in the batch once towns are kept whole and the lava group waits
   for its method (357 with the lava cells as ordinary cells); no region is whole yet.
 - [ ] CHIM-stage precheck of the batch; one build; the tracker and the build list updated.
+  17 October 2026: batch 1 (v0.0.42-dev2) = the dev1 cells + 499 easy cells (401 land, 19 of the 24 lava cells
+  as ordinary cells, the other 5 waiting with Erabenimsun Camp, Dagoth Ur and Suran; 98 seabed); 9 pocket openers
+  left out with their pocket named (cells wholly inside a town frame no longer open a pocket:
+  [CHIM-REGION-POCKET-TOWN-CELLS-42](bugs/CHIM-REGION-POCKET-TOWN-CELLS-42.md)); 1,252 cells in the list; region
+  doors get their door table ([CHIM-REGION-DOORS-NO-PROMPT-42](bugs/CHIM-REGION-DOORS-NO-PROMPT-42.md)).
 
 ### 3.3 The heavier cells, lightest first, each group measured again first
 

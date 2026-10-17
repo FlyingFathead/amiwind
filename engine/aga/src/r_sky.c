@@ -54,6 +54,9 @@ byte	newsky[128*256];	// newsky and topsky both pack in here, 128 bytes
 /* Explicit worldspawn metadata owns scene selection; pixels own no map memory. */
 static int sky_initialized,sky_shared,sky_exterior;
 static cvar_t sky_starsky={"aw_starsky","1",true},sky_nightsky={"aw_nightsky","1",true};
+/* aw_star_twinkle (saved, default 1): the slow pulse of one in five bright star
+ * texels below. 0 keeps every star at its own steady colour (SKY-STAR-TWINKLE-LATE-42). */
+static cvar_t sky_star_twinkle={"aw_star_twinkle","1",true};
 static cvar_t sky_daynight={"aw_daynight","1",true};
 static cvar_t sky_type={"aw_sky_type","3",true};
 static cvar_t sky_cloud_speed={"aw_skyspeed","0.00333333333",true};
@@ -527,7 +530,7 @@ static byte R_NightPixel(byte base,byte source,float x,float y,float z)
         /* The original bright point stays in place. Only one in five bright
          * texels cools and gently pulses over sixteen slow world-clock steps;
          * nebula luminance and cloud time are not animated by this effect. */
-        if(point && host_basepal[3*pixel]>160 && host_basepal[3*pixel+1]>160 &&
+        if(sky_star_twinkle.value>0 && point && host_basepal[3*pixel]>160 && host_basepal[3*pixel+1]>160 &&
            host_basepal[3*pixel+2]>160 && (ix*17+iy*13)%5==0){
             twinkle=(sky_night_step+ix+iy)&15;if(twinkle>8)twinkle=16-twinkle;
             starlevel-=twinkle/2;if(starlevel<1)starlevel=1;
@@ -562,7 +565,7 @@ void R_InitDayNight(void)
     Cvar_RegisterVariable(&sky_cloud_speed);Cvar_RegisterVariable(&sky_cloud_type);
     Cvar_RegisterVariable(&sky_night_clouds);Cvar_RegisterVariable(&sky_cloud_control);
     Cvar_RegisterVariable(&sky_day_clouds);Cvar_RegisterVariable(&sky_nightsky_mode);
-    Cvar_RegisterVariable(&sky_starsky);Cvar_RegisterVariable(&sky_nightsky);
+    Cvar_RegisterVariable(&sky_starsky);Cvar_RegisterVariable(&sky_nightsky);Cvar_RegisterVariable(&sky_star_twinkle);
     Cvar_RegisterVariable(&sky_night_light);Cvar_RegisterVariable(&sky_night_tint);
     Cvar_RegisterVariable(&sky_horizon_veil);Cvar_RegisterVariable(&sky_light_hue);
     Cmd_AddCommand("aw_light_hue_set",R_LightHueCommand);

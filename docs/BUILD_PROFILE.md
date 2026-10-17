@@ -18,6 +18,8 @@ releases).
 - [Reading a profile](#reading-a-profile)
 - [Optimizer](#optimizer)
 - [Perf guard](#perf-guard)
+- [Resource plan](#resource-plan)
+  - [While the build runs](#while-the-build-runs)
 - [Perf database](#perf-database)
   - [Many builds: the stage ledger](#many-builds-the-stage-ledger)
 - [Unit reuse audit](#unit-reuse-audit)
@@ -240,6 +242,105 @@ python tools/perf_guard.py show RUN [--json]
 The guard only reads the profile and the ledger; it never changes a build output. It sits beside
 the [Optimizer](#optimizer) (what to parallelize next) and the underused-phase list: those list,
 the guard fails.
+
+## Resource plan
+
+Every build checks, before its first stage, whether the memory and threads it
+gets are enough for the stages that will actually run (the stages its reuse
+plan does not reuse). Origin: a stair gate ran 22 whole-Vivec frame walks of
+about 2.6 GiB each at once in a 30 GiB container and the container ran out of
+memory (CHIM-STAIR-GATE-POOL-BROKEN-42); decided for the project on
+2026-10-17: a checklist where the compute is worked out up front, with an
+advisory to take more when it would help.
+
+```sh
+./build.sh --resource-plan ...the build's own options...      # read only, nothing is built
+./build.sh --resource-plan --resource-memory-gb 30 --resource-threads 24 ...
+./build.sh --resource-plan --resource-plan-json plan.json ...
+```
+
+`--resource-plan` prints the plan and exits (exit 5 when a stage will not
+fit); with `--check` it runs after the checks. `--resource-memory-gb` and
+`--resource-threads` name the container the build will run in (for example
+its lease); without them the plan reads this container's own limits (cgroup
+`memory.max` and `cpu.max`), else the machine's. A real build makes the same
+plan automatically after the reuse preflight, records it as
+`RESOURCE-PLAN.json` in the run folder (schema `resource-plan-1`, validated
+before it is written) and prints it:
+
+```text
+Machine at start: 0.4 of 24 threads busy in this container; memory 1650 / 30720 MiB in use (...); asks 11 threads, 23929 MiB
+Resource plan: 5 of 22 stages run; the build gets 30720 MiB (container limit (cgroup memory.max)) and 24 threads (...); --jobs 11
+  OK            census                   11 of 11 workers; about 88 MiB a worker + 355 MiB parent, peak about 1322 MiB, wall about 0m36s [measured (2 runs)]
+  WILL THROTTLE chim                     8 of 11 workers; about 2774 MiB a worker + 1734 MiB parent, ...: memory holds 8 workers at about 2774 MiB each beside a 1734 MiB parent [measured (2 runs, 2 failed) + stair model]
+ADVISORY: this build would run up to 27 % faster in chim (...) with 10 GiB more memory (the lease to ask for: --threads 11 --mem-gb 40)
+Resource plan: THROTTLED (4 OK, 1 WILL THROTTLE, 0 WILL NOT FIT); expected wall about 2m09s (stages added up)
+```
+
+One line per stage that runs:
+
+| State | Meaning |
+|---|---|
+| `OK` | the stage gets its planned workers (`--jobs`; one for a stage without a pool) |
+| `WILL THROTTLE` | fewer workers: the number, and why (the memory holds N at the stage's size per worker, or the CPU quota) |
+| `WILL NOT FIT` | one unit alone (named, with its estimated MiB) is larger than the memory the build plans with (80 % of the limit): the build is refused before any stage runs (`--resource-check warn` builds anyway, `off` skips the plan) |
+
+The `ADVISORY` line appears only when more memory or threads would make the
+build at least 2 % faster; it never asks for more than the machine has (it
+says so when full speed would need more).
+
+Where the numbers come from, said on every line in brackets:
+
+- **measured**: the `build-profile.json` of the `--reuse-from` run and the runs
+  it reused from (only stages that really ran there; a failed stage still shows
+  how much memory it reached) and the workspace's history
+  (`WORKSPACE/cache/resource-history.jsonl`). Per stage: the largest single
+  process (the parent, or one unit) and the memory of each further worker (the
+  stage's peak less its largest process, per worker; the process tree's summed
+  memory is bounded by the container's own peak while the stage ran, since
+  shared pages count once per process). The largest of the measurements is used.
+- **stair model**: every stage that builds a CHIM world walks its stairs with
+  one frame per worker: 128 MiB + 18 x the frame's placed MiB
+  (`tools/chim/stair_pool.py`, calibrated on the v0.0.41 world and the
+  whole-city Vivec frame of v0.0.42). The largest frame comes from the stair
+  gate's own worker line of an earlier run, else from the stored frame's size
+  on disk (about 2.03 placed bytes per stored byte, one calibration point).
+- **estimated, no data yet**: a stage never measured (512 MiB a worker beside a
+  256 MiB parent).
+
+Wall times are the measured wall fitted with Amdahl's law (the stage's average
+busy cores on its workers give its parallel share), so a stage that kept one
+core busy gains nothing from more workers. Stages are added up although a
+parallel build overlaps them: the totals are estimates.
+
+After a passed build every stage's actual peak is written next to its estimate
+in `RESOURCE-PLAN.json` (`actual`), a stage more than 25 % over its estimate is
+flagged in the build log (`flagged_over_estimate`), and the measured rows join
+the history, so the next plan starts from them: the models calibrate
+themselves.
+
+### While the build runs
+
+The plan is not only a start-time check. The worker pools follow the memory
+and the CPU quota the container has while the build runs, re-read every 30 s
+between tasks:
+
+- the scheduler (pooled stages): above 90 % of the memory limit in use (file
+  cache not counted) the stage holding the most workers hands out no new units
+  beyond three quarters of them; below 70 % a capped stage grows back toward its
+  share, by as many workers as the free memory holds at the plan's size per
+  worker. A CPU quota lowered while the build runs (`docker update --cpus`)
+  shrinks the shares; a raised one lets them grow back up to `--jobs`;
+- the CHIM stair gate: starts with the walks that fit now and grows back toward
+  its cores' count when memory frees up (another container ends, a raised
+  lease: `docker update --memory`), and stops starting walks when memory gets
+  tight.
+
+A running unit is never stopped: a smaller allowance only stops new units.
+Every change is printed with its reason (`[pool] ...: workers 8 -> 11 of 11
+(memory or threads freed up; ...)`, `[scheduler] memory tight ...`). The
+resource plan and the governor never change what a unit computes or the order
+of any output, so they are not part of any stage key.
 
 ## Perf database
 

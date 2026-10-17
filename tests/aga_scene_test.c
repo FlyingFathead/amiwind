@@ -586,6 +586,22 @@ int main(void){
   assert(shroompicker);AW_SceneCancelTransition();
   strcpy(sv.name,"seyda");p.v.health=73;p.v.movetype=MOVETYPE_WALK;
   cls.state=ca_connected;cls.signon=SIGNONS;aw_story.stage=AW_STAGE_RELEASED;
+  /* dbg tp mark / dbg tp marker: without a map marker nothing moves ("no map marker set"); with one it is
+   * the same teleport as dbg tp X Y to the marker's original coordinates (the map screen's saved globals). */
+  {
+   char by_mark[64],by_xy[64];
+   command_args[0]="aw_teleport";command_argc=2;command_args[1]="mark";queued[0]=0;teleport();assert(!queued[0]);
+   AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:map:marker:x",-9104);AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:map:marker:y",-72480);
+   teleport();assert(!queued[0]); /* placed but not ready: still none */
+   AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:map:marker:ready",1);
+   command_args[1]="marker";queued[0]=0;teleport();strcpy(by_mark,queued);AW_SceneCancelTransition();
+   command_argc=3;command_args[1]="-9104";command_args[2]="-72480";queued[0]=0;teleport();strcpy(by_xy,queued);
+   AW_SceneCancelTransition();assert(by_mark[0] && !strcmp(by_mark,by_xy));
+   command_argc=2;command_args[1]="mark";queued[0]=0;teleport();assert(!strcmp(queued,by_xy));AW_SceneCancelTransition();
+   AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:map:marker:ready",0);
+   queued[0]=0;teleport();assert(!queued[0]);
+   aw_state=saved;
+  }
   command_args[0]="aw_shroompicker";command_args[1]="reset";command_argc=2;
   queued[0]=0;shroompicker();assert(!queued[0]);
   command_args[1]="0";shroompicker();assert(!queued[0]);

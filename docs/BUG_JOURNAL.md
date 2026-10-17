@@ -5,12 +5,18 @@
 <!-- contents start -->
 ## Contents
 
+- [UI-INVENTORY-FONT-TABS-42, 17 October 2026](#ui-inventory-font-tabs-42-17-october-2026)
+- [SKY-STAR-TWINKLE-LATE-42, 17 October 2026](#sky-star-twinkle-late-42-17-october-2026)
+- [NOCLIP-BOB-DEFAULT-42, 17 October 2026](#noclip-bob-default-42-17-october-2026)
+- [CHIM-ZONE-RELEASE-FLICKER-42, 17 October 2026](#chim-zone-release-flicker-42-17-october-2026)
+- [MESH-EBONHEART-DRAGON-PEDESTAL-42, 17 October 2026](#mesh-ebonheart-dragon-pedestal-42-17-october-2026)
 - [BUILD-TORCH-CREATURE-RESIDENT-42, 17 October 2026](#build-torch-creature-resident-42-17-october-2026)
 - [VIVEC-ROOM-PRECACHE-LIMIT-42, 17 October 2026](#vivec-room-precache-limit-42-17-october-2026)
 - [BUILD-CHIM-VIS-VARIANT-SORT-42, 17 October 2026](#build-chim-vis-variant-sort-42-17-october-2026)
 - [NIGHT-WINDOWS-LOST-CHIM-36, 17 October 2026](#night-windows-lost-chim-36-17-october-2026)
 - [UI-INVENTORY-PREVIEW-STILL-42, 17 October 2026](#ui-inventory-preview-still-42-17-october-2026)
 - [UI-INVENTORY-PREVIEW-GAP-41, 17 October 2026](#ui-inventory-preview-gap-41-17-october-2026)
+- [UI-INVENTORY-ORIGINAL-LAYOUT-42, 17 October 2026](#ui-inventory-original-layout-42-17-october-2026)
 - [UI-WINDOW-TITLE-BAR-42 and UI-INVENTORY-HEADING-CENTRE-42, 17 October 2026](#ui-window-title-bar-42-and-ui-inventory-heading-centre-42-17-october-2026)
 - [HUD-STATS-29: original weapon and magic boxes, 17 October 2026](#hud-stats-29-original-weapon-and-magic-boxes-17-october-2026)
 - [UI-ICONS-INVENTORY-42, 17 October 2026](#ui-icons-inventory-42-17-october-2026)
@@ -156,6 +162,36 @@
 
 <!-- contents end -->
 
+## UI-INVENTORY-FONT-TABS-42, 17 October 2026
+
+[UI-INVENTORY-FONT-TABS-42](bugs/UI-INVENTORY-FONT-TABS-42.md): the inventory categories are plain text in the console
+font, not buttons in the game's font as in the original; asked for on 14 October and again on 17 October. Open.
+## SKY-STAR-TWINKLE-LATE-42, 17 October 2026
+
+[SKY-STAR-TWINKLE-LATE-42](bugs/SKY-STAR-TWINKLE-LATE-42.md): the maintainer saw no star twinkle early in a
+v0.0.42-dev1 night and some later on. Not a code change: the twinkle (three stars of the dome, unchanged since
+v0.0.28) shows only once the midnight clearing opens the sky; the moving cloud veil can also read as twinkling.
+Minor visual item; new saved switch `aw_star_twinkle` (default on, look unchanged; 0 = steady stars) with a test.
+
+## NOCLIP-BOB-DEFAULT-42, 17 October 2026
+
+[NOCLIP-BOB-DEFAULT-42](bugs/NOCLIP-BOB-DEFAULT-42.md): reported again by the maintainer in v0.0.42-dev1: the view still
+bobs in noclip, although the noclip bob was set to off by default after the first report on 13 October. Open.
+## CHIM-ZONE-RELEASE-FLICKER-42, 17 October 2026
+
+[CHIM-ZONE-RELEASE-FLICKER-42](bugs/CHIM-ZONE-RELEASE-FLICKER-42.md): reported by the maintainer in v0.0.42-dev1:
+distant buildings at Ebonheart pop in and out while standing still; zone full there and at Khuul. Measured the
+same in v0.0.41 (not a dev1 regression): the zone is locked full (world index 1,775 KiB) and chunks released for
+a request that still fails come back 50 ticks later, with 50-530 ms CHIM work frames. Repair on
+v0.0.42-outline-pop: release only what makes room (chim_release 2) and a world index without derivable paths
+(1,056 KiB). Open until in a build.
+
+## MESH-EBONHEART-DRAGON-PEDESTAL-42, 17 October 2026
+
+[MESH-EBONHEART-DRAGON-PEDESTAL-42](bugs/MESH-EBONHEART-DRAGON-PEDESTAL-42.md): the Ebonheart dragon statue
+floats (maintainer, v0.0.42-dev1). Its converted model starts 236 units above its origin; the same in v0.0.41
+and with the whole ring loaded, so not streaming. Cause open.
+
 ## BUILD-TORCH-CREATURE-RESIDENT-42, 17 October 2026
 
 [BUILD-TORCH-CREATURE-RESIDENT-42](bugs/BUILD-TORCH-CREATURE-RESIDENT-42.md): the v0.0.42-dev1 full build stopped in
@@ -198,6 +234,12 @@ whenever the free hunk gap was under a fixed 2 MiB; Seyda Neen on CHIM leaves 1.
 the preview never loaded there, in v0.0.41 as shipped too, behind a console line that named missing assets.
 Repair on v0.0.42-hud-icons: the load is admitted by its real need (three times the file plus 256 KiB) and the
 console names the refusing rule; `aw_inventory_preview_reserve 2` keeps the old rule.
+
+## UI-INVENTORY-ORIGINAL-LAYOUT-42, 17 October 2026
+
+[UI-INVENTORY-ORIGINAL-LAYOUT-42](bugs/UI-INVENTORY-ORIGINAL-LAYOUT-42.md): the A/B of the inventory window with
+the original shows no encumbrance bar, no armour rating and a list instead of the icon grid. Registered for the
+inventory work after the icons.
 
 ## UI-WINDOW-TITLE-BAR-42 and UI-INVENTORY-HEADING-CENTRE-42, 17 October 2026
 
@@ -2006,3 +2048,19 @@ BUILD-CHIM-WORLD-SERIAL-TAIL-41: 17 October 2026, v0.0.42-dev1: after the region
 BUILD-REUSE-APPLY-SERIAL-41: 17 October 2026, v0.0.42-dev1: the v0.0.41 final build applied the reused world terrain, scenery and flora on under one core each, about 30 s on the critical path. Repaired in source (B8): files staged on up to eight threads.
 
 BUILD-REUSE-KEYS-TOO-BROAD-35: 17 October 2026, v0.0.42-dev1: PERSISTING; narrowed reuse by each stage's record of what it really ran, read and listed (B7), repaired in source, takes effect from the first build that records it.
+
+INSPECT-OVER-VIEWPORT-42: 17 October 2026, v0.0.42-dev1: the maintainer's frames at Vivec's entrance show the inspect hint and the ten-line pin panel on black boxes over the top of the view. Repaired in source: the hint is a coordinate row above GLOBAL/LOCAL XYZ, the pin is packed into the strip under the view (72 lines high while inspect is on); in-game frame pending.
+
+INSPECT-OVER-VIEWPORT-42: 17 October 2026, v0.0.42-rc1: the maintainer specified the place, "underneath the player stats HUD". Repaired in source: the hint and up to three pin lines are the bottom four lines of the screen, below the health, magic and fatigue bars; while inspect is on, the bars, the boxes and the coordinate rows move up by those lines and the strip under the view grows to 84 lines. Native HUD test updated; in-game frame pending on the rc1 image.
+
+HUD-DEBUG-STRIP-OVER-BOXES-42: 17 October 2026, v0.0.42-dev1: the debug XYZ strip's black fill (from x 88) covers half the weapon box and the magic box. Repaired in source: rows and fill start right of the boxes (x 144); a cell that fits neither row goes on the row above.
+
+HUD-NOTIFY-OVERLAP-31: 17 October 2026, v0.0.42-dev1: PERSISTING; the debug title drawn over the inspect pin's notify lines at the top left, unreadable. Repaired in source: the title moves into the strip under the view; the pin's console rows print without notify lines.
+
+INSPECT-CHIM-PLACEMENT-UNNAMED-42: 17 October 2026, v0.0.42-dev1: pinning a mushroom in the Vivec city frame shows only worldspawn. Repaired in source: the pin asks the CHIM frame which placement the ray hit and names its mesh, reference, cell and origin.
+
+INSPECT-NO-RIGHT-CLICK-EXIT-42: 17 October 2026, v0.0.42-dev1: inspect mode could only be left from the console. Repaired in source: a right (or middle) click leaves it like dbg hud off; listed in the key help.
+
+MESH-VIVEC-CAP-GAP-38: 17 October 2026, v0.0.42-dev1: PERSISTING; cause found: every CHIM area but Seyda reduces mushrooms with the town profile, per material without a boundary lock, so the cap materials tear apart (flora_emp_parasol_03, references 172013 and 172126). Repaired in source at the shared profile: boundary lock for every mushroom cap mesh; island-wide seam audit 1,317 placements on torn variants before, 0 after; in-game A/B pending.
+
+NOCLIP-BOB-DEFAULT-42: 17 October 2026, v0.0.42-dev1: PERSISTING; cause found: the noclip bob check read Quake's client flag noclip_anglehack, which every map load clears, so after a frame or region crossing, a save load or a teleport the player flew in noclip with the bob back. Repaired in source: the player's movetype decides; leaving noclip gives the player's own bob and roll back.

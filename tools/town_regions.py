@@ -16,6 +16,9 @@ from town_config import load_settings, town_field
 # v0.0.42). The CHIM model builder finds them by a general rule instead (mesh_geometry.collision_parts underside,
 # AMIWIND_COLLISION_UNDERSIDE rule, CHIM-VOS-TEMPLE-WALKWAY-41); 'names' keeps this list for it too.
 UNDERPASS_NAMES = ('ex_velothi_temple_01.nif', 'ex_velothi_temple_02.nif')
+# Mushrooms whose caps are several materials joined at the rim: reduced with the boundary lock in every
+# town and CHIM area (MESH-VIVEC-CAP-GAP-38; the seam audit keeps them closed, config/seam-audit-known.json).
+MUSHROOM_CAP_PREFIXES = ('flora_emp_parasol_', 'flora_t_mushroom_', 'flora_bc_mushroom_', 'flora_t_shelffungus_')
 
 
 def visual_profile(source, triangles, underpass_names=True):
@@ -42,6 +45,12 @@ def visual_profile(source, triangles, underpass_names=True):
         target = 64
         texture_size = 64
     profile = {'ratio': min(1., target / max(1, triangles)), 'texture_size': texture_size}
+    if stem.startswith(MUSHROOM_CAP_PREFIXES):
+        # MESH-VIVEC-CAP-GAP-38: the default reducer works per material and collapses rim edges, so a
+        # mushroom's cap materials pulled apart where they meet (open bands on Vivec's giant mushrooms and
+        # every other town or CHIM-area placement). The boundary-locked reducer keeps rims and seams
+        # exactly where the source has them (static_lod.reduce_mesh; 22-35 more triangles per parasol).
+        profile['lock_boundaries'] = True
     # Convex approximation closes these authored underpasses. Keep each
     # collision surface instead, independent of visible mesh reduction.
     if stem.startswith(('ex_hlaalu_b_', 'ex_hlaalu_bal_', 'ex_hlaalu_bridge_',

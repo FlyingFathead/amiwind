@@ -568,6 +568,10 @@ class NativeSourceTests(unittest.TestCase):
             ('aw_ui.c','aw_intro.c','aw_inventory.c','aw_story.c','aw_state.c')],
             cflags=['-Wl,--wrap=malloc','-fsanitize=undefined','-fno-sanitize-recover=all'])
 
+    def test_noclip_has_no_bob_or_roll_and_walking_gets_them_back(self):
+        # NOCLIP-BOB-DEFAULT-42
+        self.compile_run('aga_noclip_bob_test.c', [ROOT/'engine/aga/src/view.c', Path(SOURCE)/'src/mathlib.c'])
+
     def test_underwater_palette_and_independent_damage(self):
         self.compile_run('aga_palette_test.c', [ROOT/'engine/aga/src/view.c', Path(SOURCE)/'src/mathlib.c'])
 

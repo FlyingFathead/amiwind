@@ -32,7 +32,8 @@ static const struct {const char *command,*action;} help_bindings[]={
 static const struct {const char *key,*action;} help_fixed[]={
     {"Esc","Pause / back"},{"Shift+V","Draw distance"},
     {"Shift+F5","Previous music"},{"Shift+F6","Next music"},
-    {"Ctrl+F","Fog (photo mode)"},{"Ctrl+H","Debug HUD (photo mode)"}
+    {"Ctrl+F","Fog (photo mode)"},{"Ctrl+H","Debug HUD (photo mode)"},
+    {"Right click","Leave inspect (dbg hud)"}
 };
 #define HELP_FIXED_COUNT ((int)(sizeof(help_fixed)/sizeof(help_fixed[0])))
 #define HELP_TOP 66

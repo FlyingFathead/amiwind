@@ -94,7 +94,27 @@ class PhotoModeSourceTests(unittest.TestCase):
         # PHOTO-DEBUG-STRIP-33
         draw = body(source('aw_hud.c'), 'Sbar_Draw')
         self.assertIn('if(AW_PhotoModeActive())Draw_Fill(0,vid.height-18,vid.width,18,255);', draw)
-        self.assertIn('else if(!AW_PhotoModeActive())AW_SmallString(92,vid.height-8,"WASD / F10 console");', draw)
+        self.assertIn('else if(!AW_PhotoModeActive())AW_SmallString(HUD_RIGHT_X,vid.height-lift-8,"WASD / F10 console");', draw)
+
+    def test_right_click_leaves_inspect_mode_and_the_key_help_says_so(self):
+        # INSPECT-NO-RIGHT-CLICK-EXIT-42: keys.c offers the right/middle button to inspect mode before the photo
+        # keys and every game binding (+aw_alt), only in game; the key help lists it.
+        event = body(source('keys.c'), 'Key_Event')
+        hook = event.index('if (down && key_dest == key_game && aw_inspect_key && aw_inspect_key(key)) return;')
+        self.assertLess(event.index("key == '`' || key == K_F10"), hook)
+        self.assertLess(hook, event.index('keydown[K_CTRL] && AW_PhotoKey(key)'))
+        self.assertIn('{"Right click","Leave inspect (dbg hud)"}', source('aw_wait.c'))
+        inspect = source('aw_inspect.c')
+        self.assertIn('if(!enabled || (k!=K_MOUSE3 && k!=K_MOUSE2))return 0;', inspect)
+        self.assertIn('aw_inspect_key=key;', inspect)
+        # INSPECT-OVER-VIEWPORT-42: while inspect is on, the strip under the view grows by the lines
+        # under the stat bars ("underneath the player stats HUD", the maintainer).
+        self.assertIn('if (AW_InspectEnabled() && !cl.intermission && !SCR_AWFullView () && sb_lines < AW_INSPECT_SB_LINES) '
+                      'sb_lines = AW_INSPECT_SB_LINES;', source('screen.c'))
+        self.assertIn('#define AW_INSPECT_SB_LINES (48+AW_INSPECT_LIFT)', source('aw_inspect.h'))
+        ui = source('aw_ui.c')
+        self.assertIn('int i,channels,y=vid.height-26-hud_lift();', ui)
+        self.assertIn('aw_ui_hud_lift=AW_InspectHudLift;', source('aw_hud.c'))
 
     def test_light_gallery_strip_hidden_unless_debug_hud(self):
         draw = body(source('aw_hud.c'), 'Sbar_Draw')

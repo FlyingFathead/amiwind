@@ -266,10 +266,13 @@ def check(report, known=None, threshold=DEFAULT_THRESHOLD, closed=()):
     and any torn seam or rim on a mesh that must stay closed (repaired bugs, e.g. the Silt Strider)."""
     known = known or {}
     failures = []
-    closed = {row['model']: row for row in closed}
+    # A closed row without "space" covers every converter path of the model; with "space" only that one
+    # (MESH-VIVEC-CAP-GAP-38: the town/CHIM-area mushrooms; their open-world profile is a separate path).
+    closed = {(row['model'], row.get('space')): row for row in closed}
     for t in report['ranked']:
-        if t['model'] in closed and (t['seam_torn_share'] > 0 or t['rim_torn_share'] > 0):
-            failures.append(dict(t, reason='must stay closed (%s)' % closed[t['model']].get('bug', '?')))
+        row = closed.get((t['model'], None)) or closed.get((t['model'], t['space']))
+        if row and (t['seam_torn_share'] > 0 or t['rim_torn_share'] > 0):
+            failures.append(dict(t, reason='must stay closed (%s)' % row.get('bug', '?')))
             continue
         if t['seam_torn_share'] <= threshold:
             continue

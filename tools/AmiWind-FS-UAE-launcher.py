@@ -53,6 +53,148 @@ PROFILE_LABELS = (
     ('Chip RAM', 'chip_memory', '2048 KiB'),
     ('Z3 Fast RAM', 'zorro_iii_memory', '16384 KiB'),
 )
+# Fast RAM choice (Zorro III). The default is the profile's 16 MiB, unchanged.
+# Limits measured in FS-UAE 3.1.66 (JIT on): every Zorro III board must be a power of two from 1 MiB to
+# 1 GiB (any other size gives NO Zorro III RAM at all), a second board may not be larger than the first,
+# and both boards together reach at most 1.5 GiB (a 2 GiB request ends up as 1 GiB + 512 MiB).
+# WinUAE uses the same per-board rule (power of two, 1 MiB to 1 GiB per board); the same limits apply to
+# both emulators so a choice means the same machine in either.
+FAST_RAM_DEFAULT_MIB = 16
+FAST_RAM_MIN_MIB = 16
+FAST_RAM_MAX_MIB = 1536
+FAST_RAM_BOARD_MAX_MIB = 1024
+FAST_RAM_PRESETS = (
+    (FAST_RAM_DEFAULT_MIB, 'default: the AmiWind profile, as before'),
+    (128, 'like a 68060 accelerator card'),
+    (256, ''),
+    (512, ''),
+    (1024, ''),
+    (1536, 'the most the emulators give'),
+)
+SETTINGS_OPTIONAL = {'fast_ram_mib': FAST_RAM_DEFAULT_MIB}
+
+
+def fast_ram_label(mib):
+    """Plain words for a Fast RAM size: '16 MiB', '1 GiB', '1.5 GiB'."""
+    if mib >= 1024 and mib % 512 == 0:
+        return ('%g GiB' % (mib / 1024))
+    return '%d MiB' % mib
+
+
+def fast_ram_boards(mib):
+    """Split a Fast RAM size (MiB) into the emulator's Zorro III boards, or explain why it cannot be."""
+    if type(mib) is not int:
+        raise ValueError('Fast RAM must be a whole number of MiB.')
+    if not FAST_RAM_MIN_MIB <= mib <= FAST_RAM_MAX_MIB:
+        raise ValueError('Fast RAM must be from %d MiB (what the game needs) to %d MiB (the most the emulator '
+                         'gives); %d MiB was asked.' % (FAST_RAM_MIN_MIB, FAST_RAM_MAX_MIB, mib))
+    first = 1
+    while first * 2 <= min(mib, FAST_RAM_BOARD_MAX_MIB):
+        first *= 2
+    second = mib - first
+    if second and (second & (second - 1) or second > first):
+        lower = max(v for v in fast_ram_valid_sizes() if v < mib)
+        upper = min(v for v in fast_ram_valid_sizes() if v > mib)
+        raise ValueError('The emulator cannot make %d MiB of Fast RAM (Zorro III boards come in powers of two, '
+                         'at most two of them). Nearest sizes: %d or %d MiB.' % (mib, lower, upper))
+    return first, second
+
+
+def fast_ram_valid_sizes():
+    sizes = set()
+    first = 1
+    while first <= FAST_RAM_BOARD_MAX_MIB:
+        for second in [0] + [1 << n for n in range(11) if (1 << n) <= first]:
+            if FAST_RAM_MIN_MIB <= first + second <= FAST_RAM_MAX_MIB:
+                sizes.add(first + second)
+        first *= 2
+    return sorted(sizes)
+
+
+def parse_fast_ram(value):
+    """--fast-ram / settings value: 'default' or a size in MiB (e.g. 128); optional 'M', 'MiB', 'G', 'GiB'."""
+    if type(value) is int:
+        mib = value
+    else:
+        text = str(value).strip().lower().replace(' ', '')
+        if text in ('', 'default', 'd'):
+            return FAST_RAM_DEFAULT_MIB
+        match = re.fullmatch(r'(\d+(?:\.\d+)?)(m|mb|mib|g|gb|gib)?', text)
+        if not match:
+            raise ValueError('Fast RAM: give a size in MiB (for example 128) or "default", not ' + repr(value) + '.')
+        number = float(match.group(1))
+        if (match.group(2) or 'm').startswith('g'):
+            number *= 1024
+        if number != int(number):
+            raise ValueError('Fast RAM must be a whole number of MiB.')
+        mib = int(number)
+    fast_ram_boards(mib)
+    return mib
+
+
+def fast_ram_fs_uae_values(mib):
+    """FS-UAE keys for the choice: zorro_iii_memory (KiB) and, above 1 GiB, uae_z3mem2_size (MiB)."""
+    first, second = fast_ram_boards(mib)
+    values = {'zorro_iii_memory': str(first * 1024)}
+    if second:
+        values['uae_z3mem2_size'] = str(second)
+    return values
+
+
+def fast_ram_winuae_text(text, mib):
+    """Set the WinUAE profile's Zorro III RAM (z3mem_size / z3mem2_size, MiB). The default leaves it as is."""
+    first, second = fast_ram_boards(mib)
+    lines = [line for line in text.splitlines() if not re.match(r'z3mem2_size=', line)]
+    if not any(re.match(r'z3mem_size=', line) for line in lines):
+        raise ValueError('WinUAE profile has no z3mem_size line.')
+    if mib == FAST_RAM_DEFAULT_MIB:
+        return text
+    out = []
+    for line in lines:
+        if line.startswith('z3mem_size='):
+            out.append('z3mem_size=%d' % first)
+            if second:
+                out.append('z3mem2_size=%d' % second)
+            continue
+        if line.startswith('z3mem_start=') and second:
+            # Above 1 GiB the boards do not fit above $40000000; start them at $10000000 (the UAE mapping,
+            # where FS-UAE 3.1.66 also places them).
+            out.append('z3mem_start=0x10000000')
+            continue
+        if line.startswith('config_description='):
+            line = line.replace('16M Z3', '%s Z3 Fast RAM' % fast_ram_label(mib).replace(' ', ''))
+        out.append(line)
+    return '\n'.join(out) + ('\n' if text.endswith('\n') else '')
+
+
+def choose_fast_ram(current, ask=None, show=print):
+    """The launcher's Fast RAM menu. Enter keeps the current choice; returns MiB, or None on EOF."""
+    ask = ask or input
+    show('Fast RAM for the emulated Amiga (now %s):' % fast_ram_label(current), flush=True)
+    for i, (mib, note) in enumerate(FAST_RAM_PRESETS, 1):
+        show(('  %d. %-8s  %s' % (i, fast_ram_label(mib), note)).rstrip(), flush=True)
+    show('  C. Custom size in MiB (%d to %d)' % (FAST_RAM_MIN_MIB, FAST_RAM_MAX_MIB), flush=True)
+    while True:
+        try:
+            answer = ask('Fast RAM [Enter keeps %s, 1-%d or C]: '
+                         % (fast_ram_label(current), len(FAST_RAM_PRESETS))).strip()
+        except EOFError:
+            return None
+        if not answer:
+            return current
+        if answer.isdigit() and 1 <= int(answer) <= len(FAST_RAM_PRESETS):
+            return FAST_RAM_PRESETS[int(answer) - 1][0]
+        if answer.lower() in ('c', 'custom'):
+            try:
+                answer = ask('Custom Fast RAM in MiB: ').strip()
+            except EOFError:
+                return None
+        try:
+            return parse_fast_ram(answer)
+        except ValueError as error:
+            show(str(error), flush=True)
+
+
 PRESET = '''# AmiWind v{version} accelerated Linux playtest preset.
 # Local paths filled by AmiWind-FS-UAE-launcher.py.
 # This is not a stock A1200 performance configuration.
@@ -100,9 +242,13 @@ def read_settings(root):
             result[key] = value
         return result
     saved = json.loads(path.read_text(encoding='utf-8-sig'), object_pairs_hook=unique_pairs)
-    if not isinstance(saved, dict) or set(saved) - set(DEFAULT_SETTINGS):
+    if not isinstance(saved, dict) or set(saved) - set(DEFAULT_SETTINGS) - set(SETTINGS_OPTIONAL):
         raise ValueError('Invalid or unknown launcher settings; settings preserved unchanged.')
     settings = dict(DEFAULT_SETTINGS, **saved)
+    if 'fast_ram_mib' in settings:
+        if type(settings['fast_ram_mib']) is not int:
+            raise ValueError('fast_ram_mib must be a whole number of MiB.')
+        fast_ram_boards(settings['fast_ram_mib'])
     if type(settings['format']) is not int or settings['format'] != 1:
         raise ValueError('Unsupported launcher settings format; expected 1.')
     if type(settings['confirm_launch']) is not bool:
@@ -145,7 +291,7 @@ def natural_key(name):
                  for p in re.split(r'(\d+)', name))
 
 
-def select_image(root, requested=None, ask=False):
+def select_image(root, requested=None, ask=False, memory=None):
     if requested:
         path = local_path(requested, root)
         if re.search(r'-world-[0-9]+\.hdf$', path.name, re.IGNORECASE):
@@ -174,7 +320,7 @@ def select_image(root, requested=None, ask=False):
             date = datetime.fromtimestamp(path.stat().st_mtime).strftime('%Y-%m-%d %H:%M')
             print('  %d. v%s%s  [%s]  %s' % (i, version, label, date, path.name), flush=True)
         prompt = 'Run ' + ('latest ' if not requested else '') + 'AmiWind v' + choices[0][2]
-        prompt += '? [Y/n' + (', or image number' if len(choices) > 1 else '') + ']: '
+        prompt += '? [Y/n' + (', or image number' if len(choices) > 1 else '') + (', M = Fast RAM' if memory else '') + ']: '
         while True:
             try:
                 answer = input(prompt).strip().lower()
@@ -187,7 +333,11 @@ def select_image(root, requested=None, ask=False):
             if answer.isdigit() and 1 <= int(answer) <= len(choices):
                 selected = int(answer) - 1
                 break
-            print('Enter Y, N' + (' or an image number from the list.' if len(choices) > 1 else '.'), flush=True)
+            if memory and answer in ('m', 'memory', 'ram'):
+                memory()
+                continue
+            print('Enter Y, N' + (', an image number from the list' if len(choices) > 1 else '') +
+                  (' or M for the Fast RAM menu.' if memory else '.'), flush=True)
     _, path, version = choices[selected]
     path = local_path(path, root)
     if not path.is_file() or path.stat().st_size == 0:
@@ -273,7 +423,7 @@ def image_disks(image):
     return disks
 
 
-def configured_text(text, image, rom):
+def configured_text(text, image, rom, fast_ram_mib=FAST_RAM_DEFAULT_MIB):
     parser = configparser.ConfigParser(interpolation=None, delimiters=('=',), strict=True)
     try:
         parser.read_string(text)
@@ -283,6 +433,9 @@ def configured_text(text, image, rom):
     if len(sections) != 1 or parser.defaults():
         raise ValueError('Expected one [config] section and no DEFAULT settings; configuration preserved unchanged.')
     values = dict(PROFILE_VALUES)
+    values.update(fast_ram_fs_uae_values(fast_ram_mib))
+    # A second Zorro III board exists only for sizes above 1 GiB; a stale one is removed.
+    dropped = set() if 'uae_z3mem2_size' in values else {'uae_z3mem2_size'}
     values.update({'kickstart_file': str(rom), 'hard_drive_0': str(image),
                    'hard_drive_0_type': 'hdf'})
     disks = image_disks(image)
@@ -314,7 +467,7 @@ def configured_text(text, image, rom):
             key = match.group(1).lower()
             if managed_layout and re.fullmatch(r'hard_drive_[0-9]+(?:_.*)?', key) and key not in values:
                 continue  # Remove stale drives/settings from the previous verified layout.
-            if key == 'uae_address_space_24':
+            if key in dropped or key == 'uae_address_space_24':
                 if '\n' in parser[sections[0]].get(key, ''):
                     raise ValueError('Managed configuration entries must use a single line: ' + key)
                 continue
@@ -339,20 +492,32 @@ def parsed_config(path):
     return parser[sections[0]]
 
 
-def print_host_preflight(version, image, rom, config):
+def print_host_preflight(version, image, rom, config, fast_ram_mib=FAST_RAM_DEFAULT_MIB):
     values = parsed_config(config)
     digest = rom_hash(rom)
+    expected_values = dict(PROFILE_VALUES, **fast_ram_fs_uae_values(fast_ram_mib))
     print('----------------------------------------------', flush=True)
     print('AmiWind v' + version + ' host preflight', flush=True)
     print('----------------------------------------------', flush=True)
     failed = False
     for label, key, display in PROFILE_LABELS:
         actual = values.get(key, '')
-        expected = PROFILE_VALUES[key]
+        expected = expected_values[key]
         ok = actual.strip().casefold() == expected.casefold()
         failed = failed or not ok
+        if key == 'zorro_iii_memory' and fast_ram_mib != FAST_RAM_DEFAULT_MIB:
+            display = expected + ' KiB'
         shown = display if ok else (actual or '<missing>')
         print(('%-21s %-23s %s' % (label + ':', shown, '[x] OK' if ok else '[!] FAIL')), flush=True)
+    second = values.get('uae_z3mem2_size', '').strip()
+    second_expected = expected_values.get('uae_z3mem2_size', '')
+    if second or second_expected:
+        ok = second == second_expected
+        failed = failed or not ok
+        print(('%-21s %-23s %s' % ('Z3 Fast RAM board 2:', (second + ' MiB') if second else '<missing>',
+                                          '[x] OK' if ok else '[!] FAIL')), flush=True)
+    note = ' (default)' if fast_ram_mib == FAST_RAM_DEFAULT_MIB else ' (chosen)'
+    print(('%-21s %-23s %s' % ('Fast RAM in total:', fast_ram_label(fast_ram_mib) + note, '[x] OK')), flush=True)
     speed_ok = values.get('uae_cpu_speed', '').strip().casefold() == 'max'
     failed = failed or not speed_ok
     print(('%-21s %-23s %s' % ('Cycle-exact speed:', 'OFF (cpu_speed=max)' if speed_ok else 'possible / unknown',
@@ -367,7 +532,7 @@ def print_host_preflight(version, image, rom, config):
         raise ValueError('Generated FS-UAE configuration failed the AmiWind accelerated-profile self-check.')
 
 
-def write_config(root, version, image, rom):
+def write_config(root, version, image, rom, fast_ram_mib=FAST_RAM_DEFAULT_MIB):
     path = root / ('AmiWind-v' + version + '-FS-UAE.fs-uae')
     if path.is_symlink():
         raise ValueError('Configuration is a symlink; preserved unchanged: ' + str(path))
@@ -379,7 +544,7 @@ def write_config(root, version, image, rom):
         template = root / 'resources' / 'emulators' / path.name
         original = template.read_text(encoding='utf-8-sig') if template.is_file() else PRESET.format(
             version=version, rom=rom, image=image)
-    output = configured_text(original, image, rom).encode('utf-8')
+    output = configured_text(original, image, rom, fast_ram_mib).encode('utf-8')
     # Keep byte-identical configuration files completely untouched on reruns.
     if before == output:
         print('Existing configuration matches.', flush=True)
@@ -443,6 +608,8 @@ def write_preserving(path, output, root, before):
 
 
 def save_settings(root, settings):
+    # Optional settings at their default are not written, so a default run leaves the file as it was.
+    settings = {k: v for k, v in settings.items() if k not in SETTINGS_OPTIONAL or v != SETTINGS_OPTIONAL[k]}
     path = root / SETTINGS_NAME
     before = path.read_bytes() if path.exists() else None
     if before is not None and json.loads(before.decode('utf-8-sig')) == settings:
@@ -458,6 +625,9 @@ def main(argv=None):
     parser.add_argument('--hdf', help='Select an HDF for this run, or use latest (the default)')
     parser.add_argument('--rom', help='Select and remember a ROM file (or search a ROM directory)')
     parser.add_argument('--fs-uae', metavar='EXECUTABLE', help='Select and remember FS-UAE executable (default: fs-uae on PATH)')
+    parser.add_argument('--fast-ram', metavar='MIB', help='Fast RAM for the emulated Amiga, remembered: "default" (%d MiB, '
+                        'the AmiWind profile) or a size in MiB, e.g. 128, 256, 512, 1024, 1536 (the most); '
+                        'other sizes are checked against what the emulator can make' % FAST_RAM_DEFAULT_MIB)
     parser.add_argument('-y', '--yes', action='store_true', help='Run the newest image without the selection prompt')
     parser.add_argument('--configure-only', action='store_true', help='Validate files and create/reuse the preset without launching')
     args = parser.parse_args(argv)
@@ -468,8 +638,18 @@ def main(argv=None):
         settings = read_settings(root)
         requested = args.hdf or settings['hdf']
         interactive = not args.yes and not args.configure_only
+        fast_ram = [parse_fast_ram(args.fast_ram) if args.fast_ram is not None
+                    else settings.get('fast_ram_mib', FAST_RAM_DEFAULT_MIB)]
+        print('Fast RAM: ' + fast_ram_label(fast_ram[0]) +
+              (' (default)' if fast_ram[0] == FAST_RAM_DEFAULT_MIB else ''), flush=True)
+
+        def memory_menu():
+            chosen = choose_fast_ram(fast_ram[0])
+            if chosen is not None:
+                fast_ram[0] = chosen
+                print('Fast RAM: ' + fast_ram_label(chosen), flush=True)
         selected = select_image(root, None if requested == 'latest' else requested,
-                                ask=settings['confirm_launch'] and interactive)
+                                ask=settings['confirm_launch'] and interactive, memory=memory_menu)
         if selected is None:
             print('Cancelled. No files changed.', flush=True)
             return 0
@@ -498,8 +678,9 @@ def main(argv=None):
         executable = shutil.which(command)
         if not args.configure_only and executable is None:
             raise ValueError('FS-UAE was not found. Install fs-uae or select it with --fs-uae /path/to/fs-uae. No configuration was changed.')
-        config = write_config(root, version, image, rom)
+        config = write_config(root, version, image, rom, fast_ram[0])
         settings['kickstart_rom'] = portable_path(rom, root)
+        settings['fast_ram_mib'] = fast_ram[0]
         if args.fs_uae:
             if Path(command).is_absolute():
                 remembered = portable_path(Path(command), root)
@@ -507,8 +688,10 @@ def main(argv=None):
             else:
                 settings['fs_uae'] = command
         save_settings(root, settings)
-        print_host_preflight(version, image, rom, config)
+        print_host_preflight(version, image, rom, config, fast_ram[0])
         print('AmiWind v' + version + '\nHDF: ' + str(image) + '\nROM: ' + str(rom), flush=True)
+        print('Starting with ' + fast_ram_label(fast_ram[0]) + ' of Fast RAM (Zorro III' +
+              (', two boards' if fast_ram_fs_uae_values(fast_ram[0]).get('uae_z3mem2_size') else '') + ').', flush=True)
         if args.configure_only:
             print('Files matched. Configuration ready.', flush=True)
             return 0

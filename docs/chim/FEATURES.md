@@ -4,7 +4,7 @@
 
 What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, where it stands, the gain that was measured (what was compared, how and when) and how Quake's visibility culling still works with it. Generated from [`features.json`](features.json); a test fails when this page is stale. Bugs are on the [CHIM bug tracker](../bugs/CHIM_TRACKER.md); ideas and held-back work are collected in [CHIM ideas](IDEAS.md). How far the open world has been converted, cell by cell, is on the [CHIM cell tracker](CELL_TRACKER.md).
 
-CHIM version: 0.2.1. 38 features: 21 shipped, 11 in progress, 3 planned, 3 ideas. Updated 11 October 2026.
+CHIM version: 0.2.1. 39 features: 21 shipped, 1 in this release, 11 in progress, 3 planned, 3 ideas. Updated 17 October 2026.
 
 ## What CHIM has done so far
 
@@ -23,6 +23,7 @@ The headline measured gains. Each links to its feature, which says what was comp
 - **Statics and flora sprites streamed with their chunks:** Seyda Neen: largest free Hunk gap after the first load 1,099,200 B to more than 2,097,200 B. *emulator, relative, busy host, 9 October 2026.* [Details](#statics-and-flora-sprites-streamed-with-their-chunks)
 - **Ground stored once:** Seven CHIM region cells (coast and sea floor): 9.0 MB of frames to 1.9 MB with references and the compiled terrain hull, 0.91 times the 2.1 MB of open-world maps they replace. *builder output, 10 October 2026.* [Details](#ground-stored-once)
 - **Fewer faces per mesh (planar merge, meshoptimizer for large shells):** Every mesh of the v0.0.36-dev3 world's CHIM areas: 101,153 to 99,052 faces with planar merge; the arrival ship 4,046 to 3,690 faces with closed seams (torn seam 2.2 % to 0) and about a seventh of the shape error. *exact counts, 11 October 2026.* [Details](#fewer-faces-per-mesh-planar-merge-meshoptimizer-for-large-shells)
+- **Extra Fast RAM as CHIM cache, automatic:** 128 MiB against 16 MiB Fast RAM, two sessions each: failed zone loads 625-655 (Seyda Neen) and 288-312 (Ebonheart plaza) to 0, evictions on a 58 s flight 487-550 to 0; frame time unchanged within drift. *emulator, relative, quiet host, 17 October 2026.* [Details](#extra-fast-ram-as-chim-cache-automatic)
 
 Several features also have a cost, listed under their caveats: CHIM leaves less of the Hunk free at the load peak, spends more time outside the 3D view and draws slightly more spans. Each shipped feature names the CHIM version it came with; the features marked "in this release" are in the development line of CHIM 0.2.1, not yet published.
 
@@ -31,7 +32,7 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | Status | Meaning | Features |
 | --- | --- | --- |
 | Shipped | in a published release | 21 |
-| In this release (CHIM 0.2.1) | in the line that becomes the next release; not yet published | 0 |
+| In this release (CHIM 0.2.1) | in the line that becomes the next release; not yet published | 1 |
 | In progress | being built or measured; not finished | 11 |
 | Planned | decided; no finished design or code | 3 |
 | Idea | written down, not decided | 3 |
@@ -61,6 +62,12 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | [Legacy and CHIM side by side](#legacy-and-chim-side-by-side) | Engine | chim_towns 0 brings back the legacy region maps for an A/B in one session; the console states which mode every town runs in, and start-up prints how many towns are on CHIM. No working method is deleted. | not measured |
 | [Statics and flora sprites streamed with their chunks](#statics-and-flora-sprites-streamed-with-their-chunks) | Streaming and memory | The frame map tags its static models and flora sprites with their chunk; the engine loads and links them when the chunk joins the ring and frees them when it leaves, instead of holding all of them in the map's fixed cost in the Hunk. | Seyda Neen Hunk gap 1.1 MB to 2.1 MB |
 | [--heap-mb builder option](#--heap-mb-builder-option) | Builder and tools | A builder option like --jobs: the map heap in MiB, exact, default 11; beyond the safe profile it prints one loud warning and runs anyway, and every gate uses the build's own value. | not measured |
+
+### In this release (CHIM 0.2.1)
+
+| Feature | Area | What it does | Measured gain |
+| --- | --- | --- | --- |
+| [Extra Fast RAM as CHIM cache, automatic](#extra-fast-ram-as-chim-cache-automatic) | Streaming and memory | At start-up the free Fast RAM beyond a margin (2 MiB plus an eighth of all Fast RAM) becomes CHIM zone banks that survive map changes, one per memory region, each under 2 GiB, no other upper limit; the look-ahead grows with it. 16 MiB takes nothing. A startup notice (M skips), Options > Extra RAM and -chimcache override it. | zone failures and evictions to 0 at 128 MiB |
 
 ### In progress
 
@@ -347,6 +354,27 @@ The frame map tags its static models and flora sprites with their chunk; the eng
 **Read more:** [CHIM ideas: memory](IDEAS.md#memory).
 
 **Bugs:** [CHIM-SEYDA-HUNK-GAP-33](../bugs/CHIM-SEYDA-HUNK-GAP-33.md).
+
+#### Extra Fast RAM as CHIM cache, automatic
+
+**Status:** In this release (CHIM 0.2.1). **ID:** `auto-fast-ram`.
+
+At start-up the free Fast RAM beyond a margin (2 MiB plus an eighth of all Fast RAM) becomes CHIM zone banks that survive map changes, one per memory region, each under 2 GiB, no other upper limit; the look-ahead grows with it. 16 MiB takes nothing. A startup notice (M skips), Options > Extra RAM and -chimcache override it.
+
+**Measured gain:**
+
+- 128 MiB against 16 MiB Fast RAM, two sessions each: failed zone loads 625-655 (Seyda Neen) and 288-312 (Ebonheart plaza) to 0, evictions on a 58 s flight 487-550 to 0; frame time unchanged within drift. Compared: the same engine and v0.0.42-dev1 image in FS-UAE (68040 JIT), same poses and flight, 16 MiB and 128 MiB Zorro III. *emulator, relative, quiet host, 17 October 2026.*
+
+Counts are exact; times are emulator-relative. First-time ground still reads in the frame (non-blocking reads are separate work).
+
+**Visibility:** No change: the same chunks and placements, kept in memory longer.
+
+**Caveats:**
+
+- Not measured on real hardware yet.
+- The game heap stays at its built size (a larger heap stays manual).
+
+**Read more:** [Memory guide](build_guide/MEMORY.md#more-fast-ram-the-automatic-chim-cache); [Real hardware](../REAL_HARDWARE.md#extra-ram-is-used-automatically).
 
 ### Rendering and visibility
 

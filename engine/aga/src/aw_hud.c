@@ -4,8 +4,22 @@
 #include "aw_world.h"
 #include "aw_clock.h"
 #include "aw_npc_lod.h"
+#include "aw_inspect.h"
 int sb_lines;
-void (*aw_inspect_draw)(void);
+/* aw_inspect.c: the hint and the pinned snapshot, drawn here underneath the stat bars. */
+const char *(*aw_inspect_hint)(void);
+int (*aw_inspect_strip)(char lines[][AW_INSPECT_LINE],int max,int width);
+extern int (*aw_ui_hud_lift)(void);   /* aw_ui.c: moves the bars and boxes up by the same lift */
+/* The coordinate rows start right of the weapon and magic boxes (aw_icons.c 85..127,
+ * the placeholders aw_ui.c 88..140): no fill or text over them (HUD-DEBUG-STRIP-OVER-BOXES-42). */
+#define HUD_RIGHT_X 144
+/* Rows of the strip under the view, from the bottom: LOCAL, GLOBAL, then one more
+ * coordinate row (the cell when it fits nowhere else); the full-width line above the
+ * stat bars carries the title. While inspect is on, everything here moves up by
+ * AW_InspectHudLift() and the inspect hint and pin lines go underneath the bars. */
+#define HUD_ROW_EXTRA 24
+#define HUD_LINE_BOTTOM 35
+#define HUD_LINE_STEP 9
 /* Set by Chim_Init: original coordinates on an active CHIM frame. */
 int (*aw_chim_source)(const float *local,float *world);
 /* GLOBAL position for the debug readouts: the world directory's transform,
@@ -26,6 +40,12 @@ extern cvar_t scr_showram;
 extern int scr_copyeverything;
 int AW_DebugOverlaysEnabled(void) {return overlays.value != 0;}
 int AW_DebugCoordsEnabled(void) {return overlays.value != 0 && coords.value != 0;}
+/* INSPECT-OVER-VIEWPORT-42 (the maintainer: "underneath the player stats HUD"): the bottom
+ * AW_INSPECT_BOTTOM_LINES lines of the screen hold the inspect hint and pin while inspect is on
+ * and screen.c has grown the strip for them; photo mode keeps its full-screen view. */
+int AW_InspectHudLift(void) {
+    return AW_InspectEnabled() && !AW_PhotoModeActive() && sb_lines>=AW_INSPECT_SB_LINES?AW_INSPECT_LIFT:0;
+}
 int AW_SeaLevelEnabled(void) {return sealevel.value != 0;}
 static int debug_toggle(cvar_t *setting,char *name) {
     char *value;
@@ -110,7 +130,17 @@ static void cell_text(const float *p,int compact,char *out,int size) {
 }
 /* Append the cell to the shorter row that still fits; full prefix first, then
  * the compact one, then the other row. Never adds a row or cuts a coordinate. */
-static void place_cell(char *a,char *b,int size,const float *p,int limit) {
+/* extra: the third row (NULL when there is none); it takes the text only when neither
+ * coordinate row has room (an empty extra row without the leading space). */
+static int place_extra(char *extra,int size,const char *text,int limit) {
+    int n;
+    if(!extra || !text[0])return 0;
+    n=(int)strlen(extra)+(extra[0]?1:0)+(int)strlen(text);
+    if(n>limit || n>=size)return 0;
+    if(extra[0])strcat(extra," ");
+    strcat(extra,text);return 1;
+}
+static void place_cell(char *a,char *b,char *extra,int size,const float *p,int limit) {
     char text[24];char *rows[2];int compact,i;
     rows[0]=strlen(a)<=strlen(b)?a:b;rows[1]=rows[0]==a?b:a;
     for(compact=0;compact<2;compact++){
@@ -120,6 +150,8 @@ static void place_cell(char *a,char *b,int size,const float *p,int limit) {
             strcat(rows[i]," ");strcat(rows[i],text);return;
         }
     }
+    cell_text(p,0,text,sizeof text);
+    if(!place_extra(extra,size,text,limit)){cell_text(p,1,text,sizeof text);place_extra(extra,size,text,limit);}
 }
 /* "NOCLIP: ON" / "FLY: ON" and "GOD: ON" while the local player has that cheat
  * (compact: "NOCLIP" / "FLY" / "GOD"); empty otherwise. */
@@ -135,7 +167,7 @@ static void cheat_text(int compact,char *out,int size) {
         snprintf(out+strlen(out),size-(int)strlen(out),compact?"%sGOD":"%sGOD: ON",out[0]?" ":"");
 }
 /* Same rule as the cell: the shorter row that still fits, full text first. */
-static void place_cheats(char *a,char *b,int size,int limit) {
+static void place_cheats(char *a,char *b,char *extra,int size,int limit) {
     char text[32];char *rows[2];int compact,i;
     rows[0]=strlen(a)<=strlen(b)?a:b;rows[1]=rows[0]==a?b:a;
     for(compact=0;compact<2;compact++){
@@ -145,6 +177,8 @@ static void place_cheats(char *a,char *b,int size,int limit) {
             strcat(rows[i]," ");strcat(rows[i],text);return;
         }
     }
+    cheat_text(0,text,sizeof text);
+    if(!place_extra(extra,size,text,limit)){cheat_text(1,text,sizeof text);place_extra(extra,size,text,limit);}
 }
 static void debug_cell(void) {
     long x,y;vec3_t global;vec_t *p;
@@ -175,6 +209,7 @@ void Sbar_Init(void) {
     Cmd_AddCommand("amiwind_debug_sealevel",debug_sea);
     Cmd_AddCommand("amiwind_debug_fps",debug_fps);Cmd_AddCommand("amiwind_debug_showfps",debug_showfps);
     Cmd_AddCommand("aw_cell",debug_cell);
+    aw_ui_hud_lift=AW_InspectHudLift;
 }
 void Sbar_Changed(void) {}
 static int current_region(const char **region) {
@@ -189,31 +224,62 @@ static int compass_heading(void) {
     /* Runtime +Y is source north; engine yaw zero points east. */
     return (int)anglemod(90-cl.viewangles[YAW]+360);
 }
+/* Characters a right-aligned row may hold: from the right margin to the column start. */
+static int column_limit(void) {
+    int left=AW_PhotoModeActive()?8:HUD_RIGHT_X,limit=(vid.width-8-left)/4;
+    return limit>0?limit:0;
+}
 static void coordinate_line(char *line,int y) {
-    int limit=(vid.width-96)/4;
-    if(limit<=0)return;
+    int limit=column_limit();
+    if(limit<=0 || !line[0])return;
     if((int)strlen(line)>limit){line[limit]=0;if(limit>=3)memcpy(line+limit-3,"...",3);}
     AW_SmallString(vid.width-8-(int)strlen(line)*4,y,line);
 }
+static int compass_visible(void) {
+    return show_compass.value && cls.state==ca_connected && key_dest==key_game && !AW_GalleryActive();
+}
 static void compass(void) {
     char line[96];int heading,limit;const char *region=NULL;
-    if(!show_compass.value || cls.state!=ca_connected || key_dest!=key_game || AW_GalleryActive())return;
+    if(!compass_visible())return;
     heading=compass_heading();
     current_region(&region);
     snprintf(line,sizeof(line),"%s %03ld / REGION: %s",directions[((heading+22)/45)&7],
              (long)heading,region?region:"unavailable");
-    limit=(vid.width-96)/4;if(limit<0)limit=0;if(limit>95)limit=95;
+    limit=column_limit();if(limit>95)limit=95;
     if((int)strlen(line)>limit){line[limit]=0;if(limit>=3)memcpy(line+limit-3,"...",3);}
-    AW_SmallString(vid.width-8-(int)strlen(line)*4,vid.height-26,line);
+    AW_SmallString(vid.width-8-(int)strlen(line)*4,vid.height-26-AW_InspectHudLift(),line);
     scr_copyeverything=1;
 }
+/* Full-width lines above the stat bars (the strip under the view) for the title. The
+ * strip's top line stays free for object names. 0 when the strip has no room for them
+ * (full-screen views keep the title at the top, as before). */
+static int strip_slots(int lift) {
+    int n=0,y;
+    if(AW_PhotoModeActive() || sb_lines<48)return 0;
+    for(y=vid.height-HUD_LINE_BOTTOM-lift;y>=vid.height-sb_lines+12;y-=HUD_LINE_STEP)n++;
+    return n;
+}
+/* INSPECT-OVER-VIEWPORT-42: the hint on the first line under the bars, then up to three
+ * lines of the packed pin, down to the bottom of the screen, in the console font. */
+static void inspect_lines(int lift) {
+    char pins[AW_INSPECT_BOTTOM_LINES-1][AW_INSPECT_LINE];const char *hint;int i,n=0,y=vid.height-lift+1;
+    if(!lift)return;
+    hint=aw_inspect_hint?aw_inspect_hint():NULL;
+    if(hint)AW_SmallString(8,y,hint);
+    if(aw_inspect_strip)n=aw_inspect_strip(pins,AW_INSPECT_BOTTOM_LINES-1,(vid.width-16)/4);
+    if(n>AW_INSPECT_BOTTOM_LINES-1)n=AW_INSPECT_BOTTOM_LINES-1;
+    for(i=0;i<n;i++)AW_SmallString(8,y+(i+1)*AW_INSPECT_LINE_STEP,pins[i]);
+    scr_copyeverything=1;
+}
+static void strip_text(int x,int y,char *s,int font) {
+    if(font==8)Draw_String(x,y,s);else AW_SmallString(x,y,s);
+}
 void Sbar_Draw(void) {
-    char title[128];const char *region;int limit,width=hud_type.value==1?8:4;
+    char title[128];const char *region;int limit,width=hud_type.value==1?8:4,slots,lift;
     if(key_dest==key_console)return;
     AW_UIHud();
     compass();
     AW_NpcLodDrawLabels();
-    if(aw_inspect_draw)aw_inspect_draw();
     /* Its strip replaces the bottom HUD. Photo mode hides it like everything
      * else over the view; Ctrl+H (dbg hud) brings it back with the debug HUD.
      * Its keys keep working while hidden (AW_WaitKey). */
@@ -225,23 +291,33 @@ void Sbar_Draw(void) {
         snprintf(title,sizeof(title),"AmiWind v" AMIWIND_VERSION " / %s",cl.levelname[0]?cl.levelname:"Location unavailable");
     limit=(vid.width-16)/width;if(limit<0)limit=0;if(limit>127)limit=127;
     if((int)strlen(title)>limit){title[limit]=0;if(limit>=3)memcpy(title+limit-3,"...",3);}
-    if(width==8)Draw_String(8,8,title);else AW_SmallString(8,8,title);
+    /* HUD-NOTIFY-OVERLAP-31: the title sits under the view (never over it or over
+     * the console's notify lines at the top), above the stat bars. */
+    lift=AW_InspectHudLift();
+    slots=strip_slots(lift);
+    if(slots){strip_text(8,vid.height-HUD_LINE_BOTTOM-lift,title,width);scr_copyeverything=1;}
+    else strip_text(8,8,title,width);
+    inspect_lines(lift);
     if(fps.value){
         char line[32];int n=AW_FpsTenths(),x=8;
         sprintf(line,"FPS:%ld.%ld",(long)(n/10),(long)(n%10));
         Draw_Fill(x,19,80,10,255);Draw_String(x+4,20,line);
     }
     if(AW_DebugCoordsEnabled() && cls.state==ca_connected && cl.viewentity>0 && cl.viewentity<MAX_EDICTS) {
-        char line[80],second[80],clock[16];vec_t *p=cl_entities[cl.viewentity].origin;vec3_t global;
-        int year,month,day,hour,minute,heading;
+        char line[80],second[80],extra[80],clock[16];vec_t *p=cl_entities[cl.viewentity].origin;vec3_t global;
+        int year,month,day,hour,minute,heading,rows3;
         /* Report the simulated player in local play, before view interpolation. */
         if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict)
             p=svs.clients[0].edict->v.origin;
-        /* Two compact console-font rows beside the health/magicka/fatigue bars.
+        /* A third row above GLOBAL/LOCAL when the strip has room and the compass
+         * (the same place) is off: the cell when it fits nowhere else. */
+        rows3=!AW_PhotoModeActive() && sb_lines>=HUD_ROW_EXTRA+8 && !compass_visible();
+        extra[0]=0;
+        /* Compact console-font rows right of the weapon/magic boxes, never over them.
          * Photo mode has no bars and a full-screen view: the strip spans the
          * whole width (PHOTO-DEBUG-STRIP-33). */
         if(AW_PhotoModeActive())Draw_Fill(0,vid.height-18,vid.width,18,255);
-        else Draw_Fill(88,vid.height-18,vid.width-88,18,255);
+        else Draw_Fill(HUD_RIGHT_X,vid.height-lift-(rows3?HUD_ROW_EXTRA+2:18),vid.width-HUD_RIGHT_X,rows3?HUD_ROW_EXTRA+2:18,255);
         if(view_source(p,global))
             snprintf(line,sizeof(line),"GLOBAL XYZ: %ld %ld %ld",(long)global[0],(long)global[1],(long)global[2]);
         else strcpy(line,"GLOBAL XYZ: unavailable (interior)");
@@ -261,16 +337,17 @@ void Sbar_Draw(void) {
             snprintf(second,sizeof(second),"LOCAL XYZ: %ld %ld %ld %s %03ld P:%ld",(long)p[0],(long)p[1],(long)p[2],
                 directions[((heading+22)/45)&7],(long)heading,(long)cl.viewangles[PITCH]);
         }
-        /* The original cell goes on the end of the shorter row: same two rows. */
-        place_cell(line,second,sizeof(line),p,(vid.width-96)/4);
+        /* The original cell goes on the end of the shorter row, else on the third row. */
+        place_cell(line,second,rows3?extra:NULL,sizeof(line),p,column_limit());
         /* Noclip, fly and god mode while active (owner request). */
-        place_cheats(line,second,sizeof(line),(vid.width-96)/4);
-        coordinate_line(line,vid.height-16);
-        coordinate_line(second,vid.height-8);
+        place_cheats(line,second,rows3?extra:NULL,sizeof(line),column_limit());
+        if(rows3)coordinate_line(extra,vid.height-lift-HUD_ROW_EXTRA);
+        coordinate_line(line,vid.height-lift-16);
+        coordinate_line(second,vid.height-lift-8);
         /* This strip is outside scr_vrect; the normal viewport-only update
          * would leave its old pixels on the Amiga screen. */
         scr_copyeverything=1;
-    } else if(!AW_PhotoModeActive())AW_SmallString(92,vid.height-8,"WASD / F10 console");
+    } else if(!AW_PhotoModeActive())AW_SmallString(HUD_RIGHT_X,vid.height-lift-8,"WASD / F10 console");
 }
 void Sbar_IntermissionOverlay(void) {}
 void Sbar_FinaleOverlay(void) {}

@@ -4,6 +4,7 @@
 #define COM_FOpenFile __wrap_COM_FOpenFile
 #define AW_SmallStringColor legacy_inventory_text
 #define AW_UITextBox legacy_inventory_textbox
+#define AW_UITextCentred legacy_inventory_centred
 #define AW_UIScrollbar legacy_inventory_scrollbar
 #define AW_UIScrollHit legacy_inventory_scrollhit
 #define main map_journal_regressions
@@ -13,6 +14,7 @@
 #undef AW_UIScrollHit
 #undef AW_SmallStringColor
 #undef AW_UITextBox
+#undef AW_UITextCentred
 #undef COM_FOpenFile
 #include "aw_inventory.h"
 #include "aw_harvest.h"
@@ -48,10 +50,12 @@ void AW_SmallStringColor(int x,int y,int width,const char *value,int color){
 }
 void AW_UITextBox(int x,int y,int w,int h,const char *value,int color){
     legacy_inventory_textbox(x,y,w,h,value,color);
-    if(layout_capture && x==6 && y==4){
+    if(layout_capture && x==6 && y==6){
         strncpy(layout_title,value,sizeof(layout_title)-1);layout_title[sizeof(layout_title)-1]=0;
     }
 }
+/* The window title (UI-INVENTORY-HEADING-CENTRE-42) is centred by painted bounds; same text record. */
+void AW_UITextCentred(int x,int y,int w,int h,const char *s,int c){AW_UITextBox(x,y,w,h,s,c);}
 static const layout_text_t *layout_find(const char *value){
     int i;for(i=0;i<layout_count;i++)if(strstr(layout_text[i].value,value))return &layout_text[i];
     return NULL;

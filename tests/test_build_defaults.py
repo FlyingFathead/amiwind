@@ -190,6 +190,9 @@ OPTIONS = {
     'quake_tools': 'tooling', 'qcc': 'tooling', 'ffmpeg': 'tooling', 'xdftool': 'tooling',
     'rdbtool': 'tooling', 'gallery_cache': 'tooling', 'gallery_seed_run': 'tooling',
     'estimate_world': 'mode', 'estimate_sample': 'mode', 'jobs': 'tooling', 'serial_stages': 'tooling',
+    # Resource plan (docs/BUILD_PROFILE.md "Resource plan"): a read-only plan and the preflight check; outputs unchanged.
+    'resource_plan': 'mode', 'resource_plan_json': 'tooling', 'resource_memory_gb': 'tooling',
+    'resource_threads': 'tooling', 'resource_from': 'tooling', 'resource_check': 'tooling',
     # Build profile and development stage reuse (docs/BUILD_PROFILE.md): outputs unchanged.
     'no_profile': 'tooling', 'perf_guard': 'tooling', 'perf_guard_baselines': 'tooling', 'size_guard': 'tooling', 'size_baseline': 'tooling',
     'size_growth_margin': 'tooling', 'size_growth_reason': 'tooling', 'log_level': 'tooling', 'quiet': 'tooling', 'reuse_from': 'tooling', 'reuse_mode': 'tooling', 'rebuild_stage': 'tooling',

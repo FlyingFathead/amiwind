@@ -48,6 +48,25 @@ int main(void){
     real(row+500,3);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);   /* charge without a kind */
     row[496]=AW_ENCH_USED;real(row+500,3);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512); /* no enchantment */
     assert(AW_InventoryRead("fixture_sword",&out));assert(!memcmp(&prior,&out,sizeof(out)));
+    /* A carried light (the debug torch row): burn time, colour, radius in subtype; checked fields. */
+    {
+        unsigned char sword[512];memcpy(sword,row,512);memset(row,0,512);
+        strcpy((char *)row,"fixture_sword");strcpy((char *)row+64,"Debug torch (test only)");
+        u32(row+160,AW_INV_MISC);u32(row+164,256);u32(row+176,1U<<AW_SLOT_LEFT);
+        u32(row+180,AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED|AW_INV_LIGHT);real(row+172,3);
+        u32(row+504,(unsigned)AW_LIGHT_INFINITE);row[508]=245;row[509]=140;row[510]=40;
+        assert(AW_InventoryRead("fixture_sword",&out));
+        assert(out.light_time==AW_LIGHT_INFINITE && out.light_radius==256 && out.light_colour[1]==140 && (out.flags&AW_INV_LIGHT));
+        u32(row+504,210);assert(AW_InventoryRead("fixture_sword",&out) && out.light_time==210);
+        u32(row+504,0);assert(!AW_InventoryRead("fixture_sword",&out));
+        u32(row+504,(unsigned)-2);assert(!AW_InventoryRead("fixture_sword",&out));u32(row+504,(unsigned)AW_LIGHT_INFINITE);
+        row[511]=1;assert(!AW_InventoryRead("fixture_sword",&out));row[511]=0;
+        u32(row+164,0);assert(!AW_InventoryRead("fixture_sword",&out));u32(row+164,256);
+        u32(row+160,AW_INV_WEAPON);assert(!AW_InventoryRead("fixture_sword",&out));u32(row+160,AW_INV_MISC);
+        u32(row+180,AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED);assert(!AW_InventoryRead("fixture_sword",&out)); /* tail without the flag */
+        u32(row+180,64|AW_INV_LIGHT);assert(!AW_InventoryRead("fixture_sword",&out));
+        memcpy(row,sword,512);assert(AW_InventoryRead("fixture_sword",&out));
+    }
     corrupt_header=1;assert(!AW_InventoryRead("fixture_sword",&out));assert(!memcmp(&prior,&out,sizeof(out)));
     corrupt_header=0;multirow=1;
     /* Link common.c: the real Quake helper is an equality test in both orders. */

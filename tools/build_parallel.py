@@ -498,6 +498,53 @@ def completed_map(function, items, jobs=None):
                 future.cancel()
 
 
+def governed_map(function, items, jobs=None, unit_mib=None, label='pool'):
+    """completed_map whose units in flight follow the container's memory and CPU quota while it runs
+    (tools/resource_plan.py MemoryGovernor, fixlist A9): at most `jobs` (and the stage's allowance), and no more units
+    of about UNIT_MIB each than the memory holds now, re-read every 30 s between tasks. A throttled map grows back
+    when memory frees up (another container stopped, a raised lease) and stops handing out units when memory gets
+    tight; a running unit is never stopped. Every change is printed with its reason. A new function of its own, so
+    the stages that use completed_map keep their keys."""
+    count = resolve_jobs(jobs)
+    size, limit = _throttle(count)
+    from resource_plan import governor_for
+    governor = governor_for(count, unit_mib, label)
+    if size == 1 or governor is None:
+        yield from completed_map(function, items, jobs)
+        return
+    items = iter(items)
+    stage = active_stage_pool()
+    with worker_environment(), _map_pool(size) as pool:
+        pending = set()
+
+        def refill():
+            while True:
+                cap = governor.limit(len(pending))
+                if limit is not None:
+                    cap = min(cap, limit())
+                if len(pending) >= cap:
+                    return
+                try:
+                    item = next(items)
+                except StopIteration:
+                    return
+                pending.add(pool.submit(function, item))
+                _count_task()
+
+        try:
+            refill()
+            while pending:
+                done, pending = wait(pending, timeout=governor.interval, return_when=FIRST_COMPLETED)
+                results = [future.result() for future in done]
+                refill()
+                yield from results
+        finally:
+            for future in pending:
+                future.cancel()
+    if stage is not None and governor.changes:
+        print('[pool] %s: %d worker change(s) while it ran' % (label, len(governor.changes)), flush=True)
+
+
 # Scene stages copy or mutate their predecessor's tree. Keep that chain ordered;
 # only independent branches may overlap. Image assembly waits for every branch.
 DEPENDENCIES = {
@@ -702,10 +749,12 @@ def execute_parallel(steps, run, metadata, root):
         if not count:
             return []
         serial = len(active) - len(pooled)
-        share = max(count, budget - serial - waiting)
+        share = max(count, guard.effective_budget() - serial - waiting)
         base, extra = divmod(share, count)
         values = [base + (1 if index < extra else 0) for index in range(count)]
         for value, state in zip(values, sorted(pooled, key=lambda s: s['start'])):
+            state['share'] = value
+            value = guard.cap(state['entry']['name'], value)   # memory guard (SchedulerGuard)
             if value != state['allowance']:
                 state['allowance'] = value
                 temporary = state['allowance_file'].with_suffix('.tmp')
@@ -716,9 +765,14 @@ def execute_parallel(steps, run, metadata, root):
                     [round(time.monotonic() - start, 3), value])
         return values[len(pooled):]
     profile = build_profile.start(run, steps, metadata, dependencies)
+    from resource_plan import SchedulerGuard   # key-neutral module (build_cache.INSTRUMENTATION_MODULES)
+    guard = SchedulerGuard(budget, metadata.get('resource_plan_units'))
     try:
         while pending or active:
             ready = [item for item in pending if set(dependencies[item[1][0]]) <= passed]
+            pooled_now = {n: s['allowance'] for n, s in active.items() if s['parallel']}
+            if pooled_now:
+                guard.tick(pooled_now, {n: s.get('share', s['allowance']) for n, s in active.items() if s['parallel']})
             rebalance(len(ready))
             for item in ready:
                 number, (name, original) = item
@@ -809,6 +863,8 @@ def execute_parallel(steps, run, metadata, root):
         save()
         profile.close(receipt)
         raise
+    if guard.changes:
+        receipt['scheduler_guard_changes'] = guard.changes
     receipt.update(status='passed', elapsed_seconds=round(time.monotonic() - start, 3))
     save()
     profile.close(receipt)

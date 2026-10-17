@@ -61,6 +61,8 @@ void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){
     if(x==14 && y>=26 && y<110 && h==14)heading_rows++;
     strcat(drawn,s);
 }
+/* The window title (UI-INVENTORY-HEADING-CENTRE-42) is centred by painted bounds; same text record. */
+void AW_UITextCentred(int x,int y,int w,int h,const char *s,int c){AW_UITextBox(x,y,w,h,s,c);}
 const char *AW_UILine(const char *p,int width,char *out,int capacity){int n=0;while(*p && n<width/6 && n<capacity-1)out[n++]=*p++;out[n]=0;return p;}
 static void word(FILE *f,unsigned n){int i;for(i=0;i<4;i++)fputc((n>>(8*i))&255,f);}
 static void fixed(FILE *f,const char *s,int n){int i;for(i=0;i<n;i++)fputc(i<(int)strlen(s)?s[i]:0,f);}

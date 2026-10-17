@@ -1,7 +1,7 @@
 {
   "schema": "chim-features 1",
   "chim_version": "0.2.1",
-  "updated": "2026-10-11",
+  "updated": "2026-10-17",
   "features": [
     {
       "id": "stored-once",
@@ -1295,6 +1295,43 @@
         {
           "title": "Mesh methods",
           "path": "docs/chim/MESH_METHODS.md"
+        }
+      ],
+      "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "auto-fast-ram",
+      "name": "Extra Fast RAM as CHIM cache, automatic",
+      "area": "streaming",
+      "summary": "At start-up the free Fast RAM beyond a margin (2 MiB plus an eighth of all Fast RAM) becomes CHIM zone banks that survive map changes, one per memory region, each under 2 GiB, no other upper limit; the look-ahead grows with it. 16 MiB takes nothing. A startup notice (M skips), Options > Extra RAM and -chimcache override it.",
+      "status": "in-release",
+      "version": "0.2.1",
+      "gains": [
+        {
+          "headline": true,
+          "text": "128 MiB against 16 MiB Fast RAM, two sessions each: failed zone loads 625-655 (Seyda Neen) and 288-312 (Ebonheart plaza) to 0, evictions on a 58 s flight 487-550 to 0; frame time unchanged within drift",
+          "compared": "the same engine and v0.0.42-dev1 image in FS-UAE (68040 JIT), same poses and flight, 16 MiB and 128 MiB Zorro III",
+          "basis": "emulator",
+          "host": "quiet",
+          "date": "2026-10-17"
+        }
+      ],
+      "gain_short": "zone failures and evictions to 0 at 128 MiB",
+      "gain_note": "Counts are exact; times are emulator-relative. First-time ground still reads in the frame (non-blocking reads are separate work).",
+      "caveats": [
+        "Not measured on real hardware yet.",
+        "The game heap stays at its built size (a larger heap stays manual)."
+      ],
+      "vis": "No change: the same chunks and placements, kept in memory longer.",
+      "links": [
+        {
+          "title": "Memory guide",
+          "path": "docs/chim/build_guide/MEMORY.md#more-fast-ram-the-automatic-chim-cache"
+        },
+        {
+          "title": "Real hardware",
+          "path": "docs/REAL_HARDWARE.md#extra-ram-is-used-automatically"
         }
       ],
       "bugs": [],

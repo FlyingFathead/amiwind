@@ -73,11 +73,12 @@ def write_launcher(folder):
     return target
 
 
-def write_configs(image, rom=None, config_suffix=''):
+def write_configs(image, rom=None, config_suffix='', fast_ram_mib=None):
     image = Path(image).resolve()
     if not image.is_file() or image.stat().st_size == 0:
         raise ValueError('Primary HDF missing or empty.')
     portable = launcher()
+    fast_ram_mib = portable.FAST_RAM_DEFAULT_MIB if fast_ram_mib is None else portable.parse_fast_ram(fast_ram_mib)
     disks = portable.image_disks(image)
     receipt = image.parent / 'build.json'
     if not receipt.is_file():
@@ -96,11 +97,12 @@ def write_configs(image, rom=None, config_suffix=''):
     if any(c in rom for c in '\r\n'):
         raise ValueError('ROM path contains a newline.')
     fs_template = (ROOT / f'resources/emulators/AmiWind-v{version}-FS-UAE.fs-uae').read_text(encoding='utf-8')
-    fs = portable.configured_text(fs_template, image, rom or ROM_PLACEHOLDER)
+    fs = portable.configured_text(fs_template, image, rom or ROM_PLACEHOLDER, fast_ram_mib)
     # Relative HDF names: the config sits beside its HDFs, so the folder can be moved or copied.
     fs = re.sub(r'(?m)^(hard_drive_[0-9]+ *= *).*[/\\]([^/\\\r\n]+\.hdf)[ \t]*$', r'\g<1>\g<2>', fs)
     fs = re.sub(r'(?m)^(jit_compiler *=)', lambda m: FS_JIT_NOTE + '\n' + m.group(1), fs, count=1)
     win_template = (ROOT / f'resources/emulators/AmiWind-v{version}-WinUAE.uae').read_text(encoding='utf-8')
+    win_template = portable.fast_ram_winuae_text(win_template, fast_ram_mib)
     lines = [line for line in win_template.splitlines() if not re.match(r'(?:hardfile2|uaehf[0-9]+)=', line)]
     lines = [f'kickstart_rom_file={rom}' if line.startswith('kickstart_rom_file=') else line for line in lines]
     for i, disk in enumerate(disks):
@@ -165,8 +167,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--image', type=Path, required=True)
     parser.add_argument('--kickstart-file', type=Path)
+    parser.add_argument('--fast-ram', metavar='MIB', help='Fast RAM in MiB for both profiles (default: the profile 16 MiB); '
+                        'the same sizes as the launcher: 128, 256, 512, 1024, 1536 or another size the emulator can make')
     args = parser.parse_args()
-    names = write_configs(args.image, args.kickstart_file)
+    names = write_configs(args.image, args.kickstart_file, fast_ram_mib=args.fast_ram)
     receipt = args.image.resolve().parent / 'build.json'
     if not receipt.is_file(): receipt = args.image.resolve().parent / 'dry-run-build.json'
     record = json.loads(receipt.read_text(encoding='utf-8'))

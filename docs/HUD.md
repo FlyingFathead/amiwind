@@ -2,6 +2,17 @@
 
 Last updated with AmiWind v0.0.42-dev1.
 
+<!-- contents start -->
+## Contents
+
+- [What the boxes show](#what-the-boxes-show)
+- [How the boxes are made (builder)](#how-the-boxes-are-made-builder)
+- [Inventory icons](#inventory-icons)
+- [Window title bar](#window-title-bar)
+- [Engine (aw_icons.c)](#engine-aw_iconsc)
+
+<!-- contents end -->
+
 The lower-left HUD shows the three resource bars (health, magicka, fatigue)
 and, beside them, the two original boxes: the **weapon box** and the **magic
 box**. From v0.0.42-dev1 both boxes are drawn from the original game art,
@@ -64,17 +75,26 @@ The image step's inventory conversion (tools/prepare_inventory.py) calls the
 icon and HUD-art import (tools/prepare_icons.py). It writes:
 
 * `gfx/icons.awl`: ONE lookup table for every UI picture: key, the original
-  source path, the picture's SHA-256. Keys: `item:<record id>` (the record's
-  icon field), `skill:26` (the hand-to-hand icon), `hud:box`, `hud:bar`,
-  `hud:track:weapon`, `hud:track:magic`, later `mgef:<index>` for spells.
-* `gfx/icon/<first 16 hex of the SHA-256>.awi`: each picture once (identical
-  pictures share one file), palette indices for the installed game palette.
-* `gfx/hud-settings.txt`: the recharge rate (fMagicItemRechargePerSecond).
+  source path, the picture's place in the pack and its SHA-256. Keys:
+  `item:<record id>` (the HUD icon of the record's icon field, 18 x 18),
+  `inv:<record id>` and `inv:<record id>:equip` (the inventory cell, 16 x 16,
+  and its equipped variant), `skill:26` (the hand-to-hand icon), `hud:box`,
+  `hud:bar`, `hud:track:weapon`, `hud:track:magic`, `ui:head:*` (the window
+  title bar), later `mgef:<index>` for spells.
+* `gfx/icons.awp`: every picture once (identical pictures stored once), in one
+  file rather than thousands (classic FFS directories), palette indices for
+  the installed game palette. The engine still reads the first v0.0.42-dev1
+  layout (one `gfx/icon/<sha>.awi` file per picture).
+* `gfx/hud-settings.txt`: the recharge rate (fMagicItemRechargePerSecond) and
+  the hand-to-hand name (sSkillHandtohand).
 * the item catalogue (`inventory/items.awi`) bytes 496..511: enchantment type
   and maximum charge.
 
-Only the referenced closure is converted: the items the build stages
-inventory resources for, plus the fixed HUD keys. The conversion prints one
+Only the referenced closure is converted: the HUD icons of the items the build
+stages resources for, the inventory icon of every catalogue item the player
+can own, and the fixed UI keys; the item pictures are converted in a process
+pool with the build's `--jobs`. On a GOG Morrowind install: 3,414 rows, 1,150 distinct
+pictures, a 305,208-byte pack and a 546,248-byte table, converted in about 1.3 s. The conversion prints one
 line with the table rows, stored pictures, their bytes and any item held back
 (a missing original is held with its reason, never replaced by other art).
 
@@ -115,6 +135,31 @@ original HUD as OpenMW 0.51 describes it (read for reference, no code taken):
 
 AmiWind's three resource bars are 24 pixels tall where the original's span 42,
 so every HUD size is the original's times 24/42 (rounded).
+
+## Inventory icons
+
+Each inventory row shows the item's own original icon as the original item
+cell: the 42 x 42 cell with the 32 x 32 icon at 5,5 and the backdrop stretched
+over it (files/data/mygui/openmw_resources.xml MW_ItemIcon,
+apps/openmw/mwgui/itemwidget.cpp setItem), scaled to the row's 16 x 16 slot
+(icon 12 x 12 at 2,2): the magic backdrop when enchanted, the equipped
+backdrop (`menu_icon_equip.dds`, `menu_icon_magic_equip.dds`) when equipped.
+Potions name their icon in the record's TEXT field, other items in ITEX. One picture slot per
+visible row, loaded only when that row's item or state changes. `aw_hud_icons
+0` keeps the old rows (the staged 32 x 32 icon in a small box).
+
+## Window title bar
+
+Titled windows (the inventory first) use the original title bar, imported in
+the same step: `ui:head:block` (the head block strip: `menu_head_block_middle`
+tiled inside its top and bottom edges), `ui:head:left` and `ui:head:right`
+(the edge columns), scaled 12/20 to AmiWind's 12-pixel title band. The title
+sits on the window's black between two head blocks, the gap being its width
+plus 24 (scaled: 14), centred by its painted pixels. The inventory's title is
+the equipped weapon's name, or the hand-to-hand skill's name (GMST
+sSkillHandtohand, written to `gfx/hud-settings.txt`) when unarmed. Composition
+from files/data/mygui/openmw_windows.skin.xml (MW_Caption, HB_ALL) and
+components/widgets/windowcaption.cpp (WindowCaption::align).
 
 ## Engine (aw_icons.c)
 

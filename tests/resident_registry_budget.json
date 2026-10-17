@@ -7,9 +7,9 @@
    "hunk_bytes": 8672
   },
   "cvars": {
-   "count": 329,
-   "static_bytes": 7896,
-   "zone_bytes": 10752
+   "count": 332,
+   "static_bytes": 7968,
+   "zone_bytes": 10848
   },
   "tables": {
    "count": 0,
@@ -28,7 +28,10 @@
   "2026-10-17: Maintainer-requested named camera marks (dbg cam mark / recall / list, maintainer 2026-10-16, docs/PLAN-v0.0.42.md 1.2c) need one command record, aw_cam (32 hunk bytes): every dbg route needs a registered handler and the three subcommands and later camera modes share this one; no cvars, the marks files are read from disk on the command only.",
   "2026-10-17: HUD-STATS-29, maintainer-ordered original HUD boxes (job of 2026-10-17, maintainer: magic box charge bar required): aw_magic, one command record (32 hunk bytes) for selecting a magic item until the magic menu exists, the diagnostic charge and the HUD icon counters; aw_hud_icons, one saved cvar for the old placeholder method (DON'T DELETE ANY METHOD). The icon table is read from disk; no static table.",
   "2026-10-17: UI-INVENTORY-PREVIEW-GAP-41, maintainer-reported missing inventory character preview: aw_inventory_preview_reserve, one saved cvar keeping the old fixed 2 MiB admission selectable (DON'T DELETE ANY METHOD) beside the new admission by the pose model's real need.",
-  "2026-10-17: UI-INVENTORY-PREVIEW-STILL-42, maintainer-ordered still inventory picture (rendered once per equipment change): aw_inventory_preview_live, one saved cvar keeping the old live, turnable preview selectable, default off (DON'T DELETE ANY METHOD)."
+  "2026-10-17: UI-INVENTORY-PREVIEW-STILL-42, maintainer-ordered still inventory picture (rendered once per equipment change): aw_inventory_preview_live, one saved cvar keeping the old live, turnable preview selectable, default off (DON'T DELETE ANY METHOD).",
+  "2026-10-17: SKY-STAR-TWINKLE-LATE-42, maintainer-requested star twinkle switch (TG 2026-10-17 12:51: config flag on/off, default on, minimal strength): aw_star_twinkle, one saved cvar (24 structure bytes, 32 zone bytes); dbg startwinkle reuses the on-disk catalogue. 0 keeps the stars steady, 1 is the unchanged default pulse.",
+  "2026-10-17: the maintainer-requested debug torch (test only) while AmiWind is a preview (TG 12:42): aw_debug_torch, one cvar set by the builder's game config (1 until the final game, not saved), decides whether the player leaves the census office with the never-burning torch; the grant, the catalogue row and the lit torch need no command or static table.",
+  "2026-10-17: maintainer-ordered automatic use of extra Fast RAM (v0.0.42-rc1, docs/ROADMAP.md cache plan: \"the benefits come automatically\", with an Options setting to turn it off for good): aw_autoram, one saved cvar (24 structure bytes, 32 zone bytes) behind Options > Extra RAM; no command (the startup notice's key and the chim command's memory line need none)."
  ],
  "entries": {
   "commands": [
@@ -332,6 +335,7 @@
    "aw_animkit",
    "aw_arena_player",
    "aw_auto_center",
+   "aw_autoram",
    "aw_autosaves",
    "aw_boot_console",
    "aw_cell_change_method",
@@ -364,6 +368,7 @@
    "aw_daynight",
    "aw_daynightcycle",
    "aw_death_retry",
+   "aw_debug_torch",
    "aw_depthslop",
    "aw_dialogue_box_display_method",
    "aw_dialogue_box_layout",
@@ -443,6 +448,7 @@
    "aw_sky_type",
    "aw_skyline_fill",
    "aw_skyspeed",
+   "aw_star_twinkle",
    "aw_starsky",
    "aw_static_flames",
    "aw_static_flames_nearest",

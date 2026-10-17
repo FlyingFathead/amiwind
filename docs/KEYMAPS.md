@@ -118,6 +118,7 @@ all remappable through gameplay bindings.
 | Gameplay | Shift+V | Cycle requested draw distance |
 | Photo mode | Ctrl+F | Fog on/off (the fog setting from before photo mode returns when it ends) |
 | Photo mode | Ctrl+H | Debug HUD on/off, the same as `dbg hud on/off` |
+| Inspect mode (`dbg hud on`) | Left click / right click | Pin the target under the crosshair / leave inspect mode (the same as `dbg hud off`); the hint and the pin are the bottom lines of the screen, under the stat bars |
 | Gameplay | Shift+F5 / Shift+F6 | Previous / next music track |
 | World map | M, Escape | Close map |
 | World map | Wheel, +/- | Zoom |

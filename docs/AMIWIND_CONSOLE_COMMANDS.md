@@ -30,7 +30,7 @@ Type: "dbg help" for help.
 | `dbg cam` | - | [mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel distance, right click or Esc ends |
 | `dbg camera` | `dbg pov`, `dbg thirdperson` | [first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md) |
 | `dbg crosshair` | `dbg crosshairs` | [on/off, true/false or 1/0; no argument toggles] show the crosshair (saved; default on; also Options > Show crosshairs) |
-| `dbg cull` | - | far detail (saved; also Options > Far detail): 1 Full (everything to the fog, default), 3 Light, 4 Strong, 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0 |
+| `dbg cull` | - | far detail (saved; also Options > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0 |
 | `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 540] |
 | `dbg fog` | - | on/off or 1/0 (default on) |
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off) |
@@ -79,7 +79,7 @@ Type: "dbg help" for help.
 | `dbg reset location` | - | 0 |
 | `dbg scene` | - | ship/town/balmora/<map name> |
 | `dbg scene change` | `dbg tp menu` | (scene picker) |
-| `dbg tp` | - | [X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (also teluvirith) / <map name>; no argument opens menu] |
+| `dbg tp` | - | [X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (also teluvirith) / <map name>; no argument opens menu] |
 | `dbg unstuck` | - | (nearest clear standing spot below or beside you; never into a wall or water; leaves noclip) |
 | `dbg view` | - | x y z yaw pitch |
 | `dbg worldbounds` | - | [on/off, true/false or 1/0; no argument shows the state] the sea current along the edge of the open world that turns you back (an AmiWind extension; on in a default build) (not saved) |
@@ -118,6 +118,7 @@ Type: "dbg help" for help.
 | `dbg skyspeed` | - | [0..100] (cloud multiplier; default 0.00333333333 = 1/300 of old speed) |
 | `dbg skytype` | - | 1/2/3 or V1/V2/V3 (V3 extra stronk default) |
 | `dbg starsky` | - | on/off true/false 1/0 (stars and nebula; default on) |
+| `dbg startwinkle` | - | on/off true/false 1/0 (slow, faint pulse of a few bright stars; default on, saved; off = steady stars) |
 | `dbg sun` | - | on/off true/false 1/0 (default on, clock still advances) |
 | `dbg timeofday` | - | [0..23.999 or morning/night/midday/day/evening/sunset/sunrise/dusk/dawn] |
 | `dbg torch flame` | - | [classic/brightbase/sparks or 1/2/3] no argument: current style |
@@ -164,7 +165,7 @@ Type: "dbg help" for help.
 | `dbg fpucount` | - | [0/1] once a second: per-frame counts of brush model rotations (and rebuilds), direction vectors, table sine/cosine lookups and NPC targeting (average/peak) |
 | `dbg hands` | - | - |
 | `dbg heap` | - | (current hunk clearance and load peak) |
-| `dbg hud` | - | on/off true/false 1/0; click-to-pin raw target identity on the HUD (not saved). Attack selects while on; off restores attacks after releasing the button. Use dbg overlay for overlays without inspection. |
+| `dbg hud` | - | on/off true/false 1/0; click-to-pin raw target identity (not saved), shown under the stat bars; a CHIM placement is named by mesh, reference and cell. Attack selects while on; right click or off leaves it and restores attacks after releasing the button. Use dbg overlay for overlays without inspection. |
 | `dbg hud type` | - | 1 original / 2 compact (default) |
 | `dbg logs live` | - | [on/off, true/false or 1/0] write the diagnostic logs (DEBUG.TXT, walk-profile.csv, frame-stalls.csv, heap-audit.log, cell-load-profile.tsv, music-events.csv, ...) as they happen, for benchmarks; default off: kept in memory (oldest lines drop) and written at Exit game or with dbg savelogs (saved once set) |
 | `dbg npcfloors` | - | (read-only ground-contact report) |

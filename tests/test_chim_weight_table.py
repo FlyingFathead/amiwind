@@ -129,6 +129,16 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual((rows['0,0']['class'], rows['1,0']['class']), ('seabed', 'seabed'))
         self.assertEqual(doc['batch'], ['1,0'])
 
+    def test_a_measured_empty_seabed_cell_without_an_island_joins(self):
+        # a seabed cell has no census row, so its tracker record names no island; a CHIMport run measured it as
+        # empty sea (nothing placed, nothing converted): it is listed and joins the batch
+        rec = cell(None, converted=False, land=False)
+        rec.pop('island')
+        rec['chim'] = {'converted': False, 'bucket': 'empty_sea', 'status': 'empty_sea', 'empty': True}
+        doc = W.make(progress(**{'2_0': rec}), set(), CLASSES, seabed={'2,0'})
+        self.assertEqual([r['class'] for r in doc['rows']], ['seabed'])
+        self.assertEqual(doc['batch'], ['2,0'])
+
 
 class OutputTests(unittest.TestCase):
     def test_cli_writes_the_batch_the_page_and_the_guide_section(self):

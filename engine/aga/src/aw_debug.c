@@ -16,6 +16,7 @@
 #include "aw_testbox.h"
 #include "aw_view.h"
 #include "aw_inspect.h"
+#include "aw_inventory.h"
 void AW_CamInit(void);
 extern trace_t SV_ClipMoveToEntity(edict_t *,vec3_t,vec3_t,vec3_t,vec3_t);
 static edict_t *player(void) {
@@ -235,7 +236,7 @@ static void godmode_command(void)
 void AW_DebugInit(void) {
     AW_InspectInit();
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
-    AW_GalleryInit();AW_WorldUIInit();
+    AW_GalleryInit();AW_WorldUIInit();AW_DebugTorchInit();
     AW_StreamInit();AW_PhotoInit();Chim_Init();
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
     AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_CompanionInit();AW_CombatInit();AW_ViewInit();AW_LavaInit();AW_AnimInit();AW_AnimKitInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();

@@ -80,6 +80,18 @@ class ChimCellListTests(unittest.TestCase):
         self.assertTrue(left[0].startswith('left out 1,'))     # ring 2 goes first
         self.assertEqual(holes([tuple(c) for c in doc['cells']]), [])
 
+    def test_town_cells_count_as_chim_in_the_pocket_test(self):
+        # CHIM-REGION-POCKET-TOWN-CELLS-42: (0,0) lies wholly inside a town frame; the ring round it opens nothing
+        cells = {'%d,%d' % (x, y): dict(ring=1, island=1) for x in range(-1, 2) for y in range(-1, 2) if (x, y) != (0, 0)}
+        (self.tmp / 'grid.json').write_text(json.dumps({'cells': cells}))
+        (self.tmp / 'town.json').write_text(json.dumps({'format': 'aw-chim-cells-1', 'cells': [[0, 0]]}))
+        doc, lines = L.make(self.tmp / 'grid.json', '1', open_pockets=True, covered=[self.tmp / 'town.json'])
+        self.assertFalse([l for l in lines if 'opens the legacy pocket' in l])
+        self.assertEqual(len(doc['cells']), 8)
+        self.assertNotIn([0, 0], doc['cells'])
+        doc, lines = L.make(self.tmp / 'grid.json', '1', open_pockets=True)
+        self.assertTrue([l for l in lines if 'opens the legacy pocket 0,0' in l])
+
     def test_cli_refuses_with_exit_2(self):
         out = self.tmp / 'out.json'
         self.assertEqual(L.main(['--progress', str(self.tmp / 'progress.json'), '--rings', '1-2', '--keep',

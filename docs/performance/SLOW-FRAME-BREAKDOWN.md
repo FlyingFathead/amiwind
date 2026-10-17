@@ -14,6 +14,10 @@ off, the engine draws exactly the same frames.
 
 ## The 3D view, with and without the placed models
 
+> Far detail: every figure on this page before 17 October 2026 was measured with far detail **Full**
+> (`aw_cull 1`, the default up to v0.0.41). From v0.0.42 the default is Strong; to compare with these
+> figures, set `dbg cull 1` first ([the far test](FAR-TEST.md)).
+
 | Camera | Normal view (ms) | Models off (ms) | Fog off (ms) | Both off (ms) |
 | --- | ---: | ---: | ---: | ---: |
 | 1 | 1,525 | 321 | 1,504 | 305 |

@@ -158,6 +158,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [NPC-LIGHT-COHERENCE-32](NPC-LIGHT-COHERENCE-32.md): Characters are lit by the floor below them, not by the light where they stand
 - [OPENING-BRIGHT-31](OPENING-BRIGHT-31.md): The prison ship hold is brighter than the original
 - SKY-MIDNIGHT-29 (no report page): Dense clouds still hide the midnight sky
+- [SKY-STAR-TWINKLE-LATE-42](SKY-STAR-TWINKLE-LATE-42.md): Star twinkle seen only late at night: before the midnight clearing the night clouds hide the few twinkling stars
 - [TERRAIN-LIGHT-UNIFORM-32](TERRAIN-LIGHT-UNIFORM-32.md): Open-world terrain lightmaps are nearly uniform
 - TORCH-LIGHT-29 (no report page): Torch flames look weak and provide little immediate light
 - TORCH-NPC-LIGHT-29 (no report page): Nearby NPCs do not visibly respond to torchlight

@@ -107,6 +107,7 @@ preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
 | `vivec-arena-pit` | `--miniwind-vivec-arena-pit` | Vivec Arena Pit: combat test |
 | `vivec-arena-chim` | `--miniwind-vivec-arena-chim` | Vivec on CHIM (whole city) from the Arena arrival |
 | `vivec-city-chim` | `--miniwind-vivec-city-chim` | All of Vivec on CHIM, one frame: cantons, Temple, frame edge |
+| `vivec-city-exterior` | `--miniwind-vivec-city-exterior` | Vivec city on CHIM, exterior: mushrooms, HUD, inspect |
 | `vivec-palace` | `--miniwind-vivec-palace` | Palace of Vivec: Vivec meditating, interior creatures |
 | `opening-ship` | `--miniwind-opening-ship` | Opening ship: lantern and ship lighting check |
 | `animkit` | `--miniwind-animkit` | Animation kit: walk and run with a companion and hostiles |

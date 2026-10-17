@@ -107,6 +107,10 @@ class ChimZoneTests(unittest.TestCase):
     def test_zone_fit_lru_locks_banks_and_stress(self):
         out = compile_and_run(self, 'aga_chim_zone_test.c', [SRC / 'chim/chim_zone.c'])
         self.assertIn('chim zone ok', out[0])
+        # Automatic extra memory: 16 MiB gives nothing; 64, 128, 512 MiB, 1 and 3 GiB over one to
+        # three regions give the expected banks, each under 2 GiB (chim_zone.c ChimZone_Auto*).
+        self.assertIn('auto sizing ok', out[0])
+        self.assertIn('many banks ok', out[0])
 
 
 def boxes(n, size=48, step=128):
@@ -385,6 +389,12 @@ class ChimWorldTests(unittest.TestCase):
         out = self.run_world(['inactive'])
         self.assertIn('inactive ok', out[0])
 
+    def test_extra_fast_ram_becomes_cache_banks_and_the_baseline_takes_none(self):
+        out = self.run_world(['autoram'])[0]
+        self.assertIn('autoram ok', out)
+        self.assertIn('CHIM cache off (not enough extra Fast RAM, standard memory)', out)
+        self.assertIn('CHIM cache 97 MiB in 2 banks (automatic)', out)
+
     def test_ring_sharing_placements_collision_streaming_and_map_change(self):
         out = self.run_world(['ring'])[0]
         self.assertIn('reach copies ok', out)
@@ -411,6 +421,33 @@ class ChimWorldTests(unittest.TestCase):
         line = [l for l in first.splitlines() if l.startswith('fullzone first method:')][0]
         holes, steps = map(int, line.split(': ')[1].split(' steps')[0].split(' of '))
         self.assertEqual(holes, steps)
+
+    def test_full_zone_standing_still_keeps_the_drawn_set(self):
+        # CHIM-ZONE-RELEASE-FLICKER-42: with the room split by locked blocks, releasing farther chunks cannot
+        # make one run for the nearer chunk's model, so none goes (chim_release 2) and the drawn set stays the
+        # same while the player stands still; the first method (chim_release 1) released and re-activated them.
+        out = self.run_world(['flicker'])[0]
+        self.assertIn('flicker ok', out)
+        self.assertIn('flicker chim_release 2: 0 changes', out)
+        first = self.run_world(['flicker'], env={'CHIM_RELEASE': '1'})[0]
+        self.assertIn('flicker ok', first)
+        self.assertNotIn('flicker chim_release 1: 0 changes', first)
+
+    def test_index_keeps_file_rows_without_their_paths(self):
+        # CHIM-ZONE-RELEASE-FLICKER-42: the file table's paths are written again from each row (the zone keeps
+        # some 600 KiB more on the whole island); every row still opens; built with CHIM_INDEX_KEEP_PATHS 1 it
+        # keeps them all (the first method).
+        sizes = {}
+        for keep in (0, 1):
+            for rows in (False, True):
+                out = self.run_world(['paths'], rows=rows, extra=['-DCHIM_INDEX_KEEP_PATHS=%d' % keep])[0]
+                self.assertIn('paths ok', out)
+                line = [l for l in out.splitlines() if l.startswith('paths: keep')][0]
+                files, size = int(line.split(': ')[2].split(' files')[0]), int(line.split('blocks ')[1].split(' ')[0])
+                sizes[keep, rows] = (files, size)
+        for rows in (False, True):
+            files = sizes[0, rows][0]
+            self.assertGreaterEqual(sizes[1, rows][1] - sizes[0, rows][1], files * 33 - 64)
 
     def test_balmora_sized_frame_primes_in_linear_work(self):
         out = self.run_world(['bigframe'], big=True)[0]

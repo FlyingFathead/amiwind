@@ -217,6 +217,41 @@ def boxes_meet(a, b):
     return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
 
+def box_covered(box, boxes):
+    """True when the union of `boxes` covers all of `box` (axis-aligned, exact: every piece of the grid the boxes'
+    edges cut `box` into has its centre inside one of them)."""
+    inside = [b for b in boxes if boxes_meet(box, b)]
+    if not inside:
+        return False
+    xs = sorted({box[0], box[2]} | {v for b in inside for v in (b[0], b[2]) if box[0] < v < box[2]})
+    ys = sorted({box[1], box[3]} | {v for b in inside for v in (b[1], b[3]) if box[1] < v < box[3]})
+    for xa, xb in zip(xs, xs[1:]):
+        for ya, yb in zip(ys, ys[1:]):
+            cx, cy = (xa + xb) / 2, (ya + yb) / 2
+            if not any(b[0] <= cx <= b[2] and b[1] <= cy <= b[3] for b in inside):
+                return False
+    return True
+
+
+def town_cells(cells, town_boxes):
+    """Cells near `cells` (their bounding box and one more ring) that lie wholly inside the town frames: CHIM town
+    cells with no legacy map left. The pocket test counts them as CHIM (CHIM-REGION-POCKET-TOWN-CELLS-42): a region
+    frame next to a town frame crosses CHIM to CHIM, never into a second map."""
+    cells = [tuple(c) for c in cells]
+    boxes = list((town_boxes or {}).values())
+    if not cells or not boxes:
+        return []
+    x0, x1 = min(c[0] for c in cells) - 1, max(c[0] for c in cells) + 1
+    y0, y1 = min(c[1] for c in cells) - 1, max(c[1] for c in cells) + 1
+    out = []
+    for b in boxes:
+        for x in range(max(x0, int(b[0] // CELL_UNITS)), min(x1, int(b[2] // CELL_UNITS)) + 1):
+            for y in range(max(y0, int(b[1] // CELL_UNITS)), min(y1, int(b[3] // CELL_UNITS)) + 1):
+                if (x, y) not in out and box_covered(cell_box((x, y)), boxes):
+                    out.append((x, y))
+    return sorted(out)
+
+
 def holes(cells, limit=HOLE_MAX):
     """Unselected pockets enclosed by the selection (4-connected flood from outside its box: a pocket open
     only at a corner is enclosed, leaving it crosses a selected cell), of at most `limit` cells: sorted lists
@@ -340,7 +375,8 @@ def preflight(cells, explicit, statuses, town_boxes, one_map_only=False):
             dropped.append({'cell': list(cell), 'reason': reason + ('; listed by name' if cell in explicit else '')})
             continue
         kept.append(cell)
-    for pocket in holes(kept):
+    # cells wholly inside a town frame are CHIM too: they close a ring around a town, they never open a pocket
+    for pocket in holes(kept + [c for c in town_cells(kept, town_boxes) if c not in kept]):
         problems.append('cells %s: a legacy pocket enclosed by CHIM region cells (select them too, or leave out a '
                         'neighbour): every crossing there would load two maps' % ' '.join(map(cell_key, pocket)))
     if stale:

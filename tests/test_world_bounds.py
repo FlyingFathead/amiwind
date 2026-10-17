@@ -58,8 +58,10 @@ class LookupTests(unittest.TestCase):
         if source != 'LAND cells':
             self.skipTest('the reference now records open-world maps')
         out = wb.report(set(cells), cells, source)
-        self.assertEqual(out['cells'], 1292)
-        self.assertEqual(out['box']['cells'], [-18, -16, 23, 27])
+        # 1,193 land cells and 197 seabed cells (LAND without heights, measured as empty sea; the 98 of
+        # CHIMPORT-OCEAN-LAND-41 counted as LAND cells since their CHIMport run of 17 October 2026)
+        self.assertEqual(out['cells'], 1390)
+        self.assertEqual(out['box']['cells'], [-18, -19, 23, 27])
         self.assertEqual(out['ring']['cells'], sum(out['ring']['by_kind'].values()))
         self.assertEqual(set(out['ring']['by_kind']), {'land', 'seabed'})
         self.assertEqual(out['enclosed_holes'], [])

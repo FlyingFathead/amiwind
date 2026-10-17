@@ -305,6 +305,10 @@ For compatibility or minimum-spec testing, use a separate emulator configuration
 
 ## Slow accelerator preset
 
+> Far detail: every figure on this page before 17 October 2026 was measured with far detail **Full**
+> (`aw_cull 1`, the default up to v0.0.41). From v0.0.42 the default is Strong; to compare with these
+> figures, set `dbg cull 1` first ([the far test](performance/FAR-TEST.md)).
+
 [resources/emulators/AmiWind-SlowAccelerator-FS-UAE.fs-uae](../resources/emulators/AmiWind-SlowAccelerator-FS-UAE.fs-uae)
 plays the game roughly like an A1200 with a TF1260-class accelerator: a 68040 at about
 50 MHz with its FPU, the same 2 MB Chip RAM and 16 MB Zorro III RAM as the normal preset.

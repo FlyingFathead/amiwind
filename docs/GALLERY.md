@@ -36,10 +36,8 @@ What changed in each version: [changelog](CHANGELOG.md).
 
 | | |
 | --- | --- |
-| ![The Balmora Temple lower entrance in v0.0.29](images/amiwind-v0.0.30-temple-before.png) | ![The same Balmora Temple view in v0.0.30](images/amiwind-v0.0.30-temple-after.png) |
-| Before: see-through holes in the Temple lower entrance (v0.0.29). | After: the same view with the wall in place. |
-| ![The Balmora Temple lower room in v0.0.30](images/amiwind-v0.0.30-temple-banner.png) | |
-| The Temple lower room: doorway and banner. | |
+| ![The Balmora Temple lower entrance in v0.0.30](images/amiwind-v0.0.30-temple-after.png) | ![The Balmora Temple lower room in v0.0.30](images/amiwind-v0.0.30-temple-banner.png) |
+| The Temple lower entrance with the wall in place. | The Temple lower room: doorway and banner. |
 
 ## v0.0.29: Let There Be (Just a Bit More) Light
 

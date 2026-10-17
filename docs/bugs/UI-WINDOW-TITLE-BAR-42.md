@@ -45,14 +45,26 @@ Press I and compare the top of the window with the original inventory window.
 
 ## Repair
 
-Planned: import the original window title-bar textures and the plaque from the
-game data in the same step as the HUD art (tools/prepare_icons.py), compose
-them as the original window skin does, centre the title on the plaque (tested),
-and use it for every titled window, the inventory first. Not implemented yet.
+The title bar is composed from the original art, imported at build time with
+the HUD art (tools/prepare_icons.py): the head block of
+`textures/menu_head_block_*.dds` (the tiled middle inside its 2-pixel edges) on
+each side and the title between them on the window's black, the gap being the
+title's width plus 24, as the original window skin lays it out
+(files/data/mygui/openmw_windows.skin.xml MW_Caption and HB_ALL,
+components/widgets/windowcaption.cpp WindowCaption::align, read for reference).
+AmiWind's title band is 12 pixels, so the pieces are scaled 12/20 (1-pixel
+edges, a 154-pixel tile). The title is centred on the plate by its painted
+pixels. The inventory's title is, as in the original, the equipped weapon's
+name or the hand-to-hand skill's name (GMST sSkillHandtohand) when unarmed
+(windowmanagerimp.cpp setSelectedWeapon, hud.cpp unsetSelectedWeapon).
+`aw_hud_icons 0` keeps the plain title. Branch v0.0.42-hud-title.
 
 ## Verification
 
-Not yet repaired.
+Synthetic-picture builder test of the piece sizes, a native fixture of the
+composition (edges, tile, plate width and position, one load) and a centring
+test by painted pixels; in-game stills unarmed and with the sword and an A/B
+with the original window are recorded with the evidence.
 
 ## Prevention
 
@@ -68,8 +80,10 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - AW-20260928-13 (no report page): New Game confirmation defaults to Cancel
 - AW25-03 (no report page): Map marker reported stale; HUD lacked global/local positions
 - CHAR-CONFIRM-BORDER-29 (no report page): Character Go back / Choose actions lack OK-style frames
+- [CHIM-REGION-DOORS-NO-PROMPT-42](CHIM-REGION-DOORS-NO-PROMPT-42.md): Doors in CHIM region cells show no entrance at all (no prompt, not even Interior unavailable), e.g. every door in Khuul
 - [FONT-BITMAP-INDEX-32](FONT-BITMAP-INDEX-32.md): Bitmap font path keeps the .fnt glyph order; the engine indexes by game byte (wrong characters)
 - [FONT-TTF-COVERAGE-32](FONT-TTF-COVERAGE-32.md): Magic Cards TrueType font silently lacks many characters and replaces ASCII brackets with ornaments
+- [HUD-DEBUG-STRIP-OVER-BOXES-42](HUD-DEBUG-STRIP-OVER-BOXES-42.md): Debug coordinate strip's black fill and text cover the weapon and magic boxes
 - [HUD-ENEMY-BAR-COLOUR-33](HUD-ENEMY-BAR-COLOUR-33.md): The enemy health bar draws orange, not yellow
 - [HUD-NOTIFY-OVERLAP-31](HUD-NOTIFY-OVERLAP-31.md): Console messages print over the location title
 - [HUD-STATS-29](HUD-STATS-29.md): Health uses fixed 100; other bars hardcoded full
@@ -78,6 +92,8 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - MAP-REG-01 (no report page): In-Game map mode hid settlement markers (regression)
 - MAP-RIGHT-DRAG-29 (no report page): Advertised right-drag does not pan teleport map
 - MAP-SPOTS-28 (no report page): In-game map screen has white/yellow spots
+- [NOCLIP-BOB-DEFAULT-42](NOCLIP-BOB-DEFAULT-42.md): Head bob still on in noclip mode by default, although the noclip bob was set to off by default
+- NPC-DREAMER-GREETING-DEFAULT-42 (no report page): Dreamers (Sixth House sleepers) give a default greeting instead of their own Sixth House greeting
 - [PHOTO-DEBUG-STRIP-33](PHOTO-DEBUG-STRIP-33.md): Photo mode with Ctrl+H: the coordinate strip blacks out only from x=88, leaving the bottom-left corner of the view
 - [PHOTO-GALLERY-TEXT-33](PHOTO-GALLERY-TEXT-33.md): Photo mode leaves test-room and gallery instruction text over the view
 - [PLACE-NAMES-INTERIOR-31](PLACE-NAMES-INTERIOR-31.md): Location label has no place name inside interiors
@@ -87,8 +103,10 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - UI-ACCEPT-29 (no report page): Character selection lacks a visible OK button
 - [UI-DEATH-DAMAGE-TINT-38](UI-DEATH-DAMAGE-TINT-38.md): Lava damage tint also colours the death menu and selection
 - [UI-ICONS-INVENTORY-42](UI-ICONS-INVENTORY-42.md): Inventory rows show icons only for the few staged items, squeezed 32 to 14 pixels; no magic or equipped backdrops
+- [UI-INVENTORY-FONT-TABS-42](UI-INVENTORY-FONT-TABS-42.md): Inventory categories use the console font as plain text instead of the original Morrowind font on button tabs
 - [UI-INVENTORY-HEADING-CENTRE-42](UI-INVENTORY-HEADING-CENTRE-42.md): The Inventory heading text is not vertically centred in its bar
 - [UI-INVENTORY-LAYOUT-40](UI-INVENTORY-LAYOUT-40.md): Inventory text overlaps fields and footer; preview initially faces away
+- [UI-INVENTORY-ORIGINAL-LAYOUT-42](UI-INVENTORY-ORIGINAL-LAYOUT-42.md): The inventory lacks the original encumbrance bar, armour rating and item icon grid
 - [UI-INVENTORY-PREVIEW-GAP-41](UI-INVENTORY-PREVIEW-GAP-41.md): Inventory shows 'Character preview unavailable': a fixed 2 MiB memory guard refuses the 128 KB pose model in Seyda Neen
 - [UI-INVENTORY-PREVIEW-STILL-42](UI-INVENTORY-PREVIEW-STILL-42.md): The inventory character is drawn live and turns instead of being a still picture
 - [UI-KEY-HELP-STALE-38](UI-KEY-HELP-STALE-38.md): Key help exposes raw actions and uses a sparse outdated layout

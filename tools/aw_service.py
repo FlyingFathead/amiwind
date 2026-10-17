@@ -403,7 +403,12 @@ def build_commands(config, request, facts, run_name):
     mounts = [f'{build["inputs_volume"]}:{build["inputs_mount"]}:ro', volume_rw]
     # rw only because the build preflight checks that the caches are writable; --check returns before the input
     # lock, the run folder or any stage
-    commands['check'] = docker_run(build, f'{prefix}-check-{run_name}', args + ['--check'], mounts,
+    check = ['--check']
+    if facts.get('resource_plan'):
+        # the resource plan of THIS build against the container it will get (its --memory and --cpus), in the check
+        check += ['--resource-plan', '--resource-memory-gb', '%g' % aw.memory_gib(extra[3]),
+                  '--resource-threads', str(extra[1])]
+    commands['check'] = docker_run(build, f'{prefix}-check-{run_name}', args + check, mounts,
                                    extra=['--cpus', str(build.get('check_cpus') or 4)], workdir=source, env=env)
     commands['build'] = docker_run(build, f'{prefix}-build-{run_name}', args + save, mounts, extra=extra,
                                    workdir=source, env=env)
@@ -484,7 +489,13 @@ def commit_facts(config, request):
     version = 'v' + text.strip().lstrip('v')
     # Builders from the build-recipes change on take --recipe / --save-recipe (git cat-file -e prints nothing).
     recipes = git_text(repo, 'cat-file', '-e', full + ':' + RECIPE_MODULE) is not None
-    return {'full': full, 'commit': full[:7], 'version': version, 'recipes': recipes}
+    # Builders with the resource plan (tools/resource_plan.py) take --resource-plan on the check
+    resources = git_text(repo, 'cat-file', '-e', full + ':' + RESOURCE_MODULE) is not None
+    return {'full': full, 'commit': full[:7], 'version': version, 'recipes': recipes, 'resource_plan': resources}
+
+
+RESOURCE_MODULE = 'tools/resource_plan.py'
+RESOURCE_PLAN_EXIT = 5   # tools/build.py --resource-plan: a stage's single unit is larger than the build's memory
 
 
 # --------------------------------------------------------------------------
@@ -695,6 +706,27 @@ def memory_lease(config, asked=None):
     return memory, None
 
 
+def machine_state(config, request, run_name, threads, memory_gib):
+    """The machine at this start, one line (build.machine_state_command: e.g. a launch registry's `state`; the
+    command prints the line and, last, a JSON object with "busy" and "line"). Returns the reason to wait when the
+    host is busy (above its threshold for the last minute), else None. No command configured: nothing."""
+    command = (build_settings(config).get('machine_state_command') or None)
+    if not command:
+        return None
+    argv = [str(part) for part in command] + ['--owner', str(request.get('requester') or 'aw'), '--purpose',
+                                              f'aw build {run_name}', '--threads', str(threads),
+                                              '--mem-gb', '%g' % memory_gib, '--json']
+    try:
+        done = subprocess.run(argv, capture_output=True, text=True, timeout=180)
+        state = json.loads((done.stdout.strip().splitlines() or ['{}'])[-1])
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        print(f'aw submit: {run_name}: machine state unknown ({type(exc).__name__}: {exc})', flush=True)
+        return None
+    if state.get('line'):
+        print(f'aw submit: {run_name}: {state["line"]}', flush=True)
+    return state.get('wait_reason') if state.get('busy') else None
+
+
 def take_cores(config, request, run_name, runner, notes, sleep=time.sleep):
     """The build's core and memory lease (docs/AW.md "Core leases"): (request with options cpus = jobs = the leased
     cores and memory = the leased GiB, lease info for the result, lease or None). A request that does not fit waits
@@ -715,6 +747,16 @@ def take_cores(config, request, run_name, runner, notes, sleep=time.sleep):
     poll = float(build.get('queue_poll_s', QUEUE_POLL_S))
     waited, said = 0.0, None
     while True:
+        busy = machine_state(config, request, run_name, min(want, host), memory)
+        if busy:
+            if busy != said:
+                print(f'aw submit: {run_name}: waiting ({priority}): {busy}', flush=True)
+                said = busy
+            if waited >= timeout:
+                raise aw.AwError(f'{busy} (waited {waited:.0f} s, timeout {timeout:.0f} s)')
+            sleep(poll)
+            waited += poll
+            continue
         if waited and config.get('_path'):
             # a waiting request reads the config again, so a changed lease size or gate reserve reaches it
             # (AW-LEASE-MEMORY-DEADLOCK-36)
@@ -785,9 +827,11 @@ def parse_check(text):
     """What build.py ... --check printed: the developer-mode verdict, its reuse preflight line (f), its REFUSED
     lines, the first Error line and whether the checks completed."""
     found = {'developer_mode': None, 'preflight': None, 'refusals': [], 'error': None, 'completed': False,
-             'line': None}
+             'line': None, 'resources': []}
     for raw in (text or '').splitlines():
         line = raw.strip()
+        if line.startswith(('Resource plan:', 'ADVISORY:', 'WILL THROTTLE', 'WILL NOT FIT', 'Machine at start:')):
+            found['resources'].append(line)
         match = re.match(r'Developer mode: (OK|REFUSED)', line)
         if match:
             found['developer_mode'] = match.group(1)
@@ -836,6 +880,17 @@ def preflight_check(request, commands, runner, notes, reuse_info):
     code, out, err = runner.capture(commands['check'], timeout=1800)
     found = parse_check((out or '') + '\n' + (err or ''))
     refusals, problems = [], []
+    # the resource plan (tools/resource_plan.py): its checklist into the result; WILL NOT FIT refuses here
+    for line in found['resources']:
+        if line.startswith(('ADVISORY:', 'WILL THROTTLE', 'WILL NOT FIT')) or line.startswith('Resource plan: ') and \
+                line.split(':', 1)[1].strip().split(' ')[0] in ('OK', 'THROTTLED', 'REFUSED'):
+            notes.append('resource plan: ' + line)
+            print('aw submit: resource plan: ' + line, flush=True)
+    if code == RESOURCE_PLAN_EXIT and found['completed']:
+        problems.append('resource plan: WILL NOT FIT: a stage\'s single unit is larger than the memory this build '
+                        'gets (' + '; '.join(line for line in found['resources'] if 'WILL NOT FIT' in line)[:400]
+                        + '); ask for more memory')
+        code = 0
     pre = found['preflight']
     if pre and 'error' not in pre:
         reuse_info.update(stages=pre['stages'], planned_reuse=pre['reused'], planned_rebuild=pre['rebuilt'],

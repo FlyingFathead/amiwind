@@ -55,6 +55,7 @@ cvar_t		con_notifytime = {"con_notifytime","3"};		//seconds
 
 #define	NUM_CON_TIMES 4
 float		con_times[NUM_CON_TIMES];	// realtime time the line was generated
+int		con_notify_quiet;	// lines printed while set never show as notify lines (aw_inspect.c pins)
 								// for transparent notify lines
 
 int			con_vislines;
@@ -333,7 +334,7 @@ void Con_Print (char *txt)
 			Con_Linefeed ();
 		// mark time for transparent overlay
 			if (con_current >= 0)
-				con_times[con_current % NUM_CON_TIMES] = realtime;
+				con_times[con_current % NUM_CON_TIMES] = con_notify_quiet ? 0 : realtime;
 		}
 
 		switch (c)

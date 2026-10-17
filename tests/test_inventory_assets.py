@@ -33,6 +33,35 @@ class InventoryAssetsTests(unittest.TestCase):
             self.assertEqual(struct.unpack_from('<ii',initial,72),(1,8))
             self.assertEqual(report['initial_items'],[{'id':'shirt','count':1}])
 
+    def test_debug_torch_row_from_the_original_torch_never_burns_out(self):
+        # The debug torch (test only): one row made from LIGH "torch" (model, icon, weight, value, radius,
+        # colour), burn time -1 (OpenMW: an infinite light), left hand, a carried light; the original
+        # record keeps its own burn time in the receipt. Other lights are not catalogued.
+        lhdt=struct.pack('<fiii4Bi',3.,5,210,256,245,140,40,0,115)
+        raw=record('LIGH',[('NAME',text('torch')),('MODL',text('l\\light_torch10.nif')),('FNAM',text('Torch')),
+                           ('ITEX',text('l\\light_torch10.tga')),('LHDT',lhdt)])
+        raw+=record('LIGH',[('NAME',text('light_com_candle_01')),('LHDT',lhdt)])
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);(base/'Morrowind.esm').write_bytes(raw)
+            with patch.object(inv,'resolve_data_files',return_value=base):
+                report=inv.prepare(base,base/'id1',palette=b'\0'*768,models=False)
+            items=base.joinpath('id1/inventory/items.awi').read_bytes()
+        self.assertEqual(struct.unpack_from('<I',items,4)[0],1)
+        row=items[8:8+512]
+        self.assertEqual(row[:64].split(b'\0')[0],b'aw_debug_torch')
+        self.assertEqual(row[64:160].split(b'\0')[0],b'Debug torch (test only)')
+        category,subtype,value,weight,slots,flags=struct.unpack_from('<iiifII',row,160)
+        self.assertEqual((category,subtype,value,weight,slots),(7,256,5,3.,1<<17))
+        self.assertEqual(flags,1|4|32)
+        self.assertEqual(struct.unpack_from('<i3BB',row,504),(-1,245,140,40,0))
+        self.assertEqual(report['debug_torch'],{'id':'aw_debug_torch','name':'Debug torch (test only)','source':'torch',
+            'time':-1,'source_time':210,'radius':256,'colour':[245,140,40]})
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);(base/'Morrowind.esm').write_bytes(record('LIGH',[('NAME',text('light_com_candle_01')),('LHDT',lhdt)]))
+            with patch.object(inv,'resolve_data_files',return_value=base):
+                report=inv.prepare(base,base/'id1',palette=b'\0'*768,models=False)
+            self.assertIsNone(report['debug_torch'])   # no original torch: no row, nothing invented
+
     def test_script_proof_requires_first_executable_registration_guard(self):
         source='Begin ring\nshort state\nshort OnPCAdd\nif ( CharGenState == -1 )\n return\nendif\nset state to 1\nEnd'
         self.assertTrue(inv.script_inert_after_registration(source))

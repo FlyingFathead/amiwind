@@ -678,7 +678,7 @@ def stair_gate(out, frames, jobs=1, models=None):
     Every walked frame names why (walk_reason: the input that changed since its last stored walk)."""
     import json
     import math
-    from build_parallel import completed_map, ordered_map
+    from build_parallel import completed_map, governed_map, ordered_map
     from player_hull import STEP_HEIGHT, WALKABLE_Z
     from stair_walk import _gating, pick_sample, rows_digest, walk_cache_mode, walk_sample
     from build_jobs import resolve_jobs
@@ -806,8 +806,8 @@ def stair_gate(out, frames, jobs=1, models=None):
              max(1, min(workers, len(units) or 1)), sum(len(u[2]) for u in units),
              sum(len(c) for c in cores.values())), flush=True)
     if workers < by_cores:
-        print('CHIM stair gate: %d of %d workers: the memory left in the container holds no more frames of this size'
-              % (workers, by_cores), flush=True)
+        print('CHIM stair gate: %d of %d workers to start: the memory left in the container holds no more frames of '
+              'this size; more start when memory frees up (re-read every 30 s)' % (workers, by_cores), flush=True)
     if keys and walk_frames:
         why = {}
         for fi in walk_frames:
@@ -872,10 +872,12 @@ def stair_gate(out, frames, jobs=1, models=None):
     done_units, peaks = set(), []
     from concurrent.futures.process import BrokenProcessPool
     try:
-        for uid, found, peak in completed_map(
+        # the walks in flight follow the container's memory while the gate runs (fixlist A9): it starts with the
+        # workers that fit now and grows back toward the cores' count when memory frees up, never killing a walk
+        for uid, found, peak in governed_map(
                 stair_unit_sized, [((str(out), u[1], u[2], u[3]) + ((areas[u[1]],) if u[1] in areas else ()),
                                     frame_mib.get(u[1], WORKER_BASE_MIB), per_worker) for u in units],
-                max(1, min(workers, len(units) or 1))):
+                max(1, min(by_cores, len(units) or 1)), unit_mib=per_worker, label='CHIM stair gate'):
             fi = unit_frame[uid]
             parts_of[fi][uid] = found
             done_units.add(uid)

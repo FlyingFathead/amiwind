@@ -174,10 +174,12 @@ void AW_FogDraw(void) {
  * faces; measured 2026-10-17 at the five Balmora benchmark cameras: -3.2 %
  * view time at one, +0.4..+0.8 % at the others; docs/performance/FAR-TEST.md);
  * 3 and 4 add a size-scaled cut-off ("Light", "Strong"), 5 a far detail
- * step, 6 both 4 and 5 ("Strong + small faces"). 1 is the default. 7 is a
+ * step, 6 both 4 and 5 ("Strong + small faces"). 4 is the default from
+ * v0.0.42 (owner decision 2026-10-17: -17..-27 % view time); a config.cfg
+ * saved before aw_cull was saved keeps 1 (AW_FarDetailSavedBefore). 7 is a
  * debug view: the fog-exact test without its colour checks (works with fog
  * off, to see what it leaves out) and the sky ray's horizon marked. */
-static cvar_t aw_cull={"aw_cull","1",true};
+static cvar_t aw_cull={"aw_cull","4",true};
 static float far_normal[3],far_distance;
 /* Brush polygons revisit the same world nodes many times in a frame.
  * Cache only the far-plane decision; PVS and brush sort keys remain untouched. */
@@ -265,6 +267,42 @@ void AW_CullBegin(void) {
     detail_step=!AW_Interior() && (mode==5 || mode==6);
     cut_distance=distance;
 }
+/* R_Init, before AW_FogInit: a config.cfg saved before aw_cull was saved (up to
+ * v0.0.41) holds the picture that player had: Full (1). A fresh install has no
+ * config.cfg and starts at the default, Strong (4); every later save keeps the
+ * player's choice. */
+void AW_FarDetailSavedBefore(int config_without_setting) {
+    if(config_without_setting)aw_cull.string="1";
+}
+/* 1 when a saved config.cfg exists and never sets the named variable
+ * (a configuration saved before that variable was saved). */
+int AW_ConfigWithout (const char *name)
+{
+	FILE	*f = NULL;
+	int		size, c, n, at_line = 1, length = (int)strlen (name);
+
+	size = COM_FOpenFile ("config.cfg", &f);
+	if (size < 0 || !f)
+		return 0;
+	for (n = -1; size-- > 0 && (c = fgetc (f)) != EOF; )
+	{
+		if (n < 0 && at_line && c == name[0])
+			n = 1;
+		else if (n > 0 && n < length && c == name[n])
+			n++;
+		else if (n == length && (c == ' ' || c == '\t' || c == '"'))
+		{
+			fclose (f);
+			return 0;
+		}
+		else
+			n = -1;
+		at_line = c == '\n';
+	}
+	fclose (f);
+	return 1;
+}
+
 int AW_FogExactActive(void) {return fog_exact;}
 float AW_FogExactDepth(void) {return fog_exact_depth;}
 /* Size-scaled cut-off presets (aw_cull 3, 4): a placement whose near side

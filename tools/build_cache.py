@@ -133,8 +133,11 @@ PATH_CALLS = {'Path', 'PurePath', 'PurePosixPath', 'joinpath', 'join', 'open', '
 # tools/cache_provenance.py: who/when/which version wrote a cache entry (CACHE-NO-PROVENANCE-36); it reads only
 # the environment, never a repository file, and its statements in the cache writers are left out of every key
 # (strip_provenance below).
+# tools/resource_plan.py: the resource plan and the memory governor (how many units a pool keeps in flight, never what
+# a unit computes or the order of any output; tests/test_resource_plan.py checks a governed map against the serial one).
 INSTRUMENTATION_MODULES = frozenset({'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
-                                     'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py'})
+                                     'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py',
+                                     'tools/resource_plan.py'})
 OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
 INSTRUMENTATION_STEMS = frozenset(path.rsplit('/', 1)[-1][:-3] for path in INSTRUMENTATION_MODULES)
 # The reuse step of a reused stage (`build_cache.py apply`) also loads the storage pool (tools/storage_pool.py) to

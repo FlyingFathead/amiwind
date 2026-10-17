@@ -65,5 +65,26 @@ int main(void){
         assert(!state.magic.selected[0] && AW_MagicCharge(&state,&used)==20);
         assert(AW_MagicCharge(&state,&plain)==0);
     }
+    /* The debug torch (test only): given once (a saved global marks it), never when switched off,
+     * and its burn time never runs out; an ordinary light counts down to 0 (OpenMW actors.cpp). */
+    {
+        aw_inventory_item_t torch,lamp;
+        memset(&state,0,sizeof(state));
+        prior=state;assert(!AW_DebugTorchGrant(&state,0));assert(!memcmp(&state,&prior,sizeof(state)));
+        assert(AW_DebugTorchGrant(&state,1));
+        assert(AW_StateGet(&state,AW_ITEM,AW_DEBUG_TORCH_ID)==1 && AW_StateGet(&state,AW_GLOBAL,AW_DEBUG_TORCH_GRANTED)==1);
+        prior=state;assert(!AW_DebugTorchGrant(&state,1));assert(!memcmp(&state,&prior,sizeof(state)));  /* second exit, reload */
+        assert(AW_ItemAdd(&state,AW_DEBUG_TORCH_ID,-1));assert(!AW_DebugTorchGrant(&state,1));          /* dropped or sold: not again */
+        assert(AW_StateGet(&state,AW_ITEM,AW_DEBUG_TORCH_ID)==0);
+        memset(&state,0,sizeof(state));
+        for(i=0;i<AW_STATE_VALUES;i++){char name[32];sprintf(name,"item%d",i);assert(AW_ItemAdd(&state,name,1));}
+        prior=state;assert(!AW_DebugTorchGrant(&state,1));assert(!memcmp(&state,&prior,sizeof(state)));  /* full: nothing, no mark */
+        memset(&torch,0,sizeof(torch));strcpy(torch.id,AW_DEBUG_TORCH_ID);torch.flags=AW_INV_LIGHT;
+        torch.light_time=AW_LIGHT_INFINITE;lamp=torch;lamp.light_time=210;
+        assert(AW_LightBurn(&torch,AW_LIGHT_INFINITE,3600)==AW_LIGHT_INFINITE);
+        assert(AW_LightBurn(&torch,AW_LIGHT_INFINITE,1e9f)==AW_LIGHT_INFINITE);
+        assert(AW_LightBurn(&lamp,210,10)==200 && AW_LightBurn(&lamp,5,10)==0 && AW_LightBurn(&lamp,0,1)==0);
+        lamp.flags=0;assert(AW_LightBurn(&lamp,210,10)==0);   /* not a light */
+    }
     return 0;
 }

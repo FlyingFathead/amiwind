@@ -88,6 +88,18 @@ int main(int argc,char **argv){
  for(i=0;i<256;i++)pal[i*3]=pal[i*3+1]=pal[i*3+2]=i;
  memset(frame,137,sizeof(frame));vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=frame+2;
  AW_UIInit();AW_UIBox(-12,-12,80,80);AW_UIBox(300,190,80,80);
+ /* UI-INVENTORY-HEADING-CENTRE-42: a title centred by its painted rows has equal space above and
+  * below in its band (the fixture glyphs paint one row), and is centred across the band. */
+ {
+  int x,y,top=-1,bottom=-1,left=-1,right=-1,c=AW_UIColor(223,199,144);(void)c;
+  memset(frame,0,sizeof(frame));AW_UITextCentred(6,6,308,12,"Guard",c);
+  for(y=6;y<18;y++)for(x=6;x<314;x++)if(vid.buffer[y*vid.rowbytes+x]){
+   if(top<0)top=y;
+   bottom=y;if(left<0 || x<left)left=x;if(x>right)right=x;}
+  assert(top>=0 && (top-6)-(17-bottom)>=-1 && (top-6)-(17-bottom)<=1);
+  assert((left-6)-(313-right)>=-1 && (left-6)-(313-right)<=1);
+  memset(frame,137,sizeof(frame));
+ }
  /* Real HUD pixels: full non-100 stats, independent fractions, live health,
   * invalid maxima, damage and overheal must not alter character state. */
  {

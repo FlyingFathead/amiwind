@@ -29,6 +29,11 @@ music crackles at some transitions remain (see Known issues).
   fireplaces in five Seyda Neen interiors, which faced away from the room.
   ([BALMORA-TEMPLE-GEOMETRY-29](bugs/BALMORA-TEMPLE-GEOMETRY-29.md),
   [CONVERTER-ROOT-ROTATION-30](bugs/CONVERTER-ROOT-ROTATION-30.md))
+
+  | Before: v0.0.29, holes where the wall should be | After: v0.0.30, the same view |
+  | --- | --- |
+  | ![Balmora Temple lower entrance in v0.0.29 with see-through holes](images/amiwind-v0.0.30-temple-before.png) | ![The same Balmora Temple view in v0.0.30 with the wall in place](images/amiwind-v0.0.30-temple-after.png) |
+
 - **Crash fix:** a `NUM_FOR_EDICT: bad pointer` crash on a Seyda Neen region
   change. The opening sequence kept actor pointers across a map reload.
   ([INTRO-ROLES-30](bugs/INTRO-ROLES-30.md))

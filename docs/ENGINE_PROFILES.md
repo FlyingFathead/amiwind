@@ -144,6 +144,10 @@ whether any `-O2` problem reaches AmiWind.
 
 ## Measurements
 
+> Far detail: every figure on this page before 17 October 2026 was measured with far detail **Full**
+> (`aw_cull 1`, the default up to v0.0.41). From v0.0.42 the default is Strong; to compare with these
+> figures, set `dbg cull 1` first ([the far test](performance/FAR-TEST.md)).
+
 11 October 2026, the v0.0.36-dev3 image (CHIM-native Balmora) with each engine variant swapped in, FS-UAE
 3.1.66 cycle-exact 68040 at `uae_cpu_multiplier 14` (49.7 MHz), the five Balmora cameras of
 [HARDWARE-BENCHMARK.md](HARDWARE-BENCHMARK.md), noon held, day and night off, headlamp off, walking NPCs

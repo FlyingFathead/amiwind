@@ -201,6 +201,7 @@ void R_Init (void)
 	Cmd_AddCommand ("timerefresh", R_TimeRefresh_f);
 	Cmd_AddCommand ("pointfile", R_ReadPointFile_f);
 
+	AW_FarDetailSavedBefore(AW_ConfigWithout("aw_cull"));
 	AW_FogInit();
     R_InitDayNight();
 	Cvar_RegisterVariable (&aw_drawdistance);

@@ -451,6 +451,8 @@ int AW_TravelDraw(void) {
     AW_UITextBox(26,170,268,14,"Esc: cancel",-1);
     AW_UISmallEnd();return 1;
 }
+/* aw_debug_torch.c: the player leaves the census office (the opening hands over control). */
+void (*aw_scene_census_exit)(void);
 int AW_SceneUse(void) {
     int i;float duration;char path[40];
     if(AW_PlayerDead())return 1;   /* dead: nothing is used (the key is spent) */
@@ -462,7 +464,8 @@ int AW_SceneUse(void) {
         if(AW_ContentExcludedSay("interiors",1)){AW_UISubtitle("","Area unavailable in this quick test build.",3);return 1;}
         AW_UISubtitle("",AW_MiniwindActive()?AREA_UNAVAILABLE:"Interior not found.",3);return 1;
     }
-    if(AW_StoryRestricted() && links[i].reference==119659)AW_StoryTransition(AW_STAGE_RELEASED);
+    if(AW_StoryRestricted() && links[i].reference==119659 && AW_StoryTransition(AW_STAGE_RELEASED) && aw_scene_census_exit)
+        aw_scene_census_exit();
     duration=AW_DoorSound(links[i].reference,0);
     if(duration>0){
         opening_door=links[i];door_ready=realtime+(duration>1?1:duration);
@@ -954,8 +957,25 @@ static void shroompicker_command(void) {
         spot.verified?"playtested":"source checked; native unverified");
     Con_Printf("Standing surface checked on arrival. Picked/empty plants remain absent; dbg shroomtracker counts picks.\n");
 }
+/* dbg tp mark / dbg tp marker: the user map marker (the map screen's right click, MAP-MARKER-29, saved in the
+ * globals under aw_worldui.c's keys, original global X Y), by the same route as dbg tp X Y: the map that
+ * holds the point (a CHIM frame on a CHIM disk) and the highest standing surface there. 0: no marker. */
+int AW_SceneMapMarker(float *source) {
+    if(AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:map:marker:ready")!=1)return 0;
+    source[0]=(float)AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:map:marker:x");
+    source[1]=(float)AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:map:marker:y");
+    source[2]=0;return 1;
+}
 static void teleport_command(void) {
     vec3_t source;
+    if(Cmd_Argc()==2 && (!strcmp(Cmd_Argv(1),"mark") || !strcmp(Cmd_Argv(1),"marker"))) {
+        if(!AW_SceneMapMarker(source)){Con_Printf("no map marker set\n");return;}
+        if(!AW_MapTeleportAt(source,0))
+            Con_Printf("Map marker teleport unavailable (no map on this disk holds %ld %ld); player state unchanged.\n",
+                (long)source[0],(long)source[1]);
+        else Con_Printf("Teleport to the map marker: %ld %ld.\n",(long)source[0],(long)source[1]);
+        return;
+    }
     if(Cmd_Argc()==2 && (!strcmp(Cmd_Argv(1),"tel_uvirith") || !strcmp(Cmd_Argv(1),"teluvirith"))) {
         /* Recorded exterior approach; reuse the checked coordinate route and
          * standing-surface placement rather than resetting the character. */

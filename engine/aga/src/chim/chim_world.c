@@ -10,6 +10,11 @@
  * and only on request, that keeps shared models and textures across map
  * changes. Without it (the 2 MiB Chip + 16 MiB Fast baseline) everything goes
  * with the map, exactly as Quake drops brush models at a map change.
+ * Without -chimcache, the same kind of bank is taken automatically at the
+ * start (Chim_MemoryStart, after config.cfg): the free Fast RAM beyond a
+ * margin for the system, in one bank per memory region (chim_zone.h
+ * ChimZone_AutoStep); aw_autoram 0 (Options > Extra RAM) turns it off. The
+ * 16 MiB baseline never reaches the first bank and plays exactly as before.
  */
 #include "quakedef.h"
 #include "aw_rcount.h"
@@ -72,6 +77,10 @@ cvar_t	chim_lookahead = {"chim_lookahead", "-1"};
  * outside the collision margin (past the active radius first), and tries
  * again; a released chunk is not activated again for 50 ticks; a chunk
  * within the collision margin that failed tries again on the next tick.
+ * chim_release 2 (the default): the same, but only the farther chunks whose
+ * locks make the request fit one run of the zone go, all at once, and none
+ * when even all of them would not (chim_chunks.c Release;
+ * CHIM-ZONE-RELEASE-FLICKER-42); 1 stays selectable.
  * chim_partial 1: a chunk whose model has no room is activated without it,
  * so its ground and its other placements are there; the model follows when
  * there is room. chim_zone_ends: blocks smaller than this many KiB come
@@ -80,8 +89,13 @@ cvar_t	chim_lookahead = {"chim_lookahead", "-1"};
  * room large models need (chim_zone.c ChimZone_SetEnds); 0: first fit for
  * every block (the first method). */
 cvar_t	chim_zone_ends = {"chim_zone_ends", "64"};
-cvar_t	chim_release = {"chim_release", "1"};
+cvar_t	chim_release = {"chim_release", "2"};
 cvar_t	chim_partial = {"chim_partial", "1"};
+/* CHIM_INDEX_KEEP_PATHS 1 (compile switch, -DCHIM_INDEX_KEEP_PATHS=1): the
+ * index keeps every file row's path (the first method, 33 bytes a row); 0
+ * (the default): only paths that are not the builder's own name for the row
+ * (chim_file_row_t). A compile switch, not a console variable: no resident
+ * registry growth (ENGINE-RESIDENT-REGISTRY-GROWTH-36). Defined in chim_local.h. */
 /* aw_fog.c: a CHIM map's view distance is limited by its world's data, not
  * by the region table. */
 extern int (*aw_chim_view_reach)(void);
@@ -95,6 +109,20 @@ static int		primed, tick_frame = -1;
 static int		map_bank = -1, cache_bank = -1;
 static void		*cache_memory;
 static long		cache_bytes;
+/* Automatic extra memory (Chim_MemoryStart): its banks, their bytes, the
+ * free and total Fast RAM measured, and what happened (memory_state). */
+static cvar_t	aw_autoram = {"aw_autoram", "1", true};
+#define AUTO_BANKS	(CHIM_ZONE_BANKS - 2)
+static void		*auto_memory[AUTO_BANKS];
+static unsigned long	auto_size[AUTO_BANKS], auto_bytes, memory_free, memory_total;
+static int		auto_banks[AUTO_BANKS], auto_count, memory_decided, memory_notice, cache_manual;
+static const char	*memory_state = "not measured";
+/* Fast RAM queries: 0 free, 1 largest block, 2 total (exec AvailMem on the
+ * Amiga; a native test sets its own; none: no extra memory). */
+unsigned long	(*chim_fast_avail)(int which);
+void		*(*chim_fast_alloc)(unsigned long bytes);
+void		(*chim_fast_free)(void *memory, unsigned long bytes);
+static void MemoryLine (void);
 static chim_user_t	buffer_user, index_user;
 static chim_pack_t	open_files[CHIM_OPEN_FILES];
 static int			open_rows[CHIM_OPEN_FILES];
@@ -223,7 +251,7 @@ chim_pack_t *Chim_File (int row)
 		return NULL;
 	if (open_files[slot].file)
 		Chim_PackClose (&open_files[slot]);
-	if (!Chim_PackOpen (&open_files[slot], chim_world.file[row].path))
+	if (!Chim_PackOpen (&open_files[slot], Chim_FilePath (row)))
 		return NULL;
 	if ((unsigned long)open_files[slot].bytes != chim_world.file[row].bytes)
 	{
@@ -244,6 +272,118 @@ void Chim_FilesClose (void)
 		Chim_PackClose (&open_files[i]);
 		open_files[i].pins = 0;
 	}
+}
+
+/* The builder's name for a file row: frames/x+04/y-12/frame.ccf,
+ * frames/x+04/y-12/s07.ccs or frames/x+04/y-12/g1/s111.ccs (no printf
+ * flags the Amiga C library may lack). */
+static char	kept_paths[CHIM_PATH_KEPT][CHIM_PATH_CHARS+1];
+static int	kept_count;
+
+static char *PutText (char *o, const char *t)
+{
+	while (*t)
+		*o++ = *t++;
+	return o;
+}
+
+static char *PutNumber (char *o, long v, int sign, int digits)
+{
+	char d[12];
+	int n = 0;
+	if (sign)
+		*o++ = v < 0 ? '-' : '+';
+	if (v < 0)
+		v = -v;
+	do
+	{
+		d[n++] = (char)('0' + v % 10);
+		v /= 10;
+	} while (v && n < 11);
+	while (n < digits && n < 11)
+		d[n++] = '0';
+	while (n)
+		*o++ = d[--n];
+	return o;
+}
+
+static void RowPath (const chim_file_row_t *f, char *out)
+{
+	char *o = PutText (out, "frames/x");
+	o = PutNumber (o, f->cx, 1, 2);
+	o = PutText (o, "/y");
+	o = PutNumber (o, f->cy, 1, 2);
+	if (!strcmp (f->kind, "FRAM"))
+		o = PutText (o, "/frame.ccf");
+	else
+	{
+		if (f->group >= 0)
+		{
+			o = PutText (o, "/g");
+			o = PutNumber (o, f->group, 0, 1);
+		}
+		o = PutText (o, "/s");
+		o = PutNumber (o, f->sector, 0, f->digits);
+		o = PutText (o, ".ccs");
+	}
+	*o = 0;
+}
+
+const char *Chim_FilePath (int row)
+{
+	static char path[CHIM_PATH_CHARS+16];
+	const chim_file_row_t *f;
+	if (row < 0 || row >= chim_world.files)
+		return "";
+	f = &chim_world.file[row];
+	if (chim_world.paths)
+		return chim_world.paths + row*(CHIM_PATH_CHARS+1);
+	if (f->kept)
+		return kept_paths[f->kept-1];
+	RowPath (f, path);
+	return path;
+}
+
+/* A decoded row of the table into the engine's row: the path is written
+ * again from the row when that gives it back exactly; else it is kept. */
+static int CompactRow (const chim_file_t *in, chim_file_row_t *f, int row)
+{
+	char derived[CHIM_PATH_CHARS+16];
+	const char *leaf = strrchr (in->path, '/'), *g;
+	int digits = 0;
+	memcpy (f->kind, in->kind, sizeof(f->kind));
+	f->cx = (short)in->cx;
+	f->cy = (short)in->cy;
+	f->sector = (unsigned short)in->sector;
+	f->bytes = in->bytes;
+	f->crc = in->crc;
+	f->entries = in->entries;
+	f->group = -1;
+	f->kept = 0;
+	if (leaf && leaf[1] == 's')
+		for (digits=0 ; leaf[2+digits] >= '0' && leaf[2+digits] <= '9' ; digits++)
+			;
+	f->digits = (unsigned char)(digits > 0 && digits < 8 ? digits : 2);
+	g = strstr (in->path, "/g");
+	if (g && g[2] >= '0' && g[2] <= '9' && g[3] == '/')
+		f->group = (signed char)(g[2] - '0');
+	if (chim_world.paths)
+	{
+		memcpy (chim_world.paths + row*(CHIM_PATH_CHARS+1), in->path, CHIM_PATH_CHARS+1);
+		return 1;
+	}
+	RowPath (f, derived);
+	if (!strcmp (derived, in->path))
+		return 1;
+	if (kept_count >= CHIM_PATH_KEPT)
+	{
+		Con_Printf ("CHIM: chim/world.cwi has more than %ld file paths of a form the engine does not write again (%s); build with CHIM_INDEX_KEEP_PATHS 1\n",
+			(long)CHIM_PATH_KEPT, in->path);
+		return 0;
+	}
+	memcpy (kept_paths[kept_count], in->path, CHIM_PATH_CHARS+1);
+	f->kept = (unsigned char)(++kept_count);
+	return 1;
 }
 
 int Chim_FileRow (const char *kind, int cx, int cy, int sector)
@@ -271,8 +411,12 @@ static int ReadTable (chim_pack_t *pack, unsigned at, unsigned count, int row_by
 		for (per=0 ; per<n ; per++)
 		{
 			const byte *p = raw + per*row_bytes;
-			if (kind == 0 && !ChimFormat_File (p, (chim_file_t *)out + i + per))
-				return 0;
+			if (kind == 0)
+			{
+				chim_file_t row;
+				if (!ChimFormat_File (p, &row) || !CompactRow (&row, (chim_file_row_t *)out + i + per, (int)(i + per)))
+					return 0;
+			}
 			if (kind == 1)
 				ChimFormat_ModelDir (p, (chim_asset_t *)out + i + per);
 			if (kind == 2)
@@ -331,8 +475,9 @@ static int ReadIndex (void)
 		t->names_at != t->textures_at + t->textures*CHIM_TEXTURE_DIR_BYTES || t->names_at > h.bytes ||
 		t->models != chim_world.settings.models || t->textures != chim_world.settings.textures)
 		goto done;
-	size = t->files*sizeof(chim_file_t) + (t->models + t->textures)*sizeof(chim_asset_t) +
-		t->models*sizeof(chim_model_t *) + t->textures*sizeof(texture_t *);
+	size = t->files*sizeof(chim_file_row_t) + (t->models + t->textures)*sizeof(chim_asset_t) +
+		t->models*sizeof(chim_model_t *) + t->textures*sizeof(texture_t *) +
+		(CHIM_INDEX_KEEP_PATHS ? t->files*(CHIM_PATH_CHARS+1) : 0);
 	if (!ChimZone_Alloc (&index_user, size, CHIM_KIND_INDEX, 0))
 		goto done;
 	ChimZone_Lock (index_user.data);
@@ -341,7 +486,9 @@ static int ReadIndex (void)
 	chim_world.texture_slot = (texture_t **)(chim_world.model_slot + t->models);
 	chim_world.model = (chim_asset_t *)(chim_world.texture_slot + t->textures);
 	chim_world.texture = chim_world.model + t->models;
-	chim_world.file = (chim_file_t *)(chim_world.texture + t->textures);
+	chim_world.file = (chim_file_row_t *)(chim_world.texture + t->textures);
+	chim_world.paths = CHIM_INDEX_KEEP_PATHS ? (char *)(chim_world.file + t->files) : NULL;
+	kept_count = 0;
 	chim_world.files = (int)t->files;
 	chim_world.models = t->models;
 	chim_world.textures = t->textures;
@@ -400,6 +547,7 @@ static void MapEnd (void)
 		ChimZone_Free (&index_user);
 	}
 	chim_world.file = NULL;
+	chim_world.paths = NULL;
 	chim_world.model = chim_world.texture = NULL;
 	chim_world.model_slot = NULL;
 	chim_world.texture_slot = NULL;
@@ -782,6 +930,12 @@ static void Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *b
 		ChimChunks_Clip (start, mins, maxs, end, best);
 }
 
+/* dbg hud: which placement a pin ray hit (aw_inspect.c). */
+static int Pick (const float *start, const float *end, aw_chim_pick_t *out)
+{
+	return active && ChimChunks_Pick (start, end, out);
+}
+
 int Chim_Active (void)
 {
 	return active;
@@ -926,6 +1080,7 @@ static void Status (void)
 	Con_Printf ("zone: %ld banks, %ld KiB used, %ld KiB free, largest free %ld KiB, %ld blocks, %ld locked\n",
 		(long)s.banks, (long)(s.used_bytes/1024), (long)(s.free_bytes/1024), (long)(s.largest_free/1024),
 		(long)s.blocks, (long)s.locked);
+	MemoryLine ();
 	Con_Printf ("models %ld (%ld KiB), textures %ld (%ld KiB), chunks %ld (%ld KiB), terrain %ld (%ld KiB)\n",
 		(long)s.kind_blocks[CHIM_KIND_MODEL], (long)(s.kind_bytes[CHIM_KIND_MODEL]/1024),
 		(long)s.kind_blocks[CHIM_KIND_TEXTURE], (long)(s.kind_bytes[CHIM_KIND_TEXTURE]/1024),
@@ -949,8 +1104,8 @@ static void Status (void)
 		ChimChunks_Pressure (&band, &ring, &partial, &zone_failed, &data_failed);
 		Con_Printf ("zone: largest run without a lock %ld KiB; %lu failed requests, the last %ld bytes\n",
 			(long)(ChimZone_LargestUnlocked ()/1024), failures, (long)last);
-		Con_Printf ("full zone: chunk loads failed %lu for room, %lu for bad data; released %lu chunks past the active radius and %lu inside it (chim_release %ld); %lu partial activations (chim_partial %ld)\n",
-			zone_failed, data_failed, band, ring, (long)chim_release.value, partial, (long)chim_partial.value);
+		Con_Printf ("full zone: chunk loads failed %lu for room, %lu for bad data; released %lu chunks past the active radius and %lu inside it, %lu releases refused as no help (chim_release %ld); %lu partial activations (chim_partial %ld)\n",
+			zone_failed, data_failed, band, ring, chim_release_refused, (long)chim_release.value, partial, (long)chim_partial.value);
 	}
 	/* The engine's entity budgets, stated (the builder's checks read the same
 	 * defines: tools/engine_limits.py): what this map uses of each. */
@@ -976,7 +1131,8 @@ static void Status (void)
 			(long)ChimChunks_ActiveRadius (), chim_draw_distance.value > 0 ? " (chim_draw_distance)" : "",
 			(long)ChimChunks_LoadRadius (),
 			(long)(chim_prefetch.value >= 0 ? chim_prefetch.value : chim_frame.settings.prefetch_margin),
-			(long)(chim_lookahead.value >= 0 ? chim_lookahead.value : chim_frame.settings.prefetch_margin),
+			(long)(chim_lookahead.value >= 0 ? chim_lookahead.value :
+				chim_frame.settings.prefetch_margin * Chim_LookaheadScale ()),
 			(long)chim_frame.settings.collision_margin);
 		ChimChunks_Streaming (&margin, &urgent, &ahead);
 		Con_Printf ("ring: nearest chunk without ground %ld units away (-1: none), %lu loads past the budget for the collision margin\n",
@@ -1081,6 +1237,7 @@ static void FreeCache (void)
 static void CacheBank (void)
 {
 	int p = COM_CheckParm ("-chimcache");
+	cache_manual = p != 0;
 	if (!p || p >= com_argc-1)
 		return;
 	cache_bytes = (long)Q_atoi (com_argv[p+1]) * 1024;
@@ -1100,6 +1257,186 @@ static void CacheBank (void)
 #endif
 	if (cache_memory)
 		cache_bank = ChimZone_AddBank (cache_memory, (int)cache_bytes, 1);
+}
+
+/* ------------------------------------------------- automatic extra memory */
+
+#ifdef AMIGA
+#ifndef MEMF_TOTAL
+#define MEMF_TOTAL	(1L<<19)
+#endif
+static unsigned long FastAvail (int which)
+{
+	return AvailMem (MEMF_FAST | (which == 2 ? MEMF_TOTAL : which ? MEMF_LARGEST : 0));
+}
+static void *FastAlloc (unsigned long bytes)
+{
+	return AllocMem ((ULONG)bytes, MEMF_FAST|MEMF_PUBLIC);
+}
+static void FastFree (void *memory, unsigned long bytes)
+{
+	FreeMem (memory, (ULONG)bytes);
+}
+#endif
+
+/* drop: take the banks out of the zone first (they must hold nothing
+ * locked: the notice's key and a failed start); 0 at exit and before the
+ * zone is reset. */
+static void FreeAuto (int drop)
+{
+	int i;
+	for (i=0 ; i<auto_count ; i++)
+	{
+		if (drop && auto_banks[i] >= 0)
+			ChimZone_DropBank (auto_banks[i]);
+		if (auto_memory[i] && chim_fast_free)
+			chim_fast_free (auto_memory[i], auto_size[i]);
+		auto_memory[i] = NULL;
+		auto_banks[i] = -1;
+	}
+	auto_count = 0;
+	auto_bytes = 0;
+}
+
+static void AtExitAuto (void)
+{
+	FreeAuto (0);
+}
+
+int Chim_LookaheadScale (void)
+{
+	return ChimZone_AutoLookahead (auto_bytes);
+}
+
+/* One line for the console and the log, on every start (and in "chim"). */
+static void MemoryLine (void)
+{
+	if (auto_count)
+		Con_Printf ("Memory: %lu MiB Fast RAM free of %lu MiB; CHIM cache %lu MiB in %ld bank%s (automatic); look-ahead x%ld\n",
+			memory_free/CHIM_AUTO_MIB, memory_total/CHIM_AUTO_MIB, auto_bytes/CHIM_AUTO_MIB,
+			(long)auto_count, auto_count == 1 ? "" : "s", (long)Chim_LookaheadScale ());
+	else if (cache_bank >= 0)
+		Con_Printf ("Memory: %lu MiB Fast RAM free of %lu MiB; CHIM cache %ld MiB (-chimcache)\n",
+			memory_free/CHIM_AUTO_MIB, memory_total/CHIM_AUTO_MIB, (long)(cache_bytes/1048576L));
+	else
+		Con_Printf ("Memory: %lu MiB Fast RAM free of %lu MiB; CHIM cache off (%s)\n",
+			memory_free/CHIM_AUTO_MIB, memory_total/CHIM_AUTO_MIB, memory_state);
+}
+
+/* At start-up, after config.cfg (aw_startup, aw_movie.c): the free Fast RAM
+ * beyond the margin becomes CHIM cache banks, largest block first, one bank
+ * per step until the budget or the blocks run out. A failed allocation gives
+ * back what was taken: the start plays on the baseline. Once per start. */
+static void Chim_MemoryStart (void)
+{
+	unsigned long budget, largest, size;
+	int i, bank;
+
+	if (memory_decided)
+		return;
+	memory_decided = 1;
+#ifdef AMIGA
+	if (!chim_fast_avail)
+	{
+		chim_fast_avail = FastAvail;
+		chim_fast_alloc = FastAlloc;
+		chim_fast_free = FastFree;
+	}
+#endif
+	memory_free = chim_fast_avail ? chim_fast_avail (0) : 0;
+	memory_total = chim_fast_avail ? chim_fast_avail (2) : 0;
+	if (memory_total < memory_free)
+		memory_total = memory_free;
+	budget = ChimZone_AutoBudget (memory_free, memory_total);
+	if (!available)
+		memory_state = "no CHIM world";
+	else if (cache_manual)
+		memory_state = "-chimcache given";
+	else if (!aw_autoram.value)
+		memory_state = "turned off: aw_autoram 0, Options > Extra RAM";
+	else if (!chim_fast_avail || !chim_fast_alloc)
+		memory_state = "no Fast RAM query";
+	else
+	{
+		memory_state = "not enough extra Fast RAM, standard memory";
+		for (i=0 ; i<AUTO_BANKS ; i++)
+		{
+			largest = chim_fast_avail (1);
+			size = ChimZone_AutoStep (largest, &budget, i == 0);
+			if (!size)
+				break;
+			auto_memory[i] = chim_fast_alloc (size);
+			auto_size[i] = size;
+			auto_banks[i] = -1;
+			auto_count = i + 1;
+			bank = auto_memory[i] ? ChimZone_AddBank (auto_memory[i], (int)size, 1) : -1;
+			if (bank < 0)
+			{
+				Con_Printf ("Memory: %lu MiB of extra Fast RAM could not be taken; playing on the standard memory\n",
+					size/CHIM_AUTO_MIB);
+				FreeAuto (1);
+				memory_state = "allocation failed, standard memory";
+				break;
+			}
+			auto_banks[i] = bank;
+			auto_bytes += size;
+		}
+		if (auto_count)
+		{
+			static int registered;
+			if (!registered)
+				atexit (AtExitAuto);
+			registered = 1;
+			memory_notice = 1;
+		}
+	}
+	MemoryLine ();
+}
+
+/* The notice's key (aw_movie.c): this start on the standard memory. Only
+ * while no CHIM map has used the banks; afterwards they stay. */
+static int Chim_MemorySkip (void)
+{
+	int i;
+	memory_notice = 0;
+	if (!auto_count)
+		return 0;
+	for (i=0 ; i<auto_count ; i++)
+		if (ChimZone_BankUsed (auto_banks[i]))
+		{
+			Con_Printf ("Memory: the extra Fast RAM is in use; it stays for this start\n");
+			return 0;
+		}
+	FreeAuto (1);
+	memory_state = "skipped for this start";
+	MemoryLine ();
+	return 1;
+}
+
+/* The startup notice's two lines while it applies (aw_movie.c draws them). */
+static int Chim_MemoryNotice (char *first, char *second, int size)
+{
+	if (!memory_notice || !auto_count || size < 48)
+		return 0;
+	snprintf (first, size, "Extra Fast RAM: %lu MiB free", memory_free/CHIM_AUTO_MIB);
+	snprintf (second, size, "%lu MiB for CHIM caches. M: not now", auto_bytes/CHIM_AUTO_MIB);
+	return 1;
+}
+
+static void Chim_MemoryNoticeDone (void)
+{
+	memory_notice = 0;
+}
+
+static int Memory (int op, char *first, char *second, int size)
+{
+	switch (op)
+	{
+	case 0: Chim_MemoryStart (); return 1;
+	case 1: return first && second ? Chim_MemoryNotice (first, second, size) : 0;
+	case 2: return Chim_MemorySkip ();
+	default: Chim_MemoryNoticeDone (); return 1;
+	}
 }
 
 void Chim_Init (void)
@@ -1124,6 +1461,12 @@ void Chim_Init (void)
 	Cvar_RegisterVariable (&chim_zone_ends);
 	Cvar_RegisterVariable (&chim_release);
 	Cvar_RegisterVariable (&chim_partial);
+	Cvar_RegisterVariable (&aw_autoram);
+	FreeAuto (0);		/* a second start-up (native tests): the zone is reset below */
+	memory_decided = memory_notice = cache_manual = 0;
+	cache_bank = -1;	/* CacheBank sets it again (the zone is reset below) */
+	memory_state = "not measured";
+	aw_chim_memory = Memory;		/* every start says its memory line, CHIM world or not */
 	ChimFar_Init ();
 	Cmd_AddCommand ("chim", Status);
 	Cmd_AddCommand ("chim_tp", Teleport);
@@ -1142,6 +1485,7 @@ void Chim_Init (void)
 	aw_chim_map_end = MapEnd;
 	aw_chim_link = Link;
 	aw_chim_clip = Clip;
+	aw_chim_pick = Pick;
 	aw_chim_player = Player;
 	aw_chim_spawn = Spawn;
 	aw_chim_frozen = Frozen;

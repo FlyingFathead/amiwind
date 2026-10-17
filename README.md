@@ -32,6 +32,20 @@ The [gallery](docs/GALLERY.md) has in-game screenshots of every version, and
 
 More in the [gallery](docs/GALLERY.md).
 
+## v0.0.42: Things Are Starting To Look Pretty Khuul
+
+More of the island on CHIM, the clouds back in the sky, and the first look of the original interface. 1,168 of
+Vvardenfell's 1,395 exterior cells are on CHIM now (776 before), from Molag Mar and Pelagiad to Gnisis, Ghostgate
+and the lava fields. The clouds are back after two releases with a flat sky, buildings no longer pop in and out
+where memory runs full, and the game uses extra Fast RAM by itself. The HUD and the inventory start to take their
+original shape: the original weapon and magic boxes, item icons from the game's own art, and the character as a
+still picture in the original pose.
+
+Running on CHIM Engine v0.2.1. See the [release notes](docs/RELEASE-v0.0.42.md) for what changed and what is
+known in this build, and the [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md) for every cell.
+
+<!-- v0.0.42 gallery: photo-mode captures from the release build go here -->
+
 ## v0.0.41: More Fixes, Fewer Planes (A Telvanni Root Story)
 
 The first regional CHIM release. Rings 0 to 4 of Vvardenfell are on CHIM, and so are two whole Morrowind
@@ -446,10 +460,10 @@ around their own origin, leaving missing walls, see-through holes and floating
 objects in the Temple's lower rooms; the same fix repairs Tharys Ancestral Tomb
 and the Nord fireplaces of five Seyda Neen interiors.
 
-| Before: v0.0.29, holes where the wall should be | After: v0.0.30, the same view |
+| The Balmora Temple lower entrance in v0.0.30 | The Temple lower room: doorway and banner |
 | --- | --- |
-| ![Balmora Temple lower entrance in v0.0.29 with see-through holes](docs/images/amiwind-v0.0.30-temple-before.png) | ![The same Balmora Temple view in v0.0.30 with the wall in place](docs/images/amiwind-v0.0.30-temple-after.png) |
-| ![Balmora Temple lower room in v0.0.30: doorway and banner](docs/images/amiwind-v0.0.30-temple-banner.png) | ![Options > Controls page in v0.0.30](docs/images/amiwind-v0.0.30-controls.png) |
+| ![The Balmora Temple lower entrance in v0.0.30 with the wall in place](docs/images/amiwind-v0.0.30-temple-after.png) | ![Balmora Temple lower room in v0.0.30: doorway and banner](docs/images/amiwind-v0.0.30-temple-banner.png) |
+| ![Options > Controls page in v0.0.30](docs/images/amiwind-v0.0.30-controls.png) | |
 
 Also new: misplaced Census office objects from dev5 fixed, a crash fix for
 Seyda Neen region changes, an Options > Controls page for rebinding keys,

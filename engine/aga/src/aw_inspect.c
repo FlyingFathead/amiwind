@@ -1,20 +1,26 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Click-to-pin raw identity. Reuses AmiQuake's point trace, frame bounds and
  * console, plus AW_NPCTargetReach's rotated slab test. No actor mutation,
- * allocation, disk lookup or per-frame entity scan. Rows are a click snapshot,
- * not a retained edict pointer (slots can be reused). Static merged geometry
- * cannot supply a source reference that the resident map does not retain.
+ * allocation or per-frame entity scan. Rows are a click snapshot, not a retained
+ * edict pointer (slots can be reused). A CHIM placement (it collides as the world)
+ * is named from its frame's placement record and the index's model name: a few
+ * small reads per click, none per frame (INSPECT-CHIM-PLACEMENT-UNNAMED-42).
+ * Nothing is drawn over the 3D view: aw_hud.c draws the hint and the snapshot
+ * underneath the stat bars, at the bottom of the screen (INSPECT-OVER-VIEWPORT-42); the
+ * right mouse button leaves inspect mode (INSPECT-NO-RIGHT-CLICK-EXIT-42).
  */
 #include "quakedef.h"
 #include "aw_character.h"
 #include "aw_inspect.h"
 #include "aw_world.h"
-#define INSPECT_ROWS 9
-#define INSPECT_WIDTH 128
+#define INSPECT_ROWS 10
+#define INSPECT_WIDTH AW_INSPECT_LINE
 #define INSPECT_REACH 2048.0f
 static int enabled,held,release_attack,rows;
 static char pinned[INSPECT_ROWS][INSPECT_WIDTH];
-extern int scr_copyeverything;
+extern int scr_copyeverything,con_notify_quiet;
+int (*aw_chim_pick)(const float *start,const float *end,aw_chim_pick_t *out);
+static const char hint_text[]="INSPECT: click pin / right exit";
 
 static int scene_ready(void) {
     return cls.state==ca_connected && !cls.demoplayback && sv.active &&
@@ -146,6 +152,27 @@ static void pin_target(void) {
     if(r<0){text_field("Inspect","camera inside collision; move the view");return;}
     if(!best && !st){text_field("Inspect","no target within 2048 local units");return;}
     VectorMA(eye,limit,dir,position);
+    /* A placed model in a CHIM frame collides as the world: ask the frame which
+     * placement the same ray hit at the same distance (else terrain/frame world). */
+    if(!st && best==sv.edicts && aw_chim_pick){
+        aw_chim_pick_t hit;vec3_t far;
+        VectorMA(eye,INSPECT_REACH,dir,far);
+        if(aw_chim_pick(eye,far,&hit) && fabs(hit.fraction*INSPECT_REACH-limit)<=2.0f){
+            snprintf(value,sizeof(value),"CHIM placement %lu / collision pick",(unsigned long)hit.pid);text_field("PINNED",value);
+            if(hit.name[0])snprintf(value,sizeof(value),"%s (model %lu)",hit.name,(unsigned long)hit.model);
+            else snprintf(value,sizeof(value),"model %lu",(unsigned long)hit.model);
+            text_field("mesh",value);
+            if(hit.ref)snprintf(value,sizeof(value),"%lu / cell %ld,%ld",(unsigned long)hit.ref,(long)hit.cell_x,(long)hit.cell_y);
+            text_field("source ref",hit.ref?value:NULL);
+            snprintf(value,sizeof(value),"%.1f %.1f %.1f yaw %.1f",hit.origin[0],hit.origin[1],hit.origin[2],hit.yaw);
+            text_field("placement local XYZ",value);
+            snprintf(value,sizeof(value),"%s / hit %.1f %.1f %.1f",sv.name,position[0],position[1],position[2]);text_field("scene",value);
+            if(AW_WorldToSource(sv.name,position,global)){
+                snprintf(value,sizeof(value),"%.1f %.1f %.1f",global[0],global[1],global[2]);text_field("hit global XYZ",value);
+            }
+            return;
+        }
+    }
     if(st){
         snprintf(value,sizeof(value),"static %ld / frame bounds pick",(long)slot);text_field("PINNED",value);
         text_field("class","client static");text_field("source id",NULL);text_field("source ref",NULL);
@@ -173,8 +200,13 @@ static void pin_target(void) {
     }else text_field("global XYZ",NULL);
 }
 static void print_pin(void) {
-    int i;Con_Printf("Inspect snapshot (fixed at click; not live):\n");
+    int i;
+    /* The lines under the stat bars show the snapshot; the console keeps the full rows
+     * without notify lines over the view. */
+    con_notify_quiet=1;
+    Con_Printf("Inspect snapshot (fixed at click; not live):\n");
     for(i=0;i<rows;i++)Con_Printf("%s\n",pinned[i]);
+    con_notify_quiet=0;
 }
 static void reset(void) {
     /* Keep explicit mode choice through scene loads, discard old identities.
@@ -193,19 +225,41 @@ static int buttons(int bits) {
     return release_attack?bits&~1:bits;
 }
 static int crosshair(void) {return enabled && interactive();}
-static void draw(void) {
-    int i,n,y=36,limit;char line[INSPECT_WIDTH];
-    if(!enabled || !interactive() || vid.width<20 || vid.height<74)return;
-    limit=((int)vid.width-16)/4;
-    if(limit>=INSPECT_WIDTH)limit=INSPECT_WIDTH-1;
-    for(i=-1;i<rows;i++){
-        const char *s=i<0?"INSPECT: click pins / attack disabled / dbg hud off":pinned[i];
-        if(y+8>vid.height-30)break;
-        n=(int)strlen(s);if(n>limit)n=limit;memcpy(line,s,n);line[n]=0;
-        if((int)strlen(s)>limit && n>=3)memcpy(line+n-3,"...",3);
-        Draw_Fill(6,y-1,vid.width-12,8,255);AW_SmallString(8,y,line);y+=8;
+int AW_InspectEnabled(void) {return enabled;}
+static const char *hint(void) {return enabled && interactive()?hint_text:NULL;}
+/* The snapshot packed into at most max lines of width characters: rows joined with
+ * " | ", a row never split unless it is longer than a line; the last line ends with
+ * "..." when rows are left over (the console has them all). */
+static int strip(char lines[][AW_INSPECT_LINE],int max,int width) {
+    int i,n=0,len,used;const char *s;
+    if(!enabled || !interactive() || max<=0 || width<8)return 0;
+    if(width>=AW_INSPECT_LINE)width=AW_INSPECT_LINE-1;
+    for(i=0;i<rows;i++){
+        s=pinned[i];len=(int)strlen(s);
+        used=n?(int)strlen(lines[n-1]):0;
+        if(n && used+3+len<=width){strcat(lines[n-1]," | ");strcat(lines[n-1],s);continue;}
+        if(n==max){
+            char *last=lines[n-1];used=(int)strlen(last);
+            if(used+4>width)used=width-4;
+            strcpy(last+used," ...");return n;
+        }
+        if(len>width){memcpy(lines[n],s,width);lines[n][width]=0;memcpy(lines[n]+width-3,"...",3);}
+        else strcpy(lines[n],s);
+        n++;
     }
-    scr_copyeverything=1;
+    return n;
+}
+static void off(void) {
+    enabled=0;rows=0;
+    /* Avoid a held inspection click leaking into combat when switched off. */
+    if(held)release_attack=1;
+    Cvar_SetValue("_aw_debug_all",0);Cvar_SetValue("_aw_debug_coords",0);
+    vid.recalc_refdef=true;scr_copyeverything=1;
+}
+/* keys.c: right (Amiga K_MOUSE3) or middle (K_MOUSE2) button = dbg hud off. */
+static int key(int k) {
+    if(!enabled || (k!=K_MOUSE3 && k!=K_MOUSE2))return 0;
+    off();Con_Printf("Inspect HUD off (right click).\n");return 1;
 }
 static void hud_command(void) {
     char *s=Cmd_Argv(1);int on;
@@ -213,16 +267,18 @@ static void hud_command(void) {
     if(Cmd_Argc()!=2 || (Q_strcasecmp(s,"on") && Q_strcasecmp(s,"off") && Q_strcasecmp(s,"true") &&
        Q_strcasecmp(s,"false") && strcmp(s,"1") && strcmp(s,"0"))){Con_Printf("Usage: dbg hud on/off\n");return;}
     on=!Q_strcasecmp(s,"on") || !Q_strcasecmp(s,"true") || !strcmp(s,"1");
-    enabled=on;rows=0;
+    if(!on){off();Con_Printf("Inspect HUD off: normal controls (release any held click).\n");return;}
+    enabled=1;rows=0;
     /* Avoid a held inspection click leaking into combat when switched off. */
     if(held)release_attack=1;
-    Cvar_SetValue("_aw_debug_all",on);Cvar_SetValue("_aw_debug_coords",on);
+    Cvar_SetValue("_aw_debug_all",1);Cvar_SetValue("_aw_debug_coords",1);
     vid.recalc_refdef=true;scr_copyeverything=1;
-    Con_Printf(on?"Inspect HUD on: aim and click to pin; attack disabled.\n":"Inspect HUD off: normal controls (release any held click).\n");
+    Con_Printf("Inspect HUD on: aim and click to pin; attack disabled; right click exits.\n");
 }
 static void inspect_command(void) {pin_target();print_pin();}
 void AW_InspectInit(void) {
     enabled=held=release_attack=rows=0;
-    aw_inspect_buttons=buttons;aw_inspect_crosshair=crosshair;aw_inspect_draw=draw;aw_inspect_reset=reset;
+    aw_inspect_buttons=buttons;aw_inspect_crosshair=crosshair;aw_inspect_reset=reset;
+    aw_inspect_hint=hint;aw_inspect_strip=strip;aw_inspect_key=key;
     Cmd_AddCommand("aw_debug_hud",hud_command);Cmd_AddCommand("aw_inspect",inspect_command);
 }

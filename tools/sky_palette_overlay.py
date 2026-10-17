@@ -12,7 +12,7 @@ BANK={222:(223,(100,69,138)),133:(113,(52,73,110)),95:(94,(210,50,34)),
 OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awn','.awq','.awr','.awt','.awg','.awl',
         '.anm','.tag'}
 # Every extension spans() parses as indexed pixels or metadata (besides OPAQUE and the named files below).
-PARSED={'.mdl','.spr','.bsp','.wad','.lmp','.awb','.awv','.awf','.mws','.awh','.awi','.awu','.awm','.aws'}
+PARSED={'.mdl','.spr','.bsp','.wad','.lmp','.awb','.awv','.awf','.mws','.awh','.awi','.awu','.awm','.aws','.awp'}
 NAMED={'save-content.bin'}
 
 
@@ -128,6 +128,13 @@ def spans(raw,rel):
     elif ext=='.awi' and rel.lower().startswith('gfx/inv/'):
         # AWIC uses the same 256-colour palette as the world (aw_worldui.c).
         need(raw[:4]==b'AWIC' and n==1028,'Invalid inventory icon');add(4,1024)
+    elif rel.lower()=='gfx/icons.awp':
+        # The UI picture pack (tools/prepare_icons.py): AWP1, count, AWI1 pictures back to back.
+        magic,count=get('<4sI',0);need(magic==b'AWP1' and 0<=count<=65536,'Invalid icon pack');at=8
+        for _ in range(count):
+            tag,w,h=get('<4sHH',at);need(tag==b'AWI1' and 0<w<=320 and 0<h<=32,'Invalid icon pack picture')
+            add(at+8,w*h);at+=8+w*h
+        need(at==n,'Icon pack length mismatch')
     elif rel.lower() in ('inventory/items.awi','inventory/initial.awi'):
         # Inventory records contain identities, paths and numbers, never pixels.
         # Match the AWI2/AWST framing consumed by aw_inventory.c.

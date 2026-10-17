@@ -10,6 +10,7 @@ on the left and carried items on the right.
 ## Contents
 
 - [Items and actions](#items-and-actions)
+- [Debug torch (test only)](#debug-torch-test-only)
 - [Appearance and implementation boundary](#appearance-and-implementation-boundary)
 - [Next inventory pass: v0.0.40-dev2, 14 October 2026](#next-inventory-pass-v0040-dev2-14-october-2026)
 - [Validation, 14 October 2026](#validation-14-october-2026)
@@ -64,6 +65,32 @@ dbg inventory grant steel_shield 1 to grant actual catalogue items. These are
 diagnostics, not starter inventory or accepted gameplay acquisition. Character
 change and grants use the on-demand debug catalogue; the I action adds one
 32-byte resident command record.
+
+## Debug torch (test only)
+
+While AmiWind is a preview, the player leaves the census office with a torch that never burns out: the
+maintainer's request of 17 October 2026, so a tester gets a torch and uses it. It will not be in the final game.
+
+- **What it is:** one catalogue row, `aw_debug_torch`, named "Debug torch (test only)", made by
+  `tools/prepare_inventory.py` from the original torch (the LIGH record `torch`: its model, icon, weight, value,
+  light radius and colour). Its burn time is -1, the value OpenMW treats as a light that never runs out
+  (`apps/openmw/mwmechanics/actors.cpp`); the original record's own time (210 seconds) stays in the build report.
+  No other light is an inventory item yet, and nothing burns down in AmiWind yet; the carried torch (V with hands
+  raised) has never had a burn time.
+- **When:** once, when the player goes through the census office's exit door to the courtyard (the point where
+  the opening hands over control). A saved mark (`amiwind:debug_torch:granted`) keeps it from being given again:
+  not on a reload, not when leaving the office again, not after it was dropped. A quick-start character
+  (the New Game screen of a `--skip-census` build) skips the office and gets no torch.
+- **Use:** Equip in the inventory puts it in the left hand and lights the carried torch (raise hands with F to
+  see it); unequip puts it out. V still toggles the carried torch as before.
+- **The switch:** `aw_debug_torch 1` in the game config the builder writes (`config/game.cfg`, staged as
+  `default-game.cfg`), on for every build until the final game, which sets it to 0. It is not a saved setting,
+  so the image decides. The build receipt says it (`build.json` "debug_torch") and the image step prints
+  `[debug torch] ON`.
+- **Tests:** `tests/aga_inventory_test.c` (given once, never when off or when the inventory is full, unlimited
+  burn time, an ordinary light counts down), `tests/aga_inventory_metadata_test.c` (the catalogue row),
+  `tests/test_inventory_assets.py` (the row from the original record), `tests/test_debug_torch.py` (the switch,
+  the receipt, the census exit, the lit torch).
 
 ## Appearance and implementation boundary
 
@@ -331,7 +358,7 @@ visuals and remaining UI work are still open. No new shipment or CHIM coverage.
 ## Icons and the HUD boxes, 17 October 2026
 
 The image step's inventory conversion also imports the item icons, the hand-to-hand icon and the HUD box
-and bar art into one lookup table (`gfx/icons.awl`, pictures in `gfx/icon/`, each stored once by SHA-256) and
+and bar art into one lookup table (`gfx/icons.awl`, pictures in the pack `gfx/icons.awp`, each stored once by SHA-256) and
 writes each item's enchantment type and maximum charge into the catalogue (bytes 496..511, zero in older
 catalogues). It prints one line with the rows, pictures and anything held back. The HUD weapon and magic boxes
-draw from it; the inventory rows will follow (UI-ICONS-INVENTORY-42). Details: [the HUD](HUD.md).
+draw from it, and so do the inventory rows: every ownable item's original icon (UI-ICONS-INVENTORY-42). Details: [the HUD](HUD.md).

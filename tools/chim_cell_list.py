@@ -70,17 +70,19 @@ def file_cells(path):
     return {key(c) for c in cells}
 
 
-def open_legacy_pockets(chosen, kept, progress, island, limit=64):
+def open_legacy_pockets(chosen, kept, progress, island, limit=64, covered=()):
     """Leave out, by name, the cells that open every legacy pocket (classic cells enclosed by CHIM cells, the
     builder's rule chim.regions.holes: every crossing there would load two maps). For each pocket the neighbour
     in the list with the highest ring that is not already on CHIM goes; repeated until no pocket is left.
+    covered: cells on CHIM inside a town frame (no legacy map left); they count as CHIM in the pocket test, the
+    builder's rule too (CHIM-REGION-POCKET-TOWN-CELLS-42), and are never written to the list.
     Returns report lines; changes chosen in place."""
     from chim.regions import holes
     rings = {k: v.get('ring') or 0 for k, v in json.loads(Path(progress).read_text(encoding='utf-8'))['cells'].items()
              if v.get('island') == island}
     lines = []
     for _ in range(limit):
-        pockets = holes([tuple(int(v) for v in k.split(',')) for k in chosen])
+        pockets = holes([tuple(int(v) for v in k.split(',')) for k in set(chosen) | set(covered)])
         if not pockets:
             return lines
         for pocket in pockets:
@@ -95,7 +97,7 @@ def open_legacy_pockets(chosen, kept, progress, island, limit=64):
 
 
 def make(progress, rings, island=1, include=(), keep=(), drop=None, reason='', leave_out=None, open_pockets=False,
-         regions=()):
+         regions=(), covered=()):
     """(document, report lines). Refuses (ValueError) when a kept cell is missing without a --drop reason."""
     if not rings and not regions and not include:
         # an --include alone is a batch list made from data (tools/chim_weight_table.py --cells-out)
@@ -140,8 +142,12 @@ def make(progress, rings, island=1, include=(), keep=(), drop=None, reason='', l
         if cell in chosen:
             chosen.discard(cell)
             lines.append('left out %s: %s' % (cell, why))
+    town = set()
+    for path in covered:
+        town |= file_cells(path)
+        lines.append('covered %s: %d cells on CHIM inside a town frame (pocket test only)' % (Path(path).name, len(town)))
     if open_pockets:
-        lines += open_legacy_pockets(chosen, kept, progress, island)
+        lines += open_legacy_pockets(chosen, kept, progress, island, covered=town - chosen)
     missing = sorted(kept - chosen - set(drop))
     if missing:   # cannot happen through the union above; kept as the guard the list exists for
         raise ValueError('kept CHIM cells missing from the list: ' + ', '.join(missing))
@@ -167,6 +173,8 @@ def main(argv=None):
                     help='a ring cell not yet on CHIM left out of this list (failing audits, a legacy pocket), named')
     ap.add_argument('--open-pockets', action='store_true',
                     help='leave out, by name, the outermost neighbour of every legacy pocket the list would enclose')
+    ap.add_argument('--covered', action='append', default=[], metavar='FILE',
+                    help='cells on CHIM inside a town frame (no legacy map left): CHIM for the pocket test, not listed')
     ap.add_argument('--reason', default='')
     ap.add_argument('--out', required=True)
     a = ap.parse_args(argv)
@@ -174,7 +182,7 @@ def main(argv=None):
         drop = dict(d.partition('=')[::2] for d in a.drop)
         leave = dict(d.partition('=')[::2] for d in a.leave_out)
         doc, lines = make(a.progress, a.rings, a.island, a.include, a.keep, drop, a.reason, leave, a.open_pockets,
-                          a.region)
+                          a.region, a.covered)
     except ValueError as error:
         print('REFUSED: %s' % error, file=sys.stderr)
         return 2

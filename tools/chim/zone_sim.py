@@ -49,13 +49,24 @@ void Sys_Error (char *fmt, ...)
 	va_start (a, fmt); vfprintf (stderr, fmt, a); va_end (a); fputc ('\n', stderr);
 	abort ();
 }
+/* The Python Stats structure must match chim_zone_stats_t (Zone checks it). */
+int ChimZone_StatsSize (void)
+{
+	return (int)sizeof (chim_zone_stats_t);
+}
 '''
+
+
+# chim_zone.h chim_zone_stats_t, field for field (CHIM_KINDS entries per kind; the byte sums are unsigned
+# long: banks together may pass 2 GiB).
+CHIM_KINDS = 9
 
 
 class Stats(ctypes.Structure):
     _fields_ = [('banks', ctypes.c_int), ('blocks', ctypes.c_int), ('locked', ctypes.c_int),
-                ('used_bytes', ctypes.c_int), ('free_bytes', ctypes.c_int), ('largest_free', ctypes.c_int),
-                ('kind_blocks', ctypes.c_int * 8), ('kind_bytes', ctypes.c_int * 8),
+                ('largest_free', ctypes.c_int),
+                ('used_bytes', ctypes.c_ulong), ('free_bytes', ctypes.c_ulong),
+                ('kind_blocks', ctypes.c_int * CHIM_KINDS), ('kind_bytes', ctypes.c_ulong * CHIM_KINDS),
                 ('locked_bytes', ctypes.c_long), ('locked_peak', ctypes.c_long),
                 ('allocations', ctypes.c_ulong), ('evictions', ctypes.c_ulong), ('failures', ctypes.c_ulong),
                 ('trims', ctypes.c_ulong)]
@@ -95,6 +106,12 @@ class Zone:
             getattr(L, name).argtypes = [ctypes.c_void_p]
         L.ChimZone_AddBank.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
         L.ChimZone_LargestUnlocked.restype = ctypes.c_int
+        L.ChimZone_FitsWithout.restype = ctypes.c_int
+        L.ChimZone_FitsWithout.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_void_p), ctypes.c_int]
+        L.ChimZone_Failures.argtypes = [ctypes.POINTER(ctypes.c_int)]
+        if L.ChimZone_StatsSize() != ctypes.sizeof(Stats):
+            raise RuntimeError('zone library: chim_zone_stats_t is %d bytes, Stats %d: update Stats'
+                               % (L.ChimZone_StatsSize(), ctypes.sizeof(Stats)))
         L.ChimZone_Reset()
         self.memory = ctypes.create_string_buffer(zone_bytes + 64)
         if L.ChimZone_AddBank(ctypes.addressof(self.memory), zone_bytes, 0) < 0:
@@ -126,6 +143,17 @@ class Zone:
 
     def failures(self):
         return self.lib.ChimZone_Failures(None)
+
+    def last_need(self):
+        """The last failed request's size, header included (ChimZone_Failures)."""
+        n = ctypes.c_int(0)
+        self.lib.ChimZone_Failures(ctypes.byref(n))
+        return n.value
+
+    def fits_without(self, need, unlock):
+        """ChimZone_FitsWithout: would need fit one unlocked run with these locks dropped (nothing changes)."""
+        arr = (ctypes.c_void_p * max(1, len(unlock)))(*unlock)
+        return bool(self.lib.ChimZone_FitsWithout(int(need), arr, len(unlock)))
 
 
 def block_sizes(world, sizes):
@@ -330,8 +358,27 @@ class Walker:
         self.state[i] = 1
         self.part[i] = False
 
-    def _release(self, i, active2, urgent2):
+    def _release(self, i, active2, urgent2, need=3):
         d = self.dist[i]
+        # the catalogue or terrain (ground) of a chunk within the collision margin: as the first method
+        if self.release >= 2 and (d > urgent2 or need == 3):
+            # chim_release 2 (chim_chunks.c Release, CHIM-ZONE-RELEASE-FLICKER-42): farthest first, only the
+            # chunks whose locks make the failed request fit one run go, all at once; none when even all
+            # of them would not.
+            order = sorted((j for j, s in enumerate(self.state) if s == 2 and self.dist[j] > d and
+                            self.dist[j] > urgent2), key=lambda j: -self.dist[j])
+            need, locks = self.zone.last_need(), []
+            for k, j in enumerate(order):
+                locks += [self.cat[j], self.ter[j]] + list(self.locked_models[j])
+                if self.zone.fits_without(need, locks):
+                    for far in order[:k + 1]:
+                        self.m['released_band' if self.dist[far] > active2 else 'released_ring'] += 1
+                        self._deactivate(far)
+                        self.released_until[far] = self.tick + 50
+                    self.failed_until = [0] * len(self.chunks)
+                    return True
+            self.m['release_refused'] = self.m.get('release_refused', 0) + 1
+            return False
         far = None
         for j, s in enumerate(self.state):
             if s == 2 and self.dist[j] > d and self.dist[j] > urgent2 and (far is None or self.dist[j] > self.dist[far]):
@@ -405,7 +452,7 @@ class Walker:
             for p in pins:
                 self.zone.unlock(p)
             if result < 0:
-                if zone_failed and self.release and self.dist[i] <= active2 and self._release(i, active2, urgent2):
+                if zone_failed and self.release and self.dist[i] <= active2 and self._release(i, active2, urgent2, need):
                     continue
                 self.failed_until[i] = self.tick + (1 if self.release and self.dist[i] <= urgent2 and self.state[i] != 2 else 50)
                 if self.dist[i] <= active2:
@@ -625,7 +672,9 @@ def require_zone_walk(out, sdk=None, sizes=None, report_path=None, memory=None, 
                       for k, (path, frame, chunks) in enumerate(frames)]
             from pass_cache import PassCache
             cache = PassCache.open('chim-zone-walk', {'unit': 'frame route'}, __file__)
-            results = walk(lib, memory, world, blocks, routes, release=1, partial=1, jobs=jobs, cache=cache)
+            from engine_limits import cvar_default
+            release = cvar_default('chim/chim_world.c', 'chim_release')      # the engine's default (2 from v0.0.42-dev2)
+            results = walk(lib, memory, world, blocks, routes, release=release, partial=1, jobs=jobs, cache=cache)
             if cache is not None:
                 used = cache.summary()
                 print('CHIM zone walk units: %d reused, %d walked (frames, by SHA-256 of their inputs)'
@@ -640,8 +689,8 @@ def require_zone_walk(out, sdk=None, sizes=None, report_path=None, memory=None, 
         report = {'zone_kib': memory['zone_kib'], 'pool_kib': memory['pool_kib'], 'spacing': spacing, 'step': step,
                   'ends_kib': memory.get('ends_kib', 0),
                   'method': 'engine zone allocator (chim_zone.c, host build) driven by the ring rules of chim_chunks.c '
-                            'with chim_release 1, chim_partial 1 and chim_zone_ends at its default; block sizes of the '
-                            'target ABI',
+                            'with chim_release %d, chim_partial 1 and chim_zone_ends at its default; block sizes of the '
+                            'target ABI' % release,
                   'walks': walks, 'ok': all(w['ok'] for w in walks)}
         report['status'] = 'passed' if report['ok'] else 'failed'
     report_path.write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')

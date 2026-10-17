@@ -56,6 +56,20 @@ class ChimZoneWalkTests(unittest.TestCase):
         self.assertGreater(r['chunk_loads'], 0)
         self.assertGreater(r['model_loads'], 0)
 
+    def test_planned_release_never_releases_more_than_the_first_method(self):
+        # CHIM-ZONE-RELEASE-FLICKER-42: chim_release 2 lets chunks go only when that makes the failed request fit
+        # one run; on the same walk through a starved zone it releases no more than chim_release 1 (which let
+        # them go one by one for requests that still failed), and leaves no more holes (the catalogue or terrain
+        # of a chunk within the collision margin still releases as the first method does). In a zone starved far
+        # below the ring (160-200 KiB here: hundreds of holes either way) the first method's spare releases
+        # can help a later ground load; that case is not a goal of either method.
+        first = self.walk(256, release=1)
+        planned = self.walk(256, release=2)
+        self.assertLessEqual(planned['holes'], first['holes'])
+        self.assertLessEqual(planned['released_ring'] + planned['released_band'],
+                             first['released_ring'] + first['released_band'])
+        self.assertGreater(planned['release_refused'], 0)
+
     def test_gate_writes_its_report_and_passes(self):
         report = zone_sim.require_zone_walk(self.tmp.name, sizes=SIZES, spacing=64.0, step=16.0)
         self.assertEqual(report['status'], 'passed')

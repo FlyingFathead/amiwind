@@ -55,11 +55,11 @@ static const char *items[]={"Return to game","New game","Save game","Load game",
 
 /* Options list rows (Back is OPTION_ROWS-1). Display settings first. */
 enum {OPT_FOG,OPT_RESET,OPT_FAR,OPT_FRAME,OPT_CROSSHAIR,OPT_PHOTO,OPT_INTERFACE,OPT_AUDIO,OPT_CONTROLS,
-    OPT_AUTOSAVE,OPT_AREA,OPT_METHOD,OPT_BUFFER,OPT_GRAPHICS};
+    OPT_AUTOSAVE,OPT_AREA,OPT_METHOD,OPT_BUFFER,OPT_MEMORY,OPT_GRAPHICS};
 #define ROW_Y 54
 #define ROW_H 19
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-#define OPTION_ROWS 15
+#define OPTION_ROWS 16
 static int brightness_options,brightness_drag;
 extern int R_BrightnessStep(int outside);
 extern void R_BrightnessSetStep(int outside,int value);
@@ -70,7 +70,7 @@ static void brightness_reset(void){brightness_options=brightness_drag=0;}
 static void brightness_back(void){brightness_reset();selection=OPT_GRAPHICS;mouse_visible=0;}
 static void brightness_pointer(void){R_BrightnessSetStep(brightness_drag-1,10+((mouse_x-BRIGHTNESS_X)*5+BRIGHTNESS_W/2)/BRIGHTNESS_W);}
 #else
-#define OPTION_ROWS 14
+#define OPTION_ROWS 15
 #define brightness_active() 0
 #define brightness_reset() ((void)0)
 #endif
@@ -193,6 +193,10 @@ static void option_step(int key,int rows){
     if(key==K_UPARROW){if(selection>0)selection--;}
     else if(selection<rows-1)selection++;
 }
+/* Options > Extra RAM: aw_autoram (chim_world.c; saved in config.cfg). Automatic:
+ * free Fast RAM beyond a margin becomes CHIM cache at the next start; Off: the
+ * standard memory always. Takes effect at the next start. */
+static void memory_toggle(void){Cvar_SetValue("aw_autoram",Cvar_VariableValue("aw_autoram")?0:1);}
 /* Options > Far detail: the far test (aw_cull, aw_fog.c; saved in config.cfg).
  * Full draws everything to the fog; the others leave out distant models
  * (docs/performance/FAR-TEST.md). Other aw_cull values (console) read Custom. */
@@ -388,6 +392,7 @@ void M_Keydown(int key){
         if(selection==OPT_AREA && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_RegionLoadingToggle();
         if(selection==OPT_METHOD && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(0,1);
         if(selection==OPT_BUFFER && AW_CellChangeMethod()==2 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(1,key==K_LEFTARROW?-1:1);
+        if(selection==OPT_MEMORY && (key==K_LEFTARROW || key==K_RIGHTARROW))memory_toggle();
         if(key==K_ENTER || key==K_MOUSE1){
             if(selection==OPT_FOG){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
             else if(selection==OPT_RESET)AW_SetDrawDistance(540);
@@ -404,6 +409,7 @@ void M_Keydown(int key){
             else if(selection==OPT_AREA)AW_RegionLoadingToggle();
             else if(selection==OPT_METHOD)AW_StreamOption(0,1);
             else if(selection==OPT_BUFFER && AW_CellChangeMethod()==2)AW_StreamOption(1,1);
+            else if(selection==OPT_MEMORY)memory_toggle();
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
             else if(selection==OPT_GRAPHICS){brightness_options=1;brightness_drag=0;selection=0;}
 #endif
@@ -580,6 +586,7 @@ void M_Draw(void){
             case OPT_AREA:strcpy(line,AW_RegionLoadingFrozen()?"Area loading: Freeze frame":"Area loading: Black screen");break;
             case OPT_METHOD:strcpy(line,AW_CellChangeMethod()==1?"Load method: Current":"Load method: Read-ahead (test)");break;
             case OPT_BUFFER:sprintf(line,"Read-ahead buffer: %ld KiB",(long)AW_StreamOption(1,0));break;
+            case OPT_MEMORY:strcpy(line,Cvar_VariableValue("aw_autoram")?"Extra RAM: Automatic":"Extra RAM: Off");break;
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
             case OPT_GRAPHICS:strcpy(line,"Graphics...");break;
 #endif

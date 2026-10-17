@@ -12,7 +12,10 @@
 #ifndef CHIM_ZONE_H
 #define CHIM_ZONE_H
 
-#define CHIM_ZONE_BANKS	4
+/* The bank for the current map, the manual -chimcache bank, and the banks of
+ * extra Fast RAM taken automatically at start-up (chim_world.c): one per
+ * memory region, each under 2 GiB, so any amount of Fast RAM fits. */
+#define CHIM_ZONE_BANKS	16
 
 /* Block kinds; 0 is a free block. */
 #define CHIM_KIND_INDEX		1	/* the current frame's chunk index */
@@ -33,8 +36,11 @@ typedef struct
 
 typedef struct
 {
-	int		banks, blocks, locked, used_bytes, free_bytes, largest_free;
-	int		kind_blocks[CHIM_KINDS], kind_bytes[CHIM_KINDS];
+	int		banks, blocks, locked, largest_free;
+	/* Sums over all banks: unsigned long, banks together may pass 2 GiB. */
+	unsigned long	used_bytes, free_bytes;
+	int		kind_blocks[CHIM_KINDS];
+	unsigned long	kind_bytes[CHIM_KINDS];
 	long	locked_bytes, locked_peak;		/* bytes of locked blocks now, most since ChimZone_LockedPeak */
 	unsigned long	allocations, evictions, failures, trims;
 } chim_zone_stats_t;
@@ -44,6 +50,26 @@ int ChimZone_AddBank (void *base, int size, int persistent);
 void ChimZone_DropBank (int bank);
 void ChimZone_DropTransient (void);
 int ChimZone_BankBytes (int bank);
+int ChimZone_BankUsed (int bank);
+int ChimZone_HasFree (int bytes);
+
+/* Automatic extra memory (chim_world.c, at start-up; docs/REAL_HARDWARE.md).
+ * The margin left to the system: 2 MiB plus an eighth of all Fast RAM. The
+ * budget: the free Fast RAM beyond that margin. Each step takes one bank from
+ * the largest free block (the first leaves 2 MiB of its block), whole MiB,
+ * under 2 GiB, at least CHIM_AUTO_FIRST for the first bank and
+ * CHIM_AUTO_NEXT for the others; 0 ends. A 16 MiB Fast RAM machine with the
+ * 11 MiB heap never reaches a first bank: it plays as without the feature. */
+#define CHIM_AUTO_MIB		1048576UL
+#define CHIM_AUTO_FLOOR		(2UL*CHIM_AUTO_MIB)
+#define CHIM_AUTO_KEEP		(2UL*CHIM_AUTO_MIB)
+#define CHIM_AUTO_FIRST		(8UL*CHIM_AUTO_MIB)
+#define CHIM_AUTO_NEXT		(4UL*CHIM_AUTO_MIB)
+#define CHIM_AUTO_BANK_MAX	(2047UL*CHIM_AUTO_MIB)
+unsigned long ChimZone_AutoMargin (unsigned long total);
+unsigned long ChimZone_AutoBudget (unsigned long free_bytes, unsigned long total);
+unsigned long ChimZone_AutoStep (unsigned long largest, unsigned long *budget, int first);
+int ChimZone_AutoLookahead (unsigned long auto_bytes);
 
 void *ChimZone_Alloc (chim_user_t *user, int size, int kind, unsigned id);
 void *ChimZone_Check (chim_user_t *user);
@@ -65,6 +91,7 @@ long ChimZone_LockedPeak (int which, int reset);
 int ChimZone_Check_Integrity (void);
 unsigned long ChimZone_Failures (int *last_need);
 int ChimZone_LargestUnlocked (void);
+int ChimZone_FitsWithout (int need, void **unlock, int n);
 unsigned long ChimZone_Unsatisfiable (void);
 void ChimZone_Map (void (*print)(const char *line));
 void ChimZone_SetEnds (int small);

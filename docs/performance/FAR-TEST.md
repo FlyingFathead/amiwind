@@ -22,10 +22,10 @@ that change the picture for the maintainer to judge.
 | `aw_cull` | Far test | Picture |
 | --- | --- | --- |
 | 0 | none | everything in the potentially visible set is drawn |
-| **1** (default) | the far plane: a world node, leaf or model whose nearest point lies more than the draw distance + 16 ahead of the eye is left out (the method since v0.0.31) | the reference |
+| 1 | the far plane: a world node, leaf or model whose nearest point lies more than the draw distance + 16 ahead of the eye is left out (the method since v0.0.31; menu: Full) | the reference |
 | 2 | 1 plus the **fog-exact test** below | identical to 1 |
 | 3 | 2 plus the size-scaled cut-off, light preset | changes: small distant models go earlier |
-| 4 | 2 plus the size-scaled cut-off, strong preset | changes more |
+| **4** (default from v0.0.42) | 2 plus the size-scaled cut-off, strong preset (menu: Strong) | changes more |
 | 5 | 2 plus the far detail step | changes a few pixels |
 | 6 | 4 and 5 together | changes |
 | 7 | debug view: the fog-exact test without its colour checks (works with `aw_fog 0`, to see what it leaves out), and the line where the fog pass's sky ray crosses the horizon marked | debug only |
@@ -37,18 +37,27 @@ through the four settings worth choosing:
 
 | Menu | `dbg cull` | What it draws |
 | --- | --- | --- |
-| Full | 1 | everything up to the fog (the picture of v0.0.41) |
+| Full | 1 | everything up to the fog (the picture of v0.0.41; kept by configurations saved before v0.0.42) |
 | Light | 3 | small and medium distant models drop out a little sooner |
-| Strong | 4 | distant models drop out sooner by size; 17-27 % less 3D time at the benchmark cameras |
+| Strong | 4 | the default: distant models drop out sooner by size; 17-27 % less 3D time at the benchmark cameras |
 | Strong + small faces | 6 | Strong, and tiny faces of distant buildings left out as well |
 
 The choice is saved with the other settings (`config.cfg`) and comes back the next time. In the
 F10 console, `dbg cull 4` (or `aw_cull 4`) sets the same thing; the other values in the table
 above are for testing and read "Custom" in the menu.
 
-`dbg cull on` is 1, `dbg cull off` is 0. Every value stays selectable; 3 to 7 are never the
-default without the maintainer's decision. 2 draws the same picture but did not pay for itself at
-the benchmark cameras (below), so 1 stays the default.
+`dbg cull on` is 1, `dbg cull off` is 0. Every value stays selectable.
+
+**Strong is the default from v0.0.42** (decided by the maintainer, 17 October 2026): it took 17-27 % off
+the 3D view time at the five Balmora benchmark cameras on the slow 68040 preset (below). What it
+costs: distant small and medium objects drop out before the fog has hidden them, for example
+hanging lanterns, signs, crates and the tops of towers far down a street. Choose Full in the
+menu (or `dbg cull 1`) to draw everything up to the fog again.
+
+A fresh install starts at Strong. A saved configuration from before v0.0.42 (which never held
+this setting) keeps Full, the picture that player had, until Strong is chosen in the menu; every
+later choice is saved. Measurements from before 17 October 2026 were all taken at Full; compare
+new ones with them at `dbg cull 1`.
 
 ## The fog-exact test (`aw_cull 2`)
 
@@ -99,7 +108,7 @@ upper parts stand against the sky, where a fogged silhouette differs from the sk
 
 ## Measurements
 
-16-17 October 2026, FS-UAE x14 cycle-exact 68040 preset (49.7 MHz, emulator-relative times),
+Far detail labels: "Full" = `aw_cull 1`, "Strong" = `aw_cull 4`. 16-17 October 2026, FS-UAE x14 cycle-exact 68040 preset (49.7 MHz, emulator-relative times),
 the five Balmora benchmark cameras ([HARDWARE-BENCHMARK.md](../HARDWARE-BENCHMARK.md)), noon
 held, day/night cycle off, headlamp off, NPC movers off, one engine binary for every value
 (no code-layout difference between the variants), each value switched in place at the same
@@ -155,7 +164,7 @@ Measured with the v0.0.41 release image, which has the flat-sky regression
 are the same with Full and Strong (0 of 78,100 differ, looking 30 degrees up). The figures and
 clips will be taken again on a build with the sky fixed.
 
-**Default:** Full, until the maintainer has seen Strong in clips with the fixed sky.
+**Default:** Strong (see above); Full until v0.0.41.
 
 ## Counters
 

@@ -39,6 +39,13 @@ void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);assert(cvar_list_
 static byte fog_colours[4096];
 viddef_t vid;refdef_t r_refdef;short *d_pzbuffer;unsigned int d_zwidth;
 byte *COM_LoadHunkFile(char *p){return fog_colours;}
+/* config.cfg for AW_ConfigWithout: NULL = no saved configuration. */
+static const char *saved_config;
+int COM_FOpenFile(char *name,FILE **f){
+ assert(!strcmp(name,"config.cfg"));
+ if(!saved_config){*f=NULL;return -1;}
+ *f=tmpfile();fputs(saved_config,*f);rewind(*f);return (int)strlen(saved_config);
+}
 static float cvar_value(const char *name){int i;for(i=cvar_list_count-1;i>=0;i--)if(!strcmp(cvar_list[i]->name,name))return cvar_list[i]->value;assert(!"unregistered");return 0;}
 /* Fog-exact far test (aw_cull 2, the default) and the detail options (aw_cull 3-6). */
 static int flame_limit_value=32767;
@@ -146,6 +153,19 @@ static void fog_exact_tests(void){
  assert(AW_BrushPassFar(box,40,box)==(AW_FAR_FACES|2<<4) && AW_BrushPassFar(box,10,box)==AW_FAR_DRAW);
  Cvar_SetValue("aw_cull",1);aw_flame_depth_limit=NULL;
 }
+/* Far detail default (owner 2026-10-17): Strong (4) for a fresh install and in
+ * every saved configuration that sets it; a config.cfg saved before aw_cull was
+ * saved (up to v0.0.41) keeps Full (1). */
+static void far_detail_default_tests(void){
+ saved_config=NULL;assert(!AW_ConfigWithout("aw_cull"));
+ saved_config="bind w +forward\naw_drawdistance \"540\"\nvolume \"0.7\"\n";assert(AW_ConfigWithout("aw_cull"));
+ saved_config="bind w +forward\naw_cull \"6\"\n";assert(!AW_ConfigWithout("aw_cull"));
+ saved_config="aw_cull \"1\"\n";assert(!AW_ConfigWithout("aw_cull"));
+ saved_config="say aw_cull 3\naw_culling \"1\"\n";assert(AW_ConfigWithout("aw_cull"));
+ saved_config="";assert(AW_ConfigWithout("aw_cull"));
+ AW_FarDetailSavedBefore(0);AW_FogInit();assert(cvar_value("aw_cull")==4);
+ AW_FarDetailSavedBefore(1);AW_FogInit();assert(cvar_value("aw_cull")==1);
+}
 int main(void) {
  int distances[6]={128,400,540,700,1400,4096},i,j,expected;byte fog[32770];
  short edge_visible[6]={790,-110,-10,810,-90,10};
@@ -160,7 +180,7 @@ int main(void) {
   assert(pixels[0]==7);assert(pixels[1]==15 && pixels[2]==15);assert(pixels[3]==0);assert(pixels[4]!=7);
   inside=1;memset(pixels,7,sizeof pixels);AW_FogDraw();for(i=0;i<5;i++)assert(pixels[i]==7);inside=0;
  }
- assert(cvar_value("aw_cull")==1); /* Full, the default */
+ assert(cvar_value("aw_cull")==4); /* Strong, the default from v0.0.42 */
  AW_CullBegin();
  assert(AW_NodeVisible(edge_visible)); /* old radius-aligned cube dropped this */
  assert(!AW_NodeVisible(distant));
@@ -199,5 +219,6 @@ int main(void) {
  chim_reach=1200;argument="1100";distance_command();assert(AW_DrawDistance()==1100);
  aw_chim_view_reach=NULL;assert(AW_DrawDistance()==540);
  fog_exact_tests();
+ far_detail_default_tests();
  puts("forward-depth culling retains visible edge/door and rejects far bounds; the fog-exact far test leaves out only full-fog geometry below the horizon");return 0;
 }

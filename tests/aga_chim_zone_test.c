@@ -291,14 +291,163 @@ static void unsatisfiable (void)
 	assert (ChimZone_Check_Integrity ());
 }
 
+/* CHIM-ZONE-RELEASE-FLICKER-42: whether dropping listed locks makes a run
+ * for a request, without changing a lock. */
+static void fits_without (void)
+{
+	static unsigned char bank[64*1024];
+	static chim_user_t u[8];
+	void *list[4];
+	int i, need;
+
+	ChimZone_Reset ();
+	assert (ChimZone_AddBank (bank, sizeof(bank), 0) == 0);
+	for (i=0 ; i<8 ; i++)
+	{
+		assert (ChimZone_Alloc (&u[i], 7000, CHIM_KIND_MODEL, i));
+		ChimZone_Lock (u[i].data);
+	}
+	ChimZone_Lock (u[3].data);			/* locked twice: two chunks hold it */
+	need = 2*7000 + 1024;				/* more than one block, less than two neighbours */
+	assert (ChimZone_LargestUnlocked () < need);	/* only the free tail is unlocked */
+	assert (!ChimZone_FitsWithout (need, list, 0));
+	list[0] = u[2].data;
+	assert (!ChimZone_FitsWithout (need, list, 1));		/* one block alone is too small */
+	list[1] = u[4].data;
+	assert (!ChimZone_FitsWithout (need, list, 2));		/* 2 and 4 are split by 3 */
+	list[2] = u[3].data;
+	assert (!ChimZone_FitsWithout (need, list, 3));		/* 3 keeps its second lock */
+	list[3] = u[3].data;
+	assert (ChimZone_FitsWithout (need, list, 4));		/* 2, 3, 4 in one run */
+	/* nothing changed */
+	assert (ChimZone_Locks (u[2].data) == 1 && ChimZone_Locks (u[3].data) == 2 && ChimZone_Locks (u[4].data) == 1);
+	assert (ChimZone_LargestUnlocked () < need);
+	for (i=0 ; i<8 ; i++)
+		ChimZone_Unlock (u[i].data);
+	ChimZone_Unlock (u[3].data);
+	assert (ChimZone_Check_Integrity ());
+}
+
+/* Automatic extra memory sizing (chim_zone.c ChimZone_Auto*): the steps
+ * chim_world.c takes over the free Fast RAM regions, largest first, as the
+ * exec AvailMem(MEMF_LARGEST) loop does. Sizes in MiB. */
+#define MIB 1048576UL
+static int auto_plan (unsigned long total_mib, const unsigned long *regions_mib, int regions,
+	unsigned long *banks_mib, unsigned long *taken_mib)
+{
+	unsigned long region[4], free_bytes = 0, budget, largest, size;
+	int i, n = 0, best;
+	for (i=0 ; i<regions ; i++)
+	{
+		region[i] = regions_mib[i] * MIB;
+		free_bytes += region[i];
+	}
+	budget = ChimZone_AutoBudget (free_bytes, total_mib * MIB);
+	*taken_mib = 0;
+	for (n=0 ; n<CHIM_ZONE_BANKS-2 ; n++)
+	{
+		for (best=0, i=1 ; i<regions ; i++)
+			if (region[i] > region[best])
+				best = i;
+		largest = region[best];
+		size = ChimZone_AutoStep (largest, &budget, n == 0);
+		if (!size)
+			break;
+		assert (size <= largest && size <= CHIM_AUTO_BANK_MAX && !(size % MIB));
+		region[best] -= size;
+		banks_mib[n] = size / MIB;
+		*taken_mib += size / MIB;
+	}
+	return n;
+}
+
+static void auto_sizing (void)
+{
+	unsigned long banks[16], taken, budget;
+	static const unsigned long r16[] = {4}, r24[] = {11}, r32[] = {19}, r64[] = {51}, r128[] = {115},
+		r128split[] = {64, 51}, r512[] = {499}, r1g[] = {500, 500}, r1g3[] = {600, 300, 90},
+		r3g[] = {3000}, r3gsplit[] = {2040, 900, 100}, r4g[] = {4000};
+	int n;
+	/* The margin: 2 MiB plus an eighth of all Fast RAM. */
+	assert (ChimZone_AutoMargin (16*MIB) == 4*MIB && ChimZone_AutoMargin (128*MIB) == 18*MIB);
+	/* 16 MiB with the 11 MiB heap (about 4.5 MiB free), 24 MiB: nothing, the baseline. */
+	assert (auto_plan (16, r16, 1, banks, &taken) == 0 && taken == 0);
+	{ unsigned long r[] = {5}; assert (auto_plan (16, r, 1, banks, &taken) == 0); }
+	assert (auto_plan (24, r24, 1, banks, &taken) == 0);
+	/* 32 MiB: 19 free, margin 6: one 13 MiB bank. */
+	n = auto_plan (32, r32, 1, banks, &taken);
+	assert (n == 1 && banks[0] == 13);
+	n = auto_plan (64, r64, 1, banks, &taken);
+	assert (n == 1 && banks[0] == 41);
+	n = auto_plan (128, r128, 1, banks, &taken);
+	assert (n == 1 && banks[0] == 97);
+	/* 128 MiB over two boards: two banks, the same total. */
+	n = auto_plan (128, r128split, 2, banks, &taken);
+	assert (n == 2 && banks[0] == 62 && banks[1] == 35 && taken == 97);
+	n = auto_plan (512, r512, 1, banks, &taken);
+	assert (n == 1 && banks[0] == 433);
+	/* 1 GiB: two regions, three regions. */
+	n = auto_plan (1024, r1g, 2, banks, &taken);
+	assert (n == 2 && banks[0] == 498 && banks[1] == 372 && taken == 870);
+	n = auto_plan (1024, r1g3, 3, banks, &taken);
+	assert (taken == 990 - 130 && n == 2 && banks[0] == 598 && banks[1] == 262);
+	/* 1.5 GiB as two Zorro III boards (1 GiB + 512 MiB, the launcher's largest FS-UAE setting), about
+	 * 1,520 MiB free after the heap: margin 2 + 192 MiB, one bank per board. */
+	{ unsigned long r[] = {1009, 511}; n = auto_plan (1536, r, 2, banks, &taken);
+	  assert (n == 2 && banks[0] == 1007 && banks[1] == 1520 - 194 - 1007 && taken == 1520 - 194); }
+	/* 3 GiB in one region: no bank reaches 2 GiB, the rest is a second bank. */
+	n = auto_plan (3072, r3g, 1, banks, &taken);
+	assert (n == 2 && banks[0] == 2047 && banks[1] == 3000 - 386 - 2047 && taken == 3000 - 386);
+	n = auto_plan (3072, r3gsplit, 3, banks, &taken);
+	assert (n == 2 && banks[0] == 2038 && banks[1] == 3040 - 386 - 2038);
+	/* Near the 32-bit end (4000 of 4095 MiB): every step stays below 2^32 bytes. */
+	n = auto_plan (4095, r4g, 1, banks, &taken);
+	assert (n == 2 && banks[0] == 2047 && banks[1] == 1439 && taken == 3486);
+	assert (ChimZone_AutoMargin (0xFFF00000UL) == 2*MIB + 0xFFF00000UL/8);
+	/* A step never takes more than the budget, nor less than its minimum. */
+	budget = 7*MIB;
+	assert (ChimZone_AutoStep (100*MIB, &budget, 1) == 0 && budget == 7*MIB);
+	assert (ChimZone_AutoStep (100*MIB, &budget, 0) == 7*MIB && budget == 0);
+	budget = 100*MIB;
+	assert (ChimZone_AutoStep (3*MIB, &budget, 0) == 0 && ChimZone_AutoStep (9*MIB, &budget, 1) == 0);
+	assert (ChimZone_AutoLookahead (0) == 1 && ChimZone_AutoLookahead (7*MIB) == 1 &&
+		ChimZone_AutoLookahead (8*MIB) == 2 && ChimZone_AutoLookahead (97*MIB) == 3);
+	printf ("auto sizing ok\n");
+}
+
+/* Many banks: the map bank and fourteen automatic ones. */
+static void many_banks (void)
+{
+	static unsigned char memory[15][8192];
+	chim_user_t u[15];
+	int i;
+	ChimZone_Reset ();
+	memset (u, 0, sizeof(u));
+	for (i=0 ; i<15 ; i++)
+		assert (ChimZone_AddBank (memory[i], sizeof(memory[i]), i > 0) == i);
+	for (i=0 ; i<15 ; i++)
+		assert (ChimZone_Alloc (&u[i], 7000, CHIM_KIND_MODEL, i));
+	for (i=0 ; i<15 ; i++)
+		assert (ChimZone_BankUsed (i) == 1);
+	assert (!ChimZone_HasFree (2000) && ChimZone_HasFree (1000));
+	assert (ChimZone_Check_Integrity ());
+	for (i=1 ; i<15 ; i++)
+		ChimZone_DropBank (i);
+	assert (ChimZone_BankUsed (0) == 1 && !ChimZone_BankUsed (3));
+	printf ("many banks ok\n");
+}
+
 int main (void)
 {
+	fits_without ();
 	unsatisfiable ();
 	basics ();
 	lru ();
 	banks ();
 	stress ();
 	diagnostics ();
+	auto_sizing ();
+	many_banks ();
 	printf ("chim zone ok\n");
 	return 0;
 }

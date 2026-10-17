@@ -83,6 +83,10 @@ split adds up to the slot measured with the profile off within a few percent.
 
 ## Ten fixed cameras (8 October 2026)
 
+> Far detail: every figure on this page before 17 October 2026 was measured with far detail **Full**
+> (`aw_cull 1`, the default up to v0.0.41). From v0.0.42 the default is Strong; to compare with these
+> figures, set `dbg cull 1` first ([the far test](FAR-TEST.md)).
+
 v0.0.32-dev engine (`dbg rcount`) overlaid on a copy of the v0.0.31 image, playtest
 profile (JIT, unlimited speed, see [FS-UAE-PLAYTESTING.md](../FS-UAE-PLAYTESTING.md)),
 noon, day/night cycle off, headlamp off, medians of 17-19 one-second lines per

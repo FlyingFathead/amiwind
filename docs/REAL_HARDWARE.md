@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -13,7 +13,7 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [Disk buffers and RAM disks](#disk-buffers-and-ram-disks)
 - [A cache test plan](#a-cache-test-plan)
 - [Compatibility roadmap](#compatibility-roadmap)
-- [Not yet: automatic sizing and non-blocking disk reads](#not-yet-automatic-sizing-and-non-blocking-disk-reads)
+- [Not yet: non-blocking disk reads](#not-yet-non-blocking-disk-reads)
 - [What to send back](#what-to-send-back)
 
 <!-- contents end -->
@@ -36,7 +36,7 @@ which settings use more memory. Measurements from real machines are very welcome
 - [Disk buffers and RAM disks](#disk-buffers-and-ram-disks)
 - [A cache test plan](#a-cache-test-plan)
 - [Compatibility roadmap](#compatibility-roadmap)
-- [Not yet: automatic sizing and non-blocking disk reads](#not-yet-automatic-sizing-and-non-blocking-disk-reads)
+- [Not yet: non-blocking disk reads](#not-yet-non-blocking-disk-reads)
 - [What to send back](#what-to-send-back)
 
 ## What the game needs
@@ -74,21 +74,50 @@ a walk profile to log files) give the numbers that matter most ([console command
 
 ## More Fast RAM: the memory settings that exist today
 
+### Extra RAM is used automatically
+
+At every start the game measures the free Fast RAM. What is free beyond a margin left to the system (2 MiB plus
+an eighth of all Fast RAM) becomes CHIM's cache: shared models, textures and streamed pieces of the world stay in
+memory, pieces you walk away from stay there too, and the world is fetched further ahead in the direction you
+travel (two chunks ahead from 8 MiB of cache, three from 32 MiB). There is no upper limit other than the machine:
+Fast RAM spread over several boards (accelerator RAM and a Zorro III card) is taken as several banks, largest
+first, each under 2 GiB, so 2 GiB and more works too.
+
+- **16 MiB of Fast RAM (the reference machine) takes nothing:** with the 11 MiB game heap only about 1 MiB is
+  free, under the margin, so the game plays exactly as without this feature. The first cache bank needs at least
+  8 MiB beyond the margin (about 30 MiB of Fast RAM or more).
+- **The console says what happened on every start**, for example
+  `Memory: 115 MiB Fast RAM free of 128 MiB; CHIM cache 97 MiB in 2 banks (automatic); look-ahead x3`
+  or `Memory: 1 MiB Fast RAM free of 16 MiB; CHIM cache off (not enough extra Fast RAM, standard memory)`.
+  The `chim` console command prints the same line.
+- **A notice on the startup logo** says how much extra RAM was found and what it is used for. Pressing **M**
+  while it shows starts this session without it (the standard memory). It never waits for a key; starts that
+  skip the logo (the test options `aw_boot_console`, `aw_test_start`, a test drive's `test.cfg`) skip the notice.
+- **Off for good:** Options > Extra RAM: Off (saved in `config.cfg` as `aw_autoram 0`; takes effect at the next
+  start).
+- **If the memory cannot be taken,** the console says so and the game plays on the standard memory.
+- **The game heap stays at its built size** (11 MiB unless `-heapmb` or the builder's `--heap-mb` say otherwise):
+  the extra goes to CHIM's cache, where the streaming memory runs full (Ebonheart, Khuul). A larger heap for
+  Quake's own cache (actors and sounds) stays a manual setting until it is measured to help.
+
+### The settings
+
 These are in the engine now ([CHIM engine](chim/ENGINE.md), [memory guide](chim/build_guide/MEMORY.md)):
 
 | Setting | What it does | Default |
 | --- | --- | --- |
-| `-chimcache KIB` (start argument) | Extra Fast RAM for CHIM's cache: shared models and textures stay in memory across map changes instead of being read again. Taken once at start; if the memory is not there, the console says so and the standard budget is used. | off |
+| `-chimcache KIB` (start argument) | Extra Fast RAM for CHIM's cache, by hand: shared models and textures stay in memory across map changes instead of being read again. Taken once at start; if the memory is not there, the console says so and the standard budget is used. Given, it replaces the automatic size (`-chimcache 0`: no cache bank at all). | automatic |
+| `aw_autoram` (Options > Extra RAM, saved) | 1: free Fast RAM beyond the margin becomes CHIM's cache at the next start; 0: the standard memory always. | 1 |
 | `-heapmb N` (start argument) | The game heap in MiB for this start (1 to 2047). | 11 (the built size) |
 | `chim_prefetch` | How far ahead of the visible ring CHIM loads chunks (-1: the world's own value). | -1 |
-| `chim_lookahead` | Loads ahead in the direction you walk (-1: the world's prefetch margin). | -1 |
+| `chim_lookahead` | Loads ahead in the direction you walk (-1: the world's prefetch margin, two or three times that with an automatic cache of 8 or 32 MiB and more). | -1 |
 | `chim_prefetch_room` | Prefetch only into free memory, so it never pushes out what is in use. | 1 |
 
 The chunk and model cache evicts what was used longest ago (LRU), and loading has a per-frame budget.
 
-On a machine with a lot of Fast RAM, for example an accelerator with 128 or 256 MiB, a larger cache and heap such
-as `-chimcache 32768 -heapmb 32` is a good first try; the interesting part is how its numbers compare with the
-defaults.
+On a machine with a lot of Fast RAM, for example an accelerator with 128 or 256 MiB, the cache is now sized by
+itself; `-chimcache` and `-heapmb 32` remain for comparisons, and the interesting part is how the numbers compare
+with Options > Extra RAM: Off.
 
 ## Disk buffers and RAM disks
 
@@ -109,7 +138,8 @@ Suggested settings to compare (not measured recommendations; keep the heap at it
 
 | Run | Start arguments |
 | --- | --- |
-| Baseline | none |
+| Baseline | Options > Extra RAM: Off (or M on the startup logo) |
+| Automatic | none |
 | Small | `-chimcache 8192` |
 | Medium | `-chimcache 32768` |
 | Large | `-chimcache 65536` |
@@ -145,16 +175,15 @@ The 68060 part has its own page, with what is known, the rules and the steps: [A
   to get the most out of the CPU, where to put the library on the game disk, and how to build the game with it
   (the `amiga-libs` folder next to `Data Files`). The notice waits a few seconds with a countdown and continues;
   pressing S stops the countdown so it can be read in full, and any key then continues.
-- **Extra RAM as speed.** Today by hand, with `-chimcache` and `-heapmb` (above); planned: when much more Fast RAM
-  is free, the game asks once whether to use it, and yes turns on larger caches (surface cache, streamed chunks kept, prefetch, visited interiors kept, read caching)
+- **Extra RAM as speed.** Since v0.0.42-rc1 the CHIM cache, the chunks kept after you leave them and the
+  look-ahead grow with the free Fast RAM by themselves (above); still planned: a larger surface cache, visited
+  interiors kept and read caching
   ([the cache plan](ROADMAP.md#the-cache-plan-extra-ram-spent-on-not-doing-work-twice-16-october-2026)).
 
-## Not yet: automatic sizing and non-blocking disk reads
+## Not yet: non-blocking disk reads
 
 Planned ([roadmap](ROADMAP.md), the cache plan above):
 
-- The cache and heap sized automatically from the free Fast RAM at start, so a big-memory machine uses it without
-  start arguments.
 - Disk reads that never stop a frame. Some reads during play still wait for the disk
   ([ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md)); a real hard disk or card is slower than an
   emulator's host disk, so this matters more on real hardware.

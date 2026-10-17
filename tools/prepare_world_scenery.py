@@ -21,7 +21,8 @@ _MODELS = {}
 
 def scenery_profile(source, triangles):
     """The visual profile of one world scenery model: giant mushrooms keep 160 triangles and their shared seams
-    (cap rims stay closed), rocks 64. Town frames use the same profile for giant mushrooms (MESH-VIVEC-CAP-GAP-38)."""
+    (their seams stay closed), rocks 64. Towns and CHIM areas reduce mushrooms with the boundary lock instead
+    (town_regions.visual_profile, MESH-VIVEC-CAP-GAP-38); this profile is the open-world and Seyda Neen one."""
     mushroom = 'flora_emp_parasol_' in source or 'flora_t_mushroom_' in source
     target = 160 if mushroom else 64
     return {'texture_size': 64, 'ratio': min(1., target / max(1, triangles)),

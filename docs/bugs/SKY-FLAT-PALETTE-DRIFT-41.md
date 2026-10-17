@@ -163,5 +163,6 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 Related bugs in other categories:
 
 - [BUILD-INVENTORY-PALETTE-41](BUILD-INVENTORY-PALETTE-41.md): Inventory icons and metadata stop the sky palette image pass
+- [SKY-STAR-TWINKLE-LATE-42](SKY-STAR-TWINKLE-LATE-42.md): Star twinkle seen only late at night: before the midnight clearing the night clouds hide the few twinkling stars
 
 <!-- END GENERATED CATEGORY -->

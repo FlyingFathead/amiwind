@@ -595,6 +595,60 @@
       "to": "68040",
       "source": "tools/build.py (engine_profile.add_options)",
       "note": "68040 = the baseline engine (make command unchanged); 68060 = the 68060-targeted engine (-m68060 -mhard-float, runs on a 68060 only, docs/68060.md), EXPERIMENTAL"
+    },
+    {
+      "version": "0.0.42-dev1",
+      "option": "resource_check",
+      "flag": "--resource-check",
+      "change": "added",
+      "to": "fail",
+      "source": "tools/build.py (resource plan, fixlist B41)",
+      "note": "fail = a stage whose single unit cannot fit the memory refuses the build before any stage (RESOURCE-PLAN.json in the run); warn = print and build; off = no plan"
+    },
+    {
+      "version": "0.0.42-dev1",
+      "option": "resource_from",
+      "flag": "--resource-from",
+      "change": "added",
+      "to": [],
+      "source": "tools/build.py (resource plan, fixlist B41)",
+      "note": "[] = measurements from the --reuse-from run chain and the workspace history only; RUN = also measure from that run"
+    },
+    {
+      "version": "0.0.42-dev1",
+      "option": "resource_memory_gb",
+      "flag": "--resource-memory-gb",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py (resource plan, fixlist B41)",
+      "note": "null = this container's own memory limit (cgroup memory.max), else the machine; GB = the container the build will run in (e.g. its lease)"
+    },
+    {
+      "version": "0.0.42-dev1",
+      "option": "resource_plan",
+      "flag": "--resource-plan",
+      "change": "added",
+      "to": false,
+      "source": "tools/build.py (resource plan, fixlist B41)",
+      "note": "print the resource plan (memory and threads per stage that will run against what the build gets) and exit; read only"
+    },
+    {
+      "version": "0.0.42-dev1",
+      "option": "resource_plan_json",
+      "flag": "--resource-plan-json",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py (resource plan, fixlist B41)",
+      "note": "with --resource-plan: also write the plan (schema resource-plan-1)"
+    },
+    {
+      "version": "0.0.42-dev1",
+      "option": "resource_threads",
+      "flag": "--resource-threads",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py (resource plan, fixlist B41)",
+      "note": "null = this container's CPU quota (cgroup cpu.max), else the machine; N = the threads the build will run with"
     }
   ],
   "current": {
@@ -690,6 +744,12 @@
       "quick_character": null,
       "quiet": false,
       "readiness_id": [],
+      "resource_check": "fail",
+      "resource_from": [],
+      "resource_memory_gb": null,
+      "resource_plan": false,
+      "resource_plan_json": null,
+      "resource_threads": null,
       "scenery_reduce": null,
       "scenery_reduce_texels": null,
       "seyda_recorded": null,

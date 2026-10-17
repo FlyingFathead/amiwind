@@ -53,16 +53,24 @@ item's icon with the original inventory at the same item.
 
 ## Repair
 
-Planned on the same pipeline as the HUD boxes (HUD-STATS-29, docs/HUD.md):
-the one icon table (tools/prepare_icons.py, gfx/icons.awl) with every item
-the player can own, box-filtered from the originals, the magic and equipped
-backdrops (textures/menu_icon_magic.dds, menu_icon_equip.dds,
-menu_icon_magic_equip.dds) imported from the game data, and the row drawing
-the table's picture without resampling. Not implemented yet.
+On the HUD's icon table (HUD-STATS-29, docs/HUD.md "Inventory icons"): the
+image step converts the inventory cell of every catalogue item that has an
+icon (the original 42 x 42 item cell with its 32 x 32 icon, scaled to the
+row's 16 x 16 slot), on the magic backdrop when enchanted, plus an equipped
+variant on menu_icon_equip.dds (or menu_icon_magic_equip.dds) for equippable
+items, as the original item widget does; potions now find their icon (the
+record's TEXT field, not ITEX); all pictures are stored once in one pack (gfx/icons.awp). Each row draws
+its picture without resampling; one slot per visible row, reloaded only on
+change. `aw_hud_icons 0` keeps the old rows. Branch v0.0.42-hud-title.
 
 ## Verification
 
-Not yet repaired.
+Builder tests with synthetic pictures (every item, the equipped and magic
+backdrops, one picture for many rows, the process pool path, the pack
+offsets and SHA-256), a native fixture of the row drawing and the pack
+reading, the palette overlay's pack parser; in-game stills and a clip of
+owned items outside the old staged set, one equipped. On a GOG Morrowind install:
+3,414 rows, 1,150 pictures, pack 305,208 bytes, 1.3 s.
 
 ## Prevention
 
@@ -101,8 +109,10 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - AW-20260928-13 (no report page): New Game confirmation defaults to Cancel
 - AW25-03 (no report page): Map marker reported stale; HUD lacked global/local positions
 - CHAR-CONFIRM-BORDER-29 (no report page): Character Go back / Choose actions lack OK-style frames
+- [CHIM-REGION-DOORS-NO-PROMPT-42](CHIM-REGION-DOORS-NO-PROMPT-42.md): Doors in CHIM region cells show no entrance at all (no prompt, not even Interior unavailable), e.g. every door in Khuul
 - [FONT-BITMAP-INDEX-32](FONT-BITMAP-INDEX-32.md): Bitmap font path keeps the .fnt glyph order; the engine indexes by game byte (wrong characters)
 - [FONT-TTF-COVERAGE-32](FONT-TTF-COVERAGE-32.md): Magic Cards TrueType font silently lacks many characters and replaces ASCII brackets with ornaments
+- [HUD-DEBUG-STRIP-OVER-BOXES-42](HUD-DEBUG-STRIP-OVER-BOXES-42.md): Debug coordinate strip's black fill and text cover the weapon and magic boxes
 - [HUD-ENEMY-BAR-COLOUR-33](HUD-ENEMY-BAR-COLOUR-33.md): The enemy health bar draws orange, not yellow
 - [HUD-NOTIFY-OVERLAP-31](HUD-NOTIFY-OVERLAP-31.md): Console messages print over the location title
 - [HUD-STATS-29](HUD-STATS-29.md): Health uses fixed 100; other bars hardcoded full
@@ -111,6 +121,8 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - MAP-REG-01 (no report page): In-Game map mode hid settlement markers (regression)
 - MAP-RIGHT-DRAG-29 (no report page): Advertised right-drag does not pan teleport map
 - MAP-SPOTS-28 (no report page): In-game map screen has white/yellow spots
+- [NOCLIP-BOB-DEFAULT-42](NOCLIP-BOB-DEFAULT-42.md): Head bob still on in noclip mode by default, although the noclip bob was set to off by default
+- NPC-DREAMER-GREETING-DEFAULT-42 (no report page): Dreamers (Sixth House sleepers) give a default greeting instead of their own Sixth House greeting
 - [PHOTO-DEBUG-STRIP-33](PHOTO-DEBUG-STRIP-33.md): Photo mode with Ctrl+H: the coordinate strip blacks out only from x=88, leaving the bottom-left corner of the view
 - [PHOTO-GALLERY-TEXT-33](PHOTO-GALLERY-TEXT-33.md): Photo mode leaves test-room and gallery instruction text over the view
 - [PLACE-NAMES-INTERIOR-31](PLACE-NAMES-INTERIOR-31.md): Location label has no place name inside interiors
@@ -119,8 +131,10 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [TOOLKIT-TEXT-ENCODING-38](TOOLKIT-TEXT-ENCODING-38.md): Toolkit labels contain corrupted Unicode characters
 - UI-ACCEPT-29 (no report page): Character selection lacks a visible OK button
 - [UI-DEATH-DAMAGE-TINT-38](UI-DEATH-DAMAGE-TINT-38.md): Lava damage tint also colours the death menu and selection
+- [UI-INVENTORY-FONT-TABS-42](UI-INVENTORY-FONT-TABS-42.md): Inventory categories use the console font as plain text instead of the original Morrowind font on button tabs
 - [UI-INVENTORY-HEADING-CENTRE-42](UI-INVENTORY-HEADING-CENTRE-42.md): The Inventory heading text is not vertically centred in its bar
 - [UI-INVENTORY-LAYOUT-40](UI-INVENTORY-LAYOUT-40.md): Inventory text overlaps fields and footer; preview initially faces away
+- [UI-INVENTORY-ORIGINAL-LAYOUT-42](UI-INVENTORY-ORIGINAL-LAYOUT-42.md): The inventory lacks the original encumbrance bar, armour rating and item icon grid
 - [UI-INVENTORY-PREVIEW-GAP-41](UI-INVENTORY-PREVIEW-GAP-41.md): Inventory shows 'Character preview unavailable': a fixed 2 MiB memory guard refuses the 128 KB pose model in Seyda Neen
 - [UI-INVENTORY-PREVIEW-STILL-42](UI-INVENTORY-PREVIEW-STILL-42.md): The inventory character is drawn live and turns instead of being a still picture
 - [UI-KEY-HELP-STALE-38](UI-KEY-HELP-STALE-38.md): Key help exposes raw actions and uses a sparse outdated layout

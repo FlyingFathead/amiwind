@@ -252,6 +252,18 @@ requirement](../WORLD_STREAMER.md#memory-placement-requirement)):
   the collision margin of it; a chunk without ground within the collision
   margin that failed tries again on the next tick; every release lets the
   waiting chunks try again.
+  `chim_release 2` (the default from v0.0.42-dev2,
+  [CHIM-ZONE-RELEASE-FLICKER-42](../bugs/CHIM-ZONE-RELEASE-FLICKER-42.md)): the same, but before letting
+  anything go the engine counts what the farther chunks hold, farthest first, and lets go of exactly those
+  whose blocks make the request fit one run, all at once; when even all of them would not (the room is
+  split by locked blocks of nearer chunks), nothing goes and the chunk waits. With `chim_release 1`
+  chunks were let go one by one for a request that still failed and came back 50 ticks later, so
+  distant buildings popped in and out while the player stood still.
+  The index keeps its file table without the paths the builder
+  writes for every frame and sector file (`frames/x+04/y-12/g1/s111.ccs`); the engine writes them
+  again when it opens a file. About 30 bytes less per row: some 600 KiB more zone on the whole island.
+  A path of another form is kept as it is; an engine built with `-DCHIM_INDEX_KEEP_PATHS=1` keeps every
+  path (the first method).
   `chim_partial 1`: a chunk whose model has no room is activated without it,
   so its ground and its other placements are there (a reach copy draws such
   a placement when its owner lacks the model); the model follows when there
@@ -268,11 +280,17 @@ requirement](../WORLD_STREAMER.md#memory-placement-requirement)):
   bytes, the largest section slice). Images up to this size are read whole;
   larger ones are streamed through it. CHIM never uses `Hunk_TempAlloc`, so
   loading does not move or evict Quake's cache (actors, sounds).
-- **Cache bank (optional).** `-chimcache <KiB>` allocates extra Fast RAM once
-  at start-up (checked, `AvailMem` advisory only). Shared models and textures
-  prefer it and survive map changes there. Without it, at the 2 MiB Chip +
-  16 MiB Fast baseline, shared models go with the map, as Quake's brush
-  models do.
+- **Cache banks (automatic).** At start-up the free Fast RAM beyond a margin
+  (2 MiB plus an eighth of all Fast RAM) is taken as one or more banks that
+  survive map changes, largest free block first, each under 2 GiB
+  (`ChimZone_AutoStep`, chim_zone.c; `Chim_MemoryStart`, chim_world.c).
+  Shared models and textures prefer them; chunks spill into them when the
+  map's bank is full and stay there as cache; the look-ahead doubles from
+  8 MiB and triples from 32 MiB. `-chimcache <KiB>` sets one bank by hand
+  instead (checked, `AvailMem` advisory only), `aw_autoram 0` turns the
+  automatic banks off. At the 2 MiB Chip + 16 MiB Fast baseline nothing is
+  free beyond the margin: shared models go with the map, as Quake's brush
+  models do, exactly as before.
   For real machines with more Fast RAM, see [real hardware](../REAL_HARDWARE.md).
 
 Sizes on the 68k target (measured with the target compiler): `model_t` 400

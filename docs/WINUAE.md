@@ -181,6 +181,9 @@ The JIT cache is host-side translation storage. Increasing it does **not** add
 Amiga Fast RAM. `chipmem_size=4` in a UAE text config means 2 MiB Chip; the unit
 is 512 KiB. `z3mem_size=16` means 16 MiB Z3 RAM. Z3 RAM is the emulator reference
 arrangement, not an expansion available inside a stock A1200.
+More Fast RAM (128 MiB, 256 MiB, 512 MiB, 1 GiB, 1.5 GiB or a custom size) is a
+launcher choice: see [Fast RAM](FS-UAE-LAUNCHER.md#fast-ram) for the sizes WinUAE and
+FS-UAE can make and the keys written (`z3mem_size`, `z3mem2_size`, `z3mem_start`).
 
 Save the customized profile under a new name, restart the emulation from that
 saved profile, and do not reapply a Quickstart preset afterward. Browse to the

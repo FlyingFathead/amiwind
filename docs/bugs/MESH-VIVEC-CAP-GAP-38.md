@@ -1,5 +1,14 @@
 # MESH-VIVEC-CAP-GAP-38: Vivec giant mushroom cap opening
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): RC1: three inspected views in cell 2,-10 show torn mushroom cap seams. Prior cell 5,-10 report retained; exact models and closure repair pending.
+- Reported with v0.0.42-dev1 at 2026-10-17 11:49 +0300: maintainer on TG with a frame at cell 1,-10: the mushrooms at Vivec are still open
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,11 +18,30 @@
 | Where | Vivec exterior cell 5,-10, global 46983,-81758,835 |
 | Reproduction | once |
 | Duplicate of | no |
-| Persists in | v0.0.39-rc1 (last seen) |
+| Persists in | v0.0.39-rc1, v0.0.42-dev1 (last seen) |
 | Severity | high: Repeated maintainer-visible failure in RC1; exact repair remains unverified. |
 | Family | Mesh converter geometry (`converter-geometry`) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Maintainer evidence reconciliation, 13 October 2026](#maintainer-evidence-reconciliation-13-october-2026)
+- [RC1 maintainer evidence, 13 October 2026](#rc1-maintainer-evidence-13-october-2026)
+- [Location confirmed, 16 October 2026](#location-confirmed-16-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Symptom
 
@@ -25,7 +53,22 @@ HUD: exterior cell 5,-10; global 46983,-81758,835; local 3553,2600,208; heading 
 
 ## How it happened
 
-Unknown. Inspect source mesh, material seams, reduction, winding and packaged identity. GEO-01 is a similar historical repair, not proof of a shared cause.
+Cause found 17 October 2026 (v0.0.42-dev2 line). The mushrooms the maintainer pinned in v0.0.42-dev1 are
+`flora_emp_parasol_03` (references 172013, cell 2,-10, and 172126, cell 2,-12; read from the Vivec city frame's
+scenery index at the three pinned hit points). There is no separate banner model: the "banners" are the mesh's own
+hanging vine quads. The cap is several materials (`Tx_emperor_parasol_01/02/03`) joined at their rims. The
+original has no two-sided draw flag (no NiStencilProperty) and no submesh is dropped.
+
+Every CHIM area except Seyda Neen (Vivec, Balmora, the region cells) converts its scenery through the town model
+profile (`tools/chim/build.py` `prepare_area` -> `town_regions.town_model_profile` -> `visual_profile`). That profile
+gives every `flora_` mesh a target of 120 triangles and the default reducer, which reduces each material on its own
+and also collapses rim edges, so each cap material pulled back from its neighbour: the same mechanism as GEO-01 and
+MESH-LOD-OPEN-SEAMS-33. The open-world and Seyda path (`prepare_world_scenery.scenery_profile`) keeps the shared
+seams, which is why the mushrooms there were closed; its docstring wrongly said the town frames used it too. So it
+was never only Vivec: before the fix, the seam audit measured torn seams or rims on 1,317 placements of 14 mushroom
+models in the town/CHIM-area space (parasol 01/02/03 191 + 238 + 271, the Telvanni mushrooms 48 + 76, the shelf
+fungus 11, Bitter Coast mushrooms 01-05 482). The audit already listed the five worst as "known" under
+MESH-LOD-TORN-MESHES-33, so the gate let them pass.
 
 ## Why it was not caught
 
@@ -37,7 +80,20 @@ Load the reported location and look up at the cap with the recorded heading and 
 
 ## Repair
 
-None established. Checked and ruled out, 16 October 2026: Vivec's detail budget (`vivec-deep`,
+17 October 2026, at the shared layer: `town_regions.visual_profile` reduces every mushroom cap mesh
+(`flora_emp_parasol_`, `flora_t_mushroom_`, `flora_bc_mushroom_`, `flora_t_shelffungus_`; `MUSHROOM_CAP_PREFIXES`) with
+the boundary-locked reducer (`lock_boundaries`: rims and seams stay exactly where the source has them, only inside
+edges collapse). That one profile serves the legacy town builder, the CHIM model builder and the seam audit. Cost:
+parasol 01/02/03 135/132/138 -> 160/163/170 triangles, the others +0 to +9; about half of what the open-world
+seam-keeping profile costs (283-328). The seam gate now treats these models as closed in the town space
+(`config/seam-audit-known.json` "closed" rows with a space): any torn seam or rim fails the build.
+
+Island-wide seam audit with the fix (all 3,775 placed meshes, 666 reduced mesh/path pairs): 0 failures; every
+mushroom model 0 % torn seam and 0 % torn rim in the town space (before: 1,317 placements on torn variants, after: 0).
+The open-world profile of the parasols still tears free rims (0.22-0.60) without tearing seams; it is the Seyda and
+legacy path and was left as it is.
+
+Earlier, ruled out 16 October 2026: Vivec's detail budget (`vivec-deep`,
 `config/chim-detail-budgets.json`) lists no mushroom or banner mesh, so its unaudited reductions
 (CHIM-DETAIL-BUDGET-SEAM-UNAUDITED-36) are not the cause. Leading suspect now: the cap and the draped banner as
 separate materials whose vertices are not shared along their edge. Next (v0.0.42 plan 2.3): the exact mesh and
@@ -123,6 +179,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [INTERIOR-HULL-CHAIN-33](INTERIOR-HULL-CHAIN-33.md): The Arena Pit's main structure collides through one chain of 36,545 clipnodes; every trace in the room walks it
 - [LIGHTMAP-GRID-31](LIGHTMAP-GRID-31.md): Some baked lightmaps sit one sample row or column off
 - [LIGHTMAP-TAIL-31](LIGHTMAP-TAIL-31.md): Interior lightmap: the last face points past the end of the lighting lump
+- [MESH-EBONHEART-DRAGON-PEDESTAL-42](MESH-EBONHEART-DRAGON-PEDESTAL-42.md): Ebonheart: the Imperial dragon statue floats; its converted model starts 236 units above its origin, nothing below
 - [MESH-EXTENT-GRID-31](MESH-EXTENT-GRID-31.md): Grid-exact mesh faces exceed the 256-texel surface limit on the 68040
 - [MESH-LOD-OPEN-SEAMS-33](MESH-LOD-OPEN-SEAMS-33.md): Static mesh reduction pulls open parts apart: the Silt Strider's hull shows the sky through its shell seams
 - [MESH-LOD-TORN-MESHES-33](MESH-LOD-TORN-MESHES-33.md): Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship)

@@ -99,7 +99,8 @@ class Table(unittest.TestCase):
         rows = mp.presets()
         self.assertEqual(sorted(row['name'] for row in rows),
                          ['animkit', 'balmora', 'balmora-exterior', 'lava-pools', 'opening-ship', 'seyda-chim',
-                          'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim', 'vivec-palace'])
+                          'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim', 'vivec-city-exterior',
+                          'vivec-palace'])
         palace = mp.find('vivec-palace')         # v0.0.42: Vivec in his palace (INTERIOR-CREATURES-MISSING-41)
         self.assertEqual(palace['start'], 'interior:Vivec, Palace of Vivec')
         seyda = mp.find('seyda-chim')            # v0.0.36-dev5: Seyda Neen CHIM-native, starts at its arrival
@@ -123,6 +124,9 @@ class Table(unittest.TestCase):
         city = mp.find('vivec-city-chim')
         self.assertEqual((city['start'], city['scope']), ('vivec_city', 'full'))
         self.assertIn('npc-gallery', city['exclude'])
+        # v0.0.42-dev2: the Vivec city frame without interiors (MESH-VIVEC-CAP-GAP-38, inspect HUD checks)
+        outside = mp.find('vivec-city-exterior')
+        self.assertEqual((outside['start'], outside['scope']), ('vivec_city', 'exterior'))
 
     def test_bad_rows_are_refused(self):
         good = dict(mp.find('balmora'))

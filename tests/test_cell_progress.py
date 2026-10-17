@@ -500,6 +500,9 @@ class ResultTests(unittest.TestCase):
         h = doc['headline']
         self.assertEqual(doc['cells']['9,9']['chim']['bucket'], 'empty_sea')
         self.assertFalse(doc['cells']['9,9']['land'])
+        # an empty sea cell belongs to the island of the nearest island cell, like open ocean (CHIMPORT-SEABED-NO-ISLAND-42)
+        self.assertEqual(doc['cells']['9,9']['island'], doc['cells']['0,0']['island'])
+        self.assertIsNotNone(doc['cells']['9,9']['island'])
         self.assertEqual(h['empty_sea'], 2)
         self.assertEqual((h['passed'], h['land_cells'], h['converted']), (1, 25, 1))
         self.assertEqual(h['not_started'], 23)         # the empty land cell 0,1 is neither started nor passed

@@ -17,6 +17,17 @@ KINDS={'WEAP':1,'ARMO':2,'CLOT':3,'ALCH':4,'INGR':5,'BOOK':6,'MISC':7,
        'LIGH':7,'APPA':7,'LOCK':7,'PROB':7,'REPA':7}
 CLOTHING_SLOTS={0:9,1:7,2:8,3:15,4:11,5:6,6:5,7:10,8:12,9:14}
 ROW=512
+# The debug torch (test only; the maintainer's preview-stage request, 17 October 2026): one
+# catalogue row made from the original torch (LIGH "torch": model, icon, weight, value, light
+# radius and colour) whose burn time is LIGHT_INFINITE, the value OpenMW 0.51
+# (apps/openmw/mwmechanics/actors.cpp) treats as a light that never runs out. The engine gives it
+# once at the census exit while aw_debug_torch is 1 (config/game.cfg). Its slot is the left hand.
+DEBUG_TORCH_ID='aw_debug_torch'
+DEBUG_TORCH_NAME='Debug torch (test only)'
+DEBUG_TORCH_SOURCE='torch'
+LIGHT_INFINITE=-1
+FLAG_LIGHT=32
+SLOT_LEFT=17
 
 def safe_text(value,size):
     value=str(value).replace('\\','/').strip()
@@ -74,6 +85,7 @@ def source_items(data):
         if kind=='GMST':
             key=text(fields,'NAME').casefold();value=first(fields,'FLTV') or first(fields,'INTV')
             if len(value)==4:settings[key]=struct.unpack('<f' if first(fields,'FLTV') else '<i',value)[0]
+            elif key=='sskillhandtohand':settings[key]=text(fields,'STRV')
             continue
         if kind=='SCPT':
             header=first(fields,'SCHD');name=header[:32].split(b'\0')[0].decode('cp1252').casefold()
@@ -98,6 +110,17 @@ def source_items(data):
         elif kind=='ARMO' and len(raw)>=24:subtype,weight,value=struct.unpack_from('<ifi',raw)
         elif kind=='WEAP' and len(raw)==32:weight,value,subtype=struct.unpack_from('<fih',raw)
         elif kind in ('BOOK','MISC','INGR','ALCH') and len(raw)>=8:weight,value=struct.unpack_from('<fi',raw)
+        elif kind=='LIGH' and identifier==DEBUG_TORCH_SOURCE and len(raw)==24:
+            # LHDT: weight, value, time, radius, colour RGBA, flags. Only the debug torch's source is
+            # catalogued; carried lights in general are not inventory items yet.
+            weight,value,time,radius=struct.unpack_from('<fiii',raw)
+            if not (math.isfinite(weight) and weight>=0 and value>=0 and 1<=radius<=65535):
+                raise ValueError('Invalid original torch light record')
+            result[DEBUG_TORCH_ID]=dict(id=DEBUG_TORCH_ID,name=DEBUG_TORCH_NAME,category=KINDS[kind],kind=kind,
+                subtype=radius,weight=weight,value=value,source_model=text(fields,'MODL'),
+                source_icon=text(fields,'ITEX'),script='',raw=raw,enchantment='',parts=False,
+                light=dict(source=identifier,time=LIGHT_INFINITE,source_time=time,radius=radius,colour=list(raw[16:19])))
+            continue
         elif kind in ('APPA','LOCK','PROB','REPA') and len(raw)>=12:
             # These records have different layouts; preserve their identity but
             # leave unsupported metadata absent until explicitly decoded.
@@ -106,7 +129,7 @@ def source_items(data):
         if not math.isfinite(weight) or weight<0 or value<0:raise ValueError('Invalid item weight/value '+identifier)
         result[identifier]=dict(id=identifier,name=name,category=KINDS[kind],kind=kind,
             subtype=subtype,weight=weight,value=value,source_model=text(fields,'MODL'),
-            source_icon=text(fields,'ITEX'),script=text(fields,'SCRI').casefold(),
+            source_icon=text(fields,'TEXT' if kind=='ALCH' else 'ITEX'),script=text(fields,'SCRI').casefold(),
             raw=raw,enchantment=text(fields,'ENAM').casefold() if kind in ('CLOT','ARMO','WEAP','BOOK') else '',parts=any(k=='INDX' for k,_ in fields))
     for identifier,enchant in enchantments.items():
         if not 0<=enchant[0]<=3:continue
@@ -114,7 +137,7 @@ def source_items(data):
         except (KeyError,ValueError):pass
     return result,enchantments,scripts,settings,initial,charges
 
-def prepare(data_files,id1,selected=(),palette=None,models=True):
+def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None):
     data=resolve_data_files(Path(data_files));id1=Path(id1)
     items,enchantments,scripts,settings,initial,charges=source_items(data);selected=set(s.casefold() for s in selected)
     if not selected:
@@ -122,6 +145,8 @@ def prepare(data_files,id1,selected=(),palette=None,models=True):
         # This stages resources only; it does not invent inventory ownership.
         selected={'gold_001','ring_keley','chargen statssheet','bk_a1_1_caiuspackage',
                   'bk_a1_1_directionscaiuscosades','common_shirt_01','common_pants_01','common_shoes_01','steel longsword','steel_shield'}
+    # The debug torch is given at the census exit: its ground model and icon are always staged.
+    if DEBUG_TORCH_ID in items:selected.add(DEBUG_TORCH_ID)
     palette=bytes(palette if palette is not None else (id1/'gfx/palette.lmp').read_bytes())
     if len(palette)!=768:raise ValueError('Expected installed 256-colour game palette')
     assets=None;report={'rows':len(items),'selected':sorted(selected),'models':{},'icons':{},'held':{}}
@@ -134,7 +159,7 @@ def prepare(data_files,id1,selected=(),palette=None,models=True):
         from prepare_scenery import nif_reader
         nif=nif_reader()
         assets=Assets(data,BSA(child_ci(data,'Morrowind.bsa')))
-    rows=[]
+    rows=[];inventory_icons={}
     for identifier,item in sorted(items.items()):
         model=icon='';slots=flags=0
         inert=not item['script'] or script_inert_after_registration(scripts.get(item['script'],''))
@@ -160,6 +185,9 @@ def prepare(data_files,id1,selected=(),palette=None,models=True):
             cls=0 if item['weight']<=limit*settings['flightmaxmod']+.0005 else 1 if item['weight']<=limit*settings['fmedmaxmod']+.0005 else 2
             combat=[0,26,*([0]*6),0.,0.,float(health),float(base),cls,int(settings['ibasearmorskill'])]
             slots=1<<17;flags|=1
+        if item.get('light'):
+            # Equipped like a torch: the left hand (its own slot rules; never a weapon or shield).
+            slots=1<<SLOT_LEFT;flags|=1|4|FLAG_LIGHT
         if item['script']:flags|=8
         if item['enchantment'] and enchantments.get(item['enchantment'],[None])[0]==3:flags|=16
         if models and identifier in selected:
@@ -191,6 +219,9 @@ def prepare(data_files,id1,selected=(),palette=None,models=True):
                     icon='gfx/inv/i'+stem+'.awi';out=id1/icon;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(b'AWIC'+indices)
                     report['icons'][identifier]={'path':icon,'sha256':hashlib.sha256(out.read_bytes()).hexdigest()}
                 except (ValueError,KeyError,OSError) as error:report['held'].setdefault(identifier,{})['icon']=str(error)
+        # Every catalogue item can be owned (pickup, reward, grant): its inventory icon (UI-ICONS-INVENTORY-42).
+        if item['source_icon']:inventory_icons[identifier]={'source_icon':item['source_icon'],
+            'enchanted':bool(item['enchantment']),'equippable':bool(flags&1)}
         row=safe_text(identifier,64)+safe_text(item['name'],96)+struct.pack('<iiifII',item['category'],item['subtype'],item['value'],item['weight'],slots,flags)
         row+=safe_text(model,64)+safe_text(icon,64)+safe_text(item['enchantment'],64)+safe_text(item['script'],64)
         # Bytes 496..511 (zero in older catalogues): the enchantment's kind (0 none, else ENDT
@@ -200,7 +231,9 @@ def prepare(data_files,id1,selected=(),palette=None,models=True):
         kind=enchant[0]+1 if enchant and 0<=enchant[0]<=3 and item['enchantment'] in charges else 0
         charge=charges[item['enchantment']] if kind else 0.
         if not (math.isfinite(charge) and 0<=charge<=1000000):raise ValueError('Invalid enchantment charge '+identifier)
-        row+=struct.pack('<ii6iffffii',*combat)+struct.pack('<B3xf8x',kind,charge)
+        light=item.get('light')
+        tail=struct.pack('<i3Bx',light['time'],*light['colour']) if light else bytes(8)
+        row+=struct.pack('<ii6iffffii',*combat)+struct.pack('<B3xf',kind,charge)+tail
         assert len(row)==ROW;rows.append(row)
     out=id1/'inventory/items.awi';out.parent.mkdir(parents=True,exist_ok=True)
     out.write_bytes(b'AWI2'+struct.pack('<I',len(rows))+b''.join(rows))
@@ -212,6 +245,9 @@ def prepare(data_files,id1,selected=(),palette=None,models=True):
         initial_rows.append(safe_text(identifier,64)+struct.pack('<ii',count,slot))
     (id1/'inventory/initial.awi').write_bytes(b'AWST'+struct.pack('<I',len(initial_rows))+b''.join(initial_rows))
     report['initial_items']=[{'id':identifier,'count':count} for identifier,count in initial]
+    # The build receipt names it (docs/INVENTORY.md "Debug torch (test only)").
+    report['debug_torch']=({'id':DEBUG_TORCH_ID,'name':DEBUG_TORCH_NAME,**items[DEBUG_TORCH_ID]['light']}
+                           if DEBUG_TORCH_ID in items else None)
     report['catalogue_sha256']=hashlib.sha256(out.read_bytes()).hexdigest()
     if models:
         # One icon lookup table for the HUD boxes and the inventory (tools/prepare_icons.py):
@@ -220,7 +256,8 @@ def prepare(data_files,id1,selected=(),palette=None,models=True):
         closure={i:{'source_icon':items[i]['source_icon'],'enchanted':bool(items[i]['enchantment'])}
                  for i in sorted(selected) if i in items}
         colours,report['hud_colours']=ini_colours(data)
-        report['icon_table']=prepare_icons(assets,id1,closure,palette,colours)
+        import os
+        report['icon_table']=prepare_icons(assets,id1,closure,palette,colours,inventory_icons,jobs or os.cpu_count() or 1)
         text_out,report['hud_settings']=hud_settings(settings)
         (id1/'gfx/hud-settings.txt').write_text(text_out,encoding='ascii',newline='\n')
     report['enchanted_items']={i:{'enchantment':items[i]['enchantment'],'kind':enchantments[items[i]['enchantment']][0],

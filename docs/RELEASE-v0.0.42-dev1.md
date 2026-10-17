@@ -23,9 +23,10 @@ CHIM cells.
 - **A size ledger** prints every build's size per folder in GiB against the previous release.
 - **Interior creatures:** the builder can place listed creatures in interiors, Vivec in his palace first, classed as
   levitating; every creature it leaves out is listed with its reason.
-- **Far detail** (Options > Far detail, or `dbg cull` in the console): Full, Light, Strong or Strong + small
-  faces; distant models drop out sooner by size for a faster frame (Strong: 17-27 % less 3D time in Balmora on a
-  slow 68040). Saved with the settings. [The far test](performance/FAR-TEST.md).
+- **Far detail: Strong is the new default.** Options > Far detail (or `dbg cull` in the console): Full, Light,
+  Strong or Strong + small faces; distant models drop out sooner by size for a faster frame (Strong: 17-27 % less
+  3D time in Balmora on a slow 68040). Saved with the settings. Existing saves keep Full; choose Strong in the menu.
+  [The far test](performance/FAR-TEST.md).
 - **Renderer counters** for the speed work (`dbg rcount 3` and `dbg rcount 4`), and the first measurements:
   [where a slow frame goes](performance/SLOW-FRAME-BREAKDOWN.md).
 - **A 68060 engine on the game disk.** Beside the 68040 engine (still the default) the disk carries the same source

@@ -294,7 +294,12 @@ discovers managed tools. For an explicit, repeatable invocation:
 ```
 
 Remove `--check` and add `--name first-town` to perform the build. `--plan`
-prints the exact stage commands without running them. To keep a build's options in
+prints the exact stage commands without running them. `--resource-plan` prints
+the memory and threads each stage will need against what the build gets (one
+line per stage: OK, WILL THROTTLE or WILL NOT FIT, plus an advisory when more
+memory or threads would help); every build makes the same plan before its first
+stage and refuses at once when a single unit cannot fit
+([Resource plan](BUILD_PROFILE.md#resource-plan)). To keep a build's options in
 one file and repeat it later, write its recipe with `--save-recipe FILE` and build
 from it with `--recipe FILE` ([Build recipes](BUILD_RECIPES.md)). `--check` creates no retained
 build outputs; guided dependency installation is possible only after confirmation.

@@ -22,7 +22,7 @@ static byte palette[768],tile[128*128],night[128*128],baseline_fog[4096];
 static unsigned short tile16[128*128];
 static int opens,inside,cloud_fixture,particle_seen,night_fixture,night_coverage_fixture;
 static cvar_t *night_light,*night_tint;
-static cvar_t *enabled,*fog_enabled,*type,*sun_enabled,*clouds_enabled,*cloud_speed,*cloud_type,*night_clouds,*cloud_control,*day_clouds,*stars_enabled,*night_enabled,*night_mode;
+static cvar_t *enabled,*fog_enabled,*type,*sun_enabled,*clouds_enabled,*cloud_speed,*cloud_type,*night_clouds,*cloud_control,*day_clouds,*stars_enabled,*night_enabled,*night_mode,*star_twinkle;
 static int nargs=1;static char *argument="";static void (*type_command)(void),(*speed_command)(void),(*cloud_type_command)(void),(*night_clouds_command)(void),(*cloud_control_command)(void),(*day_clouds_command)(void),(*night_mode_command)(void);
 server_t sv;
 client_state_t cl;
@@ -38,7 +38,7 @@ vec3_t vpn={1,0,0},vright={0,-1,0},vup={0,0,1},r_origin;
 cvar_t aw_drawdistance={"aw_drawdistance","540",0,0,540};
 int AW_Interior(void){return inside;}
 void Con_Printf(char *fmt,...){}
-void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_night_light"))night_light=c;if(!strcmp(c->name,"aw_night_tint"))night_tint=c;if(!strcmp(c->name,"aw_nightsky_mode"))night_mode=c;if(!strcmp(c->name,"aw_starsky"))stars_enabled=c;if(!strcmp(c->name,"aw_nightsky"))night_enabled=c;if(!strcmp(c->name,"aw_daynight"))enabled=c;if(!strcmp(c->name,"aw_fog"))fog_enabled=c;if(!strcmp(c->name,"aw_sky_type"))type=c;if(!strcmp(c->name,"aw_sun"))sun_enabled=c;if(!strcmp(c->name,"aw_clouds"))clouds_enabled=c;if(!strcmp(c->name,"aw_skyspeed"))cloud_speed=c;if(!strcmp(c->name,"aw_cloud_type"))cloud_type=c;if(!strcmp(c->name,"aw_night_clouds"))night_clouds=c;if(!strcmp(c->name,"aw_cloud_control"))cloud_control=c;if(!strcmp(c->name,"aw_day_clouds"))day_clouds=c;}
+void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_night_light"))night_light=c;if(!strcmp(c->name,"aw_night_tint"))night_tint=c;if(!strcmp(c->name,"aw_nightsky_mode"))night_mode=c;if(!strcmp(c->name,"aw_starsky"))stars_enabled=c;if(!strcmp(c->name,"aw_star_twinkle"))star_twinkle=c;if(!strcmp(c->name,"aw_nightsky"))night_enabled=c;if(!strcmp(c->name,"aw_daynight"))enabled=c;if(!strcmp(c->name,"aw_fog"))fog_enabled=c;if(!strcmp(c->name,"aw_sky_type"))type=c;if(!strcmp(c->name,"aw_sun"))sun_enabled=c;if(!strcmp(c->name,"aw_clouds"))clouds_enabled=c;if(!strcmp(c->name,"aw_skyspeed"))cloud_speed=c;if(!strcmp(c->name,"aw_cloud_type"))cloud_type=c;if(!strcmp(c->name,"aw_night_clouds"))night_clouds=c;if(!strcmp(c->name,"aw_cloud_control"))cloud_control=c;if(!strcmp(c->name,"aw_day_clouds"))day_clouds=c;}
 void Cvar_SetValue(char *name,float value){if(!strcmp(name,"aw_nightsky_mode")){night_mode->value=value;return;}if(!strcmp(name,"aw_skyspeed")){cloud_speed->value=value;return;}if(!strcmp(name,"aw_sky_type")){type->value=value;return;}if(!strcmp(name,"aw_cloud_type")){cloud_type->value=value;return;}if(!strcmp(name,"aw_night_clouds")){night_clouds->value=value;return;}if(!strcmp(name,"aw_cloud_control")){cloud_control->value=value;return;}if(!strcmp(name,"aw_day_clouds")){day_clouds->value=value;return;}assert(!strcmp(name,"aw_drawdistance"));aw_drawdistance.value=value;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_nightsky_mode_set"))night_mode_command=fn;if(!strcmp(name,"aw_sky_type_set"))type_command=fn;if(!strcmp(name,"aw_skyspeed_set"))speed_command=fn;if(!strcmp(name,"aw_cloud_type_set"))cloud_type_command=fn;if(!strcmp(name,"aw_night_clouds_set"))night_clouds_command=fn;if(!strcmp(name,"aw_cloud_control_set"))cloud_control_command=fn;if(!strcmp(name,"aw_day_clouds_set"))day_clouds_command=fn;}
 int Cmd_Argc(void){return nargs;}char *Cmd_Argv(int n){return n?argument:"aw_sky_type_set";}
@@ -597,6 +597,28 @@ static void point_star_checks(model_t *model){
         memset(pixels,224,n);pixels[point]=78;depth[point]=123;AW_FogDraw();assert(pixels[point]==78);
         /* A masked foliage hole has semantic sky depth and reveals the point. */
         depth[point]=AW_SKY_BACKGROUND_DEPTH;pixels[point]=224;AW_FogDraw();assert(red(pixels[point])>100);
+    }
+    /* SKY-STAR-TWINKLE-LATE-42: the zenith star is a twinkle texel ((63*17+63*13)%5==0).
+     * aw_star_twinkle 1 (default, saved): its shown colour changes over the sixteen
+     * 30 s world-clock steps; 0: one steady colour at every step. */
+    {
+        cvar_t *twinkle=star_twinkle;int k,changes,on[16];byte steady;
+        assert(twinkle && twinkle->archive && twinkle->value==1);
+        for(k=0;k<16;k++){
+            AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:clock:ms",23*3600000+k*30000);R_SetSkyFrame();
+            memset(pixels,224,n);for(i=0;i<n;i++)depth[i]=AW_SKY_BACKGROUND_DEPTH;AW_FogDraw();
+            on[k]=pixels[point];assert(on[k]!=224); /* the star is there at every step */
+        }
+        for(changes=0,k=1;k<16;k++)if(on[k]!=on[k-1])changes++;
+        assert(changes>=2); /* it pulses (down and back up at least once) */
+        twinkle->value=0;
+        for(k=0;k<16;k++){
+            AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:clock:ms",23*3600000+k*30000);R_SetSkyFrame();
+            memset(pixels,224,n);for(i=0;i<n;i++)depth[i]=AW_SKY_BACKGROUND_DEPTH;AW_FogDraw();
+            if(!k)steady=pixels[point];
+            assert(pixels[point]==steady && red(steady)>100); /* static, still a bright star */
+        }
+        twinkle->value=1;AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:clock:ms",23*3600000);R_SetSkyFrame();
     }
     /* Every dark/unlit moon interior restores pre-star background. Legacy
      * and AWN2 use the same opaque complete disc test. */

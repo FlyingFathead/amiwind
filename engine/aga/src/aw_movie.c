@@ -6,6 +6,10 @@
 #include "sound.h"
 #include "aw_miniwind.h"
 #include "aw_testbox.h"
+/* CHIM's extra-memory step (chim_world.c sets it; NULL without CHIM): op 0
+ * measures and takes the memory, 1 fills the notice's two lines (1: shown),
+ * 2 skips it for this start (1: done), 3 ends the notice. */
+int (*aw_chim_memory)(int op,char *first,char *second,int size);
 #define MAX_PIXELS 64000
 #define RATE 11025
 #define DATA_START 800
@@ -70,6 +74,7 @@ static void finish(const char *why){
         return;
     }
     if(!branding)S_StopAllSounds(true);
+    if(branding==1 && aw_chim_memory)aw_chim_memory(3,NULL,NULL,0);
     IN_AWClearButtons();
     /* After the logo: the main menu, or a partial-area build's quick start (aw_miniwind.c). */
     /* A map started while the logo played (from the console, or a test drive's remote command)
@@ -103,16 +108,32 @@ static void hold(const char *why){
     video=audio=NULL;holding=1;
     Con_Printf("Startup screen (%s): %s.\n",why,AW_MINIWIND_PROMPT);
 }
-static void draw_prompt(void){
-    const char *s=AW_MINIWIND_PROMPT;int n=(int)strlen(s),left=(320-n*8)/2,c,x,y;byte *glyph,*row;
-    if(!draw_chars)return;
+/* One centred line in the console font at row top (at most 40 characters). */
+static void draw_line(const char *s,int top,byte colour){
+    int n=(int)strlen(s),left,c,x,y;byte *glyph,*row;
+    if(!draw_chars || top<0 || top+8>vid.height)return;
+    if(n>40)n=40;
+    left=(320-n*8)/2;
     for(c=0;c<n;c++){
         glyph=draw_chars+(((unsigned char)s[c]>>4)<<10)+(((unsigned char)s[c]&15)<<3);
         for(y=0;y<8;y++){
-            row=vid.buffer+(AW_MINIWIND_PROMPT_Y+y)*vid.rowbytes+left+c*8;
-            for(x=0;x<8;x++)if(glyph[y*128+x])row[x]=prompt_colour;
+            row=vid.buffer+(top+y)*vid.rowbytes+left+c*8;
+            for(x=0;x<8;x++)if(glyph[y*128+x])row[x]=colour;
         }
     }
+}
+static void draw_prompt(void){draw_line(AW_MINIWIND_PROMPT,AW_MINIWIND_PROMPT_Y,prompt_colour);}
+/* The extra-memory notice (chim_world.c Chim_MemoryNotice) over the top rows of
+ * the startup logo, in the brightest colour of the stream's palette; M skips
+ * the extra memory for this start (AW_MovieKey). It never waits for a key. */
+static void draw_memory_notice(void){
+    char first[48],second[48];long luma,top=-1;int i;byte colour=0;
+    if(branding!=1 || !aw_chim_memory || !aw_chim_memory(1,first,second,sizeof(first)))return;
+    for(i=0;i<256;i++){
+        luma=buffers->palette[i*3]*299L+buffers->palette[i*3+1]*587L+buffers->palette[i*3+2]*114L;
+        if(luma>top){top=luma;colour=(byte)i;}
+    }
+    draw_line(first,4,colour);draw_line(second,14,colour);
 }
 static int start_movie(char *path,int brand){
     byte h[32];long size,audio_size,expected;int i;
@@ -153,6 +174,8 @@ invalid:
 }
 int AW_MovieStart(void){return start_movie("intro/mw_intro.awv",0);}
 void AW_MovieStartup(void){
+    /* Extra Fast RAM: measured once, after config.cfg (chim_world.c); one console line. */
+    if(aw_chim_memory)aw_chim_memory(0,NULL,NULL,0);
     /* A quick test build names what it left out, once, at startup (aw_excluded.c). */
     AW_ContentExcludedStartup();
     IN_AWClearButtons();key_dest=key_game;
@@ -162,7 +185,7 @@ void AW_MovieStartup(void){
 }
 /* The startup logo, unless a test start-up option or test.cfg already chose (aw_testbox.c). */
 static void startup_continue(void){
-    if(AW_TestBootSkipLogo())return;
+    if(AW_TestBootSkipLogo()){if(aw_chim_memory)aw_chim_memory(3,NULL,NULL,0);return;}
     if(!start_movie("intro/amiwind.awv",1))Cbuf_AddText((char *)AW_MiniwindAfterLogo());
 }
 static int catalogue_path(char *request,char *out,int capacity){
@@ -253,6 +276,7 @@ void AW_MovieDraw(void){
         else for(x=0;x<160;x++)row[x*2]=row[x*2+1]=src[x];
     }
     if(holding)draw_prompt();
+    draw_memory_notice();
 }
 int AW_MovieKey(int key,int down){
     if(!buffers)return 0;
@@ -260,6 +284,8 @@ int AW_MovieKey(int key,int down){
         close_movie();IN_AWClearButtons();Key_ClearStates();key_dest=debug_return_dest;V_UpdatePalette();
         Con_Printf("Debug video cancelled before playback.\n");return 1;
     }
+    /* M on the startup logo: no extra memory for this start (the notice's key). */
+    if(down && branding==1 && (key=='m' || key=='M') && aw_chim_memory && aw_chim_memory(2,NULL,NULL,0))return 1;
     if(held_screen()){
         /* A test build: the console key leaves the startup screen for the main menu
          * with the console open (the harness types at once). */

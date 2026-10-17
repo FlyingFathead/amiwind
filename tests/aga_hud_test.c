@@ -1,10 +1,14 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include <assert.h>
+#include "aw_inspect.h"
 void AW_UIHud(void){}
 void AW_NpcLodDrawLabels(void){}
 static int photo_mode;int AW_PhotoModeActive(void){return photo_mode;}
 static int fill_x=-1,fill_w=-1,hint_draws;
+/* aw_inspect.c / aw_ui.c (INSPECT-OVER-VIEWPORT-42). */
+static int inspect_on;int AW_InspectEnabled(void){return inspect_on;}
+int (*aw_ui_hud_lift)(void);
 int AW_Interior(void){return 0;}
 int AW_FpsTenths(void){return 123;}
 static int clock_ok=1,clock_hour=23,clock_minute=59;
@@ -46,31 +50,58 @@ int Q_strcasecmp(char *a,char *b) {return strcasecmp(a,b);}
 void Cvar_RegisterVariable(cvar_t *p) {settings[settings_count++]=p;p->value=atof(p->string);}
 void Cvar_SetValue(char *name,float v) {int i;if(!strcmp(name,"showram")){scr_showram.value=v;return;}for(i=0;i<settings_count;i++)if(!strcmp(name,settings[i]->name)){settings[i]->value=v;return;}assert(0);}
 void Cmd_AddCommand(char *name,void (*fn)(void)) {if(!strcmp(name,"aw_cell"))cell_command=fn;else if(!strcmp(name,"amiwind_debug_compass"))compass_command=fn;else if(!strcmp(name,"amiwind_debug_coords"))command=fn;else if(!strcmp(name,"amiwind_show_debug"))master=fn;else if(!strcmp(name,"amiwind_debug_showram"))ram=fn;else if(!strcmp(name,"amiwind_debug_sealevel"))sea=fn;else if(!strcmp(name,"amiwind_debug_fps"))fps=fn;else if(!strcmp(name,"aw_debug_hud_type"))hud_type=fn;}
-void Draw_Fill(int x,int y,int w,int h,int c) {fill_y=y;fill_x=x;fill_w=w;if(y+h==vid.height)assert(photo_mode?x==0 && w==vid.width:x==88);assert(y+h==vid.height || (y==19 && h==10 && x==8 && w==80));}
+void Draw_Fill(int x,int y,int w,int h,int c) {int lift=AW_InspectHudLift();fill_y=y;fill_x=x;fill_w=w;if(y+h==vid.height-lift)assert(photo_mode?x==0 && w==vid.width:x==144 && w==vid.width-144);assert(y+h==vid.height-lift || (y==19 && h==10 && x==8 && w==80));}
 void Draw_String(int x,int y,char *s) {text_x=x;text_y=y;strcpy(last,s);if(!strncmp(s,"FPS:",4)){assert(!strcmp(s,"FPS:12.3"));fps_draws++;}}
-static int small_draws,compass_draws;static char global_line[80],local_line[80],bearing[96];
+static int small_draws,compass_draws,strip_draws,top_draws;static char global_line[80],local_line[80],bearing[96],extra_line[80],strip_line[4][AW_INSPECT_LINE],inspect_line[AW_INSPECT_LINE];
+/* HUD-DEBUG-STRIP-OVER-BOXES-42 / HUD-NOTIFY-OVERLAP-31: with a strip (sb_lines) nothing is drawn
+ * inside the view, and right-column text never reaches the weapon/magic boxes (x < 144).
+ * INSPECT-OVER-VIEWPORT-42: while inspect is on, the stat bars (aw_ui.c) and everything here move
+ * up by the lift; the inspect lines are the only text in the bottom lift pixels, under the bars. */
 void AW_SmallString(int x,int y,const char *s){
- if(y==8){assert(x==8);strcpy(title,s);small_draws++;return;}
- if(!strcmp(s,"WASD / F10 console")){hint_draws++;return;}
- assert(x>=88 && x+strlen(s)*4<=312);
+ int lift=AW_InspectHudLift();
+ if(sb_lines)assert(y>=vid.height-sb_lines);
+ if(y==8){assert(x==8 && !sb_lines);strcpy(title,s);small_draws++;top_draws++;return;}
+ if(lift && y>=vid.height-lift){ /* underneath the bars: the hint, then the pin lines */
+  assert(x==8 && y+7<=vid.height && (int)strlen(s)*4<=vid.width-16);
+  if(y==vid.height-lift+1)strcpy(inspect_line,s);
+  else{assert((y-(vid.height-lift+1))%AW_INSPECT_LINE_STEP==0);strcpy(strip_line[strip_draws++&3],s);}
+  return;
+ }
+ if(x==8 && y<vid.height-26-lift){ /* the full-width line above the stat bars */
+  assert(sb_lines>=48 && y+7<vid.height-26-lift && (int)strlen(s)*4<=vid.width-16);
+  assert(!strncmp(s,"AmiWind v",9));strcpy(title,s);small_draws++;
+  return;
+ }
+ if(!strcmp(s,"WASD / F10 console")){assert(x>=144);hint_draws++;return;}
+ assert(x>=(photo_mode?8:144) && x+(int)strlen(s)*4<=vid.width-8);
+ y+=lift;
  if(y==174){strcpy(bearing,s);compass_draws++;}
+ else if(y==176)strcpy(extra_line,s);
  else if(y==184)strcpy(global_line,s);
  else if(y==192)strcpy(local_line,s);
  else assert(0);
 }
+static const char *inspect_hint;static int inspect_rows;
+static const char *hint_hook(void){return inspect_hint;}
+static int strip_hook(char lines[][AW_INSPECT_LINE],int max,int width){
+ int i;assert(max==AW_INSPECT_BOTTOM_LINES-1 && width==(vid.width-16)/4);
+ for(i=0;i<inspect_rows && i<max;i++)snprintf(lines[i],AW_INSPECT_LINE,"PIN ROW %d",i);
+ return i;
+}
 int main(void) {
  client_t local;edict_t player;
  Sbar_Init();assert(!AW_DebugCoordsEnabled() && !AW_DebugOverlaysEnabled());
+ assert(aw_ui_hud_lift==AW_InspectHudLift && !AW_InspectHudLift());
  assert(compass_command && settings_count==6 && !strcmp(settings[5]->name,"aw_compass"));
  assert(settings[5]->archive && settings[5]->value==0);
- vid.width=320;vid.height=200;cls.state=ca_connected;key_dest=key_game;
+ vid.width=376;vid.height=200;cls.state=ca_connected;key_dest=key_game;
  Sbar_Draw();assert(compass_draws==0); /* Default is hidden, even in gameplay. */
  arg="on";master();Sbar_Draw();assert(compass_draws==0); /* Independent switch. */
  small_draws=0;arg="on";compass_command();
  arg="on";master();assert(AW_DebugOverlaysEnabled() && AW_DebugCoordsEnabled());
  assert(AW_SeaLevelEnabled());arg="off";sea();assert(!AW_SeaLevelEnabled());arg="on";sea();
  command();assert(AW_DebugCoordsEnabled() && vid.recalc_refdef);
- vid.width=320;vid.height=200;cls.state=ca_connected;cl.viewentity=1;
+ vid.width=376;vid.height=200;cls.state=ca_connected;cl.viewentity=1;
  cl_entities[1].origin[0]=-12;cl_entities[1].origin[1]=42;cl_entities[1].origin[2]=66;
  Sbar_Draw();assert(fill_y==182 && !strcmp(bearing,"E 090 / REGION: unavailable"));
  assert(small_draws==1);arg="1";hud_type();Sbar_Draw();assert(small_draws==1);arg="2";hud_type();Sbar_Draw();assert(small_draws==2);
@@ -145,10 +176,10 @@ int main(void) {
    assert(!strstr(global_line,"CELL"));
   }
   /* A narrow screen: the full form no longer fits the shorter row, the compact one does. */
-  player.v.origin[0]=497;player.v.origin[1]=-200;vid.width=264;Sbar_Draw();
+  player.v.origin[0]=497;player.v.origin[1]=-200;vid.width=320;Sbar_Draw();
   assert(!strcmp(local_line,"LOCAL XYZ: 497 -200 65 E 090 P:0 C -2,-9") && !strstr(global_line,"C -2"));
-  vid.width=200;Sbar_Draw();assert(!strstr(local_line,"-2,-9") && !strstr(global_line,"-2,-9")); /* no room: omitted */
-  vid.width=320;
+  vid.width=256;Sbar_Draw();assert(!strstr(local_line,"-2,-9") && !strstr(global_line,"-2,-9")); /* no room: omitted */
+  vid.width=376;
   argc=1;cell_command();assert(strstr(printed,"Cell: CELL -2,-9 (exterior grid; global -9276 -72480)"));
   assert(strstr(printed,"Bitter Coast Region") && strstr(printed,"scene seyda"));argc=2;
   /* Interior: no exterior transform; number and full ID from worldspawn. */
@@ -162,7 +193,7 @@ int main(void) {
    Sbar_Draw();assert(!strcmp(local_line+strlen(local_line)-8," INT 763"));
    assert(strstr(global_line,"unavailable") && !strstr(global_line,"INT"));
    argc=1;cell_command();assert(!strcmp(printed,"Cell: INT 763 = \"Seyda Neen, Census and Excise Office\" / map census\n"));argc=2;
-   vid.width=248;Sbar_Draw();assert(!strcmp(local_line+strlen(local_line)-6," I 763"));vid.width=320;
+   vid.width=304;Sbar_Draw();assert(!strcmp(local_line+strlen(local_line)-6," I 763"));vid.width=376;
    /* The same model slot reused for another map re-reads its keys. */
    strcpy(room.name,"maps/plain.bsp");room.entities=plain;Sbar_Draw();assert(!strstr(local_line,"INT"));
    argc=1;cell_command();assert(strstr(printed,"Cell: unknown for map census"));argc=2;
@@ -187,8 +218,8 @@ int main(void) {
   * blacks out the coordinate strip across the whole width, not from x=88;
   * the input hint never draws over the photo-mode view. */
  {int n=hint_draws;
-  arg="on";master();photo_mode=1;Sbar_Draw();assert(fill_y==182 && fill_x==0 && fill_w==320);
-  photo_mode=0;Sbar_Draw();assert(fill_x==88 && fill_w==232);
+  arg="on";master();photo_mode=1;Sbar_Draw();assert(fill_y==182 && fill_x==0 && fill_w==376);
+  photo_mode=0;Sbar_Draw();assert(fill_x==144 && fill_w==232);
   arg="off";command();photo_mode=1;Sbar_Draw();assert(hint_draws==n);
   photo_mode=0;Sbar_Draw();assert(hint_draws==n+1);
   arg="0";master();
@@ -230,6 +261,42 @@ int main(void) {
   n=compass_draws;argc=1;compass_command();Sbar_Draw();assert(compass_draws==n);
   argc=2;arg="invalid";compass_command();Sbar_Draw();assert(compass_draws==n);
   argc=3;arg="on";compass_command();Sbar_Draw();assert(compass_draws==n);
+ }
+/* The 320-pixel screen with the HUD strip under the view (sb_lines 48), as in the maintainer's
+  * v0.0.42-dev1 frames: the title goes under the view (no line over the view or the notify lines),
+  * the coordinate rows stay right of the weapon/magic boxes, and the cell that fits neither row
+  * goes on the row above them (HUD-NOTIFY-OVERLAP-31, HUD-DEBUG-STRIP-OVER-BOXES-42). */
+ {int tops=top_draws;
+  argc=2;strcpy(sv.name,"seyda");cl.worldmodel=NULL;arg="on";master();
+  vid.width=320;sb_lines=48;
+  player.v.origin[0]=-4353;player.v.origin[1]=3015;player.v.origin[2]=146;cl.viewangles[YAW]=0;
+  title[0]=0;extra_line[0]=0;Sbar_Draw();
+  assert(top_draws==tops && strstr(title,"Vvardenfell / Bitter Coast Region"));
+  assert(!strcmp(extra_line,"CELL -4,-8") && !strstr(local_line,"-4,-8") && !strstr(global_line,"-4,-8"));
+  assert(fill_x==144 && fill_y==174);
+  /* INSPECT-OVER-VIEWPORT-42 (the maintainer: "underneath the player stats HUD"): the hint and the
+   * pin lines go under the stat bars, at the bottom of the screen; the bars, the boxes, the title and
+   * the coordinate rows move up by the lift; nothing over the view. Inspect off: no lift, no lines. */
+  aw_inspect_hint=hint_hook;aw_inspect_strip=strip_hook;inspect_hint="INSPECT: click pin / right exit";
+  inspect_line[0]=0;strip_draws=0;inspect_rows=2;Sbar_Draw();
+  assert(!inspect_line[0] && !strip_draws && !strcmp(extra_line,"CELL -4,-8") && fill_y==174);
+  inspect_on=1;Sbar_Draw();assert(!AW_InspectHudLift() && !inspect_line[0]); /* the strip has not grown yet */
+  sb_lines=AW_INSPECT_SB_LINES;assert(AW_InspectHudLift()==AW_INSPECT_LIFT && aw_ui_hud_lift()==AW_INSPECT_LIFT);
+  strip_draws=0;title[0]=0;extra_line[0]=0;Sbar_Draw();
+  assert(!strcmp(inspect_line,"INSPECT: click pin / right exit") && strip_draws==2);
+  assert(!strcmp(strip_line[0],"PIN ROW 0") && !strcmp(strip_line[1],"PIN ROW 1"));
+  assert(title[0] && !strcmp(extra_line,"CELL -4,-8") && fill_y==174-AW_INSPECT_LIFT);
+  inspect_rows=9;strip_draws=0;Sbar_Draw();assert(strip_draws==3); /* three pin lines under the hint */
+  inspect_rows=0;strip_draws=0;Sbar_Draw();assert(!strip_draws && title[0]);
+  photo_mode=1;assert(!AW_InspectHudLift());photo_mode=0;
+  inspect_on=0;sb_lines=48;assert(!AW_InspectHudLift());
+  /* The compass owns the row above the coordinates: no hint or cell under it. */
+  arg="on";compass_command();extra_line[0]=0;Sbar_Draw();assert(!extra_line[0] && strstr(bearing,"REGION"));
+  arg="off";compass_command();
+  /* No strip (full view): the title keeps its place at the top, as before. */
+  sb_lines=0;Sbar_Draw();assert(top_draws==tops+1);
+  aw_inspect_hint=NULL;aw_inspect_strip=NULL;inspect_hint=NULL;vid.width=376;
+  player.v.origin[0]=497;player.v.origin[1]=-200;player.v.origin[2]=65;
  }
  return 0;
 }

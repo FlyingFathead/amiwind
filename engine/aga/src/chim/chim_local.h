@@ -7,6 +7,7 @@
 #include "chim.h"
 #include "chim_format.h"
 #include "chim_zone.h"
+#include "aw_inspect.h"
 
 #ifndef CHIM_OPEN_FILES
 #define CHIM_OPEN_FILES		4		/* sector files kept open at once (the host tests may set fewer) */
@@ -115,13 +116,36 @@ typedef struct
 	int				active, loaded;
 } chim_frame_state_t;
 
+/* A row of the index's file table as the engine keeps it (CHIM-ZONE-RELEASE-
+ * FLICKER-42): the 33-character path is not stored when it is the builder's
+ * own name for the row (frames/x+04/y-12[/gG]/sNN.ccs, .../frame.ccf), which
+ * Chim_FilePath writes again from the row; about 30 bytes less per row, some
+ * 600 KiB of the zone for the whole island's 19,371 files. A path of any
+ * other form is kept (one of CHIM_PATH_KEPT, or every path when built with
+ * CHIM_INDEX_KEEP_PATHS 1, the first method). */
+typedef struct
+{
+	char			kind[5];
+	signed char		group;		/* gG directory, -1: none */
+	unsigned char	digits;		/* digits of the sector in its name */
+	unsigned char	kept;		/* 1 + the kept path's slot, 0: written from the row */
+	short			cx, cy;
+	unsigned short	sector;
+	unsigned		bytes, crc, entries;
+} chim_file_row_t;
+#define CHIM_PATH_KEPT	64
+#ifndef CHIM_INDEX_KEEP_PATHS
+#define CHIM_INDEX_KEEP_PATHS 0
+#endif
+
 typedef struct
 {
 	int				valid;
 	chim_settings_t	settings;
 	chim_toc_t		toc;
 	int				files;
-	chim_file_t		*file;
+	chim_file_row_t	*file;
+	char			*paths;			/* CHIM_INDEX_KEEP_PATHS 1: every row's path, CHIM_PATH_CHARS+1 each */
 	unsigned		models, textures;
 	chim_asset_t	*model, *texture;	/* the index's directories, by id */
 	struct chim_model_s	**model_slot;	/* resident shared model by id, or NULL */
@@ -140,7 +164,9 @@ extern chim_frame_state_t	chim_frame;
 extern cvar_t	chim_pool_kib, chim_draw_distance, chim_prefetch, chim_prefetch_room;
 extern cvar_t	chim_graft_mode, chim_graft_kib, chim_lookahead, chim_graft_trim;
 extern cvar_t	chim_release, chim_partial, chim_zone_ends;
+extern unsigned long	chim_release_refused;	/* chim_chunks.c: release plans that found no room (nothing released) */
 float Chim_ViewDistance (void);
+int Chim_LookaheadScale (void);
 int Chim_EdgeReached (const vec3_t origin);
 int Chim_HunkRest (int *stated, int *used, int *measured);
 extern cvar_t	chim_debug;			/* 1: a console line per CHIM stage (map, prime, rebuild) */
@@ -152,6 +178,7 @@ long ChimStatics_AliasBytes (void);
 int Chim_FarOnly (void);
 void Chim_FilesClose (void);
 int Chim_FileRow (const char *kind, int cx, int cy, int sector);
+const char *Chim_FilePath (int row);
 
 /* chim_models.c */
 void ChimModels_Init (void);
@@ -171,6 +198,7 @@ void ChimChunks_End (void);
 void ChimChunks_Tick (const vec3_t origin, long budget, int prime);
 void ChimChunks_Link (void);
 void ChimChunks_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *best);
+int ChimChunks_Pick (const vec3_t start, const vec3_t end, aw_chim_pick_t *out);
 void ChimChunks_Report (void);
 void ChimChunks_Init (void);
 void ChimChunks_Counts (int *linked, int *efrags, int *one_leaf, int *max_leaves);

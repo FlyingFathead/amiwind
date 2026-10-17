@@ -216,6 +216,67 @@ class ServiceTests(unittest.TestCase):
                                        'keys too broad: scene, bsp')
         self.assertEqual(broad['preflight']['too_broad'], ['scene', 'bsp'])
 
+    # ---- the resource plan in the check (tools/resource_plan.py, fixlist B41)
+
+    def with_resource_plan(self):
+        plain = self.git
+
+        def git(repo, *args):
+            if args[0] == 'cat-file' and args[-1].endswith(':' + aw_service.RESOURCE_MODULE):
+                return ''
+            return plain(repo, *args)
+        return mock.patch.object(aw_service, 'git_text', git)
+
+    def test_the_check_carries_the_resource_plan_of_the_leased_container(self):
+        check = CHECK_OK + '\n' + '\n'.join([
+            'Resource plan: 5 of 22 stages run; the build gets 30720 MiB (asked) and 24 threads (asked); --jobs 24',
+            '  WILL THROTTLE chim                     8 of 11 workers; about 2643 MiB a worker',
+            'ADVISORY: this build would run up to 27 % faster in chim with 10 GiB more memory '
+            '(the lease to ask for: --threads 24 --mem-gb 40)',
+            'Resource plan: THROTTLED (4 OK, 1 WILL THROTTLE, 0 WILL NOT FIT)'])
+        found = aw_service.parse_check(check)
+        self.assertEqual(len(found['resources']), 4)
+        with self.with_resource_plan():
+            code, result, runner = self.submit(self.request(), FakeRunner(check=check))
+        self.assertEqual(code, 0, result['notes'])
+        command = [c for c in result['commands'] if ' --check' in c][0]
+        self.assertIn('--resource-plan --resource-memory-gb', command)
+        self.assertIn('--resource-threads', command)
+        self.assertTrue(any(note.startswith('resource plan: ADVISORY:') for note in result['notes']))
+
+    def test_a_check_without_the_resource_plan_module_stays_as_it_was(self):
+        code, result, _ = self.submit(self.request())
+        command = [c for c in result['commands'] if ' --check' in c][0]
+        self.assertNotIn('--resource-plan', command)
+
+    def test_will_not_fit_in_the_check_refuses_the_build(self):
+        check = CHECK_OK + '\n  WILL NOT FIT  chim refused before any stage: one unit (stair walk) needs 2643 MiB'
+        with self.with_resource_plan():
+            code, result, runner = self.submit(self.request(),
+                                               FakeRunner(check=check, check_exit=aw_service.RESOURCE_PLAN_EXIT))
+        self.assertNotEqual(code, 0)
+        self.assertTrue(any('WILL NOT FIT' in text for text in result['refusals']), result['refusals'])
+        self.assertFalse(any('-build-' in name for name in runner.ran))
+
+    def test_a_busy_host_makes_the_build_wait_and_says_so(self):
+        states = iter([{'line': 'machine: CPU 97 %', 'busy': True, 'wait_reason': 'host busy: CPU >= 90 %'},
+                       {'line': 'machine: CPU 40 %', 'busy': False}])
+        self.config['build']['machine_state_command'] = ['state-tool']
+        self.config['build']['queue_timeout_s'] = 60
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append(argv)
+            return mock.Mock(stdout=json.dumps(next(states)) + '\n')
+        out = io.StringIO()
+        with mock.patch.object(aw_service.subprocess, 'run', run), contextlib.redirect_stdout(out):
+            request, info, lease = aw_service.take_cores(self.config, self.request(), 'run-x', FakeRunner(), [],
+                                                         sleep=lambda s: None)
+        self.assertEqual(len(calls), 2)
+        self.assertIn('--threads', calls[0])
+        self.assertIn('waiting', out.getvalue())
+        self.assertIn('machine: CPU 40 %', out.getvalue())
+
     # ---- a full build, docker replaced
 
     def test_build_runs_and_writes_its_result_and_trial(self):

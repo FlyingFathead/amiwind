@@ -881,7 +881,6 @@ static unsigned long	prefetch_held;
 static int PrefetchRoom (int index, int need, unsigned model, float active2)
 {
 	chim_entry_t *e = &chim_frame.entries[index];
-	chim_zone_stats_t s;
 	long bytes;
 	if (!chim_prefetch_room.value || e->distance <= active2)
 		return 1;
@@ -895,8 +894,7 @@ static int PrefetchRoom (int index, int need, unsigned model, float active2)
 		bytes = model < chim_world.models ? (long)chim_world.model[model].bytes : 0;
 	else
 		return 1;
-	ChimZone_Stats (&s);
-	if (s.largest_free >= 2*bytes + 65536)
+	if (bytes < 0x3ff00000L && ChimZone_HasFree ((int)(2*bytes + 65536)))
 		return 1;
 	prefetch_held++;
 	return 0;
@@ -950,17 +948,17 @@ static void Failed (int index, int need, unsigned model, int zone, int asked, in
 	if (!counts.zone_maps++ || chim_debug.value)
 		ChimZone_Map (MapLine);
 	if (need == 3 && ChimStatics_IsStatic (model))
-		Con_Printf ("CHIM: chunk %ld: streamed static model %s waits: zone full (%ld bytes; largest free %ld, free %ld, locked %ld of %ld); retrying\n",
-			(long)index, ChimStatics_Name (model), (long)asked, (long)s.largest_free, (long)s.free_bytes, (long)s.locked_bytes,
-			(long)(s.used_bytes + s.free_bytes));
+		Con_Printf ("CHIM: chunk %ld: streamed static model %s waits: zone full (%ld bytes; largest free %ld, free %lu, locked %ld of %lu); retrying\n",
+			(long)index, ChimStatics_Name (model), (long)asked, (long)s.largest_free, s.free_bytes, (long)s.locked_bytes,
+			s.used_bytes + s.free_bytes);
 	else if (need == 3)
-		Con_Printf ("CHIM: chunk %ld not loaded: zone full (model %lu, %ld bytes; largest free %ld, free %ld, locked %ld of %ld); retrying\n",
-			(long)index, (unsigned long)model, (long)asked, (long)s.largest_free, (long)s.free_bytes, (long)s.locked_bytes,
-			(long)(s.used_bytes + s.free_bytes));
+		Con_Printf ("CHIM: chunk %ld not loaded: zone full (model %lu, %ld bytes; largest free %ld, free %lu, locked %ld of %lu); retrying\n",
+			(long)index, (unsigned long)model, (long)asked, (long)s.largest_free, s.free_bytes, (long)s.locked_bytes,
+			s.used_bytes + s.free_bytes);
 	else
-		Con_Printf ("CHIM: chunk %ld not loaded: zone full (its %s, %ld bytes; largest free %ld, free %ld, locked %ld of %ld); retrying\n",
-			(long)index, part[need], (long)asked, (long)s.largest_free, (long)s.free_bytes, (long)s.locked_bytes,
-			(long)(s.used_bytes + s.free_bytes));
+		Con_Printf ("CHIM: chunk %ld not loaded: zone full (its %s, %ld bytes; largest free %ld, free %lu, locked %ld of %lu); retrying\n",
+			(long)index, part[need], (long)asked, (long)s.largest_free, s.free_bytes, (long)s.locked_bytes,
+			s.used_bytes + s.free_bytes);
 }
 
 /* An active chunk went: chunks waiting after a failed load try again now. */
@@ -975,21 +973,48 @@ static void Released (void)
  * the active chunk farthest from the player that is farther than it and
  * outside the collision margin, so the nearer chunk wins (chim_release).
  * Chunks past the active radius (kept only by the load radius's
- * hysteresis) go first, being the farthest. Returns 1 when one went. */
-static int Release (int index, float active2, float urgent2)
+ * hysteresis) go first, being the farthest. Returns 1 when one went.
+ *
+ * chim_release 2 (the default; CHIM-ZONE-RELEASE-FLICKER-42): only what makes
+ * room goes. The locks the farther chunks hold (catalogue, terrain and its
+ * frame-world lock, models) are counted farthest first until the request
+ * (need bytes, header included) would fit a run of unlocked blocks
+ * (ChimZone_FitsWithout); then exactly those chunks go, at once. When even
+ * all of them would not make a run that large (the room is split by locked
+ * blocks of nearer chunks), nothing goes: the first method (chim_release 1)
+ * released chunk after chunk for a request that still failed, and the
+ * released chunks came back 50 ticks later, so buildings and their outlines
+ * popped in and out while the player stood still (Ebonheart, v0.0.42-dev1).
+ * The catalogue or terrain of a chunk within the collision margin (its
+ * ground) still releases as the first method does: no hole to fall into for
+ * a steadier picture. */
+#define CHIM_RELEASE_LOCKS	(4*1024)	/* locks a release plan can count */
+static void			*release_locks[CHIM_RELEASE_LOCKS];
+static short		release_order[CHIM_MAX_CHUNKS];
+unsigned long		chim_release_refused;	/* plans that found no room: nothing released */
+
+static int ReleaseLocks (int index, int n)
 {
-	int i, far = -1;
-	float d = chim_frame.entries[index].distance;
-	for (i=0 ; i<chim_frame.count ; i++)
+	chim_entry_t *e = &chim_frame.entries[index];
+	chim_chunk_t *c = e->chunk.data;
+	int i;
+	if (!c || n + 3 + c->models > CHIM_RELEASE_LOCKS)
+		return -1;
+	release_locks[n++] = c;
+	if (e->terrain.data)
 	{
-		chim_entry_t *e = &chim_frame.entries[i];
-		if (e->state != CHIM_STATE_ACTIVE || e->distance <= d || e->distance <= urgent2)
-			continue;
-		if (far < 0 || e->distance > chim_frame.entries[far].distance)
-			far = i;
+		release_locks[n++] = e->terrain.data;
+		if (e->grafted)			/* the frame world's lock, dropped by ChimGraft_Update (0) */
+			release_locks[n++] = e->terrain.data;
 	}
-	if (far < 0)
-		return 0;
+	for (i=0 ; i<c->models ; i++)
+		if (c->model_list[i].model)
+			release_locks[n++] = c->model_list[i].model;
+	return n;
+}
+
+static void ReleaseDone (int far, float active2, int index)
+{
 	if (chim_frame.entries[far].distance > active2)
 		pressure.band++;
 	else
@@ -1003,6 +1028,59 @@ static int Release (int index, float active2, float urgent2)
 	 * collision margin of it): else the next nearer chunk short of room
 	 * releases it again at once, and loads chase each other. */
 	chim_frame.entries[far].released_until = ticks + 50;
+}
+
+static int Release (int index, float active2, float urgent2, int need, int part)
+{
+	int i, k, far = -1, count = 0, locks = 0;
+	float d = chim_frame.entries[index].distance;
+	/* The ground under the player outranks a steady picture: the catalogue
+	 * or terrain of a chunk within the collision margin lets go as the first
+	 * method does. A model it lacks leaves no hole (chim_partial). */
+	if (chim_release.value >= 2 && need > 0 && (d > urgent2 || part == 3))
+	{
+		/* The farther active chunks, farthest first. */
+		for (i=0 ; i<chim_frame.count ; i++)
+		{
+			chim_entry_t *e = &chim_frame.entries[i];
+			if (e->state != CHIM_STATE_ACTIVE || e->distance <= d || e->distance <= urgent2)
+				continue;
+			for (k=count ; k>0 && chim_frame.entries[release_order[k-1]].distance < e->distance ; k--)
+				release_order[k] = release_order[k-1];
+			release_order[k] = (short)i;
+			count++;
+		}
+		for (k=0 ; k<count ; k++)
+		{
+			if ((locks = ReleaseLocks (release_order[k], locks)) < 0)
+				break;
+			if (ChimZone_FitsWithout (need, release_locks, locks))
+			{
+				for (i=0 ; i<=k ; i++)
+					ReleaseDone (release_order[i], active2, index);
+				Reconcile ();
+				ChimGraft_Update (0);
+				Released ();
+				return 1;
+			}
+		}
+		chim_release_refused++;
+		if (chim_debug.value)
+			Con_Printf ("CHIM: zone full: chunk %ld waits; releasing %ld farther chunks would not make %ld bytes in one run\n",
+				(long)index, (long)count, (long)need);
+		return 0;
+	}
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		if (e->state != CHIM_STATE_ACTIVE || e->distance <= d || e->distance <= urgent2)
+			continue;
+		if (far < 0 || e->distance > chim_frame.entries[far].distance)
+			far = i;
+	}
+	if (far < 0)
+		return 0;
+	ReleaseDone (far, active2, index);
 	Reconcile ();
 	/* Its terrain leaves the frame world now, which drops the world's lock. */
 	ChimGraft_Update (0);
@@ -1110,7 +1188,9 @@ float ChimChunks_LoadRadius (void)
 static void Ahead (const vec3_t origin)
 {
 	vec3_t step;
-	float length, look = chim_lookahead.value >= 0 ? chim_lookahead.value : chim_frame.settings.prefetch_margin;
+	/* The world's margin, times Chim_LookaheadScale with extra memory (1 without). */
+	float length, look = chim_lookahead.value >= 0 ? chim_lookahead.value :
+		chim_frame.settings.prefetch_margin * Chim_LookaheadScale ();
 	VectorSubtract (origin, ring.last, step);
 	step[2] = 0;
 	length = (float)sqrt (step[0]*step[0] + step[1]*step[1]);
@@ -1258,7 +1338,7 @@ void ChimChunks_Tick (const vec3_t origin, long budget, int prime)
 			int asked, zone = ChimZone_Failures (&asked) != zone_before;
 			/* No room for a chunk the player can see: farther chunks give
 			 * theirs (chim_release), and the same chunk tries again. */
-			if (zone && chim_release.value && e->distance <= active2 && Release (best, active2, urgent2))
+			if (zone && chim_release.value && e->distance <= active2 && Release (best, active2, urgent2, asked, need))
 				continue;
 			Failed (best, need, model, zone, asked,
 				chim_release.value && e->distance <= urgent2 && e->state != CHIM_STATE_ACTIVE ? 1 : 50);
@@ -1395,6 +1475,107 @@ void ChimChunks_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_
 				return;
 		}
 	}
+}
+
+/* dbg hud pin (INSPECT-CHIM-PLACEMENT-UNNAMED-42): the nearest linked placement a
+ * point ray hits, with ClipModel's own hull test (the same collision SV_Move sees),
+ * then its record re-read from the sector and its model name from the index. One
+ * click = a handful of small reads; nothing is kept, the runtime placement is not
+ * enlarged. 0: no placement on the ray. */
+int ChimChunks_Pick (const vec3_t start, const vec3_t end, aw_chim_pick_t *out)
+{
+	vec3_t low, high, zero = {0, 0, 0}, s, e2;
+	trace_t best;
+	int i, j, k, hit_entry = -1, hit_record = -1;
+	float nearest = 1;
+	unsigned char raw[CHIM_RECORD_BYTES], row[CHIM_MODEL_DIR_BYTES];
+	chim_record_t r;
+	chim_pack_t *pack, index;
+
+	memset (out, 0, sizeof(*out));
+	VectorCopy (start, s);
+	VectorCopy (end, e2);
+	for (k=0 ; k<3 ; k++)
+	{
+		low[k] = (start[k] < end[k] ? start[k] : end[k]) - 1;
+		high[k] = (start[k] > end[k] ? start[k] : end[k]) + 1;
+	}
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		chim_chunk_t *c;
+		if (e->state != CHIM_STATE_ACTIVE)
+			continue;
+		c = e->chunk.data;
+		for (k=0 ; k<3 ; k++)
+			if (low[k] > c->maxs[k] || high[k] < c->mins[k])
+				break;
+		if (k != 3)
+			continue;
+		for (j=0 ; j<c->records ; j++)
+		{
+			chim_place_t *p = &c->places[j];
+			if (!p->linked || !p->ent.model)
+				continue;
+			for (k=0 ; k<3 ; k++)
+				if (low[k] > p->maxs[k] || high[k] < p->mins[k])
+					break;
+			if (k != 3)
+				continue;
+			memset (&best, 0, sizeof(best));
+			best.fraction = 1;
+			VectorCopy (e2, best.endpos);
+			ClipModel (p->ent.model, p->ent.origin, p->s, p->c, s, zero, zero, e2, &best);
+			if (best.fraction < nearest && !best.allsolid)
+			{
+				nearest = best.fraction;
+				hit_entry = i;
+				hit_record = j;
+			}
+		}
+	}
+	if (hit_entry < 0)
+		return 0;
+	out->fraction = nearest;
+	{
+		chim_entry_t *e = &chim_frame.entries[hit_entry];
+		chim_place_t *p = &((chim_chunk_t *)e->chunk.data)->places[hit_record];
+		out->pid = p->pid;
+		out->model = p->model;
+		VectorCopy (p->ent.origin, out->origin);
+		out->yaw = p->ent.angles[YAW];
+		out->cell_x = chim_frame.frame.cx;
+		out->cell_y = chim_frame.frame.cy;
+		if ((pack = Chim_File (e->file)) &&
+			Chim_PackRead (pack, e->disk.offset + CHIM_CHUNK_HEAD_BYTES + (long)hit_record*CHIM_RECORD_BYTES,
+			raw, CHIM_RECORD_BYTES) && ChimFormat_Record (raw, &r) && r.pid == p->pid)
+		{
+			out->ref = r.ref;
+			out->cell_x += r.cell_dx;
+			out->cell_y += r.cell_dy;
+		}
+	}
+	/* Model row: u32 name offset at +16, relative to the names table. */
+	if (out->model < chim_world.models && Chim_PackOpen (&index, "world.cwi"))
+	{
+		if (Chim_PackRead (&index, chim_world.toc.models_at + (long)out->model*CHIM_MODEL_DIR_BYTES, row, sizeof(row)))
+		{
+			unsigned at = ChimFormat_U32 (row+16);
+			char name[sizeof(out->name)];
+			long left = index.bytes - (long)chim_world.toc.names_at - (long)at;
+			int n = left < (long)sizeof(name) ? (int)left : (int)sizeof(name);
+			if (n > 1 && Chim_PackRead (&index, chim_world.toc.names_at + (long)at, name, n))
+			{
+				name[n-1] = 0;
+				for (k=0 ; name[k] ; k++)
+					if ((unsigned char)name[k] < 32 || (unsigned char)name[k] > 126)
+						name[k] = '?';
+				memcpy (out->name, name, sizeof(out->name));
+			}
+		}
+		Chim_PackClose (&index);
+	}
+	return 1;
 }
 
 /* ---------------------------------------------------------------- end */

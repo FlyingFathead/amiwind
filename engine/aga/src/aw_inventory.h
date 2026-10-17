@@ -15,6 +15,17 @@ enum {AW_SLOT_HELMET,AW_SLOT_CUIRASS,AW_SLOT_GREAVES,AW_SLOT_LPAULDRON,
 #define AW_INV_EQUIP_SUPPORTED 4U
 #define AW_INV_SCRIPTED 8U
 #define AW_INV_CONSTANT_EFFECT 16U
+/* A carried light (catalogue bytes 504..510: burn time, colour; subtype = radius). */
+#define AW_INV_LIGHT 32U
+/* The debug torch (test only), the maintainer's preview-stage request (17 October 2026): the
+ * original torch (LIGH "torch") as one catalogue row that never burns out; given once when the
+ * player leaves the census office while aw_debug_torch is 1 (the builder's game config, on until
+ * the final game). Not an original item. */
+#define AW_DEBUG_TORCH_ID "aw_debug_torch"
+#define AW_DEBUG_TORCH_GRANTED "amiwind:debug_torch:granted"
+/* The light burn time that never runs out: -1, as OpenMW 0.51 apps/openmw/mwmechanics/actors.cpp
+ * ("-1 is infinite light source") treats a held light's remaining time. */
+#define AW_LIGHT_INFINITE (-1)
 typedef struct {
     char id[64],name[96],model[64],icon[64],enchantment[64],script[64];
     uint32_t slots,flags;
@@ -26,6 +37,9 @@ typedef struct {
      * maximum charge (OpenMW getEnchantmentCharge, computed by the builder). */
     int enchant_kind;
     float charge_max;
+    /* AW_INV_LIGHT rows: burn time in seconds (AW_LIGHT_INFINITE = never runs out), radius, colour. */
+    int light_time,light_radius;
+    unsigned char light_colour[3];
 } aw_inventory_item_t;
 enum {AW_ENCH_NONE,AW_ENCH_ONCE,AW_ENCH_STRIKES,AW_ENCH_USED,AW_ENCH_CONSTANT};
 /* Selected magic item and enchantment charge (aw_magic_state_t). Pure rules:
@@ -39,6 +53,13 @@ float AW_MagicCharge(const aw_state_t *,const aw_inventory_item_t *);
 int AW_MagicSetCharge(aw_state_t *,const aw_inventory_item_t *,float);
 int AW_MagicRecharge(aw_state_t *,const aw_inventory_item_t *,float seconds,float rate);
 float AW_InventoryCondition(const char *id);
+/* Pure rules (debug torch): the remaining burn time of a carried light after seconds of use
+ * (AW_LIGHT_INFINITE stays infinite; else it counts down to 0, as OpenMW's held light); and the
+ * one-time grant: 1 = given now, 0 = switched off, given before, or no room (state unchanged). */
+float AW_LightBurn(const aw_inventory_item_t *,float remaining,float seconds);
+int AW_DebugTorchGrant(aw_state_t *,int enabled);
+/* aw_debug_torch.c: the aw_debug_torch switch, the census-exit grant and the lit torch. */
+void AW_DebugTorchInit(void);
 int AW_MagicSelectedItem(aw_inventory_item_t *out);
 void AW_MagicFrame(float seconds);
 float AW_MagicRechargeRate(void);

@@ -12,6 +12,15 @@ typedef struct {
     int ok,w,h;
     unsigned char pixels[AW_ICON_MAX*AW_ICON_MAX];
 } aw_icon_t;
+/* A wide UI strip (the title bar's head block): at most 320 x 16. */
+#define AW_STRIP_W 320
+#define AW_STRIP_H 16
+typedef struct {
+    char key[64];
+    int ok,w,h;
+    unsigned char pixels[AW_STRIP_W*AW_STRIP_H];
+} aw_strip_t;
+int AW_StripLoad(aw_strip_t *slot,const char *key);
 /* Returns 1 when the slot holds the picture of key (loading it once). */
 int AW_IconLoad(aw_icon_t *slot,const char *key);
 /* Opaque blit of a loaded picture (clipped out entirely when off screen). */

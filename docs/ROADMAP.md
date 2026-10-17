@@ -826,7 +826,8 @@ adaptive cache sizing and non-blocking CHIM disk reads remain follow-up work;
 the cache, prefetch and lookahead themselves exist already
 ([real hardware](REAL_HARDWARE.md)).
 The proposed follow-up is adaptive CHIM caching and non-blocking world streaming: keep `-chimcache` as the manual
-override; detect usable Fast RAM and grow the cache conservatively without touching the tested baseline heap; count
+override; detect usable Fast RAM and grow the cache conservatively without touching the tested baseline heap (done
+in v0.0.42-rc1: [memory guide](chim/build_guide/MEMORY.md#more-fast-ram-the-automatic-chim-cache)); count
 cache hits, misses and evictions; and turn CHIM's blocking pack reads (`Chim_PackRead`,
 [ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md)) into reads that complete in the background,
 starting from the asynchronous music reader (`aw_aread.c`). A cache only makes a hit faster; only asynchronous reads
@@ -1271,12 +1272,20 @@ Plan, measured before it is built:
 
 1. Emulator test: more Fast RAM and a larger heap on the same Seyda Neen route.
    Continue only if evictions and crossing times improve clearly.
-2. Startup check: when much more Fast RAM is available, the game uses it by itself
+2. [x] Startup check: when much more Fast RAM is available, the game uses it by itself
    (maintainer, 16 October 2026: the benefits come automatically): a short notice in plain
-   words says how much extra RAM was found and that it is being used for caches and a
-   larger game heap, with a key to skip it for this start (the game then runs on the
-   baseline). An Options setting turns it off for good; the engine falls back to
-   11 MiB and no extra caches if the larger allocation fails.
+   words says how much extra RAM was found and that it is being used for caches, with a key
+   (M) to skip it for this start (the game then runs on the baseline). An Options setting
+   (Extra RAM) turns it off for good; the engine falls back to no extra caches if the larger
+   allocation fails. Done in v0.0.42-rc1 for the CHIM cache, the chunks kept after leaving
+   them and the look-ahead, with no upper limit but the machine (one bank per memory region,
+   each under 2 GiB); measured 17 October 2026 in FS-UAE, 16 MiB against 128 MiB: zone
+   failures 625-655 and 288-312 to none, evictions on a Seyda Neen flight 487-550 to none,
+   frame time unchanged within drift; 16 MiB takes nothing
+   ([memory guide](chim/build_guide/MEMORY.md#more-fast-ram-the-automatic-chim-cache)).
+   The game heap stays at its built size: a larger heap only feeds Quake's actor and sound
+   cache, and step 1 (does it help the Seyda Neen crossing?) is not measured yet, so it
+   stays manual (`-heapmb`).
 
 The baseline does not change: AmiWind must stay playable on the reference
 configuration with the 11 MiB heap. Memory budgets, release gates and
@@ -1294,10 +1303,13 @@ much fast RAM is free and sizes the caches from it; each gain is measured in the
 in order of expected gain:
 
 1. A larger surface cache: Quake's lit surfaces rebuilt less often, a direct frame-rate gain.
-2. Streamed CHIM chunks, models and textures kept resident in a larger LRU cache (Quake's `Cache_*`), so ground
-   already seen costs no disk reads.
-3. Prefetch further ahead: the next frames' chunks loaded before the edge is reached, seamless crossings on slow
-   disks.
+2. [x] Streamed CHIM chunks, models and textures kept resident in a larger LRU cache (Quake's `Cache_*`), so ground
+   already seen costs no disk reads. v0.0.42-rc1: the automatic CHIM cache banks (step 2 above); measured: no
+   evictions and no failed loads where 16 MiB had hundreds.
+3. [x] Prefetch further ahead: the next frames' chunks loaded before the edge is reached, seamless crossings on slow
+   disks. v0.0.42-rc1: the look-ahead doubles from 8 MiB of cache and triples from 32 MiB; first-time ground
+   still reads in the frame (worst frames 0.19-0.29 s on a flight in FS-UAE, against 0.22-0.36 s on 16 MiB):
+   that needs reads that finish in the background.
 4. Visited interiors kept in RAM: going back through a door needs no loading pause.
 5. Read caching for the hard file: recently read blocks stay in memory.
 

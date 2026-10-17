@@ -268,6 +268,23 @@ def stage_debug_catalogues(id1, debug_luma=False):
 
 
 LIVE_LOGS_LINE = b'aw_logs_live 1\n'
+DEBUG_TORCH_NAME = 'Debug torch (test only)'
+
+
+def debug_torch_record(id1):
+    """The debug torch switch as staged (aw_debug_torch in default-game.cfg, config/game.cfg: 1 until the
+    final game). The build receipt (build.json "debug_torch") and the image step's log say it."""
+    value = None
+    path = Path(id1)/'default-game.cfg'
+    for line in (path.read_text(encoding='utf-8').splitlines() if path.is_file() else []):
+        words = line.split('//')[0].split()
+        if len(words) == 2 and words[0] == 'aw_debug_torch':
+            value = words[1]
+    on = value not in (None, '0')
+    return {'on': on, 'item': DEBUG_TORCH_NAME, 'config': 'id1/default-game.cfg',
+            'line': 'aw_debug_torch ' + (value or '0 (absent)'),
+            'note': ('given once at the census exit, never burns out (test only, preview builds)' if on
+                     else 'not given')}
 
 
 def stage_game_config(id1, debug_luma=False, live_logs=False):
@@ -1767,6 +1784,9 @@ def image(args):
     from prepare_player_view import stage_death_retry
     args.image_death_retry_record=stage_death_retry(getattr(args,'no_death_retry',False), boot/'id1')
     (out/'diagnostic-logs.json').write_text(json.dumps(logs_record,indent=2)+'\n', encoding='utf-8', newline='\n')
+    args.image_debug_torch_record=debug_torch_record(boot/'id1')  # build.json "debug_torch"
+    print('[debug torch] %s: %s (%s)' % ('ON' if args.image_debug_torch_record['on'] else 'off',
+          DEBUG_TORCH_NAME, args.image_debug_torch_record['note']), flush=True)
     if logs_record['diagnostic_logs']=='live':
         print('[diagnostics] --live-logs: this image writes its diagnostic logs as they happen (benchmark/diagnostic image)',flush=True)
     stage_debug_catalogues(boot/'id1', debug_luma=engine_record.get('debug_luma',False))
@@ -1813,7 +1833,7 @@ def image(args):
     (out/'player-view.json').write_text(json.dumps(view_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     from prepare_inventory import prepare as prepare_inventory
     print('Converting original inventory metadata and selected item resources...',flush=True)
-    inventory_report=prepare_inventory(args.data_files,boot/'id1')
+    inventory_report=prepare_inventory(args.data_files,boot/'id1',jobs=jobs)
     (out/'inventory-data.json').write_text(json.dumps(inventory_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     from prepare_world_ui import prepare as prepare_world_ui, validate as validate_world_ui
     if args.data_files:prepare_world_ui(args.data_files,None,boot)
@@ -2625,6 +2645,8 @@ def finalize_image(args):
         # The build's recipe (tools/build_recipe.py ENV, set by tools/build.py; never part of a stage key): a reused
         # image step keeps the record of the run that made it (its "run" names that run).
         build_json['build_recipe'] = json.loads(recipe_record)
+    if getattr(args, 'image_debug_torch_record', None):
+        build_json['debug_torch'] = args.image_debug_torch_record
     build_json['player_view'] = {'player_body': not getattr(args, 'no_player_body', False),
                                  'death_retry': not getattr(args, 'no_death_retry', False)}
     if getattr(args, 'miniwind', False):

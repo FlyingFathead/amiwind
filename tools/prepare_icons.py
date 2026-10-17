@@ -16,6 +16,9 @@ converted picture:  key -> source path(s) -> picture SHA-256 -> picture file.
                     black client)
   hud:track:weapon  the bar fill: textures/menu_bar_gray.dds tinted with
   hud:track:magic   Morrowind.ini [FontColor] color_weapon_fill / color_magic_fill
+  ui:head:block     the window title bar's head block (textures/menu_head_block_*.dds):
+  ui:head:left      the tileable strip and its two edge columns
+  ui:head:right
   mgef:<index>      a magic effect's ITEX (selected spell; none reachable yet:
                     the engine has no spell list)
 
@@ -32,15 +35,24 @@ stat bars are 24 pixels tall where the original's are 42, so every HUD size is
 scaled by 24/42: box 20x20 (1-pixel border, 18x18 icon), bar 20x4 (1-pixel
 border, 18x2 track). Our own implementation; no OpenMW code is used.
 
+  inv:<id>          an item's inventory cell, 16 x 16 (the original 42 x 42 cell with its
+                    32 x 32 icon, scaled 16/42), on
+  inv:<id>:equip    the magic backdrop when enchanted; :equip on menu_icon_equip.dds
+                    (menu_icon_magic_equip.dds when enchanted), as the original item
+                    widget's Equip state (UI-ICONS-INVENTORY-42)
+
 Pictures are AWI1 (w, h, palette indices), quantised to the installed game
-palette without dithering, written ONCE under gfx/icon/<sha16>.awi
-(content-addressed: identical pictures share one file). The table is
-gfx/icons.awl: b'AWL1', u32 count, then count rows of 160 bytes, sorted by key
-(ASCII case-insensitive, aw_icons.c binary-searches it):
-  key[64]  source[64]  sha256[32]
-Only the referenced closure is converted: the items the build stages inventory
-resources for (tools/prepare_inventory.py) plus the fixed HUD keys. All outputs
-are private game data (build output and pool only, never the repository).
+palette without dithering, each stored ONCE (by SHA-256) in one pack,
+gfx/icons.awp: b'AWP1', u32 count, the pictures back to back (one file, not
+thousands: classic FFS directories). The table is gfx/icons.awl: b'AWL2', u32
+count, then count rows of 160 bytes, sorted by key (ASCII case-insensitive,
+aw_icons.c binary-searches it):
+  key[64]  source[56]  offset u32  size u32  sha256[32]
+Only the referenced closure is converted: the HUD items the build stages
+resources for, every catalogue item the player can own (inventory icons) and
+the fixed UI keys; the item pictures are converted in a process pool. All
+outputs are private game data (build output and pool only, never the
+repository).
 """
 import hashlib, io, struct
 from pathlib import Path
@@ -56,6 +68,14 @@ MAGIC_BACKGROUND = 'textures/menu_icon_magic.dds'
 THIN = 'textures/menu_thin_border_%s.dds'
 BAR_TEXTURE = 'textures/menu_bar_gray.dds'
 LIMIT = 32          # the engine's slot holds at most 32x32 pixels
+STRIP = (320, 16)   # a wide UI strip slot: at most 320x16 pixels
+# The window title bar (UI-WINDOW-TITLE-BAR-42): openmw_windows.skin.xml MW_Caption = a head block
+# (HB_ALL: menu_head_block_middle tiled inside 2-pixel menu_head_block edges, 20 pixels tall) left
+# and right of the title, the title on the window's black between them (WindowCaption::align: the
+# text width + 24). AmiWind's title band is 12 pixels: everything scaled by 12/20.
+HEAD = 'textures/menu_head_block_%s.dds'
+HEAD_H = 12
+HEAD_EDGE = 1       # 2 * 12/20, rounded
 
 
 def key_bytes(key):
@@ -96,20 +116,56 @@ def quantise(rgb, palette):
     return np.argmin(((pixels - colours[None]) ** 2).sum(2), axis=1).astype(np.uint8).tobytes()
 
 
-def awi(rgb, palette):
+def awi(rgb, palette, limit=(LIMIT, LIMIT)):
     h, w = rgb.shape[:2]
-    if not (0 < w <= LIMIT and 0 < h <= LIMIT): raise ValueError('Picture too large for a UI slot')
+    if not (0 < w <= limit[0] and 0 < h <= limit[1]): raise ValueError('Picture too large for a UI slot')
     return b'AWI1' + struct.pack('<HH', w, h) + quantise(rgb, palette)
 
 
-def icon_picture(icon, palette, background=None):
-    """An item/skill icon over black (the box interior) or the magic backdrop, ICON x ICON."""
+def icon_picture(icon, palette, background=None, size=None):
+    """An item/skill icon over black or a backdrop (magic, equipped), size x size (default ICON)."""
     import numpy as np
-    layer = premultiplied(icon.resize((32, 32)) if icon.size != (32, 32) else icon, (ICON, ICON))
-    base = (np.zeros((ICON, ICON, 3)), np.ones((ICON, ICON)))
-    if background is not None: base = over(premultiplied(background, (ICON, ICON)), base)
+    size = size or ICON
+    layer = premultiplied(icon.resize((32, 32)) if icon.size != (32, 32) else icon, (size, size))
+    base = (np.zeros((size, size, 3)), np.ones((size, size)))
+    if background is not None: base = over(premultiplied(background, (size, size)), base)
     rgb, _ = over(layer, base)
     return awi(rgb, palette)
+
+
+def cell_picture(icon, palette, background=None, cell=None):
+    """An inventory cell as the original item widget draws it (openmw_resources.xml MW_ItemIcon:
+    a 42 x 42 cell, the backdrop texture's 44 x 44 corner stretched over it, the 32 x 32 icon at
+    5,5), scaled to cell x cell: the icon becomes 32*cell/42 pixels at 5*cell/42."""
+    import numpy as np
+    cell = cell or INV
+    side = int(round(32 * cell / 42.0)); at = int(round(5 * cell / 42.0))
+    base = (np.zeros((cell, cell, 3)), np.ones((cell, cell)))
+    if background is not None: base = over(premultiplied(background, (cell, cell)), base)
+    rgb, alpha = premultiplied(icon.resize((32, 32)) if icon.size != (32, 32) else icon, (side, side))
+    layer = (np.zeros((cell, cell, 3)), np.zeros((cell, cell)))
+    layer[0][at:at + side, at:at + side] = rgb; layer[1][at:at + side, at:at + side] = alpha
+    out, _ = over(layer, base)
+    return awi(out, palette)
+
+
+def cell_background(raw):
+    """The item widget's backdrop: the texture's 44 x 44 corner (scaled with the texture)."""
+    from PIL import Image
+    image = rgba(raw); scale = image.size[1] / 64.0
+    return image.resize((44, 44), Image.Resampling.BOX, box=(0, 0, 44 * scale, 44 * scale))
+
+
+def _convert(job):
+    """Worker: (icon bytes, backdrop or None, palette, size, cell) -> AWI1 bytes (process pool)."""
+    raw, background, palette, size, cell = job
+    if cell: return cell_picture(rgba(raw), palette, background, size)
+    return icon_picture(rgba(raw), palette, background, size)
+
+
+INV = 16            # inventory icons: the 32x32 originals 2:1 (the inventory row's 16-pixel slot)
+EQUIP_BACKGROUND = 'textures/menu_icon_equip.dds'
+MAGIC_EQUIP_BACKGROUND = 'textures/menu_icon_magic_equip.dds'
 
 
 def magic_background(raw):
@@ -139,11 +195,42 @@ def thin_frame(read, w, h):
     return out
 
 
+def head_pieces(read):
+    """The title-bar head block at HEAD_H pixels: the tileable strip (top edge, tiled middle,
+    bottom edge; the middle texture's own width scaled by the same factor) and the left and right
+    edge columns (corner, side, corner)."""
+    import numpy as np
+    scale = HEAD_H / 20.0; e = HEAD_EDGE; mid_h = HEAD_H - 2 * e
+    middle = rgba(read(HEAD % 'middle')); w = max(1, int(round(middle.size[0] * scale)))
+    def piece(name, size):
+        return premultiplied(rgba(read(HEAD % name)), size)[0]
+    strip = np.zeros((HEAD_H, w, 3))
+    strip[0:e] = piece('top', (w, e)); strip[e:HEAD_H - e] = premultiplied(middle, (w, mid_h))[0]
+    strip[HEAD_H - e:] = piece('bottom', (w, e))
+    left = np.zeros((HEAD_H, e, 3)); right = np.zeros((HEAD_H, e, 3))
+    left[0:e] = piece('top_left_corner', (e, e)); left[e:HEAD_H - e] = piece('left', (e, mid_h))
+    left[HEAD_H - e:] = piece('bottom_left_corner', (e, e))
+    right[0:e] = piece('top_right_corner', (e, e)); right[e:HEAD_H - e] = piece('right', (e, mid_h))
+    right[HEAD_H - e:] = piece('bottom_right_corner', (e, e))
+    return strip, left, right
+
+
 def track(read, colour):
     """MW_BarTrack_Weapon/Magic: menu_bar_gray tinted by the ini colour, (BOX-2) x TRACK_H."""
     import numpy as np
     rgb = premultiplied(rgba(read(BAR_TEXTURE)), (BOX - 2 * BORDER, TRACK_H))[0]
     return rgb * (np.array(colour, dtype=np.float64) / 255.0)
+
+
+def read_icon_raw(assets, source):
+    """The original icon's bytes (.dds first, then the record's own name)."""
+    failures = []
+    for candidate in (str(Path(source).with_suffix('.dds')), source):
+        try:
+            return candidate, assets.read(candidate)
+        except (KeyError, OSError, ValueError) as error:
+            failures.append(candidate + ': ' + str(error))
+    raise ValueError('; '.join(failures))
 
 
 def read_icon(assets, source):
@@ -156,42 +243,50 @@ def read_icon(assets, source):
     raise ValueError('; '.join(failures))
 
 
-def pack_table(rows):
+def pack_table(rows, offsets):
+    """AWL2: key[64] source[56] offset u32 size u32 sha256[32], sorted by key; offsets: digest -> (offset, size)
+    in gfx/icons.awp (one file instead of thousands: the classic FFS directory rule)."""
     rows = sorted(rows, key=lambda r: key_bytes(r[0]))
     keys = [key_bytes(r[0]) for r in rows]
     if len(set(keys)) != len(keys): raise ValueError('Duplicate icon key')
-    out = [b'AWL1', struct.pack('<I', len(rows))]
+    out = [b'AWL2', struct.pack('<I', len(rows))]
     for (key, source, digest), k in zip(rows, keys):
-        src = source.replace('\\', '/').encode('cp1252')[:63]
-        out += [k + b'\0' * (64 - len(k)), src + b'\0' * (64 - len(src)), bytes.fromhex(digest)]
+        src = source.replace('\\', '/').encode('cp1252')[:55]
+        offset, size = offsets[digest]
+        out += [k + b'\0' * (64 - len(k)), src + b'\0' * (56 - len(src)), struct.pack('<II', offset, size),
+                bytes.fromhex(digest)]
     return b''.join(out)
 
 
-def picture_path(digest):
-    return 'gfx/icon/' + digest[:16] + '.awi'
-
-
-def prepare(assets, id1, items, palette, colours):
-    """items: {id: {'source_icon': ITEX, 'enchanted': bool}} - the referenced closure.
+def prepare(assets, id1, items, palette, colours, inventory=None, jobs=1):
+    """items: {id: {'source_icon': ITEX, 'enchanted': bool}} - the HUD closure (item:<id>, 18 x 18).
+    inventory: {id: {'source_icon', 'enchanted', 'equippable'}} - every item the player can own
+    (inv:<id>, 16 x 16; inv:<id>:equip on the equipped backdrop for equippable items).
     colours: {'color_weapon_fill': [r,g,b], 'color_magic_fill': [r,g,b]}."""
-    id1 = Path(id1)
+    import time
+    from concurrent.futures import ProcessPoolExecutor
+    id1 = Path(id1); inventory = inventory or {}
     if len(palette) != 768: raise ValueError('Expected installed 256-colour game palette')
-    report = {'rows': {}, 'pictures': {}, 'held': {}, 'format': 'AWL1 160-byte rows, AWI1 pictures',
-              'sizes': {'box': BOX, 'border': BORDER, 'icon': ICON, 'bar_height': BAR_H, 'track_height': TRACK_H}}
-    rows = []; stored = {}; backdrop = []
+    report = {'rows': {}, 'held': {}, 'format': 'AWL2 160-byte rows into gfx/icons.awp (AWP1 of AWI1 pictures)',
+              'sizes': {'box': BOX, 'border': BORDER, 'icon': ICON, 'inventory_icon': INV, 'bar_height': BAR_H,
+                        'track_height': TRACK_H}}
+    rows = []; pictures = {}; backdrops = {}
 
     def store(key, source, raw):
-        digest = hashlib.sha256(raw).hexdigest(); path = picture_path(digest)
-        if digest not in stored:
-            (id1 / path).parent.mkdir(parents=True, exist_ok=True)
-            (id1 / path).write_bytes(raw); stored[digest] = path
-            report['pictures'][path] = {'sha256': digest, 'bytes': len(raw)}
-        rows.append((key, source, digest))
-        report['rows'][key] = {'source': source, 'sha256': digest, 'picture': path}
+        digest = hashlib.sha256(raw).hexdigest()
+        pictures.setdefault(digest, raw)
+        rows.append((key, source, digest)); report['rows'][key] = {'source': source, 'sha256': digest}
 
     def attempt(key, make):
         try: make()
         except (ValueError, KeyError, OSError) as error: report['held'][key] = str(error)
+
+    def backdrop(name, cell):
+        key = (name, bool(cell))
+        if key not in backdrops:
+            raw = assets.read(name)
+            backdrops[key] = cell_background(raw) if cell else magic_background(raw)
+        return backdrops[key]
 
     attempt('hud:box', lambda: store('hud:box', THIN % '*', awi(thin_frame(assets.read, BOX, BOX), palette)))
     attempt('hud:bar', lambda: store('hud:bar', THIN % '*', awi(thin_frame(assets.read, BOX, BAR_H), palette)))
@@ -200,28 +295,56 @@ def prepare(assets, id1, items, palette, colours):
         attempt('hud:track:' + kind, lambda kind=kind, name=name: store(
             'hud:track:' + kind, BAR_TEXTURE + ' * ' + name, awi(track(assets.read, colours[name]), palette)))
 
+    def head():
+        strip, left, right = head_pieces(assets.read)
+        store('ui:head:block', HEAD % 'middle', awi(strip, palette, STRIP))
+        store('ui:head:left', HEAD % 'left', awi(left, palette)); store('ui:head:right', HEAD % 'right', awi(right, palette))
+    attempt('ui:head:block', head)
+
     def hand():
         source, image = read_icon(assets, HAND_TO_HAND[1]); store(HAND_TO_HAND[0], source, icon_picture(image, palette))
     attempt(HAND_TO_HAND[0], hand)
+
+    # Item icons: read the originals here (one archive reader), convert in a process pool.
+    jobs_list = []
+    def queue(key, source_icon, background_name, size, cell=False):
+        try:
+            source, image = read_icon_raw(assets, 'icons/' + source_icon.replace('\\', '/'))
+            background = backdrop(background_name, cell) if background_name else None
+            jobs_list.append((key, source, (image, background, bytes(palette), size, cell)))
+        except (ValueError, KeyError, OSError) as error:
+            report['held'][key] = str(error)
     for identifier, item in sorted(items.items()):
+        if item.get('source_icon'):
+            queue('item:' + identifier, item['source_icon'], MAGIC_BACKGROUND if item.get('enchanted') else None, ICON)
+    for identifier, item in sorted(inventory.items()):
         if not item.get('source_icon'): continue
-        key = 'item:' + identifier
-        def one(identifier=identifier, item=item, key=key):
-            source, image = read_icon(assets, 'icons/' + item['source_icon'].replace('\\', '/'))
-            background = None
-            if item.get('enchanted'):
-                if not backdrop: backdrop.append(magic_background(assets.read(MAGIC_BACKGROUND)))
-                background = backdrop[0]
-            store(key, source, icon_picture(image, palette, background))
-        attempt(key, one)
-    table = pack_table(rows)
+        queue('inv:' + identifier, item['source_icon'], MAGIC_BACKGROUND if item.get('enchanted') else None, INV, True)
+        if item.get('equippable'):
+            queue('inv:' + identifier + ':equip', item['source_icon'],
+                  MAGIC_EQUIP_BACKGROUND if item.get('enchanted') else EQUIP_BACKGROUND, INV, True)
+    workers = max(1, min(int(jobs or 1), len(jobs_list) // 64 + 1))
+    start = time.time()
+    print('Icon import: %d item pictures on %d workers (asked %s)' % (len(jobs_list), workers, jobs), flush=True)
+    if workers > 1:
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            results = list(pool.map(_convert, [j[2] for j in jobs_list], chunksize=32))
+    else:
+        results = [_convert(j[2]) for j in jobs_list]
+    for (key, source, _), raw in zip(jobs_list, results): store(key, source, raw)
+
+    pack = [b'AWP1', struct.pack('<I', len(pictures))]; offsets = {}; at = 8
+    for digest in sorted(pictures):
+        raw = pictures[digest]; offsets[digest] = (at, len(raw)); pack.append(raw); at += len(raw)
+    pack = b''.join(pack); table = pack_table(rows, offsets)
     (id1 / 'gfx').mkdir(parents=True, exist_ok=True)
-    (id1 / 'gfx/icons.awl').write_bytes(table)
-    report['table_sha256'] = hashlib.sha256(table).hexdigest()
-    report['stored_pictures'] = len(stored); report['table_rows'] = len(rows)
-    report['picture_bytes'] = sum(v['bytes'] for v in report['pictures'].values())
-    print('Icon table: %d rows, %d pictures (%d bytes), %d held' % (len(rows), len(stored),
-          report['picture_bytes'], len(report['held'])), flush=True)
+    (id1 / 'gfx/icons.awp').write_bytes(pack); (id1 / 'gfx/icons.awl').write_bytes(table)
+    report['table_sha256'] = hashlib.sha256(table).hexdigest(); report['pack_sha256'] = hashlib.sha256(pack).hexdigest()
+    report['stored_pictures'] = len(pictures); report['table_rows'] = len(rows)
+    report['picture_bytes'] = sum(len(v) for v in pictures.values()); report['pack_bytes'] = len(pack)
+    report['table_bytes'] = len(table)
+    print('Icon table: %d rows, %d pictures (%d bytes in the pack), %d held; took %.1f s, %d workers' % (
+          len(rows), len(pictures), len(pack), len(report['held']), time.time() - start, workers), flush=True)
     return report
 
 
@@ -252,7 +375,12 @@ def ini_colours(data_files):
 
 def hud_settings(settings):
     """gfx/hud-settings.txt: the enchantment recharge rate (GMST fMagicItemRechargePerSecond;
-    OpenMW mwmechanics/recharge.cpp rechargeItem)."""
+    OpenMW mwmechanics/recharge.cpp rechargeItem) and the hand-to-hand name (GMST sSkillHandtohand:
+    the inventory window's title when unarmed, OpenMW mwgui/hud.cpp unsetSelectedWeapon)."""
     rate = settings.get('fmagicitemrechargepersecond')
     if rate is None or not (0 <= rate <= 1000): raise ValueError('Missing GMST fMagicItemRechargePerSecond')
-    return 'fMagicItemRechargePerSecond %.6g\n' % rate, {'recharge_per_second': rate}
+    text = 'fMagicItemRechargePerSecond %.6g\n' % rate; info = {'recharge_per_second': rate}
+    name = settings.get('sskillhandtohand')
+    if isinstance(name, str) and name and len(name) < 64 and all(32 <= ord(c) < 127 for c in name):
+        text += 'sSkillHandtohand %s\n' % name; info['hand_to_hand'] = name
+    return text, info

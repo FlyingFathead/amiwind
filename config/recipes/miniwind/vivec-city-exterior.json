@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "vivec-city-exterior",
+  "description": "MiniWind preset --miniwind-vivec-city-exterior: Vivec city frame on CHIM, exterior only (mushrooms, HUD and inspect checks)",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Vivec city on CHIM, exterior: mushrooms, HUD, inspect",
+    "direct_to_game_map": "vivec_city",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

@@ -59,6 +59,11 @@
       "mode": "authored_dead",
       "source": "NPC_ record NPDT: health 0 (base master)",
       "reason": "Authored initially dead NPC; preserve the converted death pose and placement."
+    },
+    "hentus yansurnummu": {
+      "mode": "swimming",
+      "source": "census: feet below sea level (cell -11,10); OpenMW World::isSwimming decides swimming from the water level",
+      "reason": "Decided for the project, 17 October 2026 (CHIM-ACTOR-GROUNDING-POLICY-36): stands in the water, swimming as in OpenMW."
     }
   },
   "unclassified": "error",
@@ -274,6 +279,7 @@
     "dreamer_talker04",
     "dreamer_talker05",
     "dreamer_talker06",
+    "dreamer_talker07",
     "dreamer_talker08",
     "dreamer_talker09",
     "dreamer_talker10",
@@ -386,6 +392,7 @@
     "fieryra",
     "findulain",
     "fine_mouth",
+    "fjol",
     "fjorgeir",
     "flacassia fauseius",
     "flaenia amiulusus",
@@ -551,6 +558,7 @@
     "llonas felder",
     "llovyn andus",
     "lorbumol gro-aglakh",
+    "lucan ostorius",
     "lucretinaus olcinius",
     "m'aiq",
     "ma'dara",
@@ -685,6 +693,7 @@
     "orvona vadryon",
     "pallia ceno",
     "patus assumanallit",
+    "paur maston",
     "pemenie",
     "phane rielle",
     "pilu shilansour",
@@ -894,6 +903,7 @@
     "ulvil llothas",
     "ulyne henim",
     "ulyno uvirith",
+    "umbra",
     "undil",
     "unjara",
     "urandile selandas",
@@ -916,6 +926,7 @@
     "velfred",
     "velms sadryon",
     "vevrana aryon",
+    "viatrix petilia",
     "vilamon",
     "vilyn rervam",
     "viras guls",
@@ -955,5 +966,21 @@
     "zelaku assarrapanat",
     "zenabi samma",
     "zennammu urshumusa"
+  ],
+  "decisions": [
+    {
+      "date": "2026-10-17",
+      "bug": "CHIM-ACTOR-GROUNDING-POLICY-36",
+      "npcs": [
+        "lucan ostorius",
+        "paur maston",
+        "viatrix petilia",
+        "umbra",
+        "dreamer_talker07",
+        "fjol"
+      ],
+      "mode": "ground",
+      "reason": "Decided for the project, 17 October 2026: authored 137 to 264 units above the support under them; OpenMW drops every actor that neither flies nor swims onto the first surface below on its first update (apps/openmw/mwworld/worldimp.cpp World::adjustPosition, called from apps/openmw/mwmechanics/actors.cpp), so they stand where the game drops them."
+    }
   ]
 }

@@ -101,6 +101,9 @@ class Tests(unittest.TestCase):
             for name,raw in fixtures.items():self.assertEqual((source/name).read_bytes(),raw)
 
     def test_inventory_format_validation_before_overlay(self):
+        pack=b'AWP1'+(2).to_bytes(4,'little')+b'AWI1'+bytes([2,0,1,0,83,140])+b'AWI1'+bytes([1,0,1,0,255])
+        self.assertEqual(spans(pack,'gfx/icons.awp')[0],[(16,2),(26,1)])
+        with self.assertRaises(ValueError):spans(pack[:-1],'gfx/icons.awp')
         cases=[('gfx/inv/a.awi',b'AWIC'+bytes(1024)),
                ('inventory/items.awi',b'AWI2'+struct.pack('<I',1)+bytes(512)),
                ('inventory/initial.awi',b'AWST'+struct.pack('<I',1)+bytes(72))]

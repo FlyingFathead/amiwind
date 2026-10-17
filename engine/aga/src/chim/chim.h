@@ -29,5 +29,6 @@ extern int (*aw_chim_source)(const float *local, float *world);	/* aw_hud.c: CHI
 
 void Chim_Init (void);
 int Chim_Active (void);
+extern int (*aw_chim_memory)(int op, char *first, char *second, int size);	/* aw_movie.c: extra Fast RAM (chim_world.c) */
 
 #endif

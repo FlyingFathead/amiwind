@@ -507,8 +507,12 @@ void AW_UIBar(int x,int y,int w,int h,int color,float fraction) {
  * yellow energy bar the size of the health bar, just above it). The fade
  * over its last fNPCHealthBarFade seconds becomes a stipple on the 8-bit
  * screen: every other row, then gone. */
+/* INSPECT-OVER-VIEWPORT-42: set by aw_hud.c; the pixels the bars, the boxes, the enemy bar and
+ * the guard word move up while the inspect lines are drawn underneath them (0 otherwise). */
+int (*aw_ui_hud_lift)(void);
+static int hud_lift(void) {return aw_ui_hud_lift?aw_ui_hud_lift():0;}
 void AW_UIEnemyBar(float fraction,float alpha) {
-    int x=8,y=vid.height-26-9,w=75,h=7,row,fill;
+    int x=8,y=vid.height-26-9-hud_lift(),w=75,h=7,row,fill;
     initialize();if(alpha<=.25f || !ui_hud.value)return;
     if(alpha>.75f){AW_UIBar(x,y,w,h,3,fraction);return;}
     if(!(fraction>0))fraction=0;
@@ -552,7 +556,7 @@ int (*aw_combat_enemy_bar)(float *fraction,float *alpha);   /* aw_combat.c */
 int (*aw_combat_guard_marker)(void);   /* aw_combat.c: the player guards (hold to block) */
 void AW_UIHud(void) {
     float current[3]={100,100,100},maximum[3]={100,100,100};
-    int i,channels,y=vid.height-26;
+    int i,channels,y=vid.height-26-hud_lift();
     initialize();if(cls.state!=ca_connected)return;
     if(r_refdef.vrect.y+r_refdef.vrect.height<vid.height)
         AW_UIFill(0,r_refdef.vrect.y+r_refdef.vrect.height,vid.width,vid.height,black);
@@ -574,7 +578,7 @@ void AW_UIHud(void) {
      * its top line), or inside the viewport's lower right corner when there is no strip. */
     if(aw_combat_guard_marker && aw_combat_guard_marker()){
         int bottom=r_refdef.vrect.y+r_refdef.vrect.height,gy;
-        gy=vid.height-bottom>=24?vid.height-AW_UIHeight()-2:bottom-AW_UIHeight()-4;
+        gy=vid.height-bottom>=24?vid.height-hud_lift()-AW_UIHeight()-2:bottom-AW_UIHeight()-4;
         AW_UIText(vid.width-6-AW_UIWidth("Guard"),gy,"Guard",-1);
     }
     scr_copyeverything=1;
@@ -646,6 +650,14 @@ static void text_bounds(const char *text,int *left,int *top,int *right,int *bott
         x+=advance(*p++);
     }
     if(*right<*left){*left=*right=*top=*bottom=0;}
+}
+/* One line centred in a box by its painted pixels (not the glyph boxes), so the
+ * space above and below the letters is equal (UI-INVENTORY-HEADING-CENTRE-42). */
+void AW_UITextCentred(int x,int y,int w,int h,const char *text,int color) {
+    int l,t,r,b;
+    initialize();if(!text || !*text)return;
+    text_bounds(text,&l,&t,&r,&b);if(r<=l || b<=t)return;
+    AW_UIText(x+(w-(r-l))/2-l,y+(h-(b-t))/2-t,text,color);
 }
 /* Shared fixed-panel centering for instructional text and ordinary dialogue. */
 void AW_UICenteredLines(int x,int y,int w,int h,const char *text) {

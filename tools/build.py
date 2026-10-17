@@ -526,6 +526,23 @@ def parser():
                    help='Stage fingerprint sources: units (default; the code each stage can reach, hashed per '
                         'reached function), symbols (the same code, whole files hashed) or modules (the first, '
                         'wider method: every import of every imported module)')
+    # Resource plan (tools/resource_plan.py, docs/BUILD_PROFILE.md "Resource plan"): memory and threads per stage
+    # against what the build gets, before the first stage of every build; WILL NOT FIT refuses the build at once.
+    p.add_argument('--resource-plan', action='store_true',
+                   help='Print the resource plan of this build (memory and threads per stage that will run, against '
+                        'what the build gets) and exit; read only, nothing is built. With --check: after the checks')
+    p.add_argument('--resource-plan-json', type=Path, metavar='FILE',
+                   help='With --resource-plan: also write the plan (schema resource-plan-1) to FILE')
+    p.add_argument('--resource-memory-gb', type=float, metavar='GB',
+                   help="The memory the build will run with (e.g. its lease), instead of this container's own limit")
+    p.add_argument('--resource-threads', type=int, metavar='N',
+                   help="The threads the build will run with (e.g. its lease), instead of this container's CPU quota")
+    p.add_argument('--resource-from', action='append', default=[], type=Path, metavar='RUN',
+                   help='Also measure stages from this earlier run (and the runs it reused from); repeatable. '
+                        'Default: the --reuse-from run and the workspace history only')
+    p.add_argument('--resource-check', choices=('fail', 'warn', 'off'), default='fail',
+                   help='fail (default): a stage whose single unit cannot fit the memory refuses the build before '
+                        'any stage; warn: print it and build anyway; off: no resource plan')
     add_font_options(p)
     import npc_lod
     npc_lod.add_options(p)
@@ -1846,6 +1863,99 @@ def execute(steps, run, metadata):
     profile.close(receipt)
 
 
+def resource_plan_document(args, steps, running, got=None):
+    """The resource plan (tools/resource_plan.py) of STEPS of which RUNNING will run, against what the build gets."""
+    import resource_plan
+    got = got or resource_plan.limits(getattr(args, 'resource_memory_gb', None), getattr(args, 'resource_threads', None))
+    gathered = resource_plan.gather(args.reuse_from, args.workspace, getattr(args, 'resource_from', None) or ())
+    doc = resource_plan.plan(steps, running, resolve_jobs(args.jobs), got, gathered, args.reuse_from)
+    line, record = resource_plan.state_line(resolve_jobs(args.jobs),
+                                            max([r['peak_total_mib'] for r in doc['stages']] or [0]))
+    doc['machine'] = record
+    return doc, line
+
+
+RESOURCE_PLAN_EXIT = 5   # a stage's single unit is larger than the memory the build gets
+
+
+def resource_plan_main(args, steps):
+    """`build.py --resource-plan ...`: the checklist of this build, read only (the reuse plan from --reuse-from in
+    seconds, as build.py --reuse-plan). Exit 0 (OK or WILL THROTTLE) or RESOURCE_PLAN_EXIT (WILL NOT FIT)."""
+    import resource_plan
+    names = [name for name, _ in steps]
+    running = set(names)
+    if args.reuse_from:
+        import build_cache
+        try:
+            result = build_cache.predict_preflight(args.reuse_from, getattr(args, 'fingerprint_scope', 'units'))
+            old_steps, _state = build_cache.old_run_steps(Path(args.reuse_from), ROOT)
+            old = {name for name, _ in old_steps}
+            rebuilt = {row['stage'] for row in result.get('rows') or []}
+            running = {name for name in names if name not in old or name in rebuilt}
+            print('Resource plan: reuse plan from %s: %d of %d stages run (%d reused)'
+                  % (args.reuse_from, len(running), len(names), len(names) - len(running)), flush=True)
+        except (OSError, ValueError, KeyError) as exc:
+            print('Resource plan: reuse plan unavailable (%s: %s); every stage counted as running'
+                  % (type(exc).__name__, exc), flush=True)
+    doc, line = resource_plan_document(args, steps, running)
+    print(line, flush=True)
+    for text in resource_plan.checklist(doc):
+        print(text, flush=True)
+    rendered = resource_plan.text(doc)   # validated even when not written
+    out = getattr(args, 'resource_plan_json', None)
+    if out:
+        Path(out).write_text(rendered, encoding='utf-8', newline='\n')
+        print('Resource plan written: %s' % out, flush=True)
+    return RESOURCE_PLAN_EXIT if doc['refusals'] else 0
+
+
+def resource_preflight(args, steps, metadata):
+    """The resource plan before the first stage of every build (input schema rule): printed, recorded as
+    RESOURCE-PLAN.json in the run folder, the stage units handed to the scheduler's memory guard; a stage that
+    WILL NOT FIT refuses the build here (--resource-check fail), before any stage runs."""
+    mode = getattr(args, 'resource_check', 'fail')
+    if mode == 'off' or args.dry_run:
+        print('Resource plan: skipped (%s)' % ('--resource-check off' if mode == 'off' else '--dry-run'), flush=True)
+        return None
+    import resource_plan
+    reused = set((metadata.get('stage_cache') or {}).get('reused') or {})
+    running = {name for name, _ in steps if name not in reused}
+    try:
+        doc, line = resource_plan_document(args, steps, running)
+        rendered = resource_plan.text(doc)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        # a plan that cannot be made is reported, never a reason to stop a build (the stages size themselves)
+        print('Resource plan: could not be made (%s: %s); the build goes on' % (type(exc).__name__, exc), flush=True)
+        return None
+    print(line, flush=True)
+    for item in resource_plan.checklist(doc):
+        print(item, flush=True)
+    metadata.setdefault('_run_files', {})[resource_plan.FILE] = rendered
+    metadata['resource_plan'] = {'file': resource_plan.FILE, 'verdict': doc['verdict'],
+                                 'advisory': (doc['advisory'] or {}).get('text'), 'refusals': doc['refusals']}
+    metadata['resource_plan_units'] = {r['stage']: r['worker_mib'] for r in doc['stages'] if r['worker_mib'] >= 64}
+    if doc['refusals']:
+        if mode == 'fail':
+            raise ValueError('Resource plan refused the build before any stage (WILL NOT FIT):\n  '
+                             + '\n  '.join(doc['refusals']) + '\nGive the build more memory (--memory or its lease) '
+                             'or pass --resource-check warn to build anyway')
+        print('WARNING: resource plan: WILL NOT FIT (--resource-check warn: building anyway): '
+              + '; '.join(doc['refusals']), flush=True)
+    return doc
+
+
+def resource_after_build(args, run):
+    """After a passed build: the actual peaks next to the estimates in RESOURCE-PLAN.json, and the history."""
+    if getattr(args, 'resource_check', 'fail') == 'off' or args.dry_run:
+        return []
+    import resource_plan
+    try:
+        return resource_plan.after_build(run, args.workspace, log=lambda line: print(line, flush=True))
+    except Exception as exc:  # noqa: BLE001 - bookkeeping; never fails a passed build
+        print('Resource plan: actual peaks not recorded (%s: %s)' % (type(exc).__name__, exc), flush=True)
+        return []
+
+
 PERF_GUARD_EXIT = 3   # the stages passed and their outputs are valid; the perf guard failed the build result
 
 
@@ -2868,7 +2978,7 @@ def main(argv=None):
                 recovery = inspect_run(args, ROOT)
         run = ensure_external(args.workspace / "build" / args.name, "build run")
         print(f"Prerequisites passed. Scope: {'asset-free test compile' if args.dry_run else args.stage}; data: {args.data_files}")
-        if args.check:
+        if args.check and not getattr(args, 'resource_plan', False):
             print("Checks completed. No build outputs created. Individual assets are validated during conversion; target performance is not tested here.")
             save_recipe(args, 'planned')
             return 0
@@ -2882,6 +2992,12 @@ def main(argv=None):
             from recover_image import recovery_commands
             steps = recovery_commands(steps, args.recover_image_from.resolve(), run)
             args.serial_stages = True  # Two dependent stages; engine retains its job budget.
+        if getattr(args, 'resource_plan', False):
+            code = resource_plan_main(args, steps)
+            if args.check:
+                print("Checks completed. No build outputs created. Individual assets are validated during conversion; target performance is not tested here.")
+            save_recipe(args, 'planned')
+            return code
         if args.plan:
             for name, command in steps:
                 print(name + ": " + shlex.join(command))
@@ -2987,6 +3103,7 @@ def main(argv=None):
                                     accept_rebuild=getattr(args, 'accept_rebuild', False))
         if args.reuse_from and args.allow_release_reuse:
             metadata['stage_cache']['release_reuse'] = 'allowed: the from-scratch gate runs separately'
+        resource_preflight(args, steps, metadata)
         print(f"Build run: {run}\nLive tool output follows; per-stage logs are saved in {run / 'logs'}.", flush=True)
         live = None
         if args.builder_options['builder'] == 'chim' and args.stage == 'aga' and not args.dry_run and not args.no_cell_progress:
@@ -3019,6 +3136,7 @@ def main(argv=None):
             if args.allow_known_actor_ground_findings and acceptance is None:
                 raise ValueError('Private-test build is missing its actor acceptance receipt')
         size_verdict = size_ledger_step(args, run)
+        resource_after_build(args, run)
         summary.finish('passed', result, actor_acceptance=acceptance)
         save_recipe(args, 'passed')
         if live:

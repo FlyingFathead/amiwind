@@ -34,6 +34,22 @@ static int inv_id(const char *s,int limit){
     while(*s){if((unsigned char)*s<32 || ++n>=limit)return 0;s++;}
     return n>0;
 }
+float AW_LightBurn(const aw_inventory_item_t *item,float remaining,float seconds){
+    if(!item || !(item->flags&AW_INV_LIGHT))return 0;
+    if(item->light_time==AW_LIGHT_INFINITE)return AW_LIGHT_INFINITE;
+    if(!(remaining>0))return 0;
+    if(!(seconds>0))return remaining;
+    remaining-=seconds;return remaining>0?remaining:0;
+}
+int AW_DebugTorchGrant(aw_state_t *s,int enabled){
+    aw_state_t next;
+    if(!s || !enabled || AW_StateGet(s,AW_GLOBAL,AW_DEBUG_TORCH_GRANTED))return 0;
+    /* One transaction: the item and the "given" mark together, or nothing. The mark is a saved
+     * global, so a reload or a second census exit never gives it again. */
+    next=*s;
+    if(!AW_ItemAdd(&next,AW_DEBUG_TORCH_ID,1) || !AW_StateSet(&next,AW_GLOBAL,AW_DEBUG_TORCH_GRANTED,1))return 0;
+    *s=next;return 1;
+}
 int AW_InventoryEquipped(const aw_state_t *s,const char *id){
     int i,n=0;if(!s || !inv_id(id,64))return 0;
     for(i=0;i<AW_INVENTORY_SLOTS;i++)if(!strcmp(s->inventory.equipped[i],id))n++;
@@ -203,11 +219,17 @@ int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
             if(value.enchant_kind>AW_ENCH_CONSTANT || row[497] || row[498] || row[499] ||
                !(value.charge_max>=0 && value.charge_max<=1000000) ||
                (!value.enchant_kind && value.charge_max!=0) || (value.enchant_kind && !value.enchantment[0]))goto bad;
-            {int n;for(n=504;n<512;n++)if(row[n])goto bad;}
+            if(value.flags&AW_INV_LIGHT){
+                /* A carried light: burn time (AW_LIGHT_INFINITE or 1..), colour, radius in subtype. */
+                value.light_time=(int)(int32_t)inv_u32(row+504);value.light_radius=value.subtype;
+                memcpy(value.light_colour,row+508,3);
+                if(row[511] || value.category!=AW_INV_MISC || value.light_radius<1 || value.light_radius>65535 ||
+                   (value.light_time!=AW_LIGHT_INFINITE && (value.light_time<1 || value.light_time>1000000)))goto bad;
+            }else{int n;for(n=504;n<512;n++)if(row[n])goto bad;}
             if(value.category<1 || value.category>7 || value.value<0 ||
                !(value.weight>=0 && value.weight<=1000000) ||
                (value.slots&~((1U<<AW_INVENTORY_SLOTS)-1)) ||
-               (value.flags&~31U) ||
+               (value.flags&~63U) ||
                value.weapon<0 || value.weapon>9 ||
                value.weapon_skill<0 || value.weapon_skill>=27 ||
                !(value.reach>=0 && value.reach<=100) ||

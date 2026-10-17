@@ -1323,6 +1323,9 @@ def build_region(id1, frame, world_dir, world=None, rows=None, hand_fields=None,
     task = region_task(id1, frame, world_dir, world=world, rows=rows, hand_fields=hand_fields)
     data, record, _ = region_map(task)
     record = install_region(id1, task, data, record, keep_catalogues)
+    doors = install_region_doors(id1, task['name'], region_door_rows(world_dir, frame, placed=task['placed']))
+    if doors:
+        record['door_bank'] = doors
     set_region_origins_z(id1, {n: frame['origin'][2] for n in [task['name']] + task['aliases']})
     return record
 
@@ -1338,13 +1341,77 @@ def region_source_sections(world_dir):
     return sections
 
 
+DOOR_BANK = 'AWD3'
+DOOR_LABEL_DEFAULT = 'Exterior world'
+
+
+def region_door_rows(world_dir, frame, rooms=None, placed=None):
+    """The door bank rows (AWD3, engine aw_scene.c read_links_for) of one CHIM region frame: every original load
+    door (DOOR with a destination) the frame's own cell places, its box frame-local ((Morrowind - frame centre)
+    x 0.25, z less the frame origin), its label the destination cell. A door into a converted room (rooms:
+    {original cell casefold: room map}, town_interiors.exterior_link) gets its target and arrival; every other
+    door the target "-", so the engine shows "Interior unavailable" (CHIM-REGION-DOORS-NO-PROMPT-42). Read from
+    the frame's scenery index (WORLD/work/<frame id>/scenery/scenery-index.json); a frame without one is refused
+    unless it places nothing (placed: its CHIM placement references, [] = none: open sea, an empty seabed)."""
+    from town_interiors import exterior_link
+    index_path = Path(world_dir) / 'work' / frame['id'] / 'scenery' / 'scenery-index.json'
+    if not index_path.is_file():
+        if placed is not None and not placed:
+            return []
+        raise ValueError('CHIM region frame %s: no scenery index for its door bank (%s)' % (frame['id'], index_path))
+    index = json.loads(index_path.read_text(encoding='utf-8'))
+    cell = list(frame['cell'])
+    origin = frame['origin']
+    rows = []
+    for ref in sorted(index.get('references') or [], key=lambda r: r['number']):
+        if ref.get('type') != 'DOOR' or not ref.get('destination') or list(ref.get('cell') or []) != cell:
+            continue
+        low, high = ref['bounds']
+        box = [[v * 0.25 - origin[k] for k, v in enumerate(corner)] for corner in (low, high)]
+        label = ref.get('destination_cell') or DOOR_LABEL_DEFAULT
+        if any(c in label for c in '\r\n\t'):
+            raise ValueError('CHIM region frame %s: door %d has an invalid label' % (frame['id'], ref['number']))
+        link = exterior_link(ref, rooms) if rooms else None
+        target, place = ('-', [0, 0, 0, 0]) if link is None else (link[0], [*link[1], link[2]])
+        rows.append({'reference': ref['number'], 'target': target, 'box': box, 'place': place, 'label': label})
+    return rows
+
+
+def door_bank_text(name, rows):
+    """AWD3 text of a door bank: one line per door, source map NAME (the engine compares it with sv.name)."""
+    from town_interiors import BANK_ROWS
+    if len(rows) > BANK_ROWS:
+        raise ValueError('door bank of %s: %d doors, the engine keeps %d' % (name, len(rows), BANK_ROWS))
+    lines = [DOOR_BANK]
+    for r in rows:
+        values = [*r['box'][0], *r['box'][1], *r['place']]
+        lines.append('%s %s %d %s %s' % (name, r['target'], r['reference'], ' '.join('%.5f' % v for v in values),
+                                         r['label']))
+    return '\n'.join(lines) + '\n'
+
+
+def install_region_doors(id1, name, rows):
+    """Write id1/doors-<name>.txt for a region frame map with doors (none written without doors). Returns its
+    record ({'file', 'doors', 'unavailable', 'sha256'}) or None."""
+    if not rows:
+        return None
+    raw = door_bank_text(name, rows).encode('cp1252')
+    path = Path(id1) / ('doors-%s.txt' % name)
+    if path.exists() and path.read_bytes() != raw:
+        raise ValueError('door bank %s already present with other content' % path.name)
+    path.write_bytes(raw)
+    return {'file': path.name, 'doors': len(rows), 'unavailable': sum(1 for r in rows if r['target'] == '-'),
+            'sha256': _sha256(raw)}
+
+
 def build_regions(id1, frames, world_dir, world=None, jobs=1, cache=None, progress=None, rows=None,
-                  hand_fields=None, keep_catalogues=None):
+                  hand_fields=None, keep_catalogues=None, rooms=None):
     """build_region for every CHIM region frame: the frame maps are made on the shared worker pool
     (build_parallel.ordered_map; independent read-only workers) and written here in table order, so the image
     is byte-identical with any worker count (BUILD-IMAGE-CHIM-MAPS-SERIAL-36). cache: a PassCache (region_cache):
     an unchanged frame map (region_inputs, by SHA-256) is taken from it. progress(record, reused): called after
-    each map is written. keep_catalogues: the harvest step's frame map catalogues (install_region). Returns
+    each map is written. keep_catalogues: the harvest step's frame map catalogues (install_region). rooms: the
+    converted rooms by original cell (region_door_rows); each frame with load doors gets its door bank. Returns
     (records, number taken from the cache)."""
     from build_parallel import ordered_map
     id1 = Path(id1)
@@ -1360,6 +1427,10 @@ def build_regions(id1, frames, world_dir, world=None, jobs=1, cache=None, progre
     records, reused, heights = [], 0, {}
     for task, (data, record, hit) in zip(tasks, ordered_map(region_map, tasks, jobs)):
         records.append(install_region(id1, task, data, record, keep_catalogues))
+        # the frame's load doors: a door bank under the map's name, so every door shows its prompt
+        doors = install_region_doors(id1, task['name'], region_door_rows(world_dir, task['frame'], rooms, task['placed']))
+        if doors:
+            records[-1]['door_bank'] = doors
         for n in [task['name']] + task['aliases']:     # a divided cell's alias rows stay equal to its row
             heights[n] = task['frame']['origin'][2]
         reused += bool(hit)

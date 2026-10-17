@@ -138,6 +138,23 @@ class Selection(unittest.TestCase):
         self.assertIn('inside the frame of seyda', dropped[0]['reason'])
         self.assertIn('listed by name', dropped[0]['reason'])
 
+    def test_cells_inside_a_town_frame_close_a_ring_not_open_a_pocket(self):
+        # CHIM-REGION-POCKET-TOWN-CELLS-42: region cells all round a town frame that covers (2,2) wholly: CHIM to
+        # CHIM at every crossing, no legacy pocket; a town box covering only half of (2,2) still leaves a pocket
+        ring = [c for c in self.statuses if c != (2, 2)]
+        whole = {'town': R.cell_box((2, 2))}
+        self.assertEqual(R.town_cells(ring, whole), [(2, 2)])
+        kept, problems, dropped = R.preflight(ring, set(), self.statuses, whole)
+        self.assertFalse(any('legacy pocket' in p for p in problems), problems)
+        x0, y0, x1, y1 = R.cell_box((2, 2))
+        half = {'town': (x0, y0, (x0 + x1) // 2, y1)}
+        self.assertEqual(R.town_cells(ring, half), [])
+        kept, problems, dropped = R.preflight(ring, set(), self.statuses, half)
+        self.assertTrue(any('legacy pocket' in p for p in problems))
+        # two town boxes that together cover the cell count as covering it
+        two = {'a': (x0, y0, (x0 + x1) // 2, y1), 'b': ((x0 + x1) // 2, y0, x1, y1)}
+        self.assertEqual(R.town_cells(ring, two), [(2, 2)])
+
     def test_pockets(self):
         ring = [c for c in self.statuses if c != (2, 2)]
         self.assertEqual(R.holes(ring), [[(2, 2)]])
@@ -283,6 +300,13 @@ class InPlace(unittest.TestCase):
         origin = list(self.frame['origin'][:2]) + [-384.0]
         (self.id1 / 'world/regions.awr').write_bytes(awr([
             (origin, (-1024, -1024, 1024, 1024), (-1920, -1920, 1920, 1920))]))
+        # the CHIM world's scenery index of the frame: one load door of its own cell (the door table's source)
+        x, y = (-7 * 8192 + 4096, 2 * 8192 + 4096)
+        index = Path(self.tmp.name) / 'world' / 'work' / self.frame['id'] / 'scenery'
+        index.mkdir(parents=True)
+        (index / 'scenery-index.json').write_text(json.dumps({'references': [
+            {'cell': [-7, 2], 'number': 501, 'type': 'DOOR', 'destination': {'position': [0, 0, 0]},
+             'destination_cell': 'Test Cave', 'bounds': [[x - 40, y - 8, 380.0], [x + 40, y + 8, 560.0]]}]}))
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -320,6 +344,12 @@ class InPlace(unittest.TestCase):
         finally:
             for p in patches:
                 p.stop()
+        # the frame's load door has its door table under the map's name (CHIM-REGION-DOORS-NO-PROMPT-42)
+        bank = (self.id1 / 'doors-vf0000.txt').read_text(encoding='cp1252').splitlines()
+        self.assertEqual(bank[0], 'AWD3')
+        self.assertEqual(bank[1].split(' ')[:3], ['vf0000', '-', '501'])
+        self.assertTrue(bank[1].endswith(' Test Cave'))
+        self.assertEqual(record['door_bank']['doors'], 1)
         # the frame map keeps the cell's map name with the frame-map extension (tools/map_files.py)
         self.assertEqual(record['map'], 'maps/vf0000.chim')
         self.assertFalse((self.id1 / 'maps/vf0000.bsp').exists())
@@ -434,6 +464,9 @@ class ManyRegions(unittest.TestCase):
             lumps = FM.empty_world((-1920, -1920, -100), (1920, 1920, 900))
             lumps[0] = FM.entity_text(rows)
             (id1 / ('maps/vf%04d.bsp' % i)).write_bytes(F.brush_image(lumps)[0])
+            index = Path(root) / 'world' / 'work' / frames[i]['id'] / 'scenery'
+            index.mkdir(parents=True)
+            (index / 'scenery-index.json').write_text(json.dumps({'references': []}))
         (id1 / 'harvest-vf0001.txt').write_text('AWH4 0\n', encoding='ascii')
         return id1, frames
 

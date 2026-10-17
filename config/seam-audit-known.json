@@ -1,6 +1,6 @@
 {
  "format": "amiwind-seam-audit-known-1",
- "rule": "Known torn meshes (seam torn share above the gate threshold, measured by tools/seam_audit.py on the reference GOG data, 2026-10-09). The builder gate fails on any other reduced mesh above the threshold and on any listed mesh that tears more than recorded. Remove a row when its profile is repaired. Meshes under \"closed\" must show no torn seam or rim at all (repaired bugs).",
+ "rule": "Known torn meshes (seam torn share above the gate threshold, measured by tools/seam_audit.py on the reference GOG data, 2026-10-09). The builder gate fails on any other reduced mesh above the threshold and on any listed mesh that tears more than recorded. Remove a row when its profile is repaired. Meshes under \"closed\" must show no torn seam or rim at all (repaired bugs). A closed row with \"space\" covers only that converter path.",
  "threshold": 0.02,
  "known": [
   {
@@ -139,24 +139,6 @@
    "bug": "MESH-LOD-TORN-MESHES-33"
   },
   {
-   "model": "meshes/f/flora_bc_mushroom_02.nif",
-   "space": "town",
-   "seam_torn_share": 0.54204,
-   "rim_torn_share": 0.83333,
-   "placements": 70,
-   "ratio": 0.8,
-   "bug": "MESH-LOD-TORN-MESHES-33"
-  },
-  {
-   "model": "meshes/f/flora_emp_parasol_02.nif",
-   "space": "town",
-   "seam_torn_share": 0.52572,
-   "rim_torn_share": 0.29902,
-   "placements": 238,
-   "ratio": 0.1964,
-   "bug": "MESH-LOD-TORN-MESHES-33"
-  },
-  {
    "model": "meshes/x/terrain_ashland_rock_10.nif",
    "space": "world",
    "seam_torn_share": 0.51334,
@@ -199,15 +181,6 @@
    "rim_torn_share": 0.89172,
    "placements": 376,
    "ratio": 0.2667,
-   "bug": "MESH-LOD-TORN-MESHES-33"
-  },
-  {
-   "model": "meshes/f/flora_emp_parasol_03.nif",
-   "space": "town",
-   "seam_torn_share": 0.41089,
-   "rim_torn_share": 0.58719,
-   "placements": 271,
-   "ratio": 0.2381,
    "bug": "MESH-LOD-TORN-MESHES-33"
   },
   {
@@ -265,39 +238,12 @@
    "bug": "MESH-LOD-TORN-MESHES-33"
   },
   {
-   "model": "meshes/f/flora_emp_parasol_01.nif",
-   "space": "town",
-   "seam_torn_share": 0.32593,
-   "rim_torn_share": 0.53442,
-   "placements": 191,
-   "ratio": 0.2804,
-   "bug": "MESH-LOD-TORN-MESHES-33"
-  },
-  {
    "model": "meshes/x/flora_ashtree_03.nif",
    "space": "town",
    "seam_torn_share": 0.32509,
    "rim_torn_share": 0.41455,
    "placements": 659,
    "ratio": 0.2048,
-   "bug": "MESH-LOD-TORN-MESHES-33"
-  },
-  {
-   "model": "meshes/x/flora_t_mushroom_01.nif",
-   "space": "town",
-   "seam_torn_share": 0.28984,
-   "rim_torn_share": 0.33539,
-   "placements": 48,
-   "ratio": 0.4478,
-   "bug": "MESH-LOD-TORN-MESHES-33"
-  },
-  {
-   "model": "meshes/x/flora_t_mushroom_02.nif",
-   "space": "town",
-   "seam_torn_share": 0.25726,
-   "rim_torn_share": 0.7632,
-   "placements": 76,
-   "ratio": 0.4478,
    "bug": "MESH-LOD-TORN-MESHES-33"
   },
   {
@@ -316,15 +262,6 @@
    "rim_torn_share": 0.0,
    "placements": 38,
    "ratio": 0.1734,
-   "bug": "MESH-LOD-TORN-MESHES-33"
-  },
-  {
-   "model": "meshes/x/flora_t_shelffungus_01.nif",
-   "space": "town",
-   "seam_torn_share": 0.18283,
-   "rim_torn_share": 0.31757,
-   "placements": 11,
-   "ratio": 0.75,
    "bug": "MESH-LOD-TORN-MESHES-33"
   },
   {
@@ -450,6 +387,90 @@
    "model": "meshes/r/siltstrider.nif",
    "bug": "MESH-LOD-OPEN-SEAMS-33",
    "rule": "the caravan Silt Strider is a solid object: no torn seam or rim after reduction"
+  },
+  {
+   "model": "meshes/f/flora_emp_parasol_01.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/f/flora_emp_parasol_02.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/f/flora_emp_parasol_03.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/x/flora_t_mushroom_01.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/x/flora_t_mushroom_02.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/f/flora_bc_mushroom_01.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/f/flora_bc_mushroom_02.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/f/flora_bc_mushroom_03.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/f/flora_bc_mushroom_04.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/f/flora_bc_mushroom_05.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/f/flora_bc_mushroom_06.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/f/flora_bc_mushroom_07.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/f/flora_bc_mushroom_08.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
+  },
+  {
+   "model": "meshes/x/flora_t_shelffungus_01.nif",
+   "space": "town",
+   "bug": "MESH-VIVEC-CAP-GAP-38",
+   "rule": "mushroom caps in towns and CHIM areas: reduced with the boundary lock, no torn seam or rim"
   }
  ]
 }

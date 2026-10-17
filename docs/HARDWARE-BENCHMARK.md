@@ -195,7 +195,10 @@ places you on the ground there):
 | Seyda Neen 4 | `dbg tp -10920 -75120`, then `aw_aim 0 0` |
 | Seyda Neen 5 | `dbg tp -12200 -72500`, then `aw_aim 60 0` |
 
-Before measuring: `dbg daynightcycle off`, `dbg set time 1200`, `dbg headlamp off`.
+Before measuring: `dbg daynightcycle off`, `dbg set time 1200`, `dbg headlamp off`, and
+`dbg cull 1` (far detail Full: every earlier measurement was taken with it; from v0.0.42 the
+game's default is Strong, which draws less; say which one you used, see
+[the far test](performance/FAR-TEST.md)).
 The same cameras are camera marks: `dbg cam recall bm1` to `bm5` and `sn1` to `sn5` do this setup and the
 teleport in one command, and recalling the mark again once the scene has settled sets the view, as `aw_aim` does
 ([CAMERA_MARKS.md](CAMERA_MARKS.md)).

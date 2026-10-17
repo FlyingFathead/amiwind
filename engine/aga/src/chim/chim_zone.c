@@ -135,6 +135,69 @@ int ChimZone_BankBytes (int bank)
 	return bank >= 0 && bank < numbanks && banks[bank].first ? banks[bank].size : 0;
 }
 
+/* Allocated blocks in a bank (0: empty or no such bank). */
+int ChimZone_BankUsed (int bank)
+{
+	chim_block_t *b;
+	int n = 0;
+	if (bank < 0 || bank >= numbanks || !banks[bank].first)
+		return 0;
+	for (b=banks[bank].first ; b ; b=b->next)
+		n += b->kind != 0;
+	return n;
+}
+
+/* A free block with at least bytes of data in any bank: the test
+ * ChimZone_Stats' largest_free >= bytes, stopping at the first such block
+ * (a large cache bank holds thousands of blocks). */
+int ChimZone_HasFree (int bytes)
+{
+	chim_block_t *b;
+	int i;
+	for (i=0 ; i<numbanks ; i++)
+		for (b=banks[i].first ; b ; b=b->next)
+			if (!b->kind && b->size - CHIM_HEADER >= bytes)
+				return 1;
+	return 0;
+}
+
+/* ------------------------------------------------- automatic extra memory */
+
+unsigned long ChimZone_AutoMargin (unsigned long total)
+{
+	return CHIM_AUTO_FLOOR + total / 8;
+}
+
+unsigned long ChimZone_AutoBudget (unsigned long free_bytes, unsigned long total)
+{
+	unsigned long margin = ChimZone_AutoMargin (total);
+	return free_bytes > margin ? free_bytes - margin : 0;
+}
+
+unsigned long ChimZone_AutoStep (unsigned long largest, unsigned long *budget, int first)
+{
+	unsigned long size, keep = first ? CHIM_AUTO_KEEP : 0;
+	if (!budget || largest <= keep)
+		return 0;
+	size = largest - keep;
+	if (size > *budget)
+		size = *budget;
+	if (size > CHIM_AUTO_BANK_MAX)
+		size = CHIM_AUTO_BANK_MAX;
+	size &= ~(CHIM_AUTO_MIB - 1);
+	if (size < (first ? CHIM_AUTO_FIRST : CHIM_AUTO_NEXT))
+		return 0;
+	*budget -= size;
+	return size;
+}
+
+/* Chunks fetched ahead in the direction of travel, in prefetch margins: one
+ * (the world's own) without extra memory, two from 8 MiB, three from 32 MiB. */
+int ChimZone_AutoLookahead (unsigned long auto_bytes)
+{
+	return auto_bytes >= 32UL*CHIM_AUTO_MIB ? 3 : auto_bytes >= CHIM_AUTO_FIRST ? 2 : 1;
+}
+
 /* Merge b with a free successor; b must be free. */
 static void MergeNext (chim_block_t *b)
 {
@@ -328,6 +391,30 @@ int ChimZone_LargestUnlocked (void)
 	return best > CHIM_HEADER ? best - CHIM_HEADER : 0;
 }
 
+/* Whether a request of need bytes (header included, as ChimZone_Failures
+ * reports it) would fit a run of unlocked blocks once each listed block gave
+ * up one lock per time it is listed (the locks a chunk's release drops,
+ * chim_chunks.c Release). Nothing changes: the locks are lowered for the
+ * count and put back. A block listed more often than it is locked counts as
+ * unlocked. */
+int ChimZone_FitsWithout (int need, void **unlock, int n)
+{
+	chim_block_t *b;
+	int i, run, best = 0;
+	for (i=0 ; i<n ; i++)
+		Block (unlock[i])->locks--;
+	for (i=0 ; i<numbanks ; i++)
+		for (run=0, b=banks[i].first ; b ; b=b->next)
+		{
+			run = b->kind && b->locks > 0 ? 0 : run + b->size;
+			if (run > best)
+				best = run;
+		}
+	for (i=0 ; i<n ; i++)
+		Block (unlock[i])->locks++;
+	return need <= best;
+}
+
 /* The bank's layout for the console (the first failed request of a map,
  * all of them with chim_debug): one entry per block in address order, kind
  * letter (. free, I index, B buffer, M model, C chunk, T terrain, X
@@ -337,17 +424,26 @@ void ChimZone_Map (void (*print)(const char *line))
 	static const char letters[] = ".IBMCTXWS";
 	char line[96];
 	chim_block_t *b;
-	int i, n;
+	int i, n, lines, more;
 	for (i=0 ; i<numbanks ; i++)
 	{
 		if (!banks[i].first)
 			continue;
 		n = sprintf (line, "bank %d:", i);
+		lines = 0;
 		for (b=banks[i].first ; b ; b=b->next)
 		{
 			if (n > 80)
 			{
 				print (line);
+				/* A large cache bank: its first lines only. */
+				if (banks[i].persistent && ++lines >= 16)
+				{
+					for (more=0 ; b ; b=b->next)
+						more++;
+					sprintf (line, "  ... %d more blocks", more);
+					break;
+				}
 				n = sprintf (line, "  ");
 			}
 			n += sprintf (line + n, " %c%d%s", letters[b->kind < CHIM_KINDS ? b->kind : 0], (b->size + 1023) / 1024,

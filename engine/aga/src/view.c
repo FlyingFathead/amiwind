@@ -122,12 +122,27 @@ V_CalcBob
 
 ===============
 */
+/* NOCLIP-BOB-DEFAULT-42: noclip has no walking bob and no movement roll unless aw_noclipwobble 1. The local
+ * player's movetype decides, not only Quake's noclip_anglehack: the client clears that flag on every map load
+ * (cl_parse.c serverinfo), so after a CHIM frame or region change, a save load or an arrival the player still
+ * flew in noclip with the bob back on. Leaving noclip uses the player's own cl_bob and cl_rollangle again;
+ * nothing is forced or saved. */
+int V_NoclipSteady (void)
+{
+    if (aw_noclipwobble.value == 1)
+        return 0;
+    if (noclip_anglehack)
+        return 1;
+    return sv.active && svs.maxclients == 1 && svs.clients && svs.clients[0].edict &&
+        svs.clients[0].edict->v.movetype == MOVETYPE_NOCLIP;
+}
+
 float V_CalcBob (void)
 {
     float	bob;
     float	cycle;
 
-    if(noclip_anglehack && aw_noclipwobble.value != 1)return 0;
+    if(V_NoclipSteady())return 0;
 
     cycle = cl.time - (int)(cl.time/cl_bobcycle.value)*cl_bobcycle.value;
     cycle /= cl_bobcycle.value;
@@ -894,7 +909,7 @@ void V_CalcViewRoll (void)
 {
     float		side;
 
-    side = (noclip_anglehack && aw_noclipwobble.value != 1) ? 0 :
+    side = V_NoclipSteady () ? 0 :
         V_CalcRoll (cl_entities[cl.viewentity].angles, cl.velocity);
     r_refdef.viewangles[ROLL] += side;
 

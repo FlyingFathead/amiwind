@@ -78,6 +78,8 @@ static model_t *torch_model;
 static unsigned int torch_duration;
 static double torch_animation_offset;
 int (*aw_view_torch_emitter)(vec3_t out);
+/* aw_debug_torch.c: 1 while a carried light from the inventory (the debug torch) is equipped. */
+int (*aw_torch_item_lit)(void);
 int (*aw_view_torch_light)(vec3_t out);
 double AW_TorchAnimationTime(void)
 {
@@ -180,6 +182,21 @@ static int phase(void)
 {
     return (int)floor(fmod(AW_TorchAnimationTime(),1.0)*8);
 }
+/* Equipping the inventory light lights the carried torch and unequipping puts it out, as a
+ * torch in the left hand; V still toggles it. The game rules put the torch out whenever the
+ * hands are down (world.qc), so it is lit again when the hands come up. Only changes (equip,
+ * hands, a new scene) write the field, so V keeps working while it is equipped. */
+static void item_torch(void)
+{
+    static int was_lit,was_raised;static model_t *world;
+    edict_t *p=torch_player();eval_t *v;int lit,raised;
+    if(!aw_torch_item_lit || !p)return;
+    lit=aw_torch_item_lit()!=0;raised=hand_state(p)!=0;
+    if(lit==was_lit && raised==was_raised && world==sv.worldmodel)return;
+    v=GetEdictFieldValue(p,"aw_torch");
+    if(v){if(lit && raised)v->_float=1;else if(!lit && was_lit)v->_float=0;}
+    was_lit=lit;was_raised=raised;world=sv.worldmodel;
+}
 void AW_TorchUpdate(void)
 {
     static const float radius[8]={144,147,142,146,143,148,144,141};
@@ -187,6 +204,7 @@ void AW_TorchUpdate(void)
     int torch;
     AW_GuardTorchUpdate();
     AW_LampUpdate();
+    item_torch();
     torch=AW_TorchEquipped();
     if(!torch && !aw_headlamp.value){extinguish();return;}
     light=CL_AllocDlight(AW_TORCH_LIGHT);

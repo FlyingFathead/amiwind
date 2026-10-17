@@ -71,6 +71,10 @@ void (*aw_chim_player)(vec3_t);
 int (*aw_chim_frozen)(edict_t *);
 void (*aw_chim_spawn)(vec3_t);
 int (*aw_chim_floor)(const vec3_t origin, float *lowest, float *surface);	/* aw_walk.c (the terrain floor hook chim_far.c sets) */
+int (*aw_chim_memory)(int op, char *first, char *second, int size);	/* aw_movie.c (extra Fast RAM, chim_world.c sets it) */
+extern unsigned long (*chim_fast_avail)(int which);
+extern void *(*chim_fast_alloc)(unsigned long bytes);
+extern void (*chim_fast_free)(void *memory, unsigned long bytes);
 const char *(*aw_chim_town_map)(const char *);
 mleaf_t *r_viewleaf, *r_oldviewleaf;
 int (*aw_chim_rcount)(char *out, int size, long frames);
@@ -149,7 +153,7 @@ static cvar_t *cvars[48];static int numcvars;
 /* As cvar.c: a second registration of the same variable is refused. */
 void Cvar_RegisterVariable(cvar_t *v){
     int i;for(i=0;i<numcvars;i++)if(cvars[i]==v)return;
-    assert(numcvars<48);v->value=(float)atof(v->string);cvars[numcvars++]=v;
+    assert(numcvars<64);v->value=(float)atof(v->string);cvars[numcvars++]=v;
 }
 static void set_cvar(const char *name,float value){
     int i;for(i=0;i<numcvars;i++)if(!strcmp(cvars[i]->name,name)){cvars[i]->value=value;return;}
@@ -207,6 +211,7 @@ void AW_UISubtitle(const char *name,const char *text,double duration){strncpy(su
 int (*aw_chim_view_reach)(void);
 /* aw_hud.c: original coordinates on the active frame (the debug HUD's GLOBAL row and cell). */
 int (*aw_chim_source)(const float *local,float *world);
+int (*aw_chim_pick)(const float *start,const float *end,aw_chim_pick_t *out);	/* aw_inspect.c (the dbg hud pin) */
 /* aw_fog.c's far terrain hook and aw_horizon.c's grid rasterizer (tested in
  * aga_chim_far_test.c): here only that the frame's layer is handed over. */
 void (*aw_chim_far_draw)(byte colour,int distance);
@@ -468,7 +473,7 @@ static void same_trace(const trace_t *a,const trace_t *b){
 static void legacy(void){
     reset_engine();Chim_Init();
     assert(!aw_chim_map_begin && !aw_chim_link && !aw_chim_clip && !aw_chim_player && !aw_chim_map_end);
-    assert(!aw_chim_frozen && !aw_chim_spawn && !aw_chim_rcount && !aw_chim_town_map && !aw_chim_source);
+    assert(!aw_chim_frozen && !aw_chim_spawn && !aw_chim_rcount && !aw_chim_town_map && !aw_chim_source && !aw_chim_pick);
     begin_map(frame_map);frame_at(0,0,40);
     assert(!Chim_Active() && low==0 && opens==0);
     printf("legacy ok\n");
@@ -477,6 +482,7 @@ static void legacy(void){
 static void inactive(void){
     reset_engine();Chim_Init();
     assert(aw_chim_map_begin && aw_chim_link && aw_chim_clip && aw_chim_player && aw_chim_map_end);
+    assert(aw_chim_pick);
     assert(aw_chim_frozen && aw_chim_spawn && aw_chim_rcount && aw_chim_town_map && aw_chim_source);
     {float l[3]={1,2,3},w[3];assert(!aw_chim_source(l,w));} /* no frame map yet */
     {   /* A town runs as its CHIM frame map when maps/<town>-chim.bsp exists. */
@@ -537,7 +543,7 @@ static void ring(void){
     {
         chim_zone_stats_t s;ChimZone_Stats(&s);
         assert(s.kind_blocks[CHIM_KIND_MODEL]==models);
-        printf("zone: used=%d models=%d/%d textures=%d/%d chunks=%d/%d terrain=%d/%d index=%d buffer=%d\n",
+        printf("zone: used=%lu models=%d/%lu textures=%d/%lu chunks=%d/%lu terrain=%d/%lu index=%lu buffer=%lu\n",
             s.used_bytes,s.kind_blocks[CHIM_KIND_MODEL],s.kind_bytes[CHIM_KIND_MODEL],
             s.kind_blocks[CHIM_KIND_TEXTURE],s.kind_bytes[CHIM_KIND_TEXTURE],
             s.kind_blocks[CHIM_KIND_CHUNK],s.kind_bytes[CHIM_KIND_CHUNK],
@@ -605,6 +611,20 @@ static void ring(void){
         VectorCopy(p->ent.origin,b);b[2]+=20;
         t=chim_trace(a,mins,maxs,b);r=reference(p->ent.model,p->ent.origin,45,a,mins,maxs,b);
         assert(t.fraction<1);same_trace(&t,&r);
+    }
+    /* dbg hud pin (INSPECT-CHIM-PLACEMENT-UNNAMED-42): a point ray onto pid 3 names that placement
+     * record (reference, cell, model name from the index) at the point-hull trace's distance; a ray
+     * that misses every placement names nothing. */
+    {
+        aw_chim_pick_t hit;vec3_t zero={0,0,0};
+        VectorSet(a,p->ent.origin[0]+60,p->ent.origin[1],p->ent.origin[2]+20);
+        VectorCopy(p->ent.origin,b);b[2]+=20;
+        r=reference(p->ent.model,p->ent.origin,45,a,zero,zero,b);assert(r.fraction<1);
+        assert(aw_chim_pick(a,b,&hit)==1 && hit.pid==p->pid && hit.ref==1000+p->pid-chim_frame.first_pid && hit.model==1);
+        assert(fabs(hit.fraction-r.fraction)<1e-4 && !strcmp(hit.name,"m1") && hit.cell_x==0 && hit.cell_y==0);
+        assert(close3(hit.origin,p->ent.origin) && hit.yaw==45);
+        VectorSet(a,100,-15,200);VectorSet(b,100,-15,150);
+        assert(aw_chim_pick(a,b,&hit)==0 && !hit.name[0]);
     }
     /* Terrain is the world's hull: ground at z = 0, also across a chunk edge. */
     VectorSet(a,100,-15,200);VectorSet(b,100,-15,-100);
@@ -830,8 +850,79 @@ static void fullzone(void){
     assert(chim_world.model_loads-loads0<=8);
     for(i=0;i<n;i++){ChimZone_Unlock(hog[i].data);ChimZone_Free(&hog[i]);}
     end_map();
-    set_cvar("chim_release",1);set_cvar("chim_partial",1);
+    set_cvar("chim_release",2);set_cvar("chim_partial",1);
     printf("fullzone ok%c",10);
+}
+
+/* CHIM-ZONE-RELEASE-FLICKER-42 (Ebonheart, v0.0.42-dev1): a zone whose free
+ * room is split by locked blocks, a nearer chunk short of one model, the
+ * player standing still. Releasing the farther active chunks cannot make one
+ * run large enough, so none may go: the first method (CHIM_RELEASE=1)
+ * released them all for a request that still failed and they came back 50
+ * ticks later, so the drawn set changed while nothing moved. chim_release 2
+ * keeps the drawn set the same on every tick. Then the room comes back in
+ * one piece: a release that does help still happens, and the model loads. */
+static unsigned long active_hash(void){
+    unsigned long h=5381;int i;
+    for(i=0;i<chim_frame.count;i++)if(chim_frame.entries[i].state==CHIM_STATE_ACTIVE)h=h*33+(unsigned long)i+1;
+    return h;
+}
+static void flicker(void){
+    static chim_user_t hog[64];
+    int ticks,i,n=0,k,changes=0,mode=getenv("CHIM_RELEASE")?atoi(getenv("CHIM_RELEASE")):2;
+    unsigned long band,ring,partial,zone,data,released0,refused0,h,last;chim_zone_stats_t s;
+    reset_engine();Chim_Init();
+    set_cvar("chim_zone_kib",256);set_cvar("chim_reserve_kib",0);set_cvar("chim_release",(float)mode);
+    begin_map(frame_map);assert(Chim_Active());
+    for(ticks=0;ticks<60;ticks++)frame_at(32,32,40);
+    check_once();
+    for(k=1;k<CHIM_KINDS;k++)ChimZone_EvictKind(k,NULL);
+    for(ChimZone_Stats(&s);s.largest_free>30*1024 && n<64;ChimZone_Stats(&s),n++){
+        assert(ChimZone_Alloc(&hog[n],s.largest_free-30*1024,CHIM_KIND_BUFFER,99));
+        ChimZone_Lock(hog[n].data);
+    }
+    /* to the pond chunk, where model 2 stands: it finds no room */
+    for(ticks=0;ticks<120;ticks++)frame_at(-330,-300,40);
+    ChimChunks_Pressure(&band,&ring,&partial,&zone,&data);
+    released0=band+ring;refused0=chim_release_refused;last=active_hash();
+    for(ticks=0;ticks<300;ticks++){
+        frame_at(-330,-300,40);
+        h=active_hash();if(h!=last){changes++;if(getenv("CHIM_VERBOSE"))printf("flicker: tick %d active set changed (%d active)%c",ticks,active_count(),10);}last=h;
+    }
+    check_once();
+    ChimChunks_Pressure(&band,&ring,&partial,&zone,&data);
+    printf("flicker chim_release %d: %d changes of the active set in 300 still ticks; released %lu, refused %lu, failed for room %lu%c",
+        mode,changes,band+ring-released0,chim_release_refused-refused0,zone,10);
+    assert(zone>0 && !data);
+    if(mode>=2)assert(changes==0 && band+ring==released0 && chim_release_refused>refused0);
+    else assert(changes>0 && band+ring>released0);
+    /* The room comes back in one piece: model 2 loads, no hole, no churn. */
+    for(i=0;i<n;i++){ChimZone_Unlock(hog[i].data);ChimZone_Free(&hog[i]);}
+    for(ticks=0;ticks<120;ticks++)frame_at(-330,-300,40);
+    check_once();
+    assert(ChimModels_Find(2));
+    end_map();
+    set_cvar("chim_release",2);
+    printf("flicker ok%c",10);
+}
+
+/* CHIM-ZONE-RELEASE-FLICKER-42: the index keeps file rows without their
+ * paths when the row gives the path back, and every row still opens; built
+ * with CHIM_INDEX_KEEP_PATHS 1 (the first method) it keeps every path. */
+static void paths(void){
+    chim_zone_stats_t s;int i;
+    reset_engine();Chim_Init();
+    begin_map(frame_map);assert(Chim_Active());
+    for(i=0;i<chim_world.files;i++){
+        const char *p=Chim_FilePath(i);
+        assert(p && !strncmp(p,"frames/",7));
+        assert(Chim_File(i));
+    }
+    assert(!chim_world.paths==!CHIM_INDEX_KEEP_PATHS);
+    ChimZone_Stats(&s);
+    printf("paths: keep %d: %d files, index blocks %ld bytes%c",CHIM_INDEX_KEEP_PATHS,chim_world.files,(long)s.kind_bytes[CHIM_KIND_INDEX],10);
+    end_map();
+    printf("paths ok%c",10);
 }
 
 /* The spawn hook loads and grafts the ring around the arrival point at
@@ -897,6 +988,87 @@ static void bigframe(void){
 }
 
 /* -chimcache: models and textures in the persistent bank survive the map. */
+/* Automatic extra memory (chim_world.c Chim_MemoryStart, through the
+ * aw_chim_memory hook aw_movie.c calls at start-up): a fake Fast RAM of one
+ * or more regions; the 16 MiB baseline takes nothing; 128 MiB takes the free
+ * RAM beyond the margin as cache banks that keep models across a map change
+ * and scale the look-ahead; a failed allocation gives everything back; the
+ * setting, -chimcache and the notice's skip key. */
+static unsigned long fake_region[4],fake_total;static int fake_regions,fake_fail_at,fake_allocs;
+static unsigned long fake_avail(int which){
+    unsigned long sum=0,largest=0;int i;
+    for(i=0;i<fake_regions;i++){sum+=fake_region[i];if(fake_region[i]>largest)largest=fake_region[i];}
+    return which==2?fake_total:which==1?largest:sum;
+}
+static void *fake_alloc(unsigned long bytes){
+    int i,best=-1;
+    if(++fake_allocs==fake_fail_at)return NULL;
+    for(i=0;i<fake_regions;i++)if(fake_region[i]>=bytes && (best<0 || fake_region[i]>fake_region[best]))best=i;
+    if(best<0)return NULL;
+    fake_region[best]-=bytes;return malloc(bytes);
+}
+static void fake_free(void *p,unsigned long bytes){(void)bytes;free(p);}
+static void fake_machine(unsigned long total_mib,unsigned long free_mib,unsigned long second_mib){
+    fake_total=total_mib<<20;fake_region[0]=free_mib<<20;fake_region[1]=second_mib<<20;
+    fake_regions=second_mib?2:1;fake_allocs=0;fake_fail_at=0;
+}
+static void memory_start(void){
+    console_used=0;console[0]=0;console_capture=1;
+    assert(aw_chim_memory);aw_chim_memory(0,NULL,NULL,0);console_capture=0;
+    printf("%s",console);
+}
+static void autoram(void){
+    chim_zone_stats_t s;unsigned long loads;int ticks;char a[48],b[48];
+    chim_fast_avail=fake_avail;chim_fast_alloc=fake_alloc;chim_fast_free=fake_free;
+    /* 16 MiB Fast RAM, 11 MiB heap: about 4.5 MiB free; nothing taken, no notice, look-ahead as before. */
+    fake_machine(16,4,0);fake_region[0]+=512*1024;
+    reset_engine();Chim_Init();memory_start();
+    assert(strstr(console,"CHIM cache off (not enough extra Fast RAM, standard memory)"));
+    ChimZone_Stats(&s);assert(s.banks==0 && fake_allocs==0 && Chim_LookaheadScale()==1);
+    assert(!aw_chim_memory(1,a,b,sizeof(a)));
+    begin_map(frame_map);for(ticks=0;ticks<5;ticks++)frame_at(64,64,40);
+    ChimZone_Stats(&s);assert(s.banks==1);end_map();
+    /* 128 MiB in two regions (an accelerator and a Zorro III card): both become banks. */
+    fake_machine(128,64,51);
+    reset_engine();Chim_Init();memory_start();
+    assert(strstr(console,"Memory: 115 MiB Fast RAM free of 128 MiB; CHIM cache 97 MiB in 2 banks (automatic); look-ahead x3"));
+    ChimZone_Stats(&s);assert(s.banks==2 && s.free_bytes>96ul<<20 && Chim_LookaheadScale()==3);
+    assert(aw_chim_memory(1,a,b,sizeof(a)) && !strcmp(a,"Extra Fast RAM: 115 MiB free") && !strcmp(b,"97 MiB for CHIM caches. M: not now"));
+    begin_map(frame_map);for(ticks=0;ticks<5;ticks++)frame_at(64,64,40);
+    loads=chim_world.model_loads;assert(loads>0);
+    console_used=0;console[0]=0;console_capture=1;assert(!aw_chim_memory(2,NULL,NULL,0));console_capture=0;
+    assert(strstr(console,"in use; it stays"));
+    end_map();
+    ChimZone_Stats(&s);assert(s.banks==2 && s.kind_blocks[CHIM_KIND_MODEL]>0 && !s.kind_blocks[CHIM_KIND_CHUNK]);
+    begin_map(frame_map);for(ticks=0;ticks<5;ticks++)frame_at(64,64,40);
+    assert(chim_world.model_loads==loads);check_once();end_map();
+    /* The second allocation fails: what was taken goes back, the start plays on the standard memory. */
+    fake_machine(128,64,51);fake_fail_at=2;
+    reset_engine();Chim_Init();memory_start();
+    assert(strstr(console,"could not be taken; playing on the standard memory"));
+    assert(strstr(console,"CHIM cache off (allocation failed, standard memory)"));
+    ChimZone_Stats(&s);assert(s.banks==0 && Chim_LookaheadScale()==1);
+    /* Options > Extra RAM off (aw_autoram 0, saved in config.cfg). */
+    fake_machine(128,115,0);
+    reset_engine();Chim_Init();set_cvar("aw_autoram",0);memory_start();set_cvar("aw_autoram",1);
+    assert(strstr(console,"CHIM cache off (turned off: aw_autoram 0") && fake_allocs==0);
+    /* -chimcache decides by hand: no automatic bank. */
+    fake_machine(128,115,0);com_argc=3;argv_storage[1]="-chimcache";argv_storage[2]="2048";
+    reset_engine();Chim_Init();memory_start();com_argc=1;
+    assert(strstr(console,"CHIM cache 2 MiB (-chimcache)") && fake_allocs==0);
+    /* The notice's key before any map: the banks go, this start is the baseline. */
+    fake_machine(512,499,0);
+    reset_engine();Chim_Init();memory_start();
+    assert(strstr(console,"CHIM cache 433 MiB in 1 bank (automatic)"));
+    console_used=0;console[0]=0;console_capture=1;assert(aw_chim_memory(2,NULL,NULL,0));console_capture=0;
+    assert(strstr(console,"CHIM cache off (skipped for this start)"));
+    ChimZone_Stats(&s);assert(s.banks==0 && fake_allocs==1 && !aw_chim_memory(1,a,b,sizeof(a)));
+    /* Measured once per start. */
+    memory_start();assert(!console[0]);
+    chim_fast_avail=NULL;chim_fast_alloc=NULL;chim_fast_free=NULL;
+    printf("autoram ok\n");
+}
+
 static void cache(void){
     unsigned long loads;int ticks;
     com_argc=3;argv_storage[1]="-chimcache";argv_storage[2]="2048";
@@ -1648,7 +1820,7 @@ static void pin(void){
 /* Overwrite 4 bytes of a CHIM file at [offset] (the index's file row). */
 static void poke(int row,long offset,int value){
     char path[256];FILE *f;
-    snprintf(path,sizeof path,"chim/%s",chim_world.file[row].path);
+    snprintf(path,sizeof path,"chim/%s",Chim_FilePath(row));
     f=fopen(path,"r+b");assert(f);assert(!fseek(f,offset,SEEK_SET));
     assert(fwrite(&value,1,4,f)==4);fclose(f);
 }
@@ -1755,7 +1927,10 @@ int main(int argc,char **argv){
     else if(!strcmp(argv[1],"ring"))ring();
     else if(!strcmp(argv[1],"evict"))evict();
     else if(!strcmp(argv[1],"fullzone"))fullzone();
+    else if(!strcmp(argv[1],"flicker"))flicker();
+    else if(!strcmp(argv[1],"paths"))paths();
     else if(!strcmp(argv[1],"cache"))cache();
+    else if(!strcmp(argv[1],"autoram"))autoram();
     else if(!strcmp(argv[1],"spawn"))spawn();
     else if(!strcmp(argv[1],"bigframe"))bigframe();
     else if(!strcmp(argv[1],"seam"))seam();

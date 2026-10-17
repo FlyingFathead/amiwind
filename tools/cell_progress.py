@@ -1113,7 +1113,10 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     # it: the base master's sea is Vvardenfell's map), else of any set (Chebyshev distance, then the lower island).
     placed = [(parse_cell(k), r['island'], r.get('set')) for k, r in cells.items() if r.get('island')]
     for k, rec in cells.items():
-        if rec['chim'].get('ocean') and not rec.get('island') and placed:
+        # a seabed cell measured as empty sea (CHIMport) is a sea cell too: without an island it would drop out of the
+        # published reference and the build's regions preflight would call it unknown (CHIMPORT-SEABED-NO-ISLAND-42)
+        sea = rec['chim'].get('ocean') or (not rec['land'] and rec['chim'].get('empty'))
+        if sea and not rec.get('island') and placed:
             x, y = parse_cell(k)
             mine = [p for p in placed if rec.get('set') and p[2] == rec['set']] or placed
             rec['island'] = min(mine, key=lambda p: (max(abs(p[0][0] - x), abs(p[0][1] - y)), p[1]))[1]

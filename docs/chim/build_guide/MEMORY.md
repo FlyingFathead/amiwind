@@ -14,6 +14,7 @@ On a real Amiga with more Fast RAM: [real hardware](../../REAL_HARDWARE.md) (cac
 - [Fragmentation](#fragmentation)
 - [What the builder checks](#what-the-builder-checks)
 - [Choosing another heap size: `--heap-mb N`](#choosing-another-heap-size---heap-mb-n)
+- [More Fast RAM: the automatic CHIM cache](#more-fast-ram-the-automatic-chim-cache)
 - [Reading the numbers](#reading-the-numbers)
 
 <!-- contents end -->
@@ -133,8 +134,11 @@ piece large enough for one house model. Three rules keep the room in one piece:
 - blocks smaller than `chim_zone_ends` (64 KiB) are taken from the zone's high end, larger ones from
   the low end, so small locked blocks (textures, catalogues, terrain) do not split the room large
   models need;
-- with `chim_release 1`, a chunk that finds no room lets go of the active chunk farthest from the
-  player (outside the collision margin) and tries again;
+- with `chim_release 2` (the default), a chunk that finds no room lets go of exactly the farther active
+  chunks (farthest first, outside the collision margin) whose blocks make its request fit one run, and
+  of none when that cannot work; `chim_release 1`, the first method, let them go one by one even when
+  the request still failed, and they came back 50 ticks later
+  ([CHIM-ZONE-RELEASE-FLICKER-42](../../bugs/CHIM-ZONE-RELEASE-FLICKER-42.md));
 - with `chim_partial 1`, a chunk whose model has no room is activated without it, so its ground and
   the rest of it are there; the model follows when there is room.
 
@@ -179,6 +183,61 @@ Every map loads and saves load back at 12 MiB, and Seyda Neen keeps its 2 MiB ga
 Fast RAM is left in one block: the guard torch's 1 MiB probe can never pass (guards keep their torches
 unlit) and other allocations outside the heap have little room. On a machine with more Fast RAM the
 same heap leaves more room outside it (not measured yet).
+
+## More Fast RAM: the automatic CHIM cache
+
+Everything above is about the reference machine, and the builder's gates stay measured there. A machine with more
+Fast RAM uses it by itself (since v0.0.42-rc1; [real hardware](../../REAL_HARDWARE.md#extra-ram-is-used-automatically)):
+
+- At start-up, after `config.cfg` is read, the engine asks exec how much Fast RAM is free (`AvailMem`: free, largest
+  block and total). The margin left to the system is 2 MiB plus an eighth of all Fast RAM; what is free beyond it is
+  the budget.
+- The budget becomes CHIM zone banks of the kind `-chimcache` makes (they survive map changes): one from the largest
+  free block (leaving 2 MiB of that block), then one from the next largest, and so on, each a whole number of MiB
+  under 2 GiB, the first at least 8 MiB, the others at least 4 MiB, up to 14 banks. Memory spread over several boards
+  is therefore used whole, and 2 GiB or more works as several banks. The zone's totals are unsigned (they may pass
+  2 GiB); a single block stays under 2 GiB.
+- Shared models and textures prefer these banks and stay across map changes; chunks and their terrain go there
+  when the map's zone is full, and stay as cache after you walk away from them (evicted least recently used first,
+  only when room is needed). The look-ahead in the direction of travel doubles from 8 MiB of cache and triples from
+  32 MiB, so the next chunks are read before the edge is reached.
+- The map's own zone (the bank from the heap) and the 2 MiB Hunk-gap rule are unchanged, and so is the game heap.
+- 16 MiB of Fast RAM with the 11 MiB heap leaves about 1 MiB free at start-up: under the margin, no bank, the game
+  plays exactly as before (measured in FS-UAE on 17 October 2026, below).
+- If an allocation fails, everything taken is given back and the start plays on the standard memory. `-chimcache KIB`
+  (by hand, `0` = none) and Options > Extra RAM: Off (`aw_autoram 0`) replace the automatic size.
+
+The console line on every start, for example on a 128 MiB Zorro III machine in FS-UAE:
+
+    Memory: 113 MiB Fast RAM free of 128 MiB; CHIM cache 95 MiB in 1 bank (automatic); look-ahead x3
+
+Measured in FS-UAE on 17 October 2026 (68040 JIT preset, the v0.0.42-dev1 image with this engine, two
+sessions of each size, the same poses and the same 58 s noclip flight north-east from the Seyda Neen start; quiet
+host; emulator figures are relative):
+
+| | 16 MiB Fast RAM (no bank) | 128 MiB Fast RAM (95 MiB bank) |
+| --- | ---: | ---: |
+| Failed loads, Seyda Neen start and flight ("zone full", retried) | 625 and 655 | 0 and 0 |
+| Failed loads, Ebonheart plaza (statue) | 288 and 312 | 0 and 0 |
+| Failed loads, Ebonheart bridge, Khuul | 0 to 8 | 0 |
+| Evictions during the flight | 487 and 550 | 0 and 0 |
+| Reads during the flight | 3,095 and 3,460 KiB | 2,796 and 2,817 KiB |
+| Worst frame during the flight | 216 and 360 ms | 191 and 286 ms |
+| Frame time, Ebonheart bridge (mean of 18 s) | 57.8 and 52.2 ms | 54.4 and 57.8 ms |
+| Models drawn, bridge / plaza / Khuul | 181 / 185 / 163 | 181 / 186 / 163 |
+
+With 16 MiB the zone runs full at Seyda Neen and on Ebonheart's plaza and pieces of the view stay missing until
+room is found (a tree north-east of Seyda Neen, for one); with the bank nothing fails and nothing is evicted. The
+frame time is the same within the emulator's drift (the bridge pose repeated in one session: 55.6 to 58.9 ms on
+16 MiB). The worst frames during the flight are disk reads of ground seen for the first time: a cache cannot
+remove those, only reads that finish in the background can
+([ENGINE-SYNC-IO-MAIN-LOOP-36](../../bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md)).
+
+FS-UAE gives at most 1 GiB per Zorro III board; a second 1 GiB board was not seen by the Amiga, 1 GiB + 512 MiB is
+the launcher's largest setting. On 1 GiB + 512 MiB: the Amiga saw 1,536 MiB, 1,521 MiB free in one block at start-up, and the engine took a 1,327 MiB bank; every pose and the flight ran with no failed load and no eviction, frame times as above.
+
+The CHIM world of that image is 844 MB on disk (726 frames, 22,989 models, 1,057 textures, 167,805 chunks; decoded
+in memory it takes more), so a 1.5 GiB machine keeps a large part of what it has seen, not the whole island.
 
 ## Reading the numbers
 

@@ -271,8 +271,12 @@ static void inventory_key(int key){
     if(inventory->selected<inventory->top)inventory->top=inventory->selected;
     if(inventory->selected>=inventory->top+INV_VISIBLE)inventory->top=inventory->selected-INV_VISIBLE+1;
 }
+/* aw_icons.c: the original 16 x 16 inventory icon (UI-ICONS-INVENTORY-42); 0 = draw the old way. */
+int (*aw_inventory_row_icon)(int slot,const char *id,int equipped,int x,int y);
 static void inventory_icon(int slot,int index,int x,int y){
     FILE *f=NULL;int size,xx,yy;byte raw[1028];
+    if(aw_inventory_row_icon && aw_inventory_row_icon(slot,inventory->item[index].id,
+        AW_InventoryEquipped(&aw_state,inventory->item[index].id)>0,x,y))return;
     if(inventory->icon_row[slot]!=index){
         inventory->icon_row[slot]=index;inventory->icon_ok[slot]=0;
         if(inventory->item[index].icon[0]){
@@ -340,13 +344,29 @@ static void inventory_preview(int muted){
     }
     inventory->preview_seconds+=Sys_FloatTime()-t0;inventory->preview_frames++;
 }
+/* The original window title bar (UI-WINDOW-TITLE-BAR-42), drawn by aw_icons.c from the
+ * imported art; without it the title is centred alone in the same band. */
+int (*aw_title_bar)(int x,int y,int w,const char *title);
+const char *(*aw_hand_to_hand_name)(void);
+/* The original inventory window's title is the equipped weapon's name, or the hand-to-hand skill's
+ * name when unarmed (OpenMW mwgui/windowmanagerimp.cpp setSelectedWeapon / hud.cpp
+ * unsetSelectedWeapon set the inventory window title). */
+static const char *inventory_title(void){
+    static aw_inventory_item_t item;const char *name;
+    if(AW_InventoryEquippedItem(AW_SLOT_RIGHT,&item) && item.category==AW_INV_WEAPON && item.name[0])return item.name;
+    name=aw_hand_to_hand_name?aw_hand_to_hand_name():NULL;
+    return name && *name?name:"Inventory";
+}
+static void window_title(int x,int y,int w,const char *title,int color){
+    if(!aw_title_bar || !aw_title_bar(x,y,w,title))AW_UITextCentred(x,y,w,12,title,color);
+}
 static void inventory_draw(void){
     int i,j,x,row,index,frame,right=inventory_list_right();model_t *model=NULL;aw_inventory_item_t *item;char line[160];
     int gold=AW_UIColor(223,199,144),muted=AW_UIColor(150,135,104);
     AW_UIFill(0,0,320,200,AW_UIColor(0,0,0));AW_UIBox(2,2,316,196);
     AW_UIBox(4,18,122,178);AW_UIBox(128,18,188,178);
     AW_UISmallBegin();
-    AW_UITextBox(6,4,308,12,"Inventory",gold);
+    window_title(6,6,308,inventory_title(),gold);
     AW_UISmallEnd();
     inventory_preview(muted);
     for(row=0;row<2;row++){

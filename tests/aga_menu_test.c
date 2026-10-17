@@ -19,8 +19,11 @@ static int highlight_y,highlight_w,scroll_top,scroll_total;
 static float combat_miss=1,combat_dice=1,combat_block=1;
 /* Options > Far detail (aw_cull, aw_fog.c; the engine default 4 = Strong). */
 static float far_detail=4;static int far_sets;
+/* Options > Extra RAM (aw_autoram, chim_world.c; default 1 = automatic). */
+static float autoram=1;
 float Cvar_VariableValue(char *name){
     if(!strcmp(name,"aw_cull"))return far_detail;
+    if(!strcmp(name,"aw_autoram"))return autoram;
     if(!strcmp(name,"aw_combat_miss"))return combat_miss;
     if(!strcmp(name,"aw_combat_dice"))return combat_dice;
     if(!strcmp(name,"aw_combat_block"))return combat_block;
@@ -30,6 +33,7 @@ void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&e
     if(!strcmp(name,"aw_cull")){assert(value==1 || value==3 || value==4 || value==6);far_detail=value;far_sets++;return;}
     assert(value>=0 && value<=1);
     if(!strcmp(name,"aw_combat_miss")){combat_miss=value;return;}
+    if(!strcmp(name,"aw_autoram")){autoram=value;return;}
     if(!strcmp(name,"aw_combat_dice")){combat_dice=value;return;}
     if(!strcmp(name,"aw_combat_block")){combat_block=value;return;}
     for(i=0;i<4;i++)if(!strcmp(rows[i]->name,name)){rows[i]->value=value;audio_sets++;return;}assert(0);}
@@ -127,8 +131,8 @@ static void check_setup_endpoints(void){
  front();M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
  for(j=0;j<4;j++){
   for(i=0;i<24;i++)M_Keydown(down[j]);
-  M_Draw();assert(scroll_total==14 && scroll_top==7 && highlight_y==168 && highlight_w==230);
-  M_Keydown(K_UPARROW);M_Draw();assert(scroll_top==7 && highlight_y==149);
+  M_Draw();assert(scroll_total==15 && scroll_top==8 && highlight_y==168 && highlight_w==230);
+  M_Keydown(K_UPARROW);M_Draw();assert(scroll_top==8 && highlight_y==149);
   for(i=0;i<24;i++)M_Keydown(up[j%3]);
   M_Draw();assert(scroll_top==0 && highlight_y==54 && highlight_w==230);
   M_Keydown(K_DOWNARROW);M_Draw();assert(scroll_top==0 && highlight_y==73);
@@ -186,6 +190,8 @@ int main(void){
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();assert(AW_CellChangeMethod()==2); /* scrolled loading method */
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(AW_StreamOption(1,0)==256);
  M_Keydown(K_RIGHTARROW);assert(AW_StreamOption(1,0)==512);
+ M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();assert(autoram==0); /* Extra RAM: Off */
+ M_Keydown(K_RIGHTARROW);assert(autoram==1);M_Keydown(K_LEFTARROW);assert(autoram==0);M_Keydown(K_ENTER);assert(autoram==1);
  M_Keydown(K_DOWNARROW);M_Draw();M_Keydown(K_ENTER); /* scrolled Back */
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();M_Keydown(K_ENTER);assert(changes==1);
  M_Keydown(K_ENTER);M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);

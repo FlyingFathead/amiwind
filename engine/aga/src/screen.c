@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // screen.c -- master for refresh, status bar, console, chat, notify, etc
 
 #include "quakedef.h"
+#include "aw_inspect.h"
 #include "r_local.h"
 
 // only the refresh window will be updated unless these variables are flagged
@@ -275,6 +276,9 @@ static void SCR_CalcRefdef (void)
     /* Keep the optional diagnostic strip outside the rendered world
      * (in photo mode Ctrl+H draws it over the full-screen view). */
     if (AW_DebugCoordsEnabled() && !SCR_AWFullView () && sb_lines < 12) sb_lines = 12;
+    /* dbg hud inspect: the hint and the pinned snapshot go underneath the stat bars, never over
+     * the view (INSPECT-OVER-VIEWPORT-42): four more lines of strip while inspect is on. */
+    if (AW_InspectEnabled() && !cl.intermission && !SCR_AWFullView () && sb_lines < AW_INSPECT_SB_LINES) sb_lines = AW_INSPECT_SB_LINES;
 
 // these calculations mirror those in R_Init() for r_refdef, but take no
 // account of water warping

@@ -18,6 +18,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 #include "quakedef.h"
+int (*aw_inspect_key)(int key);   /* aw_inspect.c: right click leaves inspect mode */
 #include "aw_log.h"
 
 /* Native raw keys, including extended PC/Amiga keyboard navigation.
@@ -913,6 +914,10 @@ void Key_Event (int key, qboolean down)
         if(down)Cbuf_AddText(shift_down?"aw_console_fullscreen\n":"aw_console_cycle\n");
         return;
     }
+
+    /* dbg hud inspect: the right button (Amiga K_MOUSE3; middle K_MOUSE2 too) leaves inspect
+     * mode, like dbg hud off (aw_inspect.c; INSPECT-NO-RIGHT-CLICK-EXIT-42). */
+    if (down && key_dest == key_game && aw_inspect_key && aw_inspect_key(key)) return;
 
     /* Photo mode only: Ctrl+F fog, Ctrl+H debug HUD. Outside photo mode
      * Ctrl and F keep their bindings (fast flight, hands). */
