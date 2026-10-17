@@ -9,7 +9,7 @@
 | Where | Stage output recorder (tools/build_cache.py Recorder.close) |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.33 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: character (about 19 min) and chim-town ran again in every later build; the scheduler runs independent stages together, so it recurs. |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.33 final-f583c7b and temple-debug-004/006 |

@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 16 October 2026, in v0.0.41-dev5 |
 | Where | asset-pool-v1 keys (chimport-cell), world-terrain-v1 units, build-state stage records |
 | Reproduction | always |

@@ -43,7 +43,7 @@ The roadmap entries written up to the v0.0.29 release, kept as they were. The cu
 - [Balmora interiors and loading](#balmora-interiors-and-loading)
 - [Seyda Neen subdivision](#seyda-neen-subdivision)
 - [World-coordinate HUD](#world-coordinate-hud)
-- [World map, inventory and journal TODO (owner request, 1 October 2026)](#world-map-inventory-and-journal-todo-owner-request-1-october-2026)
+- [World map, inventory and journal TODO (maintainer request, 1 October 2026)](#world-map-inventory-and-journal-todo-maintainer-request-1-october-2026)
 - [Optional field-of-view control](#optional-field-of-view-control)
 - [Next implementation milestone agreed 28 September 2026](#next-implementation-milestone-agreed-28-september-2026)
 - [Next world-mapping milestone: entire-world terrain inspection](#next-world-mapping-milestone-entire-world-terrain-inspection)
@@ -80,7 +80,7 @@ The roadmap entries written up to the v0.0.29 release, kept as they were. The cu
 - [Open incomplete terrain/rock formation report](#open-incomplete-terrainrock-formation-report)
 - [Checkpoint-016 playtest steering (27 September 2026)](#checkpoint-016-playtest-steering-27-september-2026)
 - [Checkpoint-016 outcome and next priorities](#checkpoint-016-outcome-and-next-priorities)
-- [Recovered owner list, 27 September 2026, 22:17 Helsinki](#recovered-owner-list-27-september-2026-2217-helsinki)
+- [Recovered maintainer list, 27 September 2026, 22:17 Helsinki](#recovered-maintainer-list-27-september-2026-2217-helsinki)
   - [Water feedback and scene-picker follow-up](#water-feedback-and-scene-picker-follow-up)
   - [Opening-state residency](#opening-state-residency)
   - [Adjustable visibility and appearance A/B](#adjustable-visibility-and-appearance-ab)
@@ -127,7 +127,7 @@ The roadmap entries written up to the v0.0.29 release, kept as they were. The cu
   - [Player and NPC animation coverage follow-up](#player-and-npc-animation-coverage-follow-up)
   - [Optional cloud-horizon experiment](#optional-cloud-horizon-experiment)
   - [Optional rising lava smoke and plumes](#optional-rising-lava-smoke-and-plumes)
-- [Owner-reported follow-up queue, 13 October 2026](#owner-reported-follow-up-queue-13-october-2026)
+- [Maintainer-reported follow-up queue, 13 October 2026](#maintainer-reported-follow-up-queue-13-october-2026)
 - [Bounded CHIM follow-up - 14 October 2026](#bounded-chim-follow-up---14-october-2026)
   - [Inventory scrollbar source follow-up, 14 October 2026](#inventory-scrollbar-source-follow-up-14-october-2026)
   - [Opening HUD channel parity, 14 October 2026](#opening-hud-channel-parity-14-october-2026)
@@ -253,12 +253,12 @@ visual and collision regressions together and verify the repair in FS-UAE/Docker
 
 ## RC1 comparative traversal feedback: Balmora and Seyda Neen
 
-Owner playtest, 6 October 2026; recorded 2026-10-06T13:48:58+00:00: Balmora feels smoother than
+Maintainer playtest, 6 October 2026; recorded 2026-10-06T13:48:58+00:00: Balmora feels smoother than
 Seyda Neen, with very short loads even when running through its streets. More
-open fields also felt acceptable on the owner's tested route. Preserve these
+open fields also felt acceptable on the maintainer's tested route. Preserve these
 as subjective route-specific results, not measured timing or whole-world approval.
 
-The owner suspects Seyda Neen's sub-cell count/partitioning. Compare equivalent
+The maintainer suspects Seyda Neen's sub-cell count/partitioning. Compare equivalent
 routes for crossing frequency, resident/transition RAM, geometry, entities,
 load duration, audio continuity and frame time before attributing the difference.
 Roadmap follow-up: review town partitioning **after LIGHT-EXTERIOR-JUMP-29**.
@@ -266,7 +266,7 @@ Fewer cells must not sacrifice Amiga reserve or hide the brightness discontinuit
 
 ## Console history working-set investigation: 6 October 2026
 
-The owner requests disk-backed debug output scrollback, loading old pages only
+The maintainer requests disk-backed debug output scrollback, loading old pages only
 while the game is console-paused. Current source uses a fixed **16 KiB output
 ring**; command recall is a separate **8 KiB** array. Console resizing also uses
 a transient **16 KiB stack copy**. Output history does not grow without bound.
@@ -282,8 +282,8 @@ Status: investigation requested, no disk-backed implementation yet.
 
 ## Seyda Neen partition review after lighting repair
 
-6 October 2026 owner RC1 playtest: load-ins/outs feel acceptable while walking
-through the more open fields. The owner asks whether Seyda Neen has too many
+6 October 2026 maintainer RC1 playtest: load-ins/outs feel acceptable while walking
+through the more open fields. The maintainer asks whether Seyda Neen has too many
 sub-cells. Preserve this route-specific positive feedback without calling all
 streaming solved. **Fix LIGHT-EXTERIOR-JUMP-29 first.**
 
@@ -337,7 +337,7 @@ explicit; count one accepted attack per input and avoid switching sides midway
 through a punch or a cell handoff. This is an animation requirement, not a claim
 of implemented combat damage or combo rules.
 
-The owner further localizes HAND-PUNCH-COVERAGE-29 to **maximum arm extension**.
+The maintainer further localizes HAND-PUNCH-COVERAGE-29 to **maximum arm extension**.
 Inspect that pose and adjacent/interpolated frames on both arms. Fix visible
 forearm coverage before accepting the new sequence. Preserve race/sex appearance,
 held-item behavior and a bounded selected-model working set; measure any extra
@@ -345,7 +345,7 @@ frame/cache cost rather than retaining all race animations in RAM.
 
 ## RC1 fist appearance and punch coverage: 6 October 2026
 
-Preserve the owner-accepted fist improvement. Repair and target-test the
+Preserve the maintainer-accepted fist improvement. Repair and target-test the
 marked camera-near forearm coverage during punching before final release;
 [HAND-PUNCH-COVERAGE-29](FIRST_PERSON_HANDS.md#hand-punch-coverage-29-exposed-forearm-during-punching-in-rc1)
 tracks topology, animation and clipping checks separately from torch grip.
@@ -364,7 +364,7 @@ Both are open playtester reports with unconfirmed causes. See [the follow-up](BU
 RC1 is now a delivered private playtest. Final **More Mushrooms** remains the
 current release goal; the combat milestone follows it.
 
-- Preserve owner-accepted appearance-entry music and Go back / Choose borders.
+- Preserve maintainer-accepted appearance-entry music and Go back / Choose borders.
 - Deliver and playtest bounded Options/Interface/Audio navigation and the 75%
   Effects default, retaining saved settings. Source checks pass; these edits
   are not in the published RC1.
@@ -487,7 +487,7 @@ template while preserving the user's ROM selection policy.
 - [x] DONE: implemented in v0.0.27-rc3 — mount all required HDFs together, with
   the boot HDF first, and retain compatibility with the previous single-HDF
   layout.
-- [x] DONE: implemented in v0.0.27-rc3 — support an optional owner-supplied
+- [x] DONE: implemented in v0.0.27-rc3 — support an optional user-supplied
   `--kickstart-file`; otherwise leave ROM selection empty. Never distribute or
   download ROMs.
 - [x] DONE: implemented in v0.0.27-rc3 — validate the HDF list, unsafe/missing
@@ -546,14 +546,14 @@ setup and launchers must not create a separate conversion implementation.
 - [x] Play the opening movie and enter Jiub's prison scene from the Docker HDF
   in WinUAE 6.0.3; verify Enter/Escape controls.
 - [x] Complete final v0.0.26 helper/export validation and WinUAE game-entry check.
-- [x] Complete hosted Docker CI and owner-run publication.
+- [x] Complete hosted Docker CI and maintainer-run publication.
 - [x] Review exported image layers; measured full-build peak storage remains open.
-- [x] Deliver the source-only handoff for Linux validation and owner-run publishing.
+- [x] Deliver the source-only handoff for Linux validation and maintainer-run publishing.
 
 Native Windows remains experimental, with worker and cancellation reliability
 limits documented in the [Windows roadmap](WINDOWS_BUILD_ROADMAP.md). The final
 Docker helper/export and WinUAE validation for v0.0.26 passed locally; hosted CI
-and owner-run Linux publication completed successfully.
+and maintainer-run Linux publication completed successfully.
 
 
 ## Release progress and planned follow-up
@@ -578,7 +578,7 @@ two cloud layers, moving sun and clock-aligned world tone are implemented.
 The corrected camera-tour/night/guard build passes 822-test host gates and
 matching 742,884-byte Amiga compiles, including tiny-star, arrival and slower-cloud
 changes and 64 KiB music-only source read-ahead. Shared mixer timing and
-guard voices are unchanged. Owner listening still reports intermittent
+guard voices are unchanged. Maintainer listening still reports intermittent
 audio artifacts, mostly at load-ins and in heavy scenes. Audio remains open;
 publication proceeds with the known issue and further audio investigation
 is deferred until after publication.
@@ -763,7 +763,7 @@ The [29 September plan](PLAN-2026-09-29.md) retains historical priorities.
 
 ## Seyda Neen subdivision
 
-Owner feedback: Balmora's dev3 subdivision works surprisingly well; its exterior
+Maintainer feedback: Balmora's dev3 subdivision works surprisingly well; its exterior
 often feels faster than Seyda Neen. Use that successful approach from the first
 ship-exit scene. Performance observations remain separate from measured claims.
 
@@ -772,9 +772,9 @@ ship-exit scene. Performance observations remain separate from measured claims.
   Retain complete intersecting objects, stable reference IDs and shared coordinates.
 - [x] Keep the accepted frozen frame with a small top Loading... box; retain
   the black-screen choice. Physically remove unreferenced BSP data from files.
-- [ ] Complete owner playtest of natural ship/plank/guard/office/courtyard flow,
+- [ ] Complete maintainer playtest of natural ship/plank/guard/office/courtyard flow,
   bidirectional seams, containment, save/restore and peripheral views.
-- [ ] Profile matched views and transition stalls on the owner's weaker machine;
+- [ ] Profile matched views and transition stalls on the maintainer's weaker machine;
   investigate the view-dependent distance-1000 speed-up. Keep the prison ship's
   interior cost separate. Background loading/prefetch remains future work.
 
@@ -790,11 +790,11 @@ ship-exit scene. Performance observations remain separate from measured claims.
 - [x] Use the same source transform for HUD, map marker and exterior-cell index;
   print exact scene identity through `aw_pos` for reproducible reports.
 - [ ] Consider separately configurable coordinate rows if requested; the current
-  paired display follows the owner's revised HUD request.
+  paired display follows the maintainer's revised HUD request.
 
-## World map, inventory and journal TODO (owner request, 1 October 2026)
+## World map, inventory and journal TODO (maintainer request, 1 October 2026)
 
-The post-RC3 world/map/journal pass has started at the owner's request.
+The post-RC3 world/map/journal pass has started at the maintainer's request.
 [Current implementation and limits](WORLD_MAP_AND_JOURNAL.md).
 14 October 2026, v0.0.40-dev1: the [inventory source candidate](INVENTORY.md)
 implements the requested full-screen paused modal, real item list, supported
@@ -868,7 +868,7 @@ does not establish arbitrary equipment composition.
 ## Optional field-of-view control
 
 - [ ] Consider an Options FOV slider, subject to measured performance acceptance.
-  Keep the owner's preferred **90-degree horizontal Quake FOV as the default**.
+  Keep the maintainer's preferred **90-degree horizontal Quake FOV as the default**.
   A narrower setting, including 75 degrees, would be an optional preference.
 - [ ] Use the existing runtime projection setting; changing FOV does not require
   reconverting assets, rebaking collision or rebuilding maps. It does not change
@@ -910,7 +910,7 @@ Core world/cell/chunk design: [WORLD_MAPPING_PLAN.md](WORLD_MAPPING_PLAN.md).
 
 ## Next world-mapping milestone: entire-world terrain inspection
 
-**First world-expansion milestone after v0.0.24 (owner priority, 1 October):**
+**First world-expansion milestone after v0.0.24 (project priority, 1 October):**
 build the Vvardenfell main-island topographic map from terrain and its original
 textures. Start with the source game's exterior cells and the existing loading
 method, then fit Seyda Neen and Balmora into that common world space. This
@@ -1001,7 +1001,7 @@ See [world-scale flight and precomputed geometry experiments](WORLD_MAPPING_PLAN
   Use the shared catalogue to guide conversion/runtime/save schemas and bounded
   memory; see [development notes](DEVELOPMENT.md#tables-tables-we-need-more-tables).
 
-Owner priority, 28 September 2026: establish persistent conditional game state,
+Project priority, 28 September 2026: establish persistent conditional game state,
 reference enable/disable behavior, interaction and dialogue gates, NPC actions,
 scene transitions and save/load before expanding what each attribute does in
 combat, movement, skills and spell calculations. Keep the character fields and
@@ -1051,7 +1051,7 @@ See [research references](REFERENCES.md#game-mechanics-research).
 
 ## Optional polygonal POI regions
 
-Owner principle: **"the fog is our friend"** for both bounded rendering/loading
+Maintainer principle: **"the fog is our friend"** for both bounded rendering/loading
 work and Morrowind's mystique. Preserve atmosphere when measuring view-distance
 tradeoffs; merely fogging still-processed/resident geometry is not the goal.
 
@@ -1118,14 +1118,14 @@ Remaining opportunities: individual actor/hand conversion internals, terrain
 conversion, final assembly and safe incremental caches.
 Measure them before adding workers or changing the conversion recipe.
 
-Next gameplay checkpoints requested by the owner: restore audible intro sea
+Next gameplay checkpoints requested by the maintainer: restore audible intro sea
 ambience, verify continuous gameplay music, and cover every Seyda Neen interior
 with original door destinations and repeatable entry/exit. Do not mark these
 complete from a successful host build.
 
 ## Next major milestone: the connected starting area
 
-Owner priority, 27 September 2026: **Seyda Neen exteriors first, then interiors,
+Project priority, 27 September 2026: **Seyda Neen exteriors first, then interiors,
 then a working local gameplay slice before expansion to other towns.** Complete
 the port, lighthouse/islets, bridges, opposing shore, residential connections
 and mainland/Silt Strider approach. The strider itself is a desired later visual
@@ -1167,7 +1167,7 @@ symptom/cause/fix/version/regression checks in the
 [implementation journal](IMPLEMENTATION_JOURNAL.md). Keep performance history
 and local/user acceptance evidence linked rather than replacing their records.
 
-Later combat presentation research: identify the owner's Nexus mod reference
+Later combat presentation research: identify the maintainer's Nexus mod reference
 that reportedly visualizes failed attack rolls as dodges/blocks. Preserve the
 dice-roll rules and distinguish cosmetic responses from actual gameplay blocks.
 Study its behavior, then implement independently without copying the mod's code
@@ -1196,7 +1196,7 @@ or assets. It remains unnamed/unverified; see [implementation ideas](IMPLEMENTAT
   retain silhouette and doorway/platform collision. Avoid dropping random faces
   to satisfy a hard budget. Fixed-camera profiles must compare equivalent output,
   including restored geometry; smaller textures do not reduce edge counts.
-- Continue investigating the owner's pier screenshots: suspended
+- Continue investigating the maintainer's pier screenshots: suspended
   geometry, and roads/walkways ending abruptly. Separate source-conversion loss,
   renderer clipping and the fixed scene boundary. This is the Seyda Neen slice,
   not a complete town/world export. Audit selected/skipped references and record
@@ -1234,7 +1234,7 @@ Test looking up/down through terrain, steep pitch, diagonal speed limits,
 console/menu transitions and restart so no held inputs remain latched. Add `amiwind_debug_reset_location 0` as the numbered recall entry point for
 the validated town spawn. Reject unsupported IDs without moving the player;
 future points need stable IDs, area identity and safe standing placement.
-Keep E/Q vertical movement and aw_recover; the owner
+Keep E/Q vertical movement and aw_recover; the maintainer
 reported that returning above terrain was not discoverable enough.
 
 ## Quick usability fixes
@@ -1259,7 +1259,7 @@ Original interface art, if converted locally, remains outside public source.
 Keep the current compact font for diagnostics. Dialogue needs a more readable
 font at the actual 320 x 200 output size: test letter spacing, contrast, accented
 characters, line wrapping, long topic/response text and scrollback. Investigate
-locally converting the owner's Morrowind font files through the host pipeline;
+locally converting the maintainer's Morrowind font files through the host pipeline;
 converted glyph atlases/metrics remain private derived game data. Alternatively
 use a suitable freely distributable font with its license. Do not claim either
 approach accepted before native readability and memory measurements. Greyed menu
@@ -1267,7 +1267,7 @@ options must remain distinguishable with the selected palette.
 
 ## Checkpoint-013 collision bounds and NPC behavior
 
-Owner confirmation (27 September 2026): the central town-square obstruction is
+Maintainer confirmation (27 September 2026): the central town-square obstruction is
 fixed in v0.0.12-dev2. Track per-iteration confirmations and open reports in
 [PLAYTEST_STATUS.md](PLAYTEST_STATUS.md); keep this location as regression coverage.
 
@@ -1340,11 +1340,11 @@ and [checkpoint validation](CHECKPOINT_012_VALIDATION.md).
 
 Dev4 addresses a reproduced blocked initial spawn. The next acceptance route
 must walk immediately after boot, before noclip/recovery, then test recovery
-separately. Preserve the owner's now-working door rendering and town details.
+separately. Preserve the maintainer's now-working door rendering and town details.
 Approximate collision still needs ledge/approach tests; a safe start does not
 certify the whole town.
 
-Owner playtest after dev4: walking now works from the initial spawn, but movement
+Maintainer playtest after dev4: walking now works from the initial spawn, but movement
 near the town centre feels sticky and constrained. This remains a distinct open
 regression. Capture a repeatable route and split ground/slope response from
 architecture-hull overlap before changing collision. First NPCs must not add
@@ -1358,7 +1358,7 @@ See [the research handoff](OPENMW_REF_NPCS_AND_DIALOGUE.md).
 
 ## Checkpoint-010 repair scope
 
-The owner's filesystem requester, stuck/falling movement and disappearing door
+The maintainer's filesystem requester, stuck/falling movement and disappearing door
 panels take priority over adding another town. Dev3 corrects legacy image root
 metadata, rotated collision and floor-trace merging, adds console/noclip/recovery,
 and tests near-door depth ordering separately from distance/PVS culling.
@@ -1379,11 +1379,11 @@ walls, and investigate remaining terrain/roof seams before increasing coverage.
   this is a potential pipeline, not an RC1 requirement or chosen replacement.
   See [the investigation](FIRST_PERSON_HANDS.md#investigation-first-person-hands-rendered-as-sprites).
 
-- Preserve the Quake walking bob (owner preference, 27 September 2026):
+- Preserve the Quake walking bob (maintainer preference, 27 September 2026):
   `cl_bob 0.02`, `cl_bobcycle 0.6`, `cl_bobup 0.5`. Camera motion is separate
   from collision dimensions, grounded movement and stair handling.
 - First visible player-body milestone: Nord bare hands in first person,
-  assembled from the owner's body-part data with the appropriate first-person
+  assembled from the maintainer's body-part data with the appropriate first-person
   skeleton/animation. Bake a bounded punching animation on the host.
 - Verify handedness, skin/UV seams, wrist cropping, camera-relative position,
   near clipping and animation timing. Test while standing and walking with bob.
@@ -1397,10 +1397,10 @@ walls, and investigate remaining terrain/roof seams before increasing coverage.
 
 Start with Fargoth and two town guards using compact animated alias models.
 The host assembles race/sex body parts, heads, hair, equipped clothing, armour
-and weapons from the owner's data, then bakes a bounded set of idle/walk frames.
+and weapons from the maintainer's data, then bakes a bounded set of idle/walk frames.
 AmiQuake supplies model drawing, not Morrowind actor assembly or gameplay rules.
 Start with their recognizable normal outfits and an original greeting from the
-owner's files. Validate feet/ground contact, model bounds, palette, memory and
+maintainer's files. Validate feet/ground contact, model bounds, palette, memory and
 frame cost with one, then three visible actors before filling the town.
 
 For later equipment removal/changes, swap cached complete appearance variants
@@ -1433,7 +1433,7 @@ implement those game systems.
    buffering and separate transition/underrun evidence. See
    [OPENMW_REF_MUSIC_AND_AUDIO.md](OPENMW_REF_MUSIC_AND_AUDIO.md).
 3. Convert a bounded Balmora area using the same pipeline. Add a recall-style
-   travel control using owner-supplied sound data, with repeated Seyda Neen /
+   travel control using user-supplied sound data, with repeated Seyda Neen /
    Balmora trips, safe spawn points, preserved music state, load timings and
    memory recovery checks. This tests area replacement, not continuous streaming.
 4. Introduce recognizable Fargoth and guards: assembled appearance, idle poses,
@@ -1465,12 +1465,12 @@ stage. Preserve the prior build and comparable performance evidence.
 
 ## Completed checkpoint history
 
-- Pipeline 0.1.x: owner-supplied game folder, base terrain/placement audit,
+- Pipeline 0.1.x: user-supplied game folder, base terrain/placement audit,
   converted packets, portable C reader and checked source packaging.
 - Demo v0.0.1: OpenMW-captured opening, stereo PCM clip, centred speech and boot.
 - Demo v0.0.2 / checkpoint-001: native wireframe, WASD/Shift and mouse movement.
 - Demo v0.0.3 / checkpoint-002: filled terrain, baked surface colours, dense fog,
-  blitter spans, projection tables and frame counters. Owner tested locally.
+  blitter spans, projection tables and frame counters. Maintainer tested locally.
 
 - Demo v0.0.4 / checkpoint-003: complete installed OST, fixed-size stereo queue,
   original voice, track selection and sustained streaming baseline.
@@ -1573,7 +1573,7 @@ proper surrounding map coverage becomes available.
 
 ## First complete vicinity
 
-Use [SEYDA_NEEN_SCOPE.md](SEYDA_NEEN_SCOPE.md) and the owner's UESP map as the
+Use [SEYDA_NEEN_SCOPE.md](SEYDA_NEEN_SCOPE.md) and the maintainer's UESP map as the
 coverage target: town/tradehouse, shacks, lighthouse peninsula, docks, Census
 buildings, prison-ship arrival and Silt Strider approach. Audit neighboring source
 cells before choosing smaller runtime streaming chunks. Fix origin-only object
@@ -1585,7 +1585,7 @@ ahead of distant-region expansion.
 ## Open incomplete terrain/rock formation report
 
 Reproduce the checkpoint-014 screenshot's incompletely drawn terrain/rock formation
-beside the road. The owner clarified this is missing/malformed formation geometry.
+beside the road. The maintainer clarified this is missing/malformed formation geometry.
 Compare original LAND/placed rocks with conversion at the same XYZ/yaw. Diagnose
 source topology, selected coverage and render visibility separately. Use the
 new `dbg coords on` / `dbg pos` aliases to collect coordinates. This remains
@@ -1603,7 +1603,7 @@ open; see [playtest status](PLAYTEST_STATUS.md).
 - Keep first-person 3D hands and their conversion path. Add a compile-time
   `--hands 3d|sprites` selection; bake sprites from the same owned poses.
   Compare idle/draw/punch/sheathe visibility, frame cost, RAM and loading cost.
-  Owner reports flicker and weak/transparent-looking hands in checkpoint-015.
+  Maintainer reports flicker and weak/transparent-looking hands in checkpoint-015.
 - Exterior ship gaps: deck `(804,-311,61)`, bow `(615,-548,74)`, detached edge
   views `(777,-373,61)` and `(790,-413,62)`. Preserve the current silhouette as
   reference; check source surfaces, winding, LOD and renderer before changing
@@ -1638,7 +1638,7 @@ experiment is implemented in this checkpoint. Lift scene choices into a validate
 recipe schema after the two-scene pipeline stabilizes; preserve all source and
 conversion reports so later areas inherit lessons rather than manual patches.
 
-## Recovered owner list, 27 September 2026, 22:17 Helsinki
+## Recovered maintainer list, 27 September 2026, 22:17 Helsinki
 
 The complete active register is [SEYDA_NEEN_NEXT_STEPS.md](SEYDA_NEEN_NEXT_STEPS.md):
 interior structural regression first; town-edge/Silt Strider audit; exterior and
@@ -1651,7 +1651,7 @@ Do not drop these items when handling the immediate geometry regression.
 
 - [ ] Separate blueish underwater presentation from red damage feedback and
   mapped hurt audio; test harmless immersion, damage and surfacing.
-- [ ] Track the owner's v0.0.15-dev1 slowdown against identical fixed-camera
+- [ ] Track the maintainer's v0.0.15-dev1 slowdown against identical fixed-camera
   runs; new exterior report: XYZ 211 447 47, DEG 4, P 0.
 - [x] Scene-picker command `dbg scene change` (also `debug` and `amiwind debug`);
   host/native acceptance passed in checkpoint-017. See SEYDA_NEEN_NEXT_STEPS.md.
@@ -1689,7 +1689,7 @@ Do not drop these items when handling the immediate geometry regression.
 - [ ] Preserve existing feature variants and immutable checkpoints; follow the
   non-destructive experiment rule in DEVELOPMENT.md.
 
-Recovery snapshot work takes priority until all required owner data, source,
+Recovery snapshot work takes priority until all required maintainer data, source,
 toolchain and handover files are durably saved. Intro implementation has not begun.
 
 ## Final recovery handover update, 27 September 23:32–23:35 Helsinki
@@ -1700,7 +1700,7 @@ proposal above. Current frozen dev2 still starts at700; live command:
 the next build, preserving the old packages and selectable distances.
 
 New persistent rock/Silt Strider-port report: XYZ337 643 34, DEG304, P-16,
-v0.0.15-dev2, image(20260927-203433).png. Owner screenshot shows a projecting
+v0.0.15-dev2, image(20260927-203433).png. Maintainer screenshot shows a projecting
 terrain/rock section with missing-looking lower geometry; exact source identity
 and cause still require comparison. HUD reads28.4FPS in that one screenshot,
 not a benchmark. Do not conflate the already-known omitted Silt Strider ACTI
@@ -1773,7 +1773,7 @@ Default layout: [npc_interaction_layout_template_001](INTERACTION_LAYOUTS.md).
 
 ### High priority: graphics/culling, door and wall assemblies
 
-Owner explicitly prioritizes this as a key culling/geometry issue. Keep this
+Maintainer explicitly prioritizes this as a key culling/geometry issue. Keep this
 reference case when designing broader architectural occlusion and simplification.
 
 - [ ] Reproduce exterior Census door overlap at XYZ396,-171,39, yaw170,pitch-3
@@ -1789,7 +1789,7 @@ reference case when designing broader architectural occlusion and simplification
 - [ ] Compare source/candidate mesh counts, renderer surfaces/edges and fixed-view
   frame times. Separate visible correctness from a measured performance gain.
 
-- [ ] Automate an oriented doorway cut from the placed door aperture. The owner
+- [ ] Automate an oriented doorway cut from the placed door aperture. The maintainer
   confirms intrusion at both Census exits viewed from outside. Make a door-shaped cut-out: clear obstructing wall geometry behind/through
   the door opening (bounded depth), preserve the surrounding
   frame/wall, interpolate cut-face UVs and rebuild matching collision. Scope edits
@@ -1804,7 +1804,7 @@ artifact with a rendering priority while retaining that work does not meet the
 performance goal. Profile the resulting reduction rather than assuming a gain.
 
 
-Owner refinement: the assisted doorway simplification should be enabled by
+Maintainer refinement: the assisted doorway simplification should be enabled by
 **default** in the future build configuration, with an explicit disable switch.
 Keep a conservative cut/overlap margin hidden underneath the door frame so no
 seam or missing wall leaks around the edge. Where a transition door never reveals
@@ -1837,7 +1837,7 @@ exact generated apply/publish script before packaging or posting commands.
 
 ### Transport and resident voices
 
-- [ ] Vivec gondola travel between cantons: owner-reported not implemented in
+- [ ] Vivec gondola travel between cantons: maintainer-reported not implemented in
   v0.0.38-dev2. Reconcile original gondolier routes and fares, then verify the
   interaction and successful destination transition. An NPC and talk prompt
   alone do not establish a working service. Track dock access separately in
@@ -1872,13 +1872,13 @@ Published base: dev3 / `7e36e9051da477147f78cf22236a0a4c0c7201ae`.
 See the updated [dated plan](PLAN-2026-09-29.md) and
 [dev3 feedback disposition](FEEDBACK-v0.0.23-dev3.md). This checkpoint corrects
 content-sized dialogue, input/rotation glyphs, startup audio/timing, opening quote,
-tree sprite depth and Darvame's floor placement. The owner accepts the dev3 rock
+tree sprite depth and Darvame's floor placement. The maintainer accepts the dev3 rock
 fix. Door sounds, containment, complete voice behaviour and sky remain pending.
 
 
 ## Next version: world geometry density analysis
 
-**Future-version work, outside the current fixes, by owner request (30 September 2026).**
+**Future-version work, outside the current fixes, by maintainer request (30 September 2026).**
 Analyze source map placements to identify high- and low-polygon concentrations.
 Produce spatial density maps and ranked areas, counting placed instances as
 well as unique meshes, textures and expected resident data. Compare source and
@@ -1897,7 +1897,7 @@ item, not part of the current implementation or validation claim.
 
 ### Jagged doorway arches
 
-Owner report, v0.0.24-dev3, 30 September 2026: many Balmora doorways have
+Maintainer report, v0.0.24-dev3, 30 September 2026: many Balmora doorways have
 strongly jagged upper arches. Reference cameras: XYZ1218,-792,120, yaw352,
 pitch-7; XYZ1269,-788,133, yaw343, pitch-18; and XYZ-1012,-939,142,
 yaw204, pitch-5. Screenshots show irregular
@@ -1917,8 +1917,8 @@ This is a recorded polish/optimization task, not an implemented dev4 change.
 
 ### Recurring deformed and blocked stairs — reusable conversion fix
 
-Owner report from v0.0.24-dev3: XYZ962,119,64, yaw18, pitch-8. The screenshot
-shows jagged stair treads and the owner cannot traverse them. The camera lies
+Maintainer report from v0.0.24-dev3: XYZ962,119,64, yaw18, pitch-8. The screenshot
+shows jagged stair treads and the maintainer cannot traverse them. The camera lies
 inside the bounds of `ex_hlaalu_b_15`, placed reference 41379. Together with
 XYZ613,-125,59 and the earlier b17 opening, this makes stair conversion a
 recurring city issue, with both visual and movement consequences.
@@ -1944,7 +1944,7 @@ and the doorway arch cleanup remain open work beyond the current dev4 correction
 
 ### Proposed module: Balmora stairway optimizer
 
-Additional owner report, v0.0.24-dev3: XYZ-883,126,300, yaw346, pitch-14.
+Additional maintainer report, v0.0.24-dev3: XYZ-883,126,300, yaw346, pitch-14.
 The narrow stairs cannot be climbed. The camera is within `ex_hlaalu_b_13`,
 reference 24020. Add this case to the recurring **Stairway to Balmora** issue.
 
@@ -1959,7 +1959,7 @@ the character or changing FOV. This is TODO/design, not delivered functionality.
 
 ### Missing street ground texture
 
-Owner report, v0.0.24-dev3: XYZ455,-699,61, yaw3, pitch17. The supplied
+Maintainer report, v0.0.24-dev3: XYZ455,-699,61, yaw3, pitch17. The supplied
 screenshot has the same XYZ and HUD yaw1/pitch16; retain both as nearby views.
 It shows a broad flat untextured street patch around the lightpost in front of
 two doorways.
@@ -1970,12 +1970,12 @@ two doorways.
   by the original layout, matching texture scale/orientation and edge seams.
   Verify floor collision and avoid extra overlapping surfaces.
 
-Suggested owner treatment: continue the usual street texture across the patch.
+Suggested maintainer treatment: continue the usual street texture across the patch.
 Status: recorded TODO; cause and correction not yet verified.
 
 
 Additional stair validation case: v0.0.24-dev3, XYZ1182,-141,119, yaw91,
-pitch-12; the owner cannot enter the stairway. Nearby mapped placements are
+pitch-12; the maintainer cannot enter the stairway. Nearby mapped placements are
 `ex_hlaalu_dsteps_03` reference41134 and `ex_hlaalu_b_04` reference22539.
 This is another instance of the same dsteps03/b04 asset combination seen at
 XYZ613,-125,59, strengthening the case for a reusable per-mesh correction
@@ -1985,9 +1985,9 @@ currently open, not covered by the b17 correction.
 
 ### Hlaalu guard missing/transparent chest armor
 
-Owner screenshot, v0.0.24-dev3, Balmora: XYZ862,-502,58, yaw290, pitch13.
+Maintainer screenshot, v0.0.24-dev3, Balmora: XYZ862,-502,58, yaw290, pitch13.
 The guard's chest plate/torso appears absent or transparent, with the background
-visible between the shoulders and waist. Owner suspects material conversion.
+visible between the shoulders and waist. Maintainer suspects material conversion.
 
 - [ ] Trace the NPC's equipped cuirass and BODY/armor slot resolution into the
   assembled actor; verify that torso suppression is paired with replacement armor.
@@ -2010,7 +2010,7 @@ The requested `dbg aw hors 0` preset is current dev5 work: Hors, male Nord,
 Barbarian, The Steed, after Census in Seyda Neen's square. A Balmora teleport
 creates that preset only when no character exists; it preserves existing ones.
 
-Owner acceptance against dev4, 30 September: Shift+V works; Balmora temple
+Maintainer acceptance against dev4, 30 September: Shift+V works; Balmora temple
 passage is accessible as a Nord. Additional public stair reports remain in the
 dev5 investigation: (-323,226,138), yaw260/pitch0 and (-527,187,143), yaw274/pitch-3.
 
@@ -2048,7 +2048,7 @@ Procedure and RC1 evidence: [Stair ramp walkability](STAIR_RAMP_WALKABILITY.md).
 required for partial corpse looting and equipment changes. rc10 caches existing
 appearance snapshots; it does not make fixed outfits the final runtime design.
 Preserve reusable source parts and per-actor state; do not pre-bake every outfit
-combination. Normal gallery coverage and owner-approval requirements remain.
+combination. Normal gallery coverage and maintainer-approval requirements remain.
 
 ## v0.0.27 follow-up: target playtest and profiling
 
@@ -2058,7 +2058,7 @@ Keep Vivec inactive and retain the bounded release scope during those checks.
 The normal converter now emits bounded Seyda maps and the repaired three-rectangle
 Balmora layout. The complete 2,717-map optimizer, actor/contact and static heap
 gates passed; final image assembly and all HDF filesystem readbacks also passed.
-Owner target acceptance, cold/warm lifecycle and runtime heap measurements remain
+Maintainer target acceptance, cold/warm lifecycle and runtime heap measurements remain
 pending; estimates are not runtime results.
 
 - The ordinary converter generates a 64-region Seyda Neen layout alongside its
@@ -2141,7 +2141,7 @@ The source prototype exposes aw_map_mode and aw_map_debug_available with
 selection controls and debug-policy checks. The rc5 engine compile and private
 candidate image include the marker/contrast correction and passed HDF readback.
 Nine focused source checks passed; the repaired Linux native world-UI fixture
-subsequently passed in the complete 558-test Docker suite. Owner target acceptance
+subsequently passed in the complete 558-test Docker suite. Maintainer target acceptance
 remains pending. Complete this feature after
 the repaired playtest gate. See [world map and journal](WORLD_MAP_AND_JOURNAL.md)
 for the interaction contract and progress checkpoint.
@@ -2154,7 +2154,7 @@ for the interaction contract and progress checkpoint.
   location markers, two useful map scales, click-to-zoom, and navigation/pan.
   Preserve the established marker identities and world-coordinate transforms.
   Validate axes, interiors, cell changes, teleport and levitation.
-- Read and decode only verified owner-provided map inputs on demand. Keep
+- Read and decode only verified user-provided map inputs on demand. Keep
   proprietary map art and icons out of public source and release artifacts.
   Bound input reads, decoded buffers, cache/switching peaks; release inactive
   views and test open/switch/close.
@@ -2190,7 +2190,7 @@ remaining work, not completion.
 ### Music
 
 Compare existing converted and packaged music against the complete available
-owner-provided source inventory so individual missing tracks are visible even
+user-provided source inventory so individual missing tracks are visible even
 when totals happen to match. The observed inventory contains 18 MP3 tracks; all 18 and 124 alias rows are
 included in the private v0.0.27 playable package. Target playback checks remain
 open, including the number-or-filename-stem `dbg ost play` command. Include any
@@ -2270,7 +2270,7 @@ accepted. Retain this as deferred research, not a normal-build prerequisite.
 
 ### Mandatory follow-up: building geometry and collision audit
 
-Owner-confirmed MUST-DO, 3 October 2026, scheduled after the current repair
+Maintainer-confirmed MUST-DO, 3 October 2026, scheduled after the current repair
 playtest. Profile source versus converted house/building geometry, polygon counts,
 loading/resident memory and frame costs. Investigate decorative details, internal
 or genuinely unseen surfaces, exact mesh sharing and collision representation
@@ -2303,7 +2303,7 @@ Renderer culling does not release gameplay slots. Existing static catalogue capt
 ### Selective baked building panels (proposed A/B extension)
 
 - [ ] Extend the existing explicitly selected decorative-window panel baker to audited component/surface selections for eastern Seyda house, balcony and roof/overhang assemblies. Preserve structural depth, silhouette, openings, texture orientation and collision. Whole-building billboards are not the default.
-- [ ] Bake from owner-supplied inputs at conversion time. Public source may contain the converter, recipes and synthetic tests only; original and derived game assets remain private.
+- [ ] Bake from user-supplied inputs at conversion time. Public source may contain the converter, recipes and synthetic tests only; original and derived game assets remain private.
 - [ ] Preserve variant A and isolate variant B; compare matched viewpoints, surface boundaries, texture memory, collision, compiled BSP/heap costs and target frame times. Host face reduction does not establish a playable repair.
 
 The existing surface_flatten.py route currently selects exterior decorative windows, not complete shacks. A private exact-coplanar shack specimen reduced 1,113 faces to 1,100, which is insufficient to close the current heap incident.
@@ -2518,7 +2518,7 @@ and surface rendering, cap nearby emitters, and measure baseline CPU/memory.
 Preserve an off control and verify both legacy and CHIM regions. Implementation
 and source-asset discovery remain pending.
 
-## Owner-reported follow-up queue, 13 October 2026
+## Maintainer-reported follow-up queue, 13 October 2026
 
 The v0.0.39 final release keeps its implemented scope. Unfinished parts of
 these reports and new features continue in v0.0.40; current status remains in

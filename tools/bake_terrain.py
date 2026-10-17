@@ -1,4 +1,4 @@
-"""Bake coarse terrain colours from the owner's base-game texture pixels."""
+"""Bake coarse terrain colours from the user's base-game texture pixels."""
 import io
 import json
 from pathlib import Path, PurePosixPath

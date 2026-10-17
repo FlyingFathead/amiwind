@@ -109,7 +109,7 @@ checks and two typed admission checks passed. Final-map and target gates pending
 
 Read-only final-BSP contributor inspection and private OBJ/wireframe export were completed. The first isolated shack geometry A/B merged 13 adjacent coplanar faces with matching texture transforms/styles: 1,113 to 1,100 faces. Model bounds were unchanged; surface-area difference was about 0.000149 over about 110,036 square engine units. This is only a host geometry experiment; no production BSP was changed, and lighting/rendering/collision were not accepted. It does not repair the 29 heap failures. An initial analysis report accidentally recorded whole-map rather than model bounds; a fresh numbered comparison corrected that diagnostic field, preserving the earlier report.
 
-Owner-directed inspection now targets eastern house roofs and overhang assemblies. Selective baked panels and residency rebalancing remain candidates, not established fixes. Sprite streaming alone cannot close 17 of the 29 failures even with zero temporary input. Exact transparent-border cropping plus zero input overlap still leaves the worst model 41,568 bytes over allowance, before meaningful growth room. No reserves or original placements were reduced.
+Maintainer-directed inspection now targets eastern house roofs and overhang assemblies. Selective baked panels and residency rebalancing remain candidates, not established fixes. Sprite streaming alone cannot close 17 of the 29 failures even with zero temporary input. Exact transparent-border cropping plus zero input overlap still leaves the worst model 41,568 bytes over allowance, before meaningful growth room. No reserves or original placements were reduced.
 
 
 #### WORLD-FLORA-HEAP-010 geometry/collision investigation
@@ -186,7 +186,7 @@ render accessed scene.source before a file was loaded, terminating the animation
 callback. Loading later populated the object list while the canvas stayed blank.
 An empty-scene guard, visible error reporting and requestAnimationFrame scheduling
 in finally correct the startup path. Synthetic empty-to-loaded rendering passed;
-the owner then manually confirmed browser operation. Stub rendering checks and
+the maintainer then manually confirmed browser operation. Stub rendering checks and
 actual browser/GPU confirmation are distinct evidence. Eight focused Docker tests
 passed. This fixes the inspector startup incident, not the game's heap failure;
 first introducing production release and target gameplay acceptance are not claimed.
@@ -238,7 +238,7 @@ HDF or fixed version is claimed.
 
 ### TERRAIN-CULL: global topology and local sky enclosure remain unaccepted
 
-Recorded 3 October 2026. Owner visual review rejected candidate010: 24,650
+Recorded 3 October 2026. Maintainer visual review rejected candidate010: 24,650
 stored faces remained with hanging geometry; the candidate used compiled local
 LAND proxies and did not consume the canonical global terrain NPZ. The subsequent
 011 receipt is only an alignment diagnosis: 288 source-grid corners had zero
@@ -264,7 +264,7 @@ traversal acceptance remain open. Recorded regressions are: textarea/contentedit
 focus conflicts with navigation input; Ctrl browser shortcuts can fire while
 editing; the 50 ms elapsed-time clamp halves movement below 20 fps; and repeated
 per-frame face-count traversal processes about 43,000 faces per frame. HTML012 is
-the fly-fix work item; these defects are not documented as fixed until the owner
+the fly-fix work item; these defects are not documented as fixed until the maintainer
 can verify navigation, editing shortcuts, frame-rate behavior and count updates.
 
 ### TERRAIN-CULL audit follow-up 002: sky geometry removed; global terrain still pending
@@ -419,7 +419,7 @@ both fixture issues were corrected before the passing run. See
 
 #### EXTERIOR-SURFACES follow-up: default hidden-surface cull contract
 
-Recorded 4 October 2026 01:33 EEST. Owner direction requires compile-time
+Recorded 4 October 2026 01:33 EEST. Maintainer direction requires compile-time
 removal of permanently hidden static exterior render surfaces by default, with
 `--hidden-surface-cull` defaulting to true and `--hidden-surface-cull false` as
 the explicit opt-out. Build audit output must disclose the effective setting and
@@ -626,6 +626,7 @@ Family: Engine table limits (`engine-limits`). Fixed engine tables (models, enti
 - GEO-04 (no report page): Canonical-terrain world rebuild fails VIS (too many portals)
 - [IMPORT-DOORBANK-LIMIT-32](IMPORT-DOORBANK-LIMIT-32.md): Town importer did not check the engine's 128-row door bank limit
 - [INTERIOR-COORDS-31](INTERIOR-COORDS-31.md): Some interiors place objects beyond the +/-4096 coordinate range
+- [INTERIOR-EXCLUDE-STALE-41](INTERIOR-EXCLUDE-STALE-41.md): Two Vivec rooms stayed left out on heap numbers from an older build
 - [INTERIOR-INLINE-LIMIT-31](INTERIOR-INLINE-LIMIT-31.md): Every interior object is its own inline model: 220 objects per interior at most
 - [LAMPS-CACHE-31](LAMPS-CACHE-31.md): Night lamps beyond 96 per 3x3 cells are silently dropped (Vivec)
 - [MODEL-MARKSURF-SIGNED-31](MODEL-MARKSURF-SIGNED-31.md): Face indices above 32,767 in leaf face lists become bad pointers

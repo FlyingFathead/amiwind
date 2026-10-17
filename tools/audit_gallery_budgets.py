@@ -5,7 +5,7 @@
 Normal models retain the original budget. Optional retries preserve the existing
 shell/extent protection and use only the bounded 1,024-triangle ceiling. Cases
 beyond it remain explicit failures, never progressively crushed to get green.
-All reports and converted assets stay in the owner's private build directory.
+All reports and converted assets stay in the maintainer's private build directory.
 """
 import argparse
 import hashlib

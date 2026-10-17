@@ -9,7 +9,7 @@
 | Where | tools/npc_geometry.py animated_mdl (1 <= frames <= 32) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | low: Arena fighters are squeezed into 31 combat frames; a first-person weapon view needs about 48. |
 | Family | Mesh converter geometry (`converter-geometry`) |
 
@@ -17,7 +17,7 @@
 
 ## Status: 9 October 2026
 
-Repaired in source on v0.0.33-arena-combat (owner decision: a byte budget), not yet in a build. The
+Repaired in source on v0.0.33-arena-combat (project decision: a byte budget), not yet in a build. The
 writer limits a model's vertex frames by bytes (`ALIAS_FRAME_BYTES`, 28 + 4 x vertices per frame;
 default = the previous worst case of 64 frames at 1,999 vertices) and at most 256 frames, named or not.
 The Arena fighters bake 42 frames again (idle 8, run 8, attack 8, hit 4, knockdown 6, death 8).

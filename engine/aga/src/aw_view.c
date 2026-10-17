@@ -30,6 +30,7 @@
 #include "aw_torch.h"
 #include "aw_items.h"
 #include "aw_inventory.h"
+#include "aw_inspect.h"
 
 extern cvar_t chase_active;
 /* The hooks (defined beside their callers, NULL in fixtures without this file). */
@@ -67,6 +68,11 @@ static float vanity_delay_setting=30;
 /* dbg vanitycamera on: an orbit started by hand runs until any input, also with the automatic orbit off */
 static int vanity_forced;
 static aw_view_t view;
+/* dbg cam orbit (the orbit section below) */
+static struct {
+    int active,photo,edict,pending,pending_photo,anglehack;double pending_since;
+    vec3_t point,offset,origin,angles,view;float yaw,pitch,distance,rate,pending_rate,movetype,flags;
+} orbit;
 static aw_death_t death;
 static int ready,pov_down,pov_tapped,input_seen,owned,last_view=-1,warned,death_arena,acted;
 static vec3_t anchor,last_angles,death_angles;
@@ -251,6 +257,20 @@ int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angle
     }
     return n;
 }
+static cvar_t aw_inventory_preview_reserve={"aw_inventory_preview_reserve","0",true};
+static const char *unavailable_reason="the pose model did not load";
+/* UI-INVENTORY-PREVIEW-STILL-42: 0 (default) = the original still picture, rendered once per
+ * equipment change (aw_worldui.c); 1 = the old live preview, drawn every frame and turnable. */
+static cvar_t aw_inventory_preview_live={"aw_inventory_preview_live","0",true};
+int AW_ViewInventoryLive(void){return aw_inventory_preview_live.value!=0;}
+/* Bytes the pose model's load needs (see AW_ViewInventoryBody); -1 when it is absent. */
+static int inventory_need(const char *path){
+    FILE *f=NULL;int size=COM_FOpenFile((char *)path,&f);
+    if(!f)return -1;
+    fclose(f);
+    if(aw_inventory_preview_reserve.value>0)return (int)(aw_inventory_preview_reserve.value*1024*1024);
+    return 3*size+256*1024;
+}
 /* Ten companion frames: unarmed, then original melee weapon types 0..8.
  * The builder samples each original inventory group at its START key. */
 int AW_ViewInventoryBody(model_t **model,int *frame){
@@ -277,7 +297,14 @@ int AW_ViewInventoryBody(model_t **model,int *frame){
     }
     if(inventory_failed)return 0;
     if(!inventory_model || !Cache_Check(&inventory_model->cache)){
-        if(hunk_size-hunk_low_used-hunk_high_used<2*1024*1024)goto unavailable;
+        /* UI-INVENTORY-PREVIEW-GAP-41: admit the load by what it needs, not a blanket 2 MiB:
+         * Mod_ForName holds the file as a temporary (high hunk), unpacks it on the low hunk and
+         * copies it into the cache, so at most three times the file size, plus a 256 KiB margin.
+         * The old fixed rule refused every area leaving under 2 MiB (Seyda Neen CHIM: 1.96 MiB);
+         * aw_inventory_preview_reserve 2 brings it back (DON'T DELETE ANY METHOD). */
+        int need=inventory_need(path),gap=hunk_size-hunk_low_used-hunk_high_used;
+        if(need<0){unavailable_reason="no inventory pose model in this image";goto unavailable;}
+        if(gap<need){unavailable_reason="not enough free memory in this area";goto unavailable;}
         inventory_model=Mod_ForName(path,false);
         if(!inventory_model || inventory_model->type!=mod_alias ||
            inventory_model->numframes!=10 || !Cache_Check(&inventory_model->cache))goto unavailable;
@@ -287,7 +314,7 @@ int AW_ViewInventoryBody(model_t **model,int *frame){
     if(inventory_model && inventory_model->type==mod_alias && inventory_model->cache.data)
         Cache_Free(&inventory_model->cache);
     inventory_model=NULL;inventory_failed=1;
-    Con_Printf("Original inventory poses unavailable; rebuild player view assets.\n");
+    Con_Printf("Original inventory poses unavailable: %s (%s).\n",unavailable_reason,path);
     return 0;
 }
 static float death_seconds(void) {
@@ -364,7 +391,7 @@ static int body_hand_layer(edict_t *p,int frame) {
 entity_t *AW_ViewBody(entity_t *ent) {
     float speed,rate=1,dt=(float)host_frametime;int group,block=-1,air,fists,layer;edict_t *p=local_player();
     held_visible=0;held_cursor=held_draw_count=0;
-    if(!owned || !body_ready())return NULL;
+    if(!owned || !body_ready() || orbit.active)return NULL;     /* the orbit: the player is not there */
     fists=body_fists_ready(p);
     if(dt<0)dt=0;
     if(dt>.25f)dt=.25f;
@@ -452,9 +479,134 @@ static void trace(vec3_t from,vec3_t to,vec3_t out,float *fraction) {
      TraceLine(from,to,out);VectorSubtract(out,from,d);a=Length(d);VectorSubtract(to,from,d);b=Length(d);
      *fraction=b>0?a/b:1;}
 }
+/* ---- dbg cam orbit (aw_cam.c, docs/CAMERA_MARKS.md "Orbit") ----
+ * The vanity camera turned on another centre: the same placement (chase_active, the point
+ * trace and obstacle pull-in below, the full view without HUD), around the entity under the
+ * crosshair (followed as it moves, by its drawn frame box), an entity by its original
+ * reference, or a point, at a set speed in degrees a second. While it runs the player is
+ * detached from the world: noclip, Quake's god mode and notarget (combat and idle voices
+ * check notarget: aw_combat.c, pr_cmds.c), hidden, held in place, and every game key goes to
+ * the orbit (+/- speed, 0 holds, wheel distance, right click or Esc ends); the end restores
+ * the position, view, movement and flags as they were. */
+#define ORBIT_MIN_DISTANCE 8
+#define ORBIT_MAX_DISTANCE 1024
+#define ORBIT_STEP 6
+int AW_ViewOrbitActive(void) {return orbit.active;}
+static void orbit_focal(vec3_t out) {
+    if(orbit.edict>0 && orbit.edict<cl.num_entities && cl_entities[orbit.edict].model){
+        VectorAdd(cl_entities[orbit.edict].origin,orbit.offset,out);
+    }else{VectorCopy(orbit.point,out);}
+}
+static float orbit_seconds(void) {return orbit.rate?360.0f/(orbit.rate<0?-orbit.rate:orbit.rate):0;}
+static void orbit_say(void) {
+    if(orbit.rate)Con_Printf("Orbit: %.0f degrees a second (one orbit %.1f s), distance %.0f.\n",orbit.rate,orbit_seconds(),orbit.distance);
+    else Con_Printf("Orbit: held (speed 0), distance %.0f.\n",orbit.distance);
+}
+void AW_ViewOrbitSpeed(float rate) {
+    if(rate<-360)rate=-360;
+    if(rate>360)rate=360;
+    orbit.rate=rate;if(orbit.active)orbit_say();
+}
+/* Start (or move) the orbit: around edict EDICT (0: the fixed point) whose centre is FOCAL now,
+ * the camera starting where the view is, at that distance. 0 = not now. */
+int AW_ViewOrbitStart(int edict,const float *focal,int photo,float rate) {
+    edict_t *p=local_player();vec3_t d;float flat;
+    if(!p || death.stage!=AW_DEATH_NONE || p->v.health<=0){Con_Printf("Orbit: not now (no live player in a running scene).\n");return 0;}
+    if(!orbit.active){
+        VectorCopy(p->v.origin,orbit.origin);VectorCopy(p->v.angles,orbit.angles);VectorCopy(cl.viewangles,orbit.view);
+        orbit.movetype=p->v.movetype;orbit.flags=p->v.flags;orbit.anglehack=noclip_anglehack;
+    }
+    orbit.edict=edict>0 && edict<cl.num_entities?edict:0;
+    VectorCopy(focal,orbit.point);
+    if(orbit.edict){VectorSubtract(focal,cl_entities[orbit.edict].origin,orbit.offset);}else{VectorCopy(vec3_origin,orbit.offset);}
+    VectorSubtract(focal,r_refdef.vieworg,d);
+    orbit.distance=Length(d);
+    if(orbit.distance<ORBIT_MIN_DISTANCE)orbit.distance=ORBIT_MIN_DISTANCE*4;
+    if(orbit.distance>ORBIT_MAX_DISTANCE)orbit.distance=ORBIT_MAX_DISTANCE;
+    flat=(float)sqrt(d[0]*d[0]+d[1]*d[1]);
+    orbit.yaw=flat>.01f?(float)(Q_atan2(d[1],d[0])*180/M_PI):cl.viewangles[YAW];
+    orbit.pitch=(float)(Q_atan2(-d[2],flat>.01f?flat:1)*180/M_PI);
+    if(orbit.pitch>80)orbit.pitch=80;
+    if(orbit.pitch<-80)orbit.pitch=-80;
+    orbit.photo=photo;orbit.rate=rate;orbit.pending=0;orbit.active=1;
+    /* detached: noclip, god, notarget; no velocity, nothing touched (SV_LinkEdict without triggers) */
+    p->v.movetype=MOVETYPE_NOCLIP;noclip_anglehack=true;
+    p->v.flags=(float)((int)p->v.flags|FL_GODMODE|FL_NOTARGET);
+    VectorCopy(vec3_origin,p->v.velocity);SV_LinkEdict(p,false);
+    IN_AWClearButtons();
+    orbit_say();
+    Con_Printf("Orbit keys: + / - speed, 0 holds, mouse wheel distance, mouse turns, right click or Esc ends.\n");
+    return 1;
+}
+static void set_chase(int on);
+void AW_ViewOrbitEnd(int say) {
+    edict_t *p=local_player();
+    orbit.pending=0;
+    if(!orbit.active)return;
+    orbit.active=0;
+    if(p){
+        VectorCopy(orbit.origin,p->v.origin);VectorCopy(vec3_origin,p->v.velocity);
+        p->v.movetype=orbit.movetype;p->v.flags=orbit.flags;noclip_anglehack=orbit.anglehack;
+        VectorCopy(orbit.view,cl.viewangles);VectorCopy(orbit.angles,p->v.angles);p->v.fixangle=1;
+        SV_LinkEdict(p,false);
+    }
+    IN_AWClearButtons();
+    set_chase(AW_ViewBehind(&view));
+    if(say)Con_Printf("Orbit ended: position, view, movement and flags restored.\n");
+}
+/* dbg cam orbit mark NAME: start on what the mark's shot shows once it has arrived. */
+void AW_ViewOrbitPending(int photo,float rate) {
+    orbit.pending=1;orbit.pending_photo=photo;orbit.pending_rate=rate;orbit.pending_since=realtime;
+}
+int AW_SceneStarting(void);
+static void orbit_frame(float dt) {
+    if(orbit.pending && !orbit.active){
+        int n;vec3_t focal;
+        if(AW_SceneStarting() || cls.signon!=SIGNONS){orbit.pending_since=realtime;return;}
+        if(realtime-orbit.pending_since<1.5)return;          /* the arrival view has been drawn */
+        orbit.pending=0;
+        if(AW_InspectTarget(&n,focal)>0)AW_ViewOrbitStart(n,focal,orbit.pending_photo,orbit.pending_rate);
+        else Con_Printf("Orbit: nothing under the crosshair of the mark's shot.\n");
+        return;
+    }
+    if(!orbit.active)return;
+    /* the mouse turns the orbit; the player's own view stays as it was */
+    orbit.yaw+=cl.viewangles[YAW]-orbit.view[YAW];orbit.pitch+=cl.viewangles[PITCH]-orbit.view[PITCH];
+    VectorCopy(orbit.view,cl.viewangles);
+    if(!cl.paused)orbit.yaw+=orbit.rate*dt;
+    orbit.yaw-=360.0f*(float)floor(orbit.yaw/360.0f);
+    if(orbit.pitch>80)orbit.pitch=80;
+    if(orbit.pitch<-80)orbit.pitch=-80;
+}
+static int orbit_key(int key) {
+    if(!orbit.active || key_dest!=key_game)return 0;
+    if(key=='+' || key=='=')AW_ViewOrbitSpeed(orbit.rate+ORBIT_STEP);
+    else if(key=='-')AW_ViewOrbitSpeed(orbit.rate-ORBIT_STEP);
+    else if(key=='0')AW_ViewOrbitSpeed(0);
+    else if(key==K_MWHEELUP || key==K_MWHEELDOWN){
+        orbit.distance*=key==K_MWHEELUP?.9f:1.1f;
+        if(orbit.distance<ORBIT_MIN_DISTANCE)orbit.distance=ORBIT_MIN_DISTANCE;
+        if(orbit.distance>ORBIT_MAX_DISTANCE)orbit.distance=ORBIT_MAX_DISTANCE;
+    }
+    else if(key==K_ESCAPE || key==K_MOUSE2)AW_ViewOrbitEnd(1);
+    return 1;                                                  /* every other game key: nothing */
+}
+static int orbit_camera(void) {
+    vec3_t focal,angles,forward,right,up,end,hit;float fraction,d;
+    orbit_focal(focal);
+    angles[PITCH]=orbit.pitch;angles[YAW]=orbit.yaw;angles[ROLL]=0;
+    AngleVectors(angles,forward,right,up);
+    VectorMA(focal,-orbit.distance,forward,end);
+    trace(focal,end,hit,&fraction);
+    d=AW_ViewObstacle(orbit.distance,fraction,rules.obstacle);
+    VectorMA(focal,-d,forward,r_refdef.vieworg);
+    VectorCopy(angles,r_refdef.viewangles);
+    return 1;
+}
 int AW_ViewCamera(void) {
     vec3_t focal,angles,forward,right,up,end,hit;float fraction,d;entity_t *ent;
     if(!owned)return 0;
+    if(orbit.active)return orbit_camera();
     ent=&cl_entities[cl.viewentity];
     /* camera.cpp: the focal point mHeight above the feet (124 x 0.25), not the eye's bob */
     VectorCopy(ent->origin,focal);focal[2]+=rules.height-feet();
@@ -476,6 +628,7 @@ int AW_ViewCamera(void) {
 void AW_ViewRoll(void) {if(owned)r_refdef.viewangles[ROLL]=0;}
 /* The vanity orbit's full view (screen.c): only while it orbits; any input ends the orbit and brings the HUD back. */
 int AW_ViewVanityFullscreen(void) {
+    if(owned && orbit.active)return orbit.photo;
     return owned && view.mode==AW_VIEW_VANITY && death.stage==AW_DEATH_NONE && fullview_cvar.value!=0;
 }
 int AW_ViewThirdPerson(void) {return owned;}
@@ -520,6 +673,7 @@ static void choose(int choice) {
 }
 int AW_ViewKey(int key) {
     int k=0,c;
+    if(orbit_key(key))return 1;
     if(death.stage!=AW_DEATH_ASK || acted || key_dest!=key_game)return 0;
     if(key==K_LEFTARROW || key=='a' || key=='A')k=1;
     else if(key==K_RIGHTARROW || key==K_TAB || key=='d' || key=='D')k=2;
@@ -571,7 +725,9 @@ void AW_ViewFrame(void) {
     if(dt<0)dt=0;
     if(dt>.25f)dt=.25f;
     p=local_player();
-    if(!p){if(death.stage!=AW_DEATH_NONE)end_death();set_chase(0);return;}
+    if(!p){if(death.stage!=AW_DEATH_NONE)end_death();orbit.active=0;set_chase(0);return;}
+    orbit_frame(dt);
+    if(orbit.active){if(p->v.health<=0)AW_ViewOrbitEnd(0);else{set_chase(1);return;}}
     /* Story permission is separate from the saved camera preferences and
      * body availability. Clear pending input so locked Tab taps cannot fire
      * when registration ends, and cancel an orbit carried across new game. */
@@ -639,6 +795,14 @@ void AW_ViewInput(int key,int down) {
     if(down && key_dest==key_game)input_seen=1;
 }
 void AW_ViewSceneSpawn(void) {
+    /* a new map ends an orbit (the arrival places the player); its detachment goes with it */
+    if(orbit.active){
+        edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
+        orbit.active=0;
+        if(p){p->v.flags=(float)(((int)p->v.flags&~(FL_GODMODE|FL_NOTARGET))|((int)orbit.flags&(FL_GODMODE|FL_NOTARGET)));
+              if(p->v.movetype==MOVETYPE_NOCLIP && orbit.movetype!=MOVETYPE_NOCLIP){p->v.movetype=orbit.movetype;noclip_anglehack=orbit.anglehack;}}
+        set_chase(0);
+    }
     AW_ViewInventoryClear();
     AW_ItemsAliasClear();held_cursor=held_draw_count=0;
     memset(&body_air,0,sizeof(body_air));
@@ -759,7 +923,7 @@ static void command(void) {
 void AW_ViewInit(void) {
     Cvar_RegisterVariable(&view_cvar);Cvar_RegisterVariable(&distance_cvar);Cvar_RegisterVariable(&vanity_cvar);
     Cvar_RegisterVariable(&death_cvar);Cvar_RegisterVariable(&retry_cvar);Cvar_RegisterVariable(&body_cvar);
-    Cvar_RegisterVariable(&fullview_cvar);
+    Cvar_RegisterVariable(&fullview_cvar);Cvar_RegisterVariable(&aw_inventory_preview_reserve);Cvar_RegisterVariable(&aw_inventory_preview_live);
     AW_ViewRulesDefault(&rules);AW_ViewReset(&view,&rules);
     Cmd_AddCommand("+aw_pov",pov_press);Cmd_AddCommand("-aw_pov",pov_release);
     Cmd_AddCommand("aw_view_zoom",zoom_command);Cmd_AddCommand("aw_camera",command);

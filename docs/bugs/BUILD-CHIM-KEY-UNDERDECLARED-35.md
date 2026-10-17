@@ -9,7 +9,7 @@
 | Where | tools/chim_build.py (cell progress subprocess named in parts), tools/build_cache.py source closure |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: A stage output (BUILD/toolkit) was produced by code its key did not cover; only the read trace refused the reuse |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | 2026_10_10_v0.0.35-dev1_full-try2_901f8e9 |

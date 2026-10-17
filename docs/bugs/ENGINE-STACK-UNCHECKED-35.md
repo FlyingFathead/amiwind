@@ -9,7 +9,7 @@
 | Where | engine/aga/src/sys_amiga.c main |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Started without the boot disk Stack command, the game overwrote memory instead of stopping with a message |
 | Family | Boot and engine start-up (`boot-startup`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

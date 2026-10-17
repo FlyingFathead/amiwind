@@ -12,7 +12,7 @@ of string literals) of 1 KiB or more are listed too: they are in the binary for 
 
 The engine sources are read as text: the files of engine/aga/Makefile's SRCS, comments and `#if 0` blocks left
 out. tests/test_resident_registry.py compares the totals with tests/resident_registry_budget.json (a ratchet:
-the numbers may go down freely; going up needs the budget raised in the same change with the owner's reason).
+the numbers may go down freely; going up needs the budget raised in the same change with the maintainer's reason).
 New debug commands go into the on-disk dbg command catalogue (aw_console.c, AWDC1) instead of new registrations.
 
   python3 tools/resident_registry.py [--json]
@@ -206,7 +206,7 @@ def over_budget(found, budget):
 
 ADVICE = ('Route new debug commands through the on-disk dbg command catalogue (engine/aga/src/aw_console.c, AWDC1) '
           'instead of Cmd_AddCommand/Cvar_RegisterVariable, or raise the budget in the same commit with the '
-          "owner-approved reason (tools/resident_registry.py --raise-budget 'YYYY-MM-DD: reason').")
+          "maintainer-approved reason (tools/resident_registry.py --raise-budget 'YYYY-MM-DD: reason').")
 
 
 def load_budget(path=BUDGET):
@@ -216,7 +216,7 @@ def load_budget(path=BUDGET):
 def budget_document(found, reasons):
     return {'format': 'AmiWind resident registry budget 1',
             'note': 'Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be '
-                    'lowered when the engine needs less. Raise only with a dated, owner-approved reason.',
+                    'lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.',
             'totals': totals(found), 'reasons': reasons,
             'entries': {group: [row['name'] for row in found[group]] for group in ('commands', 'cvars', 'tables')}}
 
@@ -227,7 +227,7 @@ def write_budget(document, path=BUDGET):
 
 def update_budget(found, budget, reason=None):
     """The new budget document: the current numbers. Without REASON only a lowering (nothing above BUDGET);
-    with REASON (a dated, owner-approved line) a raise, the reason appended."""
+    with REASON (a dated, maintainer-approved line) a raise, the reason appended."""
     if over_budget(found, budget) and not reason:
         raise ValueError('above the budget: raising needs a reason (--raise-budget)')
     reasons = list(budget.get('reasons', []))
@@ -242,7 +242,7 @@ def main(argv=None):
     parser.add_argument('--lower-budget', action='store_true',
                         help='write the current numbers to the budget (only when none is above it)')
     parser.add_argument('--raise-budget', metavar='REASON',
-                        help="write the current numbers with a dated, owner-approved reason ('YYYY-MM-DD: why')")
+                        help="write the current numbers with a dated, maintainer-approved reason ('YYYY-MM-DD: why')")
     args = parser.parse_args(argv)
     found = scan()
     if args.lower_budget or args.raise_budget:

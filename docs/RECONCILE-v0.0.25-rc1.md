@@ -28,7 +28,7 @@ merged runtime. Check docs/validation/reconciled-rc1.json for new source checks.
 The 23 actor-contact findings and the production image gate remain unchanged.
 No merged native runtime or full island rebuild has been run here.
 
-Preserve owner cleanup 9d22f4a: remove docs/images/amiwind-v0.0.24-journal.png
+Preserve maintainer cleanup 9d22f4a: remove docs/images/amiwind-v0.0.24-journal.png
 and its packaging exception. Keep the corrected v0.0.25-dev1 journal screenshot.
 
 Remove the obsolete v0.0.24-rc4 journal screenshot as well. The only remaining

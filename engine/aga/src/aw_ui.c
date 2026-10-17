@@ -520,10 +520,9 @@ void AW_UIEnemyBar(float fraction,float alpha) {
         if(row>=2 && row<h-2 && fill>0)AW_UIFill(x+2,y+row,fill,1,bar_fallback(3));
     }
 }
-/* Functional placeholders until original item HUD artwork is converted.
- * Read actual admitted carried equipment; never use a debug combat loadout or
- * the off-hand as a selected spell. Inventory caches metadata after changes. */
-static void hud_equipment_boxes(int y,int channels) {
+/* The interim authored marks (v0.0.40-dev1, HUD-STATS-29): a fist or a generic
+ * weapon mark and an empty-magic dash. Kept selectable: aw_hud_icons 0. */
+void AW_UIHudPlaceholders(int y,int channels) {
     static const byte fist[8]={0x38,0x7c,0x7c,0x3e,0x3e,0x1c,0x18,0x18};
     static const byte weapon[8]={0x03,0x06,0x0c,0x58,0x30,0x78,0x84,0x00};
     aw_inventory_item_t item;
@@ -539,10 +538,15 @@ static void hud_equipment_boxes(int y,int channels) {
     }
     if(channels&AW_HUD_MAGIC){
         AW_UIBox(116,y,24,24);AW_UIFill(119,y+3,18,18,black);
-        /* No selected-spell/enchantment runtime state yet. The dash is empty,
-         * not an invented selection or charge. */
         AW_UIFill(124,y+11,8,2,color);
     }
+}
+/* The original weapon/magic boxes live with the icon table (aw_icons.c, which
+ * sets this hook); it returns 0 when they are switched off (aw_hud_icons 0). */
+int (*aw_hud_item_boxes)(int y,int channels);
+static void hud_equipment_boxes(int y,int channels) {
+    if(aw_hud_item_boxes && aw_hud_item_boxes(y,channels))return;
+    AW_UIHudPlaceholders(y,channels);
 }
 int (*aw_combat_enemy_bar)(float *fraction,float *alpha);   /* aw_combat.c */
 int (*aw_combat_guard_marker)(void);   /* aw_combat.c: the player guards (hold to block) */

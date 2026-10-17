@@ -4,13 +4,13 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Shoreline cells 6,16 and 6,15; exact HUD poses in report |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.38-dev2 (last seen) |
-| Severity | high: Owner-visible world or movement defect requiring location-specific reproduction. |
+| Severity | high: Maintainer-visible world or movement defect requiring location-specific reproduction. |
 | Family | Object placement and in-game geometry (`placement-geometry`) |
 | Playtest version | v0.0.38-dev2 (visible screenshot label) |
 | From commit | source unknown, engine unknown, CHIM world unknown |
@@ -21,17 +21,17 @@
 <!-- END GENERATED FACTS -->
 
 ## Symptom
-Owner reports broken shoreline objects and missing textures. Two screenshots show broad open-looking sections, thin edges and background visible through the objects. Texture loss versus omitted faces, orientation or visibility is not yet isolated.
+Maintainer reports broken shoreline objects and missing textures. Two screenshots show broad open-looking sections, thin edges and background visible through the objects. Texture loss versus omitted faces, orientation or visibility is not yet isolated.
 
 ## Where
-Cell 6,16: global 55749,131690,154, heading 64, pitch -5. Cell 6,15: global 56812,129390,697, heading 163, pitch -13. Both are dev2 owner screenshots.
+Cell 6,16: global 55749,131690,154, heading 64, pitch -5. Cell 6,15: global 56812,129390,697, heading 163, pitch -13. Both are dev2 maintainer screenshots.
 
 An additional dev2 screenshot supplied on 12 October 2026 shows similar open
 sections at cell 6,15: global 56635,125560,1862, heading 226, pitch -4.
 The cause is not established by the additional view.
 
 ## How it happened
-Unknown. Owner evidence is preserved; no independent reproduction or cause yet.
+Unknown. Maintainer evidence is preserved; no independent reproduction or cause yet.
 
 ## Why it was not caught
 No matched native acceptance receipt covers these exact poses. Build-time checks
@@ -40,7 +40,7 @@ and other converted cells do not establish correctness at this location.
 ## Reproduction
 Identify original placed reference and model IDs at both poses. Capture matched OpenMW and native views, audit face winding, texture lookup, model bounds and visibility, then test collision separately. Read the existing AmiQuake surface and model drawing paths before designing a repair.
 
-The owner reports repeated shapes and longstanding gaps since rocks were
+The maintainer reports repeated shapes and longstanding gaps since rocks were
 separated from the topomap. A 153-model diagnostic found original material-rim
 vertex loss in 129 production reductions; boundary locking retained every
 measured rim vertex. This is a lead, not proof of an open seam or a repaired
@@ -49,14 +49,14 @@ need comparison. See [the rock investigation](../WHAT_ARE_ROCKS.md#v0038-investi
 
 ## Repair
 Pending diagnosis. Preserve the reported scene and distinguish a proposed
-repair from verified package behavior and owner acceptance.
+repair from verified package behavior and maintainer acceptance.
 
 ## Verification
-Owner-reported in v0.0.38-dev2 on 12 October 2026. No repaired package,
+Maintainer-reported in v0.0.38-dev2 on 12 October 2026. No repaired package,
 matched comparison or acceptance. Screenshot coordinates are copied from HUD.
 
 On 12 October, an original OpenMW reference near global 46864,132139,155
-(cell 5,16, heading 129, noon) showed continuous rock faces. The owner identified
+(cell 5,16, heading 129, noon) showed continuous rock faces. The maintainer identified
 the difference as further evidence of stitching problems. This supports the
 conversion investigation, but the camera is not yet matched: measured eye height
 was about 228.6 and the base pitch readback was zero despite requested extra tilt.
@@ -65,10 +65,10 @@ It does not establish the precise cause or a repaired result.
 The dev2 terrain and partition manifests route all 17 additional reported poses
 across cells 3,15; 4,16; 5,16; 6,15; 6,16; 7,15 and 7,16 to legacy BSP maps.
 These receipts identify the intended build path; they do not identify the exact
-bytes installed by the owner or the specific visible rock reference.
+bytes installed by the maintainer or the specific visible rock reference.
 
 ## Prevention
-Additional owner evidence on 12 October in v0.0.38-dev2: thin bright openings
+Additional maintainer evidence on 12 October in v0.0.38-dev2: thin bright openings
 cross several dark rock silhouettes at global 4222,148957,1765, local
 31,-648,57, cell 0,18, heading 309, pitch -20, time 08:41. This extends the
 reproduction set; it does not identify the mesh or establish that the sampled
@@ -79,9 +79,9 @@ Add the confirmed reproduction to cell-level native and source-reference
 coverage. Keep missing assets, collision and visibility findings separate.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.

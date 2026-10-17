@@ -107,6 +107,23 @@ class OwnershipTests(unittest.TestCase):
                 s['frames'][0]['frame_ownership']['pieces'][0][field] = value
                 self.assertTrue(any('serialized render/collision/placement' in f for f in self.failures(s)))
 
+    def test_frame_checks_on_the_pool_give_the_same_failures(self):
+        # BUILD-CHIM-STAGE-SERIAL-TAIL-36: the model digests and each frame's checks on the worker pool, merged in
+        # frame order: the same lines as one process, passing and failing
+        import contextlib
+        import io
+        from build_parallel import stage_pool
+        broken = copy.deepcopy(self.source)
+        broken['frames'][0]['frame_ownership']['pieces'][0]['yaw'] = 111.
+        broken['frames'][1]['frame_ownership']['pieces'].pop()
+        for source in (self.source, broken):
+            serial = list(validate(self.out, source, jobs=1, cross_checks='serial')[0])
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()), \
+                    stage_pool(2, 'test'):
+                pooled = list(validate(self.out, source, jobs=2, cross_checks='pool')[0])
+            self.assertEqual(pooled, serial)
+        self.assertGreaterEqual(sum('pieces differ' in f for f in serial), 2)
+
     def test_missing_piece_refused(self):
         s = copy.deepcopy(self.source);s['frames'][0]['frame_ownership']['pieces'].pop()
         self.assertTrue(any('pieces differ' in f for f in self.failures(s)))

@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 10 October 2026, in v0.0.35 |
 | Where | combat music trigger (player attack -> combat state), engine/QuakeC combat layer |
 | Reproduction | sometimes |
@@ -20,7 +20,7 @@
 
 ## Status: 10 October 2026
 
-Open (owner playtest of v0.0.35).
+Open (maintainer playtest of v0.0.35).
 
 ## Symptom
 

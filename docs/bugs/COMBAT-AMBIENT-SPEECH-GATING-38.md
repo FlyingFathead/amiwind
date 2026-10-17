@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Seyda Neen guard combat and nearby ambient speech |
 | Reproduction | unknown |
@@ -16,14 +16,14 @@
 | From commit | source c2eaa5a, engine c2eaa5a, CHIM world c2eaa5a |
 | CHIM engine version | CHIM unknown, engine c2eaa5a, world format unknown |
 | Unknown because | CHIM version and format not yet transcribed into this report; exact dev2 receipt preserved. |
-| Platform or emulator | unknown (Owner screenshot identifies dev2 but not the emulator.) |
+| Platform or emulator | unknown (Maintainer screenshot identifies dev2 but not the emulator.) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
 
-While fighting a guard in Seyda Neen, the owner still hears ordinary
-greetings such as Yes, possibly from the opponent or nearby guards. The owner
+While fighting a guard in Seyda Neen, the maintainer still hears ordinary
+greetings such as Yes, possibly from the opponent or nearby guards. The maintainer
 requests combat-appropriate opponent speech while unrelated ambient voices and
 speech text boxes are suppressed together. Exact actor attribution is unknown.
 
@@ -37,7 +37,7 @@ Source review, 13 October 2026: world.qc's aw_npc_idle, aw_greet and manual
 aw_interact paths do not check AW_PlayerInCombat. AW_VoiceSay's idle path checks
 distance and visibility but not combat. AW_CombatEngage stops the engaged
 opponent's QuakeC idle think, but nearby residents continue polling. That is a
-confirmed policy gap; the owner clip's exact speaker remains unknown.
+confirmed policy gap; the maintainer clip's exact speaker remains unknown.
 
 Greetings use sound plus centerprint, while combat barks use the same entity
 voice channel through a separate playback path. Generic centerprint does not
@@ -45,7 +45,7 @@ carry an actor or ambient-speech identity; its voiced label is inferred from
 remaining speech time. Thus clearing every voice or text panel would also risk
 unrelated combat, story or pickup feedback. Cancellation needs explicit ownership.
 
-OpenMW 0.48 rejects greetings and idle lines for actors in combat. The owner's
+OpenMW 0.48 rejects greetings and idle lines for actors in combat. The maintainer's
 requested suppression of unrelated nearby speech throughout the player's fight
 is a wider AmiWind policy, not a claim that the original globally silences every
 bystander. See the original [greeting and idle rules](https://raw.githubusercontent.com/OpenMW/openmw/openmw-0.48.0/apps/openmw/mwmechanics/actors.cpp).
@@ -56,7 +56,7 @@ No verified multi-actor combat/ambient subtitle regression is attached.
 
 ## Reproduction
 
-Repeat the owner scenario above in the delivered development build. Native reproduction remains pending.
+Repeat the maintainer scenario above in the delivered development build. Native reproduction remains pending.
 
 ## Repair
 

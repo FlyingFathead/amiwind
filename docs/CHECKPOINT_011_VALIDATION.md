@@ -5,7 +5,7 @@ NPC conversion research is saved; NPCs are not in this playable image yet.
 
 ## Reproduced fault and repair
 
-The owner reported working mouse look but no WASD movement, then confirmed
+The maintainer reported working mouse look but no WASD movement, then confirmed
 that noclip released the player. A fresh native dev3 test reproduced this:
 W/S/A/D and jump left the player at exactly (16, 44, 74). Input was reaching
 the engine. The nominal spawn intersects converted architectural collision.
@@ -43,7 +43,7 @@ of the old pose when no solution exists. Existing actual-runtime collision,
 culling and door-depth tests still pass.
 
 The BSP is byte-identical to dev3. Renderer, input and music implementation files
-are unchanged. The owner reports that dev3 doors now behave correctly and town
+are unchanged. The maintainer reports that dev3 doors now behave correctly and town
 details are present. This repair preserves that work.
 
 ## Artifact identity
@@ -56,10 +56,10 @@ details are present. This repair preserves that work.
 | KS3.1 A1200 40.68, 524,288 bytes | `6d43840d4099a74170ea0f0425b6257c3891ebcaa39c4d1840075a9ab22b5707` |
 
 The ROM in the preceding ZIP matches the tested local bytes; its CRC32 is
-1483A091 and its native longword checksum is FFFFFFFF. The owner resolved their
+1483A091 and its native longword checksum is FFFFFFFF. The maintainer resolved their
 ROM-selection problem but has not supplied the hash of their effective working
 ROM. Do not declare that selection identical or claim that the supplied ROM was
-repaired. Public packages contain no ROM. Keep the owner's working licensed
+repaired. Public packages contain no ROM. Keep the maintainer's working licensed
 A1200 ROM selected and record its hash for future reports.
 
 ## Resource measurements and limits

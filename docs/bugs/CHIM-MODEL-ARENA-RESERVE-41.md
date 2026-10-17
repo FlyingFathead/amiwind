@@ -9,7 +9,7 @@
 | Where | AW_BrushBound, ChimModels_Begin and tools/chim/heap.py |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.41 (last seen) |
+| Persists in | fixed in v0.0.41-dev1 |
 | Severity | high: Excess reservation rejects otherwise fitting placed-model active rings. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -143,7 +143,7 @@ Exact player-reuse verification confirms243assets/31,235,875bytes: original
 inputs, palette and adopted environment verified, and37producer dependency
 files identical against the earlier producer. This authorizes exact reuse,
 not native appearance, animation or all-player acceptance. Native, package,
-shipment and owner acceptance remain separate pending gates.
+shipment and maintainer acceptance remain separate pending gates.
 
 ## Zone, actor and model checkpoint, 15 October 2026
 

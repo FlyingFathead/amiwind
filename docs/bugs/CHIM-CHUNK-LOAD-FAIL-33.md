@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | CHIM chunk loading/zone: Balmora, Dwemer follow-up and Seyda native terrain allocation |
 | Reproduction | sometimes |
@@ -17,7 +17,7 @@
 | From commit | source 0f467e4, engine 0d8bf4f, CHIM world unknown |
 | CHIM engine version | CHIM 0.1.0, engine 0d8bf4f, world format 0.4 |
 | Unknown because | the CHIM world receipt records no commit: world built 8 October 2026 17:54 +03:00 on the v0.0.33-chim-format branch before 8caf66e (CHIM-RECEIPT-COMMIT-33) |
-| Build note | first seen in a development emulator session of the same Balmora world on 8 October 2026 (a3ef932); the owner saw it in CHIM Preview 1 on 9 October 2026 |
+| Build note | first seen in a development emulator session of the same Balmora world on 8 October 2026 (a3ef932); the maintainer saw it in CHIM Preview 1 on 9 October 2026 |
 
 <!-- END GENERATED FACTS -->
 
@@ -33,7 +33,7 @@
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
-- [Owner follow-up, 13 October 2026: Dwemer exterior cell (9,2)](#owner-follow-up-13-october-2026-dwemer-exterior-cell-92)
+- [Maintainer follow-up, 13 October 2026: Dwemer exterior cell (9,2)](#maintainer-follow-up-13-october-2026-dwemer-exterior-cell-92)
 - [Exact RC1 evidence, 13 October 2026](#exact-rc1-evidence-13-october-2026)
 - [Seyda native allocation retry, 14 October 2026](#seyda-native-allocation-retry-14-october-2026)
 - [Repeated Seyda allocation failure, 14 October 2026](#repeated-seyda-allocation-failure-14-october-2026)
@@ -56,7 +56,7 @@ CHIM-RECEIPT-COMMIT-33).
 
 ## Symptom
 
-Owner playtest of the private CHIM preview, Balmora on CHIM, 9 October 2026. The console repeats
+Maintainer playtest of the private CHIM preview, Balmora on CHIM, 9 October 2026. The console repeats
 "CHIM: chunk N not loaded (zone full or bad data); retrying" and the chunks never arrive:
 
 | Global position | Chunks named | What was seen |
@@ -76,7 +76,7 @@ heap gate's model of the ring). The world data is not affected (see below).
 
 ## How it happened
 
-Measured in FS-UAE on fresh copies of the preview's disks, at the owner's poses in his order (the same
+Measured in FS-UAE on fresh copies of the preview's disks, at the maintainer's poses in his order (the same
 chunk numbers fail at the same poses: 92 and 102 at -23807 -15931), and with the map reloaded before
 each pose:
 
@@ -94,7 +94,7 @@ each pose:
    load radius (892: + prefetch 256). The heap gate counts the active ring at one position: at most
    6,239,776 bytes against 6,242,304 for Balmora (2,528 bytes of headroom, nothing for fragmentation);
    counting everything a moving player can hold locked (the load radius), 661 of 9,216 positions are
-   over the budget, peak 7,661,472 bytes; at the owner's poses 5.6-7.5 MB.
+   over the budget, peak 7,661,472 bytes; at the maintainer's poses 5.6-7.5 MB.
 4. The ground waits for every building. A chunk is activated, and its terrain joins the frame world,
    only when all models its placements use are resident. One house model without room keeps the ground
    of its chunk out: a hole, and with no collision there the player falls.
@@ -130,7 +130,7 @@ documented in `docs/chim/ENGINE.md`, "When the zone is full"):
 - A loading chunk keeps what it has (`chim_release 1`): while a chunk within the active radius loads its
   terrain or a model, its catalogue, terrain and resident models are locked. The first method could
   evict them to make room for the next model, and a chunk whose models did not fit together loaded them
-  in turn for ever (the cache thrash: about a million model loads over the owner's route in the
+  in turn for ever (the cache thrash: about a million model loads over the maintainer's route in the
   simulation, 964 at one pose in FS-UAE).
 - Nearer chunks win (`chim_release 1`): a chunk within the active radius that finds no room releases the
   active chunk farthest from the player that is farther than itself and outside the collision margin
@@ -154,15 +154,15 @@ Tried and measured worse, not kept: eviction of the cheapest run of unlocked blo
 model loads on the sweep) and least-recently-used eviction restricted to such runs (more failures than
 evicting all unlocked blocks, which leaves the most contiguous room).
 
-A larger zone helps further (simulated over the owner's route with all methods on: 30 loads without room
-at 6,864 KiB, 14 at 7,680 KiB); the budget stays CHIM-ZONE-BUDGET-33's owner decision.
+A larger zone helps further (simulated over the maintainer's route with all methods on: 30 loads without room
+at 6,864 KiB, 14 at 7,680 KiB); the budget stays CHIM-ZONE-BUDGET-33's project decision.
 
 ## Verification
 
 The engine's own zone allocator over walks (simulation, `tools/chim/zone_sim.py`, Balmora world, target
 ABI block sizes; holes = steps with a chunk within the collision margin without its ground):
 
-| Methods | Owner's route twice (1,192 steps) | Sweep of the frame (6,111 steps) | Teleports to the poses x3 |
+| Methods | Maintainer's route twice (1,192 steps) | Sweep of the frame (6,111 steps) | Teleports to the poses x3 |
 | --- | --- | --- | --- |
 | first methods (preview, dev1 engine) | 701 failed, 860 holes, 1,010,584 model loads | 382 failed, 231 holes | 70 failed, 180 holes |
 | all methods, zone_ends 0 | 52 failed, 0 holes, 1,105 model loads | 42 failed, 0 holes | 16 failed, 0 holes |
@@ -174,7 +174,7 @@ first methods 28 and 107 holes (45 and 178 failed loads); all methods 0 and 0 ho
 loads, 11 and 31 partial activations).
 
 FS-UAE, fresh copies of the same disks (v0.0.32 release image plus the format 0.4 Balmora world), the
-owner's poses in order, twice, with a short walk at each; the engine's nearest chunk without ground
+maintainer's poses in order, twice, with a short walk at each; the engine's nearest chunk without ground
 (collision margin 224 units):
 
 | Engine | Nearest chunk without ground, worst | Failed load attempts | Data read | Notes |
@@ -189,7 +189,7 @@ An earlier run of the preview engine over the route three times stopped answerin
 budget, and its models evicted each other). No run of the repaired engine froze. No run printed a texture
 fallback ("drawn untextured") or bad data.
 
-Remaining: the owner's playtest of a build with the repaired engine.
+Remaining: the maintainer's playtest of a build with the repaired engine.
 
 ## Prevention
 
@@ -203,16 +203,16 @@ Remaining: the owner's playtest of a build with the repaired engine.
   zone's failure count, largest unlocked run and layout in `tests/aga_chim_zone_test.c`;
   `tests/test_chim_zone_sim.py`.
 
-## Owner follow-up, 13 October 2026: Dwemer exterior cell (9,2)
+## Maintainer follow-up, 13 October 2026: Dwemer exterior cell (9,2)
 
-An owner screenshot shows a visible Dwemer structure and `CHIM: chunk 116 not
+A maintainer screenshot shows a visible Dwemer structure and `CHIM: chunk 116 not
 loaded: zone full ... retrying` at global XYZ (77750,20044,1980), exterior cell
 (9,2). Its receipt identifies the v0.0.38 full-image WinUAE playtest. Evidence
 `OWNER-20261013-DWEMER-CHUNK116` binds the private original, SHA-256
 `4dab41e7209ea102524a6718089b4ab94f01088652aa63890e619a06e03ba173`.
 Other warning numbers overlap text and are not reliably transcribed.
 
-The owner reports heavy loading but working access. That does not establish
+The maintainer reports heavy loading but working access. That does not establish
 complete geometry, a measured load time or recovery of every chunk. The warning
 does not prove the earlier Balmora fragmentation cause. Reproduce the exact
 image at normal speed; record allocation details, recovery, visible/collision
@@ -240,7 +240,7 @@ This is allocation/residency evidence under the existing streaming issue.
 It does not alone establish a visible terrain hole, falling, eventual recovery,
 measured FPS impact or that inventory caused the pressure. Preserve the warning
 and exact native source/world binding for further investigation. No new cell
-coverage, memory repair or owner acceptance is claimed.
+coverage, memory repair or maintainer acceptance is claimed.
 
 ## Repeated Seyda allocation failure, 14 October 2026
 

@@ -1,6 +1,6 @@
 # Ordered voice-record lookup export
 
-`tools/prepare_dialogue_lookup.py` reads the owner's base Morrowind master and
+`tools/prepare_dialogue_lookup.py` reads the user's base Morrowind master and
 writes a private JSON index. The guided AGA build runs it as `dialogue-lookup`;
 its output is beside the build stages, not embedded in the HDF yet.
 
@@ -30,6 +30,6 @@ References:
 - [OpenMW dialogue manager](https://github.com/OpenMW/openmw/blob/46bd4599203ee52ffc0f3e8edb3fc159a0303a49/apps/openmw/mwdialogue/dialoguemanagerimp.cpp)
 - [UESP generic voiced dialogue](https://en.uesp.net/wiki/Morrowind:Generic_Dialogue_Voiced)
 
-UESP is a useful development reference for lines and filenames. The owner's
+UESP is a useful development reference for lines and filenames. The maintainer's
 ESM records and their conditions determine selection; the wiki is not a runtime
 asset source. See OPENMW_REF_NPCS_AND_DIALOGUE.md for trigger behavior and scope.

@@ -830,6 +830,26 @@ int R_BmodelCheckBBox (model_t *clmodel, float *minmaxs)
 }
 
 
+/* dbg rprof: world leaves (non-solid) the entity box r_emins/r_emaxs touches
+ * below node, and how many of them are in the current PVS and draw range. */
+static void R_RProfCountLeaves (mnode_t *node, int *leaves, int *visible)
+{
+	int sides;
+
+	while (node->contents >= 0)
+	{
+		sides = BOX_ON_PLANE_SIDE(r_emins, r_emaxs, node->plane);
+		if (sides == 3)
+			R_RProfCountLeaves (node->children[1], leaves, visible);
+		node = node->children[sides & 1 ? 0 : 1];
+	}
+	if (node->contents == CONTENTS_SOLID)
+		return;
+	(*leaves)++;
+	if (node->visframe == r_visframecount && AW_NodeVisible(node->minmaxs))
+		(*visible)++;
+}
+
 /*
 =============
 R_DrawBEntitiesOnList
@@ -837,11 +857,14 @@ R_DrawBEntitiesOnList
 */
 void R_DrawBEntitiesOnList (void)
 {
-	int			i, j, clipflags, range_pass;
+	int			i, j, clipflags, range_pass, far_result;
     model_t range_view;
 	vec3_t		oldorigin;
 	model_t		*clmodel;
 	float		minmaxs[6];
+	unsigned long	rp_t0, rp_t1;
+	long		rp_front = 0, rp_sent = 0;
+	int		rp_leaves, rp_visible;
 
 	if (!r_drawentities.value)
 		return;
@@ -881,11 +904,23 @@ void R_DrawBEntitiesOnList (void)
 
             if(currententity->angles[0] || currententity->angles[1] || currententity->angles[2])
                 for(j=0;j<3;j++){minmaxs[j]=currententity->origin[j]-clmodel->radius;minmaxs[3+j]=currententity->origin[j]+clmodel->radius;}
+            /* aw_fog.c: the fog-exact far test (the same picture) and the
+             * detail options of aw_cull; each render-range pass on its own box. */
+            far_result=AW_BrushPassFar(currententity->origin,clmodel->radius,minmaxs);
+            if(far_result==AW_FAR_SKIP){AW_RC(RC_FAR_FOG_MODELS);continue;}
+            if(far_result==AW_FAR_SIZE){AW_RC(RC_FAR_SIZE);continue;}
 			clipflags = R_BmodelCheckBBox (clmodel, minmaxs);
 
 			if (clipflags != BMODEL_FULLY_CLIPPED)
 			{
 				AW_RC(RC_BM_INVIEW);
+				rp_leaves = rp_visible = 0;
+				if (aw_rprof_on)
+				{
+					rp_front = AW_RC_GET(RC_BF_FRONT);
+					rp_sent = AW_RC_GET(RC_FRAGMENTS) + AW_RC_GET(RC_LEAF_FACES);
+				}
+				AW_RP_BEGIN(rp_t0);
 				VectorCopy (currententity->origin, r_entorigin);
 				VectorSubtract (r_origin, r_entorigin, modelorg);
 			// FIXME: is this needed?
@@ -900,6 +935,8 @@ void R_DrawBEntitiesOnList (void)
              * their root may be a negative leaf index. Light the model's
              * actual surface range after setting its local transform. */
             R_MarkBrushLights(clmodel);
+            aw_far_faces=0;
+            if((far_result&15)==AW_FAR_FACES)AW_FarPassBegin(far_result);
 
 			// if the driver wants polygons, deliver those. Z-buffering is on
 			// at this point, so no clipping to the world tree is needed, just
@@ -924,6 +961,8 @@ void R_DrawBEntitiesOnList (void)
 					{
 						currententity->topnode = r_pefragtopnode;
 
+						if (aw_rprof_on)
+							R_RProfCountLeaves (r_pefragtopnode, &rp_leaves, &rp_visible);
 						if (r_pefragtopnode->contents >= 0)
 						{
 						// not a leaf; has to be clipped to the world BSP
@@ -937,7 +976,9 @@ void R_DrawBEntitiesOnList (void)
 						// edges in the edge list and let 1/z sorting handle
 						// drawing order
 							AW_RC(RC_BM_ONELEAF);
+							AW_RP_BEGIN(rp_t1);
 							R_DrawSubmodelPolygons (clmodel, clipflags);
+							AW_RP_END(RP_ONELEAF, rp_t1);
 						}
 
 						currententity->topnode = NULL;
@@ -952,6 +993,13 @@ void R_DrawBEntitiesOnList (void)
 				VectorCopy (base_modelorg, modelorg);
 				VectorCopy (oldorigin, modelorg);
 				R_TransformFrustum ();
+				aw_far_faces=0;
+				AW_RP_END(RP_PASS, rp_t0);
+				if (aw_rprof_on)
+					AW_RProfModel (currententity->origin, clmodel->radius,
+						AW_RC_GET(RC_BF_FRONT) - rp_front,
+						AW_RC_GET(RC_FRAGMENTS) + AW_RC_GET(RC_LEAF_FACES) - rp_sent,
+						rp_leaves, rp_visible);
 			}
 
             } /* common model followed by placement-specific pool ranges */

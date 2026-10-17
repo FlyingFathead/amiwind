@@ -9,7 +9,7 @@
 | Where | CHIM builder Balmora statics versus image-step edits |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: CHIM world shows harvest mushrooms twice and misses town flora; blocks CHIM milestone 1. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

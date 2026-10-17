@@ -24,9 +24,9 @@ voiced line or invent a sound mapping for a text-only response.
 ## References and observed behaviour
 
 - [UESP: Morrowind — Generic Dialogue Voiced](https://en.uesp.net/wiki/Morrowind:Generic_Dialogue_Voiced)
-  is the owner's requested community reference for identifying voice lines.
+  is the maintainer's requested community reference for identifying voice lines.
   Its page returned HTTP 403 during this check; no recordings were downloaded.
-  Keep the link for manual cross-checks against the owner's installed data.
+  Keep the link for manual cross-checks against the maintainer's installed data.
 - [OpenMW dialogue manager](https://github.com/OpenMW/openmw/blob/master/apps/openmw/mwdialogue/dialoguemanagerimp.cpp):
   `DialogueManager::say` rejects actors already speaking, submerged NPCs and
   knocked-down actors. It looks up a dialogue topic, applies `Filter::search`,
@@ -50,7 +50,7 @@ verification. No OpenMW implementation code is copied into the GPLv2 runtime.
 
 ## Proposed conversion contract
 
-Read the owner's NPC, inventory/body-part, dialogue and response records and
+Read the maintainer's NPC, inventory/body-part, dialogue and response records and
 resolve voice paths through the installed game data. Preserve actor identity,
 topic/response IDs, record order, eligibility conditions and result-script
 references in the private intermediate. Report unsupported conditions or scripts
@@ -95,7 +95,7 @@ and `components/esm3/loadbody.hpp`, `loadnpc.hpp`, `loadclot.hpp`, `loadarmo.hpp
 `loadinfo.hpp`. These are behaviour/file-format study references, not bundled
 implementation or a linked runtime dependency.
 
-Findings from the owner's base-game records and PyFFI inspection:
+Findings from the user's base-game records and PyFFI inspection:
 
 - NPC inventory and outfit part records repeat tags; parsing into a simple
   dictionary loses inventory items and left/right part assignments. Retain order.

@@ -17,7 +17,7 @@
 | First noticed | 11 October 2026, in v0.0.36-dev3 |
 | Where | tests/test_build_parallel.py ParallelBuildTests |
 | Reproduction | sometimes |
-| Duplicate of | no |
+| Duplicate of | [TEST-PARALLEL-ORDER-LOAD-33](TEST-PARALLEL-ORDER-LOAD-33.md) |
 | Persists in | v0.0.36-dev3 (last seen) |
 | Severity | medium: a red gate on unrelated branches costs a rerun of the full gate each time |
 | Family | Gates, CI and tests (`tests-ci`) |

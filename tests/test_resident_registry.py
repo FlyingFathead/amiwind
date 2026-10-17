@@ -4,7 +4,7 @@
 Every console command, console variable and large static name table stays in memory for the whole session.
 tools/resident_registry.py counts them in the compiled engine sources with their bytes; this test fails when
 any number rises above tests/resident_registry_budget.json, naming the new entries, and asks for the budget to
-be lowered when the engine needs less (a ratchet: down freely, up only with a dated, owner-approved reason).
+be lowered when the engine needs less (a ratchet: down freely, up only with a dated, maintainer-approved reason).
 """
 import json
 from pathlib import Path
@@ -92,9 +92,9 @@ class Scan(unittest.TestCase):
                                         'commands hunk_bytes: 64 > budget 32; new: aw_b'])
             with self.assertRaises(ValueError):
                 registry.update_budget(grown, budget)
-            raised = registry.update_budget(grown, budget, '2026-10-11: owner OK for aw_b')
+            raised = registry.update_budget(grown, budget, '2026-10-11: maintainer OK for aw_b')
             self.assertEqual((raised['totals']['commands']['count'], raised['reasons'][-1]),
-                             (2, '2026-10-11: owner OK for aw_b'))
+                             (2, '2026-10-11: maintainer OK for aw_b'))
             (base / 'src' / 'a.c').write_text('void A(void){}\n')
             lowered = registry.update_budget(registry.scan(base), raised)
             self.assertEqual(lowered['totals']['commands'], {'count': 0, 'hunk_bytes': 0})

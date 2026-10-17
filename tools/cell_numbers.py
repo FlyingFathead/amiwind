@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Stable interior cell numbers for the debug HUD ("INT 412") and `dbg cell`.
 
-Every interior cell of the owner's masters gets one plain number, the same in
+Every interior cell of the maintainer's masters gets one plain number, the same in
 every build: the base master's interior cells sorted by cell ID (case folded)
 take 1..N, then each expansion master in fixed order appends the cells it adds,
 sorted the same way. A missing expansion therefore never renumbers the cells

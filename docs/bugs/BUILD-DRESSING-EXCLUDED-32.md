@@ -9,7 +9,7 @@
 | Where | Mesh converter append_meshes (tools/prepare_mesh_bsp.py), Seyda Neen interiors |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev1 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | high: Converter dropped six dressing pieces without a receipt. |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | Playtest version | v0.0.32-dev1 |
@@ -37,8 +37,8 @@
 ## Status: 8 October 2026
 
 Open: repaired in source (v0.0.32-dressing-receipts), not yet in a built image. Found in the
-v0.0.32-dev1 census of the Census and Excise Office (owner question about one entity fewer than
-v0.0.31). Owner decision (8 October 2026): A, the Seyda Neen interiors keep their dressing, with a
+v0.0.32-dev1 census of the Census and Excise Office (maintainer question about one entity fewer than
+v0.0.31). Project decision (8 October 2026): A, the Seyda Neen interiors keep their dressing, with a
 heap check, the earlier skip rule kept as an option, and a track of what is added ("keep a track on
 what's going"). Prevention: every omission is receipted, and the image step compares its entity
 tracker with the last release.
@@ -95,7 +95,7 @@ not in `models` and not in `omitted`.
 
 ## Repair
 
-Owner decision A, in source:
+Project decision A, in source:
 
 - The Seyda Neen interior converters (`prepare_census.py`, `prepare_interior.py`, the Seyda Neen
   rooms of `prepare_area.py`) keep their dressing: `INTERIOR_DRESSING` (`flora_`, `scum_`,
@@ -184,8 +184,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 Related bugs in other categories:

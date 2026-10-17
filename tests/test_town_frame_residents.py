@@ -102,7 +102,7 @@ class ResidentLandDetail(unittest.TestCase):
 
 
 class WideSupportSearch(unittest.TestCase):
-    """The wide ring (32 to 48 units) runs only after the 32-unit search (owner decision, CHIM-VIVEC-FRAME-WIDE-41)."""
+    """The wide ring (32 to 48 units) runs only after the 32-unit search (project decision, CHIM-VIVEC-FRAME-WIDE-41)."""
 
     def fitter(self, fits):
         import actor_grounding

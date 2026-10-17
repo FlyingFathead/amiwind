@@ -9,7 +9,7 @@
 | Where | dbg tp vivec_arena arrival (aw_scene.c, va010) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev1 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | high: The teleport leaves the player at the frame origin under the water; a v0.0.32 blocker. |
 | Family | Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`) |
 | Playtest version | v0.0.32-dev1 |
@@ -18,10 +18,26 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- contents start -->
+## Contents
+
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 8 October 2026
 
-Open, a v0.0.32 blocker (owner): fixed in source on branch v0.0.32-vivec-arrival, not yet in a build. Found in the v0.0.32-dev1
-FS-UAE smoke test; confirmed by the owner in dev1 play ("`dbg tp vivec_arena` teleports straight
+Open, a v0.0.32 blocker (maintainer): fixed in source on branch v0.0.32-vivec-arrival, not yet in a build. Found in the v0.0.32-dev1
+FS-UAE smoke test; confirmed by the maintainer in dev1 play ("`dbg tp vivec_arena` teleports straight
 into the sea underneath the Vivec city": GLOBAL 36352 -87040 -466, LOCAL 0 0 -116).
 
 ## Symptom
@@ -86,7 +102,7 @@ spot and Balmora's stored arrival as 23 units above its floor (resolved by the s
 
 ## Verification
 
-Owner's data, inside Docker, 8 October 2026:
+Maintainer's data, inside Docker, 8 October 2026:
 
 - `tools/arrival_spot.py` on the dev1 image: Seyda Neen arrival passes; Balmora's stored arrival
   is not itself a spot (ground 23 units below; resolved at run time to 288.125); Arena: no spot.
@@ -118,6 +134,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
+- [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
 - [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
@@ -129,6 +146,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
+- [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
+- [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

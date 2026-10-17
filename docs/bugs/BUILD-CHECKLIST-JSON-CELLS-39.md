@@ -9,7 +9,7 @@
 | Where | Offline exterior checklist between terrain, scenery and flora stages |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.39-rc1 (last seen) |
+| Persists in | fixed in v0.0.39 |
 | Severity | critical: Full RC1 image cannot finish; scenery conversion stops before image assembly. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | v0.0.39-rc1 |

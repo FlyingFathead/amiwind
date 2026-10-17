@@ -159,6 +159,40 @@ def load_esm(path, dialogue_search=""):
             "voice_matches": voice_matches}
 
 
+# One master parse per process for audit() (B5, v0.0.42): the CHIM stage audits hundreds of areas in the same
+# workers, and each audit parsed the whole master again (13.6 s of a 21.9 s source stage). share_master(True)
+# (chim.source_memo.install) keeps the last parse, keyed by the file's path, size and modification time and the
+# dialogue search; audit() gets a copy whose land table it may extend (missing_land='flat'), so every audit
+# writes what a fresh parse gives. Off by default: other callers parse as before.
+_SHARED_MASTER = {'on': False, 'key': None, 'value': None, 'hits': 0, 'parses': 0}
+
+
+def share_master(on=True):
+    _SHARED_MASTER['on'] = bool(on)
+    if not on:
+        _SHARED_MASTER.update(key=None, value=None)
+
+
+def shared_master_stats():
+    return [_SHARED_MASTER['hits'], _SHARED_MASTER['parses']]
+
+
+def _audit_master(path, dialogue_search):
+    if not _SHARED_MASTER['on']:
+        return load_esm(path, dialogue_search)
+    st = path.stat()
+    key = (str(path.resolve()), st.st_size, st.st_mtime_ns, dialogue_search)
+    if _SHARED_MASTER['key'] != key:
+        _SHARED_MASTER.update(key=None, value=None)
+        _SHARED_MASTER['value'] = load_esm(path, dialogue_search)
+        _SHARED_MASTER['key'] = key
+        _SHARED_MASTER['parses'] += 1
+    else:
+        _SHARED_MASTER['hits'] += 1
+    esm = _SHARED_MASTER['value']
+    return dict(esm, lands=dict(esm["lands"]))
+
+
 def terrain_packet(land, cx, cy, tx, ty, stride):
     """24-byte header, int16 heights, byte materials; pad to 32-byte boundary."""
     n = 16 // stride + 1
@@ -199,7 +233,7 @@ def audit(data_files, out, center, radius, stride, dialogue_search="", missing_l
     require(stride in (1, 2, 4, 8), "Invalid terrain stride")
     require(not out.exists(), "Choose a new output directory; existing data is never overwritten")
     require(radius >= 0 and radius <= 8, "Radius must be between 0 and 8")
-    esm = load_esm(child_ci(data_files, "Morrowind.esm"), dialogue_search)
+    esm = _audit_master(child_ci(data_files, "Morrowind.esm"), dialogue_search)
     bsa = BSA(child_ci(data_files, "Morrowind.bsa"))
     selected = [(x, y) for y in range(center[1] - radius, center[1] + radius + 1)
                 for x in range(center[0] - radius, center[0] + radius + 1)]

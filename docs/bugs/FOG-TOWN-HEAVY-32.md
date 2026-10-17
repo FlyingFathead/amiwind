@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 8 October 2026, in v0.0.32-dev1 |
 | Where | Exterior fog and far drawing, Vivec Arena and Balmora |
 | Reproduction | always |
@@ -30,13 +30,13 @@ From about 1,500 units the Vivec Arena shows only as a flat fog-coloured silhoue
 its upper parts look patchy, with sky and fog showing through. Balmora's buildings also look hazy,
 unlike the Balmora look of v0.0.31.
 
-Owner evidence from real play of dev1 (8 October 2026, screenshot kept in private evidence):
+Maintainer evidence from real play of dev1 (8 October 2026, screenshot kept in private evidence):
 Seyda Neen, global position -11037 -70598 317 (local 56 270 79), heading 165, pitch -14, game time
 13:35. A large flat, fog-coloured "castle" silhouette with a rounded, canopy-like outline stands
 behind the town buildings and disappears when walking closer. Cause not established; possibly the
 same mechanism as [HORIZON-FLORA-SPRITES-32](HORIZON-FLORA-SPRITES-32.md) (distant flora sprites
 drawn as flat fog silhouettes). That record ("Horizon silhouetting: not yet perfect") also holds a
-second owner screenshot: a fog-coloured wall of vertical spikes and blocks north-west of Seyda Neen.
+second maintainer screenshot: a fog-coloured wall of vertical spikes and blocks north-west of Seyda Neen.
 
 ## Where
 
@@ -58,14 +58,14 @@ v0.0.31 against now):
   Seyda Neen and Balmora). The fog runs linearly from about 44 % of that distance to solid at 540.
   `AW_FogDraw`, the far plane and `aw_horizon.c` are unchanged since v0.0.31 apart from the town
   table lookup.
-- The Seyda Neen silhouettes that the owner reported are the skyline fill, measured on the
+- The Seyda Neen silhouettes that the maintainer reported are the skyline fill, measured on the
   v0.0.31 engine too: [HORIZON-FLORA-SPRITES-32](HORIZON-FLORA-SPRITES-32.md). The new default
   (`aw_skyline_fill 0`) removes the fog-colour columns everywhere, including at the Arena.
 
 So nothing in the fog settings is heavier than in v0.0.31. The Arena canton is far larger than any
 Balmora building, so at the town distance of 540 most of it lies in the fog band and the far
 cut-off removes pieces of its upper parts ([HORIZON-HOLES-31](HORIZON-HOLES-31.md)). A longer
-Arena distance (its region overlap is 896) is an owner decision with a frame-time cost to measure.
+Arena distance (its region overlap is 896) is a project decision with a frame-time cost to measure.
 Balmora's haze has not been compared at a matched pose and time against v0.0.31.
 
 Earlier candidates:
@@ -89,7 +89,7 @@ the same poses (same time of day) with v0.0.31, and the dev1 `fog-locations.txt`
 ## Repair
 
 Fog tables and settings: nothing to repair (identical to v0.0.31). The skyline fill columns: the
-land-outline default of HORIZON-FLORA-SPRITES-32. Open: the Arena distance (owner decision) and a
+land-outline default of HORIZON-FLORA-SPRITES-32. Open: the Arena distance (project decision) and a
 matched Balmora view.
 
 ## Verification

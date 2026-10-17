@@ -153,7 +153,7 @@ separately to rerun the preflight report. Startup-sequence runs preflight on boo
 ## Remaining work
 
 The reported incomplete terrain/rock formation is open and needs a source/camera
-comparison. Shack disappearance is owner-reported no longer reproducing in the
+comparison. Shack disappearance is maintainer-reported no longer reproducing in the
 prior checkpoint; preserve that route. The ship is simplified and its authored
 collision still becomes approximate convex pieces. No ship interior, door entry,
 opening quest or departure/removal state is implemented. Unrelated scenery still
@@ -163,5 +163,5 @@ NPCs remain nonblocking with limited Hello auditions and no wandering/combat.
 Next: connected starting-area exteriors, then the dim prison-ship opening and
 separately loaded Census office. Day/night, exact-hour/freeze debug controls,
 cheap sun/sky gradients and night backdrops are design notes only; see
-[DAY_NIGHT_AND_SKY.md](DAY_NIGHT_AND_SKY.md). No owner acceptance of checkpoint-015
+[DAY_NIGHT_AND_SKY.md](DAY_NIGHT_AND_SKY.md). No maintainer acceptance of checkpoint-015
 is claimed before delivery.

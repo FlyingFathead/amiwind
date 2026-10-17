@@ -251,7 +251,7 @@ geometry opt-in are the existing documented settings, not screenshot-only code.
 | ![Balmora street](images/amiwind-v0.0.24-balmora-street.png) | ![Balmora riverfront](images/amiwind-v0.0.24-balmora-river.png) |
 
 Every image has an exact `.gitignore` exception, a documentation-media allowlist
-entry, and a source-package entry. The owner-run publishing helper also requires
+entry, and a source-package entry. The maintainer-run publishing helper also requires
 all packaged public files to be tracked before committing. Other private
 captures and converted assets remain excluded.
 

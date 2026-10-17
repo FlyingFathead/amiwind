@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38 |
 | Where | Experimental CHIM terrain clipping |
 | Reproduction | always |

@@ -29,7 +29,7 @@
   - [1. Problem and initial suspicion](#1-problem-and-initial-suspicion)
   - [2. Inspected cause](#2-inspected-cause)
   - [3. Fix and validation](#3-fix-and-validation)
-  - [Owner playtest, 30 September 2026, v0.0.24-dev2](#owner-playtest-30-september-2026-v0024-dev2)
+  - [Maintainer playtest, 30 September 2026, v0.0.24-dev2](#maintainer-playtest-30-september-2026-v0024-dev2)
 - [Balmora underpasses and global player height (v0.0.24-dev2)](#balmora-underpasses-and-global-player-height-v0024-dev2)
   - [1. Problem and initial suspicion](#1-problem-and-initial-suspicion-1)
   - [2. Inspected collision cause](#2-inspected-collision-cause)
@@ -467,9 +467,9 @@ Final dev2 full-scene captures and memory results are recorded in
 every facade in the city. The dev1 visual inspection was insufficient: reference
 counts and successful collision checks did not establish intact visible meshes.
 
-### Owner playtest, 30 September 2026, v0.0.24-dev2
+### Maintainer playtest, 30 September 2026, v0.0.24-dev2
 
-The owner reports that Balmora's exteriors now look pretty good and, ironically,
+The maintainer reports that Balmora's exteriors now look pretty good and, ironically,
 seem faster than Seyda Neen's exteriors on the same less-capable machine. This is
 positive exterior playtest feedback, not a matched frame-time benchmark or a
 claim that every asset is correct. The Balmora Silt Strider still has visibly
@@ -486,7 +486,7 @@ The perceived speed difference alone does not establish subdivision as its cause
 ### 1. Problem and initial suspicion
 
 The player could not enter two visibly open passages at (-455,-22,142), yaw 89,
-and (-419,722,210), yaw 92. The owner also reports feeling too tall throughout
+and (-419,722,210), yaw 92. The maintainer also reports feeling too tall throughout
 Seyda Neen, so this is not solely a Balmora concern. Suspected causes were an
 oversized player, a high camera, or conversion filling the openings.
 
@@ -517,7 +517,7 @@ proxies remain approximate; do not treat these two repairs as universal proof.
 
 ### 4. Global physical dimensions: runtime measurement
 
-The owner specifically requested player dimensions versus world scale, not a
+The maintainer specifically requested player dimensions versus world scale, not a
 field-of-view explanation. A native calibration room therefore checks the actual
 movement sweeps, independently of the constants printed by the engine. Its inner
 walls are x/y=-64..64 and floor/ceiling z=0..60, compiled through the same world
@@ -557,9 +557,9 @@ pre-creation race/sex. Acceptance applies the selected eye; scene entry and save
 restoration reapply it. Older catalogues retain the map fallback. This changes
 the eye height only; the verified base collision box is retained. Native dev2
 reports 31.176 before creation. Exact animated original-game camera parity and
-the owner's assessment of the resulting proportions remain open.
+the maintainer's assessment of the resulting proportions remain open.
 
-The owner prefers **90-degree Quake FOV and Quake bob**. Both remain unchanged.
+The maintainer prefers **90-degree Quake FOV and Quake bob**. Both remain unchanged.
 A potential FOV slider is only a performance-gated roadmap option; it is not the
 physical-size fix. See [player movement](PLAYER_MOVEMENT.md) and
 [roadmap](ROADMAP_HISTORY.md#optional-field-of-view-control).
@@ -567,7 +567,7 @@ physical-size fix. See [player movement](PLAYER_MOVEMENT.md) and
 ## Balmora Silt Strider — dev3 correction, 30 September 2026
 
 **Observed:** dev2 exterior buildings now look okay overall, but the Strider is
-fragmented into disconnected strips. Owner position: XYZ 96 -1445 71, yaw 204,
+fragmented into disconnected strips. Maintainer position: XYZ 96 -1445 71, yaw 204,
 pitch -27. Seyda Neen's Strider looked better.
 
 **Inspected cause:** both use the same original `meshes/r/siltstrider.nif`
@@ -594,7 +594,7 @@ zero-cost fix, perfect original-model fidelity or global performance acceptance.
 
 ## Balmora black boundary flashes — dev3 loading presentation
 
-**Observed:** black flashes while roaming; owner requested a held gameplay frame
+**Observed:** black flashes while roaming; maintainer requested a held gameplay frame
 and a small top Loading box, retaining the existing load method.
 
 **Inspected cause:** `AW_SceneTick` explicitly requested `AW_LOADING_BLANK` on

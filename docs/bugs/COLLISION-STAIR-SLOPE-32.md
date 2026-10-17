@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 8 October 2026, in v0.0.24 |
 | Where | converted stairs and slopes; staircases listed on the page |
 | Reproduction | always |
@@ -41,7 +41,7 @@
 Open: rule, switch and gate in source (not yet in a build). 9 October 2026: no staircase fails the
 gate any more on the maps rebuilt with the rule (legacy) or on the CHIM Balmora and Seyda Neen
 worlds; the last four were gate artefacts, fixed on branch v0.0.33-stairs-2 (see "Gate after the
-last fixes" below). Was: five staircases still fail the gate and are tracked separately (below). Owner order 8 October 2026:
+last fixes" below). Was: five staircases still fail the gate and are tracked separately (below). Maintainer order 8 October 2026:
 stairs follow Morrowind's own rules in the next build, and a build fails on any unclimbable
 flight of stairs.
 
@@ -55,8 +55,8 @@ In v0.0.32: the stair rule, the gate (`tools/stair_walk.py`) and the converter s
 ## Symptom
 
 Stairs that cannot be walked up although every step is lower than the step height: the Vivec
-Arena bridges and canton stairs in dev1 (owner reports, fixed by
-[VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md)), Balmora stairs in v0.0.24 (owner:
+Arena bridges and canton stairs in dev1 (maintainer reports, fixed by
+[VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md)), Balmora stairs in v0.0.24 (maintainer:
 "some too steep angle"), and the staircases listed below.
 
 ## Where
@@ -83,7 +83,7 @@ stairs after conversion.
 
 ## Why it was not caught
 
-No check walked the stairs of a converted map; the hand list came from owner reports.
+No check walked the stairs of a converted map; the hand list came from maintainer reports.
 
 ## Reproduction
 
@@ -112,7 +112,7 @@ blocking failures and 532 advisory. Native traversal and package checks remain
 pending. The original fifteen-failure result remains historical evidence.
 
 
-Owner's data, inside Docker, 8 October 2026:
+Maintainer's data, inside Docker, 8 October 2026:
 
 | Map family | Flight steps (dev2 image) | Failing before | Failing with this branch |
 |---|---|---|---|
@@ -150,7 +150,7 @@ an authored ramp under a low lintel ([STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-
 start boxes touching a wall or a closed door within the collision plates' 0.2 thickness
 ([STAIRS-SEYDA-WAREHOUSE-32](STAIRS-SEYDA-WAREHOUSE-32.md),
 [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md)); the gate rules are in
-[STAIR_RULES.md](../STAIR_RULES.md). Previous gate vs this gate on the same maps (owner's data,
+[STAIR_RULES.md](../STAIR_RULES.md). Previous gate vs this gate on the same maps (maintainer's data,
 inside Docker, flight steps passed / failed / untestable):
 
 | Maps | Previous gate | This gate | Gating failures |
@@ -201,6 +201,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
+- [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
 - [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
@@ -211,6 +212,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
+- [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
+- [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

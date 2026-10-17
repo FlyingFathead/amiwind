@@ -13,7 +13,7 @@ fits on one drive image.
 
 - [Running it](#running-it)
 - [How Quake does it, and what is computed](#how-quake-does-it-and-what-is-computed)
-- [Results on the owner's data](#results-on-the-owners-data)
+- [Results on the maintainer's data](#results-on-the-maintainers-data)
 - [Recommendations](#recommendations)
 
 <!-- contents end -->
@@ -69,7 +69,7 @@ lightmaps per face (`R_BuildLightMap`), hulls pre-expanded by the player box
 time), `R_RotateBmodel` (drawing already applies all three angles to a brush
 entity; scale is the missing part), miptex.
 
-## Results on the owner's data
+## Results on the maintainer's data
 
 Morrowind, Tribunal and Bloodmoon, 8 October 2026. Expansions count only the
 cells they add. Interiors: 1,127 + 92 + 93 cells.

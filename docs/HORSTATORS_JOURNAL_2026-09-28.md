@@ -42,20 +42,20 @@ Captain's log, 28 September 2026, 05:10–05:24 Helsinki.
 
 <!-- contents end -->
 
-Owner's development direction, recorded before the captain gets some sleep.
+Maintainer's development direction, recorded before the captain gets some sleep.
 This is a request/decision log. Completion belongs in checkpoint validation records.
 
 Later entry: [Evening — polygonal POI regions if streaming is insufficient](#evening--polygonal-poi-regions-if-streaming-is-insufficient).
 
 ## Starting point
 
-- The owner's `amiwind-2026-09-28_045110.zip` is the latest working repository
+- The maintainer's `amiwind-2026-09-28_045110.zip` is the latest working repository
   snapshot and takes precedence over older recovery packages and GitHub.
 - The repository is now public: https://github.com/FlyingFathead/amiwind.
 - Work incrementally through the todo list and roadmap. Save checkpoints after
   meaningful milestones: complete public source, separate private playable,
   incremental public source, and checksums. Preserve prior checkpoints.
-- The owner handles Git publication. Keep original and converted game assets,
+- The maintainer handles Git publication. Keep original and converted game assets,
   voices, fonts and ROMs out of public source.
 
 ## UI and fonts
@@ -110,7 +110,7 @@ The requested intro atmosphere is dark with a few local lights; audit the source
 clock and weather before claiming exact original timing. Study existing AmiQuake
 lightmap/dynamic-light paths for affordable lamps and nighttime torches.
 
-Add waiting for a chosen number of hours once the clock works. The owner recalls
+Add waiting for a chosen number of hours once the clock works. The maintainer recalls
 waiting being restricted during character generation; confirm the exact source
 gate. Waiting must not bypass the opening or silently reset state.
 
@@ -145,10 +145,10 @@ features complete.
 ## Checklist annotation convention
 
 Keep resolved older items visible as `- [x] ~~original item~~ Fixed`, followed by the
-checkpoint or owner confirmation. Do not cross out a larger feature merely
+checkpoint or maintainer confirmation. Do not cross out a larger feature merely
 because one part works; retain remaining defects explicitly.
 
-- [x] ~~Hammocks obstructing the ship interior route.~~ Fixed. Owner confirmed.
+- [x] ~~Hammocks obstructing the ship interior route.~~ Fixed. Maintainer confirmed.
 
 ## Further opening requests, 05:26–05:30
 
@@ -200,7 +200,7 @@ individual/global cooldowns and overlap handling, not one repeated audition.
 
 ## Generic dialogue reference, 05:41
 
-Owner supplied the UESP Generic Dialogue Voiced table to cross-check variation.
+Maintainer supplied the UESP Generic Dialogue Voiced table to cross-check variation.
 It explicitly flags missing entries and mixed expansion coverage. Use the owned
 master's ordered INFO conditions and assets as the authority; distinguish Hello
 from Idle, service, faction, weather, crime and combat responses. Do not import
@@ -221,7 +221,7 @@ expansion-only or player-state-dependent lines into an unconditional town pool.
 
 Keep the base version at 0.0.18 during these early milestones; increment only
 the dev suffix. Mark actual completed items with their checkpoint, leaving
-partial systems open. The owner reports that dev1 is heading in the right
+partial systems open. The maintainer reports that dev1 is heading in the right
 direction, but requests distinct red/blue/green bars and an eye-height check.
 The taller impression may have been one guard or fatigue; still verify it.
 
@@ -230,7 +230,7 @@ The taller impression may have been one guard or fatigue; still verify it.
 Try the original thick gold menu-border artwork around the whole game canvas,
 keeping the lower dialogue band black. Preserve projection/actor scale while
 comparing the frame. Physical emulator overscan is outside the game framebuffer.
-Owner likes the original voice clips and dialogue panels rising from below;
+Maintainer likes the original voice clips and dialogue panels rising from below;
 retain this presentation and extend its line variation and synchronized faces.
 
 ## Outer-frame correction and journal name, 06:14–06:16
@@ -266,16 +266,16 @@ opening stages are still on the active checklist.
 - Ship guards currently allow the player through while the escort can be blocked
   by the player. Make collision symmetric and distinguish waiting from failure.
 - The stair approach and upper barrel views have severe local slowdown; Jiub's
-  area is comparatively acceptable in the owner's setup. Measure fixed views;
+  area is comparatively acceptable in the maintainer's setup. Measure fixed views;
   preserve the repaired structural hull. Exterior loads only on hatch activation.
 - Hide the blinking top-right disk icon by default; retain a debugging switch.
 - Loading credits: By FlyingFathead; project URL; Special thanks to:
-  ChaosWhisperer, on three separate lines. Owner's joking role: “fart director”.
+  ChaosWhisperer, on three separate lines. Maintainer's joking role: “fart director”.
 
 ## 28 September, 11:26–11:32 Helsinki — prophecy movie
 
-The owner requests the original skippable New Game prophecy video before Jiub.
-The initial data ZIP has an empty Video directory; the owner is preparing the
+The maintainer requests the original skippable New Game prophecy video before Jiub.
+The initial data ZIP has an empty Video directory; the maintainer is preparing the
 missing video files. Convert on the desktop to a small indexed stream and PCM,
 without a heavyweight decoder on the Amiga. Preserve narration and source aspect
 ratio, support Esc, and start the selected ship music after the movie ends.
@@ -304,7 +304,7 @@ prophecy movie are separate sequences.
 - Research the original ship-to-Census escape restriction next. The recalled
   invisible barrier is a research lead, not yet a verified mechanism.
 - Package dev5 as a complete public source snapshot plus dev4 incremental and
-  private playable. Owner publishes the full accumulated change set to GitHub.
+  private playable. Maintainer publishes the full accumulated change set to GitHub.
 
 ## Track-change overlay follow-up
 
@@ -320,7 +320,7 @@ First try a sane way to use fog-limited visibility to load/offload exterior
 objects fast enough, allowing brief pauses at selected crossings if needed.
 Only if that approach cannot meet the Amiga's memory and frame-time budgets,
 try polygonal BSP regions, using Doom/Quake-style bounded levels and explicit
-transitions around points of interest. The owner's inspiration is a "John
+transitions around points of interest. The maintainer's inspiration is a "John
 Carmack approach":
 prepare bounded levels for the engine rather than require the entire open world
 to stream seamlessly. This is a **must-try fallback if streaming proves
@@ -351,7 +351,7 @@ PAK archives; its WADs hold graphics resources. AmiWind currently loads loose
 with a separate `gfx.wad` for graphics. Call this proposal **polygonal BSP
 regions with associated resource packs**. The polygon describes the region's
 world footprint; the resource container remains a separate choice. This
-corrects the original shorthand without changing the proposal. Owner clarification,
+corrects the original shorthand without changing the proposal. Maintainer clarification,
 20:31 Helsinki: the intended term is **polygonal BSP regions**, akin to the
 bounded levels of Doom and Quake. The footprint is the area being loaded, not
 a claim that Doom and Quake use the same map-file format.
@@ -377,7 +377,7 @@ and [roadmap experiment](ROADMAP_HISTORY.md#optional-polygonal-poi-regions).
 
 ### 20:36 Helsinki — open-world/topographic-map limitation and elevated mode
 
-The owner flags a major problem with this region approach: Morrowind's open-world
+The maintainer flags a major problem with this region approach: Morrowind's open-world
 layout and topographic map do not stop at our selected POI boundaries. A high
 viewpoint can expose region edges, false horizons and missing neighboring terrain.
 Ground-level fog/backdrops alone do not establish that this design will work.
@@ -483,7 +483,7 @@ part of Morrowind's atmosphere. The observer should make it easy to compare
 multiple LODs and streaming policies at identical positions so that "open
 world" remains a measured engineering target rather than an assumption.
 
-The owner does not want AmiWind to preserve the shape of Morrowind by turning it
+The maintainer does not want AmiWind to preserve the shape of Morrowind by turning it
 into a corridor of loading screens. Interiors being separate spaces is normal
 Morrowind behaviour; breaking the exterior world's sense of continuity is not.
 Distant objects may therefore need to become something else entirely: coarser
@@ -514,5 +514,5 @@ less than simply letting the existing renderer draw the polygons. The
 The [continuing musings](HORSTATORS_MUSINGS_2026-09-29.md#from-seyda-neen-to-balmora-evening-notes-30-september-2026)
 record the Balmora follow-up: measured read-ahead trials, a complete character
 inspection gallery, world/cell mapping ideas, build-time initial-placement checks,
-and the owner's direction toward final v0.0.24. The world-coordinate HUD remains
+and the maintainer's direction toward final v0.0.24. The world-coordinate HUD remains
 future roadmap work.

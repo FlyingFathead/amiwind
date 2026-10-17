@@ -9,7 +9,7 @@
 | Where | engine model.c brush decoders in arena mode (AW_BrushImage, AW_BrushStreamStep), CHIM loads |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: One damaged byte in a sector file on disk ends the game with a fatal error. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

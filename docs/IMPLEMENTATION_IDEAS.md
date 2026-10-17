@@ -23,7 +23,7 @@ implemented features. Verified mappings, causes and accepted fixes belong in
 
 ## Combat: make dice-roll outcomes visible
 
-Owner suggestion: a Morrowind mod reportedly preserves dice-roll combat while
+Maintainer suggestion: a Morrowind mod reportedly preserves dice-roll combat while
 showing an opponent dodge or block when an attack roll fails, making the miss
 understandable instead of leaving an apparently connected swing unexplained.
 **The mod's name, URL, implementation and license are not verified.** Find it on
@@ -33,7 +33,7 @@ stage; do not attribute these claims to a guessed mod or copy its material.
 The design goal is to retain the RPG hit calculation and improve feedback. Study
 how the mod selects/times defensive poses and distinguishes misses from actual
 blocks, what animation data it needs, and its collision/gameplay side effects.
-Record the eventual exact link/version and findings here. Owner decision: study
+Record the eventual exact link/version and findings here. Project decision: study
 the behavior as inspiration and implement AmiWind's version independently.
 Do not copy the mod's code or redistribute its assets. Use our own implementation
 and the existing local conversion pipeline for user-owned animation data.
@@ -76,7 +76,7 @@ hand punch with full combat in the next exterior checkpoint.
 
 ## Opening ship: spend detail where play begins
 
-Owner priority: the prison ship's interior is the meaningful opening space.
+Project priority: the prison ship's interior is the meaningful opening space.
 Treat it as a separate interior scene and validate movement from below deck to
 the exterior before the Census-office handoff. The exterior can be simplified
 aggressively while retaining its silhouette, deck, cabin and gangplank.

@@ -20,17 +20,132 @@ extern int (*aw_chim_view_reach)(void);
 static int chim_reach;
 static int view_reach(void){return chim_reach;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_fog_distance"))distance_command=fn;}
+static cvar_t *cvar_list[32];static int cvar_list_count;
 
 cvar_t aw_drawdistance={"aw_drawdistance","700",0,0,700};
-void Cvar_SetValue(char *name,float value){assert(!strcmp(name,"aw_drawdistance"));aw_drawdistance.value=value;}
+void Cvar_SetValue(char *name,float value){
+ int i;if(!strcmp(name,"aw_drawdistance")){aw_drawdistance.value=value;return;}
+ for(i=0;i<cvar_list_count;i++)if(!strcmp(cvar_list[i]->name,name)){cvar_list[i]->value=value;return;}
+ assert(!"unknown cvar");
+}
 vec3_t vpn={.70710678f,.70710678f,0},r_origin={0,0,0};
-vec3_t vright,vup;
-const unsigned char *R_DayNightFogColours(void){return NULL;}
-unsigned char R_DayNightSkyPixel(unsigned char c,float x,float y,float z,int fog){return c;}
-void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);}
+vec3_t vright,vup,modelorg;
+/* The day/night tables for the fog-exact far test: NULL (off) unless a test sets them;
+ * sky_fogged: below the horizon the sky pass returns the full fog colour. */
+static byte environment[4096];static int environment_on,sky_fogged;
+const unsigned char *R_DayNightFogColours(void){return environment_on?environment:NULL;}
+unsigned char R_DayNightSkyPixel(unsigned char c,float x,float y,float z,int fog){return sky_fogged && z<0 && fog?environment[15<<8]:c;}
+void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);assert(cvar_list_count<32);cvar_list[cvar_list_count++]=v;}
 static byte fog_colours[4096];
 viddef_t vid;refdef_t r_refdef;short *d_pzbuffer;unsigned int d_zwidth;
 byte *COM_LoadHunkFile(char *p){return fog_colours;}
+static float cvar_value(const char *name){int i;for(i=cvar_list_count-1;i>=0;i--)if(!strcmp(cvar_list[i]->name,name))return cvar_list[i]->value;assert(!"unregistered");return 0;}
+/* Fog-exact far test (aw_cull 2, the default) and the detail options (aw_cull 3-6). */
+static int flame_limit_value=32767;
+static int flame_limit(void){return flame_limit_value;}
+static float box[6];
+static int point_far(float x,float y,float z){
+ box[0]=box[3]=x;box[1]=box[4]=y;box[2]=box[5]=z;
+ return AW_BrushPassFar(box,0,box);
+}
+/* The fog pass's sky ray z at a projected point, as AW_FogDraw steps it (affine
+ * in the screen position, so evaluated at the projected position). */
+static float sky_ray_z(float x,float y,float z){
+ float vx=x*vright[0]+y*vright[1]+z*vright[2],vy=x*vup[0]+y*vup[1]+z*vup[2],vz=x*vpn[0]+y*vpn[1]+z*vpn[2];
+ float col=xcenter+xscale*vx/vz,row=ycenter-yscale*vy/vz;
+ int extent=r_refdef.vrect.width>r_refdef.vrect.height?r_refdef.vrect.width:r_refdef.vrect.height;
+ float step=2.0f/extent,u=(col-((int)vid.width>>1))*step,v=(((int)vid.height>>1)-row)*step;
+ return vpn[2]+u*vright[2]+v*vup[2];
+}
+static void view(float yaw,float pitch){
+ float cy=cosf(yaw),sy=sinf(yaw),cp=cosf(pitch),sp=sinf(pitch);
+ vpn[0]=cp*cy;vpn[1]=cp*sy;vpn[2]=-sp;
+ vright[0]=sy;vright[1]=-cy;vright[2]=0;
+ vup[0]=sp*cy;vup[1]=sp*sy;vup[2]=cp;
+}
+static void fog_exact_tests(void){
+ int i,j,full,skipped=0,kept=0;unsigned seed=12345;float x,y,z,depth;
+ static byte depths[32768];
+ /* Like-for-like with the measurements: the far plane alone unless set. */
+ Cvar_SetValue("aw_cull",1);
+ /* The last level-15 value of the fog table, for several distances. */
+ for(i=100;i<=4096;i+=37){
+  AW_FogDepths(depths,i);full=AW_FogFullDepthValue(i);
+  for(j=1;j<=full;j++)assert(depths[j]==15);
+  assert(full==32767 || depths[full+1]<15);
+ }
+ assert(AW_FogFullDepthValue(540)==60);
+ /* Viewport 320x200, Quake's projection (r_main.c R_ViewChanged). */
+ vid.width=320;vid.height=200;r_refdef.vrect.x=r_refdef.vrect.y=0;r_refdef.vrect.width=320;r_refdef.vrect.height=200;
+ xcenter=320*.5f-.5f;ycenter=200*.5f-.5f;xscale=160;yscale=160;
+ r_origin[0]=r_origin[1]=r_origin[2]=0;view(0,0);
+ assert(AW_DrawDistance()==540);
+ /* No day/night tables: no test (the far plane alone). */
+ environment_on=0;AW_CullBegin();assert(point_far(700,0,-50)==AW_FAR_DRAW);
+ /* Tables whose level 15 is one colour, sky below the horizon fogged. */
+ for(i=0;i<4096;i++)environment[i]=i>>8==15?9:i&255;
+ environment_on=1;sky_fogged=1;
+ Cvar_SetValue("aw_skyline_fill",0);
+ Cvar_SetValue("aw_cull",1);AW_CullBegin();assert(point_far(700,0,-50)==AW_FAR_DRAW);
+ Cvar_SetValue("aw_cull",2);AW_CullBegin();
+ assert(point_far(700,0,-50)==AW_FAR_SKIP);   /* beyond full fog, below the horizon */
+ assert(point_far(700,0,50)==AW_FAR_DRAW);    /* above the horizon: against the sky */
+ assert(point_far(500,0,-50)==AW_FAR_DRAW);   /* nearer than full fog */
+ /* A box straddling the full-fog depth below the horizon asks for face tests. */
+ box[0]=500;box[1]=-10;box[2]=-60;box[3]=700;box[4]=10;box[5]=-40;
+ assert((AW_BrushPassFar(box,0,box)&15)==AW_FAR_FACES);
+ /* Level 15 not one colour, sky colours kept below the horizon, the skyline
+  * fill marking columns, or an interior: no test. */
+ environment[(15<<8)+3]=8;AW_CullBegin();assert(point_far(700,0,-50)==AW_FAR_DRAW);environment[(15<<8)+3]=9;
+ sky_fogged=0;AW_CullBegin();assert(point_far(700,0,-50)==AW_FAR_DRAW);sky_fogged=1;
+ Cvar_SetValue("aw_skyline_fill",1);AW_CullBegin();assert(point_far(700,0,-50)==AW_FAR_DRAW);Cvar_SetValue("aw_skyline_fill",0);
+ inside=1;AW_CullBegin();assert(point_far(700,0,-50)==AW_FAR_DRAW);inside=0;
+ /* A flame farther than full fog moves the test behind it. */
+ aw_flame_depth_limit=flame_limit;flame_limit_value=40;AW_CullBegin();
+ assert(point_far(700,0,-50)==AW_FAR_DRAW && point_far(900,0,-50)==AW_FAR_SKIP);
+ flame_limit_value=32767;
+ /* Every point the test leaves out, for random views and eye heights, has a
+  * full-fog z-buffer value and lies below the sky ray's horizon. */
+ for(j=0;j<200;j++){
+  seed=seed*1103515245+12345;view((seed>>8&1023)/1024.0f*6.2831853f,((int)(seed>>18&255)-128)/128.0f*.5f);
+  seed=seed*1103515245+12345;r_origin[2]=(int)(seed>>16&255)-128;
+  AW_CullBegin();
+  for(i=0;i<500;i++){
+   float px,py,pz;
+   seed=seed*1103515245+12345;depth=520+(seed>>16&127);
+   seed=seed*1103515245+12345;x=((int)(seed>>16&1023)-512)/512.0f;
+   seed=seed*1103515245+12345;y=((int)(seed>>16&1023)-512)/512.0f*.7f;
+   /* a point on the view ray through screen offset (x,y) at view depth depth */
+   px=r_origin[0]+depth*(vpn[0]+x*vright[0]+y*vup[0]);
+   py=r_origin[1]+depth*(vpn[1]+x*vright[1]+y*vup[1]);
+   pz=r_origin[2]+depth*(vpn[2]+x*vright[2]+y*vup[2]);
+   if(point_far(px,py,pz)==AW_FAR_SKIP){
+    skipped++;
+    z=(px-r_origin[0])*vpn[0]+(py-r_origin[1])*vpn[1]+(pz-r_origin[2])*vpn[2];
+    assert((int)(32768.0f/z)<=60);
+    assert(sky_ray_z(px-r_origin[0],py-r_origin[1],pz-r_origin[2])<0);
+   }else kept++;
+  }
+ }
+ assert(skipped>1000 && kept>1000);
+ /* The model-space planes after R_RotateBmodel (identity rotation here). */
+ view(0,0);r_origin[2]=0;AW_CullBegin();VectorCopy(r_origin,modelorg);
+ box[0]=500;box[1]=-10;box[2]=-60;box[3]=700;box[4]=10;box[5]=-40;
+ AW_FarPassBegin(AW_BrushPassFar(box,0,box));
+ assert(aw_far_faces==1 && aw_far_depth[0]==1 && aw_far_depth[3]>540 && aw_far_depth[3]<560);
+ assert(DotProduct(box,aw_far_down)<aw_far_down[3]);
+ /* Size-scaled cut-off presets: near side past the share of the distance. */
+ assert(AW_SizeCutShare(1,10)==.5f && AW_SizeCutShare(1,100)==.75f && AW_SizeCutShare(1,300)==1);
+ assert(AW_SizeCutShare(2,10)==.4f && AW_SizeCutShare(2,100)==.6f && AW_SizeCutShare(2,300)==.85f && AW_SizeCutShare(2,600)==1);
+ Cvar_SetValue("aw_cull",3);AW_CullBegin();
+ box[0]=box[3]=300;box[1]=box[4]=0;box[2]=box[5]=50;
+ assert(AW_BrushPassFar(box,10,box)==AW_FAR_SIZE && AW_BrushPassFar(box,100,box)==AW_FAR_DRAW);
+ Cvar_SetValue("aw_cull",2);AW_CullBegin();assert(AW_BrushPassFar(box,10,box)==AW_FAR_DRAW);
+ /* Far detail step: far models of radius 32 and more get face tests. */
+ Cvar_SetValue("aw_cull",5);AW_CullBegin();
+ assert(AW_BrushPassFar(box,40,box)==(AW_FAR_FACES|2<<4) && AW_BrushPassFar(box,10,box)==AW_FAR_DRAW);
+ Cvar_SetValue("aw_cull",1);aw_flame_depth_limit=NULL;
+}
 int main(void) {
  int distances[6]={128,400,540,700,1400,4096},i,j,expected;byte fog[32770];
  short edge_visible[6]={790,-110,-10,810,-90,10};
@@ -45,6 +160,7 @@ int main(void) {
   assert(pixels[0]==7);assert(pixels[1]==15 && pixels[2]==15);assert(pixels[3]==0);assert(pixels[4]!=7);
   inside=1;memset(pixels,7,sizeof pixels);AW_FogDraw();for(i=0;i<5;i++)assert(pixels[i]==7);inside=0;
  }
+ assert(cvar_value("aw_cull")==1); /* Full, the default */
  AW_CullBegin();
  assert(AW_NodeVisible(edge_visible)); /* old radius-aligned cube dropped this */
  assert(!AW_NodeVisible(distant));
@@ -82,5 +198,6 @@ int main(void) {
  argument="600";said[0]=0;distance_command();assert(AW_DrawDistance()==600 && !strstr(said,"Here:"));
  chim_reach=1200;argument="1100";distance_command();assert(AW_DrawDistance()==1100);
  aw_chim_view_reach=NULL;assert(AW_DrawDistance()==540);
- puts("forward-depth culling retains visible edge/door and rejects far bounds");return 0;
+ fog_exact_tests();
+ puts("forward-depth culling retains visible edge/door and rejects far bounds; the fog-exact far test leaves out only full-fog geometry below the horizon");return 0;
 }

@@ -2,7 +2,7 @@
 """The visible part of every lava pool, for the world map's LAVA layer (WORLDMAP-LAVA-MISMATCH-36).
 
 A Morrowind lava pool is a flat tile (in_lava_1024 and kin) laid into the land at a fixed height. Where the land
-rises above the tile the pool is buried and the player sees ground, not lava (the owner stood on grass inside a
+rises above the tile the pool is buried and the player sees ground, not lava (the maintainer stood on grass inside a
 mapped pool in Molag Amur: the land there is about 270 units, the pool surface 256). The footprint of a pool is
 therefore the pool's plan outline *where the land lies below the pool surface*, not the outline itself.
 

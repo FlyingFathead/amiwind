@@ -9,7 +9,7 @@
 | Where | engine/aga/src/sys_amiga.c Sys_FloatTime, amiga_stubs.c timer |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | low: CPU time only: the mixer and frame loop call it several times per frame |
 | Family | Rendering cost and visibility (`render-performance`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

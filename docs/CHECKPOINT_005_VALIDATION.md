@@ -77,6 +77,6 @@ checkpoint. Converted opening artwork may have minor palette changes from that
 second quantization. Geometry, textures, music and ROM remain private.
 
 Physical storage/controllers, WinUAE execution, NTSC, expanded hardware, native
-static-object rendering and gameplay are untested in this release. The owner
+static-object rendering and gameplay are untested in this release. The maintainer
 reports good music streaming on their own earlier build; that is separate from
 these FS-UAE checks. Manual song switches still block during open/preload.

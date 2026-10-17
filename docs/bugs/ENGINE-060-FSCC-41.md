@@ -41,13 +41,23 @@ The FPU check covers one CPU, the 68040.
 Disassemble the engine (`m68k-amigaos-objdump -d`) and count `fs<condition>` instructions with a data register.
 
 ## Repair
-Pending (68060 work): (1) the FPU check gets a 68060 mode and reports which engine functions reach each 68060 trap,
-through the link map, as it does for the 68040; (2) measure whether GCC's 68060 target avoids `fscc`; (3) where a
-trap sits in hot code, the 68060 code path of the planned start-up CPU detection avoids it; (4) a FS-UAE 68060 run
-counts traps per frame at the benchmark poses.
+
+1. The FPU check has a 68060 mode (`tools/check_fpu_unimplemented.py --cpu 68060`): every 68060-trapping
+   instruction by kind and engine function, through the link map; every 68040 build records its 68060 traps.
+   On the v0.0.42 line (engine byte-identical to v0.0.41): 309 `fscc` in 171 engine functions.
+2. The 68060 engine (`--engine-cpu 68060`, GCC's 68060 instruction selection) has no `fscc` and no 64-bit
+   multiply in engine code ([engine profiles](../ENGINE_PROFILES.md#the-68060-targeted-build)).
+3. From v0.0.42 the game disk carries it as `AmiWind060` beside the 68040 engine, and `AmiWindCPU` picks it at
+   boot on a 68060 ([68060](../68060.md#both-engines-on-the-game-disk)).
 
 ## Verification
-Pending: trap counts per frame on an emulated 68060, then real hardware.
+
+Counted on an emulated 68060 (FS-UAE, JIT off, the instructions trap as on the chip; the `awtraps` counter),
+17 October 2026, v0.0.41 release disks, the Balmora benchmark cameras and the Mages Guild: the 68040 engine
+takes 72,914 to 424,064 traps per frame, 67 to 76 % of them `fscc` in `R_RecursiveClipBPoly` and 20 to 29 % in
+`R_EmitEdge`; the 68060 engine takes 1.5 to 3.8 (the C library's `rand`)
+([table](../68060.md#trapped-instructions-per-frame)). The two-engine disk booted on an emulated 68060 and
+picked the 68060 engine. Still to do: the time this saves on a real 68060.
 
 ## Prevention
 Every CPU the project targets has its own unimplemented-instruction check in the build.
@@ -58,6 +68,7 @@ Every CPU the project targets has its own unimplemented-instruction check in the
 
 Family: FPU and CPU behaviour (68040/68060) (`fpu-cpu`). Results must not depend on the FPU; unimplemented instructions trap on a real 68040 without a support library. See [families](README.md#families).
 
+- [ENGINE-060-MUL64-41](ENGINE-060-MUL64-41.md): The 68040 engine has 151 64-bit MULS.L/MULU.L instructions (divisions by constants), which the 68060 traps to its support library
 - [ENGINE-FLOAT-SHORT-STORE-33](ENGINE-FLOAT-SHORT-STORE-33.md): 68040 engine build stored float-to-short conversions of the animation layout parser into the wrong group
 - [ENGINE-FPSP-MISSING-31](ENGINE-FPSP-MISSING-31.md): Boot disk loads no 68040 FPU support library; emulator hides it
 - [ENGINE-FPU-DATA-DECODE-33](ENGINE-FPU-DATA-DECODE-33.md): The 68040 FPU check reads a pointer table in the engine code section as fintrz instructions
@@ -65,6 +76,7 @@ Family: FPU and CPU behaviour (68040/68060) (`fpu-cpu`). Results must not depend
 - [ENGINE-FRAME-TIME-FLOAT-35](ENGINE-FRAME-TIME-FLOAT-35.md): The main loop held the seconds since start in floats: frame times quantise after hours of play
 - [ENGINE-GAMMA-POW-35](ENGINE-GAMMA-POW-35.md): The gamma table called the C library pow, which executes FPU instructions a 68040 does not implement
 - [EXTENTS-FPU-RULE-31](EXTENTS-FPU-RULE-31.md): Surface extents and lightmap sizes depended on the FPU's arithmetic
+- [FPU-SUPPORT-MMULIB-SETPATCH-41](FPU-SUPPORT-MMULIB-SETPATCH-41.md): The MMULib 68060.library stops the boot with an alert on the AmiWind boot disk, which runs no SetPatch
 - [TEST-FPU-STRICT-JIT-31](TEST-FPU-STRICT-JIT-31.md): Emulator strict FPU mode is silently ignored while JIT is on
 
 <!-- END GENERATED CATEGORY -->

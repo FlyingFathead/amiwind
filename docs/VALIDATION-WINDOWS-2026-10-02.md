@@ -46,7 +46,7 @@ Normal public entry points, with example paths:
 
 ```powershell
 .\setup-windows.cmd -Yes
-.\build.cmd --data-files 'C:\Games\Morrowind' --workspace C:\AmiWindBuilds --name win-full --jobs 24
+.\build.cmd --data-files 'C:\Games\Morrowind' --workspace C:\Projects\AmiWindBuilds --name win-full --jobs 24
 ```
 
 Keep the input game installation read-only. Use a fresh name for a failed-run
@@ -92,7 +92,7 @@ to AmigaDOS. The test emulator was closed afterward.
 This confirms boot, game entry and basic keyboard/menu input. It does not certify
 all maps, saves, audio quality, sustained play, physical Amiga performance or
 lower-spec hardware. Runtime screenshots/configuration stay private because they
-contain the owner's converted game assets and host paths.
+contain the maintainer's converted game assets and host paths.
 
 ## Remaining release work
 

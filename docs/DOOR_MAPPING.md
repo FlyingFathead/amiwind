@@ -1,7 +1,7 @@
 # Original door mapping
 
 The converter reads base DOOR records and their placed CELL references from the
-owner's Morrowind.esm. A door's model/name/script and open/close sound IDs belong
+maintainer's Morrowind.esm. A door's model/name/script and open/close sound IDs belong
 to its base record. Each placement has its own reference number, transform,
 scale and optional teleport destination. Do not infer a return link from a shared
 base model: the other side is a separate placed reference.

@@ -58,7 +58,7 @@ for the playable scene; see [build instructions](LINUX_BUILD.md).
 | **Waterfront buildings** | |
 | <img src="images/amiwind-v0.0.15-dev2-waterfront.png" width="400" height="237" alt="AmiWind: wooden and stone buildings by the waterfront"> | |
 
-*Owner-supplied development screenshots from v0.0.15-dev2. Capture margins are
+*User-supplied development screenshots from v0.0.15-dev2. Capture margins are
 cropped; all five images are 954 × 565 pixels, without rescaling the game view.
 Debug FPS values show individual moments, not a hardware benchmark.*
 

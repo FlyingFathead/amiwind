@@ -9,7 +9,7 @@
 | Where | MiniWind build line (v0.0.33-miniwind2) and its build mw2-033b |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | low: A Balmora-only playtest carries 17 videos (162 MB) and all 6,447 voices (207 MB) it never uses. |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | Playtest version | MiniWind v0.0.33-dev1 #2 |
@@ -92,8 +92,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36](CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36.md): CHIM-native images with no legacy exterior (MiniWinds of one town) ship without the shared sky their frame maps name
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 <!-- END GENERATED CATEGORY -->

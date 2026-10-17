@@ -5,9 +5,9 @@
 ## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Source candidate: two male bodies retain full8/6 gait plus punch within512 KiB;83 affected tests pass. Target/native/visual/all-appearance/RC2-package acceptance pending.
-- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): All 20 body pairs pass binary checks with gait/punch declarations; 33 guard checks pass, earlier 83 retained. Visible punch, seams and native/package/owner acceptance pending.
-- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Scoped Nord male/Orc female candidate footage shows torso/arm punch motion and ready movement. Display only: damage, LMB, all appearances, matched A/B, seams, package/owner acceptance pending.
-- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Owner repeats no third-person punch from physical LMB in RC2. One exact input/damage control succeeds; owner-case visible animation remains unaccepted.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): All 20 body pairs pass binary checks with gait/punch declarations; 33 guard checks pass, earlier 83 retained. Visible punch, seams and native/package/maintainer acceptance pending.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Scoped Nord male/Orc female candidate footage shows torso/arm punch motion and ready movement. Display only: damage, LMB, all appearances, matched A/B, seams, package/maintainer acceptance pending.
+- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Maintainer repeats no third-person punch from physical LMB in RC2. One exact input/damage control succeeds; maintainer-case visible animation remains unaccepted.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -15,18 +15,18 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 13 October 2026, in v0.0.39-rc1 |
 | Where | Gameplay/combat: third-person player with fists readied |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.39-rc1, v0.0.39-rc2 (last seen) |
-| Severity | critical: The owner stopped release because basic third-person combat has no visible punch animation. |
+| Severity | critical: The maintainer stopped release because basic third-person combat has no visible punch animation. |
 | Family | First-person hands and torch (`torch-hands`) |
 | Playtest version | v0.0.39-rc1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
-| Unknown because | Owner named RC1; the exact running image and binary were not independently read back for this report. |
+| Unknown because | Maintainer named RC1; the exact running image and binary were not independently read back for this report. |
 | Platform or emulator | unknown (Emulator not restated for this specific observation.) |
 
 <!-- END GENERATED FACTS -->
@@ -47,7 +47,7 @@
 - [Corrected RC2 all-body result and seam limits, 13 October 2026](#corrected-rc2-all-body-result-and-seam-limits-13-october-2026)
 - [Scoped candidate native punch observation, 13 October 2026](#scoped-candidate-native-punch-observation-13-october-2026)
 - [Post-pin RC2 package observation, 14 October 2026](#post-pin-rc2-package-observation-14-october-2026)
-- [Renewed owner failure and ordinary-input controls, 14 October 2026](#renewed-owner-failure-and-ordinary-input-controls-14-october-2026)
+- [Renewed maintainer failure and ordinary-input controls, 14 October 2026](#renewed-maintainer-failure-and-ordinary-input-controls-14-october-2026)
 - [Held attack during raising: 14 October 2026, v0.0.40-dev1](#held-attack-during-raising-14-october-2026-v0040-dev1)
 - [Scoped physical-input native control, 14 October 2026](#scoped-physical-input-native-control-14-october-2026)
 - [Later outgoing-hit control, 14 October 2026](#later-outgoing-hit-control-14-october-2026)
@@ -61,7 +61,7 @@
 
 ## Symptom
 
-Drawing the fists animates, but pressing default attack LMB shows no third-person punching animation. The owner corrected the initial input-failure report: the punch apparently executes; missing body animation is the confirmed symptom. Actual hit/damage behavior is not independently verified.
+Drawing the fists animates, but pressing default attack LMB shows no third-person punching animation. The maintainer corrected the initial input-failure report: the punch apparently executes; missing body animation is the confirmed symptom. Actual hit/damage behavior is not independently verified.
 
 ## Where
 
@@ -74,7 +74,7 @@ Source review identifies a missing body-punch selection/bake path. RC1 ready/dra
 
 ## Why it was not caught
 
-Earlier scoped checks did not establish this exact visual behavior in the owner scenario. Successful damage, movement, model parsing or unrelated animations do not prove this animation or shape is correct.
+Earlier scoped checks did not establish this exact visual behavior in the maintainer scenario. Successful damage, movement, model parsing or unrelated animations do not prove this animation or shape is correct.
 
 ## Reproduction
 
@@ -82,17 +82,17 @@ Switch to third person, draw fists with F, then press LMB at rest and while movi
 
 ## Repair
 
-Source candidate binds the original punch state/clock and authored punch layers over ready idle/walk/run/jump/land. Compact action grids retain full gait samples inside the existing budgets. Preserve block/death priorities and the approved fight-ready posture. No repaired native/package or owner punch acceptance is claimed.
+Source candidate binds the original punch state/clock and authored punch layers over ready idle/walk/run/jump/land. Compact action grids retain full gait samples inside the existing budgets. Preserve block/death priorities and the approved fight-ready posture. No repaired native/package or maintainer punch acceptance is claimed.
 
 ## Verification
 
-Source candidate uses compact draw/lower/punch layer grids while retaining full normal and ready gait. Isolated Nord and Khajiit male bakes/readbacks pass under the exact RC1 budget environment: normal walk8/run6, ready walk8/run6 and authored punch layers;105 frames each,512x96 atlas. Nord has357 triangles and520,564 bytes; Khajiit358 triangles and521,876 bytes, each below512 KiB. Eighty-three affected automated checks pass. These were the first two isolated source-candidate controls; the corrected all-body binary result below extends file coverage. Actual native/visual repair, complete RC2 package readback and owner acceptance remain pending.
+Source candidate uses compact draw/lower/punch layer grids while retaining full normal and ready gait. Isolated Nord and Khajiit male bakes/readbacks pass under the exact RC1 budget environment: normal walk8/run6, ready walk8/run6 and authored punch layers;105 frames each,512x96 atlas. Nord has357 triangles and520,564 bytes; Khajiit358 triangles and521,876 bytes, each below512 KiB. Eighty-three affected automated checks pass. These were the first two isolated source-candidate controls; the corrected all-body binary result below extends file coverage. Actual native/visual repair, complete RC2 package readback and maintainer acceptance remain pending.
 
-The owner explicitly confirms that the RC1 fight-ready posture is good and must be preserved. This is a scoped posture control; torch holding, leg shape, fast gait and punch acceptance remain separate.
+The maintainer explicitly confirms that the RC1 fight-ready posture is good and must be preserved. This is a scoped posture control; torch holding, leg shape, fast gait and punch acceptance remain separate.
 
 ## Prevention
 
-Require an exact-package native reproduction and repaired capture of this scenario, with unaffected first/third-person behavior and normal-speed timing as controls. Keep automated checks, target observation and owner acceptance separate.
+Require an exact-package native reproduction and repaired capture of this scenario, with unaffected first/third-person behavior and normal-speed timing as controls. Keep automated checks, target observation and maintainer acceptance separate.
 
 ## Earlier all-appearance failure, 13 October 2026
 
@@ -104,21 +104,21 @@ The corrected isolated candidate now passes actual-format model/layout checks fo
 
 The anatomical leg-section guard now uses labelled leg parts 17â€“22 in both compared meshes, excluding Khajiit tail part 26 from the width test. Its 75% threshold and the actual model/alias budgets remain unchanged. Thirty-three focused automated checks pass against the exact corrected source snapshot, including the tail/narrow-leg regression. The earlier 83 affected body/animation checks remain separate evidence, not a rerun of the latest full suite.
 
-Read-only section audits still identify possible knee/calf gaps in five fallback bodies. Part extrema extend up to 0.415 units beyond authored bounds; knee/calf 2D section Hausdorff distance increases from about 0.45â€“0.58 to 1.17â€“1.83 units. Plain 384 simplification causes most of that increase; contour adjustment adds 0â€“0.13 units. These are geometry metrics, not proof of a visible hole or an accepted repair. Native silhouette/seam inspection, matched v0.0.38 gait and RC1 ready controls, original-game comparison, memory/performance, exact package and owner acceptance remain pending.
+Read-only section audits still identify possible knee/calf gaps in five fallback bodies. Part extrema extend up to 0.415 units beyond authored bounds; knee/calf 2D section Hausdorff distance increases from about 0.45â€“0.58 to 1.17â€“1.83 units. Plain 384 simplification causes most of that increase; contour adjustment adds 0â€“0.13 units. These are geometry metrics, not proof of a visible hole or an accepted repair. Native silhouette/seam inspection, matched v0.0.38 gait and RC1 ready controls, original-game comparison, memory/performance, exact package and maintainer acceptance remain pending.
 
 ## Scoped candidate native punch observation, 13 October 2026
 
-Review of isolated candidate footage shows displayed punches on Nord male and Orc female bodies: torso twist/arm extension differs from the earlier RC1 ready-only observation. The Orc female view shows extension at 8.0/8.2 seconds and return by 8.4, with actual ready-movement positions progressing Y 0â†’225â†’468. Both diagnostics use the earlier compiled candidate engine and isolated body assets, not a complete RC2 image. This is scoped visible animation evidence only; it does not establish damage, LMB input, all appearances, matched original-game/v0.0.38 comparison, leg seams, package or owner acceptance.
+Review of isolated candidate footage shows displayed punches on Nord male and Orc female bodies: torso twist/arm extension differs from the earlier RC1 ready-only observation. The Orc female view shows extension at 8.0/8.2 seconds and return by 8.4, with actual ready-movement positions progressing Y 0â†’225â†’468. Both diagnostics use the earlier compiled candidate engine and isolated body assets, not a complete RC2 image. This is scoped visible animation evidence only; it does not establish damage, LMB input, all appearances, matched original-game/v0.0.38 comparison, leg seams, package or maintainer acceptance.
 
 ## Post-pin RC2 package observation, 14 October 2026
 
-The independently extracted RC2 package shows Nord third-person torso/arm punch changes in an unaltered native clip. Post-exit readback preserves exact assets. Console attack control does not prove physical LMB input or damage; all appearances, matched original comparison, seams and owner acceptance remain pending.
+The independently extracted RC2 package shows Nord third-person torso/arm punch changes in an unaltered native clip. Post-exit readback preserves exact assets. Console attack control does not prove physical LMB input or damage; all appearances, matched original comparison, seams and maintainer acceptance remain pending.
 
-These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Maintainer acceptance and final v0.0.39 clearance remain pending.
 
-## Renewed owner failure and ordinary-input controls, 14 October 2026
+## Renewed maintainer failure and ordinary-input controls, 14 October 2026
 
-The owner again reports no third-person punching animation from physical LMB in
+The maintainer again reports no third-person punching animation from physical LMB in
 RC2, and identifies its gameplay as the same as final v0.0.39. This finding
 supersedes any implication that the earlier console-driven pose clip accepted
 the ordinary-input scenario. The current register entry remains open.
@@ -127,14 +127,14 @@ The exact delivered RC2 engine SHA-256
 `ef0bfa4fc2b5225fb6583f0ca012e62a77291b79652235900d730c23c1bb6da1`
 reaches ready state 2/goal 1 from physical F; physical LMB reaches attack state 3,
 frame 24 and registers a 60-point fatigue hit against a guard. This proves one
-physical-input and damage path. It does not prove visible body motion, the owner
+physical-input and damage path. It does not prove visible body motion, the maintainer
 appearance/state or universal combat correctness. A separate after-Census Nord
 control records physical LMB pulses; a still taken after a pulse cannot establish
 the punch animation. Inspect the continuous native capture before judging it.
 
 Repeat physical LMB at rest and during unobstructed ready movement, in both
 views, while recording input, body clock/frame and damage separately. Preserve
-the approved ready posture. No gameplay repair or owner acceptance follows from
+the approved ready posture. No gameplay repair or maintainer acceptance follows from
 these baseline controls.
 
 
@@ -155,7 +155,7 @@ it adds no second action clock.
 
 This is a source and executable-VM result. Native physical-input verification
 and visible third-person animation remain pending, and this is not yet an
-established explanation for the owner's inability to move with fists drawn.
+established explanation for the maintainer's inability to move with fists drawn.
 
 ## Scoped physical-input native control, 14 October 2026
 
@@ -164,7 +164,7 @@ physical F and holds physical LMB through raising. Diagnostics reach hands
 state 3, frame 23, attack 1 and latched 1; the original game clip shows arm
 changes. This is scoped visible attack/input evidence for that control.
 No target was hit and damage was not tested. Other appearances, smoothness,
-the owner's original scenario and owner acceptance remain separate; this
+the maintainer's original scenario and maintainer acceptance remain separate; this
 observation does not close the issue.
 
 ## Later outgoing-hit control, 14 October 2026
@@ -173,7 +173,7 @@ Physical held-fist attacks against Fargoth with normal dice produce outgoing
 misses: recorded chances fall from 19 to 1 to 0 as the exchange continues.
 Fargoth remains at health 41/41 and fatigue 153/154. This establishes outgoing
 attack processing in this control, not a successful hit or outgoing damage.
-It does not accept the owner's animation case, all appearances or pacing.
+It does not accept the maintainer's animation case, all appearances or pacing.
 
 ## Selected Argonian recording limit, 14 October 2026
 

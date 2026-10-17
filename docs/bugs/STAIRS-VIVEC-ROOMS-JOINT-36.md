@@ -6,7 +6,7 @@
 
 - Reported with v0.0.36-dev4 at 2026-10-11 08:37 +0300: found: whole-city Vivec with rooms try2 3734cf5, 6 flight steps in vdi012, voi025, vri000
 - Reported with v0.0.36-dev5 at 2026-10-11 09:41 +0300: PERSISTING: whole-city Vivec with rooms f6e08fe (dev5), accepted by ID for the dev MiniWind: same 6 flight steps
-- Reported with v0.0.36-dev5 at 2026-10-11 09:56 +0300: owner order (TG): fix for rc1
+- Reported with v0.0.36-dev5 at 2026-10-11 09:56 +0300: maintainer order (TG): fix for rc1
 
 <!-- END GENERATED PERSISTING -->
 
@@ -48,7 +48,7 @@ The rooms' standing hulls where two stair modules meet (the shared room converte
 
 ## How it happened
 
-Traced 11 October 2026 (reproduced with the owner's mesh in a private lab: two chained pieces fail exactly
+Traced 11 October 2026 (reproduced with the maintainer's mesh in a private lab: two chained pieces fail exactly
 as in the rooms). All six are joints of `in_velothismall_stairs_01`. Its authored collision is a landing, a
 26.8-degree ramp, and at the foot of the ramp a 50.2-degree toe 2.9 units tall. Where one piece's top landing
 meets the next piece's foot, a standing box walking up steps up onto the toe: a step-up that moves forward
@@ -73,7 +73,7 @@ receipt note says how many toes were cut.
 
 ## Verification
 
-Private lab (the owner's mesh, three chained pieces): 2 flight steps failed at the joints before, 27 of 27
+Private lab (the maintainer's mesh, three chained pieces): 2 flight steps failed at the joints before, 27 of 27
 pass with the rule. Synthetic tests: tests/test_stair_rc1_fixes.py (ToeTests: the toe becomes vertical at the
 ramp's foot; two chained pieces walk up with the rule and are blocked without it). Pending: the whole-city
 MiniWind with rooms on the fixed builder with no accepted stair findings.
@@ -95,6 +95,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
+- [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
 - [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
@@ -106,6 +107,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
+- [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
+- [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

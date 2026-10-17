@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev2 |
 | Where | Prison ship hold lighting (opening scene) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31-dev2 (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: Opening scene 1.2 to 2.5 times brighter than the original; no gameplay effect. |
 | Family | Lighting, lamps and night (`lighting-night`) |
 | Playtest version | v0.0.31-dev2 |
@@ -27,7 +27,7 @@ on the v0.0.32 image with the prison ship map re-baked by the changed converter 
 
 ## Symptom
 
-The opening scene is "too bright"; it should be murky (owner, 7 October: about 0.4 of luma too
+The opening scene is "too bright"; it should be murky (maintainer, 7 October: about 0.4 of luma too
 bright at the back of the hold, about 0.6 wanted there), with a warm lantern toward Jiub. Again on
 CHIM Preview 1 (v0.0.32 content), 9 October: "we need current luma at that very end of the ship
 where you're at with Jiub to ~0.5 of what it is and a yellow hue to the lamp above Jiub" (the

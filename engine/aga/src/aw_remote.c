@@ -6,7 +6,8 @@
  * appends its text to the command buffer, deletes it, and rewrites
  * <aw_remote_dir>state.txt: map, position, view, game time, daylight, lamps,
  * frame time, how many command files ran and, while dbg rcount is on, the
- * last renderer counter line (aw_rcount.c), ending with "end" (written in
+ * last renderer counter line (aw_rcount.c; and the dbg rprof line while that
+ * is on), ending with "end" (written in
  * place: the Amiga C library has no rename; a reader retries a file without
  * the end line). With aw_remote on, console
  * output also goes to <aw_remote_dir>console.log (Quake's -condebug log).
@@ -81,6 +82,7 @@ static void write_state(void)
     fprintf(f,"screen %s\nsignon %d\nworld_leafs %d\n",key_dest==key_game?"game":key_dest==key_menu?"menu":
         key_dest==key_console?"console":"message",cls.signon,cl.worldmodel?cl.worldmodel->numleafs:0);   /* the efrag safety net (CHIM-FRAME-EDGE-EFRAG-CRASH-36) */
     if(*AW_RCountLine())fprintf(f,"rcount %s\n",AW_RCountLine());
+    if(*AW_RProfLine())fprintf(f,"rprof %s\n",AW_RProfLine());
     fputs("end\n",f);
     fclose(f);
 }

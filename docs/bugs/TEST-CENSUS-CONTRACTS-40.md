@@ -101,7 +101,7 @@ scripted-command or documentation contract.
 
 This record changes no engine behavior and adds no CHIM coverage. Combined
 validation and native verification belong to the exact future repaired source
-and image. First fixed version and owner acceptance remain unset.
+and image. First fixed version and maintainer acceptance remain unset.
 
 ## Prevention
 

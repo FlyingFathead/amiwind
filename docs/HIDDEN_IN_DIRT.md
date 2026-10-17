@@ -24,7 +24,7 @@
 
 ## Current implementation status: incomplete; acceptance remains open
 
-Owner review rejected candidate010 with hanging geometry at 24,650 stored faces.
+Maintainer review rejected candidate010 with hanging geometry at 24,650 stored faces.
 Independent read-only audit002 subsequently verified that this candidate's final
 serialized BSP contains zero sky render faces; this is binary geometry evidence
 only, and the replacement sky/background appearance has not been verified on the
@@ -67,7 +67,7 @@ Shared models and lightmaps require correct placement-specific clipping and dedu
 
 The serialized final BSP must satisfy both conditions with ALL inspector hiding and preview options OFF. Verify serialized geometry, render references, degeneracies, seams, shared placements and preserved collision/visibility, then matching-ABI memory and target appearance/loading. Attempted-face counts, collision checks alone and viewer-only hiding are insufficient.
 
-These are required outcomes, not claims that the current implementation is complete. Candidate010 was rejected by owner visual review. It used compiled LAND proxies, not direct canonical NPZ evaluation. Direct NPZ alignment was subsequently checked at 288 source-grid corners with zero residual; that diagnosis is not a repaired BSP. The global packet exposed a continuous terrain surface where the compiled coarse/fine terrain had a height step.
+These are required outcomes, not claims that the current implementation is complete. Candidate010 was rejected by maintainer visual review. It used compiled LAND proxies, not direct canonical NPZ evaluation. Direct NPZ alignment was subsequently checked at 288 source-grid corners with zero residual; that diagnosis is not a repaired BSP. The global packet exposed a continuous terrain surface where the compiled coarse/fine terrain had a height step.
 
 
 Morrowind/AmiWind exterior culling uses the authoritative GLOBAL TOPOMAP as its
@@ -342,7 +342,7 @@ alone does not establish resident ownership or change runtime transitions.
 
 ### Resident footprint and cost investigation
 
-A read-only footprint probe proposes the owner-marked central polygon as the
+A read-only footprint probe proposes the maintainer-marked central polygon as the
 resident core, surrounded by the existing visibility apron. The original plan
 needs explicit closure and polygon validation before it can become a runtime
 region. The present small rectangular ownership cores do not meet the central

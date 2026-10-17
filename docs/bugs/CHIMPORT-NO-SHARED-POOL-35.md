@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 10 October 2026, in v0.0.34 |
 | Where | tools/chimport.py run units and cell outputs; tools/chim/units.py UnitCache |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: Store-once rule broken for the island conversion: a second run folder or workspace converts and stores every unit and cell again; no stored-vs-linked figures |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

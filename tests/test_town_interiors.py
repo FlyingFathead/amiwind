@@ -270,7 +270,7 @@ class ArenaPit(unittest.TestCase):
         order = [r['town'] in shipped for r in town_interiors()]
         self.assertEqual(order, sorted(order, reverse=True))
 
-    def test_pit_exits_lead_to_the_arena_frame_and_waistworks_stays_unavailable(self):
+    def test_pit_exits_lead_to_the_arena_frame_and_to_the_recentred_waistworks(self):
         s = load_settings('vivec_arena')
         x, y = s['centre']
         towns = ti.frame_towns()
@@ -278,12 +278,15 @@ class ArenaPit(unittest.TestCase):
         self.assertEqual(rooms['vivec, arena pit'], 'vai000')
         doors = [door(1, 'Vivec, Arena Pit', '', [x + 2100, y + 120, 2130], math.pi, interior=False),
                  door(2, 'Vivec, Arena Pit', 'Vivec, Arena Waistworks', [3800, 4800, 18400])]
-        rows = ti.room_bank('vai000', doors, rooms, towns, {n: [[-8, -8, 0], [8, 8, 120]] for n in (1, 2)})
+        rows = ti.room_bank('vai000', doors, rooms, towns, {n: [[-8, -8, 0], [8, 8, 120]] for n in (1, 2)},
+                            ti.room_offsets())
         outside, waist = (r.split('\t') for r in rows)
         self.assertEqual(outside[0].split(' ')[:2], ['vai000', 'vivec_arena'])
         self.assertEqual(outside[1], 'Vivec, Arena')
         self.assertEqual(list(map(float, outside[0].split(' ')[9:12])), [525.0, 30.0, 2130 * .25 + 16.875])
-        self.assertEqual(waist[0].split(' ')[1], '-')
+        # Arena Waistworks is listed by the whole city (vci000, v0.0.42) and recentred by 18,432 units in z
+        self.assertEqual(waist[0].split(' ')[1], 'vci000')
+        self.assertEqual(list(map(float, waist[0].split(' ')[9:12])), [950.0, 1200.0, (18400 - 18432) * .25 + 16.875])
 
 
 class TownTableInteriors(unittest.TestCase):
@@ -323,9 +326,13 @@ class WholeCityRooms(unittest.TestCase):
         city = load_settings('vivec_city')
         rooms = ti.listed_rooms(city)
         districts = [room for town in city['interiors_from'] for room in interiors(load_settings(town))]
-        self.assertEqual(rooms, districts)
+        self.assertEqual(rooms, interiors(city) + districts)
         self.assertEqual(len({r['map'] for r in rooms}), len(rooms))
-        self.assertEqual(interiors(city), [])      # the town table lists each room once, under its district
+        # the town table lists each room once: under its district, or under the city for a room added later
+        # (Arena Waistworks, v0.0.42: appended to the city's own list so no earlier save ID moves)
+        self.assertEqual([r['cell'] for r in interiors(city)],
+                         ['Vivec, Arena Waistworks', 'Vivec, Arena Canalworks', 'Vivec, Arena Fighters Quarters',
+                          'Vivec, Arena Fighters Training', 'Vivec, Arena Holding Cells'])
         self.assertEqual(city['room_failures'], 'unavailable')
         import chim_rooms
         self.assertEqual(chim_rooms.listed_rooms('vivec_city'), [r for r in rooms if r['exclude'] is None])

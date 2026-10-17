@@ -45,6 +45,18 @@
    "note": "interior view distance"
   },
   {
+   "file": "engine/aga/src/aw_cam.c",
+   "contains": "if(m->fog>4096)m->fog=4096;",
+   "class": "kept",
+   "note": "camera mark: the view distance cap of dbg fog distance (aw_fog.c), a distance, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_cam_rules.c",
+   "contains": "numbers(field[6],&value,1,4096)",
+   "class": "kept",
+   "note": "camera marks file: the fog field takes the view distance range of dbg fog distance (aw_fog.c)"
+  },
+  {
    "file": "engine/aga/src/aw_gallery.c",
    "contains": "size[i]>=0 && e->size[i]<4096))return",
    "class": "unrelated",

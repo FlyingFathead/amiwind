@@ -9,7 +9,7 @@
 | Where | CHIM engine chim_models.c (stream begin) and chim_world.c Chim_File (open-file cache) |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.35 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: A crash while walking when a large model streams and its textures or other chunks open four other sector files. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

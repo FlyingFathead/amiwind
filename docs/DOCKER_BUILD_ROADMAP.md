@@ -162,5 +162,5 @@ tool versions, logs, exit status, skips and failures. Focused tests do not repla
 the full suite. Report native Windows checks separately: Docker on Windows is a
 Linux build host, not native Windows validation. Do not create or execute native
 Windows helper binaries for this gate. Clean up only Docker/WSL resources started
-for the run and confirm prior state restoration. Publication is the owner's
+for the run and confirm prior state restoration. Publication is the maintainer's
 Linux-only step. Failed or unrun gates remain open.

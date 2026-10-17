@@ -9,7 +9,7 @@
 | Where | tools/aw_service.py finish_build |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: the result document of every failed recipe/preset build is lost (aw exits with a traceback); the trial line and perf ingest are written before it |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | MiniWind v0.0.36-dev3 |

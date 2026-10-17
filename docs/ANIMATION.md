@@ -70,7 +70,7 @@ working.
 | `full` | idle 8, walk 8, run 6, swim 6, swimidle 4, hit 3, knock 4, death 6, attack 8, block 5, dodgel 3, dodger 3 | 64 |
 | `react+full` | standing model `react` (idle 8, hit 3, death 6) plus a mover model `full` | 17 + 64 |
 
-Owner decision (9 October 2026), for the release after v0.0.33: standing
+Project decision (9 October 2026), for the release after v0.0.33: standing
 residents ship `react`; an actor that moves (the companion, followers,
 fighters) wears its `full` model only while it moves: `react+full`. `idle`
 stays the builder default until that release

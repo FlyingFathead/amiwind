@@ -9,7 +9,7 @@
 | Where | CHIM frame validation during lava-cell retry |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.37 (last seen) |
+| Persists in | fixed in v0.0.38 |
 | Severity | high: Blocks acceptance of all 25 lava-cell retries; no valid world produced |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | Builder disk layout: partition order and start offsets on each drive image |
 | Reproduction | always |
@@ -24,7 +24,7 @@
 
 ## Status: 9 October 2026
 
-Closed as an accepted platform limit, recorded as a fact by owner order. Not a defect to fix: the builder
+Closed as an accepted platform limit, recorded as a fact by maintainer order. Not a defect to fix: the builder
 enforces the limits.
 
 ## Symptom

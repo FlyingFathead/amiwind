@@ -9,7 +9,7 @@
 | Where | engine/aga/src/aw_c2p.c aw_c2p, vid_amiga.c VID_Init |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: Only screen widths whose rows are not padded drew correctly |
 | Family | Rendering cost and visibility (`render-performance`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

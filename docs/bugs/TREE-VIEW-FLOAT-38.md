@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Grazelands cell 10,11; global 89029,96069,1369 |
 | Reproduction | unknown |
@@ -21,7 +21,7 @@
 <!-- END GENERATED FACTS -->
 
 ## Symptom
-The owner reports a sprite tree floating above terrain in v0.0.38-dev2,
+The maintainer reports a sprite tree floating above terrain in v0.0.38-dev2,
 visible from one general direction. The first image shows the detached trunk.
 
 ## Where
@@ -36,7 +36,7 @@ Do not assume a shared cause with non-unit-scale sprite omissions.
 No exact-pose, multi-direction native check is recorded for this placement.
 
 ## Reproduction
-Compare the two owner views from 12 October at 15:34:54 and 15:35:33
+Compare the two maintainer views from 12 October at 15:34:54 and 15:35:33
 (Europe/Helsinki), then circle the same tree in the target engine and OpenMW.
 Both screenshots have been visually checked; native reproduction remains pending.
 
@@ -44,15 +44,15 @@ Both screenshots have been visually checked; native reproduction remains pending
 Pending diagnosis. Preserve the approved distant-tree silhouettes.
 
 ## Verification
-Owner evidence is a reproduction report, not a repair acceptance result.
+Maintainer evidence is a reproduction report, not a repair acceptance result.
 
 ## Prevention
 Check the same placement from multiple headings and heights before acceptance.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.

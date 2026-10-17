@@ -342,6 +342,11 @@ CL_FinishTimeDemo
 
 ====================
 */
+/* AmiWind (aw_rcount.c): the renderer counters of the whole timedemo, printed and
+ * appended to saves/timedemo-results.txt. NULL in fixtures without it. */
+void (*aw_timedemo_done)(const char *demo, int frames, double seconds);
+static char timedemo_name[64];
+
 void CL_FinishTimeDemo (void)
 {
 	int		frames;
@@ -355,6 +360,8 @@ void CL_FinishTimeDemo (void)
 	if (!time)
 		time = 1;
 	Con_Printf ("%i frames %5.1f seconds %5.1f fps\n", frames, time, frames/time);
+	if (aw_timedemo_done)
+		aw_timedemo_done (timedemo_name, frames, time);
 }
 
 /*
@@ -378,6 +385,7 @@ void CL_TimeDemo_f (void)
     /* A manual timing run must not re-enter the startup demo loop when its
      * final disconnect arrives, even before any live connection was made. */
     cls.demonum = -1;
+    Q_strcpy_bounded (timedemo_name, Cmd_Argv(1), sizeof(timedemo_name));
     CL_PlayDemo_f ();
     if (!cls.demoplayback)
         return;

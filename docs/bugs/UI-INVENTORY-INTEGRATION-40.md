@@ -132,7 +132,7 @@ after the integrated ordered-comparator and bounded-layout source repairs;
 their rebuilt target and repaired native verification remain pending.
 
 Native pause/input/audio, plain-BSP drop/pickup/save/load, clear CHIM refusal,
-held equipment alignment, matched original comparison and owner acceptance
+held equipment alignment, matched original comparison and maintainer acceptance
 remain pending. No first
 fixed version is assigned. CHIM conversion and coverage counts do not change.
 
@@ -211,7 +211,7 @@ control, not acceptance of every race, menu state or audio path.
 
 Third-person block posture is not accepted. Broader modal input/audio,
 plain-BSP transfer/pickup/save/load, CHIM refusal, broad item/appearance coverage
-and owner acceptance remain separate gates. The owner still requests the
+and maintainer acceptance remain separate gates. The maintainer still requests the
 original inset black name plaque in the gold top border and correct original
 inventory posture; these improvements are planned under
 [UI-INVENTORY-LAYOUT-40](UI-INVENTORY-LAYOUT-40.md), not implemented by this

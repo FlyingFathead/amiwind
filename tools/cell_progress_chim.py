@@ -213,6 +213,7 @@ def digest(name, base, label=None, commit=None, built_at=None):
     cells, anchors = {}, set()
     declared,source_counts,ownership_notes=_declared_ownership(base,receipt)
     converted=set()
+    frame_cells = {}     # frame path -> the cells it converts (its heap ring figures belong to them)
     for fr in frames:
         anchors.add(tuple(fr['cell']))
         got = _chunk_cells(fr, stats['chunks']['per_chunk']) if stats else {}
@@ -221,9 +222,11 @@ def digest(name, base, label=None, commit=None, built_at=None):
                    for c in _footprint(fr)}
         anchor=tuple(fr['cell'])
         if anchor in declared:
-            converted.update(declared[anchor])
+            mine = set(declared[anchor])
         else:
-            converted.update(c for c,e in got.items() if ((e['owned'] or 0)>0 if stats else c==anchor))
+            mine = {c for c,e in got.items() if ((e['owned'] or 0)>0 if stats else c==anchor)}
+        converted.update(mine)
+        frame_cells[frame_path(anchor)] = mine
         for c, e in got.items():
             if c in source_counts.get(anchor,{}):e['source_references']=source_counts[anchor][c]
             cur = cells.get(c)
@@ -276,6 +279,25 @@ def digest(name, base, label=None, commit=None, built_at=None):
             parts.append('zone walk: %s, %d failed chunk loads' % (zone.get('status'), sum(x.get('zone_fail', 0) for x in w)))
         for c in converted:
             put('memory_fit', c, _status(ok), '; '.join(parts))
+        # Each frame's own ring figures go to the cells it converts (TRACKER-RELEASE-HEADROOM-MISSING-42: a full run
+        # recorded only the run's least headroom as text, so no cell of it had a headroom figure): the least headroom
+        # of the frames that hold the cell, its peak, the budget and the load ring's headroom, and the frame's verdict.
+        for f in (heap.get('frames') or []) if heap else []:
+            if f.get('headroom_bytes') is None:
+                continue
+            for c in frame_cells.get(f.get('frame'), ()):
+                if c not in converted:
+                    continue
+                row = audits['memory_fit'][key(c)]
+                n = row.setdefault('numbers', {})
+                if n.get('least_headroom') is None or f['headroom_bytes'] < n['least_headroom']:
+                    n.update({'least_headroom': f['headroom_bytes'], 'peak_bytes': f.get('peak_bytes'),
+                              'budget_bytes': f.get('budget_bytes'), 'frame': f.get('frame'),
+                              'load_headroom': (f.get('load_ring') or {}).get('headroom_bytes')})
+                if f.get('ok') is False:
+                    row['status'] = 'failed'
+                row['detail'] = 'frame heap ring: least headroom %d B of %s B (%s); %s' % (
+                    n['least_headroom'], n.get('budget_bytes'), n.get('frame'), '; '.join(parts))
     models = receipt.get('models')
     # Figures that belong to the whole run (a frame's heap ring, the zone walk, the build); the tracker shows them on
     # every converted cell of the run, labelled as run-level.

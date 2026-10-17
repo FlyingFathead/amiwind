@@ -38,5 +38,32 @@ int main(void){
     memset(&state,0,sizeof(state));strcpy(state.inventory.dropped[0].id,"unknown_item");state.inventory.dropped[0].count=1;state.inventory.dropped[0].serial=1;
     for(i=0;i<AW_STATE_VALUES;i++){char name[32];sprintf(name,"item%d",i);assert(AW_ItemAdd(&state,name,1));}
     prior=state;assert(!AW_InventoryPickup(&state,0));assert(!memcmp(&state,&prior,sizeof(state)));
+    /* Magic items (HUD-STATS-29): select only an owned Cast Once / When Used item;
+     * charge full unless recorded; recharge capped; a spent stack is never dropped
+     * (drops do not carry charge yet); losing the item clears the selection. */
+    {
+        aw_inventory_item_t used=ring,strikes=ring,plain=ring;
+        memset(&state,0,sizeof(state));
+        strcpy(used.id,"magic_ring");used.enchant_kind=AW_ENCH_USED;used.charge_max=20;strcpy(used.enchantment,"e");
+        strcpy(strikes.id,"magic_sword");strikes.enchant_kind=AW_ENCH_STRIKES;strikes.charge_max=100;strcpy(strikes.enchantment,"s");
+        strcpy(plain.id,"plain_ring");
+        assert(!AW_MagicSelect(&state,&used));                       /* not owned */
+        assert(AW_ItemAdd(&state,used.id,1) && AW_ItemAdd(&state,strikes.id,1) && AW_ItemAdd(&state,plain.id,1));
+        assert(!AW_MagicSelect(&state,&plain) && !AW_MagicSelect(&state,&strikes));
+        assert(AW_MagicSelect(&state,&used) && !strcmp(state.magic.selected,"magic_ring"));
+        assert(AW_MagicCharge(&state,&used)==20 && !state.magic.charge_known);
+        assert(AW_MagicSetCharge(&state,&used,7) && AW_MagicCharge(&state,&used)==7);
+        assert(!AW_MagicSetCharge(&state,&plain,1) && !AW_MagicSetCharge(&state,&used,NAN));
+        assert(AW_MagicRecharge(&state,&used,20,.05f) && fabsf(AW_MagicCharge(&state,&used)-8)<1e-4f);
+        assert(AW_MagicRecharge(&state,&used,1000,.05f) && AW_MagicCharge(&state,&used)==20 && !state.magic.charge_known);
+        assert(!AW_MagicRecharge(&state,&used,10,.05f));                /* full stays full */
+        assert(AW_MagicSetCharge(&state,&strikes,1) && AW_MagicRecharge(&state,&strikes,20,.05f));
+        assert(AW_MagicSetCharge(&state,&used,3));
+        used.flags|=AW_INV_DROP;prior=state;
+        assert(AW_InventoryDrop(&state,&used,1,"seyda",pos,0)<0 && !memcmp(&state,&prior,sizeof(state)));
+        assert(AW_ItemAdd(&state,used.id,-1));
+        assert(!state.magic.selected[0] && AW_MagicCharge(&state,&used)==20);
+        assert(AW_MagicCharge(&state,&plain)==0);
+    }
     return 0;
 }

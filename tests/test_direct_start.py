@@ -113,7 +113,7 @@ class Scope(unittest.TestCase):
         # a room the town table excludes is refused with its own reason
         with self.assertRaises(ValueError) as error:
             ds.check(ds.parse('interior:Vivec, Guild of Mages'), ds.build_scope(['vivec_foreign'], False, False, 'full'))
-        self.assertIn('does not convert it yet: inline models', str(error.exception))
+        self.assertIn('does not convert it yet: model slots', str(error.exception))
 
     def test_cells_and_positions_inside_the_held_area(self):
         self.assertEqual(ds.check(ds.parse('cell:-3,-2'), MINI).cell_xy, [-3, -2])
@@ -387,7 +387,7 @@ class Builder(unittest.TestCase):
 
 
 class StartFollowsContent(unittest.TestCase):
-    """Owner order 2026-10-11 ("if you're only going to build a certain area, make sure the player is then there";
+    """Maintainer order 2026-10-11 ("if you're only going to build a certain area, make sure the player is then there";
     BUILD-MINIWIND-DIRECT-START-TOWN-36): a partial-area build starts inside what it holds, derived when no start is
     given, refused before any stage when the start lies outside, checked again on the final image."""
 
@@ -425,10 +425,11 @@ class StartFollowsContent(unittest.TestCase):
 
     def test_the_arena_pit_preset_starts_inside_the_pit(self):
         # BUILD-MINIWIND-ARENA-PIT-REFUSED-36: the preset builds Vivec (its start picks the town: the whole city takes
-        # the Arena's rooms, owner decision 2026-10-11), the resolver finds the Pit (vai000, listed by
+        # the Arena's rooms, project decision 2026-10-11), the resolver finds the Pit (vai000, listed by
         # config/vivec_arena.json) and the plan makes it in chim-rooms-vivec_city
         args = self.preset('vivec-arena-pit')
-        self.assertEqual((args.miniwind_town, args.miniwind_scope), ('vivec_city', 'full'))
+        # the interior scope since v0.0.42 (MINIWIND-NO-INTERIOR-SCOPE-42): the Pit only of the city's rooms
+        self.assertEqual((args.miniwind_town, args.miniwind_scope), ('vivec_city', 'interior'))
         self.assertEqual((args.direct_start.kind, args.direct_start.map, args.direct_start.town),
                          ('interior', 'vai000', 'vivec_city'))
         self.assertIn('explicit', args.start_record['source'])
@@ -441,6 +442,8 @@ class StartFollowsContent(unittest.TestCase):
         self.assertLess(names.index('chim-town-vivec_city'), names.index('chim-rooms-vivec_city'))
         image = dict(steps)['image']
         self.assertEqual(image[image.index('--chim-rooms') + 1], str(RUN / 'chim-rooms-vivec_city'))
+        rooms = [str(part) for part in dict(steps)['chim-rooms-vivec_city']]
+        self.assertEqual(rooms[rooms.index('--only-cell') + 1], 'Vivec, Arena Pit')
         self.assertIn('Vivec interiors', args.miniwind_record['features'] if 'features' in args.miniwind_record
                       else image[image.index('--miniwind-features') + 1])
 
@@ -462,7 +465,7 @@ class StartFollowsContent(unittest.TestCase):
         self.assertNotIn('chim-rooms-vivec_arena', [name for name, _ in steps])
 
     def test_vivec_arena_starts_in_the_whole_city(self):
-        # the Arena preset starts at the Arena arrival of the whole-city frame (owner decision 2026-10-11 09:55)
+        # the Arena preset starts at the Arena arrival of the whole-city frame (project decision 2026-10-11 09:55)
         args = self.preset('vivec-arena-chim')  # no --miniwind-town: the start picks the town
         self.assertEqual(args.miniwind_town, 'vivec_city')
         self.assertEqual(args.chim_areas, ['vivec_city'])

@@ -59,7 +59,7 @@ class Base(unittest.TestCase):
 
 
 class KeysUnchanged(unittest.TestCase):
-    """Provenance statements never change a key (owner order 2026-10-11: nothing is redone)."""
+    """Provenance statements never change a key (maintainer order 2026-10-11: nothing is redone)."""
 
     PLAIN = ('import json\n\n\ndef store(meta, path):\n    meta = dict(meta)\n'
              '    path.write_text(json.dumps(meta))\n    return meta\n\n\nclass Cache:\n'

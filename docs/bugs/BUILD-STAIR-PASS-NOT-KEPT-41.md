@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 16 October 2026, in v0.0.41-dev5 |
 | Where | tools/chim/collision.py walk_reason / stair_key_sources (pass_cache) |
 | Reproduction | always |
@@ -35,6 +35,12 @@ walked again) and `stair_key_sources` (the walker's code digest).
 - The digest covers everything `stair_task` reaches. Between v0.0.41-dev4 and dev5 only collision
   compilation changed (`collision_bsp`, the coplanar retry), but that code is reachable from the walker,
   so every frame's walk was keyed new although the walker itself did not change.
+- Correction (16 October 2026, measured unit by unit on the dev4 commit a962916 and the dev5 commit c2aaf80):
+  `collision_bsp.py` is not in the walker's digest. The one difference was the CHIM_VERSION file
+  (0.2.0 -> 0.2.1): `chim/validate.py` imports `chim.terrain` when it loads, `chim/__init__.py` reads
+  CHIM_VERSION, and the import chain also names the collision compilers (`chim/models.py`,
+  `prepare_mesh_bsp.py`, `routed_hull.py`, `scenery_reduce.py`) and two town configs, none of which a walk
+  runs. Any edit to those rekeyed every frame the same way.
 
 ## Why it was not caught
 The reuse audit reported "walker code changed" as a reason, not as a fault.
@@ -44,14 +50,41 @@ Change any function the walker reaches but does not run (`collision_bsp.compile_
 every frame is walked again.
 
 ## Repair
-Planned (v0.0.42 builder fixes): a frame's walk that passed is a pass: stored with its SHA-256 key and its
-provenance (timestamp, AmiWind and CHIM versions, source commit, run) and reused while the key is
-unchanged, whatever the rest of the build did. The key covers the walker and the stair rule, not the
-compilers that make the collision it reads (their output is already in the key through the frame's
-collision bytes).
+On the v0.0.42 line (branch v0.0.42-stair-pass; not in v0.0.41):
+
+- A pass is a pass. A CHIM frame's walk record carries its outcome (`passed`: no flight step the standing box
+  cannot walk; `failed`) and its provenance: `walked_at` (ISO 8601 with the zone), the AmiWind and CHIM versions,
+  the source commit and the run, next to its SHA-256 key, rows SHA-256 and record SHA-256
+  (`tools/stair_records.py` `walk_facts`, `passed`). In development builds and stand-alone runs a passed walk
+  is reused while its key is unchanged, whatever the rest of the build that walked it did; a failed walk is
+  reused only with the check mark of a passed master build (a private test's accepted known finding). The log
+  names a reused pass `reused pass from RUN (VERSION, COMMIT, TIME)`.
+- Release safety: release candidates and finals keep the check-mark rule (`checked`): they reuse only records a
+  passed master build marked, and reuse anything at all only with `--allow-release-reuse`; asking for `passes` in
+  an rc or final is refused. Every build still walks a seeded sample of the reused frames again
+  (`--stair-walk-sample`, default 2) and stops on any difference, and `--stair-walk-cache full` walks
+  everything. The rule is `AMIWIND_STAIR_WALK_REUSE` (`passes` | `checked`, the earlier rule, still selectable for
+  any build); it never keys a stage (`build_cache.IGNORED_ENV`). The legacy maps' walks keep the check mark.
+- The walker key is the walk: `chim.collision.stair_key_sources` (code form `chim-stair-code-1`) counts the units
+  `stair_task` reaches in the files of `STAIR_WALK_CODE` only: `tools/stair_walk.py` (the walk and the stair
+  rule), `tools/chim/collision.py`, `tools/audit_walkability.py`, `tools/player_hull.py` (scene, polygons,
+  trace, box) and the frame reader (`tools/chim/validate.py`, `tools/chim/format.py`, `tools/chim/cut.py`,
+  `tools/chim/__init__.py`). The compilers' output is in the frame key already, as the frame's collision lumps.
+  Records of the earlier code form are not found under the new one: the first build with it walks every frame
+  once more (never a silent reuse).
 
 ## Verification
-Pending: rerun a failed build; every passed frame reused, only changed frames walked.
+- tests/test_chim_stair_pass.py: a passed walk is reused after its build failed (nothing promoted, nothing
+  walked, report equal to the walked one); a reused pass is still sampled; a failed walk is not reused as a
+  pass; the record carries key, outcome and provenance; release versions reuse only checked walks and refuse
+  `passes`; edits to `collision_bsp.compile_standing_checked`, `prepare_mesh_bsp.standing_planes` and
+  CHIM_VERSION keep the walker key, an edit to `stair_walk.check_polys` changes it; the key holds exactly the
+  listed files; statically no reached function of those files imports or names another repository module; a
+  monitored walk of a flight of stairs calls repository code only in those files.
+- Two-frame CHIM world (Vos edge, cells 12,13 and 12,14; 4,151 steps and ramps), same tree, scratch unit and
+  pass caches, records never promoted (as after a failed build): earlier rule (`checked`): 2 frames walked
+  again, stair gate 22.5 s; `passes`: 2 frames reused as passes, 0 walked, 3.5 s; default sample 2: both walked
+  again and matched their records.
 
 ## Prevention
 Persisting with [BUILD-CHIM-STAIR-WALK-UNCACHED-36](BUILD-CHIM-STAIR-WALK-UNCACHED-36.md) and

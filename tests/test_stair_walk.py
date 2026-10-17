@@ -109,7 +109,7 @@ class StairWalkGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Stair walkability gate failed'):
             stair_walk.require(path, path / 'stair-walk.json')
         self.assertEqual(__import__('json').loads((path / 'stair-walk.json').read_text())['status'], 'failed')
-        # A recorded, owner-approved map is reported but does not stop it.
+        # A recorded, maintainer-approved map is reported but does not stop it.
         report = stair_walk.require(path, path / 'stair-walk.json', exempt=['room'])
         self.assertTrue(report['exempt_failures'])
         self.assertEqual(report['status'], 'passed')

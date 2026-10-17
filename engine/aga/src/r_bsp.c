@@ -348,7 +348,15 @@ void R_RecursiveClipBPoly (bedge_t *pedges, mnode_t *pnode, msurface_t *psurf)
 					{
 						r_currentbkey = ((mleaf_t *)pn)->key;
 						AW_RC(RC_FRAGMENTS);
-						R_RenderBmodelFace (psideedges[i], psurf);
+						if (aw_rprof_on)
+						{	/* dbg rprof: the emit share of the clip walk */
+							unsigned long rp_t0;
+							AW_RP_BEGIN(rp_t0);
+							R_RenderBmodelFace (psideedges[i], psurf);
+							AW_RP_END(RP_EMIT, rp_t0);
+						}
+						else
+							R_RenderBmodelFace (psideedges[i], psurf);
 					}
 				}
 				else
@@ -359,6 +367,68 @@ void R_RecursiveClipBPoly (bedge_t *pedges, mnode_t *pnode, msurface_t *psurf)
 			}
 		}
 	}
+}
+
+
+/*
+================
+R_FarFaceSkipped
+
+aw_fog.c far tests of one front face of the current pass (aw_far_faces, set
+by AW_FarPassBegin in model space): bit 0, every vertex beyond the fog-exact
+depth and below the sky ray's horizon (the face would draw only pixels that
+take the same colour without it); bit 1 (aw_cull 5/6), the face's largest
+extent covers fewer than aw_far_detail_pixels pixels at its nearest vertex.
+Every polygon vertex is the first vertex of one of its edges.
+================
+*/
+static int R_FarFaceSkipped (model_t *pmodel, msurface_t *psurf)
+{
+	int		j, k, lindex, hidden = aw_far_faces & 1, small = aw_far_faces & 2;
+	float	*p, depth, nearest = 1e30f, lo[3], hi[3], size;
+
+	for (j=0 ; j<psurf->numedges ; j++)
+	{
+		lindex = pmodel->surfedges[psurf->firstedge+j];
+		p = r_pcurrentvertbase[lindex > 0 ? pmodel->edges[lindex].v[0] :
+			pmodel->edges[-lindex].v[1]].position;
+		if (hidden && (DotProduct (p, aw_far_depth) < aw_far_depth[3] ||
+			DotProduct (p, aw_far_down) >= aw_far_down[3]))
+			hidden = 0;
+		if (small)
+		{
+			depth = DotProduct (p, aw_far_view);
+			if (depth < nearest)
+				nearest = depth;
+			for (k=0 ; k<3 ; k++)
+			{
+				if (!j || p[k] < lo[k])
+					lo[k] = p[k];
+				if (!j || p[k] > hi[k])
+					hi[k] = p[k];
+			}
+		}
+		else if (!hidden)
+			return 0;
+	}
+	if (hidden)
+	{
+		AW_RC(RC_FAR_FOG_FACES);
+		return 1;
+	}
+	if (small)
+	{
+		nearest -= aw_far_view[3];
+		size = hi[0] - lo[0];
+		if (hi[1] - lo[1] > size) size = hi[1] - lo[1];
+		if (hi[2] - lo[2] > size) size = hi[2] - lo[2];
+		if (nearest > 1 && size * xscale < aw_far_detail_pixels * nearest)
+		{
+			AW_RC(RC_FAR_DETAIL);
+			return 1;
+		}
+	}
+	return 0;
 }
 
 
@@ -397,6 +467,8 @@ void R_DrawSolidClippedSubmodelPolygo (model_t *pmodel)
 			(!(psurf->flags & SURF_PLANEBACK) && (dot > BACKFACE_EPSILON)))
 		{
 			AW_RC(RC_BF_FRONT);
+			if (aw_far_faces && R_FarFaceSkipped (pmodel, psurf))
+				continue;
 			AW_RC(RC_CLIP_FACES);
 		// FIXME: use bounding-box-based frustum clipping info?
 
@@ -436,7 +508,15 @@ void R_DrawSolidClippedSubmodelPolygo (model_t *pmodel)
 
 				pbedge[j-1].pnext = NULL;	// mark end of edges
 
-				R_RecursiveClipBPoly (pbedge, currententity->topnode, psurf);
+				if (aw_rprof_on)
+				{	/* dbg rprof: walk + emit of this face */
+					unsigned long rp_t0;
+					AW_RP_BEGIN(rp_t0);
+					R_RecursiveClipBPoly (pbedge, currententity->topnode, psurf);
+					AW_RP_END(RP_CLIP, rp_t0);
+				}
+				else
+					R_RecursiveClipBPoly (pbedge, currententity->topnode, psurf);
 			}
 			else
 			{
@@ -478,6 +558,8 @@ void R_DrawSubmodelPolygons (model_t *pmodel, int clipflags)
 			(!(psurf->flags & SURF_PLANEBACK) && (dot > BACKFACE_EPSILON)))
 		{
 			AW_RC(RC_BF_FRONT);
+			if (aw_far_faces && R_FarFaceSkipped (pmodel, psurf))
+				continue;
 			AW_RC(RC_LEAF_FACES);
 			r_currentkey = ((mleaf_t *)currententity->topnode)->key;
 

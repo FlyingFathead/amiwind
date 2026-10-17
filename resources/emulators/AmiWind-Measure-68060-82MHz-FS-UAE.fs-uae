@@ -1,0 +1,46 @@
+# MEASUREMENT preset, not for play: interpreted CPU (JIT off) in FS-UAE's cycle-exact mode, clock =
+# uae_cpu_multiplier x 3.546895 MHz. It runs a FIXED pace of emulated cycles per instruction: it is not a timing
+# model of a real 68060 (caches, pipelines, two integer pipelines, branch prediction are not timed), and it is slow on the PC. Use it to compare builds
+# and settings at the same poses, never as a hardware number (docs/68060.md, docs/FS-UAE-PLAYTESTING.md).
+# Measured 17 October 2026 (FS-UAE 3.1.66): the multiplier sets the pace only with the -NOMMU CPU models (an
+# integer loop ran 3.3 times faster at 23 than at 7); with "cpu = 68040" or "cpu = 68060" (with MMU) it is
+# ignored and the CPU runs at one slow fixed pace. A 68040 and a 68060 run the same pace at the same multiplier.
+# 23 x 3.546895 MHz = 81.6 MHz, the clock of our first tester's 68060, at the emulator's 68040-like pace.
+# The instructions a 68060 leaves to its library trap here as on the chip (uae_*_no_unimplemented), so the
+# game disk needs the 68060.library (see below) and the 68040 build pays its traps (docs/68060.md).
+# A 68060 needs its support library on the game disk: build with --amiga-libs (your own 68060.library,
+# mmu.library and, for MMULib's libraries, your Workbench's C/SetPatch) or copy them to LIBS: and C: of the
+# boot partition. The game picks its 68060 engine (AmiWind060) at boot; without the library it shows a notice
+# and the boot check stops (docs/68060.md, docs/FPU_SUPPORT_LIBRARY.md).
+# The multiplier pace was measured with this CPU model; a game session under it was not run (very slow).
+[config]
+amiga_model = A1200
+cpu = 68060-NOMMU
+fpu = 68060
+jit_compiler = 0
+uae_cpu_cycle_exact = true
+uae_cpu_multiplier = 23
+uae_cpu_no_unimplemented = true
+uae_fpu_no_unimplemented = true
+uae_cpu_24bit_addressing = false
+chip_memory = 2048
+slow_memory = 0
+fast_memory = 0
+zorro_iii_memory = 16384
+kickstart_file = /path/to/your/kickstart-3.1-a1200.rom
+hard_drive_0 = /path/to/your/AmiWind.hdf
+hard_drive_0_type = hdf
+# The world disk of the same image (AmiWind-...-world-01.hdf).
+hard_drive_1 = /path/to/your/AmiWind-world-01.hdf
+hard_drive_1_type = hdf
+joystick_port_1 = none
+# Send middle-click to the game; use F12+G to release input.
+middle_click_ungrab = 0
+# Deliver page navigation instead of keypad ')' / Right Amiga.
+keyboard_key_pageup = action_key_68
+keyboard_key_pagedown = action_key_69
+# Deliver Home/End (console line, map, menus) instead of keypad ( / Help.
+keyboard_key_home = action_key_6a
+keyboard_key_end = action_key_6c
+floppy_drive_volume = 0
+fullscreen = 0

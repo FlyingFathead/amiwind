@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev2 |
 | Where | Interior light bake (tools/interior_lighting.py) |
 | Reproduction | always |
@@ -28,7 +28,7 @@ difference below.
 
 ## Symptom
 
-In the opening scene the owner sees the hanging lantern above the start give
+In the opening scene the maintainer sees the hanging lantern above the start give
 too little light around it.
 
 ## Where
@@ -47,7 +47,7 @@ therefore light less, and less far, than in the original.
 
 ## Which lantern
 
-OpenMW at the owner's pose shows that the hanging lantern in view is
+OpenMW at the maintainer's pose shows that the hanging lantern in view is
 `light_com_lantern_02_200_Boat` (radius 200 original units, 50 local units) at
 local (20.7, -9.2, 22.6), on a rope. `light_com_lantern_02_64` sits on the deck
 above the hold and cannot be seen from the start. In the original the whole

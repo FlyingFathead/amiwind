@@ -20,7 +20,7 @@
 
 ## Status: 10 October 2026
 
-Open. Found in a review of the CHIM format docs. Needs one plan; the frame plan is an owner decision.
+Open. Found in a review of the CHIM format docs. Needs one plan; the frame plan is a project decision.
 
 ## Symptom
 
@@ -64,7 +64,7 @@ Always: read the four places above.
 
 ## Repair
 
-One plan, written once and linked from the other pages, after the owner decides between: (1) widening the coordinate
+One plan, written once and linked from the other pages, after the maintainer decides between: (1) widening the coordinate
 protocol (one change to how positions are sent, plus an audit of every 4,096-unit assumption), (2) two city frames
 with distant levels across their edge, (3) waiting for the M4 open-world frames. Until then every page says "frame
 plan: decision pending" and links here. "Nine" is corrected to eight.

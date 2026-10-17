@@ -1,12 +1,12 @@
 {
   "format": "AmiWind recorded stage pin 1",
   "exception": "BUILD-SEYDA-REGEN-30",
-  "decision": "Owner decisions, 8 October 2026: v0.0.31 and v0.0.32 ship the recorded v0.0.31 Seyda Neen maps byte for byte; seyda.bsp ships as the fallback region alias (option A); the world streamer (v0.0.33) rebuilds Seyda Neen.",
-  "source": "AmiWind v0.0.31 image, boot partition, id1/ (the owner's own copy; never shipped with the source)",
+  "decision": "Project decisions, 8 October 2026: v0.0.31 and v0.0.32 ship the recorded v0.0.31 Seyda Neen maps byte for byte; seyda.bsp ships as the fallback region alias (option A); the world streamer (v0.0.33) rebuilds Seyda Neen.",
+  "source": "AmiWind v0.0.31 image, boot partition, id1/ (the maintainer's own copy; never shipped with the source)",
   "aliases": {
     "maps/seyda.bsp": {
       "source": "maps/sn029.bsp",
-      "reason": "Owner decision (option A), 8 October 2026: seyda.bsp is the fallback region alias (sn029), as the builder's own Seyda region conversion writes it. v0.0.31's complete-town seyda.bsp is not shipped: the v0.0.32 release actor gate refuses its seven actor copies, while the recorded region maps pass. dbg tp seydaneen and region streaming use the region directory and are unchanged."
+      "reason": "Project decision (option A), 8 October 2026: seyda.bsp is the fallback region alias (sn029), as the builder's own Seyda region conversion writes it. v0.0.31's complete-town seyda.bsp is not shipped: the v0.0.32 release actor gate refuses its seven actor copies, while the recorded region maps pass. dbg tp seydaneen and region streaming use the region directory and are unchanged."
     }
   },
   "files": [

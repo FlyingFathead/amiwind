@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 10 October 2026, in v0.0.36-dev3 |
 | Where | Seyda Neen docks, the silt strider (CHIM model variant siltstrider@s0.89) |
 | Reproduction | always |
@@ -22,7 +22,7 @@
 
 ## Status: 10 October 2026
 
-Closed, not a bug. The report was a misunderstanding: the owner meant that Balmora's strider is the good one and should be the
+Closed, not a bug. The report was a misunderstanding: the maintainer meant that Balmora's strider is the good one and should be the
 base model; the open seams he remembered were Balmora's own, fixed in v0.0.34
 ([MESH-LOD-OPEN-SEAMS-33](MESH-LOD-OPEN-SEAMS-33.md)). Measured on every CHIM world since v0.0.34: Seyda Neen's `siltstrider@s0.89`
 is exactly Balmora's `siltstrider@s1` scaled by 0.89 (3,219 faces, face by face, at most 0.00004 units apart). The check on the way

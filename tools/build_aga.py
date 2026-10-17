@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the GPLv2 AGA runtime and an owner-only boot image.
+"""Build the GPLv2 AGA runtime and a maintainer-only boot image.
 
 CAPACITY FIRST: before starting the build, verify enough usable storage for ALL
 required content, conversion intermediates, staging copies, temporary images,
@@ -12,7 +12,7 @@ NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
 requested debugging purposes. Build time and disk usage are not reasons to omit it.
 
 Normal builds and recovery MUST include the gallery; missing input/model/catalogue
-content is an error, never an automatic opt-out. Only the owner's explicit
+content is an error, never an automatic opt-out. Only the maintainer's explicit
 --no-npc-gallery permits debugging-only omission of inspection assets. It must
 never remove required game NPC content or change the normal default.
 
@@ -27,7 +27,7 @@ coverage, quality and validation, must not be disabled, reduced or bypassed
 without a specific documented case/scenario and explicit approval from the
 project owner. The builder or contributor cannot approve its own exception.
 Time pressure, storage pressure and convenience are not approval. Existing
---no-npc-gallery support is only a mechanism for an owner-approved exceptional
+--no-npc-gallery support is only a mechanism for a maintainer-approved exceptional
 debugging case; its availability does not grant permission to use it.
 
 A complete game requires all of its NPC and other game assets intact, packaged
@@ -64,7 +64,8 @@ from vis_options import add_vis_option
 import engine_profile
 import fpu_support
 import known_inputs
-from fpu_support import LOADER as FPU_LOADER
+import camera_marks
+from fpu_support import LOADER as FPU_LOADER, SELECTOR as CPU_SELECTOR, ENGINE_060
 
 ROOT=Path(__file__).resolve().parents[1]
 UPSTREAM_COMMIT='9c62d905151614af3e788ae3145a0d4ecc8a7bb8'
@@ -186,7 +187,7 @@ def heap_bypass(failures, hard_failures, maps_dir, entries, builder='legacy'):
 def apply_map_budget_policy(report, policy='strict', receipt_path=None, maps_dir=None, bypass=None, builder='legacy'):
     """Opt in to modeled reserve warnings; never waive loader/allocation errors.
 
-    The temporary pre-CHIM heap bypass (config/heap-bypass.json, owner
+    The temporary pre-CHIM heap bypass (config/heap-bypass.json, maintainer
     decision, HEAP-SEYDA-OVERLAP-32) accepts allowance-only failures of the
     listed recorded maps with their exact bytes (maps_dir), legacy builder only;
     it is recorded and the production gate says so."""
@@ -244,14 +245,21 @@ def combat_summary(report):
 
 def stage_debug_catalogues(id1, debug_luma=False):
     """Required on-disk metadata: fail the build instead of shipping broken dbg."""
-    files = [('debug-commands.txt', b'AWDC1'), ('shroompicker.txt', b'AWSP1')]
+    # camera-marks.txt: the public camera marks of dbg cam recall (docs/CAMERA_MARKS.md), checked as the engine reads them.
+    files = [('debug-commands.txt', b'AWDC1'), ('shroompicker.txt', b'AWSP1'), ('camera-marks.txt', b'AWCM1')]
+    limits = {'debug-commands.txt': 65536, 'camera-marks.txt': 16384}
     payloads = []
     for name, magic in files:
         raw = (ROOT/'config'/name).read_bytes()
-        if not raw or len(raw) > (65536 if name == 'debug-commands.txt' else 4096):
+        if not raw or len(raw) > limits.get(name, 4096):
             raise ValueError(f'Invalid debug catalogue size: {name}')
         if raw.splitlines()[0] != magic:
             raise ValueError(f'Invalid debug catalogue header: {name}')
+        if name == 'camera-marks.txt':
+            try:
+                camera_marks.parse(raw, name)
+            except camera_marks.MarkError as error:
+                raise ValueError(f'Invalid camera marks: {error}') from None
         payloads.append((name, raw))
     for name, raw in payloads:
         (Path(id1)/name).write_bytes(raw)
@@ -439,20 +447,47 @@ def check_town_table():
                          'run tools/town_table.py --write')
 
 
-def check_engine_fpu(binary,map_path,sdk,out):
-    """ENGINE-FPU-UNIMPL-31: fail when engine code can reach a 68040-unimplemented
-    FPU instruction outside tools/fpu-unimplemented-allowlist.json; the full
-    result goes to out/fpu-unimplemented.json, a summary into engine-build.json."""
+def check_engine_fpu(binary,map_path,sdk,out,engine_cpu='68040'):
+    """ENGINE-FPU-UNIMPL-31: fail when engine code can reach an instruction its target CPU does not
+    implement, outside that CPU's allowlist: the 68040's unimplemented FPU instructions
+    (tools/fpu-unimplemented-allowlist.json), or for the 68060-targeted build (--engine-cpu 68060,
+    docs/68060.md) the 68060's set (tools/fpu-unimplemented-allowlist-68060.json). The full result goes
+    to out/fpu-unimplemented.json, a summary into engine-build.json. The 68040 build also records, as
+    information, the 68060 traps it has (out/fpu-unimplemented-68060.json, ENGINE-060-FSCC-41)."""
     objdump=executable_path(Path(sdk).resolve()/'bin/m68k-amigaos-objdump')
     disassembly=subprocess.run([str(objdump),'-d','-r','-m','m68k:68040',str(binary)],check=True,capture_output=True,text=True).stdout
-    result=check_fpu_unimplemented.check(disassembly,Path(map_path).read_text(encoding='utf-8',errors='replace'),
-        json.loads(check_fpu_unimplemented.ALLOWLIST.read_text(encoding='utf-8')))
+    map_text=Path(map_path).read_text(encoding='utf-8',errors='replace')
+    allowlist=check_fpu_unimplemented.allowlist_path(engine_cpu)
+    result=check_fpu_unimplemented.check(disassembly,map_text,json.loads(allowlist.read_text(encoding='utf-8')),engine_cpu)
     (out/'fpu-unimplemented.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8',newline='\n')
     if not result['passed']:
-        raise SystemExit('Engine code reaches 68040-unimplemented FPU instructions: '+'; '.join(
+        raise SystemExit(f'Engine code reaches {engine_cpu}-unimplemented instructions: '+'; '.join(
             ' -> '.join(row['path']) for row in result['engine_failures'][:10])+' (see fpu-unimplemented.json)')
-    return {'passed':True,'unimplemented_instructions_in_binary':result['unimplemented_instructions'],
-            'library_functions':sorted(result['functions_with_unimplemented']),'allowlist_unused':result['allowlist_unused']}
+    summary={'passed':True,'cpu':engine_cpu,'allowlist':allowlist.name,
+             'unimplemented_instructions_in_binary':result['unimplemented_instructions'],
+             'library_functions':sorted(result['functions_with_unimplemented']),'allowlist_unused':result['allowlist_unused']}
+    if engine_cpu=='68060':
+        summary['trap_kinds']=result['trap_kinds']
+    else:
+        info=check_fpu_unimplemented.check(disassembly,map_text,{'allowed':[]},'68060')
+        (out/'fpu-unimplemented-68060.json').write_text(json.dumps(info,indent=2)+'\n',encoding='utf-8',newline='\n')
+        summary['traps_on_68060']={'trap_kinds':info['trap_kinds'],
+            'engine_functions':sum(1 for row in info['functions_by_kind'].values() if row['engine']),
+            'report':'fpu-unimplemented-68060.json'}
+    return summary
+
+
+def engine_060_files(engine_binary,engine_record):
+    """(AmiWind060, AmiWindCPU) beside the engine binary, checked against the engine receipt; None for an engine
+    stage without them (older stages, the 68020 build, an --engine-cpu 68060 main build)."""
+    row=engine_record.get('engine_68060')
+    if not row:return None
+    folder=Path(engine_binary).parent
+    pair=(folder/ENGINE_060,folder/CPU_SELECTOR)
+    if not all(path.is_file() for path in pair) or digest(pair[0])!=row['binary_sha256'] or digest(pair[1])!=row['selector_sha256']:
+        raise ValueError('AmiWind060/AmiWindCPU do not match the engine build receipt; rebuild the engine')
+    for path in pair:check_binary(path.read_bytes())
+    return pair
 
 
 def fpu_loader_path(engine_binary):
@@ -532,8 +567,18 @@ def engine(args):
     loader=tree/'build'/FPU_LOADER
     run([vasm,'-m68000','-Fhunkexe','-kick1hunks','-nosym','-I',ndk,'-I',tree/'boot','-o',loader,tree/'boot/fpulib.asm'])
     check_binary(loader.read_bytes())
+    # The 68060 engine (docs/68060.md): the 68040 build stays the default and the baseline; the game disk also
+    # carries AmiWind060 (the same source for the 68060) and AmiWindCPU, which picks it at boot on a 68060.
+    engine060=None
+    if args.cpu=='68040' and engine_profile.engine_cpu(profile)=='68040':
+        selector=tree/'build'/CPU_SELECTOR
+        run([vasm,'-m68000','-Fhunkexe','-kick1hunks','-nosym','-I',ndk,'-I',tree/'boot','-o',selector,tree/'boot/cpusel.asm'])
+        check_binary(selector.read_bytes())
+        engine060=build_engine_060(args,out,env,jobs,heap,debug_luma,profile,tree/'build'/ENGINE_060)
+        engine060['selector_sha256']=digest(selector)
     (out/'engine-build.json').write_text(json.dumps({'version':VERSION,'hands':args.hands,'debug_luma':debug_luma,'compiler_jobs':jobs,'source_kind':'repository engine/aga','source_sha256':source_hashes,'upstream_commit':UPSTREAM_COMMIT,'baseline_upstream_archive_sha256':UPSTREAM_SHA256,'binary':str(binary),'binary_sha256':digest(binary),'bootcheck_sha256':digest(checker),'fpu_loader_sha256':digest(loader),'hardware_benchmark_sha256':digest(out/'awbench'),'fpu_unimplemented_check':fpu_check,
         'engine_profile':profile,'engine_profile_checks':profile_checks,'assembler':assembler_identity(vasm),
+        **({'engine_68060':engine060} if engine060 else {}),
         'heap_mb':heap['heap_mb'],'heap_mb_selected_by':heap['selected_by'],'heap_default_mb':heap['heap_default_mb'],
         'heap_safe_mb':heap['heap_safe_mb'],'heap_warning':heap['heap_warning'],
         'coord_range':coords,'protocol':coord_range.RANGES[coords]['protocol'],
@@ -585,18 +630,38 @@ def compile_engine(args,tree,env,jobs,heap,debug_luma,profile,out,variables=None
     if args.cpu=='68040' and link_map.is_file():  # a missing map fails check_engine_fpu below
         problems=engine_profile.check_link_map(link_map.read_text(encoding='utf-8',errors='replace'),profile)
         if problems:raise SystemExit('Engine link map does not match the engine profile: '+'; '.join(problems))
-    fpu_check=check_engine_fpu(binary,tree/'build/AmiQuakeGCC.map',args.sdk,out) if args.cpu=='68040' else None
+    fpu_check=(check_engine_fpu(binary,tree/'build/AmiQuakeGCC.map',args.sdk,out,engine_profile.engine_cpu(profile))
+               if args.cpu=='68040' else None)
     return binary,fpu_check
+
+def build_engine_060(args,out,env,jobs,heap,debug_luma,profile,target):
+    """AmiWind060: the main build's profile compiled for the 68060 (--engine-cpu 68060: -m68060 -mhard-float,
+    its own FPU check) in a separate tree; the binary is copied to TARGET. Returns its receipt."""
+    record=engine_profile.resolve(profile['profile'],','.join(profile['asm']) or 'none',profile['opt'],args.cpu,'68060')
+    sub=out/'engine-68060';sub.mkdir()
+    sub_tree,_=stage_runtime(sub)
+    tick=time.monotonic()
+    print('Engine for the 68060 (AmiWind060): '+engine_profile.short(record),flush=True)
+    binary,fpu_check=compile_engine(args,sub_tree,env,jobs,heap,debug_luma,record,sub)
+    shutil.copyfile(binary,target)
+    row={'file':target.name,'profile':engine_profile.short(record),'engine_profile':record,'binary_sha256':digest(target),
+         'bytes':target.stat().st_size,'fpu_unimplemented_check':fpu_check,'seconds':round(time.monotonic()-tick,1)}
+    print(f"Engine for the 68060: {row['bytes']:,} bytes, SHA-256 {row['binary_sha256']} ({row['seconds']} s)",flush=True)
+    shutil.rmtree(sub/RUNTIME_BUILD_DIR,ignore_errors=True)
+    return row
+
 
 def check_other_profiles(args,out,env,jobs,heap,debug_luma,profile,binary_sha256):
     """--check-profiles (the gate's engine step): build every other engine profile and the -O2 experiment
     from the same source, each warning-free, link-map- and FPU-checked, so no path rots unnoticed. For a c build
     also c once more with its make variables spelled out (ENGINE_ASM empty, ENGINE_OPT=o1): it must
     give the same binary SHA-256 as the plain c build (the profile machinery adds nothing to c)."""
-    variants=[(name,engine_profile.resolve(name,cpu=args.cpu),None) for name in engine_profile.PROFILES if name!=profile['label']]
+    variants=[(name,engine_profile.resolve(name,cpu=args.cpu,engine_cpu=engine_profile.engine_cpu(profile)),None)
+              for name in engine_profile.PROFILES if name!=profile['label']]
     # and the -O2 experiment (upstream's assembly with every C file at -O2 except mathlib.c and in_amiga.c), so
     # an -O2-only warning or FPU instruction is found by the gate too
-    variants.append(('upstream-o2',engine_profile.resolve('upstream',None,'o2',cpu=args.cpu),None))
+    variants.append(('upstream-o2',engine_profile.resolve('upstream',None,'o2',cpu=args.cpu,engine_cpu=engine_profile.engine_cpu(profile)),None))
+    # (the 68060 engine of the same profile is built by every 68040 engine build: build_engine_060)
     if engine_profile.is_default(profile):
         variants.append(('c-explicit',profile,['ENGINE_ASM=','ENGINE_OPT=o1']))
     results=[]
@@ -1427,7 +1492,8 @@ def direct_start_map(args):
 def mini_start_maps(args):
     """Maps outside Balmora a MiniWind image keeps for its direct start (the prison ship), else ()."""
     import miniwind
-    return miniwind.start_maps(direct_start_map(args)) if getattr(args, 'miniwind', False) else ()
+    return (miniwind.start_maps(direct_start_map(args), getattr(args, 'miniwind_scope', None) or miniwind.DEFAULT_SCOPE)
+            if getattr(args, 'miniwind', False) else ())
 
 
 def test_header(mini, start, font_path=None):
@@ -1623,7 +1689,7 @@ def image(args):
         from check_actor_ground import load_approved_report
         args.allow_known_actor_ground_findings = args.allow_known_actor_ground_findings.resolve()
         approved, _ = load_approved_report(args.allow_known_actor_ground_findings)
-        # the same owner-accepted findings reach the CHIM frame map writer's own actor check (private test only;
+        # the same maintainer-accepted findings reach the CHIM frame map writer's own actor check (private test only;
         # require_private_test_version above): exactly these references, nothing else
         import os
         from chim.frame_map import ACCEPTED_ACTORS_VARIABLE
@@ -1795,9 +1861,14 @@ def image(args):
         print('Default start: logo fade then main menu; New Game plays the optional movie then ship + track 04.',flush=True)
     shutil.copyfile(args.engine,boot/'AmiWind')
     shutil.copyfile(checker,boot/'AmiWindCheck')
+    pair=engine_060_files(args.engine,engine_record)
+    if pair:
+        shutil.copyfile(pair[0],boot/ENGINE_060)
+        shutil.copyfile(pair[1],boot/CPU_SELECTOR)
+        print('Engines: AmiWind (68040 build, default) and AmiWind060 (68060 build); AmiWindCPU picks at boot',flush=True)
     fpu_receipt=stage_fpu_support(args,engine_record,boot)
     (out/'fpu-support.json').write_text(json.dumps(fpu_receipt,indent=2)+'\n',encoding='utf-8',newline='\n')
-    (boot/'S/startup-sequence').write_text(fpu_support.startup_sequence(fpu_receipt), newline='\n')
+    (boot/'S/startup-sequence').write_text(fpu_support.startup_sequence(fpu_receipt,**fpu_support.engine_start(bool(pair))), newline='\n')
     if not mini:
         for name in ['seyda.map','town.wad']:shutil.copyfile(scene/name,out/name)
     if (scene/'scene-ready.json').is_file():
@@ -2112,6 +2183,10 @@ def finalize_image(args):
     fpu_receipt=fpu_support.load_receipt(out/'fpu-support.json')
     if (boot/FPU_LOADER).is_file() and digest(boot/FPU_LOADER)!=engine_record.get('fpu_loader_sha256'):
         raise ValueError('Staged AmiWindFPU differs from its verified build receipt')
+    row060=engine_record.get('engine_68060')
+    if (boot/ENGINE_060).is_file()!=bool(row060) or (row060 and (digest(boot/ENGINE_060)!=row060['binary_sha256']
+                                                                  or digest(boot/CPU_SELECTOR)!=row060['selector_sha256'])):
+        raise ValueError('Staged AmiWind060/AmiWindCPU differ from the verified engine build receipt')
     if (boot/FPU_LOADER).is_file()!=(fpu_receipt['status']=='installed'):
         raise ValueError('Staged AmiWindFPU and the FPU support receipt disagree')
     if engine_record.get('hands','3d')!=args.hands:
@@ -2133,6 +2208,14 @@ def finalize_image(args):
         getattr(args, 'data_files', None), out / 'sky-asset-preparation',
         shared_sky_source=getattr(args, 'shared_sky_source', None),
         local_skybox=getattr(args, 'local_skybox', 'false'))
+    # A fallback here leaves the converted maps' one-colour placeholder as the shared sky: every
+    # exterior ships a flat sky with no clouds (SKY-FLAT-PALETTE-DRIFT-41, v0.0.40 to v0.0.41, only a
+    # warning line then). With the maintainer's data files it is never acceptable: stop, naming why.
+    if sky_asset_preparation.get('status')=='fallback_warning' and getattr(args, 'data_files', None):
+        raise ValueError('Shared sky not prepared ({}): the image would ship a flat sky with no clouds '
+                         '(SKY-FLAT-PALETTE-DRIFT-41); staged palette {} sha256 {}'.format(
+                             sky_asset_preparation.get('warning'), boot / 'id1/gfx/palette.lmp',
+                             hashlib.sha256((boot / 'id1/gfx/palette.lmp').read_bytes()).hexdigest()))
     # The sky reservation remaps AWM1 pixels and rebinds their receipt. Check the
     # final palette contract, including reuse/custom-sky paths, before packaging.
     from prepare_world_ui import validate as validate_world_ui
@@ -2305,7 +2388,7 @@ def finalize_image(args):
                                             report_path=out/'chim-frame-heap.json',
                                             extra_maps=[r['map'][5:] for r in chim_frames['region_maps']],
                                             # all frames over the shared pool, unchanged frames from the image pass
-                                            # cache by their SHA-256 content key (owner order 2026-10-11 10:08)
+                                            # cache by their SHA-256 content key (maintainer order 2026-10-11 10:08)
                                             jobs=resolve_jobs(args.jobs), cache_dir=_frame_heap_cache())
         for name, m in sorted(frame_heap.get('maps', {}).items()):
             print(f"[chim] frame-map heap {name}: zone {m['zone_bytes']} B (after the map {m['after_zone_bytes']} B), "
@@ -2363,7 +2446,7 @@ def finalize_image(args):
           f"minimum clearance {world_heap['minimum_estimated_clearance_bytes']} bytes after unchanged baseline "
           f"and safety reserves. Policy={budget_decision['policy']}; runtime validation pending.",flush=True)
     verify_optimized_maps(boot/'id1/maps', optimization, jobs=jobs)
-    # The player starts inside what a partial-area build holds (owner order 2026-10-11; BUILD-MINIWIND-DIRECT-START-
+    # The player starts inside what a partial-area build holds (maintainer order 2026-10-11; BUILD-MINIWIND-DIRECT-START-
     # TOWN-36): the boot start's map is in the final payload and its spot stands on collision, in seconds, before packing.
     start_check=image_start(args, boot, out, direct_start_record)
     # Every map write is above: the recorded maps ship exactly as recorded.
@@ -2604,7 +2687,7 @@ def main():
     i.add_argument('--menu-logo',choices=['gold','legacy'],default='gold',help='Menu logo method: gold (default, name only on the palette gold ramp) or legacy (previous wordmark, whole-palette nearest colours; comparison only)')
     i.add_argument('--intro-captions',type=Path,help='Private JSON title cards; first card becomes a switchable opening overlay')
     i.add_argument('--seyda-terrain-cull',choices=('on','off'),default='on',help='off: convert Seyda Neen without the terrain visual cull (a CHIM build: its Seyda Neen region maps are only a check reference for the frame maps and leave the image)')
-    i.add_argument('--seyda-recorded',type=Path,help='Optional: owner-provided recorded v0.0.31 Seyda Neen maps (tools/recorded_stage.py, BUILD-SEYDA-REGEN-30), kept byte for byte by every later pass; without it Seyda Neen is converted from the data files')
+    i.add_argument('--seyda-recorded',type=Path,help='Optional: user-provided recorded v0.0.31 Seyda Neen maps (tools/recorded_stage.py, BUILD-SEYDA-REGEN-30), kept byte for byte by every later pass; without it Seyda Neen is converted from the data files')
     i.add_argument('--canonical-land-source',type=Path,help='World-survey terrain-source.npz (survey_vvardenfell.py); required while Seyda terrain culling is enabled')
     i.add_argument('--world-terrain',type=Path,help='Complete validated refined terrain receipt and runtime directory, staged before scenery')
     i.add_argument('--exterior-terrain',type=Path,help='Prebuild ownership terrain receipt, required to bind never-compiled exterior maps at image finalization')
@@ -2618,7 +2701,7 @@ def main():
     i.add_argument('--miniwind-debug',action='store_true',help='With --miniwind: a DEBUG ONLY image, not a playtest')
     i.add_argument('--default-draw-distance',type=int,help='DEBUG ONLY (--miniwind-debug): the starting draw distance, '
                    '128..540 (default 540)')
-    i.add_argument('--miniwind-scope',choices=('full','exterior'),help='With --miniwind: full (default; Balmora exterior and interiors) or exterior (the Balmora exterior only; implies --no-npc-gallery)')
+    i.add_argument('--miniwind-scope',choices=('full','exterior','interior'),help='With --miniwind: full (default; Balmora exterior and interiors), exterior (the Balmora exterior only; implies --no-npc-gallery) or interior (the start room of an interior:<cell> start only)')
     i.add_argument('--world-flora',type=Path,help='Complete validated private world vegetation overlay; preserves rock/mushroom inputs')
     i.add_argument('--harvest',type=Path,help='Harvest source from harvest_build.py prepare (builder step harvest); the builder default')
     i.add_argument('--hand-catalog',type=Path,help='Per-race first-person hand catalogue from prepare_hand_catalog.py --runtime-palette; the builder default')

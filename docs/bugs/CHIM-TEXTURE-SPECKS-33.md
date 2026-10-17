@@ -9,7 +9,7 @@
 | Where | CHIM shared textures (texture pack in tools/chim) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: CHIM-drawn surfaces show many bright specks that legacy frames lack. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -40,7 +40,7 @@
 
 ## Status: 9 October 2026
 
-Fixed in source (8caf66e, 8 October), not shipped. The owner's playtest of a CHIM preview build on
+Fixed in source (8caf66e, 8 October), not shipped. The maintainer's playtest of a CHIM preview build on
 9 October showed the specks all over Balmora: that build carried a CHIM world built before the
 repair. The CHIM validator now refuses a world that keeps texels on the sky bank, and the look is
 kept as an opt-in texture effect, `autumn_glitter_leaves` ([CHIM texture effects](../chim/TEXTURE_EFFECTS.md)).

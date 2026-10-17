@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 10 October 2026, in v0.0.35 |
 | Where | NPC AI: authored AI packages (Wander) and the cells' path grids |
 | Reproduction | always |
@@ -20,7 +20,7 @@
 
 ## Status: 10 October 2026
 
-Open (owner playtest of v0.0.35). Depends on ANIMKIT-COVERAGE-35 (walk animations for every NPC that moves).
+Open (maintainer playtest of v0.0.35). Depends on ANIMKIT-COVERAGE-35 (walk animations for every NPC that moves).
 
 ## Symptom
 

@@ -24,7 +24,7 @@ The engine still requires AmigaOS services and this executable's FPU target.
 
 ## Filesystem acceptance
 
-The old dev2 image reproduced the owner's exact block-1146049281 requester when
+The old dev2 image reproduced the maintainer's exact block-1146049281 requester when
 only its bitmap flag was marked invalid. Correcting reserved root word -4 and
 its checksum allowed native revalidation. The final dev3 test also began with
 a deliberately invalid bitmap, revalidated, booted, wrote profiles/configuration,

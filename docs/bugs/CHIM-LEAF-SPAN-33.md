@@ -62,7 +62,7 @@ First measurement.
 The CHIM validator report (flag on the placement record).
 
 Still 160 placements in the format 0.3 statistics (8 October 2026): they are always sent, so
-their faces count in every view ([CHIM-VIEW-FACES-33](CHIM-VIEW-FACES-33.md)). Candidate owner:
+their faces count in every view ([CHIM-VIEW-FACES-33](CHIM-VIEW-FACES-33.md)). Candidate maintainer:
 splitting large placements into pieces that each touch at most 16 leaves, or chunk-level linking.
 
 ## Repair

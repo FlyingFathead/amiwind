@@ -440,8 +440,20 @@ class WorkerAllowanceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             # media and music have no dependencies: they start together and share the budget.
+            # media runs until its allowance file shows the whole budget (at most 60 s), not a fixed 1.5 s: on a
+            # loaded host the rebalance after 'music' ended sometimes came after media's sleep (jobs_max 2).
+            wait = ('import os, time\n'
+                    'path, end = os.environ["AMIWIND_BUILD_JOBS_FILE"], time.monotonic() + 60\n'
+                    'def now():\n'
+                    '    try:\n'
+                    '        return open(path).read().strip()\n'
+                    '    except OSError:\n'
+                    '        return ""\n'
+                    'while time.monotonic() < end and now() != "4":\n'
+                    '    time.sleep(0.02)\n'
+                    'time.sleep(0.3)\n')
             steps = [('music', [sys.executable, '-c', 'import time; time.sleep(.3)', '--jobs', '1']),
-                     ('media', [sys.executable, '-c', 'import time; time.sleep(1.5)', '--jobs', '1'])]
+                     ('media', [sys.executable, '-c', wait, '--jobs', '1'])]
             with contextlib.redirect_stdout(io.StringIO()):
                 execute_parallel(steps, root / 'run', {'compiler_jobs': 4}, root)
             profile = json.loads((root / 'run' / build_profile.PROFILE_NAME).read_text())

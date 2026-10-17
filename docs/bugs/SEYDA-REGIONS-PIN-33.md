@@ -18,7 +18,7 @@
 ## Status: 8 October 2026
 
 Open. Found by the CHIM builder (milestone M2, Seyda Neen on CHIM) while preparing the recorded
-v0.0.31 Seyda Neen maps as the parity reference. The owner's copy of the recorded table is preserved
+v0.0.31 Seyda Neen maps as the parity reference. The maintainer's copy of the recorded table is preserved
 privately, with a SHA-256 manifest; it is never shipped with the source.
 
 ## Symptom
@@ -62,7 +62,7 @@ The CHIM Seyda frame map is checked against the recorded maps with the pinned ta
 
 ## Prevention
 
-Keep every recorded input in the owner's private archive with a manifest, not only in a build
+Keep every recorded input in the maintainer's private archive with a manifest, not only in a build
 volume.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->

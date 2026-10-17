@@ -9,7 +9,7 @@
 | Where | dbg tp help text and town name lookup (aw_scene.c) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev1 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | low: Help omits new towns and short names such as vivec are not accepted; debug-only. |
 | Family | Debug commands and remote control (`debug-commands`) |
 | Playtest version | v0.0.32-dev1 |

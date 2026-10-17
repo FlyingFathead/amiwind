@@ -58,7 +58,7 @@ A build, then `--reuse-mode pool --reuse-from` it with a change that reruns npcs
 
 ## Repair
 
-`mwad.paths.copy_tree` (shutil.copytree with `copy_writable`: copy2, then the new copy gets the owner write bit) is
+`mwad.paths.copy_tree` (shutil.copytree with `copy_writable`: copy2, then the new copy gets the maintainer write bit) is
 used by every folder copy in `tools/` and `src/`. Only the new copy changes mode; the pooled source keeps its bytes,
 inode and read-only mode. Pool objects are never made writable.
 

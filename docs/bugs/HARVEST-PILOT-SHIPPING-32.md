@@ -9,7 +9,7 @@
 | Where | Seyda Neen harvest catalogues (24 maps) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | high: Builder shipped the six-plant pilot catalogue instead of the full one. |
 | Family | Harvestable plants (`harvest`) |
 | Playtest version | v0.0.31 |

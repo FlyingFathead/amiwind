@@ -107,7 +107,7 @@ class Selection(unittest.TestCase):
         self.assertIn('9,8: the tracker lists 2 legacy maps', problems[0])
 
     def test_coast2_takes_rings_1_and_2_and_names_every_cell_left_out(self):
-        # owner 2026-10-11: the entire coastline, all of ring 1 and every possible cell of ring 2, as CHIM
+        # maintainer 2026-10-11: the entire coastline, all of ring 1 and every possible cell of ring 2, as CHIM
         statuses = dict(self.statuses)
         statuses[(9, 9)] = dict(statuses[(1, 1)], status='hull_policy_pending', ring=2)
         statuses[(9, 8)] = dict(statuses[(1, 1)], status='complete_unlit', ring=3)
@@ -132,7 +132,7 @@ class Selection(unittest.TestCase):
         self.assertEqual(dropped[0]['cell'], [0, 0])
         self.assertEqual(problems, [])
         # a cell listed by name inside a town frame is dropped too, recorded as listed (towns win: the whole-city
-        # Vivec frame takes 16 cells of the coast lists, owner decision 2026-10-11 09:55)
+        # Vivec frame takes 16 cells of the coast lists, project decision 2026-10-11 09:55)
         kept, problems, dropped = R.preflight([(0, 0), (1, 0)], {(0, 0)}, self.statuses, {'seyda': box})
         self.assertEqual((kept, problems), ([(1, 0)], []))
         self.assertIn('inside the frame of seyda', dropped[0]['reason'])

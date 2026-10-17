@@ -7,7 +7,7 @@ Stage code imports the scheduler, and the stage cache follows every import, so
 importing miniwind.py there put the CHIM builder modules and the engine source
 folder into every conversion stage's fingerprint (BUILD-MINIWIND-STAGE-CLOSURE-33).
 """
-SCOPES = ('full', 'exterior')
+SCOPES = ('full', 'exterior', 'interior')
 DEFAULT_SCOPE = 'full'
 
 # Stages of the normal plan a MiniWind build leaves out, with the reason.
@@ -35,6 +35,14 @@ SCOPE_OMITTED = {
     'exterior': {
         'balmora-interiors': 'Balmora interiors (--miniwind-scope exterior; their doors say Area unavailable)',
         'door-audio': 'door sounds (--miniwind-scope exterior; every Balmora door leads to a left-out interior)',
+    },
+    # interior (MINIWIND-NO-INTERIOR-SCOPE-42): the start room of an interior:<cell> start, nothing else of
+    # the town's rooms (tools/chim_rooms.py --only-cell); island-wide checks and tracker data stay out
+    'interior': {
+        'seam-audit': 'mesh seam audit (an island-wide gate of full builds and the gate suite; '
+                      '--miniwind-scope interior)',
+        'cell-progress': 'tracker data of the CHIM world (Toolkit only, never a game file; '
+                         '--miniwind-scope interior)',
     },
 }
 # Scene stages that change their predecessor's tree: without 'area', Balmora

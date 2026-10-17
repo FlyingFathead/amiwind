@@ -14,6 +14,7 @@ garbage collector) and leased workspaces (the work pool) are further down this p
 - [Units](#units)
 - [Why reuse is safe](#why-reuse-is-safe)
 - [Early cutoff](#early-cutoff)
+- [Narrowed reuse: what a stage really used](#narrowed-reuse-what-a-stage-really-used)
 - [Reuse preflight](#reuse-preflight)
 - [Run names](#run-names)
 - [Entry check](#entry-check)
@@ -131,6 +132,59 @@ pass looks the input up once under the form-1 key, verifies the entry by SHA-256
 records it under the new key, so the change of form recomputes nothing
 (BUILD-PASS-KEY-OVERBROAD-36: Vivec stage A try3 recomputed all 275 head previews after
 a new function was added to `tools/build_parallel.py`).
+
+## Narrowed reuse: what a stage really used
+
+A stage key counts everything the stage's code *can* reach: every function a static scan
+follows, every data file named in that code, a whole folder when a path continues with a
+computed part. Most of it never runs in a given stage: a change to the HUD code reran the
+whole CHIM stage (24 minutes) because the stage's code names the engine source folder, and
+a change to a model reader reran every stage that can reach it, the NPC gallery included
+(BUILD-REUSE-KEYS-TOO-BROAD-35).
+
+From v0.0.42, every stage that runs keeps a record of what it really used, beside its output
+record (`used` in `profile/manifests/STAGE.json`), made from its read trace:
+
+- every repository function and module top it ran, by the SHA-256 of its text (the same
+  pieces the key hashes);
+- every repository file it opened for reading, by SHA-256;
+- every repository folder it listed (`os.listdir`, `os.scandir`, `glob`; recursive listings
+  marked), by the SHA-256 of the names in it, so a new file in a folder it lists is seen.
+
+The stage's outputs depend on its inputs (game data, tools, settings, the stages before it:
+the other parts of its key) and on exactly this code and these files: with the same inputs it
+runs the same code and reads the same files again. So when a later key differs **only in its
+sources**, the builder compares the record with the checkout; when every function, file and
+listing of the record is unchanged, the stage is reused, and the plan says
+`its key changed only in code and files it never ran or read: FILES` (`narrowed` in the
+build state). A change to anything the record names reruns the stage as before, and the early
+cutoff then keeps the stages after it when its outputs come out the same.
+
+A record is complete only when the trace saw every process of the stage (trace form 2 lists
+the processes a stage starts): a Python process started without the trace, a program given a
+path in the checkout (a compiler, `make`) or Python code loaded from outside the checkout
+leave it incomplete, and the key is then compared whole. The import system's own folder
+listings are not reads. Records exist only for stages that ran with this builder: a run
+made before it has none, so the first build after it compares whole keys.
+`AMIWIND_REUSE_NARROWING=off` compares whole keys always (the method before v0.0.42);
+`--reuse-plan` says the same as the build.
+
+Measured on the read traces of the v0.0.39-rc1 build (every stage ran there, 40 traced):
+an edit to the HUD source `engine/aga/src/aw_ui.c` keys 8 stages, of which only the engine
+opened it; an edit to `config/debug-commands.txt` keys 2 (engine, image), and no Python
+stage opened it (the engine's compiler does: its record is incomplete, so it reruns); an
+edit to the model reader `prepare_scenery._read_model` keys 18 stages, 11 ran it (the NPC
+gallery, the CHIM towns and the image did not); an edit to `mwad.audit.audit` keys 5, 2 ran
+it. An edit to the collision code `mesh_geometry.collision_pieces` keys 12 stages and 9 ran
+it, the Balmora interiors among them: that rerun is real, its outputs decide whether the
+stages after it follow (early cutoff).
+
+A reused stage stages its recorded files (link or copy, each checked by SHA-256) on up to
+eight threads, files with the same content one after another (`AMIWIND_APPLY_THREADS=1`: one
+at a time, the method before v0.0.42). Measured on the v0.0.41 final run's records with the
+files not in the page cache: world terrain (5,875 files, 1.7 GB) 9.9 s -> 2.4 s, world scenery
+(3,413 files, 1.8 GB) 12.1 s -> 4.5 s; with the files cached both take about 2 s. These stages
+are applied one after another at the start of every reuse build.
 
 ## Reuse preflight
 
@@ -401,7 +455,7 @@ job scratch. It applies the same rules everywhere:
 
 | Decision | Items |
 | --- | --- |
-| kept: pinned | release and release-candidate references, owner pins (`WORKSPACE/cache/pins.json`, edited with `build_gc.py pin` / `unpin`) |
+| kept: pinned | release and release-candidate references, maintainer pins (`WORKSPACE/cache/pins.json`, edited with `build_gc.py pin` / `unpin`) |
 | kept: reuse source | the newest passed run of every build line (version, builder type and recipe) |
 | kept: active | runs still building; items whose owning job is still active; build caches |
 | expires | run folders, played or smoke copies, package and extraction scratch and test workspaces whose owning job is done; scratch left in a finished run; pooled objects that no run links and no reuse key (or CHIMport cell manifest key) names; pool temporaries older than a day |

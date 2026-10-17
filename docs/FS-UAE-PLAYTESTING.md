@@ -14,6 +14,7 @@
 - [Optional fullscreen mode](#optional-fullscreen-mode)
 - [Notes](#notes)
 - [Slow accelerator preset](#slow-accelerator-preset)
+- [68060 and measurement presets](#68060-and-measurement-presets)
 - [Benchmark profile](#benchmark-profile)
 - [Repository preset and validation note](#repository-preset-and-validation-note)
 - [Emulator development access](#emulator-development-access)
@@ -25,14 +26,15 @@
 
 Full-game assembly writes `AmiWind-v<VERSION>-WinUAE.uae` and
 `AmiWind-v<VERSION>-FS-UAE.fs-uae` beside the HDFs. The verified image receipt
-is the source of the drive list: load every required HDF simultaneously.
-The boot disk comes first; additional world disks are not interchangeable
-and do not require disk swapping.
+is the source of the drive list, and every HDF on it is mounted at the same
+time. The boot disk comes first. The world disks that follow are not
+interchangeable, and no disk swapping is needed during play.
 
-Supply `--kickstart-file /path/to/owned.rom` to the build to fill both local
-ROM paths, or select your licensed ROM in the emulator afterward. ROMs and
-playable images are private build outputs, never public source assets.
-Get your Kickstart ROM and Workbench legally, for example with Amiga Forever from Cloanto
+With `--kickstart-file /path/to/owned.rom`, the build fills in the ROM path in
+both configurations; without it, the licensed ROM is selected in the emulator
+afterwards. ROMs and playable images are private build outputs, never public
+source assets.
+Kickstart ROMs and Workbench are available legally, for example in Amiga Forever from Cloanto
 ([FAQ](FAQ.md#is-amiwind-official-do-i-need-the-game)).
 Configurations use host-local absolute paths. After moving the image directory,
 keep `build.json` and every listed HDF together and regenerate the configurations
@@ -96,8 +98,8 @@ explain `--kickstart-file PATH`. The selected file path is filled into
 The ROM is never downloaded, copied into the image, or bundled with source.
 
 SHA-256 `6d43840d4099a74170ea0f0425b6257c3891ebcaa39c4d1840075a9ab22b5707`
-is the owner's supplied Kickstart 3.1 A1200 reference. A match is reported as
-"SHA-256 matches the owner-tested Kickstart 3.1 A1200 ROM." A different checksum on an explicitly selected file
+is the maintainer's supplied Kickstart 3.1 A1200 reference. A match is reported as
+"SHA-256 matches the maintainer-tested Kickstart 3.1 A1200 ROM." A different checksum on an explicitly selected file
 warns that compatibility is unverified and continues with that file. A directory
 without a match prompts for another location instead of guessing.
 The checksum identifies matching bytes; it does not establish licensing or origin.
@@ -349,6 +351,20 @@ itself is the cost: about a second for every frame. Doubling the multiplier from
 nearly halves the frame time, so the multiplier does set the clock. Relative numbers until a real
 accelerated A1200 has been measured ([HARDWARE-BENCHMARK.md](HARDWARE-BENCHMARK.md)).
 
+## 68060 and measurement presets
+
+In [resources/emulators](../resources/emulators): `AmiWind-68060-FS-UAE.fs-uae` (an A1200 with a 68060,
+JIT; the game disk then starts its 68060 engine) and `AmiWind-68060-A4000-FS-UAE.fs-uae` (shaped like our
+first tester's A4000 with a 68060 and 128 MB of Fast RAM) are play presets; a 68060 needs its
+`68060.library` on the game disk ([FPU support library](FPU_SUPPORT_LIBRARY.md)).
+
+`AmiWind-Measure-68040-50MHz-FS-UAE.fs-uae` (multiplier 14, the slow accelerator preset above) and
+`AmiWind-Measure-68060-82MHz-FS-UAE.fs-uae` (multiplier 23, 81.6 MHz, with the 68060's unimplemented
+instructions trapping as on the chip) are measurement presets: cycle-exact mode, JIT off, slow, a fixed
+pace of cycles per instruction rather than a timing model of either CPU. Measured 17 October 2026: the
+multiplier sets that pace only with the `-NOMMU` CPU models; with `cpu = 68040` or `cpu = 68060` FS-UAE
+ignores it ([68060](68060.md#emulating-a-68060-machine)).
+
 ## Benchmark profile
 
 The playtest configuration above (JIT, `uae_cpu_speed = max`) runs the 68040 as fast as
@@ -436,7 +452,7 @@ A matching example is supplied under
 [resources/emulators/AmiWind-v0.0.27-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.27-FS-UAE.fs-uae).
 It explicitly disables 24-bit addressing and keyboard joystick emulation,
 selects the internal FPU and supplies placeholders for the owned ROM and HDF.
-The guide above carries forward the owner's working v0.0.12-dev1 recipe with
+The guide above carries forward the maintainer's working v0.0.12-dev1 recipe with
 the current image name and the preset's explicit memory, CPU and input settings.
 
 The earlier local FS-UAE 3.1.66 harness requested plain `68040` with JIT. Its

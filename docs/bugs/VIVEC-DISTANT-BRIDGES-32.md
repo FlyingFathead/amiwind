@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 8 October 2026, in v0.0.32-dev3 |
 | Where | Vivec Arena preview, from a canton top; pose not recorded |
 | Reproduction | unknown |
@@ -20,7 +20,7 @@
 
 ## Status: 8 October 2026
 
-Open; cause unknown. Owner decision: ship v0.0.32 as is; known in v0.0.32. Found by the owner in
+Open; cause unknown. Project decision: ship v0.0.32 as is; known in v0.0.32. Found by the maintainer in
 v0.0.32-dev3 play (8 October 2026) in a screenshot taken for the release gallery: "distant bridges
 not rendering".
 
@@ -50,7 +50,7 @@ No visual check of the Arena preview looks across to the other cantons from a ca
 ## Reproduction
 
 Pose not recorded; needs the coordinate overlay next time. Stand on a canton top in the Arena
-preview in daylight and look across towards the other cantons. The owner's frame is kept with the
+preview in daylight and look across towards the other cantons. The maintainer's frame is kept with the
 private evidence.
 
 ## Repair

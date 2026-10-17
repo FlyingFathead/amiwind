@@ -106,6 +106,18 @@ class GuardTorchAssetsTests(unittest.TestCase):
             self.assertEqual(len(result),1);self.assertEqual(result[0]['source_id'],'actual')
             self.assertFalse(result[0]['auto_inventory_eligible']);self.assertEqual(p.read_bytes(),raw)
 
+    def test_creature_residents_are_skipped_unknown_identities_still_refused(self):
+        # dev1 2026-10-17: Vivec (a creature record) is placed as an aw_npc resident in his palace
+        with tempfile.TemporaryDirectory() as tmp:
+            id1=Path(tmp);(id1/'maps').mkdir()
+            entities='''{"classname" "aw_npc" "aw_source_id" "vivec_god" "netname" "Vivec" "model" "progs/v.mdl"}\0'''.encode()
+            raw=struct.pack('<i2i',29,124,len(entities))+bytes(112)+entities
+            (id1/'maps/vpi015.bsp').write_bytes(raw)
+            kinds={'NPC_':{}}
+            self.assertEqual(_guard_models(id1,kinds,{},'l/light_torch10.nif',{'vivec_god'}),[])
+            with self.assertRaisesRegex(ValueError,'lacks original source identity'):
+                _guard_models(id1,kinds,{},'l/light_torch10.nif')
+
     def test_extra_pose_sampling_preserves_original_face_quota(self):
         points=np.array([[x,y,.02*x*x] for y in range(9) for x in range(9)],dtype=float)
         faces=[]

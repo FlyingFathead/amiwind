@@ -26,7 +26,7 @@ terrain and final image validation remain incomplete. The historical actor-conta
 findings can still stop final HDF assembly. No gate is bypassed by this update.
 See `RELEASE-v0.0.25-rc3.md` for the precise verification boundary.
 
-The owner runs all commit, push, tag and GitHub release commands. Use a prerelease
+The maintainer runs all commit, push, tag and GitHub release commands. Use a prerelease
 for this checkpoint and its matching release notes; retain existing tags and
 archives. Attach public source ZIPs and checksums only. `PACKAGE_MANIFEST.json`
 is generated and must not be tracked. Public documentation uses generic paths.

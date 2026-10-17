@@ -9,7 +9,7 @@
 | Where | Interior lightmap bake (prepare_mesh_bsp.py, interior_lighting.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | high: Seven Vivec interiors rejected by the optimizer. |
 | Family | Mesh converter geometry (`converter-geometry`) |
 

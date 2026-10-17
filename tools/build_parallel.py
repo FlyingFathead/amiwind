@@ -71,6 +71,130 @@ def process_pool(count):
                                initializer=_pool_worker_init)
 
 
+# Pool modes of a stage (BUILD-CHIM-STAGE-SERIAL-TAIL-36): 'stage' (default) keeps ONE worker pool for the whole
+# stage (stage_pool), so every ordered_map / completed_map of the stage submits to the same warm workers;
+# 'batch' (the method before v0.0.42) starts a pool for every map and stops it at the map's end.
+POOL_MODES = ('stage', 'batch')
+_STAGE = None
+
+
+class StagePool:
+    """The worker pool of one stage, kept from the stage's start to its end (stage_pool).
+
+    One process_pool of `size` workers (the stage's budget under the scheduler) serves every map of the stage;
+    each map still keeps to its own in-flight limit (its jobs, or the stage's live allowance). The pool starts
+    again only when it must: a map needs more workers than it has, a worker died (broken pool), or the
+    environment changed since it started (workers are spawned with the environment of that moment, e.g. a
+    variable the CHIM hull fallback sets between two world builds); each restart is printed with its reason."""
+
+    def __init__(self, size, label):
+        self.size, self.label = size, label
+        self.pid = os.getpid()
+        self.executor = self.env = None
+        self.capacity = 0
+        self.starts, self.maps, self.tasks = 0, 0, 0
+        self.restarts = []
+
+    def executor_for(self, size):
+        env = dict(os.environ)
+        if self.executor is not None:
+            reason = None
+            if size > self.capacity:
+                reason = 'a map needs %d workers, the pool has %d' % (size, self.capacity)
+            elif getattr(self.executor, '_broken', False):
+                reason = 'a worker died (broken pool)'
+            elif env != self.env:
+                changed = sorted(k for k in set(env) | set(self.env) if env.get(k) != self.env.get(k))
+                reason = 'environment changed: %s' % ', '.join(changed[:5])
+            if reason:
+                self.executor.shutdown(wait=True, cancel_futures=True)
+                self.executor = None
+                self.restarts.append(reason)
+                print('[pool] %s: worker pool started again (%s)' % (self.label, reason), flush=True)
+        if self.executor is None:
+            self.capacity = max(size, self.size)
+            self.executor = process_pool(self.capacity)
+            self.env = env
+            self.starts += 1
+        self.maps += 1
+        return self.executor
+
+    def recycle(self, reason):
+        """Stop the workers at a phase boundary (the next map starts fresh ones), e.g. after a phase whose
+        workers grew large: one restart, printed with its reason, instead of one per map."""
+        if self.executor is not None:
+            self.executor.shutdown(wait=True, cancel_futures=True)
+            self.executor = None
+            self.restarts.append(reason)
+            print('[pool] %s: workers stopped (%s); the next map starts fresh ones' % (self.label, reason), flush=True)
+
+    def summary(self):
+        return {'mode': 'stage', 'workers': self.capacity or self.size, 'pool_starts': self.starts,
+                'maps': self.maps, 'tasks': self.tasks, 'restarts': list(self.restarts)}
+
+    def close(self):
+        if self.executor is not None:
+            self.executor.shutdown(wait=True, cancel_futures=True)
+            self.executor = None
+
+
+def active_stage_pool():
+    """The stage pool of this process (stage_pool), or None: in a pool worker, in a forked child of the stage
+    and outside a stage_pool block it is None, and maps start their own pool as before."""
+    stage = _STAGE
+    return stage if stage is not None and stage.pid == os.getpid() else None
+
+
+@contextmanager
+def stage_pool(jobs=None, label='stage', mode='stage'):
+    """One worker pool for every map of the block (mode 'stage', the default), or none (mode 'batch': each map
+    starts and stops its own pool, the method before v0.0.42). Sized as a map of `jobs` workers is: the
+    stage's budget under the scheduler (the pool follows its live allowance), else `jobs`. A block inside
+    another uses the outer pool. Yields the StagePool or None; at the end prints one line with how often the
+    pool started and how many maps and tasks it served."""
+    global _STAGE
+    if mode not in POOL_MODES:
+        raise ValueError('Unknown pool mode %r (choose %s)' % (mode, ' or '.join(POOL_MODES)))
+    if mode == 'batch' or active_stage_pool() is not None:
+        yield active_stage_pool()
+        return
+    count = resolve_jobs(jobs)
+    size = _throttle(count)[0]
+    if size <= 1:
+        yield None
+        return
+    pool = StagePool(size, label)
+    _STAGE = pool
+    try:
+        with worker_environment():
+            yield pool
+    finally:
+        _STAGE = None
+        pool.close()
+        s = pool.summary()
+        print('[pool] %s: one worker pool of %d workers for the whole step: started %d time(s), %d maps, %d tasks%s'
+              % (label, s['workers'], s['pool_starts'], s['maps'], s['tasks'],
+                 ' (started again: %s)' % '; '.join(s['restarts']) if s['restarts'] else ''), flush=True)
+
+
+@contextmanager
+def _map_pool(size):
+    """The executor of one map: the stage pool when one is active (kept running after the map), else a pool of
+    `size` workers of its own, stopped at the map's end (the batch method)."""
+    stage = active_stage_pool()
+    if stage is not None:
+        yield stage.executor_for(size)
+        return
+    with process_pool(size) as pool:
+        yield pool
+
+
+def _count_task():
+    stage = active_stage_pool()
+    if stage is not None:
+        stage.tasks += 1
+
+
 class Background:
     """One call run beside the caller in a spawned worker (process_pool(1)); result() waits for it.
 
@@ -294,7 +418,7 @@ def ordered_map(function, items, jobs=None, cost=None, timings=None):
         source = ((index, items[index]) for index in order)
     else:
         source = enumerate(items)
-    with worker_environment(), process_pool(size) as pool:
+    with worker_environment(), _map_pool(size) as pool:
         pending = {}
         following = 0          # next input index to hand back
         submitted = 0
@@ -311,6 +435,7 @@ def ordered_map(function, items, jobs=None, cost=None, timings=None):
                         break
                     pending[index] = pool.submit(call, item)
                     submitted += 1
+                    _count_task()
                 if following in pending and pending[following].done():
                     yield deliver(pending.pop(following).result())
                     following += 1
@@ -342,16 +467,24 @@ def completed_map(function, items, jobs=None):
         yield from map(function, items)
         return
     items = iter(items)
-    with worker_environment(), process_pool(size) as pool:
+    # In a pool of its own (exactly `size` workers) two tasks per worker are kept in flight, so a worker never
+    # waits for its next task. In the stage's shared pool, which may hold more workers than this map asked for,
+    # every submitted task runs at once: there the map keeps to `count` tasks in flight, as it asked
+    # (CHIM-STAIR-GATE-POOL-BROKEN-42: 11 walk workers asked, 22 frame walks ran at once in a 24-worker pool
+    # and the container ran out of memory).
+    stage = active_stage_pool()
+    with worker_environment(), _map_pool(size) as pool:
         pending = set()
+        window = count if stage is not None and stage.capacity > size else 2 * count
 
         def refill():
-            while len(pending) < (2 * count if limit is None else limit()):
+            while len(pending) < (window if limit is None else limit()):
                 try:
                     item = next(items)
                 except StopIteration:
                     return
                 pending.add(pool.submit(function, item))
+                _count_task()
 
         try:
             refill()
@@ -663,7 +796,8 @@ def execute_parallel(steps, run, metadata, root):
             if not active and pending and not any(set(dependencies[n]) <= passed for _, (n, _) in pending):
                 raise ValueError('Build dependency cycle')
             if time.monotonic() - heartbeat >= 15:
-                print('Building: ' + ', '.join(f"{n} ({s['entry']['jobs']} workers)" for n, s in active.items()), flush=True)
+                # the live worker count of each stage (its allowance now), not its start share (fixlist B9)
+                print('Building: ' + ', '.join(f"{n} ({held(s)} workers)" for n, s in active.items()), flush=True)
                 heartbeat = time.monotonic()
             if active:
                 time.sleep(.1)

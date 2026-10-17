@@ -5,7 +5,7 @@
 ## PERSISTING: reported 2 times; something has to be done
 
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Roadmap maxstats is explicitly proposed, not an available command. One affected catalogue-doc test passes after prose correction; failed full suite retained, no handler/movement implementation.
-- Reported with v0.0.40-dev1 at 2026-10-14 (time not recorded): Owner renewed turbo-traversal report. Source math study documents defaults, original GMST/OpenMW dependencies and matched timing gate. Numeric results are not native timing or a repair.
+- Reported with v0.0.40-dev1 at 2026-10-14 (time not recorded): Maintainer renewed turbo-traversal report. Source math study documents defaults, original GMST/OpenMW dependencies and matched timing gate. Numeric results are not native timing or a repair.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -13,25 +13,25 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 13 October 2026, in v0.0.39-rc1 |
 | Where | Normal walking/running, character Speed/Athletics and fatigue; debug movement presets |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.39-rc1, v0.0.39, v0.0.40-dev1 (last seen) |
-| Severity | high: Owner-visible mechanics or diagnostic requirement; original parity and candidate native verification remain pending. |
+| Severity | high: Maintainer-visible mechanics or diagnostic requirement; original parity and candidate native verification remain pending. |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.39-rc1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
-| Unknown because | Owner named RC1; the exact running binary was not independently read back for this report. The mutable RC2 source candidate has not been compiled or packaged. |
+| Unknown because | Maintainer named RC1; the exact running binary was not independently read back for this report. The mutable RC2 source candidate has not been compiled or packaged. |
 | Platform or emulator | unknown (Emulator not restated for this specific observation.) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
 
-Open owner report: default walking/running feels overpowered. Faithful gameplay should use the original Speed, Athletics, encumbrance and running-fatigue formulas. The latest clarification retains convenient fast, less strict debug builds; no immediate replacement of the debug preset or movement repair is claimed.
+Open maintainer report: default walking/running feels overpowered. Faithful gameplay should use the original Speed, Athletics, encumbrance and running-fatigue formulas. The latest clarification retains convenient fast, less strict debug builds; no immediate replacement of the debug preset or movement repair is claimed.
 
 ## Where
 
@@ -41,7 +41,7 @@ Normal walking/running, character Speed/Athletics and fatigue; debug movement pr
 
 AmiQuake CL_BaseMove in cl_input.c multiplies fixed input speeds by cl_movespeedkey; SV_AirMove in sv_user.c applies the ordinary direction/maximum-speed handling, friction and acceleration. The RC1 default.cfg sets walking120 and run factor1.8, hence216 units/s, independent of character Speed or Athletics. Diagonal input is only capped by the inherited320 maximum. The world is scaled0.25. The same relevant source is present in published v0.0.38 and RC1, so this is an established parity gap rather than a proven new regression. No running-fatigue debit exists; aw_combat.c updates attack/hit costs and fatigue recovery.
 
-Original data and local OpenMW source give unloaded walk =100 + Speed (original units/s), multiplied by (1 -0.3 * normalized encumbrance). Run = walk * (1.75 + Athletics/100). Divide world distances/speeds by four for the current0.25 scale. At Speed100/Athletics100 and zero encumbrance these are50 and137.5 scaled units/s; they are reference formula results, not native measurements. Over-capacity actors cannot move. Original running fatigue loss is (5 +2 * normalized encumbrance) per second of moving run, with movement input factor; passive recovery is2.5 +0.02 * Endurance per second. These are separate debit/credit terms. Walking does not receive the running debit. Original godmode skips the movement fatigue debit; granting maximum debug movement speed is an owner-requested debug extension.
+Original data and local OpenMW source give unloaded walk =100 + Speed (original units/s), multiplied by (1 -0.3 * normalized encumbrance). Run = walk * (1.75 + Athletics/100). Divide world distances/speeds by four for the current0.25 scale. At Speed100/Athletics100 and zero encumbrance these are50 and137.5 scaled units/s; they are reference formula results, not native measurements. Over-capacity actors cannot move. Original running fatigue loss is (5 +2 * normalized encumbrance) per second of moving run, with movement input factor; passive recovery is2.5 +0.02 * Endurance per second. These are separate debit/credit terms. Walking does not receive the running debit. Original godmode skips the movement fatigue debit; granting maximum debug movement speed is a maintainer-requested debug extension.
 
 ## Why it was not caught
 
@@ -70,7 +70,7 @@ The source4b968c2 suite rejects a roadmap mention that looks like an available m
 
 ## Source study, 14 October 2026
 
-The renewed owner report describes turbo traversal. [Movement speed study](../MOVEMENT_SPEED_STUDY.md) records generated120/216 ground targets, the diagonal gain, 0.7 water factor, original-data/OpenMW formulas and a matched timing gate. The earlier unit-race50/137.5 example precedes actor/race scaling and is not a universal final speed; the default OpenMW reference applies Nord male weight1.25 to horizontal motion. Modified stats, load/effects, direction and gross-versus-net fatigue are explicit. No movement setting changed, and no native timing or owner acceptance is established. Keep this issue OPEN.
+The renewed maintainer report describes turbo traversal. [Movement speed study](../MOVEMENT_SPEED_STUDY.md) records generated120/216 ground targets, the diagonal gain, 0.7 water factor, original-data/OpenMW formulas and a matched timing gate. The earlier unit-race50/137.5 example precedes actor/race scaling and is not a universal final speed; the default OpenMW reference applies Nord male weight1.25 to horizontal motion. Modified stats, load/effects, direction and gross-versus-net fatigue are explicit. No movement setting changed, and no native timing or maintainer acceptance is established. Keep this issue OPEN.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

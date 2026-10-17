@@ -181,7 +181,7 @@ class FarLayerEngineContractTests(unittest.TestCase):
         # After the colour pass, controlled independently of fog. Behaviour of
         # both fog states and disabled fill is covered by aga_horizon_test.c.
         self.assertIn('if(aw_land_fill.value){', body)
-        # dbg landfill on/off (owner 2026-10-15: "a separate dbg on/off switch for land fills"); default stays 1.
+        # dbg landfill on/off (maintainer 2026-10-15: "a separate dbg on/off switch for land fills"); default stays 1.
         self.assertIn('static cvar_t aw_land_fill={"aw_land_fill","1",true};', fog)
         # Through the on-disk dbg catalogue (no new resident command): on/off become 1/0 there.
         self.assertIn('VIDEO|landfill|aw_land_fill|', (ROOT / 'config/debug-commands.txt').read_text(encoding='utf-8'))
@@ -192,9 +192,10 @@ class FarLayerEngineContractTests(unittest.TestCase):
         self.assertIn('cvar_t\tchim_far_reach = {"chim_far_reach", "896"};', far_c)       # the legacy overlap depth
         self.assertIn('cvar_t\tchim_far_objects = {"chim_far_objects", "0"};', far_c)   # object stamps: experimental
         world = (SRC / 'chim/chim_world.c').read_text()
-        self.assertIn('ChimFar_Begin (sv.worldmodel ? sv.worldmodel->name', world)
+        # MapModel (): the server's map, or the client's in demo playback (timedemo on a CHIM map)
+        self.assertIn('ChimFar_Begin (MapModel () ? MapModel ()->name', world)
         # CHIM-GRAFT-FAIL-NO-FLOOR-35: the far terrain loads before the frame world, so a failure keeps a floor
-        self.assertLess(world.index('ChimFar_Begin (sv.worldmodel'), world.index('ChimGraft_Begin (sv.worldmodel)'))
+        self.assertLess(world.index('ChimFar_Begin (MapModel ()'), world.index('ChimGraft_Begin (MapModel ())'))
         self.assertIn('ChimFar_End ();\n\tChimGraft_End ();', world)
         self.assertIn('ChimFar_Hook ();', world)
         self.assertIn('chim/chim_far.c', (ROOT / 'engine/aga/Makefile').read_text())

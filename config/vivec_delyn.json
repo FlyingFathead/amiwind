@@ -104,12 +104,10 @@
       "cell": "Vivec, St. Delyn Potter's Hall"
     },
     {
-      "cell": "Vivec, St. Delyn Storage",
-      "exclude": "inline models 249 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+      "cell": "Vivec, St. Delyn Storage"
     },
     {
-      "cell": "Vivec, St. Delyn Underworks",
-      "exclude": "heap 964 B over the 11,534,336 B budget after the optimizer (VIVEC-HEAP-31)"
+      "cell": "Vivec, St. Delyn Underworks"
     },
     {
       "cell": "Vivec, St. Delyn Waist North-One"

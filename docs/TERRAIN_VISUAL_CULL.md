@@ -36,7 +36,7 @@ See [canonical culling evidence](CANONICAL_TERRAIN_CULLING.md) and
 
 ## Historical candidate010 rejection and 011 diagnosis
 
-Owner review rejected candidate010 with hanging geometry at 24,650 stored faces.
+Maintainer review rejected candidate010 with hanging geometry at 24,650 stored faces.
 Independent read-only audit002 subsequently verified that this candidate's final
 serialized BSP contains zero sky render faces; this is binary geometry evidence
 only, and the replacement sky/background appearance has not been verified on the
@@ -91,7 +91,7 @@ Shared models and lightmaps require correct placement-specific clipping and dedu
 
 The serialized final BSP must satisfy both conditions with ALL inspector hiding and preview options OFF. Verify serialized geometry, render references, degeneracies, seams, shared placements and preserved collision/visibility, then matching-ABI memory and target appearance/loading. Attempted-face counts, collision checks alone and viewer-only hiding are insufficient.
 
-These are required outcomes, not claims that the current implementation is complete. Candidate010 was rejected by owner visual review. It used compiled LAND proxies, not direct canonical NPZ evaluation. Direct NPZ alignment was subsequently checked at 288 source-grid corners with zero residual; that diagnosis is not a repaired BSP. The global packet exposed a continuous terrain surface where the compiled coarse/fine terrain had a height step.
+These are required outcomes, not claims that the current implementation is complete. Candidate010 was rejected by maintainer visual review. It used compiled LAND proxies, not direct canonical NPZ evaluation. Direct NPZ alignment was subsequently checked at 288 source-grid corners with zero residual; that diagnosis is not a repaired BSP. The global packet exposed a continuous terrain surface where the compiled coarse/fine terrain had a height step.
 
 For the existing sky background path, see [Day/night and sky](DAY_NIGHT_AND_SKY.md#shared-exterior-background-sky-implementation-candidate).
 

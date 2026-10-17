@@ -3,7 +3,7 @@
 All documentation lives in `docs/`; keep the root limited to core project files.
 Original/converted game content stays outside distributable source. Build output
 uses ignored out/ or a selected external workspace.
-The project owner handles all Git/GitHub pushes. No remote is configured by the
+The project maintainer handles all Git/GitHub pushes. No remote is configured by the
 source package, and packaging does not commit, tag, push or publish anything.
 
 <!-- contents start -->
@@ -158,6 +158,20 @@ Long documents carry a generated contents list after their title and intro
 adding, renaming or removing a heading, run `python tools/doc_toc.py write`;
 `tests/test_doc_toc.py` runs `doc_toc.py check` and fails on a stale list.
 
+Before committing a documentation change, run the docs quick check:
+
+```sh
+python tools/docs_quick_check.py              # the working tree's changes (else the last commit)
+python tools/docs_quick_check.py --staged     # only the staged files
+python tools/docs_quick_check.py install-hook # optional: run --staged as a local pre-commit hook
+```
+
+It runs, in seconds and only for the changed files, the documentation checks of
+the full suite that such a change can break: CR bytes and trailing whitespace,
+`doc_toc.py check`, the debug help coverage (every `dbg` command a document
+names has a debug help row), the console command page, and `bug_register.py
+check` when the bug register changed. It does not replace the full test suite.
+
 ## Explicit release file list
 
 `tools/release-files.json` lists the source files permitted in a source archive.
@@ -193,7 +207,7 @@ Keep detailed format and design notes in their dedicated documents.
 ## Optional private development bundle
 
 `tools/private_bundle.py` is a separate, explicit operation. It includes the
-owner's configured original game folder, generated data and previews alongside
+maintainer's configured original game folder, generated data and previews alongside
 the validated source tree. It is not a public source release. For local use:
 
 ```sh
@@ -265,7 +279,7 @@ states and visible mesh coverage; keep native walk and visual checks as gates.
 
 ## Geometry optimization principle: remove unnecessary runtime work
 
-High-priority owner requirement: eliminate proven redundant or obstructing
+High-priority project requirement: eliminate proven redundant or obstructing
 geometry during conversion so the Amiga does not repeatedly transform, clip and
 rasterize it. A visual layering fix alone does not meet this performance goal.
 The first reference case is both exterior Census doors, including Seyda Neen
@@ -311,7 +325,7 @@ profiling that includes its own bookkeeping, memory and cache cost. The proposed
 
 ## Tables, tables, we need more tables
 
-Owner requirement, 28 September 2026, 20:41 Helsinki: maintain a cross-system
+Project requirement, 28 September 2026, 20:41 Helsinki: maintain a cross-system
 catalogue of the parameters and conditional rules needed for the game. This is
 planned coverage work, not a claim that all mechanics have been enumerated.
 
@@ -371,7 +385,7 @@ ALWAYS CHECK FOR TRAILING WHITESPACE BEFORE POSTING AN AUTOMATED PUSH/PUBLISH
 SCRIPT. Check the exact distributed helper, all changed/new source, and the
 reconstructed archive. Run `git diff --check` and `git diff --cached --check`
 before commit. Do not bypass a failed check. Preserve immutable issued archives;
-use a new revision for a correction. The owner runs publication.
+use a new revision for a correction. The maintainer runs publication.
 
 ## Terrain coverage workflow
 

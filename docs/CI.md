@@ -1,7 +1,7 @@
 # Build audit and the local pipeline
 
 The public GitHub Actions workflow (`.github/workflows/source-check.yml`) checks
-the source on every push. Builds of the game itself need the owner's own
+the source on every push. Builds of the game itself need the user's own
 Morrowind data, so they cannot run there. A local pipeline runs the checks that
 need a real build. Its generic part, the post-build audit, is in this repository
 so anyone can run it on their own builds.

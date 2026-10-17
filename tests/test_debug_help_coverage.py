@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Every dbg command the game tells the player about is in the debug help (owner rule, 2026-10-10: "always update
+"""Every dbg command the game tells the player about is in the debug help (project rule, 2026-10-10: "always update
 our debug help").
 
 The dbg layer is one table: config/debug-commands.txt (AWDC1). The engine's `dbg` / `debug` dispatcher
@@ -61,7 +61,7 @@ def engine_mentions():
 def doc_mentions():
     out = {}
     for f in sorted((ROOT / 'docs').glob('*.md')):
-        # the generated page itself; history kept as written (the changelog, the owner's dated journal and musings)
+        # the generated page itself; history kept as written (the changelog, the maintainer's dated journal and musings)
         if f.name == 'AMIWIND_CONSOLE_COMMANDS.md' or f.name == 'CHANGELOG.md' or f.name.startswith('HORSTATORS_'):
             continue
         text = f.read_text(encoding='utf-8')
@@ -98,7 +98,7 @@ class DebugHelpCoverage(unittest.TestCase):
         self.assertIn('Con_Printf(" %s %s%s\\n",r.words,r.arguments,availability(omitted,&r));', help_body)
 
     def test_aliases_are_catalogue_rows_read_from_disk(self):
-        """Owner rule: aliases live as rows in the on-disk catalogue, read only when a dbg command is submitted;
+        """Project rule: aliases live as rows in the on-disk catalogue, read only when a dbg command is submitted;
         no resident alias table and no command registered per alias."""
         console = (SRC / 'aw_console.c').read_text(encoding='utf-8')
         translate = console[console.index('int AW_DebugTranslate('):console.index('static const char *availability')]

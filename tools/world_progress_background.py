@@ -54,7 +54,7 @@ def world_heights(master):
 def cell_details(master, placed=None):
     """Local level (map menu, Local): per exterior cell 17x17 terrain heights and
     every original placement as [x, y, category, placed] with x, y in 0..255
-    across the cell. PRIVATE: positions of the owner's game objects."""
+    across the cell. PRIVATE: positions of the maintainer's game objects."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from entity_tracker import CATEGORIES, PLACEABLE, category
     from mwad.audit import cell_data

@@ -1,6 +1,6 @@
 # Balmora exterior — v0.0.24-dev1
 
-This checkpoint starts from the owner's `amiwind-2026-09-30_120052.zip` (v0.0.23).
+This checkpoint starts from the maintainer's `amiwind-2026-09-30_120052.zip` (v0.0.23).
 The earlier failed-session ideas have been recovered as a development direction:
 keep complete placements, bound residency with smaller cells, cross boundaries
 in both directions, preserve mutable residents, and move expensive work offline.
@@ -80,7 +80,7 @@ Keep the full source catalogue as the coverage authority when changing budgets.
 
 Source-only archives exclude converted game data, ROMs and disk images.
 
-## Rebuild and owner workflow
+## Rebuild and maintainer workflow
 
 Use the usual `./build.sh --stage aga` workflow with owned source data and the
 configured native toolchain. The `balmora` stage runs after `area`, before
@@ -91,4 +91,4 @@ loose geometry/textures and conversion coordinate system.
 The incremental archive is relative to the uploaded v0.0.23 source, not an older
 recovery ZIP. Inspect its manifest before overlaying it. Run the tests and
 `python3 tools/release.py --check`, review `git diff --check` and `git diff`, then
-commit/push with the owner's normal GitHub workflow. Nothing has been pushed.
+commit/push with the maintainer's normal GitHub workflow. Nothing has been pushed.

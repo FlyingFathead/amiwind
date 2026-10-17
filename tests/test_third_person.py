@@ -117,7 +117,7 @@ class ViewEngineContracts(unittest.TestCase):
         self.assertEqual(offenders, [])
 
     def test_vanity_full_view_hides_the_interface_and_comes_back(self):
-        # Owner request 2026-10-11: the vanity orbit shows the world alone, full screen (photo mode's view
+        # Maintainer request 2026-10-11: the vanity orbit shows the world alone, full screen (photo mode's view
         # without its notices); default on, saved, aw_vanity_fullview 0 keeps the HUD.
         view = (SRC / 'aw_view.c').read_text(encoding='utf-8')
         self.assertIn('static cvar_t fullview_cvar={"aw_vanity_fullview","1",true};', view)
@@ -146,7 +146,7 @@ class ViewEngineContracts(unittest.TestCase):
         self.assertIn('aw_vanity_fullview', (ROOT / 'docs/THIRD_PERSON.md').read_text(encoding='utf-8'))
 
     def test_vanity_full_view_changes_no_render_setting(self):
-        # Owner 2026-10-11 14:39: "that does NOT mean you disable fog and such": only the interface hides and
+        # Maintainer 2026-10-11 14:39: "that does NOT mean you disable fog and such": only the interface hides and
         # the view grows; fog, lighting, sky, draw distance and noclip stay exactly as in play.
         view = code('aw_view.c')
         full = body(view, 'int AW_ViewVanityFullscreen')
@@ -253,7 +253,7 @@ class ViewEngineContracts(unittest.TestCase):
 
 
 class DeadPlayerShowsAndDoesNothing(unittest.TestCase):
-    """Owner rule (PLAYER-DEATH-LIMBO-35): dead in a fight, you cannot talk to anyone or interact, and no names or
+    """Project rule (PLAYER-DEATH-LIMBO-35): dead in a fight, you cannot talk to anyone or interact, and no names or
     hints show. One predicate (quakedef.h AW_PlayerDead) that every such path asks."""
 
     def test_one_predicate_behind_the_input_lock(self):

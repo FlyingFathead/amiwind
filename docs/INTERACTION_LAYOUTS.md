@@ -2,7 +2,7 @@
 
 ## npc_interaction_layout_template_001
 
-Owner-selected default, 28 September 2026.
+Maintainer-selected default, 28 September 2026.
 
 | Element | Rendering |
 | --- | --- |
@@ -17,7 +17,7 @@ Changing a menu font size does not enlarge the NPC-name hint. Reading's black
 ink palette must not leak into this gold-on-dark name. Restore font/ink state
 after drawing. Keep both existing console font modes and all UI font assets.
 Existing supported objects provisionally reuse this placement (Read, Open,
-Take ring, Locked, Empty). The owner considers wider reuse for Take/Steal/etc.
+Take ring, Locked, Empty). The maintainer considers wider reuse for Take/Steal/etc.
 a possibility, not a finalized object UI decision. Do not advertise generic loot/dialogue
 features before they exist. Current native NPC dialogue remains a prototype.
 

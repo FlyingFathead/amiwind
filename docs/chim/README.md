@@ -96,7 +96,7 @@ file types, the format history and the roadmap of the format, in short:
 
 ## Design rules
 
-These rules come from measurements and owner decisions; every CHIM change is
+These rules come from measurements and project decisions; every CHIM change is
 checked against them.
 
 - **Stored once, placed by reference.** One copy of every mesh, hull, texture

@@ -75,6 +75,17 @@ class Order(unittest.TestCase):
         rings = [k for _, k in order]
         self.assertEqual(rings, sorted(rings))      # never back outwards
 
+    def test_seabed_cells_are_planned_in_ring_zero(self):
+        """CHIMPORT-OCEAN-LAND-41: a LAND record without heights and nothing placed is a seabed cell, planned."""
+        esm = {'cells': {(9, 9): {'name': '', 'region': 'Synthetic Region', 'refs': []}}, 'lands': {(0, 0): None},
+               'objects': {}}
+        cells = C.census(esm, {(0, 0), (9, 9)})
+        self.assertTrue(cells[(9, 9)]['seabed'])
+        self.assertFalse(cells[(9, 9)]['land'])
+        self.assertNotIn('seabed', cells[(0, 0)])
+        self.assertIn(((9, 9), 0), C.order_cells(cells))
+        self.assertNotIn((9, 9), C.census(esm))       # without the LAND table: not planned, as before
+
     def test_a_ring_walk_is_contiguous(self):
         order = [c for c, k in C.order_cells(grid(6, 6)) if k == 1]
         for a, b in zip(order, order[1:]):
@@ -142,17 +153,17 @@ class CellSettings(unittest.TestCase):
         self.assertEqual(C.tracker_cell(res, {})['audits']['hull_bevels']['outcome'], 'kept_as_chain')
 
     def test_owner_accepted_chains_pass_with_their_reason(self):
-        # COLLISION-ROUTE-NO-SPLIT-36: the kelp of -9,-4 (owner decision 2026-10-11) closes the coast ring
+        # COLLISION-ROUTE-NO-SPLIT-36: the kelp of -9,-4 (project decision 2026-10-11) closes the coast ring
         accepted = C.accepted_chains()
         self.assertIn('flora_kelp_03', accepted)
-        self.assertIn('owner decision', accepted['flora_kelp_03'])
+        self.assertIn('project decision', accepted['flora_kelp_03'])
         hulls = [{'name': 'f/flora_kelp_03@s1', 'clipnodes': 305, 'depth': 305, 'over': True},
                  {'name': 'f/flora_kelp_04@s1', 'clipnodes': 304, 'depth': 304, 'over': True}]
         rec = {'by_type': {}, 'totals': {}}
         h = C.audits_of(None, None, None, hulls, None, rec, None)['hull_bevels']
         self.assertEqual((h['status'], h['outcome']), ('passed', 'kept_as_chain'))
         self.assertEqual(h['numbers']['kept_as_chain_owner_accepted'], ['flora_kelp_03', 'flora_kelp_04'])
-        self.assertIn('owner-accepted', h['detail'])
+        self.assertIn('maintainer-accepted', h['detail'])
         with patch.object(C, 'accepted_chains', lambda: {}):      # without the list: the audit fails, as before
             self.assertEqual(C.audits_of(None, None, None, hulls, None, rec, None)['hull_bevels']['status'], 'failed')
 

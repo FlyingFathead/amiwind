@@ -9,7 +9,7 @@
 | Where | tools/chim/build.py prepare_area (ground=None: plain tile grid) vs legacy terrain_triangles |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev1 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: Height steps up to 28.25 units and arrival steps up to 24 units at the handover on 11-13 % of the border samples (limit 4.5) |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

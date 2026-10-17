@@ -152,7 +152,7 @@ class Closure(unittest.TestCase):
         self.assertEqual(self.record['sound_files_dropped'], ['fx/far.wav'])  # fire stays, ui (unnamed) stays
 
     def test_music_is_never_part_of_a_closure(self):
-        self.assertEqual(self.record['music'], 'always kept (owner rule)')
+        self.assertEqual(self.record['music'], 'always kept (project rule)')
         self.assertNotIn('music', cc.GROUPS)
         with self.assertRaises(ValueError) as error:
             cc.parse_groups('voice,music')

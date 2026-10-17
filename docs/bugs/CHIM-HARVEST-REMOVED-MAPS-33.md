@@ -9,7 +9,7 @@
 | Where | tools/build_aga.py harvest_fingerprint_entries (write_content_fingerprint after the CHIM removal) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: Every pure CHIM image with a harvest town stops in its image step. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

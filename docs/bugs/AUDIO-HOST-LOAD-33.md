@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | Emulator audio output on a host PC whose CPU is saturated by other work |
 | Reproduction | sometimes |
@@ -27,10 +27,10 @@ closed.
 
 ## Symptom
 
-The owner played CHIM Preview 1 (the v0.0.32 game with Balmora on CHIM, engine 0d8bf4f, world format
+The maintainer played CHIM Preview 1 (the v0.0.32 game with Balmora on CHIM, engine 0d8bf4f, world format
 0.4) shortly after midnight on 9 October 2026 on the same PC that was running heavy build and test
 jobs, with the host CPU at 100 %. Music and sound crackled and snapped throughout play, not only during
-loads. The same build played on the owner's second PC, which ran nothing else, had clean audio.
+loads. The same build played on the maintainer's second PC, which ran nothing else, had clean audio.
 
 ## Where
 
@@ -55,12 +55,12 @@ loads) and are heard on an idle host; this one is continuous and disappears on a
 
 Playtests had so far run on a host with spare CPU, or with the builds paused. The project's CPU budget
 for build jobs leaves only two host threads for the desktop and emulator, and critical builds may take
-every thread while the owner plays elsewhere; nothing warned that the play PC was saturated.
+every thread while the maintainer plays elsewhere; nothing warned that the play PC was saturated.
 
 ## Reproduction
 
 On one PC: play the same build idle, then with build containers holding every CPU thread at 100 %.
-Not yet run as a controlled pair; the evidence so far is the owner's two PCs.
+Not yet run as a controlled pair; the evidence so far is the maintainer's two PCs.
 
 ## Repair
 

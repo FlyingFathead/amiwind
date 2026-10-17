@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | unknown, in v0.0.29 |
 | Where | Opening: post-movie load into the Jiub ship scene (WinUAE) |
 | Reproduction | always |
@@ -18,7 +18,7 @@
 ## Status: 7 October 2026
 
 Open. Reported in v0.29-era builds, still present in v0.0.30-rc1 and
-v0.0.31-dev2 (owner, WinUAE). Cause found in source; repair in source, not yet
+v0.0.31-dev2 (maintainer, WinUAE). Cause found in source; repair in source, not yet
 packaged or heard. Earlier history: [journal](../journals/BUG_JOURNAL-v0.0.29.md#audio-03-winuae-video-to-jiub-loading-spike).
 
 ## Symptom
@@ -48,7 +48,7 @@ as the ship scene appears.
 
 ## Repair
 
-As proposed by the owner: hold the opening scene briefly and start the music
+As proposed by the maintainer: hold the opening scene briefly and start the music
 only after the loads. `AW_IntroBegin` no longer starts the music; it marks it
 pending. Once the client is fully signed on to the ship map, the intro waits a
 short settle period (4 frames and 0.25 s; shortened from 8 frames and 0.75 s once the hold also flushes the previous stream, MUSIC-OPENING-CLIP-31), then starts the opening track. Until
@@ -57,7 +57,7 @@ the music runs.
 
 ## Verification
 
-Pending: engine gates, then an owner check in WinUAE.
+Pending: engine gates, then a maintainer check in WinUAE.
 
 ## Prevention
 

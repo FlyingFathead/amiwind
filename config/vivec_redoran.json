@@ -90,7 +90,7 @@
     },
     {
       "cell": "Vivec, Redoran Temple Shrine",
-      "exclude": "room coordinates reach 4,156, beyond the +-4,096 network range (INTERIOR-COORDS-31); needs recentring"
+      "recentre": [0, 0, 16384]
     },
     {
       "cell": "Vivec, Redoran Trader"
@@ -106,7 +106,7 @@
     },
     {
       "cell": "Vivec, Redoran Waistworks",
-      "exclude": "inline models 240 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+      "exclude": "model slots 233 > 220 after same-lit sharing and plants as sprites (INTERIOR-INLINE-LIMIT-31); needs a section cut at a doorway or hallway, proposed for maintainer review (docs/INTERIOR_SECTIONS.md)"
     },
     {
       "cell": "Vivec, Saren Manor"

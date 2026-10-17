@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a PRIVATE development bundle containing the owner's original game data.
+"""Create a PRIVATE development bundle containing the maintainer's original game data.
 
 This is not a public source release. The public source archive must pass its
 independent validation before it can be included as a separate sibling tree.
@@ -45,7 +45,7 @@ def bundle(source_archive, workspace, destination):
     prefix = f"{PROJECT}-private-{version(root)}/"
     quickstart = """# Private development bundle
 
-This bundle contains the owner's original Morrowind files and locally generated
+This bundle contains the maintainer's original Morrowind files and locally generated
 data. Keep it for private development. It is separate from the public source ZIP.
 
 The two sibling folders are:

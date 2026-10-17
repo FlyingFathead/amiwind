@@ -37,6 +37,30 @@ from prepare_doors import prepare as prepare_doors
 import npc_lod
 
 
+# The inline model budget of a converted interior (INTERIOR-INLINE-LIMIT-31; town_interiors.MODEL_LIMIT).
+INLINE_MODEL_LIMIT = 220
+
+
+# The room's own spawn (info_player_start: the map command, dbg tp to the room, a direct start) is the first
+# original arrival that is not under the room's water (INTERIOR-SPAWN-UNDERWATER-41: the first arrival into
+# Vivec's Hlaalu Underworks is the canal grate, 141 units under the water). Doors keep their own arrivals.
+# AMIWIND_ROOM_SPAWN=first: the earlier rule, the first arrival whatever it is.
+ROOM_SPAWN_ENV = 'AMIWIND_ROOM_SPAWN'
+
+
+def spawn_entrance(cell):
+    """The original arrival a converted room spawns at (see ROOM_SPAWN_ENV)."""
+    import os
+    mode = os.environ.get(ROOM_SPAWN_ENV, '') or 'dry'
+    if mode not in ('dry', 'first'):
+        raise ValueError('%s must be dry or first, not %r' % (ROOM_SPAWN_ENV, mode))
+    entrances = cell['entrances']
+    water = cell.get('water_height')
+    if mode == 'first' or water is None:
+        return entrances[0]
+    return next((e for e in entrances if e['destination']['position'][2] >= water), entrances[0])
+
+
 def entity(fields):
     return '{\n' + '\n'.join(quote(k)+' '+quote(v) for k,v in fields.items()) + '\n}'
 
@@ -67,6 +91,11 @@ def build_room(task):
     slug = entry['map']
     cell = read_interior(child_ci(data, 'Morrowind.esm'), entry['cell'],
                          include_interior_entrances=entry.get('original_door_arrivals', False))
+    if entry.get('recentre'):
+        # A room moved toward the origin (INTERIOR-COORDS-31; town_interiors.room_offsets): every position of
+        # the cell, its lights and arrivals with the offset subtracted, before anything is converted.
+        from town_interiors import recentre_cell
+        cell = recentre_cell(cell, entry['recentre'])
     root = scene/'area-work'/slug
     root.mkdir(parents=True, exist_ok=False)
     refs, omitted = select_geometry(cell, harvest_references=entry.get('harvest_references', ()),
@@ -125,7 +154,7 @@ def build_room(task):
         textures+=lava_rules.wad_entries(assets.texture,layers,tile)
     (root/'room.wad').write_bytes(wad(textures))
     if not cell['entrances']:raise ValueError('No source entrance for '+cell['name'])
-    entrance = cell['entrances'][0]['destination']
+    entrance = spawn_entrance(cell)['destination']
     spawn = [v*SCALE for v in entrance['position']];spawn[2]+=16.875
     yaw = (90-math.degrees(entrance['rotation_radians'][2]))%360
     label = cell['name'].removeprefix('Seyda Neen, ').removeprefix('Balmora, ')
@@ -145,11 +174,45 @@ def build_room(task):
     base=root/'base.bsp';(root/'room.bsp').rename(base)
     rebuild_world_hull(base,root/'room.map',qbsp)
     retain_selected=entry.get('area')=='balmora' or entry.get('retain_selected_geometry',False)
+    # A room over its inline model limit draws its nonsolid decorative plants as sprites (interior_plants;
+    # town_interiors.build_room_checked asks for it): those placements are left out of the mesh models.
+    sprite_numbers,plant_rows=[],[]
+    if entry.get('plant_sprites') and retain_selected:
+        import interior_plants
+        from prepare_scenery import bsa_read, nif_reader
+        from prepare_tree_sprites import collision_metadata
+        from world_flora import flora_kind
+        bsa=BSA(child_ci(data,'Morrowind.bsa'));reader=nif_reader();collisions={}
+        def collision_of(model):
+            if model not in collisions:
+                collisions[model]=collision_metadata(bsa_read(bsa,'meshes/'+model),reader,flora_kind(model))
+            return collisions[model]
+        sprite_numbers,plant_rows=interior_plants.candidates(refs,collision_of)
+    skipped=set(sprite_numbers)
     report=append_meshes(base,root/'room.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=1,
-                         references=[r['number'] for r in index['references']] if retain_selected else None,
+                         references=[r['number'] for r in index['references'] if r['number'] not in skipped] if retain_selected else None,
                          retain_dressing=True if retain_selected else dressing,
                          map_identity='bmtemple' if slug=='bmtemple' else None)
-    if report['unique_models']>220:raise ValueError(slug+': inline model budget exceeded')
+    sprite_files={}
+    if sprite_numbers:
+        import interior_plants
+        entities,plants=interior_plants.place(parts,refs,sprite_numbers,lighting,palette,
+                                              (scene/'id1/gfx/colormap.lmp').read_bytes(),root/'id1')
+        # the sprite files live in the room's folder (cached with it); the room converter installs them
+        interior_plants.add_entities(root/'room.bsp',entities)
+        sprite_files=plants['files']
+        report['plant_sprites']={'placements':len(sprite_numbers),'sprite_files':plants['files'],
+                                 'sprites':plants['sprites'],'decisions':plant_rows,
+                                 'rule':'nonsolid static plants drawn as shaded sprites (tools/interior_plants.py)'}
+        report['bytes']=(root/'room.bsp').stat().st_size
+    elif plant_rows:
+        report['plant_sprites']={'placements':0,'decisions':plant_rows}
+    # A sprite file takes one model slot of the map, as an inline model does.
+    models_used=report['unique_models']+len(sprite_files)
+    report['model_slots']=models_used
+    if models_used>INLINE_MODEL_LIMIT:
+        raise ValueError('%s: inline model budget exceeded (%d > %d inline models)'
+                         % (slug, models_used, INLINE_MODEL_LIMIT))
     report.update(map=slug,cell=cell['name'],spawn=spawn,yaw=yaw,omitted=omitted+report['omitted'],
                   water_height=water,master_sha256=cell['master_sha256'],
                   lava={'mode':lava_mode,'pools':lava_records})
@@ -360,9 +423,19 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
             key=ref['id'].casefold()
             if not ref.get('deleted') and key in kinds['NPC_'] and not key.startswith('chargen ') and inside(ref['position']):
                 cast.append(('seyda',ref))
+    # Every room reference the resident stage does not place is listed with its reason (left_out).
+    import creature_residents
+    left_out=[];creatures=[]
     for slug,cell in rooms.items():
         cast.extend((slug,r) for r in cell['refs'] if not r.get('deleted') and r['type']=='NPC_'
                     and r['id'].casefold() not in exclude_residents)
+        left_out.extend({'map':slug,'reference':r['number'],'id':r['id'],'type':r['type'],
+                         'reason':'excluded by the town settings (resident exclusions)'}
+                        for r in cell['refs'] if not r.get('deleted') and r['type']=='NPC_'
+                        and r['id'].casefold() in exclude_residents)
+        # Interior creatures (tools/creature_residents.py, INTERIOR-CREATURES-MISSING-41).
+        placed_creatures,left=creature_residents.select(cell['refs'],kinds,slug)
+        creatures.extend((slug,r) for r in placed_creatures);left_out.extend(left)
     identifiers=sorted({r['id'].casefold() for _,r in cast})
     tasks=[];models={}
     for identifier in identifiers:
@@ -387,8 +460,28 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         record['behavior']=behavior;record['settings']=greeting_settings(kinds,behavior,SCALE)
         models[identifier]=record
         print('Resident ready:',identifier,flush=True)
-    # Near/far models (tools/npc_lod.py): near files and the pairing manifest.
+    # Near/far models (tools/npc_lod.py): near files and the pairing manifest (NPC records only).
     lod_report=npc_lod.publish(scene/'id1',models,kinds)
+    creature_ids=sorted({r['id'].casefold() for _,r in creatures})
+    creature_tasks=[(data,palette,creature_residents.appearance(kinds,i)) for i in creature_ids]
+    baked=set()
+    for identifier,raw,record in (ordered_map(creature_residents.safe_bake,creature_tasks,
+                                              max(1,min(resolve_jobs(jobs),len(creature_tasks))))
+                                  if creature_tasks else ()):
+        if raw is None:
+            # 'all' mode: a model that does not bake leaves its references out, with the error
+            left_out.extend({'map':slug,'reference':r['number'],'id':r['id'],'type':'CREA','reason':'model: '+record}
+                            for slug,r in creatures if r['id'].casefold()==identifier)
+            continue
+        stem='a_'+hashlib.sha256(identifier.encode()).hexdigest()[:12]
+        record.update(model='progs/'+stem+'.mdl',voice='')
+        replace_bytes(scene/'id1'/record['model'],raw)
+        behavior=behavior_record(kinds['CREA'][identifier],SCALE)
+        # no creature greeting or dialogue yet: hello distance 0 (the entity never greets)
+        record['behavior']=behavior;record['settings']={'distance':0,'reset_distance':0,'duration':0}
+        models[identifier]=record;baked.add(identifier)
+        print('Creature resident ready:',identifier,f"({record['frames']} frames, {record['triangles']} triangles, idle {record['idle']['group']})",flush=True)
+    cast.extend((slug,r) for slug,r in creatures if r['id'].casefold() in baked)
     placed=[]
     for slug in (['seyda'] if include_exterior else []) + list(rooms):
         path=scene/'id1/maps'/f'{slug}.bsp';b=lumps(path.read_bytes())
@@ -416,7 +509,12 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         if slug=='seyda':replace_copy(path,scene/'seyda.bsp')
     # Town interiors (import_town.py) write their own door banks.
     doors=prepare_doors(data,scene) if doors else None
+    left_out.sort(key=lambda r:(r['map'],r['reference']))
+    if left_out:
+        print(f'Resident stage: {len(left_out)} room references left out (reasons in {report_name} left_out)',flush=True)
     report={'rooms':reports,'cast':placed,'models':models,'doors':doors,'npc_lod':lod_report,
+            'creatures':{'mode':creature_residents.mode(),'placed':sum(1 for _,r in creatures if r['id'].casefold() in baked)},
+            'left_out':left_out,
             'scope':'original placed humanoid residents, blocking idle actors and bounded greetings; combat, services, schedules and small-item interactions remain separate systems'}
     (scene/report_name).write_text(json.dumps(report,indent=2)+'\n')
     return report

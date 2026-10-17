@@ -64,7 +64,7 @@ overflow was investigated separately and did not explain the isolated failure.
 **Resolution:** retain architectural/manufactured geometry and control resident
 cost through bounded sub-cells. Match source/candidate views and inspect facade,
 roof and boundary coverage. Keep organic-object reduction separately bounded.
-The owner subsequently accepted the exteriors in dev2/dev3. See the measured
+The maintainer subsequently accepted the exteriors in dev2/dev3. See the measured
 single-building comparison in [dev2 findings](INVESTIGATION-v0.0.24-dev2.md).
 
 ## 2. Hollow passages became solid collision
@@ -84,7 +84,7 @@ independent inspection.
 standing-box convex sums for the selected open architectural shells. Keep
 converted collision within region budgets. Validate actual normal walking in
 both directions, including adjacent walls and landings. Earlier bridge/temple
-and b17 routes passed targeted checks; new RC1 owner coordinates retain their
+and b17 routes passed targeted checks; new RC1 maintainer coordinates retain their
 own gates. See [mesh guidance](MESH_TIPS_AND_TRICKS.md),
 [dev4 findings](INVESTIGATION-v0.0.24-dev4.md), and the RC1 checklist.
 
@@ -217,7 +217,7 @@ separate from catalogue coverage.
 
 ## 10. Gold text lost character distinctions
 
-**Problem:** previous gold glyphs lost upper detail in `o`/`s`; the owner then
+**Problem:** previous gold glyphs lost upper detail in `o`/`s`; the maintainer then
 reported ambiguous `e`/`c` and uppercase `H` resembling lowercase `h`.
 
 **Cause:** the earlier small rasterization/packing problem and the current
@@ -234,7 +234,7 @@ original ink. Native 12/14/16-pixel comparisons pass; check full words such as
 
 ## 11. Ground patches lacked the expected paving
 
-**Problem:** the owner reports ten ground views in Parts 1, 2, 5, 6, 8, 9, 10 and the follow-up.
+**Problem:** the maintainer reports ten ground views in Parts 1, 2, 5, 6, 8, 9, 10 and the follow-up.
 
 **Cause:** source default material tiles are identified in the conversion audit;
 multiple camera reports can refer to the same tile. Texture absence must still
@@ -251,7 +251,7 @@ Camera coordinates and tile coordinates are recorded separately.
 
 ## 12. The dock guard circled or faced the wrong direction at the door
 
-**Problem:** the final route could circle an auxiliary path-grid node; the owner
+**Problem:** the final route could circle an auxiliary path-grid node; the maintainer
 also wants a post left of the door, back to the wall, facing the docks.
 
 **Cause:** a graph node beyond the requested stop was treated as mandatory.

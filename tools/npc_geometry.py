@@ -408,7 +408,7 @@ def player_leg_section_ok(reference, reference_faces, candidate, candidate_faces
             return False
     return True
 
-# Heads keep their original geometry (owner decision 2026-10-09, NPC-HEAD-DECIMATION-33).
+# Heads keep their original geometry (project decision 2026-10-09, NPC-HEAD-DECIMATION-33).
 # The whole-model bake used to fit a humanoid into 480 triangles; the head got at
 # most 120 of them and was decimated with the rest, which left faces
 # unrecognisable (Fargoth). Like Dagoth Ur's mask profile
@@ -450,7 +450,7 @@ def _budget_quotas(shapes,budget,face_limit,minimum_faces,reference_frames):
     return quotas
 
 # Body classes of the original-head bake, in the order they give up triangles
-# when the face limit is tight (owner, 9 October 2026): hair/helmet first, then
+# when the face limit is tight (maintainer, 9 October 2026): hair/helmet first, then
 # small details, then the torso, last the limbs, each never below its floor (its
 # silhouette count, simplify_shape, capped at its budget-bake share).
 LIMB_SLOTS=frozenset(range(6,23))|{26}

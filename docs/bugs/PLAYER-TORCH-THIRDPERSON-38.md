@@ -4,11 +4,11 @@
 
 ## PERSISTING: reported 5 times; something has to be done
 
-- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Owner repeat: F unsheathes fists successfully; V after F produces world light but no third-person carried torch pose or animation.
+- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Maintainer repeat: F unsheathes fists successfully; V after F produces world light but no third-person carried torch pose or animation.
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Original human/beast and common first-person torch groups confirmed. Player companion/pose remains unwired; guard overlay has layout limits. No torch/native acceptance.
-- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Owner now requires third-person torch holding in RC2. Source integration IN PROGRESS; exact bake/tests/native/package/owner acceptance pending. Swimming scope unchanged.
-- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): RC2 torch source candidate implemented. All 20 companion bake/readbacks, 35 converter and 36 runtime checks pass. Exact target/native, matched original, package/owner acceptance pending.
-- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Scoped native Nord F-then-V hold/movement/off and first-person control observed; original game/audio clip retained. Exact full package/reference and owner acceptance pending.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Maintainer now requires third-person torch holding in RC2. Source integration IN PROGRESS; exact bake/tests/native/package/maintainer acceptance pending. Swimming scope unchanged.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): RC2 torch source candidate implemented. All 20 companion bake/readbacks, 35 converter and 36 runtime checks pass. Exact target/native, matched original, package/maintainer acceptance pending.
+- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Scoped native Nord F-then-V hold/movement/off and first-person control observed; original game/audio clip retained. Exact full package/reference and maintainer acceptance pending.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -16,7 +16,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Third-person player body and equipment |
 | Reproduction | unknown |
@@ -28,7 +28,7 @@
 | From commit | source c2eaa5a, engine c2eaa5a, CHIM world c2eaa5a |
 | CHIM engine version | CHIM 0.2.0, engine c2eaa5a, world format unknown |
 | Unknown because | World format not transcribed into this report. |
-| Platform or emulator | unknown (Owner did not specify emulator.) |
+| Platform or emulator | unknown (Maintainer did not specify emulator.) |
 
 <!-- END GENERATED FACTS -->
 
@@ -45,7 +45,7 @@
 - [Verification](#verification)
 - [Prevention](#prevention)
 - [Underwater torch follow-up, 12 October 2026](#underwater-torch-follow-up-12-october-2026)
-- [Owner evidence reconciliation, 13 October 2026](#owner-evidence-reconciliation-13-october-2026)
+- [Maintainer evidence reconciliation, 13 October 2026](#maintainer-evidence-reconciliation-13-october-2026)
 - [RC1 repeated equipment report, 13 October 2026](#rc1-repeated-equipment-report-13-october-2026)
 - [Original torch-group availability, 13 October 2026](#original-torch-group-availability-13-october-2026)
 - [Required RC2 scope, 13 October 2026](#required-rc2-scope-13-october-2026)
@@ -58,7 +58,7 @@
 
 ## Symptom
 
-Owner reports a regression in v0.0.38-dev2: equip a torch and switch to third person; illumination remains, but the torch model, torch animation and raised holding pose are absent.
+Maintainer reports a regression in v0.0.38-dev2: equip a torch and switch to third person; illumination remains, but the torch model, torch animation and raised holding pose are absent.
 
 ## Where
 
@@ -81,19 +81,19 @@ camera or NPC animation checks do not establish player equipment behavior.
 
 ## Reproduction
 
-Repeat the owner scenario above in dev2, recording race, equipment, view changes,
+Repeat the maintainer scenario above in dev2, recording race, equipment, view changes,
 idle and movement. Independent native reproduction remains pending.
 
 ## Repair
 
-RC2 source candidate integrates an original torch-pose player body, held mesh and frame-aligned emitter following the owner's explicit requirement. Reuse the existing player-body and animation machinery, check
+RC2 source candidate integrates an original torch-pose player body, held mesh and frame-aligned emitter following the maintainer's explicit requirement. Reuse the existing player-body and animation machinery, check
 the original/OpenMW equipment poses and transitions, and preserve working light
 and first-person behavior. The torch regression history needs comparison with
 an earlier exact package before identifying a first-bad build.
 
 ## Verification
 
-Open, needs fixing. Owner report recorded; no fix or repaired-package acceptance.
+Open, needs fixing. Maintainer report recorded; no fix or repaired-package acceptance.
 
 ## Prevention
 
@@ -103,7 +103,7 @@ lighting, in both first and third person, at idle and while moving.
 
 ## Underwater torch follow-up, 12 October 2026
 
-The owner also reports that the torch can be lit underwater and asks to keep
+The maintainer also reports that the torch can be lit underwater and asks to keep
 this in the same torch report. Verify the original Morrowind/OpenMW rules for
 lighting, extinguishing, equipping and swimming before implementing the state
 gate. This behavior is reported, not yet independently reproduced. Test initial
@@ -121,9 +121,9 @@ before implementing the transition. Preserve first-person lighting and fuel
 controls on dry land; verify inventory and save/load effects separately.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.
@@ -132,7 +132,7 @@ or runtime acceptance. Missing build or pose information remains unknown.
 
 ## RC1 repeated equipment report, 13 October 2026
 
-The owner confirms that F unsheathes the fists in third person. Pressing V after F lights the world, but the third-person torch model, holding pose and animation are still absent. Preserve this as a repeat of the carried-torch issue, independent of bare-hand draw/lower and punch work. No repaired torch candidate or acceptance follows from the light turning on. Reproduce the F then V sequence in both views, stationary and moving, and compare the equipped mesh and pose with the original.
+The maintainer confirms that F unsheathes the fists in third person. Pressing V after F lights the world, but the third-person torch model, holding pose and animation are still absent. Preserve this as a repeat of the carried-torch issue, independent of bare-hand draw/lower and punch work. No repaired torch candidate or acceptance follows from the light turning on. Reproduce the F then V sequence in both views, stationary and moving, and compare the equipped mesh and pose with the original.
 
 ## Original torch-group availability, 13 October 2026
 
@@ -142,9 +142,9 @@ The missing third-person torch is an integration gap: the player has no carried 
 
 ## Required RC2 scope, 13 October 2026
 
-The latest owner instruction requires the carried third-person torch and authored holding animation to be repaired for RC2; this supersedes its earlier v0.0.40 deferral. Source integration is in progress. The confirmed original torch keys and existing guard/player equipment machinery are inputs, not a completed repair receipt.
+The latest maintainer instruction requires the carried third-person torch and authored holding animation to be repaired for RC2; this supersedes its earlier v0.0.40 deferral. Source integration is in progress. The confirmed original torch keys and existing guard/player equipment machinery are inputs, not a completed repair receipt.
 
-Integrate the player mesh, left-arm pose and emitter with variable idle/moving/action layouts while preserving working first-person presentation, independent light behavior, budgets and character/view/state transitions. Exact source implementation and automated/bake receipts must be supplied before pinning, followed by native idle/walk/run/view-toggle/F-then-V controls and matched original-game comparison. No native, complete RC2 image/package or owner acceptance is claimed. Swimming/diving and wider underwater gameplay remain separate open work; this instruction does not expand them into the current repair scope.
+Integrate the player mesh, left-arm pose and emitter with variable idle/moving/action layouts while preserving working first-person presentation, independent light behavior, budgets and character/view/state transitions. Exact source implementation and automated/bake receipts must be supplied before pinning, followed by native idle/walk/run/view-toggle/F-then-V controls and matched original-game comparison. No native, complete RC2 image/package or maintainer acceptance is claimed. Swimming/diving and wider underwater gameplay remain separate open work; this instruction does not expand them into the current repair scope.
 
 ## Implemented RC2 torch candidate, 13 October 2026
 
@@ -166,19 +166,19 @@ including the actual torch-light fixture. These are source/automated/bake facts.
 
 Fresh target compilation, complete image/package readback and matched native
 first/third-person idle/walk/run/F-then-V/view/state controls remain required.
-No visual repair or owner acceptance is established by these checks. Leg seams,
+No visual repair or maintainer acceptance is established by these checks. Leg seams,
 swimming/diving and wider original water/equipment parity retain their existing
 open requirements. The prior in-progress scope entry remains historical.
 
 ## Native candidate findings, 14 October 2026
 
-Target compilation and scoped Nord native F-then-V, hold/walk/run, torch-off and first-person control pass; an unaltered game/audio clip shows the carried mesh and raised arm. All 20 companions pass bake/readback. Matched original, complete image/package and owner acceptance remain pending.
+Target compilation and scoped Nord native F-then-V, hold/walk/run, torch-off and first-person control pass; an unaltered game/audio clip shows the carried mesh and raised arm. All 20 companions pass bake/readback. Matched original, complete image/package and maintainer acceptance remain pending.
 
 ## Post-pin RC2 package observation, 14 October 2026
 
-The independently extracted RC2 package shows a raised left arm and carried torch on Nord, then torch-off and water/land model selection. Full disk readback verifies all 20 body/held-torch companions. Scoped native evidence is not all-appearance or matched-original visual acceptance; owner acceptance remains pending.
+The independently extracted RC2 package shows a raised left arm and carried torch on Nord, then torch-off and water/land model selection. Full disk readback verifies all 20 body/held-torch companions. Scoped native evidence is not all-appearance or matched-original visual acceptance; maintainer acceptance remains pending.
 
-These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Maintainer acceptance and final v0.0.39 clearance remain pending.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

@@ -95,13 +95,20 @@ class BalmoraMatchesLegacy(unittest.TestCase):
         import prepare_balmora
         settings = load_settings('balmora'); grids = synthetic_grids(settings)
         timings = '"aw_eye_height" "22"\n"aw_hand_idle" "0.5"'
+        # prepare_balmora re-exports import_town's terrain_map: the same function on the same arguments gives the
+        # same text unless it changed its inputs, so check that directly instead of building every map twice.
+        shared = prepare_balmora.terrain_map is import_town.terrain_map
+        before = copy.deepcopy(settings)
         for entry in regions(settings):
             spawn = [(entry['core'][0][i] + entry['core'][1][i]) / 2 for i in range(2)]
             spawn.append(legacy.terrain_at(grids, settings, *spawn)[0] + 40)
             self.assertEqual(import_town.terrain_at(grids, settings, *spawn[:2]), legacy.terrain_at(grids, settings, *spawn[:2]))
             old = legacy.terrain_map(entry, grids, copy.deepcopy(settings), spawn, timings)
             self.assertEqual(import_town.terrain_map(entry, grids, settings, spawn, timings), old, entry['name'])
-            self.assertEqual(prepare_balmora.terrain_map(entry, grids, settings, spawn, timings), old)
+            if shared:
+                self.assertEqual(settings, before, entry['name'])
+            else:
+                self.assertEqual(prepare_balmora.terrain_map(entry, grids, settings, spawn, timings), old)
             self.assertIn('"message" "Balmora"', old)
 
     @unittest.skipUnless(CONVERTER, 'optional conversion dependencies')

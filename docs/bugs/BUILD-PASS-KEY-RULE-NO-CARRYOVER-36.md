@@ -9,7 +9,7 @@
 | Where | tools/pass_cache.py key rules (worker-only digests 98933e9, form 2 e4213a1) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev4 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: Hold-level reuse bug: verified results with unchanged code and inputs keyed out by a key rule change |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.36-dev4 |

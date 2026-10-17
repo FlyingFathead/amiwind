@@ -9,7 +9,7 @@
 | Where | tools/check_actor_ground.py and tools/build_aga.py |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev1 (last seen) |
+| Persists in | fixed in v0.0.38 |
 | Severity | low: Stops empty exterior scene packaging before playtest |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | lava-sandbox-candidate |

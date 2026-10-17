@@ -2,7 +2,7 @@
 
 Use the complete update kit to apply rc9 over rc7 or rc8. Replacements are backed
 up, checksums are verified and conflicting local edits stop before writes.
-The owner's post-rc7 README cleanup is an accepted base and is preserved.
+The maintainer's post-rc7 README cleanup is an accepted base and is preserved.
 
 RECOVER-IMAGE.sh rebuilds the engine, default NPC gallery and image from the ORIGINAL failed rc3
 full run with passed world-terrain. Do not pass a later image-recovery run.
@@ -12,7 +12,7 @@ scenery and music remain intact. No actor waiver is used.
 Playtest F/V controls, torch grip/flame, cave lighting and region labels before
 running PUBLISH.sh --publish. That script commits/pushes main, checks CI at the
 exact commit, tags, creates a source prerelease and verifies downloaded assets.
-The owner runs all remote operations. Final v0.0.25 is a later explicit promotion
+The maintainer runs all remote operations. Final v0.0.25 is a later explicit promotion
 after the candidate is accepted; existing release tags are not replaced.
 
 NPC gallery is included by default for debugging and regression inspection.
@@ -32,7 +32,7 @@ world NPC has already been converted or placed by the current demake.**
 Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
 reduced or bypassed, including model/asset generation, catalogue coverage,
 quality and validation, without a specific documented case or scenario **and
-explicit approval from the project owner**. A builder or contributor cannot
+explicit approval from the project maintainer**. A builder or contributor cannot
 approve its own exception. Build time, disk pressure and convenience do not
 supply that approval. An opt-out flag is a mechanism for an approved exceptional
 debugging case, not permission to choose that exception independently.

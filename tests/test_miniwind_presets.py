@@ -99,7 +99,9 @@ class Table(unittest.TestCase):
         rows = mp.presets()
         self.assertEqual(sorted(row['name'] for row in rows),
                          ['animkit', 'balmora', 'balmora-exterior', 'lava-pools', 'opening-ship', 'seyda-chim',
-                          'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim'])
+                          'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim', 'vivec-palace'])
+        palace = mp.find('vivec-palace')         # v0.0.42: Vivec in his palace (INTERIOR-CREATURES-MISSING-41)
+        self.assertEqual(palace['start'], 'interior:Vivec, Palace of Vivec')
         seyda = mp.find('seyda-chim')            # v0.0.36-dev5: Seyda Neen CHIM-native, starts at its arrival
         self.assertEqual(seyda['start'], 'seyda_neen')
         ship = mp.find('opening-ship')
@@ -113,7 +115,7 @@ class Table(unittest.TestCase):
         self.assertIn('npc-gallery', pit['exclude'])
         self.assertEqual(pit['unreferenced'], 'voice,npcs')
         self.assertEqual(mp.find('balmora-exterior')['scope'], 'exterior')
-        # Vivec stage A's preset, now the whole city from the Arena arrival (owner decision 2026-10-11 09:55)
+        # Vivec stage A's preset, now the whole city from the Arena arrival (project decision 2026-10-11 09:55)
         arena = mp.find('vivec-arena-chim')
         self.assertEqual((arena['start'], arena['scope']), ('vivec_city', 'full'))
         self.assertIn('npc-gallery', arena['exclude'])

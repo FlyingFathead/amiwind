@@ -4,10 +4,10 @@
 
 ## PERSISTING: reported 4 times; something has to be done
 
-- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Owner identifies v0.0.38 as last known good fast gait. RC1 has few poses; sample coverage and speed-linked playback both need repair checks. Owner comparison, not independent acceptance.
+- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Maintainer identifies v0.0.38 as last known good fast gait. RC1 has few poses; sample coverage and speed-linked playback both need repair checks. Maintainer comparison, not independent acceptance.
 - Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Source candidate: two male bodies retain full8/6 gait plus punch within512 KiB;83 affected tests pass. Target/native/visual/all-appearance/RC2-package acceptance pending.
-- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): All 20 body pairs pass binary checks; prior bake failure retained. Full 8/6 gait declarations do not establish speed-linked smoothness or native/package/owner acceptance.
-- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Owner repeats poor third-person running and asks whether frames were removed. Historical RC1 loss confirmed; sealed RC2 all 20 distinct 8/6 poses verified. Current displayed gait still unaccepted.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): All 20 body pairs pass binary checks; prior bake failure retained. Full 8/6 gait declarations do not establish speed-linked smoothness or native/package/maintainer acceptance.
+- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Maintainer repeats poor third-person running and asks whether frames were removed. Historical RC1 loss confirmed; sealed RC2: all 20 distinct 8/6 poses verified. Displayed gait still unaccepted.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -15,18 +15,18 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 13 October 2026, in v0.0.39-rc1 |
 | Where | Third-person Nord and Khajiit walking/running, fists lowered and readied |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.39-rc1, v0.0.39-rc2 (last seen) |
-| Severity | high: Visible RC1 player/NPC presentation failure reported by the owner. |
+| Severity | high: Visible RC1 player/NPC presentation failure reported by the maintainer. |
 | Family | First-person hands and torch (`torch-hands`) |
 | Playtest version | v0.0.39-rc1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
-| Unknown because | Owner named RC1; the exact running image and binary were not independently read back for this report. |
+| Unknown because | Maintainer named RC1; the exact running image and binary were not independently read back for this report. |
 | Platform or emulator | unknown (Emulator not restated for this specific observation.) |
 
 <!-- END GENERATED FACTS -->
@@ -44,7 +44,7 @@
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
-- [RC1 owner evidence, 13 October 2026](#rc1-owner-evidence-13-october-2026)
+- [RC1 maintainer evidence, 13 October 2026](#rc1-maintainer-evidence-13-october-2026)
 - [Pose coverage and speed-linked playback, 13 October 2026](#pose-coverage-and-speed-linked-playback-13-october-2026)
 - [Earlier all-appearance failure, 13 October 2026](#earlier-all-appearance-failure-13-october-2026)
 - [Corrected RC2 all-body result and seam limits, 13 October 2026](#corrected-rc2-all-body-result-and-seam-limits-13-october-2026)
@@ -69,7 +69,7 @@ physical input and matched original-game acceptance remain open.
 
 ## Symptom
 
-Fast third-person movement no longer has the earlier quick foot animation and looks like skipped frames. The owner additionally describes the run as two frames.
+Fast third-person movement no longer has the earlier quick foot animation and looks like skipped frames. The maintainer additionally describes the run as two frames.
 
 ## Where
 
@@ -90,20 +90,20 @@ Capture Nord and Khajiit at walk and fast run, lowered and readied, with the sam
 
 ## Repair
 
-Source candidate compacts upper-body action grids while preserving normal walk8/run6 and ready walk8/run6, plus authored punch layers. The isolated Nord/Khajiit male output actually contains those groups; this corrects source sample loss without proving target smoothness. Retain movement-speed-linked playback and compare the owner-reported v0.0.38 control at normal emulator pacing.
+Source candidate compacts upper-body action grids while preserving normal walk8/run6 and ready walk8/run6, plus authored punch layers. The isolated Nord/Khajiit male output actually contains those groups; this corrects source sample loss without proving target smoothness. Retain movement-speed-linked playback and compare the maintainer-reported v0.0.38 control at normal emulator pacing.
 
 ## Verification
 
-Source candidate uses compact draw/lower/punch layer grids while retaining full normal and ready gait. Isolated Nord and Khajiit male bakes/readbacks pass under the exact RC1 budget environment: normal walk8/run6, ready walk8/run6 and authored punch layers;105 frames each,512x96 atlas. Nord has357 triangles and520,564 bytes; Khajiit358 triangles and521,876 bytes, each below512 KiB. Eighty-three affected automated checks pass. These were the first two isolated source-candidate controls; the corrected all-body binary result below extends file coverage. Actual native/visual repair, complete RC2 package readback and owner acceptance remain pending.
+Source candidate uses compact draw/lower/punch layer grids while retaining full normal and ready gait. Isolated Nord and Khajiit male bakes/readbacks pass under the exact RC1 budget environment: normal walk8/run6, ready walk8/run6 and authored punch layers;105 frames each,512x96 atlas. Nord has357 triangles and520,564 bytes; Khajiit358 triangles and521,876 bytes, each below512 KiB. Eighty-three affected automated checks pass. These were the first two isolated source-candidate controls; the corrected all-body binary result below extends file coverage. Actual native/visual repair, complete RC2 package readback and maintainer acceptance remain pending.
 
-The owner explicitly confirms that the RC1 fight-ready posture is good and must be preserved. This is a scoped posture control; torch holding, leg shape, fast gait and punch acceptance remain separate. The owner-reported v0.0.38 working gait remains a comparison requirement, not independent candidate acceptance.
+The maintainer explicitly confirms that the RC1 fight-ready posture is good and must be preserved. This is a scoped posture control; torch holding, leg shape, fast gait and punch acceptance remain separate. The maintainer-reported v0.0.38 working gait remains a comparison requirement, not independent candidate acceptance.
 
 ## Prevention
 
 Check the actual extracted package, original identity and normal-speed animation
 in addition to model/layout budgets. Preserve earlier working controls.
 
-## RC1 owner evidence, 13 October 2026
+## RC1 maintainer evidence, 13 October 2026
 
 The original images remain private. Rounded HUD readings are location aids,
 not exact source/package bindings or proof of motion.
@@ -112,7 +112,7 @@ not exact source/package bindings or proof of motion.
 
 ## Pose coverage and speed-linked playback, 13 October 2026
 
-The owner reiterates that faster movement previously hastened the foot animation and explicitly identifies v0.0.38 as the last known good comparison. This is owner-reported comparison evidence, not an independently reproduced native control. RC1 appears to show only a couple of frames. The source fitter replay independently confirms two normal walk and two normal run samples for Nord and Khajiit. Restoring samples and making playback follow actual movement speed are separate checks: a faster clock cannot restore missing poses. Source presence alone does not establish baked coverage. The isolated two-male-body readback below now confirms restored samples for those bodies; normal-speed native smoothness, other appearances and complete package acceptance remain pending. Check slow walk, ordinary run and convenient debug-fast movement, lowered/readied states and both appearances against the original and exact v0.0.38 control.
+The maintainer reiterates that faster movement previously hastened the foot animation and explicitly identifies v0.0.38 as the last known good comparison. This is maintainer-reported comparison evidence, not an independently reproduced native control. RC1 appears to show only a couple of frames. The source fitter replay independently confirms two normal walk and two normal run samples for Nord and Khajiit. Restoring samples and making playback follow actual movement speed are separate checks: a faster clock cannot restore missing poses. Source presence alone does not establish baked coverage. The isolated two-male-body readback below now confirms restored samples for those bodies; normal-speed native smoothness, other appearances and complete package acceptance remain pending. Check slow walk, ordinary run and convenient debug-fast movement, lowered/readied states and both appearances against the original and exact v0.0.38 control.
 
 ## Earlier all-appearance failure, 13 October 2026
 
@@ -124,18 +124,18 @@ The corrected isolated candidate now passes actual-format model/layout checks fo
 
 The anatomical leg-section guard now uses labelled leg parts 17–22 in both compared meshes, excluding Khajiit tail part 26 from the width test. Its 75% threshold and the actual model/alias budgets remain unchanged. Thirty-three focused automated checks pass against the exact corrected source snapshot, including the tail/narrow-leg regression. The earlier 83 affected body/animation checks remain separate evidence, not a rerun of the latest full suite.
 
-Read-only section audits still identify possible knee/calf gaps in five fallback bodies. Part extrema extend up to 0.415 units beyond authored bounds; knee/calf 2D section Hausdorff distance increases from about 0.45–0.58 to 1.17–1.83 units. Plain 384 simplification causes most of that increase; contour adjustment adds 0–0.13 units. These are geometry metrics, not proof of a visible hole or an accepted repair. Native silhouette/seam inspection, matched v0.0.38 gait and RC1 ready controls, original-game comparison, memory/performance, exact package and owner acceptance remain pending.
+Read-only section audits still identify possible knee/calf gaps in five fallback bodies. Part extrema extend up to 0.415 units beyond authored bounds; knee/calf 2D section Hausdorff distance increases from about 0.45–0.58 to 1.17–1.83 units. Plain 384 simplification causes most of that increase; contour adjustment adds 0–0.13 units. These are geometry metrics, not proof of a visible hole or an accepted repair. Native silhouette/seam inspection, matched v0.0.38 gait and RC1 ready controls, original-game comparison, memory/performance, exact package and maintainer acceptance remain pending.
 
 ## Post-pin RC2 package observation, 14 October 2026
 
-Full gait samples are present in the read-back RC2 body assets, but package presence and scoped punch/water footage do not establish normal-speed fast-gait timing, original speed-linked playback or owner acceptance. Preserve the owner-reported v0.0.38 comparison and good RC1 ready posture.
+Full gait samples are present in the read-back RC2 body assets, but package presence and scoped punch/water footage do not establish normal-speed fast-gait timing, original speed-linked playback or maintainer acceptance. Preserve the maintainer-reported v0.0.38 comparison and good RC1 ready posture.
 
-These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Maintainer acceptance and final v0.0.39 clearance remain pending.
 
 
 ## Development audit, 14 October 2026
 
-A direct read-only audit of the sealed RC2 HDF found eight distinct walk poses and six distinct run poses in all 20 normal bodies, with matching ready-gait counts. This checks actual vertex frames as well as declarations. Historical RC1 full action grids reduced normal gait to two walk/two run poses; compact RC2 grids restored the samples. The speed/root-speed clock and clamp are unchanged from v0.0.38. High speed with low rendering FPS can skip displayed poses, but that possibility is not a diagnosed new regression. Normal-speed matched gait and owner acceptance remain open.
+A direct read-only audit of the sealed RC2 HDF found eight distinct walk poses and six distinct run poses in all 20 normal bodies, with matching ready-gait counts. This checks actual vertex frames as well as declarations. Historical RC1 full action grids reduced normal gait to two walk/two run poses; compact RC2 grids restored the samples. The speed/root-speed clock and clamp are unchanged from v0.0.38. High speed with low rendering FPS can skip displayed poses, but that possibility is not a diagnosed new regression. Normal-speed matched gait and maintainer acceptance remain open.
 
 ## Nord gait diagnostic, 14 October 2026
 

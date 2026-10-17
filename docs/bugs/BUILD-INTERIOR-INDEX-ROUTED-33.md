@@ -9,7 +9,7 @@
 | Where | tools/collision_index.py (prison ship shell, interior stage) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: Every full build from integration 9165a2e stops in the interior stage |
 | Family | Mesh converter geometry (`converter-geometry`) |
 | Playtest version | v0.0.33 pass 2 full build (p2b-9165a2e) |

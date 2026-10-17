@@ -24,6 +24,32 @@ next:
    each side against the limits; the proposal is reviewed in the inspector's divider (below).
 4. **Recentring** for a room whose coordinates pass +-4,096.
 
+### What the builder does today (v0.0.42)
+
+- **Before any step: same-lit placements share one model.** A lit room bakes light into every placed object,
+  so each one used to be a model of its own. A placement that no light can reach (every light farther than
+  its reach from the object's bounding sphere plus the farthest lightmap sample) is lit by the room's ambient
+  alone on every sample, so equal placements of the same mesh share one model; what is drawn does not change
+  (`prepare_mesh_bsp.unlit_placement`, `tests/test_shared_ambient.py` checks every sample). Earlier rule:
+  `AMIWIND_SHARED_AMBIENT=off`. Rooms with light zones never share.
+- **Step 1, plants as sprites,** only for a room still over its model limit: the room converter converts it
+  again with its nonsolid static plants (an NC/NCO marker or ground vegetation without an authored collision
+  node) as sprites (`tools/interior_plants.py`). A sprite keeps the plant's outline from its alpha; since
+  sprites are not lit by the renderer, each one is shaded with the room's colormap at the light its
+  placement gets, one sprite file per plant mesh and light step. A sprite file counts as one model slot.
+  Harvestable plants (containers) and plants you can bump into keep their mesh. The receipt
+  (`conversion.json` `plant_sprites`, `limit_steps`) lists every plant and what it became. Earlier rule:
+  `AMIWIND_INTERIOR_PLANTS=meshes` (the room fails as before). A room over its heap budget, which the room
+  converter cannot see (the heap is estimated in the image step), asks for plant sprites in its town config row:
+  `"plants": "sprites"` (Vivec, Hlaalu Underworks).
+- **Step 3, cut proposal:** `tools/propose_interior_cuts.py ROOM_FOLDER ... --out proposal.json` reads
+  converted rooms and proposes vertical cuts through doorway and hallway pieces, with the model slots of each
+  side (by the converter's own sharing rule) and the placements a cut would cross. A proposal is reviewed in
+  the inspector's divider before any section is built; no cut is applied by the builder.
+- **Step 4, recentring:** a room row in the town config can carry `"recentre": [x, y, z]` (original units).
+  The converter subtracts it from every position of the room, its lights and its arrivals, and every door bank
+  that leads into the room subtracts it from the arrival (`town_interiors.room_offsets`, `recentre_cell`).
+
 ## Measured fallback after subdivision — 6 October 2026
 
 Divide oversized interiors at natural doorways, corridors and cave bends first.

@@ -3,7 +3,7 @@
 
 Stone blocks whose fronts lean back about 75 degrees (as the Seyda Neen lighthouse's outer stair):
 on the lighthouse a standing box stepping up came down on such a slanted front, too steep to stand
-on, so the walk refused five flight steps (the owner's mesh, reproduced in a private lab: 3 of 5
+on, so the walk refused five flight steps (the maintainer's mesh, reproduced in a private lab: 3 of 5
 fail without the cut, 5 of 5 pass with it). The rule cuts such a face back to the vertical plane
 through the tread's front edge. Synthetic meshes: the cut itself (a plate, a block, a face that
 ends at no tread) and a flight walked by the stair gate's own walker on the model's standing hull.

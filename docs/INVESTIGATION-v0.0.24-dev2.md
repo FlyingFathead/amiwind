@@ -18,7 +18,7 @@ remain unchanged. Focused acceptance results and unresolved limits follow.
 
 ## Missing Balmora facades: reproduced and isolated
 
-Owner views:
+Maintainer views:
 
 | Local position | Yaw | Pitch | Observation |
 | --- | --- | --- | --- |
@@ -69,7 +69,7 @@ IDs and validating collision coverage did not establish intact visible geometry.
 The v0.0.23 and dev1 ship BSP, Jiub model, default settings and emulator preset
 are byte-identical. A sequential matched FS-UAE test used the same stationary
 ship viewpoint, default settings, 68040/FPU/JIT, 2 MiB Chip and 16 MiB Z3 RAM.
-The audio device was a null sink. This host is not the owner's machine.
+The audio device was a null sink. This host is not the maintainer's machine.
 
 | Build | Measured frames | Elapsed milliseconds | Average FPS |
 | --- | --- | --- | --- |
@@ -144,7 +144,7 @@ physical bounds. The full male/female source table is in
 [player movement](PLAYER_MOVEMENT.md#original-race-based-heights).
 
 The physical box is retained; the eye changes to the chosen proportions. This
-is not a claim that the owner's overall height concern is closed without their
+is not a claim that the maintainer's overall height concern is closed without their
 playtest, or that animated original-game camera parity is established. Quake
 90-degree FOV and bob are kept. An optional slider is a performance-gated roadmap
 item, not a substitute for correcting scale.
@@ -170,7 +170,7 @@ handling in the newly exercised hint path.
 ## Remaining work
 
 - Optimize the ship after profiling; no general frame-rate fix is claimed here.
-- Owner playtest of proportions at 90-degree FOV and the corrected race/sex eye.
+- Maintainer playtest of proportions at 90-degree FOV and the corrected race/sex eye.
 - Full natural opening/guard/menu flow and wider walking, stair and corner checks.
 - Balmora interiors, other Strider routes, richer NPC behavior and background
   streaming remain unfinished. Region loads still pause synchronously.

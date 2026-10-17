@@ -9,7 +9,7 @@
 | Where | Balmora CHIM frame ring [-672,-672]; CHIM model images between 3b5e7a9 and d639bb9 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev4 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: the converter mesh method fails the CHIM heap gate by 10,928 B at Balmora; the table method (default) passes with 68,192 B |
 | Family | Map heap and memory budget (`heap-memory`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -26,8 +26,8 @@ Cause found: the build settings, not a change in the code. v0.0.36-dev3 and dev4
 `--chim-terrain-hull compiled --chim-terrain-refs on` (world format 0.7); a build with the defaults uses the routed
 terrain hull and no terrain references (format 0.5), which adds 165,776 B of terrain to Balmora's peak ring. With the
 converter mesh method that is 10,928 B over the zone; the mesh method table (planar merge, the default) still fits.
-Making the compiled terrain hull and terrain references the defaults is an owner decision (flag defaults move only by
-owner decision with content proof).
+Making the compiled terrain hull and terrain references the defaults is a project decision (flag defaults move only by
+project decision with content proof).
 
 ## Symptom
 
@@ -55,7 +55,7 @@ A Balmora MiniWind on d639bb9 with `--chim-mesh-method converter`.
 
 ## Repair
 
-None needed for the shipped builds (dev3/dev4 settings, table method). Pending owner decision: the compiled terrain
+None needed for the shipped builds (dev3/dev4 settings, table method). Pending project decision: the compiled terrain
 hull and terrain references as defaults for v0.0.36.
 
 ## Verification

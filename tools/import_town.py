@@ -54,9 +54,31 @@ def write_json(path, value):
     path.write_text(json.dumps(value, indent=2) + '\n')
 
 
+# The game files of a source receipt, listed and hashed once per process (B5, v0.0.42): the CHIM stage writes a
+# receipt for each of its hundreds of areas, and each listed the whole data folder and looked up about 12,000
+# hashes again (5.3 s of a 21.9 s source stage). A file's hash is kept by its size and modification time; the
+# folder listing by the folder. The receipts are the same.
+_RECEIPT_LISTING = {}
+_RECEIPT_HASHES = {}
+
+
+def _receipt_files(data):
+    key = str(Path(data).resolve())
+    if key not in _RECEIPT_LISTING:
+        files = [child_ci(data, 'Morrowind.esm'), child_ci(data, 'Morrowind.bsa')]
+        files += [p for p in data.rglob('*') if p.is_file() and p.relative_to(data).parts[0].casefold() in ('meshes', 'textures')]
+        _RECEIPT_LISTING[key] = [(p.relative_to(data).as_posix(), p) for p in sorted(files)]
+    rows = {}
+    for name, path in _RECEIPT_LISTING[key]:
+        st = path.stat()
+        stamp = (str(path), st.st_size, st.st_mtime_ns)
+        if stamp not in _RECEIPT_HASHES:
+            _RECEIPT_HASHES[stamp] = input_sha256(path)
+        rows[name] = _RECEIPT_HASHES[stamp]
+    return rows
+
+
 def source_receipt(data, settings):
-    files = [child_ci(data, 'Morrowind.esm'), child_ci(data, 'Morrowind.bsa')]
-    files += [p for p in data.rglob('*') if p.is_file() and p.relative_to(data).parts[0].casefold() in ('meshes', 'textures')]
     import lava
     geometry = {k: settings[k] for k in ('source_cell', 'source_radius', 'centre', 'scale')}
     if 'owned_cells' in settings:
@@ -66,7 +88,7 @@ def source_receipt(data, settings):
             'fixed_visibility_cells': fixed_visibility_cells(settings),
             'visibility_code_sha256': hashlib.sha256(
                 (ROOT / 'src/mwad/script_visibility.py').read_bytes()).hexdigest(),
-            'files': {p.relative_to(data).as_posix(): input_sha256(p) for p in sorted(files)},
+            'files': _receipt_files(data),
             'conversion': {'lava_mode': lava.lava_mode(),
                            'code_sha256': {name: hashlib.sha256((ROOT / 'tools' / name).read_bytes()).hexdigest()
                                            for name in ('import_town.py', 'lava.py')}}}
@@ -778,11 +800,14 @@ def _compile_region_now(task):
     return report, messages
 
 
-def convert_interiors(data, scene, settings, qbsp, vis, light, ffmpeg, jobs, vis_mode, timings, dry_run=False):
-    """The town's listed rooms (town_interiors), their residents and door banks."""
+def convert_interiors(data, scene, settings, qbsp, vis, light, ffmpeg, jobs, vis_mode, timings, dry_run=False,
+                      only_cells=None):
+    """The town's listed rooms (town_interiors), their residents and door banks. only_cells: convert only these
+    listed rooms (a MiniWind interior scope); the others are recorded as left out."""
     import town_interiors
     from prepare_area import populate
-    result = town_interiors.convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dry_run)
+    result = town_interiors.convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dry_run,
+                                    only_cells=only_cells)
     result['receipt'] = []
     if result['rooms']:
         try:

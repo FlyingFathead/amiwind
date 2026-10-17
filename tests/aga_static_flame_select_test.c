@@ -23,7 +23,7 @@ int main(void)
     r_refdef.vrect.x=0;r_refdef.vrect.y=0;r_refdef.vrect.width=320;r_refdef.vrect.height=200;
     aliasxcenter=160;aliasycenter=100;aliasxscale=aliasyscale=160;
     /* Two chandeliers behind the camera, one in front, one wall candle in
-     * front and a hearth about 100 units ahead (owner pose, facing south). */
+     * front and a hearth about 100 units ahead (maintainer pose, facing south). */
     for(i=0;i<4;i++){candle(-11.6f-8.8f*(i&1),11+8.8f*(i>>1),95.5f);candle(43.6f+8.8f*(i&1),12+8.8f*(i>>1),95.5f);}
     for(i=0;i<4;i++)candle(-11.6f-8.8f*(i&1),-53.1f+8.8f*(i>>1),95.8f);
     candle(-39.6f,52.7f,71);candle(58.6f,-42.5f,76.1f);

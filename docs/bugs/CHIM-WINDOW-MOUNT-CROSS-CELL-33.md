@@ -39,7 +39,7 @@
 
 ## Status: 14 October 2026
 
-Open. The v0.0.40-dev1 source candidate passes focused mounting and source dependency checks. Full cell conversion, native original comparison and traversal, package inclusion and owner acceptance remain pending. The current reference retains three unconverted cells: Pelagiad (0,-7), West Gash (-3,1) and Caldera (-2,2). The original 9 October report also included Dagon Fel. Historical results are retained.
+Open. The v0.0.40-dev1 source candidate passes focused mounting and source dependency checks. Full cell conversion, native original comparison and traversal, package inclusion and maintainer acceptance remain pending. The current reference retains three unconverted cells: Pelagiad (0,-7), West Gash (-3,1) and Caldera (-2,2). The original 9 October report also included Dagon Fel. Historical results are retained.
 
 ## Symptom
 
@@ -75,7 +75,7 @@ The source dependency receipt records the master hash and each used house refere
 
 Twelve focused checks pass, including the original failure fixture, unchanged selected ownership, lazy loading, source transforms, missing-support errors and real cell-pool source receipt readback. The same source candidate was exercised against retained original Pelagiad geometry: the baseline fails, while all eight windows mount in the candidate; four depend on two original houses in neighbouring cells. All 301 selected scenery references remain in the same order; the source index is unchanged and no neighbouring runtime placement is added.
 
-These are source geometry checks. A fresh bounded Pelagiad CHIM conversion and every resulting audit, matched OpenMW/native facade and traversal checks, exact package readback and owner acceptance remain pending. Counts are unchanged until actual cell-result ingestion. Other affected cells require their own results.
+These are source geometry checks. A fresh bounded Pelagiad CHIM conversion and every resulting audit, matched OpenMW/native facade and traversal checks, exact package readback and maintainer acceptance remain pending. Counts are unchanged until actual cell-result ingestion. Other affected cells require their own results.
 
 ## Prevention
 
@@ -84,9 +84,9 @@ Keep the cross-cell fixture and pool provenance regression. Source dependencies 
 
 ## Offline conversion, 14 October 2026
 
-v0.0.40-dev1 Pelagiad (0,-7) converts successfully after the neighbouring-wall repair. All measured offline audits pass: 304 stairs, 22 visible door meshes and 3,487,056 B modelled memory headroom. Prior 294-reference ownership is unchanged; seven existing outside-frame statics remain excluded. Two other cells, native facade/traversal, interior activation, packaging and owner verification remain pending.
+v0.0.40-dev1 Pelagiad (0,-7) converts successfully after the neighbouring-wall repair. All measured offline audits pass: 304 stairs, 22 visible door meshes and 3,487,056 B modelled memory headroom. Prior 294-reference ownership is unchanged; seven existing outside-frame statics remain excluded. Two other cells, native facade/traversal, interior activation, packaging and maintainer verification remain pending.
 
-14 October 2026, v0.0.40-dev1. The exact converter-only source pin passes 15 focused checks; bounded Pelagiad conversion exits0 in40.74s (156.883s including input verification). All measured audits pass, with304 stairs/0failures/22advisory;22door meshes,one marker;3,487,056Bmodelled headroom. Original and new selection match294references. All6selectedwindows remain; two borrow original house3561 from(-1,-7). Seven existing outside-frameSTATrefs remain excluded. Native, original appearance/traversal, interior activation, packaging and owner acceptance remain pending.
+14 October 2026, v0.0.40-dev1. The exact converter-only source pin passes 15 focused checks; bounded Pelagiad conversion exits0 in40.74s (156.883s including input verification). All measured audits pass, with304 stairs/0failures/22advisory;22door meshes,one marker;3,487,056Bmodelled headroom. Original and new selection match294references. All6selectedwindows remain; two borrow original house3561 from(-1,-7). Seven existing outside-frameSTATrefs remain excluded. Native, original appearance/traversal, interior activation, packaging and maintainer acceptance remain pending.
 
 The canonical tracker now records 1,275/1,292 land-cell audit milestones, including this result; whole-cell package coverage remains 360 with six partial town overlaps excluded. CHIM remains 0.2.0. This is offline conversion evidence, not native acceptance.
 

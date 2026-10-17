@@ -9,7 +9,7 @@
 | Where | build reuse: interior stage key and outputs, actor-contact, cell-progress reading chim-stats.json |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev1 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: Hold-level by the builder rules: rebuilds the reuse plan did not expect cost about half an hour per build (world terrain alone 10 minutes) |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | 2026_10_10_v0.0.36-dev1_full-bcoast-chimtest-try3_be5d6d3 |

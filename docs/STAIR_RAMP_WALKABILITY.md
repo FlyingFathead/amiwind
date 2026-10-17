@@ -1,7 +1,8 @@
 # Recurring stair failure: authored ramps below the walkable-floor cutoff
 
 Since 8 October 2026 every converted map is checked by the stair walkability gate and stairs
-follow Morrowind's own rules: [STAIR_RULES.md](STAIR_RULES.md).
+follow Morrowind's own rules: [STAIR_RULES.md](STAIR_RULES.md). Everything found since, in order:
+[STAIR_RULES.md, Findings, in order](STAIR_RULES.md#findings-in-order).
 
 Found during v0.0.24-rc1 Balmora validation, 30 September 2026.
 
@@ -14,7 +15,7 @@ ramp. One inspected Balmora ramp has upward unit-normal component
 It was classified as too steep to stand on, so the movement/support rules could
 not consistently climb and remain grounded on it.
 
-The owner report is `stairs1`: XYZ `-410 -586 137`, yaw `4`, pitch `-6`.
+The maintainer report is `stairs1`: XYZ `-410 -586 137`, yaw `4`, pitch `-6`.
 The blocking ramp resolves to source reference `19034`, `ex_hlaalu_b_11`, in
 the `bm027` exterior sub-cell. The overlap also includes a balcony and a
 separate stair object, so the nearest visible stair object alone does not

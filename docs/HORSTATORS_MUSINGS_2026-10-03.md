@@ -77,7 +77,7 @@ missing geometry or repeatedly load and offload the same objects.
 
 ## Investigation status
 
-Owner's playtest observation and hypotheses, recorded 3 October 2026. Working
+Maintainer's playtest observation and hypotheses, recorded 3 October 2026. Working
 version: v0.0.27-rc3; exact observed playtest binary/settings are not yet bound to
 a captured performance trace. Neither clipping overhead nor cache churn is an
 established diagnosis. The inspected far-culling implementation performs bounds
@@ -135,7 +135,7 @@ merely to pass. See [memory allocation](MEMORY_ALLOCATION.md) and the growing
 
 ## Follow-up: less visible is not automatically less work
 
-The owner reiterated the Balmora observation during the town-memory review:
+The maintainer reiterated the Balmora observation during the town-memory review:
 requesting a longer distance appeared faster in the emulator. Preserve that
 observation while testing its explanation. A short cutoff can trade raster work
 for traversal, bounds tests and clipping; fewer visible polygons alone cannot

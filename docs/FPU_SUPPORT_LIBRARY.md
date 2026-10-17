@@ -74,6 +74,10 @@ upper/lower case as AmigaOS does. When it finds one or both:
 
 - they are copied to `LIBS/` on the boot partition (with `mmu.library` if it is
   beside them), and the small loader `AmiWindFPU` is copied to the root;
+- a `SetPatch` in `DIR` or `DIR/C` (your Workbench's own) is copied to `C/` and runs first: the
+  MMULib `68060.library` and `mmu.library` stop the boot with an alert when `SetPatch` has not run
+  ([FPU-SUPPORT-MMULIB-SETPATCH-41](bugs/FPU-SUPPORT-MMULIB-SETPATCH-41.md)); with `mmu.library` and no
+  `SetPatch` the build warns;
 - `S:startup-sequence` runs `AmiWindFPU` before `AmiWindCheck`;
 - each file is identified (see [Known versions](#known-versions)): its name,
   version, size, SHA-256 and verdict are recorded in `image/fpu-support.json`, in

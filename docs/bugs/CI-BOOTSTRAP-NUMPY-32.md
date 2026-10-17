@@ -9,7 +9,7 @@
 | Where | tool bootstrap (tools/build.py, tools/scenery_reduce.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-pre (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | critical: The public builder cannot bootstrap on a bare Python, failing two CI jobs. |
 | Family | Gates, CI and tests (`tests-ci`) |
 

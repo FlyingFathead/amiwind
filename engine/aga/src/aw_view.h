@@ -114,5 +114,11 @@ int AW_ViewThirdPerson(void);       /* hands and torch model hidden */
 int AW_ViewVanityFullscreen(void);   /* the vanity orbit draws the full-screen view, no HUD (aw_vanity_fullview) */
 int AW_DeathLocked(void);           /* the player is dead: no talk, activate, attack or movement */
 void AW_ViewSceneSpawn(void);       /* a new map: the death scene ends */
+/* dbg cam orbit (aw_cam.c): around EDICT (0: the point) at FOCAL, RATE degrees a second; PHOTO: no HUD */
+int AW_ViewOrbitStart(int edict,const float *focal,int photo,float rate);
+void AW_ViewOrbitPending(int photo,float rate);   /* start on the crosshair target once a recall has arrived */
+void AW_ViewOrbitEnd(int say);                    /* restores everything the orbit changed */
+void AW_ViewOrbitSpeed(float rate);
+int AW_ViewOrbitActive(void);
 #endif
 #endif

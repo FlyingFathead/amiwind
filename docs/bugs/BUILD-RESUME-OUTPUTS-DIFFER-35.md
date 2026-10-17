@@ -9,7 +9,7 @@
 | Where | tools/build_cache.py same_outputs |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Resume from the failure point was broken for the line: later stages reran although the rerun stages wrote the same bytes |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | 2026_10_10_v0.0.35-dev1_full-resume-seydafix_7ec5c03 |

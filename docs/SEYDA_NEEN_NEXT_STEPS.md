@@ -13,8 +13,8 @@
 - [Shared world systems](#shared-world-systems)
 - [Current host audit, not added native residents](#current-host-audit-not-added-native-residents)
 - [Latest playtest reports and debug request](#latest-playtest-reports-and-debug-request)
-- [Opening residency and lighting (owner follow-up, 22:40 Helsinki)](#opening-residency-and-lighting-owner-follow-up-2240-helsinki)
-- [Variable exterior frame cost (owner report, 22:50 Helsinki)](#variable-exterior-frame-cost-owner-report-2250-helsinki)
+- [Opening residency and lighting (maintainer follow-up, 22:40 Helsinki)](#opening-residency-and-lighting-maintainer-follow-up-2240-helsinki)
+- [Variable exterior frame cost (maintainer report, 22:50 Helsinki)](#variable-exterior-frame-cost-maintainer-report-2250-helsinki)
 - [Post-checkpoint-017 building reports (27 September, 23:06–23:13 Helsinki)](#post-checkpoint-017-building-reports-27-september-23062313-helsinki)
   - [Exact reproductions](#exact-reproductions)
   - [Narrow host diagnostic actually completed](#narrow-host-diagnostic-actually-completed)
@@ -23,12 +23,12 @@
   - [FPS follow-up](#fps-follow-up)
 - [Roof inspector follow-up (27 September, 23:14–23:15 Helsinki)](#roof-inspector-follow-up-27-september-23142315-helsinki)
 - [Building culling investigation 001 (after checkpoint-017)](#building-culling-investigation-001-after-checkpoint-017)
-- [Owner checkpoint-017 playtest, 27 September 23:28 Helsinki](#owner-checkpoint-017-playtest-27-september-2328-helsinki)
-- [Latest owner playtest and default decision, 27 September 23:29–23:31 Helsinki](#latest-owner-playtest-and-default-decision-27-september-23292331-helsinki)
+- [Maintainer checkpoint-017 playtest, 27 September 23:28 Helsinki](#maintainer-checkpoint-017-playtest-27-september-2328-helsinki)
+- [Latest maintainer playtest and default decision, 27 September 23:29–23:31 Helsinki](#latest-maintainer-playtest-and-default-decision-27-september-23292331-helsinki)
 - [Final recovery handover update, 27 September 23:32–23:35 Helsinki](#final-recovery-handover-update-27-september-23322335-helsinki)
   - [Actor solidity and attack responses (2026-09-28)](#actor-solidity-and-attack-responses-2026-09-28)
 - [v0.0.18-dev5 follow-up](#v0018-dev5-follow-up)
-- [28 September 15:50 owner follow-up](#28-september-1550-owner-follow-up)
+- [28 September 15:50 maintainer follow-up](#28-september-1550-maintainer-follow-up)
 
 <!-- contents end -->
 
@@ -60,10 +60,10 @@ Save design and pending comparison gates: [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md).
 - [ ] [AW-20260928-01](journals/BUGS-NOTES-v0.0.29.md#aw-20260928-01-potential-prison-ship-exit-freeze-during-intro): ship-exit freeze during intro on FS-UAE 3.1.66; second attempt worked.
 - [ ] [AW-20260928-02](journals/BUGS-NOTES-v0.0.29.md#aw-20260928-02-potential-dockmenu-freeze-with-looping-music): freeze after remaining in the menu on the dock, with music looping, on the same machine/emulator.
 
-Both are owner reports with unknown cause. The earlier hatch implementation and
+Both are maintainer reports with unknown cause. The earlier hatch implementation and
 passing activation checks below do not close these intermittent stability reports.
 
-Owner reports and requests recovered on 27 September 2026, 22:17–22:27 Helsinki.
+Maintainer reports and requests recovered on 27 September 2026, 22:17–22:27 Helsinki.
 Keep this register with the roadmap so interrupted chat messages do not lose work.
 Runtime baseline: v0.0.15-dev1 / checkpoint-016.
 Additional reports: 27 September 2026, 22:32–22:35 Helsinki.
@@ -100,12 +100,12 @@ Additional reports: 27 September 2026, 22:32–22:35 Helsinki.
 
 ## Immediate correctness and diagnosis
 
-- [x] ~~Hammocks obstructing the ship interior route.~~ Fixed. Lower-hull structural repair delivered in checkpoint-017; owner confirmed the hammock obstruction is gone on 28 September.
+- [x] ~~Hammocks obstructing the ship interior route.~~ Fixed. Lower-hull structural repair delivered in checkpoint-017; maintainer confirmed the hammock obstruction is gone on 28 September.
 - **Remaining interior defects:** minor hull flicker/glitches remain open. Preserve structural source surfaces/UVs and check the continuous lower-to-upper route. The resolved hammock obstruction is not a claim that every hull view is correct.
 
 - **Debug camera:** already delivered XYZ + DEG horizontal yaw + P vertical pitch.
   Enable `dbg coords on`; include version, area, position and both angles.
-- **Missing town-edge formation:** the owner suspects the Silt Strider port.
+- **Missing town-edge formation:** the maintainer suspects the Silt Strider port.
   Treat as a hypothesis, not a confirmed identity. Owned source audit finds the
   strider as a visible ACTI, excluded by the ordinary STAT/DOOR renderer filter.
   Compare source bounds/terrain and fixed cameras before conflating that omission
@@ -179,11 +179,11 @@ Output is private derived game data; public source contains only the reader/test
 - Implemented in checkpoint-017: `dbg scene change`, `debug scene change` and `amiwind debug scene change`:
   a popup with the available compiled scenes, arrows/Enter or mouse selection,
   Escape/Cancel back to the console. Keep direct ship/town commands.
-- Owner camera **XYZ 211 447 47 / DEG 4 / P 0**, exterior v0.0.15-dev1:
+- Maintainer camera **XYZ 211 447 47 / DEG 4 / P 0**, exterior v0.0.15-dev1:
   malformed arched formation near the suspected Silt Strider approach. Screenshot
   received and inspected. Identity remains unconfirmed; compare source geometry
   at this exact view instead of assuming it is the missing ACTI strider itself.
-- Owner notices a performance drop since the preceding update. Reproduce with
+- Maintainer notices a performance drop since the preceding update. Reproduce with
   identical emulator settings, scene, camera, hands and fog before attributing it
   to geometry or raising requirements. Keep old checkpoint as the baseline.
 - **Underwater presentation:** ordinary immersion should have a blueish tint,
@@ -196,7 +196,7 @@ Output is private derived game data; public source contains only the reader/test
 - Audit the original hatch/character-generation scripts for re-entry restrictions;
   debug scene travel remains available independently of eventual story gates.
 
-## Opening residency and lighting (owner follow-up, 22:40 Helsinki)
+## Opening residency and lighting (maintainer follow-up, 22:40 Helsinki)
 
 - Audit the authored opening script sequence before implementing it. Record each
   stage's controls, NPCs, dialogue waits, door permissions, menu handoffs and
@@ -214,9 +214,9 @@ Output is private derived game data; public source contains only the reader/test
   Try a small measured dynamic-light budget; preserve static fallback and record
   surface-cache rebuild cost, palette visibility, frame times and audio deadlines.
 
-## Variable exterior frame cost (owner report, 22:50 Helsinki)
+## Variable exterior frame cost (maintainer report, 22:50 Helsinki)
 
-v0.0.15-dev1, **XYZ -44 259 75 / DEG 328 / P -14**: owner reports heavy
+v0.0.15-dev1, **XYZ -44 259 75 / DEG 328 / P -14**: maintainer reports heavy
 slowdown in this view, while other views run smoothly. Preserve its current
 geometry/textures as an exterior `method_001` reference (checkpoint-016 immutable
 image/source); ship-specific method_001 remains the checkpoint-015 archive.
@@ -229,12 +229,12 @@ Missing geometry cannot count as a successful performance improvement.
 Silt Strider: prepare a separate low-poly ACTI conversion candidate with a retained
 source silhouette and suitable texture bake. The model is not native-loaded yet.
 
-Live visibility controls: current default remains 700 local units. Owner requested
+Live visibility controls: current default remains 700 local units. Maintainer requested
 fine adjustment: normal Left/Right steps are 10, Shift+Left/Right steps are 1;
 console accepts exact whole-number values. Keep the fog table and cull distance
 coupled. Low-poly/texture candidates remain separate from this runtime control.
 
-Owner follow-up, 22:54 Helsinki: the (-44,259,75), yaw328/pitch-14 view was not
+Maintainer follow-up, 22:54 Helsinki: the (-44,259,75), yaw328/pitch-14 view was not
 previously expensive; suspect the ship behind town. Treat as regression, not
 simply a fundamentally dense view. Required diagnostic: same-camera/same-engine
 ship-present vs ship-omitted visual candidate, same fog, hands, audio and hardware.
@@ -242,13 +242,13 @@ Hidden/occluded geometry can still cost traversal/transformation/raster work.
 Record whether the ship contributes before simplifying unrelated town buildings.
 Keep the ship/no-ship candidate separate from the deliverable and method_001.
 
-Owner follow-up, 22:55 Helsinki: emulator may be running at a 1440p host display
+Maintainer follow-up, 22:55 Helsinki: emulator may be running at a 1440p host display
 size. Compare the same camera in a small window vs that output size before
 blaming converted geometry. AmiWind's internal 320x200 render size is separate
 from host scaling/filter/display costs. Record window/fullscreen mode, filters,
 sync, host load and CPU/JIT settings with each performance report.
 
-Owner aft-deck report, 22:56 Helsinki: **XYZ 790 -364 81 / DEG39 / P25**,
+Maintainer aft-deck report, 22:56 Helsinki: **XYZ 790 -364 81 / DEG39 / P25**,
 v0.0.15-dev1. Aft/deck opening still visible. Compare full source exterior
 geometry and reduced output at this view before declaring it an authored hole.
 Keep separate from the lower-hold structural repair and intended hatch opening.
@@ -257,9 +257,9 @@ Second reported slow view, 22:57 Helsinki: **XYZ 692 -455 66 / DEG132 / P-8**,
 looking from the boat toward the same town building. Keep both approach angles
 in performance acceptance; an expensive building/material path is another lead.
 The exact responsible reference, surface-cache behavior and ship contribution
-remain unconfirmed. Owner screenshots retained privately.
+remain unconfirmed. Maintainer screenshots retained privately.
 
-Owner narrows slow geometry to overhang/details, 22:59 Helsinki, camera
+Maintainer narrows slow geometry to overhang/details, 22:59 Helsinki, camera
 **XYZ 435 -248 37 / DEG140 / P-26**. Preserve screenshot and compare constituent
 model/material surfaces, especially roof/overhang undersides and balcony details.
 Do not flatten the whole building before determining whether a subset dominates.
@@ -286,7 +286,7 @@ Coordinates below were read from the images, rather than their imperfect OCR.
 | 200847 | 202 16 191 | 287 / 21 | Coordinate-only crop; no geometry evidence in this image. |
 | 201024 | 267 32 181 | 347 / -14 | Upward roof/skywalk view; investigate visible structure and cost. |
 | 201201 | 301 -9 257 | 23 / 39 | Elevated roof view; distinguish authored joins from conversion artifacts. |
-| 201319 | 181 125 251 | 313 / 13 | Owner localizes expensive view to this building/spot, not adjacent tower. |
+| 201319 | 181 125 251 | 313 / 13 | Maintainer localizes expensive view to this building/spot, not adjacent tower. |
 
 Keep these separate from the prior ground-level slowdown cameras. Noclip inside
 an authored one-sided shell can expose its backfaces; that alone does not imply
@@ -319,7 +319,7 @@ boundaries remain acceptance constraints. No renderer change was made for this
 new report.
 
 Private evidence: building017-source-audit.py, source.png, merged-split.png,
-comparison.json and the owner screenshots. Retain outside the public source.
+comparison.json and the maintainer screenshots. Retain outside the public source.
 
 ### Local model counts, not a diagnosed offending model
 
@@ -376,17 +376,17 @@ true/false and1/0; `debug` and `amiwind debug` prefixes work. Bare `dbg fps` pri
 its state. It uses the existing profiler time sample and about a one-second
 average. It is internal game FPS, not the emulator's output refresh rate.
 The frozen build draws it at the upper right; `dbg overlay off` hides it.
-Owner's new preference: move it to the left (avoid overwriting coordinates), and
+Maintainer's new preference: move it to the left (avoid overwriting coordinates), and
 add `dbg show fps` as an enabling alias with optional validated toggle argument.
 Those placement/alias changes are queued, not included in the frozen dev2 binary.
 
 ## Roof inspector follow-up (27 September, 23:14–23:15 Helsinki)
 
 - Exact filenames are image(20260927-201431).png and
-  image(20260927-201533).png; private owner screenshots, not public source assets.
+  image(20260927-201533).png; private maintainer screenshots, not public source assets.
 - First camera: XYZ269 12 214, DEG341, P8. Second: XYZ292 22 214, DEG345, P7.
   Both show pointed/slender roof-edge projections near the adjacent taller roof.
-  Owner suspects these details explain the localized slowdown. Hypothesis remains
+  Maintainer suspects these details explain the localized slowdown. Hypothesis remains
   unconfirmed; test the named surface group at these cameras as well as street level.
 - Working idea: **Jagged Edge Reducer (TM)**, an offline detail-cleanup candidate.
   First establish whether a spike exists in the source or arises during BSP/native
@@ -403,7 +403,7 @@ Those placement/alias changes are queued, not included in the frozen dev2 binary
 
 ## Building culling investigation 001 (after checkpoint-017)
 
-Owner report at XYZ249 40 227 / DEG315 P25 linked roof-edge popping to culling
+Maintainer report at XYZ249 40 227 / DEG315 P25 linked roof-edge popping to culling
 cost. Native fixed-camera A/B with `dbg cull 1` and0 reproduces the lines in both
 states, also at XYZ288 42 171 / DEG332 P12. HUD-excluded scene crops are identical
 (zero changed pixels of166352 at each pair). This rules out the added fog-distance
@@ -417,24 +417,24 @@ rendering/cache costs. Do not turn off useful culling globally or assume the
 visual artifact proves the performance culprit. Details and private evidence:
 AmiWind-building-culling-audit-001; this is not a new playable checkpoint.
 
-## Owner checkpoint-017 playtest, 27 September 23:28 Helsinki
+## Maintainer checkpoint-017 playtest, 27 September 23:28 Helsinki
 
-v0.0.15-dev2 prison-ship interior: owner reports improved appearance, but lower
+v0.0.15-dev2 prison-ship interior: maintainer reports improved appearance, but lower
 hull flicker from the pictured angle and performance dips. Screenshot:
 image(20260927-202651).png; coordinates are not enabled, so no exact pose is
 claimed. Preserve it privately and reproduce after restoring the workspace.
 Structural shape repair did not certify all depth/clipping or performance issues.
 Intro/UI/font work remains the next planned milestone; recovery ZIPs take priority.
 
-## Latest owner playtest and default decision, 27 September 23:29–23:31 Helsinki
+## Latest maintainer playtest and default decision, 27 September 23:29–23:31 Helsinki
 
-Owner says the previously slow town-building view no longer lags in dev2.
+Maintainer says the previously slow town-building view no longer lags in dev2.
 Screenshot image(20260927-202925).png has no coordinates. Record this as an
-owner-reported improvement with unconfirmed cause, not a proven targeted fix;
+maintainer-reported improvement with unconfirmed cause, not a proven targeted fix;
 checkpoint-017 exterior BSP is byte-identical to checkpoint-016. The fog table
 rebuild was optimized, but that runs on distance changes, not every frame.
 
-Owner chooses450 local units as the default fog/cull distance from the NEXT
+Maintainer chooses450 local units as the default fog/cull distance from the NEXT
 build onward. Released dev2 still defaults to700; `dbg fog distance 450` works
 now. Next implementation must update renderer/config/UI reset/docs/tests together;
 keep700 available as a selectable value and preserve existing frozen packages.
@@ -448,7 +448,7 @@ proposal above. Current frozen dev2 still starts at700; live command:
 the next build, preserving the old packages and selectable distances.
 
 New persistent rock/Silt Strider-port report: XYZ337 643 34, DEG304, P-16,
-v0.0.15-dev2, image(20260927-203433).png. Owner screenshot shows a projecting
+v0.0.15-dev2, image(20260927-203433).png. Maintainer screenshot shows a projecting
 terrain/rock section with missing-looking lower geometry; exact source identity
 and cause still require comparison. HUD reads28.4FPS in that one screenshot,
 not a benchmark. Do not conflate the already-known omitted Silt Strider ACTI
@@ -468,14 +468,14 @@ with proof of this formation's geometry cause. Backup first; keep this open.
 - [x] ~~Keep a source reference for the town interiors and their distinct doors.~~
   Fixed in dev5: private 14-cell layout/placement reference and 41 door links.
 - [ ] Research the original arrival restriction between ship, pier and Census
-  Office. Owner recalls an invisible boundary preventing early escape. Inspect
+  Office. Maintainer recalls an invisible boundary preventing early escape. Inspect
   collision meshes, activators, scripts, controls and chargen state to identify
   the actual mechanism and when it is released. Do not assume a force-field
   object exists or add arbitrary geometry before verifying the source.
 - [ ] Convert Census Office and remaining town interiors from those source cells;
   implement their actors, registration menus and persistent door/reference state.
 
-## 28 September 15:50 owner follow-up
+## 28 September 15:50 maintainer follow-up
 
 The Silt Strider-port defect persists in v0.0.19 at XYZ260/417/30, DEG11, P-19;
 the strider and driver are still absent. Track as AW-20260928-03 in [BUGS.md](BUGS.md).

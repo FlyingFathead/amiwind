@@ -1,15 +1,15 @@
 {
  "format": "AmiWind resident registry budget 1",
- "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, owner-approved reason.",
+ "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.",
  "totals": {
   "commands": {
-   "count": 269,
-   "hunk_bytes": 8608
+   "count": 271,
+   "hunk_bytes": 8672
   },
   "cvars": {
-   "count": 326,
-   "static_bytes": 7824,
-   "zone_bytes": 10656
+   "count": 329,
+   "static_bytes": 7896,
+   "zone_bytes": 10752
   },
   "tables": {
    "count": 0,
@@ -18,13 +18,17 @@
  },
  "reasons": [
   "2026-10-10: first budget = the engine of v0.0.36-dev 6f0d219 (third-person view and vanity camera included): 266 console commands (8512 bytes of hunk), 321 console variables (7704 bytes of structures, 10496 bytes of zone), no static name table of 1 KiB or more (ENGINE-RESIDENT-REGISTRY-GROWTH-36).",
-  "2026-10-11: +1 console variable aw_music (dbg music on/off, ENGINE-MUSIC-NO-OFF-SWITCH-36), ordered by the owner stand-in; the switch reuses the existing aw_music_status command (no new command)",
-  "2026-10-11: aw_vanity_fullview, the owner-requested saved switch for the vanity camera full view (owner request 14:15)",
+  "2026-10-11: +1 console variable aw_music (dbg music on/off, ENGINE-MUSIC-NO-OFF-SWITCH-36), ordered by the maintainer stand-in; the switch reuses the existing aw_music_status command (no new command)",
+  "2026-10-11: aw_vanity_fullview, the maintainer-requested saved switch for the vanity camera full view (maintainer request 14:15)",
   "2026-10-11: aw_combat_block, the saved Blocking option (hold to block / automatic), COMBAT-BLOCKING-36",
-  "2026-10-12: Owner-requested persistent independent LAND fill toggle, enabled by default; aw_land_fill adds one cvar, 24 structure bytes and 32 zone bytes. Debug aliases use the on-disk catalogue. These are registry accounting costs, not measured native frame-time costs.",
-  "2026-10-13: Owner-requested saved noclip wobble control, disabled by default and suppressed during photo mode; aw_noclipwobble adds one cvar, 24 structure bytes and 32 zone bytes. Debug aliases reuse the on-disk catalogue. This records registry costs and does not increase the CHIM heap cap.",
+  "2026-10-12: Maintainer-requested persistent independent LAND fill toggle, enabled by default; aw_land_fill adds one cvar, 24 structure bytes and 32 zone bytes. Debug aliases use the on-disk catalogue. These are registry accounting costs, not measured native frame-time costs.",
+  "2026-10-13: Maintainer-requested saved noclip wobble control, disabled by default and suppressed during photo mode; aw_noclipwobble adds one cvar, 24 structure bytes and 32 zone bytes. Debug aliases reuse the on-disk catalogue. This records registry costs and does not increase the CHIM heap cap.",
   "2026-10-13: requested click-to-pin entity HUD inspection adds two commands (64 bytes of command records); no new cvars.",
-  "2026-10-14: Owner-requested I inventory gameplay binding requires one command record (32 hunk bytes). Characterchange and diagnostic item grants reuse existing on-disk debug routes/handlers; no extra diagnostic registry entries, cvars or static tables. Native frame cost remains unmeasured."
+  "2026-10-14: Maintainer-requested I inventory gameplay binding requires one command record (32 hunk bytes). Characterchange and diagnostic item grants reuse existing on-disk debug routes/handlers; no extra diagnostic registry entries, cvars or static tables. Native frame cost remains unmeasured.",
+  "2026-10-17: Maintainer-requested named camera marks (dbg cam mark / recall / list, maintainer 2026-10-16, docs/PLAN-v0.0.42.md 1.2c) need one command record, aw_cam (32 hunk bytes): every dbg route needs a registered handler and the three subcommands and later camera modes share this one; no cvars, the marks files are read from disk on the command only.",
+  "2026-10-17: HUD-STATS-29, maintainer-ordered original HUD boxes (job of 2026-10-17, maintainer: magic box charge bar required): aw_magic, one command record (32 hunk bytes) for selecting a magic item until the magic menu exists, the diagnostic charge and the HUD icon counters; aw_hud_icons, one saved cvar for the old placeholder method (DON'T DELETE ANY METHOD). The icon table is read from disk; no static table.",
+  "2026-10-17: UI-INVENTORY-PREVIEW-GAP-41, maintainer-reported missing inventory character preview: aw_inventory_preview_reserve, one saved cvar keeping the old fixed 2 MiB admission selectable (DON'T DELETE ANY METHOD) beside the new admission by the pose model's real need.",
+  "2026-10-17: UI-INVENTORY-PREVIEW-STILL-42, maintainer-ordered still inventory picture (rendered once per equipment change): aw_inventory_preview_live, one saved cvar keeping the old live, turnable preview selectable, default off (DON'T DELETE ANY METHOD)."
  ],
  "entries": {
   "commands": [
@@ -86,6 +90,7 @@
    "aw_animkit_cmd",
    "aw_arenapit",
    "aw_blockers",
+   "aw_cam",
    "aw_camera",
    "aw_cell",
    "aw_charplane",
@@ -139,6 +144,7 @@
    "aw_lightgallery",
    "aw_logs_live_set",
    "aw_luma_status",
+   "aw_magic",
    "aw_main_menu",
    "aw_music_mode",
    "aw_music_next",
@@ -375,10 +381,13 @@
    "aw_headlamp",
    "aw_horizon_defaults",
    "aw_horizon_veil",
+   "aw_hud_icons",
    "aw_input_trace",
    "aw_interaction_label_style",
    "aw_interiorluma",
    "aw_intro_text_overlay",
+   "aw_inventory_preview_live",
+   "aw_inventory_preview_reserve",
    "aw_lamp_lights",
    "aw_lamp_radius",
    "aw_land_fill",

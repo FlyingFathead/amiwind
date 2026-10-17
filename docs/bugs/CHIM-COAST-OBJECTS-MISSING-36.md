@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 11 October 2026, in v0.0.36 |
 | Where | CHIM coast regions; exact cells and references pending reproduction |
 | Reproduction | unknown |
@@ -16,14 +16,14 @@
 | Playtest version | v0.0.36-owner-playtest |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM 0.2.0, engine unknown, world format 0.7 |
-| Unknown because | Historical owner report did not bind an exact tested package hash; do not infer it from a release tag |
+| Unknown because | Historical maintainer report did not bind an exact tested package hash; do not infer it from a release tag |
 | Platform or emulator | unknown (Exact emulator or hardware not recorded with this report) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
 
-The owner reported missing objects, including Dwemer ruins, in the v0.0.36 CHIM coast. The roadmap previously named this issue without a canonical report page or register row. This report preserves the original ID.
+The maintainer reported missing objects, including Dwemer ruins, in the v0.0.36 CHIM coast. The roadmap previously named this issue without a canonical report page or register row. This report preserves the original ID.
 
 ## Where
 
@@ -39,7 +39,7 @@ Existing terrain and format checks establish neither complete object placement n
 
 ## Reproduction
 
-The owner reported the issue on 11 October 2026 with v0.0.36. Identify a missing object from the original data, bind its cell and reference ID, and compare matching original-game and converted-game poses. Repeat on the exact candidate image.
+The maintainer reported the issue on 11 October 2026 with v0.0.36. Identify a missing object from the original data, bind its cell and reference ID, and compare matching original-game and converted-game poses. Repeat on the exact candidate image.
 
 ## Repair
 
@@ -84,8 +84,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 <!-- END GENERATED CATEGORY -->

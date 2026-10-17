@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "vivec-palace",
+  "description": "MiniWind preset --miniwind-vivec-palace: Palace of Vivec: Vivec meditating, interior creatures",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "interior",
+    "miniwind_description": "Palace of Vivec: Vivec meditating, interior creatures",
+    "direct_to_game_map": "interior:Vivec, Palace of Vivec",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

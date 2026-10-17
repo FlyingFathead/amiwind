@@ -137,7 +137,7 @@ class FilesTests(unittest.TestCase):
                        'document.createElement(\'script\')', "'../data/live-status.json"):
             self.assertIn(needle, page, needle)
         self.assertRegex(page, r"\$\('chimlive'\)\.onchange = \(\) => \{ if \(\$\('chimlive'\)\.checked\)")
-        # Served by the Toolkit server, auto-update starts ON (owner stand-in 2026-10-10: "this should be the default setting
+        # Served by the Toolkit server, auto-update starts ON (maintainer 2026-10-10: "this should be the default setting
         # when available"); a page opened from disk without a live build keeps it off.
         self.assertIn("else if (SERVED) { $('chimlive').checked = true; liveStart();", page)
         self.assertIn('liveStop(true)', page)          # a finished build stops the refresh

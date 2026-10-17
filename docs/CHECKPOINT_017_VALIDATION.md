@@ -42,7 +42,7 @@ door/container metadata and conditioned voice candidates. It does not spawn them
 
 The source mesh and transforms render a curved lower hold; reducing the entire
 shell at .08 ratio flattens it through the furniture. Independent host raster
-comparisons and owner native screenshots agree on this failure. Host renders
+comparisons and maintainer native screenshots agree on this failure. Host renders
 are diagnostic source projections, not OpenMW screenshots or exact lighting parity.
 The fix retains named lower-hull, floor, wall, ceiling, stair and plank groups.
 A synthetic curved-mesh test checks exact retained triangles/UVs and rejects
@@ -84,7 +84,7 @@ The E tests first place diagnostic cameras and then disable noclip. They do
 not certify a continuous unassisted lower-to-upper stair route. That remains
 an explicit acceptance item. Hatch open/closed geometry and persistence are
 still TODO; the current link loads another scene with a static hatch mesh.
-The owner's exterior formation at (211,447,47), requested yaw4/pitch0, is
+The maintainer's exterior formation at (211,447,47), requested yaw4/pitch0, is
 reproduced and remains unfixed; its identity is not proven by the screenshot.
 
 Four scene leave/enter pairs retain the same music track and increasing played
@@ -146,7 +146,7 @@ HDF: 134,250,496 bytes, 128 MiB FFS partition in RDB, 18 music tracks.
 
 ## Remaining reports
 
-Owner visual acceptance pending. Exterior formation/Silt Strider coverage,
+Maintainer visual acceptance pending. Exterior formation/Silt Strider coverage,
 ship deck/bow gaps, disappearing house, underwater warm tint, audio clicks and
 reported WinUAE slowdown remain tracked. Opening scripts and NPCs, Census
 interior, hatch state, containers, dialogue, save/load, sky and torches are not
@@ -157,7 +157,7 @@ implemented by this hotfix. See the roadmap and follow-up register.
 `interior017-native-r2` uses image r3/engine r4. It verifies both scene directions
 and live fog changes with zero edge/surface overflow and zero music read errors;
 its numeric menu text was faulty, so it is not the final UI acceptance. At the
-owner's requested camera (-44,259,75), yaw328/pitch-14 (quantized to 327.65/-12.66),
+maintainer's requested camera (-44,259,75), yaw328/pitch-14 (quantized to 327.65/-12.66),
 stationary windows inside the recorded screenshot brackets gave:
 
 | Fog/cull distance | Measured frames / time | Effective FPS | Median sampled frame |
@@ -168,10 +168,10 @@ stationary windows inside the recorded screenshot brackets gave:
 Same run, machine, camera, hidden hands and overlay; no native memory increase.
 Frame intervals span the full selected windows; median values sample every tenth
 frame. This is one short stationary comparison with no confidence interval, not
-a stock-hardware benchmark or proof of the cause of the owner's regression.
+a stock-hardware benchmark or proof of the cause of the maintainer's regression.
 The nearer cutoff visibly changes what can be seen. Do not count missing source
 geometry as an optimization. The broader ship/no-ship and overhang/material A/B
-comparisons remain TODO; WinUAE 1440p output is another owner-reported variable.
+comparisons remain TODO; WinUAE 1440p output is another maintainer-reported variable.
 
 An earlier three-checkpoint comparison was interrupted during its third run.
 The older checkpoint also has a different eye height. Those captures are kept

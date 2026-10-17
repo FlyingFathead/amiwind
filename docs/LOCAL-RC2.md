@@ -37,5 +37,5 @@ override it. Console aw_autosaves N or Options > Autosave history sets 0..16;
 zero disables autosaves. Exit normally to persist the setting. Quicksaves are
 separate and the save-menu empty/incompatible distinction remains unresolved.
 
-Owner controls all Git/GitHub operations. No original/checkpoint archive or tag
+Maintainer controls all Git/GitHub operations. No original/checkpoint archive or tag
 is replaced. Public release attachments must contain public source only.

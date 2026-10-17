@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """CHIM-LEGACY-CHAIN-33: a town on CHIM is made from the game data, not from legacy region maps.
 
-Owner decision 2026-10-09 04:29 +0300: CHIM Balmora is the only Balmora of default builds;
+Project decision 2026-10-09 04:29 +0300: CHIM Balmora is the only Balmora of default builds;
 the legacy Balmora chain stays behind --legacy-area balmora (or --builder legacy).
 Synthetic data only (no game files).
 """
@@ -84,7 +84,7 @@ class DefaultPlanTests(unittest.TestCase):
         self.assertTrue(help_text.startswith('RETIRED - DO NOT USE'))  # BUILD-LEGACY-CHAIN-DEFAULT-36
 
     def test_seyda_is_chim_native(self):
-        # v0.0.36-dev5 (owner order 2026-10-11, BUILD-LEGACY-TOWN-MAPS-SHIPPED-36): no legacy Seyda Neen chain
+        # v0.0.36-dev5 (maintainer order 2026-10-11, BUILD-LEGACY-TOWN-MAPS-SHIPPED-36): no legacy Seyda Neen chain
         args = build.parser().parse_args(['--builder', 'chim', '--chim-area', 'seyda', '--chim-area', 'balmora',
                                           '--chim-native-towns', 'on'])
         self.assertEqual(build.chim_native_towns(args), ['seyda', 'balmora'])

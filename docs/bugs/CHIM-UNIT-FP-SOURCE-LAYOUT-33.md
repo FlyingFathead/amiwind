@@ -9,7 +9,7 @@
 | Where | tools/chim/build.py mesh_fingerprint (scenery index record with offsets) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Store-once conversion fails across areas: CHIMport rings 1-4 built 9,526 mesh units for 1,081 distinct meshes (about 8.8 times the work). |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

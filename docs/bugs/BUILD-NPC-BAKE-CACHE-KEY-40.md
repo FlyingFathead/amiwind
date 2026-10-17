@@ -9,7 +9,7 @@
 | Where | tools/npc_lod.py BAKE_MODULES and code_identity |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.40-dev2 (last seen) |
+| Persists in | fixed in v0.0.40 |
 | Severity | critical: The required source gate fails, and later helper edits could incorrectly reuse an older NPC model. |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

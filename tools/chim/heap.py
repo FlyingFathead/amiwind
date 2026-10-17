@@ -312,18 +312,52 @@ def ring_peak(world, sizes, zone_kib=None, pool_kib=None, sample=SAMPLE, points=
     jobs = jobs or 1
     big = [i for i in todo if jobs > 1 and _frame_positions(tasks[i]) >= BIG_FRAME_POSITIONS]
     small = [i for i in todo if i not in big]
-    for i in big:
-        results[i] = _frame_ring(tasks[i], jobs=jobs)
-    if jobs > 1 and len(small) > 1:
-        # the shared worker pool: largest frames first, and the pool follows the stage's live allowance
-        # (a fixed pool of the stage's start share left cores idle; BUILD-CHIM-STAGE-SERIAL-TAIL-36)
-        from build_parallel import ordered_map
-        for i, r in zip(small, ordered_map(_frame_ring, [tasks[i] for i in small], min(jobs, len(small)),
-                                           cost=lambda t: len(t['chunks']) * (1 + len(t['used_models'])))):
-            results[i] = r
+    import build_parallel
+    if jobs > 1 and build_parallel.active_stage_pool() is not None and len(big) + len(small) > 1:
+        # ONE map over the slices of every big frame and every small frame, largest first, on the stage's pool
+        # (BUILD-CHIM-STAGE-SERIAL-TAIL-36): no big frame waits for the one before, no small frame for the big ones;
+        # one progress line per frame
+        import progress_line
+        steps = {i: _frame_ring_steps(tasks[i], jobs) for i in big}
+        units = [('slice', i, k, w) for i in big for k, w in enumerate(next(steps[i]))]
+        units += [('frame', i, 0, tasks[i]) for i in small]
+        slices_of = {i: sum(1 for u in units if u[0] == 'slice' and u[1] == i) for i in big}
+        got = {i: {} for i in big}
+
+        def cost(u):
+            if u[0] == 'slice':
+                return (u[3][2] - u[3][1]) * max(1, len(u[3][0]['own']))
+            return _frame_positions(u[3]) * max(1, len(u[3]['chunks']))
+        done = 0
+        units.sort(key=lambda u: -cost(u))           # largest first (stable: ties in frame order)
+        for (kind, i, k), r in build_parallel.completed_map(_heap_unit, units, min(jobs, len(units))):
+            if kind == 'slice':
+                got[i][k] = r
+                if len(got[i]) < slices_of[i]:
+                    continue
+                try:
+                    steps[i].send([got[i][n] for n in range(slices_of[i])])
+                except StopIteration as finished:
+                    results[i] = finished.value
+            else:
+                results[i] = r
+            done += 1
+            progress_line.emit('CHIM heap gate', tasks[i]['path'], 'active ring peak %d of %d bytes'
+                               % (results[i]['peak_bytes'], results[i]['budget_bytes']),
+                               (done, len(todo), 'frames'))
     else:
-        for i in small:
+        for i in big:
             results[i] = _frame_ring(tasks[i], jobs=jobs)
+        if jobs > 1 and len(small) > 1:
+            # the shared worker pool: largest frames first, and the pool follows the stage's live allowance
+            # (a fixed pool of the stage's start share left cores idle; BUILD-CHIM-STAGE-SERIAL-TAIL-36)
+            from build_parallel import ordered_map
+            for i, r in zip(small, ordered_map(_frame_ring, [tasks[i] for i in small], min(jobs, len(small)),
+                                               cost=lambda t: len(t['chunks']) * (1 + len(t['used_models'])))):
+                results[i] = r
+        else:
+            for i in small:
+                results[i] = _frame_ring(tasks[i], jobs=jobs)
     if cache:
         for i in todo:
             try:
@@ -433,9 +467,34 @@ def _scan(work):
             else np.zeros(0), best, load_best, links, largest)
 
 
+def _heap_unit(unit):
+    """Worker of ring_peak's one map: a slice of a big frame's position scan, or a whole small frame."""
+    kind, i, k, work = unit
+    return (kind, i, k), (_scan(work) if kind == 'slice' else _frame_ring(work))
+
+
 def _frame_ring(task, jobs=1):
     """One frame's ring report (ring_peak), on the frame's own model and texture numbering. jobs > 1: the
     positions are scanned in slices over the shared worker pool (same report)."""
+    steps = _frame_ring_steps(task, jobs)
+    work = next(steps)
+    if len(work) > 1:
+        from build_parallel import ordered_map
+        parts_out = list(ordered_map(_scan, work, min(jobs, len(work))))
+    else:
+        parts_out = [_scan(w) for w in work]
+    try:
+        steps.send(parts_out)
+    except StopIteration as done:
+        return done.value
+    raise RuntimeError('heap frame steps did not finish')
+
+
+def _frame_ring_steps(task, jobs=1):
+    """_frame_ring in two steps (a generator): it yields the frame's scan work (slices of positions, _scan's
+    input), takes back their results in the same order and returns the report. ring_peak scans the slices
+    of every big frame and the small frames in ONE map, largest first, so no frame waits for another frame's
+    slices (BUILD-CHIM-STAGE-SERIAL-TAIL-36)."""
     import numpy as np
     from chim import format as F
     sizes = task['sizes']
@@ -496,11 +555,7 @@ def _frame_ring(task, jobs=1):
     step = -(-(-(-len(P) // SCAN_BATCH)) // slices) * SCAN_BATCH
     work = [(arrays, start, min(start + step, len(P))) for start in range(0, len(P), step)] if len(P) else \
         [(arrays, 0, 0)]
-    if len(work) > 1:
-        from build_parallel import ordered_map
-        parts_out = list(ordered_map(_scan, work, min(jobs, len(work))))
-    else:
-        parts_out = [_scan(w) for w in work]
+    parts_out = yield work
     best, load_best, largest, links = None, None, 0.0, 0
     for _, _, b, lb, li, la in parts_out:
         if b is not None and (best is None or b[0] > best[0]):
@@ -512,7 +567,7 @@ def _frame_ring(task, jobs=1):
     load_totals = [t for _, t, _, _, _, _ in parts_out]
     largest = max(largest, float(own.max()) if len(own) else 0.0)
     total, where, nchunks, nmodels, ntex, peak_models = best
-    # What fills the worst position, by kind (the owner's question "is any terrain resident twice?": each chunk's
+    # What fills the worst position, by kind (the maintainer's question "is any terrain resident twice?": each chunk's
     # terrain is one zone block here; its copy in the frame world lives in the frame-world slots, outside this
     # budget)
     _, act, nm, nt = rings(np.array([where]))
@@ -695,14 +750,16 @@ def require_frame_map_heap(world_dir, id1, sdk=None, sizes=None, heap_mb=None, r
     return report
 
 
-def require_heap(out, sdk=None, sizes=None, report_path=None, zone_kib=None, pool_kib=None, jobs=1, cache_dir=None):
+def require_heap(out, sdk=None, sizes=None, report_path=None, zone_kib=None, pool_kib=None, jobs=1, cache_dir=None,
+                 world=None):
     """The build's CHIM heap gate: OUT/chim-heap.json, and a ValueError naming the frame whose largest
     ring does not fit. sizes: the target ABI sizes (default: probed with the SDK's compiler, as the
     strict world-map heap gate does). Without either the gate is recorded as not run. jobs and
-    cache_dir: ring_peak's (frames in parallel, each frame's result kept by its content key)."""
+    cache_dir: ring_peak's (frames in parallel, each frame's result kept by its content key). world: the world
+    the step's validation read (chim.validate.loaded_world), else the files are read again."""
     import json
     from pathlib import Path
-    from chim.validate import Failures, load_world
+    from chim.validate import loaded_world
     report_path = Path(report_path or Path(out) / 'chim-heap.json')
     if sizes is None and sdk is None:
         report = {'ok': None, 'status': 'not run: no Amiga SDK given (--sdk)'}
@@ -710,10 +767,10 @@ def require_heap(out, sdk=None, sizes=None, report_path=None, zone_kib=None, poo
         if sizes is None:
             from check_world_map_heap import compile_target_sizes
             sizes = compile_target_sizes(sdk)[0]       # (sizes, probe receipt)
-        fails = Failures()
-        settings, files, disk, textures, models, frames = load_world(out, fails)
-        if fails:
-            raise ValueError('CHIM heap gate: the world does not read back (%s)' % fails[0])
+        try:
+            settings, files, disk, textures, models, frames = loaded_world(out, world)
+        except ValueError as exc:
+            raise ValueError('CHIM heap gate: the world does not read back (%s)' % exc)
         report = ring_peak({'settings': settings, 'textures': textures, 'models': models, 'frames': frames},
                            sizes, zone_kib, pool_kib, jobs=jobs, cache_dir=cache_dir)
         report['status'] = 'passed' if report['ok'] else 'failed'
@@ -727,7 +784,7 @@ def require_heap(out, sdk=None, sizes=None, report_path=None, zone_kib=None, poo
                          % (f['frame'], f['efrags']['ring_placements_peak'], f['efrags']['budget_links'],
                             report_path))
     if bad:
-        # every frame over the budget, worst first, each with how much it is over (owner 2026-10-16: "whenever
+        # every frame over the budget, worst first, each with how much it is over (maintainer 2026-10-16: "whenever
         # something is over budget, I'd know how much over budget")
         bad = sorted(bad, key=lambda f: f['budget_bytes'] - f['peak_bytes'])
         zone_kib, pool_kib = report['zone_kib'], report['pool_kib']

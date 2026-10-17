@@ -13,7 +13,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 11 October 2026, in v0.0.36-dev3 |
 | Where | Image layout of v0.0.36-dev3: two files, disk 1 DH0 + DW0, disk 2 DW1 + DW2 |
 | Reproduction | always |
@@ -30,7 +30,7 @@
 
 ## Status: 11 October 2026
 
-Open. PERSISTING, NOT RESOLVED. Found by the owner while reading the v0.0.36-dev3 build.
+Open. PERSISTING, NOT RESOLVED. Found by the maintainer while reading the v0.0.36-dev3 build.
 
 ## Symptom
 

@@ -9,7 +9,7 @@
 | Where | CHIM engine slice, chunk terrain (engine/aga/src/chim) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: Chunk terrain is a brush entity, so it does not occlude and gives placements no leaves. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

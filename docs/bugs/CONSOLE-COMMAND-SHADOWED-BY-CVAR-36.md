@@ -9,7 +9,7 @@
 | Where | aw_combat.c, aw_animkit.c: Cmd_AddCommand after a cvar of the same name; debug-commands.txt |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev5 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: Every dbg combat and dbg animkit option did nothing in game; the host fixtures did not model Quake's refusal |
 | Family | Debug commands and remote control (`debug-commands`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

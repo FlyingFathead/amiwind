@@ -1,7 +1,7 @@
 # Build AmiWind on Linux
 
-rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
-coverage and protected model quality remain mandatory.
+Since rc10 the builder can [reuse verified NPC models from earlier builds](NPC_MODEL_CACHE.md).
+Full gallery coverage and protected model quality are still required.
 
 <!-- contents start -->
 ## Contents
@@ -30,58 +30,49 @@ coverage and protected model quality remain mandatory.
 
 <!-- contents end -->
 
-**Outside approval is required for any exception affecting either gallery.**
-Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
-reduced or bypassed, including model/asset generation, catalogue coverage,
-quality and validation, without a specific documented case or scenario **and
-explicit approval from the project owner**. A builder or contributor cannot
-approve its own exception. Build time, disk pressure and convenience do not
-supply that approval. An opt-out flag is a mechanism for an approved exceptional
-debugging case, not permission to choose that exception independently.
+**The NPC gallery stays in every complete build.** Neither the NPC gallery
+nor the planned static-asset gallery is disabled, reduced or bypassed, and that
+includes their model and asset generation, catalogue coverage, quality and
+validation. The only exception is a specific, documented debugging case that
+the project maintainer has explicitly approved; a builder or contributor cannot
+approve its own exception. Build time, disk pressure and convenience are not
+reasons for one. The opt-out flag exists for such an approved debugging case,
+not as a free choice.
 
-All NPCs and other game assets must remain intact, packaged and loadable by the
-engine for the complete game to function properly. Skipping their creation
-alongside either gallery is pointless and counterproductive: the final product
-requires those assets anyway. An exceptional debug build must be labelled
-incomplete and cannot redefine the complete game's required content. Runtime
-loading may be on demand; this does not require every asset to reside in RAM
-simultaneously. The static-asset gallery is still planned, not implemented.
+The reason is simple: the complete game needs every NPC and every other game
+asset, packaged and loadable by the engine. Skipping their creation along with
+a gallery gains nothing, because the final product needs those assets anyway.
+An exceptional debug build is labelled incomplete and does not change what the
+complete game must contain. The engine may load assets on demand, so they do
+not all have to be in RAM at the same time. The static-asset gallery is
+planned, not implemented yet.
 
-**First prerequisite: sufficient build capacity.** Before starting, verify
-usable space for all required models/content, intermediates, staging copies,
-temporary images, final outputs, verification copies and a safety margin. Check
-the actual output filesystem and quota. RAM-backed scratch also consumes the
-process/container memory budget; it is not extra independent disk capacity.
-If space is insufficient, provide capacity before expensive conversion begins.
-Do not skip NPC models or gallery creation to make the build fit.
-
-**All NPCs must be included and loadable by the engine for the game to be complete.
-NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
-requested debugging purposes. Build time and disk usage are not reasons to omit it.**
-
-Skipping NPC model creation together with the gallery is pointless and
-counterproductive for a complete build: all character models are still required
-in the final product. Exceptional debugging may temporarily isolate the gallery;
-it cannot reduce the final game's required content.
+**Disk space comes first.** A build needs room for all models and content, the
+intermediate files, staging copies, temporary images, the final outputs,
+verification copies and a safety margin. It is worth checking the real output
+filesystem and any quota before starting. Scratch space in RAM counts against
+the process or container memory budget; it is not extra disk. If space is
+short, the fix is more capacity before the long conversion starts, not leaving
+out NPC models or the gallery.
 
 The guided builder converts a bounded Seyda Neen proof of concept and builds
 an experimental AGA HDF. It does not convert the complete game or promise stock
 A1200 performance. The current reference needs 040/FPU, AGA, 2 MiB Chip and
 16 MiB Fast RAM; see [AGA setup](AGA_BUILD.md) and [WinUAE](WINUAE.md).
 
-**Please purchase Morrowind from
+**AmiWind needs your own installed copy of Morrowind**, available from
 [GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition) or
-[Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/)
-and supply your installed game files. AmiWind's Morrowind demo cannot run
-without converted data from your own copy.** An existing installation is fine.
+[Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/).
+The Morrowind demo cannot run without data converted from it. An existing
+installation is fine.
 
-**The GOG GOTY edition is the preferred AmiWind source installation.** The GOG
-layout used for development includes loose `BookArt/*.ttf` TrueType fonts, which
-are preferred for host-side rasterization at AmiWind's target sizes. Steam GOTY
-normally lacks those loose TTFs. When they are absent, the builder reports that
-explicitly and falls back to Bethesda's `Fonts/*.fnt` + `.tex` bitmap fonts. The
-fallback is supported, but visual results may vary and may be inferior at scaled
-or non-native sizes. Preferred edition: <https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition>.
+**The GOG GOTY edition is the preferred source.** The GOG installation used
+for development includes loose `BookArt/*.ttf` TrueType fonts, which give the
+best results when the fonts are rendered at AmiWind's sizes on the PC. Steam
+GOTY normally lacks those loose TTFs. When they are missing, the builder says
+so and falls back to Bethesda's `Fonts/*.fnt` + `.tex` bitmap fonts. The
+fallback is supported, but the text may look different, and worse when scaled
+to sizes other than the original. Preferred edition: <https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition>.
 
 There is no need to reinstall intact base files. GOG installers are not read
 directly; AmiWind reads the installed game tree. Tribunal, Bloodmoon and mod load
@@ -522,7 +513,7 @@ cannot be picked), and the image does not match a release.
 Normal AGA builds import every town after Seyda Neen and Balmora that a release
 ships: the rows of `config/towns.json` with `shipped_since` and no `withdrawn`
 reason, one `town-<id>` stage each, right after Balmora's interiors. The Vivec
-Arena preview (shipped since v0.0.32) is withdrawn from v0.0.33 by owner
+Arena preview (shipped since v0.0.32) is withdrawn from v0.0.33 by maintainer
 decision (CHIM-ARENA-MEMORY-33), so a default build no longer imports it;
 `--extra-town vivec_arena` still builds it. `--extra-town <id>` adds a town that
 is not shipped (or is withdrawn); naming a
@@ -662,11 +653,17 @@ or one option per group.
 Release builds: the image step's stair walk walks only the steps of flights
 (the rows that can stop the build) in release candidates and finals, and every
 step and ramp otherwise; `--stair-walk all` forces the full walk (nightly full
-reports), `--stair-walk flights` the short one. A map or CHIM frame whose collision is unchanged is not
-walked again: its stored result is reused (`--stair-walk-cache cached`, the default; a few are walked again on
+reports), `--stair-walk flights` the short one. A build from your own copy of the game takes the known-good
+stair records shipped with the source (`config/stair-records/`, `--stair-walk-cache records`, the default
+without `--developer-mode`): a CHIM frame whose collision has the SHA-256 recorded there is not walked; a frame
+whose collision differs (another converter, other game data) is named in the log and walked only on request
+(`--stair-walk-cache cached`). In development builds (`--developer-mode`) a map or CHIM frame whose collision is
+unchanged is not walked again: its stored result is reused (`--stair-walk-cache cached`; a few are walked again on
 every build to check the cache, `--stair-walk-sample N`). Only a result checked by a build of the master builder
 that passed every gate is reused; the log names the run it comes from. `--stair-walk-cache full` walks everything
-again, for regression and beta-test runs only. With `--allow-release-reuse`,
+again, for regression and beta-test runs only. A CHIM region frame walks only the cell it owns plus the
+map-switch margin; its border copies of other cells are walked where they are owned (`--stair-walk-area owned`,
+the default; `frame` walks the whole frame as before v0.0.42). With `--allow-release-reuse`,
 release builds also reuse the image step's per-map pass results, and each pass
 receipt counts its hits; the from-scratch reference build is then compared file
 by file with the release payload. Details: [BUILD_PROFILE.md](BUILD_PROFILE.md).

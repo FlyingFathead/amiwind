@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev2 |
 | Where | Exterior street lamps at night (Balmora, Seyda Neen) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31-dev2 (last seen) |
+| Persists in | fixed in v0.0.31 |
 | Severity | high: Exterior lamps give no light at night, so both towns are nearly black. |
 | Family | Lighting, lamps and night (`lighting-night`) |
 | Playtest version | v0.0.31-dev2 |
@@ -21,17 +21,17 @@
 
 ## Status: 7 October 2026
 
-Open. Owner report from the v0.0.31-dev2 playtest. Causes measured in source
+Open. Maintainer report from the v0.0.31-dev2 playtest. Causes measured in source
 and in the shipped dev2 maps; no repair yet.
 
 ## Symptom
 
 At night in Balmora a street lamp and the walls around it are almost black; the
-lamp gives no visible pool of light. The owner confirms the same in Seyda Neen:
+lamp gives no visible pool of light. The maintainer confirms the same in Seyda Neen:
 at night the only light in either town comes from the guards' torches. The
 cause below is in the exterior converter, so it applies to every exterior. The lantern models themselves are dark too:
 "that lantern and the others in Balmora, they are NOT LIT" (second view at
-23:18, global -20907 -17118 532, a lantern hanging by a doorway). The owner also
+23:18, global -20907 -17118 532, a lantern hanging by a doorway). The maintainer also
 notes "this very peculiar hue": the dark walls show scattered dark-red speckles
 on near-black.
 
@@ -42,7 +42,7 @@ looking up at a lamp (north-west, pitch -29).
 
 ## How it happened
 
-Both owner views look at the same original lamp, `light_de_streetlight_01_223`
+Both maintainer views look at the same original lamp, `light_de_streetlight_01_223`
 (radius 223 original units, colour 245 140 40) on a lamp post beside a Hlaalu
 door, at original (-21076, -16773, 718). Three causes together:
 
@@ -91,7 +91,7 @@ choosing):
 
 ## Verification
 
-Reference: OpenMW at both owner poses (22:21 and 23:18, clear weather) shows the
+Reference: OpenMW at both maintainer poses (22:21 and 23:18, clear weather) shows the
 lantern panes glowing cream-orange and a clear warm pool on the wall and door
 arch below it, fading within about one storey; walls away from it are dim
 blue-grey. Repair verification pending: the same poses in AmiWind side by side.

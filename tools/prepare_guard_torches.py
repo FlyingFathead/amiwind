@@ -123,7 +123,16 @@ def _source_records(master):
     return lights
 
 
-def _guard_models(id1, kinds, lights, mesh):
+def _creature_ids(master):
+    """Creature record IDs of the master: creatures placed as residents (Vivec) carry no torches."""
+    found = set()
+    for kind, flags, payload in records(master.read_bytes()):
+        if kind == 'CREA':
+            found.add(text(list(subrecords(payload)), 'NAME').casefold())
+    return found
+
+
+def _guard_models(id1, kinds, lights, mesh, creatures=frozenset()):
     found = {}
     for path in sorted((id1 / 'maps').glob('*.bsp')):
         with path.open('rb') as stream:
@@ -139,6 +148,10 @@ def _guard_models(id1, kinds, lights, mesh):
             if ent.get('classname') != 'aw_npc':
                 continue
             source = ent.get('aw_source_id', '').casefold()
+            # interior creature residents (tools/creature_residents.py, e.g. vivec_god) are aw_npc entities from
+            # creature records: never guards, no torch (BUILD-TORCH-CREATURE-RESIDENT-42)
+            if source not in kinds['NPC_'] and source in creatures:
+                continue
             if source not in kinds['NPC_']:
                 raise ValueError('Staged NPC lacks original source identity: ' + path.name)
             guard, eligible, inventory = guard_eligibility(kinds['NPC_'][source], lights, mesh)
@@ -300,7 +313,7 @@ def prepare(data_files, id1, output_id1=None, jobs=None):
     master = child_ci(data_files, 'Morrowind.esm')
     kinds, _, _ = load_master(master)
     lights = _source_records(master); mesh = text(lights['torch'], 'MODL')
-    entries = _guard_models(id1, kinds, lights, mesh)
+    entries = _guard_models(id1, kinds, lights, mesh, _creature_ids(master))
     palette = (id1 / 'gfx/palette.lmp').read_bytes()
     if len(palette) != 768: raise ValueError('Invalid guard palette')
     # One guard model per worker of the shared pool, results in entry order (the image step's guard torches ran one

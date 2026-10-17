@@ -9,7 +9,7 @@
 | Where | Lava CHIM exterior first presentation |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev1 (last seen) |
+| Persists in | fixed in v0.0.38 |
 | Severity | medium: Native hunk gap 2004064 bytes is 93088 bytes below the 2 MiB safety threshold |
 | Family | Map heap and memory budget (`heap-memory`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -60,7 +60,7 @@ Proposed update in **v0.0.38-dev2**, recorded 2026-10-12 13:44 UTC.
 History clarified 2026-10-12 13:56 UTC: the scoped evidence below does not close the issue.
 Later regressions remain attached to this history and require fresh verification.
 
-Implementation present from v0.0.38-dev2; proposed repair evidence: startup WAV scratch reserve integrated. Scoped voice-on native cold peak gap 2112448 bytes and warm2220640 exceed2097152; cold margin15296. No observed chunk failure or partial activation. Wider cell/performance and owner acceptance remain open.
+Implementation present from v0.0.38-dev2; proposed repair evidence: startup WAV scratch reserve integrated. Scoped voice-on native cold peak gap 2112448 bytes and warm2220640 exceed2097152; cold margin15296. No observed chunk failure or partial activation. Wider cell/performance and maintainer acceptance remain open.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

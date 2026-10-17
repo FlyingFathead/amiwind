@@ -4,11 +4,11 @@
 ## Contents
 
 - [Appearance acceptance: 2026-10-06T20:06:10+03:00](#appearance-acceptance-2026-10-06t2006100300)
-- [Indoor/outdoor torch contrast: owner follow-up 2026-10-06T13:53:32+00:00](#indooroutdoor-torch-contrast-owner-follow-up-2026-10-06t1353320000)
-- [RC1 owner torch follow-up: 6 October 2026](#rc1-owner-torch-follow-up-6-october-2026)
+- [Indoor/outdoor torch contrast: maintainer follow-up 2026-10-06T13:53:32+00:00](#indooroutdoor-torch-contrast-maintainer-follow-up-2026-10-06t1353320000)
+- [RC1 maintainer torch follow-up: 6 October 2026](#rc1-maintainer-torch-follow-up-6-october-2026)
 - [RC1 interior NPC follow-up: 6 October 2026](#rc1-interior-npc-follow-up-6-october-2026)
 - [NPC illumination: dev4 report](#npc-illumination-dev4-report)
-- [v0.0.29 open owner reports](#v0029-open-owner-reports)
+- [v0.0.29 open maintainer reports](#v0029-open-maintainer-reports)
 - [v0.0.29 required hands and light acceptance matrix](#v0029-required-hands-and-light-acceptance-matrix)
   - [Scoped v0.0.29-dev1 native F/V replay](#scoped-v0029-dev1-native-fv-replay)
 - [Secrets of the original torch](#secrets-of-the-original-torch)
@@ -26,7 +26,7 @@
 - [TRANSITION-EQUIPMENT-29: carried torch blinks out during cell handoff (OPEN)](#transition-equipment-29-carried-torch-blinks-out-during-cell-handoff-open)
 - [TORCH-HAND-SEPARATION-29: grip appears to break during idle animation (OPEN)](#torch-hand-separation-29-grip-appears-to-break-during-idle-animation-open)
   - [5 October torch-light acceptance follow-up](#5-october-torch-light-acceptance-follow-up)
-  - [Later 5 October owner refinement](#later-5-october-owner-refinement)
+  - [Later 5 October maintainer refinement](#later-5-october-maintainer-refinement)
   - [Near-field and movement acceptance update, 5 October](#near-field-and-movement-acceptance-update-5-october)
 - [Source-candidate torch controls, 5 October](#source-candidate-torch-controls-5-october)
   - [Running torch arm: tested source mitigation, target acceptance pending](#running-torch-arm-tested-source-mitigation-target-acceptance-pending)
@@ -40,15 +40,15 @@
 
 ## Appearance acceptance: 2026-10-06T20:06:10+03:00
 
-The owner approved the new torch appearance shown in the follow-up capture.
+The maintainer approved the new torch appearance shown in the follow-up capture.
 Candidate 004 demonstrated off/on/off in FS-UAE after appearance selection.
 Keep the gray unlit test-floor and stronger outdoor-area illumination requests
 open; appearance approval alone does not close them. No follow-up package has
 been delivered.
 
-## Indoor/outdoor torch contrast: owner follow-up 2026-10-06T13:53:32+00:00
+## Indoor/outdoor torch contrast: maintainer follow-up 2026-10-06T13:53:32+00:00
 
-The RC1 owner repeatedly reports stronger, more useful carried-torch illumination
+The RC1 maintainer repeatedly reports stronger, more useful carried-torch illumination
 indoors than outdoors. Temple images provide interior examples. Preserve the
 accepted nearby-NPC response while comparing fixed torch style/radius/strength,
 distance, surface material, ambient/static light and day/night state in matched
@@ -56,17 +56,17 @@ indoor/outdoor tests. This does not prove one shared cause with missing Temple
 architecture or the Seyda fullbright discontinuity. Type2 remains the requested
 new default; separate normalized illumination control is in implementation.
 
-## RC1 owner torch follow-up: 6 October 2026
+## RC1 maintainer torch follow-up: 6 October 2026
 
-Recorded 2026-10-06T13:48:58+00:00. Owner reports NPC illumination from a carried torch now
+Recorded 2026-10-06T13:48:58+00:00. Maintainer reports NPC illumination from a carried torch now
 looks reasonably good on the tested route. Preserve this scoped positive
 result; it does not close Census static interior lighting or every NPC case.
 The remaining request is stronger useful light on nearby ground/walls, farther
 forward and around player/NPC torch holders, with bounded falloff and light count.
 
-The owner prefers flame type **2, brightbase**, and explicitly requests type 2
+The maintainer prefers flame type **2, brightbase**, and explicitly requests type 2
 or 3 as the new default. The next candidate will use 2; existing saved preferences
-should remain effective. Type 3's sparks/embers were not visible to the owner,
+should remain effective. Type 3's sparks/embers were not visible to the maintainer,
 so spark visibility remains unaccepted. In RC1 the bright flame core is shared
 by player and supported guard torches; the extra spark pass is player-only.
 `dbg torch flame` without a value already reports the current setting. It does
@@ -123,19 +123,19 @@ frame cost. The existing alias path has dynamic-light code; base-light
 saturation, actual actor representation and post-render night shading remain
 unverified contributors. **No fix is claimed.**
 
-## v0.0.29 open owner reports
+## v0.0.29 open maintainer reports
 
 On 4 October 2026, post-release v0.0.28 playtesting again found **F unable to
 raise hands in debug play; V prints torch on/off but no hands or working torch
 appear**. Treat [TORCH-INPUT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open)
 as a high-priority recurring regression. Missing converted-world hand metadata
-is a confirmed defect; the exact older owner-session cause and debug/map
+is a confirmed defect; the exact older maintainer-session cause and debug/map
 involvement remain unverified. Existing control descriptions below state the contract,
 not proof that this reported runtime state works. Keep the older fist blink
 and previous torch crash separate.
 
 Guard torches also fail to produce convincing surrounding night illumination
-in the owner's view, and interiors lack convincing lantern/torch lighting.
+in the maintainer's view, and interiors lack convincing lantern/torch lighting.
 [TORCH-LIGHT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-light-29-guard-torches-do-not-illuminate-nearby-night-surfaces-open)
 and [INTERIOR-LIGHT-29](journals/BUG_JOURNAL-v0.0.29.md#interior-light-29-interiors-lack-convincing-local-light-open)
 need matched-camera surface comparisons, not just flame/admission tests.
@@ -225,7 +225,7 @@ are raised. V puts it away; F lowers the hands and extinguishes it. Shift+V
 retains its draw-distance shortcut. Personal bindings can override V.
 
 rc9 converts the original `torch` equipment mesh and an animated holding pose
-from the owner's installation. The old independent screen-space wooden shaft
+from the maintainer's installation. The old independent screen-space wooden shaft
 is removed. This remains temporary equipment: no inventory, fuel or durability.
 
 ## Secrets of the original torch
@@ -289,7 +289,7 @@ guarantee occlusion. Water rendering is unchanged.
 ## Conversion and runtime
 
 `tools/prepare_torch.py` runs during image assembly, including engine/image-only
-recovery. It reads the owner's master, mesh, first-person animation and textures.
+recovery. It reads the maintainer's master, mesh, first-person animation and textures.
 The inspected base data produces 551 combined hand/torch triangles and 1,653
 vertices, below the existing 2,000-vertex small-model limit. Exact counts and
 checksums are recorded in the private build's `torch-conversion.json`.
@@ -310,7 +310,7 @@ can hide the held model while the equipped light remains active.
 
 ## rc7 crash and rc8 correction
 
-The owner reported a crash on F then V after successful rc7 image assembly.
+The maintainer reported a crash on F then V after successful rc7 image assembly.
 The old brush-lighting path treated a negative leaf root as a node-array offset.
 A host address-sanitized test reproduces the segmentation fault through the
 actual R_DrawBEntitiesOnList entry point. The earlier torch test exercised the
@@ -330,7 +330,7 @@ The fix still needs the same F-then-V sequence retested on the target emulator.
 
 ## Original-model replacement and reported hand flicker
 
-The owner reports that fists stay visible, blink completely off very briefly,
+The maintainer reports that fists stay visible, blink completely off very briefly,
 and return immediately. That brief blink repeats approximately every **1–2
 seconds**. This is the interval between blinks, not a 1–2-second disappearance.
 It has happened since hands were first implemented and is not a torch regression.
@@ -511,7 +511,7 @@ and palette lookup triggered signed overflow in `R_DrawSurfaceBlock8_mip0`.
 The surface light samples are unsigned. Subtracting them before the shift made
 negative slopes wrap into huge positive steps and overflow during interpolation.
 This is an inherited renderer arithmetic defect; its introducing revision is
-not established. It is not yet proven to explain the owner's entire guard-light
+not established. It is not yet proven to explain the maintainer's entire guard-light
 report.
 
 The v0.0.29-dev1 candidate converts the bounded samples before subtraction and
@@ -537,7 +537,7 @@ scene-specific diagnosis.
 
 ## TRANSITION-EQUIPMENT-29: carried torch blinks out during cell handoff (OPEN)
 
-Owner reports 5 October 2026 in Seyda Neen automatic cell/sub-cell travel: hands
+Maintainer reports 5 October 2026 in Seyda Neen automatic cell/sub-cell travel: hands
 remain visible, but an equipped torch disappears briefly on arrival. Reproduce
 with F-raised hands plus V torch, cross a boundary without toggling either, and
 inspect the first visible arrival frames. Compare unarmed, fists, fists+torch,
@@ -551,12 +551,12 @@ rendering/lighting requires ready state2, so the saved torch bit alone cannot
 prevent the blink. Transfer field-by-field values and timer age across the new
 server clock, rebind new-world model names instead of carrying VM pointers, and
 restore before the first visible client state. Native acceptance remains pending.
-**Fixed: N.** The separate owner observation that player torch lights surfaces
+**Fixed: N.** The separate maintainer observation that player torch lights surfaces
 does not establish transfer continuity.
 
 ## TORCH-HAND-SEPARATION-29: grip appears to break during idle animation (OPEN)
 
-Owner supplied two frames on 5 October 2026 showing the torch-side hand/grip
+Maintainer supplied two frames on 5 October 2026 showing the torch-side hand/grip
 changing/separating while standing. He associates it with breathing/idle motion;
 this is a reproduction hypothesis, not a confirmed geometry or skinning cause.
 Visible HUD: global -14208,-66080,170; local -736,1399,42; heading282/pitch0;
@@ -567,7 +567,7 @@ Keep distinct from the map-handoff blink until evidence links them. **Fixed: N.*
 
 ### 5 October torch-light acceptance follow-up
 
-Owner confirms the held/player torch now visibly illuminates surroundings.
+Maintainer confirms the held/player torch now visibly illuminates surroundings.
 He separately reports the guard torches still appear to illuminate little or
 nothing. A nighttime guard screenshot records global -11281,-70292,315;
 local -4,346,78; heading330/pitch13; game time21:12. Reproduce there, distinguish
@@ -588,7 +588,7 @@ player. Measure bounded falloff, frame/memory cost and save/config behavior.
 Keep the surface radius separate from flame appearance and urgent equipment
 handoff.
 
-### Later 5 October owner refinement
+### Later 5 October maintainer refinement
 
 The newer source candidate implements universal player and admitted-guard
 radius control: saved aw_torch_radius default 192, bounds 32–288, and console
@@ -607,13 +607,13 @@ not an established root cause or parity requirement.
 
 ### Near-field and movement acceptance update, 5 October
 
-The owner identifies dim ground directly beneath the player as the main torch
+The maintainer identifies dim ground directly beneath the player as the main torch
 illumination problem. Compare torch OFF/ON at the same nighttime position while
 looking down from a normal holding pose, inspecting ground immediately beneath
 the player. Test held-player and guard torches independently; a successful
 farther-wall response or guard pavement sample does not close the other case.
 
-The owner reports the hand/torso glitch most strongly during SHIFT+RUN, with
+The maintainer reports the hand/torso glitch most strongly during SHIFT+RUN, with
 left-side geometry appearing and disappearing. Treat this as stronger
 reproduction evidence for TORCH-HAND-SEPARATION-29, not a confirmed part-
 visibility/mesh cause. Study OpenMW and OG first-person part visibility as
@@ -624,7 +624,7 @@ requested. The later traversal screenshot strengthens the SHIFT+RUN reproduction
 
 The controls described above are source-only pending delivery to current development playtest.
 Amiga compilation passed; integration/native acceptance is not established
-by compilation. Do not raise or lower the default without owner direction.
+by compilation. Do not raise or lower the default without maintainer direction.
 
 
 The principal player-light acceptance gap remains ground directly beneath the
@@ -670,7 +670,7 @@ surface before the existing approximate distance calculation. Basis setup runs
 once per lit surface, with no square root per lightmap sample. Singular mappings
 retain the legacy fallback. Radius, flicker, light counts and guard admission
 policy remain unchanged. This corrects a reproduced material-density defect;
-it does not establish the cause of the owner's specific dim-underfoot or guard
+it does not establish the cause of the maintainer's specific dim-underfoot or guard
 view. Sparse lightmap samples, palette saturation and guard rejection remain
 separate possible limits.
 
@@ -727,13 +727,13 @@ remain pending. This candidate is not part of the sealed dev2 playtest.
 
 ## Dev4 follow-up: accepted dev3 light and optional sparks
 
-The player torch's dev3 surface lighting has owner acceptance. The next request
+The player torch's dev3 surface lighting has maintainer acceptance. The next request
 is more visible upward and sideways reach, independently of small white-hot and
 yellow flame sparks. The dev4 source adds an optional `sparks` flame style while
 retaining classic as default. See [Torch particles and light reach](TORCH_PARTICLES.md)
 for pinned AmiQuake source findings, commands and exact validation limits.
 Earlier source-only statements above describe their original checkpoints;
-they do not retract the later dev3 owner acceptance.
+they do not retract the later dev3 maintainer acceptance.
 
 ## Final-release gates added after dev4 playtesting
 

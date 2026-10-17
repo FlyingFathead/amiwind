@@ -35,7 +35,7 @@ PROBE = r'''#!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-only
 # Engine boot + map-load smoke, emulator side (tools/engine_smoke.py starts it in a throwaway offline FS-UAE container).
 # Mounts: /w = the run's fresh boot-disk copy (play-boot.hdf), /img = the image folder (world disk, read-only),
-# /roms = the owner's Kickstart folder (read-only), /out = this run's output folder.
+# /roms = the maintainer's Kickstart folder (read-only), /out = this run's output folder.
 # Env: WORLD (world disk file name in /img, may be empty), PROF jit|interp, KICK (Kickstart file name in /roms),
 # MAP1 (first map, default seyda), AFTER (after it loads: a console command, or key:NAME, e.g. key:Return for a MiniWind), TP (second load as "dbg tp X Y", default Balmora), PLAY (seconds of play, 10).
 # TP "same X Y": a one-area image; teleport inside MAP1 and stay in it (no second map). TP "view X Y Z": noclip and

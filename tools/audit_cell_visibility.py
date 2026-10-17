@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Write a private source-script visibility audit from an owner-supplied master."""
+"""Write a private source-script visibility audit from an user-supplied master."""
 import argparse
 import json
 import math

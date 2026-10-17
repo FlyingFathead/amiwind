@@ -9,7 +9,7 @@
 | Where | CHIM terrain collision hull expansion (tools/chim) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: Standing box rests up to 8 units above convex terrain edges. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Stairs and collision on CHIM worlds ([CHIM Engine tracker](CHIM_TRACKER.md)) |

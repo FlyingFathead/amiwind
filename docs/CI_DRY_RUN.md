@@ -11,7 +11,7 @@ recovery archives are inputs to this workflow. It does not run an emulator or
 claim full gameplay validation. Action dependencies are pinned by commit, and
 the SDK archive is pinned by URL, size and SHA-256. New versions require an
 intentional reference update. The first hosted run remains to be performed after
-the owner publishes the repository; local compilation/image checks have passed.
+the maintainer publishes the repository; local compilation/image checks have passed.
 
 ## Local use
 

@@ -4,11 +4,11 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | NPC model bake (base_anim idle frames only) and QuakeC aw_npc_idle |
 | Reproduction | always |
-| Duplicate of | no |
+| Duplicate of | [NPC-ANIM-IDLE-ONLY-33](NPC-ANIM-IDLE-ONLY-33.md) |
 | Persists in | v0.0.33-dev (last seen) |
 | Severity | medium: Moving NPCs (the companion, chasing or fleeing actors) glide in their idle pose |
 | Family | Actors and NPCs (`actors-npc`) |
@@ -24,7 +24,7 @@ Open. Planned for the next release as the animation kit.
 
 ## Symptom
 
-The owner, playing the companion test in a MiniWind build: the companion follows well but has no walking
+The maintainer, playing the companion test in a MiniWind build: the companion follows well but has no walking
 animation; it glides in its idle pose. Every NPC is the same.
 
 ## Where

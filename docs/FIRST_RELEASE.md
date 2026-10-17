@@ -1,6 +1,6 @@
 # First repository release: v0.0.16
 
-The owner runs this workflow on Linux or WSL. It creates a **private** repository
+The maintainer runs this workflow on Linux or WSL. It creates a **private** repository
 at `FlyingFathead/amiwind`, pushes `main`, waits for that commit's GitHub Actions
 source/asset-free build to succeed, then creates tag `v0.0.16` and a demo
 prerelease. The release uploads only the full and incremental public source ZIPs
@@ -63,4 +63,4 @@ and presets. Play from a writable HDF copy. Do not upload this ZIP to GitHub.
 Reference CLI behavior: [repo create](https://cli.github.com/manual/gh_repo_create),
 [run watch](https://cli.github.com/manual/gh_run_watch),
 [release create](https://cli.github.com/manual/gh_release_create).
-The collaborator has not run Git/GitHub publication; this is the owner-run step.
+The collaborator has not run Git/GitHub publication; this is the maintainer-run step.

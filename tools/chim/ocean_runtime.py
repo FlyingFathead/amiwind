@@ -17,12 +17,12 @@ MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
 OBJECT_TYPES = set('STAT DOOR MISC WEAP CONT CREA LIGH NPC_ ARMO CLOT REPA ACTI APPA LOCK PROB INGR BOOK ALCH LEVI LEVC'.split())
 
 
-def land_cells(data_files):
+def land_cells(data_files, masters=None):
     """{(x, y)} of every exterior cell with a live LAND record in the masters (MASTERS), in one pass: the
     preflight's check that a cell taken as open ocean has no land (admit_cell refuses it later, after the
     CHIM stage has started; CHIMPORT-OCEAN-LAND-41)."""
     found = set()
-    for name in MASTERS:
+    for name in masters or MASTERS:
         try:
             path = child_ci(Path(data_files), name)
         except (FileNotFoundError, ValueError):

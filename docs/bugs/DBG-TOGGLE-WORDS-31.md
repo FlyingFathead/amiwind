@@ -55,7 +55,7 @@ single argument; commands keep their own words. Native test cases cover both.
 
 ## Verification
 
-Native console test; owner check pending.
+Native console test; maintainer check pending.
 
 ## Prevention
 

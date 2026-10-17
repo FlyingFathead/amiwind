@@ -9,7 +9,7 @@
 | Where | engine aw_scene.c read_links_for (links[128]); tools/town_interiors.py BANK_ROWS |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev4 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: The chim-town stage refuses the city's door bank, so the whole-city build fails |
 | Family | Town and interior import (`town-import`) |
 | Playtest version | offline CHIM world vivec_city (v0.0.36-vivec-b) |

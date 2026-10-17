@@ -9,7 +9,7 @@
 | Where | CHIM variant hulls (chim.models variant_unit, model_image_lumps) with --model-hull auto |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: The pure-CHIM release build stopped at the CHIM heap gate: Balmora's south-west ring 136,160 B over the zone. |
 | Family | Map heap and memory budget (`heap-memory`) |
 

@@ -25,7 +25,7 @@
     },
     "vivec_god": {
       "mode": "levitating",
-      "reason": "Source creature vivec_god, r/LordVivec.NIF; preserve the owner-confirmed levitating pose."
+      "reason": "Source creature vivec_god, r/LordVivec.NIF; preserve the maintainer-confirmed levitating pose."
     },
     "dead orc male_02": {
       "mode": "authored_dead",
@@ -94,6 +94,7 @@
     "alveleg",
     "alveno andules",
     "alvis teri",
+    "alvura othrenim",
     "amili llaram",
     "anasour selitbael",
     "ancola",
@@ -357,6 +358,7 @@
     "faral retheran",
     "faralenu henim",
     "fargoth",
+    "farmin",
     "farusea salas",
     "farvyn oreyn",
     "fasele viralaine",
@@ -593,6 +595,7 @@
     "mervs uvayn",
     "mette",
     "mevel fererus",
+    "mevil molor",
     "mevure hlen",
     "mi-ilu massitisun",
     "miara viake",
@@ -745,6 +748,7 @@
     "satheri rothandus",
     "savard",
     "savile imayn",
+    "seanwen",
     "seba anurnudai",
     "sedrane arvel",
     "sedyni veran",
@@ -753,6 +757,7 @@
     "selvil sareloth",
     "sen",
     "sendus sathis",
+    "senyndie",
     "serer andrano",
     "seryn othralen",
     "sevisa teran",
@@ -884,6 +889,7 @@
     "ugdumph gro-lumbuk",
     "ughash gro-batul",
     "ulam gro-shugham",
+    "ultis salam",
     "ulveni daram",
     "ulvil llothas",
     "ulyne henim",

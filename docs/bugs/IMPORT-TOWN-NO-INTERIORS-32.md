@@ -21,7 +21,7 @@
 ## Status: 11 October 2026
 
 Repaired for the Vivec Arena Pit: the importer's interior step converts it (`vai000`), and it shipped in v0.0.35
-(eecb4eb, owner decision D1). A CHIM-native Arena build (the default since v0.0.36) runs no stage that makes it:
+(eecb4eb, project decision D1). A CHIM-native Arena build (the default since v0.0.36) runs no stage that makes it:
 BUILD-MINIWIND-ARENA-PIT-REFUSED-36. The direct start no longer cites this ID for the Pit. The other 27 of 29 Arena door
 rows (Waistworks, Underworks) stay unavailable until those rooms are listed.
 

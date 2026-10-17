@@ -20,7 +20,7 @@ polygons() returns the converter's face list or the merged one, whichever has fe
 converter's), so a mesh never gets more faces from this step. Lossless: the surface, materials and
 texture mapping are the source's. Deterministic: fixed orders everywhere, no randomness.
 
-Measured on the owner's data (v0.0.36-dev3): Balmora's 226 meshes 45,105 -> 44,324 faces, Seyda Neen's
+Measured on the maintainer's data (v0.0.36-dev3): Balmora's 226 meshes 45,105 -> 44,324 faces, Seyda Neen's
 60 meshes 21,659 -> 21,458; organic meshes (the silt strider) gain nothing (docs/chim/MESH_METHODS.md).
 """
 from collections import defaultdict

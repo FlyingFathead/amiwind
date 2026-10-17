@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 10 October 2026, in v0.0.35 |
 | Where | player death handling (engine/QuakeC), death screen and menus |
 | Reproduction | always |
@@ -36,7 +36,7 @@
 
 ## Status: 10 October 2026
 
-Open (owner playtest of v0.0.35). 10 October 2026: repaired in source on v0.0.36-dev (gated); the in-game check is pending.
+Open (maintainer playtest of v0.0.35). 10 October 2026: repaired in source on v0.0.36-dev (gated); the in-game check is pending.
 
 ## Symptom
 
@@ -92,7 +92,7 @@ animation has finished, mwstate/statemanagerimp.cpp askLoadRecent):
   lost fight a third button, Retry fight, puts the player and the opponents back where the fight began, with the
   health and fatigue they had then (aw_combat.c AW_CombatRetry).
 
-Owner rule added the same day ("dead in a fight, you cannot talk to anyone or interact or even see their names"):
+Project rule added the same day ("dead in a fight, you cannot talk to anyone or interact or even see their names"):
 one predicate, `AW_PlayerDead()` (engine/aga/src/quakedef.h: the single-player player's health is gone), is asked
 by every path that shows or starts an interaction: the focus name (aw_scene.c AW_SceneTargetName: NPC names, the
 travel driver, plants), the prompts (AW_SceneDraw: doors, opening hints, "E: Talk"/"E: Pick"), the use key

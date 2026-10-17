@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 11 October 2026, in v0.0.36-dev5 |
 | Where | Map screen (M): lava pools on the world map vs the world |
 | Reproduction | always |
@@ -22,11 +22,11 @@
 
 ## Status: 11 October 2026
 
-Fixed in v0.0.36. Reported by the owner on 11 October 2026 from the v0.0.36-dev5 playtest build on FS-UAE; the cause was the map, not the world.
+Fixed in v0.0.36. Reported by the maintainer on 11 October 2026 from the v0.0.36-dev5 playtest build on FS-UAE; the cause was the map, not the world.
 
 ## Symptom
 
-In Molag Amar the in-game map (M) shows the player standing inside a lava band. The game itself shows grass there, and no lava. The owner was at GLOBAL 87439 3671 349, LOCAL -156 405 -296, cell 10,0, at 09:16 game time.
+In Molag Amar the in-game map (M) shows the player standing inside a lava band. The game itself shows grass there, and no lava. The maintainer was at GLOBAL 87439 3671 349, LOCAL -156 405 -296, cell 10,0, at 09:16 game time.
 
 ## Where
 
@@ -34,7 +34,7 @@ The map screen's lava layer (AWM2 `LAVA` section, `tools/prepare_world_ui.py`) c
 
 ## How it happened
 
-A Morrowind lava pool is a flat tile (`in_lava_1024`, 1,024 units square, surface at a fixed height) laid into the land. Where the land rises above the surface the lava is buried and the player sees ground. The map layer drew every pool's whole outline and never looked at the land. At the reported pose the land is about 270 units high and the pool surface is 256, so the pool is buried there and the owner stood on grass inside a mapped tile. The land falls below 256 about 30 units south of that pose, which is where the visible lava begins.
+A Morrowind lava pool is a flat tile (`in_lava_1024`, 1,024 units square, surface at a fixed height) laid into the land. Where the land rises above the surface the lava is buried and the player sees ground. The map layer drew every pool's whole outline and never looked at the land. At the reported pose the land is about 270 units high and the pool surface is 256, so the pool is buried there and the maintainer stood on grass inside a mapped tile. The land falls below 256 about 30 units south of that pose, which is where the visible lava begins.
 
 The same mistake was everywhere, not only at that pose. Measured on the Game of the Year masters (the land read from the master's own LAND records, bilinear between the 128-unit vertices), the 349 pools cover 257.9 million square units, and only 119.3 million of them (46 %) lie on land below the pool surface. 27 pools are buried entirely, and the old layer painted the other 138.6 million square units (54 % of the footprints) over ground. The census was right (a pool is placed there); the world was right (the lava surface is under the ground there). The two candidates named when the bug was filed, a map that is too coarse and a world that lacks lava, were both wrong: the conversion keeps the pools and the lava surface stays hidden where the land covers it.
 
@@ -99,10 +99,15 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [TOOLKIT-TEXT-ENCODING-38](TOOLKIT-TEXT-ENCODING-38.md): Toolkit labels contain corrupted Unicode characters
 - UI-ACCEPT-29 (no report page): Character selection lacks a visible OK button
 - [UI-DEATH-DAMAGE-TINT-38](UI-DEATH-DAMAGE-TINT-38.md): Lava damage tint also colours the death menu and selection
+- [UI-ICONS-INVENTORY-42](UI-ICONS-INVENTORY-42.md): Inventory rows show icons only for the few staged items, squeezed 32 to 14 pixels; no magic or equipped backdrops
+- [UI-INVENTORY-HEADING-CENTRE-42](UI-INVENTORY-HEADING-CENTRE-42.md): The Inventory heading text is not vertically centred in its bar
 - [UI-INVENTORY-LAYOUT-40](UI-INVENTORY-LAYOUT-40.md): Inventory text overlaps fields and footer; preview initially faces away
+- [UI-INVENTORY-PREVIEW-GAP-41](UI-INVENTORY-PREVIEW-GAP-41.md): Inventory shows 'Character preview unavailable': a fixed 2 MiB memory guard refuses the 128 KB pose model in Seyda Neen
+- [UI-INVENTORY-PREVIEW-STILL-42](UI-INVENTORY-PREVIEW-STILL-42.md): The inventory character is drawn live and turns instead of being a still picture
 - [UI-KEY-HELP-STALE-38](UI-KEY-HELP-STALE-38.md): Key help exposes raw actions and uses a sparse outdated layout
 - [UI-MENU-LOGO-32](UI-MENU-LOGO-32.md): The menu logo has a line above the name and reddish-pink letters instead of gold
 - UI-OPTIONS-WRAP-29 (no report page): Setup selection wraps despite a bounded scrollbar
+- [UI-WINDOW-TITLE-BAR-42](UI-WINDOW-TITLE-BAR-42.md): Menu windows lack the original title bar (tiled frame with the window name on a dark plaque)
 - [WAIT-NOCLIP-MESSAGE-32](WAIT-NOCLIP-MESSAGE-32.md): Wait refusal names registration, dry ground and speech together instead of the reason that applied (noclip)
 
 <!-- END GENERATED CATEGORY -->

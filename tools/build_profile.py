@@ -934,7 +934,10 @@ class Sampler(threading.Thread):
             if count == 0:
                 continue
             previous = self.last.get(stage)
-            self.last[stage] = (now, cpu)
+            # The tree's CPU never really goes down: a dip is a child that ended between the walk's reads (or
+            # before its parent reaped it). Keeping the higher baseline stops the reaped child's CPU, already
+            # sampled while it ran, from being counted a second time when it shows up in the parent's cutime.
+            self.last[stage] = (now, cpu if previous is None else max(cpu, previous[1]))
             self.peak_rss[stage] = max(self.peak_rss.get(stage, 0), rss)
             if previous is None or now <= previous[0]:
                 continue

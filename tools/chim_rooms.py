@@ -54,7 +54,8 @@ def has_rooms(town, root=None):
         return False
 
 
-def prepare(town, data_files, scene, chim_world, out, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis_mode='fast'):
+def prepare(town, data_files, scene, chim_world, out, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis_mode='fast',
+            only_cells=None):
     if town == 'seyda':
         raise ValueError('Seyda Neen keeps its rooms in its own stages, not chim_rooms')
     from build_jobs import resolve_jobs
@@ -75,10 +76,15 @@ def prepare(town, data_files, scene, chim_world, out, qbsp, vis, light, ffmpeg='
     for folder in ('id1/gfx', 'id1/maps', 'id1/progs', 'id1/sound/npc'):
         (work_scene / folder).mkdir(parents=True)
     shutil.copyfile(scene / 'id1/gfx/palette.lmp', work_scene / 'id1/gfx/palette.lmp')
+    # the colormap shades the plant sprites of a room over its model limit (interior_plants)
+    if (scene / 'id1/gfx/colormap.lmp').is_file():
+        shutil.copyfile(scene / 'id1/gfx/colormap.lmp', work_scene / 'id1/gfx/colormap.lmp')
     # The hand timings every converted map carries (as chim_town and import_town take them).
     ext = lumps((scene / 'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
     timings = '\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"', ext))
-    rooms = convert_interiors(data, work_scene, settings, qbsp, vis, light, ffmpeg, jobs, vis_mode, timings)
+    # only_cells (--only-cell, a MiniWind interior scope): just those rooms; the others are recorded as left out
+    rooms = convert_interiors(data, work_scene, settings, qbsp, vis, light, ffmpeg, jobs, vis_mode, timings,
+                              only_cells=only_cells)
     # The town's exterior door bank with its doors into the converted rooms (the CHIM world's own source stage).
     work = chim_world / 'work' / town
     if not (work / 'audit/placements.json').is_file():
@@ -144,6 +150,9 @@ def main(argv=None):
         p.add_argument('--' + name, type=Path, required=True)
     p.add_argument('--ffmpeg', default='ffmpeg')
     p.add_argument('--vis-mode', default='fast')
+    p.add_argument('--only-cell', action='append', metavar='CELL',
+                   help='convert only this listed room (cell ID; repeatable): a MiniWind interior scope '
+                        '(MINIWIND-NO-INTERIOR-SCOPE-42); the other rooms are recorded as left out')
     add_jobs(p)
     import npc_lod
     npc_lod.add_converter_options(p)  # the residents' near/far models, as import_town takes them
@@ -152,7 +161,7 @@ def main(argv=None):
     import build_profile; build_profile.instrument('chim-rooms')  # sub-stage timers (docs/BUILD_PROFILE.md)
     try:
         prepare(a.town, a.data_files, a.scene, a.chim_world, a.out, a.qbsp, a.vis, a.light, a.ffmpeg, a.jobs,
-                a.vis_mode)
+                a.vis_mode, only_cells=a.only_cell)
     except (OSError, ValueError) as error:
         p.exit(1, f'Error: {error}\n')
 

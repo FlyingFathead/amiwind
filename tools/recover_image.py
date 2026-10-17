@@ -11,7 +11,7 @@ NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
 requested debugging purposes. Build time and disk usage are not reasons to omit it.
 
 Normal builds and recovery MUST include the gallery; missing input/model/catalogue
-content is an error, never an automatic opt-out. Only the owner's explicit
+content is an error, never an automatic opt-out. Only the maintainer's explicit
 --no-npc-gallery permits debugging-only omission of inspection assets. It must
 never remove required game NPC content or change the normal default.
 
@@ -26,7 +26,7 @@ coverage, quality and validation, must not be disabled, reduced or bypassed
 without a specific documented case/scenario and explicit approval from the
 project owner. The builder or contributor cannot approve its own exception.
 Time pressure, storage pressure and convenience are not approval. Existing
---no-npc-gallery support is only a mechanism for an owner-approved exceptional
+--no-npc-gallery support is only a mechanism for a maintainer-approved exceptional
 debugging case; its availability does not grant permission to use it.
 
 A complete game requires all of its NPC and other game assets intact, packaged

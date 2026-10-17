@@ -9,7 +9,7 @@
 | Where | Seyda region records: tools/prepare_bounded_world.py, tools/prepare_seyda_regions.py |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev1, v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: Hold-level: every rerun of actor-contact rebuilt world terrain, world scenery and world flora (about 10 minutes) |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | 2026_10_10_v0.0.36-dev1_full-bcoast-chimtest-try3_be5d6d3 |

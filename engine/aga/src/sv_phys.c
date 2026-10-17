@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "aw_bounds.h"
+#include "aw_state.h"
 #include "chim/chim.h"
 
 /*
@@ -1578,6 +1579,9 @@ void SV_Physics (void)
 	AW_CompanionPhysics ();
 	/* Hostile NPCs and the player's punch (aw_combat.c), after the companion. */
 	AW_CombatPhysics ();
+	/* Enchanted items recharge with unpaused time (OpenMW Engine::frame rechargeItems). */
+	if (svs.maxclients == 1 && aw_magic_frame)
+		aw_magic_frame ((float)host_frametime);
 	/* Lava damage (aw_lava.c), after combat: the player's health as combat left it. */
 	AW_LavaPhysics ();
 

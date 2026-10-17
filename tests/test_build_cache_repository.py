@@ -76,7 +76,7 @@ class RepositoryReuseTests(unittest.TestCase):
         for stage, script in MINIWIND_STAGES.items():
             python, data, _ = self.index.closure(self.repository / 'tools' / script)
             docs = sorted(path for path in python | data if path.startswith('docs/'))
-            # The image builder (engine/image script) reads the owner's walked-cells list.
+            # The image builder (engine/image script) reads the maintainer's walked-cells list.
             self.assertEqual(docs, ['docs/trackers/checked.json'] if stage == 'engine' else [], stage)
 
     def test_engine_edits_reuse_every_stage_that_does_not_compile_it(self):

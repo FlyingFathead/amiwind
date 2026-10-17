@@ -1,6 +1,6 @@
 # Canonical exterior terrain culling
 
-The host pass consumes the owner's local, authored LAND NPZ directly. No assets
+The host pass consumes the maintainer's local, authored LAND NPZ directly. No assets
 are shipped with these tools. Water is never an occlusion receiver. Negative
 LAND heights are the actual seabed; there is no invented bottom cutoff.
 
@@ -184,7 +184,7 @@ sn054. Local movement of only those copies would violate the existing shared
 placement contract. Erene's sn011 ownership remains intact and does not require
 expanding this bounded trial.
 
-A feasibility compile of the largest affected owner, sn054, produced 43,907
+A feasibility compile of the largest affected maintainer, sn054, produced 43,907
 final point-hull nodes against the 32,767 limit. Exact deduplication still left
 36,972, so that representation does not fit. A private compact exact-heightfield
 prototype has since measured 17,450 nodes and 6,969 planes, with zero mismatches

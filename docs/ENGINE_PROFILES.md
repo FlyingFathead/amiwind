@@ -3,6 +3,19 @@
 The AGA engine (`engine/aga/`) can be compiled two ways. Which one a build used is recorded in its
 engine receipt, its image receipt, its build summary and on the boot check screen.
 
+<!-- contents start -->
+## Contents
+
+- [Options](#options)
+- [The assembly units](#the-assembly-units)
+- [What is recorded](#what-is-recorded)
+- [Checks](#checks)
+- [The 68060-targeted build](#the-68060-targeted-build)
+- [Optimisation levels](#optimisation-levels)
+- [Measurements](#measurements)
+
+<!-- contents end -->
+
 | Profile | What it compiles | Default |
 | --- | --- | --- |
 | `c` | AmiWind's C code paths: the GPL C span drawing, the independent chunky-to-planar conversion (`aw_c2p.c`), `-O1` everywhere (`d_sprite.c` at `-O0`) | yes |
@@ -34,7 +47,7 @@ A mix that matches neither profile is recorded as `custom`. The default `c` buil
 option to the engine stage and no variable to `make`, so its command lines (and its stage key) stay
 those of a build without engine profiles. The engine's `Makefile` takes the same choice as
 `ENGINE_ASM="turb c2p"` and `ENGINE_OPT=o2`. All profile options are experimental
-([EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md)) until the owner picks a default from measurements.
+([EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md)) until the maintainer picks a default from measurements.
 
 ## The assembly units
 
@@ -84,6 +97,38 @@ both). The first `-O2` build then showed four `-Wstringop-truncation` warnings i
 copies that `-O1` does not inline; they were fixed in the C source
 ([ENGINE-O2-STRNCPY-WARNINGS-36](bugs/ENGINE-O2-STRNCPY-WARNINGS-36.md)), which changes the `c`
 binary once.
+
+## The 68060-targeted build
+
+`--engine-cpu 68060` (`make ENGINE_CPU=68060`) compiles the same profile for the 68060
+([68060](68060.md)): GCC's 68060 instruction selection with the hardware FPU, `-m68060 -mhard-float`.
+In this SDK `-m68060` alone means software floating point, and its 68060 libraries are built that way, so
+the build links the 68040 build's hard-float C library and libgcc. The default (`68040`, `-m68040
+-m68881`) adds nothing to the `make` command; any profile can be combined with either CPU, and the
+boot row and summaries add `68060`.
+
+GCC's 68060 code avoids the instructions the 68060 traps to its support library: no `fscc` (a float
+comparison turned into a true or false value) and no 64-bit `MULS.L`/`DIVS.L` in the engine code,
+while float-to-integer conversion uses `FINTRZ`, which the 68060 runs in hardware and the 68040 does
+not. So the binary runs on a 68060 only. Its FPU check is the 68060 one
+(`tools/check_fpu_unimplemented.py --cpu 68060`, allowlist `tools/fpu-unimplemented-allowlist-68060.json`:
+the C library and libgcc functions that keep a 64-bit multiply or divide, and the three FMOVECR
+error branches the 68040 build allows too). Every 68040 engine build also builds this 68060 engine of the same
+profile as `AmiWind060` (receipt `engine_68060` in `engine-build.json`), and the game disk carries both with
+`AmiWindCPU`, which picks it at boot on a 68060 ([68060](68060.md#both-engines-on-the-game-disk)); the 68040
+build records the 68060 traps it has (`fpu-unimplemented-68060.json`).
+
+Measured 16 October 2026 on the v0.0.42 line (88f2ad8, the c profile; the 68040 binary is
+byte-identical to the v0.0.41 release engine):
+
+| | 68040 build | 68060 build |
+| --- | --- | --- |
+| Binary | 1,071,824 bytes | 1,043,608 bytes (-2.6 %) |
+| `fscc` | 309 (in 171 engine functions) | 0 |
+| 64-bit `MULS.L`/`MULU.L` | 156 (151 in 68 engine functions: GCC divides by constants that way; 5 in the C library) | 6 (C library, libgcc) |
+| 64-bit `DIVS.L`/`DIVU.L` | 8 (libgcc) | 8 (libgcc) |
+| `FINTRZ` | 0 | 934 |
+| Warnings | 0 | 0 |
 
 ## Optimisation levels
 

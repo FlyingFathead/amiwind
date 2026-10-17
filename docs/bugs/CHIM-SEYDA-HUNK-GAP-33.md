@@ -134,17 +134,17 @@ The builder's heap gate checks the whole map's Hunk against the 2 MiB safety, no
 Seyda Hunk gap of 2,091,392 bytes, 5,760 bytes below the 2 MiB safety. The
 reported post-zone map use exceeds its stated figure by 5,808 bytes. Load and
 scoped gameplay completed, but reserve safety remains open; no universal
-memory/performance or owner acceptance is established.
+memory/performance or maintainer acceptance is established.
 
 ## Scoped corrected-engine repeat, 13 October 2026
 
-The two isolated diagnostics at corrected source4b968c2 use unchanged RC1 assets. Initial Seyda first presentation reports current gap2,091,392 bytes and peak gap2,090,672, both under the2,097,152-byte safety target. After the same-map development restart, current gap2,113,264 is above the target, while first-presented peak gap1,586,032 is below it and the safety warning remains. Distinguish stable and peak values; gameplay and observed AmigaDOS exit do not establish reserve safety or normal-speed performance. Record this under the existing issue without claiming a new regression, new world coverage or owner acceptance.
+The two isolated diagnostics at corrected source4b968c2 use unchanged RC1 assets. Initial Seyda first presentation reports current gap2,091,392 bytes and peak gap2,090,672, both under the2,097,152-byte safety target. After the same-map development restart, current gap2,113,264 is above the target, while first-presented peak gap1,586,032 is below it and the safety warning remains. Distinguish stable and peak values; gameplay and observed AmigaDOS exit do not establish reserve safety or normal-speed performance. Record this under the existing issue without claiming a new regression, new world coverage or maintainer acceptance.
 
 ## Post-pin RC2 package observation, 14 October 2026
 
 Exact RC2 package native inspection repeats startup hunk-reserve warnings and zone-full chunks 100/107 retries after water and land return. A playable scene and successful guest exit do not prove complete chunk recovery, memory headroom or performance acceptance. This remains an existing open finding.
 
-These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Maintainer acceptance and final v0.0.39 clearance remain pending.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

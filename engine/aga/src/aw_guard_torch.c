@@ -145,8 +145,10 @@ static void command(void)
         lights,last_lights,last_light_range,last_light_contents,last_light_trace,last_light_untested);
 }
 extern cvar_t aw_static_flames,aw_static_flames_nearest;
+static int flame_depth_limit(void);
 void AW_GuardTorchInit(void)
 {
+    aw_flame_depth_limit=flame_depth_limit;
     Cvar_RegisterVariable(&aw_static_flames_nearest);Cvar_RegisterVariable(&aw_static_flames);
     Cvar_RegisterVariable(&guards_torch_cycle);Cmd_AddCommand("aw_guardtorch",command);
 }
@@ -451,18 +453,26 @@ static float flame_size(const aw_static_flame_t *f)
 {
     return f->shape[0]>f->scale*1.5f?f->shape[0]:f->scale*1.5f;
 }
-/* Could any particle of this flame land in the view rectangle? Same
- * projection as flame_particle; flames behind the camera never can. */
-static int flame_on_screen(const aw_static_flame_t *f,const vec3_t delta)
+/* How far a particle of this flame can land from its origin. */
+static float flame_reach(const aw_static_flame_t *f)
 {
-    float depth=DotProduct(delta,vpn),reach,x,y,margin;
-    reach=flame_size(f)+f->shape[2]+(f->shape[0]>0?f->shape[1]:2.7f*(f->scale<2.5f?f->scale:2.5f));
+    return flame_size(f)+f->shape[2]+(f->shape[0]>0?f->shape[1]:2.7f*(f->scale<2.5f?f->scale:2.5f));
+}
+/* Could any particle within reach of this origin land in the view rectangle?
+ * Same projection as flame_particle; flames behind the camera never can. */
+static int flame_reach_on_screen(const vec3_t delta,float reach)
+{
+    float depth=DotProduct(delta,vpn),x,y,margin;
     if(depth<=-reach)return 0;
     if(depth<=1)return 1; /* the flame straddles the camera plane: flame_particle decides */
     x=DotProduct(delta,vright)*aliasxscale/depth;y=DotProduct(delta,vup)*aliasyscale/depth;
     margin=16+reach*(aliasxscale>aliasyscale?aliasxscale:aliasyscale)/depth;
     return aliasxcenter+x>=r_refdef.vrect.x-margin && aliasxcenter+x<=r_refdef.vrect.x+r_refdef.vrect.width+margin &&
            aliasycenter-y>=r_refdef.vrect.y-margin && aliasycenter-y<=r_refdef.vrect.y+r_refdef.vrect.height+margin;
+}
+static int flame_on_screen(const aw_static_flame_t *f,const vec3_t delta)
+{
+    return flame_reach_on_screen(delta,flame_reach(f));
 }
 /* Choose at most STATIC_FLAME_DRAW flames within STATIC_FLAME_RANGE into
  * chosen[], best first; returns the count. nearest: the earlier rule (nearest
@@ -487,6 +497,42 @@ int AW_StaticFlamesPick(const aw_static_flame_t *flames,int count,int nearest,in
         key[j]=k;chosen[j]=i;
     }
     return n;
+}
+/* aw_fog.c fog-exact far test (aw_cull 2 and up): the smallest z-buffer value
+ * (32768/depth, as flame_particle writes it) any flame particle drawn after
+ * the fog pass can have this frame. Geometry whose values are at most this
+ * hides no flame, so leaving it out cannot reveal one. Every flame that could
+ * be drawn counts (all static fires in range, every listed guard torch, the
+ * player's torch), each at its origin's depth plus the farthest a particle
+ * travels from it (flame_on_screen's reach). 32767 when none can be drawn. */
+static int flame_limit(const vec3_t origin,float reach,int limit)
+{
+    vec3_t delta;float depth;int z;
+    VectorSubtract(origin,r_refdef.vieworg,delta);
+    if(!flame_reach_on_screen(delta,reach))return limit;
+    depth=DotProduct(delta,vpn)+reach+1;
+    if(!(depth>1))return limit;
+    z=(int)(32768/depth);
+    return z<limit?z:limit;
+}
+static int flame_depth_limit(void)
+{
+    int i,limit=32767;vec3_t delta,player;const aw_static_flame_t *f;
+    if(!flame_pixels)return limit;
+    if(aw_view_torch_emitter && aw_view_torch_emitter(player))limit=flame_limit(player,4.2f,limit);
+    for(i=0;i<visible_count;i++)if(guards[i].active)limit=flame_limit(guards[i].flame,4.2f,limit);
+    if(aw_static_flames.value && cl.worldmodel){
+        /* Not read yet for this map (AW_StaticFlamesDraw reads it): unknown
+         * flames, so nothing may be left out this frame. */
+        if(cl.worldmodel!=static_flame_world)return 0;
+        for(i=0;i<static_flame_count;i++){
+            f=&static_flames[i];
+            VectorSubtract(f->origin,r_refdef.vieworg,delta);
+            if(DotProduct(delta,delta)>STATIC_FLAME_RANGE)continue;
+            limit=flame_limit(f->origin,flame_reach(f),limit);
+        }
+    }
+    return limit;
 }
 void AW_StaticFlamesDraw(void)
 {

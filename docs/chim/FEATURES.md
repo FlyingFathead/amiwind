@@ -14,7 +14,7 @@ The headline measured gains. Each links to its feature, which says what was comp
 - **Every asset stored once:** Seyda Neen with the intro docks and the courtyard: 190.4 MB to 7.83 MB (24.3 times smaller). *builder output, 9 October 2026.* [Details](#every-asset-stored-once)
 - **Streaming with no region stop:** Bytes read on the Balmora door walk: 73.5 MB to 40.7 MB. *builder output, 8 October 2026.* [Details](#streaming-with-no-region-stop)
 - **Incremental frame world:** At most 16 KB copied per update instead of 405 KB; 85 chunk copies instead of 4,504. *emulator, relative, busy host, 9 October 2026.* [Details](#incremental-frame-world)
-- **Chunk pinning: no holes in the town:** Steps with a chunk missing its ground inside the collision margin on the owner's Balmora route: 860 to 0. *host simulation, 9 October 2026.* [Details](#chunk-pinning-no-holes-in-the-town)
+- **Chunk pinning: no holes in the town:** Steps with a chunk missing its ground inside the collision margin on the maintainer's Balmora route: 860 to 0. *host simulation, 9 October 2026.* [Details](#chunk-pinning-no-holes-in-the-town)
 - **No disk writes during play:** Time spent "not validated" during play: 3.7 % to 0 %; write bursts during play: 6 in 410 s to 0 in 1,355 s. *emulator, relative, busy host, 9 October 2026.* [Details](#no-disk-writes-during-play)
 - **Quake's visibility culling kept effective:** Brush models sent to the renderer: 512-654 to 46-114; BSP nodes walked per clipped face: 27-52 to 8.6-9.9. *exact counts, 8 October 2026.* [Details](#quakes-visibility-culling-kept-effective)
 - **Faster frames in town:** Slow preset (cycle-exact 68040 at about 50 MHz): median frame 2.0-4.1 s to 1.1-1.6 s, 1.6-2.6 times faster. *emulator, relative, busy host, 9 October 2026.* [Details](#faster-frames-in-town)
@@ -44,7 +44,7 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | [Pure CHIM towns: no legacy maps shipped](#pure-chim-towns-no-legacy-maps-shipped) | World format and disk | Balmora and Seyda Neen (with the intro docks and the courtyard) are drawn only by CHIM; the legacy region maps of a CHIM town are neither built nor shipped. Seyda Neen is regenerated from your data, so the temporary heap bypass for three recorded maps ends. | not measured |
 | [Streaming with no region stop](#streaming-with-no-region-stop) | Streaming and memory | The land is cut into chunks of 256 units. A ring of chunks around the player is resident and chunks join and leave a little at a time, within a per-frame budget, so crossing a region border no longer loads a whole map. | 40.7 MB read instead of 73.5 MB on the door walk |
 | [Incremental frame world](#incremental-frame-world) | Streaming and memory | When a chunk joins or leaves the ring, only the leaves it touches are relinked, instead of rebuilding the whole frame world on every crossing. The full rebuild is kept as a selectable method (chim_graft_mode 0). | 16 KB copied per update instead of 405 KB |
-| [Chunk pinning: no holes in the town](#chunk-pinning-no-holes-in-the-town) | Streaming and memory | Chunks are pinned only while they load, farther chunks give way first, small blocks come from the high end of the memory zone and the ground never waits for a building. A chunk shows as soon as its ground is in. | holes on the owner's route 860 to 0 |
+| [Chunk pinning: no holes in the town](#chunk-pinning-no-holes-in-the-town) | Streaming and memory | Chunks are pinned only while they load, farther chunks give way first, small blocks come from the high end of the memory zone and the ground never waits for a building. A chunk shows as soon as its ground is in. | holes on the maintainer's route 860 to 0 |
 | [Zone walk gate](#zone-walk-gate) | Builder and tools | The builder runs the engine's own zone code over a walk through every frame and fails the build when a step leaves the player without ground. | not measured |
 | [Strict heap gate and a fixed chunk zone](#strict-heap-gate-and-a-fixed-chunk-zone) | Streaming and memory | CHIM reserves one chunk zone of fixed size in the Hunk when a town loads. The builder checks every CHIM area against the engine's own numbers (active ring, load ring, largest block) before the game ever runs. | Seyda Neen passes the strict heap gate with room to spare |
 | [No disk writes during play](#no-disk-writes-during-play) | Engine | Diagnostic logs stay in memory during play and are written on request or when the game is left, so a closed emulator or a power cut no longer lands in the middle of a write and leaves the volume "not validated". | time "not validated" in play 3.7 % to 0 % |
@@ -293,7 +293,7 @@ Chunks are pinned only while they load, farther chunks give way first, small blo
 
 **Measured gain:**
 
-- Steps with a chunk missing its ground inside the collision margin on the owner's Balmora route: 860 to 0. Compared: the engine's own zone allocator run over the route twice (1,192 steps), first methods against all methods with defaults; Seyda Neen sweep of the frame with rows 128 units apart: 107 to 0. *host simulation, 9 October 2026.*
+- Steps with a chunk missing its ground inside the collision margin on the maintainer's Balmora route: 860 to 0. Compared: the engine's own zone allocator run over the route twice (1,192 steps), first methods against all methods with defaults; Seyda Neen sweep of the frame with rows 128 units apart: 107 to 0. *host simulation, 9 October 2026.*
 - In the emulator on the same route: nearest chunk without ground 69 units to 438 units away, failed chunk loads 180 to 95, bytes read 24.8 MB to 16.7 MB. Compared: CHIM preview engine against the repaired engine with its defaults, JIT preset, seven poses with a short walk at each, twice. *exact counts, 9 October 2026.*
 
 **Visibility:** Pinning decides which chunks are resident, not how they are culled; placements stay linked to the leaves they touch.
@@ -301,7 +301,7 @@ Chunks are pinned only while they load, farther chunks give way first, small blo
 **Caveats:**
 
 - Some loads still fail for lack of room (far buildings); a larger zone budget would halve the remaining gaps and waits for the memory measurements (CHIM-ZONE-BUDGET-33).
-- The repaired engine awaits the owner's playtest.
+- The repaired engine awaits the maintainer's playtest.
 
 **Read more:** [Draft v0.0.33 release notes, Balmora's holes](../RELEASE-v0.0.33.md#lets-fix-those-bugs); [CHIM engine: memory](ENGINE.md#memory).
 
@@ -367,7 +367,7 @@ Placements are linked to the leaves they touch, terrain is world geometry with s
 
 - CHIM draws slightly more spans than the legacy maps at every camera.
 - Per-placement lists block 11.5 % of the visibility tests in Balmora (CHIM-PVS-HOLLOW-33): hollow house shells let rows see through buildings.
-- A few models dominate every view; distance detail is the owner (CHIM-VIEW-FACES-33).
+- A few models dominate every view; distance detail is the maintainer (CHIM-VIEW-FACES-33).
 
 **Read more:** [CHIM engine: vis and culling](ENGINE.md#vis-and-culling); [World streamer: visibility requirement](../WORLD_STREAMER.md#visibility-and-culling-requirement); [Town visibility](../performance/TOWN-VISIBILITY.md); [Renderer counters](../performance/RENDERER-COUNTERS.md).
 
@@ -418,7 +418,7 @@ A resident low-detail layer of the land for the frame and beyond its edge (maps/
 
 **Measured gain:**
 
-- Far layer in the low Hunk: 13.2 KB for Balmora; drawing it costs 30.6-43.7 ms per frame on the slow preset at the bridge and east-bank poses. Compared: the far layer on and off at the owner's bridge pose and the east-bank pose (docs/chim/FAR_TERRAIN.md, Cost). *emulator, relative, busy host, 9 October 2026.*
+- Far layer in the low Hunk: 13.2 KB for Balmora; drawing it costs 30.6-43.7 ms per frame on the slow preset at the bridge and east-bank poses. Compared: the far layer on and off at the maintainer's bridge pose and the east-bank pose (docs/chim/FAR_TERRAIN.md, Cost). *emulator, relative, busy host, 9 October 2026.*
 
 **Visibility:** The far layer is drawn beyond the ring the way the approved horizon draws land at the fog plane, from the same height samples as the chunk terrain; it is checked with the renderer counters against the v0.0.32 horizon before it counts.
 
@@ -735,7 +735,7 @@ Every CHIM mesh's coplanar triangles with one texture mapping become one convex 
 
 **Measured gain:**
 
-- Every mesh of the v0.0.36-dev3 world's CHIM areas: 101,153 to 99,052 faces with planar merge; the arrival ship 4,046 to 3,690 faces with closed seams (torn seam 2.2 % to 0) and about a seventh of the shape error. Compared: the converter against the mesh methods on the same meshes and profiles (prepare_mesh_bsp._prepare_model), owner's data. *exact counts, 11 October 2026.*
+- Every mesh of the v0.0.36-dev3 world's CHIM areas: 101,153 to 99,052 faces with planar merge; the arrival ship 4,046 to 3,690 faces with closed seams (torn seam 2.2 % to 0) and about a seventh of the shape error. Compared: the converter against the mesh methods on the same meshes and profiles (prepare_mesh_bsp._prepare_model), maintainer's data. *exact counts, 11 October 2026.*
 
 Lossless for every mesh except the meshopt+merge rows, each chosen by measurement (config/mesh-methods.json).
 

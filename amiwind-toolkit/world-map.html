@@ -310,7 +310,7 @@ const LAYERS = [
   {id: 'inspectable', name: '3D inspectable (corner triangles)', on: false, kind: 'mark', option: true,
    legend: [['#38e1ff', 'map available in your maps folder (click, then Inspect in 3D)']],
    mark: (g, c) => { if (inspectable(c)) badge(g, c); }},
-  {id: 'checked', name: 'Owner checked', on: true, kind: 'mark',
+  {id: 'checked', name: 'Maintainer checked', on: true, kind: 'mark',
    legend: [['#32cfa0', 'walked and accepted (thick outline)']],
    mark: (g, c) => { if (c.checked) outline(g, c, '#32cfa0', 3); }},
   {id: 'grid', name: 'Cell grid', on: false, kind: 'grid'},
@@ -1107,7 +1107,7 @@ $('metricsfile').onchange = e => {
   load(f, text => { if (setMetrics(JSON.parse(text))) metricsFileName = f.name; });
 };
 // Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
-const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.4'};
+const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.5'};
 let statusFileName = null;
 function stateJson() {
   const sel = picked && data ? data.cells.find(c => c.x === picked.x && c.y === picked.y) : null;
@@ -1301,7 +1301,7 @@ function describeBase(x, y, c, sep, noMetrics) {
     (here.length > 4 ? ' +' + (here.length - 4) : '') : '';
   return head + poiText + sep + 'map: ' + (c.map === 'full' ? 'full town/area' : c.map === 'terrain' ? 'topomap terrain' : 'no terrain') +
     sep + 'entities placed: ' + placedLabel(c.placed, c.original, c.map !== 'none') + sep + 'interiors converted: ' + c.interiors_converted + ' / ' + c.interiors +
-    sep + 'named places: ' + c.places + (c.checked ? sep + 'owner checked' : '');
+    sep + 'named places: ' + c.places + (c.checked ? sep + 'maintainer checked' : '');
 }
 // The interior-entrance marker under the cursor, if any (same transform as cellAt).
 function poiAt(e) {
@@ -1371,7 +1371,7 @@ const CHIM_BUCKETS = {
   terrain_complete: ['#7dffa6', 'Terrain complete: all audits passed, everything but actors converted'],
   complete_unlit: ['#7dffa6', 'Cell complete, awaiting lighting: everything but the lighting audit (zebra, white border)', CHIM_ZEBRA],
   terrain_complete_unlit: ['#7dffa6', 'Terrain complete, awaiting lighting: everything but actors and the lighting audit (zebra)', CHIM_ZEBRA],
-  approved: ['#ffd23f', 'owner-approved'], playtested: ['#2ec4b6', 'playtested'], audits_passed: ['#46c37b', 'passed (something still deferred)'],
+  approved: ['#ffd23f', 'maintainer-approved'], playtested: ['#2ec4b6', 'playtested'], audits_passed: ['#46c37b', 'passed (something still deferred)'],
   converted_failing: ['#e5484d', 'converted, failing audits'], not_converted: ['#c2185b', 'not converted (tried, could not finish)'], converted_unmeasured: ['#6ea4df', 'converted, nothing measured'],
   not_started: ['#3a4f66', 'not started'], empty_sea: ['#2f7fa6', 'empty sea (terrain and water only)'], hull_policy_pending: ['#b07ae0', 'hull policy pending'],
   ocean: ['#c0c6cc', 'Open ocean: shared ocean chunk made, not yet placed in the game (no LAND record)']};
@@ -1490,7 +1490,7 @@ function chimLegend() {
   if (m === 'legacy') return Object.entries(CHIM_GRADES).map(([g, c]) => [c, 'legacy ' + g + ': ' + ({A: 'full map, 80 %+ placed', B: 'full town/area map', C: 'terrain, some placed', D: 'terrain only', E: 'no terrain'}[g]), 'chim:grade:' + g]);
   if (m === 'bugs') return [['#1f3b73', 'open bugs linked to the cell (few)'], ['#ef4545', 'many']];
   if (m === 'lastbuild') return [['#1f3b73', 'quick last build'], ['#ef4545', 'slow'], ['#555f6b', 'no ledger entry']];
-  return Object.entries({passed: 'passed', failed: 'failed', accepted: 'failed, owner-accepted', not_measured: 'not measured'}).map(([k, t]) => [CHIM_AUDIT[k], chimMech(m.slice(6)) + ': ' + t, 'chim:audit:' + k]);
+  return Object.entries({passed: 'passed', failed: 'failed', accepted: 'failed, maintainer-accepted', not_measured: 'not measured'}).map(([k, t]) => [CHIM_AUDIT[k], chimMech(m.slice(6)) + ': ' + t, 'chim:audit:' + k]);
 }
 function chimIsComplete(c) { return c.chim.bucket === 'complete' || c.chim.bucket === 'complete_unlit'; }
 // Zebra only for the awaiting-lighting statuses, only in the status colouring.
@@ -1738,7 +1738,7 @@ function chimTotalsBlock() {
       .map(([g, label]) => '<details><summary>' + label + '</summary>' + chimCatTable(g.by_category) + '</details>').join('') + '</details>';
 }
 
-// ---- The store-once chart (owner, 2026-10-09: "what is this chart trying to tell?"). The title is the takeaway; two panels
+// ---- The store-once chart (maintainer, 2026-10-09: "what is this chart trying to tell?"). The title is the takeaway; two panels
 // with 14 px+ text, every legend OUTSIDE the plot, a log axis so the no-reuse line fits, ring labels staggered above panel (a).
 const MESH_COL = {store: '#4fc3f7', risk: '#ffcf55', own: '#ff7b72'};
 const MESH_SENTENCE = 'Spiral order grows one contiguous playable area from the coast inwards. Risk order meets the most distinct meshes first, so a bug in a mesh shows up early.';
@@ -1892,7 +1892,7 @@ function showChimCell(x, y) {
     '<h3>Stats</h3>' + chimStatsTable(c.stats, c.chim.converted) + chimErrorsBlock(c) +
     '<h3>Legacy mapping quality (before CHIM)</h3>' + (lg ? '<p>' + chimSpan(CHIM_GRADES[lg.grade], 'grade ' + lg.grade + ': ' + lg.grade_label) + '<br>entities placed ' + placedLabel(lg.placed, lg.original, !!c.land) +
       (lg.placed_share == null ? '' : ' (' + pct(lg.placed_share, 1) + ')') + ' · interiors converted ' + lg.interiors_converted + ' / ' + lg.interiors + ' · named places ' + lg.places +
-      (lg.checked ? ' · owner checked' : '') + '</p>' : '<p>not measured</p>') +
+      (lg.checked ? ' · maintainer checked' : '') + '</p>' : '<p>not measured</p>') +
     '<h3>Audits</h3>' + (c.chim.converted ? '<table class="mt"><thead><tr><th class="l">Mechanism</th><th class="l">Result</th><th class="l">Detail</th><th class="l">Build</th></tr></thead><tbody>' + audits + '</tbody></table>' : '<p>not converted yet: nothing to audit</p>') +
     '<h3>Provenance</h3><p>' + (pv ? 'build ' + escapeHtml(pv.build) + ' (' + escapeHtml(pv.label || '') + ') · source commit ' + escapeHtml(pv.source_commit || 'not recorded') + ' · CHIM ' + escapeHtml(pv.chim_version || '?') +
       ' · world format ' + escapeHtml(pv.world_format || '?') + ' · built ' + escapeHtml((pv.built_at || '').replace('T', ' ').slice(0, 16)) : 'not in a CHIM build') +

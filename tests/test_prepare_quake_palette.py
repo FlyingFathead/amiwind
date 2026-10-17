@@ -23,6 +23,14 @@ class PaletteTests(unittest.TestCase):
         expected=strip.getpalette()[:672]+[102,119,136]*30+[238,221,170,0,0,0]
         self.assertEqual(prepare_quake.scene_palette(samples),expected)
 
+    def test_image_step_refuses_a_sky_fallback_with_owned_data(self):
+        # SKY-FLAT-PALETTE-DRIFT-41: the fallback shipped a flat sky behind one warning line.
+        source=(ROOT/'tools/build_aga.py').read_text(encoding='utf-8')
+        start=source.index('sky_asset_preparation = prepare_staged_sky(boot')
+        check=source.index("sky_asset_preparation.get('status')=='fallback_warning'",start)
+        self.assertLess(check,source.index('validate_world_ui(boot',start))
+        self.assertIn('raise ValueError',source[check:check+400])
+
     def test_explicit_palette_preserves_every_index(self):
         raw=bytes(range(256))*3
         samples=np.array([[1,2,3],[4,5,6]],dtype=np.uint8)

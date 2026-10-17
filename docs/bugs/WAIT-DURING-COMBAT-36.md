@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 10 October 2026, in v0.0.36-dev3 |
 | Where | engine/aga/src/aw_wait.c allowed(), the wait key |
 | Reproduction | always |

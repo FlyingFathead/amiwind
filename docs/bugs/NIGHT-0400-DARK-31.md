@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev4 |
 | Where | Balmora exterior lighting around 04:00 game time |
 | Reproduction | unknown |
@@ -21,7 +21,7 @@
 
 ## Status: 7 October 2026
 
-Open. Owner report on v0.0.31-dev4; cause unknown.
+Open. Maintainer report on v0.0.31-dev4; cause unknown.
 
 ## Symptom
 

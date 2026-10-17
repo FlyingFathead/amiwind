@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "aw_anim.h"
 
+extern void (*aw_demo_map_begin)(void);   /* aw_scenery.c, with the other CHIM map hooks */
+
 char *svc_strings[] =
 {
 	"svc_bad",
@@ -316,6 +318,12 @@ void CL_ParseServerInfo (void)
 
 // local state
 	cl_entities[0].model = cl.worldmodel = cl.model_precache[1];
+
+	/* AmiWind: a demo plays without a server, so the CHIM frame world that
+	 * SV_SpawnServer would graft onto the map is started here, from the map
+	 * the demo names (chim/chim_world.c DemoMap). NULL without CHIM. */
+	if (cls.demoplayback && !sv.active && aw_demo_map_begin)
+		aw_demo_map_begin ();
 
 	R_NewMap ();
 

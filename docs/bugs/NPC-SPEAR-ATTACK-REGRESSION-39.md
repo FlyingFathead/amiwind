@@ -4,25 +4,25 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 13 October 2026, in v0.0.39-rc1 |
 | Where | Seyda Neen guard combat viewed in first person |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.39-rc1 (last seen) |
-| Severity | critical: The owner reports a regression in visible guard combat during the stopped RC1 playtest. |
+| Severity | critical: The maintainer reports a regression in visible guard combat during the stopped RC1 playtest. |
 | Family | Actors and NPCs (`actors-npc`) |
 | Playtest version | v0.0.39-rc1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
-| Unknown because | Owner named RC1; the exact running image and binary were not independently read back for this report. |
+| Unknown because | Maintainer named RC1; the exact running image and binary were not independently read back for this report. |
 | Platform or emulator | unknown (Emulator not restated for this specific observation.) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
 
-In first-person view the owner no longer sees the guard spear-attack animation that worked before. The owner separately confirms the guard can kill the player; missing attack animation and actual combat damage are different observations.
+In first-person view the maintainer no longer sees the guard spear-attack animation that worked before. The maintainer separately confirms the guard can kill the player; missing attack animation and actual combat damage are different observations.
 
 ## Where
 
@@ -31,11 +31,11 @@ Exact running binary, map pose and appearance details require capture/readback.
 
 ## How it happened
 
-Cause is not yet established. Do not substitute an implementation hypothesis for the owner observation.
+Cause is not yet established. Do not substitute an implementation hypothesis for the maintainer observation.
 
 ## Why it was not caught
 
-Earlier scoped checks did not establish this exact visual behavior in the owner scenario. Successful damage, movement, model parsing or unrelated animations do not prove this animation or shape is correct.
+Earlier scoped checks did not establish this exact visual behavior in the maintainer scenario. Successful damage, movement, model parsing or unrelated animations do not prove this animation or shape is correct.
 
 ## Reproduction
 
@@ -47,11 +47,11 @@ No repair is claimed. RC2 is required; final release preparation and delivery we
 
 ## Verification
 
-Owner-reported regression; exact first failing version, package/model/layout binding and previous working capture still require comparison. Existing [ANIMKIT-COVERAGE-35](ANIMKIT-COVERAGE-35.md) tracks broader NPC animation coverage; this report preserves the specific spear regression.
+Maintainer-reported regression; exact first failing version, package/model/layout binding and previous working capture still require comparison. Existing [ANIMKIT-COVERAGE-35](ANIMKIT-COVERAGE-35.md) tracks broader NPC animation coverage; this report preserves the specific spear regression.
 
 ## Prevention
 
-Require an exact-package native reproduction and repaired capture of this scenario, with unaffected first/third-person behavior and normal-speed timing as controls. Keep automated checks, target observation and owner acceptance separate.
+Require an exact-package native reproduction and repaired capture of this scenario, with unaffected first/third-person behavior and normal-speed timing as controls. Keep automated checks, target observation and maintainer acceptance separate.
 
 ## Activation and authored stance are separate, 13 October 2026
 
@@ -59,15 +59,15 @@ The exact RC1 diagnostic confirms that same-map reload can prevent the packaged 
 
 ## Authored spear attack candidate, 14 October 2026
 
-RC2 source selects authored weapontwowide attack/hit for equipped weapon type6 in resident conversion. Forty-three focused tests pass; unchanged runtime damage/mover ABI. The generic-pose mismatch predates RC1; same-map mover registration is a separate repaired regression. Exact affected assets, native package and owner acceptance remain pending.
+RC2 source selects authored weapontwowide attack/hit for equipped weapon type6 in resident conversion. Forty-three focused tests pass; unchanged runtime damage/mover ABI. The generic-pose mismatch predates RC1; same-map mover registration is a separate repaired regression. Exact affected assets, native package and maintainer acceptance remain pending.
 
 The original steel spear has weapon type 6. Its two-hand-wide chop/hit keys replace generic hand-to-hand sampling for live equipped resident movers; other weapon types keep their prior behavior. Reuse existing alias animation timing and item attachment machinery. Dead static bodies are unaffected.
 
 ## Post-pin RC2 package observation, 14 October 2026
 
-Exact-source 690 staged diagnostic footage shows guard pursuit and changing strike poses, with hits reducing health 995 to 899 then 882.3. Post-exit readback verifies 21 movers plus engine, bootcheck and catalogue (24 files). This supports scoped chase/attack and preserved damage, not damage balance or complete spear attachment alignment. Final RC2 disk readback separately verifies the 21 equipped-resident files and palette binding; it does not turn the staged diagnostic into final-package guard native acceptance. Matched OpenMW and owner acceptance remain pending.
+Exact-source 690 staged diagnostic footage shows guard pursuit and changing strike poses, with hits reducing health 995 to 899 then 882.3. Post-exit readback verifies 21 movers plus engine, bootcheck and catalogue (24 files). This supports scoped chase/attack and preserved damage, not damage balance or complete spear attachment alignment. Final RC2 disk readback separately verifies the 21 equipped-resident files and palette binding; it does not turn the staged diagnostic into final-package guard native acceptance. Matched OpenMW and maintainer acceptance remain pending.
 
-These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Maintainer acceptance and final v0.0.39 clearance remain pending.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

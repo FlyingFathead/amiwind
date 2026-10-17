@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 10 October 2026, in v0.0.35 |
 | Where | engine/aga/src/aw_music.c refill(): synchronous music read in the main loop |
 | Reproduction | sometimes |
@@ -48,7 +48,7 @@ still wait are listed in [ENGINE-SYNC-IO-MAIN-LOOP-36](ENGINE-SYNC-IO-MAIN-LOOP-
 
 With the player left idle for a few minutes on the legacy open-world terrain outside any settlement, the picture
 stops, keys and the console have no effect, and the music keeps looping its last fraction of a second. The session
-has to be ended. The owner saw it several times on FS-UAE playing v0.0.35, the last time around sundown.
+has to be ended. The maintainer saw it several times on FS-UAE playing v0.0.35, the last time around sundown.
 
 ## Where
 
@@ -81,7 +81,7 @@ Two parts:
    debugger followed by heavy host-file traffic from the remote console (it rewrites its state file twice per
    emulated second, about 35 times faster under warp); without either, no freeze. In v0.0.30 it appeared during
    region loads (map reads and music reads at the same moment). The layer that drops the reply (file system
-   handler, hard file device or the emulator's host disk thread) is not identified, and the owner's own trigger (an
+   handler, hard file device or the emulator's host disk thread) is not identified, and the maintainer's own trigger (an
    emulator pause such as the FS-UAE menu, a host stall) is not shown.
 
 Earlier leads the soak run did **not** confirm as the trigger: dusk and the night lamps switching on (they switch on
@@ -99,7 +99,7 @@ at about 16:10 game time; real-speed runs across dusk did not freeze), long play
 
 ## Reproduction
 
-Sometimes. Owner: stand idle on legacy terrain outside a settlement for several minutes, across sundown (FS-UAE).
+Sometimes. Maintainer: stand idle on legacy terrain outside a settlement for several minutes, across sundown (FS-UAE).
 Soak harness (same pose for every variant, A/B/C/D with replicas):
 
 | Variant | Emulator speed | Debugger break | Remote console | Ran | Freeze |

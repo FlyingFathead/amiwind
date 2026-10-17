@@ -54,12 +54,12 @@ static const char *front_items[]={"New game","Load game","Options","Exit game"};
 static const char *items[]={"Return to game","New game","Save game","Load game","Options","Main menu"};
 
 /* Options list rows (Back is OPTION_ROWS-1). Display settings first. */
-enum {OPT_FOG,OPT_RESET,OPT_FRAME,OPT_CROSSHAIR,OPT_PHOTO,OPT_INTERFACE,OPT_AUDIO,OPT_CONTROLS,
+enum {OPT_FOG,OPT_RESET,OPT_FAR,OPT_FRAME,OPT_CROSSHAIR,OPT_PHOTO,OPT_INTERFACE,OPT_AUDIO,OPT_CONTROLS,
     OPT_AUTOSAVE,OPT_AREA,OPT_METHOD,OPT_BUFFER,OPT_GRAPHICS};
 #define ROW_Y 54
 #define ROW_H 19
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-#define OPTION_ROWS 14
+#define OPTION_ROWS 15
 static int brightness_options,brightness_drag;
 extern int R_BrightnessStep(int outside);
 extern void R_BrightnessSetStep(int outside,int value);
@@ -70,7 +70,7 @@ static void brightness_reset(void){brightness_options=brightness_drag=0;}
 static void brightness_back(void){brightness_reset();selection=OPT_GRAPHICS;mouse_visible=0;}
 static void brightness_pointer(void){R_BrightnessSetStep(brightness_drag-1,10+((mouse_x-BRIGHTNESS_X)*5+BRIGHTNESS_W/2)/BRIGHTNESS_W);}
 #else
-#define OPTION_ROWS 13
+#define OPTION_ROWS 14
 #define brightness_active() 0
 #define brightness_reset() ((void)0)
 #endif
@@ -193,6 +193,13 @@ static void option_step(int key,int rows){
     if(key==K_UPARROW){if(selection>0)selection--;}
     else if(selection<rows-1)selection++;
 }
+/* Options > Far detail: the far test (aw_cull, aw_fog.c; saved in config.cfg).
+ * Full draws everything to the fog; the others leave out distant models
+ * (docs/performance/FAR-TEST.md). Other aw_cull values (console) read Custom. */
+static const int far_values[4]={1,3,4,6};
+static const char *const far_names[4]={"Full","Light","Strong","Strong + small faces"};
+static int far_index(void){int i,v=(int)Cvar_VariableValue("aw_cull");for(i=0;i<4;i++)if(far_values[i]==v)return i;return -1;}
+static void far_step(int direction){int i=far_index();i=i<0?0:(i+direction+4)%4;Cvar_SetValue("aw_cull",far_values[i]);}
 static int front_height(void){int size=AW_UIFontSize();return size>=16?18:16;}
 static int front_top(void){return 192-4*front_height();}
 static int front_width(void){int i,w=96,n;for(i=0;i<4;i++){n=AW_UIWidth(front_items[i])+16;if(n>w)w=n;}return w;}
@@ -372,6 +379,7 @@ void M_Keydown(int key){
         if(selection==OPT_GRAPHICS && (key==K_LEFTARROW || key==K_RIGHTARROW)){brightness_options=1;brightness_drag=0;selection=0;return;}
 #endif
         if(selection==OPT_FOG && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetDrawDistance(AW_DrawDistance()+(key==K_LEFTARROW?-1:1)*(keydown[K_SHIFT]?1:10));
+        if(selection==OPT_FAR && (key==K_LEFTARROW || key==K_RIGHTARROW))far_step(key==K_LEFTARROW?-1:1);
         if(selection==OPT_CROSSHAIR && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_CrosshairSet(!AW_CrosshairShown());
         if(selection==OPT_INTERFACE && (key==K_LEFTARROW || key==K_RIGHTARROW)){interface_options=1;selection=0;return;}
         if(selection==OPT_AUDIO && (key==K_LEFTARROW || key==K_RIGHTARROW)){audio_options=1;selection=0;return;}
@@ -383,6 +391,7 @@ void M_Keydown(int key){
         if(key==K_ENTER || key==K_MOUSE1){
             if(selection==OPT_FOG){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
             else if(selection==OPT_RESET)AW_SetDrawDistance(540);
+            else if(selection==OPT_FAR)far_step(1);
             else if(selection==OPT_FRAME)AW_UIFrameToggle();
             else if(selection==OPT_CROSSHAIR)AW_CrosshairSet(!AW_CrosshairShown());
             /* Photo mode needs the running game; the menu closes first so the
@@ -560,6 +569,7 @@ void M_Draw(void){
             switch(i){
             case OPT_FOG:sprintf(line,"Fog distance: %ld",(long)AW_DrawDistance());break;
             case OPT_RESET:strcpy(line,"Reset distance: 540");break;
+            case OPT_FAR:if(far_index()<0)strcpy(line,"Far detail: Custom");else sprintf(line,"Far detail: %s",far_names[far_index()]);break;
             case OPT_FRAME:strcpy(line,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off");break;
             case OPT_CROSSHAIR:strcpy(line,AW_CrosshairShown()?"Show crosshairs: On":"Show crosshairs: Off");break;
             case OPT_PHOTO:strcpy(line,AW_PhotoModeActive()?"Leave photo mode":"Photo mode");break;

@@ -9,7 +9,7 @@
 | Where | town importer door bank (tools/import_town.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | medium: The 128-row door limit was not checked, so extra rows would be dropped silently. |
 | Family | Engine table limits (`engine-limits`) |
 
@@ -80,6 +80,7 @@ Family: Engine table limits (`engine-limits`). Fixed engine tables (models, enti
 - FLORA-RESERVE-002 (no report page): Two world flora maps exceed storage and clipnode reserves
 - GEO-04 (no report page): Canonical-terrain world rebuild fails VIS (too many portals)
 - [INTERIOR-COORDS-31](INTERIOR-COORDS-31.md): Some interiors place objects beyond the +/-4096 coordinate range
+- [INTERIOR-EXCLUDE-STALE-41](INTERIOR-EXCLUDE-STALE-41.md): Two Vivec rooms stayed left out on heap numbers from an older build
 - [INTERIOR-INLINE-LIMIT-31](INTERIOR-INLINE-LIMIT-31.md): Every interior object is its own inline model: 220 objects per interior at most
 - [LAMPS-CACHE-31](LAMPS-CACHE-31.md): Night lamps beyond 96 per 3x3 cells are silently dropped (Vivec)
 - [MODEL-MARKSURF-SIGNED-31](MODEL-MARKSURF-SIGNED-31.md): Face indices above 32,767 in leaf face lists become bad pointers

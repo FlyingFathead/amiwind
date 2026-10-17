@@ -1,8 +1,30 @@
 # Running AmiWind on real Amiga hardware
 
-AmiWind has so far been tested in emulators (FS-UAE: A1200, AGA, 68040 with FPU, 2 MiB Chip and 16 MiB Fast RAM,
-JIT). No run on a real Amiga has been measured yet. If you have one, this page lists what the game needs, what to
-run first, and which settings use more memory. Measurements from real machines are very welcome: see
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Contents](#contents-1)
+- [What the game needs](#what-the-game-needs)
+- [Before you start: 68060 and Kickstart 3.1](#before-you-start-68060-and-kickstart-31)
+- [First measure, then play](#first-measure-then-play)
+- [More Fast RAM: the memory settings that exist today](#more-fast-ram-the-memory-settings-that-exist-today)
+- [Disk buffers and RAM disks](#disk-buffers-and-ram-disks)
+- [A cache test plan](#a-cache-test-plan)
+- [Compatibility roadmap](#compatibility-roadmap)
+- [Not yet: automatic sizing and non-blocking disk reads](#not-yet-automatic-sizing-and-non-blocking-disk-reads)
+- [What to send back](#what-to-send-back)
+
+<!-- contents end -->
+
+AmiWind is developed in emulators (FS-UAE: A1200, AGA, 68040 with FPU, 2 MiB Chip and 16 MiB Fast RAM,
+JIT). The first figure from a real Amiga came from a tester in October 2026: an earlier build on an A4000 with a
+68060 at 100 MHz ran at about 0.2 frames per second, about 0.1 above the same tester's emulator runs. That is not
+playable yet; making the frame cheaper is the main engine work now ([AmiWind on the 68060](68060.md)). More real
+measurements, with the details listed under [what to send back](#what-to-send-back), are what turn emulator figures
+into predictions for real machines. If you have one, this page lists what the game needs, what to run first, and
+which settings use more memory. Measurements from real machines are very welcome: see
 [how to report](#what-to-send-back).
 
 ## Contents
@@ -30,15 +52,22 @@ run first, and which settings use more memory. Measurements from real machines a
 
 ## Before you start: 68060 and Kickstart 3.1
 
-On a 68060 with Kickstart 3.1, install your own `68060.library` and let the game load it at boot:
-[FPU support library](FPU_SUPPORT_LIBRARY.md) (your own copy; it is never shipped). Without it the start-up check
-stops at the FPU line: [BOOT-68060-FPU-FAIL-32](bugs/BOOT-68060-FPU-FAIL-32.md) (open).
+On a 68060 with Kickstart 3.1, the game needs your own copy of `68060.library`, which it loads at boot (AmiWind
+never ships it; see [FPU support library](FPU_SUPPORT_LIBRARY.md)). Without it the start-up check stops at the FPU
+line: [BOOT-68060-FPU-FAIL-32](bugs/BOOT-68060-FPU-FAIL-32.md) (open).
+
+From v0.0.42 the game disk has two engines and starts `AmiWind060` on a 68060 (the boot console says which). The
+68040 engine makes a 68060 emulate 73,000 to 424,000 instructions per frame at the benchmark places (measured on
+an emulated 68060; what that costs on a real one is estimated at up to about 40 % of a 5 s frame), the 68060 engine
+about 3: [trapped instructions per frame](68060.md#trapped-instructions-per-frame). 68060 owners, please report
+the build, `dbg fps`, the `dbg rcount` lines at the benchmark cameras, and whether `68060.library` and `SetPatch`
+are installed; a file `S:AmiWind-68040` starts the 68040 engine instead, to compare both.
 
 ## First measure, then play
 
 `awbench` measures the machine without any game data: CPU and FPU speed, Chip and Fast RAM throughput, disk
-transfers and the CPU time left while the disk reads. Run it first, so there are numbers even if the game does not
-start: [hardware benchmark](HARDWARE-BENCHMARK.md).
+transfers and the CPU time left while the disk reads. Running it first gives useful numbers even if the game does
+not start ([hardware benchmark](HARDWARE-BENCHMARK.md)).
 
 In the game, `dbg rcount` (what each frame draws) and `dbg logs live on` (writes frame stalls, cell load times and
 a walk profile to log files) give the numbers that matter most ([console commands](AMIWIND_CONSOLE_COMMANDS.md)).
@@ -57,8 +86,9 @@ These are in the engine now ([CHIM engine](chim/ENGINE.md), [memory guide](chim/
 
 The chunk and model cache evicts what was used longest ago (LRU), and loading has a per-frame budget.
 
-On a machine with a lot of Fast RAM, for example an accelerator with 128 or 256 MiB, start with a larger cache and
-heap, such as `-chimcache 32768 -heapmb 32`, and compare the numbers with the defaults.
+On a machine with a lot of Fast RAM, for example an accelerator with 128 or 256 MiB, a larger cache and heap such
+as `-chimcache 32768 -heapmb 32` is a good first try; the interesting part is how its numbers compare with the
+defaults.
 
 ## Disk buffers and RAM disks
 
@@ -66,8 +96,8 @@ heap, such as `-chimcache 32768 -heapmb 32`, and compare the numbers with the de
   name); `AddBuffers DW1: 100` adds 100 more (it adds, it does not set the total). They are small FFS buffers that
   mostly hold filesystem blocks such as the ones that locate data inside large files, not a large data cache.
   `awbench buffers DRIVE N` repeats the disk test with another buffer count ([hardware benchmark](HARDWARE-BENCHMARK.md)).
-- **Block cache tools.** A third-party disk cache may help, but try it as a comparison with and without, not as a
-  requirement.
+- **Block cache tools.** A third-party disk cache may help. It is not required, and it is best judged by
+  comparing runs with and without it.
 - **RAM disk.** `RAM:` can hold a few frequently used files, but the game data is gigabytes, the files must be copied
   in at every start, saves must stay on a real disk, and a RAM disk copy plus CHIM's own cache keeps the same data
   twice. CHIM's own cache (`-chimcache`) is the better first choice: it keeps what the engine actually uses, already
@@ -84,17 +114,18 @@ Suggested settings to compare (not measured recommendations; keep the heap at it
 | Medium | `-chimcache 32768` |
 | Large | `-chimcache 65536` |
 
-For each: a cold start, then the same walk twice through Seyda Neen, Balmora and Vivec. Note the load times, the
-worst stalls, and the sound (does the music skip). The console command `chim` prints the cache bank's use, loads,
+Each run is a cold start followed by the same walk, twice, through Seyda Neen, Balmora and Vivec. The useful
+notes are the load times, the worst stalls and the sound (whether the music skips). The console command `chim` prints the cache bank's use, loads,
 evictions and file reads; `dbg rcount` adds the per-frame counts.
 
 On accelerators whose Fast RAM comes in more than one region, the regions may differ in speed or in what a disk
-controller can reach by DMA; if a large cache behaves oddly, note how much memory the card has and where.
+controller can reach by DMA. If a large cache behaves oddly, how much memory the card has, and where, helps explain
+it.
 
 
 ## Compatibility roadmap
 
-Planned (owner decisions, 16 October 2026; [roadmap](ROADMAP.md#near-future-one-game-for-the-68040-and-the-68060-16-october-2026)).
+Planned (project decisions, 16 October 2026; [roadmap](ROADMAP.md#near-future-one-game-for-the-68040-and-the-68060-16-october-2026)).
 The baseline stays: the game is built and checked for an accelerated Amiga with the reference memory, and
 everything below only adds to it.
 
@@ -109,7 +140,7 @@ The 68060 part has its own page, with what is known, the rules and the steps: [A
   library folder after building. The boot script loads the one matching the CPU.
 - **A clear message instead of a crash.** If the CPU needs a library that is not on the disk, the game says which
   file is missing and where to put it.
-- **A boot notice when a 68060 is found without its library** (owner, 16 October 2026): a field set apart by
+- **A boot notice when a 68060 is found without its library** (maintainer, 16 October 2026): a field set apart by
   dashed lines the width of the screen, saying that a 68060 was detected, that `68060.library` was not found, how
   to get the most out of the CPU, where to put the library on the game disk, and how to build the game with it
   (the `amiga-libs` folder next to `Data Files`). The notice waits a few seconds with a countdown and continues;
@@ -130,7 +161,6 @@ Planned ([roadmap](ROADMAP.md), the cache plan above):
 
 ## What to send back
 
-The machine (model, CPU and its revision, clock, FPU, Chip and Fast RAM, Kickstart, disk or card), the `awbench`
-results, and from the game: where you were, the `dbg rcount` lines, the log files of `dbg logs live`, and a
-screenshot. Report through
-the project's issue tracker on GitHub.
+A useful report describes the machine (model, CPU and its revision, clock, FPU, Chip and Fast RAM, Kickstart, disk
+or card) and includes the `awbench` results. From the game, it helps to have where you were, the `dbg rcount`
+lines, the log files of `dbg logs live` and a screenshot. Reports go to the project's issue tracker on GitHub.

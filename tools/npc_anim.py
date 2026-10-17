@@ -519,7 +519,7 @@ def in_place(skeleton, entries):
     return KitSkeleton(skeleton, [(skeleton, float(t), root_xy if moving else None) for t, moving in entries])
 
 
-# ---- profile policies, byte budget and frame subsets (owner decision 2026-10-09: residents stand in
+# ---- profile policies, byte budget and frame subsets (project decision 2026-10-09: residents stand in
 # 'react' and wear the 'full' model only while they move: companion, followers, fighters)
 
 ALIAS_BYTE_BUDGET = 512 * 1024      # the engine's alias stream staging limit (model.c AW_ALIAS_STAGING_LIMIT)

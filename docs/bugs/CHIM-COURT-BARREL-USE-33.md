@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33 |
 | Where | Seyda Neen CHIM frame maps (tools/chim/frame_map.py), engine aw_opening.c |
 | Reproduction | always |

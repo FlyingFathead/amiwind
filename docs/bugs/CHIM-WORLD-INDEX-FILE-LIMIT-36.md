@@ -9,7 +9,7 @@
 | Where | engine/aga/src/chim/chim_world.c ReadIndex; tools/chim/format.py write_index |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | critical: every CHIM frame map of the v0.0.36-dev3 image is refused (Host_Error), so no CHIM town loads |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | World format ([CHIM Engine tracker](CHIM_TRACKER.md)) |

@@ -20,6 +20,21 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- contents start -->
+## Contents
+
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Symptom
 In v0.0.41-dev5 the stair gate walked 2.67 million steps and ramps in 8 min 52 s (15.8 cores). Its only
 failure was a step in a classic neighbour cell (Vos, (11,14)), walked as a copy in the border of the new
@@ -45,16 +60,47 @@ Any full build: the stair gate's step count is several times the island's distin
 see [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md).
 
 ## Repair
-Planned (v0.0.42 builder fixes): walk each flight once, in the frame that owns it, plus the margin the
-engine lets a player stand in before it switches map; border copies of classic cells are left to the
-classic map's own gate. The per-flight result is recorded by its SHA-256 so every frame that copies it
-reuses it.
+On the v0.0.42 line (branch v0.0.42-stairs; not in v0.0.41):
+
+- A CHIM region frame's stair walk covers its walk area (`chim.collision.frame_walk_areas`): the cell it owns
+  (`core` in the build's ownership table `chim-regions.json`) plus the engine's map-switch margin (`leave_margin`,
+  64 units: `aw_world.c` `AW_WorldDestination`) plus the standing box's half width (7.32): 71.32 units past the cell
+  on every side. A step or ramp whose riser point lies farther out is a copy, walked in the frame that owns its cell,
+  or for a classic cell on that cell's own map by the image step's stair walk. A town's frame is walked whole.
+- The steps, ramps and flight marks are still found on the whole 1024-unit core; only the walking is restricted
+  (`stair_task_in`), so every row is the row the whole-frame walk gives for the same step and a flight crossing
+  the area's edge keeps its mark. Cores outside the area are no tasks.
+- An area walk is its own record (key = the frame's key plus its area; walker digest of `stair_task_in`), so the
+  whole-frame records keep their keys. When a frame has an unchanged whole-frame walk stored, its area walk is taken
+  from it without walking (`derive_area_rows`: the whole-frame rows inside the area) and kept with `derived_from`;
+  under the development rule a whole-frame walk that failed only on a border copy becomes a pass of the cell. The
+  seeded sample walks derived frames again too.
+- `--stair-walk-area frame` (`AMIWIND_STAIR_WALK_AREA`, also a `tools/chim_build.py` option) keeps the earlier
+  whole-frame walk.
+- The report and the log give the rows against the distinct places they test (`walk_counts`); over 1.2 rows per
+  place is a warning.
 
 ## Verification
-Pending: step count before and after on the same world, and the same failures found.
+- tests/test_chim_stair_area.py: the area rows are byte for byte the whole-frame rows inside the area; a failure in
+  the owned cell is still found, one inside the switch margin too, one past it is not; `frame` mode is the earlier
+  walk; cores outside the area are no tasks; an unchanged whole-frame walk gives the area walk with nothing walked,
+  is stored as a pass and reused, and is sampled; a failing area is not derived from an unchecked walk; a
+  misplaced ownership row is refused.
+- v0.0.41 final CHIM world (726 frames: 723 region frames, 3 towns), the count step's steps and ramps: whole frames
+  2,672,454 for 869,846 distinct places (3.07 per place); walk areas 853,398 for 771,793 places (1.11 per place:
+  the strips along shared edges that both neighbours walk, and the town frames). 98,053 places are left to other
+  maps: 97,927 lie in cells no region frame owns (classic cells, the towns), 19 are the same place one unit off,
+  and 107 lie in CHIM cells where only a neighbour frame's copy detects them (a borderline step that the cell's own frame, at its own coordinates, does not count as one; 2 of them flight steps
+  of one Telvanni spiral ramp, `ex_t_spiralramp`, reference 162877: [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md)).
+- The dev5 failure, two-frame world (12,13 and 12,14, dev5 source): whole frames 4,151 rows, failed on the Vos copy
+  in both frames, 13.6 s; walk areas 890 rows, passed, 8.0 s (12 workers, no stored walks).
+- Same failure, three-frame world with Vos on CHIM (11,14 + 12,13 + 12,14, dev5 source before the temple fix):
+  whole frames 6,171 rows, 3 failures (Vos's own frame and the two copies), 15.6 s; walk areas 1,604 rows, 1
+  failure: reference 177306 in Vos's own frame (11,14), 9.0 s (16 workers). The failure rows are the same rows.
 
 ## Prevention
-The build report lists walked steps against distinct steps; a ratio over 1.2 is flagged.
+The stair report and the log list the rows against the distinct places they test (`walk_counts`); a ratio over 1.2
+is printed as a warning.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -73,10 +119,12 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-PER-WORKSPACE-33](BUILD-CACHE-PER-WORKSPACE-33.md): Per-file caches live in each build workspace, so a build on a new volume with --reuse-from converts everything again (MiniWind media 1,195 s instead of seconds)
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
+- [BUILD-CHIM-SOURCE-REPEAT-41](BUILD-CHIM-SOURCE-REPEAT-41.md): The CHIM stage parsed the whole master and read the same models again for every area: 723 source stages took 24,500 CPU seconds
 - [BUILD-CHIM-STAGE-IDLE-START-36](BUILD-CHIM-STAGE-IDLE-START-36.md): The chim stage of the 270-frame coast build spends its first 35-45 minutes on 1-4 cores while it holds 12-24 workers
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build)
 - [BUILD-CHIM-STATS-SERIAL-TAIL-36](BUILD-CHIM-STATS-SERIAL-TAIL-36.md): The chim stage ended with its statistics validating the whole CHIM world a second time, on one core with no output (7 min 44 s on 273 frames)
 - [BUILD-CHIM-UNIT-HULL-KEY-33](BUILD-CHIM-UNIT-HULL-KEY-33.md): CHIM unit cache ignores the standing-hull form: a --model-hull chain build reused routed-hull model units
+- [BUILD-CHIM-WORLD-SERIAL-TAIL-41](BUILD-CHIM-WORLD-SERIAL-TAIL-41.md): After the region frames the CHIM world conversion prepared the towns one after another and worked out 723 frames' visibility rows in turn: about 7 minutes on 1 to 5 of 24 cores
 - [BUILD-DOOR-REFERENCE-SERIAL-33](BUILD-DOOR-REFERENCE-SERIAL-33.md): The door step reads the whole master once per destination cell
 - [BUILD-ENGINE-SOURCE-KEY-BROAD-36](BUILD-ENGINE-SOURCE-KEY-BROAD-36.md): Any engine source edit changes the keys of the chim and world-flora stages
 - [BUILD-ENV-FINGERPRINT-GLOBAL-33](BUILD-ENV-FINGERPRINT-GLOBAL-33.md): The stair rule setting invalidates the reuse cache of every build stage, including stages that never read it
@@ -105,9 +153,11 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
 - [BUILD-PRERENDERED-PRUNE-ORDER-33](BUILD-PRERENDERED-PRUNE-ORDER-33.md): Prerendered store prune picks the superseded entry by folder name when two entries share a timestamp
 - [BUILD-PROFILE-JOBS-START-ONLY-33](BUILD-PROFILE-JOBS-START-ONLY-33.md): The build profile compares a stage's cores with the workers it started with, not the ones it held
+- [BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42](BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42.md): The build profiler's sampled timeline counts a finished child process twice
 - [BUILD-PROFILE-SECTIONS-MISSING-36](BUILD-PROFILE-SECTIONS-MISSING-36.md): Long builder phases printed no elapsed time and recorded no sections: the chim stage's 44-minute stair gate was visible only from cache file times
 - [BUILD-PROFILER-NO-WASTE-ALARM-36](BUILD-PROFILER-NO-WASTE-ALARM-36.md): No profiler, perf ledger or gate flagged idle cores, work done for maps that are removed, or growth of the image
 - [BUILD-PROGRESS-ETA-BASIS-36](BUILD-PROGRESS-ETA-BASIS-36.md): The live build progress took a stage's expected time from earlier runs of any size: dev3's chim stage was expected at 154 s and ran 1 h 48 min
+- [BUILD-REUSE-APPLY-SERIAL-41](BUILD-REUSE-APPLY-SERIAL-41.md): A reused stage staged its files one at a time: world terrain, scenery and flora took 8 to 12 seconds each, one after another, at the start of every reuse build
 - [BUILD-REUSE-KEYS-TOO-BROAD-35](BUILD-REUSE-KEYS-TOO-BROAD-35.md): A whole build reused no stage, and the cost was not visible before the build started
 - [BUILD-REUSE-TMP-UNDECLARED-33](BUILD-REUSE-TMP-UNDECLARED-33.md): A stage that runs while a reused stage is copied becomes non-reusable
 - [BUILD-SCHEDULER-EVEN-SHARE-33](BUILD-SCHEDULER-EVEN-SHARE-33.md): The stage scheduler splits the workers evenly between running stages, so the longest stage gets no more than the shortest (MiniWind media on 1 of 4 workers for 1,195 s)
@@ -116,6 +166,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-SILENT-PHASES-36](BUILD-SILENT-PHASES-36.md): Builder phases run silent: no start/end timing, no progress, no heartbeat; the CHIM stats step is a single-core tail
 - [BUILD-STAGE-INTERRUPT-ABSORBED-36](BUILD-STAGE-INTERRUPT-ABSORBED-36.md): The stage wrapper absorbed Ctrl-C: a stage that handled the interrupt and returned 0 counted as passed, and the build went on
 - [BUILD-STAGE-START-SHARE-33](BUILD-STAGE-START-SHARE-33.md): A pooled stage that starts while others run gets one worker as its start value
+- [BUILD-STAIR-GATE-OOM-42](BUILD-STAIR-GATE-OOM-42.md): The CHIM stair gate runs a whole-Vivec MiniWind out of memory: its worker pool breaks
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them
@@ -126,11 +177,15 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-PVS-SLOW-33](CHIM-PVS-SLOW-33.md): Seyda Neen's CHIM visibility rows take 5.5 minutes and are rebuilt whenever the worker count changes
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
+- [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
+- [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 
 Related bugs in other categories:
 
 - [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
+- [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
+- [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
 
 <!-- END GENERATED CATEGORY -->

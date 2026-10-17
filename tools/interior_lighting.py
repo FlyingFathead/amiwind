@@ -35,7 +35,7 @@ WARM_MIN_LIGHT = 24
 # Per-cell lighting choices (cell name, case-insensitive). Cells without an
 # entry bake exactly as before. Coordinates are local units (original / 4).
 CELL_PROFILES = {
-    # Owner, opening scene (OPENING-BRIGHT-31): the start end of the hold at
+    # Maintainer, opening scene (OPENING-BRIGHT-31): the start end of the hold at
     # about half its v0.0.32 light, the lantern above Jiub warm. The original
     # attenuation and facing term as in the original. At the stern end (y
     # below about 0) all light at 0.71 and the ambient at a further 0.35

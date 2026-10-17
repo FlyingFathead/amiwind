@@ -9,7 +9,7 @@
 | Where | tools/town_config.py handoff_core default inset 96; chim_far.c draws beyond the fog plane only |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev1 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: Frame edge 96 units past the core, fog plane 540 ahead: 444 to 476 units of missing ground at the handover, every edge |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Rendering and visibility ([CHIM Engine tracker](CHIM_TRACKER.md)) |

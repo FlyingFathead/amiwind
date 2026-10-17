@@ -9,7 +9,7 @@
 | Where | tests/test_chim_format.py (switch fingerprint test) and in-process builder tests |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33 (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: The owner's Linux publish run (sequential unittest discover) fails two subtests; the product code is not affected |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -24,7 +24,7 @@ Fixed in the tests on the v0.0.33 release line. No product code changed.
 
 ## Symptom
 
-The owner's Linux publish run of v0.0.33 runs the whole suite in one process (`unittest discover`). Two
+The maintainer's Linux publish run of v0.0.33 runs the whole suite in one process (`unittest discover`). Two
 subtests of `test_build_switches_change_the_tool_fingerprint` (the standing-hull switch, mesh and variant
 units) failed: the fingerprint did not change when the switch was set.
 

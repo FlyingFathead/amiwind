@@ -9,7 +9,7 @@
 | Where | CI workflow docker-builder job (tools/build_docker.py check) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33 (last seen) |
+| Persists in | fixed in v0.0.34 |
 | Severity | low: Every revision waits for a second full suite run; no wrong result. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

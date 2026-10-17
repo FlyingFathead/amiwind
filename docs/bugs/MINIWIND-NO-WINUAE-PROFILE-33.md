@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | Private playtest packaging of MiniWind builds (the package step after the builder's image) |
 | Reproduction | always |
@@ -26,7 +26,7 @@ type (MiniWind, development, release candidate, final).
 
 ## Symptom
 
-The owner unpacked a MiniWind playtest package to play it in WinUAE and found only an FS-UAE profile.
+The maintainer unpacked a MiniWind playtest package to play it in WinUAE and found only an FS-UAE profile.
 The v0.0.32 playtest packages had a launcher and a WinUAE configuration generated for the build.
 
 ## Where

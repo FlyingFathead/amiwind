@@ -24,7 +24,7 @@ def resolve(argv):
 
 class BuilderOptionTests(unittest.TestCase):
     def test_shipped_default_is_chim_with_balmora_and_seyda(self):
-        # v0.0.33, owner decision: the first CHIM release ships Balmora and Seyda Neen on CHIM; v0.0.36 (owner decision
+        # v0.0.33, project decision: the first CHIM release ships Balmora and Seyda Neen on CHIM; v0.0.36 (project decision
         # 2026-10-11, Vivec stage A): the Vivec Arena joins them.
         shipped = json.loads((ROOT / 'config/build-defaults.json').read_text(encoding='utf-8'))
         self.assertEqual((shipped['builder'], shipped['chim_areas']), ('chim', ['balmora', 'seyda', 'vivec_city']))

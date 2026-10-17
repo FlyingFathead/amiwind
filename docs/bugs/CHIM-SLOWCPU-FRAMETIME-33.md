@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | engine frame time on a slow CPU: CHIM Balmora exterior (placements, host frame) |
 | Reproduction | always |
@@ -40,9 +40,9 @@
 ## Status: 9 October 2026
 
 Not a CHIM regression: CHIM is faster than legacy on the x14 preset in the preview-engine run
-(same session, same poses). Slow-hardware optimisation deferred to after v0.0.33 (owner decision).
+(same session, same poses). Slow-hardware optimisation deferred to after v0.0.33 (project decision).
 The measurement used the private CHIM preview engine (0d8bf4f, world format 0.4); the run with
-the release-line engine was stopped by the owner before it produced verified poses.
+the release-line engine was stopped by the maintainer before it produced verified poses.
 
 ## Symptom
 

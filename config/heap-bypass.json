@@ -8,7 +8,7 @@
       "builder": "legacy",
       "until": "CHIM M2 (Seyda Neen on CHIM)",
       "bug": "HEAP-SEYDA-OVERLAP-32",
-      "decision": "Owner decision A, 8 October 2026: v0.0.32 ships the recorded v0.0.31 Seyda Neen map (BUILD-SEYDA-REGEN-30), which exceeds the modelled reserve allowance only (-238,180 bytes in the dev1 estimate), as a temporary bypass until Seyda Neen is built by CHIM."
+      "decision": "Project decision A, 8 October 2026: v0.0.32 ships the recorded v0.0.31 Seyda Neen map (BUILD-SEYDA-REGEN-30), which exceeds the modelled reserve allowance only (-238,180 bytes in the dev1 estimate), as a temporary bypass until Seyda Neen is built by CHIM."
     },
     {
       "map": "sn026.bsp",
@@ -16,7 +16,7 @@
       "builder": "legacy",
       "until": "CHIM M2 (Seyda Neen on CHIM)",
       "bug": "HEAP-SEYDA-OVERLAP-32",
-      "decision": "Owner decision A, 8 October 2026: v0.0.32 ships the recorded v0.0.31 Seyda Neen map (BUILD-SEYDA-REGEN-30), which exceeds the modelled reserve allowance only (-104,356 bytes in the dev1 estimate), as a temporary bypass until Seyda Neen is built by CHIM."
+      "decision": "Project decision A, 8 October 2026: v0.0.32 ships the recorded v0.0.31 Seyda Neen map (BUILD-SEYDA-REGEN-30), which exceeds the modelled reserve allowance only (-104,356 bytes in the dev1 estimate), as a temporary bypass until Seyda Neen is built by CHIM."
     },
     {
       "map": "sn035.bsp",
@@ -24,7 +24,7 @@
       "builder": "legacy",
       "until": "CHIM M2 (Seyda Neen on CHIM)",
       "bug": "HEAP-SEYDA-OVERLAP-32",
-      "decision": "Owner decision A, 8 October 2026: v0.0.32 ships the recorded v0.0.31 Seyda Neen map (BUILD-SEYDA-REGEN-30), which exceeds the modelled reserve allowance only (-12,148 bytes in the dev1 estimate), as a temporary bypass until Seyda Neen is built by CHIM."
+      "decision": "Project decision A, 8 October 2026: v0.0.32 ships the recorded v0.0.31 Seyda Neen map (BUILD-SEYDA-REGEN-30), which exceeds the modelled reserve allowance only (-12,148 bytes in the dev1 estimate), as a temporary bypass until Seyda Neen is built by CHIM."
     }
   ]
 }

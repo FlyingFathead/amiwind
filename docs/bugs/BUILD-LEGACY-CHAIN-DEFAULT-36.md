@@ -13,13 +13,13 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 10 October 2026, in v0.0.36-dev1 |
 | Where | tools/build.py: --chim-native-towns default off, --legacy-area accepted with a warning |
 | Reproduction | always |
 | Duplicate of | no |
 | Persists in | fixed in v0.0.36-dev3 |
-| Severity | high: Playtest images prepared Balmora's CHIM frame through the legacy chain against the owner's direction |
+| Severity | high: Playtest images prepared Balmora's CHIM frame through the legacy chain against the maintainer's direction |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.36-dev1 playtest builds (--legacy-area balmora) |
@@ -109,7 +109,7 @@ selectable.
 
 ## Prevention
 
-A method replaced by owner decision goes into the retired-flags table in the same change, so developer-mode
+A method replaced by project decision goes into the retired-flags table in the same change, so developer-mode
 builds refuse it instead of warning. Related: [CHIM-LEGACY-CHAIN-33](CHIM-LEGACY-CHAIN-33.md).
 
 ## Persisting

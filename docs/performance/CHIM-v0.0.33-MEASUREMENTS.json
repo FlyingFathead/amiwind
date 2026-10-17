@@ -838,7 +838,7 @@
       "id": "chunkload",
       "file": "amiwind-v0.0.33-chim-chunkload.png",
       "title": "Balmora holes: chunk loading before and after the repair",
-      "subtitle": "The owner's route through Balmora (seven poses, a short walk at each, twice), CHIM preview engine against the repaired engine with its defaults (CHIM-CHUNK-LOAD-FAIL-33). JIT preset.",
+      "subtitle": "The maintainer's route through Balmora (seven poses, a short walk at each, twice), CHIM preview engine against the repaired engine with its defaults (CHIM-CHUNK-LOAD-FAIL-33). JIT preset.",
       "series": [
         "CHIM preview engine",
         "CHIM repaired"
@@ -852,7 +852,7 @@
           "ratio": true,
           "rows": [
             {
-              "label": "Owner's route x2",
+              "label": "Maintainer's route x2",
               "values": [
                 24.8,
                 16.7
@@ -868,7 +868,7 @@
           "ratio": true,
           "rows": [
             {
-              "label": "Owner's route x2",
+              "label": "Maintainer's route x2",
               "values": [
                 180,
                 95
@@ -885,7 +885,7 @@
           "ratio": true,
           "rows": [
             {
-              "label": "Owner's route x2",
+              "label": "Maintainer's route x2",
               "values": [
                 69,
                 438

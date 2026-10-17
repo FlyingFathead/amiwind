@@ -9,8 +9,8 @@
 | Where | Morrowind data readers (src/mwad, tools/known_inputs.py, tools/content_closure.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
-| Severity | low: Readers could accept or misread unusual data silently; the owner base-game data is unaffected (outputs byte-identical). |
+| Persists in | fixed in v0.0.35 |
+| Severity | low: Readers could accept or misread unusual data silently; the user's base-game data is unaffected (outputs byte-identical). |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | none |
 | From commit | source and engine 6979d4f |
@@ -36,7 +36,7 @@ The readers grew separately, each with its own copy of the small helpers.
 
 ## Why it was not caught
 
-Owner data is well formed, so the differences never showed; found by code review.
+Maintainer data is well formed, so the differences never showed; found by code review.
 
 ## Reproduction
 
@@ -48,7 +48,7 @@ audit, paths (workspace.json) and prepare_scenery pin newline LF and UTF-8; test
 
 ## Verification
 
-tests/test_text_writers.py; stage outputs on the owner data compared by hash tree against the reuse source.
+tests/test_text_writers.py; stage outputs on the maintainer data compared by hash tree against the reuse source.
 
 ## Prevention
 

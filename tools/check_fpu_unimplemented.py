@@ -22,8 +22,21 @@ unimplemented instruction or references a bad function. Edges listed in the allo
 allowed to use it, and why) are cut. The check fails if any engine function
 (an input object outside the libraries) is bad, and names one call path.
 
+--cpu 68060 checks the 68060's set instead (docs/68060.md; ENGINE-060-FSCC-41): the 68060
+implements FINT and FINTRZ, but traps, besides the rest of the 68040's list and packed decimal
+operands, FScc, FDBcc and FTRAPcc, FMOVEM.X with a dynamic register list, FMOVEM.L of several
+control registers from an immediate, extended or packed immediate operands ("unimplemented
+effective address"), and the integer instructions 64-bit MULS.L/MULU.L (Dh:Dl result), 64-bit
+DIVS.L/DIVU.L (Dr:Dq dividend), MOVEP, CHK2, CMP2 and CAS2 (MC68060 User's Manual, sections
+"Unimplemented Integer Instructions" and "Unimplemented Floating-Point Instructions"; the
+68060 software package in the CPU library emulates them). Each trap site gets a kind (fpu,
+fscc, fdbcc, ftrapcc, fmovem-dynamic, fmovem-control-immediate, fpu-immediate, mul64, div64,
+movep, chk2, cmp2, cas2), counted per function in the report. MOVEP, CHK2, CMP2 and CAS2 are
+counted but never fail the check: GCC does not emit them from C, so in compiled code they are
+strings or tables that objdump decodes as instructions (a CR LF pair reads as MOVEP).
+
 Usage:
-  check_fpu_unimplemented.py --binary B --map M [--objdump PATH] [--allowlist J] [--report OUT.json]
+  check_fpu_unimplemented.py --binary B --map M [--cpu 68040|68060] [--objdump PATH] [--allowlist J] [--report OUT.json]
   check_fpu_unimplemented.py --disassembly D --map M ...   (pre-made objdump -d -r output)
 """
 import argparse
@@ -36,6 +49,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWLIST = ROOT / 'tools' / 'fpu-unimplemented-allowlist.json'
+ALLOWLIST_68060 = ROOT / 'tools' / 'fpu-unimplemented-allowlist-68060.json'
 # 68040 User's Manual, "Unimplemented floating-point instructions": emulated
 # by the FPSP. Plus packed decimal operands (size .p) on any instruction.
 UNIMPLEMENTED = frozenset('''facos fasin fatan fatanh fcos fcosh fetox fetoxm1 fgetexp fgetman
@@ -46,6 +60,15 @@ IMPLEMENTED = frozenset('''fabs fadd fsadd fdadd fbeq fbne fbgt fbge fblt fble f
     fbugt fbuge fbult fbule fbf fbt fcmp fdbcc fdiv fsdiv fddiv fmove fsmove fdmove fmovem fmul
     fsmul fdmul fneg fsneg fdneg fnop frestore fsave fscc fsgldiv fsglmul fsqrt fssqrt fdsqrt fsub
     fssub fdsub ftrapcc ftst fabs fsabs fdabs'''.split())
+# The 68060 runs FINT and FINTRZ in hardware; the rest of the 68040's list traps on it too.
+UNIMPLEMENTED_060 = UNIMPLEMENTED - {'fint', 'fintrz'}
+CONDITIONS = frozenset(('f eq ogt oge olt ole ogl or un ueq ugt uge ult ule ne t sf seq gt ge lt le gl gle '
+                        'ngle ngl nle nlt nge ngt sne st').split())
+FP_SIZES = 'bwlsdxp'
+# Trap kinds GCC never emits from C: in compiled objects they are decoded data.
+DECODE_ONLY = frozenset(('movep', 'chk2', 'cmp2', 'cas2'))
+CPUS = ('68040', '68060')
+DATA_REGISTER = re.compile(r'^%?d[0-7]$')
 INSTRUCTION = re.compile(r'^\s*([0-9a-f]+):\s+(?:[0-9a-f]{4} )+\s*(\S+)\s*(.*)$')
 ABSOLUTE = re.compile(r'(?<![#\w@(])0x([0-9a-f]+)|(?:^|\s)([0-9a-f]{3,8})(?= <)')
 PCREL = re.compile(r'%pc@\(0x([0-9a-f]+)\)')
@@ -65,6 +88,66 @@ def unimplemented(mnemonic):
     if size in 'bwlsdxp' and (base in UNIMPLEMENTED or base in IMPLEMENTED):
         return base in UNIMPLEMENTED or size == 'p'
     return False
+
+
+def allowlist_path(cpu='68040'):
+    """The allowlist of CPU: the 68040's, or the 68060-targeted build's."""
+    return ALLOWLIST_68060 if cpu == '68060' else ALLOWLIST
+
+
+def operands_of(text):
+    """Top-level operands of an objdump operand field (commas inside parentheses stay)."""
+    out, depth, current = [], 0, ''
+    for char in text.strip():
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+        if char == ',' and depth == 0:
+            out.append(current.strip())
+            current = ''
+        else:
+            current += char
+    if current.strip():
+        out.append(current.strip())
+    return out
+
+
+def trap_kind(mnemonic, operands='', cpu='68040'):
+    """The kind of trap this instruction takes on CPU, or None (it runs in hardware)."""
+    m = mnemonic.lower()
+    if cpu == '68040':
+        return 'fpu' if unimplemented(m) else None
+    if cpu != '68060':
+        raise ValueError('cpu must be one of %s' % (CPUS,))
+    ops = operands_of(operands)
+    if m.startswith('f'):
+        if m.startswith('fmovem'):
+            if any(DATA_REGISTER.match(op) for op in ops):
+                return 'fmovem-dynamic'
+            if any(op.startswith('#') for op in ops) and any('/' in op and 'fp' in op for op in ops):
+                return 'fmovem-control-immediate'
+            return None
+        for prefix, kind in (('fdb', 'fdbcc'), ('ftrap', 'ftrapcc'), ('fs', 'fscc')):
+            if m.startswith(prefix):
+                rest = m[len(prefix):]
+                if rest in CONDITIONS or (kind == 'ftrapcc' and rest[:-1] in CONDITIONS and rest[-1:] in 'wl'):
+                    return kind
+        base, size = (m[:-1], m[-1:]) if m[-1:] in FP_SIZES else (m, '')
+        known = base in IMPLEMENTED or base in UNIMPLEMENTED
+        if m in UNIMPLEMENTED_060 or base in UNIMPLEMENTED_060 or (size == 'p' and known):
+            return 'fpu'
+        if size == 'x' and known and any(op.startswith('#') for op in ops):
+            return 'fpu-immediate'
+        return None
+    if m in ('mulsl', 'mulul') and len(ops) == 3:
+        return 'mul64'      # objdump: "mulsl <ea>,dh,dl" is the 64-bit product; "mulsl <ea>,dl" 32-bit
+    if m in ('divsl', 'divul') and len(ops) == 3:
+        return 'div64'      # "divsl <ea>,dr,dq": 64-bit dividend; divsll/divull are 32-bit
+    for kind in ('movep', 'chk2', 'cmp2', 'cas2'):
+        if m.startswith(kind) and m[len(kind):] in ('', 'b', 'w', 'l'):
+            return kind
+    return None
 
 
 def read_map(text):
@@ -99,7 +182,7 @@ def is_library(obj):
     return '.a(' in obj or obj.endswith('.a') or '/lib/' in obj or obj.endswith('crt0.o')
 
 
-def analyse(disassembly, functions):
+def analyse(disassembly, functions, cpu='68040'):
     starts = [f[0] for f in functions]
     by_start = {f[0]: f[1] for f in functions}
 
@@ -143,8 +226,9 @@ def analyse(disassembly, functions):
         function = owner(address)
         if function is None:
             continue
-        if unimplemented(mnemonic):
-            sites.setdefault(function, []).append((address, '%x %s %s' % (address, mnemonic, operands.strip())))
+        kind = trap_kind(mnemonic, operands, cpu)
+        if kind:
+            sites.setdefault(function, []).append((address, '%x %s %s' % (address, mnemonic, operands.strip()), kind))
         for value in PCREL.findall(operands):
             refer(function, int(value, 16))
         absolute = [int(a or b, 16) for a, b in ABSOLUTE.findall(PCREL.sub('', operands))]
@@ -156,15 +240,18 @@ def analyse(disassembly, functions):
     # instructions carry relocations only in their operands
     # (ENGINE-FPU-DATA-DECODE-33).
     data = lambda address: any(address - k in relocated for k in range(4))
-    sites = {f: [text for address, text in rows if not data(address)] for f, rows in sites.items()}
+    sites = {f: [(text, kind) for address, text, kind in rows if not data(address)] for f, rows in sites.items()}
     sites = {f: rows for f, rows in sites.items() if rows}
     return sites, calls
 
 
-def check(disassembly, map_text, allowlist):
+def check(disassembly, map_text, allowlist, cpu='68040'):
     functions = read_map(map_text)
     objects = {name: obj for _, name, obj in functions}
-    sites, calls = analyse(disassembly, functions)
+    every, calls = analyse(disassembly, functions, cpu)
+    # Decoded data kinds are reported, never followed (DECODE_ONLY).
+    sites = {f: [text for text, kind in rows if kind not in DECODE_ONLY] for f, rows in every.items()}
+    sites = {f: rows for f, rows in sites.items() if rows}
     allowed = {}
     for row in allowlist.get('allowed', []):
         allowed[row['function']] = set(row['callers']) if row['callers'] != '*' else '*'
@@ -199,10 +286,22 @@ def check(disassembly, map_text, allowlist):
     used = {callee for caller, targets in calls.items() for callee in targets if cut(caller, callee)}
     unused = sorted(set(allowed) - used)
     total = sum(len(v) for v in sites.values())
-    return dict(passed=not failures, unimplemented_instructions=total,
-                functions_with_unimplemented={f: dict(object=objects.get(f, '?'), count=len(v))
-                                              for f, v in sorted(sites.items())},
-                engine_failures=failures, allowlist_unused=unused)
+    result = dict(passed=not failures, unimplemented_instructions=total,
+                  functions_with_unimplemented={f: dict(object=objects.get(f, '?'), count=len(v))
+                                                for f, v in sorted(sites.items())},
+                  engine_failures=failures, allowlist_unused=unused)
+    if cpu != '68040':
+        kinds = {}
+        for rows in every.values():
+            for _, kind in rows:
+                kinds[kind] = kinds.get(kind, 0) + 1
+        result.update(cpu=cpu, trap_kinds=dict(sorted(kinds.items())), decoded_data_kinds=sorted(DECODE_ONLY),
+                      functions_by_kind={
+                          f: dict(object=objects.get(f, '?'), engine=not is_library(objects.get(f, '')),
+                                  kinds={k: sum(1 for _, kk in rows if kk == k) for k in sorted({kk for _, kk in rows})},
+                                  first=[text for text, _ in rows[:3]])
+                          for f, rows in sorted(every.items())})
+    return result
 
 
 def main(argv=None):
@@ -211,8 +310,11 @@ def main(argv=None):
     src.add_argument('--binary', type=Path)
     src.add_argument('--disassembly', type=Path)
     p.add_argument('--map', type=Path, required=True)
+    p.add_argument('--cpu', choices=CPUS, default='68040',
+                   help="whose unimplemented set to check: 68040 (default) or 68060 (docs/68060.md)")
     p.add_argument('--objdump', default='m68k-amigaos-objdump')
-    p.add_argument('--allowlist', type=Path, default=ALLOWLIST)
+    p.add_argument('--allowlist', type=Path, default=None,
+                   help='default: tools/fpu-unimplemented-allowlist.json, with --cpu 68060 tools/fpu-unimplemented-allowlist-68060.json')
     p.add_argument('--report', type=Path)
     args = p.parse_args(argv)
     if args.binary:
@@ -220,12 +322,16 @@ def main(argv=None):
                                      check=True, capture_output=True, text=True).stdout
     else:
         disassembly = args.disassembly.read_text(encoding='utf-8', errors='replace')
-    allowlist = json.loads(args.allowlist.read_text(encoding='utf-8'))
-    result = check(disassembly, args.map.read_text(encoding='utf-8', errors='replace'), allowlist)
+    allowlist = json.loads((args.allowlist or allowlist_path(args.cpu)).read_text(encoding='utf-8'))
+    result = check(disassembly, args.map.read_text(encoding='utf-8', errors='replace'), allowlist, args.cpu)
     if args.report:
         args.report.write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8', newline='\n')
-    print('68040-unimplemented FPU instructions in the binary: %d in %d functions'
-          % (result['unimplemented_instructions'], len(result['functions_with_unimplemented'])))
+    label = '68040-unimplemented FPU' if args.cpu == '68040' else '68060-trapping'
+    print('%s instructions in the binary: %d in %d functions'
+          % (label, result['unimplemented_instructions'], len(result['functions_with_unimplemented'])))
+    if args.cpu != '68040':
+        print('  by kind: ' + (', '.join('%s %d' % kv for kv in result['trap_kinds'].items()) or 'none')
+              + ' (%s: decoded data, not counted)' % '/'.join(result['decoded_data_kinds']))
     for name, row in result['functions_with_unimplemented'].items():
         print('  %-28s %3d  %s' % (name, row['count'], Path(row['object']).name))
     for name in result['allowlist_unused']:
@@ -234,9 +340,10 @@ def main(argv=None):
         print('FAIL engine function %s (%s) reaches %s: %s'
               % (row['function'], Path(row['object']).name, ' -> '.join(row['path']), '; '.join(row['instructions'])))
     if not result['passed']:
-        print('Engine code reaches 68040-unimplemented FPU instructions (see ENGINE-FPU-UNIMPL-31).')
+        print('Engine code reaches %s instructions (see %s).'
+              % (label, 'ENGINE-FPU-UNIMPL-31' if args.cpu == '68040' else 'ENGINE-060-FSCC-41'))
         return 1
-    print('No engine function reaches a 68040-unimplemented FPU instruction outside the allowlist.')
+    print('No engine function reaches a %s instruction outside the allowlist.' % label)
     return 0
 
 

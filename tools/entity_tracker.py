@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Entity tracker: what the original game places versus what AmiWind places.
 
-Original side: every placed reference in the owner's master file (one row per
+Original side: every placed reference in the maintainer's master file (one row per
 placement: reference number, base record type, category, cell). AmiWind side:
 the reference numbers carried by the shipped maps' entities (`aw_ref`, written
 for scenery, doors, flora, harvest plants, NPCs and corpses). A reference
@@ -377,7 +377,7 @@ def build_gate(out, maps_dir, master_path, baseline=None, accepted_loss=None, jo
     print(terminal(result), end='', flush=True)
     dressing = None
     if dressing_terms:
-        # Keep a track of the interior dressing the image places (owner, BUILD-DRESSING-EXCLUDED-32).
+        # Keep a track of the interior dressing the image places (maintainer, BUILD-DRESSING-EXCLUDED-32).
         found = dressing_placements(master, by_map, dressing_terms)
         track = dict(format='AW-DRESSING-TRACK1', rules=list(dressing_terms),
                      pieces=sum(len(v) for v in found.values()),

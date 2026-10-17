@@ -131,6 +131,13 @@ class Zone:
 def block_sizes(world, sizes):
     """Zone request sizes (bytes, without the zone's header) for every model, texture, chunk
     catalogue and chunk terrain of the world (chim.validate.load_world layout)."""
+    model_bytes, model_tex, tex_bytes = model_tables(world, sizes)
+    frames = [(path, frame, frame_blocks(frame, chunks, sizes)) for path, frame, chunks in world['frames']]
+    return model_bytes, model_tex, tex_bytes, frames
+
+
+def model_tables(world, sizes):
+    """block_sizes' world tables: (model bytes, model textures, texture bytes)."""
     from chim import format as F
     from chim import heap as H
     hunk = sizes['hunk']
@@ -140,23 +147,28 @@ def block_sizes(world, sizes):
         model_bytes.append(H.image_bytes(lumps, sizes, point_hull_only=True) - hunk + 64)       # + chim_model_t's arena record
         model_tex.append(F.read_texture_refs(lumps[2]))
     tex_bytes = [H.texture_bytes(t['width'], t['height'], sizes) - hunk for t in world['textures']]
+    return model_bytes, model_tex, tex_bytes
+
+
+def frame_blocks(frame, chunks, sizes):
+    """block_sizes' entries of one frame's chunks (load_world / load_frame layout)."""
+    from chim import format as F
+    from chim import heap as H
+    hunk = sizes['hunk']
     entry = sizes.get('scenery', sizes['entity'])
-    frames = []
-    for path, frame, chunks in world['frames']:
-        out = []
-        for c in chunks:
-            lumps = F.read_brush_image(c['image'])
-            records = c['owned'] + c['reach']
-            out.append({
-                'catalogue': 64 + len(records) * (entry + 48 + sizes['pointer'] + 8) + len(c.get('pvs', b'')) +
-                len(c.get('pvl', b'')),
-                'terrain': H.image_bytes(lumps, sizes) - hunk + 64,
-                'terrain_textures': F.read_texture_refs(lumps[2]),
-                'models': sorted({r['model'] for r in records}),
-                'box': (frame['low'][0] + c['cx'] * frame['grain'], frame['low'][1] + c['cy'] * frame['grain'],
-                        frame['grain'])})
-        frames.append((path, frame, out))
-    return model_bytes, model_tex, tex_bytes, frames
+    out = []
+    for c in chunks:
+        lumps = F.read_brush_image(c['image'])
+        records = c['owned'] + c['reach']
+        out.append({
+            'catalogue': 64 + len(records) * (entry + 48 + sizes['pointer'] + 8) + len(c.get('pvs', b'')) +
+            len(c.get('pvl', b'')),
+            'terrain': H.image_bytes(lumps, sizes) - hunk + 64,
+            'terrain_textures': F.read_texture_refs(lumps[2]),
+            'models': sorted({r['model'] for r in records}),
+            'box': (frame['low'][0] + c['cx'] * frame['grain'], frame['low'][1] + c['cy'] * frame['grain'],
+                    frame['grain'])})
+    return out
 
 
 class Walker:
@@ -482,6 +494,42 @@ def _walk_route(task):
     return result
 
 
+_TABLES = {}
+
+
+def _world_tables(ref):
+    """The world's (model bytes, model textures, texture bytes) a worker reads once from walk's table file
+    (ref: (path, SHA-256)) and keeps for every later route of the step."""
+    path, digest = ref
+    if digest not in _TABLES:
+        import hashlib
+        import pickle
+        raw = Path(path).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != digest:
+            raise ValueError('zone walk tables %s: SHA-256 differs from the one the step wrote' % path)
+        _TABLES.clear()
+        _TABLES[digest] = pickle.loads(raw)
+    return _TABLES[digest]
+
+
+def _walk_route_at(item):
+    """Worker: (index, _walk_route result) of one indexed route (walk's completed map). The world's model and
+    texture tables come from the step's table file (read once per worker), not with every route: the parent
+    pickled them for each of 726 routes, on one core (BUILD-CHIM-STAGE-SERIAL-TAIL-36)."""
+    k, task, tables = item
+    model_bytes, model_tex, tex_bytes = _world_tables(tables)
+    chunks = task[4]
+    if isinstance(chunks, tuple) and chunks and chunks[0] == 'frame-file':
+        # the frame's block sizes from its own files (validate.load_frame: load_world's frame row byte for
+        # byte), in the worker instead of for every frame in the step's process
+        from chim.validate import load_frame
+        _, out, index, sizes = chunks
+        (_, frame, frame_chunks), _ = load_frame(out, index)
+        chunks = frame_blocks(frame, frame_chunks, sizes)
+    task = task[:4] + (chunks, model_bytes, model_tex, tex_bytes) + task[8:]
+    return k, _walk_route(task)
+
+
 def walk(lib_path, memory, world, sizes_tuple, routes, ends=None, release=1, partial=1, draw_distance=None,
          jobs=1, cache=None):
     """Run each route on a fresh zone; returns {route name: result}. jobs: routes on the shared worker pool
@@ -491,6 +539,30 @@ def walk(lib_path, memory, world, sizes_tuple, routes, ends=None, release=1, par
     if (jobs and jobs > 1 and len(routes) > 1) or cache is not None:
         tasks = [(str(lib_path), memory, settings, frames[k][1], frames[k][2], model_bytes, model_tex, tex_bytes,
                   positions, ends, release, partial, draw_distance, cache) for _, k, positions in routes]
+        import build_parallel
+        if jobs and jobs > 1 and len(routes) > 1 and build_parallel.active_stage_pool() is not None:
+            # on the stage's one pool, largest route first, each route handed back as it finishes with its
+            # progress line (fixlist B2, BUILD-CHIM-STAGE-SERIAL-TAIL-36); the report keeps the route order
+            import hashlib
+            import pickle
+            import progress_line
+            raw = pickle.dumps((model_bytes, model_tex, tex_bytes), protocol=4)
+            digest = hashlib.sha256(raw).hexdigest()
+            table_file = Path(lib_path).parent / ('zone-tables-%s.pickle' % digest[:16])
+            table_file.write_bytes(raw)
+            try:
+                order = sorted(range(len(tasks)), key=lambda k: -len(tasks[k][8]) * max(
+                    1, tasks[k][3]['nx'] * tasks[k][3]['ny']))
+                found = {}
+                light = [(k, tasks[k][:5] + (None, None, None) + tasks[k][8:], (str(table_file), digest))
+                         for k in order]
+                for k, r in build_parallel.completed_map(_walk_route_at, light, min(jobs, len(tasks))):
+                    found[k] = r
+                    progress_line.emit('CHIM zone walk gate', routes[k][0], '%d steps, %d without ground'
+                                       % (r['steps'], r['holes']), (len(found), len(tasks), 'frames'))
+            finally:
+                table_file.unlink()
+            return {name: found[k] for k, (name, _, _) in enumerate(routes)}
         if jobs and jobs > 1 and len(routes) > 1:
             from build_parallel import ordered_map
             done = ordered_map(_walk_route, tasks, min(jobs, len(tasks)), cost=lambda t: len(t[8]) * len(t[4]))
@@ -508,16 +580,18 @@ def walk(lib_path, memory, world, sizes_tuple, routes, ends=None, release=1, par
     return results
 
 
-def require_zone_walk(out, sdk=None, sizes=None, report_path=None, memory=None, spacing=256.0, step=24.0, jobs=1):
+def require_zone_walk(out, sdk=None, sizes=None, report_path=None, memory=None, spacing=256.0, step=24.0, jobs=1,
+                      world=None):
     """The build's CHIM zone walk gate: OUT/chim-zone-walk.json, and a ValueError when a walk over any
     frame leaves the player without ground (a chunk within the collision margin not active at the end
     of a step) or a chunk fails for bad data. Loads that found no room, chunks released for nearer
     ones and partial activations are reported (the engine's full-zone methods at their defaults); the
     budget itself is the heap gate's (chim.heap) and CHIM-ZONE-BUDGET-33's. Without sizes or an SDK the
-    gate is recorded as not run."""
+    gate is recorded as not run. world: the world the step's validation read (chim.validate.loaded_world),
+    else the files are read again."""
     import json
     from build_scratch import scratch_dir
-    from chim.validate import Failures, load_world
+    from chim.validate import loaded_world
     from chim import heap as H
     report_path = Path(report_path or Path(out) / 'chim-zone-walk.json')
     if sizes is None and sdk is None:
@@ -526,13 +600,20 @@ def require_zone_walk(out, sdk=None, sizes=None, report_path=None, memory=None, 
         if sizes is None:
             from check_world_map_heap import compile_target_sizes
             sizes = compile_target_sizes(sdk)[0]
-        fails = Failures()
-        settings, files, disk, textures, models, frames = load_world(out, fails)
-        if fails:
-            raise ValueError('CHIM zone walk gate: the world does not read back (%s)' % fails[0])
+        try:
+            settings, files, disk, textures, models, frames = loaded_world(out, world)
+        except ValueError as exc:
+            raise ValueError('CHIM zone walk gate: the world does not read back (%s)' % exc)
         world = {'settings': settings, 'textures': textures, 'models': models, 'frames': frames}
         memory = memory or H.engine_memory()
-        blocks = block_sizes(world, sizes)
+        import build_parallel
+        if jobs and jobs > 1 and len(frames) > 1 and build_parallel.active_stage_pool() is not None:
+            # on the stage's pool each route's worker sizes its own frame's chunks (read from the frame's files):
+            # the same blocks as block_sizes, without a pass over every chunk of the world in this process
+            blocks = model_tables(world, sizes) + ([(path, frame, ('frame-file', str(out), k, sizes))
+                                                    for k, (path, frame, _) in enumerate(frames)],)
+        else:
+            blocks = block_sizes(world, sizes)
         # The host library is built and loaded from the build's own scratch folder (build_scratch: the
         # run's scratch, else OUT/work): /tmp is often mounted noexec (Docker --tmpfs, hardened hosts),
         # where loading a shared object fails (CHIM-ZONE-TMP-NOEXEC-33, BUILD-TMP-SCRATCH-33).

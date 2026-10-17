@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-rc1 |
 | Where | Image step (tools/build_aga.py image/finalize_image) and stages without unit caches |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-rc1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: The rc1c image step failed 3,082 s in on a check the preflight runs in 7 s; the rerun redid all 2,724 maps of every pass (51.7 min). |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.33-rc1 builds rc1b and rc1c |

@@ -9,7 +9,7 @@
 | Where | tools/build_cache.py external_inputs (--npc-model-pool of balmora, area, interiors, towns) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: balmora (and every other stage given the pool folder) rebuilt in every build: hold-level reuse loss under the primary build imperative |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | MiniWind v0.0.35-dev1 animkit-companion |

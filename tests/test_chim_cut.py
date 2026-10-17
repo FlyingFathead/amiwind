@@ -210,7 +210,7 @@ class DetailBudgetTests(unittest.TestCase):
         self.assertEqual(detail_budget(None), {})
         vivec = detail_budget('vivec')
         self.assertEqual(vivec['meshes/x/ex_v_vivecstatue_02.nif'], 1200)
-        # the owner-approved deep budget: every 'vivec-wide' mesh, at or below its 'vivec-wide' target
+        # the maintainer-approved deep budget: every 'vivec-wide' mesh, at or below its 'vivec-wide' target
         wide, deep = detail_budget('vivec-wide'), detail_budget('vivec-deep')
         self.assertTrue(set(wide) <= set(deep))
         self.assertTrue(all(deep[k] <= wide[k] for k in wide))
@@ -248,7 +248,7 @@ class ReducerOptionTests(unittest.TestCase):
 
 
 class AreaCutSettingTests(unittest.TestCase):
-    """The cut as an area setting (Vivec M3 stage A, owner decision 2026-10-10): the Arena's config turns it on at
+    """The cut as an area setting (Vivec M3 stage A, project decision 2026-10-10): the Arena's config turns it on at
     512 units, Balmora and Seyda Neen keep every model whole, a build-wide value still wins, and flora stays
     whole until tiling it is measured."""
 

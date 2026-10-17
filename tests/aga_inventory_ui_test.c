@@ -129,9 +129,18 @@ int main(void){
     strcpy(fixture_item.model,"progs/inv/fixture.mdl");fixture_item.category=AW_INV_CLOTHING;
     fixture_item.slots=(1U<<AW_SLOT_LRING)|(1U<<AW_SLOT_RRING);fixture_item.flags=7;
     assert(AW_ItemAdd(&aw_state,fixture_item.id,2));
-    AW_InventoryOpen();assert(AW_InventoryActive() && key_dest==key_menu);draw();assert(preview_calls);
+    AW_InventoryOpen();assert(AW_InventoryActive() && key_dest==key_menu);draw();assert(preview_calls==1);
     assert(strstr(drawn,"Fixture Ring") && strstr(drawn,"Sort: Name"));
+    /* UI-INVENTORY-PREVIEW-STILL-42: a still picture: one render, then the same pose and the
+     * front angle frame after frame (the stub asserts the angle); turning keys do nothing. */
+    {int i;for(i=0;i<8;i++)draw();}
+    assert(preview_calls==1);
+    /* The footer offers turning only with the live preview (it is off here). */
+    assert(strstr(drawn,"Up/Down select") && !strstr(drawn,"Left/Right turn"));
+    AW_WorldUIKey(K_LEFTARROW,1);AW_WorldUIKey(K_RIGHTARROW,1);AW_WorldUIKey(K_RIGHTARROW,1);draw();
+    assert(preview_calls==1);
     AW_WorldUIKey('e',1);assert(AW_InventoryEquipped(&aw_state,fixture_item.id)==1);assert(store_calls && changed_calls);
+    draw();draw();assert(preview_calls==2);   /* the equipment changed: one new picture */
     AW_WorldUIKey('e',1);assert(!AW_InventoryEquipped(&aw_state,fixture_item.id));
     /* Right click selects the actual row; Enter-equivalent action is real. */
     AW_WorldUIMouse(-1000,-1000);AW_WorldUIMouse(160,60);AW_WorldUIKey(K_MOUSE3,1);draw();assert(strstr(drawn,"Equip"));

@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 8 October 2026, in v0.0.32-dev1 |
 | Where | Census and Excise Office hearth (static flame budget) |
 | Reproduction | always |
@@ -20,7 +20,7 @@
 
 ## Status: 8 October 2026
 
-Open: repaired in source (v0.0.32-fire-range), not yet in a built image. Reported by the owner
+Open: repaired in source (v0.0.32-fire-range), not yet in a built image. Reported by the maintainer
 on v0.0.32-dev1. Present since static flames got their per-frame budget (v0.0.30-dev5), so
 v0.0.31 behaves the same; not a v0.0.32 regression.
 
@@ -41,7 +41,7 @@ particle embers (`pt_awember`, `r_part.c`).
 Each frame the engine draws at most 12 static flames (`STATIC_FLAME_DRAW`) within 640 units, and
 chose the 12 nearest in any direction, without looking at the view or the flame size. The Census
 office has 51 `aw_flame` entities: one hearth (size 8) and 50 candles (size 0.8), most of them in
-fours on chandeliers. At the owner's pose 14 flames are nearer than the hearth (about 100 units
+fours on chandeliers. At the maintainer's pose 14 flames are nearer than the hearth (about 100 units
 away), 10 of them behind the camera, so the hearth ranked 15th and was never drawn. Closer to the
 fireplace it got into the nearest 12, which matches the report. The map's `aw_flame` entities are
 identical in v0.0.31 and dev1, and the selection code is unchanged since v0.0.31.

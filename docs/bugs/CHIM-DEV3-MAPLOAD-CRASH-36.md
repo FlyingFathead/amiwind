@@ -9,7 +9,7 @@
 | Where | engine/aga/src/aw_aread.c (c8bf614, HANG-IDLE-DUSK-35 fix) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | critical: playtest blocker: the published dev3 playtest cannot load a map in FS-UAE with its shipped preset |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

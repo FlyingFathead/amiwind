@@ -39,7 +39,7 @@
 ## Status: 8 October 2026
 
 Open; performance. Found by the strict CHIM heap gate (`tools/chim/heap.py`) on the first Seyda Neen
-world (milestone M2) and on Balmora's format 0.5 world, both built from the owner's own data.
+world (milestone M2) and on Balmora's format 0.5 world, both built from the maintainer's own data.
 
 ## Symptom
 
@@ -80,7 +80,7 @@ fails and names the position.
 
 ## Repair
 
-Proposed, owner decision pending:
+Proposed, project decision pending:
 - Interim (option A): a 7,680 KiB zone. The builder's `ZONE_KIB` is 7,680 and the engine cvar
   default must follow; a test checks that they agree. Seyda Neen then has 279,024 bytes of
   headroom, Balmora 575,968.

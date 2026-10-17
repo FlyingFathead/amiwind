@@ -129,7 +129,7 @@ def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
     if scope != 'all':
         options['scope'] = scope
     # the walker's records: the same cache and key as stair_walk.check (sources: the walker module)
-    cache = PassCache.open('stair-walk', options, *sw.walk_key_sources()) if sw.walk_cache_mode() == 'cached' else None
+    cache = PassCache.open('stair-walk', options, *sw.walk_key_sources()) if sw.walk_cache_mode() != 'full' else None
     sample = set(sw.pick_sample([t[0] for t in tasks], sw.walk_sample(), 'legacy:%d' % len(tasks))) if cache else set()
     workers = max(1, resolve_jobs(jobs))
     work = [(*task, cache, scope, task[0] in sample) for task in tasks]

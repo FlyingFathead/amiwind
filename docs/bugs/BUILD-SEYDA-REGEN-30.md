@@ -31,7 +31,7 @@ See [Which Seyda Neen is in my build?](../LINUX_BUILD.md#which-seyda-neen-is-in-
 
 ## Status: 8 October 2026
 
-Open; recorded exception for v0.0.31 and again for v0.0.32 (owner decision, 8 October 2026). The
+Open; recorded exception for v0.0.31 and again for v0.0.32 (project decision, 8 October 2026). The
 shipped Seyda Neen stages are used as a recorded input; Seyda Neen is rebuilt by the world streamer
 (v0.0.33), so the legacy builder is not fixed. Report page written 8 October 2026 from the
 [journal entry](../journals/BUG_JOURNAL-v0.0.31.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026)
@@ -73,9 +73,9 @@ must be intended and documented here. dev1 broke it: later image passes rewrote 
 world streamer's Seyda Neen.
 
 Builder option (v0.0.32-final-blockers): `--seyda-recorded DIR`, where `DIR/id1` holds the recorded
-maps from the owner's own v0.0.31 image (`maps/sn000.bsp` .. `sn063.bsp`, `intro_docks.bsp`,
+maps from the maintainer's own v0.0.31 image (`maps/sn000.bsp` .. `sn063.bsp`, `intro_docks.bsp`,
 `sncourt.bsp`, `seyda-regions.txt`, `seyda-regions.json`; `maps/seyda.bsp` optional), checked
-against `config/seyda-recorded-v0.0.31.json`. The recorded files are owner-provided input and are
+against `config/seyda-recorded-v0.0.31.json`. The recorded files are user-provided input and are
 never shipped with the source. Every later image pass keeps them byte for byte; the builder checks
 it after each pass (`tools/recorded_stage.py`).
 
@@ -83,8 +83,8 @@ Intended differences from v0.0.31 (each named here and in the pin):
 
 | File | Shipped as | Reason |
 | --- | --- | --- |
-| `maps/seyda.bsp` | a copy of the recorded fallback region `maps/sn029.bsp` (3,892,672 bytes) instead of v0.0.31's complete town (4,411,968 bytes) | Owner decision (option A), 8 October 2026. The builder's own region conversion writes the same alias. The v0.0.32 release actor audit refuses the complete town's seven actor copies; the recorded region maps with this alias pass (24 of 24 placements grounded). `dbg tp seydaneen` and region streaming use `seyda-regions.txt` and are unchanged. |
-| `maps/sn019.bsp`, `maps/sn026.bsp`, `maps/sn035.bsp` | the recorded maps, byte for byte, through a temporary pre-CHIM bypass of the strict world-map heap gate | Owner decision A, 8 October 2026: they exceed the modelled reserve allowance only (dev1 estimate -238,180, -104,356 and -12,148 bytes), not the allocation ceiling. A temporary bypass for the legacy builder, removed when Seyda Neen moves to CHIM (milestone M2); listed by name and SHA-256 in `config/heap-bypass.json` ([HEAP-SEYDA-OVERLAP-32](HEAP-SEYDA-OVERLAP-32.md)). |
+| `maps/seyda.bsp` | a copy of the recorded fallback region `maps/sn029.bsp` (3,892,672 bytes) instead of v0.0.31's complete town (4,411,968 bytes) | Project decision (option A), 8 October 2026. The builder's own region conversion writes the same alias. The v0.0.32 release actor audit refuses the complete town's seven actor copies; the recorded region maps with this alias pass (24 of 24 placements grounded). `dbg tp seydaneen` and region streaming use `seyda-regions.txt` and are unchanged. |
+| `maps/sn019.bsp`, `maps/sn026.bsp`, `maps/sn035.bsp` | the recorded maps, byte for byte, through a temporary pre-CHIM bypass of the strict world-map heap gate | Project decision A, 8 October 2026: they exceed the modelled reserve allowance only (dev1 estimate -238,180, -104,356 and -12,148 bytes), not the allocation ceiling. A temporary bypass for the legacy builder, removed when Seyda Neen moves to CHIM (milestone M2); listed by name and SHA-256 in `config/heap-bypass.json` ([HEAP-SEYDA-OVERLAP-32](HEAP-SEYDA-OVERLAP-32.md)). |
 
 v0.0.34-dev1 (9 October 2026): the recorded input is no longer required. v0.0.33 refused a CHIM build with
 Seyda Neen without it, only because its frame maps were checked against the recorded maps. The

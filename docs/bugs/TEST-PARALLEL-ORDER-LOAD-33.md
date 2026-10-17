@@ -1,5 +1,15 @@
 # TEST-PARALLEL-ORDER-LOAD-33: The process-pool order test fails on a fully loaded host
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.33-rc1 at 2026-10-09 (time not recorded): gate 1051 failed test_processes_keep_order_and_limit_nested_threads (all nine results from one worker)
+- Reported with v0.0.36-dev3 at 2026-10-11 00:35 +0300: gate 1782 failed, time approximate (first registered as TEST-PARALLEL-ORDER-FLAKY-36)
+- Reported with v0.0.36-dev3 at 2026-10-11 01:10 +0300: gate 1786 failed, time approximate; gates 1783, 1785 and 1787 passed (first registered as TEST-PARALLEL-ORDER-FLAKY-36)
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,7 +19,7 @@
 | Where | tests/test_build_parallel.py test_processes_keep_order_and_limit_nested_threads |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.33-rc1 (last seen) |
+| Persists in | v0.0.33-rc1, v0.0.36-dev3 (last seen) |
 | Severity | low: A gate can fail on host load alone; the worker pool itself is not wrong. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

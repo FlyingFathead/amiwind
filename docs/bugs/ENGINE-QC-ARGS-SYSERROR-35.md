@@ -9,7 +9,7 @@
 | Where | engine/aga/src/pr_cmds.c PF_sound, PF_lightstyle |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | low: A QuakeC change with a bad argument crashed or wrote past sv.lightstyles |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

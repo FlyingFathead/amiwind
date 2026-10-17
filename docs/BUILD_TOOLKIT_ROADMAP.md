@@ -27,7 +27,7 @@ coverage and protected model quality remain mandatory.
 Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
 reduced or bypassed, including model/asset generation, catalogue coverage,
 quality and validation, without a specific documented case or scenario **and
-explicit approval from the project owner**. A builder or contributor cannot
+explicit approval from the project maintainer**. A builder or contributor cannot
 approve its own exception. Build time, disk pressure and convenience do not
 supply that approval. An opt-out flag is a mechanism for an approved exceptional
 debugging case, not permission to choose that exception independently.
@@ -446,4 +446,4 @@ loading/collision work and is not implemented by current image recovery.
 required for partial corpse looting and equipment changes. rc10 caches existing
 appearance snapshots; it does not make fixed outfits the final runtime design.
 Preserve reusable source parts and per-actor state; do not pre-bake every outfit
-combination. Normal gallery coverage and owner-approval requirements remain.
+combination. Normal gallery coverage and maintainer-approval requirements remain.

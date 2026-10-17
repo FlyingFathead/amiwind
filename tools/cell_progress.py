@@ -3,7 +3,7 @@
 """CHIM Progress Tracker: one record per exterior cell, filled from what the project already measures.
 
 The tracker is a layer of the AmiWind Toolkit (docs/AMIWIND_TOOLKIT.md, "CHIM Progress Tracker"). This is its
-ingester and the ONLY writer of the progress data: builds, audit jobs and the owner all go through it.
+ingester and the ONLY writer of the progress data: builds, audit jobs and the maintainer all go through it.
 
 Inputs (all optional; anything missing is "not measured", never guessed):
   --progress  world-progress.json      the legacy mapping quality per cell (what is mapped, what share is placed)
@@ -19,7 +19,7 @@ Inputs (all optional; anything missing is "not measured", never guessed):
   OUT/owner-status.json                playtested / approved cells, see `owner`
   OUT/plan.json                        the release plan (planned / in_build / shipped per cell), see `plan` and `ship`
 
-Outputs in OUT (a private folder: the data is derived from the owner's game files):
+Outputs in OUT (a private folder: the data is derived from the maintainer's game files):
   cell-progress.json   the tracker data the Toolkit loads (format aw-cell-progress-1)
   next.json            the sweep orders: spiral (coast inwards) and risk (scout list), cells not yet converted
   mesh-curve.json      the store-once mesh reuse curve; mesh-curve.png the same as a picture
@@ -71,7 +71,7 @@ MECHANISMS = collections.OrderedDict([
     ('actor_grounding', 'Actor grounding'),
     ('door_links', 'Doors / interior links'),
 ])
-RESULTS = ('passed', 'failed', 'accepted', 'not_measured')   # accepted = failed but owner-accepted
+RESULTS = ('passed', 'failed', 'accepted', 'not_measured')   # accepted = failed but maintainer-accepted
 OWNER_STATES = ('playtested', 'approved')
 BUCKETS = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed', 'converted_failing', 'not_converted', 'converted_unmeasured', 'not_started',
            'empty_sea', 'hull_policy_pending', 'ocean')
@@ -82,26 +82,26 @@ SEA_BUCKETS = ('empty_sea', 'ocean')
 DONE_SEA = ('empty_sea',)
 # SUCCESS = every bucket that counts as passed (complete cells included). Precedence of the statuses, strongest first:
 # complete > terrain_complete > complete_unlit > terrain_complete_unlit > approved > playtested > passed (audits_passed) >
-# hull policy pending > failed > not converted. The _unlit levels ("awaiting lighting", owner 2026-10-09): every criterion
+# hull policy pending > failed > not converted. The _unlit levels ("awaiting lighting", maintainer 2026-10-09): every criterion
 # of the level met except lighting; they count as done, each on its own line.
 SUCCESS = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed')
 COMPLETE_UNLIT_LABEL = 'Cell complete, awaiting lighting'
 TERRAIN_COMPLETE_UNLIT_LABEL = 'Terrain complete, awaiting lighting'
 COMPLETE_LEVELS = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit')
-# Eligible for the next release (owner, 2026-10-09): every done status, lighting done or not = every passed status
-# (cell / terrain complete, awaiting lighting or not, owner states, passed) and empty sea (it passes as it is; the
+# Eligible for the next release (maintainer, 2026-10-09): every done status, lighting done or not = every passed status
+# (cell / terrain complete, awaiting lighting or not, maintainer states, passed) and empty sea (it passes as it is; the
 # open world needs the water around the coast).
 ELIGIBLE = SUCCESS + DONE_SEA
 ELIGIBLE_RELEASE = 'v0.0.34'
 # The "eligible" selector of the release tool and the Toolkit preset: eligible statuses plus empty sea (done = usable).
 ELIGIBLE_SELECT = tuple(dict.fromkeys(tuple(ELIGIBLE) + DONE_SEA))
-# Two completion levels (owner, 2026-10-09). Terrain complete: all audits pass and every placed object except actors is
+# Two completion levels (maintainer, 2026-10-09). Terrain complete: all audits pass and every placed object except actors is
 # converted (actors may still be deferred). Cell complete: terrain complete and every actor converted too.
 COMPLETE_LABEL = 'Cell complete'
 TERRAIN_COMPLETE_LABEL = 'Terrain complete'
 ACTOR_CATEGORIES = ('npcs', 'creatures')
 # Nonvisual markers (door/travel/north/editor markers) are not drawn and not required: they never block either completion
-# level (owner, 2026-10-09). Door destinations come from the door records. They stay in the by-type table.
+# level (maintainer, 2026-10-09). Door destinations come from the door records. They stay in the by-type table.
 MARKERS_BLOCK_COMPLETE = False
 ISLAND_NAMES = {1: 'Vvardenfell', 2: 'Solstheim'}
 # Audit outcome "kept as chain for memory": meshes the heap fallback deliberately left as hull chains. It passes. The result
@@ -121,7 +121,7 @@ CATEGORIES = collections.OrderedDict([
 TYPE_CATEGORY = dict([('STAT', 'statics'), ('LIGH', 'lights'), ('DOOR', 'doors'), ('CONT', 'containers'), ('ACTI', 'activators'),
                       ('NPC_', 'npcs'), ('CREA', 'creatures'), ('LEVC', 'creatures')] + [(t, 'items') for t in ITEM_TYPES])
 MARKER_WORD = 'marker'
-# Lit like the original is required for Terrain complete and Cell complete (owner, 2026-10-09: "a cell is only complete
+# Lit like the original is required for Terrain complete and Cell complete (maintainer, 2026-10-09: "a cell is only complete
 # when it's lit like Morrowind"). The lighting audit is tools/cell_lighting.py. Lights deferred for want of a CHIM light
 # path (lights without a mesh) are then judged by that audit instead of the Lights category.
 LIGHTING_REQUIRED = True
@@ -229,10 +229,15 @@ def build_census(data_files, progress=print):
             e['doors'].extend(_count_refs(e, c['refs'], objects, molten=molten))
         progress('census: %s parsed' % name)
     solstheim = bm_land - base_land
+    # Every live LAND record, also those without height data (the seabed cells: 'land' above keeps only records with
+    # heights). A cell in this list is never open ocean (CHIMPORT-OCEAN-LAND-41).
+    from chim.ocean_runtime import land_cells
+    land_records = land_cells(data_files)
     meshes = sorted({m for e in cells.values() for m in e['meshes']})
     index = {m: i for i, m in enumerate(meshes)}
     return {'format': CENSUS_FORMAT, 'masters': shas, 'meshes': meshes,
             'land': sorted(ckey(*c) for c in land), 'land_bloodmoon': sorted(ckey(*c) for c in solstheim),
+            'land_records': sorted(ckey(*c) for c in land_records),
             'cells': {ckey(*xy): {'counts': dict(e['counts']), 'placements': e['placements'], 'flora': e['flora'],
                                   'meshes': sorted(index[m] for m in e['meshes']),
                                   'lights': LT.light_census_cell(e.get('lights', ())), 'lava': e.get('lava', 0),
@@ -874,6 +879,18 @@ def build_interiors(census, metrics, cells, pois, bugs, maps):
     return sorted(recs.values(), key=lambda r: (r['set'], r['name'].casefold())), entrances
 
 
+def _later(a, b):
+    """True when ISO time a is after ISO time b (both given; zones respected)."""
+    import datetime
+    try:
+        ta, tb = datetime.datetime.fromisoformat(a), datetime.datetime.fromisoformat(b)
+    except (TypeError, ValueError):
+        return False
+    if (ta.tzinfo is None) != (tb.tzinfo is None):
+        ta, tb = ta.replace(tzinfo=None), tb.replace(tzinfo=None)
+    return ta > tb
+
+
 def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chim_runs=(), labels=None, commits=None,
            bugs=None, ledger=None, areas=None, now=None, png=False, config_dir=None):
     out = Path(out)
@@ -891,6 +908,7 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     owner_doc = read_json(out / OUT_FILES['owner']) or {}
     owner = owner_doc.get('cells', {})
     ledger_map = ledger_by_build(ledger)
+    land_records = set((census or {}).get('land_records') or ())
 
     # --- which cells exist, which are land
     if census:
@@ -964,6 +982,8 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
             for m, per in d['audits'].items():
                 if k in per:
                     rec['audits'][m] = {'status': per[k]['status'], 'detail': per[k].get('detail'), 'build': d['name']}
+                    if per[k].get('numbers') is not None:      # e.g. a frame's least headroom (memory_fit)
+                        rec['audits'][m]['numbers'] = per[k]['numbers']
             rec['provenance'] = {'build': d['name'], 'label': d.get('label'), 'source_commit': d.get('commit'),
                                  'chim_version': d.get('chim_version'), 'world_format': d.get('world_format'),
                                  'built_at': d.get('built_at'), 'builder': d.get('builder')}
@@ -979,6 +999,14 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
         ch = rec['chim']
         ch['result_generated'] = r.get('generated')
         rec['errors'] = r['errors']
+        if r.get('ocean') and k in land_records:
+            # A seabed cell (a LAND record, often without height data, entirely under water) measured as open ocean by
+            # an earlier ocean run: it is not open sea, the build refuses it as ocean, so it stays not started until it
+            # is converted as its own cell (CHIMPORT-OCEAN-LAND-41).
+            ch['seabed_land'] = True
+            ch['blockers'] = ['seabed cell with a LAND record measured as open ocean by %s: convert it as its own cell '
+                              '(CHIMPORT-OCEAN-LAND-41)' % (r.get('build') or 'an ocean run')]
+            continue
         if r.get('ocean'):
             # open sea: a reference to the shared ocean chunk; its audits (the chunk's checks, the seam to LAND
             # neighbours) are shown, the cell never counts as converted land
@@ -1019,8 +1047,14 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
             ch['failed'] = True      # the job's own verdict "failed" (also when no single audit failed)
             ch['not_converted'] = bool(r.get('not_converted'))
         if ch['converted']:
+            newer_run = digest_cell.get(k, (None,))[0]
             for m, a in r['audits'].items():
                 if m in MECHANISMS and a.get('status') in RESULTS:
+                    if newer_run and _later(newer_run.get('built_at'), r.get('generated')) and                             rec['audits'][m].get('build') == newer_run['name'] and                             rec['audits'][m].get('status') != 'not_measured':
+                        # A full build made after this CHIMport result measured the cell again: its figure stands
+                        # (TRACKER-RELEASE-HEADROOM-MISSING-42: the v0.0.41 release run's audits were replaced by
+                        # CHIMport results of 10-13 October).
+                        continue
                     rec['audits'][m] = {'status': a['status'], 'detail': a.get('detail'), 'build': a.get('build') or r.get('build')}
                     if a.get('numbers') is not None:
                         rec['audits'][m]['numbers'] = a['numbers']
@@ -1148,7 +1182,7 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
                   'placements': d.get('placements'), 'models': d.get('models'), 'reports': d.get('reports'),
                   'run_stats': d.get('run_stats') or {}, 'frame_ownership': d.get('frame_ownership') or []} for d in digests]
     history = update_history(out, head, [d['name'] for d in digests], now)
-    rel_doc = RL.load(out)         # owner-set, never written by ingest
+    rel_doc = RL.load(out)         # maintainer-set, never written by ingest
     RL.attach(cells, rel_doc)
     releases = RL.summary(cells, rel_doc)
     plan_doc = PL.load(out)        # set by `plan` / `ship` only, never by ingest; separate from conversion status
@@ -1212,7 +1246,7 @@ def update_history(out, head, builds, now):
     """Append a history line when the counts changed; return one entry per day (the last of the day)."""
     path = out / OUT_FILES['history']
     every = [json.loads(x) for x in path.read_text(encoding='utf-8').splitlines() if x.strip()] if path.is_file() else []
-    lines = [x for x in every if x.get('type') is None]      # count lines; owner release lines (type "release") stay in the file
+    lines = [x for x in every if x.get('type') is None]      # count lines; maintainer release lines (type "release") stay in the file
     entry = {'date': now, 'passed': head['passed'], 'land_cells': head['land_cells'], 'converted': head['converted'],
              'buckets': {b: head[b] for b in BUCKETS}, 'builds': builds}
     same = lines and {k: v for k, v in lines[-1].items() if k != 'date'} == {k: v for k, v in entry.items() if k != 'date'}
@@ -1360,7 +1394,7 @@ def main(argv=None):
     rec.add_argument('--status', choices=('passed', 'failed', 'accepted'))
     rec.add_argument('--cells', help='"x,y x,y ..." (with --status)')
     rec.add_argument('--detail')
-    own = sub.add_parser('owner', help='mark cells playtested or owner-approved')
+    own = sub.add_parser('owner', help='mark cells playtested or maintainer-approved')
     own.add_argument('--out', type=Path, required=True)
     own.add_argument('--status', required=True, choices=OWNER_STATES)
     own.add_argument('--cells', required=True)

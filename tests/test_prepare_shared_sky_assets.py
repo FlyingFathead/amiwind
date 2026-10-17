@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 from PIL import Image
 import sky_palette_overlay as overlay
-from prepare_shared_sky_assets import prepare_staged_sky
+from prepare_shared_sky_assets import validate_sky, prepare_staged_sky
 from build_night_sky import PHASES,ATLAS_BYTES,validate
 
 class PipelineTests(unittest.TestCase):
@@ -96,8 +96,20 @@ class PipelineTests(unittest.TestCase):
                 report=prepare_staged_sky(id1,None,root/'no-owned')
             self.assertFalse(report['vivid_sky']);self.assertIn('No owned',report['warning']);self.assertEqual(report['night_sky']['status'],'fallback_warning')
             report=prepare_staged_sky(id1,None,root/'wrong-palette')
-            self.assertFalse(report['vivid_sky']);self.assertIn('fingerprint',report['warning'])
+            self.assertFalse(report['vivid_sky']);self.assertIn('No owned',report['warning'])
             self.assertEqual((id1/'gfx/palette.lmp').read_bytes(),before)
+    def test_other_palette_gets_palette_matched_clouds_and_changes_nothing_else(self):
+        # SKY-FLAT-PALETTE-DRIFT-41: no fingerprint fallback any more; owned clouds against this palette.
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);id1,_=self.stage(root);data=self.owned(root)
+            before={p.relative_to(id1).as_posix():p.read_bytes() for p in id1.rglob('*') if p.is_file()}
+            report=prepare_staged_sky(id1,data,root/'matched')
+            self.assertEqual(report['status'],'prepared_owned_clouds_palette_matched');self.assertEqual(report['changed_files'],0)
+            raw=Path(report['shared_sky_source']).read_bytes();validate_sky(raw)
+            self.assertGreater(report['cloud_conversion']['cloud_pixels'],0)
+            after={p.relative_to(id1).as_posix():p.read_bytes() for p in id1.rglob('*') if p.is_file()}
+            self.assertEqual({k:v for k,v in after.items() if k in before},before)
+            self.assertFalse((id1/'gfx/sky-palette-bank.json').exists())
     def test_unknown_payload_hard_error_preserves_stage(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);id1,fingerprint=self.stage(root);data=self.owned(root);before=(id1/'gfx/palette.lmp').read_bytes()

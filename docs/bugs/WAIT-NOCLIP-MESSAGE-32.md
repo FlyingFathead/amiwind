@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 8 October 2026, in v0.0.32-dev3 |
 | Where | Wait dialogue (T) with noclip on, anywhere |
 | Reproduction | always |
@@ -20,8 +20,8 @@
 
 ## Status: 8 October 2026
 
-Open, low priority (message wording); cause found in source. Owner decision: fix later, no code
-change in v0.0.32. Reported by the owner in v0.0.32-dev3 play (8 October 2026); seen many times
+Open, low priority (message wording); cause found in source. Project decision: fix later, no code
+change in v0.0.32. Reported by the maintainer in v0.0.32-dev3 play (8 October 2026); seen many times
 before in earlier development builds (first version unknown).
 
 ## Symptom
@@ -62,7 +62,7 @@ Any build with the wait dialogue: after release from the Census office, open the
 
 Not yet. Let `allowed()` return the reason and show a message for that reason only (in the air or
 flying, in water, during speech, before registration), with wording checked against the original
-game in OpenMW. Waiting in noclip stays refused unless the owner decides otherwise.
+game in OpenMW. Waiting in noclip stays refused unless the maintainer decides otherwise.
 
 ## Verification
 
@@ -100,10 +100,15 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [TOOLKIT-TEXT-ENCODING-38](TOOLKIT-TEXT-ENCODING-38.md): Toolkit labels contain corrupted Unicode characters
 - UI-ACCEPT-29 (no report page): Character selection lacks a visible OK button
 - [UI-DEATH-DAMAGE-TINT-38](UI-DEATH-DAMAGE-TINT-38.md): Lava damage tint also colours the death menu and selection
+- [UI-ICONS-INVENTORY-42](UI-ICONS-INVENTORY-42.md): Inventory rows show icons only for the few staged items, squeezed 32 to 14 pixels; no magic or equipped backdrops
+- [UI-INVENTORY-HEADING-CENTRE-42](UI-INVENTORY-HEADING-CENTRE-42.md): The Inventory heading text is not vertically centred in its bar
 - [UI-INVENTORY-LAYOUT-40](UI-INVENTORY-LAYOUT-40.md): Inventory text overlaps fields and footer; preview initially faces away
+- [UI-INVENTORY-PREVIEW-GAP-41](UI-INVENTORY-PREVIEW-GAP-41.md): Inventory shows 'Character preview unavailable': a fixed 2 MiB memory guard refuses the 128 KB pose model in Seyda Neen
+- [UI-INVENTORY-PREVIEW-STILL-42](UI-INVENTORY-PREVIEW-STILL-42.md): The inventory character is drawn live and turns instead of being a still picture
 - [UI-KEY-HELP-STALE-38](UI-KEY-HELP-STALE-38.md): Key help exposes raw actions and uses a sparse outdated layout
 - [UI-MENU-LOGO-32](UI-MENU-LOGO-32.md): The menu logo has a line above the name and reddish-pink letters instead of gold
 - UI-OPTIONS-WRAP-29 (no report page): Setup selection wraps despite a bounded scrollbar
+- [UI-WINDOW-TITLE-BAR-42](UI-WINDOW-TITLE-BAR-42.md): Menu windows lack the original title bar (tiled frame with the window name on a dark plaque)
 - [WORLDMAP-LAVA-MISMATCH-36](WORLDMAP-LAVA-MISMATCH-36.md): The in-game map shows a lava band in Molag Amar where the world has grass and no lava
 
 Related bugs in other categories:

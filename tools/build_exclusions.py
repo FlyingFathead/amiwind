@@ -13,7 +13,7 @@ leaves nothing out. An exclusion is for quick -devN test builds only; release
 candidates and finals refuse every one of them
 (project_version.require_private_test_version).
 
-Never an exclusion group (owner rule): dressing, clutter, props, flora or
+Never an exclusion group (project rule): dressing, clutter, props, flora or
 anything else with collision that NPCs or the player walk into. NPCs can get
 stuck on that content, so path and movement tests need it in every build.
 REFUSED names those groups and the reason; tests/test_build_exclusions.py
@@ -141,7 +141,7 @@ GROUPS = {
 CLOSURE_STAGE = 'reference-closure'
 CLOSURE_FILE = 'reference-closure.json'
 
-# Never exclusion groups (owner rule, 2026-10-09): content with collision that NPCs
+# Never exclusion groups (project rule, 2026-10-09): content with collision that NPCs
 # or the player walk into. Each name maps to the reason the refusal prints.
 REFUSED = {
     'dressing': 'dressing (hooks, ropes, ferns, lanterns) has collision NPCs get stuck on; path and movement '
@@ -153,7 +153,7 @@ REFUSED = {
     'collision': 'collision content stays in every build',
     'scenery': 'scenery has collision the player and NPCs walk into; it stays in every build',
 }
-# Always included (owner rule, 2026-10-09): shared engine assets that maps and the
+# Always included (project rule, 2026-10-09): shared engine assets that maps and the
 # engine find by name or by metadata, not by a placement, so a reference closure would
 # miss them. No group and no --exclude-unreferenced closure may drop them; the image
 # step of every quick test build checks them (check_always_included). id1-relative.
@@ -276,7 +276,7 @@ def resolve(args, version, area_build=False):
     return groups
 
 
-# A MiniWind build (an area build) is a quick test build by default (owner decision,
+# A MiniWind build (an area build) is a quick test build by default (project decision,
 # 2026-10-09: MiniWind #2 shipped with all 17 videos and 6,447 voices): no videos, and
 # only the voices and NPC records Balmora references. Music stays; the shared sky and the
 # other always-included assets stay; --with-video and --exclude-unreferenced none undo it.

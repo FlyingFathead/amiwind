@@ -12,6 +12,11 @@ int AW_TorchEquipped(void){return torch;}
 int Hunk_LowMark(void){return 0;}
 void Hunk_FreeToLowMark(int n){(void)n;}
 byte *COM_LoadHunkFile(char *path){(void)path;return NULL;}
+static int pose_file=128*1024,pose_absent;
+int COM_FOpenFile(char *path,FILE **f){
+    (void)path;*f=NULL;if(pose_absent)return -1;
+    *f=tmpfile();assert(*f);return pose_file;
+}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 void Con_Printf(char *format,...){(void)format;}
 void *Cache_Check(cache_user_t *c){return c->data;}
@@ -54,8 +59,17 @@ int main(void){
     }
     right_type=9;assert(!AW_ViewInventoryBody(&m,&frame)); /* no fabricated ranged pose */
     right_type=-1;AW_ViewInventoryClear();assert(!portrait.cache.data && world.cache.data);
-    hunk_size=1024*1024;oldloads=loads;
+    /* UI-INVENTORY-PREVIEW-GAP-41: admitted by the model's real need (3 x file + 256 KiB),
+     * not a blanket 2 MiB: the Seyda Neen CHIM gap (2,056,656 bytes) shows the preview;
+     * a gap below the need, a missing file and the old rule (reserve 2) refuse without a load. */
+    hunk_size=2056656;oldloads=loads;
+    assert(AW_ViewInventoryBody(&m,&frame) && loads==oldloads+1);
+    AW_ViewInventoryClear();hunk_size=600*1024;oldloads=loads;
     assert(!AW_ViewInventoryBody(&m,&frame) && loads==oldloads);
+    AW_ViewInventoryClear();hunk_size=2056656;aw_inventory_preview_reserve.value=2;oldloads=loads;
+    assert(!AW_ViewInventoryBody(&m,&frame) && loads==oldloads);
+    AW_ViewInventoryClear();aw_inventory_preview_reserve.value=0;pose_absent=1;hunk_size=8*1024*1024;
+    assert(!AW_ViewInventoryBody(&m,&frame) && loads==oldloads);pose_absent=0;
     hunk_size=8*1024*1024;AW_ViewInventoryClear();wrong_frames=1;
     assert(!AW_ViewInventoryBody(&m,&frame));oldloads=loads;
     assert(!AW_ViewInventoryBody(&m,&frame) && loads==oldloads);

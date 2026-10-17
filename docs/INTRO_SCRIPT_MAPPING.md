@@ -68,7 +68,7 @@ emitter. Swinging lamp scripts and their dynamic shadows are not implemented.
 Dev4 boots with `Music/Special/morrowind title.mp3`. New Game resets the
 established exploration track 04 (`Music/Explore/mx_explore_3.mp3`) first. No exact intro
 song was established by the audited CharGen scripts, so this choice is not
-claimed as original intro music parity. The owner subsequently supplied the original prologue video; it is included
+claimed as original intro music parity. The maintainer subsequently supplied the original prologue video; it is included
 in the private dev4/dev5 conversions. Dev5 adds 320×200 playback and optional
 readable native-font cards. The exact original ship music sequence remains open.
 

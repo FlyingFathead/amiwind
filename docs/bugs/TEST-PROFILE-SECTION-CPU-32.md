@@ -9,7 +9,7 @@
 | Where | tests/test_build_profile.py section CPU assertion |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | low: Test tolerance issue on a loaded host; the profiler itself is correct. |
 | Family | Gates, CI and tests (`tests-ci`) |
 

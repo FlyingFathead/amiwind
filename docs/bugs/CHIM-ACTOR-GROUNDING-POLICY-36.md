@@ -81,7 +81,7 @@ Two parts, both at the shared layer:
 
 ## Verification
 
-- The census on the owner's data: 559 of 566 exterior placements measure as ground. All nine missing
+- The census on the maintainer's data: 559 of 566 exterior placements measure as ground. All nine missing
   residents of the test area (Gnaar Mok block) are ground; every CHIM area (Seyda Neen, Balmora, the Vivec
   districts and the test area) passes the preflight.
 - Before the policy update the preflight refused the test area with exactly the nine missing IDs, in 2 seconds.

@@ -9,7 +9,7 @@
 | Where | engine/aga/src/mathlib.c anglemod |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | low: Angles outside [0,360) reach code that assumes the range |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

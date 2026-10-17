@@ -231,7 +231,7 @@ package, shipment or playtest acceptance is claimed by this record update.
 
 ## Named-apron owner dispositions, 15 October 2026
 
-15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or owner acceptance is promoted.
+15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or maintainer acceptance is promoted.
 
 The failed world941 reached the existing original-reference ownership guard.
 All ten reported references match exact declared Seyda deferred originals:
@@ -269,13 +269,13 @@ The fourteen previously questioned STAT references have model pieces on both
 frame sides; actual model geometry equivalence remains under review. Neither
 their earlier sprite-only lookup nor the named-apron fix proves a runtime
 omission or its cause. Native suspect captures await a matching runtime image;
-no current package, delivery artifact, shipment or owner acceptance is established.
+no current package, delivery artifact, shipment or maintainer acceptance is established.
 
 ## Earlier coastal survey and retained-world evidence
 
 ## Outer sea LAND survey follow-up, 15 October 2026
 
-15 October 2026, v0.0.41 source candidate: the expanded Vivec survey stopped before conversion because two outer sea cells have no original LAND. All 36 owned cells have original LAND. The candidate selects the existing flat seabed policy for missing outer LAND; its source audit and 10 focused tests pass. The failed 936 world is preserved, and exact source 935 retains its reviewed full-suite pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no native, package or owner acceptance is established.
+15 October 2026, v0.0.41 source candidate: the expanded Vivec survey stopped before conversion because two outer sea cells have no original LAND. All 36 owned cells have original LAND. The candidate selects the existing flat seabed policy for missing outer LAND; its source audit and 10 focused tests pass. The failed 936 world is preserved, and exact source 935 retains its reviewed full-suite pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no native, package or maintainer acceptance is established.
 
 The expanded radius-4 source survey found no original LAND for cells (7,-16)
 and (8,-16). Both lie outside the unchanged 36-cell owned core. The complete

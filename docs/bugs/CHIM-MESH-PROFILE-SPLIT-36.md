@@ -37,7 +37,7 @@
 
 ## Status: 10 October 2026
 
-Open: measured, not repaired. Which profile is the one for a mesh both paths convert is an owner decision.
+Open: measured, not repaired. Which profile is the one for a mesh both paths convert is a project decision.
 
 ## Symptom
 
@@ -71,7 +71,7 @@ Always: `tools/chim/variant_audit.py <chim world>` lists them under "other reduc
 
 ## Repair
 
-To do, after the owner's decision: one profile per mesh for every CHIM area (the town profile, or Seyda Neen's
+To do, after the maintainer's decision: one profile per mesh for every CHIM area (the town profile, or Seyda Neen's
 where it is the better one), so each mesh is converted once and placed everywhere.
 
 ## Verification

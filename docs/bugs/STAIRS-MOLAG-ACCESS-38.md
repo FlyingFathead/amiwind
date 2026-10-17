@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 13 October 2026, in v0.0.38-dev2 |
 | Where | Tel Uvirith exterior (10,1): raised walkway step and stairs to doors |
 | Reproduction | unknown |
@@ -29,7 +29,7 @@ change the issue status or establish package/native acceptance.
 
 ## Symptom
 
-The owner reports getting stuck at a raised walkway step and on the stairs leading to doors in the Tel Uvirith inspection map. Two screenshots document the walkway area. Door stair locations need individual capture and reference identification.
+The maintainer reports getting stuck at a raised walkway step and on the stairs leading to doors in the Tel Uvirith inspection map. Two screenshots document the walkway area. Door stair locations need individual capture and reference identification.
 
 ## Where
 
@@ -46,7 +46,7 @@ Visual inspection and noclip exploration do not establish that a route can be wa
 ## Reproduction
 
 1. Load the reported Tel Uvirith diagnostic map and approach the pictured walkway step in cell (10,1).
-2. Disable noclip and try crossing in both directions under normal movement. The owner reports becoming stuck. God mode was on in the first screenshot; it does not bypass collision.
+2. Disable noclip and try crossing in both directions under normal movement. The maintainer reports becoming stuck. God mode was on in the first screenshot; it does not bypass collision.
 3. Independently exercise each reported stair approach to a door. Exact door references remain to be recorded.
 4. Compare the same routes and poses in the original game through OpenMW, including whether ordinary walking or jumping succeeds.
 
@@ -56,7 +56,7 @@ No repair established. Inspect AmiQuake step handling and the relevant CHIM hull
 
 ## Verification
 
-Owner report and two original screenshots received. Independent reproduction, matched OpenMW comparison, exact model/reference binding and repaired normal-walking traversal are pending. Noclip is not an acceptance test.
+Maintainer report and two original screenshots received. Independent reproduction, matched OpenMW comparison, exact model/reference binding and repaired normal-walking traversal are pending. Noclip is not an acceptance test.
 
 
 ## Existing staircase rules and tests
@@ -96,6 +96,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
+- [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
 - [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
@@ -107,6 +108,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
+- [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
+- [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

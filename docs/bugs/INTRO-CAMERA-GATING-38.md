@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev |
 | Where | Prison ship and deck before character race selection |
 | Reproduction | unknown |
@@ -12,17 +12,17 @@
 | Persists in | v0.0.38-dev (last seen) |
 | Severity | medium: Breaks opening character continuity by revealing an unselected body. |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
-| Platform or emulator | unknown (Owner did not identify the emulator in this report.) |
+| Platform or emulator | unknown (Maintainer did not identify the emulator in this report.) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
 
-The owner reports that idling into the vanity camera or pressing Tab before race
+The maintainer reports that idling into the vanity camera or pressing Tab before race
 selection shows a default Argonian on the prison ship and its deck. This breaks
 character continuity. The report identifies the latest development build;
 the exact running version and emulator have not been independently confirmed.
-The owner says the displayed body is appropriate after race selection.
+The maintainer says the displayed body is appropriate after race selection.
 
 ## Where
 
@@ -45,7 +45,7 @@ Ordinary third-person rendering checks do not establish character-creation gatin
 
 Start a new game. Before race selection, try Tab and wait for idle vanity on the
 prison ship and deck. Compare the displayed body before and after selecting race.
-This is owner-reported; independent native reproduction remains pending.
+This is maintainer-reported; independent native reproduction remains pending.
 
 ## Repair
 

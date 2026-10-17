@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33 |
 | Where | CHIM frame world (engine chim_graft.c Repack), Seyda Neen town square on CHIM |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33 (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: The ground and every building vanish and the player falls through the world in the starting town. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -39,12 +39,12 @@
 
 ## Status: 9 October 2026
 
-Fixed in source on v0.0.33-fix-terrain-fall, not yet in a build. Found by the owner in the v0.0.33
+Fixed in source on v0.0.33-fix-terrain-fall, not yet in a build. Found by the maintainer in the v0.0.33
 final3 image (source 4b26ffc), Seyda Neen on CHIM.
 
 ## Symptom
 
-Owner playtest of v0.0.33 final3, Seyda Neen town square on CHIM, 9 October 2026. Walking from
+Maintainer playtest of v0.0.33 final3, Seyda Neen town square on CHIM, 9 October 2026. Walking from
 Fargoth between the two buildings towards the silt strider, or north-east past the guard towards the
 bridge to the mainland (with or without `dbg aw hors 0`), the ground and every building vanish: only
 the sky and the NPC sprites are left, and the player falls under the world without end. The console
@@ -121,7 +121,7 @@ The engine test above, and a second layer below the frame world: the terrain flo
 
 ## Safety net: the terrain floor (second layer)
 
-Owner rule: with noclip off, the terrain height is the lowest height. Whatever the frame world holds,
+Project rule: with noclip off, the terrain height is the lowest height. Whatever the frame world holds,
 no walking body may fall below the terrain at its X/Y.
 
 - Data: the frame's far terrain layer (`maps/<frame map>.far`, CHIM-FAR-TERRAIN-33), read once at

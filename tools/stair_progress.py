@@ -16,7 +16,7 @@ from pathlib import Path
 def chim_count_task(task):
     """Worker: (frame index, steps and ramps the frame's walk will check) for TASK (world folder, frame index,
     [core...]), with the same polygon filter as chim.collision.stair_task."""
-    from chim.collision import STAIR_MARGIN, _poly_box, frame_polys
+    from chim.collision import _poly_box, frame_polys, stair_polys
     from stair_walk import candidates
     out, frame_index, cores = task
     # the frame's own files only (chim.validate.load_frame), never the whole world per worker
@@ -24,30 +24,29 @@ def chim_count_task(task):
     row, models = load_frame(out, frame_index)
     world = {'frames': {frame_index: row}, 'models': models}
     polys = [(pts, ref, _poly_box(pts)) for pts, ref in frame_polys(world, frame_index)]
-    m, total = STAIR_MARGIN, 0
+    total = 0
     for core in cores:
-        near = [(pts, ref) for pts, ref, b in polys
-                if b[2] >= core[0] - m and b[0] <= core[2] + m and b[3] >= core[1] - m and b[1] <= core[3] + m]
-        total += len(candidates(near, core))
+        total += len(candidates(stair_polys(polys, core)[1], core))
     return frame_index, total
 
 
 def chim_core_counts_task(task):
-    """Worker: (frame index, [steps and ramps per core]) for TASK (world folder, frame index, [core...]): the
-    count per core, in core order, with the same polygon filter as chim.collision.stair_task. The CHIM stair
+    """Worker: (frame index, [steps and ramps per core]) for TASK (world folder, frame index, [core...][, walk
+    area]): the count per core, in core order, with the same polygon filter as chim.collision.stair_task (with a
+    walk area only the steps and ramps chim.collision.stair_task_in walks: riser point in the area). The CHIM stair
     gate's scheduler sizes its units by these counts and skips the cores without any (they walk nothing)."""
-    from chim.collision import STAIR_MARGIN, _poly_box, frame_polys
+    from chim.collision import _poly_box, frame_polys, in_walk_area, stair_polys
     from stair_walk import candidates
-    out, frame_index, cores = task
+    out, frame_index, cores = task[:3]
+    area = task[3] if len(task) > 3 else None
     from chim.validate import load_frame
     row, models = load_frame(out, frame_index)
     world = {'frames': {frame_index: row}, 'models': models}
     polys = [(pts, ref, _poly_box(pts)) for pts, ref in frame_polys(world, frame_index)]
-    m, found = STAIR_MARGIN, []
+    found = []
     for core in cores:
-        near = [(pts, ref) for pts, ref, b in polys
-                if b[2] >= core[0] - m and b[0] <= core[2] + m and b[3] >= core[1] - m and b[1] <= core[3] + m]
-        found.append(len(candidates(near, core)))
+        items = candidates(stair_polys(polys, core)[1], core)
+        found.append(len(items) if area is None else sum(1 for i in items if in_walk_area(area, i['point'])))
     return frame_index, found
 
 

@@ -11,7 +11,7 @@ implemented**. Existing tools and private controls below have different status.
 | Group | Options / questions | Current implementation status |
 | --- | --- | --- |
 | Visibility | Matched `fast` versus full VIS; exact decoded-row checks; codec baseline/candidate comparisons | Bounded builder uses fast VIS; isolated full-VIS control stopped/checkpointed on 3 October, with comparison incomplete and resumption unverified; new codec not implemented |
-| Render cost | Matched position/view/build; requested and effective distance; frame time; tested/rejected/clipped/drawn geometry; separate fog pass from culling | Balmora owner observation remains unprofiled; counter collection/control required |
+| Render cost | Matched position/view/build; requested and effective distance; frame time; tested/rejected/clipped/drawn geometry; separate fog pass from culling | Balmora maintainer observation remains unprofiled; counter collection/control required |
 | Allocation | Per-map ordered peak/resident/temporary allocations, used/free, mandatory reserve and growth margin | Target-ABI estimator and final-payload gate implemented |
 | Node roles | World-render reachability, inline point-collision reachability, shared nodes, avoidable duplicate representations | Node-role audit and loader representation change included in v0.0.27; host checks passed, target gameplay pending; zero face count alone is insufficient |
 | Retention | Explain why terrain, visibility, textures, model parts and actors remain: view, crossing, collision/traces, simulation or dependency | Required future resource ledger; not complete |

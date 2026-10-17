@@ -9,7 +9,7 @@
 | Where | Boot check text (engine/aga/boot/bootcheck.asm) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | low: Cosmetic: boot lines and countdown wrap on a 64-column console. |
 | Family | Boot and engine start-up (`boot-startup`) |
 

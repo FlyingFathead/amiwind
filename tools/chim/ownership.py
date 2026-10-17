@@ -196,41 +196,76 @@ def bind_index(out, source):
     source['ownership_index_sha256'] = hashlib.sha256((Path(out)/'chim/world.cwi').read_bytes()).hexdigest()
 
 
-def binary_failures(out, source, sections, frames, models):
-    """Validate sidecar against the serialized pieces, not just source intent."""
+def _frame_binary_failures(task):
+    """One frame's sidecar checks against its serialized pieces (binary_failures; worker or in its process):
+    its failure lines in order. task: (path, frame, owned records in chunk order, frame_ownership, model count,
+    {model: digest} of the frame's models)."""
+    path, frame, owned, m, nmodels, digests = task
+    failures = []
+    centre = frame['centre']
+    coverage = [centre[k]+4*frame['low'][k] for k in range(2)]
+    coverage += [coverage[k]+4*frame[['nx', 'ny'][k]]*frame['grain'] for k in range(2)]
+    if m['coverage'] != coverage:
+        failures.append('%s: ownership coverage differs from binary frame' % path)
+    actual = []
+    footprint_refs = set()
+    for p in owned:
+        mi = p['model']
+        if not 0 <= mi < nmodels:
+            failures.append('%s: ownership piece has invalid model' % path);continue
+        actual.append({'ref': p['ref'], 'origin': list(p['origin']), 'yaw': p['yaw'],
+                       'cell': [frame['cell'][0]+p['cell_dx'], frame['cell'][1]+p['cell_dy']],
+                       'model_sha256': digests[mi], 'story_hidden': bool(p['flags'] & F.FLAG_STORY_HIDDEN)})
+        lo, hi = p['box']
+        box = [centre[k]+4*lo[k] for k in range(2)] + [centre[k]+4*hi[k] for k in range(2)]
+        if intersects(coverage, box):
+            footprint_refs.add(source_ref(p['ref']))
+    if sorted(actual, key=lambda p: p['ref']) != sorted(m.get('pieces', []), key=lambda p: p['ref']):
+        failures.append('%s: ownership pieces differ from serialized render/collision/placement records' % path)
+    for row in m.get('references', []):
+        if row.get('role') == 'dependency' and row['original']['number'] not in footprint_refs:
+            failures.append('%s: dependency has no footprint in frame coverage' % path)
+    return failures
+
+
+def _model_digests(images):
+    """Worker: model_digest of each brush image."""
+    return [model_digest(F.read_brush_image(image)) for image in images]
+
+
+DIGEST_GROUP = 256          # model images per digest task on the worker pool
+
+
+def binary_failures(out, source, sections, frames, models, jobs=1):
+    """Validate sidecar against the serialized pieces, not just source intent. jobs > 1: the model digests and
+    the frames' checks run on the worker pool (build_parallel.ordered_map), merged in frame order: the same
+    failures in the same order as one process (BUILD-CHIM-STAGE-SERIAL-TAIL-36)."""
     failures = source_failures(list(sections.values()))
     actual_hash = hashlib.sha256((Path(out)/'chim/world.cwi').read_bytes()).hexdigest()
     if source.get('ownership_index_sha256') != actual_hash:
         failures.append('ownership metadata is not bound to this world index')
-    hashes = {}
+    work = []
     for path, frame, chunks in frames:
         m = sections.get(path, {}).get('frame_ownership')
         if not isinstance(m, dict) or m.get('schema') != 1:
             continue
-        centre = frame['centre']
-        coverage = [centre[k]+4*frame['low'][k] for k in range(2)]
-        coverage += [coverage[k]+4*frame[['nx', 'ny'][k]]*frame['grain'] for k in range(2)]
-        if m['coverage'] != coverage:
-            failures.append('%s: ownership coverage differs from binary frame' % path)
-        actual = []
-        footprint_refs = set()
-        for c in chunks:
-            for p in c['owned']:
-                mi = p['model']
-                if not 0 <= mi < len(models):
-                    failures.append('%s: ownership piece has invalid model' % path);continue
-                if mi not in hashes:
-                    hashes[mi] = model_digest(F.read_brush_image(models[mi]['image']))
-                actual.append({'ref': p['ref'], 'origin': list(p['origin']), 'yaw': p['yaw'],
-                               'cell': [frame['cell'][0]+p['cell_dx'], frame['cell'][1]+p['cell_dy']],
-                               'model_sha256': hashes[mi], 'story_hidden': bool(p['flags'] & F.FLAG_STORY_HIDDEN)})
-                lo, hi = p['box']
-                box = [centre[k]+4*lo[k] for k in range(2)] + [centre[k]+4*hi[k] for k in range(2)]
-                if intersects(coverage, box):
-                    footprint_refs.add(source_ref(p['ref']))
-        if sorted(actual, key=lambda p: p['ref']) != sorted(m.get('pieces', []), key=lambda p: p['ref']):
-            failures.append('%s: ownership pieces differ from serialized render/collision/placement records' % path)
-        for row in m.get('references', []):
-            if row.get('role') == 'dependency' and row['original']['number'] not in footprint_refs:
-                failures.append('%s: dependency has no footprint in frame coverage' % path)
+        work.append((path, frame, [p for c in chunks for p in c['owned']], m))
+    used = sorted({p['model'] for _, _, owned, _ in work for p in owned if 0 <= p['model'] < len(models)})
+    jobs = max(1, int(jobs or 1))
+    if jobs > 1 and len(work) > 1:
+        from build_parallel import ordered_map
+        groups = [used[k:k + DIGEST_GROUP] for k in range(0, len(used), DIGEST_GROUP)]
+        hashes = {}
+        for ids, found in zip(groups, ordered_map(_model_digests, [[models[i]['image'] for i in g] for g in groups],
+                                                   min(jobs, len(groups) or 1))):
+            hashes.update(zip(ids, found))
+        tasks = [(path, frame, owned, m, len(models), {mi: hashes[mi] for mi in {p['model'] for p in owned}
+                                                       if mi in hashes}) for path, frame, owned, m in work]
+        done = ordered_map(_frame_binary_failures, tasks, min(jobs, len(tasks)), cost=lambda t: len(t[2]) + 1)
+    else:
+        hashes = {mi: model_digest(F.read_brush_image(models[mi]['image'])) for mi in used}
+        done = map(_frame_binary_failures, ((path, frame, owned, m, len(models), hashes)
+                                            for path, frame, owned, m in work))
+    for found in done:
+        failures += found
     return failures

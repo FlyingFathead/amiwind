@@ -9,7 +9,7 @@
 | Where | tools/build_cache.py same_outputs: the mode comparison |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: Hold-level reuse bug: byte-identical outputs refused every dependant (in dev3 about 455 s of stage time and 40 CPU-minutes ran again) |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.36-dev3 |

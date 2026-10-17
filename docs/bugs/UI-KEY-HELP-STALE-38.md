@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Current keys help screen |
 | Reproduction | unknown |
@@ -16,15 +16,15 @@
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
 | Unknown because | Menu-only screenshots do not identify exact binary; nearby gameplay screenshots identify dev2. |
-| Platform or emulator | unknown (Owner did not name the emulator.) |
+| Platform or emulator | unknown (Maintainer did not name the emulator.) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
-The owner reports stale, sparse key help. A screenshot shows TAB as +aw_pov,
+The maintainer reports stale, sparse key help. A screenshot shows TAB as +aw_pov,
 seven entries on page 1 of 5, and a separate F10 console footer. A second image
 shows only the title and border; its transition and persistence are unknown.
-The owner suggests two or three columns to use the available space better.
+The maintainer suggests two or three columns to use the available space better.
 
 ## Where
 Current keys help screen. The surrounding playtest reports identify dev2;
@@ -75,7 +75,7 @@ The reported blank frame still has no established cause or repair; page
 clamping is a safeguard, not a diagnosis of that image.
 
 ## Verification
-Owner screenshots and source diagnosis; label and layout corrections prepared
+Maintainer screenshots and source diagnosis; label and layout corrections prepared
 on 13 October 2026. The existing wait/help C fixture now exercises both font
 sizes, column boundaries, all bindings across page changes, a long custom
 command, rebound keys, a shrinking or empty binding table and a wider viewport.
@@ -91,9 +91,9 @@ F10 and grave console cycling. Capture each page at native resolution and with
 rebinding; require legible labels and no clipped or unexpectedly empty pages.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.
@@ -129,9 +129,14 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [TOOLKIT-TEXT-ENCODING-38](TOOLKIT-TEXT-ENCODING-38.md): Toolkit labels contain corrupted Unicode characters
 - UI-ACCEPT-29 (no report page): Character selection lacks a visible OK button
 - [UI-DEATH-DAMAGE-TINT-38](UI-DEATH-DAMAGE-TINT-38.md): Lava damage tint also colours the death menu and selection
+- [UI-ICONS-INVENTORY-42](UI-ICONS-INVENTORY-42.md): Inventory rows show icons only for the few staged items, squeezed 32 to 14 pixels; no magic or equipped backdrops
+- [UI-INVENTORY-HEADING-CENTRE-42](UI-INVENTORY-HEADING-CENTRE-42.md): The Inventory heading text is not vertically centred in its bar
 - [UI-INVENTORY-LAYOUT-40](UI-INVENTORY-LAYOUT-40.md): Inventory text overlaps fields and footer; preview initially faces away
+- [UI-INVENTORY-PREVIEW-GAP-41](UI-INVENTORY-PREVIEW-GAP-41.md): Inventory shows 'Character preview unavailable': a fixed 2 MiB memory guard refuses the 128 KB pose model in Seyda Neen
+- [UI-INVENTORY-PREVIEW-STILL-42](UI-INVENTORY-PREVIEW-STILL-42.md): The inventory character is drawn live and turns instead of being a still picture
 - [UI-MENU-LOGO-32](UI-MENU-LOGO-32.md): The menu logo has a line above the name and reddish-pink letters instead of gold
 - UI-OPTIONS-WRAP-29 (no report page): Setup selection wraps despite a bounded scrollbar
+- [UI-WINDOW-TITLE-BAR-42](UI-WINDOW-TITLE-BAR-42.md): Menu windows lack the original title bar (tiled frame with the window name on a dark plaque)
 - [WAIT-NOCLIP-MESSAGE-32](WAIT-NOCLIP-MESSAGE-32.md): Wait refusal names registration, dry ground and speech together instead of the reason that applied (noclip)
 - [WORLDMAP-LAVA-MISMATCH-36](WORLDMAP-LAVA-MISMATCH-36.md): The in-game map shows a lava band in Molag Amar where the world has grass and no lava
 

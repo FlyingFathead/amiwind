@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | Whole-model NPC bake (tools/npc_geometry.py), every humanoid head |
 | Reproduction | always |
@@ -39,7 +39,7 @@ before this change is affected.
 
 ## Symptom
 
-The owner saw Fargoth's face badly mangled in game: the head of a converted NPC is a handful of large,
+The maintainer saw Fargoth's face badly mangled in game: the head of a converted NPC is a handful of large,
 wrong-shaped triangles instead of the original face.
 
 ## Where

@@ -36,7 +36,7 @@ OLD_PRESETS = [
     {'name': 'vivec-arena-pit', 'description': 'Vivec Arena Pit: combat test', 'scope': 'full',
      'start': 'interior:Vivec, Arena Pit', 'exclude': ['npc-gallery'], 'unreferenced': 'voice,npcs',
      'character': None, 'skip_census': None, 'boot_commands': []},
-    # owner decision 2026-10-11 09:55: the Arena preset starts in the whole-city frame
+    # project decision 2026-10-11 09:55: the Arena preset starts in the whole-city frame
     {'name': 'vivec-arena-chim', 'description': 'Vivec on CHIM (whole city) from the Arena arrival', 'scope': 'full',
      'start': 'vivec_city', 'exclude': ['npc-gallery'], 'unreferenced': 'voice,npcs', 'character': None,
      'skip_census': None, 'boot_commands': []},
@@ -430,10 +430,15 @@ class Receipts(Base):
 
 class Presets(Base):
     def test_every_preset_is_its_recipe(self):
-        # every old table row is a recipe; seyda-chim and lava-pools were added after the old table
-        self.assertEqual(sorted(row['name'] for row in mp.presets() if row['name'] not in ('seyda-chim', 'lava-pools')),
+        # every old table row is a recipe; seyda-chim, lava-pools and vivec-palace were added after the old table
+        self.assertEqual(sorted(row['name'] for row in mp.presets()
+                                if row['name'] not in ('seyda-chim', 'lava-pools', 'vivec-palace')),
                          sorted(row['name'] for row in OLD_PRESETS))
+        # vivec-arena-pit moved to the interior scope (MINIWIND-NO-INTERIOR-SCOPE-42): its room only
+        self.assertEqual(mp.find('vivec-arena-pit')['scope'], 'interior')
         for row in OLD_PRESETS:
+            if row['name'] == 'vivec-arena-pit':
+                row = dict(row, scope='interior')
             with self.subTest(preset=row['name']):
                 self.assertEqual(mp.find(row['name']), row)
                 document, _ = br.read(br.preset_path(row['name']))
@@ -443,6 +448,8 @@ class Presets(Base):
     def test_every_preset_gives_the_options_its_table_row_gave(self):
         extra = (['--miniwind-description', 'Mine', '--exclude-video', '--no-skip-census'], [])
         for row in OLD_PRESETS:
+            if row['name'] == 'vivec-arena-pit':
+                row = dict(row, scope='interior')  # moved to the interior scope (MINIWIND-NO-INTERIOR-SCOPE-42)
             for more in extra:
                 with self.subTest(preset=row['name'], more=more):
                     argv = ['--miniwind-preset', row['name'], *more]

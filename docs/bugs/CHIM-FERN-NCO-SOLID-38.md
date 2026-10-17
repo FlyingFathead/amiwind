@@ -9,7 +9,7 @@
 | Where | CHIM cell 3,-1, fire fern reference 175055; scenery mesh export |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev1 (last seen) |
+| Persists in | fixed in v0.0.38 |
 | Severity | medium: Decorative ferns obstruct normal walking; limited placements have a route around them. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

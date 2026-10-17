@@ -522,7 +522,7 @@ static void night_coverage_checks(model_t *model){
     assert(composed_cloud_pixels()>0);
     AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:clock:days",2);
 
-    /* The owner-approved protected interval stays byte-identical across sky
+    /* The maintainer-approved protected interval stays byte-identical across sky
      * profiles even when forced clear versus overcast. */
     cloud_type->value=1;
     for(day=1;day<=3;day++){

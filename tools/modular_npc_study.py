@@ -8,7 +8,7 @@ census   every humanoid appearance of the gallery resolver -> unique parts,
 compose  N residents: whole-actor bake (the resident stage's method) versus
          parts baked once and concatenated; faces, bytes, time, flat previews.
 
-Host-only measurement. Reads the owner's data; writes JSON (and private
+Host-only measurement. Reads the maintainer's data; writes JSON (and private
 preview PNGs) to --out. Nothing here enters a game image.
 """
 import argparse

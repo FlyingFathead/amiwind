@@ -28,6 +28,15 @@ typedef struct {
     float condition[AW_STATE_VALUES];
     aw_dropped_item_t dropped[AW_INVENTORY_DROPS];
 } aw_inventory_state_t;
+/* The selected magic item (the original magic menu's item selection; OpenMW
+ * InventoryStore::mSelectedEnchantItem) and current enchantment charge per
+ * owned item (AW_ITEM index, like condition). A clear charge_known bit means
+ * full charge (OpenMW CellRef charge -1). */
+typedef struct {
+    char selected[64];
+    uint32_t charge_known;
+    float charge[AW_STATE_VALUES];
+} aw_magic_state_t;
 enum aw_value_kind { AW_GLOBAL, AW_JOURNAL, AW_ITEM };
 enum aw_compare { AW_EQ, AW_NE, AW_GT, AW_GE, AW_LT, AW_LE };
 typedef struct {char id[64];int32_t value;} aw_value_t;
@@ -37,6 +46,7 @@ typedef struct {
     int journal_count;aw_journal_entry_t journal[AW_JOURNAL_ENTRIES];
     aw_harvest_state_t harvest;
     aw_inventory_state_t inventory;
+    aw_magic_state_t magic;
 } aw_state_t;
 extern aw_state_t aw_state;
 void AW_StateReset(void);
@@ -45,6 +55,8 @@ int AW_StateSet(aw_state_t *state,int kind,const char *id,int32_t value);
 int AW_StateTest(const aw_state_t *state,int kind,const char *id,int comparison,int32_t value);
 int AW_JournalAdd(aw_state_t *state,const char *id,int32_t index);
 int AW_ItemAdd(aw_state_t *state,const char *id,int32_t count);
+/* Enchantment recharge for unpaused or waited seconds (aw_inventory.c sets it). */
+extern void (*aw_magic_frame)(float seconds);
 int AW_CaptainDuties(void);
 int AW_CourtyardRingAvailable(void);
 int AW_CourtyardTakeRing(void);

@@ -34,11 +34,20 @@ def chim_version(version_file):
     return read_chim_version(path) if path.is_file() else None
 
 
+# Every private-test option a refusal check saw in this process, in order: the builder's release readiness
+# block (tools/release_readiness.py) lists exactly what a release candidate or final would refuse.
+private_test_options = []
+
+
 def require_private_test_version(version, waivers):
     """Private-test waivers are for -devN builds only; rc and final images pass every gate.
 
     waivers: names of the waiver options in use (empty when none). VIVEC-ARENA-ACTORS-32.
+    Each one is also recorded in private_test_options (release readiness).
     """
+    for waiver in waivers or ():
+        if waiver not in private_test_options:
+            private_test_options.append(waiver)
     if waivers and not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-dev[0-9]+', version):
         raise ValueError(f'Version {version} is a release candidate or final: private-test waivers '
                          f'({", ".join(waivers)}) are refused; the image must pass every gate')
@@ -141,13 +150,13 @@ def generate_heap(out, heap_mb=None, source=None):
 def generate_native(version_file, out, heap_mb=None):
     value = read_version(version_file)
     chim = chim_version(version_file)
-    # The boot check's short form "AmiWind vX / CHIM vY" (owner decision, 2026-10-08).
+    # The boot check's short form "AmiWind vX / CHIM vY" (project decision, 2026-10-08).
     title = f'AmiWind v{value} / CHIM v{chim}' if chim else f'AmiWind v{value}'
     out = Path(out); out.mkdir(parents=True, exist_ok=True)
     (out/'amiwind_version.h').write_text('/* Generated from VERSION; do not edit. */\n'
         '#ifndef AMIWIND_VERSION_H\n#define AMIWIND_VERSION_H\n'
         f'#define AMIWIND_VERSION "{value}"\n'
-        # The console's first version line (owner, 11 October 2026): the boot check's title.
+        # The console's first version line (maintainer, 11 October 2026): the boot check's title.
         f'#define AMIWIND_TITLE "{title}"\n#endif\n')
     if chim:
         # CHIM's own version for the engine (engine/aga/src/chim/chim.h includes it).

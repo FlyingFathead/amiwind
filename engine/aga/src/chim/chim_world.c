@@ -467,6 +467,30 @@ int Chim_FarOnly (void)
 	return far_only;
 }
 
+/* The map CHIM runs on: the server's, or in demo playback (no server) the
+ * client's (DemoMap below). */
+static int demo_map;		/* MapBegin runs for a demo (DemoMap) */
+static model_t *MapModel (void)
+{
+	return demo_map ? cl.worldmodel : sv.worldmodel;
+}
+static const char *MapName (void)
+{
+	static char name[MAX_QPATH];
+	const char *p;
+	if (!demo_map)
+		return sv.name;
+	name[0] = 0;
+	if (cl.worldmodel)
+	{
+		p = strrchr (cl.worldmodel->name, '/');
+		Q_strcpy_bounded (name, p ? p + 1 : cl.worldmodel->name, sizeof(name));
+		if ((p = strrchr (name, '.')) != NULL)
+			name[p - name] = 0;
+	}
+	return name;
+}
+
 static void Fail (const char *why)
 {
 	int floor = active == 0 && ChimFar_Loaded ();
@@ -500,7 +524,7 @@ static void Refuse (int cx, int cy, const char *why)
 		Hunk_FreeToLowMark (hunk_mark);
 	hunk_mark = -1;
 	Host_Error ("CHIM frame map %s (frame %ld %ld): %s; it is a BSP29 file but not a playable map without its CHIM world",
-		sv.modelname, (long)cx, (long)cy, why);
+		MapModel () ? MapModel ()->name : "?", (long)cx, (long)cy, why);
 }
 
 static void MapBegin (const char *entities)
@@ -520,8 +544,8 @@ static void MapBegin (const char *entities)
 	}
 	rest_used = rest_stated;
 	if (chim_rest_measured.value >= 2 || (chim_rest_measured.value >= 1 && rest_stated > 0))
-		if (RestMeasured (sv.name) > rest_used)
-			rest_used = RestMeasured (sv.name);
+		if (RestMeasured (MapName ()) > rest_used)
+			rest_used = RestMeasured (MapName ());
 	rest_checked = 0;
 	size = (int)chim_zone_kib.value * 1024;
 	/* Less the zone's own Hunk header and alignment (Hunk_AllocName). */
@@ -572,7 +596,7 @@ static void MapBegin (const char *entities)
 	/* The frame's far terrain (chim_far.c, low Hunk, given back with the
 	 * map) before the frame world: if a later step fails, the map keeps it
 	 * as its floor (H15; CHIM-GRAFT-FAIL-NO-FLOOR-35). */
-	ChimFar_Begin (sv.worldmodel ? sv.worldmodel->name : "", (long)host_parms.memsize - Hunk_LowMark () - Hunk_HighMark ()
+	ChimFar_Begin (MapModel () ? MapModel ()->name : "", (long)host_parms.memsize - Hunk_LowMark () - Hunk_HighMark ()
 		- (long)chim_reserve_kib.value*1024);
 	{
 		/* Statics the frame map streams with their chunks (chim_statics.c). */
@@ -581,7 +605,7 @@ static void MapBegin (const char *entities)
 			chim_frame.count);
 	}
 	/* The frame's terrain becomes the map's world (chim_graft.c). */
-	if (!sv.worldmodel || !ChimGraft_Begin (sv.worldmodel))
+	if (!MapModel () || !ChimGraft_Begin (MapModel ()))
 	{
 		Fail ("no room for the CHIM frame world");
 		return;
@@ -974,6 +998,20 @@ static void Status (void)
  *   reads, opens of CHIM files. */
 static unsigned long last_bytes, last_reads, last_opens, last_evictions;
 
+/* Demo playback (cl_parse.c): the same frame world as a live game, started from
+ * the client's map (no server); the client side then streams it as in play
+ * (Link: the ring follows the view entity). Server-side parts (the arrival
+ * prime, edge notices, collision) have nothing to do in a demo. */
+extern void (*aw_demo_map_begin)(void);
+static void DemoMap (void)
+{
+	if (!cl.worldmodel || !cl.worldmodel->entities)
+		return;
+	demo_map = 1;
+	MapBegin (cl.worldmodel->entities);
+	demo_map = 0;
+}
+
 static int RCount (char *out, int size, long frames)
 {
 	chim_zone_stats_t s;
@@ -1100,6 +1138,7 @@ void Chim_Init (void)
 	aw_chim_world = 1;		/* the map path resolver may now pick .chim frame maps */
 	CacheBank ();
 	aw_chim_map_begin = MapBegin;
+	aw_demo_map_begin = DemoMap;
 	aw_chim_map_end = MapEnd;
 	aw_chim_link = Link;
 	aw_chim_clip = Clip;

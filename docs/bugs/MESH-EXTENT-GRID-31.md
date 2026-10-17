@@ -9,7 +9,7 @@
 | Where | mesh converter split_surface; Vivec Underworks interiors |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | high: Thirteen Vivec interiors hit the surface extent limit and are rejected or stop the engine at load. |
 | Family | Mesh converter geometry (`converter-geometry`) |
 

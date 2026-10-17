@@ -63,7 +63,7 @@ items and records, never extracted game data.
 
 ## Refresh policy and safer behavior
 
-The owner specifically requests sensible refresh/persistence. Ordinary scene
+The maintainer specifically requests sensible refresh/persistence. Ordinary scene
 unload/re-entry is not a refresh trigger. Preserve taken/added items by placed
 reference, including player storage, and resolve leveled contents once per
 initialization/explicit reset event. Audit original flags, delays, scripts and

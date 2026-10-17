@@ -4,7 +4,7 @@
 
 A cold full conversion using Docker Desktop on Windows 11 with the WSL 2
 backend passed. The tools/source-only image used the existing Linux pipeline,
-24 workers, read-only owner-provided game inputs in a Linux named volume,
+24 workers, read-only user-provided game inputs in a Linux named volume,
 a separate writable Linux build/cache volume and `--network none`.
 
 - All 3,551 NPC gallery models converted; zero failures.

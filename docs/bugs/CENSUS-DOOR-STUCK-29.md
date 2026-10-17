@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 6 October 2026, in v0.0.29-rc1 |
 | Where | Census and Excise Office hall door |
 | Reproduction | always |
@@ -40,7 +40,7 @@ in progress; no shipped fix yet**.
 | Fixed | N |
 | First shipped fixed version | None |
 | Intended fix checkpoint | Next candidate after published RC1; exact release designation pending |
-| Owner | Collision/runtime maintenance |
+| Maintainer | Collision/runtime maintenance |
 | Release gate | Safe passage after opening, with original collision and save behavior preserved |
 
 ## Report and expected behavior

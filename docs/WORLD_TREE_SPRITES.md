@@ -2,7 +2,7 @@
 
 ## Open sprite-root regression - 4 October 2026
 
-An owner screenshot from the post-release v0.0.28 playtest shows an unintended
+A maintainer screenshot from the post-release v0.0.28 playtest shows an unintended
 vertically striped pillar beneath a sprite-tree trunk on a slope. The exact
 placement still needs target replay. A source reproduction found a scale and
 authored-origin mismatch between projected geometry and sprite texture gradients.

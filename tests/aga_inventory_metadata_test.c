@@ -38,6 +38,16 @@ int main(void){
     u32(row+444,27);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
     u32(row+488,3);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
     strcpy((char *)row+184,"../escape.mdl");assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
+    assert(AW_InventoryRead("fixture_sword",&out) && out.enchant_kind==0 && out.charge_max==0);
+    strcpy((char *)row+312,"heal_minor");row[496]=AW_ENCH_USED;real(row+500,20);
+    assert(AW_InventoryRead("fixture_sword",&out) && out.enchant_kind==AW_ENCH_USED && out.charge_max==20);
+    row[496]=5;assert(!AW_InventoryRead("fixture_sword",&out));row[496]=AW_ENCH_USED;
+    row[497]=1;assert(!AW_InventoryRead("fixture_sword",&out));row[497]=0;
+    row[511]=1;assert(!AW_InventoryRead("fixture_sword",&out));row[511]=0;
+    real(row+500,NAN);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);
+    real(row+500,3);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512);   /* charge without a kind */
+    row[496]=AW_ENCH_USED;real(row+500,3);assert(!AW_InventoryRead("fixture_sword",&out));memcpy(row,pristine,512); /* no enchantment */
+    assert(AW_InventoryRead("fixture_sword",&out));assert(!memcmp(&prior,&out,sizeof(out)));
     corrupt_header=1;assert(!AW_InventoryRead("fixture_sword",&out));assert(!memcmp(&prior,&out,sizeof(out)));
     corrupt_header=0;multirow=1;
     /* Link common.c: the real Quake helper is an equality test in both orders. */

@@ -1,6 +1,6 @@
 # Player scale, collision and camera motion
 
-The owner reported blocked stairs, excessive resistance on mild slopes and
+The maintainer reported blocked stairs, excessive resistance on mild slopes and
 idle downhill sliding in checkpoint-011. The old standing player used Quake's
 32 x 32 x 56 box although the imported Morrowind world is scaled by 0.25.
 
@@ -21,7 +21,7 @@ idle downhill sliding in checkpoint-011. The old standing player used Quake's
 
 ## Verified base dimensions
 
-The owner's `meshes/base_anim.nif` Bounding Box gives half extents approximately
+The maintainer's `meshes/base_anim.nif` Bounding Box gives half extents approximately
 29.28 x 28.48 x 66.5 and centre z=66.5. OpenMW reads that collision box in
 `mwphysics/actor.cpp`. `Npc::adjustScale(..., false)` in `mwclass/npc.cpp` does
 not apply race height/weight to collision; those proportions affect rendering.
@@ -41,7 +41,7 @@ collision profile. The dev2 eye-height selection is independent of this box.
 
 ## Physical recheck, v0.0.24-dev2
 
-The owner reports being too tall relative to both Seyda Neen and Balmora. A live
+The maintainer reports being too tall relative to both Seyda Neen and Balmora. A live
 Amiga calibration room compares body and point sweeps against known flat walls,
 floor and ceiling. This tests the effective baked collision, not just constants:
 
@@ -73,7 +73,7 @@ catalogue reports 31.176 before creation.
 Keep **90-degree horizontal FOV** and the existing Quake bob. The optional slider
 in the roadmap must pass a performance comparison and is not a world-scale fix.
 These measurements do not establish original-game animated camera parity or
-close the owner's broader assessment of player proportions.
+close the maintainer's broader assessment of player proportions.
 
 ## Original race-based heights
 
@@ -137,7 +137,7 @@ swimming or noclip player must not be glued to nearby ground. The native
 step-down code must test the hit object's solidity, not the player's solidity,
 before restoring grounded state.
 
-Keep the owner's preferred Quake camera motion: `cl_bob 0.02`,
+Keep the maintainer's preferred Quake camera motion: `cl_bob 0.02`,
 `cl_bobcycle 0.6`, `cl_bobup 0.5`. These defaults and the view code are unchanged.
 Collision fixes must not remove bob or replace it with a motionless camera.
 
@@ -151,7 +151,7 @@ See checkpoint-012 validation for native evidence and remaining limitations.
 
 ## Checkpoint-013 architectural ghost volumes
 
-The owner reported an invisible square obstruction after slopes/stairs improved.
+The maintainer reported an invisible square obstruction after slopes/stairs improved.
 Expanding only a convex piece's facet planes creates large solid spikes at acute
 corners. Add six axial support limits before expanding each piece by the standing
 player box. Point traces retain their original hull: the extra limits are only
@@ -161,12 +161,12 @@ A host grid found 246 old solid hits outside expanded model bounds and zero afte
 the change. Native comparison reproduced a false-solid point at (0,136,90): old
 code refused to leave noclip, while the corrected image grounded the player and
 walked across the square. This is a reproduced local defect, not proof that it is
-the exact spot in the owner's screenshot or that all collision is now exact.
+the exact spot in the maintainer's screenshot or that all collision is now exact.
 Use `aw_pos` and `aw_blockers` to report any remaining location.
 
 ## Eye-height audit, checkpoint-016 development
 
-The owner's low-camera report is credible: the existing `view_ofs.z=13.3`
+The maintainer's low-camera report is credible: the existing `view_ofs.z=13.3`
 places the nominal eye 29.925 runtime units above the feet (119.7 source units),
 before bob and network quantization. That value was a prototype choice, not
 verified first-person parity.
@@ -194,8 +194,8 @@ animated camera parity for every race/equipment combination.
 
 ## Dev1 regression comparison, 28 September 2026
 
-Owner reported that guards seemed smaller or the player taller. Recompiled the
-owner's v0.0.17 snapshot and compared it with v0.0.18-dev1 on the same HDF,
+Maintainer reported that guards seemed smaller or the player taller. Recompiled the
+maintainer's v0.0.17 snapshot and compared it with v0.0.18-dev1 on the same HDF,
 scene, spawn and emulator configuration. Both native logs report eye offset
 16.434 / eye above feet 33.059, player origin (16,44,60), and identical placed
 NPC coordinates. Fargoth/guard MDLs and both BSP files are byte-identical to

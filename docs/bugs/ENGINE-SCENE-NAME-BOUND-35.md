@@ -9,7 +9,7 @@
 | Where | engine/aga/src/aw_scene.c (scene links, travel, region crossing) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | low: Map names are checked shorter today; a longer one would overwrite the record |
 | Family | Scene changes, arrivals and handoffs (`transitions-arrivals`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -66,6 +66,7 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 - AW25-01 (no report page): Seyda Neen walking reaches water before the island handoff
 - [CHIM-INTRO-TP-OTHER-TOWN-33](CHIM-INTRO-TP-OTHER-TOWN-33.md): During the intro stages, travelling to Balmora on CHIM loads Seyda Neen's intro-docks frame map: the player lands in empty water
 - INPUT-01 (no report page): Held Ctrl/Shift flight modifiers reset on cell changes
+- [INTERIOR-SPAWN-UNDERWATER-41](INTERIOR-SPAWN-UNDERWATER-41.md): Vivec underworks rooms spawn under their water
 - [INTRO-ROLES-30](INTRO-ROLES-30.md): NUM_FOR_EDICT bad-pointer crash on a Seyda Neen region change
 - SEYDA-TRANSITION-29 (no report page): v0.0.29-dev1: Cell/sub-cell passage problems around Seyda Neen
 - TRANSITION-EQUIPMENT-29 (no report page): Carried torch blinks out on cell/sub-cell arrival

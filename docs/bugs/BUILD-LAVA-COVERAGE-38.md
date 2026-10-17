@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Full dev2 exterior world |
 | Reproduction | unknown |
@@ -16,7 +16,7 @@
 | From commit | source c2eaa5a, engine c2eaa5a, CHIM world c2eaa5a |
 | CHIM engine version | CHIM unknown, engine c2eaa5a, world format unknown |
 | Unknown because | CHIM version and format not yet transcribed into this report; exact dev2 receipt preserved. |
-| Platform or emulator | unknown (Owner screenshot identifies dev2 but not the emulator.) |
+| Platform or emulator | unknown (Maintainer screenshot identifies dev2 but not the emulator.) |
 
 <!-- END GENERATED FACTS -->
 
@@ -37,14 +37,14 @@
 - [Partial height audit, 12 October 2026](#partial-height-audit-12-october-2026)
 - [Terrain cause isolated, 12 October 2026](#terrain-cause-isolated-12-october-2026)
 - [Local terrain-detail candidate, 12 October 2026](#local-terrain-detail-candidate-12-october-2026)
-- [Owner evidence reconciliation, 13 October 2026](#owner-evidence-reconciliation-13-october-2026)
+- [Maintainer evidence reconciliation, 13 October 2026](#maintainer-evidence-reconciliation-13-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
 
 ## Symptom
 
-The owner reports missing lava in v0.0.38-dev2 at cell 9,2 (global
+The maintainer reports missing lava in v0.0.38-dev2 at cell 9,2 (global
 77347,17749,490) and cell 10,2 (global 81952,21390,323). The first screenshot
 shows terrain without lava; the second shows the map lava layer. These are
 reported positions, not yet independently reproduced camera poses.
@@ -69,7 +69,7 @@ delivered world contains the demonstrated feature.
 
 ## Reproduction
 
-Repeat the owner scenario above in the delivered development build. Native reproduction remains pending.
+Repeat the maintainer scenario above in the delivered development build. Native reproduction remains pending.
 
 ## Repair
 
@@ -113,7 +113,7 @@ both world formats, full package coverage and release validation remain pending.
 
 ## Height verification requirement, 12 October 2026
 
-The owner explicitly asks whether lava is at the correct height relative to the
+The maintainer explicitly asks whether lava is at the correct height relative to the
 topomap. End-to-end verification remains pending. Compare original transformed
 mesh surface Z, converted BSP/CHIM surface Z, terrain/topomap coordinate and
 elevation data, and runtime contact height at the same references. Shared
@@ -217,9 +217,9 @@ This remains a standalone map without normal exterior routing; flora, actors,
 original steam, audio and frame-cost acceptance are incomplete.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.
@@ -270,8 +270,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 Related bugs in other categories:

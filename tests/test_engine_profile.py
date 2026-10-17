@@ -94,6 +94,61 @@ class ProfileRecordTests(unittest.TestCase):
         self.assertEqual(len(engine_profile.check_link_map('obj/aw_c2p.o\n', upstream)), 2)
 
 
+class EngineCpuTests(unittest.TestCase):
+    """--engine-cpu 68060: the experimental 68060-targeted build (docs/68060.md, ENGINE-060-FSCC-41)."""
+
+    def test_default_is_the_68040_baseline(self):
+        record = engine_profile.resolve()
+        self.assertEqual(record['engine_cpu'], '68040')
+        self.assertEqual(record['engine_cpu_flags'], '-m68040 -m68881')
+        import build
+        with contextlib.redirect_stdout(io.StringIO()):
+            args = build.parser().parse_args([])
+        self.assertEqual(args.engine_cpu, '68040')
+        self.assertEqual(build.engine_profile_arguments(args), [])
+
+    def test_68060_record_variables_and_labels(self):
+        record = engine_profile.resolve('c', engine_cpu='68060')
+        self.assertFalse(engine_profile.is_default(record))
+        self.assertEqual(record['label'], 'c')
+        self.assertEqual(engine_profile.make_variables(record), ['ENGINE_ASM=', 'ENGINE_OPT=o1', 'ENGINE_CPU=68060'])
+        self.assertEqual(engine_profile.short(record), 'c (C paths, -O1; 68060)')
+        line = engine_profile.boot_line(record)
+        self.assertLessEqual(len(line), 63)
+        self.assertIn('68060', line)
+        upstream = engine_profile.resolve('upstream', engine_cpu='68060')
+        self.assertEqual(upstream['asm_objects'], ['c2p8.o', 'd_scan_68k.o'])
+        self.assertIn('ENGINE_CPU=68060', engine_profile.make_variables(upstream))
+        args = SimpleNamespace(engine_profile='c', engine_asm=None, engine_opt=None, engine_cpu='68060')
+        self.assertEqual(engine_profile.cli_arguments(args), ['--engine-cpu', '68060'])
+        self.assertEqual(engine_profile.from_args(args)['engine_cpu'], '68060')
+
+    def test_68060_needs_the_fpu_build(self):
+        with self.assertRaises(ValueError):
+            engine_profile.resolve('c', cpu='68020', engine_cpu='68060')
+        with self.assertRaises(ValueError):
+            engine_profile.resolve('c', engine_cpu='68030')
+
+    def test_records_written_before_the_option_read_as_68040(self):
+        record = engine_profile.resolve()
+        del record['engine_cpu']
+        self.assertEqual(engine_profile.engine_cpu(record), '68040')
+        self.assertTrue(engine_profile.is_default(record))
+
+    def test_makefile_and_builder(self):
+        text = (ENGINE / 'Makefile').read_text(encoding='utf-8')
+        self.assertIn('ENGINE_CPU ?= 68040', text)
+        self.assertIn('-m68060 -mhard-float', text)
+        self.assertIn('fpu: ARCH_FLAGS = $(FPU_ARCH_FLAGS)', text)
+        # the 68060 build links the 68040 build's hard-float libraries (the SDK's 68060 set is soft-float)
+        self.assertIn('fpu: LDFLAGS = -m68040 -m68881 -s', text)
+        builder = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')
+        # every 68040 engine build also builds the 68060 engine of the same profile (AmiWind060)
+        self.assertIn("engine060=build_engine_060(", builder)
+        self.assertIn("resolve(profile['profile'],','.join(profile['asm']) or 'none',profile['opt'],args.cpu,'68060')", builder)
+        self.assertIn('engine_profile.engine_cpu(profile)', builder)
+
+
 class BootLineTests(unittest.TestCase):
     def test_boot_rows_fit_and_name_the_profile(self):
         for args, word in ((('c',), 'c:'), (('upstream',), 'upstream:'), (('c', 'turb'), 'custom:')):
@@ -193,6 +248,23 @@ class MakefileTests(unittest.TestCase):
         self.assertIn(' -O1 ', compile_of('in_amiga.c'))
         self.assertIn(' -O0 ', compile_of('d_sprite.c'))
         self.assertFalse([line for line in commands if line.startswith('vasmm68k_mot ')])
+
+    def test_68060_commands(self):
+        commands = make_commands('ENGINE_CPU=68060')
+        compiles = [line for line in commands if ' -c -o obj/' in line]
+        self.assertTrue(compiles)
+        for line in compiles:
+            self.assertIn(' -m68060 -mhard-float ', line)
+            self.assertNotIn('-m68040', line)
+        link = next(line for line in commands if ' -o build/AmiQuakeGCC ' in line)
+        self.assertIn('-m68040 -m68881', link)
+        self.assertNotIn('-m68060', link)
+        # the default spelled out is the plain build
+        self.assertEqual(make_commands(), make_commands('ENGINE_CPU=68040'))
+        result = subprocess.run(['make', '-n', '-B', 'fpu', 'PYTHON=python3', 'ENGINE_CPU=68030'], cwd=ENGINE,
+                                capture_output=True, text=True, timeout=120)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('ENGINE_CPU', result.stderr)
 
     def test_unknown_units_are_refused(self):
         result = subprocess.run(['make', '-n', '-B', 'fpu', 'PYTHON=python3', 'ENGINE_ASM=vector'], cwd=ENGINE,

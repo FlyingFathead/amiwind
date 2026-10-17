@@ -80,7 +80,7 @@ checks remain separate. The hosted Docker job runs for every published release (
 [v0.0.35](RELEASE-v0.0.35.md)). Each source release requires its own exact-commit CI; local prototype
 success does not establish hosted CI success.
 
-The owner-input/export helper completed the full v0.0.26 conversion and exported
+The maintainer-input/export helper completed the full v0.0.26 conversion and exported
 the verified final-identity HDF. The strict actor-ground gate passed with zero
 unresolved findings; WinUAE game entry, opening movie and Enter/Escape controls
 passed. Those are dated full-game results. Published v0.0.27 subsequently
@@ -171,5 +171,5 @@ bytes, SHA-256 `da3f80b3d7ebefe30c53031fdd29c34a094d0b486328daa46739a4a5ad6364a3
 Conversion elapsed was 1,566.061 seconds (26 minutes 6 seconds), excluding export, provisioning and emulator testing; the cached run reported 78 warnings. WinUAE 6.0.3
 played the opening movie, entered Jiub's prison scene and responded to Enter/Escape.
 Hosted Docker CI subsequently passed for v0.0.26 and v0.0.27. Synthetic CI
-remains separate from this owner-supplied full-game validation; every future
+remains separate from this user-supplied full-game validation; every future
 publication still requires its own exact-commit hosted result.

@@ -199,7 +199,7 @@ verified-fixed versions. Do not replace a failure history with a later green run
 
 ## Residency is not the same as per-frame visibility
 
-The owner observed improved central-Balmora performance at view distance 1000
+The maintainer observed improved central-Balmora performance at view distance 1000
 compared with a lower setting. This is a playtest observation, not a verified
 fog/culling cause. Record matched camera, route, scene, settings and cache state.
 Compare render/server/audio time, edges/surfaces, visible entities, cache misses

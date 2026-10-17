@@ -1,10 +1,10 @@
-# Owner playtest feedback — v0.0.23-dev2
+# Maintainer playtest feedback — v0.0.23-dev2
 
 Received 29 September 2026 (Europe/Helsinki), following publication of commit
 `e368511551657b67cf84049934b093c97749d0ae`. These are observed playtest reports;
-a passing synthetic test does not close an owner-reported gameplay defect.
+a passing synthetic test does not close a maintainer-reported gameplay defect.
 
-## Working in the owner's playtest
+## Working in the maintainer's playtest
 
 - The pier guard no longer spins around their axis during the escort.
 - The introduction from the ship through the Census Office works reasonably well.
@@ -15,7 +15,7 @@ Preserve both while changing collision, menus and speech timing.
 
 | Report / request | dev3 disposition / remaining work |
 | --- | --- |
-| Ship creaking/splashing drowns out opening speech | Boat Hull converted once from the original at -5 dB; unchanged speech/music. Measured -4.99 dB after quantization. Owner listening acceptance pending. |
+| Ship creaking/splashing drowns out opening speech | Boat Hull converted once from the original at -5 dB; unchanged speech/music. Measured -4.99 dB after quantization. Maintainer listening acceptance pending. |
 | Player can walk off the deck/pier during creation | **Open regression.** All 22 authored collision boxes are present, and their source collision-mesh dimensions were rechecked. Existing synthetic box/stage tests are insufficient evidence of a closed route. Reproduce side escapes on deck, plank and pier; inspect physical rails and gaps as well as script gating. Do not mark fixed from source presence. |
 | Pier appearance choice needs an overlay confirmation showing the selection | Added confirmation showing race/sex and face/hair selections; back preserves edits. |
 | Census character choices/review need confirmation | Added confirmation showing selected race/sex, class and birthsign; progress advances only after Choose/Y. |

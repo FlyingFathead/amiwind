@@ -16,7 +16,7 @@ prefix ahead of a crossing; neither keeps two complete regions resident.
 - [Memory and disk access](#memory-and-disk-access)
 - [Save format and recovery](#save-format-and-recovery)
 - [Proposed implementation stages](#proposed-implementation-stages)
-- [Owner acceptance: 30 September 2026](#owner-acceptance-30-september-2026)
+- [Maintainer acceptance: 30 September 2026](#maintainer-acceptance-30-september-2026)
 - [Seyda Neen regions in dev4](#seyda-neen-regions-in-dev4)
 - [dev5 Seyda centre boundary](#dev5-seyda-centre-boundary)
 
@@ -26,7 +26,7 @@ Dev3 can hold the last rendered frame with a small top Loading box during these
 swaps; Options retains the previous black-screen method. This masks the blank
 transition, not the disk/decoding pause. Music servicing remains active.
 
-Owner playtest: Balmora exteriors now look okay overall and often run faster than
+Maintainer playtest: Balmora exteriors now look okay overall and often run faster than
 Seyda Neen despite the city's size. Interiors remain a requested content priority.
 This performance observation is not yet a controlled comparison.
 
@@ -73,7 +73,7 @@ Acceptance requires fewer disruptive pauses without slower city roaming,
 missed audio deadlines, duplicated/lost NPCs, collision gaps or save regressions.
 Repeat the [NPC ground-contact check](NPC_GROUND_CONTACT.md) after fresh loads,
 sub-cell returns and restores for every tested method. Keep the experimental
-method opt-in until the owner accepts those comparisons.
+method opt-in until the maintainer accepts those comparisons.
 
 `cell-load-profile.tsv` records map, method, measured model/BSP disk bytes and
 read calls, time inside those reads, BSP decode time, whole-world-model time,
@@ -239,10 +239,10 @@ This is a proposed architecture for AmiWind. It does not claim full Morrowind
 script compatibility, completed persistence, or seamless world streaming.
 
 
-## Owner acceptance: 30 September 2026
+## Maintainer acceptance: 30 September 2026
 
 Balmora's v0.0.24-dev3 regions and sub-cells work surprisingly well in the
-owner's playtest. The accepted frozen-frame Loading... presentation is the
+maintainer's playtest. The accepted frozen-frame Loading... presentation is the
 current standard. This is a promising foundation for continuous travel across
 a larger game world without disruptive scene breaks. Preserve this result
 while extending coverage. Current loading is still synchronous and only one

@@ -69,7 +69,7 @@ class Plan(unittest.TestCase):
 
 
 class Collisions(unittest.TestCase):
-    """The preflight collision check (owner order 11 October 2026: never a CHIM map and a legacy map of the same cell):
+    """The preflight collision check (maintainer order 11 October 2026: never a CHIM map and a legacy map of the same cell):
     before any stage, every open-world stage must take exactly the manifest's CHIM region cells."""
     CELLS = '5,5:s 6,5:l'
 

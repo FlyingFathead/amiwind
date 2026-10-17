@@ -9,7 +9,7 @@
 | Where | tools/build_cache.py Recorder.after: cell-progress reads chim-world/chim-stats.json |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev1 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: About 5 s per build, but reported as an unexpected rebuild every time, which hides real ones |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | 2026_10_10_v0.0.36-dev1_full-bcoast-chimtest-try3_be5d6d3 |

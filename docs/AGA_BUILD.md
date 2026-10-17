@@ -24,13 +24,15 @@ experiment; this accelerated AGA profile is not stock-A1200 performance proof.
 Tested with FS-UAE 3.1.66, A1200 model, 68040/FPU, 2 MiB Chip, 16 MiB 32-bit
 Fast memory, Kickstart 3.1 A1200 revision 40.68,
 JIT and maximum CPU speed.
-JIT results describe this emulator setup only. The current executable requires
-an FPU. A 68020/no-FPU trial exists but does not boot from our bare-ROM setup
-without an additional math library; stock A1200 playability is unproven.
+JIT results describe this emulator setup only. The current executable needs
+an FPU. A 68020 build without FPU exists as a trial, but it does not boot from
+the bare-ROM setup without an extra maths library, and whether a stock A1200
+can play the game is not known.
 
-The small 68000 preflight checks the hardware and free memory before loading
-the engine. It reports a clear failure and stops the startup script if unsuitable.
-Use 2 MiB Chip and 16 MiB Fast; the 4 MiB Quickstart preset is too small.
+A small 68000 program checks the hardware and the free memory before the
+engine loads. If the machine is not suitable, it says why and stops the startup
+script. The game needs 2 MiB Chip and 16 MiB Fast RAM; the 4 MiB Quickstart
+preset is too small.
 See [WinUAE setup](WINUAE.md) for panel-by-panel instructions and
 [FS-UAE playtesting](FS-UAE-PLAYTESTING.md) for the Linux recipe/preset.
 
@@ -106,7 +108,7 @@ does not run per frame and does not alter collision.
 `aw_view x y z yaw pitch` places a reproducible diagnostic camera while noclip
 is enabled. `aw_probe` runs 441 floor sweeps and writes `collision-probe.csv`.
 The latter stalls the game and is not a normal performance workload. Use
-`aw_cull 0/1` and `aw_fog 0/1` to isolate distance rejection from shading.
+`aw_cull 0..6` ([far test](performance/FAR-TEST.md)) and `aw_fog 0/1` to isolate distance rejection from shading.
 These are development tools, not save/load or final Morrowind controls.
 **E** activates the targeted door or resident in the implemented interaction
 slice; see [the maintained keymap](KEYMAPS.md). Full gameplay remains incomplete.

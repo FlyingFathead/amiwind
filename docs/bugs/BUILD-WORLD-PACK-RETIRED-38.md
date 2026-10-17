@@ -9,7 +9,7 @@
 | Where | World partition input selection after validated exterior-map omissions |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38 (last seen) |
+| Persists in | fixed in v0.0.39-rc1 |
 | Severity | critical: Full-world image assembly would stop before partition writing on intentionally absent maps. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -131,8 +131,8 @@ size are distinct measurements; these figures do not identify a final039 ZIP.
 RC1 package and matching source delivery finalized on 13 October 2026 at
 18:06:05 UTC (21:06 in Finland), with source `57a8699` and image `fbf9a6c`
 kept distinct. The six partial overlaps remain outside the shipped whole-cell
-count. Final v0.0.39 remains in preparation pending explicit owner inspection
-approval; RC1 shipment does not supply owner or universal gameplay acceptance.
+count. Final v0.0.39 remains in preparation pending explicit maintainer inspection
+approval; RC1 shipment does not supply maintainer or universal gameplay acceptance.
 
 Conversion/audit data is the unchanged 13 October 2026, 14:04:49 UTC snapshot:
 1,190 converted cells including 15 failed audits, 99 empty sea, three not

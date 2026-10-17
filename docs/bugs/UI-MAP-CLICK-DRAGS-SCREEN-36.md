@@ -4,8 +4,8 @@
 
 ## PERSISTING: reported 2 times; something has to be done
 
-- Reported with v0.0.36-dev5 at 2026-10-11 14:31 +0300: owner: clicking in the map (M) drags AmigaDOS into view
-- Reported with v0.0.36-dev5 at 2026-10-11 14:33 +0300: owner: right+left click combos reach the AmigaDOS screen behind the game
+- Reported with v0.0.36-dev5 at 2026-10-11 14:31 +0300: maintainer: clicking in the map (M) drags AmigaDOS into view
+- Reported with v0.0.36-dev5 at 2026-10-11 14:33 +0300: maintainer: right+left click combos reach the AmigaDOS screen behind the game
 
 <!-- END GENERATED PERSISTING -->
 
@@ -13,7 +13,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 11 October 2026, in v0.0.36-dev5 |
 | Where | Engine: the game screen (vid_amiga.c) and the input handler (sys_amiga.c) |
 | Reproduction | always |
@@ -25,13 +25,13 @@
 | From commit | source 6c29a23, engine 6c29a23, CHIM world 6c29a23 |
 | CHIM engine version | CHIM 0.1.0, engine 6c29a23, world format 0.7 |
 | Build note | run 2026_10_11_v0.0.36-dev5_full-coast-arena-seyda-dev5_6c29a23 |
-| Platform or emulator | FS-UAE, JIT (owner, dev5 playtest) |
+| Platform or emulator | FS-UAE, JIT (maintainer, dev5 playtest) |
 
 <!-- END GENERATED FACTS -->
 
 ## Status: 11 October 2026
 
-Fixed on the v0.0.36 line (branch v0.0.36-thirdperson). The owner reported it twice from the v0.0.36-dev5 playtest
+Fixed on the v0.0.36 line (branch v0.0.36-thirdperson). The maintainer reported it twice from the v0.0.36-dev5 playtest
 on FS-UAE: clicking and dragging in the world map pulled the AmigaDOS window into view, and right+left click
 combinations reached the AmigaDOS screen behind the game.
 
@@ -99,7 +99,7 @@ Family: Console, keyboard and mouse input (`console-input`). The console line ed
 - AW25-04 (no report page): M/N switched to the desktop, including while typing in the console
 - AW25-05 (no report page): Console typed only uppercase letters and shifted digits
 - CONSOLE-CAPS-29 (no report page): FS-UAE F10 Caps Lock appears stuck
-- [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the owner's FS-UAE (Ubuntu)
+- [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the maintainer's FS-UAE (Ubuntu)
 - [CONSOLE-HISTORY-EMPTY-32](CONSOLE-HISTORY-EMPTY-32.md): Console Up past the oldest command shows an empty line and stays there
 - CONSOLE-WHEEL-29 (no report page): FS-UAE console wheel starts working then reports unbound
 - [ENGINE-CBUF-OVERFLOW-35](ENGINE-CBUF-OVERFLOW-35.md): Command text larger than the command buffer or a line over 1023 characters overflowed

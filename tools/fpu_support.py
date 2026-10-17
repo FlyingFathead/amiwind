@@ -29,6 +29,12 @@ SUPPORT_LIBRARIES = ('68040.library', '68060.library')
 # MMULib's 68040/68060 libraries open mmu.library; copied when it sits beside them.
 COMPANION_LIBRARIES = ('mmu.library',)
 LOADER = 'AmiWindFPU'
+# The 68060 engine and the program that picks it at boot (docs/68060.md; engine/aga/boot/cpusel.asm).
+ENGINE_060 = 'AmiWind060'
+SELECTOR = 'AmiWindCPU'
+# MMULib's libraries refuse to install before the system's SetPatch has run (an alert stops the boot:
+# FPU-SUPPORT-MMULIB-SETPATCH-41); the boot disk runs the user's own SetPatch first when it is in the folder.
+SETPATCH = 'SetPatch'
 HUNK_HEADER = b'\x00\x00\x03\xf3'
 MAXIMUM_BYTES = 4 * 1024 * 1024
 NONE_TEXT = 'no FPU support library'
@@ -71,6 +77,17 @@ def find(directory):
     if not any(name in found for name in SUPPORT_LIBRARIES):
         return {}
     return found
+
+
+def find_setpatch(directory):
+    """The user's own SetPatch in DIR or DIR/C (any case), or None."""
+    directory = Path(directory).expanduser()
+    for place in (directory, _child(directory, 'c')):
+        if place is not None and place.is_dir():
+            path = _child(place, SETPATCH)
+            if path is not None and path.is_file():
+                return path
+    return None
 
 
 def inspect(directory, policy='warn', lock=None, table=None):
@@ -150,10 +167,21 @@ def stage(directory, boot, loader=None, loader_target=LOADER, policy='warn', loc
         (installed if name in SUPPORT_LIBRARIES else companions).append(row)
     shutil.copyfile(loader, boot / loader_target)
     names = ', '.join(row['name'] for row in installed)
-    return {'status': 'installed', 'source_dir': source, 'policy': policy,
-            'summary': names, 'libraries': installed, 'companions': companions, 'rejected': rejected,
-            'warnings': warnings, 'install_dir': 'LIBS',
-            'loader': {'path': loader_target, 'sha256': _digest(boot / loader_target)}}
+    receipt = {'status': 'installed', 'source_dir': source, 'policy': policy,
+               'summary': names, 'libraries': installed, 'companions': companions, 'rejected': rejected,
+               'warnings': warnings, 'install_dir': 'LIBS',
+               'loader': {'path': loader_target, 'sha256': _digest(boot / loader_target)}}
+    setpatch = find_setpatch(directory)
+    if setpatch is not None and setpatch.read_bytes()[:4] == HUNK_HEADER and setpatch.stat().st_size <= MAXIMUM_BYTES:
+        (boot / 'C').mkdir(exist_ok=True)
+        shutil.copyfile(setpatch, boot / 'C' / SETPATCH)
+        receipt['setpatch'] = record(boot / 'C' / SETPATCH, SETPATCH)
+    elif any(row['name'] == 'mmu.library' for row in companions):
+        receipt['warnings'] = list(warnings or []) + [
+            'mmu.library (MMULib) installs only after SetPatch, which this folder does not have: put your '
+            "Workbench's C/SetPatch beside the libraries, or the boot stops at an alert on that library "
+            '(FPU-SUPPORT-MMULIB-SETPATCH-41)']
+    return receipt
 
 
 def load_receipt(path):
@@ -167,10 +195,23 @@ def load_receipt(path):
     return receipt
 
 
+def engine_start(pair, check='SYS:AmiWindCheck'):
+    """startup_sequence() arguments for one engine, or for the 68040/68060 pair: AmiWindCPU runs first (its notice
+    for a 68060 without 68060.library must come before the boot check, which fails there) and its WARN (a 68060)
+    picks AmiWind060; the boot check then runs in either branch."""
+    if not pair:
+        return {'check': check, 'rest': ('Stack 300000', 'SYS:AmiWind')}
+    return {'check': 'SYS:' + SELECTOR,
+            'rest': ('If WARN', '  ' + check, '  Stack 300000', '  SYS:' + ENGINE_060,
+                     'Else', '  ' + check, '  Stack 300000', '  SYS:AmiWind', 'EndIf')}
+
+
 def startup_sequence(receipt, check='SYS:AmiWindCheck', loader='SYS:AmiWindFPU', rest=('Stack 300000', 'SYS:AmiWind')):
     """The boot disk's S:startup-sequence; AmiWindFPU runs only when installed."""
     lines = ['FailAt 10']
     if receipt.get('status') == 'installed':
+        if receipt.get('setpatch'):
+            lines.append('SYS:C/' + SETPATCH + ' QUIET')
         lines.append(loader)
     lines.append(check)
     lines.extend(rest)
@@ -193,4 +234,7 @@ def summary_lines(receipt):
         lines.append('FPU support library: ' + _row_text(row))
     for row in receipt.get('companions', []):
         lines.append('  also copied: ' + _row_text(row))
+    if receipt.get('setpatch'):
+        row = receipt['setpatch']
+        lines.append(f"  also copied: C/{row['name']} ({row['bytes']:,} bytes) SHA-256 {row['sha256']}: runs first")
     return lines + rejected

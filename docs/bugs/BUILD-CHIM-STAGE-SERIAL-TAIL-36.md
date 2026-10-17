@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
-- Reported with v0.0.36-dev3 at 2026-10-11 01:43 +0300: owner via the Monitor: chim 19.0-29.1 min on about 1 core in the 270-frame coast build; validation 8 min, heap gate and zone walk 1 min each (file times)
+- Reported with v0.0.36-dev3 at 2026-10-11 01:43 +0300: maintainer via the Monitor: chim 19.0-29.1 min on about 1 core in the 270-frame coast build; validation 8 min, heap gate and zone walk 1 min each (file times)
 - Reported with v0.0.36-dev4 at 2026-10-11 10:20 +0300: perf guard seed: CHIM heap gate 295 s on 0.94 of 12 cores in the dev4 whole-city Vivec MiniWind (e7a8e82); the chim-speed repair has not reached the line
+- Reported with v0.0.41-dev5 at 2026-10-16 (time not recorded): dev5, 726 frames: validation on 1 core for over half of its 6 min, heap gate 2.9 cores, zone walk 1 core between frames (fixlist B1-B4)
 
 <!-- END GENERATED PERSISTING -->
 
@@ -13,12 +14,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 11 October 2026, in v0.0.36-dev3 |
 | Where | tools/chim/validate.py validate, chim/heap.py ring_peak, chim/zone_sim.py walk |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | v0.0.36-dev3, v0.0.41-dev5 (last seen) |
 | Severity | high: About 10 minutes of one-core work in every chim stage of the coast build, on 24 held workers, redone on every build |
 | Family | Build speed (`build-speed`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -31,7 +32,8 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Status: 16 October 2026](#status-16-october-2026)
 - [Status: 11 October 2026](#status-11-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -44,6 +46,48 @@
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## Status: 16 October 2026
+
+PERSISTING in v0.0.41-dev5 (726 frames): the stage's final checks still ran in long one-core stretches between
+pool phases (maintainer's measurement over the 46 minutes of the stage: validation 10.3 cores on average and on one
+core for over half of its 6 minutes, the heap gate 2.9 cores, the zone walk dropping to one core between frames;
+the world conversion's pools dropped from 20-24 to 4-8 cores every 1-3 minutes). Repaired in source on
+v0.0.42-chim-pool, not shipped at the time of writing. What still held the checks on one core:
+
+- every map started and stopped its own worker pool (one per phase and part of a phase);
+- the walk measurement read every model of the world again for each of the 364 frames with doors, and the stats
+  scanned every chunk of the world once per frame (quadratic in a world of 726 frames);
+- the per-frame cross-checks (owners, reach copies, drawn boxes and their leaves, PVS and placement rows), the
+  variant audit and the ownership sidecar checks ran one frame or mesh after another in the stage process;
+- the "met before?" test of the pack-walk home rule searched a list for every model of every frame;
+- the heap gate scanned its big frames one after another before the small frames, and every gate read and
+  decoded the whole world again (about 13 s each);
+- the zone walk pickled the world's model and texture tables into each of its 726 routes, and sized every
+  chunk of the world in the stage process.
+
+Repair (fixlist B1-B4, B9): `build_parallel.stage_pool` keeps ONE worker pool for the whole CHIM step (`chim_build
+--pool stage`, the default; `--pool batch` keeps the method before); the cross-checks, the variant audit and the
+ownership checks are frame and mesh units on it; a big frame's chunk checks go out in runs of 256 chunks; the heap
+gate's big-frame slices and small frames are one map, largest first; the gates after the validation use the world
+it read; the zone walk's workers read the tables once and size their own frame; one progress line per frame in
+the validation, the heap gate, the zone walk and the world frames; the scheduler's heartbeat names a stage's live
+worker count.
+
+Measured on the finished dev5 world (read-only copy, 24 workers, one container, quiet host, no pass cache):
+
+| Phase | before (batch) | after (stage pool) | report SHA-256 |
+| --- | --- | --- | --- |
+| Validation | 353.6 s, 11.3 cores, 53 % of the time under 2 cores | 212.8 s, 18.5 cores, 16 % under 2 | identical (`42941178...`) |
+| Heap gate | 33.8 s, 2.7 cores, 55 % under 2 | 12.3 s, 3.3 cores, 12 % under 2 | identical (`68c73e13...`) |
+| Zone walk | 57.9 s, 7.6 cores, 67 % under 2 | 43.5 s, 13.0 cores, 45 % under 2 | identical (`53c50577...`) |
+| Total | 445 s | 269 s (-40 %) | |
+
+The pool started once for the three phases (6 maps, about 2,700 tasks). Left: loading the world (about 13 s), the
+chunk-record part of the per-frame checks and the source ownership comparison (about 10 s) are still one core;
+the zone walk's last stretch is its largest routes. `tests/test_chim_check_pool.py` and `tests/test_stage_pool.py`
+compare both methods byte for byte (passing and failing worlds) and check the progress lines and the largest-first
+order.
 
 ## Status: 11 October 2026
 
@@ -133,9 +177,11 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-PER-WORKSPACE-33](BUILD-CACHE-PER-WORKSPACE-33.md): Per-file caches live in each build workspace, so a build on a new volume with --reuse-from converts everything again (MiniWind media 1,195 s instead of seconds)
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
+- [BUILD-CHIM-SOURCE-REPEAT-41](BUILD-CHIM-SOURCE-REPEAT-41.md): The CHIM stage parsed the whole master and read the same models again for every area: 723 source stages took 24,500 CPU seconds
 - [BUILD-CHIM-STAGE-IDLE-START-36](BUILD-CHIM-STAGE-IDLE-START-36.md): The chim stage of the 270-frame coast build spends its first 35-45 minutes on 1-4 cores while it holds 12-24 workers
 - [BUILD-CHIM-STATS-SERIAL-TAIL-36](BUILD-CHIM-STATS-SERIAL-TAIL-36.md): The chim stage ended with its statistics validating the whole CHIM world a second time, on one core with no output (7 min 44 s on 273 frames)
 - [BUILD-CHIM-UNIT-HULL-KEY-33](BUILD-CHIM-UNIT-HULL-KEY-33.md): CHIM unit cache ignores the standing-hull form: a --model-hull chain build reused routed-hull model units
+- [BUILD-CHIM-WORLD-SERIAL-TAIL-41](BUILD-CHIM-WORLD-SERIAL-TAIL-41.md): After the region frames the CHIM world conversion prepared the towns one after another and worked out 723 frames' visibility rows in turn: about 7 minutes on 1 to 5 of 24 cores
 - [BUILD-DOOR-REFERENCE-SERIAL-33](BUILD-DOOR-REFERENCE-SERIAL-33.md): The door step reads the whole master once per destination cell
 - [BUILD-ENGINE-SOURCE-KEY-BROAD-36](BUILD-ENGINE-SOURCE-KEY-BROAD-36.md): Any engine source edit changes the keys of the chim and world-flora stages
 - [BUILD-ENV-FINGERPRINT-GLOBAL-33](BUILD-ENV-FINGERPRINT-GLOBAL-33.md): The stair rule setting invalidates the reuse cache of every build stage, including stages that never read it
@@ -164,9 +210,11 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
 - [BUILD-PRERENDERED-PRUNE-ORDER-33](BUILD-PRERENDERED-PRUNE-ORDER-33.md): Prerendered store prune picks the superseded entry by folder name when two entries share a timestamp
 - [BUILD-PROFILE-JOBS-START-ONLY-33](BUILD-PROFILE-JOBS-START-ONLY-33.md): The build profile compares a stage's cores with the workers it started with, not the ones it held
+- [BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42](BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42.md): The build profiler's sampled timeline counts a finished child process twice
 - [BUILD-PROFILE-SECTIONS-MISSING-36](BUILD-PROFILE-SECTIONS-MISSING-36.md): Long builder phases printed no elapsed time and recorded no sections: the chim stage's 44-minute stair gate was visible only from cache file times
 - [BUILD-PROFILER-NO-WASTE-ALARM-36](BUILD-PROFILER-NO-WASTE-ALARM-36.md): No profiler, perf ledger or gate flagged idle cores, work done for maps that are removed, or growth of the image
 - [BUILD-PROGRESS-ETA-BASIS-36](BUILD-PROGRESS-ETA-BASIS-36.md): The live build progress took a stage's expected time from earlier runs of any size: dev3's chim stage was expected at 154 s and ran 1 h 48 min
+- [BUILD-REUSE-APPLY-SERIAL-41](BUILD-REUSE-APPLY-SERIAL-41.md): A reused stage staged its files one at a time: world terrain, scenery and flora took 8 to 12 seconds each, one after another, at the start of every reuse build
 - [BUILD-REUSE-KEYS-TOO-BROAD-35](BUILD-REUSE-KEYS-TOO-BROAD-35.md): A whole build reused no stage, and the cost was not visible before the build started
 - [BUILD-REUSE-TMP-UNDECLARED-33](BUILD-REUSE-TMP-UNDECLARED-33.md): A stage that runs while a reused stage is copied becomes non-reusable
 - [BUILD-SCHEDULER-EVEN-SHARE-33](BUILD-SCHEDULER-EVEN-SHARE-33.md): The stage scheduler splits the workers evenly between running stages, so the longest stage gets no more than the shortest (MiniWind media on 1 of 4 workers for 1,195 s)
@@ -175,6 +223,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-SILENT-PHASES-36](BUILD-SILENT-PHASES-36.md): Builder phases run silent: no start/end timing, no progress, no heartbeat; the CHIM stats step is a single-core tail
 - [BUILD-STAGE-INTERRUPT-ABSORBED-36](BUILD-STAGE-INTERRUPT-ABSORBED-36.md): The stage wrapper absorbed Ctrl-C: a stage that handled the interrupt and returned 0 counted as passed, and the build went on
 - [BUILD-STAGE-START-SHARE-33](BUILD-STAGE-START-SHARE-33.md): A pooled stage that starts while others run gets one worker as its start value
+- [BUILD-STAIR-GATE-OOM-42](BUILD-STAIR-GATE-OOM-42.md): The CHIM stair gate runs a whole-Vivec MiniWind out of memory: its worker pool breaks
 - [BUILD-STAIR-WALK-BORDER-COPIES-41](BUILD-STAIR-WALK-BORDER-COPIES-41.md): The CHIM stair gate walks every frame's whole border, so each cell's flights are walked many times and unreachable copies can fail a build
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
@@ -186,7 +235,9 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-PVS-SLOW-33](CHIM-PVS-SLOW-33.md): Seyda Neen's CHIM visibility rows take 5.5 minutes and are rebuilt whenever the worker count changes
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
+- [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
+- [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 
 <!-- END GENERATED CATEGORY -->

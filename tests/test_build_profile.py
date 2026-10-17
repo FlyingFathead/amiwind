@@ -139,6 +139,21 @@ class MeasuredStageTests(unittest.TestCase):
             self.assertGreaterEqual(second['start'], first['end'] - 0.01)
             self.assertEqual(profile['analysis']['critical_path']['path'], ['first', 'second'])
 
+    def test_timeline_counts_a_reaped_child_once(self):
+        # TEST-PROFILE-TIMELINE-BOUND-33 under load: a child that ended between the tree walk's reads made the tree's
+        # CPU dip (0.2 s instead of 1.0 s) and its whole CPU came back when the parent reaped it, counted twice.
+        readings = iter([(0.0, 1, 1), (1.0, 1, 2), (0.2, 1, 1), (1.2, 1, 1), (1.5, 1, 1)])
+        clock = iter([10.0, 11.0, 12.0, 13.0, 14.0])
+        sampler = build_profile.Sampler(1.0, 10.0)
+        sampler.add('media', 4242)
+        with patch.object(build_profile, 'tree_usage', lambda pid: next(readings)), \
+                patch.object(build_profile.time, 'monotonic', lambda: next(clock)):
+            for _ in range(5):
+                sampler.sample()
+        cores = [row[1] for row in sampler.stages['media']]
+        self.assertEqual(cores, [1.0, 0.0, 0.2, 0.3])
+        self.assertAlmostEqual(sum(cores), 1.5, places=6)   # the tree's real CPU, not 2.3
+
     def test_profiler_overhead_is_bounded(self):
         # A sampler at 20 Hz over a tree of eight processes; the build default is 1 Hz.
         # TEST-PROFILE-OVERHEAD-SAMPLES-36: on a busy host 2 s gave only 6 samples; sample until there are more
@@ -446,7 +461,7 @@ class AnalysisTests(unittest.TestCase):
             self.assertIsNone(build_profile.summary_record(Path(temp)))
 
     def test_host_load_is_recorded_flagged_and_never_compared_silently(self):
-        # Owner note: a busy host skews timings. 8 CPUs; this build uses 2 cores.
+        # Maintainer note: a busy host skews timings. 8 CPUs; this build uses 2 cores.
         def timeline(busy):
             return {'interval': 1.0, 't': [float(i) for i in range(100)], 'cores': [2.0] * 100,
                     'cgroup_cores': [2.0] * 100, 'memory_bytes': None, 'stages': {},

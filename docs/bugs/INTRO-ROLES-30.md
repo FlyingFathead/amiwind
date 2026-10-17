@@ -23,7 +23,7 @@
 
 Cause identified and repaired in `engine/aga/src/aw_intro.c`. Present in
 v0.0.29 and v0.0.30-dev3; first fixed build: v0.0.30-dev4 (development build,
-not owner-accepted).
+not maintainer-accepted).
 
 ## Symptom
 
@@ -59,7 +59,7 @@ crossings:
 | Repaired engine | 3 | No crash; all six planned crossings plus four open-world region loads |
 
 Not yet covered: the full opening sequence played through to the town with a
-region change at every stage, and owner playtest.
+region change at every stage, and maintainer playtest.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -74,6 +74,7 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 - [CHIM-INTRO-TP-OTHER-TOWN-33](CHIM-INTRO-TP-OTHER-TOWN-33.md): During the intro stages, travelling to Balmora on CHIM loads Seyda Neen's intro-docks frame map: the player lands in empty water
 - [ENGINE-SCENE-NAME-BOUND-35](ENGINE-SCENE-NAME-BOUND-35.md): Scene links copied map names into 16-byte fields with strcpy
 - INPUT-01 (no report page): Held Ctrl/Shift flight modifiers reset on cell changes
+- [INTERIOR-SPAWN-UNDERWATER-41](INTERIOR-SPAWN-UNDERWATER-41.md): Vivec underworks rooms spawn under their water
 - SEYDA-TRANSITION-29 (no report page): v0.0.29-dev1: Cell/sub-cell passage problems around Seyda Neen
 - TRANSITION-EQUIPMENT-29 (no report page): Carried torch blinks out on cell/sub-cell arrival
 - TRANSITION-VIEW-29 (no report page): Automatic cell handoff forgets mouse orientation

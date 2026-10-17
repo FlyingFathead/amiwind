@@ -26,7 +26,7 @@ Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
   the guided builder. The runtime still uses one Hello per actor appearance.
 - Add pitch-directed noclip flight with bounded speed/no inertia, numbered
   safe recall point 0 and a normal-exit restart reminder.
-- Preserve owner-confirmed town-square repair, remaining shack-wall reports,
+- Preserve maintainer-confirmed town-square repair, remaining shack-wall reports,
   vicinity/ship scope and interior work in docs.
 
 ## Correctness and native evidence
@@ -120,7 +120,7 @@ World geometry remains resident. Census and Excise interior/linked entry-exit,
 complete vicinity/NPC registry, varied voice filtering, dialogue presentation,
 walking routes, combat damage, Balmora and saves
 remain on ROADMAP.md. Current noclip E/Q provides explicit up/down; aw_recover
-returns to a safe town spawn. No owner confirmation of checkpoint-014 yet.
+returns to a safe town spawn. No maintainer confirmation of checkpoint-014 yet.
 
 ## Final flight/relaunch check and hashes
 

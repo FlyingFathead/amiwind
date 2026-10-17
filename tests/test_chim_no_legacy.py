@@ -100,7 +100,7 @@ class SeydaInputTests(unittest.TestCase):
     """BUILD-SEYDA-REGEN-30 (closed in v0.0.35): the recorded v0.0.31 Seyda Neen maps are optional."""
 
     def test_recorded_seyda_is_marked_not_recommended(self):
-        # Owner decision 10 October 2026: optional and NOT RECOMMENDED since v0.0.31, in the help, the warning
+        # Project decision 10 October 2026: optional and NOT RECOMMENDED since v0.0.31, in the help, the warning
         # the build prints when the option is given, and the receipt.
         help_text = next(a.help for a in build.parser()._actions if '--seyda-recorded' in a.option_strings)
         for text in (help_text, build.SEYDA_RECORDED_WARNING):
@@ -249,7 +249,7 @@ class SafetyNetTests(unittest.TestCase):
 
 
 class NotOnChimTests(unittest.TestCase):
-    """Owner decision for pass 2: extra towns not on CHIM yet (the Vivec Arena) leave a CHIM image."""
+    """Project decision for pass 2: extra towns not on CHIM yet (the Vivec Arena) leave a CHIM image."""
 
     def image_id1(self, tmp):
         id1 = Path(tmp) / 'id1'

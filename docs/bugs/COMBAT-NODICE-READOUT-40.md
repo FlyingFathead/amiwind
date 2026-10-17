@@ -66,7 +66,7 @@ actual outcome and amount, with dead-victim -1, ordinary hit/miss/block and
 readout-disabled controls; printing leaves the resolved result and fighter
 state unchanged. The preceding runtime fails; the candidate passes under UBSan.
 All 22 bounded combat-module checks pass. Exact new target/full gate/native
-readout and owner acceptance remain pending. The earlier misleading native
+readout and maintainer acceptance remain pending. The earlier misleading native
 message is not proof of outgoing damage failure or corrected native behavior.
 
 ## Prevention

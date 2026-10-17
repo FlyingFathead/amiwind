@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev5 |
 | Where | Night lamp lights (aw_lamps.c), Seyda Neen and Balmora |
 | Reproduction | always |
@@ -21,7 +21,7 @@
 
 ## Status: 7 October 2026
 
-Open. Owner report on v0.0.31-dev5 (Seyda Neen and Balmora at night); repaired
+Open. Maintainer report on v0.0.31-dev5 (Seyda Neen and Balmora at night); repaired
 in source, not yet packaged.
 
 ## Symptom
@@ -62,7 +62,7 @@ The full repair remains baking every lamp into the maps on a night light style
 ## Verification
 
 Native test: turning round keeps the lit lamps; a clearly nearer lamp takes a
-slot and the dropped one fades, then goes. Owner walk pending.
+slot and the dropped one fades, then goes. Maintainer walk pending.
 
 ## Prevention
 

@@ -9,7 +9,7 @@
 | Where | tools/engine_smoke.py PROBE; engine aw_movie.c (logo end), aw_remote.c (state file) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev5 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: Hold level: the boot smoke is the ship check; 109 of 142 gate smokes proved only the second map in play |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | v0.0.36-dev5 |

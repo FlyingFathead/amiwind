@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 11 October 2026, in v0.0.36-dev3 |
 | Where | every build cache and the storage pool (entry records) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: Reuse was correct, but a reused entry could not be traced to its build and a changed key could not be explained |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.36-dev3 |

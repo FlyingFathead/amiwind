@@ -71,7 +71,7 @@ The audit ids are `format_validation`, `stair_walk`, `memory_fit`, `seam_tears`,
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `status` | string | `passed`, `failed`, `accepted` (failed, and the owner accepted it) or `not_measured` |
+| `status` | string | `passed`, `failed`, `accepted` (failed, and the maintainer accepted it) or `not_measured` |
 | `detail` | string | One line saying what was found |
 | `numbers` | object | Free numeric figures behind the result |
 | `build` | string | The build the audit ran on; defaults to the file's `build`. A result measured on another build than the cell's current one is shown as stale and counts as not measured |
@@ -96,7 +96,7 @@ Use bytes for sizes and seconds for times.
 
 - Cells outside the land and content universe of the game data are listed under `result_ignored` in the tracker data, never silently dropped.
 - Interiors are not in result files yet.
-- The tracker never writes the owner's fields (`release`, playtested, approved); a result file cannot set them.
+- The tracker never writes the maintainer's fields (`release`, playtested, approved); a result file cannot set them.
 
 ## Versioning
 

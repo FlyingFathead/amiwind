@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | Converters (prepare_area, import_town, prepare_bounded_world): light_sources.entity() unused |
 | Reproduction | always |
@@ -31,7 +31,7 @@ TERRAIN-LIGHT-UNIFORM-32, INTERIOR-BAKE-UNIFORM-32, OPENING-JIUB-LANTERN-32 and 
 
 ## Symptom
 
-The owner reported on 9 October 2026 that the lantern above Jiub in the opening ship still does not light the
+The maintainer reported on 9 October 2026 that the lantern above Jiub in the opening ship still does not light the
 area in the right warm hue. The same pattern shows in every lit scene: baked light has no colour, no shadows and
 no original falloff, and exterior lamps give light only at night through runtime dynamic lights.
 

@@ -73,10 +73,14 @@ class Rooms(unittest.TestCase):
         self.assertIn('chim-rooms-vivec_city', [name for name, _ in steps])
         deps = build_parallel.stage_dependencies(steps)
         self.assertIn('chim-rooms-vivec_city', deps['image'])
-        self.assertEqual(len(chim_rooms.listed_rooms('vivec_city')), 130)
+        # 130 rooms on 16 October 2026; v0.0.42 plan 2.1: six rooms listed again after same-lit sharing and plant
+        # sprites, the Redoran Temple Shrine recentred, Arena Waistworks listed (recentred): 138; the four Arena rooms
+        # behind Arena Waistworks (Canalworks, Fighters Quarters, Fighters Training, Holding Cells): 142; Telvanni Tower
+        # excluded again on 17 October (257 model precaches > 256, VIVEC-ROOM-PRECACHE-LIMIT-42): 141
+        self.assertEqual(len(chim_rooms.listed_rooms('vivec_city')), 141)
 
     def test_the_default_build_makes_the_whole_city_rooms_and_no_other_room_stage(self):
-        # all of Vivec in one CHIM frame is the default area (owner decision 2026-10-11 09:55): its 130 rooms, the
+        # all of Vivec in one CHIM frame is the default area (project decision 2026-10-11 09:55): its 130 rooms, the
         # Arena Pit among them, in one room stage
         steps = self.plan()
         rooms = [name for name, _ in steps if name.startswith('chim-rooms-')]

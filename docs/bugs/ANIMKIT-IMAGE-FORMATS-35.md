@@ -9,7 +9,7 @@
 | Where | tools/sky_palette_overlay.py spans; tools/payload_preflight.py |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Every default image build stopped after the image work; the payload preflight did not check file formats |
 | Family | Actors and NPCs (`actors-npc`) |
 | Playtest version | v0.0.35-dev1 MiniWind animkit e521e14 |

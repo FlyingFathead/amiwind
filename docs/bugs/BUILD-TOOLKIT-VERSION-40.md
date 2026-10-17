@@ -9,7 +9,7 @@
 | Where | Toolkit header and Git-aware release preflight |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.40-dev2 (last seen) |
+| Persists in | fixed in v0.0.40 |
 | Severity | medium: A stale previous-release baseline misclassified unchanged Toolkit content and caused an unnecessary release-label change. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

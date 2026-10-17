@@ -4,19 +4,19 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 14 October 2026, in v0.0.39-rc2 |
 | Where | Third-person player locomotion on land with fists drawn |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.39-rc2 (last seen) |
-| Severity | high: A normal combat-ready state prevents the owner from moving. |
+| Severity | high: A normal combat-ready state prevents the maintainer from moving. |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.39-rc2 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
-| Unknown because | Owner names RC2 and the same gameplay as final; the exact owner-running image and cell were not independently read back. |
-| Platform or emulator | unknown (Owner did not restate the emulator or CPU preset for this observation.) |
+| Unknown because | Maintainer names RC2 and the same gameplay as final; the exact owner-running image and cell were not independently read back. |
+| Platform or emulator | unknown (Maintainer did not restate the emulator or CPU preset for this observation.) |
 
 <!-- END GENERATED FACTS -->
 
@@ -48,7 +48,7 @@
 
 ## Symptom
 
-On 14 October 2026 the owner explicitly reports that the third-person player
+On 14 October 2026 the maintainer explicitly reports that the third-person player
 cannot move with fists drawn in RC2, and says its gameplay is the same as final
 v0.0.39. This is a locomotion failure, separate from coarse or skipped gait
 frames in [PLAYER-MOVEMENT-FRAME-SKIP-39](PLAYER-MOVEMENT-FRAME-SKIP-39.md).
@@ -67,7 +67,7 @@ No source repair has been verified.
 
 ## Why it was not caught
 
-Earlier ready-pose and authored-frame checks did not cover the owner's physical
+Earlier ready-pose and authored-frame checks did not cover the maintainer's physical
 movement sequence. A pose, file readback or unrelated moving diagnostic does
 not accept unobstructed ordinary-input locomotion.
 
@@ -94,9 +94,9 @@ The first movement attempt ran into a guard and is not an unobstructed control.
 
 A separate after-Census Nord control starts at (0, 0, 57), reaches ready state
 2/goal 1 from physical F, and physical A/S/D moves to (-255, -48, 24),
-(-239, -276, 14) and (-52, -236, 50), with the ready body visible. The owner
+(-239, -276, 14) and (-52, -236, 50), with the ready body visible. The maintainer
 failure is not reproduced in this one control; this does not disprove it or
-accept another appearance, scene or state. Owner-case reproduction, repair,
+accept another appearance, scene or state. Maintainer-case reproduction, repair,
 both-view normal movement and exact repaired-package acceptance remain pending.
 
 ## Character-change testing aid, 14 October 2026
@@ -112,13 +112,13 @@ with no movement, punch, block or swimming repair claimed.
 
 Require a physical-input, normally colliding lowered/ready movement comparison,
 with position deltas and continuous body footage, on the exact proposed package.
-Keep gait smoothness, movement mechanics, native checks and owner acceptance as
+Keep gait smoothness, movement mechanics, native checks and maintainer acceptance as
 separate gates.
 
 
 ## Development audit, 14 October 2026
 
-The diagnostic command was exercised in FS-UAE with physical keys: it opened the pier appearance page, changed Nord male to Orc female and changed head/hair choices, confirmed, selected the Orc female gameplay body and reopened the menu. Two focused C/console tests and post-exit engine readback pass; AmigaDOS exit was visually verified. Full-body chosen head/hair recomposition is still a separate limitation. Physical A/S movement with fists ready succeeded in this Orc control. This does not reproduce or close the owner's inability to move.
+The diagnostic command was exercised in FS-UAE with physical keys: it opened the pier appearance page, changed Nord male to Orc female and changed head/hair choices, confirmed, selected the Orc female gameplay body and reopened the menu. Two focused C/console tests and post-exit engine readback pass; AmigaDOS exit was visually verified. Full-body chosen head/hair recomposition is still a separate limitation. Physical A/S movement with fists ready succeeded in this Orc control. This does not reproduce or close the maintainer's inability to move.
 
 
 ## Input-gate readout, 14 October 2026
@@ -127,7 +127,7 @@ The v0.0.40-dev1 source adds the active story/modal/combat/death predicates,
 last movement command sent and attack latch to the existing hands diagnostic.
 This does not alter those gates or establish the cause. The next native test
 must capture the failing input state; fresh released controls that move do
-not close the owner's report.
+not close the maintainer's report.
 
 
 ## Disabled-combat lock edge, 14 October 2026
@@ -140,9 +140,9 @@ only while combat is enabled. The fixture fails before this change and passes
 after it; enabled knockdown, including after re-enabling combat, still locks
 input. Normal death and story restrictions remain independent.
 
-There is no evidence yet that the owner disabled combat in the failing save.
+There is no evidence yet that the maintainer disabled combat in the failing save.
 This fixes the demonstrated edge without treating it as the established cause
-of all fists-ready movement reports. Native and owner-case validation remain
+of all fists-ready movement reports. Native and maintainer-case validation remain
 pending.
 
 ## Scoped male-Nord ready movement, 14 October 2026
@@ -152,7 +152,7 @@ reaches attack state, followed by physical S and D with fists still ready.
 Position changes from local (0,-59,72) through (-13,-72,75) to (115,36,74).
 The player uses normal WALK movetype 3 without noclip. This establishes
 movement in this one ready-state control, not reproduction or resolution of
-the owner's inability to move, all-appearance coverage or hit/damage behavior.
+the maintainer's inability to move, all-appearance coverage or hit/damage behavior.
 
 ## Selected Argonian movement control, 14 October 2026
 

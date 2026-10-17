@@ -1,6 +1,6 @@
 # v0.0.25-dev1 feedback and v0.0.25-rc1 work
 
-Owner reports, 1 October 2026. Candidate name: **v0.0.25-rc1**.
+Maintainer reports, 1 October 2026. Candidate name: **v0.0.25-rc1**.
 These are acceptance requirements; an item is not fixed merely because it is listed.
 
 - Priority 1: connect detailed Seyda Neen to the main island terrain, preserving
@@ -13,7 +13,7 @@ These are acceptance requirements; an item is not fixed merely because it is lis
   camera is `9 484 102`, yaw `298`, pitch `50`; its terrain region was not recorded.
   Check original LAND heights, source water policy and region Z origins before
   changing the water datum. Map curvature and a Seyda-derived sea level are
-  owner hypotheses, not established causes.
+  maintainer hypotheses, not established causes.
 - M and N send the game behind the AmigaDOS screen, including when typing in
   the debug console. Preserve plain letters; deliberate desktop access should
   use Alt+M in debug mode. Test actual native input before claiming resolution.
@@ -24,5 +24,5 @@ These are acceptance requirements; an item is not fixed merely because it is lis
 - Record original-game unexplored-map masking as a TODO. Do not implement it
   in this candidate.
 
-The owner considers the M map's appearance successful. Preserve that presentation
+The maintainer considers the M map's appearance successful. Preserve that presentation
 while fixing its position indicator and controls.

@@ -15,7 +15,7 @@
 
 ## v0.0.29 F/V regression gate
 
-The 4 October owner playtest reported F no longer raising hands and V printing
+The 4 October maintainer playtest reported F no longer raising hands and V printing
 torch on/off without visible hands or a working torch, especially in debug play.
 The [canonical bug register](BUGS.md#fix-index) holds the current evidence and
 status for TORCH-INPUT-29. This historical report is not the current diagnosis.

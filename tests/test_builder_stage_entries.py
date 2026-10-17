@@ -3,7 +3,7 @@
 
 BUILD-ACTOR-CONTACT-CALL-32: the actor-contact stage called the Seyda region
 conversion with a signature two releases old; only a from-scratch build with
-the owner's data reached it. These tests reach every stage entry without data:
+the maintainer's data reached it. These tests reach every stage entry without data:
 each stage script parses the exact command line the builder generates, and the
 actor-contact stage runs end to end on a synthetic scene with only the heavy
 calls replaced by signature-checked stand-ins.

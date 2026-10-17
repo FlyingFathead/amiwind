@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 10 October 2026, in v0.0.35 |
 | Where | tools/AmiWind-FS-UAE-launcher.py and the package's RUN-FS-UAE.sh (Linux) |
 | Reproduction | sometimes |

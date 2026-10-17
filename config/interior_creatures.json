@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "note": "Creatures the resident stage places in converted interiors with --interior-creatures listed (the default; tools/creature_residents.py, INTERIOR-CREATURES-MISSING-41). Each needs a reason and a source; its support state comes from config/actor_grounding.json.",
+  "creatures": {
+    "vivec_god": {
+      "reason": "Vivec in the Palace of Vivec: the demigod meditating above the floor in his crossed-leg idle.",
+      "source": "CREA vivec_god (model r/LordVivec.NIF, the idle2 group in its text keys; AI_W idle chances: Idle2 60); placed once, Vivec, Palace of Vivec"
+    }
+  }
+}

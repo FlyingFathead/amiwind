@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev2 |
 | Where | shipped maps (emissive lantern glass; only the Temple has it) |
 | Reproduction | always |
@@ -25,7 +25,7 @@ Open. Measured in the v0.0.31-dev2 maps; no repair yet.
 
 ## Symptom
 
-Lanterns and lamps do not glow, although `dbg emissive` is on (owner: "that
+Lanterns and lamps do not glow, although `dbg emissive` is on (maintainer: "that
 lantern and the others in Balmora, they are NOT LIT").
 
 ## Where

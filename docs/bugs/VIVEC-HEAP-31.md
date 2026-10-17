@@ -59,7 +59,7 @@ map optimizer and the heap check.
 ## Repair
 
 Not done. Measured options from the earlier sweep and sections study: finer
-region cores (384), a shorter draw distance (360, a visible change and owner
+region cores (384), a shorter draw distance (360, a visible change and maintainer
 decision), interior sections at real doors, 32-pixel textures on props, and
 sprite flora. Each needs a rerun of this measurement.
 

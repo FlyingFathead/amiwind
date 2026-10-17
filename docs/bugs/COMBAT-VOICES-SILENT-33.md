@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-rc1 |
 | Where | engine/aga/src/aw_combat.c voice hook (no receiver); player hit voice |
 | Reproduction | always |
@@ -15,14 +15,14 @@
 | Playtest version | v0.0.33-rc1 |
 | From commit | source 7ae3ea7, engine 7ae3ea7, CHIM world unknown |
 | CHIM engine version | CHIM 0.1.0, engine 7ae3ea7, world format unknown |
-| Unknown because | owner playtest report names no image commit or world format |
-| Build note | owner playtest of a v0.0.33 build; the exact image commit is not in the report |
+| Unknown because | maintainer playtest report names no image commit or world format |
+| Build note | maintainer playtest of a v0.0.33 build; the exact image commit is not in the report |
 
 <!-- END GENERATED FACTS -->
 
 ## Status: 9 October 2026
 
-Open (owner playtest). The NPC voice receiver (attack, hit, flee lines) exists on the animation kit line, not in v0.0.33; the player's own hit voice is not implemented anywhere.
+Open (maintainer playtest). The NPC voice receiver (attack, hit, flee lines) exists on the animation kit line, not in v0.0.33; the player's own hit voice is not implemented anywhere.
 
 ## Symptom
 

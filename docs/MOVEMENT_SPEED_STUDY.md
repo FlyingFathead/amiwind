@@ -17,7 +17,7 @@ The following are source-derived targets for sustained, unobstructed input, in A
 
 Diagonal input therefore gains about 41.4% under these defaults. Water pitch, the separate vertical movement command and jump/surface handling require their own controls; they are excluded from the level-water numbers. The reported sinking, water-walking and swimming-pose failures remain separately open under [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md).
 
-The converted world scale is 0.25, so 120 and 216 correspond to 480 and 864 original world units/s. `quake.rc` executes defaults, gameplay defaults, saved configuration, key maps and autoexec in that order. Saved or custom settings can therefore change the effective inputs. The running owner's cvars were not read for this study. [Startup order](../tools/build_aga.py).
+The converted world scale is 0.25, so 120 and 216 correspond to 480 and 864 original world units/s. `quake.rc` executes defaults, gameplay defaults, saved configuration, key maps and autoexec in that order. Saved or custom settings can therefore change the effective inputs. The running maintainer's cvars were not read for this study. [Startup order](../tools/build_aga.py).
 
 ## Original-data and OpenMW reference
 
@@ -47,7 +47,7 @@ All speeds below have already been multiplied by 0.25 to use AmiWind units. Acto
 | 50 | 50 | 1 | 26.25 | 59.06 | 14.44 | 32.48 |
 | 50 | 50 | 1.01 | 0.00 | 0.00 | 0.00 | 0.00 |
 
-At 50/50 and no load, current straight-line targets are 3.20 times the unit-race reference walk and 2.56 times its run. At 100/100 they are 2.40 and 1.57 times. Increased load widens the gap. This supports investigating the owner's fast-traversal report, but does not measure that particular running session.
+At 50/50 and no load, current straight-line targets are 3.20 times the unit-race reference walk and 2.56 times its run. At 100/100 they are 2.40 and 1.57 times. Increased load widens the gap. This supports investigating the maintainer's fast-traversal report, but does not measure that particular running session.
 
 ### Race, direction and effects matter
 
@@ -67,4 +67,4 @@ AmiWind already has recovery and combat fatigue costs, but the audited code does
 
 First record effective movement cvars, character stats, effects, load, race/sex, camera, water state and exact build. In matched OpenMW and AmiWind scenes, use an unobstructed segment with no cell crossing: measure a five-second steady-state forward walk, run and level swim after a separate acceleration interval. Record start/end positions, velocity and simulated elapsed time, and also wall-clock duration. Use normal emulator pacing with warp off and record frame timing; the inherited engine caps an ordinary frame's simulation step at 0.1 seconds, so wall time alone is insufficient. [Time handling](../engine/aga/src/host.c).
 
-Repeat sideways/diagonal controls, loaded/over-capacity cases and low/middle/high stats before selecting any faithful movement formula. Then cover both views, readied fists/weapon/torch, water transitions and save/load. Keep convenient fast debug movement separately selectable as requested. A source formula, arithmetic check or host test cannot close the native parity or owner acceptance gate.
+Repeat sideways/diagonal controls, loaded/over-capacity cases and low/middle/high stats before selecting any faithful movement formula. Then cover both views, readied fists/weapon/torch, water transitions and save/load. Keep convenient fast debug movement separately selectable as requested. A source formula, arithmetic check or host test cannot close the native parity or maintainer acceptance gate.

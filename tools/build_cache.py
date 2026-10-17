@@ -54,6 +54,7 @@ import re
 import shutil
 import stat as stat_module
 import sys
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -107,7 +108,7 @@ IGNORED_ENV = {'AMIWIND_BUILD_JOBS', 'AMIWIND_INPUTS_LOCK', 'AMIWIND_PROFILE_SEC
                'AMIWIND_REBUILD_UNITS', 'AMIWIND_CACHE_FALLBACK', 'AMIWIND_SOURCE_COMMIT', 'AMIWIND_STORAGE_POOL',
                'AMIWIND_BUILD_RECIPE',
                # the stair walk's reuse and its check sample: the same rows either way (stair_walk.walk_cache_mode)
-               'AMIWIND_STAIR_WALK_CACHE', 'AMIWIND_STAIR_WALK_SAMPLE',
+               'AMIWIND_STAIR_WALK_CACHE', 'AMIWIND_STAIR_WALK_SAMPLE', 'AMIWIND_STAIR_WALK_REUSE',
                # what the stages print and when the builder's heartbeat speaks: logs only (build_profile.phase)
                'AMIWIND_LOG_LEVEL', 'AMIWIND_HEARTBEAT_SECONDS', 'AMIWIND_BUILD_EPOCH',
                # who wrote a stair-walk record (tools/stair_records.py): provenance, not an input
@@ -152,7 +153,7 @@ TEMPORARY_SUFFIX = '.amiwind-reuse-tmp'
 # `cache_provenance.NAME(...)`, each on lines of its own. They record who, when and from which version a cache
 # entry was written, check an entry's output SHA-256 on read (a mismatch is a miss: the unit is built again) and
 # append reuse lines; they never change an output. Every key computation reads module source with them removed
-# (strip_provenance), so adding provenance to a writer keeps every stage, unit and pass key (owner order
+# (strip_provenance), so adding provenance to a writer keeps every stage, unit and pass key (maintainer order
 # 2026-10-11: "KEEP USING all existing results and hashes WITHOUT REDOING ANYTHING"; tests/test_cache_provenance.py).
 PROVENANCE_MODULE = 'cache_provenance'
 
@@ -260,6 +261,51 @@ class FileHashes(MutableMapping):
         return len(self._paths)
 
 
+# Source text -> _parse_text / module_symbols result, shared by every SourceIndex of this process. Both are pure
+# functions of the text (and the scope's REFINED flag): an index of an edited file reads a new text and gets a new
+# entry, so a shared result is always the one a fresh parse would give. Callers only read the results.
+_PARSE_MEMO = {}
+_SYMBOL_MEMO = {}
+
+
+def _parse_text(raw):
+    """(imports, string constants, broken) of one module's source text: a pure function of RAW, so every
+    index shares one result per text (_PARSE_MEMO); the AST walk is most of a closure's cost."""
+    text = strip_provenance(raw)
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return ([], [], True)
+    docstrings = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.body:
+            first = node.body[0]
+            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
+                docstrings.add(id(first.value))
+    # Constants used as path parts: ROOT / 'engine', Path('config'), os.path.join(..., 'docs').
+    path_parts = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            path_parts.update(id(side) for side in (node.left, node.right))
+        elif isinstance(node, ast.Call):
+            function = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, 'id', '')
+            if function in PATH_CALLS:
+                path_parts.update(id(argument) for argument in node.args)
+    imports, constants = [], []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports.extend((alias.name, 0, None) for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            imports.append((node.module or '', node.level, [alias.name for alias in node.names]))
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings:
+            constants.append((node.value, '/' in node.value or id(node) in path_parts))
+        elif isinstance(node, (ast.BinOp, ast.JoinedStr)):
+            joined = folded_string(node)
+            if joined is not None:
+                constants.append((joined, '/' in joined or id(node) in path_parts))
+    return (imports, constants, False)
+
+
 class SourceIndex:
     """SHA-256 of every repository file a stage may read (docs prose and tests excluded).
 
@@ -311,40 +357,11 @@ class SourceIndex:
 
     def _parse(self, relative):
         if relative not in self._parsed:
-            text = strip_provenance((self.root / relative).read_text(encoding='utf-8', errors='replace'))
-            try:
-                tree = ast.parse(text)
-            except SyntaxError:
-                self._parsed[relative] = ([], [], True)
-                return self._parsed[relative]
-            docstrings = set()
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.body:
-                    first = node.body[0]
-                    if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
-                        docstrings.add(id(first.value))
-            # Constants used as path parts: ROOT / 'engine', Path('config'), os.path.join(..., 'docs').
-            path_parts = set()
-            for node in ast.walk(tree):
-                if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
-                    path_parts.update(id(side) for side in (node.left, node.right))
-                elif isinstance(node, ast.Call):
-                    function = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, 'id', '')
-                    if function in PATH_CALLS:
-                        path_parts.update(id(argument) for argument in node.args)
-            imports, constants = [], []
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    imports.extend((alias.name, 0, None) for alias in node.names)
-                elif isinstance(node, ast.ImportFrom):
-                    imports.append((node.module or '', node.level, [alias.name for alias in node.names]))
-                elif isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings:
-                    constants.append((node.value, '/' in node.value or id(node) in path_parts))
-                elif isinstance(node, (ast.BinOp, ast.JoinedStr)):
-                    joined = folded_string(node)
-                    if joined is not None:
-                        constants.append((joined, '/' in joined or id(node) in path_parts))
-            self._parsed[relative] = (imports, constants, False)
+            raw = (self.root / relative).read_text(encoding='utf-8', errors='replace')
+            known = _PARSE_MEMO.get(raw)
+            if known is None:
+                known = _PARSE_MEMO[raw] = _parse_text(raw)
+            self._parsed[relative] = known
         return self._parsed[relative]
 
     def _module_files(self, name, base=''):
@@ -458,12 +475,17 @@ class SourceIndex:
 
     def _module_symbols(self, relative):
         if relative not in self._symbols:
-            text = strip_provenance((self.root / relative).read_text(encoding='utf-8', errors='replace'))
-            try:
-                tree = ast.parse(text)
-            except SyntaxError:
-                tree = None
-            self._symbols[relative] = module_symbols(tree, text, refined=self.scope == 'units')
+            raw = (self.root / relative).read_text(encoding='utf-8', errors='replace')
+            key = (raw, self.scope == 'units')
+            known = _SYMBOL_MEMO.get(key)
+            if known is None:
+                text = strip_provenance(raw)
+                try:
+                    tree = ast.parse(text)
+                except SyntaxError:
+                    tree = None
+                known = _SYMBOL_MEMO[key] = module_symbols(tree, text, refined=key[1])
+            self._symbols[relative] = known
         return self._symbols[relative]
 
     def refresh(self, paths):
@@ -768,6 +790,20 @@ class SourceIndex:
                     pending.extend(value)
             self._json_values[(relative, key)] = found
         return self._json_values[(relative, key)]
+
+    def unit_hashes(self, relative, units, top_format=None):
+        """{unit: SHA-256 of its text} for UNITS of a module (the parts unit_digest hashes), None for a unit the
+        module no longer has; None when the module is gone or cannot be read (B7 narrowed reuse)."""
+        top_format = top_format or self.top_format
+        if relative not in self.files:
+            return None
+        symbols = self._module_symbols(relative)
+        if symbols.get('broken'):
+            return None
+        texts = symbols.get('texts') or {}
+        text = {'<top>': TOP_TEXT[top_format]}
+        return {unit: (hashlib.sha256(texts[text.get(unit, unit)].encode('utf-8', 'surrogateescape')).hexdigest()
+                       if text.get(unit, unit) in texts else None) for unit in sorted(units)}
 
     def selection(self, script, top_format=None):
         """({path: digest} a stage's fingerprint covers, uncertain).
@@ -1746,6 +1782,65 @@ def _install():
     if fallback and os.path.isabs(fallback):
         pools.append(fallback.rstrip('/') + '/asset-pool-v1/')
 
+    # Trace form 2 (B7, v0.0.42): directory listings of the checkout ('#L' / '#R' recursive lines) and the
+    # processes a stage starts ('$' lines) are listed too, so a stage's record can name exactly what it ran
+    # and read (Recorder.used_record): a listing can see a new file, a process the trace does not follow can
+    # read anything.
+    os.write(handle, b'#v2\\n')
+    hook_folder = os.path.dirname(os.path.abspath(__file__))
+
+    def listed(path, recursive=False):
+        if isinstance(path, bytes):
+            path = os.fsdecode(path)
+        if path is None:
+            path = '.'
+        if not isinstance(path, str):
+            return
+        path = os.path.abspath(path)
+        if (path.rstrip('/') + '/').startswith(root):
+            line = ('#R' if recursive else '#L') + path[len(root):].rstrip('/') + '\\n'
+            if line not in seen:
+                seen.add(line)
+                os.write(handle, line.encode('utf-8', 'surrogateescape'))
+
+    def globbed(args):
+        pattern = os.fsdecode(args[0]) if isinstance(args[0], bytes) else args[0]
+        if not isinstance(pattern, str):
+            return
+        base = args[2] if len(args) > 2 and isinstance(args[2], (str, bytes)) else None
+        if base is not None and not os.path.isabs(pattern):
+            pattern = os.path.join(os.fsdecode(base), pattern)
+        parts = pattern.split('/')
+        fixed = []
+        for part in parts:
+            if any(ch in part for ch in '*?['):
+                break
+            fixed.append(part)
+        listed('/'.join(fixed) or '/', recursive=('**' in pattern and bool(args[1])) or len(fixed) < len(parts) - 1)
+
+    def spawned(event, args):
+        if event == 'os.system':
+            command = os.fsdecode(args[0]) if isinstance(args[0], bytes) else str(args[0])
+            exe, argv, cwd, env = command.split()[0] if command.split() else '', [command], None, None
+        elif event == 'subprocess.Popen':
+            executable, argv, cwd, env = args
+            argv = [argv] if isinstance(argv, (str, bytes)) else list(argv or ())
+            exe = executable or (argv[0] if argv else '')
+        else:  # os.posix_spawn, os.exec: (path, argv, env)
+            exe, argv, env = args[0], list(args[1] or ()), args[2] if len(args) > 2 else None
+            cwd = None
+        exe = os.path.basename(os.fsdecode(exe) if isinstance(exe, bytes) else str(exe))
+        texts = [os.fsdecode(a) if isinstance(a, bytes) else str(a) for a in argv] + ([os.fsdecode(cwd) if isinstance(cwd, bytes) else str(cwd)] if cwd else [])
+        flags = []
+        if exe.startswith('python') or exe == os.path.basename(sys.executable):
+            flags.append('py')
+            if isinstance(env, dict) and (hook_folder not in [os.path.abspath(p) for p in str(
+                    env.get('PYTHONPATH', '')).split(os.pathsep) if p] or env.get('AMIWIND_STAGE_TRACE') != target):
+                flags.append('untraced')
+        if any(t.startswith(root) or (' ' + root) in t for t in texts):
+            flags.append('repo')
+        os.write(handle, ('$' + exe + '\\t' + ','.join(flags) + '\\n').encode('utf-8', 'surrogateescape'))
+
     def is_diagnostic(path):
         return path.endswith('.log') or os.path.basename(path) in diagnostic_names
 
@@ -1776,6 +1871,30 @@ def _install():
                 if run is not None and source.startswith(run) and is_diagnostic(source) and is_diagnostic(target):
                     copying.add(source)
             except Exception:  # noqa: BLE001 - tracing must never change the stage
+                pass
+            return
+        if event in ('os.listdir', 'os.scandir'):
+            try:
+                # the import system lists every folder on its search path (FileFinder): not a read of the stage
+                frame, depth = sys._getframe(1), 0
+                while frame is not None and depth < 4:
+                    if frame.f_code.co_filename.startswith('<frozen importlib'):
+                        return
+                    frame, depth = frame.f_back, depth + 1
+                listed(args[0])
+            except Exception:  # noqa: BLE001 - tracing must never change the stage
+                pass
+            return
+        if event in ('glob.glob', 'glob.glob/2'):
+            try:
+                globbed(args)
+            except Exception:  # noqa: BLE001
+                pass
+            return
+        if event in ('subprocess.Popen', 'os.posix_spawn', 'os.exec', 'os.system'):
+            try:
+                spawned(event, args)
+            except Exception:  # noqa: BLE001
                 pass
             return
         if event != 'open':
@@ -1970,6 +2089,11 @@ def check_calls(lines, reached, modules, run_inside=None):
     return sorted(misses)
 
 
+# Trace lines that are not repository reads: '@' code entered, '>' run-folder writes, '<' run-folder diagnostics
+# read, '%' storage pool reads, '#' form and directory listings, '$' processes started (B7).
+TRACE_MARKS = ('@', '>', '<', '%', '#', '$')
+
+
 def check_reads(lines, covered, files, root, run_inside=None):
     """(misses, uncovered, outside) of one stage's read list.
 
@@ -2034,6 +2158,150 @@ def pool_read_problems(lines):
     return sorted(set(problems)), summary
 
 
+# --------------------------------------------------------------------------
+# What a stage really used (B7, v0.0.42; BUILD-REUSE-KEYS-TOO-BROAD-35)
+#
+# A stage's key covers everything its code CAN reach (functions, data files named in its code, whole folders
+# named with a computed part). A stage that ran records, from its trace (form 2), what it DID use: every
+# repository function and module top it ran (by the SHA-256 of its text), every repository file it read (by
+# SHA-256) and every repository folder it listed (by the SHA-256 of its names). The stage's outputs are a
+# function of its inputs (the other parts of the key) and of exactly this code and these files: with the same
+# inputs it runs the same code and reads the same files again. So when a later key differs only in its sources,
+# and every unit, file and listing of the record is unchanged, the stage is reused (narrowed reuse); the reuse
+# plan says so and names the changed files the stage never used. A record is complete only when the trace saw
+# every process of the stage: a Python process started without the trace, or another program given a checkout
+# path, leaves it incomplete, and the key is compared whole as before. AMIWIND_REUSE_NARROWING=off: the whole
+# key, always (the method before v0.0.42).
+
+USED_SCHEMA = 1
+NARROWING_ENV = 'AMIWIND_REUSE_NARROWING'
+
+
+def narrowing_enabled():
+    return os.environ.get(NARROWING_ENV, 'on') != 'off'
+
+
+def listing_digest(root, relative, recursive=False):
+    """SHA-256 of the names in a checkout folder (recursive: every file below it), None when it is gone."""
+    folder = Path(root) / relative
+    if not folder.is_dir():
+        return None
+    if recursive:
+        names = sorted(p.relative_to(folder).as_posix() for p in folder.rglob('*')
+                       if '__pycache__' not in p.parts and not p.name.endswith('.pyc'))
+    else:
+        names = sorted(n for n in os.listdir(folder) if n != '__pycache__' and not n.endswith('.pyc'))
+    return hashlib.sha256('\n'.join(names).encode('utf-8', 'surrogateescape')).hexdigest()
+
+
+def used_record(lines, index, run_inside=None, reused=False):
+    """The record of what a stage used (see above), from its trace lines and its checkout's index."""
+    root = Path(index.root)
+    record = {'schema': USED_SCHEMA, 'top_format': index.top_format, 'complete': True, 'why': []}
+    if '#v2' not in lines:
+        record.update(complete=False, why=['trace form 1 (no listings or processes)'])
+        return record
+
+    def inside(path):
+        return bool(run_inside) and (path == run_inside or path.startswith(run_inside + '/'))
+    called, opened, listed = {}, set(), {}
+    for line in lines:
+        if line.startswith('@'):
+            path, _, name = line[1:].partition('\t')
+            if inside(path) or path in OUTPUT_NEUTRAL or (reused and apply_module(path)):
+                continue
+            called.setdefault(path, set()).add(name)
+        elif line.startswith(('#L', '#R')):
+            listed[line[2:]] = listed.get(line[2:], False) or line[1] == 'R'
+        elif line.startswith('$'):
+            exe, _, flags = line[1:].partition('\t')
+            flags = set(flags.split(',')) if flags else set()
+            if 'untraced' in flags:
+                record['why'].append('started a Python process without the trace (%s)' % exe)
+            elif 'repo' in flags and 'py' not in flags:
+                record['why'].append('started %s with a checkout path' % exe)
+        elif line.startswith('!'):
+            name = line[1:].rpartition('/')[2]
+            if name.split('.')[0] not in APPLY_STEMS:
+                record['why'].append('ran Python code from outside the checkout (%s)' % line[1:])
+        elif not line.startswith(TRACE_MARKS) and line.strip():
+            if '__pycache__' in line.split('/'):
+                continue      # a module's compiled form: the module itself is listed by its '@' lines
+            opened.add(line.strip())
+    if record['why']:
+        record['complete'] = False
+        return record
+    units = {}
+    for path, names in sorted(called.items()):
+        if path not in index.files or not path.endswith('.py'):
+            continue
+        symbols = index._module_symbols(path)
+        texts = symbols.get('texts') or {}
+        functions = set(symbols.get('units') or ())
+        wanted = {'<top>'}
+        for name in names:
+            if name == '<module>':
+                if '<main>' in texts:
+                    wanted.add('<main>')
+            elif name in functions and not name.startswith('<'):
+                wanted.add(name)
+            # a class, a decorated function, a comprehension or lambda at module level: part of '<top>'
+        hashes = index.unit_hashes(path, wanted)
+        if hashes is None or any(v is None for v in hashes.values()):
+            record.update(complete=False, why=['cannot hash the units of %s' % path])
+            return record
+        units[path] = hashes
+    data = {}
+    for path in sorted(opened):
+        parts = path.split('/')
+        if inside(path) or path in OUTPUT_NEUTRAL or parts[0] in SKIP_DIRECTORIES \
+                or any(part.startswith('.') for part in parts):
+            continue
+        if path.endswith('.py') and path in called:
+            continue          # imported: its code is in units
+        if path in index.files:
+            data[path] = index.files[path]
+    listings = {}
+    for path, recursive in sorted(listed.items()):
+        if not inside(path):
+            listings[('R:' if recursive else 'L:') + path] = listing_digest(root, path, recursive)
+    record.update(units=units, data=data, listed=listings)
+    return record
+
+
+def narrowed_unchanged(old_run, name, index):
+    """(True, None) when the stage's record in OLD_RUN (where it last really ran) names only code, files and
+    listings that are unchanged in INDEX's checkout; else (False, why)."""
+    if not narrowing_enabled():
+        return False, 'narrowing off'
+    record = (ran_manifest(old_run, name) or {}).get('used')
+    if not record or record.get('schema') != USED_SCHEMA:
+        return False, 'no record of what it used'
+    if not record.get('complete'):
+        return False, 'record incomplete: ' + '; '.join(record.get('why') or ['unknown'])
+    top_format = record.get('top_format')
+    for path, hashes in (record.get('units') or {}).items():
+        now = index.unit_hashes(path, hashes, top_format)
+        if now != hashes:
+            changed = sorted(u for u in hashes if (now or {}).get(u) != hashes[u])
+            return False, 'it ran changed code: %s %s' % (path, ', '.join(changed[:3]))
+    for path, digest in (record.get('data') or {}).items():
+        if path not in index.files or index.files[path] != digest:
+            return False, 'it read a changed file: ' + path
+    for key, digest in (record.get('listed') or {}).items():
+        kind, _, path = key.partition(':')
+        if listing_digest(index.root, path, kind == 'R') != digest:
+            return False, 'a folder it listed changed: ' + path
+    return True, None
+
+
+def only_sources_changed(old_components, new_components):
+    """True when, of a stage's own key parts, only its sources differ (its dependencies may differ too)."""
+    changed = [part for part in explain(old_components or {}, new_components or {})
+               if not part.startswith('dependency ')]
+    return bool(changed) and all(part == 'sources' or part.startswith('sources (') for part in changed)
+
+
 class Recorder:
     """Snapshots before and diffs after each stage; writes profile/manifests/STAGE.json."""
 
@@ -2057,6 +2325,7 @@ class Recorder:
         if details is not None:
             (self.run / 'profile' / 'fingerprints.json').write_text(json.dumps(details, indent=1, sort_keys=True) + '\n')
         self.closures = CLOSURES.pop(str(self.run), None) or {}
+        self.index = None     # the checkout's SourceIndex for the used records (prepare's, when it made one)
         # The prerendered store (tools/prerendered.py): passed stages are captured as they finish
         # and become store entries only when the whole build passed.
         self.store = None
@@ -2098,7 +2367,7 @@ class Recorder:
         except ValueError:
             run_inside = None
         pool_problems, pool_summary = pool_read_problems(lines)
-        misses, uncovered, outside = check_reads([line for line in lines if not line.startswith(('@', '>', '<', '%'))],
+        misses, uncovered, outside = check_reads([line for line in lines if not line.startswith(TRACE_MARKS)],
                                                  self.closures['stages'][name], set(self.closures['files']),
                                                  root, run_inside)
         if (self.cache.get('reused') or {}).get(name):
@@ -2134,6 +2403,30 @@ class Recorder:
                   '. The fingerprint missed an input: register a bug (docs/BUILD_PROFILE.md, read trace).', flush=True)
         return reasons, summary
 
+    def used(self, name, reads):
+        """What the stage used (used_record), for a stage that really ran with the trace; else None."""
+        if not self.traced or reads is None or name in NON_REUSABLE or name not in self.closures.get('stages', {}):
+            return None
+        reused = bool((self.cache.get('reused') or {}).get(name))
+        if reused and not (self.run / 'profile' / 'reuse-fallback' / f'{name}.txt').is_file():
+            return None       # it only copied its old outputs: its record is the one where it ran (manifests-ran)
+        try:
+            lines = Path(reads).read_text(encoding='utf-8', errors='surrogateescape').splitlines()
+        except OSError:
+            return None
+        root = Path(self.closures['root'])
+        try:
+            run_inside = self.run.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            run_inside = None
+        try:
+            if self.index is None:
+                self.index = INDEXES.pop(str(self.run), None) or SourceIndex(
+                    root, scope=self.closures.get('scope') or DEFAULT_SCOPE, top_format=STAGE_TOP_FORMAT)
+            return used_record(lines, self.index, run_inside, reused=reused)
+        except Exception as exc:  # noqa: BLE001 - only an optimisation: without it the key is compared whole
+            return {'schema': USED_SCHEMA, 'complete': False, 'why': ['record failed: %s' % exc]}
+
     def diagnostic_reads(self, reads):
         """Run-folder diagnostics (logs, timing reports) the stage's Python processes read ('<' lines)."""
         if not self.traced or reads is None:
@@ -2168,6 +2461,7 @@ class Recorder:
         regular = [path for path in changed if files[path][4] is None]
         hashes = hash_files(self.run, regular)
         reasons, trace = self.check_trace(name, reads)
+        used = self.used(name, reads)
         # A reused stage copies into the run folder through NAME + TEMPORARY_SUFFIX while other stages run; that
         # temporary of a declared root is not this stage's output (BUILD-REUSE-TMP-UNDECLARED-33).
         undeclared = sorted(entry for entry in set(os.listdir(self.run)) - state['top'] - RUN_PRIVATE - self.all_roots
@@ -2199,6 +2493,8 @@ class Recorder:
                     'deleted': sorted(set(before) - set(files)),
                     'deleted_directories': sorted(state['directories'] - directories),
                     'reusable': not reasons, 'reasons': reasons, 'reads': trace}
+        if used is not None:
+            manifest['used'] = used
         manifest['counts'] = {'files': len(regular), 'bytes': sum(files[path][0] for path in regular)}
         # Units -> segments -> stage hash (tools/unit_tree.py): compared in one step, drilled into on a mismatch.
         from unit_tree import of_manifest
@@ -2289,6 +2585,7 @@ class Recorder:
 
 PLANS = {}    # run -> per-stage file plan, written into the run by Recorder
 CLOSURES = {}  # run -> {stage: repository files its fingerprint covers}, checked against the stage's trace
+INDEXES = {}   # run -> the SourceIndex its fingerprints were made with (Recorder.used)
 DETAILS = {}  # run -> fingerprint components, written into the run by Recorder
 
 
@@ -2340,8 +2637,11 @@ def requalify(manifest):
     return manifest
 
 
-def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run, forced=()):
-    """({stage: plan}, {stage: reason not reused}) against a completed earlier run."""
+def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run, forced=(), index=None,
+               narrowed=None):
+    """({stage: plan}, {stage: reason not reused}) against a completed earlier run. INDEX (this checkout's
+    SourceIndex): a stage whose key differs only in its sources is reused when what it used is unchanged
+    (narrowed_unchanged); NARROWED (a dict) gets {stage: the changed key files it never used}."""
     old_run = Path(old_run)
     state_path = old_run / 'build-state.json'
     if not state_path.is_file():
@@ -2364,6 +2664,17 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
     for name in names:
         own_same = name in old_details and not [part for part in explain(old_details[name], components[name])
                                                  if not part.startswith('dependency ')]
+        if (not own_same and index is not None and name in old_details and name not in NON_REUSABLE
+                and name not in forced and old_status.get(name) == 'passed'
+                and only_sources_changed(old_details[name], components[name])):
+            same, _ = narrowed_unchanged(old_run, name, index)
+            if same:
+                own_same = True
+                if narrowed is not None:
+                    old_files = ((old_details[name].get('sources') or {}).get('by_file') or {})
+                    new_files = ((components[name].get('sources') or {}).get('by_file') or {})
+                    narrowed[name] = sorted(p for p in set(old_files) | set(new_files)
+                                            if old_files.get(p) != new_files.get(p))
         if name in NON_REUSABLE:
             reasons[name] = NON_REUSABLE[name]
         elif name in forced:
@@ -2602,6 +2913,7 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
     cache = {'schema': CACHE_SCHEMA, 'scope': index.scope, 'fingerprints': fingerprints, 'reuse_from': None,
              'reused': {}, 'not_reused': {}, 'reuse_mode': None}
     units, modules = stage_units(steps, index)
+    INDEXES[str(run)] = index
     CLOSURES[str(run)] = {'root': str(index.root), 'scope': index.scope, 'stages': stage_closures(steps, index),
                           'files': sorted(index.files), 'units': units, 'module_units': modules}
     DETAILS[str(run)] = components
@@ -2616,8 +2928,11 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
         except (OSError, ValueError):
             old_details = {}
         compared = comparable_all(components, old_details, run)
+        narrowed = {}
         plans, reasons = plan_reuse(steps, fingerprints, dependencies, compared, problems, reuse_from,
-                                    forced=set(forced))
+                                    forced=set(forced), index=index, narrowed=narrowed)
+        if narrowed:
+            cache['narrowed'] = {name: files[:20] for name, files in narrowed.items() if name in plans}
         if forced:
             cache['forced'] = sorted(forced)
         cache.update(reuse_from=str(reuse_from), not_reused=reasons, reuse_mode=mode)
@@ -2641,6 +2956,11 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
                 after = plans[name]['rebuilt_ancestors']
                 print(f'   reused  {name} (fingerprint {fingerprints[name][:12]})'
                       + (f" if {', '.join(after)} write the same files again" if after else ''), flush=True)
+                if name in narrowed:
+                    files = narrowed[name]
+                    more = f' (+{len(files) - 4} more)' if len(files) > 4 else ''
+                    print(f"           its key changed only in code and files it never ran or read: "
+                          f"{', '.join(files[:4])}{more}", flush=True)
         # Reuse preflight (BUILD-REUSE-KEYS-TOO-BROAD-35): every rebuild with its reason and the changed files
         # that touch it, before any stage runs; a rebuild the source diff and the inputs do not explain stops here.
         import reuse_report
@@ -2699,6 +3019,68 @@ def _rebuild(run, stage, reason, command):
         return 1
     import subprocess
     return subprocess.run(command).returncode
+
+
+APPLY_THREADS_ENV = 'AMIWIND_APPLY_THREADS'
+
+
+class _StagingError(ValueError):
+    """A file of a reused stage could not be staged; `staged` lists the temporaries already made."""
+
+
+def apply_threads(files):
+    """Threads that stage (link or copy, and verify by SHA-256) a reused stage's files (B8, v0.0.42): a reused
+    stage applied its files one at a time on one core (the world terrain, scenery and flora stages 10 s each
+    in every reuse build, one after another on the critical path). AMIWIND_APPLY_THREADS=1: the method
+    before v0.0.42."""
+    try:
+        wanted = int(os.environ.get(APPLY_THREADS_ENV, '0'))
+    except ValueError:
+        wanted = 0
+    if wanted < 1:
+        wanted = min(8, os.cpu_count() or 1)
+    return max(1, min(wanted, files // 64 + 1))
+
+
+def _stage_files(items, run, old, pool, link):
+    """[(temporary, target)] for ITEMS [(relative, info)] in their order. Files with the same SHA-256 are staged
+    one after another by the same thread (the storage pool object they share is made once); different contents
+    side by side. On any failure every temporary made is listed on the raised error (`staged`)."""
+    groups = {}
+    for relative, info in items:
+        groups.setdefault(info['sha256'], []).append((relative, info))
+    made, lock = {}, threading.Lock()
+
+    def stage(group):
+        for relative, info in group:
+            target = run / relative
+            source = old / relative
+            if pool and link:
+                source = _pooled(pool, source, info['sha256'])
+            temporary = _copy_verified(source, target, info['sha256'], info['mode'], link)
+            with lock:
+                made[relative] = (temporary, target)
+    threads = apply_threads(len(items))
+    failure = None
+    if threads == 1:
+        try:
+            for group in groups.values():
+                stage(group)
+        except (OSError, ValueError) as exc:
+            failure = exc
+    else:
+        with ThreadPoolExecutor(max_workers=threads) as executor:
+            for future in [executor.submit(stage, group) for group in groups.values()]:
+                try:
+                    future.result()
+                except (OSError, ValueError) as exc:
+                    failure = failure or exc
+    staged = [made[relative] for relative, _ in items if relative in made]
+    if failure is not None:
+        error = _StagingError(str(failure))
+        error.staged = staged
+        raise error from failure
+    return staged
 
 
 def _copy_verified(source, target, expected, mode, link):
@@ -2925,14 +3307,11 @@ def apply_stage(run, stage, command):
     try:
         for relative in sorted(plan['directories']):
             make(run / relative)
-        for relative, info in sorted(plan['files'].items()):
-            target = run / relative
-            make(target.parent)
-            source = old / relative
-            if pool and link:
-                source = _pooled(pool, source, info['sha256'])
-            staged.append((_copy_verified(source, target, info['sha256'], info['mode'], link), target))
+        for relative in sorted(plan['files']):
+            make((run / relative).parent)
+        staged = _stage_files(sorted(plan['files'].items()), run, old, pool, link)
     except (OSError, ValueError) as exc:
+        staged = getattr(exc, 'staged', staged)
         # Leave the run exactly as before, so the stage can run on a clean state.
         for temporary, _ in staged:
             temporary.unlink(missing_ok=True)
@@ -2959,7 +3338,7 @@ def apply_stage(run, stage, command):
     size = sum(info['size'] for info in plan['files'].values())
     origin = f"prerendered {plan['prerendered']}" if plan.get('prerendered') else str(old)
     print(f"Reused stage {stage} from {origin} (fingerprint {plan['fingerprint']}): {len(plan['files'])} files, "
-          f"{size:,} bytes, every SHA-256 verified "
+          f"{size:,} bytes on {apply_threads(len(plan['files']))} thread(s), every SHA-256 verified "
           f"({'links to the storage pool, read-only' if pool and link else 'hard links, read-only' if link else 'copies'}); "
           f"{plan.get('skipped_later_replaced', 0)} files are replaced by later reused stages.", flush=True)
     return 0
@@ -3014,7 +3393,13 @@ def predict(old_run, scope=DEFAULT_SCOPE, root=ROOT, dependencies=None, index=No
             changed = explain(old_details.get(name, {}), components[name]) if name in old_details else ['fingerprint']
             # Only stages before it changed: the build reuses it if they write the same outputs again
             # (early cutoff, BUILD-CACHE-NO-CUTOFF-33), as plan_reuse does; counted as reused (an upper bound).
-            result[name] = None if all(part.startswith('dependency ') for part in changed) else 'changed: ' + ', '.join(changed)
+            if all(part.startswith('dependency ') for part in changed):
+                result[name] = None
+            elif (name in old_details and only_sources_changed(old_details[name], components[name])
+                  and narrowed_unchanged(old_run, name, index)[0]):
+                result[name] = None   # narrowed reuse: what it used is unchanged (B7)
+            else:
+                result[name] = 'changed: ' + ', '.join(changed)
         else:
             result[name] = None
     return (result, components) if details else result

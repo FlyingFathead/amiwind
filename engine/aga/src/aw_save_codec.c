@@ -200,13 +200,29 @@ static void inventory_fields(aw_state_t *s){
         if(error)return;
     }
 }
+/* AWS4 feature bit 4: the selected magic item and current enchantment charges
+ * (HUD-STATS-29). Older readers reject the bit instead of losing the charge. */
+static int magic_used(const aw_magic_state_t *m){return m->selected[0] || m->charge_known;}
+static void magic_fields(aw_state_t *s){
+    aw_magic_state_t *m=&s->magic;int i;
+    string(m->selected,64);if(error)return;
+    if(m->selected[0] && AW_StateGet(s,AW_ITEM,m->selected)<1){error=1;return;}
+    word(&m->charge_known);
+    for(i=0;i<AW_STATE_VALUES;i++){
+        if(m->charge_known&(1U<<i)){
+            if(i>=s->count[AW_ITEM] || s->values[AW_ITEM][i].value<1){error=1;return;}
+            floating(&m->charge[i],0,1000000);
+        }else if(writing && m->charge[i]!=0){error=1;return;}
+    }
+}
 int AW_SaveEncode(unsigned char *out,int capacity,const aw_save_t *state)
 {
     aw_save_t copy=*state;uint32_t size=0,crc;
     if(capacity<12 || capacity>AW_SAVE_BYTES)return 0;
     writing=out;reading=NULL;at=12;end=capacity;error=0;
     memset(out,0,capacity);fields(&copy);if(!error)journal_fields(&copy.state);
-    {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state.inventory)?2U:0U);word(&features);}
+    {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state.inventory)?2U:0U)|
+        (magic_used(&copy.state.magic)?4U:0U);word(&features);}
     if(!error && copy.state.harvest.slots)harvest_fields(&copy.state.harvest);
     if(!copy.state.harvest.slots){
         int i;for(i=0;i<32;i++)if(copy.state.harvest.catalogue[i])error=1;
@@ -216,6 +232,7 @@ int AW_SaveEncode(unsigned char *out,int capacity,const aw_save_t *state)
     if((copy.equipment&~AW_EQUIPMENT_MASK) ||
        ((copy.equipment&AW_EQUIPMENT_TORCH) && !(copy.equipment&AW_EQUIPMENT_DRAWN)))error=1;
     if(!error && inventory_used(&copy.state.inventory))inventory_fields(&copy.state);
+    if(!error && magic_used(&copy.state.magic))magic_fields(&copy.state);
     if(error)return 0;
     size=at;memcpy(out,"AWS4",4);at=4;word(&size);
     crc=crc32(out+12,size-12);word(&crc);return size;
@@ -230,7 +247,7 @@ int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
     /* Older saves have quest indices but no chronological evidence. Do not
      * fabricate earlier entries or dates when decoding them. */
     if(!error && data[3]!='1')journal_fields(&candidate.state);
-    if(!error && data[3]=='4'){word(&features);if(features>3)error=1;}
+    if(!error && data[3]=='4'){word(&features);if(features>7)error=1;}
     if(!error && (data[3]=='3' || (data[3]=='4' && (features&1))))harvest_fields(&candidate.state.harvest);
     if(!error && data[3]=='4'){
         word(&candidate.equipment);
@@ -238,6 +255,7 @@ int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
            ((candidate.equipment&AW_EQUIPMENT_TORCH) && !(candidate.equipment&AW_EQUIPMENT_DRAWN)))error=1;
     }
     if(!error && data[3]=='4' && (features&2))inventory_fields(&candidate.state);
+    if(!error && data[3]=='4' && (features&4))magic_fields(&candidate.state);
     if(error || at!=size)return 0;
     *out=candidate;return 1;
 }

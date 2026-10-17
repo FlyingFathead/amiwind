@@ -9,7 +9,7 @@
 | Where | tools/chim/validate.py measure (largest model of the world) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.40 |
 | Severity | medium: The streaming walk and visibility figures of empty cells are lost; 102 of the 171 outer-ring cells are empty sea. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

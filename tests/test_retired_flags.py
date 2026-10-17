@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
 
 class VivecDistrictsTests(unittest.TestCase):
-    """Owner decision 2026-10-11 09:55 +0300: all of Vivec in one CHIM frame (vivec_city) is the default; the district
+    """Project decision 2026-10-11 09:55 +0300: all of Vivec in one CHIM frame (vivec_city) is the default; the district
     areas (the Arena-only frame of stage A and the other cantons) are retired legacy areas, refused in developer mode
     without --override vivec-districts, and by the master builder without override.allow retired-flags."""
 

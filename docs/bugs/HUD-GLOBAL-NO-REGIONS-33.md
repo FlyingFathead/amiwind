@@ -9,7 +9,7 @@
 | Where | debug HUD GLOBAL row (aw_hud.c) on a disk without world/regions.awr |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | low: Debug only: the GLOBAL row (and with it the cell readout) was empty on MiniWind disks. |
 | Family | Debug commands and remote control (`debug-commands`) |
 

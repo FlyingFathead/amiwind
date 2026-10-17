@@ -62,4 +62,4 @@ resident memory.
 ## First step
 
 A short design note with the measured costs of today's shell (load time, entity parsing, resident memory),
-then the owner's decision on the header and loader before any code changes.
+then the maintainer's decision on the header and loader before any code changes.

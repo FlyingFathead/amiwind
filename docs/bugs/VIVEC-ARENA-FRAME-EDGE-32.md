@@ -17,7 +17,7 @@
 
 ## Status: 8 October 2026
 
-Open (design limit of the one-frame Arena preview). Found while checking the owner's dev1 reports
+Open (design limit of the one-frame Arena preview). Found while checking the maintainer's dev1 reports
 for [VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md).
 
 ## Symptom
@@ -30,7 +30,7 @@ places the player can reach inside the frame, for example the St. Delyn walkway 
 there is only sea and sky. In dev1 the bodies were missing altogether.
 
 The Arena preview is one isolated frame: it is not connected to the open world or to the rest of
-Vivec, and walking off its edges leads nowhere. Owner report in v0.0.32-dev3 play (8 October 2026,
+Vivec, and walking off its edges leads nowhere. Maintainer report in v0.0.32-dev3 play (8 October 2026,
 "vivec is not connected anywhere"): at LOCAL 1067 -819 159 (GLOBAL 40623 -90317 639), heading SE
 140, time 20:48, label "Vivec, St. Olms", a flat stone slab ends in darkness with nothing beyond.
 Joining Vivec to the world is world streamer (CHIM) work.
@@ -57,7 +57,7 @@ render of the fixed `va000`).
 
 ## Repair
 
-Not yet; owner decision. Measured options:
+Not yet; project decision. Measured options:
 
 - Whole cantons in the Arena frame: their footprints need bounds of about +-3072, which is 64
   regions (the region cap) and takes in the Temple and Ministry regions. The canton frames of the
@@ -67,7 +67,7 @@ Not yet; owner decision. Measured options:
   the neighbouring canton's own frame.
 - A shorter fog distance near the frame edge (location fog) would hide the cut without new data.
 
-Related owner reports from v0.0.32-dev3 play in the same edge area (8 October 2026):
+Related maintainer reports from v0.0.32-dev3 play in the same edge area (8 October 2026):
 [VIVEC-ARENA-WATER-FALL-32](VIVEC-ARENA-WATER-FALL-32.md) (no sea past the canton edge; the player
 falls out through the water) and [VIVEC-ARENA-FLOATING-NPC-32](VIVEC-ARENA-FLOATING-NPC-32.md) (a
 resident at a walkway end with sky below him).

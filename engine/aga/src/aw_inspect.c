@@ -68,19 +68,20 @@ static float model_hit(const float *eye,const float *dir,entity_t *candidate,flo
     }
     return lo;
 }
-static void pin_target(void) {
+/* The thing under the rendered crosshair: an edict (alias model by its drawn frame box, else
+ * the collision hit), a client static, or only the world. 0 = no local scene; -1 = the camera
+ * is inside collision; 1 = picked (*limit: the distance along the view ray). */
+static int pick(edict_t **best_out,entity_t **st_out,int *slot_out,int *bounds_out,vec3_t eye,vec3_t dir,float *limit_out) {
     edict_t *p,*e,*best=NULL;entity_t *st=NULL;model_t *m;trace_t tr;
-    vec3_t eye,dir,right,up,end,position,global;float limit,hit;int i,index,slot=-1,bounds=0;
-    char value[INSPECT_WIDTH];eval_t *ref;
-    rows=0;
-    if(!scene_ready()){text_field("Inspect","no local scene");return;}
+    vec3_t right,up,end;float limit,hit;int i,index,slot=-1,bounds=0;
+    if(!scene_ready())return 0;
     p=svs.clients[0].edict;
     /* The rendered camera is essential in third person; player eye angles
      * would select a different actor from the one under the visible crosshair. */
     VectorCopy(r_refdef.vieworg,eye);AngleVectors(r_refdef.viewangles,dir,right,up);
     VectorMA(eye,INSPECT_REACH,dir,end);
     tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p);
-    if(tr.startsolid || tr.allsolid){text_field("Inspect","camera inside collision; move the view");return;}
+    if(tr.startsolid || tr.allsolid)return -1;
     limit=tr.fraction*INSPECT_REACH;
     if(tr.fraction<1)best=tr.ent;
     /* Use the client pose actually drawn, not a newer server position/frame.
@@ -100,6 +101,49 @@ static void pin_target(void) {
         hit=model_hit(eye,dir,candidate,limit);
         if(hit>=0 && hit<limit){limit=hit;best=NULL;st=candidate;slot=i;bounds=1;}
     }
+    *best_out=best;*st_out=st;*slot_out=slot;*bounds_out=bounds;*limit_out=limit;
+    return 1;
+}
+/* The centre of an alias entity's drawn frame box in the world (model_hit's box, its local
+ * axes turned back); 0 when the model is not in the cache. */
+int AW_InspectFrameCentre(entity_t *candidate,float *out) {
+    aliashdr_t *header;mdl_t *mdl;maliasframedesc_t *frame;vec3_t forward,right,up,angles,centre;float scale;int j,f;
+    if(!candidate->model || candidate->model->type!=mod_alias || !(header=Cache_Check(&candidate->model->cache)))return 0;
+    mdl=(mdl_t *)((byte *)header+header->model);if(mdl->numframes<=0)return 0;
+    f=candidate->frame;if(f<0 || f>=mdl->numframes)f=0;
+    frame=&header->frames[f];scale=R_SpriteEntityScale(candidate);
+    for(j=0;j<3;j++)centre[j]=((frame->bboxmin.v[j]+frame->bboxmax.v[j])*.5f*mdl->scale[j]+mdl->scale_origin[j])*scale;
+    VectorCopy(candidate->angles,angles);angles[PITCH]=-angles[PITCH];
+    AngleVectors(angles,forward,right,up);
+    for(j=0;j<3;j++)out[j]=candidate->origin[j]+centre[0]*forward[j]-centre[1]*right[j]+centre[2]*up[j];
+    return 1;
+}
+/* dbg cam orbit (aw_view.c): what the crosshair shows. *edict: its number (0 none), *focal: the
+ * centre of its drawn frame box (a static: the same; the world: the point the view ray hits). */
+int AW_InspectTarget(int *edict,float *focal) {
+    edict_t *best;entity_t *st;int slot,bounds,r;vec3_t eye,dir;float limit;
+    *edict=0;
+    r=pick(&best,&st,&slot,&bounds,eye,dir,&limit);
+    if(r<=0)return r;
+    if(st){if(!AW_InspectFrameCentre(st,focal)){VectorCopy(st->origin,focal);}return 1;}
+    if(best && best!=sv.edicts && bounds){
+        int n=NUM_FOR_EDICT(best);
+        *edict=n;
+        if(n<cl.num_entities && AW_InspectFrameCentre(&cl_entities[n],focal))return 1;
+        VectorAdd(best->v.absmin,best->v.absmax,focal);VectorScale(focal,.5f,focal);return 1;
+    }
+    /* the world or a brush model: the point the view ray hits */
+    if(limit>=INSPECT_REACH)return 0;
+    VectorMA(eye,limit,dir,focal);return 1;
+}
+static void pin_target(void) {
+    edict_t *best=NULL;entity_t *st=NULL;model_t *m;
+    vec3_t eye,dir,position,global;float limit;int index,slot=-1,bounds=0,r;
+    char value[INSPECT_WIDTH];eval_t *ref;
+    rows=0;
+    r=pick(&best,&st,&slot,&bounds,eye,dir,&limit);
+    if(!r){text_field("Inspect","no local scene");return;}
+    if(r<0){text_field("Inspect","camera inside collision; move the view");return;}
     if(!best && !st){text_field("Inspect","no target within 2048 local units");return;}
     VectorMA(eye,limit,dir,position);
     if(st){

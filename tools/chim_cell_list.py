@@ -8,7 +8,8 @@ A build's cell list (tools/build.py --chim-regions @FILE) is the union of:
                    ring 1 = land touching the sea, then inwards; --island 1 = Vvardenfell)
   --region NAME    every cell of that Morrowind region in the tracker data (repeatable; the regional
                    CHIMport: a region in one step, so its towns are not cut at the CHIM edge)
-  --include FILE   extra cells, e.g. ring-0 sea cells (any cell file tools/chim/regions.py reads)
+  --include FILE   extra cells, e.g. ring-0 sea cells or a batch by weight (tools/chim_weight_table.py
+                   --cells-out); any cell file tools/chim/regions.py reads
   --keep FILE      cells that are already on CHIM (the previous release's list, or a build run's
                    world-scenery/world-scenery.json, whose chim_region_cells it reads); repeatable
 
@@ -96,8 +97,9 @@ def open_legacy_pockets(chosen, kept, progress, island, limit=64):
 def make(progress, rings, island=1, include=(), keep=(), drop=None, reason='', leave_out=None, open_pockets=False,
          regions=()):
     """(document, report lines). Refuses (ValueError) when a kept cell is missing without a --drop reason."""
-    if not rings and not regions:
-        raise ValueError('give --rings or --region')
+    if not rings and not regions and not include:
+        # an --include alone is a batch list made from data (tools/chim_weight_table.py --cells-out)
+        raise ValueError('give --rings, --region or --include')
     drop = dict(drop or {})
     leave_out = dict(leave_out or {})
     chosen, lines = set(), []

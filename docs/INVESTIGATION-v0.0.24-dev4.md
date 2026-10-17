@@ -21,11 +21,11 @@ separates reported symptoms, inspected causes, corrections and remaining limits.
 
 ## Accepted dev3 behavior
 
-The owner reports that Balmora regions/sub-cells work surprisingly well and are
+The maintainer reports that Balmora regions/sub-cells work surprisingly well and are
 a promising foundation for streaming the wider game without disruptive scene
 breaks. Keep the frozen last frame with a small top Loading... box as the default;
 retain the black-screen option. Loading still replaces one BSP synchronously.
-The owner explicitly accepts the Balmora Silt Strider: do not change its dev3
+The maintainer explicitly accepts the Balmora Silt Strider: do not change its dev3
 geometry/profile. Its earlier broken-appearance report is superseded.
 
 ## Seyda Neen residency
@@ -37,7 +37,7 @@ scenery and leaf marks but retained unused geometry inside the loaded BSP.
 **Correction:** add 30 regular overlapping Seyda regions, the compact arrival
 area `intro_seyda_neen_subcell_pier` (file `intro_docks.bsp`) and separate
 `sncourt.bsp`. Select complete intersecting models using transformed bounds;
-the intro uses a conservative eight-sided footprint guided by the owner's map.
+the intro uses a conservative eight-sided footprint guided by the maintainer's map.
 Keep the Strider, driver, ship/plank/pier and nearby Census buildings.
 
 The compactor removes unused models and their referenced geometry, textures,
@@ -56,12 +56,12 @@ for other scenes. This cap is a coverage requirement, not a claimed FPS cure.
 Native diagnostic visits reach 7,710,896 hunk bytes at the intro pier and
 7,188,288 at the courtyard, within the existing 11 MiB reservation. These are
 specific scene/setup measurements, not a guarantee of the same FPS gain on the
-owner's machine. Static source reference 227023 (Strider) and actor 270748 (driver)
+maintainer's machine. Static source reference 227023 (Strider) and actor 270748 (driver)
 remain in the intro payload. Complete placements avoid repeating facade loss.
 
 ## Distance-1000 observation
 
-The owner repeatedly reports that the opening pier becomes faster at 1000.
+The maintainer repeatedly reports that the opening pier becomes faster at 1000.
 A native sweep on unchanged dev3 dock geometry used the same camera position
 (590,-353,56), three headings and actual uncapped 450/540/1000 distances. The
 new profiler records effective distance, world render time and BSP identity.
@@ -74,7 +74,7 @@ new profiler records effective distance, world render time and BSP identity.
 
 One view exhibits a modest reversal; others get substantially slower. These are
 small diagnostic samples (roughly 5 per distance, with settling samples in some
-groups), not repeated randomized benchmarks. They do not yet explain the owner's
+groups), not repeated randomized benchmarks. They do not yet explain the maintainer's
 large gain. Occlusion/draw ordering and host variability remain hypotheses.
 Do not label the report fixed or infer a general benefit from increasing distance.
 Prison-ship interior cost is separate and unchanged by exterior subdivision.
@@ -111,9 +111,9 @@ The numeric keys are available for the planned keymap.
 | --- | --- | --- |
 | 925,-290,62; yaw1, pitch-18 | `ex_hlaalu_b_17`, ref 32631 | Convex collider seals the authored stair opening; corrected |
 | 613,-125,59; yaw22, pitch-5 | `ex_hlaalu_dsteps_03`, ref 41159, beside `ex_hlaalu_b_04`, ref 22548 | Visible broken/jagged treads reproduced; source/conversion cause and traversal remain open |
-| 1182,-141,119; yaw91, pitch-12 | `ex_hlaalu_dsteps_03`, ref41134, beside `ex_hlaalu_b_04`, ref22539 | Another blocked stair instance; owner report, open |
-| -883,126,300; yaw346, pitch-14 | `ex_hlaalu_b_13`, ref 24020 | Narrow stairs cannot be climbed; owner report, open |
-| 962,119,64; yaw18, pitch-8 | `ex_hlaalu_b_15`, ref 41379 | Owner reports jagged treads and blocked ascent; recurring defect, not covered by b17 correction |
+| 1182,-141,119; yaw91, pitch-12 | `ex_hlaalu_dsteps_03`, ref41134, beside `ex_hlaalu_b_04`, ref22539 | Another blocked stair instance; maintainer report, open |
+| -883,126,300; yaw346, pitch-14 | `ex_hlaalu_b_13`, ref 24020 | Narrow stairs cannot be climbed; maintainer report, open |
+| 962,119,64; yaw18, pitch-8 | `ex_hlaalu_b_15`, ref 41379 | Maintainer reports jagged treads and blocked ascent; recurring defect, not covered by b17 correction |
 
 For b17, preserve authored collision surfaces as thin shells for both references
 32631 and 32644. Rebuild nineteen affected regions. Visible vertices, UVs, edges
@@ -130,7 +130,7 @@ standing-hull ascent/descent validation algorithm, plus memory-cost acceptance.
 
 ## Jagged door arches
 
-Owner screenshots show irregular dark strips around many upper doorway arches:
+Maintainer screenshots show irregular dark strips around many upper doorway arches:
 (1218,-792,120), yaw352/pitch-7; (1269,-788,133), yaw343/pitch-18; and
 (-1012,-939,142), yaw204/pitch-5. These remain open visual defects.
 Inspect source triangles, wall/door overlap, merging and depth ordering. A baked
@@ -141,7 +141,7 @@ implemented. The whole-map polygon-density study is next-version roadmap only.
 
 ## Missing street texture
 
-Owner report: XYZ455,-699,61, yaw3/pitch17 (screenshot HUD yaw1/pitch16).
+Maintainer report: XYZ455,-699,61, yaw3/pitch17 (screenshot HUD yaw1/pitch16).
 The image shows a broad flat untextured patch by a lightpost and two doorways.
 Restore continuity with the usual paving after checking source placement,
 materials and converted UV/texture references. Geometry loss versus texture
@@ -150,8 +150,8 @@ and seam checks required.
 
 ## Hlaalu guard chest armor
 
-Owner screenshot: XYZ862,-502,58, yaw290/pitch13, v0.0.24-dev3. The torso/chest
-plate is visibly absent or transparent. Material conversion is the owner's
+Maintainer screenshot: XYZ862,-502,58, yaw290/pitch13, v0.0.24-dev3. The torso/chest
+plate is visibly absent or transparent. Material conversion is the maintainer's
 hypothesis, not a confirmed cause. Inspect equipped armor/body slots, missing
 submeshes, triangle retention/winding and material/alpha conversion separately.
 This is an open actor-conversion defect, distinct from the static architecture.
@@ -164,7 +164,7 @@ migration. Native GCC diagnostics compare 82 to 82 with no added or removed
 warnings; full text is retained privately. Existing warnings remain work.
 The native profile remains 68040/FPU/JIT, 2 MiB Chip, 16 MiB Z3 and an 11 MiB heap.
 Tests use an offscreen emulator/null host audio sink; deterministic walking runs
-are not FPS benchmarks. Full opening/citywide walking and owner acceptance remain
+are not FPS benchmarks. Full opening/citywide walking and maintainer acceptance remain
 open. New geometry changes the save fingerprint; dev3 saves are incompatible.
 
 

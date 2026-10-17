@@ -1881,6 +1881,9 @@ static void PF_aw_animprep(void)
 /* A voice bark (aw_anim.c AW_VoiceSay): topic 0 attack, 1 hit, 2 flee, 3 idle; odds in percent (0.15 = 0.15 %). */
 static void PF_aw_bark(void)
 {
+    /* Idle lines need the player there: none while notarget detaches the player (dbg cam orbit). */
+    if((int)G_FLOAT(OFS_PARM1)==3 && sv.active && svs.clients && svs.clients[0].edict &&
+       ((int)svs.clients[0].edict->v.flags & FL_NOTARGET)){G_FLOAT(OFS_RETURN)=0;return;}
     G_FLOAT(OFS_RETURN)=AW_VoiceSay(G_EDICT(OFS_PARM0),(int)G_FLOAT(OFS_PARM1),(int)(G_FLOAT(OFS_PARM2)*100+.5f));
 }
 

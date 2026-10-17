@@ -7,7 +7,7 @@ this repository.
 
 ## GOG and Steam Game of the Year editions (checked 8 October 2026)
 
-A file-by-file comparison of an owner's GOG GOTY installation and an owner's Steam
+A file-by-file comparison of a maintainer's GOG GOTY installation and a maintainer's Steam
 GOTY installation found the six master files **identical**:
 
 | File | Bytes | SHA-256 |

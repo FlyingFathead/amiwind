@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 8 October 2026, in v0.0.32-dev3 |
 | Where | Vivec Arena preview, a canton wall seen from below; pose not recorded |
 | Reproduction | unknown |
@@ -20,7 +20,7 @@
 
 ## Status: 8 October 2026
 
-Open; cause unknown. Owner decision: ship v0.0.32 as is. Found by the owner in v0.0.32-dev3 play
+Open; cause unknown. Project decision: ship v0.0.32 as is. Found by the maintainer in v0.0.32-dev3 play
 (8 October 2026) in a screenshot taken for the release gallery: "a graphics issue in it, not very
 visible but still".
 
@@ -52,7 +52,7 @@ reports face defects per map but not holes between pieces.
 ## Reproduction
 
 Pose not recorded; needs the coordinate overlay next time. Look up at the canton walls from the
-lower walkways in daylight. The owner's frame is kept with the private evidence.
+lower walkways in daylight. The maintainer's frame is kept with the private evidence.
 
 ## Repair
 

@@ -9,7 +9,7 @@
 | Where | tools/chim/models.py BrushLumps.collider; render-only tiles of cut models (tools/chim/cut.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | critical: cut-model tiles without collision are solid to point traces; the engine refuses an empty node lump on load (possible crash) |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | World format ([CHIM Engine tracker](CHIM_TRACKER.md)) |

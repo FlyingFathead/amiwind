@@ -9,7 +9,7 @@
 | Where | tools/chim_build.py --validate: gate order |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: Hold-level class (a check that runs late): a seconds-long check ran after a 69-minute walk in a 1h48m stage |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

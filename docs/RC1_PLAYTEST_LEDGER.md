@@ -1,4 +1,4 @@
-# v0.0.29-rc1 owner playtest ledger
+# v0.0.29-rc1 maintainer playtest ledger
 
 <!-- contents start -->
 ## Contents
@@ -104,7 +104,7 @@ Recorded 2026-10-06T21:23:03+03:00. Release candidate preparation, not yet publi
 Interior brightness defaults to1.2x; independent exterior control defaults
 to1.0x. Six-step Options > Graphics controls and saved settings are included,
 with both build opt-out flags and explanatory disabled console commands.
-The owner approved the latest torch off/on/off test5/5 for this candidate.
+The maintainer approved the latest torch off/on/off test5/5 for this candidate.
 Balmora Temple remains a major partial geometry/collision defect. Its shipped
 map stays unchanged; the scoped converter plane correction does not resolve
 the broad holes. WinUAE Enter/load audio, brief hand-transition disappearance,
@@ -156,14 +156,14 @@ The original maximum-extension aperture was absent in the sampled view. Normal
 pre-Census restrictions were retained outside the explicit test rooms. Engine
 and map readback matched the candidate; the session closed to AmigaDOS.
 
-- HAND-PUNCH-TRANSITION-29: new owner report against the proposed-fix punch clip:
+- HAND-PUNCH-TRANSITION-29: new maintainer report against the proposed-fix punch clip:
   hands briefly disappear when changing into the punch animation. Reproduce the
   idle-to-punch transition frame by frame, including first attack and repetition.
   Cause and repair are pending. This is separate from maximum-extension coverage.
 - PUNCH-AUDIO-COVERAGE-29: inventory original punch swing/hit samples, converted
   equivalents and gameplay event wiring. Availability of every sample is not yet
   verified. Keep swing, hit and any material/target distinctions explicit.
-- Torch appearance: owner approves the new appearance. This does not close the
+- Torch appearance: maintainer approves the new appearance. This does not close the
   dark-room gray floor, outdoor surface strength or fuel/unlit-state reports.
 - BALMORA-TEMPLE-GEOMETRY-29: exported planes are a confirmed contributing defect;
   the Temple-only candidate passes 23 focused checks. Rebuilt-map/native repair
@@ -190,27 +190,27 @@ No subsequent package or first shipped fixed version is established below.
 | TORCHTEST-DARKNESS-29 | Separate open candidate defect. Zero light samples still show dim gray floor because palette generation enforces a 15% minimum. | Room-scoped darkness policy and actual-palette native off/on comparison; preserve ordinary scenes. |
 | INTERIOR-LIGHT-29 | Building-only default1.2 implemented. Native Census fixed-view gain observed; cave reports effective1.0 at both settings. Cave views differ by28 of158720 sampled pixels; no exact-image equality claim. | Next-package fresh/saved setting and broader building controls. Census static NPC sampling remains a separate open issue. |
 | CENSUS-DOOR-STUCK-29 | Opening hull overlaps reported local65,52,65. Source reproduction and five guard tests pass. | Native blocked/clear activation and return/save cases; no shipped fix. |
-| CONSOLE-WHEEL-29 / UI-OPTIONS-WRAP-29 | Five wheel and seven menu endpoint checks pass for candidate repairs. | Native boundary/reverse-scroll checks; not owner-accepted in a later package. |
+| CONSOLE-WHEEL-29 / UI-OPTIONS-WRAP-29 | Five wheel and seven menu endpoint checks pass for candidate repairs. | Native boundary/reverse-scroll checks; not maintainer-accepted in a later package. |
 | AUDIO-ENTER-29 / AUDIO-LOAD-29 | Both remain open. Nonzero native menu music is not continuity acceptance. Smaller read chunks help one synthetic load rate but not every rate. | Exact guard Enter and ship-to-deck capture with active music on target. |
 
-Owner-confirmed RC1 positives remain scoped: appearance-screen entry music,
+Maintainer-confirmed RC1 positives remain scoped: appearance-screen entry music,
 Go back/Choose borders, substantially improved fists, and tested torch-to-NPC
 response. They do not close the separate reports above. Full coordinates,
 reproduction notes and follow-up requests: [RC1 playtest ledger](RC1_PLAYTEST_LEDGER.md).
 
-Recorded 6 October 2026. This ledger consolidates owner reports and scoped positive observations for the exact private RC1 playtest. Next-source work is separate from RC1 and does not constitute a shipped fix. Local original game inputs and captures are not included.
+Recorded 6 October 2026. This ledger consolidates maintainer reports and scoped positive observations for the exact private RC1 playtest. Next-source work is separate from RC1 and does not constitute a shipped fix. Local original game inputs and captures are not included.
 
 ## Package identity and status
 
-This record applies to the v0.0.29-rc1 owner playtest on WinUAE. Exact private package and capture receipts are retained in the development evidence ledger.
+This record applies to the v0.0.29-rc1 maintainer playtest on WinUAE. Exact private package and capture receipts are retained in the development evidence ledger.
 
-Track owner-reported, source-checked, candidate-tested, packaged, target-observed and owner-accepted separately. Only an explicit owner acceptance in this exact package is marked fixed below.
+Track maintainer-reported, source-checked, candidate-tested, packaged, target-observed and maintainer-accepted separately. Only an explicit maintainer acceptance in this exact package is marked fixed below.
 
 ## Balmora Temple geometry/collision - BALMORA-TEMPLE-GEOMETRY-29
 
 **Open, major, release blocker.** RC1 shows partial structural loss: absent wall/floor/ceiling spans, thin horizontal remnants and pass-through gaps. Some other walls and ceilings remain; the upper route and stairs are the intact control. This is neither a wholly absent Temple nor a texture-only report.
 
-| Owner local runtime XYZ | Heading / pitch | Time | Observation |
+| Maintainer local runtime XYZ | Heading / pitch | Time | Observation |
 | --- | --- | --- | --- |
 | 1063,1048,3700 | E076 / 65 | ~05:28 | Primary report; broad gaps, pass-through concern |
 | 1072,1063,3701 | E089 / 8 | 05:22 | Damaged area |
@@ -222,9 +222,9 @@ Track owner-reported, source-checked, candidate-tested, packaged, target-observe
 | 1016,1033,3701 | SW204 / 13 | 08:56 | Thin remnant/open lower structure |
 | 1061,1056,3700 | E072 / 31 | 09:24 | Thin remnant/open lower structure |
 | 1062,888,3697 | SW207 / 46 | 09:50 | Largely open damaged section |
-| 931,1052,3701 | SE131 / 8 | 10:21 | Latest owner view; continuing damage report |
+| 931,1052,3701 | SE131 / 8 | 10:21 | Latest maintainer view; continuing damage report |
 
-These are approximate local HUD poses from owner WinUAE playtesting; headings and integer positions are not precision measurements. Independent FS-UAE reproduction is pending.
+These are approximate local HUD poses from maintainer WinUAE playtesting; headings and integer positions are not precision measurements. Independent FS-UAE reproduction is pending.
 
 **Pipeline findings:** source interior contains 286 references; 185 explicit selected references and all 185 reference IDs survive in sealed RC1. The prior RC1/RC4 cache has 185 converted placements and 41,816 placed source triangles. Assembled BSP has 35,242 faces, 186 models and 39,864 clipnodes. Exact packaged BSP matches its private catalogue; RC1 and RC4 cached assembled BSP hashes match each other. This rules out wholesale placement omission and a simple post-append face-count drop; it does not prove required transformed surfaces or collision at the gaps.
 
@@ -242,39 +242,39 @@ Detailed record: [BALMORA-TEMPLE-GEOMETRY-29](bugs/BALMORA-TEMPLE-GEOMETRY-29.md
 
 | Issue | RC1 report | State and next evidence |
 | --- | --- | --- |
-| LIGHT-EXTERIOR-JUMP-29 | Owner repeatedly sees dark-to-bright changes around Seyda Neen shacks/sub-cell crossings without torch; says it stops after leaving the area. Pair: dark global `-13037,-70679,113`, local `-443,251,28`, heading165/pitch7, 13:14; bright global `-12659,-71562,90`, local `-348,29,22`, heading122/pitch-5, 13:18. Correct maps: dark `sn037`, bright `sn031` (not `sn039`); later `sn061`/`vf0846` pair adds evidence. | Open; owner-reproduced traversal symptom. Source audit isolates empty/unused lighting-lump path; candidate ambient/dynamic fix has six focused Docker checks, not package/owner acceptance. Replay both ways at fixed clock, torch off/on, both pairs and open-country control. |
+| LIGHT-EXTERIOR-JUMP-29 | Maintainer repeatedly sees dark-to-bright changes around Seyda Neen shacks/sub-cell crossings without torch; says it stops after leaving the area. Pair: dark global `-13037,-70679,113`, local `-443,251,28`, heading165/pitch7, 13:14; bright global `-12659,-71562,90`, local `-348,29,22`, heading122/pitch-5, 13:18. Correct maps: dark `sn037`, bright `sn031` (not `sn039`); later `sn061`/`vf0846` pair adds evidence. | Open; maintainer-reproduced traversal symptom. Source audit isolates empty/unused lighting-lump path; candidate ambient/dynamic fix has six focused Docker checks, not package/maintainer acceptance. Replay both ways at fixed clock, torch off/on, both pairs and open-country control. |
 | CONSOLE-WHEEL-29 | F10 console down at newest output triggers repeated MWHEELDOWN/MWHEELUP unbound warnings and degrades scroll. Lower boundary owner-reproduced; source regression tests both ends. | Cause source-checked: warning prints before console consumes key. Candidate moves warning into game-binding path; five focused checks, not target accepted or shipped. Verify both limits/directions and ordinary game-binding negative control. |
 | INTERIOR-NPC-LIGHT-29 | Census Office NPCs look too dark under static interior lighting. | Open, distinct from surface light and player torch. Compare same-pose room light and torch off/on on actor and adjacent surfaces; inspect actor path/light data/sample/final shading. |
-| INTERIOR-LIGHT-29 / `dbg interiorluma` | Owner requests archived `aw_interiorluma`, query on no argument, default 1.2 vs baseline 1.0 for built interiors. | Candidate applies to 55 explicitly reviewed buildings, bounded 0..4; natural caves/tombs and unknown maps remain 1.0, as do ship/exteriors/dark torch room. Eight focused checks plus bounded native Census gain and Addamasartus effective-baseline evidence. Cave images were near-identical, not exactly identical. No later package delivered. |
+| INTERIOR-LIGHT-29 / `dbg interiorluma` | Maintainer requests archived `aw_interiorluma`, query on no argument, default 1.2 vs baseline 1.0 for built interiors. | Candidate applies to 55 explicitly reviewed buildings, bounded 0..4; natural caves/tombs and unknown maps remain 1.0, as do ship/exteriors/dark torch room. Eight focused checks plus bounded native Census gain and Addamasartus effective-baseline evidence. Cave images were near-identical, not exactly identical. No later package delivered. |
 | Traversal feel | Balmora streets feel smoother/shorter loads than Seyda Neen; tested open fields acceptable. | Subjective scoped positive, not timings or world approval. Compare equivalent crossings, RAM, entities, geometry, loading, audio and frame time. Defer coarser town-cell study until LIGHT-EXTERIOR-JUMP-29 is addressed. |
 
 ## Audio and interface
 
 | Issue | RC1 report | State and next evidence |
 | --- | --- | --- |
-| AUDIO-APPEARANCE-29 | Appearance-screen entry no longer jumps. | Owner accepts in RC1; fixed within this entry behavior. Preserve regression; full confirmation exit separate. |
+| AUDIO-APPEARANCE-29 | Appearance-screen entry no longer jumps. | Maintainer accepts in RC1; fixed within this entry behavior. Preserve regression; full confirmation exit separate. |
 | AUDIO-ENTER-29 | Small music jump still occurs on Enter at prison-ship “follow the guard” prompt. | Open, separate from appearance entry and load crackle. Replay exact event with music, mixer/service/queue/read timings and listen. |
 | AUDIO-LOAD-29 | OST crackles on prison-ship-to-deck heavy load. | Open. 4 KiB candidate servicing removes misses in synthetic test at 32 KiB/s but still misses 53,312 at 25 KiB/s and increases load duration. Target replay with active music, service gaps, queue and reads required. |
 | UI-OPTIONS-WRAP-29 | Setup list and scrollbar work; Options wraps bottom to top. | Open in RC1. Candidate clamps Options/Interface/Audio endpoints; seven focused checks, target pending. Check arrows, W/S, wheel, Tab and reverse with focus/scroll. |
-| Effects default | Owner requests 75%; saved overrides and other defaults preserved. | Candidate defaults Effects at 75%; eight focused checks. Next-package fresh settings and override persistence pending. |
-| CHAR-CONFIRM-BORDER-29 | Go back and Choose have OK-style borders. | Owner rates both 5/5 in RC1; fixed for those two controls. Preserve regression; other menus separate. |
+| Effects default | Maintainer requests 75%; saved overrides and other defaults preserved. | Candidate defaults Effects at 75%; eight focused checks. Next-package fresh settings and override persistence pending. |
+| CHAR-CONFIRM-BORDER-29 | Go back and Choose have OK-style borders. | Maintainer rates both 5/5 in RC1; fixed for those two controls. Preserve regression; other menus separate. |
 
 ## Hands and combat
 
 | Issue/request | RC1 report | State and next evidence |
 | --- | --- | --- |
 | HAND-PUNCH-COVERAGE-29 | Fists substantially improved; camera-near forearm shows background/open coverage at maximum extension. Race/sex/frame not identified by screenshot. | Open. Inspect exact packaged punch and adjacent frames, both arms, viewport/FOV/near plane, winding/interpolation/clipping. All 20 inspected encoded models are closed at maximum extension; actual-C projection exposes a near-plane cross-section. Simple offsets and plane reduction did not solve it. A later diagnostic viewmodel-only camera-depth scale closes the sampled maximum-extension gap without deforming geometry; depth-bias and world-entity controls, full pose coverage and native acceptance remain pending. Any repair remains explicit and separately tested. |
-| Alternating attacks | Owner requests bare-knuckle right/left/right/left. | Not in RC1; current source samples one 10-frame punch. Inspect owned animation catalogue and define fallback; do not claim original behavior from request. Forearm coverage first. |
-| FPV action pipeline | Owner requests adjustable preview/conversion pipeline retaining immutable RC1 input with per-action/frame offsets. | Not an RC1 editor. Produce repeatable full-viewport previews/contact sheets for idle/draw/lower/full punch; measure selected model/cache and render cost. Framing change is not topology repair. |
+| Alternating attacks | Maintainer requests bare-knuckle right/left/right/left. | Not in RC1; current source samples one 10-frame punch. Inspect owned animation catalogue and define fallback; do not claim original behavior from request. Forearm coverage first. |
+| FPV action pipeline | Maintainer requests adjustable preview/conversion pipeline retaining immutable RC1 input with per-action/frame offsets. | Not an RC1 editor. Produce repeatable full-viewport previews/contact sheets for idle/draw/lower/full punch; measure selected model/cache and render cost. Framing change is not topology repair. |
 | `dbg combattest` | Isolated attack inspection requested. | Next candidate uses finite 4096-unit empty gallery floor/current hands; four focused Docker checks. Native room entry passed but hands failed due to DEBUG-GALLERY-TIMING-29. Does not repair forearm or add combo. |
-| Scoped positive | Latest tested movement had no observed blinking; held-torch NPC response is “pretty okay” on tested route. | Preserve as scoped owner observations. Paw/grip, broad race coverage, punch and Census static NPC light remain open. |
+| Scoped positive | Latest tested movement had no observed blinking; held-torch NPC response is “pretty okay” on tested route. | Preserve as scoped maintainer observations. Paw/grip, broad race coverage, punch and Census static NPC light remain open. |
 
 ## Torch and local light
 
 | Issue/request | RC1 report | State and next evidence |
 | --- | --- | --- |
-| Flame style | Owner prefers brightbase type 2 and requests 2 or 3 as new default. | RC1 style query/control exists; next candidate defaults 2, saved preference retained. Verify fresh/saved settings on target. |
-| Sparks | Owner did not see type 3 sparks/embers. | Extra spark pass is player-only; not owner-accepted. Full viewport fixed-pose/time type 1/2/3 off/on, player/guard distinction pending. |
+| Flame style | Maintainer prefers brightbase type 2 and requests 2 or 3 as new default. | RC1 style query/control exists; next candidate defaults 2, saved preference retained. Verify fresh/saved settings on target. |
+| Sparks | Maintainer did not see type 3 sparks/embers. | Extra spark pass is player-only; not maintainer-accepted. Full viewport fixed-pose/time type 1/2/3 off/on, player/guard distinction pending. |
 | Surface reach/strength | Stronger near ground/walls, farther forward/around player and NPC torch holders requested. Indoor torch is twice described as more useful than outdoors. | Keep radius, light strength, flame appearance and admitted-light count distinct. Candidate 0.7 normalized strength is not photometric/daylight equivalence. Matched indoor/outdoor surfaces/NPC, falloff and cost pending. |
 | TORCH-FUEL-29 | RC1 torch is drawn but does not consume fuel/burn out. | Open design; source duration and zero/negative semantics unknown. Compact changed-item state proposal only; no implementation/fixed release. Verify equip/off/relight/burnout/save-load/area transitions and memory. |
 | `dbg torchtest` | Absolutely dark isolated surface room with optional NPC and exact state-preserving return requested. | Candidate zero-lightmap enclosure/standing collision and seven focused checks; native entry/return observed, but invalid hand timing blocks torch-on, and dim gray floor leaves absolute darkness open. Full state-return acceptance pending. Not in RC1. |

@@ -114,6 +114,105 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(result['unimplemented_instructions'], 1)
 
 
+class Cpu68060Tests(unittest.TestCase):
+    """--cpu 68060 (docs/68060.md, ENGINE-060-FSCC-41): the 68060's unimplemented set, in the objdump
+    spelling of this SDK (registers without %)."""
+
+    def kind(self, mnemonic, operands=''):
+        return check.trap_kind(mnemonic, operands, '68060')
+
+    def test_fpu_conditionals_trap(self):
+        for m in ('fsgt', 'fsne', 'fseq', 'fslt', 'fsugt', 'fsngle', 'fsst', 'fssf', 'fsogl'):
+            self.assertEqual(self.kind(m, 'd0'), 'fscc', m)
+        self.assertEqual(self.kind('fdbne', 'd1,0x40'), 'fdbcc')
+        for m in ('ftrapne', 'ftrapnew', 'ftrapeql'):
+            self.assertEqual(self.kind(m, '#1'), 'ftrapcc', m)
+        # arithmetic with an s (single) prefix, and other fs... mnemonics, are not FScc
+        for m, ops in (('fsnegx', '%fp0,%fp1'), ('fsaddx', '%fp1,%fp0'), ('fsglmulx', '%fp1,%fp0'),
+                       ('fsgldivx', '%fp1,%fp0'), ('fsqrtx', '%fp0'), ('fsubx', '%fp1,%fp0'), ('fsave', 'sp@-'),
+                       ('fsmoves', 'd0,%fp0'), ('fsabsx', '%fp0')):
+            self.assertIsNone(self.kind(m, ops), m)
+
+    def test_fint_runs_on_the_68060_only(self):
+        self.assertIsNone(self.kind('fintrzx', '%fp0,%fp1'))
+        self.assertIsNone(self.kind('fintx', '%fp0,%fp1'))
+        self.assertEqual(check.trap_kind('fintrzx', '%fp0,%fp1', '68040'), 'fpu')
+        for m in ('fsinx', 'fmovecrx', 'fetoxx', 'fmodx', 'fgetexpx', 'fscalex'):
+            self.assertEqual(self.kind(m, '%fp0,%fp1'), 'fpu', m)
+        self.assertEqual(self.kind('fmovep', '%fp0,a0@'), 'fpu')
+
+    def test_effective_address_forms(self):
+        self.assertEqual(self.kind('fmovemx', 'a0@,d1'), 'fmovem-dynamic')
+        self.assertEqual(self.kind('fmovemx', '%d0,%a0@'), 'fmovem-dynamic')
+        self.assertIsNone(self.kind('fmovemx', '%fp0-%fp2,sp@-'))
+        self.assertIsNone(self.kind('fmovemx', 'sp@+,%fp2'))
+        self.assertEqual(self.kind('fmoveml', '#0,fpsr/fpcr'), 'fmovem-control-immediate')
+        self.assertIsNone(self.kind('fmovel', '#0,fpcr'))
+        self.assertEqual(self.kind('fmovex', '#0x3fff0000800000000000,%fp0'), 'fpu-immediate')
+        self.assertIsNone(self.kind('fmoves', '#0x3f800000,%fp0'))
+        self.assertIsNone(self.kind('fmoved', '#0x3ff0000000000000,%fp0'))
+
+    def test_integer_instructions(self):
+        self.assertEqual(self.kind('mulsl', 'd1,d2,d0'), 'mul64')
+        self.assertEqual(self.kind('mulul', '#-858993459,d0,d1'), 'mul64')
+        self.assertIsNone(self.kind('mulsl', 'd1,d0'))
+        # commas inside an indexed operand are not operand separators
+        self.assertIsNone(self.kind('mulsl', 'a0@(0,d0:l:4),d1'))
+        self.assertEqual(self.kind('divsl', 'd1,d2,d0'), 'div64')
+        self.assertEqual(self.kind('divul', 'd3,d1,d0'), 'div64')
+        self.assertIsNone(self.kind('divsll', 'd1,d2,d0'))
+        self.assertIsNone(self.kind('divull', 'd1,d0,d0'))
+        for m, kind in (('movepw', 'movep'), ('movepl', 'movep'), ('chk2l', 'chk2'), ('cmp2b', 'cmp2'),
+                        ('cas2w', 'cas2')):
+            self.assertEqual(self.kind(m, 'd0,a0@(2)'), kind, m)
+        self.assertIsNone(check.trap_kind('mulsl', 'd1,d2,d0', '68040'))
+        self.assertIsNone(self.kind('movel', 'd0,d1'))
+
+    def test_operands_split_at_top_level(self):
+        self.assertEqual(check.operands_of('a0@(0,d0:l:4),d1'), ['a0@(0,d0:l:4)', 'd1'])
+        self.assertEqual(check.operands_of(' d1,d2,d0 '), ['d1', 'd2', 'd0'])
+        self.assertEqual(check.operands_of(''), [])
+
+    def test_check_reports_kinds_per_function_and_fails_on_engine_traps(self):
+        disassembly = dis(
+            '   10:\tf240 0012      \tfsgt d0',
+            '   14:\t4c01 0c02      \tmulsl d1,d2,d0',
+            '   18:\t0d0a 0073      \tmovepw a2@(115),d6',
+            '  108:\tf200 0083      \tfintrzx %fp0,%fp1')
+        result = check.check(disassembly, MAP, {'allowed': []}, '68060')
+        self.assertFalse(result['passed'])
+        self.assertEqual(result['cpu'], '68060')
+        self.assertEqual(result['trap_kinds'], {'fscc': 1, 'movep': 1, 'mul64': 1})
+        row = result['functions_by_kind']['R_RotateBmodel']
+        self.assertEqual(row['kinds'], {'fscc': 1, 'movep': 1, 'mul64': 1})
+        self.assertTrue(row['engine'])
+        self.assertEqual(result['unimplemented_instructions'], 2)   # movep: decoded data, not counted
+        self.assertEqual([r['function'] for r in result['engine_failures']], ['R_RotateBmodel'])
+        # the same binary in 68040 mode: FINTRZ fails, the rest runs in hardware
+        result = check.check(disassembly, MAP, {'allowed': []})
+        self.assertEqual([r['function'] for r in result['engine_failures']], ['AW_Print'])
+        self.assertNotIn('trap_kinds', result)
+
+    def test_decoded_data_alone_passes(self):
+        result = check.check(dis('   18:\t0d0a 0073      \tmovepw a2@(115),d6'), MAP, {'allowed': []}, '68060')
+        self.assertTrue(result['passed'])
+        self.assertEqual(result['trap_kinds'], {'movep': 1})
+
+    def test_68060_allowlist_is_justified(self):
+        self.assertEqual(check.allowlist_path('68060').name, 'fpu-unimplemented-allowlist-68060.json')
+        self.assertEqual(check.allowlist_path('68040'), check.ALLOWLIST)
+        data = json.loads(check.ALLOWLIST_68060.read_text(encoding='utf-8'))
+        names = [row['function'] for row in data['allowed']]
+        self.assertEqual(len(names), len(set(names)))
+        for row in data['allowed']:
+            self.assertEqual(set(row), {'function', 'callers', 'why'})
+            self.assertGreater(len(row['why']), 30, row['function'])
+        # engine code itself is never allowlisted: only C library and libgcc functions
+        for name in names:
+            self.assertFalse(name[:1].isupper() or name.startswith(('AW_', 'R_', 'D_', 'CHIM_')), name)
+        self.assertNotIn('cexp', names)
+
+
 class RepositoryTests(unittest.TestCase):
     def test_allowlist_is_justified_line_by_line(self):
         data = json.loads(check.ALLOWLIST.read_text(encoding='utf-8'))

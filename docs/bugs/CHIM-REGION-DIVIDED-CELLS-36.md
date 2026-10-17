@@ -9,7 +9,7 @@
 | Where | tools/chim/regions.py preflight (one frame replaces one open-world map) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev2, v0.0.36-dev3, v0.0.36-dev4 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: 454 of 724 converted cells refused; measured: only 148 finished land cells are truly divided, the rest came from an over-counted map list |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

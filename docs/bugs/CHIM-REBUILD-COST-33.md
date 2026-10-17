@@ -9,7 +9,7 @@
 | Where | CHIM frame-world rebuild per chunk crossing (engine) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: Each crossing rebuilds the whole frame world: 95-184 ms in a cycle-exact run, a visible hitch. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -39,7 +39,7 @@
 ## Status: 9 October 2026
 
 Fixed in source on v0.0.33-chim-engine (839b36e; dev1 memory defaults 0d8bf4f), not shipped at the time of
-writing. Measured in FS-UAE with the JIT; the cycle-exact measurement is pending (deferred by the owner).
+writing. Measured in FS-UAE with the JIT; the cycle-exact measurement is pending (deferred by the maintainer).
 Found by the second CHIM engine slice (terrain in the world tree).
 
 ## Symptom

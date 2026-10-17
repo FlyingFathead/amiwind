@@ -9,7 +9,7 @@
 | Where | tools/collision_bsp.py compile_standing (terrain, CHIM models, legacy converter) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: A player box sinks up to 3 units into the ground; the CHIM validation of the 270-frame region build failed after 45 minutes |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

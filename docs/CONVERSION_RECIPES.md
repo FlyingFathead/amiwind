@@ -10,7 +10,7 @@ The repair candidate is Temple-only; the wider interior audit is read-only.
 
 For the consolidated Balmora problem/cause/implications/resolution reference,
 see [Balmora conversion lessons](BALMORA_CONVERSION_LESSONS.md). Its RC1 checklist
-link tracks the owner reports and remaining native acceptance gates.
+link tracks the maintainer reports and remaining native acceptance gates.
 
 AmiWind is a host conversion pipeline plus an Amiga runtime. The goal is to
 repeat a documented build from user-provided inputs, not to repair each scene

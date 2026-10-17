@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 4 October 2026, in v0.0.28 |
 | Where | Converted interiors (local light sources) |
 | Reproduction | always |

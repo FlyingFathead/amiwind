@@ -9,7 +9,7 @@
 | Where | engine/aga/src/aw_arena.c, aw_scene.c, chim/chim_world.c (bounded strncpy copies inlined at -O2) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | low: compiler warnings in the experimental -O2 build only; the copies were already bounded and terminated |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

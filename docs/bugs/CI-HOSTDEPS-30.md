@@ -9,7 +9,7 @@
 | Where | host CI job host-launcher-parity (tools/prepare_scenery.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.30 (last seen) |
+| Persists in | fixed in v0.0.30 |
 | Severity | medium: Hosted CI job failed on the first v0.0.30 push; game unaffected, fixed before tagging. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | v0.0.30 |

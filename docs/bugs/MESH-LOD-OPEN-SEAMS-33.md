@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.32 |
 | Where | Silt Strider (siltstrider.nif) in Balmora and Seyda Neen; static_lod.reduce_mesh |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32, v0.0.33 (last seen) |
+| Persists in | fixed in v0.0.34 |
 | Severity | medium: Visible holes in a landmark model in two towns; no crash, other reduced models to be audited |
 | Family | Mesh converter geometry (`converter-geometry`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -36,18 +36,18 @@
 
 ## Status: 10 October 2026
 
-Fixed in source for v0.0.34; not shipped yet, owner playtest pending. v0.0.32 and v0.0.33 ship the
-open hull: v0.0.33 kept the v0.0.32 strider profile by owner decision because the full-detail repair
+Fixed in source for v0.0.34; not shipped yet, maintainer playtest pending. v0.0.32 and v0.0.33 ship the
+open hull: v0.0.33 kept the v0.0.32 strider profile by project decision because the full-detail repair
 (variant E below) did not fit CHIM Balmora's memory ([CHIM-STRIDER-RING-33](CHIM-STRIDER-RING-33.md)),
 and the release notes listed it as a known issue. It is not a regression: the repair and its seam
-audit stayed on their own branch and never reached the v0.0.33 release line. The owner saw the open
+audit stayed on their own branch and never reached the v0.0.33 release line. The maintainer saw the open
 hull again in v0.0.33 (Balmora, global -21760 -19334 380, looking up at the strider).
 
 ## Symptom
 
-The owner, playing CHIM Preview 1 in Balmora (global -21618 -19058 336, looking up at the Silt
+The maintainer, playing CHIM Preview 1 in Balmora (global -21618 -19058 336, looking up at the Silt
 Strider, compass 032, pitch -57): the strider has an "open hull design"; the shell looks ribbed and
-the sky shows through gaps between its plates. The model should be closed. The owner then reported
+the sky shows through gaps between its plates. The model should be closed. The maintainer then reported
 the same at the Seyda Neen strider.
 
 ## Where
@@ -91,7 +91,7 @@ CHIM converters actually compose.
 
 ## Reproduction
 
-Measured on the owner's data (private receipts): source 5,600 visible triangles; ratio 0.5 gives 3,057
+Measured on the maintainer's data (private receipts): source 5,600 visible triangles; ratio 0.5 gives 3,057
 triangles, 3,266 BSP faces (the shipped Balmora maps carry exactly this: bm019 reference 41523, 3,266
 faces, the same surface area). Sky-through test, 16 views around and below the model, one-sided
 rendering: 8.8 % of the pixels where the source is solid show sky with the shipped reduction, 0 % at
@@ -115,7 +115,7 @@ GEO-01 rule) stays selectable (DON'T DELETE ANY METHOD).
 
 The strider's shared profile (one object, `a_siltstrider`, in all nine caravan towns: Seyda Neen,
 Balmora, Vivec, Suran, Molag Mar, Ald-ruhn, Maar Gan, Gnisis, Khuul) keeps the shell, arms and legs
-unreduced and reduces only the claws, boundary-locked. Owner direction: the strider is a solid object;
+unreduced and reduces only the claws, boundary-locked. Maintainer direction: the strider is a solid object;
 0 % sky-through at the 16 views. Variants measured (same views; bm011 rebuilt from the v0.0.32 cache;
 heap = the map heap estimate of bm011):
 
@@ -148,14 +148,14 @@ The seam audit measured each mesh with the scenery group's profile alone, while 
 (legacy `import_town` and the CHIM model builder) put `town_regions.visual_profile` over it. Both now
 read one function, `town_regions.town_model_profile`, and the audit measures that composition as well
 as the group profile alone (the Seyda Neen scenery path), so every converter path the builder uses,
-CHIM included, is gated. Island-wide run with the owner's data: no failure above 2 % beyond the known
+CHIM included, is gated. Island-wide run with the maintainer's data: no failure above 2 % beyond the known
 findings.
 
 ## Verification
 
-- Headless OpenMW 0.48 at the owner's pose (static camera, eye 396): the shell is closed.
+- Headless OpenMW 0.48 at the maintainer's pose (static camera, eye 396): the shell is closed.
 - FS-UAE, fresh copies of CHIM Preview 1 from the sealed ZIP: the shipped CHIM and legacy Balmora
-  maps and the Seyda Neen maps reproduce the owner's frame (gaps); a control rebuild of bm011 with the
+  maps and the Seyda Neen maps reproduce the maintainer's frame (gaps); a control rebuild of bm011 with the
   shipped profile reproduces them; rebuilds with A2/C, D and E at the same pose close them (headlamp
   off and on pairs, private receipts).
 - Unit tests (synthetic): two curved open plates sharing a rim keep every rim vertex and the seam,
@@ -164,11 +164,11 @@ findings.
   the strider profile keeps shell, arms and legs; the converter and the estimates share
   `reduce_for_profile`; the seam metric finds the torn seam of the old reducer and none for the locked
   one; the gate fails on a new torn mesh and on any tear of a mesh that must stay closed. With the
-  owner's data, the builder's `seam-audit` stage measures the real strider in every build: it is listed
+  maintainer's data, the builder's `seam-audit` stage measures the real strider in every build: it is listed
   under "closed" in `config/seam-audit-known.json`, so any torn seam or rim (or a build that does not
   measure it) fails the build. The first audit: strider 0 % torn (the old profile: 4.8 %).
 - Not yet: the CHIM Balmora world and the Seyda Neen region maps are not rebuilt here (Seyda's are
-  recorded maps, BUILD-SEYDA-REGEN-30; they change when Seyda Neen is rebuilt); owner playtest.
+  recorded maps, BUILD-SEYDA-REGEN-30; they change when Seyda Neen is rebuilt); maintainer playtest.
 
 ## Prevention
 

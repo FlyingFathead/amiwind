@@ -63,7 +63,7 @@ No OpenMW implementation source is copied into AmiWind's Amiga runtime.
 
 ## Reported regression and required evidence
 
-The owner reports repeated title music and small snaps/glitches in v0.0.10.
+The maintainer reports repeated title music and small snaps/glitches in v0.0.10.
 That release contains 18 files, including two byte-identical title copies. Its
 exploration list incorrectly includes their canonical title entry. Removing it
 addresses menu/exploration separation. Subsequent native investigation found
@@ -95,7 +95,7 @@ For the first Fargoth/guard milestone, see [NPC and greeting behaviour](OPENMW_R
 
 ## Intermittent clicks: recovered WinUAE report
 
-Owner still hears occasional clicks/pops in v0.0.15-dev1. Local FS-UAE final
+Maintainer still hears occasional clicks/pops in v0.0.15-dev1. Local FS-UAE final
 3D route logged 2 late mixer updates / 9,325 missed frames, plus startup warmup;
 read_errors=0 and one synchronous source fill. No matched WinUAE audio capture
 is available, so these counters do not identify every reported click.
@@ -120,7 +120,7 @@ Also distinguish host/UAE output-buffer underruns from emulated-side misses.
 The current OST source queue has four 8,192-frame stereo blocks (64 KiB),
 with the same 4 KiB refill slices. The shared mixer schedule, DMA buffer,
 speech and guard voices are unchanged. Host suites and matching Amiga
-compiles pass. The owner initially rated the current WinUAE opening-session
+compiles pass. The maintainer initially rated the current WinUAE opening-session
 audio 5/5, then immediately reported remaining audible trouble, mostly at
 load-ins and in heavy scenes. That qualification supersedes the initial verdict.
 Publication proceeds with this known issue; further audio investigation is

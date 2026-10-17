@@ -5,10 +5,10 @@ step are in [CHIM lighting](LIGHTING.md). Progress per cell is in the [cell trac
 only missing criterion is light shows as "awaiting lighting" (zebra) and turns solid green when its lighting audit
 says lit.
 
-Priority (owner, 9 October 2026): the open world goes in first. Lighting work that would slow the world conversion
+Priority (maintainer, 9 October 2026): the open world goes in first. Lighting work that would slow the world conversion
 waits; the builds and bakes of steps 3 to 9 are queued until then.
 
-The builder option is `--chim-lighting-type`, default `hybrid` (owner decision, 9 October 2026):
+The builder option is `--chim-lighting-type`, default `hybrid` (project decision, 9 October 2026):
 
 | Type | What it does | State |
 | --- | --- | --- |
@@ -39,7 +39,7 @@ The reserved types are refused with a message that says why.
 
 - **Balmora's ring room** (milestone 8, CHIM-BALMORA-LIGHT-ROOM-33): any stored light needs room made in Balmora's ring.
   The options are a smaller hysteresis or draw distance in Balmora, lighter house models, or a larger CHIM zone.
-  Pending with the owner. The first slice is built on Seyda Neen and one open-world ring until then.
+  Pending with the maintainer. The first slice is built on Seyda Neen and one open-world ring until then.
 - **The increased-memory version** (milestones 7 and later): whether and when `baked-e` and `full` get a build with
   a larger CHIM zone. Pending.
 

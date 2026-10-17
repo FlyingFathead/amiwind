@@ -32,11 +32,13 @@
 
 <!-- contents end -->
 
-**Last updated:** 9 October 2026. **FAQ revision:** 7.
-**Latest release:** v0.0.33 - Towards CHIM: Replacing the Engine Block, the first
-release on the CHIM world streamer engine ([release notes](RELEASE-v0.0.33.md)).
-**Next:** the animation kit for all character types, Vivec on CHIM and the CHIM open
-world. See the [roadmap](ROADMAP.md) and [tracker](BUGS.md).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026). FAQ revision 10._
+
+**Latest release:** v0.0.41 - More Fixes, Fewer Planes (A Telvanni Root Story), the first
+regional CHIM release: 723 cells of Vvardenfell on the CHIM engine ([release notes](RELEASE-v0.0.41.md)).
+**Next (v0.0.42):** faster and more precise build tools, all of Vivec's interiors and creatures in
+interiors, then the remaining cells by weight. See the [v0.0.42 plan](PLAN-v0.0.42.md), the
+[roadmap](ROADMAP.md) and the [tracker](BUGS.md).
 
 ## What is possible on the Amiga?
 
@@ -235,10 +237,11 @@ still needs its own measurements and validation.
 
 ## Can today's heavily upgraded Amigas realistically run AmiWind?
 
-**Yes: the specifications and current CPU/FPU support provide a credible
-hardware path, especially an A1200 with PiStorm32 Lite and a Pi 4 or CM4.**
-This is a feasibility assessment from the hardware and source, with an actual
-AmiWind hardware run still needed to establish compatibility and frame rates.
+**Yes, on paper: their specifications and CPU/FPU support make them a credible
+path, especially an A1200 with a PiStorm32 Lite and a Pi 4 or CM4.** This
+assessment comes from the hardware documentation and the source code. A real
+AmiWind run on such a machine is still needed to confirm compatibility and
+frame rates.
 
 These are concrete configurations that retain Commodore AGA, checked against
 project and builder documentation reviewed on **6 October 2026**:
@@ -373,10 +376,27 @@ contains CyberGraphX/RTG paths. Their presence does not establish a validated
 PiStorm/RTG release. The documented configuration and supplied startup checks
 still target AGA, and the current renderer uses software drawing.
 
+Picasso96 and CyberGraphX, the two common graphics card systems on the Amiga,
+are nearly compatible: Picasso96 also provides the CyberGraphX programming
+interface, so one RTG display path can serve both. The renderer already draws
+each frame into an 8-bit chunky buffer (one byte per pixel). An 8-bit chunky RTG screen can take that buffer as it is,
+without the chunky-to-planar conversion that AGA needs; the inherited video
+code has such a direct CyberGraphX path. The emulators' virtual graphics card
+(UAEgfx, in WinUAE and FS-UAE, with the Picasso96 software installed on the
+emulated Amiga) makes that path testable without a real card.
+
+Today the screen is not what limits a frame: the 3D work is. On a slow
+accelerator most of a frame goes into drawing the scene, above all the
+placed models, before any picture reaches the screen (see
+[where a slow frame goes](performance/SLOW-FRAME-BREAKDOWN.md)). An RTG screen
+would save the conversion step, but the large gains have to come from the 3D
+work first.
+
 More CPU power or another display backend can expand the available budget.
 Loading, memory use and gameplay systems still need their own work. AGA remains
 a deliberate part of the project's identity while these additional avenues
-can be investigated.
+can be investigated. For how another PC role-playing game port fares on
+PiStorm, Vampire and 68060 hardware, see [Comparisons](COMPARISONS.md).
 
 ## Is this a Ship of Theseus question about what counts as an Amiga?
 
@@ -404,11 +424,11 @@ It gave the project a practical foundation for software rendering and Amiga
 integration, so development could concentrate on bringing over Morrowind's
 world and building the conversion pipeline and runtime changes it needs.
 
-The AGA runtime incorporates **id Software's Quake through the AmiQuake
-lineage**, modified, extended and adapted for AmiWind. The conversion tools
-prepare the original game data on the host; the Amiga runtime consumes the
-converted output. OpenMW is a reference for formats and behaviour, and its
-engine is not linked into the current Amiga program. See
+The Amiga runtime contains **id Software's Quake, by way of the AmiQuake
+port**, changed and extended for AmiWind. The conversion tools prepare the
+original game data on the PC, and the Amiga runtime reads the converted
+result. OpenMW serves as a reference for formats and behaviour; none of its
+engine is linked into the current Amiga program. See
 [licensing, provenance and credits](LICENSING_AND_CREDITS.md).
 
 **John Carmack ♥** And thanks to the other id Software and Quake contributors,
@@ -476,10 +496,12 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **9 October 2026**, the latest release is **v0.0.33: Towards CHIM: Replacing the
-Engine Block** (Balmora and Seyda Neen on the CHIM engine; the rest of the world is still on
-the legacy pipeline). "Release" here identifies the project's release track; AmiWind
-as a whole is still an early work in progress.
+As of **16 October 2026**, the latest release is **v0.0.41: More Fixes, Fewer Planes (A Telvanni
+Root Story)**. 723 cells of Vvardenfell run on the CHIM engine: rings 0 to 4 from the coast inwards
+plus the whole Bitter Coast and Azura's Coast regions, with Seyda Neen, Balmora, the whole city of
+Vivec, Hla Oad, Sadrith Mora and Vos. The rest of the island is still in the classic world; the
+[CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows which cell is which. "Release" here
+identifies the project's release track; AmiWind as a whole is still an early work in progress.
 
 The documented playable scope now includes:
 
@@ -503,6 +525,11 @@ The documented playable scope now includes:
   `dbg tp vivec_arena` and not yet joined to the island; its stairs, bridges and
   residents work; fires in view stay lit; a console that edits like a terminal prompt,
   with history; `dbg daynight off` holds midday (v0.0.32).
+- The CHIM engine: the world stored once and streamed from disk in small pieces, Balmora and
+  Seyda Neen first (v0.0.33); fixes to the Silt Strider and the Bitter Coast mushrooms (v0.0.34).
+- The coast converted first and inwards from there (v0.0.35, v0.0.36), the whole city of Vivec as
+  one CHIM area (v0.0.36), lava regions and Tel Uvirith (v0.0.38), rings 0 to 2 of the island in
+  full CHIM (v0.0.40), and whole regions with compact collision for the Telvanni towns (v0.0.41).
 
 World coverage and converted assets do not mean complete Morrowind gameplay.
 Full combat, quest simulation, services, schedules, conversations and the
@@ -510,8 +537,19 @@ complete inventory system remain unfinished. Wider settlements, world actors
 and interiors also need further work. Tribunal and Bloodmoon world content are
 outside the current playable scope.
 
+Speed on real hardware is the main open question. The first real-machine figure (an earlier
+build on an A4000 with a 68060 at 100 MHz) was about 0.2 frames per second, so frame cost is
+now the main engineering work; see [AmiWind on the 68060](68060.md) and the
+[comparisons](COMPARISONS.md) with other big PC games on the Amiga.
+
+Part of the answer on a 68060: the engine built for the 68040 uses instructions the 68060 leaves to its support
+library to emulate, 73,000 to 424,000 per frame at the benchmark places (measured on an emulated 68060; the time on
+a real one is an estimate, up to about 40 % of such a frame). From v0.0.42 the game disk also has a 68060 engine
+without them, started automatically on a 68060:
+[trapped instructions per frame](68060.md#trapped-instructions-per-frame).
+
 See the [current overview](../README.md),
-[v0.0.33 release notes](RELEASE-v0.0.33.md),
+[v0.0.41 release notes](RELEASE-v0.0.41.md),
 [project state](PROJECT_STATE.md) and [roadmap](ROADMAP.md) for maintained scope
 and outstanding work.
 
@@ -551,18 +589,20 @@ and leave something for whoever wants to pick up the torch next.
 
 ## Do I need my own Morrowind files? What is included in the release?
 
-**Yes. You supply your own Morrowind installation.** The tools convert its
-data locally into content the Amiga runtime can use. Compiling the engine
-alone does not require the game data. Emulator use additionally requires a
-suitable licensed Kickstart ROM. Purchase Morrowind GOTY from
+**Yes. AmiWind works from your own Morrowind installation.** The tools convert
+its data on your machine into content the Amiga runtime can use. Compiling only
+the engine needs no game data. Running the game in an emulator also needs a
+suitable licensed Kickstart ROM. Morrowind GOTY is sold on
 [GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition) or
 [Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/).
 
-The public source package includes source, tools, documentation and selected
-demonstration media. It does not distribute the original or converted game
-assets needed for play, a compiled AmiWind executable, Kickstart ROMs or
-Workbench files. Playable images containing converted game assets are private
-local build outputs. Start with the [build and setup instructions](../README.md#building-and-playing).
+The public source package holds source code, tools, documentation and a few
+demonstration screenshots and clips. It does not include the original or
+converted game assets needed for play, a compiled AmiWind executable,
+Kickstart ROMs or Workbench files. A playable image contains converted game
+assets, so it is a private build output that stays with whoever built it. The
+[build and setup instructions](../README.md#building-and-playing) are the place
+to start.
 
 ### Is AmiWind official? Do I need the game?
 
@@ -596,14 +636,14 @@ The applicable GPL version depends on the component:
 
 | Component | Licence |
 | --- | --- |
-| Selected Quake/AmiQuake AGA runtime | Distributed under GPLv2, preserving applicable original v2-or-later grants. |
+| Selected Quake/AmiQuake AGA runtime | Distributed under GPLv2; files originally granted under "v2 or later" keep that grant. |
 | AmiWind's separate AGA additions and QuakeC | GPL-2.0-or-later. |
 | AmiWind's host tools and original A500 runtime | GPL-3.0-only. |
 
-Copyright remains with the respective contributors and rights holders.
+Copyright stays with the respective contributors and rights holders.
 Original and converted game assets, music, voices, ROMs and Workbench files
-retain their own licensing; the code's GPL terms do not grant redistribution
-rights to them. See [LICENSE](../LICENSE), the
+keep their own licences; the GPL that covers the code gives no right to share
+them. More detail is in [LICENSE](../LICENSE), the
 [AGA runtime licence](../engine/aga/COPYING) and
 [licensing and credits](LICENSING_AND_CREDITS.md).
 

@@ -181,15 +181,25 @@ def connected_components(v,f):
 
 HOLE_AREA=32.  # uncovered square units that make a flat collision piece authored plates (STAIRS-EBONHEART-CHIM-36)
 
-def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False):
+UNDERSIDE_DEPTH=1.  # a convex piece reaching more than this below an authored downward surface of its own closes space
+UNDERSIDE_NZ=-.69    # downward-facing: a surface a player can stand under (the walkable normal, mirrored)
+UNDERSIDE_ABOVE=.25  # and solid just above it: the surface is the underside of something (not a top wound downward)
+
+def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False,underside=None,underside_split=False):
  """Convex proxies of a collision mesh: each connected component, split at its median while the convex hull
  closes source surface deeper than tolerance. plates: a list to collect the positions of authored plates that
  replace a piece (they need exact standing bevels); with it, a flat component whose hull covers more than
  HOLE_AREA square units its triangles do not (a wall plate around an arch or a door: the hull fills the opening,
  STAIRS-EBONHEART-CHIM-36) becomes the authored plates of its triangles, and with fill_plates (meshes with stairs)
  a piece that still closes more than tolerance when it cannot be split further does too (three triangles over a
- flight whose hull invents a 67-degree face, VIVEC-TEMPLE-STAIRS-33). Without plates: the convex proxies only."""
+ flight whose hull invents a 67-degree face, VIVEC-TEMPLE-STAIRS-33). With underside (a depth, UNDERSIDE_DEPTH: the
+ CHIM model builder) a piece whose hull passes through an authored downward-facing surface of the mesh and reaches
+ more than that depth below it (the underside of a slab a walkway runs under, whichever piece the slab is in)
+ becomes the authored plates of its triangles: the convex proxy closed the space under it (CHIM-VOS-TEMPLE-WALKWAY-41; the general rule that replaces the name list
+ of town_regions.UNDERPASS_NAMES); with underside_split such a piece is split further first and only a piece that
+ cannot be split becomes plates. Without plates: the convex proxies only."""
  results=[];tris=v[f[:,:3],:3]*.25
+ ceilings=_ceiling_samples(tris) if underside and plates is not None else None
  def as_plates(ids):
   for piece in shell_collision_parts(v,f[np.array(ids,int)]):
    plates.append(len(results));results.append(piece)
@@ -217,9 +227,41 @@ def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False):
    split(np.array(ids)[order[:mid]],depth+1);split(np.array(ids)[order[mid:]],depth+1);return
   if error>tolerance and fill_plates and plates is not None and len(ids)<=4 and _invents_steep_face(hull,tris[ids]):
    as_plates(ids);return
+  if ceilings is not None and len(ceilings) and _closes_under_ceiling(hull,ceilings,underside):
+   # underside_split: split first, as for any closed space (smaller convex pieces cost less memory than plates:
+   # on every exterior mesh plates at once add 15 % standing clipnodes, split first 3.6 %); the authored plates
+   # only for a piece that cannot be split further
+   if underside_split and len(ids)>4 and depth<8:
+    axis=np.argmax(np.ptp(samples,axis=0));order=np.argsort(samples[:,axis]);mid=len(order)//2
+    split(np.array(ids)[order[:mid]],depth+1);split(np.array(ids)[order[mid:]],depth+1);return
+   as_plates(ids);return
   results.append((p,hull,ids,error))
  for ids in connected_components(v,f):split(ids,0)
  return results
+
+def _ceiling_samples(t):
+ """Sample points of every downward-facing triangle of a mesh (normal z at most UNDERSIDE_NZ): its centre and the
+ points halfway to each corner."""
+ n=np.cross(t[:,1]-t[:,0],t[:,2]-t[:,0]);a=np.linalg.norm(n,axis=1);ok=a>1e-9
+ nz=np.zeros(len(t));nz[ok]=n[ok,2]/a[ok]
+ down=t[ok&(nz<=UNDERSIDE_NZ)]
+ if not len(down):return np.zeros((0,3))
+ c=down.mean(axis=1)
+ return np.concatenate([c]+[(c+down[:,k])/2 for k in range(3)])
+
+def _closes_under_ceiling(hull,samples,depth=UNDERSIDE_DEPTH):
+ """True when the convex hull passes through an authored downward-facing surface (SAMPLES, _ceiling_samples of the
+ whole mesh): a sample point UNDERSIDE_ABOVE up (inside the solid the surface is the underside of) and DEPTH down
+ (the space under it) both lie inside the hull. The piece then fills more than DEPTH of the space the visible mesh
+ leaves open under that surface (CHIM-VOS-TEMPLE-WALKWAY-41). A piece that only touches a ceiling from below (a
+ column under a slab) or a top face wound the wrong way (open air above it) is not caught."""
+ lo,hi=hull.min_bound,hull.max_bound
+ near=samples[(samples[:,0]>lo[0])&(samples[:,0]<hi[0])&(samples[:,1]>lo[1])&(samples[:,1]<hi[1])
+              &(samples[:,2]-depth>lo[2])&(samples[:,2]+UNDERSIDE_ABOVE<hi[2])]
+ if not len(near):return False
+ def inside(q):
+  return ((q@hull.equations[:,:3].T+hull.equations[:,3])<-1e-6).all(axis=1)
+ return bool((inside(near-np.array([0.,0.,depth]))&inside(near+np.array([0.,0.,UNDERSIDE_ABOVE]))).any())
 
 def _invents_steep_face(hull,t):
  """True when the hull has an upward face too steep to stand on (but not a wall) that no source triangle lies
@@ -287,6 +329,17 @@ def collision_pieces(v,f,profile,stairs=None):
     return shell,frozenset(_plate_positions(shell)),'stairs: '+cut
    return shell,exact,('stairs: '+cut) if cut else None
   return shell,True,'stairs: exact bevels on the authored plates of a mesh with stairs'+('; '+cut if cut else '')
+ whole=profile.get('underside_whole')
+ if whole:
+  # the underside rule for the whole mesh (AMIWIND_COLLISION_UNDERSIDE whole): when any plain convex piece passes
+  # through an authored downward-facing surface and fills more than WHOLE units under it, the mesh keeps all its
+  # authored collision surfaces with exact bevels, as the name list did for the Velothi temples
+  samples=_ceiling_samples(v[f[:,:3],:3]*.25)
+  if len(samples) and any(_closes_under_ceiling(hull,samples,whole) for _,hull,_,_ in
+                          collision_parts(v,f,profile.get('collision_tolerance',2))):
+   shell,toes=plate_toes(v,f,shell_collision_parts(v,f),mode)
+   return shell,True,('authored collision surfaces: a convex piece fills more than %g units under an authored '
+                      'ceiling' % whole)+(f'; {toes} steep toes cut to vertical steps' if toes else '')
  limit=profile.get('surface_collision_beyond')
  if limit is not None:
   # measured on the plain convex proxies: the plates below would hide the deep fill this test is for (the Vivec
@@ -298,7 +351,9 @@ def collision_pieces(v,f,profile,stairs=None):
                       f'{fill:.2f} units > {limit} step height'+(f'; {toes} steep toes cut to vertical steps' if toes else ''))
  plates=[]
  # the fill test of the stair rule only on meshes with stairs (mode on): every other mesh keeps its convex proxies
- pieces=collision_parts(v,f,profile.get('collision_tolerance',2),plates=plates,fill_plates=mode!='off' and bool(len(stair_treads(v,f))))
+ treads=mode!='off' and bool(len(stair_treads(v,f)))
+ pieces=collision_parts(v,f,profile.get('collision_tolerance',2),plates=plates,fill_plates=treads,
+                        underside=profile.get('underside_plates'),underside_split=bool(profile.get('underside_split')))
  own=[pieces[k] for k in plates]
  notes=[f'authored plates where the convex proxy filled open space ({len(own)} plates)'] if own else []
  stair_plates=frozenset()

@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Third-person player body and equipment |
 | Reproduction | unknown |
@@ -16,7 +16,7 @@
 | From commit | source c2eaa5a, engine c2eaa5a, CHIM world c2eaa5a |
 | CHIM engine version | CHIM 0.2.0, engine c2eaa5a, world format unknown |
 | Unknown because | World format not transcribed into this report. |
-| Platform or emulator | unknown (Owner did not specify emulator.) |
+| Platform or emulator | unknown (Maintainer did not specify emulator.) |
 
 <!-- END GENERATED FACTS -->
 
@@ -32,14 +32,14 @@
 - [Verification](#verification)
 - [Prevention](#prevention)
 - [Exact RC1 evidence, 13 October 2026](#exact-rc1-evidence-13-october-2026)
-- [Scoped owner posture control, 13 October 2026](#scoped-owner-posture-control-13-october-2026)
+- [Scoped maintainer posture control, 13 October 2026](#scoped-maintainer-posture-control-13-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
 
 ## Symptom
 
-Owner reports no fists-up pose or weapon unsheathing animation on the third-person player body. Exact weapon and race are not yet identified.
+Maintainer reports no fists-up pose or weapon unsheathing animation on the third-person player body. Exact weapon and race are not yet identified.
 
 ## Where
 
@@ -68,10 +68,10 @@ camera or NPC animation checks do not establish player equipment behavior.
 
 ## Reproduction
 
-The owner confirms F is the default sheathe/unsheathe key. Test F with fists
+The maintainer confirms F is the default sheathe/unsheathe key. Test F with fists
 and a weapon equipped, then compare the third-person pose and transition.
 
-Repeat the owner scenario above in dev2, recording race, equipment, view changes,
+Repeat the maintainer scenario above in dev2, recording race, equipment, view changes,
 idle and movement. Independent native reproduction remains pending.
 
 ## Repair
@@ -113,7 +113,7 @@ Malformed, incomplete, overlapping or unbound grid data disables the overlay.
 No runtime skeletal evaluation is introduced. The guard retains its original
 left-clavicle mask and 8/21-frame timing. The RC1 source passed Amiga compilation on 13 October 2026;
 target costs remain unverified. Punch overlays, armed-weapon variants and torch attachment remain
-unfinished; this source candidate does not close the owner report.
+unfinished; this source candidate does not close the maintainer report.
 
 ## Verification
 
@@ -152,9 +152,9 @@ third-person ready/lower, movement, jump and camera changes. This is one
 appearance and scene; matched original-game views, all-appearance motion,
 loaded memory and performance acceptance remain separate.
 
-## Scoped owner posture control, 13 October 2026
+## Scoped maintainer posture control, 13 October 2026
 
-The owner explicitly confirms that the RC1 fight-ready posture is good and must be preserved. This is a scoped posture control; torch holding, leg shape, fast gait and punch acceptance remain separate. Preserve the existing fight-ready silhouette and posture while changing action grids, leg geometry or movement playback. Bare-hand posture approval does not close the broader original weapon/equipment issue.
+The maintainer explicitly confirms that the RC1 fight-ready posture is good and must be preserved. This is a scoped posture control; torch holding, leg shape, fast gait and punch acceptance remain separate. Preserve the existing fight-ready silhouette and posture while changing action grids, leg geometry or movement playback. Bare-hand posture approval does not close the broader original weapon/equipment issue.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

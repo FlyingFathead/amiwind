@@ -18,7 +18,7 @@ atomically, so builds can share the folder.
 
 The builder sets AMIWIND_PASS_CACHE to WORKSPACE/cache/image-passes for
 development (-devN) builds, and for release candidates and finals only with
---allow-release-reuse (owner decision 9 October 2026: the from-scratch reference
+--allow-release-reuse (project decision 9 October 2026: the from-scratch reference
 build runs separately on the same commit and its payload is compared file by file
 before the release), so a release build that failed late in the image step resumes from
 the maps it had finished (BUILD-IMAGE-NO-RESUME-33); otherwise they run every pass on
@@ -48,7 +48,7 @@ def folder():
 
 def setting(version, workspace, allow_release_reuse=False, release_reuse=None):
     """The builder's value for ENV: the workspace cache for development (-devN)
-    versions; for release candidates and finals only with --allow-release-reuse (owner
+    versions; for release candidates and finals only with --allow-release-reuse (maintainer
     decision 9 October 2026: the same rule as the world terrain and media caches, the
     from-scratch reference build runs separately on the same commit and its payload is
     compared file by file before the release; every pass records its hits and misses in

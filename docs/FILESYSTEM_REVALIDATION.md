@@ -2,7 +2,7 @@
 
 ## Confirmed cause
 
-The owner reported `Error validating AMIWIND / Block 1146049281 out of range`.
+The maintainer reported `Error validating AMIWIND / Block 1146049281 out of range`.
 The decimal block value is `0x444f5301`, the DOS1 filesystem marker. The shipped
 v0.0.11-dev2 HDF had that value at root-block longword -4 (byte 496), despite
 being a legacy FFS/DOS1 volume. This is a defect in our image-building pipeline.
@@ -26,7 +26,7 @@ The paired native experiment is the decisive evidence for this particular image.
 4. The bad copy remains bitmap-invalid; the corrected copy is marked valid by
    the native filesystem after revalidation. No ROM/controller change is needed.
 
-We do not know what originally dirtied the owner's image. An interrupted write
+We do not know what originally dirtied the maintainer's image. An interrupted write
 is one possibility, not an established cause. Re-extracting a clean archive
 hides the latent field defect until validation is needed again.
 

@@ -40,7 +40,7 @@ shows 1,522 uncovered near-plane cross-section pixels at pitch0 and 2,641 at
 pitch-39 in the diagnostic camera. The encoded mesh is closed. Small view-local
 offsets did not eliminate the gap; lowering the near plane from5 to3.25 worsened
 coverage, so neither is accepted as a repair. These measurements use a synthetic
-camera, not an identified match to the owner's screenshot. Native confirmation
+camera, not an identified match to the maintainer's screenshot. Native confirmation
 and a scoped repair remain pending; no first fixed version is assigned.
 
 ## RC1 maximum-extension hand audit: 2026-10-06T14:46:55+00:00
@@ -55,7 +55,7 @@ At frame25 the standard five-unit near plane intersects 20 triangles in each
 of six sampled appearances. The alias clipper trims triangles without creating
 a cross-section cap. Camera/near-plane exposure is therefore a leading hypothesis
 for the reported see-through forearm, not yet a proven visible cause or repair.
-The owner's screenshot still does not identify an exact race, sex or frame.
+The maintainer's screenshot still does not identify an exact race, sex or frame.
 
 Next compare actual renderer coverage at idle, adjacent and maximum poses using
 small view-relative placement changes. Preserve hand proportions, torch grip and
@@ -124,7 +124,7 @@ explicit; count one accepted attack per input and avoid switching sides midway
 through a punch or a cell handoff. This is an animation requirement, not a claim
 of implemented combat damage or combo rules.
 
-The owner further localizes HAND-PUNCH-COVERAGE-29 to **maximum arm extension**.
+The maintainer further localizes HAND-PUNCH-COVERAGE-29 to **maximum arm extension**.
 Inspect that pose and adjacent/interpolated frames on both arms. Fix visible
 forearm coverage before accepting the new sequence. Preserve race/sex appearance,
 held-item behavior and a bounded selected-model working set; measure any extra
@@ -171,12 +171,12 @@ The compile-time sprite path uses the existing animation frame state, avoiding
 the hand-model cache load. The 3D source asset remains on disk. Some sampled
 draw/lower/punch poses move fully offscreen; those empty baked frames are recorded
 in the report and need animation/framing refinement. This prototype is not a
-complete fix for the owner's disappearance report.
+complete fix for the maintainer's disappearance report.
 
 First-person drawing now occurs after world fog; 3D hand ambient has a minimum
 brightness floor. This prevents the world fog pass from obscuring the overlay,
 but it does not prove the original flicker cause or eliminate all model/texture
-issues. Native screenshots still warrant owner comparison. Sprite lighting is
+issues. Native screenshots still warrant maintainer comparison. Sprite lighting is
 a fixed neutral bake and does not yet follow the dim interior.
 
 ## Coverage gate before adopting sprites generally

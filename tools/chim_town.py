@@ -404,7 +404,7 @@ def seyda_activated_check(data_files, maps, models, region_names):
 
 def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_index=None, town_scene_report=None,
                   jobs=None):
-    """Seyda Neen on CHIM with no legacy region maps (owner order 2026-10-11: "we can't have that kind of a
+    """Seyda Neen on CHIM with no legacy region maps (maintainer order 2026-10-11: "we can't have that kind of a
     workflow, first builds it, then throws them away"). The legacy chain compiled the complete converted town
     into 64 region maps and two special scenes, passed them through the image's flora, harvest and grounding
     passes, made the CHIM frame maps from their entities and deleted them. Here the same entities come from the

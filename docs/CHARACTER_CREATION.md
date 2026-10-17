@@ -6,7 +6,7 @@ remains the behavioral target. Numeric journal indices, globals and inventory
 counts are distinct from the intro UI stage; no universal linear quest enum.
 NPCs retain individual local state and timers. A general script/condition
 interpreter and full dialogue-topic state remain future work.
-The owner chose maintenance first on 28 September 2026, then this work. Keep
+The maintainer chose maintenance first on 28 September 2026, then this work. Keep
 [the intermittent freezes](BUGS.md) open throughout implementation and testing.
 
 <!-- contents start -->
@@ -202,7 +202,7 @@ owned collision NIF. Raw extracts and fingerprints accompany private evidence.
 
 ## Class mechanics reference checklist
 
-Owner-supplied UESP Classes text is linked in REFERENCES.md. The existing
+User-supplied UESP Classes text is linked in REFERENCES.md. The existing
 starting-stat builder uses the owned RACE/CLAS/SKIL records: two favored
 attributes gain 10; skills start at 5, with an additional 25 for major or 10 for
 minor, then race bonuses and 5 for matching specialization. Preserve the
@@ -280,6 +280,6 @@ Missing components requested on 5 October 2026:
   minor skills, validation and saved-character representation before claiming
   support. Preset class selection is not custom-class creation.
 
-The owner confirmed appearance/head rotation and class selection work in the
+The maintainer confirmed appearance/head rotation and class selection work in the
 preceding target build. That observation does not verify the new V2 controls,
 class artwork or custom-class functionality.

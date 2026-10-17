@@ -3,6 +3,7 @@
 <!-- contents start -->
 ## Contents
 
+- [Clouds missing in v0.0.40 and v0.0.41 (17 October 2026)](#clouds-missing-in-v0040-and-v0041-17-october-2026)
 - [RC1 Seyda Neen brightness discontinuity: cause isolated](#rc1-seyda-neen-brightness-discontinuity-cause-isolated)
 - [v0.0.29 sky follow-up](#v0029-sky-follow-up)
 - [Native playtest blockers and preview — 4 October 2026](#native-playtest-blockers-and-preview--4-october-2026)
@@ -29,18 +30,40 @@
 - [Recovered sky fallback and guard-torch request](#recovered-sky-fallback-and-guard-torch-request)
 - [Earlier shared sky and regional environment review — 4 October 2026](#earlier-shared-sky-and-regional-environment-review--4-october-2026)
   - [Source references](#source-references)
-  - [Owner-authorized reference audit: visual target without asset redistribution — 4 October 2026, 02:41 EEST](#owner-authorized-reference-audit-visual-target-without-asset-redistribution--4-october-2026-0241-eest)
+  - [Maintainer-authorized reference audit: visual target without asset redistribution — 4 October 2026, 02:41 EEST](#maintainer-authorized-reference-audit-visual-target-without-asset-redistribution--4-october-2026-0241-eest)
 - [Protected sunrise and sunset baseline for v0.0.29](#protected-sunrise-and-sunset-baseline-for-v0029)
 - [Additive cloud controls: v0.0.29 development candidate](#additive-cloud-controls-v0029-development-candidate)
 - [Dev3 midnight clearing mode — source candidate, 5 October 2026](#dev3-midnight-clearing-mode--source-candidate-5-october-2026)
 
 <!-- contents end -->
 
+## Clouds missing in v0.0.40 and v0.0.41 (17 October 2026)
+
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
+Found by the maintainer while looking at test pictures: the exterior sky was one flat colour with no clouds at
+every hour. The sun, the moons, the stars and the day and night colours still worked.
+
+- **Cause:** on 15 October a wider Seyda Neen scenery area put 183 textures instead of 107 into the sample the
+  256-colour palette is picked from; 221 of the 256 colours moved. The shared cloud sky is converted only for the
+  palette it knows, so the build fell back to a flat stand-in sky and printed one warning line.
+- **Affected:** v0.0.40 and v0.0.41. v0.0.36 and v0.0.38 have the cloud sky.
+- **Repair:** the cloud sky is converted for whatever palette the build has (by nearest colour, without the
+  sky colour bank), so the v0.0.41 palette gets its clouds and nothing else is converted again; a stand-in sky
+  stops the build with a named reason instead of shipping.
+- **Speed figures:** the far-detail and slow-frame measurements of 16 and 17 October were taken on the flat-sky
+  image; they are measured again with the cloud sky.
+
+Record: [SKY-FLAT-PALETTE-DRIFT-41](bugs/SKY-FLAT-PALETTE-DRIFT-41.md).
+
+Also open since v0.0.36: window glass no longer glows at night
+([NIGHT-WINDOWS-LOST-CHIM-36](bugs/NIGHT-WINDOWS-LOST-CHIM-36.md)).
+
 ## RC1 Seyda Neen brightness discontinuity: cause isolated
 
 Recorded 2026-10-06T14:18:00+00:00; affected build v0.0.29-rc1; introducing version unknown.
 Walking between some Seyda Neen regions causes an abrupt brightness change
-without a torch. The owner did not observe it on the later open-country route.
+without a torch. The maintainer did not observe it on the later open-country route.
 The first reported bright region is **sn031**, not sn039. Retain the corrected
 identity when comparing geometry or attempting the original reproduction.
 
@@ -149,7 +172,7 @@ Console/menu pauses it. Saved time/date, player position and settings are preser
 
 ## Original night sky, Masser and Secunda — current candidate
 
-The local converter now builds one bounded atlas from the owner's original
+The local converter now builds one bounded atlas from the maintainer's original
 stars, three nebula textures and eight phase textures for each moon. The atlas
 contains a 128 by 128 indexed night field, sixteen 24 by 24 moon tiles and a
 2,048-byte star-role mask. The AWN2 file is 27,664 bytes on disk, including its
@@ -365,9 +388,9 @@ ownership checks passed. This is a scoped native pass, not all-map, unrestricted
 world, or physical-hardware certification. The minimum logged peak clearance
 was 1,812,304 bytes at sn012, 284,848 bytes below the unchanged 2 MiB safety
 reference. That remains a reserve warning; the production memory gate did not
-pass. Intermittent music artifacts remain an owner-deferred known issue, and no
+pass. Intermittent music artifacts remain a maintainer-deferred known issue, and no
 clean-audio pass is claimed. Stable v0.0.28 is accepted locally within this
-scope; hosted CI, tag and public publication remain pending the owner's Linux
+scope; hosted CI, tag and public publication remain pending the maintainer's Linux
 publication step.
 
 The image009 and `f19...` results below are explicitly historical V1 evidence.
@@ -954,7 +977,7 @@ or forced quest advancement. Presentation reads the existing single saved clock.
    as the player turns. Quantize phase/azimuth and test seams/banding at the
    target palette. This is a painted lighting impression, not atmospheric scattering.
 
-**Secondary mood reference:** the owner prefers vivid red/orange sunrise and
+**Secondary mood reference:** the maintainer prefers vivid red/orange sunrise and
 sunset and cool contrasting night associated with Skyrim. Keep the Morrowind sky
 and weather as the primary source reference; use this color direction only as a
 visual target. It creates no Skyrim asset dependency, and no Skyrim art or data
@@ -1073,7 +1096,7 @@ such test was run for this documentation update.
 - [`r_sky.c`](../engine/aga/src/r_sky.c), [`aw_sky.h`](../engine/aga/src/aw_sky.h), [`d_sky.c`](../engine/aga/src/d_sky.c), [`d_edge.c`](../engine/aga/src/d_edge.c) and [`r_misc.c`](../engine/aga/src/r_misc.c) — local runtime implementation.
 - [Commodore-Amiga Hardware Reference Manual: moving playfields](https://amigadev.elowar.com/read/ADCD_2.1/Hardware_Manual_guide/node0086.html), [horizontal scrolling](https://amigadev.elowar.com/read/ADCD_2.1/Hardware_Manual_guide/node0088.html), and [DMA/display tradeoffs](https://amigadev.elowar.com/read/ADCD_2.1/Hardware_Manual_guide/node012B.html) — hardware reference, used here for constraints rather than a claim about current backend acceleration.
 - [id Software Quake `WinQuake/r_sky.c`](https://github.com/id-Software/Quake/blob/master/WinQuake/r_sky.c) — primary-source precedent for two-layer indexed sky composition and view-dependent span sampling.
-### Owner-authorized reference audit: visual target without asset redistribution — 4 October 2026, 02:41 EEST
+### Maintainer-authorized reference audit: visual target without asset redistribution — 4 October 2026, 02:41 EEST
 
 A read-only reference audit confirms that the original night look is layered: the
 star/nebula fields are separate from the atmosphere and moving cloud layers, with
@@ -1096,7 +1119,7 @@ not contain their game art.
 
 ## Protected sunrise and sunset baseline for v0.0.29
 
-The owner explicitly likes the v0.0.28 sunrise/sunset clouds and asks that they
+The maintainer explicitly likes the v0.0.28 sunrise/sunset clouds and asks that they
 remain unchanged, or change as little as possible. Preserve classic dawn, dusk,
 golden-hour and twilight cloud appearance as the visual baseline. Night-coverage
 changes must stay outside those protected windows and pass byte-identity

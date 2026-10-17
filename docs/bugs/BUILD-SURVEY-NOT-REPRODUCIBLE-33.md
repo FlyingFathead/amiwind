@@ -9,7 +9,7 @@
 | Where | World survey (tools/survey_vvardenfell.py summary.seconds; Vvardenfell-atlas.html) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-rc1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: A world-survey stage that runs again never matches its earlier outputs, so every stage depending on it is refused reuse. |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.33-rc1 builds rc1b and rc1c |

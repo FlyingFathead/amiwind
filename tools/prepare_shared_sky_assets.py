@@ -75,11 +75,29 @@ def prepare_staged_sky(id1,data_files,work_dir,*,shared_sky_source=None,local_sk
         path.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8');return with_night(report)
     from ui_palette import legacy_bank_or_none
     legacy=legacy_bank_or_none(data_files) if digest(palette)!=overlay.EXPECTED_PALETTE else None
-    if not overlay.approved(palette.read_bytes(),legacy):return fallback('Unsupported original palette fingerprint; no reservation/reindex performed')
+    approved=overlay.approved(palette.read_bytes(),legacy)
     if not data_files:return fallback('No owned data files supplied; no cloud artwork or vivid palette asserted')
     try:clouds=owned_clouds(data_files)
     except (FileNotFoundError,KeyError,OSError,ValueError) as exc:return fallback(str(exc))
     if work.exists():raise ValueError('Sky preparation work directory exists; preserve it and use fresh output')
+    if not approved:
+        # Palette-matched method (SKY-FLAT-PALETTE-DRIFT-41): any other palette gets the owned clouds too,
+        # converted by colour against the build's own palette. No sky colour bank is reserved, so no other
+        # staged file changes (no texture or map reconversion); the runtime tables find the twilight colours
+        # by nearest colour (R_SkyNearest) instead of the bank's exact entries.
+        work.mkdir(parents=True)
+        raw,new_report=build_cloud_sky(clouds[0][0],palette.read_bytes(),secondary=clouds[1][0])
+        validate_sky(raw)
+        output=work/'owned-cloud-sky.lmp';output.write_bytes(raw)
+        report={'status':'prepared_owned_clouds_palette_matched','method':'palette-matched','vivid_sky':'palette-matched (no sky colour bank)',
+                'shared_sky_source':str(output),'palette_sha256':digest(palette),'sky_sha256':hashlib.sha256(raw).hexdigest(),
+                'sources':[r for _,r in clouds],'cloud_conversion':new_report,'changed_files':0,
+                'why':'the palette is not the one the sky colour bank is made for (fingerprint '+overlay.EXPECTED_PALETTE+')',
+                'runtime_colour_mapping_required':True,'native_acceptance':False}
+        print('Shared sky: owned clouds converted against the palette of this build (palette-matched method; no sky colour bank, no other file changed).',flush=True)
+        report=with_night(report)
+        (work/'sky-asset-preparation.json').write_text(json.dumps(report,indent=2)+chr(10),encoding='utf-8',newline=chr(10))
+        return report
     # Hard format errors stop before any staged mutation. Overlay contains only
     # changed files; every original is backed up before installing a changed file.
     record=overlay.convert(id1,work/'changed-overlay',digest(palette),changed_only=True)

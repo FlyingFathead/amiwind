@@ -9,7 +9,7 @@
 | Where | engine/aga/src/chim/chim_statics.c Place |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: A Host_Error during activation left zone blocks locked and the next map load hit Sys_Error |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

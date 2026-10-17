@@ -1,0 +1,19 @@
+AWCM1
+# Public camera marks: dbg cam recall NAME (docs/CAMERA_MARKS.md). One mark per line:
+# name|place|position|yaw pitch|time|headlamp|fog|note
+# place "global": position X Y [Z] in original Morrowind coordinates, travelled to as dbg tp X Y [Z];
+# place = a map name: position X Y Z in that map's local units, the camera exactly there (noclip).
+# time HHMM (the clock held there) or -; headlamp on/off/-; fog = fog/draw distance 100..4096 or -.
+# The ten emulator benchmark cameras (docs/HARDWARE-BENCHMARK.md "Frame time in the game"):
+bm1|global|-20088 -14638|113 -3|1200|off|540|Balmora 1 (benchmark camera)
+bm2|global|-20970 -16963|45 0|1200|off|540|Balmora 2 (benchmark camera)
+bm3|global|-21800 -12300|90 0|1200|off|540|Balmora 3 (benchmark camera)
+bm4|global|-19000 -11000|225 0|1200|off|540|Balmora 4 (benchmark camera)
+bm5|global|-20500 -9500|270 0|1200|off|540|Balmora 5 (benchmark camera)
+sn1|global|-11264 -71680|90 0|1200|off|540|Seyda Neen 1 (benchmark camera)
+sn2|global|-11548 -71200|180 0|1200|off|540|Seyda Neen 2 (benchmark camera)
+sn3|global|-10474 -73437|45 0|1200|off|540|Seyda Neen 3 (benchmark camera)
+sn4|global|-10920 -75120|0 0|1200|off|540|Seyda Neen 4 (benchmark camera)
+sn5|global|-12200 -72500|60 0|1200|off|540|Seyda Neen 5 (benchmark camera)
+# Bug-evidence spots:
+vivec-palace|vpi015|0 -64.7 -83.9|90 0|1200|off|-|Palace of Vivec, Vivec meditating: the pose of the original-game comparison (MiniWind vivec-palace)

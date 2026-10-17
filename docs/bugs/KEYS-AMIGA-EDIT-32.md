@@ -9,7 +9,7 @@
 | Where | engine raw-key table (keys.c) and FS-UAE presets: Del, Home, End |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev1 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | medium: Delete never worked and Home or End did nothing in FS-UAE; present in every earlier version. |
 | Family | Console, keyboard and mouse input (`console-input`) |
 
@@ -86,7 +86,7 @@ Family: Console, keyboard and mouse input (`console-input`). The console line ed
 - AW25-04 (no report page): M/N switched to the desktop, including while typing in the console
 - AW25-05 (no report page): Console typed only uppercase letters and shifted digits
 - CONSOLE-CAPS-29 (no report page): FS-UAE F10 Caps Lock appears stuck
-- [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the owner's FS-UAE (Ubuntu)
+- [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the maintainer's FS-UAE (Ubuntu)
 - [CONSOLE-HISTORY-EMPTY-32](CONSOLE-HISTORY-EMPTY-32.md): Console Up past the oldest command shows an empty line and stays there
 - CONSOLE-WHEEL-29 (no report page): FS-UAE console wheel starts working then reports unbound
 - [ENGINE-CBUF-OVERFLOW-35](ENGINE-CBUF-OVERFLOW-35.md): Command text larger than the command buffer or a line over 1023 characters overflowed

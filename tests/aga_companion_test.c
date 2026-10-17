@@ -171,7 +171,7 @@ int main(void){
     p->v.origin[0]+=150;step_cost=60;
     {int s0=steps;tick(12);assert(steps-s0==2);}
     step_cost=3;assert(gap(spawned,p)<64);
-    /* stuck responses per actor kind (owner decision): a follower in the
+    /* stuck responses per actor kind (project decision): a follower in the
      * player's view waits; once out of view it is placed behind the player */
     p->v.angles[1]=180;                                 /* looking back at it */
     p->v.origin[0]+=150;step_cost=60;console[0]=0;

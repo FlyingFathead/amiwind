@@ -9,7 +9,7 @@
 | Where | Interior lightmap bake (converter, tools/interior_lighting.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31-dev (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | medium: Lightmaps off by one sample row or column: patchy, misplaced light. |
 | Family | Mesh converter geometry (`converter-geometry`) |
 

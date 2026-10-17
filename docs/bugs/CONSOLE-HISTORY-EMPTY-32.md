@@ -9,7 +9,7 @@
 | Where | Console history (keys.c Key_Console, console.c) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev1 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | low: Up past the oldest command shows an empty line; looks like Up does nothing. |
 | Family | Console, keyboard and mouse input (`console-input`) |
 | Playtest version | v0.0.32-dev1 |
@@ -91,7 +91,7 @@ Family: Console, keyboard and mouse input (`console-input`). The console line ed
 - AW25-04 (no report page): M/N switched to the desktop, including while typing in the console
 - AW25-05 (no report page): Console typed only uppercase letters and shifted digits
 - CONSOLE-CAPS-29 (no report page): FS-UAE F10 Caps Lock appears stuck
-- [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the owner's FS-UAE (Ubuntu)
+- [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the maintainer's FS-UAE (Ubuntu)
 - CONSOLE-WHEEL-29 (no report page): FS-UAE console wheel starts working then reports unbound
 - [ENGINE-CBUF-OVERFLOW-35](ENGINE-CBUF-OVERFLOW-35.md): Command text larger than the command buffer or a line over 1023 characters overflowed
 - [ENGINE-COM-TOKEN-UNBOUNDED-35](ENGINE-COM-TOKEN-UNBOUNDED-35.md): COM_Parse wrote tokens of any length into the 1 KiB com_token

@@ -48,7 +48,9 @@ LARGE_TEXT = {"docs/bugs/bugs.json": 1048576, "docs/BUGS.md": 1048576, "docs/chi
               "amiwind-toolkit/chim-inclusion.json": 1048576, "amiwind-toolkit/chim-inclusion.js": 1048576}
 # Whitespace baselines (docs/PATCH-v<version>.json) list every file of the published base release and
 # grow with the repository (RELEASE-PATCH-SIZE-33).
-LARGE_TEXT_PATTERNS = ((re.compile(r"docs/PATCH-v[0-9][0-9A-Za-z.-]*[.]json"), 1048576),)
+# The known-good stair records (tools/stair_records.py, one entry per CHIM frame) grow with the CHIM world.
+LARGE_TEXT_PATTERNS = ((re.compile(r"docs/PATCH-v[0-9][0-9A-Za-z.-]*[.]json"), 1048576),
+                       (re.compile(r"config/stair-records/[0-9A-Za-z._-]+[.]json"), 1048576))
 
 
 def text_limit(name):
@@ -110,8 +112,8 @@ DOCUMENTATION_SOURCE_GRAPHICS = {"docs/images/amiwind-shared-sky-build-compariso
 # Performance charts written by tools/perf_charts.py from measured numbers.
 DOCUMENTATION_SOURCE_GRAPHICS.update(f"docs/images/amiwind-perf-{name}.svg" for name in ("visibility-by-map", "faces-world-vs-funcwall", "seyda-crossing-load"))
 # Project-authored bounded command metadata, required by the runtime dispatcher.
-DEBUG_CATALOGUES = {"config/debug-commands.txt", "config/shroompicker.txt"}
-# Plain-text world tables shipped to id1/world/ (owner-editable, no game data).
+DEBUG_CATALOGUES = {"config/debug-commands.txt", "config/shroompicker.txt", "config/camera-marks.txt"}
+# Plain-text world tables shipped to id1/world/ (maintainer-editable, no game data).
 WORLD_TABLES = {"config/fog-locations.txt"}
 # Project-authored CHIM texture effect definitions: plain-text .chimfx files of the public effects library
 # (docs/chim/TEXTURE_EFFECTS.md); no game data.

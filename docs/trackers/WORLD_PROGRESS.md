@@ -27,7 +27,7 @@ Tick any combination in the layer bar:
 - **Content missing:** outline where original placements are not placed.
 - **Interiors:** interior entrances in the cell and how many are converted.
 - **Named places:** cells with a named place ([POI checklist](POI.md)).
-- **Owner checked:** cells walked and accepted in a playtest
+- **Maintainer checked:** cells walked and accepted in a playtest
   ([`checked.json`](checked.json), edited by hand).
 - **Cell grid.**
 
@@ -59,7 +59,7 @@ polygon-count heatmap layer.
 A first estimate of every map the whole island would need, with every object
 placed, against AmiWind's limits (heap budget, faces, texture mappings,
 collision nodes, brush models per map, entities, flames, lamps, coordinate
-range). It was made from the owner's own data with an estimator calibrated on
+range). It was made from the maintainer's own data with an estimator calibrated on
 1,102 converted maps and checked on 30 new conversions (heap error about 1 %
 median; pass or fail agreed on all 28 maps it could check). A public builder
 command to make the same estimate from your own Morrowind files is in

@@ -5,7 +5,7 @@
 ## PERSISTING: reported 2 times; something has to be done
 
 - Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Original room records and exact package/HDF mapping verified; Ordinator is Dark Elf, not Wood Elf/Fargoth. Actual screenshot actor identity still pending click-to-pin inspection.
-- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Native owner-pose view repeats foreground elf/background armored actor; coarse bounds choose background Ord201385. Original/package identities agree; foreground reference remains unbound.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Native maintainer-pose view repeats foreground elf/background armored actor; coarse bounds choose background Ord201385. Original/package identities agree; foreground reference remains unbound.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -13,25 +13,25 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 13 October 2026, in v0.0.39-rc1 |
 | Where | Vivec, Hlaalu Waistworks; local115,97,-73, heading031, pitch24 |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.39-rc1 (last seen) |
-| Severity | high: Visible RC1 player/NPC presentation failure reported by the owner. |
+| Severity | high: Visible RC1 player/NPC presentation failure reported by the maintainer. |
 | Family | Actors and NPCs (`actors-npc`) |
 | Playtest version | v0.0.39-rc1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
-| Unknown because | Owner named RC1; the exact running image and binary were not independently read back for this report. |
+| Unknown because | Maintainer named RC1; the exact running image and binary were not independently read back for this report. |
 | Platform or emulator | unknown (Emulator not restated for this specific observation.) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
 
-The targeted actor is labelled Ordinator but appears unhelmeted, pointed-eared and brown/red-clothed. The owner compares the appearance to Fargoth. Exact actor/model identity is not yet established; no intentional placeholder is claimed.
+The targeted actor is labelled Ordinator but appears unhelmeted, pointed-eared and brown/red-clothed. The maintainer compares the appearance to Fargoth. Exact actor/model identity is not yet established; no intentional placeholder is claimed.
 
 ## Where
 
@@ -52,12 +52,12 @@ Enter Hlaalu Waistworks at the recorded pose; identify the targeted Ordinator fr
 
 ## Repair
 
-No repaired package or owner acceptance is claimed. Preserve the report while
+No repaired package or maintainer acceptance is claimed. Preserve the report while
 investigating the exact RC1 payload and producing an isolated RC2 candidate.
 
 ## Verification
 
-Owner report recorded. Exact running binary is not independently bound by a HUD
+Maintainer report recorded. Exact running binary is not independently bound by a HUD
 version string. Candidate tests and matched original/native captures remain separate.
 
 ## Prevention
@@ -65,7 +65,7 @@ version string. Candidate tests and matched original/native captures remain sepa
 Check the actual extracted package, original identity and normal-speed animation
 in addition to model/layout budgets. Preserve earlier working controls.
 
-## RC1 owner evidence, 13 October 2026
+## RC1 maintainer evidence, 13 October 2026
 
 The original images remain private. Rounded HUD readings are location aids,
 not exact source/package bindings or proof of motion.
@@ -80,7 +80,7 @@ The room also contains male Wood Elf Eloroth (201388, `progs/a_4e6ef22194cf.mdl`
 
 ## Native foreground and bounds-pick limit, 13 October 2026
 
-The exact-engine diagnostic with unchanged RC1 room assets reproduces the unhelmeted foreground elf and armored actor behind. The inspector selects background Ordinator217/reference201385 using the full alias quantization-domain box. Its broad other-pose bounds extend in front of the standing actor; the selected raw identity cannot therefore identify the foreground face. Nearby Eloroth is still a plausible Wood Elf explanation, but the owner screenshot is not bound to a precise visible reference. Record this as an open identity/targeting limit, not proof that the foreground elf is an Ordinator or a repaired appearance. Noclip could not be disabled at the requested pose, heading/pitch are rounded residuals, and original matched-camera evidence remains pending. See the [inspector limitation](DBG-ENTITY-INSPECT-39.md).
+The exact-engine diagnostic with unchanged RC1 room assets reproduces the unhelmeted foreground elf and armored actor behind. The inspector selects background Ordinator217/reference201385 using the full alias quantization-domain box. Its broad other-pose bounds extend in front of the standing actor; the selected raw identity cannot therefore identify the foreground face. Nearby Eloroth is still a plausible Wood Elf explanation, but the maintainer screenshot is not bound to a precise visible reference. Record this as an open identity/targeting limit, not proof that the foreground elf is an Ordinator or a repaired appearance. Noclip could not be disabled at the requested pose, heading/pitch are rounded residuals, and original matched-camera evidence remains pending. See the [inspector limitation](DBG-ENTITY-INSPECT-39.md).
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

@@ -1,0 +1,59 @@
+{
+ "content": {
+  "excluded": [],
+  "npc_gallery": true,
+  "partial_area": null
+ },
+ "drive_bytes": 5234556928,
+ "drives": [
+  {
+   "bytes": 4026564608,
+   "file": "AmiWind-v0.0.41.hdf"
+  },
+  {
+   "bytes": 1207992320,
+   "file": "AmiWind-v0.0.41-world-01.hdf"
+  }
+ ],
+ "groups": {
+  "chim-world": {
+   "bytes": 852620958,
+   "files": 20828
+  },
+  "classic-maps": {
+   "bytes": 2125313024,
+   "files": 1364
+  },
+  "music": {
+   "bytes": 56272804,
+   "files": 21
+  },
+  "npc-gallery": {
+   "bytes": 228011160,
+   "files": 7106
+  },
+  "other": {
+   "bytes": 88416626,
+   "files": 843
+  },
+  "progs": {
+   "bytes": 392777206,
+   "files": 2633
+  },
+  "sound": {
+   "bytes": 208819628,
+   "files": 7660
+  },
+  "video": {
+   "bytes": 137136474,
+   "files": 44
+  }
+ },
+ "labels": [],
+ "note": "AmiWind v0.0.41 release image (the previous release); payload totals of earlier builds, GiB: v0.0.35 4.33, v0.0.36-rc1 4.72, v0.0.41-dev2 4.33, dev3 4.17, dev4 3.91, dev5 3.60 (no NPC gallery), v0.0.41 3.81 (NPC gallery 0.21)",
+ "payload_bytes": 4089367880,
+ "run": "2026_10_16_v0.0.41_release_ce7ace6",
+ "schema": "amiwind-size-ledger-v1",
+ "status": "complete",
+ "version": "0.0.41"
+}

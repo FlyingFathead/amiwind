@@ -12,13 +12,20 @@ workspace), under the SHA-256 of exactly what the walk reads plus the walk's own
 record_sha256 is the SHA-256 of the record's canonical JSON without that field; rows_sha256 binds the rows, stored
 once next to the record where the cache kept them before (a build of an earlier commit sharing the cache still
 reads them: the walker's key did not change, so neither did its results). A record written by a run is a
-CANDIDATE. It becomes reusable only when the run that wrote it passed every gate as a build of the master builder
+CANDIDATE. It becomes reusable when the run that wrote it passed every gate as a build of the master builder
 (tools/aw_service.py runs `stair_records.py promote` after a passed build): the promotion writes a check mark next
-to the record, naming the record's SHA-256, the run, its request and the time. A later build reuses a record only
-when its mark names exactly that record; anything else (a candidate of a failed, dry or local run, a damaged
-record, a record written again since) is walked again. Every build also walks a seeded sample of the reused ones
-again and stops on any difference (stair_walk.walk_sample): that would be a key that misses one of the walk's
+to the record, naming the record's SHA-256, the run, its request and the time. A later build reuses a record by its
+mark only when the mark names exactly that record; anything else (a candidate of a failed, dry or local run, a
+damaged record, a record written again since) is walked again. Every build also walks a seeded sample of the reused
+ones again and stops on any difference (stair_walk.walk_sample): that would be a key that misses one of the walk's
 inputs. BUILD-CHIM-STAIR-WALK-UNCACHED-36.
+
+A CHIM frame's record also carries the walk's OUTCOME ('passed': no flight step the standing box cannot walk;
+'failed') and its provenance: walked_at (ISO 8601 with the zone), the AmiWind and CHIM versions, the source commit
+and the run. A passed walk is a pass (passed(), BUILD-STAIR-PASS-NOT-KEPT-41): development builds reuse it while its
+key is unchanged without a check mark, whatever the rest of the build that walked it did, so a build that fails
+late keeps every frame that passed (chim.collision.walk_reuse_rule). Release candidates and finals keep the
+check-mark rule. Records without an outcome (the legacy maps' walks, records written before) need their mark.
 
 One-time migration (`adopt`): the walks a passed master build stored in the cache's earlier form (rows only,
 before these records) become checked records without walking them again, when nothing they depend on changed:
@@ -131,13 +138,60 @@ def lookup(cache, input_sha256):
     return record, mark
 
 
-def store(cache, input_sha256, rows):
-    """Store this run's walk as a candidate record; returns what the run's report lists for the promotion."""
+ROOT = Path(__file__).resolve().parents[1]
+OUTCOMES = ('passed', 'failed')
+
+
+def _version_file(name):
+    try:
+        return (ROOT / name).read_text(encoding='utf-8').strip() or None
+    except OSError:
+        return None
+
+
+def walk_facts(outcome, environ=None):
+    """The outcome and provenance fields of a walk's record: outcome, walked_at (ISO 8601 with the zone), the CHIM
+    version (the builder's AMIWIND_RUN_CHIM_VERSION, else this tree's CHIM_VERSION) and the AmiWind version and
+    commit when the builder did not give them (this tree's VERSION, AMIWIND_SOURCE_COMMIT)."""
+    if outcome not in OUTCOMES:
+        raise ValueError('A walk outcome is one of %s, not %r' % (', '.join(OUTCOMES), outcome))
+    environ = os.environ if environ is None else environ
+    facts = run_facts(environ)
+    if not facts['version']:
+        facts['version'] = _version_file('VERSION')
+    if not facts['commit']:
+        facts['commit'] = environ.get('AMIWIND_SOURCE_COMMIT') or None
+    facts.update(outcome=outcome, walked_at=datetime.datetime.now().astimezone().isoformat(timespec='seconds'),
+                 chim_version=environ.get('AMIWIND_RUN_CHIM_VERSION') or _version_file('CHIM_VERSION'))
+    return facts
+
+
+def passed(record):
+    """True for an intact record of a walk that passed (a pass is reused while its key is unchanged); RECORD as
+    lookup() gives it (with its rows) or as stored."""
+    if not isinstance(record, dict):
+        return False
+    return intact({k: v for k, v in record.items() if k != 'rows'}) and record.get('outcome') == 'passed'
+
+
+def pass_provenance(record):
+    """'reused pass from RUN (VERSION, COMMIT, TIME)' of a passed walk's record."""
+    return 'reused pass from %s (%s, %s, %s)' % (record.get('run') or '?', record.get('version') or '?',
+                                                 record.get('commit') or '?', record.get('walked_at') or
+                                                 record.get('time') or '?')
+
+
+def store(cache, input_sha256, rows, outcome=None, derived_from=None):
+    """Store this run's walk as a record (a candidate until promoted; with an OUTCOME it carries walk_facts, and a
+    passed one is a pass); returns what the run's report lists for the promotion. DERIVED_FROM: the record a walk
+    restricted to a frame's walk area was taken from (chim.collision.derive_area_rows: its key, record SHA-256,
+    run, checked), kept in the record; nothing was walked for it."""
     full_key = cache.key(input_sha256)
     # the rows keep the walk's own key order (reports read the same with or without reuse); the SHA-256 is taken
     # over the canonical form
     rows = json.loads(json.dumps(rows, default=str))
-    record = make_record(full_key, rows, cache.sources)
+    record = make_record(full_key, rows, cache.sources, facts=walk_facts(outcome) if outcome else None,
+                         extra={'derived_from': derived_from} if derived_from else None)
     cache.store(input_sha256, {'rows': rows, 'record': record})
     return {'root': str(cache.root), 'name': cache.name, 'key': full_key, 'record_sha256': record['record_sha256']}
 
@@ -445,6 +499,144 @@ def adopt(run_dir, request, aw_result, old_source, cache_root, sample=2, dry_run
     return out
 
 
+# ---------------------------------------------------------------- known-good stair records (shipped with the source)
+#
+# The records above live in a build workspace's cache. The known-good stair records are the same walks as public
+# data in the repository (config/stair-records/*.json), so that a build from the same game data does not walk
+# again (B14, v0.0.42 plan 1.0b): one entry per CHIM frame, under the frame walk's full key (the SHA-256 of exactly
+# what the walk reads, chim.collision.frame_stair_parts plus its walk area, with the walker's code digest and the
+# stair rule: PassCache.key). An entry holds the frame's path and cell, the key, the walker digest and the rule, the
+# outcome, the counts by result, the SHA-256 of all its rows, and every flight step with its place (placement
+# reference, riser point, direction) and behaviour (result, rise, status). Hashes, references and coordinates only:
+# no game data. tools/build.py --stair-walk-cache records (the default without --developer-mode) reuses a frame
+# whose key is there; a frame whose key is not there (another converter or other game data) is reported by name
+# and walked only on request (--stair-walk-cache cached). Written by `stair_records.py export` from a full walk.
+SHIPPED_FORMAT = 'aw-stair-records-1'
+SHIPPED_FOLDER = ROOT / 'config' / 'stair-records'
+SHIPPED_ENV = 'AMIWIND_STAIR_RECORDS'      # another folder of shipped records (tests, a nightly build's own)
+NL = chr(10)
+
+
+def flight_row(row):
+    """The compact, canonical form of one flight step's row in the shipped records:
+    [reference, kind, x, y, z, direction x, direction y, rise, result, status]."""
+    detail = row.get('detail') or {}
+    point, direction = row.get('point') or (0, 0, 0), row.get('direction') or (0, 0)
+    return [str(row.get('ref')), row.get('kind'), round(float(point[0]), 3), round(float(point[1]), 3),
+            round(float(point[2]), 3), round(float(direction[0]), 4), round(float(direction[1]), 4),
+            None if row.get('rise') is None else round(float(row['rise']), 3), row.get('result'),
+            detail.get('status') or detail.get('error')]
+
+
+def flight_rows(rows):
+    """The flight steps of a walk, in walk order (the rows that can stop a build), as flight_row gives them."""
+    return [flight_row(r) for r in rows if r.get('kind') == 'step' and r.get('flight')]
+
+
+def shipped_entry(path, cell, key, walker, rule, rows, area, outcome):
+    """One frame's entry in the shipped records (see above); OUTCOME as the walk's record ('passed': no flight
+    step the standing box cannot walk); entry_sha256 binds it."""
+    if outcome not in OUTCOMES:
+        raise ValueError('A walk outcome is one of %s, not %r' % (', '.join(OUTCOMES), outcome))
+    flights = flight_rows(rows)
+    entry = {'path': path, 'cell': cell, 'key': key, 'walker': walker, 'rule': rule, 'area': area,
+             'outcome': outcome,
+             'counts': counts(rows), 'rows_sha256': sha256_of(json.loads(json.dumps(rows, default=str))),
+             'flights': flights, 'flights_sha256': sha256_of(flights)}
+    entry['entry_sha256'] = sha256_of(entry)
+    return entry
+
+
+def shipped_intact(entry):
+    if not isinstance(entry, dict) or not isinstance(entry.get('flights'), list):
+        return False
+    body = {k: v for k, v in entry.items() if k != 'entry_sha256'}
+    return entry.get('entry_sha256') == sha256_of(body) and entry.get('flights_sha256') == sha256_of(entry['flights'])
+
+
+def write_shipped(path, meta, entries):
+    """Write a shipped records file: one JSON object, one frame entry per line (diffs stay readable), UTF-8 + LF."""
+    head = dict(meta, format=SHIPPED_FORMAT, frames=len(entries))
+    lines = ['{"head": %s,' % canonical(head), ' "entries": [']
+    body = sorted(entries, key=lambda e: e['path'])
+    for i, entry in enumerate(body):
+        lines.append('  ' + canonical(entry) + (',' if i + 1 < len(body) else ''))
+    lines.append(']}')
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(NL.join(lines) + NL, encoding='utf-8', newline=NL)
+    return {'path': str(path), 'frames': len(body), 'bytes': Path(path).stat().st_size,
+            'sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest()}
+
+
+def load_shipped(folder=None):
+    """({full key: entry}, notes) of every shipped records file (SHIPPED_FOLDER, or AMIWIND_STAIR_RECORDS, or
+    FOLDER). An entry whose SHA-256 does not match is left out and named in the notes (it is never reused)."""
+    folder = Path(folder or os.environ.get(SHIPPED_ENV) or SHIPPED_FOLDER)
+    found, notes = {}, {'files': [], 'damaged': []}
+    for path in sorted(folder.glob('*.json')) if folder.is_dir() else ():
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+        except (OSError, ValueError) as exc:
+            notes['damaged'].append('%s: %s' % (path.name, exc))
+            continue
+        if not isinstance(data, dict) or (data.get('head') or {}).get('format') != SHIPPED_FORMAT:
+            notes['damaged'].append('%s: not a %s file' % (path.name, SHIPPED_FORMAT))
+            continue
+        notes['files'].append({'file': path.name, 'version': data['head'].get('version'),
+                               'commit': data['head'].get('commit'), 'frames': len(data.get('entries') or ())})
+        for entry in data.get('entries') or ():
+            if shipped_intact(entry):
+                found[entry['key']] = dict(entry, file=path.name, version=data['head'].get('version'))
+            else:
+                notes['damaged'].append('%s: %s' % (path.name, (entry or {}).get('path')))
+    return found, notes
+
+
+def shipped_rows(entry, path):
+    """The rows of a frame reused from the shipped records: its flight steps (the rows that gate a build), in walk
+    order, in the form the stair report lists them; the other rows (advisory) are counted in entry['counts']."""
+    out = []
+    for ref, kind, x, y, z, dx, dy, rise, result, status in entry['flights']:
+        try:
+            ref = int(ref)
+        except ValueError:
+            pass
+        row = {'kind': kind, 'ref': ref, 'point': [x, y, z], 'direction': [dx, dy], 'flight': True,
+               'result': result, 'map': path, 'shipped': True}
+        if rise is not None:
+            row['rise'] = rise
+        if status is not None:
+            row['detail'] = {'status': status}
+        out.append(row)
+    return out
+
+
+def shipped_provenance(entry):
+    return 'reused from the shipped records (%s, %s)' % (entry.get('version') or '?', entry.get('file') or '?')
+
+
+def export(world, cache_root, out, version, commit, run):
+    """Write the known-good stair records of the CHIM world WORLD (every frame walked into CACHE_ROOT) to OUT;
+    refuses (writes nothing) when a frame has no stored walk. Loads the walkers' key code (chim.collision)."""
+    from chim.collision import shipped_entries
+    from chim.validate import Failures, load_world
+    loaded = load_world(str(world), Failures())
+    frames, models = loaded[5], loaded[4]
+    entries, missing = shipped_entries(str(world), frames, models, str(cache_root))
+    result = {'frames': len(frames), 'entries': len(entries), 'missing': missing[:20], 'missing_count': len(missing)}
+    if missing:
+        return result
+    walkers = sorted({e['walker'] for e in entries})
+    meta = {'version': version, 'commit': commit, 'run': run, 'made': stamp(), 'walkers': walkers,
+            'rules': sorted({e['rule'] for e in entries}),
+            'note': 'known-good stair walks of the CHIM frames (hashes, references and coordinates only; no game '
+                    'data): tools/stair_records.py, docs/BUILD_PROFILE.md "Known-good stair records"'}
+    result.update(write_shipped(out, meta, entries))
+    result['flight_steps'] = sum(len(e['flights']) for e in entries)
+    result['outcomes'] = {o: sum(1 for e in entries if e['outcome'] == o) for o in OUTCOMES}
+    return result
+
+
 def pick_sample_names(names, count, seed):
     """A seeded choice of COUNT names (stair_walk.pick_sample's rule, standard library only)."""
     import random
@@ -468,7 +660,19 @@ def main(argv=None):
                                               "run's workspace cache/image-passes)")
     ad.add_argument('--sample', type=int, default=2, help='frames and maps walked again to check (default 2 each)')
     ad.add_argument('--dry-run', action='store_true', help='only report what would be adopted; walk and write nothing')
+    ex = sub.add_parser('export', help='write the known-good stair records of a CHIM world whose every frame was '
+                                       'walked into a pass cache (a full stair gate in cached mode)')
+    ex.add_argument('--world', type=Path, required=True, help='the CHIM world folder (chim-world)')
+    ex.add_argument('--cache', type=Path, required=True, help='the pass cache folder the walk stored its records in')
+    ex.add_argument('--out', type=Path, required=True, help='the records file (config/stair-records/NAME.json)')
+    ex.add_argument('--version', required=True, help='the AmiWind version of the world (e.g. 0.0.41)')
+    ex.add_argument('--commit', required=True, help='the source commit the world was built from')
+    ex.add_argument('--run', required=True, help='the build run the world comes from')
     a = p.parse_args(argv)
+    if a.command == 'export':
+        result = export(a.world, a.cache, a.out, a.version, a.commit, a.run)
+        print(json.dumps(result, sort_keys=True))
+        return 1 if result['missing'] else 0
     if a.command == 'adopt':
         cache = a.cache or (os.environ.get('AMIWIND_PASS_CACHE') or None)
         cache = Path(cache) if cache else a.from_run.resolve().parents[1] / 'cache' / 'image-passes'

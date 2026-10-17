@@ -9,7 +9,7 @@
 | Where | Image assembly: rcp6_m5, cell (6,-5), frame_ground point-hull trace |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38 (last seen) |
+| Persists in | fixed in v0.0.38 |
 | Severity | critical: Stops full release image assembly. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

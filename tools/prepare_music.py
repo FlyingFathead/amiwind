@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert an owner's complete installed Music directory to Paula stream blocks."""
+"""Convert a maintainer's complete installed Music directory to Paula stream blocks."""
 import hashlib
 import json
 from pathlib import Path

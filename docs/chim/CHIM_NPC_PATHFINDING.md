@@ -64,7 +64,7 @@ the renderer sends. Two places touch visibility:
 
 ## The ladder
 
-Each step runs only when the cheaper one failed. Owner direction, 9 October
+Each step runs only when the cheaper one failed. Maintainer direction, 9 October
 2026: start from plain Quake movement.
 
 ### 1. Quake chase with stair climbing
@@ -247,7 +247,7 @@ time on the same data; the stair rule applies to NPCs without extra work.
 
 ## Followers across doors and cells
 
-Owner question, 9 October 2026: companions following the player through a load
+Maintainer question, 9 October 2026: companions following the player through a load
 door, for example into a cave or barrow with its own entrance.
 
 ### How OpenMW does it (0.51.0 source)
@@ -283,7 +283,7 @@ Paths relative to the [OpenMW repository](https://gitlab.com/OpenMW/openmw):
   followers (`apps/openmw/mwmechanics/spelleffects.cpp`,
   `apps/openmw/mwscript/cellextensions.cpp`, `apps/openmw/mwworld/worldimp.cpp`).
 - **Tribunal and Bloodmoon.** The engine path is the same for all three
-  masters; the expansions only add more followers. Counted in the owner's
+  masters; the expansions only add more followers. Counted in the maintainer's
   masters: base actors with a follow package 70 / 16 / 14 (Morrowind /
   Tribunal / Bloodmoon), dialogue results that start one 81 / 12 / 21, scripts
   that call it 9 / 3 / 9; one escort package (Bloodmoon). A Bloodmoon barrow or
@@ -341,7 +341,7 @@ table gate), and the frame time of the arrival spawn.
 
 ### Test cases from Bloodmoon
 
-Read from the owner's `Bloodmoon.esm` (quest and record IDs only): of its
+Read from the maintainer's `Bloodmoon.esm` (quest and record IDs only): of its
 dialogue results, 21 start a follow package aimed at the player and 4 move an
 actor with a scripted `PositionCell`; none uses an escort package (one script
 does, for a guide leading the player outdoors). Three quests make good test

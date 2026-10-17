@@ -1,0 +1,21 @@
+{
+  "about": "Library functions that contain instructions the 68060 does not implement and may stay reachable from the experimental 68060-targeted engine build (--engine-cpu 68060; tools/check_fpu_unimplemented.py --cpu 68060; docs/68060.md, ENGINE-060-FSCC-41), each with the callers allowed to use it and why. GCC's 68060 code for the engine itself avoids them; these come from the C library and libgcc, which the build links from the SDK's 68040 (hard-float) set because the SDK's 68060 libraries are soft-float. On a 68060 they run through the 68060.library's emulation; how often per frame is measured, not assumed (docs/68060.md, Steps). Any other path from engine code fails the build.",
+  "allowed": [
+    {"function": "fmod", "callers": "*",
+     "why": "FMOVECR #$0F (0.0) only in the domain-error branch that makes a NaN for fmod(x, 0); valid arguments never execute it (as on the 68040)"},
+    {"function": "sqrt", "callers": "*",
+     "why": "FMOVECR #$0F only in the domain-error branch (NaN for a negative argument), as on the 68040"},
+    {"function": "sqrtf", "callers": "*",
+     "why": "FMOVECR #$0F only in the domain-error branch (NaN for a negative argument), as on the 68040"},
+    {"function": "rand", "callers": "*",
+     "why": "the C library's generator multiplies with a 64-bit MULU.L (Dh:Dl), which the 68060 emulates; called per particle and sound; count measured per frame in the emulated 68060 run"},
+    {"function": "__muldi3", "callers": "*",
+     "why": "libgcc's 64-bit integer multiply (long long, e.g. Q_strtod's digits) built for the 68020 with a 64-bit MULU.L; text parsing, not per pixel"},
+    {"function": "__udivdi3", "callers": "*",
+     "why": "libgcc's 64-bit unsigned divide built for the 68020 with 64-bit DIVU.L/MULU.L; reached through long long division in text and number conversion"},
+    {"function": "__umoddi3", "callers": "*",
+     "why": "libgcc's 64-bit unsigned remainder built for the 68020 with 64-bit DIVU.L/MULU.L; reached through long long remainders in text and number conversion"},
+    {"function": "__loadlocale", "callers": "*",
+     "why": "the C library's locale setup divides by constants with a 64-bit MULU.L; runs at start-up only"}
+  ]
+}

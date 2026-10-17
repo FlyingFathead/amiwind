@@ -21,7 +21,7 @@ and creatures. The immediate inspection tool is the character model gallery in
 time, inspect clothing and proportions, and record what converts and renders.
 Large catalogues live on disk; only the current inspection model needs residency.
 
-These are retained owner goals. Seamless loading, whole-world terrain and a
+These are retained maintainer goals. Seamless loading, whole-world terrain and a
 complete playable world are not claimed as implemented by recording them here.
 
 ## Initial character placement: no repeated floater repairs

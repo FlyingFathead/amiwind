@@ -41,7 +41,7 @@
 
 [BUILD-INVENTORY-PALETTE-41](../bugs/BUILD-INVENTORY-PALETTE-41.md) — 15 October 2026, v0.0.41 source candidate: image assembly prepares inventory before the sky palette pass, which rejected current AWIC icons and AWI2/AWST metadata as unknown images. The source repair validates each inventory format at its exact path, remaps only icon pixels and preserves metadata bytes. Scoped evidence contains 15 passing palette checks and 2 passing inventory-asset checks on matching unchanged source. Actual image assembly, native verification, packaging and shipment remain pending.
 
-[CHIM-FRAME-STATIC-SEAM-40](../bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or owner acceptance is promoted.
+[CHIM-FRAME-STATIC-SEAM-40](../bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or maintainer acceptance is promoted.
 
 [CHIM-MODEL-ARENA-RESERVE-41](../bugs/CHIM-MODEL-ARENA-RESERVE-41.md) — 15 October 2026: exact allocation and predecessor-world checks remain separately recorded. The later 941 world stopped at its ownership guard because named aprons bypassed ten existing deferred-owner dispositions. The source-only disposition repair passes 38 focused checks; fresh world, boundary/model review and native/package acceptance remain pending.
 
@@ -226,7 +226,7 @@ A cell has exactly one status. Strongest first:
 | Terrain complete | bright green | The same, except that actors (NPCs, creatures) may still be deferred |
 | Cell complete, awaiting lighting | bright green with cyan stripes, white border | Everything cell complete needs except the lighting audit; counts as done |
 | Terrain complete, awaiting lighting | bright green with cyan stripes | Everything terrain complete needs except the lighting audit; counts as done |
-| Owner-approved, Playtested | gold, teal | Set by the owner for a converted cell that passes |
+| Maintainer-approved, Playtested | gold, teal | Set by the maintainer for a converted cell that passes |
 | Passed | green | Converted and every measured audit passed, but something placed is still deferred or skipped |
 | Empty sea | blue | Terrain and water only, nothing placed; counts as done |
 | Open ocean | silver | No LAND record; explicit ocean-frame conversion is tracked separately from native placement and packaging. Never counted as land |
@@ -236,7 +236,7 @@ A cell has exactly one status. Strongest first:
 | Converted, nothing measured | light blue | Converted, no audit measured |
 | Not started | grey-blue | The conversion has not reached the cell |
 
-Precedence: cell complete, terrain complete, the two awaiting-lighting levels, owner-approved, playtested, passed, hull policy pending, failed, not converted, not started. Nonvisual markers (door, travel, north and editor markers) are not drawn and not required, so they never block a level; light emitters without a mesh do cast light, so they stay under Lights and the lighting audit judges them.
+Precedence: cell complete, terrain complete, the two awaiting-lighting levels, maintainer-approved, playtested, passed, hull policy pending, failed, not converted, not started. Nonvisual markers (door, travel, north and editor markers) are not drawn and not required, so they never block a level; light emitters without a mesh do cast light, so they stay under Lights and the lighting audit judges them.
 
 **Done** = cell complete + terrain complete + the two awaiting-lighting levels + passed + empty sea, each on its own line. The open ocean is **not** done: it is drawn silver, has its own legend row and its own totals row, and is counted apart (`ocean`, `map_cells`) until the tracker policy and exact runtime evidence establish otherwise. An island's figures count its land and empty-sea cells and keep the land-only figures beside them (land cells, land done, land percent); the headline's percent stays passed of land cells. The generated page repeats the exact definitions in its import policy section, built from the code's own constants.
 
@@ -258,7 +258,7 @@ A cell is only complete when it is lit like Morrowind. `tools/cell_lighting.py` 
 
 ## The release field and the version tracker
 
-Which cells are approved for which release is an owner decision, kept separate from the measured data:
+Which cells are approved for which release is a project decision, kept separate from the measured data:
 
 - The field is `release` (for example `v0.0.33`, `v0.0.34`) per cell, stored in `releases.json` next to the tracker data. Only `cell_progress.py release` writes it; conversion results and ingest never change it, and a re-ingest keeps it.
 - Every change is also one line in `history.jsonl` with the host-clock date and who made it.
@@ -275,7 +275,7 @@ Selectors: a cell ID `x,y`, `ring:N`, `status:BUCKET`, `eligible`, `unassigned`,
 
 ## The release plan: gold for the next release
 
-Besides the owner's approval (above), every cell can be **planned** for an upcoming release. The plan is a layer of its own: it is stored in `plan.json` next to the tracker data (format `aw-cell-plan-1`, schema 1), written only by `cell_progress.py plan` and `cell_progress.py ship`, and it never changes a cell's conversion or audit status. Conversion results and ingest do not touch it, and a re-ingest keeps it.
+Besides the maintainer's approval (above), every cell can be **planned** for an upcoming release. The plan is a layer of its own: it is stored in `plan.json` next to the tracker data (format `aw-cell-plan-1`, schema 1), written only by `cell_progress.py plan` and `cell_progress.py ship`, and it never changes a cell's conversion or audit status. Conversion results and ingest do not touch it, and a re-ingest keeps it.
 
 Each planned cell carries one open record in the tracker data (`cell.plan`):
 
@@ -357,8 +357,8 @@ All commands take `--out DIR`, the tracker folder, and are run with `python3 too
 | `ingest --out DIR [inputs...]` | Fill the records from everything that exists now: legacy progress table, metrics, census (`--data-files`), CHIM runs (`--chim-run NAME=PATH`), bugs, build ledger, area names. Idempotent |
 | `result --out DIR --file RESULT.json` | Validate and store a per-cell result file ([format](CELL_RESULT_FORMAT.md)), then ingest again |
 | `record --out DIR --mechanism ID --build NAME (--results FILE or --status S --cells "x,y ...")` | Record one audit's results from another tool |
-| `owner --out DIR --status playtested/approved --cells "x,y ..." [--note T]` | The owner's verdict on cells |
-| `release --out DIR --version V --cells SELECTORS [--clear] [--shipped] [--who W]` | The owner's release assignment, see above |
+| `owner --out DIR --status playtested/approved --cells "x,y ..." [--note T]` | The maintainer's verdict on cells |
+| `release --out DIR --version V --cells SELECTORS [--clear] [--shipped] [--who W]` | The maintainer's release assignment, see above |
 | `export --out DIR [--csv F] [--json F]` | The cells as CSV (status, audits, every numeric stat) and JSON |
 | `status --out DIR` | One line with the headline counts |
 | `render-md --out DIR [--md FILE]` | Write the generated page `docs/chim/CELL_TRACKER.md` |

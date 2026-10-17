@@ -60,6 +60,16 @@ endif
 ifneq ($(filter-out o1 o2,$(ENGINE_OPT)),)
 $(error ENGINE_OPT must be o1 or o2, not $(ENGINE_OPT))
 endif
+# ENGINE_CPU: the CPU the engine code is compiled for (docs/68060.md). 68040 (default) is the baseline:
+# -m68040 -m68881, the command line unchanged. 68060 is the experimental 68060-targeted build: GCC's
+# 68060 instruction selection with the hardware FPU (no FScc, no 64-bit MULS.L/DIVS.L, FINTRZ in
+# hardware); -m68060 alone means soft float in this SDK, and its 68060 libraries are soft-float, so it
+# links the 68040 build's hard-float libraries. The result runs on a 68060 only (FINTRZ traps on a 68040).
+ENGINE_CPU ?= 68040
+ifneq ($(filter-out 68040 68060,$(ENGINE_CPU)),)
+$(error ENGINE_CPU must be 68040 or 68060, not $(ENGINE_CPU))
+endif
+FPU_ARCH_FLAGS = $(if $(filter 68060,$(ENGINE_CPU)),-m68060 -mhard-float,-m68040 -m68881)
 ENGINE_DEFINES =
 ENGINE_ASM_SRCS =
 ifneq ($(filter spans turb,$(ENGINE_ASM)),)
@@ -105,8 +115,8 @@ OBJDIR = obj
 # Display conversion is implemented independently in aw_c2p.c.
 SRCS = \
 	amiga_stubs.c \
-	aw_debug.c aw_clock.c aw_wait.c \
-	aw_ui.c aw_excluded.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_inventory.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_npcpath.c aw_companion.c aw_combat_rules.c aw_combat.c aw_items.c aw_arena.c aw_view_rules.c aw_view.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_scene.c aw_hand_sprites.c aw_anim.c aw_animkit_rules.c aw_animkit.c aw_lava_rules.c aw_lava.c \
+	aw_debug.c aw_cam_rules.c aw_cam.c aw_clock.c aw_wait.c \
+	aw_ui.c aw_icons.c aw_excluded.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_inventory.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_npcpath.c aw_companion.c aw_combat_rules.c aw_combat.c aw_items.c aw_arena.c aw_view_rules.c aw_view.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_scene.c aw_hand_sprites.c aw_anim.c aw_animkit_rules.c aw_animkit.c aw_lava_rules.c aw_lava.c \
 	aw_spawn.c aw_scenery.c aw_region.c aw_section.c aw_mappath.c aw_gallery.c aw_stream.c \
 	aw_walk.c aw_world.c aw_bounds_rules.c aw_bounds.c aw_torch.c aw_guard_torch.c aw_lamps.c aw_remote.c aw_fog_location.c aw_hand_models.c aw_npc_lod.c \
 	aw_music.c aw_aread.c aw_log.c \
@@ -229,7 +239,7 @@ $(ALLOBJS): build/version/amiwind_version.h | $(OBJDIR)
 
 # FPU target (68040 with FPU)
 # Uses Quake III fast InvSqrt for math (2.3x faster than hardware sqrt on real 68040)
-fpu: ARCH_FLAGS = -m68040 -m68881
+fpu: ARCH_FLAGS = $(FPU_ARCH_FLAGS)
 fpu: DEFINES = -DAMIGA -DFALSE=0 -DTRUE=1 -DUSE_ASM_SPANS=0 -DUSE_FAST_RECIPROCAL=1 $(EXTRA_DEFINES)
 fpu: TARGET = build/AmiQuakeGCC
 fpu: OBJDIR = obj
@@ -285,10 +295,18 @@ build/awbench: bench/awbench.c
 	@mkdir -p build
 	$(CC) -m68020 -m68881 -O1 -Wall -s -o $@ $< -lamiga
 
+# Trap counter for the 68060 work (docs/68060.md "Counting trapped instructions"): asset-free,
+# a measurement tool only (never on a game disk).
+.PHONY: traps
+traps: build/awtraps
+build/awtraps: bench/awtraps.asm
+	@mkdir -p build
+	$(AS) -m68040 -Fhunkexe -kick1hunks -nosym -quiet -I$(NDK_INC) -o $@ $<
+
 # Clean
 clean:
 	rm -rf obj obj-nofpu
-	rm -f build/AmiQuakeGCC build/AmiQuakeGCC-NoFPU build/awbench
+	rm -f build/AmiQuakeGCC build/AmiQuakeGCC-NoFPU build/awbench build/awtraps
 	rm -f build/test_*
 	rm -f tests/*.o
 

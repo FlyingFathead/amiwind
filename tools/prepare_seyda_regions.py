@@ -304,7 +304,7 @@ def convert_builder_scene(maps, *, scene_map, palette, ericw_bin, work_dir,
     regions. Both builder stages call this, so a convert() signature change
     reaches them together (BUILD-ACTOR-CONTACT-CALL-32). With `recorded`
     (--seyda-recorded), the recorded-stage exception BUILD-SEYDA-REGEN-30
-    installs the owner's recorded maps instead (tools/recorded_stage.py).
+    installs the maintainer's recorded maps instead (tools/recorded_stage.py).
     terrain_cull=False converts without the terrain visual cull: a CHIM build
     whose Seyda Neen is a CHIM area ships none of these maps (the frame maps are
     checked against them, then they leave the image), and the canonical cull

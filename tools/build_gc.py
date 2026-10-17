@@ -21,7 +21,7 @@ several runs) is counted only when every one of its links is in the deletion set
 Dry run by default: the collector prints the list (path, kind, owner, reason, bytes freed) and
 writes it as JSON with --json. Only --delete removes anything, and only items whose decision is
 "expire" (never pinned, active or unregistered items). --item PATH limits deletion to the listed
-items (the owner approves a list; the collector deletes exactly that list).
+items (the maintainer approves a list; the collector deletes exactly that list).
 
 Registry (--registry FILE, JSON): {"items": [{"path": "...", "owner": "job", "purpose": "...",
 "state": "active"|"done", "expires": "with-job"|"never"}]}; paths absolute or relative to the root

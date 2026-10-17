@@ -11,7 +11,7 @@ Affected build: local AmiWind v0.0.27-rc3 town-handoff candidate, image-002,
 played in WinUAE using its generated rc3 configuration. The reference configuration
 has 16 MiB Fast RAM; the engine reserves an 11 MiB hunk heap (11534336 bytes).
 
-While in Jiub's opening/name-entry scene, the owner entered `dbg aw hors 0`,
+While in Jiub's opening/name-entry scene, the maintainer entered `dbg aw hors 0`,
 which normally takes the player to Seyda Neen. The game showed a brief loading
 screen and exited to AmigaDOS. WinUAE remained open. The prompt showed the
 startup “Loading AmiWind v0.0.27-rc3” text followed by `1>` without an immediate
@@ -53,7 +53,7 @@ BSP/visibility expansion and is not the established cause.
    inspecting its filesystem with host tools. Never modify/read through a second
    writable mount while the emulator owns the image.
 
-Observed by the owner and supported by the recovered fatal report. Repetition
+Observed by the maintainer and supported by the recovered fatal report. Repetition
 count and exact emulator executable revision were not separately recorded;
 therefore deterministic repetition across other configurations is not claimed.
 

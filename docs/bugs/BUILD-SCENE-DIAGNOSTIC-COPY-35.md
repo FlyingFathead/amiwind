@@ -9,7 +9,7 @@
 | Where | tools/build_cache.py read trace hook; shutil.copytree in prepare_npcs/hands/interior/intro |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: npcs, hands, interior and intro rebuilt in every reuse build although their inputs had not changed |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | 2026_10_10_v0.0.35-dev1_full-try2_901f8e9 |

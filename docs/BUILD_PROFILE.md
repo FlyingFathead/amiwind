@@ -32,6 +32,7 @@ releases).
   - [Caches of another workspace](#caches-of-another-workspace)
   - [Cache provenance](#cache-provenance)
 - [Build speed in CHIM](#build-speed-in-chim)
+  - [CHIM world conversion (v0.0.42)](#chim-world-conversion-v0042)
 - [Payload preflight](#payload-preflight)
 - [Measured release builds (v0.0.33 -> v0.0.34)](#measured-release-builds-v0033---v0034)
 
@@ -415,6 +416,33 @@ What the file holds and how it is worked out:
   from three-area runs and ran 1 h 48 min, while the progress showed 27 % and
   about 22 minutes left
   ([BUILD-PROGRESS-ETA-BASIS-36](bugs/BUILD-PROGRESS-ETA-BASIS-36.md)).
+- **The estimate follows the work while a stage runs**: a stage that counts
+  its units (its phase timer's done/total, else the last counted progress line
+  of its log, `[done/total unit] ...`) is corrected from them. The units still
+  to do at the rate measured here, plus the history time of the phases that
+  follow the current one (scaled by the work), are blended with the history
+  estimate by the square root of the share done, so the estimate moves to the
+  measured rate early and equals it when the counter is complete; once the
+  history estimate is overrun, the measured rate alone counts. A stage past its
+  history estimate with no counter takes the history of its current phase and
+  the phases after it. The units a stage counted are kept in its row
+  (`units_seen`), so the next build expects it per unit: history seconds per
+  unit times this build's units (`expected_per_unit`). Each corrected stage
+  row carries `counter` and `live` (remaining, measured, weight, seconds per
+  unit, the later phases and a `basis` sentence), the ETA basis says which
+  stages were corrected, and the builder prints one `[eta]` line every 5
+  minutes (`AMIWIND_ETA_LINE_SECONDS`, 0 = off):
+
+  ```text
+  [eta] 67.6 %, ETA 27m46s (at 12:40:00) | chim: ~27m46s left, 539/723 frames done, 6.45 s each here (log counter 'CHIM region frames'), weight 1.00 against history (5 run(s), 364 frames there, 726 here); later phases 7m59s from history
+  ```
+
+  Origin: v0.0.41-dev5's chim stage was expected at 43 minutes from history
+  (364-frame runs scaled to 726 frames, many of their frames reused from the
+  unit cache) and ran over 85; the ETA said 23 minutes left at 12:40 and still
+  25 at 13:07. Replayed with an even frame rate, the corrected ETA at 12:40 says
+  28 minutes (37 were left)
+  ([BUILD-PROGRESS-ETA-BASIS-36](bugs/BUILD-PROGRESS-ETA-BASIS-36.md)).
 - **Percent**: finished stages count their whole expected duration, a running
   stage its elapsed share (at most 95 % until it ends), pending stages nothing;
   the sum over all expected durations. Weighting by duration keeps a dozen
@@ -792,7 +820,7 @@ inputs did not, with the files that differ). Exit status 1 when anything is
 UNEXPECTED, 2 for a run made without `--reuse-from`.
 
 Release candidates and finals use the pass cache only with
-`--allow-release-reuse` (owner decision, 9 October 2026), the same rule as the
+`--allow-release-reuse` (project decision, 9 October 2026), the same rule as the
 world terrain and media caches: the from-scratch reference build runs separately
 on the same commit, and its payload is compared file by file with the release
 payload before the release; the hit counts in the optimizer, cull and stair-walk
@@ -818,14 +846,26 @@ before a release or a nightly check, not for everyday builds.
 
 Each stored walk is a record (`tools/stair_records.py`): its key, the rows and their counts by result, the walk's
 code version, the AmiWind version, the source commit, the run name, the master builder request and the host time,
-with the SHA-256 of the record itself. A record is only a candidate until the run that wrote it has passed every
-gate as a build of the master builder (`tools/aw.py`): the master builder then marks the run's records as checked
-(`stair_records.py promote --run RUN`), and only a checked record is ever reused. A record of a failed, dry or local
-run, a damaged record, or one written again since its check, is walked again. The build log and the stair report
-name every map and frame as "walked" or "reused from RUN (VERSION, COMMIT, TIME)", and the master builder's result
-counts the records it marked and how many maps and frames the build reused and walked. The CHIM stage prints one line per frame as its walk
-finishes, and runs its heap gate and zone walk (seconds) before the stair walk (BUILD-CHIM-HEAP-GATE-LATE-36,
-BUILD-CHIM-STAIR-WALK-UNCACHED-36). The receipts record the mode and how many maps or frames were reused, walked
+with the SHA-256 of the record itself. When the run that wrote it has passed every gate as a build of the master
+builder (`tools/aw.py`), the master builder marks the run's records as checked (`stair_records.py promote --run
+RUN`). A CHIM frame's record also holds the walk's outcome (`passed`: no flight step the standing box cannot walk;
+`failed`) and its provenance: `walked_at` (ISO 8601 with the zone), the AmiWind and CHIM versions, the source commit
+and the run. A pass is a pass (BUILD-STAIR-PASS-NOT-KEPT-41): in development builds a frame walk that passed is
+reused while its key is unchanged, whatever the rest of the build that walked it did, so a build that fails late
+keeps every frame that passed and its rerun walks only the frames that failed or changed. A failed walk is reused
+only with a check mark (a private test's accepted known finding). Release candidates and finals keep the check-mark
+rule: they reuse only checked records (and anything at all only with `--allow-release-reuse`). The rule is
+`AMIWIND_STAIR_WALK_REUSE` (`passes`, the default of development and stand-alone runs; `checked`, the earlier rule,
+selectable for any build; `passes` is refused for an rc or final); it never keys a stage. The legacy maps' walks keep
+the check-mark rule. A damaged record, or one written again since its check, is walked again. The build log and the
+stair report name every map and frame as "walked", "reused from RUN (VERSION, COMMIT, TIME)" (checked) or "reused
+pass from RUN (VERSION, COMMIT, TIME)", and the master builder's result counts the records it marked and how many
+maps and frames the build reused and walked. The CHIM stage prints one line per frame as its walk
+finishes. Since v0.0.42 it runs the stair gate first, right after the validation and before the statistics, the
+heap gate and the zone walk (`tools/chim_build.py --gate-order stairs-first`, the default): with the stored passes
+an unchanged frame costs nothing, so the gate walks the frames that changed and a stair failure stops the step
+before anything else runs. `--gate-order stairs-last` keeps the earlier order (heap gate and zone walk first:
+BUILD-CHIM-HEAP-GATE-LATE-36, BUILD-CHIM-STAIR-WALK-UNCACHED-36); the reports are the same either way. The receipts record the mode and how many maps or frames were reused, walked
 and walked again.
 
 A CHIM frame's key (key form `chim-stair-key-2`, `chim.collision.frame_stair_parts`) holds exactly what its walk
@@ -835,11 +875,22 @@ surfedges, models); per chunk its owned placements in order (reference, origin, 
 placed model's image, by content). It never holds the world's texture table entries (the textures lump), the
 world's model numbers, placement ids, reach records or lighting, which change in every frame when a frame is
 added anywhere in the world (the coast2 build walked all 330 frames again for that reason, although 220 of the
-237 frames it shared with dev5 had byte-identical collision). The walker's code in the key is the frame worker
-(`stair_task`) and what it reaches; the known-findings table is not in it. A walked frame says why in its line
-and in the report: `walked: no earlier walk of this frame in the pool`, `walked: inputs changed: 2 of 41 (chunk
-0,1 terrain, chunk 0,1 placements)`, `walked: walker code changed (...)`, or `walked: its stored walk has no check
-mark of a passed master build`; one summary line counts the reasons. The pool keeps, per frame, the key and the
+237 frames it shared with dev5 had byte-identical collision). The walker's code in the key (code form
+`chim-stair-code-1`, `chim.collision.stair_key_sources`) is the frame worker (`stair_task`) and the code of it a walk
+runs, in the files of `chim.collision.STAIR_WALK_CODE` only: the walk and the stair rule (`tools/stair_walk.py`), the
+frame's scene, polygons and trace (`tools/chim/collision.py`, `tools/audit_walkability.py`, `tools/player_hull.py`)
+and the frame reader (`tools/chim/validate.py`, `tools/chim/format.py`, `tools/chim/cut.py`,
+`tools/chim/__init__.py`), each counted by the units the worker reaches. The collision compilers
+(`tools/collision_bsp.py`, `tools/prepare_mesh_bsp.py`, `tools/chim/models.py` ...), which the frame reader's
+imports name, the CHIM_VERSION label and the known-findings table are not in it: what the compilers made is in the
+key already as the frame's collision lumps (v0.0.41-dev5 walked 604 unchanged frames again because CHIM_VERSION went
+from 0.2.0 to 0.2.1). `tests/test_chim_stair_pass.py` keeps the list to the code a walk runs: a traced walk calls
+nothing outside it, and no reached function of those files imports or names another repository module. Records
+written under the earlier code form are not found under this one (one more walk of every frame, never a silent
+reuse). A walked frame says why in its line and in the report: `walked: no earlier walk of this frame in the pool`,
+`walked: inputs changed: 2 of 41 (chunk 0,1 terrain, chunk 0,1 placements)`, `walked: walker code changed (...)`,
+`walked: its stored walk did not pass and has no check mark of a passed master build`, or (release rule) `walked:
+its stored walk has no check mark of a passed master build`; one summary line counts the reasons. The pool keeps, per frame, the key and the
 inputs of its last stored walk (`stair-walk-frames/`, bookkeeping only).
 
 The walk itself is scheduled as units: the count step (one read per frame, in parallel) gives the steps and
@@ -847,6 +898,92 @@ ramps of every 1024-unit core; cores without any are skipped (they walk nothing)
 order into runs of about total / (4 x workers) steps, and the runs go to the full worker count largest first,
 results taken as they finish. A worker reads a frame once per unit instead of once per core, and one large frame
 no longer tails the gate. The rows are the per-core walk's, byte for byte (tests/test_chim_stair_key.py).
+
+How many workers walk at once is set by cores AND by memory (CHIM-STAIR-GATE-POOL-BROKEN-42, `tools/chim/stair_pool.py`).
+Each worker reads a whole frame (its scenes and polygons): measured high-water marks were 259-548 MiB for region
+frames and 2,643 MiB for the whole-city Vivec frame, about 100 MiB plus 17 times the frame's placed bytes (chunk
+images plus the model image of every owned placement). The gate estimates every frame to walk as 128 MiB plus 18
+times its placed MiB, gives each worker the share of the largest, and runs no more workers than 80 % of the memory
+left in its container holds (cgroup `memory.max` minus `memory.current`; the host's MemAvailable only when the
+container has no limit). The line `CHIM stair gate: workers: ...` says which bound won and why. A worker lets go of
+the frames it keeps built, oldest first, until the next frame fits its share. A map in the step's shared worker pool
+keeps to the tasks it asked for (`tools/build_parallel.py completed_map`): before, 11 walk workers asked meant 22
+frame walks at once in the 24-worker stage pool, and the Vivec palace sandboxes ran out of memory. A worker that is
+killed anyway stops the gate with the unfinished units, their frames and estimates, the peak of the finished
+units, the container's memory and its out-of-memory kill count. Measured on the Vivec palace sandbox frame
+(83,247 steps and ramps) in a 12 GiB container: 3 workers by memory (cores allowed 11), passed in 511 s. None of
+this is in the walk key: `stair_pool.py` is outside `STAIR_WALK_CODE`, so stored walks stay valid.
+
+Each flight is walked once, where a player can stand on it (BUILD-STAIR-WALK-BORDER-COPIES-41, v0.0.42). A CHIM
+region frame owns one cell, but its map holds copies of everything within about 3,500 units of it so that its edges
+can be drawn; the engine changes to the next open-world map 64 units past the cell (`aw_world.c`
+`AW_WorldDestination`), so most of those copies can never be walked from the map that holds them. A region frame's
+walk therefore covers its walk area (`chim.collision.frame_walk_areas`): the cell it owns (`core` in the build's
+ownership table `chim-regions.json`) plus `leave_margin` (64) plus the standing box's half width (7.32), so 71.32
+units on every side. A step or ramp whose riser point lies farther out is a copy: it is walked in the frame that owns
+its cell, or, for a classic cell, by the image step's stair walk on that cell's own map. Steps, ramps and flight marks
+are still found on the whole 1024-unit core (`chim.collision.stair_task_in`), and only the walking is restricted, so
+every row is the row the whole-frame walk gives for the same step, and a flight that crosses the area's edge keeps
+its mark. Cores outside the area are not tasks at all. A town's frame (no ownership row) is walked whole, as before.
+`--stair-walk-area frame` (`AMIWIND_STAIR_WALK_AREA`, also a `tools/chim_build.py` option) keeps the earlier
+whole-frame walk.
+
+An area walk is a record of its own: its key is the frame's key plus its walk area (`chim.collision.area_part`),
+under the area walker's own code digest (`chim.collision.stair_area_key_sources`, the units `stair_task_in` reaches
+in `STAIR_WALK_CODE`); whole-frame walks keep their keys, so their records stay valid. When a frame has no area
+record yet but an unchanged whole-frame walk is stored, the area walk is taken from it without walking
+(`chim.collision.derive_area_rows`: the whole-frame rows inside the area, which are exactly the area walk's rows) and
+kept as a record with `derived_from` (key, record SHA-256, run). Under the release rule (`checked`) only a checked
+whole-frame walk is used; under `passes` any intact one whose area rows pass, so a frame whose whole-frame walk
+failed only on a border copy becomes a pass of its cell. The seeded sample walks derived frames again too and stops
+on any difference. The report adds `walk_area` (mode, frames with an area, cores skipped, frames derived) and
+`walk_counts`: the rows against the distinct places they test (placement, kind and riser point on the island, to the
+unit); the gate prints both and warns when there are more than 1.2 rows per place.
+
+Measured on the v0.0.41 final CHIM world (726 frames: 723 region frames, 3 towns), steps and ramps found by the
+count step: whole frames 2,672,454 for 869,846 distinct places (3.07 per place); walk areas 853,398 for 771,793
+places (1.11 per place: strips about 143 units wide along each shared edge are walked by both neighbours, and the
+three town frames are walked whole). 2,718 distinct flight
+places, 2,472 of them inside a CHIM frame's walk area; the others lie in classic cells and are walked on their own
+maps. Vos edge test world (frames 12,13 and 12,14, the dev5 failure): see BUILD-STAIR-WALK-BORDER-COPIES-41.
+
+The steps of a core are found the same way as on the whole frame (v0.0.42 stair round 2; one change to the
+walker's code, so every frame was walked once more). Flight marks: a core's steps are found on the core plus
+`stair_walk.FLIGHT_MARGIN` (128 units; `chim.collision.stair_polys` gives the polygons that far out), the flights
+are marked on all of them, and only the core's own steps are kept, so a flight that crosses a core line keeps its
+mark in both cores (STAIR-FLIGHT-CORE-SPLIT-41; v0.0.41 final world: 39 of 5,646 flight steps lost their mark per
+core, now 0, and none gained). Position: every edge pair of two level faces is tested (bins searched wide enough
+for the parallel and offset tolerances), the pair with the longest shared edge is taken whatever order the bins
+hold them in, every threshold is met within `GRACE` (1e-6 units; normals 1e-9), and a face's normal is taken
+relative to its first corner, so a placement gives the same steps in each frame that places it
+(STAIR-DETECT-POSITION-41; places found only in a neighbour frame's copy 107 -> 63 on the v0.0.41 world, the rest
+open). The count step and the walk are slower by the wider search: about 1.5 times the candidate time on the
+heaviest frame (x+04/y-12: 20.1 s -> 31.8 s for all its cores), small next to the walk.
+
+Known-good stair records (v0.0.42 plan 1.0b, B14). The pass records above live in a build workspace's cache. The
+known-good stair records ship the same walks with the source as public data (`config/stair-records/*.json`,
+`tools/stair_records.py`), so that a build from the same game data does not walk: one entry per CHIM frame, under
+the frame walk's full key (the SHA-256 of exactly what the walk reads, `frame_stair_parts` plus the walk area, with
+the walker's code digest and the stair rule: `PassCache.key`), with the frame's path and cell, the walker digest,
+the rule, whether it has a walk area, the outcome, the counts by result, the SHA-256 of all its rows, every flight
+step as `[reference, kind, x, y, z, direction x, direction y, rise, result, status]` and the SHA-256 of those, and
+the entry's own SHA-256. Hashes, references and coordinates only: no game data. `--stair-walk-cache` chooses:
+`records` (the default of a build without `--developer-mode`, so the end user's): a frame's walk is taken from
+this workspace's own walks, else from the shipped records (`reused from the shipped records (0.0.41,
+v0.0.41-chim.json)`: its flight steps are the report's rows, the other rows are counted); a frame in neither
+(another converter, other game data) is named in the log and the report (`records.unmatched`) and NOT walked;
+`cached` (the default with `--developer-mode`, every master-builder build): walk what changed, the shipped records
+are not read; `full`: walk everything, ignoring every stored and shipped walk (regression and nightly reference
+builds). A sampled shipped frame (`--stair-walk-sample`) is walked again and its flight steps must equal the shipped
+ones, else the gate stops (a key that misses an input); an entry whose SHA-256 does not match is never used and is
+counted as damaged. Legacy maps have no shipped records: in `records` mode they are walked as with `cached`.
+Written by `stair_records.py export --world W --cache C --out F --version V --commit C --run R` from a full walk
+into a pass cache C (it refuses when a frame has no stored walk). Shipped: `v0.0.41-chim.json`, from the v0.0.41
+final CHIM world (run 2026_10_16_v0.0.41_release_ce7ace6) walked in full with the v0.0.42 walker: 726 frames, all
+passed, 1,233 flight steps, 498,667 bytes (SHA-256 92662f56...). The full walk took 32 min on 16 workers (frame keys
+about 15 min, the count step 9.6 min, the walk the rest). Any edit to the walker's code changes every key, so the
+file must be written again with each walker change (planned for the nightly reference build; by hand until then);
+a new world form (a converter change) gives new keys too.
 
 Counted progress lines put the counters first (`tools/progress_line.py`): `[done/total work | done/total
 containers] stage: unit: result`, the real work units first. The stair walks count their steps and ramps before
@@ -985,6 +1122,38 @@ fails the build. Commands:
 The streamer's builder keeps this profiler and records a fingerprint per pack,
 so a change rebuilds only the packs it reaches. See
 [WORLD_STREAMER.md](WORLD_STREAMER.md).
+
+### CHIM world conversion (v0.0.42)
+
+The chim stage's world conversion is timed in phases, each with its start and end line,
+time and build-machine threads used:
+
+| Phase | What runs | Workers |
+| --- | --- | --- |
+| `CHIM world: areas side by side` | every region frame and, when the region frames fill the workers at least four times over, the towns too (towns first), one area per worker | the stage pool |
+| `CHIM world: areas in turn` | areas not prepared side by side (a sandbox with few region frames, or `AMIWIND_CHIM_TOWN_PREP=after`), one after another, each with every worker | inside each area |
+| `CHIM world: visibility rows` | every frame's visibility rows: towns first, their blocks over every worker; then the one-cell frames whole on the workers, largest first (`AMIWIND_CHIM_VIS_ROWS=serial`: one frame after another) | the stage pool |
+| `CHIM world: pack` | the world files, frame by frame in pack order | one |
+
+Each area's source stage parses the game's master once per worker process and remembers the
+models it read by their SHA-256 (`tools/chim/source_memo.py`; `AMIWIND_SOURCE_MEMO=off` reads
+everything again, `AMIWIND_SOURCE_MEMO_MB` sets the memory per process, default 384). Before,
+every area parsed the whole master again (13.6 s of a light area's 21.9 s) and listed and hashed
+the game files for its receipt (5.3 s), and a heavy area read the same 168 models twice
+(213 s of 232 s, measured under the profiler).
+
+Measured 16-17 October 2026 on the v0.0.41 final run's inputs, 160 region frames and the three
+towns, 12 CPUs (`--cpus 12 --jobs 12`), the shared unit cache read-only, on a host shared with
+about fifteen other containers (wall times and threads used skewed by that load; the CPU seconds are
+the measure):
+
+| | before (`old` modes) | after | |
+| --- | ---: | ---: | --- |
+| CPU seconds, whole conversion | 15,855 | 8,626 | -46 % |
+| CPU seconds, source stages | 6,555 | 2,088 | -68 % |
+| CPU seconds, ground samples | 1,023 | 72 | |
+| wall (busy host) | 4,364 s | 2,750 s | |
+| files of the world (8,318) | | | all byte-identical |
 
 ## Payload preflight
 

@@ -355,6 +355,8 @@ class BuildSummary:
         harvest = read_harvest(self.run)
         engine = read_engine_profile(self.run)
         file_cache = read_file_cache(self.run)
+        import size_ledger
+        sizes = size_ledger.read(self.run) if status == 'passed' else None
         elapsed = max(0, time.monotonic() - self.started)
         result = {'schema': 'amiwind-build-summary-v1', 'version': self.version,
                   'mode': self.mode, 'status': status,
@@ -369,6 +371,7 @@ class BuildSummary:
                   'engine_profile': engine,
                   'harvest': harvest,
                   'file_cache': file_cache,
+                  'size_ledger': sizes,
                   'known_inputs': self.known_inputs,
                   **({'build_type': self.build_type} if self.build_type else {}),
                   'retired_flags_used': self.retired_flags,
@@ -448,6 +451,10 @@ class BuildSummary:
         else:
             lines.append('Output: no completed output verified')
         lines.extend(media_coverage_lines(media_coverage, coverage_scope))
+        if sizes and sizes.get('groups'):
+            lines.extend(size_ledger.table_lines(sizes))
+        elif sizes:
+            lines.append(size_ledger.guard_line(sizes['guard']))
         if self.known_inputs:
             from known_inputs import summary_lines as known_input_lines
             lines.extend(known_input_lines(self.known_inputs))

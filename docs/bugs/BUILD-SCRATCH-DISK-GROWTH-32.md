@@ -37,7 +37,7 @@ drive. Affects full builds, image steps and any job that copies build trees into
 Each job copied its inputs and outputs into its own scratch volume, and earlier image attempts
 were moved aside instead of removed. The virtual disk grows on demand and never shrinks: space
 freed inside it is reused by later writes but returned to the system drive only by compaction,
-which needs Docker stopped (an owner decision on this host).
+which needs Docker stopped (a project decision on this host).
 
 ## Why it was not caught
 
@@ -53,7 +53,7 @@ volume.
 ## Repair
 
 Not yet: per-job scratch budgets; reuse of one scratch tree instead of new copies; cleanup of
-moved-aside image attempts after delivery; compaction of the disk image only when the owner stops
+moved-aside image attempts after delivery; compaction of the disk image only when the maintainer stops
 Docker for it.
 
 ## Verification
@@ -116,6 +116,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TOOLKIT-CULL-DIAGNOSTICS-38](TOOLKIT-CULL-DIAGNOSTICS-38.md): Collision-only diagnostics disable terrain culling preview
 - [TOOLKIT-MAP-SCALING-36](TOOLKIT-MAP-SCALING-36.md): The CHIM Progress Tracker map scales badly: a small box in the middle with inner scrollbars, controls far away, the island cropped
 - [TOOLKIT-MONITOR-BLIND-PHASES-36](TOOLKIT-MONITOR-BLIND-PHASES-36.md): The Toolkit Monitor shows nothing during silent build phases: no activity, no phases, no time since the last log line
+- [TRACKER-AREA-CELLS-RUN-WIDE-42](TRACKER-AREA-CELLS-RUN-WIDE-42.md): The CHIM tracker gives every area of a build all of the build's cells: Balmora holds 811 cells, so an area or shipped-towns plan selector takes most of the island
 - [TRACKER-CHIM-LINK-MERGE-33](TRACKER-CHIM-LINK-MERGE-33.md): A merge dropped the CHIM Engine tracker link from the register; the integration head fails a tracker test
 - [TRACKER-FIXED-LEFT-OPEN-36](TRACKER-FIXED-LEFT-OPEN-36.md): Fixed work whose bug entry stayed open (LAVA-NOT-IMPLEMENTED-33)
 - [TRACKER-MAP-BLANK-31](TRACKER-MAP-BLANK-31.md): World progress map vanished when the mouse moved over it
@@ -123,6 +124,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACKER-REGISTER-LINK-MERGE-33](TRACKER-REGISTER-LINK-MERGE-33.md): An integration merge dropped the CHIM Engine tracker link from the bug register
 - [TRACKER-REGISTER-SIZE-33](TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit
 - [TRACKER-REGISTER-SIZE-36](TRACKER-REGISTER-SIZE-36.md): The live register bugs.json reached 75 % of its 1 MiB release text limit; the size warning was raised to 85 % until a second archive rotation
+- [TRACKER-RELEASE-HEADROOM-MISSING-42](TRACKER-RELEASE-HEADROOM-MISSING-42.md): The CHIM tracker keeps no memory headroom per cell from a full build, and older CHIMport results replace a newer full build's audits: every headroom figure dates from the v0.0.36-v0.0.40 builders
 - [TRACKER-SEA-CELL-SET-36](TRACKER-SEA-CELL-SET-36.md): The CHIM tracker's island view leaves out 37 land cells that hold only terrain and sea; one is labelled Solstheim
 - WIN-02 (no report page): Cancelled Windows stage leaves child workers alive
 

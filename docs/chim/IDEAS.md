@@ -38,7 +38,7 @@ measuring them again.
 | in source | implemented and gated on a development branch, not yet in a release |
 | measured and dropped | tried or counted; not worth it, for the reason given |
 
-All figures come from the owner's own game data and builder output, as
+All figures come from the maintainer's own game data and builder output, as
 aggregates. Emulator frame times are relative until a real accelerated Amiga
 has been measured ([hardware benchmark](../HARDWARE-BENCHMARK.md)).
 
@@ -121,7 +121,7 @@ pursuers stop at load doors, as in Morrowind
 
 ## The Ghostfence as a Quake turbulent surface
 
-**Status: idea (owner, 16 October 2026), with the Red Mountain region.** The Ghostfence and the Ghostgate show an
+**Status: idea (maintainer, 16 October 2026), with the Red Mountain region.** The Ghostfence and the Ghostgate show an
 upright, shimmering curtain between the pylons, like electricity and water at once. Quake already draws exactly
 this kind of surface: a texture whose name starts with `*` is drawn turbulent (`D_DrawTurbulent`, the warp that
 ripples water, slime, lava and the upright teleporter fields), and our lava already uses it. Plan: the fence's
@@ -140,7 +140,7 @@ seen from the world. The legacy region maps drew these views much better.
 
 - **Reference look.** v0.0.32's horizon, the HORSTATOR APPROVED method
   (`aw_skyline_fill 0`), and its sky veil. Every CHIM change to the distant
-  view is A/B-checked against v0.0.32 at the same poses (the owner's poses and
+  view is A/B-checked against v0.0.32 at the same poses (the maintainer's poses and
   the release gallery poses) and must not look worse. The skyline fill stays
   selectable as an experimental alternative.
 - **Far terrain.** A resident, low-detail layer of the land for the frame and
@@ -214,7 +214,7 @@ the current builder.
   side; three frames fit
   ([CHIM-FRAME-COORD-RANGE-33](../bugs/CHIM-FRAME-COORD-RANGE-33.md)). This
   section is the one Vivec frame plan
-  ([DOCS-VIVEC-FRAME-PLAN-36](../bugs/DOCS-VIVEC-FRAME-PLAN-36.md)). Owner
+  ([DOCS-VIVEC-FRAME-PLAN-36](../bugs/DOCS-VIVEC-FRAME-PLAN-36.md)). Maintainer
   decision (10 October 2026): widen the coordinates first, as a measured
   spike (in source behind the engine switch `AW_EXP_WIDECOORD`, off by
   default), then one city frame; the Arena returns to default builds after
@@ -356,7 +356,7 @@ Detail: [CHIM engine, "Memory"](ENGINE.md#memory) and the heap gate in the
   own zone code over a walk through every frame and fails when a step leaves
   the player without ground
   ([CHIM-CHUNK-LOAD-FAIL-33](../bugs/CHIM-CHUNK-LOAD-FAIL-33.md)).
-- **The 2 MiB Hunk-gap rule. Status: kept (owner decision).** The engine's
+- **The 2 MiB Hunk-gap rule. Status: kept (project decision).** The engine's
   heap audit keeps at least 2 MiB of the map heap free at the load peak. The
   CHIM zone is taken from that heap when a CHIM map starts, so the zone may
   only be as large as the rule allows: measured, Balmora's map allows the
@@ -432,6 +432,9 @@ byte-identical in every build, off unless selected. The shipped example is
 
 ## The slow-accelerator reality
 
+Where a slow frame goes, part by part, and how the speed work adds up and is
+calibrated on real machines: [where a slow frame goes](../performance/SLOW-FRAME-BREAKDOWN.md).
+
 **Status: measured; the breakdown is in progress.** Measured in FS-UAE on
 Balmora on CHIM (relative numbers, busy host): the normal JIT preset runs
 20-25 frames per second, but an A1200 with a 68040 at about 50 MHz (the slow
@@ -455,6 +458,63 @@ The plan:
 - **One real number.** A frame and disk measurement on a real accelerated
   A1200 ([hardware benchmark](../HARDWARE-BENCHMARK.md)); until then every
   emulator figure stays relative ([BENCH-JIT-PROFILE-32](../bugs/BENCH-JIT-PROFILE-32.md)).
+  The first one arrived on 16 October 2026: a tester's A4000 with a 68060 at
+  100 MHz ran an earlier build at about 0.2 frames per second, about 0.1 above
+  his own emulator runs
+  ([CHIM-SLOWCPU-FRAMETIME-33](../bugs/CHIM-SLOWCPU-FRAMETIME-33.md)). Next: the
+  same build indoors and outdoors with the console counters, and whether the
+  68060 support library was installed.
+
+Two directions follow from what the frame is spent on (16 October 2026), each
+measured before it is built:
+
+- **Detail by distance and size.** The far cut-off at the fog distance already
+  exists: nothing past the fog is drawn. What is missing is detail that falls
+  away before it. Small objects (cups, plants, clutter) drop out well before the
+  fog, large buildings stay to the fog edge; past a set distance a block of
+  scenery becomes one merged, simplified shape per chunk; meshes get simpler in
+  the last stretch before the fog. A counter of drawn models and faces per
+  distance band and size class decides which of these pays first.
+- **Scenery that is not drawn as brush models.** Quake's brush models are made
+  for a few doors and lifts: each one is set up and its polygons clipped against
+  the world on its own, and at Morrowind's density that is most of a slow frame.
+  Large static scenery can become part of each chunk's own world geometry (drawn
+  front to back and culled with the world, at the price of storing it per
+  placement instead of once), small props can be drawn the way Quake draws items
+  and monsters (no world clipping), and clutter as sprites, as flora already is.
+  Brush models stay for doors and moving parts. Each option is compared at the
+  same views (frame time, counters, memory, disk), and the current method stays
+  selectable.
+
+An independent review of the renderer (16 October 2026) sharpened the order.
+The brush-model share is two costs of similar size, walking each model's tree
+and emitting its polygon pieces; baking scenery into the world removes only the
+first, and the 16-bit limits of the chunk pool stand in its way. Even with
+brush models at zero, a slow frame keeps 400-700 ms (edge scan, the fog pass,
+the server frame, the screen copy), and a Balmora view sends about 13,500 faces
+where Quake was designed around 800 surfaces. So the plan is:
+
+1. Measure first: the frame with entities and fog off, the walk and the emit
+   timed apart, faces per distance band and size, leaves touched per placement,
+   small props drawn as items against brush models, and one real 68060 run.
+2. Fewer faces in view: the size-scaled cut-off and the heaviest models.
+3. A coarser terrain drawing tree, so most props sit in one leaf, which is
+   Quake's cheap path.
+4. The fog pass folded into drawing, and a lighter server frame.
+5. A 68060 build without the floating-point instructions that trap on that
+   processor.
+6. A larger surface cache from extra memory, and the window size as a player
+   option (the full AGA picture stays the default).
+7. Hand-written 68k code for the measured hottest loops.
+8. Scenery baked into the world last outdoors; interiors (sealed rooms whose
+   every mesh is a separate model today) are the clean case for it.
+
+The first measurements of that plan (16 October 2026) are written up in
+[where a slow frame goes](../performance/SLOW-FRAME-BREAKDOWN.md).
+
+A faster processor alone (PiStorm-class) or a graphics-card screen does not
+change this order: at 0.2 frames per second the 3D work, not the screen, is the
+limit ([comparisons](../COMPARISONS.md)).
 
 ## Island-wide audits (mechanism classes)
 

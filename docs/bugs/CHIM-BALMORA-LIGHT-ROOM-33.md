@@ -37,7 +37,7 @@
 
 ## Status: 9 October 2026
 
-Open. Measured on the CHIM world of a v0.0.33-rc1 development build. Needs an owner decision on where the room comes
+Open. Measured on the CHIM world of a v0.0.33-rc1 development build. Needs a project decision on where the room comes
 from ([CHIM lighting](../chim/LIGHTING.md), "Recommendation").
 
 ## Symptom
@@ -73,7 +73,7 @@ Always: `tools/chim/lighting.py measure WORLD --sdk SDK --master Morrowind.esm` 
 
 ## Repair
 
-Owner decision. Room can come from:
+Project decision. Room can come from:
 
 - a smaller hysteresis or draw distance in Balmora;
 - lighter house models;

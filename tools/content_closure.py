@@ -3,7 +3,7 @@
 """Reference closure of an area build: the content the built cells reference.
 
 --exclude-unreferenced [GROUP,...] (tools/build_exclusions.py) builds only what
-the selected area references. This module computes that set from the owner's
+the selected area references. This module computes that set from the maintainer's
 masters (Morrowind.esm, Tribunal.esm, Bloodmoon.esm, in that order; a later
 master's record replaces an earlier one):
 
@@ -28,7 +28,7 @@ NPC or creature satisfies. Function and variable conditions cannot be decided
 before the game runs, so they never drop a line. Lines a script plays with Say
 are kept. Only lines no included actor can ever say are left out.
 
-Music is never part of a closure (owner rule): --exclude-unreferenced never
+Music is never part of a closure (project rule): --exclude-unreferenced never
 trims it; --exclude music is the separate, explicit opt-out.
 
 Groups (one table, GROUPS): npcs (NPC/creature records, so the NPC gallery
@@ -59,7 +59,7 @@ GROUPS = {
     'models': 'models no included record uses (receipt only: the scene stages convert only what the area places)',
     'textures': 'textures of left-out models (receipt only, like models)',
 }
-NEVER = {'music': 'music is always kept (owner rule); --exclude music is the separate explicit opt-out'}
+NEVER = {'music': 'music is always kept (project rule); --exclude music is the separate explicit opt-out'}
 # Records with an ID and an optional model and script.
 OBJECT_TAGS = ('ACTI', 'ALCH', 'APPA', 'ARMO', 'BODY', 'BOOK', 'CLOT', 'CONT', 'CREA', 'DOOR', 'INGR', 'LEVC',
                'LEVI', 'LIGH', 'LOCK', 'MISC', 'NPC_', 'PROB', 'REPA', 'STAT', 'WEAP')
@@ -432,7 +432,7 @@ def closure(master, cells, groups=None):
         'voice_files': sorted(voice_files), 'voice_files_said_by_scripts': said_by_scripts,
         'sound_files_dropped': dropped_sounds,
         'kept_by_script': dict(sorted(kept_by_script.items())), 'unresolved_kept': unresolved,
-        'music': 'always kept (owner rule)',
+        'music': 'always kept (project rule)',
         # Shared engine assets maps and the engine find by name or metadata (the shared sky,
         # palette, fonts, menus: build_exclusions.ALWAYS_INCLUDED) are never part of a closure:
         # nothing here filters them, and the image step checks them.

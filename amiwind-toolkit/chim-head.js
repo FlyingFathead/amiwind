@@ -11,7 +11,7 @@
     ['terrain_complete', 'terrain complete', '#7dffa6'],
     ['complete_unlit', 'cell complete, awaiting lighting', 'repeating-linear-gradient(135deg,#7dffa6 0 4px,#00e5ff 4px 7px)'],
     ['terrain_complete_unlit', 'terrain complete, awaiting lighting', 'repeating-linear-gradient(135deg,#7dffa6 0 4px,#00e5ff 4px 7px)'],
-    ['approved', 'owner-approved', '#ffd23f'],
+    ['approved', 'maintainer-approved', '#ffd23f'],
     ['playtested', 'playtested', '#2ec4b6'],
     ['audits_passed', 'passed (something deferred)', '#46c37b'],
     ['converted_failing', 'converted, failing audits', '#e5484d'],

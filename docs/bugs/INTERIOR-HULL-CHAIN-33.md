@@ -9,7 +9,7 @@
 | Where | Interior converter collision (prepare_mesh_bsp collider), Vivec, Arena Pit (vai000) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Every movement trace in the Pit costs tens of thousands of plane tests on a 68040; the stair gate on the room took 95 minutes on one core. |
 | Family | Mesh converter geometry (`converter-geometry`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -96,7 +96,7 @@ order.
 
 
 
-12 October owner follow-up: severe performance drop reported inside the Vivec Arena Pit. Exact installed hashes, frame times, position, movement state and room format are not yet bound. This is a new performance observation alongside this investigation, not proof that the old hull chain is its cause. Measure idle versus movement, collision trace cost, visibility and render work with the AmiQuake mechanisms before selecting a repair. Keep interiors eligible for BSP29, CHIM or a mixture.
+12 October maintainer follow-up: severe performance drop reported inside the Vivec Arena Pit. Exact installed hashes, frame times, position, movement state and room format are not yet bound. This is a new performance observation alongside this investigation, not proof that the old hull chain is its cause. Measure idle versus movement, collision trace cost, visibility and render work with the AmiQuake mechanisms before selecting a repair. Keep interiors eligible for BSP29, CHIM or a mixture.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

@@ -9,7 +9,7 @@
 | Where | tools/release.py text size limit and docs/PATCH-v<version>.json |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | low: Blocks the source gate of every version whose published base has more than about 1,700 files. |
 | Family | Gates, CI and tests (`tests-ci`) |
 

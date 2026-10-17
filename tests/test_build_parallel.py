@@ -20,6 +20,18 @@ def work(item):
     return item * item, os.getpid(), {k: os.environ.get(k) for k in THREAD_LIMITS}
 
 
+def work_together(task):
+    """work(item) after at least two pool processes have taken an item (each waits, at most 30 s): on a loaded
+    host one fast worker could otherwise take all nine items before the others start."""
+    item, folder = task
+    folder = Path(folder)
+    (folder / str(os.getpid())).touch()
+    end = time.monotonic() + 30
+    while len(list(folder.iterdir())) < 2 and time.monotonic() < end:
+        time.sleep(.01)
+    return work(item)
+
+
 def fail(item):
     if item == 2:
         raise ValueError('worker failed')
@@ -137,7 +149,8 @@ class ParallelBuildTests(unittest.TestCase):
             list(completed_map(fail, range(5), 2))
 
     def test_processes_keep_order_and_limit_nested_threads(self):
-        result = list(ordered_map(work, range(9), 3))
+        with tempfile.TemporaryDirectory() as folder:
+            result = list(ordered_map(work_together, [(n, folder) for n in range(9)], 3))
         self.assertEqual([r[0] for r in result], [n*n for n in range(9)])
         self.assertGreater(len({r[1] for r in result}), 1)
         self.assertLessEqual(len({r[1] for r in result}), 3)

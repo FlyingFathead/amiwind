@@ -155,7 +155,7 @@ static void history_section(void){
  assert(!strstr(queued,"+forward") && !strstr(queued,"+back"));
  queued[0]=0;raw(RAW_RETURN,0);assert(!strcmp(queued,"echo two\n"));
  raw(RAW_UP,0);expect("]echo two");raw(RAW_UP,0);expect("]echo three");
- /* The owner's FS-UAE trace (CONSOLE-HISTORY-ARROWS-32): every event carries
+ /* The maintainer's FS-UAE trace (CONSOLE-HISTORY-ARROWS-32): every event carries
   * IEQUALIFIER_RELATIVEMOUSE (0x8000, mouse grabbed), and a held Down repeats
   * its press before the release. After a command: Down x4, Up, Down. */
  raw(RAW_DOWN,0);expect("]echo two");raw(RAW_DOWN,0);expect("]");type_line("echo ten");

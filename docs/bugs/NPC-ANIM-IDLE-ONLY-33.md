@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | tools/prepare_area.py build_resident (idle_times(8) only); engine/aga/src/aw_companion.c |
 | Reproduction | always |
@@ -21,7 +21,7 @@ Repair in source on v0.0.33-anim-kit, not yet in a build: the character animatio
 ([ANIMATION.md](../ANIMATION.md)) samples walk, run, swim, hit, knockdown, death and a hand-to-hand
 attack from the original text keys (`build.py --npc-anim react|move|full`), the engine picks the group
 from the actor's speed with a speed-matched rate and plays the original footstep sounds. `idle` (the
-previous 8 idle frames, byte-identical models) stays the default until the owner accepts a profile
+previous 8 idle frames, byte-identical models) stays the default until the maintainer accepts a profile
 ([NPC-ANIM-MEMORY-33](NPC-ANIM-MEMORY-33.md)).
 
 ## Symptom

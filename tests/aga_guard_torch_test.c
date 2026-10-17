@@ -6,6 +6,7 @@
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
 entity_t cl_entities[MAX_EDICTS],*cl_visedicts[MAX_VISEDICTS];int cl_numvisedicts;
 int (*aw_view_torch_emitter)(vec3_t out);
+int (*aw_flame_depth_limit)(void);   /* aw_fog.c */
 dlight_t cl_dlights[MAX_DLIGHTS];viddef_t vid;refdef_t r_refdef;
 vec3_t vpn,vup,vright;float aliasxcenter,aliasycenter,aliasxscale,aliasyscale;
 short *d_pzbuffer;unsigned int d_zwidth;aw_state_t aw_state;
@@ -69,7 +70,7 @@ int main(void)
     strcpy(base.name,"progs/original.mdl");base.type=body.type=held.type=body_b.type=held_b.type=mod_alias;base.numframes=body.numframes=held.numframes=body_b.numframes=held_b.numframes=8;
     sv.active=1;sv.num_edicts=40;svs.maxclients=1;cls.state=ca_connected;cl.time=1;
     make_registry(8);for(i=204;i<716;i+=2){torch[i]=220;torch[i+1]=255;}
-    AW_GuardTorchInit();assert(cycle && cycle->archive && cycle->value==1 && cmd);
+    AW_GuardTorchInit();assert(aw_flame_depth_limit);assert(cycle && cycle->archive && cycle->value==1 && cmd);
     AW_GuardTorchLoadAssets(torch);npc(1,18,100);npc(2,18,80);npc(3,18,120);npc(4,26,140);
     /* Actual string offsets are bound, never inferred from display names. */
     source[1].string=source[2].string=source[3].string=(int)(strstr(strings+18,"guard_a")-strings);

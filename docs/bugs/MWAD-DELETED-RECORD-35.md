@@ -9,8 +9,8 @@
 | Where | Morrowind data readers (src/mwad, tools/known_inputs.py, tools/content_closure.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
-| Severity | low: Readers could accept or misread unusual data silently; the owner base-game data is unaffected (outputs byte-identical). |
+| Persists in | fixed in v0.0.35 |
+| Severity | low: Readers could accept or misread unusual data silently; the user's base-game data is unaffected (outputs byte-identical). |
 | Family | Morrowind editions, archives and inputs (`game-data-editions`) |
 | Playtest version | none |
 | From commit | source and engine 6979d4f |
@@ -36,7 +36,7 @@ The readers grew separately, each with its own copy of the small helpers.
 
 ## Why it was not caught
 
-Owner data is well formed, so the differences never showed; found by code review.
+Maintainer data is well formed, so the differences never showed; found by code review.
 
 ## Reproduction
 
@@ -48,7 +48,7 @@ One mwad.esm.is_deleted(flags, subrecords) (flag OR DELE; cell header only for c
 
 ## Verification
 
-tests/test_mwad_shared.py DeletedTests; stage outputs on the owner data compared by hash tree against the reuse source.
+tests/test_mwad_shared.py DeletedTests; stage outputs on the maintainer data compared by hash tree against the reuse source.
 
 ## Prevention
 
@@ -58,7 +58,7 @@ One shared module for these helpers; new readers import it. The writer scan test
 
 ## Bugs in the same category
 
-Family: Morrowind editions, archives and inputs (`game-data-editions`). The builder reads the owner's data the way Morrowind does (archive order, loose files) and checks inputs against known versions. See [families](README.md#families).
+Family: Morrowind editions, archives and inputs (`game-data-editions`). The builder reads the user's data the way Morrowind does (archive order, loose files) and checks inputs against known versions. See [families](README.md#families).
 
 - [ASSETS-ARCHIVE-ORDER-32](ASSETS-ARCHIVE-ORDER-32.md): Asset readers ignore the Tribunal and Bloodmoon archives, so some textures are pre-expansion versions
 - [BUILD-EDITION-DIFFERENCES-32](BUILD-EDITION-DIFFERENCES-32.md): GOG and Steam editions produce different builds (fonts, loose files)

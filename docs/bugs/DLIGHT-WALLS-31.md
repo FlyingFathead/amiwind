@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev3 |
 | Where | Balmora at night, outdoor night remap (aw_fog.c) |
 | Reproduction | always |
@@ -22,12 +22,12 @@
 ## Status: 7 October 2026
 
 Cause found and measured; repaired in source for v0.0.31-dev4 (light-space
-night made the default), awaiting the owner's in-game check.
+night made the default), awaiting the maintainer's in-game check.
 
 ## Symptom
 
 At night in Balmora the player's torch and the guards' torches seemed to light
-the ground but not the buildings (owner). The same carried light lights walls
+the ground but not the buildings (maintainer). The same carried light lights walls
 inside the prison ship.
 
 ## Where
@@ -70,7 +70,7 @@ that stored 0 keeps 0 until changed.
 
 ## Verification
 
-In-game A/B above; owner check of dev4 pending.
+In-game A/B above; maintainer check of dev4 pending.
 
 ## Prevention
 

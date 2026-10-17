@@ -9,7 +9,7 @@
 | Where | CHIM chunk terrain standing hull (tools/chim/terrain.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: Seyda Neen could not run on CHIM in the reference memory profile. |
 | Family | Map heap and memory budget (`heap-memory`) |
 | CHIM | Performance ([CHIM Engine tracker](CHIM_TRACKER.md)) |

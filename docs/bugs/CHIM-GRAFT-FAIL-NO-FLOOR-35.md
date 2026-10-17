@@ -9,7 +9,7 @@
 | Where | CHIM engine chim_world.c MapBegin / Fail, chim_far.c floor and horizon |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.35 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: Rare (no room for the frame world at map start), but then the player falls through the map. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

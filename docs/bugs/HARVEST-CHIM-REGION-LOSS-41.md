@@ -20,6 +20,21 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- contents start -->
+## Contents
+
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Symptom
 The image step's entity tracker of the v0.0.41-dev4 build recorded harvestable plants lost against the
 v0.0.31 baseline on six CHIM region cells:
@@ -144,6 +159,7 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 Related bugs in other categories:
 
 - [BUILD-HARVEST-NATIVE-TOWN-ORDER-36](BUILD-HARVEST-NATIVE-TOWN-ORDER-36.md): The image step's harvest check refused a CHIM-native town's catalogues before its frame map was written
+- [BUILD-RELEASE-READINESS-HIDDEN-41](BUILD-RELEASE-READINESS-HIDDEN-41.md): A development build did not say what a final would refuse: dev5 passed with a waiver, an accepted plant loss and no NPC gallery
 - [CHIM-HARVEST-REMOVED-MAPS-33](CHIM-HARVEST-REMOVED-MAPS-33.md): A pure CHIM image stops at the save fingerprint: harvest catalogues of the removed town region maps have no matching map
 
 <!-- END GENERATED CATEGORY -->

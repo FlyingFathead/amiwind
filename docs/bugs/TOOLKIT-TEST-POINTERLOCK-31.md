@@ -9,7 +9,7 @@
 | Where | Inspector JavaScript test (markup tests) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | low: An earlier test left pointer lock set, so a later drag check misbehaved. |
 | Family | Gates, CI and tests (`tests-ci`) |
 

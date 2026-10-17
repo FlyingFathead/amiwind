@@ -9,7 +9,7 @@
 | Where | engine/aga/src/snd_dma.c S_FindName |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: The play command or a long session reached Sys_Error |
 | Family | Music and sound (`audio`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

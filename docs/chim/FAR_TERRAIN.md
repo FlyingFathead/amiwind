@@ -29,7 +29,7 @@ HORSTATOR APPROVED horizon.
 On a CHIM map the ground ends where the chunk ring ends. Past it there was
 nothing: the background (sky) filled the screen down to the bottom of the
 valley, fully fogged, so valleys looked empty and the land outline that
-v0.0.32 drew against the sky was gone. The owner rated v0.0.32's distant
+v0.0.32 drew against the sky was gone. The maintainer rated v0.0.32's distant
 views 4 to 5 out of 5 in many places.
 
 ## How the legacy builder and engine draw the distance (v0.0.32)
@@ -48,7 +48,10 @@ four ordinary pieces:
    corner of its box lies in front of the plane `distance + 16` ahead of the
    eye (`AW_NodeVisible`); models likewise (`AW_ModelVisible`). A node that
    straddles the plane is drawn whole, so terrain faces reach a little past
-   the fog distance.
+   the fog distance. Brush models and faces that lie wholly in the full fog
+   colour below the horizon, where leaving them out changes no pixel,
+   can be left out as well (`aw_cull 2`, an option:
+   [FAR-TEST.md](../performance/FAR-TEST.md)).
 3. **Palette fog.** `AW_FogDraw` remaps every drawn pixel after rasterising,
    by Quake's inverse-depth z-buffer: level 1 at 0.44 x the distance, full fog
    colour (level 15) at the distance. Ground at and past the far plane is
@@ -209,7 +212,7 @@ the standard profile, fewer pixels than measured here):
 
 | Pose | chim_far 0: frame | reach 896, objects on: far draw | reach 0 (whole layer): far draw |
 | --- | ---: | ---: | ---: |
-| Owner's bridge pose, 19:54, looking west | 0.96 s | 43.7 ms (166 triangles, 8,549 pixels) | 228.6 ms (2,342 triangles, 29,591 pixels) |
+| Maintainer's bridge pose, 19:54, looking west | 0.96 s | 43.7 ms (166 triangles, 8,549 pixels) | 228.6 ms (2,342 triangles, 29,591 pixels) |
 | East bank (HORIZON-HOLES-31 position), looking west | 1.50 s | 30.6 ms (191 triangles, 209 pixels) | 193.8 ms (2,149 triangles, 5,392 pixels) |
 
 So the default depth costs 3 to 5 % of a slow-preset frame there; the whole layer
@@ -254,13 +257,13 @@ default and `aw_terrain_horizon` stays as it was.
 
 FS-UAE, standard play profile, A/B/C/D in separate sessions from the same
 images, headlamp off (look evidence) and on (near geometry), at fixed poses:
-the owner's bridge frames (global -17541 -15916, 19:54 and 19:58), the east
+the maintainer's bridge frames (global -17541 -15916, 19:54 and 19:58), the east
 bank of HORIZON-HOLES-31 (18:00), the town centre looking north and south
 (13:00), the west at 19:30 and a raised view south-west (16:00). None of the
 ten release gallery poses is in Balmora or Seyda Neen (all ten are at the
 Vivec Arena, and their poses were not recorded), so they are not part of this
 A/B; Seyda Neen has no CHIM image yet. Variants: A the v0.0.32 release image;
-B CHIM Preview 1 (as the owner played it); C the far layer (default), CHIM
+B CHIM Preview 1 (as the maintainer played it); C the far layer (default), CHIM
 before on the same engine (`chim_far 0`), the whole layer, legacy region maps
 in the same image (`chim_towns 0`, with and without entities), and a rerun of
 the first pose (drift control: identical counters). Frames and counters are
@@ -268,7 +271,7 @@ on the bug page.
 
 What the A/B shows:
 
-- At the owner's bridge pose v0.0.32 itself shows no ground in that band
+- At the maintainer's bridge pose v0.0.32 itself shows no ground in that band
   either: past the fog distance the valley is sky in every variant. What
   v0.0.32 had and CHIM did not is the fogged land outline at the horizon; the
   far layer at the default depth draws it, continuous instead of the

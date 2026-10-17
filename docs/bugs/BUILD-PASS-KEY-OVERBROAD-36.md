@@ -9,7 +9,7 @@
 | Where | tools/pass_cache.py source_digest: the key form of every pass and unit cache |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: Hold-level reuse bug: unchanged inputs, every recorded result keyed out by an edit no pass runs |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.36-dev3 |

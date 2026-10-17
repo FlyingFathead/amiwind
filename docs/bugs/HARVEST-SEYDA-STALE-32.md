@@ -9,7 +9,7 @@
 | Where | Seyda Neen and docks harvest catalogues (46 maps) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | medium: Shipped plant catalogues do not match their maps in 46 maps. |
 | Family | Harvestable plants (`harvest`) |
 | Playtest version | v0.0.31 |

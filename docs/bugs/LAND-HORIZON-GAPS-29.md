@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 5 October 2026, in v0.0.29-dev2 |
 | Where | Bitter Coast, distant resident ground beyond the forward-distance gate |
 | Reproduction | always |
@@ -17,7 +17,7 @@
 
 ## Symptom
 
-Historical reports describe gaps in resident distant LAND. The owner supplies
+Historical reports describe gaps in resident distant LAND. The maintainer supplies
 two v0.0.38-dev2 screenshots showing an incomplete jagged mountain silhouette
 and asks that distant/topographic terrain occlude the sky. This follow-up is
 linked provisionally; the exact current cause is not independently reproduced.
@@ -54,7 +54,7 @@ occlusion without changing unrelated sky rendering. Measure baseline cost.
 
 ## Verification
 
-Owner evidence preserved; no new repair or native acceptance established.
+Maintainer evidence preserved; no new repair or native acceptance established.
 
 ## Prevention
 

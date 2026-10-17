@@ -20,10 +20,10 @@ license or its game compatibility.
 
 [UESP: Generic Dialogue Voiced](https://en.uesp.net/wiki/Morrowind:Generic_Dialogue_Voiced)
 is a useful community index for voiced lines and their associated audio filenames.
-Use it when matching greetings and other voice cues to files in an owner's
+Use it when matching greetings and other voice cues to files in a maintainer's
 installation, alongside the installed master records. It is a reference, not a
 replacement for original game data or a grant to redistribute the recordings.
-The converter must continue to read the owner's local files.
+The converter must continue to read the maintainer's local files.
 
 For the first Fargoth/guard milestone, see [NPC and greeting behaviour](OPENMW_REF_NPCS_AND_DIALOGUE.md), including the requested UESP voice reference and OpenMW selection/trigger paths.
 
@@ -36,7 +36,7 @@ rule from one opening event. Record access failures and use supplied excerpts
 without pretending they were fetched live.
 
 - [UESP: Attributes](https://en.uesp.net/wiki/Morrowind:Attributes) — character
-  fields and later attribute-effect research. Owner supplied the page text on
+  fields and later attribute-effect research. Maintainer supplied the page text on
   28 September 2026; the page reports a 24 October 2025 revision. Direct access
   returned HTTP 403 in this session. Retain the eight primary fields, distinguish
   base/modifier/current values and derived resources; defer full gameplay effect
@@ -50,9 +50,9 @@ without pretending they were fetched live.
   — direct object transforms used in the invisible-barrier investigation.
 - [Opening state conditions](CHARACTER_CREATION.md#persistent-rule-opening-access-is-conditional-world-state)
   and [trial/fix journal](IMPLEMENTATION_JOURNAL.md) — local findings and their
-  validation status. A passing local check is separate from owner acceptance.
+  validation status. A passing local check is separate from maintainer acceptance.
 
-- [UESP: Classes](https://en.uesp.net/wiki/Morrowind:Classes) — owner supplied
+- [UESP: Classes](https://en.uesp.net/wiki/Morrowind:Classes) — maintainer supplied
   page text on 28 September 2026, identifying a 9 August 2026 revision and
   CC BY-SA 2.5 attribution. Reference only; do not reconstruct the flattened
   comparison table as authoritative data. Read exact playable class records

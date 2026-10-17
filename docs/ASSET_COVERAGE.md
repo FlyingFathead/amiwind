@@ -48,11 +48,11 @@ upper-route/stair observations remain the intact control. Next inspect runtime
 visibility/collision. Any geometry repair remains Temple-only.
 See [the detailed issue](bugs/BALMORA-TEMPLE-GEOMETRY-29.md).
 
-Temple scope update: some walls/ceilings are intact; upper area and stairs look usable on the owner-tested route. Broken lower/other sections remain a major geometry/collision defect. [Detailed evidence and pipeline audit](bugs/BALMORA-TEMPLE-GEOMETRY-29.md).
+Temple scope update: some walls/ceilings are intact; upper area and stairs look usable on the maintainer-tested route. Broken lower/other sections remain a major geometry/collision defect. [Detailed evidence and pipeline audit](bugs/BALMORA-TEMPLE-GEOMETRY-29.md).
 
 ## RC1 Temple runtime coverage failure: 2026-10-06T13:53:32+00:00
 
-Owner playtesting reports missing walls/floors and pass-through collision in
+Maintainer playtesting reports missing walls/floors and pass-through collision in
 Balmora Temple. See [BALMORA-TEMPLE-GEOMETRY-29](bugs/BALMORA-TEMPLE-GEOMETRY-29.md).
 Unit: interior structural placements/surfaces; exact source, converted, packaged
 and affected counts **unknown** pending audit. Runtime acceptance has failed at
@@ -230,7 +230,7 @@ Current screenshots show the six-placement dev4 pilot only.
 | v0.0.29-dev4 mushroom diagnostic / 5 October, 18:45 UTC | No new packaged count claimed | 6 original placements from 3 source models converted into a bounded diagnostic sample | Native appearance untested; harvest interaction not implemented |
 | v0.0.29-dev4 harvest source candidate / 5 October, 19:15 UTC | 0 new mushroom placements in a delivered playtest | The same 6 diagnostic source placements now have original-content harvest catalogues and tested pickup/save logic | 0 native-accepted harvest placements; native pickup/appearance pending |
 | v0.0.29-dev4 hand diagnostic / 5 October, 19:15 UTC | 40 MDLs plus catalogue/emitter read back from a separate diagnostic image; no delivered playtest count claimed | 20 race/sex model pairs generated | Nord punch/torch checks and Argonian demo selection observed; complete live race coverage pending |
-| v0.0.29-dev4 mushroom cue/preview / 5 October, 19:30 UTC | 0 new packaged placements or cue outputs claimed | 1 selected source effect converted; source/runtime fixture passed; static preview owner-approved | Native pickup, appearance and audible cue remain unaccepted; requested interaction prompt pending |
+| v0.0.29-dev4 mushroom cue/preview / 5 October, 19:30 UTC | 0 new packaged placements or cue outputs claimed | 1 selected source effect converted; source/runtime fixture passed; static preview maintainer-approved | Native pickup, appearance and audible cue remain unaccepted; requested interaction prompt pending |
 | v0.0.29-dev4 verified source/staging / 6 October, 00:36 UTC | Final HDF and delivery pending at that checkpoint | 7,255 staged files /409,039,811 bytes; 6 original mushrooms, 3 shared models, 41 map catalogues; 949 source tests passed, 4 skipped | Final native acceptance pending |
 | v0.0.29-dev4 sealed package / 6 October, 04:27 UTC | 17,992 payload files /4,784,758,692 bytes; full image readback passed | 6,447 voices, 717 effects, 18 music tracks, 17 videos; 6 original mushrooms /3 models /41 catalogues packaged | Native and delivery acceptance pending at that checkpoint; not a release candidate |
 
@@ -394,7 +394,7 @@ are not part of this public report.
 
 ### Dev4 mushroom cue and preview update
 
-The owner approved the **static converted-mesh preview** (“mushrooms look great!”).
+The maintainer approved the **static converted-mesh preview** (“mushrooms look great!”).
 That feedback applies to the preview image only; native in-game appearance remains
 untested. The selected pickup cue has one present source file, one converted
 output and zero conversion failures. Its source/runtime fixture passed, but no

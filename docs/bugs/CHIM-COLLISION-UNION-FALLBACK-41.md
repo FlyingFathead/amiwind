@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 16 October 2026, in v0.0.41-dev3 |
 | Where | CHIM region frames near Hla Oad: (-8,-5) (-8,-4) (-7,-5) (-7,-4) (-6,-4) |
 | Reproduction | always |

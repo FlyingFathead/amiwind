@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 6 October 2026, in v0.0.29-rc2 |
 | Where | Bitter Coast cluster 266620-266622 (map vf0850 and its neighbours); aw_harvest_runtime.c target() |
 | Reproduction | always |
@@ -18,7 +18,7 @@
 ## Status: 10 October 2026
 
 Cause found and fixed in source for v0.0.34 (engine pick rule plus an island-wide pick audit that
-gates the image); owner playtest pending. Seen again by the owner in v0.0.33 at the same cluster.
+gates the image); maintainer playtest pending. Seen again by the maintainer in v0.0.33 at the same cluster.
 
 ## Symptom
 
@@ -52,7 +52,7 @@ placed plant can actually be picked.
 
 ## Reproduction
 
-Offline, with `tools/harvest_pick_audit.py audit` on the v0.0.33 image: at the owner's position the
+Offline, with `tools/harvest_pick_audit.py audit` on the v0.0.33 image: at the maintainer's position the
 replayed pick ray picks 266620 and is stopped by 266608's collision for the other two (both have
 their centre inside that solid). Island-wide, 51 of the 934 placed plants could not be picked from
 any standing position within reach (32 Luminous Russula, 19 Violet Coprinus). Every one of the 51 has
@@ -74,7 +74,7 @@ the plant stays a candidate. A wall between the eye and a plant in the open stil
 - `tools/harvest_pick_audit.py` on the v0.0.33 maps: 51 plants unpickable with the earlier rule, 0
   with the new one (934 plants, 325 maps); 9 plants have no standing position within reach (water or
   steep ground) and are reported, not judged.
-- Not yet: owner playtest at the reported cluster.
+- Not yet: maintainer playtest at the reported cluster.
 
 ## Prevention
 

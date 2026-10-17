@@ -27,9 +27,10 @@ Type: "dbg help" for help.
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg cam` | - | [mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel distance, right click or Esc ends |
 | `dbg camera` | `dbg pov`, `dbg thirdperson` | [first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md) |
 | `dbg crosshair` | `dbg crosshairs` | [on/off, true/false or 1/0; no argument toggles] show the crosshair (saved; default on; also Options > Show crosshairs) |
-| `dbg cull` | - | 0/1 or on/off (default 1) |
+| `dbg cull` | - | far detail (saved; also Options > Far detail): 1 Full (everything to the fog, default), 3 Light, 4 Strong, 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0 |
 | `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 540] |
 | `dbg fog` | - | on/off or 1/0 (default on) |
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off) |
@@ -171,7 +172,7 @@ Type: "dbg help" for help.
 | `dbg npcs` | - | - |
 | `dbg pos` | - | - |
 | `dbg probe` | - | (slow floor audit) |
-| `dbg rcount` | - | [0/1/2] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only |
+| `dbg rcount` | - | [0/1/2/3/4] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only; 3 = 2 + brush-slot profile (walk/emit split, distance x size table, leaves per placement); 4 = 3 printed |
 | `dbg savelogs` | - | write the in-memory diagnostic logs to the game folder now (also done at Exit game) |
 | `dbg sealevel` | - | on/off |
 | `dbg show fps` | - | [on/off] |

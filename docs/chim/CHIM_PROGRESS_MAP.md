@@ -27,7 +27,7 @@
 - [Blue: empty sea](#blue-empty-sea)
 - [Silver: open ocean](#silver-open-ocean)
 - [Gold: planned for a release](#gold-planned-for-a-release)
-- [Owner marks: approved, playtested, accepted](#owner-marks-approved-playtested-accepted)
+- [Maintainer marks: approved, playtested, accepted](#maintainer-marks-approved-playtested-accepted)
 - [Problems that are not a colour](#problems-that-are-not-a-colour)
 - [Who decides what](#who-decides-what)
 - [Package inclusion](#package-inclusion)
@@ -47,7 +47,7 @@
 
 [BUILD-INVENTORY-PALETTE-41](../bugs/BUILD-INVENTORY-PALETTE-41.md) — 15 October 2026, v0.0.41 source candidate: image assembly prepares inventory before the sky palette pass, which rejected current AWIC icons and AWI2/AWST metadata as unknown images. The source repair validates each inventory format at its exact path, remaps only icon pixels and preserves metadata bytes. Scoped evidence contains 15 passing palette checks and 2 passing inventory-asset checks on matching unchanged source. Actual image assembly, native verification, packaging and shipment remain pending.
 
-[CHIM-FRAME-STATIC-SEAM-40](../bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or owner acceptance is promoted.
+[CHIM-FRAME-STATIC-SEAM-40](../bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or maintainer acceptance is promoted.
 
 [CHIM-MODEL-ARENA-RESERVE-41](../bugs/CHIM-MODEL-ARENA-RESERVE-41.md) — 15 October 2026: exact allocation and predecessor-world checks remain separately recorded. The later 941 world stopped at its ownership guard because named aprons bypassed ten existing deferred-owner dispositions. The source-only disposition repair passes 38 focused checks; fresh world, boundary/model review and native/package acceptance remain pending.
 
@@ -354,7 +354,7 @@ failed and held cells explicitly. The ring table contains 5 open-ocean cells in
 ring 0, 171 cells in ring 1 and 160 in ring 2; this membership is not an inclusion
 claim. Interiors may independently remain BSP, CHIM or a mixture.
 
-## Owner marks: approved, playtested, accepted
+## Maintainer marks: approved, playtested, accepted
 
 These are explicit review states. A conversion, a green colour or a packaged
 file cannot set them. An accepted failure remains labelled as a failure accepted
@@ -389,7 +389,7 @@ full disk readback and independent package extraction. Six selected town
 overlaps remain partial and are excluded. The exact inspection artifacts were
 finalized at 2026-10-13T22:15:44Z. Conversion/audit/native-cell counts are unchanged;
 artifact shipment does not certify every actor, gameplay feature or route.
-Owner acceptance remains separate.
+Maintainer acceptance remains separate.
 
 **Historical RC1 package check, 13 October 2026:** the exact image and
 independently extracted package contain 360 verified
@@ -413,7 +413,7 @@ RC1 package and matching source delivery finalized on 13 October 2026 at
 kept distinct. The six partial overlaps remain outside the shipped whole-cell
 count. Final v0.0.39 private playtest and matching public source delivery
 finalized at 2026-10-14T07:15:35Z. Earlier RC1/RC2 scene checks remain
-historical, scoped evidence. Shipment does not establish owner acceptance
+historical, scoped evidence. Shipment does not establish maintainer acceptance
 or close the renewed [third-person punch](../bugs/PLAYER-PUNCH-THIRDPERSON-39.md),
 [readied movement](../bugs/PLAYER-READY-MOVEMENT-39.md),
 [blocking](../bugs/COMBAT-BLOCKING-36.md) or

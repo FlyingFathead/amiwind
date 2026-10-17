@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev4 |
 | Where | Balmora night lamps (engine lamp module) |
 | Reproduction | always |
@@ -21,7 +21,7 @@
 
 ## Status: 7 October 2026
 
-Open (limit of the v0.0.31-dev4 night lamps). Owner report; cause known.
+Open (limit of the v0.0.31-dev4 night lamps). Maintainer report; cause known.
 
 ## Symptom
 
@@ -55,11 +55,11 @@ few houses away.
 Not done. The lamp data is not lost between sub-cells: every lamp in the 3 x 3
 cells around the player is read and known to be lit. Only the nearest lamps get
 one of the few dynamic lights, so a step can hand a slot from the lamp ahead to
-one behind ("like walking into motion detector lights", owner).
+one behind ("like walking into motion detector lights", maintainer).
 
 dev5 mitigation: lamps ahead of the view win the slots (a lamp behind counts
 three times as far), a newly chosen lamp grows to full radius over 0.4 s instead
-of popping on, the lamp radius is the torch radius (owner choice from 1.0/1.5/2.0 captures) (`dbg outdoorlantern`), and
+of popping on, the lamp radius is the torch radius (project choice from 1.0/1.5/2.0 captures) (`dbg outdoorlantern`), and
 lantern glass and windows glow at night at any distance (no per-frame cost).
 
 Full repair (Quake's switchable lights): every lamp baked into the map

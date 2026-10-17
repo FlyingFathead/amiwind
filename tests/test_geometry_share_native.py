@@ -14,7 +14,7 @@ from test_share_bsp_geometry import repeated_geometry
 COMPILER = os.environ.get('CC') or shutil.which('cc') or shutil.which('gcc')
 
 
-@unittest.skipIf(os.name == 'nt', 'Owner workflow: no generated Windows test executables; run this native oracle on Linux')
+@unittest.skipIf(os.name == 'nt', 'Project workflow: no generated Windows test executables; run this native oracle on Linux')
 @unittest.skipUnless(COMPILER, 'install a host C compiler or set CC')
 class GeometryShareNativeTests(unittest.TestCase):
     def test_world_and_inline_face_winding_uv_and_light_samples_identical(self):

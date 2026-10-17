@@ -117,7 +117,7 @@ not certify every collider.
 
 ## dev4 follow-up
 
-The owner confirms the port rock fix in dev3. The later missing rider was an
+The maintainer confirms the port rock fix in dev3. The later missing rider was an
 entity spawn-order problem: actor floor traces ran before the platform brushes
 were linked. The cut-off town tree was a signed sprite-depth comparison against
 the background. Neither required changing the accepted rock mesh or terrain.
@@ -143,8 +143,8 @@ reason to ship open caps. See GEO-01 in the [bug journal](BUG_JOURNAL.md).
 
 ## v0.0.38 investigation: repeated shoreline rock gaps
 
-On 12 October 2026 the owner reported recurring open rock sections in
-v0.0.38-dev2, across Ashlands and Sheogorad shoreline cells. The owner reports
+On 12 October 2026 the maintainer reported recurring open rock sections in
+v0.0.38-dev2, across Ashlands and Sheogorad shoreline cells. The maintainer reports
 that this predates dev2; the first affected version remains unknown. See
 [WORLD-SHORE-OPEN-GEOMETRY-38](bugs/WORLD-SHORE-OPEN-GEOMETRY-38.md).
 Repeated shapes suggest a shared conversion problem rather than an isolated

@@ -6,12 +6,12 @@ The basis is the topomap: the open-world terrain, converted for the whole
 island, read from the runtime region table (id1/world/regions.awr). Everything
 else is a layer on top of it.
 
-Inputs (generated or owner-maintained; none of them game data in the output):
+Inputs (generated or maintainer-maintained; none of them game data in the output):
   --regions   id1/world/regions.awr from the image (terrain coverage per cell)
   --entities  entity-tracker.json from the image build (tools/entity_tracker.py)
   --poi       the private POI checklist JSON (tools/poi_checklist.py); only
               counts per cell are copied, never place names
-  --checked   docs/trackers/checked.json: cells the owner walked and accepted
+  --checked   docs/trackers/checked.json: cells the maintainer walked and accepted
 
 Per cell: map ("full" town/area map, "terrain" topomap only, or "none"),
 original vs placed entities, named places, interiors whose entrance is in the

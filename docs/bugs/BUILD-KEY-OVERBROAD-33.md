@@ -9,7 +9,7 @@
 | Where | Stage source fingerprints (tools/build_cache.py SourceIndex, _unit_facts) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Every tracker commit rebuilt the chain from interior onward for every worker (chim alone 125-210 s); the v0.0.33 final rebuilt harvest and chim for nothing. |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.33 final-f583c7b and temple-debug-004/006 |

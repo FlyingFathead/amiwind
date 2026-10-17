@@ -27,7 +27,7 @@ KINDS = ('chim-area', 'chim-region-cell')
 # The one reason a CHIM area's legacy town chain is still made: a labelled A/B test of a historical regression with
 # a retired flag (tools/retired_flags.py; refused in developer mode without --override). The earlier reason "source
 # of the town frame maps until the town is prepared CHIM-native" (Seyda Neen until v0.0.36-dev5) is gone: no CHIM
-# area takes its frame from a legacy chain any more (owner order 2026-10-11, BUILD-LEGACY-TOWN-MAPS-SHIPPED-36).
+# area takes its frame from a legacy chain any more (maintainer order 2026-10-11, BUILD-LEGACY-TOWN-MAPS-SHIPPED-36).
 KEPT_RETIRED_FLAG = 'A/B regression test with a retired flag (%s): the legacy town chain, labelled, never shipped'
 KEPT_REGION_MAP = ('source of the region frame map (--chim-region-rows legacy, the earlier method: worldspawn, player '
                    'start, flora sprites, sounds copied from it; every static checked against the CHIM placements)')
@@ -90,7 +90,7 @@ def region_cells(manifest):
 
 
 def collisions(manifest, steps, cells_text=None):
-    """The preflight collision check, before any stage (owner order: never a CHIM map and a legacy map of the same
+    """The preflight collision check, before any stage (maintainer order: never a CHIM map and a legacy map of the same
     cell): a list of refusals, empty when every cell has exactly one owner.
     - every open-world stage in STEPS ([(name, command)]) takes the CHIM region cells, exactly the manifest's, so
       its work list holds no legacy map of a CHIM cell;

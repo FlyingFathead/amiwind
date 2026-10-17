@@ -2,7 +2,7 @@
 
 Core world/cell/chunk design: [WORLD_MAPPING_PLAN.md](WORLD_MAPPING_PLAN.md).
 
-The host reads the owner's game data, converts a selected region, and writes a
+The host reads the maintainer's game data, converts a selected region, and writes a
 small target data representation outside the repository. A separate native
 Amiga runtime is intended to consume that representation.
 

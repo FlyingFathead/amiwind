@@ -9,7 +9,7 @@
 | Where | Benchmark tool awbench (engine/aga/bench/awbench.c), buffers mode |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | low: Tool reports a stale buffer count; measurement tooling. |
 | Family | Emulator measurement method (`benchmark-method`) |
 

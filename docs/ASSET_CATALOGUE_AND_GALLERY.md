@@ -4,7 +4,7 @@
 Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
 reduced or bypassed, including model/asset generation, catalogue coverage,
 quality and validation, without a specific documented case or scenario **and
-explicit approval from the project owner**. A builder or contributor cannot
+explicit approval from the project maintainer**. A builder or contributor cannot
 approve its own exception. Build time, disk pressure and convenience do not
 supply that approval. An opt-out flag is a mechanism for an approved exceptional
 debugging case, not permission to choose that exception independently.
@@ -98,7 +98,7 @@ imply that the Amiga can load or render it. Keep conversion on the build host;
 load prepared assets on demand at runtime with a bounded resident set. Do not
 put the whole catalogue's geometry or textures into RAM at once.
 
-Generate these reports from the owner's installed game files. Public source
+Generate these reports from the maintainer's installed game files. Public source
 contains the tools, schemas and synthetic examples; generated asset payloads and
 full game-derived catalogues stay with private build outputs.
 
@@ -118,7 +118,7 @@ the scale-filter path still present in rc8, found:
 Evidence master SHA-256:
 `5c3c8c2cbd20e25901b59b3ece33d36b7ef0e3d60ad8d11828bcc61a5ead1647`.
 This is a focused retained-output audit, not an inspection of every asset in the
-owner's current HDF or an emulator rendering test.
+maintainer's current HDF or an emulator rendering test.
 
 `prepare_quake.py` generates the flora sprite files, then skips any placement
 where `abs(scale - 1) > 0.02`. All sixteen calculated sprite origins fall inside

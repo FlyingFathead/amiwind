@@ -97,7 +97,7 @@ Face counts per view in the report; frame budget in the design.
 
 ## Exterior slowdown report and dev2 audit, 14 October 2026
 
-The owner reports occasional severe FPS drops around exterior Dwemer ruins and
+The maintainer reports occasional severe FPS drops around exterior Dwemer ruins and
 asks whether CHIM mesh optimization is still needed where CHIM maps already
 exist. The exact ruin, cell, coordinates, viewing direction, running build,
 settings and frame-time measurements are unknown. This report is not yet
@@ -133,7 +133,7 @@ control before selecting any mesh optimization:
 - Treat hidden faces, weak occlusion, transform/clip cost, detail levels,
   overdraw, cache pressure and streaming stalls as hypotheses. Link any
   confirmed cause to its canonical issue; the existing hidden-face, visibility
-  and slow-CPU reports do not prove this owner's cause.
+  and slow-CPU reports do not prove this maintainer's cause.
 - Compare original geometry/appearance in headless OpenMW at the same cell,
   position, heading and time. Preserve placements, silhouettes, UV/materials,
   lighting, collision, actors and gameplay. OpenMW is a fidelity reference,

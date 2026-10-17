@@ -33,7 +33,7 @@ actual C player across buffer boundaries, tails and at least 18 full track
 completions. Tests also cover Previous/Next history, modes, malformed playlists
 and truncated streams. These checks are not emulator audio evidence.
 
-The guided AGA build completed all eight stages from the owner's installed base
+The guided AGA build completed all eight stages from the maintainer's installed base
 files using the documented SDK, qcc and ericw-tools. It generated an RDB HDF and
 independently read back every payload. The qcc compile command was checked here.
 A fresh Linux distribution or different toolchain has not been tested.
@@ -55,7 +55,7 @@ prisms and multipart world brushes exceeded BSP29 limits. A direct-surface
 submodel trial separates visual meshes from collision; it must pass native
 loading, rendering, collision and memory checks before adoption.
 
-The owner's continuous-title report remains an acceptance case. The old
+The maintainer's continuous-title report remains an acceptance case. The old
 manifest demonstrably included title music in exploration. An unattended
 reference run opened multiple songs, so continuous repetition was not reproduced
 there; open counts alone do not prove full-song completion. New transition

@@ -1,6 +1,6 @@
 # v0.0.16 validation
 
-Date: 28 September 2026. This records local validation before owner publication.
+Date: 28 September 2026. This records local validation before maintainer publication.
 
 ## Completed
 
@@ -18,7 +18,7 @@ Date: 28 September 2026. This records local validation before owner publication.
   remain byte-identical to the checkpoint-017 playable baseline.
 - FS-UAE 3.1.66 booted a writable copy to the prison interior, changed to town
   and back, showed version v0.0.16, and exited cleanly to DOS. The normal boot
-  output shows the owner-approved credits and project URL.
+  output shows the maintainer-approved credits and project URL.
 - Console reported the initial fog distance as 540. Native graphics menu showed
   540, adjusted to 530 and reset to 540.
 - Native water check at player origin `(900,-900,-30)`, yaw 135, pitch 0 showed
@@ -43,7 +43,7 @@ hardware performance measurements.
 
 Existing prepared scenes and converted music were reused. Full clean conversion,
 fresh dependency installation, Windows/WSL execution and hosted GitHub CI have
-not been run here. The publisher waits for CI on the owner's pushed commit.
+not been run here. The publisher waits for CI on the maintainer's pushed commit.
 Native red damage application is exercised in the host-compiled real engine
 routine; this update does not introduce or certify drowning/combat gameplay.
 

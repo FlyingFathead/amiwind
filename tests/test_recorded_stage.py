@@ -52,11 +52,11 @@ class PinTests(unittest.TestCase):
         self.assertEqual(maps, sorted([f'sn{i:03d}.bsp' for i in range(64)] +
                                       ['intro_docks.bsp', 'sncourt.bsp', 'seyda.bsp']))
         self.assertEqual(set(files) - {'maps/' + m for m in maps}, {'seyda-regions.txt', 'seyda-regions.json'})
-        # v0.0.31's seyda.bsp is the complete town; option A (owner, 8 October 2026)
+        # v0.0.31's seyda.bsp is the complete town; option A (maintainer, 8 October 2026)
         # ships the fallback region alias instead, the one named difference.
         self.assertEqual(files['maps/seyda.bsp'][0], 4411968)
         self.assertEqual(aliases, {'maps/seyda.bsp': 'maps/sn029.bsp'})
-        self.assertIn('Owner decision', record['aliases']['maps/seyda.bsp']['reason'])
+        self.assertIn('Project decision', record['aliases']['maps/seyda.bsp']['reason'])
         ship = recorded_stage.shipped(files, aliases)
         self.assertEqual(len(ship), 69)
         self.assertEqual([n for n, s in ship.items() if n != s], ['maps/seyda.bsp'])

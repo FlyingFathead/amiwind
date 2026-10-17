@@ -34,7 +34,7 @@ use, so from almost anywhere in town Quake treats almost the whole town as
 visible. Everything in front of the player is transformed, clipped and sorted
 every frame, including houses hidden behind the one being looked at; only what
 is behind the player is skipped by the view test. Shortening the fog distance
-helps (owner measurement in Balmora: fog distance 250 roughly doubles the
+helps (maintainer measurement in Balmora: fog distance 250 roughly doubles the
 frame rate) because the far cut-off is then the only thing removing hidden
 buildings.
 

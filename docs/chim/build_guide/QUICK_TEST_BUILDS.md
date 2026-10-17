@@ -136,7 +136,7 @@ folder, and `build.json` keeps the summary:
   script;
 - `unresolved_kept`: names that point to no record, kept.
 
-Measured on the owner's own game files, for Balmora (its 9 exterior cells and
+Measured on the maintainer's own game files, for Balmora (its 9 exterior cells and
 43 interiors):
 
 | | Full build | Balmora only |

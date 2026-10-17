@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev2 |
 | Where | Seyda Neen shore stone wall near map sn019 |
 | Reproduction | always |
@@ -21,14 +21,14 @@
 
 ## Status: 7 October 2026
 
-Open. Owner report from the v0.0.31-dev2 playtest. Likely cause found by a
+Open. Maintainer report from the v0.0.31-dev2 playtest. Likely cause found by a
 ray-cast simulation of the reported pose; not yet confirmed with an in-game
 capture. No repair yet.
 
 ## Symptom
 
 A dark, brown, roughly triangular shape sticks out of the side of a stone wall,
-level with the ground, near the shore and the docks. The owner had not seen it
+level with the ground, near the shore and the docks. The maintainer had not seen it
 in earlier builds.
 
 ## Where

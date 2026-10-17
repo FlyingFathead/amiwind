@@ -18,7 +18,7 @@
 ## Status: 8 October 2026
 
 Open. Found by the map loader rework (decoding without staging). v0.0.32 ships sn019, sn026 and
-sn035 through a temporary pre-CHIM bypass of the strict heap gate (owner decision A, 8 October
+sn035 through a temporary pre-CHIM bypass of the strict heap gate (project decision A, 8 October
 2026): a temporary bypass for the legacy builder, removed when Seyda Neen moves to CHIM (milestone
 M2). M2 must pass the strict heap gate without it.
 
@@ -59,12 +59,12 @@ the seven had harvest in v0.0.31, so this is a player-visible regression:
 Not yet: measure the real overlap in the emulator and set the allowance from it; Seyda Neen
 is rebuilt by CHIM.
 
-Temporary pre-CHIM bypass (owner decision A, 8 October 2026; from-scratch build dev3-r2 stopped at
+Temporary pre-CHIM bypass (project decision A, 8 October 2026; from-scratch build dev3-r2 stopped at
 "World-map heap clearance estimate failed: estimate_failed; sn019.bsp, sn026.bsp, sn035.bsp"):
 
 - `config/heap-bypass.json`, section `temporary_pre_chim_heap_bypass`: each entry names the map,
   the SHA-256 of the exact recorded map (the same as in `config/seyda-recorded-v0.0.31.json`), the
-  builder (`legacy`), `until: "CHIM M2 (Seyda Neen on CHIM)"`, this bug and the owner decision. A
+  builder (`legacy`), `until: "CHIM M2 (Seyda Neen on CHIM)"`, this bug and the project decision. A
   separate file rather than the recorded-stage pin: the pin says which bytes are shipped, this file
   is a gate decision with its own end date, and it is read by the heap gate whether or not the
   recorded stage is used.

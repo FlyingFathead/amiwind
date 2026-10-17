@@ -99,7 +99,7 @@ limit would need.
 
 ## Accuracy and bias
 
-Measured on one owner's data (Morrowind, Tribunal, Bloodmoon); your numbers
+Measured on one user's data (Morrowind, Tribunal, Bloodmoon); your numbers
 come from `--sample-convert` and `estimate-calibrate`.
 
 Per mesh, against the submodels of 1,102 converted maps (interiors): faces
@@ -140,7 +140,7 @@ script or dialogue result names (scripts move the player with `PositionCell`).
 Each one is listed with its reason under `excluded_interiors` in
 `summary.json`. `config/world-estimate.json` is yours
 to edit: `include_cells` keeps a cell the rule would drop, `exclude_cells`
-drops any cell. On the owner's data the rule left out 15 interiors: every
+drops any cell. On the maintainer's data the rule left out 15 interiors: every
 known test cell and a few unused cells that nothing in the game leads to. `--exclude listed`
 applies only `exclude_cells`; `--exclude none` keeps everything. The rule uses
 no cell names, so the repository carries none.

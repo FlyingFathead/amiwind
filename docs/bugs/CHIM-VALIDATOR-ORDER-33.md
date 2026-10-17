@@ -9,7 +9,7 @@
 | Where | CHIM validator walk (tools/chim/validate.py) |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | low: Validator reports could differ between runs through string hash order. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

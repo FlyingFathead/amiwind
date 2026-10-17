@@ -7,9 +7,12 @@
 #include "aw_town.h"
 #include "aw_sky.h"
 #include "aw_horizon.h"
+#include "aw_rcount.h"
 extern short *d_pzbuffer;
 extern unsigned int d_zwidth;
 extern cvar_t aw_drawdistance;
+extern vec3_t modelorg;
+extern float xcenter,ycenter,xscale,yscale;
 static cvar_t aw_fog={"aw_fog","1",true};
 /* Land Fill Independence v1: disabling colour fog must not disable an
  * enabled geometric LAND pass. 0 disables LAND fill for a measured A/B. */
@@ -151,6 +154,12 @@ void AW_FogDraw(void) {
             for(k=0;k<3;k++)ray[k]+=delta[k];
         }
     }
+    /* aw_cull 7 (debug): mark where the sky ray crosses the horizon. */
+    if((int)aw_cull.value==7)for(x=0;x<w;x++)for(y=r_refdef.vrect.y+1;y<r_refdef.vrect.y+h;y++){
+        u=(r_refdef.vrect.x+x-((int)vid.width>>1))*step;v=(((int)vid.height>>1)-y)*step;
+        if(vpn[2]+u*vright[2]+v*vup[2]<0 && vpn[2]+u*vright[2]+(v+step)*vup[2]>=0)
+            vid.buffer[y*vid.rowbytes+r_refdef.vrect.x+x]^=0x80;
+    }
     if(aw_land_fill.value){
         if(aw_terrain_horizon.value==1)AW_HorizonDraw(ramp[15<<8],distance);
         if(aw_chim_far_draw)aw_chim_far_draw(ramp[15<<8],distance);
@@ -158,20 +167,157 @@ void AW_FogDraw(void) {
 }
 
 /* Far clipping uses the same forward depth as palette fog. Radial/cubic
- * cutoffs removed visible edge-of-screen ground before it reached the fog. */
-static cvar_t aw_cull={"aw_cull","1"};
+ * cutoffs removed visible edge-of-screen ground before it reached the fog.
+ * aw_cull (dbg cull, Options > Far detail; saved in config.cfg): 0 no far
+ * test; 1 the far plane alone (the method from v0.0.31 to v0.0.41, "Full"
+ * in the menu); 2: 1 plus the fog-exact test below (the same picture, fewer
+ * faces; measured 2026-10-17 at the five Balmora benchmark cameras: -3.2 %
+ * view time at one, +0.4..+0.8 % at the others; docs/performance/FAR-TEST.md);
+ * 3 and 4 add a size-scaled cut-off ("Light", "Strong"), 5 a far detail
+ * step, 6 both 4 and 5 ("Strong + small faces"). 1 is the default. 7 is a
+ * debug view: the fog-exact test without its colour checks (works with fog
+ * off, to see what it leaves out) and the sky ray's horizon marked. */
+static cvar_t aw_cull={"aw_cull","1",true};
 static float far_normal[3],far_distance;
 /* Brush polygons revisit the same world nodes many times in a frame.
  * Cache only the far-plane decision; PVS and brush sort keys remain untouched. */
 typedef struct {short *bounds;unsigned frame;int visible;} aw_far_cache_t;
 static aw_far_cache_t far_cache[2048];
 static unsigned far_frame;
+/* Fog-exact far test (aw_cull 2 and up; render speed plan E1). A brush model,
+ * or one of its faces, is left out only where drawing it changes no pixel:
+ * - every pixel it would cover takes the full fog colour: its z-buffer value
+ *   (32768/depth, D_DrawZSpans) is at most the last value the fog table maps
+ *   to level 15, and level 15 of the colour table maps every colour to one;
+ * - whatever it would hide takes that colour too: anything behind it is
+ *   deeper (level 15 as well); sky behind it lies strictly below the horizon
+ *   of the fog pass's sky ray (ray z < 0), where the sky pass maps every
+ *   colour to that same colour (checked each frame for all 256 colours: no
+ *   sun, moon, stars or glow there); the distant land layers draw it as well;
+ * - it hides no flame drawn after the fog pass (static fires, guard and
+ *   player torches, aw_guard_torch.c): its z-buffer value is at most the
+ *   smallest any flame particle can have this frame.
+ * Both conditions are half-spaces in view space (1/z and the sky ray's z are
+ * affine in screen position on a plane, and every covered pixel sample lies
+ * in the projected polygon), so a polygon passes when all its vertices do and
+ * a box when all its corners do. The object-silhouetting horizon
+ * (aw_skyline_fill 1) marks columns from fogged scenery: no test then. */
+#define FOG_HORIZON_MARGIN 1e-3f    /* sky ray z the fog pass's float stepping cannot reach from below 0 */
+int (*aw_flame_depth_limit)(void);
+static int fog_exact;               /* the test applies this frame */
+static float fog_exact_depth;       /* view depth from which a point is full fog and hides no flame */
+static float fog_down_k[3];         /* below-horizon form: k0*vpn + kx*vright + ky*vup */
+static float fog_down[3];
+static int size_cut;                /* aw_cull 3/4: size-scaled cut-off preset */
+static int detail_step;             /* aw_cull 5/6: far detail step */
+static float cut_distance;
+/* r_bsp.c face tests of the current pass, in model space (x, y, z, dist):
+ * aw_far_faces bit 0 = fog-exact test, bit 1 = detail step. */
+float aw_far_depth[4],aw_far_down[4],aw_far_view[4];
+int aw_far_faces;
+/* The last z-buffer value the fog table maps to level 15 (AW_FogDepths). */
+int AW_FogFullDepthValue(int distance) {
+    int last;
+    if(distance<100)distance=100;
+    if(distance>4096)distance=4096;
+    last=819200/(distance*25);
+    return last>32767?32767:last;
+}
+/* Why the test is off this frame (dbg rcount "ft" third figure): 1 no fog or no
+ * day/night tables, 2 the skyline fill, 3 level 15 not one colour, 4 the sky
+ * below the horizon not that colour, 5 a flame nearer than the full fog
+ * depth behind which nothing can be proved (z-buffer limit under 1). */
+static int fog_exact_begin(int distance) {
+    const byte *environment=R_DayNightFogColours();
+    int i,w=r_refdef.vrect.width,h=r_refdef.vrect.height,extent=w>h?w:h,limit,flames;byte full;float step;
+    if((int)aw_cull.value==7 && extent>0)goto geometry; /* debug view: the colour checks skipped */
+    if(!colours || !aw_fog.value || !environment || extent<=0){AW_RC_ADD(RC_FAR_FOG_WHY,1);return 0;}
+    if(aw_skyline_fill.value>0 && w<=SKYLINE_MAX){AW_RC_ADD(RC_FAR_FOG_WHY,2);return 0;}
+    full=environment[15<<8];
+    for(i=0;i<256;i++){
+        if(environment[(15<<8)+i]!=full){AW_RC_ADD(RC_FAR_FOG_WHY,3);return 0;}
+        if(R_DayNightSkyPixel((unsigned char)i,0,0,-1,1)!=full){AW_RC_ADD(RC_FAR_FOG_WHY,4);return 0;}
+    }
+geometry:
+    limit=AW_FogFullDepthValue(distance);
+    if(aw_flame_depth_limit && (flames=aw_flame_depth_limit())<limit)limit=flames;
+    if(limit<1){AW_RC_ADD(RC_FAR_FOG_WHY,5);return 0;}
+    fog_exact_depth=32768.0f/(limit+.5f);
+    /* The fog pass's sky ray at screen (col,row) has z = vpn.z + (col-W/2)*step*vright.z
+     * + (H/2-row)*step*vup.z; with col = xcenter + xscale*x/z and row = ycenter - yscale*y/z
+     * (R_EmitEdge) that times the view depth z is k0*z + kx*x + ky*y. */
+    step=2.0f/extent;
+    fog_down_k[0]=vpn[2]+(xcenter-(float)((int)vid.width>>1))*step*vright[2]+
+        ((float)((int)vid.height>>1)-ycenter)*step*vup[2]+FOG_HORIZON_MARGIN;
+    fog_down_k[1]=xscale*step*vright[2];
+    fog_down_k[2]=yscale*step*vup[2];
+    for(i=0;i<3;i++)fog_down[i]=fog_down_k[0]*vpn[i]+fog_down_k[1]*vright[i]+fog_down_k[2]*vup[i];
+    AW_RC_ADD(RC_FAR_FOG_ON,100);AW_RC_ADD(RC_FAR_FOG_DEPTH,(long)fog_exact_depth);
+    return 1;
+}
 void AW_CullBegin(void) {
-    float distance=AW_Interior()?4096:AW_DrawDistance();
+    float distance=AW_Interior()?4096:AW_DrawDistance();int mode=(int)aw_cull.value;
     if(!++far_frame){memset(far_cache,0,sizeof(far_cache));far_frame=1;}
     VectorCopy(vpn,far_normal);
     far_distance=DotProduct(r_origin,far_normal)+distance+16;
+    fog_exact=mode>=2 && !AW_Interior() && fog_exact_begin((int)distance);
+    size_cut=AW_Interior()?0:mode==3?1:mode==4 || mode==6?2:0;
+    detail_step=!AW_Interior() && (mode==5 || mode==6);
+    cut_distance=distance;
 }
+int AW_FogExactActive(void) {return fog_exact;}
+float AW_FogExactDepth(void) {return fog_exact_depth;}
+/* Size-scaled cut-off presets (aw_cull 3, 4): a placement whose near side
+ * (centre depth less its radius) lies past this share of the draw distance is
+ * left out; the size classes are those of dbg rcount 3 (radius under 32,
+ * 32-128, 128-512, 512 and over). */
+static const float size_cut_share[2][4]={{.50f,.75f,1,1},{.40f,.60f,.85f,1}};
+float AW_SizeCutShare(int preset,float radius) {
+    int k=radius<32?0:radius<128?1:radius<512?2:3;
+    return preset<1 || preset>2?1:size_cut_share[preset-1][k];
+}
+/* A brush model pass with world box minmaxs (the box R_DrawBEntitiesOnList
+ * gives the frustum test; a rotated model's is the cube of its radius):
+ * AW_FAR_DRAW, AW_FAR_SKIP (nothing of it drawn) or AW_FAR_FACES plus the
+ * face tests (<<4) to give AW_FarPassBegin after R_RotateBmodel. */
+int AW_BrushPassFar(vec3_t origin,float radius,const float *minmaxs) {
+    float eye,depth,nearest=0,farthest=0,down=0,top=0;int i,faces=0;
+    if(!aw_cull.value)return AW_FAR_DRAW;
+    eye=DotProduct(r_origin,far_normal);
+    depth=DotProduct(origin,far_normal)-eye;
+    if(size_cut && depth-radius>cut_distance*AW_SizeCutShare(size_cut,radius))return AW_FAR_SIZE;
+    if(fog_exact){
+        for(i=0;i<3;i++){
+            nearest+=far_normal[i]*minmaxs[i+(far_normal[i]<0?3:0)];
+            farthest+=far_normal[i]*minmaxs[i+(far_normal[i]<0?0:3)];
+            top+=fog_down[i]*minmaxs[i+(fog_down[i]<0?0:3)];
+            down+=fog_down[i]*minmaxs[i+(fog_down[i]<0?3:0)];
+        }
+        nearest-=eye;farthest-=eye;
+        top-=DotProduct(r_origin,fog_down);down-=DotProduct(r_origin,fog_down);
+        if(nearest>=fog_exact_depth && top<0)return AW_FAR_SKIP;
+        if(farthest>=fog_exact_depth && down<0)faces|=1;
+    }
+    if(detail_step && radius>=32 && depth>cut_distance*.5f)faces|=2;
+    return faces?AW_FAR_FACES|faces<<4:AW_FAR_DRAW;
+}
+/* After R_RotateBmodel (vpn, vright, vup and modelorg in model space): the
+ * model-space planes of the face tests AW_BrushPassFar asked for. */
+void AW_FarPassBegin(int result) {
+    int i;float d[3];
+    aw_far_faces=result>>4;
+    for(i=0;i<3;i++){
+        aw_far_depth[i]=aw_far_view[i]=vpn[i];
+        d[i]=aw_far_down[i]=fog_down_k[0]*vpn[i]+fog_down_k[1]*vright[i]+fog_down_k[2]*vup[i];
+    }
+    aw_far_view[3]=DotProduct(modelorg,vpn);
+    aw_far_depth[3]=aw_far_view[3]+fog_exact_depth;
+    aw_far_down[3]=DotProduct(modelorg,d);
+}
+/* r_bsp.c, aw_cull 5/6: a front face of a far model (AW_BrushPassFar) whose
+ * largest model-space extent covers fewer than this many pixels at its
+ * nearest vertex is left out. */
+float aw_far_detail_pixels=2;
 int AW_NodeVisible(short *bounds) {
     float nearest=0;int i;aw_far_cache_t *cached;
     if(!aw_cull.value)return 1;

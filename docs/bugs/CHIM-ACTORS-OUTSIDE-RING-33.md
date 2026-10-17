@@ -9,7 +9,7 @@
 | Where | server physics with CHIM chunks (actors outside the ring) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: Actors outside the loaded ring could fall through terrain. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Stairs and collision on CHIM worlds ([CHIM Engine tracker](CHIM_TRACKER.md)) |

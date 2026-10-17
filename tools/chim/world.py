@@ -20,6 +20,7 @@ Rules (docs/chim/WORLD_FORMAT.md):
 import hashlib
 import json
 import math
+import os
 import struct
 from pathlib import Path
 
@@ -323,6 +324,132 @@ def frame_order(frames):
                                                      cells[k]))
 
 
+VIS_ROWS_ENV = 'AMIWIND_CHIM_VIS_ROWS'
+VIS_ROWS_MODES = ('frames', 'serial')
+# A frame of at most this many chunks (a region frame: one cell, 15 x 15 chunks) has its visibility rows worked out
+# whole on one worker; larger frames (towns: 576 to 2,916 chunks in dev5) spread their own blocks over every
+# worker, one frame after another.
+FRAME_VIS_CHUNKS = 256
+
+
+def _visibility_inputs(spec, layout, settings):
+    """What chunk_visibility reads of one frame, without the terrain images and model lumps."""
+    world, by_chunk, _, _, _ = layout
+    keep = ('_pid', '_box', 'variant', 'origin', 'yaw')
+    rows = {c: {kind: [{k: p[k] for k in keep} for p in by_chunk[c][kind]] for kind in ('owned', 'reach')}
+            for c in world.order}
+    # variant keys mix model numbers and ('tile', ...) tuples (chim/build.py terrain tiles): order them by repr
+    used = {p['variant'] for c in world.order for p in by_chunk[c]['owned']}
+    variants = {k: {'occluders': spec['variants'][k]['occluders'],
+                    **({'occluder_grid': spec['variants'][k]['occluder_grid']}
+                       if spec['variants'][k].get('occluder_grid') else {})} for k in sorted(used, key=repr)}
+    terrain = {c: {'info': {'zmax': spec['terrain'][c]['info']['zmax']}} for c in world.order}
+    return spec['frame'], settings, terrain, rows, variants, spec.get('visibility')
+
+
+def _frame_visibility_task(task):
+    """Worker of frame_visibility: one frame's visibility rows on one worker, and its unit counts."""
+    frame, settings, terrain, rows, variants, visibility, cache = task
+    world = World(frame, settings)
+    result = chunk_visibility(world, terrain, rows, variants, visibility, 1, cache)
+    if cache is None:
+        return result, {}, None
+    return result, cache.stats, getattr(cache, 'pool_stats', None)
+
+
+def frame_visibility(specs, layouts, settings=None, jobs=1, cache=None):
+    """[(pvs, pvl, stats)] of every frame, in the order given (B5, v0.0.42).
+
+    The method before v0.0.42 (AMIWIND_CHIM_VIS_ROWS=serial) worked each frame out in turn, its blocks on the
+    workers: the hundreds of one-cell region frames of a regional world (32 blocks each, most of them reused
+    from the unit cache, looked up and decoded here) then kept one core busy for about four minutes (dev5).
+    Now frames of at most FRAME_VIS_CHUNKS chunks go whole to the workers, largest first, beside each other;
+    larger frames keep their blocks spread over every worker. The unit keys do not change, so the rows are the
+    same and the cached units are reused."""
+    mode = os.environ.get(VIS_ROWS_ENV, 'frames')
+    if mode not in VIS_ROWS_MODES:
+        raise ValueError('%s=%s: choose %s' % (VIS_ROWS_ENV, mode, ' or '.join(VIS_ROWS_MODES)))
+    results = [None] * len(specs)
+    small = []
+    for i, (spec, layout) in enumerate(zip(specs, layouts)):
+        world, by_chunk = layout[0], layout[1]
+        if mode == 'frames' and jobs > 1 and len(specs) > 1 and len(world.order) <= FRAME_VIS_CHUNKS:
+            small.append(i)
+            continue
+        results[i] = chunk_visibility(world, spec['terrain'], by_chunk, spec['variants'], spec.get('visibility'),
+                                      jobs, cache)
+    if small:
+        from build_parallel import ordered_map
+        import progress_line
+        tasks = [(*_visibility_inputs(specs[i], layouts[i], settings), _unit_cache_copy(cache)) for i in small]
+        weight = {id(t): sum(len(r['owned']) + len(r['reach']) for r in t[3].values()) + len(t[3]) for t in tasks}
+        done = 0
+        for i, (result, stats, pool_stats) in zip(small, ordered_map(_frame_visibility_task, tasks, max(1, min(jobs, len(tasks))),
+                                                         cost=lambda t: weight[id(t)])):
+            results[i] = result
+            if cache is not None:
+                for kind, counts in stats.items():
+                    mine = cache.stats.setdefault(kind, {})
+                    for k, v in counts.items():
+                        mine[k] = mine.get(k, 0) + v
+                if pool_stats and hasattr(cache, 'pool_stats'):
+                    for k, v in pool_stats.items():
+                        cache.pool_stats[k] = cache.pool_stats.get(k, 0) + v
+            done += 1
+            if done % 50 == 0 or done == len(small):
+                progress_line.emit('CHIM visibility rows', 'frames', 'one frame per worker', (done, len(small), 'frames'))
+    return results
+
+
+def _unit_cache_copy(cache):
+    """A worker's copy of the unit cache: the same folder (and pool), its own counts."""
+    if cache is None:
+        return None
+    import copy
+    clone = copy.copy(cache)
+    clone.stats = {}
+    if hasattr(clone, 'pool_stats'):
+        clone.pool_stats = {k: 0 for k in clone.pool_stats}
+        clone._keys = {}
+    return clone
+
+
+def frame_layout(spec, settings, pid):
+    """((world, by_chunk, placement rows, first id, owned count), next id) of one frame: every placement with its
+    stored origin, box, owning chunk, touched chunks, leaves and id (ids run on from PID, chunk by chunk)."""
+    world = World(spec['frame'], settings)
+    variants, terrain = spec['variants'], spec['terrain']
+    by_chunk = {c: {'owned': [], 'reach': []} for c in world.order}
+    seen_refs = set()
+    rows_in = []
+    for p in spec['placements']:
+        if p['ref'] in seen_refs:
+            raise ValueError('Placement %d listed twice' % p['ref'])
+        seen_refs.add(p['ref'])
+        v = variants[p['variant']]
+        # origin, yaw and model bounds as stored (single precision), so the engine and
+        # the validator derive the same box from the files
+        p = dict(p, origin=tuple(f32(x) for x in p['origin']), yaw=f32(p['yaw']))
+        box = stored_box(*placed_box(p['origin'], p['yaw'], [f32(x) for x in v['lo']], [f32(x) for x in v['hi']]))
+        owner = world.chunk_of(p['origin'][0], p['origin'][1])
+        p = dict(p, _owner=owner, _box=box, _touched=world.touched(*box) | {owner})
+        by_chunk[owner]['owned'].append(p)
+        rows_in.append(p)
+    base = pid
+    trees = {}
+    for c in world.order:
+        for p in sorted(by_chunk[c]['owned'], key=lambda q: q['ref']):
+            p['_pid'] = pid
+            pid += 1
+            for t in sorted(p['_touched'] - {c}):
+                by_chunk[t]['reach'].append(p)
+    owned_total = pid - base
+    for p in rows_in:
+        lo, hi = p['_box']
+        p['_leaves'] = sum(len(placed_tree(terrain[c], trees).leaves_touched(lo, hi)) for c in p['_touched'])
+    return (world, by_chunk, rows_in, base, owned_total), pid
+
+
 def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=None, timer=None):
     """Write chim/ under `out` for one or more frames; returns the receipt.
 
@@ -337,6 +464,7 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     if not frames:
         raise ValueError('A world needs at least one frame')
     order = frame_order(frames)
+    import progress_line
     root = Path(out) / 'chim'
     texture_ids, texture_content, texture_records, texture_names = {}, {}, [], {}
     model_ids, model_content, model_records, aliases, model_names = {}, {}, [], [], {}
@@ -394,41 +522,20 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     model_at, texture_at = {}, {}
     pid = 0
     vis_totals, reach_total, over_total, largest = {}, 0, 0, 0
+    # Every frame's placement layout first (ids run on across frames in pack order), then the visibility rows of
+    # all frames on the workers, then the pack in order (B5, v0.0.42; frame_visibility). Same files.
+    layouts = []
     for fi in order:
+        layout, pid = frame_layout(frames[fi], settings, pid)
+        layouts.append(layout)
+    import build_profile      # timed phases: start/end lines with time and cores (never part of a key)
+    with section('visibility rows'), build_profile.phase('CHIM world: visibility rows', '%d frames' % len(frames)):
+        visible = frame_visibility([frames[fi] for fi in order], layouts, settings, jobs, cache)
+    pack_timer = build_profile.phase('CHIM world: pack', '%d frames' % len(frames)).__enter__()
+    for fi, layout, (pvs, pvl, vis_stats) in zip(order, layouts, visible):
         spec = frames[fi]
-        world = World(spec['frame'], settings)
+        world, by_chunk, rows_in, base, owned_total = layout
         variants, terrain = spec['variants'], spec['terrain']
-        by_chunk = {c: {'owned': [], 'reach': []} for c in world.order}
-        seen_refs = set()
-        rows_in = []
-        for p in spec['placements']:
-            if p['ref'] in seen_refs:
-                raise ValueError('Placement %d listed twice' % p['ref'])
-            seen_refs.add(p['ref'])
-            v = variants[p['variant']]
-            # origin, yaw and model bounds as stored (single precision), so the engine and
-            # the validator derive the same box from the files
-            p = dict(p, origin=tuple(f32(x) for x in p['origin']), yaw=f32(p['yaw']))
-            box = stored_box(*placed_box(p['origin'], p['yaw'], [f32(x) for x in v['lo']], [f32(x) for x in v['hi']]))
-            owner = world.chunk_of(p['origin'][0], p['origin'][1])
-            p = dict(p, _owner=owner, _box=box, _touched=world.touched(*box) | {owner})
-            by_chunk[owner]['owned'].append(p)
-            rows_in.append(p)
-        base = pid
-        trees = {}
-        for c in world.order:
-            for p in sorted(by_chunk[c]['owned'], key=lambda q: q['ref']):
-                p['_pid'] = pid
-                pid += 1
-                for t in sorted(p['_touched'] - {c}):
-                    by_chunk[t]['reach'].append(p)
-        owned_total = pid - base
-        for p in rows_in:
-            lo, hi = p['_box']
-            p['_leaves'] = sum(len(placed_tree(terrain[c], trees).leaves_touched(lo, hi)) for c in p['_touched'])
-        with section('visibility rows'):
-            pvs, pvl, vis_stats = chunk_visibility(world, terrain, by_chunk, variants, spec.get('visibility'),
-                                                   jobs, cache)
         for k, v in vis_stats.items():
             if isinstance(v, (int, float)) and not isinstance(v, bool):
                 vis_totals[k] = vis_totals.get(k, 0) + v
@@ -535,6 +642,13 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
             reach_total += sum(len(v['reach']) for v in by_chunk.values())
             over_total += sum(1 for p in rows_in if p['_leaves'] > F.MAX_ENT_LEAFS)
             largest = max([largest] + [r[2] for r in sector_rows])
+        if len(frames) > 1:
+            # one line per frame: the visibility rows and the pack of a world of hundreds of frames are minutes
+            # of work (fixlist B2: dev5 printed nothing here)
+            progress_line.emit('CHIM world frames', fdir, '%d placements, %d chunks, %d sectors'
+                               % (owned_total, len(chunk_rows), len(sector_rows)),
+                               (len(frame_recs), len(frames), 'frames'))
+    pack_timer.__exit__(None, None, None)
     with section('pack assembly'):
         if len(model_records) > 65535 or len(texture_records) > 65535:
             raise ValueError('Model or texture count beyond format 0.2 ids')

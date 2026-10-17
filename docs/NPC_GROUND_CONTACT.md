@@ -8,6 +8,7 @@ proof of foot contact after geometry conversion.
 ## Contents
 
 - [Classify the intended initial state first](#classify-the-intended-initial-state-first)
+- [Interior creatures and the levitating class](#interior-creatures-and-the-levitating-class)
 - [Main gate: host build, before packaging](#main-gate-host-build-before-packaging)
 - [Runtime correction](#runtime-correction)
 - [Native integration checks](#native-integration-checks)
@@ -48,6 +49,44 @@ Authored corpses keep their death pose and placement. Their pose/contact checks,
 swimming depth, flight clearance and later scripted movement are separate
 contracts. A future placement-specific override must use the placed reference,
 not change every instance of a source actor to hide one bad placement.
+
+## Interior creatures and the levitating class
+
+From v0.0.42 the resident stage (`tools/prepare_area.py` populate, through `tools/creature_residents.py`)
+also places creature records (CREA) in converted interiors (INTERIOR-CREATURES-MISSING-41). Before, it took
+NPC records only and dropped every creature without a log line. `--interior-creatures` selects which:
+
+| Mode | What is placed |
+| --- | --- |
+| `listed` (default) | the creatures in `config/interior_creatures.json`, each with a reason and a source: Vivec (`vivec_god`) in the Palace of Vivec |
+| `all` (experimental) | every interior creature reference that `config/actor_grounding.json` classifies and whose model bakes |
+| `off` | no creature: the method before v0.0.42 |
+
+A creature's model is its own NIF posed on its own skeleton: 8 frames over one loop of its idle group (the
+gallery profile's `pose_event` group in `config/gallery_model_quality.json`, else `idle`), at the original
+scale and **not** moved to the floor, so the height the animation gives the body above the reference point is
+kept. Vivec: the `idle2` loop (his AI_W idle chances give Idle2 60; his model has no `idle` group), the posed
+body from 13.9 to 33.1 Quake units above his reference point. A placed creature is an idle `aw_npc` like the
+placed NPCs: no greeting, dialogue or combat yet (nothing is invented).
+
+The support state is the policy's class, never a rule for one ID in code. `levitating` (aw_ground_mode 1)
+means the authored animation holds the body above the actor's reference point: the host contact fit and the
+image-stage ground check skip the actor, and the engine's floor snap (`AW_NPCFloor`) leaves the origin where
+the reference put it. Source for Vivec: the record has neither the Flies nor a Levitate effect, so the
+original engine keeps his actor on the floor and the lift is the animation's; his reference point is
+0.15 Quake units under the converted palace floor, so keeping it equals snapping it within that.
+
+Every room reference the stage does not place is listed with its reason in the stage report
+(`<town>-interiors.json` or `area-report.json`, `left_out`: map, reference, ID, type, reason): creatures not
+listed, levelled creature lists (the pick is not resolved at build time), authored dead creatures (no
+creature death pose bake yet), creatures the policy does not classify (`all`), instance scales other than 1,
+models that do not bake (`all`) and NPCs excluded by the town settings. The report's `creatures` row gives the
+mode and the number placed.
+
+Island-wide, the base master places 530 creature references in interiors (178 records, 222 cells). With
+`all`, Vivec is the only one classified today: 494 references have no grounding classification and 35 are
+authored dead. Classifying them is source work (Flies flag, the Levitate effect, water level, measured
+support), as for the NPCs; by their records 330 walk, 108 swim only, 1 flies and 91 have none of the three.
 
 ## Main gate: host build, before packaging
 
@@ -124,7 +163,7 @@ their complete collision and are measured directly.
    footwear, slopes and platforms. Test the full idle cycle where feet move.
    Bounding-box contact alone cannot certify both feet on an uneven surface.
 6. Keep the report and native captures in private release evidence. Summarize
-   checked maps, remaining exceptions and owner acceptance in public notes.
+   checked maps, remaining exceptions and maintainer acceptance in public notes.
 
 The audit never moves actors. Automatic correction and independent measurement
 are separate steps. Do not hide a failure by removing the NPC from the report or
@@ -138,7 +177,7 @@ systems need their own support rules when implemented.
 
 ## Diagnostic RC2 exception
 
-The owner requested an interim RC2 while placement and model-budget investigations
+The maintainer requested an interim RC2 while placement and model-budget investigations
 remain open. Its separate snapshot package retains the failed audit, exact payload
 hashes and all 23 unresolved contacts. This is a diagnostic distribution exception,
 not a successful placement gate. The normal `build_aga.py image` gate remains
@@ -162,7 +201,7 @@ town, dock and courtyard scenes. They are not 23 different levitating characters
 | Balmora Temple | Llarara Omayn (259838) |
 | Seyda Neen | Dock guard (172852), Erene Llenim (128960), Indrele Rathryon (128961), Vodunius Nuccius (128962), Eldafire (128963), Fargoth (128964), Imperial Guards (128965 and 128966) |
 
-The owner recalls earlier unintended floating NPCs outdoors in Balmora. The
+The maintainer recalls earlier unintended floating NPCs outdoors in Balmora. The
 outdoor Dreamer finding is relevant evidence, but there is not yet a verified
 mapping from those earlier sightings to every current reference. The report
 also includes penetration and unsupported/blocked samples, not only floating.

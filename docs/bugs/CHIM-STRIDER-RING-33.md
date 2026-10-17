@@ -9,7 +9,7 @@
 | Where | CHIM Balmora heap gate (tools/chim/heap.py) with the strider profile of MESH-LOD-OPEN-SEAMS-33 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev, v0.0.33 (last seen) |
+| Persists in | fixed in v0.0.34 |
 | Severity | high: The strict CHIM heap gate would fail the Balmora build once the fix and the CHIM builder are merged together |
 | Family | Map heap and memory budget (`heap-memory`) |
 | CHIM | Performance ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -66,7 +66,7 @@ Variants: B = the shipped profile (ratio 0.5), D = boundary-locked 0.5, E = the 
 | Seyda Neen ring at 636 | 5,683,920 (ok) | 5,696,016 (ok) | 5,960,944 (ok, +281,360) |
 | Seyda Neen ring at 892 | 6,417,728 (29 over) | 6,429,824 (31) | 6,694,752 (181) |
 | Zone walk, Balmora lawnmower (6,111 steps): holes / loads without room / partial | 0 / 30 / 25 | 0 / 29 / 24 | 0 / 51 / 39 |
-| Zone walk, owner's route twice (1,192 steps) | 0 / 26 / 19 | 0 / 31 / 22 | 0 / 37 / 27 |
+| Zone walk, maintainer's route twice (1,192 steps) | 0 / 26 / 19 | 0 / 31 / 22 | 0 / 37 / 27 |
 | Zone walk, Seyda Neen lawnmower (4,674 steps) | 0 / 14 / 10 | 0 / 13 / 9 | 0 / 14 / 10 |
 
 The load-radius ring (892) is over the budget for every variant already

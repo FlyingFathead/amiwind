@@ -9,7 +9,7 @@
 | Where | tools/exterior_sky_build.py configure_staged_maps |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: the Vivec stage A image (try4) had no gfx/aw_shared_sky.lmp while its frame named it; a room in such a build stops the image step |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -36,7 +36,7 @@ the shared sky at all, although its CHIM frame map names it in its worldspawn.
 `tools/exterior_sky_build.py` `configure_staged_maps`: the shared sky was installed only when the build has an exterior
 Quake map (a region map, a town map, an open-world map). An area build of a CHIM town (the MiniWind of the Vivec Arena)
 has none: its exterior is a CHIM frame map, which the sky pass does not list. So nothing installed the sky the image step
-had prepared from the owner's own cloud artwork (`prepare_shared_sky_assets.prepare_staged_sky`), although the frame map
+had prepared from the maintainer's own cloud artwork (`prepare_shared_sky_assets.prepare_staged_sky`), although the frame map
 (`chim_town_rows`) and every classified room (the sky pass tags interiors too) name it.
 
 ## How it happened
@@ -99,8 +99,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 <!-- END GENERATED CATEGORY -->

@@ -13,7 +13,7 @@ NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
 requested debugging purposes. Build time and disk usage are not reasons to omit it.
 
 Normal builds and recovery MUST include the gallery; missing input/model/catalogue
-content is an error, never an automatic opt-out. Only the owner's explicit
+content is an error, never an automatic opt-out. Only the maintainer's explicit
 --no-npc-gallery permits debugging-only omission of inspection assets. It must
 never remove required game NPC content or change the normal default.
 
@@ -28,7 +28,7 @@ coverage, quality and validation, must not be disabled, reduced or bypassed
 without a specific documented case/scenario and explicit approval from the
 project owner. The builder or contributor cannot approve its own exception.
 Time pressure, storage pressure and convenience are not approval. Existing
---no-npc-gallery support is only a mechanism for an owner-approved exceptional
+--no-npc-gallery support is only a mechanism for a maintainer-approved exceptional
 debugging case; its availability does not grant permission to use it.
 
 A complete game requires all of its NPC and other game assets intact, packaged
@@ -157,7 +157,7 @@ DISABLED_MARKER = 'npc-gallery-disabled.txt'
 
 
 def omit_gallery(id1):
-    """Omit inspection assets only for a documented, owner-approved debug case.
+    """Omit inspection assets only for a documented, maintainer-approved debug case.
 
     The caller must have explicit outside approval from the project owner;
     this function and the opt-out flag do not authorize an exception. Preserve
@@ -371,7 +371,7 @@ def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_ru
     """Convert the complete NPC/creature catalogue; unresolved models must fail.
 
     Do not reduce catalogue coverage or protected geometry to save build time.
-    Any exception requires a specific case and explicit project-owner approval.
+    Any exception requires a specific case and explicit maintainer approval.
     All source records remain accounted for; normal game builds require this
     inspection gallery as well as every NPC asset required by the game.
     """

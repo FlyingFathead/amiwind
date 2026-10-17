@@ -114,7 +114,7 @@ here (next experiment: large direct reads into the game's own memory).
 
 Same-batch FS-UAE measurements above (2 valid runs per variant, all six
 Seyda maps). `tests/test_file_read_buffer.py` guards the buffer setup. The
-packaged build and an owner playtest are pending.
+packaged build and a maintainer playtest are pending.
 
 ## Prevention
 

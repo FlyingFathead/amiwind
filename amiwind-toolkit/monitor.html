@@ -187,7 +187,7 @@ function sectionTip(sec, stage, source) {
     (sec.files_written ? ' · wrote ' + sec.files_written + ' files' + (sec.last_written && sec.last_written.length ? ' (last: ' + sec.last_written.join(', ') + ')' : '') : '') +
     (isLow(sec) ? ' · UNDER ' + LOW_CORES + ' CORES' + (sec.low_run ? ' (part of a ' + (sec.low_run / 60).toFixed(1) + ' min low-core stretch)' : '') : '');
 }
-// Red stretches: where the build's cores stay under THRESHOLD for at least MIN seconds (owner: "wherever utilization
+// Red stretches: where the build's cores stay under THRESHOLD for at least MIN seconds (maintainer: "wherever utilization
 // drops to 1-2 cores"). SERIES: [[t, cores], ...] in time order. Returns [{start, end, mean}].
 function redStretches(series, threshold, min) {
   const out = [];

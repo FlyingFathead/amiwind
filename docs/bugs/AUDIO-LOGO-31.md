@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev2 |
 | Where | Startup logo video and title music (aw_movie.c, aw_menu.c) |
 | Reproduction | always |
@@ -21,7 +21,7 @@
 
 ## Status: 7 October 2026
 
-Open. Owner report in WinUAE; cause found in source; repair in source, not yet
+Open. Maintainer report in WinUAE; cause found in source; repair in source, not yet
 packaged or heard.
 
 ## Symptom
@@ -58,7 +58,7 @@ The logo itself is now silent.
 
 ## Verification
 
-Pending: engine gates, then an owner check in WinUAE.
+Pending: engine gates, then a maintainer check in WinUAE.
 
 ## Prevention
 

@@ -9,7 +9,7 @@
 | Where | tests/test_build_parallel.py test_cost_order_starts_the_longest_first_and_keeps_input_order |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | low: A gate can fail on host load alone; the scheduler itself is not wrong. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

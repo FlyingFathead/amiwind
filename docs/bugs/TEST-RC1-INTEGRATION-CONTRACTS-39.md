@@ -9,7 +9,7 @@
 | Where | RC1 source gate, image pass ordering and guard animation cache regression |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.39-rc1 (last seen) |
+| Persists in | fixed in v0.0.39 |
 | Severity | medium: Stale structural expectations fail the gate; the cache assertion does not test actual invalidation. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

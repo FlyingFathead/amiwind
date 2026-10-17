@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 11 October 2026, in v0.0.36-dev5 |
 | Where | Engine: the client's entity list (cl_main.c CL_RelinkEntities) while the third-person body is drawn |
 | Reproduction | always |
@@ -23,9 +23,9 @@
 
 ## Status: 11 October 2026
 
-Open, reported by the owner on 11 October 2026 after playing the v0.0.36-dev5 playtest build on FS-UAE with JIT. The cause is not known yet. The vivec-b job will investigate on a v0.0.37 branch. Target: v0.0.37.
-Open, reported by the owner on 11 October 2026 after playing the v0.0.36-dev5 playtest build on FS-UAE with JIT. The cause is not known yet. It is investigated on a v0.0.37 branch. Target: v0.0.37.
-Fixed on the v0.0.36 line (branch v0.0.36-thirdperson). The owner reported it after playing the v0.0.36-dev5 playtest
+Open, reported by the maintainer on 11 October 2026 after playing the v0.0.36-dev5 playtest build on FS-UAE with JIT. The cause is not known yet. The vivec-b job will investigate on a v0.0.37 branch. Target: v0.0.37.
+Open, reported by the maintainer on 11 October 2026 after playing the v0.0.36-dev5 playtest build on FS-UAE with JIT. The cause is not known yet. It is investigated on a v0.0.37 branch. Target: v0.0.37.
+Fixed on the v0.0.36 line (branch v0.0.36-thirdperson). The maintainer reported it after playing the v0.0.36-dev5 playtest
 build on FS-UAE with JIT, and added later that the switch itself triggers it: Tab into third person hides the enemy,
 Tab back to first person brings it back. It is ordered into v0.0.36 rc1.
 
@@ -58,7 +58,7 @@ entities with the third-person camera active, and no source check looked for a l
 
 ## Reproduction
 
-Reported by the owner in normal play of the dev5 playtest build. Steps to try: start a fight with a hostile NPC, press Tab, and watch the NPC; press Tab again.
+Reported by the maintainer in normal play of the dev5 playtest build. Steps to try: start a fight with a hostile NPC, press Tab, and watch the NPC; press Tab again.
 Always, from the first frame in third person: start a fight (`dbg arena`), press Tab or start the vanity camera
 (`aw_camera vanity now`), and watch the opponent. With `dbg rcount 2` the remote state shows the count: on the
 dev5 engine, 39 entities in first person, then 1 (the player's body) in the vanity orbit.

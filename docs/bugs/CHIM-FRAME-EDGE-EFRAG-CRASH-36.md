@@ -5,9 +5,9 @@
 ## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.36-dev5 at 2026-10-11 11:33 +0300: README shots session, whole-city Vivec MiniWind, FS-UAE interpreter: noclip view past the frame edge
-- Reported with v0.0.36-dev5 at 2026-10-11 13:09 +0300: owner, dev5 playtest build 6c29a23, FS-UAE JIT, normal play: Seyda Neen near the shack, backing off from a hostile NPC
-- Reported with v0.0.36-dev5 at 2026-10-11 13:19 +0300: owner, dev5 playtest build, FS-UAE: frozen frame during combat in Seyda Neen, punch sound and music looping (a hang; same corruption suspected, not proven)
-- Reported with v0.0.36-dev5 at 2026-10-11 13:32 +0300: owner, dev5 playtest build, FS-UAE: same message outside Balmora by the bridge with the pylon, player idle, the vanity camera orbiting
+- Reported with v0.0.36-dev5 at 2026-10-11 13:09 +0300: maintainer, dev5 playtest build 6c29a23, FS-UAE JIT, normal play: Seyda Neen near the shack, backing off from a hostile NPC
+- Reported with v0.0.36-dev5 at 2026-10-11 13:19 +0300: maintainer, dev5 playtest build, FS-UAE: frozen frame during combat in Seyda Neen, punch sound and music looping (a hang; same corruption suspected, not proven)
+- Reported with v0.0.36-dev5 at 2026-10-11 13:32 +0300: maintainer, dev5 playtest build, FS-UAE: same message outside Balmora by the bridge with the pylon, player idle, the vanity camera orbiting
 
 <!-- END GENERATED PERSISTING -->
 
@@ -27,8 +27,8 @@
 | Playtest version | v0.0.36-dev5 |
 | From commit | source 6c29a23, engine 6c29a23, CHIM world 6c29a23 |
 | CHIM engine version | CHIM 0.1.0, engine 6c29a23, world format 0.7 |
-| Build note | Platform: FS-UAE 3.1.66, JIT, A1200 68040; dev5 playtest build 6c29a23 (owner) and MiniWind f6e08fe (README session) |
-| Platform or emulator | FS-UAE, JIT (owner, dev5 playtest build); FS-UAE interpreter (README session) |
+| Build note | Platform: FS-UAE 3.1.66, JIT, A1200 68040; dev5 playtest build 6c29a23 (maintainer) and MiniWind f6e08fe (README session) |
+| Platform or emulator | FS-UAE, JIT (maintainer, dev5 playtest build); FS-UAE interpreter (README session) |
 
 <!-- END GENERATED FACTS -->
 
@@ -65,9 +65,9 @@ type 270440", or the game freezes with its audio looping. Reports:
 | Report | Build | Platform | What the player did |
 | --- | --- | --- | --- |
 | 11 October 2026, README screenshot session | MiniWind f6e08fe (whole-city Vivec) | FS-UAE 3.1.66 | a noclip view to local (0, -7500, 500), outside the frame (+/-5,376) |
-| 11 October 2026 13:09, owner | dev5 playtest 6c29a23 | FS-UAE, JIT | normal play in Seyda Neen near the shack, backing away from a hostile woman, after switching between first and third person (owner, 14:09) |
-| 11 October 2026 13:19, owner | dev5 playtest 6c29a23 | FS-UAE | combat with an NPC in Seyda Neen: the frame froze, the punch sound and a short piece of music looped (a hang, no error screen) |
-| 11 October 2026 13:32, owner | dev5 playtest 6c29a23 | FS-UAE | outside Balmora by the bridge with the pylon, before entering the town, player idle, the idle (vanity) camera orbiting |
+| 11 October 2026 13:09, maintainer | dev5 playtest 6c29a23 | FS-UAE, JIT | normal play in Seyda Neen near the shack, backing away from a hostile woman, after switching between first and third person (maintainer, 14:09) |
+| 11 October 2026 13:19, maintainer | dev5 playtest 6c29a23 | FS-UAE | combat with an NPC in Seyda Neen: the frame froze, the punch sound and a short piece of music looped (a hang, no error screen) |
+| 11 October 2026 13:32, maintainer | dev5 playtest 6c29a23 | FS-UAE | outside Balmora by the bridge with the pylon, before entering the town, player idle, the idle (vanity) camera orbiting |
 | Total | 2 builds | FS-UAE | 3 crashes with the same message and value, 1 hang |
 
 After the crash the AmigaDOS shell and the next run also mangled the keyboard
@@ -116,7 +116,7 @@ Later the renderer met them:
 - a looping chain froze the frame while the audio buffer kept playing.
 
 It needed the third-person, idle (vanity) or death camera, but the damage stayed after switching back to first person.
-That explains the owner's Seyda Neen crash after "juggling between first and third person".
+That explains the maintainer's Seyda Neen crash after "juggling between first and third person".
 
 ## Why it was not caught
 

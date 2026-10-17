@@ -142,7 +142,7 @@ class LimitTests(unittest.TestCase):
         self.assertEqual(lim['flames'], self.define('engine/aga/src/aw_guard_torch.c', 'STATIC_FLAME_MAX'))
         self.assertIn('count>65520', (ROOT / 'engine/aga/src/model.c').read_text(encoding='utf-8'))
         self.assertEqual(lim['clipnodes'], 65520)
-        self.assertIn("['unique_models']>220", (ROOT / 'tools/prepare_area.py').read_text(encoding='utf-8'))
+        self.assertIn("INLINE_MODEL_LIMIT = 220", (ROOT / 'tools/prepare_area.py').read_text(encoding='utf-8'))
         self.assertEqual(lim['inline_models'], 220)
         self.assertEqual((lim['texinfo'], wm.TEXINFO_LIMITS['planned']), (32767, 65535))
 

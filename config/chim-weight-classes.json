@@ -1,0 +1,15 @@
+{
+  "format": "aw-chim-weight-classes-1",
+  "note": "Weight classes of the CHIMport order (tools/chim_weight_table.py). Thresholds are data: the maintainer sets them here, never in code. Headroom = the least free bytes of the cell's frame ring under the CHIM heap budget (chim-heap.json headroom_bytes); 1 MB = 1,000,000 bytes. Placed faces = faces drawn from the cell's placed models (stats.faces.chim_placed). A class with max_placed_faces 'median_shipped' takes the median of the cells already on CHIM. The first class a cell meets is its class; a cell failing an audit, over the budget or not converted gets the fallback classes below.",
+  "status": "confirmed for the project, 17 October 2026",
+  "classes": [
+    {"id": "featherweight", "label": "Featherweight", "min_headroom_bytes": 3000000, "max_placed_faces": "median_shipped"},
+    {"id": "lightweight", "label": "Lightweight", "min_headroom_bytes": 2000000},
+    {"id": "middleweight", "label": "Middleweight", "min_headroom_bytes": 1000000},
+    {"id": "heavyweight", "label": "Heavyweight", "min_headroom_bytes": 0}
+  ],
+  "over": {"id": "over", "label": "Over the limit or failing an audit"},
+  "unmeasured": {"id": "unmeasured", "label": "Not measured (not converted, or no headroom figure)"},
+  "seabed": {"id": "seabed", "label": "Seabed cell (LAND record under water), to be converted as its own cell"},
+  "easy_batch": ["featherweight", "lightweight"]
+}

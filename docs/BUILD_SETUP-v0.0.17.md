@@ -113,9 +113,9 @@ package commands if APT or pip fails.
 
 ## Evidence and remaining checks
 
-- Owner's Ubuntu machine: fresh SDK and ericw downloads matched the pinned
+- Maintainer's Ubuntu machine: fresh SDK and ericw downloads matched the pinned
   SHA-256 hashes. The pinned qcc source was cloned and compiled successfully.
-- Owner's compiler checks: original qcc produced 16,220 bytes, FTEQCC produced
+- Maintainer's compiler checks: original qcc produced 16,220 bytes, FTEQCC produced
   15,232 bytes; both reported version 6 and CRC 5927. This checks compilation and
   interface compatibility, not gameplay equivalence.
 - Local verification: 139 host regression tests passed; empty-destination native-tool
@@ -125,16 +125,16 @@ package commands if APT or pip fails.
   includes. The engine's Amiga version tag and boot-checker banner contain 0.0.17.
 - Bootstrap entry point starts without third-party Python packages. Python
   package metadata resolves VERSION to 0.0.17.
-- Owner test-004 completed all 12 stages using the actual game installation,
+- Maintainer test-004 completed all 12 stages using the actual game installation,
   producing `AmiWind-v0.0.17.hdf`. This repaired and reused the tools downloaded
   during earlier test attempts; it is not a wholly fresh uninterrupted run.
-- The owner subsequently confirmed test-006 works. A fresh uninterrupted setup
+- The maintainer subsequently confirmed test-006 works. A fresh uninterrupted setup
   after all fixes and updated hosted CI were not independently observed here.
   Native compiler warnings remain for review.
 
 ## Test-004 fixes
 
-The owner’s test-003 run downloaded and verified the SDK, map tools and reference
+The maintainer’s test-003 run downloaded and verified the SDK, map tools and reference
 QuakeC compiler, passed the compiler preflight and terrain conversion, then failed
 at scenery because the fresh Python 3.12 environment lacked distutils.
 The subsequent test-004 run completed the full game-data build, as recorded above.
@@ -173,7 +173,7 @@ The source ZIP and patch contain no game assets or ROMs.
 Validation: 29 targeted build, native scene/spawn and music tests passed;
 the updated 68040 Amiga engine and boot checker compiled. The actual production
 music code was tested against synthetic audio, including first-track selection,
-full-track transitions, history and missing-track fallback. The owner then
+full-track transitions, history and missing-track fallback. The maintainer then
 reported that test-006 works and requested publication. Earlier compiler
 warnings have not been hidden or claimed resolved.
 

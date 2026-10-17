@@ -114,3 +114,24 @@ def export_npc_head_detail(mode):
     """Export the resolved npc_head_detail for every converter worker."""
     os.environ[NPC_HEAD_DETAIL_VARIABLE] = npc_head_detail(mode)
     return os.environ[NPC_HEAD_DETAIL_VARIABLE]
+
+
+# How the CHIM model builder keeps collision that a convex proxy closes under an authored ceiling
+# (CHIM-VOS-TEMPLE-WALKWAY-41, B16; tools/build.py and tools/chim_build.py --collision-underside). names (default):
+# the list of mesh names town_regions.UNDERPASS_NAMES keeps all its authored collision surfaces with exact bevels.
+# The general rules are EXPERIMENTAL (measured on every exterior mesh, v0.0.42; neither replaces the list yet):
+# rule: a convex piece whose hull passes through an authored downward-facing surface of the mesh and fills more
+# than mesh_geometry.UNDERSIDE_DEPTH under it becomes the authored plates of its triangles (+33 % standing clip
+# nodes over 240 meshes; the Vos walkway step still starts in solid); split: such a piece is split further first,
+# plates only where it cannot be; whole: such a mesh keeps all its authored surfaces, as the list does (the Vos
+# walkway passes; x2.25 standing clip nodes over 238 meshes). Resolved by the orchestrator into each mesh's
+# profile (so it is in every model's unit key).
+UNDERSIDE_MODES = ('rule', 'split', 'whole', 'names')
+UNDERSIDE_VARIABLE = 'AMIWIND_COLLISION_UNDERSIDE'
+
+
+def underside_mode():
+    mode = os.environ.get(UNDERSIDE_VARIABLE, '').strip() or 'names'
+    if mode not in UNDERSIDE_MODES:
+        raise ValueError(UNDERSIDE_VARIABLE + ' must be rule, split, whole or names, not %r' % mode)
+    return mode

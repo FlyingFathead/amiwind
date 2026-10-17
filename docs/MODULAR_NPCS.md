@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-**Request (owner, 9 October 2026):** humanoid NPCs are built from shared body
+**Request (maintainer, 9 October 2026):** humanoid NPCs are built from shared body
 parts, the way Morrowind builds them, instead of one complete model per actor.
 Two reasons: the builder wastes most of its NPC time converting the same parts
 again and again, and looting or changing equipment must change an actor's
@@ -143,7 +143,7 @@ faithfulness (measured below).
 
 ## Measurements
 
-Inputs: the owner's GOG Game of the Year data (Morrowind.esm, Morrowind.bsa),
+Inputs: the maintainer's GOG Game of the Year data (Morrowind.esm, Morrowind.bsa),
 the v0.0.32 release build made from scratch on 8 October 2026 (24 threads), and
 `tools/modular_npc_study.py` (host, Docker, 4 CPUs) on 9 October 2026.
 
@@ -323,7 +323,7 @@ times faster.
 
 ## Joint seams
 
-Owner question (9 October 2026): do the bodies close at the joints? They do
+Maintainer question (9 October 2026): do the bodies close at the joints? They do
 not always, in the whole bake and in the parts bake alike: each shape is
 reduced alone, and the reducer also collapses rim edges, so a part pulls back
 from the part it meets ([NPC-JOINT-GAPS-33](bugs/NPC-JOINT-GAPS-33.md)).
@@ -498,7 +498,7 @@ light.
 
 ## Reproducing the numbers
 
-All in Docker, with the owner's own data mounted read-only:
+All in Docker, with the maintainer's own data mounted read-only:
 
     python3 tools/modular_npc_study.py census --data-files DATA --out OUT --jobs 4
     python3 tools/modular_npc_study.py policies --data-files DATA --out OUT --census OUT/census.json

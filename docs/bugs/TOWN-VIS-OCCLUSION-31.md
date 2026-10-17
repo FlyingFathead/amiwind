@@ -28,7 +28,7 @@ prototyped and measured not to help open towns; see
 ## Symptom
 
 Low frame rates in Balmora and Seyda Neen, worst with a long fog distance;
-shortening the fog distance to 250 roughly doubles the frame rate (owner).
+shortening the fog distance to 250 roughly doubles the frame rate (maintainer).
 
 ## Where
 

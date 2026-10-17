@@ -9,6 +9,10 @@ upstream  the optimisations of TerribleFire's AmiQuake GCC port (Stephen Leary),
           Makefile does (its README's "-O2 for most code" describes an older state).
 
 --engine-asm and --engine-opt override either half; any other mix is recorded as "custom".
+--engine-cpu 68060 is the experimental 68060-targeted build (docs/68060.md): the same profile compiled
+with GCC's 68060 instruction selection (-m68060 -mhard-float: no FScc, no 64-bit MULS.L/DIVS.L, FINTRZ
+in hardware), linked with the 68040 build's hard-float libraries; the binary runs on a 68060 only (FINTRZ
+traps on a 68040). Default 68040, the baseline, whose make command stays unchanged.
 --engine-opt o2 is the separate selective -O2 experiment (everything at -O2 except mathlib.c and
 in_amiga.c at -O1, as upstream's README describes and its Makefile did before it went back to -O1).
 The assembly units (engine/aga/src, upstream revision 9c62d90):
@@ -28,6 +32,7 @@ from __future__ import annotations
 UNITS = ('spans', 'turb', 'maths', 'c2p', 'fixed')
 PROFILES = ('c', 'upstream')
 OPT_LEVELS = ('o1', 'o2')
+ENGINE_CPUS = ('68040', '68060')
 
 # What each profile selects before overrides.
 PROFILE_ASM = {'c': (), 'upstream': ('turb', 'c2p', 'fixed')}
@@ -84,12 +89,18 @@ def parse_opt(text):
     return value
 
 
-def resolve(profile='c', asm=None, opt=None, cpu='68040'):
+def resolve(profile='c', asm=None, opt=None, cpu='68040', engine_cpu='68040'):
     """The engine profile record: what the engine build compiles and links.
 
-    profile: c|upstream; asm: --engine-asm text (or None); opt: --engine-opt text (or None)."""
+    profile: c|upstream; asm: --engine-asm text (or None); opt: --engine-opt text (or None);
+    engine_cpu: --engine-cpu 68040 (the baseline) or 68060 (the experimental 68060-targeted build)."""
     if profile not in PROFILES:
         raise ValueError('--engine-profile takes c or upstream (not %r)' % (profile,))
+    engine_cpu = str(engine_cpu or '68040')
+    if engine_cpu not in ENGINE_CPUS:
+        raise ValueError('--engine-cpu takes 68040 or 68060 (not %r)' % (engine_cpu,))
+    if engine_cpu == '68060' and cpu != '68040':
+        raise ValueError('--engine-cpu 68060 needs the FPU build (--cpu 68040), not --cpu %s' % (cpu,))
     units = parse_asm(asm)
     level = parse_opt(opt)
     selected = tuple(PROFILE_ASM[profile]) if units is None else units
@@ -105,7 +116,10 @@ def resolve(profile='c', asm=None, opt=None, cpu='68040'):
     label = next((name for name in PROFILES
                   if {unit for unit in PROFILE_ASM[name] if cpu in UNIT_OBJECTS[unit]} == set(effective)
                   and PROFILE_OPT[name] == level), 'custom')
-    return {'profile': profile, 'label': label, 'cpu': cpu,
+    # (the 68060 build links the same objects as the 68040 build: the same make target, other -m flags)
+    return {'profile': profile, 'label': label, 'cpu': cpu, 'engine_cpu': engine_cpu,
+            'engine_cpu_flags': ('-m68060 -mhard-float (libraries of the 68040 build)' if engine_cpu == '68060'
+                                 else ('-m68040 -m68881' if cpu == '68040' else None)),
             'asm': list(selected), 'asm_linked': list(effective), 'asm_objects': linked,
             'opt': level,
             'opt_flags': ('-O1 everywhere' if level == 'o1'
@@ -117,25 +131,35 @@ def resolve(profile='c', asm=None, opt=None, cpu='68040'):
             'credit': CREDIT if (selected or level != 'o1') else None}
 
 
+def engine_cpu(record):
+    """The record's --engine-cpu (68040 for records written before the option existed)."""
+    return record.get('engine_cpu') or '68040'
+
+
 def is_default(record):
-    """True for the c profile with nothing linked and -O1: the build's commands stay unchanged."""
-    return not record['asm'] and record['opt'] == 'o1'
+    """True for the c profile with nothing linked, -O1 and the 68040 baseline: the build's commands stay
+    unchanged."""
+    return not record['asm'] and record['opt'] == 'o1' and engine_cpu(record) == '68040'
 
 
 def make_variables(record):
     """engine/aga/Makefile variables; none for the c profile (its make command stays unchanged)."""
     if is_default(record):
         return []
-    return ['ENGINE_ASM=' + ' '.join(record['asm']), 'ENGINE_OPT=' + record['opt']]
+    out = ['ENGINE_ASM=' + ' '.join(record['asm']), 'ENGINE_OPT=' + record['opt']]
+    if engine_cpu(record) != '68040':
+        out.append('ENGINE_CPU=' + engine_cpu(record))
+    return out
 
 
 def short(record):
     """One line for logs, summaries and the boot check: e.g. 'upstream (asm turb,c2p; -O1)'."""
     asm = ','.join(record['asm_linked']) or 'none'
     level = '-O1' if record['opt'] == 'o1' else '-O2'
+    cpu = '; 68060' if engine_cpu(record) == '68060' else ''
     if record['label'] == 'c':
-        return 'c (C paths, -O1)'
-    return '%s (asm %s; %s)' % (record['label'], asm, level)
+        return 'c (C paths, -O1%s)' % cpu
+    return '%s (asm %s; %s%s)' % (record['label'], asm, level, cpu)
 
 
 def boot_line(record):
@@ -146,6 +170,8 @@ def boot_line(record):
         value = 'upstream: 68k asm, -O1'
     else:
         value = 'custom: asm %d, -O%s' % (len(record['asm_linked']), record['opt'][1])
+    if engine_cpu(record) == '68060':
+        value += ', 68060'
     return ('Engine profile:       ' + value).ljust(49) + ' [i] INFO'
 
 
@@ -185,11 +211,15 @@ def add_options(parser):
     parser.add_argument('--engine-opt', choices=('o1', 'o2', 'upstream'), default=None,
                         help="Override the profile's optimisation: o1 (-O1 everywhere; upstream = o1, as upstream's Makefile) "
                              'or o2 (the selective -O2 experiment: mathlib.c and in_amiga.c at -O1). EXPERIMENTAL')
+    parser.add_argument('--engine-cpu', choices=ENGINE_CPUS, default='68040',
+                        help='Target CPU of the engine code: 68040 (default, the baseline) or 68060 (GCC 68060 '
+                             'instruction selection, -m68060 -mhard-float; runs on a 68060 only; docs/68060.md). '
+                             'EXPERIMENTAL')
 
 
 def from_args(args, cpu='68040'):
     return resolve(getattr(args, 'engine_profile', 'c') or 'c', getattr(args, 'engine_asm', None),
-                   getattr(args, 'engine_opt', None), cpu)
+                   getattr(args, 'engine_opt', None), cpu, getattr(args, 'engine_cpu', None) or '68040')
 
 
 def cli_arguments(args):
@@ -201,4 +231,6 @@ def cli_arguments(args):
         out += ['--engine-asm', args.engine_asm]
     if getattr(args, 'engine_opt', None) is not None:
         out += ['--engine-opt', args.engine_opt]
+    if (getattr(args, 'engine_cpu', None) or '68040') != '68040':
+        out += ['--engine-cpu', args.engine_cpu]
     return out

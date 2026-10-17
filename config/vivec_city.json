@@ -68,7 +68,24 @@
     },
     "return": null
   },
-  "interiors": [],
+  "interiors": [
+    {
+      "cell": "Vivec, Arena Waistworks",
+      "recentre": [0, 0, 18432]
+    },
+    {
+      "cell": "Vivec, Arena Canalworks"
+    },
+    {
+      "cell": "Vivec, Arena Fighters Quarters"
+    },
+    {
+      "cell": "Vivec, Arena Fighters Training"
+    },
+    {
+      "cell": "Vivec, Arena Holding Cells"
+    }
+  ],
   "detail_budget": "vivec-deep",
   "interiors_from": [
     "vivec_arena",

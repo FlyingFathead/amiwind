@@ -30,12 +30,13 @@ DESCRIPTION_OPTION = '--miniwind-description'
 SCOPE_OPTION = '--miniwind-scope'
 from miniwind_plan import SCOPES, DEFAULT_SCOPE  # noqa: E402
 SCOPE_PARTIAL_AREA = {'full': PARTIAL_AREA,
-                      'exterior': 'PARTIAL-AREA test build: Balmora exterior only; not a release'}
+                      'exterior': 'PARTIAL-AREA test build: Balmora exterior only; not a release',
+                      'interior': 'PARTIAL-AREA test build: one Balmora room only; not a release'}
 # The exterior scope's label: in the run folder and HDF names, the receipts, the
 # build summary and the boot notice. Every scope leaves the NPC gallery out.
 QUICK_LABEL = 'quick playtest, no NPC gallery'
 QUICK_SLUG = 'quick-playtest-no-NPC-gallery'
-SCOPE_LABEL = {'full': None, 'exterior': QUICK_LABEL}
+SCOPE_LABEL = {'full': None, 'exterior': QUICK_LABEL, 'interior': None}
 # The town the build holds, its CHIM area and where a new game starts: Balmora by
 # default; --miniwind-town picks another town table row (a sandbox of that town on
 # CHIM: its exterior frame, its residents and interiors). Seyda Neen is a MiniWind
@@ -93,7 +94,7 @@ HEADER_LINES, HEADER_WIDTH = 2, 300
 LOGO_TITLE = 'MiniWind Playtest'
 # The version line's "CHIM v<CHIM_VERSION>" is drawn in the console font (the
 # prompt's font), the rest of the line in the game font: Magic Cards' capital H
-# is an uncial h, so "CHIM" would read "ChIM" (owner decision). The font names
+# is an uncial h, so "CHIM" would read "ChIM" (project decision). The font names
 # are tools/prepare_logo.py's GAME_FONT and CONSOLE_FONT (not imported here: this
 # module stays free of the image tools).
 GAME_FONT, CONSOLE_FONT = 'game', 'console'
@@ -157,7 +158,7 @@ def partial_area(scope=DEFAULT_SCOPE, town=TOWN):
     if town == TOWN:
         return SCOPE_PARTIAL_AREA[check_scope(scope)]
     return 'PARTIAL-AREA test build: %s%s only; not a release' % (
-        town_title(town), ' exterior' if check_scope(scope) == 'exterior' else '')
+        town_title(town), {'exterior': ' exterior', 'interior': ', one room'}.get(check_scope(scope), ''))
 
 
 def label(scope=DEFAULT_SCOPE):
@@ -179,6 +180,7 @@ def omitted(name, scope=DEFAULT_SCOPE, town=TOWN):
         # a CHIM-native town's listed rooms (tools/chim_rooms.py): the sandbox town's, in the full scope only
         if name != 'chim-rooms-' + town:
             return 'extra town (not %s)' % town
+        # the interior scope converts only its start room (tools/chim_rooms.py --only-cell)
         return 'interiors (exterior scope)' if check_scope(scope) == 'exterior' else None
     if name.startswith('town-'):
         return EXTRA_TOWN_REASON if town == TOWN else 'extra town (not %s)' % town
@@ -385,7 +387,8 @@ def kept_maps(root=None, scope=DEFAULT_SCOPE, town=TOWN, extra=()):
     from town_config import runtime_towns, town_interiors
     root = Path(root) if root else ROOT
     row = next(t for t in runtime_towns(root) if t['name'] == town)
-    if check_scope(scope) == 'exterior':
+    if check_scope(scope) in ('exterior', 'interior'):
+        # interior: the start room arrives in extra (the image step's start maps)
         return {town, *extra}, row['prefix']
     if town == TOWN:
         rooms = json.loads((root / 'config/balmora_interiors.json').read_text(encoding='utf-8'))['scenes']
@@ -403,8 +406,11 @@ def kept_maps(root=None, scope=DEFAULT_SCOPE, town=TOWN, extra=()):
 START_MAPS = ('prison',)
 
 
-def start_maps(start_map):
-    """The extra map a MiniWind image keeps for its direct start: (map,) or ()."""
+def start_maps(start_map, scope=DEFAULT_SCOPE):
+    """The extra map a MiniWind image keeps for its direct start: (map,) or (). The interior scope keeps its
+    start room (the only room it converts)."""
+    if check_scope(scope) == 'interior' and start_map:
+        return (start_map,)
     return (start_map,) if start_map in START_MAPS else ()
 
 

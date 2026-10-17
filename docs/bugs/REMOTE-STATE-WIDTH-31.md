@@ -9,7 +9,7 @@
 | Where | remote state file formatter (engine remote pipe) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | low: Debug state file printed garbled numbers; never released. |
 | Family | Debug commands and remote control (`debug-commands`) |
 

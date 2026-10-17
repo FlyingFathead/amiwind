@@ -9,7 +9,7 @@
 | Where | Tel Uvirith, Molag Amur, exterior cell (10,1), CHIM frame x+10/y+01 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev3 (last seen) |
+| Persists in | fixed in v0.0.38 |
 | Severity | high: Prevents complete Molag Mar exterior CHIM coverage under the unchanged memory budget. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Performance ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -31,7 +31,7 @@
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
-- [Owner evidence reconciliation, 13 October 2026](#owner-evidence-reconciliation-13-october-2026)
+- [Maintainer evidence reconciliation, 13 October 2026](#maintainer-evidence-reconciliation-13-october-2026)
 - [Regular-builder integration, 13 October 2026](#regular-builder-integration-13-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
@@ -100,7 +100,7 @@ shared and lightmapped faces. Format, seams, six doors and 1,363 stair steps pas
 (zero failures, 86 advisories); 13 existing terrain-cull tests pass. The resulting peak still
 exceeds the 6,242,304-byte budget by 4,722,032 bytes. Model cutting has not been combined
 with this trial. Matched FS-UAE/OpenMW images, native gameplay and wider conversion acceptance
-are pending. The owner repeatedly points to lantern assemblies as density hotspots; one
+are pending. The maintainer repeatedly points to lantern assemblies as density hotspots; one
 original streetlight mesh has 149 faces and a separate curved support has 264, but their
 relative memory cost is not established.
 
@@ -203,9 +203,9 @@ normal door interaction and movement/collision checks remain pending. This
 load/run result does not accept the candidate as fixed or ready to ship.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.
@@ -234,12 +234,12 @@ using four assets totaling 41,903 on-disk bytes, and records their Hunk reserve.
 It projects the selected-cell directory rows; final-image routing and aggregate
 memory still need validation. Stage 6 retains 120 converted references and
 excludes 33 script-disabled construction references; five actors remain deferred.
-No final-image, native traversal, delivery or owner acceptance is established.
+No final-image, native traversal, delivery or maintainer acceptance is established.
 
 Prevention: compare both named replacement profiles and recipe defaults against
 the retained successful geometry; test full terrain margins before image assembly.
 
-Final full-image verification, 13 October 2026: completed-stage Tel Uvirith and all four sprite assets passed HDF readback. Both teleport aliases reach its CHIM frame. Active-ring memory is 5,596,320 bytes and load-ring memory 5,767,824 bytes against 6,242,304 bytes. Arrival and scoped scene verified; normal staircase traversal and owner acceptance remain open.
+Final full-image verification, 13 October 2026: completed-stage Tel Uvirith and all four sprite assets passed HDF readback. Both teleport aliases reach its CHIM frame. Active-ring memory is 5,596,320 bytes and load-ring memory 5,767,824 bytes against 6,242,304 bytes. Arrival and scoped scene verified; normal staircase traversal and maintainer acceptance remain open.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

@@ -209,7 +209,7 @@ def push(cells, x, y, vx, vy, waterlevel):
 
 # ---------------------------------------------------------------- builder option
 
-DEFAULT = 'on'          # owner decision 2026-10-10: world bounds on by default
+DEFAULT = 'on'          # project decision 2026-10-10: world bounds on by default
 OPTION = '--world-bounds'
 
 

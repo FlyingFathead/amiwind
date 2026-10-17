@@ -418,7 +418,7 @@
         "seyda",
         "vivec_arena"
       ],
-      "source": "config/build-defaults.json (owner decision 2026-10-11: Vivec stage A passed the owner playtest)",
+      "source": "config/build-defaults.json (project decision 2026-10-11: Vivec stage A passed the maintainer playtest)",
       "note": "the Vivec Arena is a default CHIM area, CHIM-native (chim-town-vivec_arena); legacy builds still leave it out (config/towns.json withdrawn, --extra-town vivec_arena builds it there)"
     },
     {
@@ -481,7 +481,7 @@
         "seyda",
         "vivec_city"
       ],
-      "source": "config/build-defaults.json (owner decision 2026-10-11 09:55 +0300: whole-city Vivec replaces the Arena-only area by default)",
+      "source": "config/build-defaults.json (project decision 2026-10-11 09:55 +0300: whole-city Vivec replaces the Arena-only area by default)",
       "note": "all of Vivec in one CHIM frame with its 130 rooms; the district areas (vivec_arena ...) are retired (--override vivec-districts)"
     },
     {
@@ -491,8 +491,8 @@
       "change": "default",
       "from": "auto",
       "to": "compiled",
-      "source": "tools/build.py (owner decision 2026-10-11 10:11 +0300)",
-      "note": "compiled terrain hull for every chunk by default (owner decision 2026-10-11; a default build otherwise overruns Balmora's ring, CHIM-BALMORA-RING-GROWTH-36); auto and routed stay selectable"
+      "source": "tools/build.py (project decision 2026-10-11 10:11 +0300)",
+      "note": "compiled terrain hull for every chunk by default (project decision 2026-10-11; a default build otherwise overruns Balmora's ring, CHIM-BALMORA-RING-GROWTH-36); auto and routed stay selectable"
     },
     {
       "version": "0.0.36-dev5",
@@ -501,8 +501,8 @@
       "change": "default",
       "from": "off",
       "to": "on",
-      "source": "tools/build.py (owner decision 2026-10-11 10:11 +0300)",
-      "note": "terrain references (world format 0.7) by default (owner decision 2026-10-11); off keeps a terrain copy per chunk (format 0.5)"
+      "source": "tools/build.py (project decision 2026-10-11 10:11 +0300)",
+      "note": "terrain references (world format 0.7) by default (project decision 2026-10-11); off keeps a terrain copy per chunk (format 0.5)"
     },
     {
       "version": "0.0.38",
@@ -542,7 +542,59 @@
       "flag": "--actor-search",
       "change": "added",
       "to": "wide",
-      "source": "tools/build.py: a ground actor that no spot within 32 units fits is also tried up to 48 units away (CHIM-VIVEC-FRAME-WIDE-41, owner decision); near = 32 units only"
+      "source": "tools/build.py: a ground actor that no spot within 32 units fits is also tried up to 48 units away (CHIM-VIVEC-FRAME-WIDE-41, project decision); near = 32 units only"
+    },
+    {
+      "version": "0.0.41",
+      "option": "readiness_id",
+      "flag": "--readiness-id",
+      "change": "added",
+      "to": [],
+      "source": "tools/build.py: the tracker ID of a release readiness item (tools/release_readiness.py, BUILD-RELEASE-READINESS-HIDDEN-41); a full development build stops while an item has none"
+    },
+    {
+      "version": "0.0.42-dev1",
+      "option": "stair_walk_area",
+      "flag": "--stair-walk-area",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py ccdc07f",
+      "note": "null = owned: a CHIM region frame walks the cell it owns plus the map-switch margin (BUILD-STAIR-WALK-BORDER-COPIES-41); frame = the whole frame with its border copies (before v0.0.42)"
+    },
+    {
+      "version": "0.0.41",
+      "option": "interior_creatures",
+      "flag": "--interior-creatures",
+      "change": "added",
+      "to": "listed",
+      "source": "tools/build.py: creatures in converted interiors (INTERIOR-CREATURES-MISSING-41): listed = config/interior_creatures.json (Vivec); all = experimental, every creature the grounding policy classifies; off = no creature (the method before)"
+    },
+    {
+      "version": "0.0.42-dev1",
+      "option": "collision_underside",
+      "flag": "--collision-underside",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py (v0.0.42 stair round 2)",
+      "note": "null = names: the mesh-name list keeps its authored collision surfaces (as before); rule, split, whole = EXPERIMENTAL general underside rules for every CHIM model (CHIM-VOS-TEMPLE-WALKWAY-41, B16; measured, not shipped)"
+    },
+    {
+      "version": "0.0.42-dev1",
+      "option": "stair_walk_cache",
+      "flag": "--stair-walk-cache",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py (v0.0.42 stair round 2)",
+      "note": "new choice records: null = records without --developer-mode (the known-good stair records shipped in config/stair-records; a frame in neither them nor the workspace's walks is reported, not walked), cached with --developer-mode; full walks everything"
+    },
+    {
+      "version": "0.0.42-dev1",
+      "option": "engine_cpu",
+      "flag": "--engine-cpu",
+      "change": "added",
+      "to": "68040",
+      "source": "tools/build.py (engine_profile.add_options)",
+      "note": "68040 = the baseline engine (make command unchanged); 68060 = the 68060-targeted engine (-m68060 -mhard-float, runs on a 68060 only, docs/68060.md), EXPERIMENTAL"
     }
   ],
   "current": {
@@ -578,10 +630,12 @@
       "chim_terrain_resident_detail": "on",
       "chim_terrain_shoreline": "on",
       "chim_texture_effects": null,
+      "collision_underside": null,
       "coord_range": "wide",
       "death_retry": null,
       "direct_to_game_map": null,
       "engine_asm": null,
+      "engine_cpu": "68040",
       "engine_experiment": null,
       "engine_opt": null,
       "engine_profile": "c",
@@ -594,6 +648,7 @@
       "hands": "3d",
       "heap_mb": null,
       "hidden_surface_cull": "true",
+      "interior_creatures": "listed",
       "intro_captions": null,
       "lava": null,
       "legacy_areas": [],
@@ -634,6 +689,7 @@
       "player_body": null,
       "quick_character": null,
       "quiet": false,
+      "readiness_id": [],
       "scenery_reduce": null,
       "scenery_reduce_texels": null,
       "seyda_recorded": null,
@@ -643,6 +699,7 @@
       "skip_dressing": false,
       "stage": "aga",
       "stair_walk": "auto",
+      "stair_walk_area": null,
       "stair_walk_cache": null,
       "stair_walk_sample": null,
       "texinfo_snap": null,

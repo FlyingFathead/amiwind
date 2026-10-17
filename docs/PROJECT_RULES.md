@@ -4,7 +4,7 @@ These requirements apply to changes in the public project.
 
 ## Required Linux and Windows compatibility
 
-Owner requirement, 3 October 2026: the converter, build pipeline, configuration
+Project requirement, 3 October 2026: the converter, build pipeline, configuration
 and validation tools must support both Linux and Windows. A correction on one
 host must not silently break the other. This is a development requirement, not
 a claim that every path has already passed both platforms.
@@ -23,10 +23,10 @@ a claim that every path has already passed both platforms.
 
 ## Mandatory bug and incident documentation
 
-Owner requirement, reaffirmed 3 October 2026: ALWAYS record every bug, issue,
+Project requirement, reaffirmed 3 October 2026: ALWAYS record every bug, issue,
 regression and failed build/validation incident in public docs/BUG_JOURNAL.md
 and the relevant subsystem documentation, with supporting private production
-notes. Record it when discovered; do not wait for a fix or an owner reminder.
+notes. Record it when discovered; do not wait for a fix or a maintainer reminder.
 
 - State the affected/first-observed version, location, environment, symptoms and
   reproduction steps. Identify the introducing version/change only when proven.
@@ -67,7 +67,7 @@ This includes development, conversion, compilation, validation, packaging and
 gameplay failures. Record every such incident when it
 is discovered and update its entry whenever new evidence, an attempted
 solution, a failure, a mitigation, a correction or a validation result changes
-what is known. Do this in the same work, without waiting for an owner reminder.
+what is known. Do this in the same work, without waiting for a maintainer reminder.
 Keep public bug/subsystem documentation and private production notes consistent.
 Preserve dated history and mark unknown/pending facts honestly. Never leave a
 resolved issue stale as pending, or a pending/unverified issue described as fixed.
@@ -90,9 +90,9 @@ that previously working behavior was lost. Track severity and lifecycle status
 separately from type; proposed repair, mitigation, host-validated candidate and
 target-verified fix are distinct statuses.
 
-## Keep owner playtest material private
+## Keep maintainer playtest material private
 
-Owner playtest packages, playable HDFs, screenshots, recordings and private
+Maintainer playtest packages, playable HDFs, screenshots, recordings and private
 playtest receipts stay outside the public repository, source archives, CI
 artifacts and public issue attachments. Public documentation may summarize
 verified findings in text, but must not embed or link private captures, packages,
@@ -107,6 +107,6 @@ environment, logs, exit status, skips and failures. Focused tests are not a
 replacement. Record native Windows checks separately; Docker-on-Windows is Linux
 container evidence, not native Windows validation. Do not create or run native
 Windows helper executables for this gate. Clean up only Docker/WSL resources
-started for validation and verify the prior state is restored. The owner performs
+started for validation and verify the prior state is restored. The maintainer performs
 publication on Linux. Failed gates remain open; distinguish fixture failures,
 unknown failures and product defects until evidence resolves them.

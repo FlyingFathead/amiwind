@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 8 October 2026, in v0.0.32-dev3 |
 | Where | Vivec Arena preview, Telvanni side, seen from LOCAL 1185 -59 117 |
 | Reproduction | unknown |
@@ -20,7 +20,7 @@
 
 ## Status: 8 October 2026
 
-Open; cause unknown. Owner decision: fix later; known in v0.0.32. Reported by the owner while playing
+Open; cause unknown. Project decision: fix later; known in v0.0.32. Reported by the maintainer while playing
 the v0.0.32-dev3 private test (8 October 2026): "that dude there is even floating in the air".
 
 ## Symptom
@@ -57,7 +57,7 @@ v0.0.32 (or dev3): `dbg tp vivec_arena`, go to LOCAL 1185 -59 117, face E 087, p
 
 ## Repair
 
-Not yet (owner decision: later). First identify the resident and the piece he stands on, and render
+Not yet (project decision: later). First identify the resident and the piece he stands on, and render
 the converted region offline at the pose (visual faces and collision separately).
 
 ## Verification

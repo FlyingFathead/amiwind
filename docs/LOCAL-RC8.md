@@ -12,5 +12,5 @@ It does not accept the successful rc7 recovery run as its input baseline.
 Retest F then V in the emulator before publishing this correction. PUBLISH.sh
 with --publish commits/pushes main, waits for successful exact-commit CI, then
 tags and publishes the source prerelease and verifies downloaded checksums.
-Its default --check performs only local candidate checks. The owner runs all
+Its default --check performs only local candidate checks. The maintainer runs all
 remote publication commands. Published rc7 tags and archives stay unchanged.

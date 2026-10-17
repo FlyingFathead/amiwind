@@ -9,7 +9,7 @@
 | Where | Census and Excise Office scene load |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev3 (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: Census office loads in 8-10 s against 0.2-1.5 s elsewhere in the emulator. |
 | Family | Loading and disk reads (`disk-loading`) |
 | Playtest version | v0.0.32-dev3 |

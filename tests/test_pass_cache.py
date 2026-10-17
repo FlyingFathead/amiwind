@@ -183,7 +183,7 @@ class PassCacheTests(unittest.TestCase):
                 self.assertEqual(len(sampled['pass_cache']['walked_again']), 1)
             self.assertEqual(reports['off'], reports['cold'])
             self.assertEqual(reports['off'], reports['warm'])
-            # The receipt counts the pass cache's hits (owner decision 9 October 2026).
+            # The receipt counts the pass cache's hits (project decision 9 October 2026).
             self.assertIsNone(counts['off'])
             self.assertEqual((counts['cold']['hits'], counts['cold']['misses']), (0, 2))
             self.assertEqual((counts['warm']['hits'], counts['warm']['misses']), (2, 0))

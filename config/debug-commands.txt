@@ -3,10 +3,11 @@ AWDC1
 AUDIO|door sounds|aw_door_sounds|on/off (default on)
 AUDIO|music|aw_music_status|[on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again
 AUDIO|ost play|aw_music_play|00..98 / original music filename stem (spaces as underscores)
+VIDEO|cam|aw_cam|[mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel distance, right click or Esc ends
 VIDEO|camera|aw_camera|[first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md)
 VIDEO|crosshair|aw_crosshair|[on/off, true/false or 1/0; no argument toggles] show the crosshair (saved; default on; also Options > Show crosshairs)
 VIDEO|crosshairs|aw_crosshair|same as crosshair
-VIDEO|cull|aw_cull|0/1 or on/off (default 1)
+VIDEO|cull|aw_cull|far detail (saved; also Options > Far detail): 1 Full (everything to the fog, default), 3 Light, 4 Strong, 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0
 VIDEO|draw distance|aw_fog_distance|[100..4096 local units; default 540]
 VIDEO|drawdistance|aw_fog_distance|[100..4096 local units; default 540]
 VIDEO|fog|aw_fog|on/off or 1/0 (default on)
@@ -156,7 +157,7 @@ DIAGNOSTICS|npcs|aw_npcs|
 DIAGNOSTICS|overlay|amiwind_show_debug|on/off true/false 1/0
 DIAGNOSTICS|pos|aw_pos|
 DIAGNOSTICS|probe|aw_probe|(slow floor audit)
-DIAGNOSTICS|rcount|aw_rcount|[0/1/2] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only
+DIAGNOSTICS|rcount|aw_rcount|[0/1/2/3/4] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only; 3 = 2 + brush-slot profile (walk/emit split, distance x size table, leaves per placement); 4 = 3 printed
 DIAGNOSTICS|savelogs|aw_savelogs|write the in-memory diagnostic logs to the game folder now (also done at Exit game)
 DIAGNOSTICS|sealevel|amiwind_debug_sealevel|on/off
 DIAGNOSTICS|show fps|amiwind_debug_showfps|[on/off]

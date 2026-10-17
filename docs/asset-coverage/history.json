@@ -174,7 +174,7 @@
       "version": "0.0.29-dev4",
       "stage": "source_candidate_and_static_preview",
       "recorded_utc": "2026-10-05T19:30:34Z",
-      "label": "Selected mushroom pickup cue and owner-reviewed static preview",
+      "label": "Selected mushroom pickup cue and maintainer-reviewed static preview",
       "selected_pickup_cue": {
         "source_files": 1,
         "converted_outputs": 1,

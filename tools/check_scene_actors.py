@@ -71,7 +71,7 @@ def main():
     parser.add_argument('--canonical-land-source', type=Path,
                         help='World-survey terrain-source.npz; required while Seyda terrain culling is enabled')
     parser.add_argument('--seyda-recorded', type=Path,
-                        help='Recorded-stage exception BUILD-SEYDA-REGEN-30: owner-provided recorded Seyda Neen maps '
+                        help='Recorded-stage exception BUILD-SEYDA-REGEN-30: user-provided recorded Seyda Neen maps '
                              '(tools/recorded_stage.py) instead of the Seyda region conversion')
     parser.add_argument('--seyda-terrain-cull', choices=('on', 'off'), default='on',
                         help='off: convert Seyda Neen without the terrain visual cull (a CHIM build, whose Seyda Neen '

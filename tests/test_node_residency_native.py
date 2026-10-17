@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPILER = os.environ.get('CC') or shutil.which('cc') or shutil.which('gcc')
 
 
-@unittest.skipIf(os.name == 'nt', 'Owner workflow: no generated Windows test executables; run this native oracle on Linux')
+@unittest.skipIf(os.name == 'nt', 'Project workflow: no generated Windows test executables; run this native oracle on Linux')
 @unittest.skipUnless(COMPILER, 'install a host C compiler or set CC')
 class NodeResidencyTests(unittest.TestCase):
     def test_render_prefix_hull_identity_fallback_and_malformed_bounds(self):

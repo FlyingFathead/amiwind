@@ -189,7 +189,7 @@ def interiors(settings):
         raise ValueError('Town interiors must be a list of at most %d rooms' % INTERIOR_MAX)
     out, cells = [], set()
     for index, row in enumerate(rows):
-        if not isinstance(row, dict) or set(row) - {'cell', 'exclude'} or 'cell' not in row:
+        if not isinstance(row, dict) or set(row) - {'cell', 'exclude', 'recentre', 'plants'} or 'cell' not in row:
             raise ValueError('Town interior needs a cell and an optional exclude reason')
         cell, reason = row['cell'], row.get('exclude')
         if (not isinstance(cell, str) or not cell or len(cell) > TITLE_MAX or not cell.isascii()
@@ -200,7 +200,21 @@ def interiors(settings):
         if reason is not None and (not isinstance(reason, str) or not reason.strip() or any(ord(c) < 32 for c in reason)):
             raise ValueError('Town interior exclusion needs a reason')
         cells.add(cell.casefold())
-        out.append({'map': interior_map(settings, index), 'cell': cell, 'exclude': reason})
+        # "recentre": [x, y, z] original units subtracted from every position of the room (INTERIOR-COORDS-31:
+        # a room past the +-4,096 network range is moved toward the origin; town_interiors.room_offsets)
+        shift = row.get('recentre')
+        if shift is not None and (not isinstance(shift, list) or len(shift) != 3 or any(
+                isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or abs(v) > 65536
+                for v in shift)):
+            raise ValueError('Town interior recentre must be three finite numbers (original units): ' + cell)
+        # "plants": "sprites": the room's nonsolid plants are sprites from the start (interior_plants), for a room
+        # over its heap budget (the model limit asks for them by itself, town_interiors.build_room_checked)
+        plants = row.get('plants')
+        if plants is not None and plants != 'sprites':
+            raise ValueError('Town interior plants must be "sprites": ' + cell)
+        out.append({'map': interior_map(settings, index), 'cell': cell, 'exclude': reason,
+                    **({'recentre': [float(v) for v in shift]} if shift is not None else {}),
+                    **({'plants': plants} if plants is not None else {})})
     return out
 
 
@@ -250,7 +264,7 @@ def shipped_since(row):
     (BUILD-EXTRA-TOWN-OPTIN-32). Seyda and Balmora are always built; a
     blocked town cannot be shipped. A town with "withdrawn": "<reason>" keeps
     its "shipped_since" on record but is left out of default builds until the
-    field is removed; --extra-town still builds it (an owner decision, e.g.
+    field is removed; --extra-town still builds it (a project decision, e.g.
     the Vivec Arena in v0.0.33: CHIM-ARENA-MEMORY-33).
     """
     value = row.get('shipped_since')

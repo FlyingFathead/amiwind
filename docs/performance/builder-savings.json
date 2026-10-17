@@ -7,7 +7,7 @@
     "Measured: v0.0.33-rc1b and rc1c build profiles (22 workers, busy host); MiniWind hudcell-mw1 media log (4 workers);",
     "stair walk on 48 rc1c maps old vs new code. Estimated: after-values until the measurement build on the fixed builder.",
     "Fixes: BUILD-REUSE-SCRATCH-UNDECLARED-33, payload preflight, BUILD-STAIR-WALK-SLOW-33, BUILD-CACHE-PER-WORKSPACE-33,",
-    "release pass cache and flight-only stair walk (owner decisions), BUILD-IMAGE-NOT-INCREMENTAL-33."
+    "release pass cache and flight-only stair walk (project decisions), BUILD-IMAGE-NOT-INCREMENTAL-33."
   ],
   "items": [
     {"label": "Release rerun after a small fix", "before": 4527, "before_kind": "measured",

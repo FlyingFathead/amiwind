@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.32 |
 | Where | Boot volume AMIWIND at game start (startup-sequence, engine start-up writes) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32 (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: A system requester stops the start; the player must choose Retry or Cancel, and Cancel may lose a write. |
 | Family | Boot and engine start-up (`boot-startup`) |
 | Playtest version | CHIM Preview 1 |
@@ -40,7 +40,7 @@
 Open. Cause measured and reproduced in FS-UAE; repaired in source on v0.0.33-dev (branch
 v0.0.33-boot-validate, not merged, not shipped): the engine waits for the validation before
 its first write, the optional debug log can no longer stop the game, and the diagnostic logs
-stay in memory during play (owner decision, 9 October 2026), so play no longer writes to the
+stay in memory during play (project decision, 9 October 2026), so play no longer writes to the
 boot volume except for saves.
 
 ## Symptom
@@ -76,7 +76,7 @@ state read from the root block's bitmap flag every 0.2 s):
 - Next boot, fast setting (JIT, fastest CPU): the validation ends during the boot check's
   5-second countdown; no request appeared.
 - Next boot, slow setting (cycle-exact 68040, CPU multiplier 14, JIT off): the request
-  appeared about 15 s after power-on, identical to the owner's screenshot. The validation ended
+  appeared about 15 s after power-on, identical to the maintainer's screenshot. The validation ended
   between 48 and 59 s after power-on (Retry at 26, 37 and 48 s brought the request back;
   Retry at 59 s let the game start). Retry after about 5 minutes also worked.
 - Cancel stopped the game: "AmiWind v0.0.32 crashed! Crash details: Error opening DEBUG.TXT",
@@ -120,7 +120,7 @@ In source on v0.0.33-dev (branch v0.0.33-boot-validate):
   before closing the emulator, and what to do with the request on older builds (wait about a
   minute, Retry, never Cancel).
 
-Diagnostic logs off the disk during play (owner decision, 9 October 2026):
+Diagnostic logs off the disk during play (project decision, 9 October 2026):
 
 - `engine/aga/src/aw_log.c`: `DEBUG.TXT`, `walk-profile.csv`, `frame-stalls.csv`,
   `frame-profile.txt`, `heap-audit.log`, `cell-load-profile.tsv`, `cell-visible-profile.tsv`,

@@ -18,6 +18,20 @@ this build's size; with none it says "no comparable history" and the ETA is a
 lower bound (BUILD-PROGRESS-ETA-BASIS-36). Every expected duration carries its
 basis (expected_basis) in the progress record.
 
+While a stage runs, its estimate follows the work (fixlist B6; dev5's chim
+stage was expected at 43 min from the frames of earlier runs and ran 85):
+the stage's counter (its phase timer's done/total, else the last counted
+progress line of its log, "[done/total unit] ...") gives the units done and
+the time they took here; the remaining units at that rate, plus the history
+time of the phases that follow, are blended with the history estimate by
+sqrt(done/total), so the estimate moves to the measured rate as the stage
+runs and equals it at the end. A stage past its history estimate with no
+counter takes its phase history instead. The units a stage counted are kept
+(units_seen) so the next build expects it per unit: unit counts x per-unit
+cost. The basis is in every stage row (expected_basis, live) and in the ETA
+basis, and the builder prints an "[eta]" line every 5 minutes
+(AMIWIND_ETA_LINE_SECONDS; 0 = off).
+
     python tools/build.py status RUN [--json]
 
 prints a one-screen summary of a running or finished build. The progress file
@@ -30,6 +44,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import statistics
 import sys
 import threading
@@ -55,6 +70,9 @@ DONE = ('passed',)
 STOPPED = ('failed', 'cancelled')
 COMPARABLE_RATIO = 2.0     # history of a run within this size ratio counts as the same size
 NO_COMPARABLE = 'no comparable history'
+LOG_TAIL_BYTES = 65536     # how much of a stage log's end is read for its last counted progress line
+ETA_LINE_ENV = 'AMIWIND_ETA_LINE_SECONDS'
+DEFAULT_ETA_LINE = 300.0   # the builder's "[eta]" stdout line, every this many seconds while stages run
 
 
 # --------------------------------------------------------------------------
@@ -145,11 +163,18 @@ def history_samples(run, limit=HISTORY_RUNS):
         budget = profile.get('budget')
         found = False
         commands = None
+        counted = run_units(folder)
         for row in profile.get('stages', []):
             if row.get('status') != 'passed' or row.get('reused') or not row.get('wall'):
                 continue
             sample = {'wall': row['wall'], 'cpu': row.get('cpu'), 'jobs': row.get('jobs_max') or row.get('jobs'),
                       'budget': budget, 'run': folder.name}
+            if counted.get(row['name']):
+                sample['units'] = counted[row['name']]
+            phases = [{'name': item['name'], 'start': item.get('start') or 0.0, 'wall': item.get('wall') or 0.0}
+                      for item in row.get('sections') or () if item.get('phase') and not item.get('min_depth')]
+            if phases:
+                sample['phases'] = sorted(phases, key=lambda item: item['start'])
             if row['name'] in WORK_MEASURES:
                 if commands is None:
                     commands = run_commands(folder)
@@ -160,6 +185,16 @@ def history_samples(run, limit=HISTORY_RUNS):
         if found:
             used.append(folder.name)
     return samples, used
+
+
+def run_units(folder):
+    """{stage: {unit: total}} a run's stages counted (build-progress.json units_seen; {} when unknown)."""
+    try:
+        progress = json.loads((Path(folder) / PROGRESS_NAME).read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+    return {row['name']: dict(row['units_seen']) for row in progress.get('stages', [])
+            if row.get('name') and isinstance(row.get('units_seen'), dict) and row['units_seen']}
 
 
 def run_commands(folder):
@@ -238,6 +273,80 @@ def expected_durations(names, budget, samples=None, defaults=(None, {}), reused=
 
 
 # --------------------------------------------------------------------------
+# Live correction from the work done (fixlist B6; pure: tested with synthetic counters)
+
+COUNTER_LINE = re.compile(r'^(?:\[\+[^\]]*\]\s*)?\[(\d+)/(\d+)(?: ([^\]|]*?))?\s*(?:\|[^\]]*)?\]\s*([^:\n]+)')
+
+
+def log_counter(path, limit=LOG_TAIL_BYTES):
+    """{name, done, total, unit} of the last counted progress line ("[done/total unit] name: ...",
+    tools/progress_line.py) in the end of a stage log, or None."""
+    try:
+        with open(path, 'rb') as stream:
+            stream.seek(0, os.SEEK_END)
+            size = stream.tell()
+            stream.seek(max(0, size - limit))
+            text = stream.read().decode('utf-8', errors='replace')
+    except OSError:
+        return None
+    for line in reversed(text.splitlines()):
+        match = COUNTER_LINE.match(line.strip())
+        if match and int(match.group(2)) > 0:
+            return {'name': match.group(4).strip(), 'done': int(match.group(1)), 'total': int(match.group(2)),
+                    'unit': (match.group(3) or '').strip() or None}
+    return None
+
+
+def per_unit_expected(rows, unit, total, budget):
+    """(seconds, seconds per unit, runs) for TOTAL units of UNIT from history rows that counted that unit
+    (wall scaled to this budget, then per unit), or None."""
+    costs = [scaled_seconds(r['wall'], r.get('cpu'), r.get('jobs'), r.get('budget'), budget) / r['units'][unit]
+             for r in rows or () if (r.get('units') or {}).get(unit)]
+    if not costs or not total:
+        return None
+    each = statistics.median(costs)
+    return each * total, each, len(costs)
+
+
+def phase_history(rows, phase, ratio=1.0):
+    """(median wall of PHASE, median wall of the outermost phases after it) in history rows, scaled by
+    RATIO (this build's work / the run's); (None, None) when no history run had that phase."""
+    walls, tails = [], []
+    for row in rows or ():
+        phases = row.get('phases') or ()
+        found = next((item for item in phases if item['name'] == phase), None)
+        if found is None:
+            continue
+        scale = ratio(row) if callable(ratio) else ratio
+        end = found['start'] + found['wall']
+        walls.append(found['wall'] * scale)
+        tails.append(sum(item['wall'] for item in phases if item['start'] >= end - 1.0) * scale)
+    if not walls:
+        return None, None
+    return statistics.median(walls), statistics.median(tails)
+
+
+def corrected_remaining(prior, elapsed, counted_seconds, done_since, done, total, tail=0.0, overrun=False):
+    """The stage's remaining seconds from its counter, blended with the history estimate.
+
+    prior: the history estimate's remaining seconds (None when unknown); counted_seconds: the time the
+    DONE_SINCE units took here; done/total: the counter now; tail: the history seconds of the phases after
+    the counted one. The measured remaining (rate x units left + tail) gets weight sqrt(done/total), 1 when
+    the history estimate is unknown or already overrun: it converges to the measured rate as the stage
+    runs and equals it when the counter is complete. Returns {remaining, measured, weight, each} or None
+    when the counter cannot give a rate yet."""
+    if not total or done_since <= 0 or counted_seconds <= 0:
+        return None
+    each = counted_seconds / done_since
+    measured = each * max(0, total - done) + max(0.0, tail or 0.0)
+    fraction = max(0.0, min(1.0, done / total))
+    weight = 1.0 if prior is None or overrun else math.sqrt(fraction)
+    remaining = measured if prior is None else (1 - weight) * prior + weight * measured
+    return {'remaining': round(max(0.0, remaining), 1), 'measured': round(measured, 1), 'weight': round(weight, 3),
+            'each': round(each, 3)}
+
+
+# --------------------------------------------------------------------------
 # Estimate (pure: tested with synthetic builds)
 
 def trailing_idle(points, limit, interval=1.0):
@@ -250,7 +359,7 @@ def trailing_idle(points, limit, interval=1.0):
     return round(seconds, 1)
 
 
-def estimate(order, dependencies, stages, expected, budget):
+def estimate(order, dependencies, stages, expected, budget, live=None):
     """Percent, ETA and the chain the ETA waits on.
 
     order: every stage of the build. stages: {name: {'status', 'elapsed'}} for
@@ -259,8 +368,10 @@ def estimate(order, dependencies, stages, expected, budget):
     its expected duration (the median of known stages for one without history);
     a running stage counts its elapsed share, at most 95 %. The ETA is the later
     of the longest remaining dependency chain and the remaining CPU work spread
-    over the budget.
+    over the budget. live: {stage: remaining seconds} of running stages corrected from their work done
+    (corrected_remaining); such a stage weighs its elapsed time plus that.
     """
+    live = live or {}
     known = [entry['seconds'] for entry in expected.values() if entry.get('seconds')]
     fallback = statistics.median(known) if known else FALLBACK_SECONDS
     weight = {name: (expected.get(name) or {}).get('seconds') or fallback for name in order}
@@ -269,6 +380,11 @@ def estimate(order, dependencies, stages, expected, budget):
     for name in order:
         state, wall = status[name], weight[name]
         elapsed = (stages.get(name) or {}).get('elapsed') or 0.0
+        if state == 'running' and live.get(name) is not None:
+            remaining[name] = live[name]
+            weight[name] = elapsed + live[name]
+            done_weight += elapsed
+            continue
         if state in DONE:
             done_weight += wall
             remaining[name] = 0.0
@@ -354,6 +470,8 @@ class Tracker:
         self.started_epoch = time.time() - (time.monotonic() - self.origin)
         reused = set(((metadata.get('stage_cache') or {}).get('reused') or {}).keys())
         samples, self.history_runs = history_samples(self.run)
+        self.samples = samples
+        self.counters = {}     # stage -> the counter it is corrected from (key, base time and units, completion)
         defaults = load_defaults()
         work = {}
         for name in self.order:
@@ -372,6 +490,12 @@ class Tracker:
             except ValueError:
                 interval = DEFAULT_INTERVAL
         self.interval = max(0.05, interval)
+        try:
+            self.eta_every = float(os.environ.get(ETA_LINE_ENV, DEFAULT_ETA_LINE))
+        except ValueError:
+            self.eta_every = DEFAULT_ETA_LINE
+        self.eta_printed = time.monotonic()
+        self.last = None
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._loop, name='build-progress', daemon=True)
         self.writes = 0
@@ -381,6 +505,80 @@ class Tracker:
     def _loop(self):
         while not self.stop_event.wait(self.interval):
             self.write()
+            if self.eta_every > 0 and time.monotonic() - self.eta_printed >= self.eta_every:
+                self.eta_printed = time.monotonic()
+                text = eta_line(self.last)
+                if text:
+                    print(text, flush=True)
+
+    def _live(self, name, stage, row, elapsed, entry):
+        """The running stage's estimate corrected from its work done (row['live']), or None."""
+        now = time.time()
+        current = row.get('phase') or {}
+        if current.get('total'):
+            counter = {'source': 'phase timer', 'name': current.get('name'), 'done': int(current.get('done') or 0),
+                       'total': int(current['total']), 'unit': current.get('unit')}
+            start = now - float(current.get('elapsed_seconds') or 0.0)
+        else:
+            counter = log_counter(self.run / 'logs' / f"{stage['number']:02}-{name}.log")
+            if counter:
+                counter['source'] = 'log counter'
+            start = None
+        phase = current.get('name')
+        state = self.counters.get(name)
+        if counter:
+            key = (counter['source'], counter['name'], counter['total'], counter['unit'], phase)
+            if state is None or state['key'] != key or counter['done'] < state['base_done']:
+                state = {'key': key, 'base_epoch': start if start is not None else now,
+                         'base_done': 0 if start is not None else counter['done'], 'complete_epoch': None}
+                self.counters[name] = state
+            if counter['done'] >= counter['total'] and state['complete_epoch'] is None:
+                state['complete_epoch'] = now
+            seen = stage.setdefault('units_seen', {})
+            unit = counter['unit'] or 'units'
+            seen[unit] = max(seen.get(unit, 0), counter['total'])
+            row['counter'] = dict(counter)
+        rows = self.samples.get(name) or ()
+        prior, basis = entry.get('seconds'), entry.get('basis') or entry.get('source')
+        unit = (counter or {}).get('unit') or 'units'
+        if counter:
+            per_unit = per_unit_expected(rows, unit, counter['total'], self.budget)
+            if per_unit:
+                prior = per_unit[0]
+                basis = f'history per unit: {per_unit[1]:.2f} s each ({per_unit[2]} run(s)) x {counter["total"]} {unit}'
+                row['expected_per_unit'] = {'seconds': round(per_unit[0], 1), 'each': round(per_unit[1], 3),
+                                            'runs': per_unit[2], 'unit': unit, 'total': counter['total']}
+        overrun = prior is not None and elapsed >= prior
+        prior_left = None if prior is None else max(0.0, prior - elapsed)
+        work_here = entry.get('work') or (counter or {}).get('total')
+
+        def ratio(sample):
+            there = sample.get('work') if entry.get('work') else (sample.get('units') or {}).get(unit)
+            return work_here / there if work_here and there else 1.0
+
+        phase_wall, tail = phase_history(rows, phase, ratio) if phase else (None, None)
+        result = None
+        if counter and state:
+            tail_left = tail or 0.0
+            if state['complete_epoch'] is not None and tail_left:
+                tail_left = max(OVERRUN_MIN, tail_left - (now - state['complete_epoch']))
+            result = corrected_remaining(prior_left, elapsed, now - state['base_epoch'],
+                                         counter['done'] - state['base_done'], counter['done'], counter['total'],
+                                         tail_left, overrun)
+            if result:
+                result.update(source=counter['source'], tail=round(tail_left, 1),
+                              basis=(f"{counter['done']}/{counter['total']} {unit} done, {result['each']:.2f} s each "
+                                     f"here ({counter['source']} '{counter['name']}'), weight {result['weight']:.2f} "
+                                     f"against {basis or 'no history'}"
+                                     + (f'; later phases {duration(tail_left)} from history' if tail else '')))
+        if result is None and phase_wall is not None and (prior is None or overrun):
+            left = max(OVERRUN_MIN, phase_wall - float(current.get('elapsed_seconds') or 0.0)) + (tail or 0.0)
+            result = {'remaining': round(left, 1), 'source': 'phase history', 'weight': 1.0,
+                      'basis': f"phase '{phase}' and the phases after it from history (the stage estimate "
+                               f"{'is overrun' if overrun else 'is unknown'})"}
+        if result:
+            row['live'] = result
+        return result
 
     def stage_started(self, name, number, jobs):
         with self.lock:
@@ -455,7 +653,7 @@ class Tracker:
             status = self.status
         per_stage, build_cores, timeline = self._cores(now)
         interval = getattr(self.sampler, 'interval', 1.0) if self.sampler else 1.0
-        states, rows, warnings = {}, [], []
+        states, rows, warnings, live = {}, [], [], {}
         for name in self.order:
             stage = stages.get(name)
             entry = self.expected.get(name, {})
@@ -471,6 +669,12 @@ class Tracker:
                 states[name] = {'status': row['status'], 'elapsed': elapsed}
                 if row['status'] == 'running':
                     self._phase_now(name, stage, row)
+                    try:
+                        corrected = self._live(name, self.stages.get(name, stage), row, elapsed, entry)
+                    except Exception:  # noqa: BLE001 - the correction never stops progress
+                        corrected = None
+                    if corrected:
+                        live[name] = corrected['remaining']
                     jobs = self._jobs_now(name, stage) or 1
                     row['jobs'] = jobs
                     points = per_stage.get(name, [])
@@ -488,8 +692,17 @@ class Tracker:
                             low = [cores for t, cores in points if t >= points[-1][0] - idle]
                             warnings.append({'stage': name, 'cores': round(sum(low) / len(low), 2) if low else None,
                                              'jobs': jobs, 'seconds': idle})
+            seen = (self.stages.get(name) or {}).get('units_seen')
+            if seen:
+                row['units_seen'] = dict(seen)   # the next build's per-unit history (run_units)
             rows.append(row)
-        result = estimate(self.order, self.dependencies, states, self.expected, self.budget)
+        result = estimate(self.order, self.dependencies, states, self.expected, self.budget, live)
+        if result['eta_basis'] and live:
+            result['eta_basis'] += '; corrected from the work done: ' + ', '.join(
+                f"{row['name']} ({row['live']['source']}"
+                + (f", {row['counter']['done']}/{row['counter']['total']} {row['counter'].get('unit') or 'units'}"
+                   if row.get('counter') and row['live']['source'] != 'phase history' else '') + ')'
+                for row in rows if row['name'] in live)
         for row in rows:
             if row['status'] == 'running':
                 row['remaining_seconds'] = result['remaining'].get(row['name'])
@@ -532,12 +745,34 @@ class Tracker:
         try:
             with self.write_lock:  # the builder thread and the timer thread
                 data = self.snapshot()
+                self.last = data
                 self.writes += 1
                 temporary = self.run / (PROGRESS_NAME + '.tmp')
                 temporary.write_text(json.dumps(data, indent=1) + '\n', encoding='utf-8', newline='\n')
                 temporary.replace(self.run / PROGRESS_NAME)
         except Exception:  # noqa: BLE001 - progress must never fail a build
             pass
+
+
+def eta_line(progress):
+    """The builder's periodic "[eta]" line from a progress record (None when nothing runs)."""
+    if not progress or progress.get('status') != 'running':
+        return None
+    running = [row for row in progress.get('stages', []) if row.get('status') == 'running']
+    if not running:
+        return None
+    eta = progress.get('eta_seconds')
+    head = (f"[eta] {progress.get('percent') or 0:.1f} %, ETA "
+            + (f"{duration(eta)} (at {(progress.get('eta_at') or '')[11:19]})" if eta is not None else 'unknown'))
+    parts = []
+    for row in running:
+        text = row['name']
+        if row.get('live'):
+            text += f": ~{duration(row['live']['remaining'])} left, {row['live']['basis']}"
+        elif row.get('remaining_seconds') is not None:
+            text += f": ~{duration(row['remaining_seconds'])} left ({row.get('expected_basis') or 'no history'})"
+        parts.append(text)
+    return head + ' | ' + ' | '.join(parts)
 
 
 def start(run, order, dependencies, metadata, sampler=None, origin=None, commands=None):
@@ -630,6 +865,8 @@ def status_lines(progress, now=None):
                 note.append(row['expected_basis'])
             elif row.get('expected_source') == 'default':
                 note.append('default table')
+            if row.get('live'):
+                note.append('live: ' + row['live']['basis'])
             if row.get('overrun'):
                 note.append('OVERRUN')
             current = row.get('phase')

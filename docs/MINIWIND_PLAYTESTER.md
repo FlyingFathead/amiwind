@@ -9,6 +9,7 @@ how to add a sandbox). This page is the reference for the build type itself.
 - [How to build it](#how-to-build-it)
 - [What it builds](#what-it-builds)
 - [Scope: the Balmora exterior only](#scope-the-balmora-exterior-only)
+- [Scope: one room](#scope-one-room)
 - [Another town and DEBUG ONLY sandboxes](#another-town-and-debug-only-sandboxes)
 - [How the game starts](#how-the-game-starts)
 - [Boot notice](#boot-notice)
@@ -51,9 +52,11 @@ building.
   to at most two lines; anything else is refused with a clear message before
   any stage runs. The text is recorded in both receipts.
 - `--miniwind-scope SCOPE` (optional): `full` (the default, everything this
-  page describes) or `exterior` (the Balmora exterior on CHIM only, see
-  [below](#scope-the-balmora-exterior-only)). Any other value, or the option
-  without `--miniwind`, is refused before any stage runs.
+  page describes), `exterior` (the Balmora exterior on CHIM only, see
+  [below](#scope-the-balmora-exterior-only)) or `interior` (one room: the
+  start room of an `interior:<cell id>` start, see
+  [below](#scope-one-room)). Any other value, or the option without
+  `--miniwind`, is refused before any stage runs.
 
 The build is refused unless `VERSION` is a private `-devN` version (refused
 for release candidates and finals, as the private-test waivers are), in every
@@ -144,6 +147,16 @@ both receipts (`build_type`: `scope`, `label`, `partial_area`
 What it is NOT: not a test of any interior, door transition, door sound or
 the NPC gallery; not the locked MiniWind scope (that is `full`, the default);
 not a release or release candidate.
+
+## Scope: one room
+
+`--miniwind-scope interior` (with `--direct-to-game-map "interior:<cell id>"`) is the sandbox of one room: the
+town's rooms stage converts only that room (`tools/chim_rooms.py --only-cell`), every other room of the town is
+recorded as left out ("not in this build") and its doors say "Area unavailable". The island-wide mesh seam
+audit (`seam-audit`, a gate of full builds and the gate suite) and the Toolkit tracker data (`cell-progress`)
+are left out; the scene chain, the CHIM frame and the town's residents stage still run (the engine boots from
+them). The image keeps the town's frame map and the start room. Presets: `vivec-palace`, `vivec-arena-pit`.
+A start that is not an interior is refused before any stage runs. (MINIWIND-NO-INTERIOR-SCOPE-42.)
 
 ## Another town and DEBUG ONLY sandboxes
 

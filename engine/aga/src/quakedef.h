@@ -369,6 +369,15 @@ void AW_InputGuardInit(void);
 void AW_InputGuardShutdown(void);
 extern qboolean noclip_anglehack;
 int AW_ModelVisible(vec3_t origin,float radius);
+/* aw_fog.c far tests of a brush model pass (aw_cull 2 and up). */
+enum {AW_FAR_DRAW,AW_FAR_SKIP,AW_FAR_SIZE,AW_FAR_FACES};
+int AW_BrushPassFar(vec3_t origin,float radius,const float *minmaxs);
+void AW_FarPassBegin(int result);
+int AW_FogFullDepthValue(int distance);
+float AW_SizeCutShare(int preset,float radius);
+extern float aw_far_depth[4],aw_far_down[4],aw_far_view[4],aw_far_detail_pixels;
+extern int aw_far_faces;
+extern int (*aw_flame_depth_limit)(void);
 
 qboolean AW_FindSafeSpawn(edict_t *,vec3_t,vec3_t);
 qboolean AW_PlacePlayer(edict_t *,vec3_t);
@@ -483,6 +492,9 @@ void AW_UIFill(int,int,int,int,int);
 void AW_UIScrollbar(int,int,int,int,int,int);
 int AW_UIScrollHit(int,int,int,int,int,int,int,int);
 void AW_UIBox(int,int,int,int);
+void AW_UIHudPlaceholders(int y,int channels);   /* the interim weapon/magic marks */
+extern int (*aw_hud_item_boxes)(int y,int channels);   /* aw_icons.c: the original boxes */
+void AW_IconsInit(void);
 void AW_UIFrame(int,int,int,int);
 void AW_UIOuterFrame(void);
 int AW_UIFrameEnabled(void);
@@ -690,6 +702,7 @@ extern int (*aw_hand_block_item)(char id[64],char model[64]);
 int AW_ViewInventoryBody(model_t **model,int *frame);
 int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int height,float angle);
 void AW_InventoryPreviewClear(void);
+int AW_ViewInventoryLive(void);   /* aw_view.c: the old live inventory preview selected */
 void AW_ViewInventoryClear(void);
 int AW_InventoryActive(void);
 void AW_WorldUIInit(void);

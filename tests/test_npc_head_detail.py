@@ -266,7 +266,7 @@ class HeadDetailSwitch(unittest.TestCase):
         self.assertNotEqual(gallery_cache.token(keys['original']), gallery_cache.token(keys['budget']))
 
     def test_dagoth_ur_profile_keeps_his_whole_model(self):
-        # Owner decision 2026-10-09: Dagoth Ur (dagoth_ur_1 and dagoth_ur_2 share r/dagothr.nif) keeps all 2,254
+        # Project decision 2026-10-09: Dagoth Ur (dagoth_ur_1 and dagoth_ur_2 share r/dagothr.nif) keeps all 2,254
         # original triangles through the shared-vertex encoding (NPC-DAGOTH-BODY-DECIMATION-33).
         config = json.loads((ROOT / 'config/gallery_model_quality.json').read_text())
         profile = config['profiles']['r/dagothr.nif']

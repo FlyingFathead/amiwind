@@ -9,7 +9,7 @@
 | Where | Builder container images (recipe in tools/build_docker.py); tools/build.py entry |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Any container run of another source tree without its own PYTHONPATH could import old builder code silently; a job read the wrong VERSION from it. |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

@@ -9,7 +9,7 @@
 | Where | tools/chimport.py run, pending_rows(): only runner-state failures were retried |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev1 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: The 546 hull-pending cells and every audit-failed cell of the island run could not be rerun after a shared-layer fix without hand-editing state.json |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

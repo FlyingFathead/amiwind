@@ -9,7 +9,7 @@
 | Where | tools/prepare_area.py populate, via tools/prepare_seyda_carrier.py |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.40-dev2 (last seen) |
+| Persists in | fixed in v0.0.40 |
 | Severity | critical: The original-data carrier build stops before complete resident and opening-reference output. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

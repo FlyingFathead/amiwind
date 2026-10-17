@@ -15,7 +15,7 @@ Interactive build uses the corrected async4k scheduler. Prior releases are immut
 | CRC32 | `c4f0f55f` |
 | End-around ROM checksum | `ffffffff` |
 
-The owner also reported that the `[o]` variant works in their setup. Its uploaded
+The maintainer also reported that the `[o]` variant works in their setup. Its uploaded
 `kick34005.A500` member is 524,288 bytes, exactly two copies of the 256 KiB ROM
 above. Its SHA-256 is
 `1d68ba18412501d2a4b307a0a632b94a50b839c2c7c5ff2df6de2c38b99a921f`.
@@ -23,7 +23,7 @@ That is a user-reported result plus a byte comparison, not a second emulator run
 in this build's validation. Other uploaded ROM collections were not needed.
 
 Public source/docs contain these identifiers only. ROM bytes are excluded from
-the source ZIP. The owner explicitly requested the tested ROM in the private
+the source ZIP. The maintainer explicitly requested the tested ROM in the private
 package; it is included there alone.
 
 ## Emulator and effective settings

@@ -39,6 +39,14 @@ class ChimCellListTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             L.make(self.tmp / 'regions.json', None)
 
+    def test_a_batch_file_alone_with_the_kept_cells(self):
+        # the easy CHIMport batch: tools/chim_weight_table.py --cells-out, no rings or regions
+        (self.tmp / 'batch.json').write_text(json.dumps({'format': 'aw-chim-cells-1', 'cells': [[3, 3]]}))
+        doc, lines = L.make(self.tmp / 'progress.json', None, include=[self.tmp / 'batch.json'],
+                            keep=[self.tmp / 'prev.json'])
+        self.assertEqual(doc['cells'], [[1, 1], [3, 3], [9, 0]])
+        self.assertIn('include batch.json: 1 cells, 1 new', lines)
+
     def test_run_receipt_as_keep_source(self):
         doc, _ = L.make(self.tmp / 'progress.json', '1', keep=[self.tmp / 'scenery.json'])
         self.assertEqual(doc['cells'], [[1, 1], [9, 0]])

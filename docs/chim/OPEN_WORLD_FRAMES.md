@@ -135,7 +135,7 @@ textures once.
 3. Edge checks and the MiniWind sandbox; A/B against the legacy region and OpenMW.
 4. All frames with every cell converted; frames with missing cells wait for CHIMport.
 
-## Decisions (owner, 9 October 2026)
+## Decisions (maintainer, 9 October 2026)
 
 - Frames whose missing cells are only water (CHIMport's "empty" cells) ship. A frame missing any
   cell that holds land or placements waits for CHIMport.

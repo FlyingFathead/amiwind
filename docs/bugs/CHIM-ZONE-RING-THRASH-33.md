@@ -9,7 +9,7 @@
 | Where | CHIM engine zone cache sizing, Balmora chunk ring |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: Cache thrashes: 15,259 evictions and 64 failed frame-world rebuilds. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Performance ([CHIM Engine tracker](CHIM_TRACKER.md)) |

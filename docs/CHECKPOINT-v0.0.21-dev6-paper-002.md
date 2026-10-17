@@ -5,7 +5,7 @@ release, parallel-build delivery, or validated new private playable.
 
 ## Scope
 
-Implement the owner's approved paper-only bitmap candidate and an opt-out.
+Implement the maintainer's approved paper-only bitmap candidate and an opt-out.
 TTF stays preferred. The candidate defaults on only for the actual bitmap reading
 path; TTF and ordinary dialogue/menu output remain unchanged.
 See [settings and implementation](PAPER_FONT_OPTIONS.md).
@@ -29,13 +29,13 @@ The exact supplied font inputs were tested privately, not bundled in source.
   ordinary bitmap family/size outputs match dev5; TTF paper bytes are unchanged
   with either ink setting.
 - No new Amiga compilation, HDF, emulator session or physical-hardware run is
-  claimed. The owner's earlier successful Steam HDF build was dev5.
+  claimed. The maintainer's earlier successful Steam HDF build was dev5.
 
 ## Baseline and use
 
-Exact base: owner snapshot `amiwind-2026-09-29_003353.zip`.
+Exact base: maintainer snapshot `amiwind-2026-09-29_003353.zip`.
 Base archive SHA-256: `2a3eb8322ac871a5616d3a4dd3ca56e1ed5b1c7ef1b418ca8cb1e191ef029267`.
-The owner identified this as the published dev5 tree at commit
+The maintainer identified this as the published dev5 tree at commit
 `cd339b89a1bc7d59c6b0c8be2ad81033baa4610e`; no live Git operation was performed here.
 The patch is against this source snapshot, not an unprovided in-progress tree.
 

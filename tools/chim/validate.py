@@ -526,6 +526,21 @@ _FRAME_FILES = {}          # per process: (path, size, mtime) -> bytes, for load
 _FRAME_FILES_MAX = 96
 
 
+def loaded_world(out, world=None):
+    """(settings, files, sizes, textures, models, frames) of the CHIM world in OUT: the given world (the dict the
+    step's validation read with load_world, which the gates after it use instead of reading and decoding every
+    file again: about 13 s each on 726 frames, BUILD-CHIM-STAGE-SERIAL-TAIL-36), else load_world. Failures of
+    the read are raised as ValueError(first failure)."""
+    if world is not None:
+        return (world['settings'], world['files'], world['sizes'], world['textures'], world['models'],
+                world['frames'])
+    fails = Failures()
+    loaded = load_world(out, fails)
+    if fails:
+        raise ValueError(fails[0])
+    return loaded
+
+
 def _world_file(root, rel):
     """The bytes of one CHIM world file, kept per process (a small cache: the stair gate's workers read a
     frame's sectors and the model records it places, often again for the next core of the same frame)."""
@@ -815,6 +830,84 @@ def _model_checks(task):
     return out
 
 
+def _frame_cross_checks(task):
+    """Worker of validate() (or in its process): one frame's owner and reach-copy checks and its PVS and
+    placement-row checks, from the frame's records, chunk trees and decoded PVS rows. Pure: the same
+    failures in the same order in any worker. Returns (owner/copy failures, PVS/row failures, leaves per
+    placement, chunks per placement, placement rows {cell: pids}, ring {cell: cells})."""
+    from world_chunk_estimate import placed_box
+    owners, copies, order, trees, vis = task['owners'], task['copies'], task['order'], task['trees'], task['vis']
+    g, lx, ly, nx, ny = task['grid']
+    nmodels, bounds, hidden, offs = task['models'], task['bounds'], task['hidden'], task['offs']
+    fails = Failures()
+    leaf_counts, chunk_counts = [], []
+    # owners and reach copies
+    for ref, rows in owners.items():
+        if not fails.check(len(rows) == 1, 'placement %d stored as owner %d times' % (ref, len(rows))):
+            continue
+        _, ci, r = rows[0]
+        x, y = r['origin'][0], r['origin'][1]
+        own = (min(nx - 1, max(0, int((x - lx) // g))), min(ny - 1, max(0, int((y - ly) // g))))
+        fails.check(order[ci] == own, 'placement %d: owner chunk does not hold its origin' % ref)
+        if r['model'] >= nmodels:
+            continue
+        lo, hi = placed_box(r['origin'], (0.0, r['yaw'], 0.0), *bounds[r['model']])
+        box = (tuple(int(math.floor(v - 1)) for v in lo), tuple(int(math.ceil(v + 1)) for v in hi))
+        fails.check(tuple(r['box']) == box, 'placement %d: stored drawn box %s, model bounds give %s'
+                    % (ref, r['box'], box))
+        lo, hi = r['box']
+        a = (min(nx - 1, max(0, int((lo[0] - lx) // g))), min(ny - 1, max(0, int((lo[1] - ly) // g))))
+        b = (min(nx - 1, max(0, int((hi[0] - lx) // g))), min(ny - 1, max(0, int((hi[1] - ly) // g))))
+        want = {(i, j) for i in range(a[0], b[0] + 1) for j in range(a[1], b[1] + 1)} - {own}
+        leaves = sum(len(box_leaves(*trees[k], lo, hi)) for k in want | {own} if k in trees)
+        fails.check(r['leaves'] == min(leaves, 65535), 'placement %d: record says %d leaves, its box reaches %d'
+                    % (ref, r['leaves'], leaves))
+        fails.check(bool(r['flags'] & F.FLAG_OVER_16_LEAVES) == (leaves > F.MAX_ENT_LEAFS),
+                    'placement %d: over-16-leaves flag wrong' % ref)
+        if hidden is not None:
+            fails.check(bool(r['flags'] & F.FLAG_STORY_HIDDEN) == (ref in hidden),
+                        'placement %d: story-hidden flag differs from the source' % ref)
+        leaf_counts.append(leaves)
+        chunk_counts.append(len(want) + 1)
+        got = [order[k] for _, k, _ in copies.get(ref, [])]
+        fails.check(sorted(got) == sorted(want), 'placement %d: reach copies %s, drawn box touches %s'
+                    % (ref, sorted(got), sorted(want)))
+        fails.check(all(rr == r for _, _, rr in copies.get(ref, [])),
+                    'placement %d: a reach copy differs from the owner record' % ref)
+    fails.check(not set(copies) - set(owners), 'reach copies without an owner record: %s'
+                % sorted(set(copies) - set(owners))[:5])
+    rows_fails = Failures()
+    # cluster PVS rows: itself and its neighbours, symmetric, nothing beyond the ring
+    for c, seen in vis.items():
+        ring = {(c[0] + dx, c[1] + dy) for dx, dy in offs}
+        near = {(c[0] + dx, c[1] + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)} & set(vis)
+        rows_fails.check(near <= seen, 'chunk %d,%d: PVS misses itself or a neighbour' % c)
+        rows_fails.check(seen <= ring, 'chunk %d,%d: PVS marks a chunk beyond the ring' % c)
+        rows_fails.check(all(c in vis.get(b, set()) for b in seen), 'chunk %d,%d: PVS not symmetric' % c)
+    # potentially visible placements: a bit row over the frame's placements (from its lowest id)
+    records_of = {cell: records for cell, records, _ in task['rows']}
+    frame_pids = [rows[0][2]['pid'] for rows in owners.values()]
+    base = min(frame_pids) if frame_pids else 0
+    pvl = {}
+    owned_total = task['owned_total']
+    for cell, _, row in task['rows']:
+        try:
+            bits = row_to_bits(decompress_row(row, (owned_total + 7) // 8), owned_total)
+        except ValueError as e:
+            rows_fails.append('chunk %d,%d: placement row: %s' % (cell[0], cell[1], e))
+            continue
+        seen = {base + k for k, b in enumerate(bits) if b}
+        ring = {(cell[0] + dx, cell[1] + dy) for dx, dy in offs}
+        cand = {r['pid'] for b in ring if b in records_of for r in records_of[b]}
+        near = {r['pid'] for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+                for r in records_of.get((cell[0] + dx, cell[1] + dy), ())}
+        rows_fails.check(seen <= cand, 'chunk %d,%d: placement row marks a placement outside the ring' % cell)
+        rows_fails.check(near <= seen, 'chunk %d,%d: placement row misses a placement next to the chunk' % cell)
+        pvl[cell] = seen
+    ring = {c: {(c[0] + dx, c[1] + dy) for dx, dy in offs} & set(vis) for c in vis}
+    return fails, rows_fails, leaf_counts, chunk_counts, pvl, ring
+
+
 def check_cache(counted=False):
     """The validation's unit cache (pass_cache.PassCache 'chim-validate', AMIWIND_PASS_CACHE: the stage's
     hashed pool), or None when off. Keyed by validate.py's sources and everything they read. counted: with a
@@ -838,9 +931,16 @@ def _pool_map(function, tasks, jobs, cost):
 
 
 MODEL_GROUP = 64          # models per validation task
+CHUNK_GROUP = 256         # chunks per validation task of a big frame (cross_checks 'pool')
 
 
-def validate(out, source=None, palette=None, jobs=1):
+def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
+    """(failures, world) of the CHIM world in OUT. jobs: the worker pool's size for the frame and model checks
+    and, with cross_checks 'pool' (the default), the whole-world cross-checks split into frame units;
+    cross_checks 'serial' runs those one frame after another in this process (the method before v0.0.42).
+    Same failures, same order, same world either way."""
+    if cross_checks not in ('pool', 'serial'):
+        raise ValueError('cross_checks: pool or serial, not %r' % (cross_checks,))
     from world_chunk_estimate import placed_box
     fails = Failures()
     settings, files, sizes, textures, models, frames = load_world(out, fails)
@@ -886,7 +986,8 @@ def validate(out, source=None, palette=None, jobs=1):
     # model's variants must all be its base transformed, with its vertices and edges; other meshes are reported
     from chim.variant_audit import audit_models, reference_stems
     references = reference_stems()
-    variant_report = audit_models([{'name': m['name'], 'image': m['image']} for m in models], references)
+    variant_report = audit_models([{'name': m['name'], 'image': m['image']} for m in models], references,
+                                  jobs=jobs if cross_checks == 'pool' else 1)
     for row in variant_report['failures']:
         fails.append('model %s: %s (base %s)' % (row['variant'], row['reason'], row['base']))
     for row in variant_report['topology_differences']:
@@ -913,25 +1014,46 @@ def validate(out, source=None, palette=None, jobs=1):
     if source is not None and ('ownership_index_sha256' in source or
                                any('frame_ownership' in s for s in sections.values())):
         from chim.ownership import binary_failures
-        ownership_errors = binary_failures(out, source, sections, frames, models)
+        ownership_errors = binary_failures(out, source, sections, frames, models,
+                                           jobs=jobs if cross_checks == 'pool' else 1)
         fails.extend('source ownership: ' + e for e in ownership_errors)
         ownership_verified = not ownership_errors
     met_models, met_textures = [], []
-    # the per-chunk checks of every frame on the worker pool, a frame per task, largest first
-    tasks = []
+    met_model_set, met_texture_set = set(), set()
+    # the per-chunk checks of every frame on the worker pool, a frame per task, largest first; with cross_checks
+    # 'pool' a frame of more than CHUNK_GROUP chunks (a town) is split into runs of chunks, so one big frame
+    # does not finish alone at the end (each run is its own unit, keyed by what it reads; results joined in
+    # chunk order: the same results)
+    tasks, runs = [], []
+    group = CHUNK_GROUP if cross_checks == 'pool' and jobs > 1 else None
     for path, frame, chunks in frames:
         g, (lx, ly) = frame['grain'], frame['low']
-        tasks.append(([({k: c[k] for k in ('cx', 'cy', 'image', 'ref') if k in c},
-                        (lx + c['cx'] * g, ly + c['cy'] * g, lx + (c['cx'] + 1) * g, ly + (c['cy'] + 1) * g))
-                       for c in chunks], len(textures), sections.get(path), cache))
-    checked = _pool_map(_chunk_checks, tasks, jobs, lambda t: sum(len(c['image']) for c, _ in t[0]))
-    del tasks
+        rows = [({k: c[k] for k in ('cx', 'cy', 'image', 'ref') if k in c},
+                 (lx + c['cx'] * g, ly + c['cy'] * g, lx + (c['cx'] + 1) * g, ly + (c['cy'] + 1) * g))
+                for c in chunks]
+        step = group if group and len(rows) > group else max(1, len(rows))
+        pieces = [rows[k:k + step] for k in range(0, len(rows), step)] or [rows]
+        runs.append(len(pieces))
+        tasks += [(piece, len(textures), sections.get(path), cache) for piece in pieces]
+    done = iter(_pool_map(_chunk_checks, tasks, jobs, lambda t: sum(len(c['image']) for c, _ in t[0])))
+    checked = [[r for _ in range(n) for r in next(done)] for n in runs]
+    del tasks, done
     if cache is not None:
         used = cache.summary()
         print('CHIM validation units: %d reused, %d checked (frame and model checks, by SHA-256 of their inputs)'
               % (used['hits'], used['misses']), file=sys.stderr, flush=True)
+    # The per-frame checks in three parts, in the order the failures are listed: (1) the chunk records, here;
+    # (2) owners and reach copies and (3) the PVS and placement rows: the whole-world cross-checks, one unit per
+    # frame (_frame_cross_checks), on the worker pool largest first (cross_checks 'pool', the default) or one
+    # frame after another in this process ('serial', the method before v0.0.42); the same failures in the same
+    # order either way (fixlist B3, BUILD-CHIM-STAGE-SERIAL-TAIL-36). The checks that need every frame before it
+    # (homes in the pack walk, placements owned by two frames) stay here, between the parts.
+    from asset_census import ring_offsets
+    import progress_line
+    offs = None
+    states = []
     for (path, frame, chunks), results in zip(frames, checked):
-        first_failure = len(fails)          # this frame's failures get its name (BUILD-CHIM-VALIDATE-LATE-36)
+        part1 = Failures()
         g, (lx, ly), nx, ny = frame['grain'], frame['low'], frame['nx'], frame['ny']
         order = F.sector_order(nx, ny, frame['sector_chunks'])[0]
         owners = collections.defaultdict(list)
@@ -940,33 +1062,32 @@ def validate(out, source=None, palette=None, jobs=1):
         nbytes = (len(order) + 7) // 8
         frame_chunks = []
         for c, done in zip(chunks, results):
-            fails.check(F.render_extent(c['image']) >= c['image_render'], path + ': chunk %d collision before render'
+            part1.check(F.render_extent(c['image']) >= c['image_render'], path + ': chunk %d collision before render'
                         % c['index'])
-            fails.extend(done['brush_fails'])
+            part1.extend(done['brush_fails'])
             used_tex.update(done['refs'])
-            fails.extend(done['tree_fails'])
+            part1.extend(done['tree_fails'])
             trees[(c['cx'], c['cy'])] = done['tree']
-            fails.check(c['leaves'] == len(trees[(c['cx'], c['cy'])][1]) - 1,
+            part1.check(c['leaves'] == len(trees[(c['cx'], c['cy'])][1]) - 1,
                         'chunk %d,%d: head leaf count differs from its subtree' % (c['cx'], c['cy']))
             try:
                 row = decompress_row(c['pvs'], nbytes)
                 vis[(c['cx'], c['cy'])] = {order[k] for k, b in enumerate(row_to_bits(row, len(order))) if b}
             except ValueError as e:
-                fails.append('chunk %d,%d: PVS row: %s' % (c['cx'], c['cy'], e))
+                part1.append('chunk %d,%d: PVS row: %s' % (c['cx'], c['cy'], e))
                 vis[(c['cx'], c['cy'])] = set()
-            box = (lx + c['cx'] * g, ly + c['cy'] * g, lx + (c['cx'] + 1) * g, ly + (c['cy'] + 1) * g)
             if sections.get(path) is not None:
-                fails.extend(done['coverage_fails'])
+                part1.extend(done['coverage_fails'])
                 terrain_tiles += done['tiles']
-                fails.extend(done['seam_fails'])
+                part1.extend(done['seam_fails'])
                 seam_samples += done['samples']
             for r in c['owned']:
                 owners[r['ref']].append((path, c['index'], r))
-                fails.check(r['owner'] == c['index'], 'placement %d: owner record names another chunk' % r['ref'])
+                part1.check(r['owner'] == c['index'], 'placement %d: owner record names another chunk' % r['ref'])
             for r in c['reach']:
                 copies[r['ref']].append((path, c['index'], r))
             for r in c['owned'] + c['reach']:
-                if fails.check(r['model'] < len(models), 'placement %d: model id out of range' % r['ref']):
+                if part1.check(r['model'] < len(models), 'placement %d: model id out of range' % r['ref']):
                     used_models.add(r['model'])
             entry = {'file': c['file'], 'frame': path, 'index': c['index'], 'cell': (c['cx'], c['cy']),
                      'sector': c['sector'], 'offset': c['offset'], 'render': c['render'],
@@ -975,89 +1096,59 @@ def validate(out, source=None, palette=None, jobs=1):
                      'terrain_textures': done['texture_refs']}
             per_chunk.append(entry)
             frame_chunks.append(entry)
+        if offs is None or offs[0] != g:
+            offs = (g, ring_offsets(g, settings['draw_distance'] + settings['hysteresis']))
+        section = sections.get(path)
+        used_here = {r['model'] for rows in owners.values() for _, _, r in rows if r['model'] < len(models)}
+        task = {'owners': dict(owners), 'copies': dict(copies), 'order': order, 'grid': (g, lx, ly, nx, ny),
+                'models': len(models), 'bounds': {m: model_bounds[m] for m in used_here}, 'trees': trees,
+                'hidden': None if section is None else section.get('story_hidden', []), 'offs': offs[1],
+                'vis': vis, 'rows': [((c['cx'], c['cy']), c['owned'] + c['reach'], c['pvl']) for c in chunks],
+                'owned_total': frame['owned_total']}
+        states.append((path, frame, part1, frame_chunks, task))
+    del checked
+    tasks = [state[4] for state in states]
+    if cross_checks == 'pool' and jobs > 1 and len(tasks) > 1:
+        from build_parallel import ordered_map
+        crossed = ordered_map(_frame_cross_checks, tasks, min(int(jobs), len(tasks)),
+                              cost=lambda t: sum(len(r[1]) for r in t['rows']) + len(t['rows']))
+    else:
+        crossed = map(_frame_cross_checks, tasks)
+    for number, ((path, frame, part1, frame_chunks, task), (part2, part3, leaves_of, chunks_of, pvl, ring)) in \
+            enumerate(zip(states, crossed), 1):
+        first_failure = len(fails)          # this frame's failures get its name (BUILD-CHIM-VALIDATE-LATE-36)
+        fails.extend(part1)
         # home rule: every model and texture lives in the sector where the pack walk first meets it
         model_order, texture_order, model_home, texture_home = first_met(frame_chunks, models_tex)
         cell = tuple(frame['cell'])
         for kind, home, items in (('model', model_home, models), ('texture', texture_home, textures)):
-            wrong = [i for i, sec in home.items() if i not in (met_models if kind == 'model' else met_textures)
+            wrong = [i for i, sec in home.items() if i not in (met_model_set if kind == 'model' else met_texture_set)
                      and items[i]['file'] != sector_path.get((cell, sec))]
             fails.check(not wrong, '%ss not stored in the sector that first needs them: %s' % (kind, wrong[:5]))
-        met_models += [m for m in model_order if m not in met_models]
-        met_textures += [t for t in texture_order if t not in met_textures]
-        # owners and reach copies
-        for ref, rows in owners.items():
-            if not fails.check(len(rows) == 1, 'placement %d stored as owner %d times' % (ref, len(rows))):
-                continue
-            _, ci, r = rows[0]
-            x, y = r['origin'][0], r['origin'][1]
-            own = (min(nx - 1, max(0, int((x - lx) // g))), min(ny - 1, max(0, int((y - ly) // g))))
-            fails.check(order[ci] == own, 'placement %d: owner chunk does not hold its origin' % ref)
-            if r['model'] >= len(models):
-                continue
-            lo, hi = placed_box(r['origin'], (0.0, r['yaw'], 0.0), *model_bounds[r['model']])
-            box = (tuple(int(math.floor(v - 1)) for v in lo), tuple(int(math.ceil(v + 1)) for v in hi))
-            fails.check(tuple(r['box']) == box, 'placement %d: stored drawn box %s, model bounds give %s'
-                        % (ref, r['box'], box))
-            lo, hi = r['box']
-            a = (min(nx - 1, max(0, int((lo[0] - lx) // g))), min(ny - 1, max(0, int((lo[1] - ly) // g))))
-            b = (min(nx - 1, max(0, int((hi[0] - lx) // g))), min(ny - 1, max(0, int((hi[1] - ly) // g))))
-            want = {(i, j) for i in range(a[0], b[0] + 1) for j in range(a[1], b[1] + 1)} - {own}
-            leaves = sum(len(box_leaves(*trees[k], lo, hi)) for k in want | {own} if k in trees)
-            fails.check(r['leaves'] == min(leaves, 65535), 'placement %d: record says %d leaves, its box reaches %d'
-                        % (ref, r['leaves'], leaves))
-            fails.check(bool(r['flags'] & F.FLAG_OVER_16_LEAVES) == (leaves > F.MAX_ENT_LEAFS),
-                        'placement %d: over-16-leaves flag wrong' % ref)
-            if sections.get(path) is not None:
-                hidden = sections[path].get('story_hidden', [])
-                fails.check(bool(r['flags'] & F.FLAG_STORY_HIDDEN) == (ref in hidden),
-                            'placement %d: story-hidden flag differs from the source' % ref)
-            leaf_counts.append(leaves)
-            chunk_counts.append(len(want) + 1)
-            got = [order[k] for _, k, _ in copies.get(ref, [])]
-            fails.check(sorted(got) == sorted(want), 'placement %d: reach copies %s, drawn box touches %s'
-                        % (ref, sorted(got), sorted(want)))
-            fails.check(all(rr == r for _, _, rr in copies.get(ref, [])),
-                        'placement %d: a reach copy differs from the owner record' % ref)
-        fails.check(not set(copies) - set(owners), 'reach copies without an owner record: %s'
-                    % sorted(set(copies) - set(owners))[:5])
+        # the lists keep the order; the sets answer "met before?" (a list search per model and frame was 21 s of
+        # one core on 726 frames)
+        new_models = [m for m in model_order if m not in met_model_set]
+        new_textures = [t for t in texture_order if t not in met_texture_set]
+        met_models += new_models
+        met_textures += new_textures
+        met_model_set.update(new_models)
+        met_texture_set.update(new_textures)
+        fails.extend(part2)
+        leaf_counts += leaves_of
+        chunk_counts += chunks_of
+        owners = task['owners']
         if not ownership_verified:
             fails.check(not all_refs & set(owners), 'placements owned by two frames')
-        # cluster PVS rows: itself and its neighbours, symmetric, nothing beyond the ring
-        from asset_census import ring_offsets
-        offs = ring_offsets(g, settings['draw_distance'] + settings['hysteresis'])
-        for c, seen in vis.items():
-            ring = {(c[0] + dx, c[1] + dy) for dx, dy in offs}
-            near = {(c[0] + dx, c[1] + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)} & set(vis)
-            fails.check(near <= seen, 'chunk %d,%d: PVS misses itself or a neighbour' % c)
-            fails.check(seen <= ring, 'chunk %d,%d: PVS marks a chunk beyond the ring' % c)
-            fails.check(all(c in vis.get(b, set()) for b in seen), 'chunk %d,%d: PVS not symmetric' % c)
-        # potentially visible placements: a bit row over the frame's placements (from its lowest id)
-        records_of = {(c['cx'], c['cy']): c['owned'] + c['reach'] for c in chunks}
-        frame_pids = [rows[0][2]['pid'] for rows in owners.values()]
-        base = min(frame_pids) if frame_pids else 0
-        pvl = {}
-        for c in chunks:
-            cell = (c['cx'], c['cy'])
-            try:
-                bits = row_to_bits(decompress_row(c['pvl'], (frame['owned_total'] + 7) // 8), frame['owned_total'])
-            except ValueError as e:
-                fails.append('chunk %d,%d: placement row: %s' % (cell[0], cell[1], e))
-                continue
-            seen = {base + k for k, b in enumerate(bits) if b}
-            ring = {(cell[0] + dx, cell[1] + dy) for dx, dy in offs}
-            cand = {r['pid'] for b in ring if b in records_of for r in records_of[b]}
-            near = {r['pid'] for dx in (-1, 0, 1) for dy in (-1, 0, 1)
-                    for r in records_of.get((cell[0] + dx, cell[1] + dy), ())}
-            fails.check(seen <= cand, 'chunk %d,%d: placement row marks a placement outside the ring' % cell)
-            fails.check(near <= seen, 'chunk %d,%d: placement row misses a placement next to the chunk' % cell)
-            pvl[cell] = seen
-        visibility.append({'file': path, 'vis': vis, 'trees': trees, 'pvl': pvl,
-                           'ring': {c: {(c[0] + dx, c[1] + dy) for dx, dy in offs} & set(vis) for c in vis}})
+        fails.extend(part3)
+        visibility.append({'file': path, 'vis': task['vis'], 'trees': task['trees'], 'pvl': pvl, 'ring': ring})
         all_refs |= set(owners)
         pids += [rows[0][2]['pid'] for rows in owners.values()]
         name = frame_label(path, frame, sections.get(path))
         for k in range(first_failure, len(fails)):
             fails[k] = '%s: %s' % (name, fails[k])
+        if len(states) > 1:
+            progress_line.emit('CHIM validation', path, '%d failures' % (len(fails) - first_failure),
+                               (number, len(states), 'frames'), stream=sys.stderr)
     pids.sort()
     fails.check(pids == list(range(len(pids))) and len(pids) == settings['placements'],
                 'placement ids are not 0..n-1 once each')
@@ -1114,7 +1205,7 @@ def ring_needs(ring_chunks, models, textures, model_tex, sizes):
 
 
 def walk_measure(world, source, legacy_sizes=None, legacy_regions=None, extra_caps=(0, 1 << 20, 2 << 20), cost=None,
-                 frame_index=0):
+                 frame_index=0, model_tex=None, by_cell=None):
     """Bytes read per chunk crossing along a walk through the source's doors (and today's map reads).
 
     Sector reading (format 0.2): when a chunk enters the ring, the whole file of
@@ -1123,16 +1214,20 @@ def walk_measure(world, source, legacy_sizes=None, legacy_regions=None, extra_ca
     the ring is read on its own. Every crossing reads file by file in ascending
     order; runs are reads joined over the forward gaps the cost model calls free;
     the time is the cost model's estimate (chim.readcost). source: the frame's
-    source section (its doors); frame_index: the frame walked."""
+    source section (its doors); frame_index: the frame walked; model_tex (every model's texture ids) and
+    by_cell (the frame's chunks by cell): computed here when not given (measure computes them once for every
+    frame instead of once per walked frame: the same values, BUILD-CHIM-STAGE-SERIAL-TAIL-36)."""
     from chim.readcost import DEFAULT, crossing_ms, merge_runs
     cost = cost or DEFAULT
     from asset_census import door_route, ring_offsets, walk_chunks
     settings = world['settings']
     path, frame, chunks = world['frames'][frame_index]
     g, (lx, ly), nx, ny = frame['grain'], frame['low'], frame['nx'], frame['ny']
-    by_cell = {c['cell']: c for c in world['chunks'] if c['frame'] == path}
+    if by_cell is None:
+        by_cell = {c['cell']: c for c in world['chunks'] if c['frame'] == path}
     models, textures, sizes = world['models'], world['textures'], world['sizes']
-    model_tex = [F.read_texture_refs(F.read_brush_image(m['image'])[2]) for m in models]
+    if model_tex is None:
+        model_tex = [F.read_texture_refs(F.read_brush_image(m['image'])[2]) for m in models]
 
     class Grid:
         grain = g
@@ -1360,11 +1455,20 @@ def measure(world, source=None, legacy_maps=None, legacy_regions=None, cost=None
                          'ratio_legacy_over_chim': round(sum(legacy_sizes.values()) / res['bytes_total'], 2)}
     sections = source_sections(source, world['frames'])
     walks = {}
+    model_tex, by_frame = None, None
     for k, (path, frame, _) in enumerate(world['frames']):
         section = sections.get(path)
         if section and section.get('doors'):
+            if model_tex is None:
+                # once for every walked frame (each walk read every model and every chunk again: quadratic in a
+                # world of 726 frames)
+                model_tex = [F.read_texture_refs(F.read_brush_image(m['image'])[2]) for m in world['models']]
+                by_frame = collections.defaultdict(dict)
+                for c in world['chunks']:
+                    by_frame[c['frame']][c['cell']] = c
             walks['%d,%d' % tuple(frame['cell'])] = walk_measure(world, section, legacy_sizes if k == 0 else None,
-                                                                 regions if k == 0 else None, cost=cost, frame_index=k)
+                                                                 regions if k == 0 else None, cost=cost, frame_index=k,
+                                                                 model_tex=model_tex, by_cell=by_frame[path])
     if walks:
         res['walk'] = next(iter(walks.values()))       # the first frame's (pack order)
         if len(walks) > 1:
@@ -1393,11 +1497,11 @@ def write_replays(folder, replays, volume, legacy_volume='AW_LEGACY:'):
 
 
 def report_world(out, source=None, palette=None, legacy_maps=None, legacy_regions=None, cost=None, cameras=(),
-                 jobs=1):
+                 jobs=1, cross_checks='pool'):
     """(report, world, replays): the validation report as `validate.py --json` writes it, the validated world
     (None when it fails) and the walk's reads per crossing. chim_build keeps the world for the stats, so a build
     validates its world once (BUILD-CHIM-STATS-SERIAL-TAIL-36)."""
-    fails, world = validate(out, source, palette, jobs)
+    fails, world = validate(out, source, palette, jobs, cross_checks)
     report = {'ok': not fails, 'failures': fails[:200], 'failure_count': len(fails),
               'source_checked': source is not None, 'variant_audit': world.get('variant_audit')}
     replays = {}

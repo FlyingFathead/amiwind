@@ -50,7 +50,7 @@
       ],
       "source_material": 0,
       "material": 34,
-      "reason": "Owner ground1/ground2 and Part 5 view: default tile interrupts surrounding paving"
+      "reason": "Maintainer ground1/ground2 and Part 5 view: default tile interrupts surrounding paving"
     },
     {
       "cell": [
@@ -63,7 +63,7 @@
       ],
       "source_material": 0,
       "material": 34,
-      "reason": "Owner Part 2 ground view at 562 -1176: default tile at road approach"
+      "reason": "Maintainer Part 2 ground view at 562 -1176: default tile at road approach"
     },
     {
       "cell": [
@@ -76,7 +76,7 @@
       ],
       "source_material": 0,
       "material": 14,
-      "reason": "Owner Part 6 ground5 at -1036 -901: default tile surrounded on three sides by known WG_rockyscrub"
+      "reason": "Maintainer Part 6 ground5 at -1036 -901: default tile surrounded on three sides by known WG_rockyscrub"
     },
     {
       "cell": [
@@ -89,7 +89,7 @@
       ],
       "source_material": 0,
       "material": 34,
-      "reason": "Owner Part 8 ground6 at 121 -49 looks into unfilled tile next to WG_road pavement"
+      "reason": "Maintainer Part 8 ground6 at 121 -49 looks into unfilled tile next to WG_road pavement"
     },
     {
       "cell": [
@@ -102,7 +102,7 @@
       ],
       "source_material": 0,
       "material": 34,
-      "reason": "Owner Part 9 ground8 at 252 169 faces blank pavement tile adjoining WG_road to west and north"
+      "reason": "Maintainer Part 9 ground8 at 252 169 faces blank pavement tile adjoining WG_road to west and north"
     },
     {
       "cell": [
@@ -115,7 +115,7 @@
       ],
       "source_material": 0,
       "material": 8,
-      "reason": "RC1 owner view 1144 -426 114 yaw225 pitch64: isolated default tile in the adjoining hill material"
+      "reason": "RC1 maintainer view 1144 -426 114 yaw225 pitch64: isolated default tile in the adjoining hill material"
     },
     {
       "cell": [
@@ -128,7 +128,7 @@
       ],
       "source_material": 0,
       "material": 35,
-      "reason": "Owner view XYZ 2663 -1107 211, yaw 14 pitch 27: isolated default tile surrounded by WG_dirtroad_01"
+      "reason": "Maintainer view XYZ 2663 -1107 211, yaw 14 pitch 27: isolated default tile surrounded by WG_dirtroad_01"
     }
   ],
   "arrival_actor": "selvil sareloth",

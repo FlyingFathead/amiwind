@@ -9,7 +9,7 @@
 | Where | Stage fingerprints: tools/build_cache.py module_symbols; DEPENDENCIES in tools/build_parallel.py |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Stages with no real input change (media about 7 minutes cold, music, world-scenery-assets) rebuilt after the seam-audit row was added; hold-level reuse loss |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.34 hotfix build |

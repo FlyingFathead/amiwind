@@ -91,7 +91,7 @@ separate gate from ordinary host readback.
 
 ## Preferred future content placement
 
-The owner's preference is to keep the main Morrowind game together on partition
+The maintainer's preference is to keep the main Morrowind game together on partition
 1 if the measured, deduplicated payload fits. If two larger partitions are
 eventually needed, use the following order of priority:
 
@@ -174,7 +174,7 @@ to flush before stopping an emulator; the test harness waits at least ten second
 
 ## Capacity budget
 
-The owner's roughly 1.2 GB original installation fits inside a 2 GiB planning
+The maintainer's roughly 1.2 GB original installation fits inside a 2 GiB planning
 budget. This is not a requirement to carry all original files onto the Amiga.
 Converted sprite directions, animations and scale variants can exceed the source
 size; streamable PCM can also be larger than MP3. Budget the converted runtime

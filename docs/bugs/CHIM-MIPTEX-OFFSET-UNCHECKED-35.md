@@ -9,7 +9,7 @@
 | Where | CHIM engine chim_models.c LoadTexture |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.35 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: Damaged data could read outside the texture block when drawn. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

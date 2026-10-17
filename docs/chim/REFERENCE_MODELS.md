@@ -56,7 +56,7 @@ exactly its base's seams.
 
 ## The base silt strider
 
-Owner decision, 10 October 2026: the silt strider at Balmora is the good one, the one whose polygons
+Project decision, 10 October 2026: the silt strider at Balmora is the good one, the one whose polygons
 are properly closed, and it is the base silt strider model: the reference for its scale and for every
 other copy of it.
 

@@ -48,8 +48,10 @@ class StairCacheTests(unittest.TestCase):
         return stair_records.promote(folder, 'req-1')
 
     def test_only_records_of_a_passed_master_build_are_reused(self):
+        # the check-mark rule (release candidates and finals; AMIWIND_STAIR_WALK_REUSE=checked for any build).
+        # Development builds reuse a passed walk without the mark: tests/test_chim_stair_pass.py
         os.environ.update(AMIWIND_RUN_NAME='2026_10_10_v0.0.36-dev3_full_abc1234', AMIWIND_RUN_COMMIT='abc1234',
-                          AMIWIND_RUN_VERSION='0.0.36-dev3')
+                          AMIWIND_RUN_VERSION='0.0.36-dev3', AMIWIND_STAIR_WALK_REUSE='checked')
         first = self.gate(self.world('a'))
         self.assertEqual((first['pass_cache']['reused'], first['pass_cache']['walked']), (0, 1))
         self.assertEqual(len(first['pass_cache']['stored']), 1)
@@ -114,10 +116,11 @@ class StairCacheTests(unittest.TestCase):
         report = self.gate(self.world('b'))
         self.assertEqual((report['pass_cache']['mode'], report['pass_cache']['reused']), ('full', 0))
 
-    def test_the_heap_gate_and_the_zone_walk_run_before_the_stair_walk(self):
+    def test_both_gate_orders_are_offered(self):
+        # v0.0.42 (B15): the stair gate first by default; the earlier order (heap gate and zone walk before the stair
+        # walk, BUILD-CHIM-HEAP-GATE-LATE-36) stays selectable. The run order itself: tests/test_chim_stair_area.py
         text = (ROOT / 'tools/chim_build.py').read_text(encoding='utf-8')
-        self.assertLess(text.index('require_heap(a.out'), text.index('require_stairs(a.out'))
-        self.assertLess(text.index('require_zone_walk(a.out'), text.index('require_stairs(a.out'))
+        self.assertIn("choices=('stairs-first', 'stairs-last'), default='stairs-first'", text)
 
     def test_the_builder_sets_the_variables_the_walk_reads(self):
         import stair_walk
@@ -174,7 +177,7 @@ class RegionFramesSideBySideTests(unittest.TestCase):
 
     def test_build_world_sends_region_frames_side_by_side(self):
         text = (ROOT / 'tools/chim/build.py').read_text(encoding='utf-8')
-        self.assertIn('prepare_areas_parallel(regional', text)
+        self.assertIn('prepare_areas_parallel(towns + regional', text)
 
 
 class AdoptEarlierFormTests(unittest.TestCase):

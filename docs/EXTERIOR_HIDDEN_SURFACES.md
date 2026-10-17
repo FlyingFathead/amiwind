@@ -9,7 +9,7 @@ was removed by this investigation; no target-rendering acceptance is implied.
 <!-- contents start -->
 ## Contents
 
-- [Owner imperative: default compile-time hidden-surface culling](#owner-imperative-default-compile-time-hidden-surface-culling)
+- [Maintainer imperative: default compile-time hidden-surface culling](#maintainer-imperative-default-compile-time-hidden-surface-culling)
 - [Verified mesh pipeline gap and BSP storage](#verified-mesh-pipeline-gap-and-bsp-storage)
   - [Source-loop winding and serialized-output validation — 4 October 2026, 04:23 EEST](#source-loop-winding-and-serialized-output-validation--4-october-2026-0423-eest)
 - [Cell loading, backface rejection and stored geometry](#cell-loading-backface-rejection-and-stored-geometry)
@@ -27,10 +27,10 @@ was removed by this investigation; no target-rendering acceptance is implied.
 
 <!-- contents end -->
 
-## Owner imperative: default compile-time hidden-surface culling
+## Maintainer imperative: default compile-time hidden-surface culling
 
 Recorded 4 October 2026 01:33 EEST. Compile-time omission of permanently hidden
-static exterior render surfaces is an owner-required default: the effective
+static exterior render surfaces is a maintainer-required default: the effective
 `--hidden-surface-cull` setting must be `true` unless explicitly overridden with
 `--hidden-surface-cull false`. Build diagnostics must report the effective value
 and the relevant input, examined, excluded and retained surface counts so the
@@ -412,7 +412,7 @@ operation: it changes mesh topology and may add subdivisions, so it needs its
 own before/after measurement. No general terrain/object Boolean union or weld is
 implemented. The current house convex-containment detector still finds zero cuts.
 
-The owner-directed A/B record compares float vertices, polygons, fan triangles,
+The maintainer-directed A/B record compares float vertices, polygons, fan triangles,
 serialized bytes, exposed shape and material, plus collision separately. Do not
 infer net savings from removed surface area or an appearance check alone. In one
 bounded private mesh experiment, the original had 616 float32 local vertices,
@@ -500,7 +500,7 @@ layout against the required continuous central footprint and measured budget.
 The [AmiWind 3D Map Inspector](POLYCOUNT_INSPECTOR.md) exposes compiled geometry and review plans;
 it does not apply those plans to BSP output.
 
-Exact-face paint and box/polygon-volume plans express owner intent. They are not
+Exact-face paint and box/polygon-volume plans express maintainer intent. They are not
 currently inputs to the source triangle selector above. Display RGB, opacity and
 zebra style do not change that contract. A volume cut can also create partial
 faces, which cannot be represented by simply dropping whole source triangles.

@@ -9,7 +9,7 @@
 | Where | Vos (11,14): ex_vivec_b_wb_01 ref 177306 meets ex_velothi_temple_01 ref 177289 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.41-dev5 (last seen) |
+| Persists in | fixed in v0.0.41 |
 | Severity | high: stopped the v0.0.41-dev5 build after 1 h 35 min; Vos cannot join CHIM while it fails |
 | Family | Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`) |
 | CHIM | Stairs and collision on CHIM worlds ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -63,13 +63,28 @@ Build the two frames on their own: `tools/chim_build.py --chim-regions-cells '12
 `tests/test_balmora.py` (the underpass profiles).
 
 ## Verification
-Pending: the two-frame test world with the fix, then the full dev5 rerun (stair gate, heap gate).
+v0.0.42 (B16), a Vos test world (cells 11,14, 12,13 and 12,14 built on their own, the v0.0.42 walker): with the name
+list (`--collision-underside names`, the default) the stair gate passes and the heap gate passes (peak 5.17 of
+6.24 MB).
 
 ## Prevention
 - A CHIMport cell whose stair walk fails gets a bug page the same day, not only a tracker status.
-- Planned for v0.0.42: a general rule instead of a list of names. A convex piece whose underside sits more
-  than a unit below an authored downward-facing surface becomes that mesh's authored plates, as
-  steep invented slopes already do (`_invents_steep_face`).
+- A general rule instead of the list of names (B16) was built and measured; it stays experimental
+  (`--collision-underside rule`, `split`, `whole`; docs/EXPERIMENTAL_FLAGS.md). On every exterior mesh (1,017
+  measured) and on the Vos test world:
+
+| Rule | Meshes changed | Standing clip nodes (all meshes) | Vos walkway step | Vos heap peak |
+| --- | --- | --- | --- | --- |
+| names (default) | - | 643,637 | passes | 5.17 MB |
+| a piece filling more than a unit under its own downward triangles: plates | 162 | +98,841 (+15 %) | start in solid | 5.53 MB |
+| the same, split first | 162 | +22,887 (+3.6 %) | start in solid | 5.17 MB |
+| a piece passing through any authored downward surface of the mesh: plates | 240 | +213,055 (+33 %) | start in solid | 5.63 MB |
+| such a mesh keeps all its authored surfaces (whole) | 238 | +807,912 (x2.25) | passes | 7.21 MB (fails the 6.24 MB budget) |
+
+  The blocking surface is a 22.7-degree slope of the temple base 53 units over the step: the step passes only
+  when the whole temple keeps its authored surfaces with exact bevels, which the rule cannot give every mesh it
+  catches within the heap budget. Next: find which of the temple's pieces closes the walkway (its point hull at
+  the step) and make the rule about that piece's bevels.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -84,6 +99,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
+- [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
 - [COLLISION-NC-FLAGS-32](COLLISION-NC-FLAGS-32.md): Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters
@@ -94,6 +110,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
+- [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
+- [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

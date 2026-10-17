@@ -6,10 +6,10 @@
 
 - Reported with v0.0.25 at 2026-10-01 (time not recorded): earlier entry AW25-05 (v0.0.25): console typed only capitals and shifted digits; stuck Shift suspected, never reproduced natively
 - Reported with v0.0.29-dev1 at 2026-10-05 12:07 +0300: earlier entry CONSOLE-CAPS-29 (v0.0.29-dev1, FS-UAE): Caps Lock appears stuck in the F10 console
-- Reported with v0.0.36-dev5 at 2026-10-11 13:12 +0300: owner, dev5 playtest build, FS-UAE JIT: after the efrag crash the shell typed amiwind as AIWDID (capitals, M and N missing)
-- Reported with v0.0.36-dev5 at 2026-10-11 13:35 +0300: owner, after the Balmora crash: AMIWIND arrives (M and N too) but all in capitals, no Shift or Caps Lock pressed
-- Reported with v0.0.36-dev5 at 2026-10-11 13:36 +0300: owner, AmiWind restarted without a reboot: in the main menu the cursor keys move the mouse pointer (a latched Amiga qualifier)
-- Reported with v0.0.36-dev5 at 2026-10-11 13:38 +0300: owner, same restarted run: console typed 1234567890 as !@#$%^&*() (a latched Shift inside the new run)
+- Reported with v0.0.36-dev5 at 2026-10-11 13:12 +0300: maintainer, dev5 playtest build, FS-UAE JIT: after the efrag crash the shell typed amiwind as AIWDID (capitals, M and N missing)
+- Reported with v0.0.36-dev5 at 2026-10-11 13:35 +0300: maintainer, after the Balmora crash: AMIWIND arrives (M and N too) but all in capitals, no Shift or Caps Lock pressed
+- Reported with v0.0.36-dev5 at 2026-10-11 13:36 +0300: maintainer, AmiWind restarted without a reboot: in the main menu the cursor keys move the mouse pointer (a latched Amiga qualifier)
+- Reported with v0.0.36-dev5 at 2026-10-11 13:38 +0300: maintainer, same restarted run: console typed 1234567890 as !@#$%^&*() (a latched Shift inside the new run)
 
 <!-- END GENERATED PERSISTING -->
 
@@ -17,7 +17,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 1 October 2026, in v0.0.25 |
 | Where | engine sys_amiga.c Sys_Error and Sys_Quit, the input.device handler AW_InputGuardInit |
 | Reproduction | sometimes |
@@ -29,7 +29,7 @@
 | From commit | source 6c29a23, engine 6c29a23, CHIM world 6c29a23 |
 | CHIM engine version | CHIM 0.1.0, engine 6c29a23, world format 0.7 |
 | Build note | Platform: FS-UAE, JIT, A1200 68040; dev5 playtest build 6c29a23 |
-| Platform or emulator | FS-UAE, JIT, A1200 68040 (owner, dev5 playtest build); AmigaDOS shell after the crash and the next AmiWind run |
+| Platform or emulator | FS-UAE, JIT, A1200 68040 (maintainer, dev5 playtest build); AmigaDOS shell after the crash and the next AmiWind run |
 
 <!-- END GENERATED FACTS -->
 
@@ -53,7 +53,7 @@
 
 ## Status: 11 October 2026
 
-Open and PERSISTING. The owner reports it since very early AmiWind versions; the exact first version is unknown.
+Open and PERSISTING. The maintainer reports it since very early AmiWind versions; the exact first version is unknown.
 The earliest tracker entries are AW25-05 (v0.0.25: the console typed only capitals and shifted digits)
 and CONSOLE-CAPS-29 (v0.0.29-dev1: Caps Lock stuck in the F10 console). Both are listed as report lines above.
 Repaired in source, not yet gated.
@@ -64,7 +64,7 @@ After the v0.0.36-dev5 playtest stopped with "AmiWind crashed!"
 ([CHIM-FRAME-EDGE-EFRAG-CRASH-36](CHIM-FRAME-EDGE-EFRAG-CRASH-36.md)), typing went wrong, both in the AmigaDOS shell
 and in the next AmiWind run (no reboot):
 
-| When (owner, 11 October 2026) | Where | What arrived |
+| When (maintainer, 11 October 2026) | Where | What arrived |
 | --- | --- | --- |
 | 13:12 and 13:14 | AmigaDOS shell after the crash | "amiwind" came out as "AIWDID". A longer try came out as a long stretch of capitals ("AIWDIDAIDWIIAIDSADAIADSADASFDJKF"), then lowercase ("qeowietweitaid"). No m or n anywhere. |
 | 13:35 | AmigaDOS shell after the Balmora crash | "AMIWIND": M and N arrive, but everything is in capitals with no Shift or Caps Lock pressed |
@@ -74,7 +74,7 @@ and in the next AmiWind run (no reboot):
 
 ## Evidence
 
-The owner's photos (11 October 2026 13:12, 13:14, 13:35, 13:38) and reports, FS-UAE, dev5 playtest build 6c29a23,
+The maintainer's photos (11 October 2026 13:12, 13:14, 13:35, 13:38) and reports, FS-UAE, dev5 playtest build 6c29a23,
 JIT.
 
 The engine installs an input.device handler, "AmiWind screen keys" (`sys_amiga.c`, `AW_InputGuardInit`). That handler
@@ -101,7 +101,7 @@ Two parts:
    running, it returns early ("recursive shutdown") and `VID_Shutdown` never runs. The program then exits with its
    handler still in the chain. Its code and data are freed memory, so every later key event passes through whatever
    is there. That is consistent with qualifiers latched until a reboot, M and N eaten in one run, and different
-   behaviour the next time. The exact failing step in the owner's runs is not known.
+   behaviour the next time. The exact failing step in the maintainer's runs is not known.
 2. **The game trusts latched qualifiers.** A new AmiWind run took the stale Shift, Caps Lock and Amiga bits as real,
    so the console typed symbols and Intuition moved the mouse pointer with the cursor keys.
 

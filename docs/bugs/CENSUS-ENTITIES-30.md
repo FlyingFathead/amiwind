@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.30-dev5 |
 | Where | Census and Excise Office interior map |
 | Reproduction | always |
@@ -21,7 +21,7 @@
 
 ## Status: 7 October 2026
 
-Fixed in v0.0.30-rc1 and owner-accepted (WinUAE playtest, 7 October 2026:
+Fixed in v0.0.30-rc1 and maintainer-accepted (WinUAE playtest, 7 October 2026:
 "Census office interiors now work"). Present only in v0.0.30-dev5;
 v0.0.30-dev4 was correct.
 
@@ -93,7 +93,7 @@ Same engine, same disks, only the map exchanged, at the four reported
 positions: the repaired map shows the floor/ceiling intact with its
 chandeliers, flat rugs, tapestries on the walls and the bookshelf in place.
 The exact v0.0.30-rc1 disks were checked at the same positions afterwards.
-The owner playtest of v0.0.30-rc1 confirmed the interiors work.
+The maintainer playtest of v0.0.30-rc1 confirmed the interiors work.
 
 ## Prevention
 

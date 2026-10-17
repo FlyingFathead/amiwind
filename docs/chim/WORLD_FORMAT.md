@@ -561,7 +561,7 @@ rule (format 0.4) in 52 s: 3,733 steps and ramps, 295 flight steps passed,
 
 ## Visibility and culling
 
-Owner rule (8 October 2026): CHIM must keep Quake's visibility working, never
+Project rule (8 October 2026): CHIM must keep Quake's visibility working, never
 turn everything into brush entities, and keep the BSP shallow. How the format
 does that:
 
@@ -738,7 +738,7 @@ What was built (8 October 2026), against the plan above:
     placements. A sprite with solid source collision gets a collision-only placement, its
     model without faces. The sprite itself stays a point entity of the region maps, which the
     frame map carries as an ordinary Quake static entity. Sprite records in the chunks are
-    deferred until a frame holds more statics than the engine's static-entity limit (owner
+    deferred until a frame holds more statics than the engine's static-entity limit (maintainer
     decision, 8 October 2026). Seyda Neen's region maps hold 229 such statics.
 - Frame maps: `maps/seyda-chim.chim` (the town) and `maps/intro_docks-chim.chim`, both naming the
   same frame. The docks map is checked one way: its statics must be in the frame, and the frame
@@ -750,7 +750,7 @@ What was built (8 October 2026), against the plan above:
   (BUILD-SEYDA-REGEN-30). The legacy region cut cannot be regenerated from scratch
   (BUILD-SEYDA-CULL-STABLE-32).
 - A CHIM build ships Seyda Neen on CHIM only, with the strict heap gate and no exception
-  (owner decision, 8 October 2026). The legacy Seyda Neen maps stay buildable and selectable
+  (project decision, 8 October 2026). The legacy Seyda Neen maps stay buildable and selectable
   with `--builder legacy`.
 
 The sea is the water plane at z = 0 that every chunk already carries. The sky
@@ -763,7 +763,7 @@ private stages (BUILD-SEYDA-REGEN-30) and its heap overlap
 
 ## Planned: all of Vivec (M3) and the open world (M4)
 
-Owner direction (8 October 2026): builds go pure CHIM. Every exterior comes from the CHIM builder;
+Maintainer direction (8 October 2026): builds go pure CHIM. Every exterior comes from the CHIM builder;
 the legacy region maps stay in the code, selectable, but unused. Pure CHIM therefore needs the
 whole game's exteriors. Interiors stay Quake maps behind doors. Plan, before code:
 
@@ -871,9 +871,9 @@ the legacy preview at the A/B poses.
   Every frame over the room peaks in the Temple district: the two Vivec statues (727 and 526 KB), the
   Ministry of Truth's tiles, the dock and the High Fane. Named detail budgets
   (`config/chim-detail-budgets.json`, not applied by default) bring the Temple frame to 6,776,624
-  ('vivec') and 6,423,456 bytes ('vivec-wide'), still 181,152 over. The rest is an owner decision: deeper
+  ('vivec') and 6,423,456 bytes ('vivec-wide'), still 181,152 over. The rest is a project decision: deeper
   budgets, simpler distant detail beyond about 300 units, or a stated closer view in that district.
-  Owner decision (9 October 2026): simplify the dense meshes, with the open rim locked. Budget 'vivec-deep'
+  Project decision (9 October 2026): simplify the dense meshes, with the open rim locked. Budget 'vivec-deep'
   ('vivec-wide' plus the coda flowers at 150 triangles, the Ministry of Truth at 1,500, the statues at 900,
   and the High Fane's main body at 700) fits the Temple frame at the full 540 view: active ring peak
   6,222,288 B, 20,016 B of headroom, stair gate passing. No closer view and no distant detail level are
@@ -1001,7 +1001,7 @@ piece, not a whole canton body.
   builder records per area in the receipt (`area_cut`); `chim_build --cut-models-over` sets one value for
   every area and wins. The Vivec Arena sets 512 (M3 stage A); Balmora and Seyda Neen set nothing and keep
   every model whole.
-- Flora stays whole (`cut_keep_whole`, default the `f/flora_` meshes; owner decision 10 October 2026): around
+- Flora stays whole (`cut_keep_whole`, default the `f/flora_` meshes; project decision 10 October 2026): around
   Vivec 24 wide trees and 31 parasols are wider than 512 units, and tiling them is not measured yet.
 
 Measured on the Vivec Arena frame (9 October 2026, `--cut-models-over 512`, tiles): active ring 6,492,688
@@ -1385,6 +1385,23 @@ The CHIM builder is built for short edit-build cycles:
 - **Parallel.** Units run through `build_parallel.ordered_map` with exactly
   `--jobs` workers; results never depend on the worker count (tests compare
   serial and parallel output byte for byte).
+- **One pool for the step.** `chim_build.py --pool stage` (the default since
+  v0.0.42) keeps one worker pool from the world conversion to the last gate
+  (`build_parallel.stage_pool`): every map of the step (units, validation,
+  heap gate, zone walk, stair walk) runs on the same warm workers, and the
+  pool starts again only when a map needs more workers, a worker died or the
+  environment changed (each restart is printed with its reason; the step
+  ends with one line: workers, starts, maps, tasks). The validation's
+  whole-world cross-checks (owners, reach copies, drawn boxes, PVS and
+  placement rows) and the variant audit run as frame and mesh units on that
+  pool, the heap gate scans the slices of its big frames and its small
+  frames in one map, largest first, and the gates after the validation use
+  the world it read instead of reading every file again. Each of these
+  prints one progress line per frame (`[done/total frames] CHIM validation:
+  <frame>: N failures`, likewise the heap gate, the zone walk and the world
+  frames). `--pool batch` is the method before v0.0.42 (a pool per map, the
+  cross-checks on one core); the reports are byte for byte the same
+  (`tests/test_chim_check_pool.py`, `tests/test_stage_pool.py`).
 - **Files.** The files are assembled from the units in a fraction of a second
   and a file whose bytes did not change is not written again.
 - **Timers.** Every stage runs in a `section(name)` timer (wall and CPU

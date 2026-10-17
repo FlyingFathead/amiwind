@@ -1,7 +1,7 @@
 # Balmora fixes and dev4 follow-up
 
 Work in progress, 30 September 2026. Delivered dev4 archives are immutable.
-Results below distinguish owner reports, inspected causes and validation.
+Results below distinguish maintainer reports, inspected causes and validation.
 
 <!-- contents start -->
 ## Contents
@@ -10,7 +10,7 @@ Results below distinguish owner reports, inspected causes and validation.
 - [Small gold font](#small-gold-font)
 - [Stairs](#stairs)
 - [Paving](#paving)
-- [Additional owner reports against dev4 (18:16 Helsinki)](#additional-owner-reports-against-dev4-1816-helsinki)
+- [Additional maintainer reports against dev4 (18:16 Helsinki)](#additional-maintainer-reports-against-dev4-1816-helsinki)
 - [Accepted constraints](#accepted-constraints)
 - [Subsequent reports and current candidates (18:43 Helsinki)](#subsequent-reports-and-current-candidates-1843-helsinki)
 - [Final collision and door findings](#final-collision-and-door-findings)
@@ -36,7 +36,7 @@ solid chest restored. This does not certify every armor combination.
 
 ## Small gold font
 
-Owner screenshots of “your” and lowercase s confirm missing upper strokes.
+Maintainer screenshots of “your” and lowercase s confirm missing upper strokes.
 The shipped magic14.awf already lacks the stroke: the native UI drawer is not
 clipping it. Direct 14px TrueType hinting leaves the top of o at alpha 30–32,
 which rounds to zero in the four-level AWF ink encoding.
@@ -78,11 +78,11 @@ material from its final northern height corner, shifting texture rows. Material
 is now sampled inside each quad. Full region regeneration is complete; native
 seam/floor and packaged-build acceptance remain pending.
 
-## Additional owner reports against dev4 (18:16 Helsinki)
+## Additional maintainer reports against dev4 (18:16 Helsinki)
 
 - Debug HUD: retain the current banner as `dbg hud type 1`; default type 2 uses
   the small diagnostic-console font so long version/location text fits.
-- Fog controls: owner confirmed Shift+V works at 18:20 Helsinki and requested
+- Fog controls: maintainer confirmed Shift+V works at 18:20 Helsinki and requested
   moving on. The missing-shortcut report is resolved; retain the existing binding.
 - Prison ship: low FPS persists. Inspect/profile the guard's lower walkway and
   compare a simpler flat collision surface before attributing render cost to it.
@@ -92,7 +92,7 @@ seam/floor and packaged-build acceptance remain pending.
 - Census courtyard: transparent wall, floating window and jagged plank at
   (104,-80,57), yaw305/pitch-26; (125,-91,55), yaw328/pitch-20; and
   (99,-141,61), yaw345/pitch-23. Reproduce in the courtyard sub-cell.
-- Seyda residency: keep the town centre together; owner suggests the bridge at
+- Seyda residency: keep the town centre together; maintainer suggests the bridge at
   (-30,474,70), yaw79/pitch2, as a transition boundary toward outskirts.
 - Additional Balmora blocked stair: (597,-21,58), yaw337/pitch-5. Map and test it.
 
@@ -103,7 +103,7 @@ Whole-map polygon-density analysis remains future roadmap work. No FOV change.
 
 ## Subsequent reports and current candidates (18:43 Helsinki)
 
-- Owner confirms dev4 Shift+V and Nord temple passage work. Preserve both.
+- Maintainer confirms dev4 Shift+V and Nord temple passage work. Preserve both.
 - New public stairs: (-323,226,138), yaw260/pitch0 (bridge06 ref32699);
   (-527,187,143), yaw274/pitch-3 (bridge05 ref32722); and
   (-297,-1180,138), yaw85/pitch1 (another b04 placement).
@@ -119,7 +119,7 @@ Whole-map polygon-density analysis remains future roadmap work. No FOV change.
 - Appearance entry must select Race. Zero mouse movement no longer overwrites
   keyboard focus; cursor begins over Race. Add clickable gold left/right arrows
   to Race/Sex/Face/Hair. The confirmation still defaults to Choose.
-- Birthsign arrow-key report: owner sees cursor movement instead of selection,
+- Birthsign arrow-key report: maintainer sees cursor movement instead of selection,
   while WASD works. Host input tests pass both arrow directions and WASD; raw
   Amiga key translation maps both correctly. Exact native/emulator trigger is
   not yet reproduced. Optional `dbg input trace on` distinguishes received raw
@@ -188,7 +188,7 @@ medians of 16 samples per corrected-renderer case, after initial frames:
 That is approximately 13 to 28 FPS at this view on this host. The unchanged world
 cost and much smaller server cost support the collision-search diagnosis.
 Legacy renderer comparison also improves from 87.24 to 43.47 ms. This does not
-predict the owner's weaker machine or every view. Full natural escort acceptance
+predict the maintainer's weaker machine or every view. Full natural escort acceptance
 remains a separate playtest. The renderer itself remains the largest measured
 cost after indexing; future work should profile before further visual reduction.
 
@@ -230,7 +230,7 @@ road/arch views are captured. The prison loads the indexed hull successfully.
 No surface/edge overflows occur. Peaks are 8,983 surfaces and 15,607 edges;
 peak sampled hunk use is 10,926,416 bytes within 11,534,336 reserved bytes.
 Audio reports only its startup warmup event. Offscreen/null-audio acceptance does
-not certify subjective sound quality, the owner's hardware, every scene or the
+not certify subjective sound quality, the maintainer's hardware, every scene or the
 complete natural opening. 291 host tests pass without skips. Compiler diagnostics
 remain the same 82 warnings as dev4. Source allowlist/whitespace checks pass for
 675 files. No publishing or Git actions are performed.

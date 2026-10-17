@@ -1,21 +1,25 @@
 # Original game content stays outside this repository
 
-This is an unofficial fan tribute and proof-of-concept porting pipeline.
-Original Morrowind files are required and must be supplied by the user. Please
-support the original work by purchasing it from
-[GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition) or
-[Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/).
+AmiWind is an unofficial fan tribute and a proof-of-concept porting pipeline.
+It needs the original Morrowind files, which each user provides from their own
+copy. The original game is sold on
+[GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition) and
+[Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/),
+and buying it supports the people who made it.
 
 The source repository and its checked source archive contain project code,
-configuration, documentation, explicitly selected development screenshots and synthetic
-test generators. The screenshots illustrate development and are not reusable
-runtime assets. The archive does not contain
-id Software or Bethesda game files, extracted assets, converted game assets,
-Amiga ROMs, Workbench files or compiled AmiWind executables. Selected GPL Quake
-engine code is included as source; it is not Quake game data. The complete corresponding
-runtime source under engine/aga also excludes binary-recovered assembly.
-The original game and its assets belong to their respective rights holders.
-This project is not affiliated with or endorsed by Bethesda or the OpenMW team.
+configuration, documentation, a hand-picked set of development screenshots and
+generators for synthetic test data. The screenshots show the development work;
+they are not runtime assets for reuse. The archive contains no id Software or
+Bethesda game files, no extracted or converted game assets, no Amiga ROMs, no
+Workbench files and no compiled AmiWind executables. Selected GPL Quake engine
+code is included as source code, which is not Quake game data. The default
+build of the runtime source under engine/aga links no binary-recovered
+assembly; the upstream AmiQuake assembly files used only by the experimental
+`upstream` engine profile are described in
+[licensing and credits](LICENSING_AND_CREDITS.md#project-decision-upstream-amiquake-assembly-10-october-2026).
+The original game and its assets belong to their rights holders. This project
+is not affiliated with or endorsed by Bethesda or the OpenMW team.
 
 The OpenMW comparison concerns the user-supplied-data setup model. This project
 does not claim OpenMW compatibility and does not bundle OpenMW or Hunter code.
@@ -36,7 +40,7 @@ does not claim OpenMW compatibility and does not bundle OpenMW or Hunter code.
 
 External workspaces remain supported. The guided builder now defaults to ignored
 `amiwind/out/`; this directory is excluded from all source packages. Converted
-sprites, terrain, textures and audio remain private build outputs. The owner
+sprites, terrain, textures and audio remain private build outputs. The maintainer
 selected specific screenshots for README documentation, including three rc2
 Rocks and Mushrooms views; only filenames in tools/release-files.json are
 approved in the source packager. Their contents are not covered

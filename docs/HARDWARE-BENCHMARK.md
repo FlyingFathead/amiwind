@@ -10,6 +10,7 @@ Part of [running AmiWind on real Amiga hardware](REAL_HARDWARE.md).
 - [Running it](#running-it)
 - [Reading the results](#reading-the-results)
 - [Frame time in the game](#frame-time-in-the-game)
+- [Timedemo](#timedemo)
 - [Emulator numbers are not hardware numbers](#emulator-numbers-are-not-hardware-numbers)
 
 <!-- contents end -->
@@ -195,6 +196,9 @@ places you on the ground there):
 | Seyda Neen 5 | `dbg tp -12200 -72500`, then `aw_aim 60 0` |
 
 Before measuring: `dbg daynightcycle off`, `dbg set time 1200`, `dbg headlamp off`.
+The same cameras are camera marks: `dbg cam recall bm1` to `bm5` and `sn1` to `sn5` do this setup and the
+teleport in one command, and recalling the mark again once the scene has settled sets the view, as `aw_aim` does
+([CAMERA_MARKS.md](CAMERA_MARKS.md)).
 Wait until the scene has loaded and the view has settled, close the console, wait ten
 seconds and note two or three `rcount` lines (they also scroll by at the top of the
 screen). `timerefresh` in the console renders 128 frames while turning on the spot and
@@ -204,6 +208,26 @@ On a 68040 without its support library the game can stop with an FPU exception
 ([ENGINE-FPSP-MISSING-31](bugs/ENGINE-FPSP-MISSING-31.md)); load 68040.library (via
 `SetPatch` or your accelerator's tools) before starting AmiWind and mention it in your
 report.
+
+## Timedemo
+
+Quake's own demo benchmark works on the CHIM maps: record a short walk or a series of views once, then play it
+back as fast as the machine can draw it.
+
+1. In the game, at the place to measure: `record NAME MAP` (for Balmora, `record bench balmora-chim`). The map
+   restarts and everything that happens is recorded: walk, turn, or set views with `aw_aim YAW PITCH`.
+2. `stop` ends the recording; the demo is `NAME.dem` in the game's `id1` folder.
+3. `timedemo NAME` plays it back as fast as possible and prints Quake's line (`N frames S seconds F fps`) and
+   `timedemo rcount ...`: the renderer counters of `dbg rcount` (above) averaged over every frame of the demo.
+
+Each run also adds one line to `saves/timedemo-results.txt` in the game folder:
+`AWTD1|demo|frames|time in hundredths of a second|frames per second x 10|the counters`. The counters are the
+comparable part: the same demo draws the same frames, so they match from run to run (three runs of one Balmora
+demo gave the same counters); the time and frames per second are the machine's. The first run after loading may
+read from the disk where later runs find the data cached. Send the file with your report.
+
+`playdemo NAME` plays the demo at its recorded speed. A demo plays the CHIM frame world it was recorded on,
+streamed around the recorded view as in the game.
 
 ## Emulator numbers are not hardware numbers
 

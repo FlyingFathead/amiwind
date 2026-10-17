@@ -4,12 +4,12 @@
 The shipped defaults are config/build-defaults.json:
 bitmap_paper_ink: paper text ink for bitmap-derived fonts.
 follow_original_stair_rules: collide stairs and slopes by Morrowind's own rules (step up 34 units = 8.5 at our
-scale, walkable slope up to 46 degrees, authored collision instead of convex shells). TRUE by default (owner
+scale, walkable slope up to 46 degrees, authored collision instead of convex shells). TRUE by default (maintainer
 decision 2026-10-08); the converters read it through resolve_font_options()["follow_original_stair_rules"].
 builder: legacy or chim, with chim_areas, the areas the CHIM builder writes.
 chim_texture_effects: CHIM texture effects (.chimfx paths or shipped names, tools/chim/effects) the CHIM
 builder applies, in order; none by default (docs/chim/TEXTURE_EFFECTS.md).
-chim_lighting_type: how a CHIM world is lit (tools/chim/light_types.py): none, lamps or hybrid (the default, owner
+chim_lighting_type: how a CHIM world is lit (tools/chim/light_types.py): none, lamps or hybrid (the default, maintainer
 decision 2026-10-09); baked-e and full are reserved for an increased-memory version (docs/chim/LIGHTING.md).
 model_hull: how a placed model's standing hull is written when qbsp does not compile it (tools/routed_hull.py):
 auto (default: routed above 16 convex pieces, INTERIOR-HULL-CHAIN-33 / CHIM-HULL-CHAIN-COST-33), chain (every piece
@@ -187,7 +187,7 @@ def resolve_font_options(args):
         heads, heads_origin = args.npc_head_detail, "CLI override"
     heads_setting = heads
     if heads == "auto":
-        # v0.0.35: original heads are EXPERIMENTAL and off by default (owner decision 2026-10-10).
+        # v0.0.35: original heads are EXPERIMENTAL and off by default (project decision 2026-10-10).
         heads, heads_origin = "budget", heads_origin + ", auto: budget (original heads are experimental)"
     cli = getattr(args, "bitmap_paper_ink", None)
     if cli is not None:

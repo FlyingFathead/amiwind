@@ -12,7 +12,7 @@ NPC gallery creation MUST NOT be skipped except for exceptional, explicitly
 requested debugging purposes. Build time and disk usage are not reasons to omit it.
 
 Normal builds and recovery MUST include the gallery; missing input/model/catalogue
-content is an error, never an automatic opt-out. Only the owner's explicit
+content is an error, never an automatic opt-out. Only the maintainer's explicit
 --no-npc-gallery permits debugging-only omission of inspection assets. It must
 never remove required game NPC content or change the normal default.
 
@@ -27,7 +27,7 @@ coverage, quality and validation, must not be disabled, reduced or bypassed
 without a specific documented case/scenario and explicit approval from the
 project owner. The builder or contributor cannot approve its own exception.
 Time pressure, storage pressure and convenience are not approval. Existing
---no-npc-gallery support is only a mechanism for an owner-approved exceptional
+--no-npc-gallery support is only a mechanism for a maintainer-approved exceptional
 debugging case; its availability does not grant permission to use it.
 
 A complete game requires all of its NPC and other game assets intact, packaged
@@ -68,7 +68,7 @@ from build_font_options import (add_builder_options, add_font_options, add_heap_
 from build_aga import UPSTREAM_SHA256, RUNTIME_BUILD_DIR, VERSION, runtime_sources, check_quakec
 
 
-# Legacy recorded Seyda Neen maps (owner decision 10 October 2026): optional and NOT RECOMMENDED since v0.0.31.
+# Legacy recorded Seyda Neen maps (project decision 10 October 2026): optional and NOT RECOMMENDED since v0.0.31.
 SEYDA_RECORDED_HELP = ("optional, NOT RECOMMENDED since v0.0.31: legacy recorded v0.0.31 Seyda Neen maps; the "
                        "default converts Seyda Neen from your data. DIR/id1 holds them (from your own v0.0.31 "
                        "image), checked against config/seyda-recorded-v0.0.31.json and kept byte for byte "
@@ -133,7 +133,13 @@ def parser():
                    help="DEBUGGING ONLY: do not compare the image's entity tracker with the release baseline "
                         "(config/entity-baseline.json); by default a placement lost against it stops the build")
     p.add_argument("--accept-entity-loss", metavar="REASON",
-                   help="Recorded reason that lets an intended loss against the entity baseline pass")
+                   help="Recorded reason that lets an intended loss against the entity baseline pass; name the "
+                        "loss's tracker ID in it (release readiness)")
+    p.add_argument("--readiness-id", action="append", default=[], metavar="KEY=ID[,ID]",
+                   help="Release readiness (tools/release_readiness.py): the tracker ID of an item a release "
+                        "candidate or final would refuse (KEY = the option without its dashes, as the readiness "
+                        "block prints it, e.g. no-npc-gallery=ID); a full development build stops before any stage "
+                        "while an item has no registered ID. Repeatable")
     p.add_argument("--amiga-libs-policy", choices=("warn", "fail", "require-known"), default="warn",
                    help="Known-inputs policy for --amiga-libs: warn (default; unknown builds used with a warning, "
                         "invalid files not used), fail (an invalid file stops the build), require-known. See docs/KNOWN_INPUTS.md")
@@ -186,9 +192,11 @@ def parser():
     p.add_argument("--anim-kit", choices=("on", "off"), default="on",
                    help="The animation kit (docs/ANIMKIT.md): on (default) = residents get the react+full kit, so companions and fighters walk and run by speed; off = the previous 8 idle frames (--npc-anim idle). --npc-anim picks a profile directly and wins over this switch")
     p.add_argument("--npc-anim", choices=("idle", "react", "move", "full", "react+full"), default=None,
-                   help="NPC animation groups per resident model (config/npc-anim-kit.json, docs/ANIMATION.md); default from --anim-kit (on: react+full, off: idle): idle = the previous 8 idle frames; react adds hit and death; move adds walk and run; full adds swim, knockdown and a hand-to-hand attack; react+full (owner decision for the next release) = react standing models plus a full model each actor wears only while it moves")
+                   help="NPC animation groups per resident model (config/npc-anim-kit.json, docs/ANIMATION.md); default from --anim-kit (on: react+full, off: idle): idle = the previous 8 idle frames; react adds hit and death; move adds walk and run; full adds swim, knockdown and a hand-to-hand attack; react+full (project decision for the next release) = react standing models plus a full model each actor wears only while it moves")
     p.add_argument("--no-npc-gallery", action="store_true", help="DEBUGGING ONLY: omit inspection gallery, never required game NPCs; gallery included by default. The image says so in game: dbg npcgallery and the other gallery commands print a built-without-the-NPC-gallery notice. Same as --exclude npc-gallery")
     p.add_argument("--npc-root-rule", choices=("morrowind", "legacy"), default="legacy", help="NIF root node rule for NPC body parts and equipment: legacy (default; the full root transform, verified correct for rigid body parts) or morrowind (the root rotation is ignored exactly as for scenery; measured to break 35 rigid NPC part meshes). Part of every NPC stage's cache key (AMIWIND_NPC_ROOT_RULE)")
+    import creature_residents
+    creature_residents.add_option(p)
     p.add_argument("--actor-search", choices=("wide", "near"), default="wide", help="Actor support search: wide (default; a ground actor that no spot within 32 units fits is also tried up to 48 units away, CHIM-VIVEC-FRAME-WIDE-41; an actor the 32-unit search places never moves) or near (32 units only: the method before v0.0.41). Part of the actor stages' cache keys (AMIWIND_ACTOR_SEARCH)")
     from build_exclusions import add_options as add_exclusion_options
     add_exclusion_options(p)
@@ -333,11 +341,11 @@ def parser():
                         '128-unit tile grid there (off: the method before v0.0.41)')
     p.add_argument('--chim-terrain-hull', choices=('auto', 'routed', 'compiled'), default='compiled',
                    help='CHIM builder: standing hull of chunk terrain: compiled for every chunk (default from v0.0.36, '
-                        'owner decision: a fraction of the bytes; CHIM-REGION-MARGIN-STORAGE-36, CHIM-BALMORA-RING-GROWTH-36), '
+                        'project decision: a fraction of the bytes; CHIM-REGION-MARGIN-STORAGE-36, CHIM-BALMORA-RING-GROWTH-36), '
                         'auto (the earlier default: compiled by qbsp for irregular ground, routed chains for the regular '
                         'grid) or routed')
     p.add_argument('--chim-terrain-refs', choices=('off', 'on'), default='on',
-                   help='CHIM builder: terrain references (world format 0.7, default from v0.0.36, owner decision): '
+                   help='CHIM builder: terrain references (world format 0.7, default from v0.0.36, project decision): '
                         'chunk terrain stored once per content and placed at an offset by every chunk with it, so '
                         'neighbouring CHIM region frames share their margins (CHIM-REGION-MARGIN-STORAGE-36); off keeps '
                         'a copy per chunk (format 0.5, the earlier default)')
@@ -416,6 +424,18 @@ def parser():
     p.add_argument('--perf-guard-baselines', type=Path, metavar='FILE',
                    help='Perf guard baselines ledger (default: AMIWIND_PERF_GUARD_BASELINES, else '
                         '<workspace>/cache/perf-guard/baselines.jsonl); a passed build adds its sections to it')
+    p.add_argument('--size-guard', choices=('auto', 'fail', 'warn', 'off'), default='auto',
+                   help='Size guard at the end of an image build (tools/size_ledger.py, docs/BUILD_OUTPUT.md "Size '
+                        'ledger"): a payload folder that grew more than --size-growth-margin against a like-for-like '
+                        'record (the previous release, tools/size-baseline.json, and --size-baseline) fails the '
+                        'build with exit 4 unless --size-growth-reason names it; auto (default) = warn for -devN '
+                        'versions, fail for rc and final; off is for DEBUGGING ONLY')
+    p.add_argument('--size-baseline', type=Path, metavar='FILE',
+                   help='A previous build\'s size-ledger.json to compare with, besides the previous release')
+    p.add_argument('--size-growth-margin', type=float, default=0.05, metavar='GIB',
+                   help='Growth per payload folder the size guard allows without a reason (GiB, default 0.05)')
+    p.add_argument('--size-growth-reason', metavar='TEXT',
+                   help='Names why the payload grew (recorded in size-ledger.json and the build summary)')
     p.add_argument('--no-profile', action='store_true',
                    help='DEBUGGING ONLY: run stages without the build profiler and output manifests '
                         '(build-profile.json); outputs are the same, and a later --reuse-from cannot use such a run. '
@@ -458,12 +478,27 @@ def parser():
                         'flights for release candidates and finals). This is WHAT is walked; with the walk cache '
                         '(--stair-walk-cache cached, the default) a map or frame whose collision is unchanged is not '
                         'walked again')
-    p.add_argument('--stair-walk-cache', choices=('cached', 'full'), default=None,
-                   help='cached (default): a legacy map or CHIM frame is stair-walked once and its result reused while '
-                        'what the walk reads (its collision, by SHA-256) is unchanged; a few reused ones are walked '
-                        'again on every build to check the cache (--stair-walk-sample). full: REGRESSION AND BETA-TEST '
-                        'RUNS ONLY (the from-scratch reference build before a release, a nightly check): walks every '
-                        'map and frame again')
+    p.add_argument('--stair-walk-cache', choices=('records', 'cached', 'full'), default=None,
+                   help='records (the default without --developer-mode): a CHIM frame whose collision matches the '
+                        'known-good stair records shipped with the source (config/stair-records, by SHA-256) or a '
+                        'walk stored in this workspace is not walked; a frame in neither (another converter or other '
+                        'game data) is reported by name and walked only on request (cached); legacy maps as cached. '
+                        'cached (the default with --developer-mode): a legacy map or CHIM frame is stair-walked once '
+                        'and its result reused while what the walk reads (its collision, by SHA-256) is unchanged; a '
+                        'few reused ones are walked again on every build to check the cache (--stair-walk-sample). '
+                        'full: REGRESSION AND BETA-TEST RUNS ONLY (the from-scratch reference build before a release, '
+                        'a nightly check): walks every map and frame again, ignoring every stored and shipped walk')
+    p.add_argument('--stair-walk-area', choices=('owned', 'frame'), default=None,
+                   help='Where a CHIM region frame\'s stair walk walks: owned (default: the cell the frame owns plus '
+                        'the map-switch margin; its border copies of other cells are walked where they are owned) '
+                        'or frame (the method before v0.0.42: the whole frame with its border copies)')
+    p.add_argument('--collision-underside', choices=('rule', 'split', 'whole', 'names'), default=None,
+                   help='How a CHIM model keeps collision that a convex piece closes under an authored ceiling '
+                        '(CHIM-VOS-TEMPLE-WALKWAY-41): names (default): a list of mesh names (the Velothi temples) '
+                        'keeps its authored collision surfaces. EXPERIMENTAL general rules, for every mesh: rule (a '
+                        'piece filling more than a unit under an authored downward-facing surface becomes authored '
+                        'plates), split (such a piece is split first) or whole (such a mesh keeps all its authored '
+                        'surfaces; much more collision memory)')
     p.add_argument('--stair-walk-sample', type=int, default=None, metavar='N',
                    help='Reused maps or frames the stair walk walks again and compares on every build (default 2; '
                         '0 = none, development builds only): a difference stops the build (the cache key missed an '
@@ -965,7 +1000,7 @@ def legacy_town_stage(town):
 def chim_native_towns(args, builder=None):
     """CHIM areas built without their legacy region-map chain (CHIM-LEGACY-CHAIN-33): every CHIM
     area, Seyda Neen included since v0.0.36-dev5 (chim_town.prepare_seyda: no region maps are cut;
-    owner order 2026-10-11, BUILD-LEGACY-TOWN-MAPS-SHIPPED-36), except towns named with the retired
+    maintainer order 2026-10-11, BUILD-LEGACY-TOWN-MAPS-SHIPPED-36), except towns named with the retired
     --legacy-area and a Seyda Neen from the retired --seyda-recorded (A/B regression tests only)."""
     builder = builder or getattr(args, 'builder_options', None) or resolve_builder(args)
     if builder['builder'] != 'chim' or getattr(args, 'chim_native_towns', 'on') != 'on':
@@ -1071,7 +1106,7 @@ def world_terrain_cache(args):
 def stair_walk_scope(version, choice='auto'):
     """'all' or 'flights' for the image step's stair walk: --stair-walk all|flights as given;
     auto = 'all' for development (-devN) versions, 'flights' for release candidates and finals
-    (owner decision 9 October 2026; a nightly full report builds with --stair-walk all)."""
+    (project decision 9 October 2026; a nightly full report builds with --stair-walk all)."""
     if choice in ('all', 'flights'):
         return choice
     if choice != 'auto':
@@ -1144,7 +1179,8 @@ def seyda_source(args):
 def seyda_scene_source(args):
     """'carrier' or 'compiled': how the bsp stage makes Seyda Neen's scene map (tools/prepare_mesh_bsp.py
     --seyda-source). A CHIM-native Seyda Neen takes the source-only carrier (entities and exact model boxes,
-    no qbsp/vis/light: its cell-aligned frame exceeds BSP29's node limit, BUILD-SEYDA-HULL2-32); the legacy
+    no qbsp/vis/light: its cell-aligned frame exceeds BSP29's node limit, BUILD-SEYDA-HULL2-32), and so does a CHIM
+    MiniWind of another town, whose image leaves Seyda Neen out (BUILD-MINIWIND-SEYDA-COMPILE-42); the legacy
     chains (converted, recorded), other builds and --seyda-scene-source compiled (A/B) compile the town.
     A dry run plans what the real build would run."""
     choice = getattr(args, 'seyda_scene_source', 'auto') or 'auto'
@@ -1154,10 +1190,23 @@ def seyda_scene_source(args):
     real = copy.copy(args)
     real.dry_run = False
     native = seyda_source(real) == 'chim-native'
+    # A CHIM MiniWind of another town (vivec_city, balmora) does not hold Seyda Neen: the image step prunes its
+    # maps and takes the carrier for a MiniWind (build_aga.py), so its bsp stage does not compile the whole town
+    # either: that town exceeds BSP29's node limit (BUILD-MINIWIND-SEYDA-COMPILE-42, BUILD-SEYDA-HULL2-32).
+    if not native and seyda_absent_miniwind(real):
+        native = True
     if choice == 'carrier' and not native:
         raise ValueError('--seyda-scene-source carrier needs a CHIM-native Seyda Neen (--builder chim with Seyda '
                          'Neen on CHIM, no --legacy-area seyda or --seyda-recorded)')
     return 'carrier' if native else 'compiled'
+
+
+def seyda_absent_miniwind(args):
+    """True for a CHIM MiniWind build that does not hold Seyda Neen (its town is another one)."""
+    if not getattr(args, 'miniwind', False) or getattr(args, 'stage', 'aga') != 'aga':
+        return False
+    builder = getattr(args, 'builder_options', None) or resolve_builder(args)
+    return builder['builder'] == 'chim' and 'seyda' not in builder['chim_areas']
 
 
 def seyda_scene_options(args):
@@ -1617,6 +1666,11 @@ def miniwind_commands(args, steps):
     feature_line = miniwind.features_line(names, scope, town)
     miniwind.data_file(feature_line, town, debug=debug)  # the engine's limits, before any stage runs
     description = getattr(args, 'miniwind_description', None)
+    if scope == 'interior':
+        # the interior scope converts its start room only (MINIWIND-NO-INTERIOR-SCOPE-42)
+        cell = interior_start_cell(args)
+        steps = [(name, [*command, '--only-cell', cell] if name == 'chim-rooms-' + town else command)
+                 for name, command in steps]
     image = []
     for name, command in steps:
         if name == 'image':
@@ -1828,6 +1882,22 @@ def perf_guard_step(args, run):
     return 0
 
 
+SIZE_GUARD_EXIT = 4   # the stages passed and their outputs are valid; the size guard failed the build result
+
+
+def size_ledger_step(args, run):
+    """The size ledger after a passed image build (tools/size_ledger.py): size-ledger.json in the run folder, read
+    by the build summary (table at the end, record in build-summary.json). Returns the guard verdict ('skipped'
+    for builds without an image)."""
+    if args.stage != 'aga' or args.dry_run:
+        print('Size ledger: skipped (%s)' % ('--dry-run' if args.dry_run else 'no image in this build'), flush=True)
+        return 'skipped'
+    import size_ledger
+    return size_ledger.step(run, VERSION, [args.size_baseline] if getattr(args, 'size_baseline', None) else [],
+                            getattr(args, 'size_guard', 'auto'), getattr(args, 'size_growth_margin', 0.05),
+                            getattr(args, 'size_growth_reason', None), log=lambda line: print(line, flush=True))
+
+
 def provenance(args, tools):
     """Capture inputs and build choices once, before any conversion stage runs."""
     def hashes(base, accept):
@@ -1907,6 +1977,7 @@ def provenance(args, tools):
         "input_check": getattr(args, "input_report", None),
         "npc_root_rule": getattr(args, "npc_root_rule", "legacy"),
         "actor_search": getattr(args, "actor_search", "wide"),
+        "interior_creatures": getattr(args, "interior_creatures", "listed"),
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
         "input_sha256": {} if args.dry_run else input_hashes(args),
         "known_inputs": known_inputs_record(args),
@@ -2006,6 +2077,18 @@ def miniwind_mode(scope=None, town=None, debug=False):
             + miniwind.partial_area(scope, town or miniwind.TOWN) + (', ' + tag if tag else '') + ')')
 
 
+def interior_start_cell(args):
+    """The cell ID of a MiniWind interior scope's start (--direct-to-game-map interior:<cell>); ValueError when the
+    start is not an interior (MINIWIND-NO-INTERIOR-SCOPE-42)."""
+    import direct_start
+    text = getattr(args, 'direct_to_game_map', None)
+    start = direct_start.parse(text) if text else None
+    if start is None or start.kind != 'interior':
+        raise ValueError('--miniwind-scope interior builds one room: give its start, --direct-to-game-map '
+                         '"interior:<cell id>" (e.g. "interior:Vivec, Palace of Vivec")')
+    return start.cell
+
+
 def configure_area_closure(args):
     """The cells an area build's reference closure covers (--exclude-unreferenced): a MiniWind
     build's Balmora (its exterior grid and, in the full scope, its rooms). Sets args.closure_cells."""
@@ -2016,6 +2099,9 @@ def configure_area_closure(args):
     cells = area_cells(getattr(args, 'miniwind_town', None) or 'balmora')
     if getattr(args, 'miniwind_scope', None) == 'exterior':
         cells = [cell for cell in cells if cell.startswith('cell:')]
+    elif getattr(args, 'miniwind_scope', None) == 'interior':
+        # the start room and the town's exterior grid (the frame the room's doors lead to)
+        cells = [cell for cell in cells if cell.startswith('cell:')] + ['interior:' + interior_start_cell(args)]
     args.closure_cells = cells
     return cells
 
@@ -2070,7 +2156,7 @@ def configure_direct_start(args):
 
 
 def start_record(args):
-    """Where the player starts, and why (receipts; owner order 2026-10-11: a partial-area build starts inside what
+    """Where the player starts, and why (receipts; maintainer order 2026-10-11: a partial-area build starts inside what
     it holds). An explicit start was checked against the build's content above; without one, a MiniWind build
     starts at its town's arrival point and a full build with the new game."""
     recipe = (getattr(args, 'build_recipe_record', None) or {}).get('name')
@@ -2123,7 +2209,7 @@ def configure_miniwind(args):
     if not args.miniwind:
         raise ValueError(miniwind.DESCRIPTION_OPTION + '/' + miniwind.SCOPE_OPTION + '/' + miniwind.TOWN_OPTION
                          + '/' + miniwind.DEBUG_OPTION + ' require ' + miniwind.OPTION)
-    # The player starts in what the build holds (owner order 2026-10-11): without --miniwind-town, an explicit start
+    # The player starts in what the build holds (maintainer order 2026-10-11): without --miniwind-town, an explicit start
     # inside a town (an area, a room or a cell of it) picks that town, so the build holds its start point.
     args.miniwind_town_source = '--miniwind-town' if getattr(args, 'miniwind_town', None) else 'default'
     if getattr(args, 'miniwind_town', None) is None and getattr(args, 'direct_to_game_map', None) is not None:
@@ -2151,6 +2237,8 @@ def configure_miniwind(args):
             town, ', '.join(a for a in areas if a != town)))
     args.builder, args.chim_areas = 'chim', [town]
     args.miniwind_scope, args.miniwind_town, args.miniwind_debug = scope, town, debug
+    if scope == 'interior':
+        interior_start_cell(args)  # the one room it builds, before any work
     if getattr(args, 'chim_draw_distance', None) is not None:
         # a stated closer view: debugging only, never in a playtest
         if not debug:
@@ -2262,6 +2350,27 @@ def resolve_log_level(args):
     return {'level': 'normal', 'selected_by': 'default'}
 
 
+def release_readiness_step(args):
+    """The release readiness block (tools/release_readiness.py), printed before any stage; None outside AGA
+    builds. A real full AGA build (not --plan, --check, --dry-run or a MiniWind area test) refuses an item
+    without a registered tracker ID."""
+    if args.stage != 'aga':
+        return None
+    import project_version
+    import release_readiness
+    preview = bool(args.plan or args.check or args.dry_run)
+    area = bool(getattr(args, 'miniwind', False))
+    note = ('MiniWind area test build: never a release; tracker IDs listed, not required' if area else
+            'preview (--plan/--check/--dry-run): tracker IDs listed, required when the build runs' if preview
+            else None)
+    record = release_readiness.check(args, project_version.private_test_options, not (preview or area), note)
+    print('\n'.join(release_readiness.lines(record)), flush=True)
+    problem = release_readiness.refusal(record)
+    if problem:
+        raise ValueError(problem)
+    return record
+
+
 def main(argv=None):
     # Also cover direct Python invocations and subsequent environment re-exec.
     os.environ['PYTHONUNBUFFERED'] = '1'
@@ -2269,6 +2378,8 @@ def main(argv=None):
         if hasattr(stream, 'reconfigure'):
             stream.reconfigure(line_buffering=True)
     argv = list(sys.argv[1:] if argv is None else argv)
+    import project_version
+    project_version.private_test_options.clear()  # this build's release readiness (tools/release_readiness.py)
     # Read-only commands on run folders (docs/BUILD_PROFILE.md): live progress and the profiler.
     if argv[:1] == ['status']:
         import build_progress
@@ -2352,6 +2463,11 @@ def main(argv=None):
     os.environ['AMIWIND_NPC_ROOT_RULE'] = args.npc_root_rule
     # Actor support search (tools/actor_grounding.py reads AMIWIND_ACTOR_SEARCH; part of the actor stages' keys).
     os.environ['AMIWIND_ACTOR_SEARCH'] = getattr(args, 'actor_search', 'wide')
+    # Interior creatures in the resident stage (tools/creature_residents.py reads AMIWIND_INTERIOR_CREATURES;
+    # part of the resident stages' keys; INTERIOR-CREATURES-MISSING-41).
+    os.environ['AMIWIND_INTERIOR_CREATURES'] = getattr(args, 'interior_creatures', 'listed')
+    if os.environ['AMIWIND_INTERIOR_CREATURES'] == 'all' and not getattr(args, 'host_plan', False):
+        print('Interior creatures: all (experimental: every classified creature; docs/BUILDER.md)', flush=True)
     # Resident animation kit profile (tools/npc_anim.py reads AMIWIND_NPC_ANIM; part of the stage cache identity).
     if getattr(args, 'npc_anim', 'idle') != 'idle':
         os.environ['AMIWIND_NPC_ANIM'] = args.npc_anim
@@ -2378,7 +2494,7 @@ def main(argv=None):
         os.environ[PASS_CACHE_ENV] = 'off'
     else:
         os.environ.setdefault(PASS_CACHE_ENV, pass_cache_value)
-    # What the image step's stair walk covers (owner decision 9 October 2026): every step and
+    # What the image step's stair walk covers (project decision 9 October 2026): every step and
     # ramp in development builds and nightly full reports, only the steps of flights (the rows
     # that can fail the gate) in release candidates and finals.
     STAIR_WALK_ENV = 'AMIWIND_STAIR_WALK'  # tools/stair_walk.py SCOPE_ENV
@@ -2388,12 +2504,15 @@ def main(argv=None):
     # tools/stair_walk.py WALK_CACHE_ENV / WALK_SAMPLE_ENV / WALK_SAMPLE_DEFAULT (not imported: it needs numpy,
     # which the builder must not load before the tools exist; tests/test_chim_stair_cache.py checks they agree)
     WALK_CACHE_ENV, WALK_SAMPLE_ENV, WALK_SAMPLE_DEFAULT = 'AMIWIND_STAIR_WALK_CACHE', 'AMIWIND_STAIR_WALK_SAMPLE', 2
-    walk_cache = getattr(args, 'stair_walk_cache', None) or 'cached'
+    # end users (no --developer-mode) take the known-good stair records shipped with the source; development builds
+    # walk what changed (B14, v0.0.42 plan 1.0b)
+    walk_cache = getattr(args, 'stair_walk_cache', None) or (
+        'cached' if getattr(args, 'developer_mode', False) else 'records')
     walk_sample = getattr(args, 'stair_walk_sample', None)
     walk_sample = WALK_SAMPLE_DEFAULT if walk_sample is None else walk_sample
     if walk_sample < 0:
         raise SystemExit('Error: --stair-walk-sample must be 0 or more')
-    if walk_sample == 0 and walk_cache == 'cached':
+    if walk_sample == 0 and walk_cache in ('cached', 'records'):
         from project_version import require_private_test_version
         try:
             require_private_test_version(VERSION, ['--stair-walk-sample 0'])
@@ -2401,6 +2520,10 @@ def main(argv=None):
             raise SystemExit('Error: %s' % exc)
     os.environ[WALK_CACHE_ENV] = walk_cache
     os.environ[WALK_SAMPLE_ENV] = str(walk_sample)
+    if getattr(args, 'stair_walk_area', None):
+        os.environ['AMIWIND_STAIR_WALK_AREA'] = args.stair_walk_area   # chim.collision.walk_area_mode
+    if getattr(args, 'collision_underside', None):
+        os.environ['AMIWIND_COLLISION_UNDERSIDE'] = args.collision_underside   # mesh_geometry_env.underside_mode
     if not getattr(args, 'host_plan', False) and walk_cache == 'full':
         print('NOTE: --stair-walk-cache full: every map and frame is stair-walked again (a regression or beta-test '
               'run)', flush=True)
@@ -2704,6 +2827,9 @@ def main(argv=None):
         elif args.working_version or args.accept_version_mismatch:
             raise ValueError('--working-version and --accept-version-mismatch need --developer-mode '
                              '(or use build.py --check-entry)')
+        # Release readiness (tools/release_readiness.py): everything a release candidate or final would refuse,
+        # each with its tracker ID, before any stage; a full build with an item without one stops here.
+        args.release_readiness_record = release_readiness_step(args)
         if args.stage == "aga" and not args.dry_run:
             print("Original stair rules: " + ("on" if args.font_options["follow_original_stair_rules"] else "OFF (debugging)") +
                   " (" + args.font_options["follow_original_stair_rules_selected_by"] + ")", flush=True)
@@ -2729,7 +2855,7 @@ def main(argv=None):
         tools =(dry_run_prerequisites if args.dry_run else prerequisites)(args, interactive=sys.stdin.isatty())
         exterior_checklist = getattr(args, 'exterior_checklist', None)
         if not args.dry_run and args.stage == 'aga':
-            # The direct start against the owner's masters: the cell exists, the character is playable.
+            # The direct start against the maintainer's masters: the cell exists, the character is playable.
             import direct_start
             if getattr(args, 'direct_start', None) is not None:
                 direct_start.check_cell_exists(args.direct_start, args.data_files)
@@ -2800,6 +2926,8 @@ def main(argv=None):
         if getattr(args, 'developer_mode_record', None) is not None:
             metadata['developer_mode'] = args.developer_mode_record  # tools/entry_check.py
         metadata['run_name'] = args.run_name_record  # date, version, suffix, purpose, commit (tools/run_name.py)
+        if getattr(args, 'release_readiness_record', None) is not None:
+            metadata['release_readiness'] = args.release_readiness_record  # tools/release_readiness.py
         # The recipe record (tools/build_recipe.py): build-state.json, build-summary.json and, through the
         # environment (never a stage key), image/build.json.
         metadata['build_recipe'] = recipe_metadata(args)
@@ -2818,7 +2946,7 @@ def main(argv=None):
             manifest = world_manifest.plan(args.builder_options['chim_areas'], chim_native_towns(args, args.builder_options),
                                            table, statuses, region_rows=getattr(args, 'chim_region_rows', None) or 'game-data',
                                            retired=getattr(args, 'retired_flags_record', None) or ())
-            # The collision check, before the first stage: every cell has one owner (owner order 2026-10-11).
+            # The collision check, before the first stage: every cell has one owner (maintainer order 2026-10-11).
             collisions = world_manifest.collisions(manifest, steps)
             if collisions:
                 raise ValueError('World map collision check refused the plan before any stage (a CHIM map and a '
@@ -2890,6 +3018,7 @@ def main(argv=None):
                 result = run/'image'/name
             if args.allow_known_actor_ground_findings and acceptance is None:
                 raise ValueError('Private-test build is missing its actor acceptance receipt')
+        size_verdict = size_ledger_step(args, run)
         summary.finish('passed', result, actor_acceptance=acceptance)
         save_recipe(args, 'passed')
         if live:
@@ -2907,7 +3036,12 @@ def main(argv=None):
             except (OSError, ValueError) as exc:
                 print(f'[warning] Build succeeded; FS-UAE launch skipped: {exc}. HDF retained: {result}')
         pool_outputs(args, run, played=bool(emulator))
-        return perf_guard_step(args, run)
+        code = perf_guard_step(args, run)
+        if size_verdict == 'failed':
+            print('SIZE GUARD FAILED: a payload folder grew past the margin without a named reason (%s); the '
+                  'stages passed and their outputs stay valid and reusable' % (run / 'size-ledger.json'), flush=True)
+            return code or SIZE_GUARD_EXIT
+        return code
     except (KeyboardInterrupt, EOFError):
         if summary and not summary.finished:
             summary.finish('cancelled')

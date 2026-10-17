@@ -68,7 +68,7 @@
 
 [BUILD-INVENTORY-PALETTE-41](bugs/BUILD-INVENTORY-PALETTE-41.md) — 15 October 2026, v0.0.41 source candidate: image assembly prepares inventory before the sky palette pass, which rejected current AWIC icons and AWI2/AWST metadata as unknown images. The source repair validates each inventory format at its exact path, remaps only icon pixels and preserves metadata bytes. Scoped evidence contains 15 passing palette checks and 2 passing inventory-asset checks on matching unchanged source. Actual image assembly, native verification, packaging and shipment remain pending.
 
-[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or owner acceptance is promoted.
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or maintainer acceptance is promoted.
 
 [CHIM-MODEL-ARENA-RESERVE-41](bugs/CHIM-MODEL-ARENA-RESERVE-41.md) — 15 October 2026: exact allocation and predecessor-world checks remain separately recorded. The later 941 world stopped at its ownership guard because named aprons bypassed ten existing deferred-owner dispositions. The source-only disposition repair passes 38 focused checks; fresh world, boundary/model review and native/package acceptance remain pending.
 
@@ -84,7 +84,7 @@ prefetch, visited interiors kept, read caching. Details: [the cache plan](#the-c
 
 ## Near future: one game for the 68040 and the 68060, 16 October 2026
 
-Owner decision, 16 October 2026: one game binary that recognises the machine at start-up.
+Project decision, 16 October 2026: one game binary that recognises the machine at start-up.
 The 68060 plan, its rules and steps: [AmiWind on the 68060](68060.md).
 
 - [ ] The engine reads the CPU and FPU type at start-up (the system's attention flags) and picks its 68040 or its
@@ -101,7 +101,7 @@ The 68060 plan, its rules and steps: [AmiWind on the 68060](68060.md).
 
 ## Goal: every exterior on CHIM, 16 October 2026
 
-Owner decision, 16 October 2026: everything above ground (and the sea around it) is CHIM; interiors are each a
+Project decision, 16 October 2026: everything above ground (and the sea around it) is CHIM; interiors are each a
 Quake map or CHIM, whichever suits the room. When every exterior cell is CHIM, the classic region maps leave the
 game: no edges between CHIM and classic cells, no border copies of classic objects in CHIM frames, no object
 stored many times over, one world format outdoors. The classic region builder stays in the code, selectable for
@@ -111,7 +111,7 @@ the open sea, then Solstheim ([v0.0.42 working plan](PLAN-v0.0.42.md)).
 
 ## v0.0.42: Complete Vivec (the city), 16 October 2026
 
-Owner decision, 16 October 2026: v0.0.41 ships the first regional build (More Fixes, Fewer Planes
+Project decision, 16 October 2026: v0.0.41 ships the first regional build (More Fixes, Fewer Planes
 (A Telvanni Root Story)); v0.0.42 completes the city of Vivec.
 
 The step-by-step checklist, with what counts as done for each step, is the
@@ -152,22 +152,22 @@ The step-by-step checklist, with what counts as done for each step, is the
 - [ ] The open Vivec entries of the bug register reviewed: each one still real, fixed, or replaced by the whole-city
   frame, with evidence; the still-real ones fixed or scheduled.
 - [ ] Vivec's interior plants that cost frame time drawn as sprites, measured in game.
-- [ ] The batch import of the easy cells (owner, 16 October 2026), once Vivec is done: every converted cell with all
+- [ ] The batch import of the easy cells (maintainer, 16 October 2026), once Vivec is done: every converted cell with all
   audits passing and comfortable memory headroom joins CHIM in one step, whole regions where possible. Measured
   16 October: 524 such cells outside v0.0.41, 459 of them with at least 2 MB of headroom (Ashlands 157, Molag Amur
   91, West Gash 77, Ascadian Isles 58, Sheogorad 53, Grazelands 53, Red Mountain 35). Every CHIM edge removed is a
   frame that no longer carries copies of a classic neighbour's objects, and every classic region map retired is
-  one of the old, overlapping maps gone. Order by weight (owner, 16 October 2026): the lightest cells first, then
+  one of the old, overlapping maps gone. Order by weight (maintainer, 16 October 2026): the lightest cells first, then
   the heavier, the heaviest last, each step measured again with the current builder (CHIMport) and prechecked in
   the CHIM stage before one build. Converting the light cells first turns the heavy cells' classic neighbours into
   CHIM, which removes the border copies that push them over; the heaviest then go through the over-budget
   procedure.
-- [ ] The builder names the neighbour overlap (owner, 16 October 2026): each frame's memory peak split into its own
+- [ ] The builder names the neighbour overlap (maintainer, 16 October 2026): each frame's memory peak split into its own
   objects, border copies from CHIM neighbours and border copies from classic neighbours (a model used by the
   frame's own objects counts as its own). The heap gate's failure message, the heap report and the master
   builder's over-budget summary say how much of a peak is classic-neighbour overlap and from which cells, and warn
   on tight frames (over 90 %) where that share is large: those neighbours go first in the light-to-heavy order.
-- [ ] An automatic cause overview for every frame over the budget or tight (owner, 16 October 2026: "show it in the
+- [ ] An automatic cause overview for every frame over the budget or tight (maintainer, 16 October 2026: "show it in the
   logs or errors ... what exactly caused the heap excess"): in the log, the error, the heap report and the master
   builder's summary, the peak by kind (drawn, collision, terrain, textures; collision planes and nodes no longer
   counted as drawn), by source (own cell, classic and CHIM neighbours), the top models with their heavy part
@@ -184,14 +184,14 @@ The step-by-step checklist, with what counts as done for each step, is the
   Caldera, never converted. Each group is worked through in that order, measured again first.
 - [ ] The inland lava group as ordinary region cells, with the lava stored once: the lava surface a shared,
   content-keyed piece every lava cell references (as the shared ocean chunk and CHIM's terrain references), so
-  no lava is stored twice on disk or in memory (owner, 16 October 2026: avoid duplicates). Measured first: each
+  no lava is stored twice on disk or in memory (maintainer, 16 October 2026: avoid duplicates). Measured first: each
   of the 24 cells built on its own against the memory budget. The other options stay open and selectable, as
   every method does: smaller lava frame groups split along natural breaks, the shared lava surface on its own,
-  and ordinary cells with each cell's own lava; all three are measured, the default is the owner's choice.
+  and ordinary cells with each cell's own lava; all three are measured, the default is the maintainer's choice.
 
 ## Effects to investigate: Quake machinery first, 16 October 2026
 
-Owner request, 16 October 2026: future effects start from what AmiQuake already draws, mapped onto the Morrowind
+Maintainer request, 16 October 2026: future effects start from what AmiQuake already draws, mapped onto the Morrowind
 data, before any new engine feature ([IDEAS](chim/IDEAS.md#the-ghostfence-as-a-quake-turbulent-surface)).
 
 - [ ] The Ghostfence and the Ghostgate: the upright shimmering curtain between the pylons (electricity and water
@@ -200,7 +200,7 @@ data, before any new engine feature ([IDEAS](chim/IDEAS.md#the-ghostfence-as-a-q
   becomes such a texture on the fence walls, with no new engine feature.
 - [ ] The electric pulse: a flickering light style (Quake's animated light patterns) on the fence's glow, so the
   light around it pulses like the original's shimmer.
-- [ ] Smoke plumes rising from the lava pools (owner, 16 October 2026: "they can be massive, use AmiQuake cheap
+- [ ] Smoke plumes rising from the lava pools (maintainer, 16 October 2026: "they can be massive, use AmiQuake cheap
   ones"): large animated Quake sprites over the pools the build already records. A sprite is one camera-facing
   picture, so a massive plume costs what a small one does (one quad, a few frames), with its outline kept like the
   tree sprites. The plumes can be intense: two or three overlapping, nearly opaque smoke sprites per pool at
@@ -618,7 +618,7 @@ new effects; compare spell costs, eligibility, delivery and effects against the
 original. Reusable projectile machinery is not complete spell-system parity.
 No spell implementation is included in this roadmap update.
 
-The v0.0.40 exterior target is CHIM coverage of rings 0, 1 and 2, with every failed, held, partial or excluded cell explicit. The shipped v0.0.40-dev1 gameplay inspection candidate omitted the town-boundary/seam expansion; dev2 requires the approved original-cell ownership and full rings 0, 1 and 2. For each included CHIM owner, exclude its replaced legacy BSP29 map before compilation and from the final payload. Preserve independently selected interior formats and required nonduplicate dependencies; conversion/audit alone does not prove runtime inclusion. Adjacent-cell acceptance must cover shared border heights/coordinates, water and surface continuity, collision crossings in both directions, and unique edge-object ownership.
+The v0.0.40 exterior target is CHIM coverage of rings 0, 1 and 2, with every failed, held, partial or excluded cell explicit. The shipped v0.0.40-dev1 gameplay inspection candidate omitted the town-boundary/seam expansion; dev2 requires the approved original-cell ownership and full rings 0, 1 and 2. For each included CHIM maintainer, exclude its replaced legacy BSP29 map before compilation and from the final payload. Preserve independently selected interior formats and required nonduplicate dependencies; conversion/audit alone does not prove runtime inclusion. Adjacent-cell acceptance must cover shared border heights/coordinates, water and surface continuity, collision crossings in both directions, and unique edge-object ownership.
 
 Keep a per-reference entrance ledger for converted CHIM cells: original location/type/destination, visible geometry, activation bank, configured target, actual packaged destination and native entry/return states. Reuse the existing unavailable-interior handler for registered entrances with deferred destinations. Actual interior implementation follows in the next pass. Resolve the six partial town overlaps in dev2 through the approved original-cell-aligned town ownership and complete reference-band conversion, with separate terrain aprons.
 
@@ -639,8 +639,8 @@ suite, full native modal, third-person block pose, plain-BSP transfer/save/load
 and CHIM-refusal gates remain pending.
 
 
-Owner-published v0.0.39 source is commit
-`751e1efa6b28e7fc58453fc81c73100715b88195`; the owner reports the same gameplay
+Maintainer-published v0.0.39 source is commit
+`751e1efa6b28e7fc58453fc81c73100715b88195`; the maintainer reports the same gameplay
 in inspected RC2 and final. The current bounded priority is the renewed
 [physical-LMB punch](bugs/PLAYER-PUNCH-THIRDPERSON-39.md),
 [ready-state inability to move](bugs/PLAYER-READY-MOVEMENT-39.md),
@@ -654,10 +654,10 @@ exact guest timing and Preview-specific suppression are unproven. Keep original 
 state transitions with event timing. This is a measurement correction, not a
 gameplay fix. [Punch record](bugs/PLAYER-PUNCH-THIRDPERSON-39.md).
 
-Reproduce owner input/state first, repair the diagnosed paths, then check the
+Reproduce maintainer input/state first, repair the diagnosed paths, then check the
 exact target and package with ordinary physical input, matched original views
-and owner inspection. A successful Nord ready-movement or input/damage control
-is scoped evidence; it does not accept the owner failure. Preserve good ready
+and maintainer inspection. A successful Nord ready-movement or input/damage control
+is scoped evidence; it does not accept the maintainer failure. Preserve good ready
 posture, original shield eligibility and earlier historical receipts.
 
 The requested `dbg characterchange` testing command is implemented in source:
@@ -665,7 +665,7 @@ it reuses the existing pier race/gender/head/hair appearance menu by default;
 `all` selects the full quick-character page sequence. Two focused C/console
 checks pass. Native Nord-male to Orc-female menu/confirmation/reopen and exact
 engine readback pass. Story-registration restrictions remain in place. Package
-and owner acceptance remain pending; it is a diagnostic aid,
+and maintainer acceptance remain pending; it is a diagnostic aid,
 with no gameplay repair claimed.
 The new source race-testing shortcut dbg set race/playerrace accepts a strict
 zero-based loaded ID or normalized race name, with no-value/list output for
@@ -689,7 +689,7 @@ coverage is established by this follow-up.
 
 ## Additional RC1 inspection findings, 13 October 2026
 
-Vivec mushroom seams and missing swimming remain open. The owner also reports
+Vivec mushroom seams and missing swimming remain open. The maintainer also reports
 coarse Nord/Khajiit third-person gait and an Ordinator appearance mismatch.
 Five original screenshots were inspected and retained privately. No new cell
 conversion, native coverage or packaged coverage follows from these reports.
@@ -710,9 +710,9 @@ after the immutable RC2 source/package pin; it does not rewrite those artifacts.
 
 The [spear-resident candidate](bugs/NPC-SPEAR-ATTACK-REGRESSION-39.md) now selects the authored attack from equipped weapon type; affected asset/native/package checks are pending.
 
-RC2 update, 14 October: [third-person torch](bugs/PLAYER-TORCH-THIRDPERSON-38.md) has scoped native holding/movement evidence. All 20 [swim companions](bugs/WATER-GAMEPLAY-PARITY-38.md) are built and select in water; inherited idle sinking is repaired in source with target/reference checks pending. RC2 package/readback and scoped water checks have passed. Final packaging is authorized; CHIM coverage and individual owner acceptance are unchanged.
+RC2 update, 14 October: [third-person torch](bugs/PLAYER-TORCH-THIRDPERSON-38.md) has scoped native holding/movement evidence. All 20 [swim companions](bugs/WATER-GAMEPLAY-PARITY-38.md) are built and select in water; inherited idle sinking is repaired in source with target/reference checks pending. RC2 package/readback and scoped water checks have passed. Final packaging is authorized; CHIM coverage and individual maintainer acceptance are unchanged.
 
-The owner stopped final preparation after RC1 playtest reports. RC2 must
+The maintainer stopped final preparation after RC1 playtest reports. RC2 must
 address the third-person punch animation, reported Nord leg shape, recurring
 NPC chase animation and guard spear-attack regression before final delivery.
 Earlier RC1 release approval does not clear these newly reported blockers.
@@ -722,7 +722,7 @@ All 20 candidate body model/layout pairs now pass offline binary checks within
 the unchanged 512 KiB limit, superseding the earlier incomplete bake set.
 Possible knee/calf section gaps remain under
 [PLAYER-BODY-LEG-SHAPE-39](bugs/PLAYER-BODY-LEG-SHAPE-39.md); numeric fitting does
-not establish visible seams, gait, punch, memory or owner acceptance. Complete RC2 package readback and scoped native checks passed; wider visual acceptance remains open.
+not establish visible seams, gait, punch, memory or maintainer acceptance. Complete RC2 package readback and scoped native checks passed; wider visual acceptance remains open.
 
 - [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation.
 - [PLAYER-BODY-LEG-SHAPE-39](bugs/PLAYER-BODY-LEG-SHAPE-39.md): Nord player legs appear abnormally thin in RC1.
@@ -736,9 +736,9 @@ not establish visible seams, gait, punch, memory or owner acceptance. Complete R
 v0.0.39 keeps the implemented RC1 scope: safer automatic checkpoints and death
 UI, third-person jump and bare-hand ready/draw/lower source work, body budget
 fallback, current help, sound cancellation and exclusive exterior ownership.
-The owner initially approved RC1 on 13 October 2026, then stopped final
+The maintainer initially approved RC1 on 13 October 2026, then stopped final
 preparation and requested RC2 after the additional playtest reports above.
-On 14 October the owner authorized the final release package from RC2.
+On 14 October the maintainer authorized the final release package from RC2.
 Exact-source checks, image readback, native acceptance and publication remain
 separate gates; only the agreed repair/diagnostic scope enters RC2.
 
@@ -749,7 +749,7 @@ retains all unresolved findings.
 
 ## Movement presets and all eight attributes, 13 October 2026
 
-The owner requests faithful normal-game movement using original Speed, Athletics,
+The maintainer requests faithful normal-game movement using original Speed, Athletics,
 encumbrance and running-fatigue rules. Keep convenient fast, less strict debug
 builds distinct: this report does not authorize silently slowing the current
 debug preset. A proposed maxstats option would accept on/off, true/false and1/0.
@@ -785,17 +785,17 @@ candidate to bind reports to entities/references. Its ordinary overlays remain
 separate from click interception. Torch equipment and both-view swimming repeats
 remain open; no broader mechanics acceptance follows from the RC1 inspection.
 
-The latest owner instruction makes
+The latest maintainer instruction makes
 [third-person torch holding](bugs/PLAYER-TORCH-THIRDPERSON-38.md) required for RC2.
 Its source candidate is implemented; all 20 isolated companion bake/readbacks,
 35 converter and 36 runtime focused checks pass. Fresh target/native, matched
-original, complete image/package and owner checks remain pending. This supersedes
+original, complete image/package and maintainer checks remain pending. This supersedes
 the earlier player-torch deferral.
 
 ## v0.0.40 - Unfinished work and new features
 
-The owner's reported swimming/diving, gait and combat repairs are required for
-RC2. Their source, matched original reference, native/package and owner gates
+The maintainer's reported swimming/diving, gait and combat repairs are required for
+RC2. Their source, matched original reference, native/package and maintainer gates
 remain open; this future-feature milestone does not defer them. v0.0.40 retains
 new extensions such as optional cloud/lava effects and terrain texture fidelity.
 Existing open issues retain their IDs/evidence and require scoped acceptance;
@@ -876,7 +876,7 @@ areas; collision for thin underwater plants; and rebuild cascades in the builder
 Next, v0.0.38: all green zones. Every cell shown green (finished) on the CHIM Progress Tracker map, about 670 cells,
 moves onto CHIM in the game and is tested there, with bug fixes along the way. The first item is the lava
 stale-source fix (CHIMPORT-RETRY-LAVA-STALE-SOURCE-36). The tracker already shows this plan in pale gold.
-Also for v0.0.38, from the owner's dev5 playtest: the NPC you are fighting must stay visible in third person
+Also for v0.0.38, from the maintainer's dev5 playtest: the NPC you are fighting must stay visible in third person
 (CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36), and, longer term, blocking: NPCs block by their Block skill with a block animation, and the player
 blocks with the right mouse button, with the companion pick on another key (COMBAT-BLOCKING-36; the original rules are
 researched first).
@@ -989,7 +989,7 @@ A better pipeline for finding and removing slow or idle build sections:
   The original draws its local map live from the world; here the builder pre-draws one small map picture per
   exterior cell and per interior, and the engine shows the current one and turns the arrow. If that proves too
   heavy, a simple compass in the same frame replaces it (both kept selectable). Drawn with Quake's own status
-  bar pictures, converted at build time from the owner's game data; memory measured against the town limits
+  bar pictures, converted at build time from the maintainer's game data; memory measured against the town limits
   first.
   Layout: sizes and positions from OpenMW's HUD files, scaled to the AmiWind screen, A/B'd at the same pose.
 - Waiting and resting with the original's rules (planned, 10 October 2026). Today **T** only moves the clock
@@ -1272,7 +1272,7 @@ Plan, measured before it is built:
 1. Emulator test: more Fast RAM and a larger heap on the same Seyda Neen route.
    Continue only if evictions and crossing times improve clearly.
 2. Startup check: when much more Fast RAM is available, the game uses it by itself
-   (owner, 16 October 2026: the benefits come automatically): a short notice in plain
+   (maintainer, 16 October 2026: the benefits come automatically): a short notice in plain
    words says how much extra RAM was found and that it is being used for caches and a
    larger game heap, with a key to skip it for this start (the game then runs on the
    baseline). An Options setting turns it off for good; the engine falls back to
@@ -1284,7 +1284,7 @@ acceptance stay measured there, and nothing may depend on the larger heap.
 
 ### The cache plan: extra RAM spent on not doing work twice (16 October 2026)
 
-Owner decision, 16 October 2026: the baseline game keeps working on today's memory setup, and the game uses more
+Project decision, 16 October 2026: the baseline game keeps working on today's memory setup, and the game uses more
 RAM when a machine has it, as caches. This extends the 11 October plan (adaptive CHIM caching and non-blocking world
 streaming). Step zero exists already: the start arguments `-chimcache KIB` (shared models and textures kept across
 map changes) and `-heapmb N` ([hardware guide](REAL_HARDWARE.md#more-fast-ram-the-memory-settings-that-exist-today));
@@ -1309,7 +1309,7 @@ exists.
 ### Sky fading into the horizon
 
 At its lowest points the sky should fade into a gradient, not end in a crude cut-out. This pairs with the sea skirt
-being prototyped for the open ocean (off by default until the owner approves it): both fade into the same horizon colour.
+being prototyped for the open ocean (off by default until the maintainer approves it): both fade into the same horizon colour.
 
 ### Sea skirt: the sea runs to the horizon
 

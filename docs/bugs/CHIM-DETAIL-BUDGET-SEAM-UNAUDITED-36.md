@@ -44,7 +44,7 @@ nothing shipped is affected; the gap matters before 'vivec-deep' becomes the Viv
 ## Symptom
 
 The CHIM builder's named detail budgets (`config/chim-detail-budgets.json`, `--chim-detail-budget NAME`) reduce
-chosen meshes to a triangle target. 'vivec-deep', the owner-approved budget for the Temple district, takes the
+chosen meshes to a triangle target. 'vivec-deep', the maintainer-approved budget for the Temple district, takes the
 two Vivec statues to 900 of 5,451 and 4,009 triangles, the Ministry of Truth to 1,500 of 10,240 and the High
 Fane's main body to 700 of 2,042. The seam-tear audit, which keeps reduced meshes from opening the seams between
 their parts (MESH-LOD-OPEN-SEAMS-33: sky through the Silt Strider's shell), never measures these reductions.

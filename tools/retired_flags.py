@@ -14,36 +14,36 @@ Light module: no third-party imports (the parser and the tests read it).
 
 RETIRED_SINCE = 'CHIM v0.1.0'
 # The Vivec district areas (one CHIM frame per canton; the Arena-only frame of Vivec stage A): replaced by all of
-# Vivec in one CHIM frame, vivec_city (owner decision 2026-10-11 09:55 +0300). Kept selectable for A/B regression
+# Vivec in one CHIM frame, vivec_city (project decision 2026-10-11 09:55 +0300). Kept selectable for A/B regression
 # tests (DON'T DELETE ANY METHOD), refused like the other retired options.
 VIVEC_DISTRICTS = ('vivec_arena', 'vivec_foreign', 'vivec_hlaalu', 'vivec_redoran', 'vivec_telvanni', 'vivec_temple',
                    'vivec_delyn', 'vivec_olms')
 HELP_PREFIX = 'RETIRED - DO NOT USE except for antiquated regression testing'
 
 # name (the --override value), the flag as written, the argparse dest, the value that is
-# retired (None = any use), why, and the owner decision it comes from.
+# retired (None = any use), why, and the project decision it comes from.
 RETIRED = (
     {'name': 'legacy-area', 'flag': '--legacy-area', 'dest': 'legacy_areas', 'value': None,
      'replacement': 'the CHIM-native town (default: --chim-native-towns on)',
      'why': 'builds a CHIM town through the legacy region-map chain (CHIM-LEGACY-CHAIN-33)',
-     'source': 'owner decision 2026-10-09 (legacy Balmora disabled from builds by default) and '
+     'source': 'project decision 2026-10-09 (legacy Balmora disabled from builds by default) and '
                '2026-10-10 (CHIM-native areas by default; retired flags stop developer-mode builds)'},
     {'name': 'chim-native-towns-off', 'flag': '--chim-native-towns off', 'dest': 'chim_native_towns', 'value': 'off',
      'replacement': '--chim-native-towns on (the default)',
      'why': 'prepares every CHIM town other than Seyda Neen through its legacy region-map chain',
-     'source': 'owner decision 2026-10-10 (CHIM-native areas by default; BUILD-LEGACY-CHAIN-DEFAULT-36)'},
+     'source': 'project decision 2026-10-10 (CHIM-native areas by default; BUILD-LEGACY-CHAIN-DEFAULT-36)'},
     {'name': 'vivec-districts', 'flag': '--chim-area/--miniwind-town/--extra-town <Vivec district>',
      'dest': 'chim_areas', 'dests': ('chim_areas', 'miniwind_town', 'extra_town'), 'value': None,
      'contains': VIVEC_DISTRICTS,
      'replacement': 'vivec_city (all of Vivec in one CHIM frame, the default; --miniwind-preset vivec-city-chim)',
      'why': 'builds a Vivec district frame (the Arena-only frame of stage A or another canton) instead of the '
             'whole city in one frame',
-     'source': 'owner decision 2026-10-11 09:55 +0300 (whole-city Vivec replaces the district areas by default; '
+     'source': 'project decision 2026-10-11 09:55 +0300 (whole-city Vivec replaces the district areas by default; '
                'everything else behind legacy/debug settings)'},
     {'name': 'seyda-recorded', 'flag': '--seyda-recorded', 'dest': 'seyda_recorded', 'value': None,
      'replacement': 'Seyda Neen converted from the game data (the default)',
      'why': 'ships the recorded v0.0.31 Seyda Neen region maps: a legacy town chain (NOT RECOMMENDED since v0.0.31)',
-     'source': 'owner decision 2026-10-10 (rules consolidation item 8: legacy only for A/B regression tests)'},
+     'source': 'project decision 2026-10-10 (rules consolidation item 8: legacy only for A/B regression tests)'},
     {'name': 'seyda-scene-compiled', 'flag': '--seyda-scene-source compiled', 'dest': 'seyda_scene_source',
      'value': 'compiled',
      'replacement': 'the source-only Seyda Neen scene carrier (the default for a CHIM-native Seyda Neen)',

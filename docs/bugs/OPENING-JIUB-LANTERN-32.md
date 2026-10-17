@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.32 |
 | Where | Prison ship lantern (light_com_lantern_02_200_Boat): converter bake and renderer colour table |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32 (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: The opening scene's key light reads as a grey box; no gameplay effect. |
 | Family | Lighting, lamps and night (`lighting-night`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -42,7 +42,7 @@ changed engine (see "Verification").
 
 ## Symptom
 
-Owner, playing CHIM Preview 1 (v0.0.32 content), opening scene: "a yellow hue to the lamp above
+Maintainer, playing CHIM Preview 1 (v0.0.32 content), opening scene: "a yellow hue to the lamp above
 Jiub. I've been talking about the lantern above his head in the prison ship, but it's still not
 working as it should." The hanging lantern reads as a grey box; nothing about it looks lit.
 

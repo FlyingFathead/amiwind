@@ -53,7 +53,7 @@ LEVEL_SETS = {2: (0, 1), 3: (0, 1, 2), 4: (0, 1, 2, 3)}
 POLICY_OPTION = '--npc-face-lod'
 POLICIES = ('all', 'named', 'measured', 'list')
 # Fallbacks of the shipped defaults. The shipped defaults are config/build-defaults.json (npc_lod,
-# npc_lod_levels, npc_face_lod, npc_lod_disk_mib): the owner compares the levels in game before any of
+# npc_lod_levels, npc_face_lod, npc_lod_disk_mib): the maintainer compares the levels in game before any of
 # them becomes the default, so that is a config change, not a code change. A --build-config file
 # overrides them, and the command line overrides both.
 DEFAULT_MODE = 'off'

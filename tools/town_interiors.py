@@ -75,9 +75,42 @@ def exit_town(position, towns):
     return None
 
 
-def local_arrival(destination, settings=None):
-    """Original DODT position to the target map's local arrival (feet lifted)."""
+def room_offsets(root=None):
+    """{original cell (casefolded): [x, y, z]} of every listed room moved toward the origin ("recentre" in its
+    town's interiors row, original units; INTERIOR-COORDS-31). Every position of such a room (its placements,
+    lights, residents, door boxes and every arrival into it) has this subtracted; the room itself is unchanged."""
+    offsets = {}
+    for row in load_registry(root)['towns']:
+        settings = json.loads((Path(root or ROOT) / 'config' / row['config']).read_text(encoding='utf-8'))
+        for room in interiors(settings):
+            if room.get('recentre'):
+                offsets[room['cell'].casefold()] = list(room['recentre'])
+    return offsets
+
+
+def recentre_cell(cell, offset):
+    """The room's cell record with OFFSET (original units) subtracted from every reference position and every
+    arrival into it (its entrances' destinations); the water height moves with z. Returns a new record."""
+    if not offset or not any(offset):
+        return cell
+    def moved(position):
+        return [position[k] - offset[k] for k in range(3)]
+    out = dict(cell)
+    out['refs'] = [dict(ref, position=moved(ref['position'])) if 'position' in ref else ref for ref in cell['refs']]
+    out['entrances'] = [dict(e, destination=dict(e['destination'], position=moved(e['destination']['position'])))
+                        for e in cell.get('entrances', [])]
+    if cell.get('water_height') is not None:
+        out['water_height'] = cell['water_height'] - offset[2]
+    out['recentred_by'] = list(offset)
+    return out
+
+
+def local_arrival(destination, settings=None, offset=None):
+    """Original DODT position to the target map's local arrival (feet lifted). offset: the target room's
+    recentring (room_offsets), subtracted first."""
     position = destination['position']
+    if offset:
+        position = [position[k] - offset[k] for k in range(3)]
     point = [(position[k] - (settings['centre'][k] if settings is not None and k < 2 else 0)) * SCALE for k in range(3)]
     point[2] += FEET
     return point, arrival_yaw(destination['rotation_radians'][2])
@@ -114,19 +147,23 @@ def available_rooms(root=None, converted=None):
     return rooms
 
 
-def room_bank(room, doors, rooms, towns, door_bounds):
+def room_bank(room, doors, rooms, towns, door_bounds, offsets=None, offset=None):
     """doors-<room>.txt rows of one converted room.
 
     doors: original door links whose source is this room (mwad.interior.original_doors).
     door_bounds: reference -> [[x, y, z], [x, y, z]] original door mesh bounds.
+    offsets: room_offsets() (arrivals into a recentred room); offset: this room's own recentring (its door boxes).
     """
     rows = []
+    offsets = offsets or {}
+    shift = offset or [0, 0, 0]
     for door in sorted(doors, key=lambda d: d['number']):
         low, high = door_bounds[door['number']]
-        mins = [v * SCALE - .5 for v in low]; maxs = [v * SCALE + .5 for v in high]
+        mins = [(v - shift[k]) * SCALE - .5 for k, v in enumerate(low)]
+        maxs = [(v - shift[k]) * SCALE + .5 for k, v in enumerate(high)]
         if door['destination_interior']:
             target = rooms.get(door['destination_cell'].casefold(), '-')
-            arrival, yaw = local_arrival(door['destination'])
+            arrival, yaw = local_arrival(door['destination'], offset=offsets.get(door['destination_cell'].casefold()))
             label = door['destination_cell']
         else:
             town = exit_town(door['destination']['position'], towns)
@@ -142,13 +179,16 @@ def room_bank(room, doors, rooms, towns, door_bounds):
     return rows
 
 
-def exterior_link(ref, rooms):
-    """(target, arrival, yaw) of one exterior load door, or None when unavailable."""
+def exterior_link(ref, rooms, offsets=None):
+    """(target, arrival, yaw) of one exterior load door, or None when unavailable. offsets: room_offsets()
+    (None: read from the town table)."""
     cell = ref.get('destination_cell')
     target = rooms.get(cell.casefold()) if cell else None
     if not target or not ref.get('destination'):
         return None
-    arrival, yaw = local_arrival(ref['destination'])
+    if offsets is None:
+        offsets = room_offsets()
+    arrival, yaw = local_arrival(ref['destination'], offset=offsets.get(cell.casefold()))
     return target, arrival, yaw
 
 
@@ -165,11 +205,27 @@ def bsp_extent(raw):
 
 def build_room_checked(task):
     """prepare_area.build_room plus the coordinate range; returns (status, value). Finished rooms come from the
-    room unit cache (prepare_area.build_room_cached; BUILD-IMAGE-NO-RESUME-33)."""
+    room unit cache (prepare_area.build_room_cached; BUILD-IMAGE-NO-RESUME-33).
+
+    A room over its inline model limit is converted again with its nonsolid plants as sprites (step 1 of
+    docs/INTERIOR_SECTIONS.md "Interiors over a limit: the order"; interior_plants, AMIWIND_INTERIOR_PLANTS
+    =meshes keeps the earlier rule: the room fails). The receipt says which step the room needed."""
     from prepare_area import build_room_cached as build_room
+    import interior_plants
     data, scene, entry = task[:3]
     try:
-        report, cell = build_room(task)
+        try:
+            report, cell = build_room(task)
+            report['limit_steps'] = []
+        except ValueError as error:
+            if 'inline model budget exceeded' not in str(error) or interior_plants.plant_mode() != 'auto':
+                raise
+            print('Interior over its model limit, plants as sprites:', entry['map'], str(error), flush=True)
+            import shutil as _shutil
+            _shutil.rmtree(Path(scene) / 'area-work' / entry['map'], ignore_errors=True)
+            task = (task[0], task[1], {**entry, 'plant_sprites': True}, *task[3:])
+            report, cell = build_room(task)
+            report['limit_steps'] = [{'step': 'plants as sprites', 'because': str(error)}]
         extent = bsp_extent((Path(scene) / 'area-work' / entry['map'] / 'room.bsp').read_bytes())
         report['coordinate_extent'] = extent
         if extent >= COORD_LIMIT:
@@ -180,11 +236,31 @@ def build_room_checked(task):
         return 'failed', '%s: %s' % (type(error).__name__, error)
 
 
-def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dry_run=False):
-    """Convert the town's listed rooms; returns {'rooms', 'cells', 'failed', 'excluded', 'reports'}."""
+# The reason of a room a MiniWind interior scope leaves out (convert only_cells; MINIWIND-NO-INTERIOR-SCOPE-42).
+ONLY_CELLS_LEFT_OUT = 'not in this build (MiniWind --miniwind-scope interior: its start room only)'
+
+
+def only_rooms(listed, only_cells, title):
+    """listed with every room outside only_cells (cell IDs) excluded as ONLY_CELLS_LEFT_OUT; listed itself when
+    only_cells is None. A cell that is no converted room of the list stops the stage."""
+    if only_cells is None:
+        return listed
+    wanted = {cell.casefold() for cell in only_cells}
+    unknown = sorted(wanted - {room['cell'].casefold() for room in listed if room['exclude'] is None})
+    if unknown:
+        raise ValueError('%s: not a converted room of this town: %s' % (title, ', '.join(unknown)))
+    return [room if room['cell'].casefold() in wanted or room['exclude'] is not None else
+            dict(room, exclude=ONLY_CELLS_LEFT_OUT) for room in listed]
+
+
+def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dry_run=False, only_cells=None):
+    """Convert the town's listed rooms; returns {'rooms', 'cells', 'failed', 'excluded', 'reports'}.
+    only_cells: convert only these listed rooms (cell IDs; a MiniWind interior scope); every other room is
+    excluded with that reason, and a name that is no listed room stops the stage."""
     from build_parallel import ordered_map
     from vis_options import map_threads
-    listed = listed_rooms(settings)
+    from interior_plants import plant_mode
+    listed = only_rooms(listed_rooms(settings), only_cells, town_field(settings, 'title'))
     work = [room for room in listed if room['exclude'] is None]
     result = {'rooms': {}, 'cells': {}, 'reports': [], 'failed': {},
               'excluded': {room['map']: {'cell': room['cell'], 'reason': room['exclude']}
@@ -199,7 +275,10 @@ def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dr
                if not door['source_interior'] and door['destination_interior']}
     workers = min(jobs, len(work))
     tasks = [(data, scene, {'map': room['map'], 'cell': room['cell'], 'interior': True, 'area': 'balmora',
-                            **({} if room['cell'].casefold() in outside else {'original_door_arrivals': True})},
+                            **({} if room['cell'].casefold() in outside else {'original_door_arrivals': True}),
+                            **({'recentre': room['recentre']} if room.get('recentre') else {}),
+                            **({'plant_sprites': True} if room.get('plants') == 'sprites' and plant_mode() == 'auto'
+                               else {})},
               qbsp, vis, light, timings, map_threads(jobs, workers), vis_mode) for room in work]
     from build_costs import costed_map, room_sizes
     sizes = room_sizes(data, [(room['map'], room['cell']) for room in work])
@@ -216,6 +295,13 @@ def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dr
             continue
         report, cell = value
         shutil.copyfile(Path(scene) / 'area-work' / room['map'] / 'room.bsp', Path(scene) / 'id1/maps' / (room['map'] + '.bsp'))
+        # files the room needs besides its map (its plant sprites, interior_plants): same bytes = same file
+        for name in (report.get('plant_sprites') or {}).get('sprite_files', {}):
+            source, target = Path(scene) / 'area-work' / room['map'] / 'id1' / name, Path(scene) / 'id1' / name
+            if target.is_file() and target.read_bytes() != source.read_bytes():
+                raise ValueError('Room file %s differs from the one another room wrote' % name)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
         result['rooms'][room['map']] = cell
         result['cells'][room['cell'].casefold()] = room['map']
         result['reports'].append(report)
@@ -245,7 +331,11 @@ def write_room_banks(data, scene, result, root=None, prefer=()):
         return []
     converted = {cell: True for cell in result['cells']}
     converted.update({room['cell'].casefold(): False for room in result['failed'].values()})
+    # rooms a MiniWind interior scope left out (convert only_cells) are not in the image: their doors say unavailable
+    converted.update({room['cell'].casefold(): False for room in result.get('excluded', {}).values()
+                      if room.get('reason') == ONLY_CELLS_LEFT_OUT})
     rooms = available_rooms(root, converted)
+    offsets = room_offsets(root)
     towns = frame_towns(root, prefer)
     by_cell = {}
     for door in original_doors(child_ci(data, 'Morrowind.esm').read_bytes()):
@@ -254,7 +344,8 @@ def write_room_banks(data, scene, result, root=None, prefer=()):
     receipt = []
     for name, cell in result['rooms'].items():
         doors = by_cell.get(cell['name'].casefold(), [])
-        rows = room_bank(name, doors, rooms, towns, door_mesh_bounds(data, doors))
+        rows = room_bank(name, doors, rooms, towns, door_mesh_bounds(data, doors), offsets,
+                         offsets.get(cell['name'].casefold()))
         (Path(scene) / 'id1' / ('doors-' + name + '.txt')).write_text(bank_text(rows), encoding='cp1252')
         receipt.append({'map': name, 'cell': cell['name'], 'doors': len(rows),
                         'unavailable': sum(1 for r in rows if r.split(' ', 2)[1] == '-')})

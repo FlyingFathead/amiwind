@@ -84,14 +84,14 @@ its baseline rather than claiming a speedup or a regression from these timings.
 A late mixer update remains visible in the counters. Zero read errors is not a
 claim of uninterrupted audio.
 
-## Owner WinUAE result
+## Maintainer WinUAE result
 
-The owner's saved configs identify WinUAE 6.0.3. One used only 4 MiB Fast; another
+The maintainer's saved configs identify WinUAE 6.0.3. One used only 4 MiB Fast; another
 already used 16 MiB Z3. The subsequent Tester 2 config selected the complete
 bundled KS3.1 ROM (CRC identity 1483A091), 040/internal FPU, 2 MiB Chip, 16 MiB
-Z3 and JIT, but retained cpu_speed=real. The owner reported that v0.0.9 loaded
+Z3 and JIT, but retained cpu_speed=real. The maintainer reported that v0.0.9 loaded
 but ran slowly with severe repeating/broken audio. After selecting Fastest
-possible, the owner reported that it ran OK. This is owner-reported v0.0.9
+possible, the maintainer reported that it ran OK. This is maintainer-reported v0.0.9
 validation; v0.0.10 was tested locally with FS-UAE, not WinUAE.
 
 The working profile is preserved with maximum CPU speed, a complete extracted
@@ -109,5 +109,5 @@ The 40 host tests pass. Native emulator cases above test the hardware branches.
 
 Source ZIPs use an explicit allowlist, UTF-8/binary checks, member/CRC checks and
 SHA-256 manifests. Public archives contain no ROMs, game assets, derived assets,
-HDFs or executables. The private archive includes owner data and both complete
+HDFs or executables. The private archive includes maintainer data and both complete
 A1200 ROMs. Old checkpoints are retained without modification.

@@ -9,7 +9,7 @@
 | Where | tools/chim_build.py: CHIM gates run after the whole world is built |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | high: A check that takes seconds per frame ran after a 2,687-second stage (hold-level class: a check that runs late) |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

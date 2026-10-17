@@ -87,7 +87,7 @@ def bug(**kw):
 class BugTrackerTest(unittest.TestCase):
     def test_live_register_round_trips_complete_issue_history(self):
         records = [bug(title='A "quoted" Nord and Khajiit',
-                       status='Preserve source checks, native limits and owner acceptance.',
+                       status='Preserve source checks, native limits and maintainer acceptance.',
                        reports=[{'version': 'v0.0.32', 'at': '2026-10-09', 'note': 'First finding'},
                                 {'version': 'v0.0.39-rc2', 'at': '2026-10-13',
                                  'note': 'Repeated finding: ääkköset and a \\ path are data.'}],
@@ -174,7 +174,7 @@ class BugTrackerTest(unittest.TestCase):
         self.assertIn('TEST-TAG-31', section)
         self.assertNotIn('TEST-NOTAG-31', section)
 
-    # Owner requirement, 9 October 2026: who, what, when, where, how, which version, reproduction,
+    # Project requirement, 9 October 2026: who, what, when, where, how, which version, reproduction,
     # duplicate, persistence, severity, and links between bugs of the same kind.
     def test_bugs_from_v0030_must_carry_every_fact(self):
         bare = {k: v for k, v in bug().items() if k not in bug_register.FACTS}
@@ -305,7 +305,7 @@ class BugTrackerTest(unittest.TestCase):
                                    where='Addamasartus cave', reproduction='always', duplicate_of=None,
                                    persists_in=['v0.0.32-dev2', 'v0.0.32'], severity='low',
                                    severity_reason='A 1-unit step.', related=['TEST-B-32']))
-        owner = bug_register.facts_from_table({'Reported by': 'Harry (owner playtest)',
+        owner = bug_register.facts_from_table({'Reported by': 'Harry (maintainer playtest)',
                                                'Persists in': 'unknown (not reproduced)'}, bug(), set())
         self.assertEqual((owner['reported_by'], owner['persists_in']), ('owner', 'unknown'))
 
@@ -355,8 +355,10 @@ class BugTrackerTest(unittest.TestCase):
         files += sorted(DOCS.glob('PATCH-v*.json'))  # whitespace baselines (RELEASE-PATCH-SIZE-33)
         # 2026-10-11 coordinator: temporary until the second archive rotation (TRACKER-REGISTER-SIZE-36);
         # bugs.json warns at 85 %, every other file at 75 %; the hard 1 MiB limit is unchanged.
+        # 2026-10-16 register audit: 178 fixed entries rotated into the one archive (79 % of its 256 KiB
+        # limit, one issue per line); it warns at 85 % too until the second archive (TRACKER-REGISTER-SIZE-33).
         def share(p):
-            return 0.85 if p.name == 'bugs.json' else 0.75
+            return 0.85 if p.name == 'bugs.json' or p.parent.name == 'archive' else 0.75
         big = ['%s %d of %d' % (p.name, p.stat().st_size, release.text_limit(p.relative_to(ROOT).as_posix()))
                for p in files if p.stat().st_size > share(p) * release.text_limit(p.relative_to(ROOT).as_posix())]
         self.assertEqual(big, [], 'tracker files near the release text limit (tools/release.py)')
@@ -413,7 +415,7 @@ class BugTrackerTest(unittest.TestCase):
                    if p.is_file() and p.relative_to(ROOT).as_posix() not in shipped]
         self.assertEqual(missing, [], 'tracker files missing from tools/release-files.json')
 
-    # CHIM Engine tracker (owner request, 9 October 2026): docs/bugs/CHIM_TRACKER.md, generated with
+    # CHIM Engine tracker (maintainer request, 9 October 2026): docs/bugs/CHIM_TRACKER.md, generated with
     # the register; every CHIM bug on it, CHIM- IDs always marked.
     def test_chim_tracker_is_generated_and_lists_every_chim_bug(self):
         bugs = bug_register.load()
@@ -514,7 +516,7 @@ class BugTrackerTest(unittest.TestCase):
         self.assertIn('2 CHIM bugs: 2 open, 0 fixed, 0 closed.', page)
         self.assertNotIn('TEST-BUG-32', page)
 
-    # Owner requirement, 9 October 2026: every bug says which build it was found in.
+    # Project requirement, 9 October 2026: every bug says which build it was found in.
     def test_playtest_bugs_must_name_their_build(self):
         bare = bug(id='TEST-PLAY-33', found_in='v0.0.33-dev1', persists_in=['v0.0.33-dev1'])
         del bare['build']
@@ -542,9 +544,9 @@ class BugTrackerTest(unittest.TestCase):
         dev = dict(LEGACY_BUILD, name='v0.0.36-dev5')
         bare = bug(id='TEST-PLAT-36', found_in='v0.0.36-dev5', persists_in=['v0.0.36-dev5'], reported_by='owner',
                    family='actors-npc', build=dev)
-        self.assertTrue(any('missing platform' in e for e in bug_register.validate([bare])), 'owner report, no platform')
+        self.assertTrue(any('missing platform' in e for e in bug_register.validate([bare])), 'maintainer report, no platform')
         self.assertEqual(bug_register.validate([dict(bare, platform='FS-UAE 3.1.66, JIT')]), [])
-        self.assertEqual(bug_register.validate([dict(bare, reported_by='developer')]), [], 'only the owner reports')
+        self.assertEqual(bug_register.validate([dict(bare, reported_by='developer')]), [], 'only the maintainer reports')
         self.assertEqual(bug_register.validate([dict(bare, family='build-speed')]), [], 'builder families are exempt')
         self.assertEqual(bug_register.validate([dict(bare, id='TEST-PLAT-35', found_in='v0.0.35-dev2',
                                                      persists_in=['v0.0.35-dev2'], build=dict(dev, name='v0.0.35-dev2'))]),

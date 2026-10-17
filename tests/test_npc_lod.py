@@ -229,7 +229,7 @@ class Options(unittest.TestCase):
         self.assertEqual(npc_lod.option_arguments(options), [])
 
     def test_shipped_defaults_come_from_the_config_file(self):
-        # Owner (9 October 2026): no level becomes a default before he compares them in game; the
+        # Maintainer (9 October 2026): no level becomes a default before he compares them in game; the
         # default is a config change (config/build-defaults.json), not code.
         import json
         shipped = json.loads((ROOT / 'config/build-defaults.json').read_text(encoding='utf-8'))

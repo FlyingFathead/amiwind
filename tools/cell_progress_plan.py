@@ -12,7 +12,7 @@ refused for writing (never silently downgraded) and read as far as it is underst
 
 "Upcoming" is data, not code: the next release is the lowest-numbered plan release that is not shipped. When it ships
 (`ship`), the next one takes its place, so the gold colour always means "planned for the next release" and later planned
-releases are drawn in a lighter gold. This is separate from releases.json (cell_progress_release.py), the owner's approval.
+releases are drawn in a lighter gold. This is separate from releases.json (cell_progress_release.py), the maintainer's approval.
 """
 import json
 from pathlib import Path

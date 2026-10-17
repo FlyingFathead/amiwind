@@ -18,7 +18,7 @@ The menu/world soundtrack pauses so it cannot overlap the movie's narration.
 The chosen ship track starts only after the movie finishes or is skipped.
 
 The source installation file is `Data Files/Video/mw_intro.bik`. The supplied
-data-files archive initially contained an empty Video directory; the owner then
+data-files archive initially contained an empty Video directory; the maintainer then
 supplied the original videos separately. The New Game movie converts to 575
 frames over 57.5 seconds (37,434,738 bytes at 320×200, including mono PCM). Missing or
 invalid optional video is logged and falls through to the ship; it must never
@@ -73,7 +73,7 @@ fixture reached Jiub both after completion and after Esc. The final native
 checkpoint also plays the supplied original prophecy and reaches Jiub after both
 normal completion and Esc. Packed movie PCM exactly matches an independent
 conversion of the source audio. Physical-hardware throughput and subjective audio
-clarity remain owner playtests; emulator success does not certify those.
+clarity remain maintainer playtests; emulator success does not certify those.
 
 ## Dev5 readable cards and logo
 
@@ -85,7 +85,7 @@ AGA low-resolution screen; no untested hires display-mode switch is claimed.
 `--captions /private/cards.json --font /private/gfx/magic16.awf` replaces selected
 burned-in cards with readable native-pixel text on black. The JSON is a list of
 objects with `start`, `end` (seconds) and `text`. Text is supplied privately from
-the owner's movie, never embedded in public source. The dev5 private conversion
+the maintainer's movie, never embedded in public source. The dev5 private conversion
 includes three replacement cards; timing boundaries are a readability adaptation,
 not an exact reproduction of the original text fades. Narration is unchanged.
 Exact gold ink shades are reserved in the movie palette.

@@ -508,7 +508,7 @@ class BlockDodgeTests(unittest.TestCase):
 
 
 class MoverTests(unittest.TestCase):
-    """Owner decision 2026-10-09: residents stand in 'react' and wear 'full' only while they move."""
+    """Project decision 2026-10-09: residents stand in 'react' and wear 'full' only while they move."""
 
     def test_split_profiles(self):
         self.assertEqual(npc_anim.split_profile('react+full'), ('react', 'full'))

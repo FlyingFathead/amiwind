@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev3 |
 | Where | Engine music start-up (aw_music.c, CDAudio_Init) |
 | Reproduction | always |
@@ -21,7 +21,7 @@
 
 ## Status: 7 October 2026
 
-Regression in v0.0.31-dev3, found by the owner in WinUAE the evening it was
+Regression in v0.0.31-dev3, found by the maintainer in WinUAE the evening it was
 published. Cause read in source; repaired in source, not yet packaged.
 
 ## Symptom
@@ -43,7 +43,7 @@ the switch, so the random track played under the logo until the menu started
 the title.
 
 This also explains the original start-up crackle ([AUDIO-LOGO-31](AUDIO-LOGO-31.md)),
-as the owner spotted: start-up opened and pre-read a random track (16 reads),
+as the maintainer spotted: start-up opened and pre-read a random track (16 reads),
 then the logo threw it away and opened the title (16 more) while the logo video
 streamed from the same disk. dev3 is silent under the logo and does not crackle;
 with this repair only one track (the title) is opened, once, at the menu.
@@ -67,7 +67,7 @@ title track keep the world shuffle at start-up.
 ## Verification
 
 Native music test: after start-up with a title track nothing is open and the
-mixer is silent; the title then starts with the title track. Owner listening
+mixer is silent; the title then starts with the title track. Maintainer listening
 check pending.
 
 ## Prevention

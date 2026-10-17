@@ -4,13 +4,13 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Ashlands cell 7,14; global 61461,120073,2158; HUD heading 187, pitch 50; dev2 screenshot. |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.38-dev2 (last seen) |
-| Severity | high: Owner-visible world or movement defect requiring location-specific reproduction. |
+| Severity | high: Maintainer-visible world or movement defect requiring location-specific reproduction. |
 | Family | Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`) |
 | Playtest version | v0.0.38-dev2 (visible screenshot label) |
 | From commit | source unknown, engine unknown, CHIM world unknown |
@@ -21,30 +21,30 @@
 <!-- END GENERATED FACTS -->
 
 ## Symptom
-Owner reports being stuck beside a steep terrain face; slope involvement is suggested, not established.
+Maintainer reports being stuck beside a steep terrain face; slope involvement is suggested, not established.
 
 ## Where
 Ashlands cell 7,14; global 61461,120073,2158; HUD heading 187, pitch 50; dev2 screenshot.
 
 ## How it happened
-Unknown. Owner evidence is preserved; no independent reproduction or cause yet.
+Unknown. Maintainer evidence is preserved; no independent reproduction or cause yet.
 
 ## Why it was not caught
 No matched native acceptance receipt covers these exact poses. Build-time checks
 and other converted cells do not establish correctness at this location.
 
 ## Reproduction
-Additional owner report on 12 October, v0.0.38-dev2: the walkpath down to
+Additional maintainer report on 12 October, v0.0.38-dev2: the walkpath down to
 the boats near Vivec Arena is inaccessible. HUD pose: global
 33055,-89249,659, local 71,727,164, cell 4,-11, heading 185, pitch 75,
-time 05:52. The owner suspects the recurring slope/step difference from
+time 05:52. The maintainer suspects the recurring slope/step difference from
 Morrowind. This is an additional movement symptom; a shared cause with the
 Ashlands report is not established. Reproduce the whole approach and descent
 with ordinary movement, identify the actual model/reference and compare the
 same route in OpenMW. A still image and stair checks for other cells do not
 prove this route is walkable.
 
-The owner also reports that jumping cannot pass this obstruction. Other Vivec
+The maintainer also reports that jumping cannot pass this obstruction. Other Vivec
 gondola approaches are suspected but have not been checked; do not generalize
 this reproduction to all docks without testing each route.
 
@@ -52,7 +52,7 @@ A subsequent dev2 image identifies a blockage on the apparently level wooden
 walkway itself: global 33216,-89297,727, local 112,715,181, cell (4,-11),
 heading 256, pitch 40, time 11:22. An overhead image locates the same section
 but has no HUD pose. Include plank joins and adjacent collision shapes in the
-reproduction; a slope-limit explanation alone is insufficient. The owner
+reproduction; a slope-limit explanation alone is insufficient. The maintainer
 recalls earlier polygon-budget problems and suggests stronger reduction.
 Treat that as a hypothesis: measure the responsible hull's traversal cost and
 trace result before reducing geometry or changing normal movement rules.
@@ -61,10 +61,10 @@ Reproduce ordinary movement from the reported pose, including approach, retreat,
 
 ## Repair
 Pending diagnosis. Preserve the reported scene and distinguish a proposed
-repair from verified package behavior and owner acceptance.
+repair from verified package behavior and maintainer acceptance.
 
 ## Verification
-Owner-reported in v0.0.38-dev2 on 12 October 2026. No repaired package,
+Maintainer-reported in v0.0.38-dev2 on 12 October 2026. No repaired package,
 matched comparison or acceptance. Screenshot coordinates are copied from HUD.
 
 ## Prevention
@@ -72,9 +72,9 @@ Add the confirmed reproduction to cell-level native and source-reference
 coverage. Keep missing assets, collision and visibility findings separate.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.
@@ -97,6 +97,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
+- [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
 - [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
@@ -108,6 +109,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
+- [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
+- [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

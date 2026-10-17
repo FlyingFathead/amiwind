@@ -9,7 +9,7 @@
 | Where | engine/aga/src/aw_harvest_runtime.c AW_HarvestUse |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | low: Only reachable with very many or very long item labels |
 | Family | Harvestable plants (`harvest`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

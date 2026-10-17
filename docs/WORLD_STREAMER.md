@@ -1,6 +1,6 @@
 # World streamer: every asset stored once
 
-**Decision (owner, 8 October 2026):** AmiWind gets a world streamer in which no
+**Decision (maintainer, 8 October 2026):** AmiWind gets a world streamer in which no
 asset is duplicated. Mesh geometry, collision hulls and textures are stored
 once and placed by reference, the way Morrowind places its meshes; only
 per-placement data (origin, angles, scale, and per-placement lighting where it
@@ -44,7 +44,7 @@ done so far, feature by feature with the measured gains, is in the
 Status: the CHIM engine and builder run Balmora and Seyda Neen (private playtests,
 CHIM 0.1.0, world format 0.5). The numbers behind the relative results below come from the shipped town maps and
 the whole-world estimate and stay with the private build records, because they
-are derived from the owner's game data.
+are derived from the maintainer's game data.
 
 ## Why
 
@@ -140,7 +140,7 @@ collision parts loaded.
 
 The image as it ships today, file group by file group, and the one-partition goal on the roadmap horizon: [IMAGE_SIZE.md](IMAGE_SIZE.md).
 
-Owner limits: classic FFS partitions below 2 GiB, drive images below 4 GiB
+Maintainer limits: classic FFS partitions below 2 GiB, drive images below 4 GiB
 ([build output](BUILD_OUTPUT.md); the limits, the savings measured so far and the size budget of the whole game are in [disk space](chim/DISK_SPACE.md)); two drive images are the absolute maximum
 for the whole game, and the real target is close to the original game's art
 and world data plus our terrain and lightmaps.

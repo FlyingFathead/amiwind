@@ -62,7 +62,7 @@ Saved configuration overrides the default; `config/game.cfg` also selects V2.
 These modes do not change `aw_modal_freeze`, `aw_modal_black` or music policy.
 
 Source changes and synthetic checks are distinct from native acceptance. The
-owner has accepted the preceding appearance/class blackout/freeze presentation;
+maintainer has accepted the preceding appearance/class blackout/freeze presentation;
 the new OK buttons and scene shortcut still need a matching target build check.
 
 ## v0.0.29 navigation and character-HUD work
@@ -83,7 +83,7 @@ Recurring F/V hand readiness in debug play is tracked independently in
 
 ## Open map-teleport regression - 4 October 2026
 
-The owner reports that both `dbg tp map` and `dbg map tp` no longer work from
+The maintainer reports that both `dbg tp map` and `dbg map tp` no longer work from
 F10 in the post-release v0.0.28 playtest; a later `dbg tp map` retry worked.
 Both aliases route to `aw_teleport_map` in the source. The report remains
 intermittent and open. The instructions below describe the
@@ -279,7 +279,7 @@ surfaces; do not interpret those differences as a new player size.
 
 `dbg coords on` in v0.0.15-dev2 already shows XYZ, DEG (horizontal yaw) and P
 (vertical pitch). Capture all fields plus version and area. Keep the same fog,
-overlay/viewport and hand mode for comparisons. Existing owner lower-hold views:
+overlay/viewport and hand mode for comparisons. Existing maintainer lower-hold views:
 (12,142,-9), DEG47/P11; (-3,276,-8), DEG282/P10; (7,234,-9), DEG95/P-8.
 
 ## Teleport shortcuts and destination menu (v0.0.24-dev4)

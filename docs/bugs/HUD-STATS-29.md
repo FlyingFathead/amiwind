@@ -2,12 +2,13 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 5 times; something has to be done
 
 - Reported with v0.0.40-dev1 at 2026-10-14 (time not recorded): Original HUD reference requires actual weapon/fists and selected spell/enchantment boxes with applicable condition/charge indicators; no off-hand guess.
 - Reported with v0.0.40-dev1 at 2026-10-14 (time not recorded): Opening HUD timing queried. Source audit finds missing staged channel checks; actual weapon model is a separate gate. Native reproduction and repair pending.
 - Reported with v0.0.40-dev2 at 2026-10-14 (time not recorded): Dev2 source restores staged HUD channels and paper-pickup fighting. Seven focused checks pass; full suite, target and native pending. Map/menu gates and inventory pose remain separate.
 - Reported with v0.0.40-dev2 at 2026-10-14 (time not recorded): Original and candidate show paper pickup enabling fists before the hall guard; reading alone does not. Scoped HUD observations retained; failed exit gate and full-route checks remain separate.
+- Reported with v0.0.42-dev1 at 2026-10-17 01:58 +0300: owner: the weapon and magic boxes at the bottom of the HUD are still placeholders (fist, dash) and look bad
 
 <!-- END GENERATED PERSISTING -->
 
@@ -29,7 +30,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -45,6 +46,7 @@
 - [Opening HUD source audit, 14 October 2026](#opening-hud-source-audit-14-october-2026)
 - [Opening HUD source repair, 14 October 2026](#opening-hud-source-repair-14-october-2026)
 - [Scoped opening comparison, 14 October 2026](#scoped-opening-comparison-14-october-2026)
+- [Original weapon and magic boxes, 17 October 2026](#original-weapon-and-magic-boxes-17-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -53,7 +55,7 @@
 
 The historical issue concerned resource bars showing an incorrect fraction:
 health divided by a fixed 100, with the other bars treated as full. The newer
-owner reference also identifies missing equipped-weapon or bare-fist and selected
+maintainer reference also identifies missing equipped-weapon or bare-fist and selected
 spell/enchantment HUD boxes with their appropriate indicators. These are
 separate presentation requirements; the old bar-arithmetic cause does not
 explain missing item or magic icons.
@@ -78,7 +80,7 @@ artwork and selected-magic game logic remain incomplete.
 ## Why it was not caught
 
 Resource-fraction pixel checks can verify bar arithmetic without proving the
-complete original HUD layout, item-selection state or icon assets. The owner's
+complete original HUD layout, item-selection state or icon assets. The maintainer's
 new original-HUD reference makes that missing scope explicit.
 
 ## Reproduction
@@ -107,10 +109,10 @@ inventory and journal roadmap. It is not implemented by this report.
 
 Current resource binding is source-checked; older independent pixel checks are
 preserved as historical evidence. The missing weapon/fists and selected-magic
-presentation is a current source finding and owner-reference request.
+presentation is a current source finding and maintainer-reference request.
 Original reference images remain private and are not public source assets.
 The later bounded placeholder implementation is described below. Native HUD
-parity, packaging and owner acceptance remain pending. Keep this existing issue
+parity, packaging and maintainer acceptance remain pending. Keep this existing issue
 open, with no first fixed version.
 
 ## Prevention
@@ -143,7 +145,7 @@ restoration, unchanged empty magic under off-hand equip, and 32 stable draws
 without new malloc calls or catalogue opens. The preceding HUD fails the
 transition assertion; the candidate passes. Five other affected UI callers pass.
 No full target, native HUD capture, original-reference visual parity, measured
-frame-time saving or owner acceptance is established.
+frame-time saving or maintainer acceptance is established.
 
 ## Planned effect-display diagnostic, 14 October 2026
 
@@ -155,7 +157,7 @@ This display diagnostic is not implemented, and cannot prove real effect logic.
 
 ## Temporary centre Guard label removed in source, 14 October 2026
 
-The owner rejects the inherited Guard text over the middle of the normal world
+The maintainer rejects the inherited Guard text over the middle of the normal world
 view. The new mutable candidate removes only that AW_UIHud text call. Actual
 guard state, the existing callback, debug combat readout, ordinary target-name
 locations, enemy bar and resource/equipment boxes remain.
@@ -285,6 +287,49 @@ readback passed, but does not turn the failed gate into a pass. These observatio
 are retained separately; this is not release acceptance or a new shipment.
 The original reference exited normally. Full opening-route checks remain open.
 
+## Original weapon and magic boxes, 17 October 2026
+
+Reported again by the maintainer in v0.0.42-dev1: the boxes were placeholders, a
+flat skin-coloured fist and a dash. That fist was not a converted picture at
+all: it was an 8 x 8 bit pattern written into the source (`hud_equipment_boxes`
+in aw_ui.c) and filled with one menu-gold colour, so no conversion or palette
+setting could have made it look like the original.
+
+Repair (v0.0.42-dev1, docs/HUD.md): one icon and HUD-art lookup table built at
+image time from the user's own game data (tools/prepare_icons.py,
+`gfx/icons.awl` + `gfx/icon/<sha>.awi`, each picture stored once by SHA-256):
+
+* the weapon box shows the equipped weapon's own icon, or the original
+  hand-to-hand icon when unarmed, over a thin condition bar (empty for fists);
+* the magic box shows the selected magic item's icon on the original magic
+  backdrop over its charge bar, and the empty box when nothing is selected;
+* the box and bar frames are the original thin menu border, the bar fill the
+  original grey bar tinted with Morrowind.ini's fill colours; sizes are the
+  original's times 24/42 (our resource bars are 24 pixels tall, the
+  original's 42): box 20 x 20, icon 18 x 18, bar 20 x 4.
+
+New game state: the selected magic item and the current enchantment charge of
+each owned item, saved (AWS4 feature bit 4); the maximum charge comes from the
+ENCH, MGEF and GMST records; Cast When Used and Cast When Strikes items
+recharge by fMagicItemRechargePerSecond (0.05 per second) of unpaused play and
+of waited time. The original's magic menu does not exist yet, so the
+selection is made with the console command `aw_magic select ID`; spells
+cannot be selected because there is no spell list. Casting from an item is not
+implemented, so charge is spent only by the diagnostic `aw_magic charge`.
+`aw_hud_icons 0` brings back the interim marks.
+
+Verification: synthetic-picture builder tests (tests/test_hud_icons.py),
+native fixtures for the table, the boxes, single loading per change, the
+magic rules, the catalogue bytes and the save round trip; on the maintainer's
+data the conversion gives 15 table rows and 14 pictures (4,192 bytes) and the
+item catalogue's first 496 bytes per row are unchanged. In FS-UAE (JIT preset,
+v0.0.41 image with this engine and data): unarmed, steel longsword, the ring
+selected at full and at partial charge, recharge observed (13 to 17.1 points),
+switching recorded on video. Per-frame cost and the side-by-side with the
+original HUD are recorded with the evidence. Native acceptance by the maintainer is
+pending; the issue stays open (spells, active effects, the magic menu and the
+inventory icons, UI-ICONS-INVENTORY-42, remain).
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -312,10 +357,15 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [TOOLKIT-TEXT-ENCODING-38](TOOLKIT-TEXT-ENCODING-38.md): Toolkit labels contain corrupted Unicode characters
 - UI-ACCEPT-29 (no report page): Character selection lacks a visible OK button
 - [UI-DEATH-DAMAGE-TINT-38](UI-DEATH-DAMAGE-TINT-38.md): Lava damage tint also colours the death menu and selection
+- [UI-ICONS-INVENTORY-42](UI-ICONS-INVENTORY-42.md): Inventory rows show icons only for the few staged items, squeezed 32 to 14 pixels; no magic or equipped backdrops
+- [UI-INVENTORY-HEADING-CENTRE-42](UI-INVENTORY-HEADING-CENTRE-42.md): The Inventory heading text is not vertically centred in its bar
 - [UI-INVENTORY-LAYOUT-40](UI-INVENTORY-LAYOUT-40.md): Inventory text overlaps fields and footer; preview initially faces away
+- [UI-INVENTORY-PREVIEW-GAP-41](UI-INVENTORY-PREVIEW-GAP-41.md): Inventory shows 'Character preview unavailable': a fixed 2 MiB memory guard refuses the 128 KB pose model in Seyda Neen
+- [UI-INVENTORY-PREVIEW-STILL-42](UI-INVENTORY-PREVIEW-STILL-42.md): The inventory character is drawn live and turns instead of being a still picture
 - [UI-KEY-HELP-STALE-38](UI-KEY-HELP-STALE-38.md): Key help exposes raw actions and uses a sparse outdated layout
 - [UI-MENU-LOGO-32](UI-MENU-LOGO-32.md): The menu logo has a line above the name and reddish-pink letters instead of gold
 - UI-OPTIONS-WRAP-29 (no report page): Setup selection wraps despite a bounded scrollbar
+- [UI-WINDOW-TITLE-BAR-42](UI-WINDOW-TITLE-BAR-42.md): Menu windows lack the original title bar (tiled frame with the window name on a dark plaque)
 - [WAIT-NOCLIP-MESSAGE-32](WAIT-NOCLIP-MESSAGE-32.md): Wait refusal names registration, dry ground and speech together instead of the reason that applied (noclip)
 - [WORLDMAP-LAVA-MISMATCH-36](WORLDMAP-LAVA-MISMATCH-36.md): The in-game map shows a lava band in Molag Amar where the world has grass and no lava
 

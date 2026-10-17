@@ -155,7 +155,7 @@ class PerFrameAuditTests(unittest.TestCase):
             self.assertGreater(other['frames'][0]['peak_bytes'], serial['frames'][0]['peak_bytes'])
 
     def test_a_big_frame_split_over_the_pool_gives_the_same_report(self):
-        # owner order 2026-10-11 10:08 (max parallelization): a big frame scans its positions in slices over the
+        # maintainer order 2026-10-11 10:08 (max parallelization): a big frame scans its positions in slices over the
         # shared pool; with the threshold lowered here every frame of this small world is "big": same report
         from unittest.mock import patch
         opts = self.options()

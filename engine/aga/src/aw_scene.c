@@ -310,6 +310,50 @@ int AW_MapTeleportAt(const float *source_position,int use_height) {
     map_jump=use_height?2:1;return 1;
 }
 int AW_MapTeleport(const float *source_position) {return AW_MapTeleportAt(source_position,0);}
+/* The view of a shot, as aw_aim sets it (dbg cam recall, aw_cam.c). */
+static void shot_view(edict_t *p,float yaw,float pitch) {
+    V_StopPitchDrift();cl.viewangles[0]=pitch;cl.viewangles[1]=yaw;cl.viewangles[2]=0;
+    p->v.angles[0]=pitch;p->v.angles[1]=yaw;p->v.angles[2]=0;p->v.fixangle=1;
+}
+/* dbg cam recall (aw_cam.c): a named shot. GLOBAL: the teleport of dbg tp X Y
+ * [Z] (the same route, placement and checks; HAS_Z as its Z); a second recall
+ * that finds the player already on that map within 48 units of the point only
+ * sets the view. Else MAP at the local POINT exactly, noclip: on the current
+ * map at once (no reload, SV_LinkEdict without touching triggers), on another
+ * map through the debug teleport's map load. The view is applied on arrival
+ * after the signon angles (the mushroom picker's view). 0 = unavailable,
+ * player state unchanged; 1 = placed now; 2 = loading. */
+int AW_SceneShot(int global,const char *map,const float *point,int has_z,float yaw,float pitch) {
+    aw_scene_link_t r;edict_t *p;float local[3];
+    if(pending || !sv.active || svs.maxclients!=1 || !svs.clients ||
+       !(p=svs.clients[0].edict) || cls.state!=ca_connected || p->v.health<=0 ||
+       AW_StoryRestricted())return 0;
+    memset(&r,0,sizeof(r));
+    if(global){
+        if(!AW_WorldMapTarget(point,r.target,r.arrival))return 0;
+        if(!strcmp(r.target,sv.name) && fabs(p->v.origin[0]-r.arrival[0])<48 && fabs(p->v.origin[1]-r.arrival[1])<48 &&
+           (!has_z || (AW_SourceToWorld(r.target,point,local) && p->v.origin[2]<=local[2]+48))){
+            shot_view(p,yaw,pitch);return 1;
+        }
+        if(!AW_MapTeleportAt(point,has_z))return 0;
+    }else{
+        if(!map_valid(map) || !(fabs(point[0])<AW_COORD_BOUND && fabs(point[1])<AW_COORD_BOUND &&
+                                fabs(point[2])<AW_COORD_BOUND))return 0;
+        if(!strcmp(map,sv.name)){
+            VectorCopy(point,p->v.origin);VectorCopy(vec3_origin,p->v.velocity);
+            p->v.movetype=MOVETYPE_NOCLIP;noclip_anglehack=true;
+            shot_view(p,yaw,pitch);SV_LinkEdict(p,false);return 1;
+        }
+        copy_name(r.target,sizeof(r.target),map);VectorCopy(point,r.arrival);
+        r.yaw=yaw;region_crossing=0;door_ready=0;door_close=0;
+        crossing_movetype=MOVETYPE_NOCLIP;
+        load_scene(&r,1);
+        if(!pending)return 0;
+        map_jump=3;
+    }
+    next.yaw=yaw;shroompicker_pitch=pitch;shroompicker_yaw=yaw;shroompicker_view=1;
+    return 2;
+}
 /* Ray/slab intersection with converted model bounds. The model origin may
  * be buried in the ceiling or far from the visible handle/hatch surface. */
 static int door_hit(aw_scene_link_t *r,vec3_t eye,vec3_t forward,vec3_t hit) {
@@ -611,6 +655,11 @@ void AW_SceneSpawn(edict_t *p) {
     if(pending && !strcmp(sv.name,next.target)) {
         if(map_jump){
             extern const char *aw_map_place_failure;
+            /* 3: a camera mark on its map (AW_SceneShot): the exact point, noclip. */
+            if(map_jump==3){
+                VectorCopy(next.arrival,p->v.origin);VectorCopy(next.arrival,p->v.oldorigin);
+                VectorCopy(vec3_origin,p->v.velocity);SV_LinkEdict(p,false);placed=1;
+            }else
             placed=(map_jump==2 && AW_MapPlaceBelow(p,next.arrival)) || arrival_place(p,next.arrival,1);
             /* Said when the player did not land at the asked XY (the fallbacks
              * use the scene spawn), with why the map placement failed. */

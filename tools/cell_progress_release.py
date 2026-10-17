@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """CHIM Progress Tracker: which cells are approved for which release (owner-set, per cell).
 
-The release of a cell ("v0.0.33", "v0.0.34") is set by the owner through `cell_progress.py release` only and lives in
+The release of a cell ("v0.0.33", "v0.0.34") is set by the maintainer through `cell_progress.py release` only and lives in
 OUT/releases.json. Conversion results, audits and ingest never write it, and an ingest never loses it. Every change is
 also one line in OUT/history.jsonl with the date (host clock) and who made it.
 """
@@ -87,7 +87,7 @@ def record(out, version, keys, who='owner', date=None, shipped=False, clear=Fals
 
 
 def attach(cells, doc):
-    """rec['release'] = {name, date, who, shipped} or None, from the owner's file."""
+    """rec['release'] = {name, date, who, shipped} or None, from the maintainer's file."""
     for k, rec in cells.items():
         e = doc['cells'].get(k)
         rec['release'] = {'name': e['release'], 'date': e.get('date'), 'who': e.get('who'), 'shipped': bool(e.get('shipped'))} if e else None

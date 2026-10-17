@@ -1245,7 +1245,7 @@ static void budget(void){
     printf("budget ok%c",10);
 }
 
-/* CHIM-GRAFT-REPACK-EMPTY-33 (owner, v0.0.33 final3, Seyda Neen: "frame world
+/* CHIM-GRAFT-REPACK-EMPTY-33 (maintainer, v0.0.33 final3, Seyda Neen: "frame world
  * repacked (marks full): 0 chunks", the world gone and the player falling):
  * a ring that outgrows the frame world's block in a zone with no free run
  * for a larger one. The repack keeps the old block and the nearest chunks

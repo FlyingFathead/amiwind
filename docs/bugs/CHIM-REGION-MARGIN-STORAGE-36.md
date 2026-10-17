@@ -9,7 +9,7 @@
 | Where | tools/chim/regions.py TERRAIN_MARGIN 896; one frame per cell, 15 x 15 chunks |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev1 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: Scratch world of three cells: 3.46 MB of CHIM frames for 0.68 MB of legacy maps; the sea ring (172 cells) would add about 120 MB to the image |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | World format ([CHIM Engine tracker](CHIM_TRACKER.md)) |

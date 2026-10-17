@@ -16,6 +16,7 @@ on the left and carried items on the right.
   - [Inventory scrollbar source follow-up, 14 October 2026](#inventory-scrollbar-source-follow-up-14-october-2026)
 - [Dedicated pose source progress, 14 October 2026](#dedicated-pose-source-progress-14-october-2026)
 - [Inventory native checkpoint, 14 October 2026](#inventory-native-checkpoint-14-october-2026)
+- [Icons and the HUD boxes, 17 October 2026](#icons-and-the-hud-boxes-17-october-2026)
 
 <!-- contents end -->
 
@@ -161,7 +162,7 @@ The inventory character must match the actual player: selected race, sex, head,
 hair, clothing, armour and equipped items. Composition and visibility must follow
 the original body-part and equipment rules. The existing race/sex alias, default
 head/hair and baked starter outfit leave full appearance matching pending.
-Convert the full original item-icon catalogue from the owner's game data and
+Convert the full original item-icon catalogue from the maintainer's game data and
 track missing, held and unsupported icons per item. Dev1's ten selected test
 models/icons do not establish full icon or item coverage.
 
@@ -179,7 +180,7 @@ drag interaction must not claim an unsupported use or effect occurred.
 Keep the black full-screen backdrop, paused world, original golden borders and
 tall character panel. Place the literal "Inventory" title in the original inset black
 plaque within the golden top border. The planned separate stats screen uses
-the actual player name in its header. The latest owner reference still rejects
+the actual player name in its header. The latest maintainer reference still rejects
 the preview posture; both plaque and original-posture refinements are planned,
 not implemented here. Provide readable item-hover details at AGA resolution,
 including a variant in the readable F10 console-font style. Hover interaction
@@ -199,7 +200,7 @@ compression. Memory reduction must preserve item identity, rules and save data.
 
 The delivered dev1 preview uses the live body frame/ordinary idle; a camera half-turn
 does not reproduce OpenMW's dedicated inventoryhandtohand or inventory-plus-
-weapon pose fixed at time zero. The latest owner finds the listing readable,
+weapon pose fixed at time zero. The latest maintainer finds the listing readable,
 but dedicated posture and original-reference parity remain pending.
 
 Use the original inventory-specific posture for the still preview. Evaluate
@@ -227,7 +228,7 @@ keep runtime open/close, scrolling and preview costs in the same performance
 record. Keep the inventory producer, runtime format/consumer, documentation,
 release allowlist and exported public source synchronized in each reviewed
 change. Public source contains conversion code and permitted metadata, while
-original game icons and models remain owner-supplied inputs/private outputs.
+original game icons and models remain user-supplied inputs/private outputs.
 This phase and its performance monitoring are planned work.
 
 Plan a MiniWind `--inventory-test` entry that loads a controlled scene with
@@ -239,7 +240,7 @@ action/effect support, conversion, native verification and exact package
 readback. Exercise appearance changes, drag cancellation, equip/use/drop,
 pickup, capacity/condition refusal, scene re-entry and save/load without losing
 or duplicating items. Retain original-versus-native comparison and separate
-owner acceptance; a controlled test scene does not establish full-game support.
+maintainer acceptance; a controlled test scene does not establish full-game support.
 
 Inventory state must persist through panel close/reopen, scene changes and
 save/load: carried counts, quest items such as the starting ring, equipment
@@ -282,8 +283,8 @@ removal and live no-dice readout controls are observed. These scoped results
 do not establish complete inventory or selected-body acceptance. Matched original comparison, complete appearance/clothing,
 full-game drop placement, scene/save/load and target memory/performance remain
 separate pending checks. This is a source
-candidate, not a shipped or owner-accepted feature. No CHIM cell coverage changes
-are claimed. [Current roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-owner-request-1-october-2026)
+candidate, not a shipped or maintainer-accepted feature. No CHIM cell coverage changes
+are claimed. [Current roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-maintainer-request-1-october-2026)
 and [blocking issue](bugs/COMBAT-BLOCKING-36.md) retain their pending gates.
 
 ### Inventory scrollbar source follow-up, 14 October 2026
@@ -326,3 +327,11 @@ The initial missing-model-allowance refusal is preserved in the report. Original
 OpenMW appearance/equipment match is scoped; full appearance, torch, all-race
 visuals and remaining UI work are still open. No new shipment or CHIM coverage.
 [UI-INVENTORY-LAYOUT-40](bugs/UI-INVENTORY-LAYOUT-40.md).
+
+## Icons and the HUD boxes, 17 October 2026
+
+The image step's inventory conversion also imports the item icons, the hand-to-hand icon and the HUD box
+and bar art into one lookup table (`gfx/icons.awl`, pictures in `gfx/icon/`, each stored once by SHA-256) and
+writes each item's enchantment type and maximum charge into the catalogue (bytes 496..511, zero in older
+catalogues). It prints one line with the rows, pictures and anything held back. The HUD weapon and magic boxes
+draw from it; the inventory rows will follow (UI-ICONS-INVENTORY-42). Details: [the HUD](HUD.md).

@@ -11,8 +11,8 @@ The optional town opening:
 - Start exploration track 04 (`track04.mws`) from the beginning.
 - Continue with the other exploration tracks through the normal shuffle.
 
-In the owner's verified conversion manifest, track 04 comes from
-`Music/Explore/mx_explore_3.mp3`. The owner confirmed that this is the intended
+In the maintainer's verified conversion manifest, track 04 comes from
+`Music/Explore/mx_explore_3.mp3`. The maintainer confirmed that this is the intended
 recording. We identify it by converted track number and source path; no
 unverified soundtrack title is assigned. Audio remains privately converted
 from the user's installed game files.
@@ -61,5 +61,5 @@ The native Amiga engine and boot checker compile with this change. Host tests
 exercise the production scene-start command, default and disabled selection,
 track-04 playback against synthetic PCM, complete-track transitions, shuffle
 history, and missing-track fallback. The existing standing-hull tests pass.
-The updated default still requires the owner's emulator playtest before the
+The updated default still requires the maintainer's emulator playtest before the
 v0.0.17 publication step. Compiler warnings remain recorded for review.

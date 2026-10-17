@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""follow_original_stair_rules: Morrowind's stair/slope collision rules are ON by default (owner decision
+"""follow_original_stair_rules: Morrowind's stair/slope collision rules are ON by default (project decision
 2026-10-08); a build config or the CLI can turn them off for debugging, and the choice is resolved once."""
 import argparse
 import json

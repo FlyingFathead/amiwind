@@ -86,8 +86,7 @@
       "cell": "Vivec, Foreign Quarter Canalworks"
     },
     {
-      "cell": "Vivec, Foreign Quarter Lower Waistworks",
-      "exclude": "inline models 222 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+      "cell": "Vivec, Foreign Quarter Lower Waistworks"
     },
     {
       "cell": "Vivec, Foreign Quarter Plaza"
@@ -106,7 +105,7 @@
     },
     {
       "cell": "Vivec, Guild of Mages",
-      "exclude": "inline models 260 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+      "exclude": "model slots 248 > 220 after same-lit sharing and plants as sprites (INTERIOR-INLINE-LIMIT-31); needs a section cut at a doorway or hallway, proposed for maintainer review (docs/INTERIOR_SECTIONS.md)"
     },
     {
       "cell": "Vivec, J'Rasha: Healer"

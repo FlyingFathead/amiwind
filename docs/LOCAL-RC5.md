@@ -28,6 +28,6 @@ All 353 source tests and a fresh native compile/asset-free image build passed.
 A complete game conversion is a separate gate and has not passed here. No
 private playable is supplied. Windows remains an untested roadmap target.
 
-The owner performs Git/GitHub publishing. Create a new rc5 prerelease with the
+The maintainer performs Git/GitHub publishing. Create a new rc5 prerelease with the
 matching source assets; do not replace rc4 tags or archives. The generated
 `docs/PACKAGE_MANIFEST.json` stays untracked.

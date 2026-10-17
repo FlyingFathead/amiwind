@@ -89,7 +89,7 @@ Autosaves: source defaults live in `config/game.cfg`. Existing saved values in
 history allows 0..16; five is the fresh default. Set `aw_autosaves 5` in the
 console to change an existing installation, then exit normally to persist it.
 
-## Owner-run Git/GitHub commands
+## Maintainer-run Git/GitHub commands
 
 Review the diff before committing. These commands create a checkpoint branch,
 push it, and publish an explicitly incomplete prerelease at a unique checkpoint

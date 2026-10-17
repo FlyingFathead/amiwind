@@ -9,7 +9,7 @@
 | Where | Remote console log (console.c, Con_DebugLog) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31-dev5, v0.0.31 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | low: Debug log keeps only the last message. |
 | Family | Debug commands and remote control (`debug-commands`) |
 | Playtest version | v0.0.31 |

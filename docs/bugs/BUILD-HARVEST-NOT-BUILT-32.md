@@ -9,7 +9,7 @@
 | Where | builder harvest stage (tools/harvest_build.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | high: A from-scratch build ships no harvestable mushrooms. |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | Playtest version | v0.0.31 |
@@ -38,7 +38,7 @@
 ## Status: 8 October 2026
 
 Fixed in source on v0.0.32-harvest (not shipped at the time of writing; a finished from-scratch image is still to
-confirm it). Owner decision 8 October 2026: a default builder step for every map family, with the
+confirm it). Project decision 8 October 2026: a default builder step for every map family, with the
 Seyda Neen catalogues regenerated against the maps the build ships. Found by the builder defaults
 audit (every option and stage compared with the v0.0.31 payload).
 
@@ -177,8 +177,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 Related bugs in other categories:

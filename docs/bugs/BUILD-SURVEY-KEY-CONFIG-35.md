@@ -9,7 +9,7 @@
 | Where | Stage fingerprints: tools/build_cache.py _literal_runs; tools/world_survey.py area_catalogue |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: world-survey (62 s) re-ran despite --reuse-from; world-terrain and CHIM keys moved with any config edit |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.34 release build |

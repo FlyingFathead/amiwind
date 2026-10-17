@@ -175,7 +175,7 @@ your own master file when the image is built.
 
 The original game has no block button: blocking is automatic whenever a shield
 is equipped (the rule above). AmiWind adds a held block, an AmiWind extension
-and the default (owner decision, 11 October 2026):
+and the default (project decision, 11 October 2026):
 
 - Blocking: Hold to block (default, `aw_combat_block 1`). Hold the right mouse
   button (the Block action in Options > Controls) to raise your shield. You

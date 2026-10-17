@@ -60,7 +60,7 @@ class FsUaeTests(unittest.TestCase):
                  contextlib.redirect_stdout(output):
                 _, selected = runner.prepare_launch()
             self.assertEqual(selected, rom)
-            self.assertIn('matches the owner-tested', output.getvalue())
+            self.assertIn('matches the maintainer-tested', output.getvalue())
             self.assertEqual(list(home.rglob('*.fs-uae')), [])
 
     def test_missing_rom_fails_and_different_rom_warns(self):

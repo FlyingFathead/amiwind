@@ -9,7 +9,7 @@
 | Where | dbg tp coordinate targets and help (aw_world.c, aw_scene.c) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | low: Debug only: dbg tp X Y into a CHIM town failed on a pure-CHIM disk; the help offered towns the disk lacks. |
 | Family | Debug commands and remote control (`debug-commands`) |
 

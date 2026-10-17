@@ -9,7 +9,7 @@
 | Where | lava-pools MiniWind, normal collision after diagnostic placement |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev1 (last seen) |
+| Persists in | fixed in v0.0.38 |
 | Severity | low: Debug recovery fails; normal traversal and menu reload not assessed. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -75,7 +75,7 @@ Proposed update in **v0.0.38-dev2**, recorded 2026-10-12 13:44 UTC.
 History clarified 2026-10-12 13:56 UTC: the scoped evidence below does not close the issue.
 Later regressions remain attached to this history and require fresh verification.
 
-Implementation present from v0.0.38-dev2; proposed repair evidence: checked arrival/collision recovery integrated. Native initial and displaced recovery returned to369,688,149 with walking movement state3. Screenshot-state lag and scripted final noclip limit evidence; broader traversal and owner acceptance remain open.
+Implementation present from v0.0.38-dev2; proposed repair evidence: checked arrival/collision recovery integrated. Native initial and displaced recovery returned to369,688,149 with walking movement state3. Screenshot-state lag and scripted final noclip limit evidence; broader traversal and maintainer acceptance remain open.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

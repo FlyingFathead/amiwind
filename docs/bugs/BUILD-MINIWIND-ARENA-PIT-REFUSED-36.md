@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 11 October 2026, in v0.0.36-dev3 |
 | Where | tools/direct_start.py (start resolver), tools/build.py chim_town_commands |
 | Reproduction | always |
@@ -45,7 +45,7 @@ build.
 ## How it happened
 
 The Pit became the Arena's first listed room on v0.0.33-arena-interiors (a8f0568, routed hulls cceb661 and 1b53fbb) and
-reached the v0.0.35 line with the merge eecb4eb (owner decision D1): map `vai000`, built inside `town-vivec_arena`. The
+reached the v0.0.35 line with the merge eecb4eb (project decision D1): map `vai000`, built inside `town-vivec_arena`. The
 direct start was written before that, with the town-table rooms "not converted yet" and a fixed list of two scene files;
 nobody updated it when the rooms arrived. Then CHIM-native areas became the default (BUILD-LEGACY-CHAIN-DEFAULT-36), and
 the Arena's CHIM-native plan dropped `town-vivec_arena` and the room conversion with it. The Vivec stage A run
@@ -131,8 +131,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 Related bugs in other categories:

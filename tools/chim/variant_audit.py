@@ -117,20 +117,12 @@ def reference_stems(path=REFERENCE_MODELS):
     return out
 
 
-def audit_models(models, references=None):
-    """models: [{'name', 'image'}] of a world. Returns the report (see module text)."""
-    from collections import defaultdict
-    references = reference_stems() if references is None else set(references)
-    groups = defaultdict(list)
-    for i, m in enumerate(models):
-        stem, scale, plain, flat, dup = parse_name(m['name'])
-        groups[stem].append({'id': i, 'name': m['name'], 'scale': scale, 'plain': plain, 'flattened': flat,
-                             'dup': dup, 'image': m['image']})
-    report = {'format': 'amiwind-variant-audit-1', 'meshes': len(groups), 'variants': len(models),
-              'compared': 0, 'derived': 0, 'other_reductions': [], 'topology_differences': [], 'failures': [],
-              'references': sorted(references)}
-    for stem in sorted(groups):
-        rows = groups[stem]
+def _audit_groups(task):
+    """Worker of audit_models (or in its process): the rows of a run of meshes, each [stem, rows, reference],
+    in their order: (compared, derived, other reductions, topology differences, failures)."""
+    compared = derived = 0
+    other, topo, failures = [], [], []
+    for stem, rows, reference in task:
         plain = [r for r in rows if r['plain'] and not r['dup']]
         base = next((r for r in plain if r['scale'] == 1.0), None)
         if base is None:
@@ -141,24 +133,68 @@ def audit_models(models, references=None):
         for r in rows:
             if r is base:
                 continue
-            report['compared'] += 1
+            compared += 1
             v, f = decode(r['image'])
             worst = congruent(blen, face_lengths(v, f), r['scale'] / base['scale'])
             row = {'mesh': stem, 'base': base['name'], 'variant': r['name'], 'base_faces': len(bf), 'faces': len(f)}
             if worst is None or worst > ABS_TOL:
                 row['shape_mismatch'] = None if worst is None else round(worst, 6)
-                if stem in references:
-                    report['failures'].append(dict(row, reason='reference model variant is not its base '
-                                                               'transformed (another reduction or a stale record)'))
+                if reference:
+                    failures.append(dict(row, reason='reference model variant is not its base '
+                                                     'transformed (another reduction or a stale record)'))
                 else:
-                    report['other_reductions'].append(row)
+                    other.append(row)
                 continue
-            report['derived'] += 1
+            derived += 1
             if r['flattened']:
                 continue                    # flattening moves faces apart on purpose: shape only
             top = topology(v, f)
             if top['vertices'] != btop['vertices'] or top['open_edges'] != btop['open_edges']:
-                report['topology_differences'].append(dict(row, base_topology=btop, topology=top))
+                topo.append(dict(row, base_topology=btop, topology=top))
+    return compared, derived, other, topo, failures
+
+
+AUDIT_GROUP_BYTES = 4 << 20       # mesh images per audit task on the worker pool
+
+
+def audit_models(models, references=None, jobs=1):
+    """models: [{'name', 'image'}] of a world. Returns the report (see module text). jobs > 1: the meshes are
+    audited in runs on the worker pool (build_parallel.ordered_map, largest first), merged in mesh order: the
+    same report as one process (BUILD-CHIM-STAGE-SERIAL-TAIL-36)."""
+    from collections import defaultdict
+    references = reference_stems() if references is None else set(references)
+    groups = defaultdict(list)
+    for i, m in enumerate(models):
+        stem, scale, plain, flat, dup = parse_name(m['name'])
+        groups[stem].append({'id': i, 'name': m['name'], 'scale': scale, 'plain': plain, 'flattened': flat,
+                             'dup': dup, 'image': m['image']})
+    report = {'format': 'amiwind-variant-audit-1', 'meshes': len(groups), 'variants': len(models),
+              'compared': 0, 'derived': 0, 'other_reductions': [], 'topology_differences': [], 'failures': [],
+              'references': sorted(references)}
+    # runs of meshes in stem order, each about AUDIT_GROUP_BYTES of images (a mesh is never split)
+    tasks, run, size = [], [], 0
+    for stem in sorted(groups):
+        rows = groups[stem]
+        run.append((stem, rows, stem in references))
+        size += sum(len(r['image']) for r in rows)
+        if size >= AUDIT_GROUP_BYTES:
+            tasks.append(run)
+            run, size = [], 0
+    if run:
+        tasks.append(run)
+    jobs = max(1, int(jobs or 1))
+    if jobs > 1 and len(tasks) > 1:
+        from build_parallel import ordered_map
+        done = ordered_map(_audit_groups, tasks, min(jobs, len(tasks)),
+                           cost=lambda t: sum(len(r['image']) for _, rows, _ in t for r in rows))
+    else:
+        done = map(_audit_groups, tasks)
+    for compared, derived, other, topo, failures in done:
+        report['compared'] += compared
+        report['derived'] += derived
+        report['other_reductions'] += other
+        report['topology_differences'] += topo
+        report['failures'] += failures
     return report
 
 

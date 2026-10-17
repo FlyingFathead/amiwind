@@ -69,7 +69,7 @@ note the host load. In-game loading crackle stays under [AUDIO-LOAD-29](BUGS.md#
 ## Start-up and opening music: 7 October 2026
 
 Music start points were moved away from disk-heavy moments, and two
-regressions from that move were found by the owner in v0.0.31-dev3 and
+regressions from that move were found by the maintainer in v0.0.31-dev3 and
 repaired for dev4. Status lives in the [bug register](BUGS.md).
 
 - [AUDIO-03](bugs/AUDIO-03.md): the opening track no longer starts as the ship
@@ -80,7 +80,7 @@ repaired for dev4. Status lives in the [bug register](BUGS.md).
 - [MUSIC-STARTUP-TRACK-31](bugs/MUSIC-STARTUP-TRACK-31.md) (dev3 regression):
   start-up opened a random world track, which then played under the silent
   logo. With a title track in the playlist, start-up now opens nothing.
-  This also explains the old start-up crackle, as the owner spotted: start-up
+  This also explains the old start-up crackle, as the maintainer spotted: start-up
   pre-read a random track, the logo threw it away and opened the title, while
   the logo video streamed from the same disk.
 - [MUSIC-OPENING-CLIP-31](bugs/MUSIC-OPENING-CLIP-31.md) (dev3 regression): the
@@ -104,11 +104,11 @@ candidate still missed 53,312 samples; keeping playback serviced also increased
 total load duration. These are synthetic source experiments, not WinUAE timings.
 Treat this as a mitigation candidate. Ship-to-deck crackle and guard-follow Enter
 jump remain open until target replay; appearance-selection entry already has
-separate owner RC1 acceptance.
+separate maintainer RC1 acceptance.
 
 ## RC1 playtester updates and next mix default: 6 October 2026
 
-Recorded 2026-10-06T13:09:20+00:00. The owner confirms **appearance-selection entry music is
+Recorded 2026-10-06T13:09:20+00:00. The maintainer confirms **appearance-selection entry music is
 fixed on WinUAE in RC1**. The small Enter jump at the prison-ship follow-guard
 prompt remains, and the ship-to-deck load produces OST crackling. These are
 separate acceptance cases: AUDIO-APPEARANCE-29 is accepted, AUDIO-ENTER-29 and
@@ -137,7 +137,7 @@ source restored before compilation.
 
 The synthetic player fixture verifies 30,000 prebuffered stereo frames without
 another file read or synchronous fill, alongside track/tail/history checks.
-Both full host suites and matching Amiga compiles pass. The owner initially
+Both full host suites and matching Amiga compiles pass. The maintainer initially
 reported 5/5 audio in the current WinUAE opening session, then immediately
 qualified that impression because audible trouble remained, mostly at load-ins
 and in heavy scenes. The later report supersedes the initial verdict:
@@ -311,7 +311,7 @@ action plays the opening sample without adding a close action.
 
 ## 5 October: long-stall playback clock recovery, next development source
 
-The owner reports renewed crackling in the dev2 WinUAE playtest, with much less
+The maintainer reports renewed crackling in the dev2 WinUAE playtest, with much less
 in FS-UAE. This renews WIN-05 investigation; it does not establish whether the
 remaining noise comes from guest deadlines, OST reads or the host audio backend.
 The delivered WinUAE template explicitly sets `sound_output=exact`, stereo,
@@ -349,7 +349,7 @@ Both changed C files compile for Amiga 68040; `snd_amiga.c` retains three
 pointer-signedness warnings at the existing audio-device buffer interfaces,
 while `snd_dma.c` reports none in this bounded compile.
 
-The original owner listening report remains OPEN. This is a tested source
+The original maintainer listening report remains OPEN. This is a tested source
 recovery/accounting repair for a future build; sealed dev2 artifacts are
 unchanged. Matched native listening and frame/music profiles remain pending.
 Low late-update counts from the old clock cannot rule out long guest stalls.

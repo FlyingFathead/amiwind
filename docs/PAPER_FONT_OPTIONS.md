@@ -101,7 +101,7 @@ pixel-for-pixel in a host-side comparison. All twelve ordinary bitmap family/siz
 remain byte-identical to dev5. No source or converted font files are distributed.
 
 
-## dev2 owner feedback / dev3 recommendation
+## dev2 maintainer feedback / dev3 recommendation
 
 The supplied Sellus Gravius paper capture still shows rough, broken-looking
 bitmap strokes with the current filled-ink treatment. Prefer conversion using

@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in an unknown version |
 | Where | Night remap tables (engine R_SkyNearest), dark walls and ground |
 | Reproduction | always |
@@ -23,7 +23,7 @@ yet packaged or seen in game.
 ## Symptom
 
 At night, dark walls and ground show scattered dark rust-red speckles on
-near-black, a hue the textures do not have ("this very peculiar hue", owner,
+near-black, a hue the textures do not have ("this very peculiar hue", maintainer,
 Balmora).
 
 ## Where

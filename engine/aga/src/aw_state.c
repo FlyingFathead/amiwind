@@ -5,6 +5,7 @@
 #include <string.h>
 #include "aw_state.h"
 aw_state_t aw_state;
+void (*aw_magic_frame)(float seconds);
 static int key(char out[64],const char *id)
 {
     unsigned char c;int n=0;
@@ -82,6 +83,9 @@ int AW_ItemAdd(aw_state_t *state,const char *id,int32_t count)
         }
         if(old+count==0 && index>=0){
             state->inventory.condition_known&=~(1U<<index);state->inventory.condition[index]=0;
+            state->magic.charge_known&=~(1U<<index);state->magic.charge[index]=0;
+            /* A selected item that leaves the inventory is no longer selected. */
+            if(!strcmp(state->magic.selected,id))memset(state->magic.selected,0,64);
         }
     }
     return 1;

@@ -20,7 +20,7 @@ The full AGA build has three kinds of dependency:
 | Separate public tools | AmigaPorts GCC SDK/vasm, ericw-tools, id Quake-Tools qcc | Amiga executable, BSP maps and QuakeC |
 | Vendored in the repository | meshoptimizer 1.3 simplifier (MIT, `third_party/meshoptimizer`), compiled with the host C++ compiler (build-essential) the first time a build uses it | CHIM mesh method `meshopt+merge` ([mesh methods](chim/MESH_METHODS.md)) |
 
-The terrain-only converter needs Python and the owner's base game data. The
+The terrain-only converter needs Python and the user's base game data. The
 asset-free test image needs Make, the Amiga SDK/vasm and amitools; it does not
 need game data, ROMs, FFmpeg, ericw-tools or qcc. See [CI and dry-run](CI_DRY_RUN.md).
 

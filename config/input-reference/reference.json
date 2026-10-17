@@ -1,6 +1,6 @@
 {
   "schema": "amiwind-game-reference-v1",
-  "reference": "Owner-supplied installation used for checkpoint-017; edition/language not independently certified",
+  "reference": "User-supplied installation used for checkpoint-017; edition/language not independently certified",
   "recorded": "2026-09-28",
   "scope": "File sizes and SHA-256 metadata only; no game content. Current build uses base master/archive, music and selected sounds. Fonts/Splash are optional. Other editions may differ.",
   "shards": [

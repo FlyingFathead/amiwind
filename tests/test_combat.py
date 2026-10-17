@@ -108,7 +108,7 @@ class CombatSourceContractTests(unittest.TestCase):
         self.assertIn('v->block_off', code('aw_combat_rules.c').split('int AW_CombatCanBlock')[1].split('}')[0])
         self.assertIn('bits = aw_combat_buttons (bits);', code('cl_input.c'))
         self.assertIn('AW_CombatGuarding()', code('aw_view.c'))      # the body's block group
-        # The Guard marker is drawn at the lower right, under the viewport (owner 2026-10-15: "underneath the
+        # The Guard marker is drawn at the lower right, under the viewport (maintainer 2026-10-15: "underneath the
         # viewport on the lower right where it is usually"), never under the crosshair; target names remain.
         self.assertIn('aw_combat_guard_marker()', code('aw_ui.c'))
         self.assertIn('AW_UIText(vid.width-6-AW_UIWidth("Guard"),gy,"Guard",-1);', code('aw_ui.c'))

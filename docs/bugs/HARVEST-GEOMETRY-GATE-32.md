@@ -9,7 +9,7 @@
 | Where | Harvest preparation chain (Seyda Neen, intro docks maps) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | medium: The no-baked-mushroom geometry gate was never re-run on the shipped Seyda Neen maps. |
 | Family | Harvestable plants (`harvest`) |
 | Playtest version | v0.0.31 |

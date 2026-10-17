@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.32 |
 | Where | NPC model baker (tools/npc_geometry.py simplify_shape), every humanoid model |
 | Reproduction | always |
@@ -27,7 +27,7 @@ numbers: [MODULAR_NPCS.md](../MODULAR_NPCS.md#joint-seams).
 
 ## Symptom
 
-Owner, 9 October 2026: humanoid bodies sometimes show gaps and openings. Morrowind builds a body
+Maintainer, 9 October 2026: humanoid bodies sometimes show gaps and openings. Morrowind builds a body
 from separate meshes (head, neck, chest, groin, upper arms, forearms, wrists, hands, upper legs,
 knees, ankles, feet; clothing and armour replace some of them) whose rims meet at the joints.
 After conversion the background shows through at some of those joints.

@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-rc1 |
 | Where | engine/aga/src/aw_arena.c setup, aw_menu.c, aw_combat.c |
 | Reproduction | always |
@@ -15,18 +15,18 @@
 | Playtest version | v0.0.33-rc1 |
 | From commit | source 7ae3ea7, engine 7ae3ea7, CHIM world unknown |
 | CHIM engine version | CHIM 0.1.0, engine 7ae3ea7, world format unknown |
-| Unknown because | owner playtest report names no image commit or world format |
-| Build note | owner playtest of a v0.0.33 build; the exact image commit is not in the report |
+| Unknown because | maintainer playtest report names no image commit or world format |
+| Build note | maintainer playtest of a v0.0.33 build; the exact image commit is not in the report |
 
 <!-- END GENERATED FACTS -->
 
 ## Status: 9 October 2026
 
-Open (owner request from the playtest). The original blocks automatically (Block skill roll); a block button would be an AmiWind extension.
+Open (maintainer request from the playtest). The original blocks automatically (Block skill roll); a block button would be an AmiWind extension.
 
 ## Symptom
 
-The owner wants to pick the hit chance mode (AmiWind dice extension or the original rolls) before the fight starts, and the right mouse button to block "as in Morrowind".
+The maintainer wants to pick the hit chance mode (AmiWind dice extension or the original rolls) before the fight starts, and the right mouse button to block "as in Morrowind".
 
 ## Where
 

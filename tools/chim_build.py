@@ -16,6 +16,7 @@ does. tools/build.py runs this as its `chim` stage with --builder chim.
 See docs/chim/WORLD_FORMAT.md.
 """
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -117,8 +118,39 @@ def main(argv=None):
                          '--chim-regions-status')
     ap.add_argument('--chim-regions-status', type=Path, metavar='FILE',
                     help='The CHIM progress tracker file --chim-regions is checked against (cell-progress.json)')
+    ap.add_argument('--pool', choices=('stage', 'batch'), default='stage',
+                    help='Worker pool of the step: stage (default: ONE pool kept from the world conversion to the '
+                         'last gate, every map of the step on the same workers, largest first; the validation\'s '
+                         'whole-world cross-checks split into frame units on it) or batch (the method before '
+                         'v0.0.42: a pool started and stopped for every map, cross-checks on one core); same '
+                         'results (BUILD-CHIM-STAGE-SERIAL-TAIL-36)')
+    ap.add_argument('--stair-walk-area', choices=('owned', 'frame'), default=None,
+                    help='Where a region frame\'s stair walk walks: owned (default: its cell plus the map-switch '
+                         'margin) or frame (the whole frame with its border copies, the method before v0.0.42); '
+                         'sets AMIWIND_STAIR_WALK_AREA (chim.collision.walk_area_mode)')
+    ap.add_argument('--collision-underside', choices=('rule', 'split', 'whole', 'names'), default=None,
+                    help='How a model keeps collision a convex piece closes under an authored ceiling: names '
+                         '(default: a list of mesh names) or the EXPERIMENTAL general rules rule, split, whole '
+                         '(mesh_geometry_env.underside_mode); sets AMIWIND_COLLISION_UNDERSIDE')
+    ap.add_argument('--stair-walk-cache', choices=('records', 'cached', 'full'), default=None,
+                    help='How the stair walk reuses its walks (default: AMIWIND_STAIR_WALK_CACHE, else cached): '
+                         'records (also the known-good stair records shipped with the source; a frame in neither is '
+                         'reported, not walked), cached (walk what changed) or full (walk every frame); sets '
+                         'AMIWIND_STAIR_WALK_CACHE')
+    ap.add_argument('--gate-order', choices=('stairs-first', 'stairs-last'), default='stairs-first',
+                    help='When the stair gate runs among the CHIM checks: stairs-first (default since v0.0.42: right '
+                         'after the validation, before the statistics, heap gate and zone walk; with the stored '
+                         'passes only the frames that changed are walked, so a stair failure stops the step in '
+                         'minutes) or stairs-last (the order before v0.0.42: heap gate and zone walk first, the '
+                         'stair gate last); same reports either way')
     add_jobs(ap)
     a = ap.parse_args(argv)
+    import build_parallel
+    with build_parallel.stage_pool(a.jobs, 'CHIM', mode=a.pool):
+        return _main(ap, a)
+
+
+def _main(ap, a):
     # default Balmora, unless the world holds CHIM region frames only
     areas = list(dict.fromkeys(a.areas or ([] if a.chim_regions or a.chim_regions_cells else ['balmora'])))
     regions_table = None
@@ -167,6 +199,12 @@ def main(argv=None):
     problems = area_problems(areas)
     if problems:
         ap.exit(1, 'Error: %s\n' % '; '.join(problems))
+    if a.stair_walk_area:
+        os.environ['AMIWIND_STAIR_WALK_AREA'] = a.stair_walk_area
+    if a.collision_underside:
+        os.environ['AMIWIND_COLLISION_UNDERSIDE'] = a.collision_underside
+    if a.stair_walk_cache:
+        os.environ['AMIWIND_STAIR_WALK_CACHE'] = a.stair_walk_cache
     from chim.build import build_areas
     from chim.texfx import effect_path
     def build_world():
@@ -190,6 +228,11 @@ def main(argv=None):
     import build_profile      # phase timer: start/end lines with time and cores, never part of a stage key
     with build_profile.phase('CHIM world conversion', '%d areas' % len(areas)):
         build_world()
+    import build_parallel
+    stage = build_parallel.active_stage_pool()
+    if stage is not None:
+        # the conversion's workers hold whole areas' meshes: the checks start on fresh workers (one restart)
+        stage.recycle('world conversion done, its workers released')
     if regions_table is not None:
         a.out.mkdir(parents=True, exist_ok=True)
         (a.out / 'chim-regions.json').write_bytes(chim_regions.dumps(regions_table).encode('utf-8'))
@@ -211,7 +254,8 @@ def main(argv=None):
             src_path = a.out / 'chim-source.json'
             report, world, _ = report_world(a.out, json.loads(src_path.read_text(encoding='utf-8'))
                                             if src_path.is_file() else None, a.palette.read_bytes(),
-                                            jobs=resolve_jobs(a.jobs))
+                                            jobs=resolve_jobs(a.jobs),
+                                            cross_checks='serial' if a.pool == 'batch' else 'pool')
             text = report_text(report)
             (a.out / 'chim-validate.json').write_bytes(text.encode('utf-8'))
             sys.stdout.write(text)
@@ -220,17 +264,60 @@ def main(argv=None):
         if not report['ok']:
             ap.exit(1, 'Error: the CHIM world fails validation (%s)\n' % (a.out / 'chim-validate.json'))
         validated = (world, report['measured'])
-        if a.stats:
-            # Right after validation, while its world is in memory (the gates below never change the world).
-            write_stats(a, build_profile, validated)
-            validated = None
+        # the gates below read the world the validation read (--pool stage), instead of reading and decoding
+        # every file again each (--pool batch: the method before v0.0.42); the same world, the same reports
+        shared = world if a.pool == 'stage' else None
+
+        def stair_gate():
+            """The stair gate and its receipt entries (gate order: --gate-order)."""
+            import json
+            # Every flight of stairs walked on the frame's own collision (COLLISION-STAIR-SLOPE-32).
+            from chim.collision import require_stairs
+            stair_timer = build_profile.phase('CHIM stair gate').__enter__()
+            try:
+                report = require_stairs(a.out, a.jobs, accepted=a.accept_known_stair_findings, world=shared)
+            except ValueError as exc:
+                stair_timer.__exit__(ValueError, exc, None)
+                ap.exit(1, 'Error: %s\n' % exc)
+            reuse = report.get('pass_cache') or {}
+            stair_timer.done('CHIM stair gate: %s (%s steps and ramps tested, %d advisory, %d accepted known; walk %s: '
+                             '%s frames reused, %s walked, %d walked again to check the cache)'
+                             % (report['status'], report.get('tested', 0), len(report.get('advisory_failures', [])),
+                                len(report.get('accepted_known_findings', [])), reuse.get('mode', 'cached'),
+                                reuse.get('reused', 0), reuse.get('walked', '?'), len(reuse.get('sampled', []))))
+            stair_timer.__exit__(None, None, None)
+            # the CHIM receipt records the walk's reuse (BUILD-CHIM-HEAP-GATE-LATE-36)
+            receipt_path = a.out / 'chim-receipt.json'
+            receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+            # (the candidate records this run stored are listed in chim-stairs.json, which the promotion reads)
+            receipt['stair_walk'] = dict({k: v for k, v in reuse.items() if k != 'stored'}, status=report['status'],
+                                         tested=report.get('tested', 0))
+            receipt_path.write_text(json.dumps(receipt, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
+            if a.accept_known_stair_findings:
+                # the receipt records the waiver (private test only)
+                path = a.out / 'chim-receipt.json'
+                receipt = json.loads(path.read_text(encoding='utf-8'))
+                receipt['accepted_known_stair_findings'] = {
+                    'ids': sorted(a.accept_known_stair_findings),
+                    'failures': len(report.get('accepted_known_findings', [])),
+                    'policy': 'private -devN test only (require_private_test_version)'}
+                path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
+        if a.gate_order == 'stairs-first':
+            # Order (B15, v0.0.42): the stair gate first. Its stored passes make an unchanged frame cost nothing, so
+            # the walk is the frames that changed, and a stair failure stops the step before anything else runs.
+            stair_gate()
         import json
         fallback = json.loads((a.out / 'chim-receipt.json').read_text(encoding='utf-8')).get('hull_fallback')
         if fallback:
             print('CHIM hull fallback: chains kept for %s (a ring did not fit with their routed hulls)'
                   % ', '.join(fallback['kept_as_chain']), flush=True)
-        # Order (BUILD-CHIM-HEAP-GATE-LATE-36): the checks that take seconds per frame first (heap, zone walk), the
-        # stair walk (the slowest: about an hour for 270 frames) last, so a ring over the zone stops the stage at once.
+        if a.stats:
+            # While the validation's world is in memory (the gates never change the world).
+            write_stats(a, build_profile, validated)
+            validated = None
+        # Order with --gate-order stairs-last (BUILD-CHIM-HEAP-GATE-LATE-36, the method before v0.0.42): the checks that
+        # take seconds per frame first (heap, zone walk), the stair walk last, so a ring over the zone stops the stage at
+        # once.
         # Every ring fits the engine's CHIM zone: strict, no exceptions (chim.heap).
         from chim.heap import require_heap
         heap_timer = build_profile.phase('CHIM heap gate', '%d frames' % len(areas)).__enter__()
@@ -238,7 +325,8 @@ def main(argv=None):
             # frames in parallel; each frame's result kept by its content key beside the unit cache
             # (CHIM-WORLD-AUDIT-SCALING-33)
             heap = require_heap(a.out, a.sdk, jobs=resolve_jobs(a.jobs),
-                                cache_dir=(a.unit_cache / 'heap') if a.unit_cache and not a.no_cache else None)
+                                cache_dir=(a.unit_cache / 'heap') if a.unit_cache and not a.no_cache else None,
+                                world=shared)
         except ValueError as exc:
             heap_timer.__exit__(ValueError, exc, None)
             ap.exit(1, 'Error: %s\n' % exc)
@@ -253,7 +341,7 @@ def main(argv=None):
         from chim.zone_sim import require_zone_walk
         walk_timer = build_profile.phase('CHIM zone walk gate').__enter__()
         try:
-            walk = require_zone_walk(a.out, a.sdk, jobs=resolve_jobs(a.jobs))
+            walk = require_zone_walk(a.out, a.sdk, jobs=resolve_jobs(a.jobs), world=shared)
         except ValueError as exc:
             walk_timer.__exit__(ValueError, exc, None)
             ap.exit(1, 'Error: %s\n' % exc)
@@ -262,38 +350,8 @@ def main(argv=None):
             % (w['name'], w['steps'], w['zone_fail'], w['partial'], w['released_band'], w['released_ring'],
                w['model_loads']) for w in walk.get('walks', []))))
         walk_timer.__exit__(None, None, None)
-        # Every flight of stairs walked on the frame's own collision (COLLISION-STAIR-SLOPE-32).
-        from chim.collision import require_stairs
-        stair_timer = build_profile.phase('CHIM stair gate').__enter__()
-        try:
-            report = require_stairs(a.out, a.jobs, accepted=a.accept_known_stair_findings)
-        except ValueError as exc:
-            stair_timer.__exit__(ValueError, exc, None)
-            ap.exit(1, 'Error: %s\n' % exc)
-        reuse = report.get('pass_cache') or {}
-        stair_timer.done('CHIM stair gate: %s (%s steps and ramps tested, %d advisory, %d accepted known; walk %s: '
-                         '%s frames reused, %s walked, %d walked again to check the cache)'
-                         % (report['status'], report.get('tested', 0), len(report.get('advisory_failures', [])),
-                            len(report.get('accepted_known_findings', [])), reuse.get('mode', 'cached'),
-                            reuse.get('reused', 0), reuse.get('walked', '?'), len(reuse.get('sampled', []))))
-        stair_timer.__exit__(None, None, None)
-        # the CHIM receipt records the walk's reuse (BUILD-CHIM-HEAP-GATE-LATE-36)
-        receipt_path = a.out / 'chim-receipt.json'
-        receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
-        # (the candidate records this run stored are listed in chim-stairs.json, which the promotion reads)
-        receipt['stair_walk'] = dict({k: v for k, v in reuse.items() if k != 'stored'}, status=report['status'],
-                                     tested=report.get('tested', 0))
-        receipt_path.write_text(json.dumps(receipt, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
-        if a.accept_known_stair_findings:
-            # the receipt records the waiver (private test only)
-            import json
-            path = a.out / 'chim-receipt.json'
-            receipt = json.loads(path.read_text(encoding='utf-8'))
-            receipt['accepted_known_stair_findings'] = {
-                'ids': sorted(a.accept_known_stair_findings),
-                'failures': len(report.get('accepted_known_findings', [])),
-                'policy': 'private -devN test only (require_private_test_version)'}
-            path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
+        if a.gate_order == 'stairs-last':
+            stair_gate()
     if a.stats and not a.validate:
         if write_stats(a, build_profile, None) != 0:
             return 1

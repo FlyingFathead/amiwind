@@ -9,7 +9,7 @@
 | Where | tools/npc_anim.py profiles; engine/aga/src/model.c AW_ALIAS_STAGING_LIMIT |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: Frames cost 4 bytes per vertex and actors share no vertices (3 per face); memory decides which groups ship |
 | Family | Map heap and memory budget (`heap-memory`) |
 
@@ -17,7 +17,7 @@
 
 ## Status: 9 October 2026
 
-Open: the owner chooses the shipped profile. Measured on the 15 Balmora exterior residents (v0.0.33
+Open: the maintainer chooses the shipped profile. Measured on the 15 Balmora exterior residents (v0.0.33
 MiniWind inputs): idle 3.21 MB in all; react +0.70 MB; move +1.93 MB; full 7.17 MB (+3.96 MB).
 
 ## Symptom

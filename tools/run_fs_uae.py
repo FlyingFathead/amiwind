@@ -97,9 +97,9 @@ def prepare_launch(kickstart=None, *, interactive=False):
     digest = rom_sha256(rom)
     print(f'Kickstart ROM: {rom}\nSHA-256: {digest}', flush=True)
     if digest == REFERENCE_ROM_SHA256:
-        print('[ok] SHA-256 matches the owner-tested Kickstart 3.1 A1200 ROM.', flush=True)
+        print('[ok] SHA-256 matches the maintainer-tested Kickstart 3.1 A1200 ROM.', flush=True)
     else:
-        print('[warning] ROM checksum differs from the owner-tested Kickstart 3.1 A1200 ROM. '
+        print('[warning] ROM checksum differs from the maintainer-tested Kickstart 3.1 A1200 ROM. '
               'Continuing with your supplied file; compatibility is unverified.', flush=True)
     # Validate the same preset that the launcher will use, without writing files.
     configuration(Path('/placeholder/AmiWind.hdf'), rom)

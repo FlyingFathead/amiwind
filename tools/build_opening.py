@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a private 68000 opening and terrain walk from the owner's assets."""
+"""Build a private 68000 opening and terrain walk from the maintainer's assets."""
 import argparse
 import hashlib
 import json

@@ -21,13 +21,13 @@ This audit does not claim an exhaustive inventory of original map-related artwor
 
 ## What AmiWind already provides
 
-[world_progress_background.py](../tools/world_progress_background.py) already generates local-use backgrounds from the owner's master: `topo` uses detailed terrain heights, `world` uses `LAND.WNAM` with the established dark-map palette, and `cells` writes terrain plus original placement metadata. The output image sidecar contains `bounds`, `pixels_per_cell` and `style` in a common north-up cell frame.
+[world_progress_background.py](../tools/world_progress_background.py) already generates local-use backgrounds from the maintainer's master: `topo` uses detailed terrain heights, `world` uses `LAND.WNAM` with the established dark-map palette, and `cells` writes terrain plus original placement metadata. The output image sidecar contains `bounds`, `pixels_per_cell` and `style` in a common north-up cell frame.
 
-The toolkit's [Island (local) loader](../amiwind-toolkit/world-map.html) accepts PNG and JSON selected by the user, using local file reads and image blob URLs. The documented [local layer workflow](AMIWIND_TOOLKIT.md#your-data) already supports these owner-derived files. Reuse it before adding another loader or map generator.
+The toolkit's [Island (local) loader](../amiwind-toolkit/world-map.html) accepts PNG and JSON selected by the user, using local file reads and image blob URLs. The documented [local layer workflow](AMIWIND_TOOLKIT.md#your-data) already supports these maintainer-derived files. Reuse it before adding another loader or map generator.
 
 The toolkit's current Local close-up is terrain shading plus placement dots. It is not a textured OpenMW local-map render. Likewise, a WNAM-derived background is not an original-save RGB image and is not proof of exact rendered palette parity. Keep those labels distinct.
 
-## Load an owner-supplied reference background
+## Load an user-supplied reference background
 
 The existing server and file picker support this already; no additional image loader is required.
 
@@ -56,7 +56,7 @@ Validation used synthetic data through the real local HTTP handler: exact image/
 ## Bounded implementation plan
 
 1. Keep original assets, original/save-derived images, extracted exploration masks and detailed placement JSON outside public source and public exports. Publish only code, schemas and sanitized findings. The existing background generator already states that its game-derived outputs must not be committed or published.
-2. Start with the existing private `world` PNG and its matching bounds sidecar. For an owner-supplied PNG, supply a calibrated sidecar in the same format; confirm the loader's chosen style and image orientation. Do not infer world bounds just from image dimensions.
+2. Start with the existing private `world` PNG and its matching bounds sidecar. For an user-supplied PNG, supply a calibrated sidecar in the same format; confirm the loader's chosen style and image orientation. Do not infer world bounds just from image dimensions.
 3. Record private input hashes, content/plugin identity, bounds, resolution, source type and whether exploration is baked into the image. Preserve original pixels. Apply the coordinate transform in the viewer rather than repainting evidence. One exterior cell is 8192 original units; the current converted scale is 0.25. Test corners, the origin and at least two known landmarks, including the image's top-down Y orientation.
 4. Keep the reference background, exploration mask, town/subcell footprints and converted/audited/native/packaged status as separate layers. Showing an original area on the reference map must never increase conversion or acceptance counts. Existing partial-cell coverage diagrams remain separate project-generated evidence.
 5. If an exact saved original map is needed, add a small private `.ess` FMAP reader/export step after validating the stored RGB size and bounds. This is not implemented here. Do not import local fog by claiming the existing OpenMW importer preserves it.

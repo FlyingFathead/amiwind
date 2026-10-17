@@ -60,7 +60,7 @@ Read the packaged world directory and map inventory. Subtract higher-priority to
 
 ## Repair
 
-Candidate: normal CHIM image assembly now subtracts higher-priority runtime cores and removes fully shadowed legacy BSPs only after checking metadata, entity lumps and included save files for explicit dependencies. Partial cores and CHIM frames remain. Every removal records size, hash and reason; dependencies record retention reasons. Directory indices and metadata remain unchanged. External saves from older builds are not migrated: the existing scene loader refuses unavailable saved scenes. Direct debug loading of retired legacy maps is no longer supported; coordinate teleports resolve the active owner.
+Candidate: normal CHIM image assembly now subtracts higher-priority runtime cores and removes fully shadowed legacy BSPs only after checking metadata, entity lumps and included save files for explicit dependencies. Partial cores and CHIM frames remain. Every removal records size, hash and reason; dependencies record retention reasons. Directory indices and metadata remain unchanged. External saves from older builds are not migrated: the existing scene loader refuses unavailable saved scenes. Direct debug loading of retired legacy maps is no longer supported; coordinate teleports resolve the active maintainer.
 
 ## Verification
 
@@ -79,7 +79,7 @@ Extend the final payload check beyond duplicate filenames to runtime reachabilit
 
 ## Pre-conversion ownership checklist, 13 October 2026
 
-The final-image cleanup alone does not prevent wasted conversion. The dev1 candidate inventories every original exterior CELL and height-bearing LAND record before any build stage and records its BSP or CHIM owner. Town cores follow the existing town-first routing rectangles in `aw_world.c`; partial cells explicitly keep their required BSP remainder and rendering apron. Selected CHIM regions are unchanged from the chosen build recipe.
+The final-image cleanup alone does not prevent wasted conversion. The dev1 candidate inventories every original exterior CELL and height-bearing LAND record before any build stage and records its BSP or CHIM maintainer. Town cores follow the existing town-first routing rectangles in `aw_world.c`; partial cells explicitly keep their required BSP remainder and rendering apron. Selected CHIM regions are unchanged from the chosen build recipe.
 
 Terrain resolves each subdivided map against that checklist before invoking a compiler. Fully town-owned cores retain their stable directory IDs but produce no legacy BSP. Scenery and flora take the same checklist, verify it against the terrain receipt, and skip those cores too. Missing placements are allowed only where their source positions belong to CHIM; an outside placement still fails coverage. Interiors are absent from this exterior ownership calculation.
 
@@ -115,8 +115,8 @@ size are distinct measurements; these figures do not identify a final039 ZIP.
 RC1 package and matching source delivery finalized on 13 October 2026 at
 18:06:05 UTC (21:06 in Finland), with source `57a8699` and image `fbf9a6c`
 kept distinct. The six partial overlaps remain outside the shipped whole-cell
-count. Final v0.0.39 remains in preparation pending explicit owner inspection
-approval; RC1 shipment does not supply owner or universal gameplay acceptance.
+count. Final v0.0.39 remains in preparation pending explicit maintainer inspection
+approval; RC1 shipment does not supply maintainer or universal gameplay acceptance.
 
 Conversion/audit data is the unchanged 13 October 2026, 14:04:49 UTC snapshot:
 1,190 converted cells including 15 failed audits, 99 empty sea, three not

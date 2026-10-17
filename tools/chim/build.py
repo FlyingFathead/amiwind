@@ -55,7 +55,7 @@ def wad_lumps(wad):
 # settings (cut_models_over, e.g. 512: district-size bodies such as the Vivec cantons).
 CUT_MODELS_OVER = 0.0
 # Meshes the large-model cut keeps whole even when they are wider than cut_models_over: variant name prefixes
-# (the mesh path without 'meshes/'). Owner decision 2026-10-10 (Vivec M3): flora stays whole until tiling it is
+# (the mesh path without 'meshes/'). Project decision 2026-10-10 (Vivec M3): flora stays whole until tiling it is
 # measured (24 wide trees and 31 parasols around Vivec). An area may set its own list (cut_keep_whole).
 CUT_KEEP_WHOLE = ('f/flora_',)
 # Area config keys of the cut (config/<town>.json): the area's own value unless the build names one for every
@@ -819,6 +819,8 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
     else:
         cache = UnitCache((Path(unit_cache) if unit_cache else out / 'work' / 'chim-units') if use_cache else None)
     pal_bytes = Path(palette).read_bytes()
+    from chim import source_memo
+    source_memo.install()       # the areas prepared here reuse the model reads and master parse (B5)
     harvest_set = harvest_numbers(harvest, data) if harvest else set()
     specs, sections, parity, meshes = [], [], {}, 0
     # CHIM region frames (one cell each, registered generated areas) are prepared side by side, one area per
@@ -830,8 +832,20 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
     regional = [t for t in areas if t in generated]
     prepared = {}
     if len(regional) > 1 and jobs > 1:
-        prepared = prepare_areas_parallel(regional, generated, data, out, pal_bytes, qbsp, jobs, cache, timer,
-                                          settings_override, rebuild_meshes, mesh_occluders, harvest_set, flora)
+        # The towns too, first, each on one worker, beside the region frames (B5, v0.0.42): prepared after them
+        # with the whole budget they kept 1-5 of 24 cores busy for 2-3 minutes (dev5). With few region frames
+        # (a sandbox) or AMIWIND_CHIM_TOWN_PREP=after (the method before v0.0.42) they still follow, one after
+        # another, with every worker. Same frames either way.
+        towns = [t for t in areas if t not in generated] if towns_beside(len(regional), jobs) else []
+        import build_profile      # timed phases: start/end lines with time and cores (never part of a key)
+        with build_profile.phase('CHIM world: areas side by side', '%d region frames, %d towns'
+                                 % (len(regional), len(towns))):
+            prepared = prepare_areas_parallel(towns + regional, generated, data, out, pal_bytes, qbsp, jobs, cache,
+                                              timer, settings_override, rebuild_meshes, mesh_occluders, harvest_set,
+                                              flora, legacy_run=legacy_run)
+    import build_profile
+    turn = [t for t in areas if t not in prepared]
+    turn_timer = build_profile.phase('CHIM world: areas in turn', '%d areas' % len(turn)).__enter__() if turn else None
     for town in areas:
         if town in prepared:
             spec, section, parity[town], count = prepared.pop(town)
@@ -858,6 +872,8 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
         specs.append(spec)
         sections.append(section)
         meshes += count
+    if turn_timer is not None:
+        turn_timer.__exit__(None, None, None)
     from chim.apron_policy import reconcile
     apron_dispositions = reconcile(specs, sections, out, set(regional), flora)
     from chim.apron_policy import supplement_seyda
@@ -1113,31 +1129,56 @@ def _area_cache(cache):
     return clone
 
 
+TOWN_PREP_ENV = 'AMIWIND_CHIM_TOWN_PREP'
+TOWN_PREP_MODES = ('beside', 'after')
+# Towns go beside the region frames only when the region frames fill the workers many times over (a town on one
+# worker takes several times its wall time with every worker).
+TOWNS_BESIDE_FRAMES_PER_JOB = 4
+
+
+def towns_beside(regional, jobs):
+    """True when the towns are prepared beside `regional` region frames on `jobs` workers (B5)."""
+    mode = os.environ.get(TOWN_PREP_ENV, 'beside')
+    if mode not in TOWN_PREP_MODES:
+        raise ValueError('%s=%s: choose %s' % (TOWN_PREP_ENV, mode, ' or '.join(TOWN_PREP_MODES)))
+    return mode == 'beside' and jobs > 1 and regional >= TOWNS_BESIDE_FRAMES_PER_JOB * jobs
+
+
 def _prepare_area_task(task):
-    """Worker of prepare_areas_parallel: one generated area prepared with one job, its early frame checks and
-    its timing and unit counts."""
+    """Worker of prepare_areas_parallel: one area (a generated region frame, or a town) prepared with one job,
+    its early frame checks and its timing and unit counts."""
     (town, settings, data, work, pal_bytes, qbsp, cache, settings_override, rebuild_meshes, mesh_occluders,
-     harvest_set, flora) = task
+     harvest_set, flora, legacy_run) = task
     from town_config import register_generated
     from chim.validate import early_frame_failures
-    register_generated([settings])
+    from chim import source_memo
+    source_memo.install()       # this worker's later areas reuse its model reads and master parse (B5)
+    if settings is not None:
+        register_generated([settings])
     timer = Timer()
-    spec, section, parity, count = prepare_area(town, data, work, pal_bytes, qbsp, 1, cache, timer,
-                                                settings_override, rebuild_meshes, mesh_occluders, harvest_set,
-                                                flora)
+    if town == 'seyda':
+        from chim import seyda
+        spec, section, parity, count = seyda.prepare_area(legacy_run, data, work, pal_bytes, qbsp, 1, cache, timer,
+                                                          settings_override, rebuild_meshes, mesh_occluders,
+                                                          harvest_set, flora)
+    else:
+        spec, section, parity, count = prepare_area(town, data, work, pal_bytes, qbsp, 1, cache, timer,
+                                                    settings_override, rebuild_meshes, mesh_occluders, harvest_set,
+                                                    flora)
     with timer.section('early frame checks'):
         early = early_frame_failures(spec, section, town, 1)
     return (spec, section, parity, count), early, timer.sections, cache.stats, getattr(cache, 'pool_stats', None)
 
 
 def prepare_areas_parallel(towns, generated, data, out, pal_bytes, qbsp, jobs, cache, timer, settings_override,
-                           rebuild_meshes, mesh_occluders, harvest_set, flora):
-    """{town: prepare_area result} of generated areas (CHIM region frames), one area per worker
+                           rebuild_meshes, mesh_occluders, harvest_set, flora, legacy_run=None):
+    """{town: prepare_area result} of generated areas (CHIM region frames) and towns, one area per worker
     (BUILD-CHIM-STAGE-IDLE-START-36). The first frame whose early checks fail stops the stage, named; unit
-    counts and timings are merged into the caller's cache and timer."""
+    counts and timings are merged into the caller's cache and timer. Towns (not generated) are listed first,
+    so they start first."""
     from build_parallel import ordered_map
-    tasks = [(t, generated[t], data, out / 'work' / t, pal_bytes, qbsp, _area_cache(cache), settings_override,
-              rebuild_meshes, mesh_occluders, harvest_set, flora) for t in towns]
+    tasks = [(t, generated.get(t), data, out / 'work' / t, pal_bytes, qbsp, _area_cache(cache), settings_override,
+              rebuild_meshes, mesh_occluders, harvest_set, flora, legacy_run) for t in towns]
     results = {}
     with timer.section('region frames (side by side)'):
         for town, (result, early, sections, stats, pool_stats) in zip(
@@ -1194,11 +1235,23 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     everywhere = everywhere_recipe(recipes)
     archive = work / 'scenery/scenery.mwpak'
     budget = detail_budget(area_cut_settings(settings, settings_override).get('detail_budget'))
+    from mesh_geometry import UNDERSIDE_DEPTH
+    from mesh_geometry_env import underside_mode
+    underside = underside_mode()
     for mi, model in enumerate(index['models']):
-        profile = town_model_profile(group[model['source']], model['source'], model['triangles'])
+        profile = town_model_profile(group[model['source']], model['source'], model['triangles'],
+                                     underpass_names=underside == 'names')
         # CHIM models take the stair-plate rules (mesh_geometry.collision_pieces; legacy open-world maps do not,
         # BUILD-FLORA-STAIR-PLATES-BUDGET-36)
         profile['stair_plates'] = True
+        if underside == 'whole':
+            profile['underside_whole'] = UNDERSIDE_DEPTH
+        elif underside in ('rule', 'split'):
+            # a convex piece reaching more than a unit below an authored downward surface becomes authored plates
+            # (CHIM-VOS-TEMPLE-WALKWAY-41; replaces the name list town_regions.UNDERPASS_NAMES)
+            profile['underside_plates'] = UNDERSIDE_DEPTH
+            if underside == 'split':
+                profile['underside_split'] = True
         if model['source'] in flatten:
             profile['flatten'] = flatten[model['source']]
         target = budget.get(model['source'].replace(chr(92), '/').lower())
@@ -1213,7 +1266,7 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         model_recipe = model.get('_visual_recipe', recipe_name)
         if model_recipe:
             profile = apply_recipe(profile, model, model_recipe, recipes)
-        # the everywhere recipe (owner 2026-10-16: the streetlight lantern replaced in every cell) for the meshes the
+        # the everywhere recipe (maintainer 2026-10-16: the streetlight lantern replaced in every cell) for the meshes the
         # cell's own recipe left as they were; AMIWIND_VISUAL_EVERYWHERE=off keeps the originals
         if everywhere and 'visual_recipe' not in profile:
             profile = apply_recipe(profile, model, everywhere, recipes)

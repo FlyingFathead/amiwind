@@ -1,7 +1,7 @@
 # Map optimization findings: 4 October 2026
 
 Companion to [AmiWind Map Optimization Toolkit](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md).
-This integrates the owner's supplied documentation draft with measured local
+This integrates the maintainer's supplied documentation draft with measured local
 artifacts and host tests. Public summaries contain no game geometry or private
 host paths. The supplied draft and independent reviews remain unchanged in the
 private archive. Diagnostic numbers are experiment identifiers, not game releases.
@@ -110,7 +110,7 @@ where crossing-fragment growth was retained, 960 collision semantic checks, and
 was not overwritten, and target loader/heap acceptance remained pending. This
 older receiver was compiled BSP LAND, not the later globally aligned canonical
 topomap surface; its removals are historical evidence for that limited trial,
-not acceptance of the owner-required canonical-terrain pass.
+not acceptance of the maintainer-required canonical-terrain pass.
 
 Unlike the supplied draft's derived total, 023's size above is now measured.
 It remains 6,019 faces and 412,288 disk bytes larger than the original production

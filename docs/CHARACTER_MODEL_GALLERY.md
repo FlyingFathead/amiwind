@@ -22,7 +22,7 @@ coverage and protected model quality remain mandatory.
 Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
 reduced or bypassed, including model/asset generation, catalogue coverage,
 quality and validation, without a specific documented case or scenario **and
-explicit approval from the project owner**. A builder or contributor cannot
+explicit approval from the project maintainer**. A builder or contributor cannot
 approve its own exception. Build time, disk pressure and convenience do not
 supply that approval. An opt-out flag is a mechanism for an approved exceptional
 debugging case, not permission to choose that exception independently.
@@ -66,7 +66,7 @@ way to inspect and regression-test that content; omitting it is not a valid
 content optimization. Share/cache converted assets with verified dependencies
 instead of removing coverage. The current demake does not yet place every original world reference.
 
-Only the owner's explicit `--no-npc-gallery` permits a **debugging-only** build
+Only the maintainer's explicit `--no-npc-gallery` permits a **debugging-only** build
 without the inspection gallery. It must never remove required game NPCs, models,
 placements, dialogue or dependencies, and must never become the normal default.
 Such an image carries `id1/npc-gallery-disabled.txt`; the gallery commands
@@ -156,7 +156,7 @@ shared names can have different outfits, and many distinct residents can share
 one appearance. Dialogue and world placement still need their own checks.
 
 An optional private `--reviews` JSON maps a model key to `sha256`, `status`
-(`accepted` or `rejected`) and any owner notes. Only a matching content checksum
+(`accepted` or `rejected`) and any maintainer notes. Only a matching content checksum
 carries the decision into the next table. A changed asset returns to `unreviewed`;
 conversion success alone never means visual acceptance.
 
@@ -209,7 +209,7 @@ It is a debugging and regression-inspection tool, not optional content selected
 silently by the builder. A missing catalogue, selected model, footprint,
 inspection map or budget receipt fails the default build.
 
-Only the owner's explicit `--no-npc-gallery` flag permits an exceptional
+Only the maintainer's explicit `--no-npc-gallery` flag permits an exceptional
 debugging build without it, for example to isolate a gallery-specific failure.
 This must not be used as a time/space optimization. The build receipt, final
 summary and image metadata record the choice; the console explains

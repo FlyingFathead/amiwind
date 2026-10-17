@@ -1,12 +1,12 @@
-# CONSOLE-HISTORY-ARROWS-32: Console Up/Down arrows recall nothing on the owner's FS-UAE (Ubuntu)
+# CONSOLE-HISTORY-ARROWS-32: Console Up/Down arrows recall nothing on the maintainer's FS-UAE (Ubuntu)
 
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 8 October 2026, in v0.0.32-dev1 |
-| Where | Console Up/Down history on the owner's FS-UAE (Ubuntu) |
+| Where | Console Up/Down history on the maintainer's FS-UAE (Ubuntu) |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.32-dev1 (last seen) |
@@ -36,16 +36,16 @@
 
 ## Status: 8 October 2026
 
-Open. Reported on v0.0.32-dev1. The arrows reach the game on the owner's
+Open. Reported on v0.0.32-dev1. The arrows reach the game on the maintainer's
 machine; the most likely cause is the engine defect
 [CONSOLE-HISTORY-EMPTY-32](CONSOLE-HISTORY-EMPTY-32.md), fixed in source and
-not yet in a build the owner has played.
+not yet in a build the maintainer has played.
 
 ## Symptom
 
-Owner, v0.0.32-dev1, FS-UAE on Ubuntu 24.04 with a real keyboard: in the
+Maintainer, v0.0.32-dev1, FS-UAE on Ubuntu 24.04 with a real keyboard: in the
 console, the Up and Down arrows do nothing (no history recall, nothing else
-visible). Keypad 8 and 2 type digits with Num Lock on or off. The owner
+visible). Keypad 8 and 2 type digits with Num Lock on or off. The maintainer
 remembers the history working a few versions earlier, when playing in WinUAE.
 
 ## Where
@@ -67,7 +67,7 @@ Ruled out by reading and by test:
 
 ## How it happened
 
-Not proven. The owner's `aw_input_trace 1` on dev1 (FS-UAE, mouse grabbed)
+Not proven. The maintainer's `aw_input_trace 1` on dev1 (FS-UAE, mouse grabbed)
 shows the keys arriving: `Input raw 77 qualifier 32768` / `205` for Down and
 `76` / `204` for Up, after the `196` release of the Return that enabled the
 trace. Qualifier 32768 is `IEQUALIFIER_RELATIVEMOUSE`; the engine reads only
@@ -82,7 +82,7 @@ looks exactly like "the arrows do nothing".
 A keyboard joystick gives the same complaint by another route: with
 `joystick_port_1 = keyboard`, or the line missing (FS-UAE's `auto` then falls
 back to keyboard emulation), FS-UAE uses the cursor keys and Right Ctrl/Right
-Alt as the joystick and the game never sees them (no trace line). The owner's
+Alt as the joystick and the game never sees them (no trace line). The maintainer's
 trace rules this out for his machine.
 
 ## Why it was not caught
@@ -106,9 +106,9 @@ disks:
 
 Second round, same day:
 
-- The owner's key order (Return, Down x4 with one repeated press, Up, Down)
+- The maintainer's key order (Return, Down x4 with one repeated press, Up, Down)
   with qualifier 32768, made by clicking into the window and moving the mouse
-  first: the trace matches the owner's line for line, and Up recalls the last
+  first: the trace matches the maintainer's line for line, and Up recalls the last
   command.
 - Same disks with the FS-UAE preset changed, one change each: without the
   `joystick_port_1` line (log: `configuring joystick port 1 (auto)`, `could
@@ -142,14 +142,14 @@ in the console, `aw_input_trace 1`, press Up and Down, then
 
 ## Verification
 
-Owner trace received (keys arrive). Pending: the owner checks Up and Down on
+Maintainer trace received (keys arrive). Pending: the maintainer checks Up and Down on
 the next build that contains the CONSOLE-HISTORY-EMPTY-32 repair.
 
 ## Prevention
 
 `tests/aga_console_history_test.c` drives Up and Down as native raw keys and
 qualifiers through `Key_Event` into the console history, with the default
-`+forward`/`+back` bindings on the arrows, and replays the owner's trace
+`+forward`/`+back` bindings on the arrows, and replays the maintainer's trace
 with qualifier 32768. `tests/test_fsuae_keyboard_ports.py` keeps
 `joystick_port_1 = none` in every shipped FS-UAE configuration.
 

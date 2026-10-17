@@ -118,7 +118,7 @@ only when supported and valid, including disjoint checks. CPU submission timing
 is a different measurement. Host GPU frame rate must not be presented as Amiga FPS.
 
 CUDA/ray-tracing acceleration is an optional backend to evaluate after profiling
-the first implementation. The owner's CUDA-accelerated QCC/compiler idea belongs
+the first implementation. The maintainer's CUDA-accelerated QCC/compiler idea belongs
 to the same host-compute research direction, but it is a separate proposal:
 profile actual compiler stages, identify sufficiently parallel work and account
 for transfer/setup cost. Neither a CUDA compiler speedup nor a CUDA visibility

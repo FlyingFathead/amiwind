@@ -4,7 +4,7 @@ Normal builds and image recovery MUST include the complete NPC/creature gallery.
 This optimization reuses verified conversion work; it never omits models,
 reduces catalogue coverage, changes polygon budgets or bypasses validation.
 Any exception to either gallery's mandatory coverage/quality requires a specific
-documented case and explicit approval from the project owner, outside the builder.
+documented case and explicit approval from the project maintainer, outside the builder.
 Build time, disk pressure and convenience are not approval.
 
 <!-- contents start -->
@@ -120,7 +120,7 @@ work, not claimed implementations in rc10.
 
 ## Original heads
 
-Owner decision (9 October 2026): NPC heads keep their original geometry, as
+Project decision (9 October 2026): NPC heads keep their original geometry, as
 Dagoth Ur's mask does. The previous whole-model bake fitted a humanoid into 480
 triangles and decimated the head with everything else, which left faces
 unrecognisable (Fargoth; [NPC-HEAD-DECIMATION-33](bugs/NPC-HEAD-DECIMATION-33.md)).
@@ -137,7 +137,7 @@ budget bake gave it, so the body is never thinner than in the budget model.
 Shapes smaller than a tenth of the actor's height are details (floor 4). The
 face limit rises only as far as needed: the smallest of 666, 777 and 1,024 that
 holds the model. When even 1,024 is tight, triangles come off in this order
-(owner, 9 October 2026), each class down to its floors: (1) the hair or helmet,
+(maintainer, 9 October 2026), each class down to its floors: (1) the hair or helmet,
 (2) small details, (3) the torso, (4) the limbs. An overshoot measured in a bake
 comes off the same way before any texture work. If the head and every floor do
 not fit, the appearance is "LOD only": it gets the budget model, recorded in the
@@ -153,7 +153,7 @@ the body a quarter of the texels of the budget model).
 
 **The switch:** `--npc-head-detail auto|original|budget` (build config
 `npc_head_detail`; shipped default `auto`), exported to every converter as
-`AMIWIND_NPC_HEAD_DETAIL`. Owner decision (9 October 2026): original heads ship
+`AMIWIND_NPC_HEAD_DETAIL`. Project decision (9 October 2026): original heads ship
 through the near/far NPC levels only, so `auto` is `budget` while `--npc-lod` is
 on (the map model stays the budget bake; the near level bakes the original head)
 and `original` when it is off. `original` and `budget` select one bake for every
@@ -169,7 +169,7 @@ one per model; the image step now adds one for every such model outside the
 gallery (world residents, combat and guard models), after the guard torches
 (`audit_gallery_budgets.world_allowances`, receipt `world-model-budgets.json`).
 
-**Measured** (owner's base master, 9 October 2026; plan arithmetic over every
+**Measured** (maintainer's base master, 9 October 2026; plan arithmetic over every
 appearance with the resident and gallery calls, real bakes for a sample). These
 numbers are for the first version of the rule, which kept head and hair whole and
 left the body unprotected (Fargoth's legs thinned to sticks); the body figures of
@@ -300,10 +300,10 @@ for a complete cold gallery. Both native hand modes compile as asset-free images
 
 ## NPC model levels of detail
 
-Owner decision (9 October 2026): original heads up close and the budget model further
+Project decision (9 October 2026): original heads up close and the budget model further
 away, as a facial level of detail, generalised to several levels that fit a memory
 budget. Implemented in `tools/npc_lod.py` (builder) and `engine/aga/src/aw_npc_lod.c`
-(engine). The measurements below are offline (the bakes on the owner's data); the
+(engine). The measurements below are offline (the bakes on the maintainer's data); the
 emulator frame times are still to come.
 
 ### Levels
@@ -331,7 +331,7 @@ Builder options ([LINUX_BUILD.md](LINUX_BUILD.md#npc-model-levels-of-detail)):
 `--npc-lod-levels 2|3|4` (2: levels 0-1; 3: levels 0-2; 4: levels 0-3),
 `--npc-face-lod all|named|measured|list` and `--npc-lod-disk-mib`. Their defaults are
 `config/build-defaults.json`: off, 3 levels, `all`, 96 MiB. The levels stay off by default until
-the owner has compared them in game (9 October 2026); turning them on by default is a change of
+the maintainer has compared them in game (9 October 2026); turning them on by default is a change of
 that file, not of code.
 
 In game, the console's `dbg npclod` switches the levels live

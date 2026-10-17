@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Recorded stage (optional): ship owner-provided recorded maps byte for byte.
+"""Recorded stage (optional): ship user-provided recorded maps byte for byte.
 
 BUILD-SEYDA-REGEN-30 (closed in v0.0.34): v0.0.31 to v0.0.33 used the recorded
 v0.0.31 Seyda Neen maps because the repository builder could not regenerate the
-Seyda Neen sub-cells (owner decision). From v0.0.34 the builder converts them from
-the owner's data and this input is optional; it is kept as a selectable method.
+Seyda Neen sub-cells (project decision). From v0.0.34 the builder converts them from
+the maintainer's data and this input is optional; it is kept as a selectable method.
 `--seyda-recorded DIR` (tools/build.py, build_aga.py image,
-check_scene_actors.py) names a folder holding them as the owner's own input:
+check_scene_actors.py) names a folder holding them as the maintainer's own input:
 
     DIR/id1/maps/sn000.bsp .. sn063.bsp, intro_docks.bsp, sncourt.bsp
     DIR/id1/seyda-regions.txt, DIR/id1/seyda-regions.json
     DIR/id1/maps/seyda.bsp (optional: recorded, but not shipped, see below)
 
-copied from the owner's v0.0.31 image (boot partition, id1/). Every file must
+copied from the maintainer's v0.0.31 image (boot partition, id1/). Every file must
 match config/seyda-recorded-v0.0.31.json (names, sizes and SHA-256); the files
 themselves are never part of the repository or a release source.
 
@@ -22,12 +22,12 @@ the recorded set replaces the Seyda region conversion, every later pass that
 would rewrite those maps skips them, and check() after each map pass stops the
 build if any installed file differs from its recorded bytes.
 
-The pin's `aliases` name the one intended difference (owner decision,
+The pin's `aliases` name the one intended difference (project decision,
 8 October 2026, documented on BUILD-SEYDA-REGEN-30): maps/seyda.bsp ships as a
 copy of the fallback region (sn029), as the builder's own region conversion
 writes it, instead of v0.0.31's complete town, whose actor copies the release
 actor gate refuses. Any other change needs the same: named on
-BUILD-SEYDA-REGEN-30 with the owner's reason.
+BUILD-SEYDA-REGEN-30 with the maintainer's reason.
 
     python3 tools/recorded_stage.py check DIR    # verify a folder against the pin
 """

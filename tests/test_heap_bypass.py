@@ -1,4 +1,4 @@
-"""Temporary pre-CHIM heap bypass (HEAP-SEYDA-OVERLAP-32, owner decision A).
+"""Temporary pre-CHIM heap bypass (HEAP-SEYDA-OVERLAP-32, project decision A).
 
 v0.0.32 ships the recorded Seyda Neen maps sn019, sn026 and sn035, which exceed
 the modelled reserve allowance only. The strict heap gate accepts exactly those

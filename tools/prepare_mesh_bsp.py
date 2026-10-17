@@ -28,7 +28,7 @@ NO_FLAMES = os.environ.get('AMIWIND_NO_FLAMES') == '1'
 # door overlays); a collection keeps those fragments only. Each omission is
 # receipted ("omitted"), each retained piece too ("dressing_retained").
 DRESSING_EXCLUDED = ('flora_', 'marker_', 'scum_', 'lantern_hook', 'furn_de_rope')
-# Interiors keep their dressing (owner decision A, BUILD-DRESSING-EXCLUDED-32):
+# Interiors keep their dressing (project decision A, BUILD-DRESSING-EXCLUDED-32):
 # lantern hooks, ropes, potted ferns and grass. Editor markers stay out. The
 # earlier rule (skip all dressing) stays selectable: --skip-dressing.
 INTERIOR_DRESSING = ('flora_', 'scum_', 'lantern_hook', 'furn_de_rope')
@@ -237,12 +237,83 @@ def placement_metadata(ref, prepared, centre=CENTRE, texture_size=64):
     return origin, -ref['rotation_radians'][2]*180/math.pi, low, high
 
 
-def _instance_key(ref, lighting):
+def _instance_key(ref, lighting, unlit=False):
+    """Model key of a placement. A lit placement gets a model of its own (its lightmap is baked where it stands),
+    unless the map's lighting is shared_ambient or the placement is unlit: no light reaches it (unlit_placement),
+    so its lightmap is the cell's ambient everywhere and equal placements share one model."""
     key=(ref['model_index'],round(ref['scale'],6),round(ref['rotation_radians'][0],6),round(ref['rotation_radians'][1],6))
     # Tilt and yaw do not commute. Flat instances can still share one bake.
     if any(abs(math.sin(a))>1e-7 or math.cos(a)<0 for a in ref['rotation_radians'][:2]):
         key=(*key,round(ref['rotation_radians'][2],6))
-    return (*key,ref['number']) if lighting and not lighting.get('shared_ambient') else key
+    return (*key,ref['number']) if lighting and not lighting.get('shared_ambient') and not unlit else key
+
+
+# Same-lit placements share one model (v0.0.42 plan 2.1, INTERIOR-INLINE-LIMIT-31). "unlit" (the default): a lit
+# map's placement that no light can reach shares its model with the equal placements (unlit_placement: its
+# lightmap is the cell ambient on every sample, so the shared model draws exactly what each own model drew).
+# "off": the earlier rule, every lit placement its own model.
+SHARED_AMBIENT_ENV = 'AMIWIND_SHARED_AMBIENT'
+SHARED_AMBIENT_MODES = ('unlit', 'off')
+
+
+def shared_ambient_mode():
+    value = os.environ.get(SHARED_AMBIENT_ENV, '') or 'unlit'
+    if value not in SHARED_AMBIENT_MODES:
+        raise ValueError('%s must be one of %s, not %r' % (SHARED_AMBIENT_ENV, ', '.join(SHARED_AMBIENT_MODES), value))
+    return value
+
+
+def _sample_reach(polys, scale, texsize):
+    """Upper bound (map units) of how far a lightmap sample of these faces lies from the face itself: the bake
+    grid reaches less than 16 lightmap units past the face on each axis (interior_lighting.bake_grid), and a
+    point that far in lightmap units lies at most |(16, 16)| / smallest singular value of the face's
+    texture-axes-and-normal matrix away in the plane. inf for a face whose mapping has no inverse (its one sample
+    is the face centre: 0 would do; inf keeps it conservative)."""
+    reach = 0.
+    for _, _, axes, _, normal in polys:
+        matrix = np.vstack(((axes / scale * texsize).T, np.asarray(normal, float) / max(np.linalg.norm(normal), 1e-12)))
+        smallest = float(np.linalg.svd(matrix, compute_uv=False)[-1])
+        if smallest <= 1e-9:
+            return math.inf
+        reach = max(reach, 16 * math.sqrt(2) / smallest)
+    return reach
+
+
+def unlit_placement(ref, prepared, lighting, centre, texsize, cache=None):
+    """True when no light of a lit map can light any lightmap sample of this placement, so its baked lightmap is
+    the cell ambient alone on every sample (point_light), whatever its position: no zones (they scale by
+    position), no texinfo snap (its rebakes use other mappings), not a light itself, and every light farther from
+    the placement's bounding sphere (vertices, faces, visual offset, flatten shift) plus the sample reach than the
+    light's own reach (radius, twice the radius with the original falloff; off-by-default lights give none)."""
+    from interior_lighting import OFF_BY_DEFAULT
+    if not lighting or lighting.get('zones') or ref.get('light') or scenery_reduce.texinfo_snap() is not None:
+        return False
+    v, f, polys, components, lod = prepared
+    scale = ref['scale']
+    key = (ref['model_index'], round(scale, 6), texsize)
+    if cache is not None and key in cache:
+        extent = cache[key]
+    else:
+        extent = 0.
+        if len(v):
+            extent = float(np.linalg.norm(np.asarray(v)[:, :3], axis=1).max()) * SCALE * scale
+        for polygon, *_ in polys:
+            extent = max(extent, float(np.linalg.norm(np.asarray(polygon), axis=1).max()) * scale)
+        extent += _sample_reach(polys, scale, texsize)
+        if cache is not None:
+            cache[key] = extent
+    if not math.isfinite(extent):
+        return False
+    extent += float(np.linalg.norm(ref.get('_visual_offset', [0, 0, 0]))) * scale + abs(ref.get('_flatten_shift', 0)) + 1.
+    origin = (np.array(ref['position']) - np.array([*centre, 0])) * SCALE
+    factor = 2. if lighting.get('falloff', 'linear') == 'original' else 1.
+    for light in lighting.get('lights', ()):
+        radius = light['radius'] * .25
+        if radius <= 0 or light.get('flags', 0) & OFF_BY_DEFAULT:
+            continue
+        if float(np.linalg.norm(np.array(light['position']) * .25 - origin)) <= extent + factor * radius:
+            return False
+    return True
 
 
 def _stable_face_normal(points):
@@ -608,9 +679,18 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
     mount_references(index,selected,models,centre,SCALE)
     from visual_offsets import apply_visual_offsets, visual_key
     apply_visual_offsets(index,selected)
+    # Same-lit placements share one model (shared_ambient_mode; INTERIOR-INLINE-LIMIT-31).
+    share_unlit=bool(lighting) and not lighting.get('shared_ambient') and shared_ambient_mode()=='unlit'
+    unlit_refs={};extent_cache={}
+    def lit_key(ref):
+        if share_unlit and ref['number'] not in unlit_refs:
+            mi=ref['model_index']
+            unlit_refs[ref['number']]=(mi in models and unlit_placement(
+                ref,models[mi],lighting,centre,profiles.get(index['models'][mi]['source'],{}).get('texture_size',64),extent_cache))
+        return _instance_key(ref,lighting,unlit_refs.get(ref['number'],False))
     placement_groups={}
     for ref in selected:
-        key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5),visual_key(ref))
+        key=(*lit_key(ref),round(ref.get('_flatten_shift',0),5),visual_key(ref))
         origin=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
         placement_groups.setdefault(key,[]).append((origin,-ref['rotation_radians'][2]*180/math.pi))
     def placement_tasks():
@@ -618,7 +698,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
      for ref in selected:
        mi=ref['model_index']
        if mi not in models:continue
-       key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5),visual_key(ref))
+       key=(*lit_key(ref),round(ref.get('_flatten_shift',0),5),visual_key(ref))
        if key in seen:continue
        seen.add(key)
        # Explicit Temple opt-in only; inferred filenames must not alter other maps.
@@ -640,7 +720,7 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
       if any(t in name for t in excluded):continue
       o=(np.array(ref['position'])-np.array([*centre,0]))*SCALE
       origin=o.copy();o=np.zeros(3);yaw=-ref['rotation_radians'][2]*180/math.pi
-      key=(*_instance_key(ref,lighting),round(ref.get('_flatten_shift',0),5),visual_key(ref))
+      key=(*lit_key(ref),round(ref.get('_flatten_shift',0),5),visual_key(ref))
       v,f,polys,components,lod=models[mi]
       texsize=profiles.get(name,{}).get('texture_size',64)
       if key in visual_models:
@@ -806,6 +886,10 @@ def _append_meshes(src, out, scenery, palette, archive, centre, lighting, jobs,
              'rule':'engine grid from stored single-precision values; extents within 256 under engine, binary32 and extended rules'},
             'nodes':len(lumps[5])//24,'clipnodes':len(lumps[9])//8,'bytes':out.stat().st_size,
             'instances':len(entities),'unique_models':len(instance_models),
+            'shared_ambient':{'mode':'map' if lighting and lighting.get('shared_ambient') else shared_ambient_mode() if lighting else 'no lightmaps',
+                              'unlit_placements':sum(unlit_refs.values()),'lit_placements_checked':len(unlit_refs),
+                              'unlit_references':sorted(n for n,v in unlit_refs.items() if v),
+                              'rule':'a placement no light reaches shares one model with its equal placements (same ambient lightmap)'},
             'collision':'multipart convex union; exact standing-box bevels for open shells, axial bounds otherwise',
             'scope':'resident bounded scene, shared building meshes, no cells streamed during play'}
     return result

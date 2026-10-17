@@ -9,7 +9,7 @@
 | Where | CHIM cell-progress digest and aggregate statistics |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.40-dev2 (last seen) |
+| Persists in | fixed in v0.0.40 |
 | Severity | medium: Coverage and per-cell resource claims can be overstated despite correct converted geometry. |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -43,7 +43,7 @@ Validate declared original-cell bounds against the frame origin, scale and
 terrain grid. Count the complete declared core, including empty cells, and
 retain apron cells separately. Use original master/reference identities for
 owned, dependency and deferred types; a shared dependency does not become a
-second owner. Preserve separate dependency provenance for each frame and
+second maintainer. Preserve separate dependency provenance for each frame and
 unknown counts when source accounting is absent. Reject conflicting or
 incomplete ownership. Historical builds without declarations keep their prior
 interpretation. Whole-frame memory, timing, model and placement totals remain
@@ -138,8 +138,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36](CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36.md): CHIM-native images with no legacy exterior (MiniWinds of one town) ship without the shared sky their frame maps name
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 <!-- END GENERATED CATEGORY -->

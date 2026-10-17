@@ -6,7 +6,7 @@ meaning the same as the general form, when a default build leaves anything
 out, when a group is added without its alias or table row, when the stage
 cache key ignores the exclusion set, when a release candidate or final accepts
 an exclusion, or when a group would remove dressing, flora or anything else
-with collision that NPCs or the player walk into (owner rule).
+with collision that NPCs or the player walk into (project rule).
 """
 import contextlib
 import io
@@ -75,7 +75,7 @@ class GroupTable(unittest.TestCase):
             self.assertIn(stage, names)
 
     def test_no_group_removes_collision_content(self):
-        """Owner rule: dressing, clutter, props, flora and other collision content stay in."""
+        """Project rule: dressing, clutter, props, flora and other collision content stay in."""
         for name, row in ex.GROUPS.items():
             with self.subTest(group=name):
                 self.assertNotIn(name, ex.REFUSED)
@@ -186,7 +186,7 @@ class Plans(unittest.TestCase):
         image = dict(steps('--exclude', 'video'))['image']
         self.assertNotIn('--accept-entity-loss', image)
         image = dict(steps('--exclude', 'interiors', '--accept-entity-loss', 'my reason'))['image']
-        self.assertEqual(image.count('--accept-entity-loss'), 1)  # the owner's own reason wins
+        self.assertEqual(image.count('--accept-entity-loss'), 1)  # the maintainer's own reason wins
         self.assertEqual(option(image, '--accept-entity-loss'), 'my reason')
 
     def test_labels(self):
@@ -335,7 +335,7 @@ class Media(unittest.TestCase):
 
 
 class AlwaysIncluded(unittest.TestCase):
-    """The shared sky, palette, fonts and menus survive every exclusion (owner rule)."""
+    """The shared sky, palette, fonts and menus survive every exclusion (project rule)."""
 
     def test_no_group_or_combination_skips_a_protected_stage(self):
         import itertools
@@ -413,7 +413,7 @@ class AlwaysIncluded(unittest.TestCase):
 
 class MiniWindDefaults(unittest.TestCase):
     """A MiniWind build leaves the videos out and builds only the voices and NPC records Balmora
-    references (owner decision after MiniWind #2 shipped all 17 videos and 6,447 voices). Music,
+    references (project decision after MiniWind #2 shipped all 17 videos and 6,447 voices). Music,
     the included NPCs' whole dialogue pool and the always-included assets stay."""
 
     def plan(self, *extra):

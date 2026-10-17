@@ -24,9 +24,9 @@ corpse looting and equipment changes; fixed outfits are not the final design.
 Inherited rc9 features include the original-model torch, region HUD and restored
 default NPC gallery. The longstanding momentary fist blink and separate unknown
 F-toggle state issue remain open. The static-asset gallery remains planned.
-Target playtesting and explicit owner acceptance are required before final
+Target playtesting and explicit maintainer acceptance are required before final
 v0.0.25 promotion. Public packages contain source, not owned game payloads.
 
-The owner applies the complete source kit, rebuilds using retained rc3 terrain
+The maintainer applies the complete source kit, rebuilds using retained rc3 terrain
 and optionally stopped rc9 gallery output, playtests, then runs the supplied
 commit/push/exact-commit CI/tag/prerelease/download-verification workflow.

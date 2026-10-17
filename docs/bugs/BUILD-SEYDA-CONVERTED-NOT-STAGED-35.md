@@ -9,7 +9,7 @@
 | Where | Image step: early payload preflight before the Seyda Neen region conversion (build_aga.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Every default full build stopped after all its stages, at the image step (50 min into the first v0.0.35 build); the recorded path too. |
 | Family | Seyda Neen recorded stage (`seyda-recorded`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

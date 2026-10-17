@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev2 |
 | Where | far culling and distant land fill (Balmora, Vivec Arena) |
 | Reproduction | always |
@@ -31,14 +31,14 @@
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
-- [Owner evidence reconciliation, 13 October 2026](#owner-evidence-reconciliation-13-october-2026)
+- [Maintainer evidence reconciliation, 13 October 2026](#maintainer-evidence-reconciliation-13-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
 
 ## Status: 7 October 2026
 
-8 October 2026: not re-checked on v0.0.32. The owner's verdict on v0.0.32-dev3 covers the
+8 October 2026: not re-checked on v0.0.32. The maintainer's verdict on v0.0.32-dev3 covers the
 horizon fill ([HORIZON-FLORA-SPRITES-32](HORIZON-FLORA-SPRITES-32.md)), not this view; the
 v0.0.32-dev3 smoke frames of Balmora are close views. The across-the-river Balmora view at sunset
 is needed on a v0.0.32 build before this can be closed.
@@ -49,7 +49,7 @@ Open. Needs work; cause understood in outline, not yet measured.
 
 Looking across the river at Balmora at sunset, the far buildings are a flat
 fog-brown silhouette with the sky showing through holes and jagged gaps
-(owner screenshots at 17:59, 18:19 and 18:24, local about (284..319,
+(maintainer screenshots at 17:59, 18:19 and 18:24, local about (284..319,
 116..260, 62), facing east).
 
 ## Where
@@ -76,7 +76,7 @@ land fill was designed and tested for terrain only.
 
 ## Reproduction
 
-12 October 2026, additional owner evidence in v0.0.38-dev2: with `dbg fog off`,
+12 October 2026, additional maintainer evidence in v0.0.38-dev2: with `dbg fog off`,
 a triangular sky-coloured opening appears in the terrain silhouette at global
 25183,122620,1354, local -872,959,-557, cell 3,14, heading 257, pitch 1,
 game time 12:40. This is a related symptom, not proof of the same cause as the
@@ -85,7 +85,7 @@ reproduction remain pending. Investigate missing terrain, culling and distant
 fill separately; preserve the previously approved silhouette algorithm and
 measure CPU/RAM costs before accepting any additional fill method.
 
-A second fog-off owner image that day shows scattered dark silhouettes with
+A second fog-off maintainer image that day shows scattered dark silhouettes with
 sky-coloured gaps at global 25389,127416,1560, local -820,110,-377, cell 3,15,
 heading 27, pitch 5, time 16:19. The requested investigation is coherent horizon
 coverage; filling arbitrary screen gaps would risk occluding legitimate sky.
@@ -96,7 +96,7 @@ Source inspection on 12 October found that `AW_FogDraw` calls the existing
 also suppresses this fill; that is a candidate explanation for the fog-off
 evidence, not a diagnosis of every historical hole. Compare fog and terrain
 occlusion independently before introducing another silhouette algorithm. The
-owner reports the broader problem since the beginning of the project; the
+maintainer reports the broader problem since the beginning of the project; the
 earliest affected build remains unverified.
 
 If this investigation produces an additional distant-terrain method, document
@@ -111,12 +111,12 @@ v0.0.31-dev2: from the west bank opposite Balmora (global about -19300 -11800),
 
 ### Land Fill Independence v1 (candidate, 12 October 2026)
 
-An additional owner sequence in v0.0.38-dev2 shows large distant terrain
+An additional maintainer sequence in v0.0.38-dev2 shows large distant terrain
 openings in the Ashlands, cell 0,17. The visible failure pose is global
 5312,141714,1125, heading 6, pitch 6, time 06:06. After moving forward, the
-owner's next image shows continuous ground at 4637,143445,769, heading 352,
+maintainer's next image shows continuous ground at 4637,143445,769, heading 352,
 pitch -3, time 06:11. These are different poses, not a matched fix comparison.
-The owner describes this as "GAPING HOLES IN DISTANT TERRAIN" and reports it
+The maintainer describes this as "GAPING HOLES IN DISTANT TERRAIN" and reports it
 across terrain, not only at one location. Keep it under this existing issue.
 
 Another fog-off image shows extensive sky exposure between terrain fragments
@@ -159,9 +159,9 @@ Pending: the same views without holes, and the frame-time cost.
 Distance views of every town against a bright sky in the capture set.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.

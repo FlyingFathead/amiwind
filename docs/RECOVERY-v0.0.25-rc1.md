@@ -81,7 +81,7 @@ launcher with mode 0755. Native validation: none; this is host packaging behavio
   files merely because a content fingerprint changed.
 - Keep full/incremental source plus SHA-256 sidecars; export one logical change
   at a time before any lengthy conversion. Source first, private playable later.
-- Keep development records in docs/. Preserve historical artifacts. The owner
+- Keep development records in docs/. Preserve historical artifacts. The maintainer
   handles all commits/pushes/tags/GitHub releases. No publication is performed.
 
 ## Validation boundary
@@ -137,11 +137,11 @@ The uploaded dev1 runtime compiled successfully as a warning-comparison baseline
 
 ## Keyboard recovery (checkpoint 004 work)
 
-Affected: v0.0.25-dev1. Reproduction from the owner: enable debug/noclip;
+Affected: v0.0.25-dev1. Reproduction from the maintainer: enable debug/noclip;
 M/N send the game to AmigaDOS even while entering console text. The observed
 pair matches Intuition screen shortcuts with an Amiga qualifier. Source inspection
 also found Right Amiga incorrectly translated to game Ctrl. The precise source
-of the held OS qualifier on the owner's machine is not established.
+of the held OS qualifier on the maintainer's machine is not established.
 
 Fix: priority-51 input.device filter clears Amiga qualifiers only on M/N while
 the game window is active; remove the Right-Amiga-to-Ctrl alias; clear input on
@@ -204,7 +204,7 @@ autosave, following the existing policy. Zero disables automatic saving.
 The actual quicksave implementation has one slot with two generations, plus
 four manual slots. The load menu currently labels absent, corrupt and incompatible
 saves alike as empty. This is confirmed by code inspection, but changing the
-menu and exposing quicksave generations is still TODO. The owner's ordering
+menu and exposing quicksave generations is still TODO. The maintainer's ordering
 report cannot be diagnosed without the affected saves. No existing save is removed
 or migrated by this checkpoint.
 
@@ -228,7 +228,7 @@ checkpoint tag in the supplied commands. Nothing has been committed or pushed.
 
 ### Critical console modifier report (part 7)
 
-Affected: owner's dev1-to-rc1 testing, exact installed binary not yet identified.
+Affected: maintainer's dev1-to-rc1 testing, exact installed binary not yet identified.
 Symptom: console always types capitals and shifted number symbols, preventing
 commands such as dbg 1. Reproduction: enter console and type letters/numbers
 without intentionally holding Shift; reported digits become parentheses/symbols.
@@ -236,7 +236,7 @@ without intentionally holding Shift; reported digits become parentheses/symbols.
 Established source defects: modifier state was remembered from separate key
 transitions, so losing a release leaves Shift latched; raw international key
 0x30 was also incorrectly translated as Shift. The exact event that triggered
-the owner's state is not established.
+the maintainer's state is not established.
 
 Fix: synchronize Shift/Ctrl/Alt from each Intuition RAWKEY qualifier before
 dispatch; preserve either physical Shift/Alt while its other key is released.
@@ -265,7 +265,7 @@ timed out; no native stuck-Shift pass is claimed.
 
 The complete host suite passes 333 tests (one optional test skipped). The native
 build has 82 warnings, matching the dev1 warning count; no warning-free claim is
-made. The original stuck-Shift incident still needs confirmation on the owner's
+made. The original stuck-Shift incident still needs confirmation on the maintainer's
 FS-UAE setup even though the synthesized lost-release host test passes.
 
 ### Checkpoint 006 final export validation

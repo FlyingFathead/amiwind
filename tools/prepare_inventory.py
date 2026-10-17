@@ -33,10 +33,33 @@ def script_inert_after_registration(source):
     source=re.sub(r'^\s*(?:(?:short|long|float)\s+\w+\s*)*','',source)
     return bool(re.match(r'\s*if\s*\(?\s*chargenstate\s*==\s*-1\s*\)?\s*return\s*endif',source))
 
+def effect_cost(effect,mgef,cost_mult):
+    # OpenMW 0.51 mwmechanics/spellutil.cpp calcEffectCost, EffectCostMethod::GameEnchantment
+    # (no magnitude clamp, no duration offset, no minimum area), then getTotalCost's x1.5 on target.
+    ident,_,_,rng,area,duration,low,high=effect
+    base,flags=mgef.get(ident,(None,None))
+    if base is None:raise ValueError('Enchantment names an unknown magic effect %d'%ident)
+    if flags&8:low=high=1                    # NoMagnitude
+    if flags&4:duration=1                    # NoDuration
+    if not flags&0x1000:duration=max(1,duration)   # not AppliedOnce
+    x=.5*(low+high)*.1*base*duration+.05*max(0,area)*base
+    x=max(0.,x*cost_mult)
+    return x*1.5 if rng==2 else x
+
+def max_charge(enchant,effects,mgef,settings):
+    # OpenMW 0.51 spellutil.cpp getEnchantmentCharge: autocalc charge = round(total cost) times
+    # iMagicItemCharge{Once,Strike,Use,Const}; otherwise the ENDT charge as authored.
+    kind,_,charge,flags=enchant
+    if not flags&1:return float(charge)
+    total=sum(effect_cost(e,mgef,settings['feffectcostmult']) for e in effects)
+    multiplier=settings[('imagicitemchargeonce','imagicitemchargestrike','imagicitemchargeuse','imagicitemchargeconst')[kind]]
+    return float(math.floor(total+.5)*multiplier)
+
 def source_items(data):
     result={};enchantments={};scripts={};settings={};initial=[]
+    effects={};mgef={};charges={}
     for kind,flags,raw in records(child_ci(data,'Morrowind.esm').read_bytes()):
-        if kind not in KINDS and kind not in ('ENCH','SCPT','GMST','NPC_'):continue
+        if kind not in KINDS and kind not in ('ENCH','SCPT','GMST','NPC_','MGEF'):continue
         fields=list(subrecords(raw))
         if is_deleted(flags,fields):continue
         if kind=='NPC_':
@@ -55,10 +78,17 @@ def source_items(data):
         if kind=='SCPT':
             header=first(fields,'SCHD');name=header[:32].split(b'\0')[0].decode('cp1252').casefold()
             scripts[name]=text(fields,'SCTX');continue
+        if kind=='MGEF':
+            index=first(fields,'INDX');medt=first(fields,'MEDT')
+            if len(index)==4 and len(medt)>=12:
+                _,base,mflags=struct.unpack_from('<ifi',medt);mgef[struct.unpack('<i',index)[0]]=(base,mflags)
+            continue
         identifier=text(fields,'NAME').casefold()
         if kind=='ENCH':
             raw=first(fields,'ENDT')
-            if len(raw)==16:enchantments[identifier]=struct.unpack('<4i',raw)
+            if len(raw)==16:
+                enchantments[identifier]=struct.unpack('<4i',raw)
+                effects[identifier]=[struct.unpack('<hbbiiiii',e) for t,e in fields if t=='ENAM' and len(e)==24]
             continue
         name=text(fields,'FNAM') or identifier;subtype=-1;weight=value=None
         tag={'WEAP':'WPDT','ARMO':'AODT','CLOT':'CTDT','ALCH':'ALDT','INGR':'IRDT',
@@ -78,11 +108,15 @@ def source_items(data):
             subtype=subtype,weight=weight,value=value,source_model=text(fields,'MODL'),
             source_icon=text(fields,'ITEX'),script=text(fields,'SCRI').casefold(),
             raw=raw,enchantment=text(fields,'ENAM').casefold() if kind in ('CLOT','ARMO','WEAP','BOOK') else '',parts=any(k=='INDX' for k,_ in fields))
-    return result,enchantments,scripts,settings,initial
+    for identifier,enchant in enchantments.items():
+        if not 0<=enchant[0]<=3:continue
+        try:charges[identifier]=max_charge(enchant,effects[identifier],mgef,settings)
+        except (KeyError,ValueError):pass
+    return result,enchantments,scripts,settings,initial,charges
 
 def prepare(data_files,id1,selected=(),palette=None,models=True):
     data=resolve_data_files(Path(data_files));id1=Path(id1)
-    items,enchantments,scripts,settings,initial=source_items(data);selected=set(s.casefold() for s in selected)
+    items,enchantments,scripts,settings,initial,charges=source_items(data);selected=set(s.casefold() for s in selected)
     if not selected:
         # Existing earned opening items plus original player starting clothes.
         # This stages resources only; it does not invent inventory ownership.
@@ -159,7 +193,14 @@ def prepare(data_files,id1,selected=(),palette=None,models=True):
                 except (ValueError,KeyError,OSError) as error:report['held'].setdefault(identifier,{})['icon']=str(error)
         row=safe_text(identifier,64)+safe_text(item['name'],96)+struct.pack('<iiifII',item['category'],item['subtype'],item['value'],item['weight'],slots,flags)
         row+=safe_text(model,64)+safe_text(icon,64)+safe_text(item['enchantment'],64)+safe_text(item['script'],64)
-        row+=struct.pack('<ii6iffffii',*combat)+b'\0'*16
+        # Bytes 496..511 (zero in older catalogues): the enchantment's kind (0 none, else ENDT
+        # type + 1: cast once, when strikes, when used, constant) and its maximum charge, so
+        # the HUD can show the original charge bar (docs/HUD.md "Weapon and magic boxes").
+        enchant=enchantments.get(item['enchantment']) if item['enchantment'] else None
+        kind=enchant[0]+1 if enchant and 0<=enchant[0]<=3 and item['enchantment'] in charges else 0
+        charge=charges[item['enchantment']] if kind else 0.
+        if not (math.isfinite(charge) and 0<=charge<=1000000):raise ValueError('Invalid enchantment charge '+identifier)
+        row+=struct.pack('<ii6iffffii',*combat)+struct.pack('<B3xf8x',kind,charge)
         assert len(row)==ROW;rows.append(row)
     out=id1/'inventory/items.awi';out.parent.mkdir(parents=True,exist_ok=True)
     out.write_bytes(b'AWI2'+struct.pack('<I',len(rows))+b''.join(rows))
@@ -172,6 +213,19 @@ def prepare(data_files,id1,selected=(),palette=None,models=True):
     (id1/'inventory/initial.awi').write_bytes(b'AWST'+struct.pack('<I',len(initial_rows))+b''.join(initial_rows))
     report['initial_items']=[{'id':identifier,'count':count} for identifier,count in initial]
     report['catalogue_sha256']=hashlib.sha256(out.read_bytes()).hexdigest()
+    if models:
+        # One icon lookup table for the HUD boxes and the inventory (tools/prepare_icons.py):
+        # the same referenced closure as the staged inventory resources.
+        from prepare_icons import prepare as prepare_icons, hud_settings, ini_colours
+        closure={i:{'source_icon':items[i]['source_icon'],'enchanted':bool(items[i]['enchantment'])}
+                 for i in sorted(selected) if i in items}
+        colours,report['hud_colours']=ini_colours(data)
+        report['icon_table']=prepare_icons(assets,id1,closure,palette,colours)
+        text_out,report['hud_settings']=hud_settings(settings)
+        (id1/'gfx/hud-settings.txt').write_text(text_out,encoding='ascii',newline='\n')
+    report['enchanted_items']={i:{'enchantment':items[i]['enchantment'],'kind':enchantments[items[i]['enchantment']][0],
+        'max_charge':charges.get(items[i]['enchantment'])} for i in sorted(selected)
+        if i in items and items[i]['enchantment'] in enchantments}
     return report
 
 def main():

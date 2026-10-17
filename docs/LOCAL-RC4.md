@@ -31,6 +31,6 @@ Windows is untested. `py -3 tools\build.py --host-plan` can collect an inventory
 without installing or executing native tools. It is not a working full-build
 recipe; follow the [roadmap](WINDOWS_BUILD_ROADMAP.md) for pending acceptance.
 
-The owner performs all Git/GitHub publishing, using a new rc4 prerelease and
+The maintainer performs all Git/GitHub publishing, using a new rc4 prerelease and
 matching source assets. Do not replace rc3 tags or assets. The generated
 `docs/PACKAGE_MANIFEST.json` remains untracked. No private playable is delivered.

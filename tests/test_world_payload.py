@@ -154,7 +154,9 @@ class PayloadTests(unittest.TestCase):
     def test_volume_packer_requires_declared_omissions(self):
         import world_volumes
         with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
+            # pack() sizes everything under id1's parent: keep that parent private to this test
+            root = Path(td) / 'id1'
+            root.mkdir()
             towns = fixture(root)
             rows = prune(root, root / 'receipt.json', towns)
             omitted = [r['file'] for r in rows]
@@ -170,7 +172,9 @@ class PayloadTests(unittest.TestCase):
     def test_volume_packer_rejects_unexpected_absence_and_present_omission(self):
         import world_volumes
         with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
+            # pack() sizes everything under id1's parent: keep that parent private to this test
+            root = Path(td) / 'id1'
+            root.mkdir()
             fixture(root)
             with patch.object(world_volumes, 'write_partitions') as writer:
                 with self.assertRaisesRegex(ValueError, 'remains at packing'):

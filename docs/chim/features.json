@@ -202,7 +202,7 @@
       "gains": [
         {
           "headline": true,
-          "text": "Steps with a chunk missing its ground inside the collision margin on the owner's Balmora route: 860 to 0",
+          "text": "Steps with a chunk missing its ground inside the collision margin on the maintainer's Balmora route: 860 to 0",
           "compared": "the engine's own zone allocator run over the route twice (1,192 steps), first methods against all methods with defaults; Seyda Neen sweep of the frame with rows 128 units apart: 107 to 0",
           "basis": "simulation",
           "date": "2026-10-09"
@@ -214,10 +214,10 @@
           "date": "2026-10-09"
         }
       ],
-      "gain_short": "holes on the owner's route 860 to 0",
+      "gain_short": "holes on the maintainer's route 860 to 0",
       "caveats": [
         "Some loads still fail for lack of room (far buildings); a larger zone budget would halve the remaining gaps and waits for the memory measurements (CHIM-ZONE-BUDGET-33).",
-        "The repaired engine awaits the owner's playtest."
+        "The repaired engine awaits the maintainer's playtest."
       ],
       "vis": "Pinning decides which chunks are resident, not how they are culled; placements stay linked to the leaves they touch.",
       "links": [
@@ -368,7 +368,7 @@
       "caveats": [
         "CHIM draws slightly more spans than the legacy maps at every camera.",
         "Per-placement lists block 11.5 % of the visibility tests in Balmora (CHIM-PVS-HOLLOW-33): hollow house shells let rows see through buildings.",
-        "A few models dominate every view; distance detail is the owner (CHIM-VIEW-FACES-33)."
+        "A few models dominate every view; distance detail is the maintainer (CHIM-VIEW-FACES-33)."
       ],
       "vis": "This is the vis story itself: every CHIM change is checked with the renderer counters (entities sent, faces clipped, BSP nodes per face) on fixed cameras, and they may not get worse.",
       "links": [
@@ -484,7 +484,7 @@
         {
           "headline": true,
           "text": "Far layer in the low Hunk: 13.2 KB for Balmora; drawing it costs 30.6-43.7 ms per frame on the slow preset at the bridge and east-bank poses",
-          "compared": "the far layer on and off at the owner's bridge pose and the east-bank pose (docs/chim/FAR_TERRAIN.md, Cost)",
+          "compared": "the far layer on and off at the maintainer's bridge pose and the east-bank pose (docs/chim/FAR_TERRAIN.md, Cost)",
           "basis": "emulator",
           "host": "busy",
           "date": "2026-10-09"
@@ -1280,7 +1280,7 @@
         {
           "headline": true,
           "text": "Every mesh of the v0.0.36-dev3 world's CHIM areas: 101,153 to 99,052 faces with planar merge; the arrival ship 4,046 to 3,690 faces with closed seams (torn seam 2.2 % to 0) and about a seventh of the shape error",
-          "compared": "the converter against the mesh methods on the same meshes and profiles (prepare_mesh_bsp._prepare_model), owner's data",
+          "compared": "the converter against the mesh methods on the same meshes and profiles (prepare_mesh_bsp._prepare_model), maintainer's data",
           "basis": "count",
           "date": "2026-10-11"
         }

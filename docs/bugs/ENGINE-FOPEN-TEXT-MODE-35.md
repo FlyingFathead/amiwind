@@ -9,7 +9,7 @@
 | Where | engine/aga/src/sys_file_amiga.c Sys_FileOpenRead, Sys_FileTime |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | low: No difference on AmigaOS, wrong on a C library that translates line ends |
 | Family | Loading and disk reads (`disk-loading`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

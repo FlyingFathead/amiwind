@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev4 |
 | Where | Balmora night, Hlaalu guard torches |
 | Reproduction | always |
@@ -21,8 +21,8 @@
 
 ## Status: 7 October 2026
 
-Open. Owner report on v0.0.31-dev4; repaired in source for dev5, not yet
-owner-checked.
+Open. Maintainer report on v0.0.31-dev4; repaired in source for dev5, not yet
+maintainer-checked.
 
 ## Symptom
 
@@ -61,7 +61,7 @@ peak at the flame stays the same and only the reach shrinks.
 ## Verification
 
 Native tests (guard torch fixture) and gate 075; same-pose captures dev4 versus
-dev5 (guard radius 1.0 and 0.5), headlamp off. Owner check pending.
+dev5 (guard radius 1.0 and 0.5), headlamp off. Maintainer check pending.
 
 ## Prevention
 

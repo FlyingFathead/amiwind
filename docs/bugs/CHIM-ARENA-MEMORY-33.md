@@ -9,7 +9,7 @@
 | Where | CHIM Vivec Arena world: canton body models ex_vivec_c_02 and ex_vivec_c_04 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: Blocks the Arena on CHIM (v0.0.33 scope): heap gate fails, and one model needs a 2.5 MB free run in the zone. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Performance ([CHIM Engine tracker](CHIM_TRACKER.md)) |

@@ -37,7 +37,7 @@
 
 ## Status: 10 October 2026
 
-Open, **potentially important regression** (owner, 10 October 2026: the whole point of the upstream AmiQuake work is
+Open, **potentially important regression** (maintainer, 10 October 2026: the whole point of the upstream AmiQuake work is
 that it is fast). Found by a source review of the engine against upstream AmiQuake.
 
 ### Update, 10 October 2026 (late): engine profiles
@@ -92,10 +92,10 @@ optimiser bugs.
 Upstream's README states the whole port is GPL v2 "as per original Quake source code license", and argues that
 NovaCoder's AmiQuake is itself a port of GPL Quake, so publishing the disassembled routines as readable source is how
 the port meets the GPL. AmiWind's licence review of 27 September 2026 was more cautious about code recovered from a
-binary. Whether AmiWind follows upstream's reading is the owner's decision; `fixedpoint_asm.s` carries no such
+binary. Whether AmiWind follows upstream's reading is the maintainer's decision; `fixedpoint_asm.s` carries no such
 question either way.
 
-Owner decision, 10 October 2026: AmiWind adopts upstream's GPL v2 reading for all five files
+Project decision, 10 October 2026: AmiWind adopts upstream's GPL v2 reading for all five files
 ([LICENSING_AND_CREDITS.md](../LICENSING_AND_CREDITS.md)); they are measured before they ship.
 
 (Corrected below the status: upstream's Makefile is `-O1` too.) A second, independent loss in the same place: upstream compiles most of the engine at `-O2` and only `mathlib.c` and

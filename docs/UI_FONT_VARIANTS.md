@@ -1,6 +1,6 @@
 # Original-font and message-box direction
 
-Owner decisions, 28 September 2026. In v0.0.21-dev1, 14 px is the default
+Project decisions, 28 September 2026. In v0.0.21-dev1, 14 px is the default
 and Options cycles through 16, 14, 12 px and fallback. All existing atlases are
 preserved. The main-menu panel follows font metrics and sits lower to expose
 the Morrowind title. Independent dialogue/book size settings remain planned.
@@ -14,7 +14,7 @@ the Morrowind title. Independent dialogue/book size settings remain planned.
 
 Keep the original font's character and proportional spacing. Preserve existing
 readable/retro/compact fonts and provide a fallback; no replacement by accident.
-The private host preview converted the owner's actual bitmap font and atlas,
+The private host preview converted the maintainer's actual bitmap font and atlas,
 then rendered a 320x200 mockup with the current palette. It was a font legibility
 test, not an approved final panel design. The study itself was a mockup. Native integration followed in v0.0.18-dev1;
 see RELEASE-v0.0.18-dev1.md.
@@ -26,11 +26,11 @@ placement and sizing as closely as the target resolution permits. Inspect the
 original assets and behavior before committing to details. Do not adopt a generic
 oversized dialogue panel simply because it was convenient for the font preview.
 Keep short spoken lines/subtitles, scripted messages and full topic-based dialogue
-as distinct UI cases. The owner requests dialogue to enter from below, analogous
+as distinct UI cases. The maintainer requests dialogue to enter from below, analogous
 to the existing debug console entering from above. Preserve both directions.
 Inventory, character, magic, map and journal can use separate tabs/submenus when
 the original PC arrangement does not fit at 320x200. Screenshots supplied by the
-owner are references, not redistributable public assets.
+maintainer are references, not redistributable public assets.
 
 ## Conversion provenance
 

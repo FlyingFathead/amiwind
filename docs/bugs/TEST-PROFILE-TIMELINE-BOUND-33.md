@@ -9,7 +9,7 @@
 | Where | tests/test_build_profile.py test_cpu_and_wall_of_a_stage_and_all_its_children |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | low: No effect on the game or builds; a gate failure without a defect (1.99606 s summed samples against a 1.996 s bound). |
 | Family | Gates, CI and tests (`tests-ci`) |
 
@@ -124,5 +124,9 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-TOWN-BOUNDS-40](TEST-TOWN-BOUNDS-40.md): Town expansion left recovery fixtures and coordinate audit stale
 - [TEST-WORKER-SYSPATH-32](TEST-WORKER-SYSPATH-32.md): Pool workers started from tests import tools/mwad.py instead of the mwad package
 - [TOOLKIT-TEST-POINTERLOCK-31](TOOLKIT-TEST-POINTERLOCK-31.md): Inspector test left pointer lock set, breaking later drag checks
+
+Related bugs in other categories:
+
+- [BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42](BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42.md): The build profiler's sampled timeline counts a finished child process twice
 
 <!-- END GENERATED CATEGORY -->

@@ -86,6 +86,9 @@ int AW_InventoryDrop(aw_state_t *s,const aw_inventory_item_t *item,int32_t count
     if(!s || !item || !position || !inv_id(item->id,64) || !inv_id(scene,16) ||
        !(item->flags&AW_INV_DROP) || !item->model[0] || count<1)return -1;
     old=AW_StateGet(s,AW_ITEM,item->id);if(count>old || s->inventory.next_serial==UINT32_MAX)return -1;
+    /* Placed items carry condition but no charge yet: never refill a spent item by dropping it. */
+    item_index=inv_item_index(s,item->id);
+    if(count==old && item_index>=0 && (s->magic.charge_known&(1U<<item_index)))return -1;
     for(j=0;j<3;j++)if(!(position[j]>=-32767 && position[j]<=32767))return -1;
     if(!(yaw>=-360 && yaw<=360))return -1;
     for(i=0;i<AW_INVENTORY_DROPS && s->inventory.dropped[i].count;i++);
@@ -104,6 +107,39 @@ int AW_InventoryDrop(aw_state_t *s,const aw_inventory_item_t *item,int32_t count
     if(old==count && item_index>=0){s->inventory.condition_known&=~(1U<<item_index);s->inventory.condition[item_index]=0;}
     s->inventory.initialized=1;
     s->inventory.dropped[i]=drop;s->inventory.next_serial=drop.serial;return i;
+}
+int AW_MagicSelectable(const aw_inventory_item_t *item){
+    return item && (item->enchant_kind==AW_ENCH_ONCE || item->enchant_kind==AW_ENCH_USED) && item->charge_max>0;
+}
+int AW_MagicSelect(aw_state_t *s,const aw_inventory_item_t *item){
+    if(!s || !AW_MagicSelectable(item) || !inv_id(item->id,64) || AW_StateGet(s,AW_ITEM,item->id)<1)return 0;
+    memset(s->magic.selected,0,64);strcpy(s->magic.selected,item->id);return 1;
+}
+void AW_MagicClear(aw_state_t *s){if(s)memset(s->magic.selected,0,64);}
+float AW_MagicCharge(const aw_state_t *s,const aw_inventory_item_t *item){
+    int index;
+    if(!s || !item || item->enchant_kind==AW_ENCH_NONE || !(item->charge_max>0))return 0;
+    index=inv_item_index(s,item->id);
+    if(index>=0 && (s->magic.charge_known&(1U<<index)))return s->magic.charge[index];
+    return item->charge_max;
+}
+int AW_MagicSetCharge(aw_state_t *s,const aw_inventory_item_t *item,float value){
+    int index;
+    if(!s || !item || item->enchant_kind==AW_ENCH_NONE || !(item->charge_max>0) ||
+       !(value>=0) || AW_StateGet(s,AW_ITEM,item->id)<1)return 0;
+    index=inv_item_index(s,item->id);if(index<0)return 0;
+    if(value>=item->charge_max){s->magic.charge_known&=~(1U<<index);s->magic.charge[index]=0;}
+    else{s->magic.charge_known|=1U<<index;s->magic.charge[index]=value;}
+    return 1;
+}
+/* MWMechanics::rechargeItem: min(charge + rate * seconds, maximum); full stays full. */
+int AW_MagicRecharge(aw_state_t *s,const aw_inventory_item_t *item,float seconds,float rate){
+    int index;
+    if(!s || !item || !(seconds>0) || !(rate>=0) ||
+       (item->enchant_kind!=AW_ENCH_USED && item->enchant_kind!=AW_ENCH_STRIKES))return 0;
+    index=inv_item_index(s,item->id);
+    if(index<0 || !(s->magic.charge_known&(1U<<index)))return 0;
+    return AW_MagicSetCharge(s,item,s->magic.charge[index]+rate*seconds);
 }
 int AW_InventoryPickup(aw_state_t *s,int index){
     aw_dropped_item_t *d;int item_index;int32_t old;float current,incoming;
@@ -163,6 +199,11 @@ int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
             bits=(uint32_t)inv_u32(row+480);memcpy(&value.health,&bits,4);
             bits=(uint32_t)inv_u32(row+484);memcpy(&value.armor,&bits,4);
             value.shield_class=(int)inv_u32(row+488);value.armor_skill_base=(int)inv_u32(row+492);
+            value.enchant_kind=row[496];bits=(uint32_t)inv_u32(row+500);memcpy(&value.charge_max,&bits,4);
+            if(value.enchant_kind>AW_ENCH_CONSTANT || row[497] || row[498] || row[499] ||
+               !(value.charge_max>=0 && value.charge_max<=1000000) ||
+               (!value.enchant_kind && value.charge_max!=0) || (value.enchant_kind && !value.enchantment[0]))goto bad;
+            {int n;for(n=504;n<512;n++)if(row[n])goto bad;}
             if(value.category<1 || value.category>7 || value.value<0 ||
                !(value.weight>=0 && value.weight<=1000000) ||
                (value.slots&~((1U<<AW_INVENTORY_SLOTS)-1)) ||
@@ -258,6 +299,44 @@ static float inv_condition(const char *id){
     int index=inv_item_index(&aw_state,id);
     return index>=0 && (aw_state.inventory.condition_known&(1U<<index))?aw_state.inventory.condition[index]:1;
 }
+float AW_InventoryCondition(const char *id){return inv_condition(id);}
+/* The selected magic item, read once per selection change (no per-frame I/O). */
+int AW_MagicSelectedItem(aw_inventory_item_t *out){
+    static char id[64];static aw_inventory_item_t value;static int ok;
+    if(!out || !aw_state.magic.selected[0] || AW_StateGet(&aw_state,AW_ITEM,aw_state.magic.selected)<1)return 0;
+    if(strcmp(id,aw_state.magic.selected)){
+        strcpy(id,aw_state.magic.selected);ok=AW_InventoryRead(id,&value) && AW_MagicSelectable(&value);
+    }
+    if(ok)*out=value;
+    return ok;
+}
+/* gfx/hud-settings.txt (tools/prepare_icons.py): the GMST, read once. */
+static float recharge_rate=-1;
+float AW_MagicRechargeRate(void){
+    FILE *f=NULL;char text[256];int n;float value;
+    if(recharge_rate>=0)return recharge_rate;
+    recharge_rate=0;
+    n=COM_FOpenFile("gfx/hud-settings.txt",&f);if(!f)return 0;
+    if(n>0 && n<(int)sizeof(text) && fread(text,1,n,f)==(size_t)n){
+        char *p;text[n]=0;p=strstr(text,"fMagicItemRechargePerSecond ");
+        if(p){value=(float)Q_atof(p+28);if(value>=0 && value<=1000)recharge_rate=value;}
+    }
+    fclose(f);return recharge_rate;
+}
+/* Unpaused single-player time (SV_Physics) and waiting/resting: only items with
+ * a recorded (below full) charge do any work; their catalogue rows are cached. */
+void AW_MagicFrame(float seconds){
+    static char ids[AW_STATE_VALUES][64];static aw_inventory_item_t rows[AW_STATE_VALUES];static int ok[AW_STATE_VALUES];
+    int i;float rate;
+    if(!aw_state.magic.charge_known || !(seconds>0) || (rate=AW_MagicRechargeRate())<=0)return;
+    for(i=0;i<aw_state.count[AW_ITEM] && i<AW_STATE_VALUES;i++){
+        if(!(aw_state.magic.charge_known&(1U<<i)))continue;
+        if(strcmp(ids[i],aw_state.values[AW_ITEM][i].id)){
+            strcpy(ids[i],aw_state.values[AW_ITEM][i].id);ok[i]=AW_InventoryRead(ids[i],&rows[i]);
+        }
+        if(ok[i])AW_MagicRecharge(&aw_state,&rows[i],seconds,rate);
+    }
+}
 static void inv_store(const aw_fighter_t *sheet){
     int kind,index,slot;float current,maximum,value;aw_inventory_item_t item;
     for(kind=0;kind<2;kind++){
@@ -309,6 +388,7 @@ void AW_InventoryGrantCommand(void){
 }
 void AW_InventoryInit(void){
     aw_combat_equipment=inv_combat;aw_combat_equipment_store=inv_store;aw_hand_block_item=inv_block_item;
+    aw_magic_frame=AW_MagicFrame;
 }
 static void inv_level(void){
     if(inventory_world!=sv.worldmodel){

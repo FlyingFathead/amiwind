@@ -9,7 +9,7 @@
 | Where | chim.models.variant_unit: 253 records of 70 meshes stored as name#2 and up |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | low: disk and unit-cache waste (5.15 MB of records stored more than once); no visible change |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

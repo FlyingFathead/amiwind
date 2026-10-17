@@ -17,7 +17,7 @@ visibility traversal and surface caches are useful foundations. The existing
 A500 terrain renderer remains a separate executable experiment. Neither route
 currently implements Morrowind's quests, script VM, combat or full game mechanics.
 
-Current executable progress: the host static-model exporter reads the owner's
+Current executable progress: the host static-model exporter reads the maintainer's
 base BSA using PyFFI, flattens visible unskinned NIF shapes, retains UVs/vertex
 colours/materials, reduces textures and indexes shared geometry plus placements.
 It is not yet an OpenMW exporter or Quake BSP compiler. The Amiga executable does

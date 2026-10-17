@@ -67,12 +67,12 @@ Original-cell catalogues distinguish physical-origin owners from footprint
 or assembly dependencies. Construction retains whole-object dependencies
 needed at boundaries. The world writer assigns each placement a local owner
 chunk; validation treats every repeated placement ID across frames as a
-second global owner. The catalogue distinction is not carried through this
+second global maintainer. The catalogue distinction is not carried through this
 combined check.
 
 All 36 repeated originals have identical original position, rotation, scale,
 model identity and source cell in both catalogues, with exactly one logical
-physical-cell owner. Six frame pairs are affected:
+physical-cell maintainer. Six frame pairs are affected:
 
 | Pair | Original references |
 | --- | ---: |
@@ -116,7 +116,7 @@ Implemented in the current source candidate. Both preparation paths snapshot
 original identity/transform before mounting and visual offsets, including
 merged flora and the opening barrel. Core and apron coverage remain separate.
 A source ownership check runs before pack assembly. Dependencies outside an
-isolated selection remain valid; an included original owner must be present.
+isolated selection remain valid; an included original maintainer must be present.
 
 Each frame records the exact piece IDs, stored float poses, source cells,
 story state and render/collision payload hashes. Validation checks those
@@ -132,7 +132,7 @@ or collision equivalence; those checks remain separate release gates.
 
 AmiQuake mechanism reviewed: the CHIM loader selects one frame at map start
 and uses its existing chunks, model cache and efrags. A local chunk owner is
-storage/streaming ownership, not proof of a second original reference owner.
+storage/streaming ownership, not proof of a second original reference maintainer.
 No runtime mechanism or binary format was changed.
 
 ## Verification

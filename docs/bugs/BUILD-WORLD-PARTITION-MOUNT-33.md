@@ -9,7 +9,7 @@
 | Where | image step drive grouping (tools/world_volumes.py) and the RDB it writes |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: The full two-disk image does not boot past the loader (measured in FS-UAE 3.1.66 with Kickstart 3.1). |
 | Family | Disk images, partitions and launchers (`disk-image-layout`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -85,7 +85,7 @@ becomes DW2, DW3, DW1 (starts 32,768; 268,468,224; 402,685,952) and stays one fi
 2,415,951,872 bytes. The image step also gates the partition table as written: any partition that
 starts at or beyond 2 GiB of its drive stops the build (`require_mountable`).
 
-Owner order (9 October 2026): the image step now runs one disk-layout gate on every drive it writes,
+Maintainer order (9 October 2026): the image step now runs one disk-layout gate on every drive it writes,
 for every image type the builder makes (full, MiniWind, release): `world_volumes.require_disk_layout`
 checks every partition's start offset and size below 2 GiB, every file below 1 GiB (well under the
 2 GiB file limit) and the drive below 4 GiB, names the drive, partition or file with the measured

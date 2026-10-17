@@ -271,7 +271,7 @@ def audit(maps, jobs=1, chim_frames=None):
 
 
 def waivable(error):
-    """Findings an owner may accept for a private test: ordinary mesh contact, and a CHIM town frame resident not
+    """Findings a maintainer may accept for a private test: ordinary mesh contact, and a CHIM town frame resident not
     supported on its frame collision (owner 2026-10-16, v0.0.41-dev2: three Vivec frame residents). Nothing else."""
     return (error == 'Initial mesh contact outside support tolerance'
             or error.startswith('CHIM frame resident not supported on the frame collision ('))
@@ -297,7 +297,7 @@ FINDINGS_SCOPE = ('actor findings: every row (map, reference, pose samples, gaps
 
 def evidence(report, before_world=False, findings_only=False):
     # The early check has no vf terrain yet; it compares every other payload hash.
-    # findings_only (image step, private test): the owner approved the findings,
+    # findings_only (image step, private test): the maintainer approved the findings,
     # not the bytes of maps that image assembly rewrites. Every row and error is
     # still compared exactly; never reduce the comparison to a count.
     view = dict(report)

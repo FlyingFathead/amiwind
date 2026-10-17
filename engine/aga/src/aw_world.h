@@ -7,6 +7,7 @@ int AW_SourceToWorld(const char *,const float *,float *);
 int AW_WorldMapTarget(const float *,char *,float *);
 int AW_MapTeleport(const float *);
 int AW_MapTeleportAt(const float *,int);
+int AW_SceneShot(int,const char *,const float *,int,float,float);
 qboolean AW_MapPlaceBelow(edict_t *,const float *);
 qboolean AW_MapPlace(edict_t *,const float *);
 int AW_WorldContains(const char *,const float *);

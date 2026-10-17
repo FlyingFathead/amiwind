@@ -78,4 +78,4 @@ player is sleeping. They need a script runtime or a native port of each script.
 4. Do guards chasing the player (not yet fighting) stop resting? Other descriptions: yes; OpenMW: only actors in
    combat or about to attack.
 
-To be settled by watching the original or by an owner decision.
+To be settled by watching the original or by a project decision.

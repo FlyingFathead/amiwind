@@ -15,14 +15,14 @@ Like community projects such as
 
 *Not affiliated with or endorsed by Bethesda Softworks or ZeniMax. Please support the original creators: buy Morrowind.*
 
-In addition to being a standalone engine extension of the GPL-licensed
-[AmiQuake](https://github.com/terriblefire/amiquake), AmiWind converts your own
-Morrowind installation for an experimental native Amiga runtime. Read the
-[FAQ](docs/FAQ.md) for the project vision, hardware and current scope, and
-[licensing and credits](docs/LICENSING_AND_CREDITS.md) for source provenance and
-what the public package contains. In-game screenshots of every version:
-[gallery](docs/GALLERY.md).
-Have a real Amiga? [Running AmiWind on real hardware](docs/REAL_HARDWARE.md).
+AmiWind is a standalone extension of the GPL-licensed
+[AmiQuake](https://github.com/terriblefire/amiquake) engine. It also converts
+your own Morrowind installation into data for an experimental native Amiga
+runtime. The [FAQ](docs/FAQ.md) covers the project's aims, the hardware it
+needs and what it can do today. [Licensing and credits](docs/LICENSING_AND_CREDITS.md)
+explains where the source comes from and what the public package contains.
+The [gallery](docs/GALLERY.md) has in-game screenshots of every version, and
+[Running AmiWind on real hardware](docs/REAL_HARDWARE.md) is for owners of a real Amiga.
 
 <p align="center">
   <img src="docs/images/amiwind-v0.0.32-gallery.gif" width="800" alt="AmiWind v0.0.32 in Vivec: ten in-game screenshots in turn">
@@ -916,41 +916,47 @@ Quake** (John Carmack and the id team) and its Amiga port **AmiQuake** (Peter
 McGavin, NovaCoder, Stephen Leary). The CHIM builder that converts your own
 Morrowind files is GPLv3.
 
-The AGA runtime incorporates code from **id Software's Quake** and the
-**AmiQuake** lineage, modified, extended and adapted for **AmiWind**. These
-components are distributed under the **GNU GPL version 2**, with the original
-copyright and licence notices preserved; individual v2-or-later grants remain
-intact. AmiWind's host tools and original A500 runtime are separately
-**GPL-3.0-only**; see [LICENSE](LICENSE). OpenMW is a reference for file formats
-and behaviour; the current converters are standalone tools and bundle none of
-its code. Earlier opening experiments used it for external captures. See
-[licensing and credits](docs/LICENSING_AND_CREDITS.md) for component details.
+The Amiga runtime contains code from **id Software's Quake** and the
+**AmiQuake** port, changed and extended for **AmiWind**. That code is
+distributed under the **GNU GPL version 2**, with the original copyright and
+licence notices kept in the files; files granted under "version 2 or later"
+keep that grant. AmiWind's host tools and the original A500 runtime are a
+separate program under **GPL-3.0-only**; see [LICENSE](LICENSE). OpenMW serves
+as a reference for file formats and behaviour. The current converters are
+standalone tools and include none of its code; earlier opening experiments used
+OpenMW only to make external captures. [Licensing and credits](docs/LICENSING_AND_CREDITS.md)
+has the details for each component.
 
-Please also support [Cloanto / Amiga Forever](https://www.amigaforever.com/) for
-licensed Amiga ROMs. Supply a suitable Kickstart ROM yourself; none is included
-in the public repository. Public test records identify tested ROMs by checksum.
+Licensed Amiga ROMs are available from
+[Cloanto / Amiga Forever](https://www.amigaforever.com/), which is worth
+supporting. The public repository includes no Kickstart ROM, so you need a
+suitable one of your own. Public test records identify the tested ROMs by
+checksum.
 
-The setup model is similar to OpenMW: point the tools at your installed game
-folder. Conversion runs locally and writes to a separate workspace. This
-independent project is not an OpenMW release or an official Bethesda product.
+Setup works much as it does in OpenMW: you point the tools at your installed
+game folder. The conversion runs on your own machine and writes to a separate
+workspace. AmiWind is an independent project, not an OpenMW release and not an
+official Bethesda product.
 
-> **Public source package  -  no commercial game data or ROMs.** No Quake or
-> Morrowind game data, reusable game artwork, music, voices, game
-> executables, Amiga Kickstart ROMs or Workbench files are included. This source
-> package includes the selected development screenshots and a short clip for documentation, but
-> contains no compiled AmiWind executable or assembly recovered
-> from a game binary. GPL-licensed engine source is distinct from game assets.
-> Supply your own Morrowind installation to convert its data, and a suitable
-> licensed Kickstart ROM to run the resulting demo in an emulator. Compiling
-> the engine alone does not require game data or a ROM.
+> **Public source package: no commercial game data or ROMs.** The package
+> includes no Quake or Morrowind game data, reusable game artwork, music,
+> voices, game executables, Amiga Kickstart ROMs or Workbench files. It holds
+> a selection of development screenshots and a short clip for the
+> documentation, but no compiled AmiWind executable. The default engine build
+> links no assembly recovered from a game binary (see
+> [licensing and credits](docs/LICENSING_AND_CREDITS.md) for the upstream
+> assembly used by an experimental profile). The GPL-licensed engine source is
+> separate from the game assets. Converting the data needs your own Morrowind installation, and
+> running the result in an emulator needs a suitable licensed Kickstart ROM.
+> Compiling only the engine needs neither.
 
-Copyrights remain with their respective holders, including the original code
-contributors. Each component retains its applicable licence. Morrowind and
-The Elder Scrolls, Quake, Amiga and related names belong to their respective
-owners. AmiWind is an independent fan tribute, not affiliated with or endorsed
-by Bethesda/ZeniMax, id Software, Commodore, Cloanto or the OpenMW project.
-The GPL does not grant rights to redistribute game assets or ROMs. Locally
-generated game images are private build outputs, not public source releases.
+Copyrights stay with their holders, including the original code contributors,
+and each component keeps its own licence. Morrowind, The Elder Scrolls, Quake,
+Amiga and related names belong to their owners. AmiWind is an independent fan
+tribute, not affiliated with or endorsed by Bethesda/ZeniMax, id Software,
+Commodore, Cloanto or the OpenMW project. The GPL gives no right to share game
+assets or ROMs. Game images you build yourself are private build outputs, not
+public source releases.
 
 ## Building and playing
 
@@ -983,21 +989,23 @@ and `AmiWind-v<version>-WinUAE.uae`. Without `--kickstart-file` the two configs 
 placeholder ROM setting to fill in; see [WinUAE setup](docs/WINUAE.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).
 
-Replace the example ROM path with your actual file or a directory containing ROMs. The builder checks FS-UAE
-and the ROM before setup, fills both ROM and HDF paths in the
-[documented preset](docs/FS-UAE-PLAYTESTING.md), and launches the finished image.
-If you omit `--kickstart-file`, it checks `~/.roms/kickstart-3.1-a1200.rom` under
-the current user's home directory, then checks files directly in `~/.roms/` for
-the known SHA-256. If no ROM is selected, it **asks for a file or directory**.
-Directory searches select a checksum match; an explicitly selected different
-ROM warns that compatibility is unverified. Noninteractive runs exit with clear
-instructions if no ROM is selected. ROMs are never downloaded or included.
+The example ROM path stands for your own ROM file, or for a directory that
+contains ROMs. The builder checks FS-UAE and the ROM before setup, fills in the
+ROM and HDF paths of the [documented preset](docs/FS-UAE-PLAYTESTING.md), and
+launches the finished image. Without `--kickstart-file`, it looks for
+`~/.roms/kickstart-3.1-a1200.rom` in your home directory, and then for a file
+directly in `~/.roms/` with the known SHA-256. If it still has no ROM, it
+**asks for a file or directory**. In a directory it picks the file whose
+checksum matches; a different ROM chosen by name is accepted with a warning
+that compatibility is unverified. A run without a terminal stops with
+instructions when no ROM is selected. ROMs are never downloaded or included.
 
-Select your Morrowind installation and confirm the dependency proposal. The tool
-reuses installed dependencies, fetches missing pinned SDK/map tools, builds the
-reference QuakeC compiler when needed, uses its Python environment automatically,
-and continues into the build. APT may also ask for your sudo password and package
-confirmation. Use `--autoinstall --plan` to preview setup without installing.
+Next, the tool asks for your Morrowind installation and shows the dependencies
+it proposes to install. Once you confirm, it reuses what is already installed,
+fetches the missing pinned SDK and map tools, builds the reference QuakeC
+compiler if needed, sets up its own Python environment and carries on into the
+build. APT may also ask for your sudo password and to confirm packages.
+`--autoinstall --plan` shows the setup steps without installing anything.
 
 Start with [Linux build instructions](docs/LINUX_BUILD.md) or
 [Windows host options](docs/WINDOWS_BUILD.md). Native Windows/MSYS2 has completed a full

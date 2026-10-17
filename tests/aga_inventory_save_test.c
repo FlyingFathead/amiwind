@@ -39,6 +39,17 @@ int main(void){
     decoded.state.inventory.condition[0]=.375f;
     assert(AW_InventoryPickup(&decoded.state,index));assert(AW_StateGet(&decoded.state,AW_ITEM,ring.id)==3);
     assert(AW_InventoryEquipped(&decoded.state,ring.id)==1);
+    /* Feature bit 4: the selected magic item and a recorded charge round-trip;
+     * a selection of an item not owned is refused. */
+    {
+        aw_save_t magic=save;int msize;unsigned char mbytes[AW_SAVE_BYTES];
+        strcpy(magic.state.magic.selected,"synthetic_ring");magic.state.magic.charge_known=1;magic.state.magic.charge[0]=7.5f;
+        msize=AW_SaveEncode(mbytes,sizeof(mbytes),&magic);assert(msize>size);
+        memset(&decoded,0,sizeof(decoded));assert(AW_SaveDecode(mbytes,msize,&decoded));
+        assert(!strcmp(decoded.state.magic.selected,"synthetic_ring") && decoded.state.magic.charge[0]==7.5f);
+        strcpy(magic.state.magic.selected,"not_owned");assert(!AW_SaveEncode(mbytes,sizeof(mbytes),&magic));
+        assert(AW_SaveDecode(bytes,size,&decoded) && !decoded.state.magic.selected[0]);
+    }
     prior=decoded;bytes[size-1]^=1;assert(!AW_SaveDecode(bytes,size,&decoded));assert(!memcmp(&prior,&decoded,sizeof(prior)));
     save.state.inventory.dropped[index].count=-1;assert(!AW_SaveEncode(bytes,sizeof(bytes),&save));
     save.state.inventory.dropped[index].count=2;save.state.inventory.dropped[index].serial=0;assert(!AW_SaveEncode(bytes,sizeof(bytes),&save));

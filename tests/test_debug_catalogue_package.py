@@ -14,7 +14,7 @@ class DebugCataloguePackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             receipt = build_aga.stage_debug_catalogues(target, debug_luma=True)
-            self.assertEqual(set(receipt), {'debug-commands.txt', 'shroompicker.txt'})
+            self.assertEqual(set(receipt), {'debug-commands.txt', 'shroompicker.txt', 'camera-marks.txt'})
             for name, record in receipt.items():
                 self.assertEqual((target/name).read_bytes(),
                                  (build_aga.ROOT/'config'/name).read_bytes())
@@ -45,6 +45,7 @@ class DebugCataloguePackageTests(unittest.TestCase):
                 (tree/'build/AmiWindCheck').write_bytes(b'fixture checker')
                 (tree/'build/awbench').write_bytes(b'fixture benchmark')
                 (tree/'build/AmiWindFPU').write_bytes(b'fixture loader')
+                (tree/'build/AmiWindCPU').write_bytes(b'fixture selector')
                 argv = ['build_aga.py','engine','--sdk',tmp,'--out',str(out),'--jobs','1']
                 if flag:
                     argv.append(flag)
@@ -55,7 +56,10 @@ class DebugCataloguePackageTests(unittest.TestCase):
                      patch.object(build_aga,'check_engine_fpu',return_value={'passed':True}) as fpu, \
                      patch.object(build_aga,'write_world_coverage'), patch.object(build_aga,'executable_path',side_effect=str):
                     build_aga.main()
-                fpu.assert_called_once()  # 68040 builds run the FPU check (ENGINE-FPU-UNIMPL-31)
+                # 68040 builds run the FPU check (ENGINE-FPU-UNIMPL-31), and the 68060 engine they also build
+                # (AmiWind060, docs/68060.md) its own 68060 check
+                self.assertEqual([call.args[-1] for call in fpu.call_args_list], ['68040', '68060'])
+                self.assertIn('engine_68060', json.loads((out/'engine-build.json').read_text()))
                 self.assertEqual(json.loads((out/'engine-build.json').read_text())['fpu_unimplemented_check'], {'passed':True})
                 make = run.call_args_list[0].args[0]
                 compiler = next(arg for arg in make if arg.startswith('CC='))
@@ -77,6 +81,7 @@ class DebugCataloguePackageTests(unittest.TestCase):
                 (tree/'build/AmiWindCheck').write_bytes(b'fixture checker')
                 (tree/'build/awbench').write_bytes(b'fixture benchmark')
                 (tree/'build/AmiWindFPU').write_bytes(b'fixture loader')
+                (tree/'build/AmiWindCPU').write_bytes(b'fixture selector')
                 argv = ['build_aga.py','engine','--sdk',tmp,'--out',str(out),'--jobs','1',*extra]
                 with patch.object(sys,'argv',argv), patch.object(build_aga,'check_native_versions'), \
                      patch.object(build_aga,'new_output',return_value=out), \

@@ -9,7 +9,7 @@
 | Where | Map load of aw_flame entities (game logic, entity loader) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.30-dev5, v0.0.32-dev2, v0.0.32-dev3 (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: Every placed flame prints about 23 console errors per load; likely slows Census loads. |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.32-dev3 |

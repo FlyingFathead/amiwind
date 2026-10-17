@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Release rules of the image step's per-map passes (owner decisions, 9 October 2026):
+"""Release rules of the image step's per-map passes (project decisions, 9 October 2026):
 
 1. the per-map pass cache is used by release candidates and finals only with --allow-release-reuse
    (the from-scratch reference build is compared file by file before the release), and every pass

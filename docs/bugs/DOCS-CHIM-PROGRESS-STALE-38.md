@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 13 October 2026, in v0.0.38 |
 | Where | Main README: CHIM progress map image, caption, counts and release-plan legend |
 | Reproduction | always |
@@ -47,7 +47,7 @@ Those historical conversion figures do not describe current packaged coverage.
 ## Where
 
 The main README's CHIM progress map section: image, alternative text, caption,
-counts and legend. The owner reported the mismatch on 13 October 2026.
+counts and legend. The maintainer reported the mismatch on 13 October 2026.
 
 ## How it happened
 
@@ -121,7 +121,7 @@ size are distinct measurements; these figures do not identify a final039 ZIP.
 RC1 package and matching source delivery finalized on 13 October 2026 at
 18:06:05 UTC (21:06 in Finland), with source `57a8699` and image `fbf9a6c`
 kept distinct. The six partial overlaps remain outside the shipped whole-cell
-count. The owner approved RC1 on 13 October 2026 as the basis for final
+count. The maintainer approved RC1 on 13 October 2026 as the basis for final
 v0.0.39. This release-level approval does not supply universal gameplay
 acceptance or close unrelated issues; final-image checks remain separate.
 
@@ -135,10 +135,10 @@ cells are not included cells and package presence does not prove gameplay.
 
 ## Post-pin RC2 package observation, 14 October 2026
 
-RC2 full disk readback and independent extraction verify360 whole regional CHIM cells; six partial town overlaps remain excluded. The exact inspection package and matching source artifacts were finalized at 2026-10-13T22:15:44Z. Conversion/audit/native-cell coverage and owner acceptance are unchanged. Historical empty RC1 plan remains incorrectly selected as next by the existing selector; no supported historical flag permits a truthful metadata-only correction.
+RC2 full disk readback and independent extraction verify360 whole regional CHIM cells; six partial town overlaps remain excluded. The exact inspection package and matching source artifacts were finalized at 2026-10-13T22:15:44Z. Conversion/audit/native-cell coverage and maintainer acceptance are unchanged. Historical empty RC1 plan remains incorrectly selected as next by the existing selector; no supported historical flag permits a truthful metadata-only correction.
 
-These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. At that RC2 checkpoint owner acceptance and final v0.0.39 clearance were pending;
-final shipment is recorded in the later recurrence below without inferring owner acceptance.
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. At that RC2 checkpoint maintainer acceptance and final v0.0.39 clearance were pending;
+final shipment is recorded in the later recurrence below without inferring maintainer acceptance.
 
 ## Shipment-status recurrence, 14 October 2026
 
@@ -153,7 +153,7 @@ RC1/RC2 scene diagnostics as historical. Renewed
 [movement with fists drawn](PLAYER-READY-MOVEMENT-39.md),
 [blocking](COMBAT-BLOCKING-36.md) and
 [swimming](WATER-GAMEPLAY-PARITY-38.md) remain open.
-Shipment, independent fresh-download verification and owner gameplay
+Shipment, independent fresh-download verification and maintainer gameplay
 acceptance are distinct. No coverage count or runtime source changes.
 
 The correction is prepared for integration; this report's historical pending
@@ -197,6 +197,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TOOLKIT-CULL-DIAGNOSTICS-38](TOOLKIT-CULL-DIAGNOSTICS-38.md): Collision-only diagnostics disable terrain culling preview
 - [TOOLKIT-MAP-SCALING-36](TOOLKIT-MAP-SCALING-36.md): The CHIM Progress Tracker map scales badly: a small box in the middle with inner scrollbars, controls far away, the island cropped
 - [TOOLKIT-MONITOR-BLIND-PHASES-36](TOOLKIT-MONITOR-BLIND-PHASES-36.md): The Toolkit Monitor shows nothing during silent build phases: no activity, no phases, no time since the last log line
+- [TRACKER-AREA-CELLS-RUN-WIDE-42](TRACKER-AREA-CELLS-RUN-WIDE-42.md): The CHIM tracker gives every area of a build all of the build's cells: Balmora holds 811 cells, so an area or shipped-towns plan selector takes most of the island
 - [TRACKER-CHIM-LINK-MERGE-33](TRACKER-CHIM-LINK-MERGE-33.md): A merge dropped the CHIM Engine tracker link from the register; the integration head fails a tracker test
 - [TRACKER-FIXED-LEFT-OPEN-36](TRACKER-FIXED-LEFT-OPEN-36.md): Fixed work whose bug entry stayed open (LAVA-NOT-IMPLEMENTED-33)
 - [TRACKER-MAP-BLANK-31](TRACKER-MAP-BLANK-31.md): World progress map vanished when the mouse moved over it
@@ -204,6 +205,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACKER-REGISTER-LINK-MERGE-33](TRACKER-REGISTER-LINK-MERGE-33.md): An integration merge dropped the CHIM Engine tracker link from the bug register
 - [TRACKER-REGISTER-SIZE-33](TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit
 - [TRACKER-REGISTER-SIZE-36](TRACKER-REGISTER-SIZE-36.md): The live register bugs.json reached 75 % of its 1 MiB release text limit; the size warning was raised to 85 % until a second archive rotation
+- [TRACKER-RELEASE-HEADROOM-MISSING-42](TRACKER-RELEASE-HEADROOM-MISSING-42.md): The CHIM tracker keeps no memory headroom per cell from a full build, and older CHIMport results replace a newer full build's audits: every headroom figure dates from the v0.0.36-v0.0.40 builders
 - [TRACKER-SEA-CELL-SET-36](TRACKER-SEA-CELL-SET-36.md): The CHIM tracker's island view leaves out 37 land cells that hold only terrain and sea; one is labelled Solstheim
 - WIN-02 (no report page): Cancelled Windows stage leaves child workers alive
 

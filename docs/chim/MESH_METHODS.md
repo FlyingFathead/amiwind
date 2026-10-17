@@ -77,7 +77,7 @@ Vivec cantons, houses, docks) get planar merge only.
 
 ## Measured
 
-Owner's data, the v0.0.36-dev3 world (Balmora, Seyda Neen, 270 CHIMport region cells), every mesh through
+Maintainer's data, the v0.0.36-dev3 world (Balmora, Seyda Neen, 270 CHIMport region cells), every mesh through
 the converter (`prepare_mesh_bsp._prepare_model`), 11 October 2026. Render bytes: the model record's
 render part (planes, vertices, texture vectors, faces, edges).
 
@@ -156,7 +156,7 @@ estimates active-ring peaks of 1,115,744; 1,451,376; 1,541,344; 5,113,632; 5,721
 1,087,024 B over budget. The current engine does not implement this stage-selective loading;
 metadata, transition overlap, neighboring frames and deferred actors are not accounted for.
 
-The owner repeatedly identifies lantern assemblies as visual density hotspots. In this cell,
+The maintainer repeatedly identifies lantern assemblies as visual density hotspots. In this cell,
 the original streetlight mesh has 149 faces and its separate curved support has 264 faces.
 Those observations do not establish that lanterns dominate the ring's memory cost.
 

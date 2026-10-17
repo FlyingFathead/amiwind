@@ -20,7 +20,7 @@
   - [Historical priority — v0.0.16](#historical-priority--v0016)
   - [Open issues and measured findings](#open-issues-and-measured-findings)
   - [Final recovery handover update, 27 September 23:32–23:35 Helsinki](#final-recovery-handover-update-27-september-23322335-helsinki)
-  - [28 September 15:50 owner follow-up](#28-september-1550-owner-follow-up)
+  - [28 September 15:50 maintainer follow-up](#28-september-1550-maintainer-follow-up)
 
 <!-- contents end -->
 
@@ -62,7 +62,7 @@ Open, in priority order:
 
 ### In preparation: v0.0.28 — Trees and Grass, Day and Night
 
-VERSION is 0.0.28; scoped local image015 native acceptance passed. Hosted CI, tag and public publication remain pending the owner's Linux step.
+VERSION is 0.0.28; scoped local image015 native acceptance passed. Hosted CI, tag and public publication remain pending the maintainer's Linux step.
 v0.0.27 is the latest published release. Default V3 adds two cloud layers,
 red/gold sunset, purple twilight, blue hour and a moving sun, with clock-aligned
 fog/world tone and default-on sun/cloud controls. Foliage remains 19,984 unique
@@ -109,9 +109,9 @@ ownership checks passed. This is a scoped native pass, not all-map, unrestricted
 world, or physical-hardware certification. The minimum logged peak clearance
 was 1,812,304 bytes at sn012, 284,848 bytes below the unchanged 2 MiB safety
 reference. That remains a reserve warning; the production memory gate did not
-pass. Intermittent music artifacts remain an owner-deferred known issue, and no
+pass. Intermittent music artifacts remain a maintainer-deferred known issue, and no
 clean-audio pass is claimed. Stable v0.0.28 is accepted locally within this
-scope; hosted CI, tag and public publication remain pending the owner's Linux
+scope; hosted CI, tag and public publication remain pending the maintainer's Linux
 publication step.
 
 The coherent 049/050 Seyda batch passes bounded host checks: all 64 maps repeat
@@ -210,7 +210,7 @@ correct the cap gaps reported in rc1. Full world overlay, strict actor contact
 (zero unresolved), complete NPC gallery and filesystem/HDF verification passed.
 The two generated emulator configurations mount both HDFs simultaneously.
 
-Corrected-image owner playtest, texture/boundary acceptance, fresh Linux/Docker
+Corrected-image maintainer playtest, texture/boundary acceptance, fresh Linux/Docker
 pipeline validation and hosted CI remain pending. The published baseline is
 v0.0.26. See [rc2 notes](RELEASE-v0.0.27-rc2.md),
 [What are rocks?](WHAT_ARE_ROCKS.md) and [known issues](BUG_JOURNAL.md).
@@ -244,7 +244,7 @@ as an ongoing priority alongside host support; speculative QCC acceleration
 remains future work. The workstation
 build completed world-terrain in 4232.5 seconds, then failed image assembly's
 world/journal receipt check. rc6 repairs that receipt and provides checked
-[image recovery](IMAGE_RECOVERY.md). The owner has since reported successful
+[image recovery](IMAGE_RECOVERY.md). The maintainer has since reported successful
 rc3 private-test assembly with 23 explicitly accepted contact findings. That rc3 result remains historical evidence. Current rc7 actor-fit validation
 is recorded separately below.
 
@@ -256,12 +256,12 @@ including the rc8 crash correction. See [v0.0.25 scope](RELEASE-v0.0.25.md) and
 [validation](validation/v0.0.25-source.json). Target playtesting remains pending.
 The regular, very brief fist blink every 1–2 seconds is still open. The
 static asset gallery and broad scenery coverage remain future work.
-The owner completed rc7 engine/image recovery with strict actor checking and no
+The maintainer completed rc7 engine/image recovery with strict actor checking and no
 waiver: 2026-10-01 23:49:33 to 2026-10-02 00:00:28 +03:00, about 10m55s.
 The reported HDF is 3,221,258,240 bytes, SHA-256
 `20b63b78c95f5fbcba5b741bf7ee8dd14e7ff57c1cede4f0ce6fdcfc6837d1b8`.
 Source commit `176524e0fc8f4f3e07163282d8f2a81e42a9cfce` passed GitHub run
-36925716217; the owner verified the prerelease downloads. These are reported
+36925716217; the maintainer verified the prerelease downloads. These are reported
 build/publication results, not a claim of successful runtime playtesting.
 
 Subsequent rc7 playtesting found an F-then-V crash. The host regression reproduces
@@ -310,7 +310,7 @@ behavior that must remain distinct from geometric placement correction.
 
 ### RC3 recovery baseline (historical)
 
-**AmiWind v0.0.24-rc3 — owner-requested recovery candidate.** All 2,935
+**AmiWind v0.0.24-rc3 — maintainer-requested recovery candidate.** All 2,935
 base-master NPC/creature records map to 3,551 successfully converted assets.
 There are 29 exact-model opt-in geometry allowances, bounded at 1,024 triangles.
 Dagoth Ur retains the original mask/crest geometry and a larger texture atlas.
@@ -347,7 +347,7 @@ Full selected interior geometry is retained, including distant-origin towers
 and previously omitted dressing. The checklist records stair collision and
 slope classification, ground-material repairs, clearer gold e/H glyphs, shared
 NPC targeting, the guard's final dock post and filename packaging corrections.
-These are local checks, not owner acceptance of every route or the full game.
+These are local checks, not maintainer acceptance of every route or the full game.
 
 The accepted Strider, frozen-frame Loading... box, Shift+V, 90-degree FOV,
 base player hull and race/sex eye heights remain. Balmora has 64 overlapping
@@ -357,7 +357,7 @@ whole-map polygon-density analysis, full NPC services, schedules, combat and
 quest simulation remain future work. Greetings use a bounded authored fixture.
 
 Stable v0.0.23 and the published dev5 prerelease remain unchanged. Final
-v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
+v0.0.24 needs the maintainer's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
 [complete checklist](INVESTIGATION-v0.0.24-rc1.md),
 [conversion lessons](BALMORA_CONVERSION_LESSONS.md) and
 [Amiga naming constraints](RELEASE_WORKFLOW.md#amiga-limitations).
@@ -385,7 +385,7 @@ Strider travel. Dev2 restores missing architectural facades, repairs two concave
 underpass colliders, the guard's final approach and Talk hints. Race/sex now
 selects eye height; the measured base player body and Quake 90-degree FOV remain.
 
-Owner playtest: dev3 Balmora regions/sub-cells work surprisingly well and are a
+Maintainer playtest: dev3 Balmora regions/sub-cells work surprisingly well and are a
 promising basis for the wider world. The Strider is explicitly accepted: leave
 its conversion unchanged. Balmora often feels faster than Seyda Neen; this
 observation remains distinct from matched measurements. The loader replaces
@@ -412,7 +412,7 @@ existing fonts. CPU-job detection tolerates a failed process CPU-count query.
 See [v0.0.22 scope](RELEASE-v0.0.22.md) and [paper settings](PAPER_FONT_OPTIONS.md).
 
 Whole-pipeline parallel scheduling remains pending. This source merge does not
-claim a new Amiga/HDF build or emulator playtest. The owner completed all 17
+claim a new Amiga/HDF build or emulator playtest. The maintainer completed all 17
 stages of the earlier dev5 Steam build; that is separate historical evidence.
 
 Dev7 makes the native preflight visible long enough to diagnose startup: after a
@@ -445,7 +445,7 @@ contrast and Census wall-art conversion, and selects New Game by default. The
 fixed Y/N/version index is in BUGS.md. Full opening acceptance remains pending.
 
 The dev2 correction preserves the original invisible enclosure while fixing its
-compound rotations. Focused native plank passage/containment passed; owner
+compound rotations. Focused native plank passage/containment passed; maintainer
 confirmation and full opening acceptance remain pending.
 
 The opening/character/save prototype and UI changes are described in
@@ -460,7 +460,7 @@ The standalone [FS-UAE launcher](FS-UAE-LAUNCHER.md) now speeds up repeat
 playtests: latest-image selection, remembered ROM and generated local config.
 This host-tool addition does not change the runtime or resolve the open freeze.
 
-Owner chose maintenance first. The next milestone includes [dock character
+Maintainer chose maintenance first. The next milestone includes [dock character
 creation and Census Office interiors/NPCs](CHARACTER_CREATION.md), attributes set,
 and working [save/load with adjustable autosave history](SAVEGAME_PLAN.md). These are not v0.0.20 features.
 
@@ -484,12 +484,12 @@ The disk indicator is optional and off by default. Optional streamed movie playb
 precedes Jiub and supports Esc; see INTRO_VIDEO.md for source availability and tests. Dock/Census creation and the complete opening remain unfinished. The historical
 state below describes preceding releases, not the complete current feature set.
 
-The owner completed all 12 full game-data build stages with test-004 and
+The maintainer completed all 12 full game-data build stages with test-004 and
 confirmed test-006 works on 28 September 2026. That v0.0.17 release included FS-UAE
 autorun and the default `early_game_demo_start_1` town-center opening with
 track 04. Final ROM-directory prompting and documentation updates follow that
 confirmation; the engine is unchanged from test-006. Hosted CI is checked by
-the owner when pushing the release commit. See [validation](VALIDATION-v0.0.17.md)
+the maintainer when pushing the release commit. See [validation](VALIDATION-v0.0.17.md)
 and [demo opening](EARLY_GAME_DEMO_START.md).
 
 The published v0.0.16 release includes boot credits, a blue ordinary-water tint and
@@ -499,10 +499,10 @@ Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 
 ### Project identity and build access, 28 September 2026
 
-The owner selected **amiwind** as the repository name and
+The maintainer selected **amiwind** as the repository name and
 **https://github.com/FlyingFathead/amiwind** as the official project home.
 This records the intended publication location; remote creation/publication
-remains with the owner. The working README now identifies this URL.
+remains with the maintainer. The working README now identifies this URL.
 
 Source 0.12.1.dev1 consolidates both public source components under one
 `amiwind/` repository root. `engine/aga/` now contains authoritative native source;
@@ -549,11 +549,11 @@ hardware performance claim. Buildings are resident; music streams.
 
 See CHECKPOINT_017_VALIDATION.md for exact hashes, checks and limitations.
 Development source ZIP and private playable ZIP are immutable. Public source
-contains no game/ROM data; private recovery packages contain owner-supplied data.
+contains no game/ROM data; private recovery packages contain user-supplied data.
 
 ### Historical priority — v0.0.16
 
-Owner requested complete development recovery before moving sessions. That recovery backup is complete. The v0.0.16 release
+Maintainer requested complete development recovery before moving sessions. That recovery backup is complete. The v0.0.16 release
 updates build access, versioning, ordinary-water tint and the fog default. Next milestone is an opt-in reconstruction of the
 opening sequence: audit original scripts/voice completion timing; implement the
 first playable beat and dark bordered UI/subtitle/message boxes; evaluate an
@@ -586,7 +586,7 @@ rollback path. Never destructively replace an existing feature during experiment
 - New small requests: move FPS to the left; add `dbg show fps` alias. Current
   `dbg fps on/off` works, but those two changes have not been made.
 
-All recent owner coordinates and reusable LOD ideas are in SEYDA_NEEN_NEXT_STEPS.md.
+All recent maintainer coordinates and reusable LOD ideas are in SEYDA_NEEN_NEXT_STEPS.md.
 OPTIMIZATION_HISTORY.md and the implementation journals preserve causes, trials
 and known limitations. Correctness must accompany performance measurements.
 
@@ -598,13 +598,13 @@ proposal above. Current frozen dev2 still starts at700; live command:
 the next build, preserving the old packages and selectable distances.
 
 New persistent rock/Silt Strider-port report: XYZ337 643 34, DEG304, P-16,
-v0.0.15-dev2, image(20260927-203433).png. Owner screenshot shows a projecting
+v0.0.15-dev2, image(20260927-203433).png. Maintainer screenshot shows a projecting
 terrain/rock section with missing-looking lower geometry; exact source identity
 and cause still require comparison. HUD reads28.4FPS in that one screenshot,
 not a benchmark. Do not conflate the already-known omitted Silt Strider ACTI
 with proof of this formation's geometry cause. Backup first; keep this open.
 
-### 28 September 15:50 owner follow-up
+### 28 September 15:50 maintainer follow-up
 
 The Silt Strider-port defect persists in v0.0.19 at XYZ260/417/30, DEG11, P-19;
 the strider and driver are still absent. Track as AW-20260928-03 in [BUGS.md](BUGS.md).
@@ -622,10 +622,10 @@ effects are roadmap work, not completed gameplay.
 #### Historical image recovery evidence — v0.0.25 candidates
 
 The receipt-patched rc3 image reached QCC, then stopped on 23 known actor-contact
-findings. The owner subsequently reported successful private-test image assembly
+findings. The maintainer subsequently reported successful private-test image assembly
 with exact-report acceptance: 144.664 seconds, 3,221,258,240 bytes, SHA-256
 `b99358fc5342b8c8dfc827d4db8353acd113daad1420853d8b2a4865080acb47`.
-The terrain was reused. This is an owner-reported rc3 diagnostic result; actor
+The terrain was reused. This is a maintainer-reported rc3 diagnostic result; actor
 production acceptance remains false and no emulator result is recorded.
 
 rc6 keeps strict default acceptance, adds a separate explicitly requested
@@ -642,7 +642,7 @@ an error. Recovery now schedules engine, gallery and image while retaining terra
 Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
 reduced or bypassed, including model/asset generation, catalogue coverage,
 quality and validation, without a specific documented case or scenario **and
-explicit approval from the project owner**. A builder or contributor cannot
+explicit approval from the project maintainer**. A builder or contributor cannot
 approve its own exception. Build time, disk pressure and convenience do not
 supply that approval. An opt-out flag is a mechanism for an approved exceptional
 debugging case, not permission to choose that exception independently.

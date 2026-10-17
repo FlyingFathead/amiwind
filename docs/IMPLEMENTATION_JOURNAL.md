@@ -59,7 +59,7 @@ instead of erasing old results. Keep rejected trials and their evidence.
 
 Entry format: **symptom -> confirmed cause (or hypothesis) -> change -> first
 fixed version -> evidence -> regression check -> remaining limitation**.
-Distinguish host tests, native tests and owner confirmation. Never assign a fix
+Distinguish host tests, native tests and maintainer confirmation. Never assign a fix
 version to an unresolved hypothesis. Raw extracts, screenshots and source lookup
 tables remain private; public notes describe the mapping. Untried proposals live
 in [IMPLEMENTATION_IDEAS.md](IMPLEMENTATION_IDEAS.md).
@@ -96,7 +96,7 @@ Morrowind's actor assembly or game rules.
   v0.0.13-dev1 / checkpoint-014. No wider field or bank switching needed.
 - **Evidence/regression:** actual-loader boundary fixture and same-camera native
   pier comparison in [checkpoint-014](CHECKPOINT_014_VALIDATION.md). Retain 32767,
-  32768 and maximum/bad-index cases. Locally verified; owner pending. The separate
+  32768 and maximum/bad-index cases. Locally verified; maintainer pending. The separate
   shack-wall report remains open.
 
 ## J002 — restored geometry exposed capacity and cache limits
@@ -131,7 +131,7 @@ Morrowind's actor assembly or game rules.
   could create distant solid extensions.
 - **Fix/version:** six axial bounds on expanded architectural hulls in
   v0.0.12-dev2 / checkpoint-013. Keeping point hulls unchanged avoided the extra
-  memory of an early candidate. Owner confirmed the central square repaired.
+  memory of an early candidate. Maintainer confirmed the central square repaired.
 - **Regression/limit:** retain the exact route and hull fixtures in
   [checkpoint-013](CHECKPOINT_013_VALIDATION.md). Bad host samples are not a count
   of proven gameplay traps; other approximate collision still needs testing.
@@ -182,7 +182,7 @@ Morrowind's actor assembly or game rules.
 
 Include runtime/pipeline version, source/build hashes, camera/route, hardware
 profile and evidence location when relevant. Keep public fixtures synthetic.
-Link [playtest status](PLAYTEST_STATUS.md) for owner acceptance and
+Link [playtest status](PLAYTEST_STATUS.md) for maintainer acceptance and
 [optimization history](OPTIMIZATION_HISTORY.md) for measured comparisons.
 Do not replace a prior failure with a later pass: explain what changed.
 
@@ -212,7 +212,7 @@ Do not replace a prior failure with a later pass: explain what changed.
 
 ## J010 — console contrast, typing and font (checkpoint-015)
 
-- **Owner report:** the console backdrop seemed to appear/disappear and text was
+- **Maintainer report:** the console backdrop seemed to appear/disappear and text was
   hard to read. Its old color could blend into sky; the exact reported flicker
   cause is not isolated. Do not call that a proved cache or transparency bug.
 - **Change:** fill all visible console rows with a solid palette color every draw,
@@ -227,7 +227,7 @@ Do not replace a prior failure with a later pass: explain what changed.
 
 ## J011 — incomplete terrain/rock formation (open)
 
-- **Owner report:** two checkpoint-014 views show an incompletely drawn formation
+- **Maintainer report:** two checkpoint-014 views show an incompletely drawn formation
   beside the road. The second view clarifies the first; this is not classified
   as an intended overhang or a creature.
 - **Cause:** unknown. Needs same-camera original LAND/placed-rock comparison and
@@ -296,7 +296,7 @@ value itself. Preserve the failed screenshots and final native acceptance.
 
 ### Baseline and recovery
 
-The owner's `amiwind-2026-09-28_045110.zip` contains v0.0.17 and is the source
+The maintainer's `amiwind-2026-09-28_045110.zip` contains v0.0.17 and is the source
 baseline. All 162 original host tests passed before edits. Do not restart from
 v0.0.15-dev2 source just because those playable/recovery archives are attached.
 The older playable still provides a geometry/data comparison, not current code.
@@ -318,7 +318,7 @@ glyphs begin at byte 296. The retained study and format reference agree. Native
 assets use validated packed 2-bit coverage and per-glyph proportional metrics.
 
 The first dialogue animation targeted a position above the bars, which would
-cover rendered world pixels. Owner clarified that the panel belongs entirely
+cover rendered world pixels. Maintainer clarified that the panel belongs entirely
 inside the unused lower strip. Corrected the target: starts off-screen at the
 screen bottom, ends at the 3D viewport's lower boundary, temporarily replaces
 bars. Long subtitles page inside that strip. The console remains top-opening
@@ -392,7 +392,7 @@ the next UI/intro work. It is not claimed by this checkpoint.
 - Sample blink at the maximum authored key, not the time-range midpoint: the
   midpoint did not fully close the lids. Reconverted all ten appearances.
 - Include intro conversion in the guided build; a private hand-built scene alone
-  does not make a source checkpoint reproducible by the owner.
+  does not make a source checkpoint reproducible by the maintainer.
 - A debug reload of the same ship map must also clear old intro pointers/prompts.
   Reset the adapter on every non-New-Game scene spawn, including same-map reloads.
 
@@ -489,7 +489,7 @@ independent HDF payload readback.
   Do not quote an FPS multiplier: camera paths differ and world geometry remains
   costly. No actor rescaling, viewport change, barrel reduction or extra resident
   game heap was used.
-- The first game-data ZIP had no video payload. The owner supplied Video files
+- The first game-data ZIP had no video payload. The maintainer supplied Video files
   separately. Decode Bink on the host; AWV1 streams indexed frames and PCM with
   about 21KiB of picture/audio/palette buffers. A synthetic native fixture passed
   both EOF and Esc into Jiub. Original mw_intro.bik is 640x480, 57.5 seconds, with
@@ -563,7 +563,7 @@ path, covering startup, EOF, Next, Previous and group changes. Preserve the
 event-log call and explicit status command. The player test checks silent
 off-state transitions, enabled notices, runtime toggling and status availability.
 
-Promoted this accumulated checkpoint to the owner's requested public v0.0.19
+Promoted this accumulated checkpoint to the maintainer's requested public v0.0.19
 release, without a development suffix. The final version passed 179 host tests,
 68040 compilation, complete HDF payload readback, and FS-UAE debug on/off/status
 checks. Only the enabled Next event emitted a routine OST console notice; three
@@ -571,7 +571,7 @@ Next and two group events were still recorded privately.
 
 ## J015 — opening invisible barriers crossed the plank (v0.0.21-dev1)
 
-- **Symptom:** owner report, 28 September 2026: walking from the ship toward
+- **Symptom:** maintainer report, 28 September 2026: walking from the ship toward
   the dock guard was obstructed and pushed the player into the sea.
 - **Confirmed conversion defect:** the 22 original collision-only references
   had correct centres and extents, but compound rotations used `Rz @ Ry @ Rx`.
@@ -594,7 +594,7 @@ Next and two group events were still recorded privately.
   startsolid or allsolid. A synthetic ESM combined-rotation regression now checks
   a diagonal wall's expected thickness normal. Native state tests also keep the
   enclosure active across dock, race, office, courtyard and captain stages.
-- **Validation status:** locally verified correction in v0.0.21-dev2; owner
+- **Validation status:** locally verified correction in v0.0.21-dev2; maintainer
   confirmation pending. In FS-UAE 3.1.66, debug setup placed the player at the
   hatch arrival, then ordinary walking crossed the deck/plank. Sustained lateral
   inputs hit both plank boundaries without falling into the sea. Continuing to
@@ -609,8 +609,8 @@ Next and two group events were still recorded privately.
 
 ## J016 — dock approach used mismatched actor anchors
 
-- **Symptom:** owner says the dock guard does not catch the player as in the
-  original. Character selection itself otherwise works in the owner's playtest.
+- **Symptom:** maintainer says the dock guard does not catch the player as in the
+  original. Character selection itself otherwise works in the maintainer's playtest.
 - **Cause:** NPC native origin is at the feet; player native origin is at body
   centre. Comparing raw origins shrank the source108-unit approach sphere.
   OpenMW's GetDistance compares full 3-D reference positions; it is not a 2-D
@@ -626,7 +626,7 @@ Next and two group events were still recorded privately.
 
 ## J017 — scripted room was omitted as an activator
 
-- **Symptom:** owner falls beneath the Census Office floor and sees a missing
+- **Symptom:** maintainer falls beneath the Census Office floor and sees a missing
   wall behind a cupboard. The precise later view is XYZ127/206/0, not the
   supplied OCR's127/266/0. A separate wall view is XYZ46/192/65.
 - **Cause:** architectural reference172861, `chargen stuff room`, is ACTI using
@@ -642,7 +642,7 @@ Next and two group events were still recorded privately.
   Converted candidate collision has reference172861 under five room samples,
   including127/206. Synthetic selector regression covers the intended room,
   deleted reference, unknown activator and wrong model. Native result is recorded
-  with the release evidence; owner acceptance remains separate.
+  with the release evidence; maintainer acceptance remains separate.
 - **Reusable lesson:** classify placed content by its visual/collision role and
   scripted lifetime. A script-bearing record type does not imply disposable
   geometry. Audit omitted structural references before accepting a new interior.
@@ -700,7 +700,7 @@ surfaces are not automatically treated as traversable routes. Do not patch every
 flag with a box: investigate omitted source geometry, transforms and collision.
 
 
-The later owner out-of-bounds view XYZ201,-210,0 is outside the restored room.
+The later maintainer out-of-bounds view XYZ201,-210,0 is outside the restored room.
 Both old and fixed BSP standing hulls at X201/Y-210 trace down to the outer
 world enclosure at origin Z0.625; that is a catch floor, not a valid room floor.
 This illustrates why a long downward hit alone cannot certify walkability.
@@ -710,7 +710,7 @@ route is reproduced. Do not turn the enclosure hit into a recovery checkpoint.
 
 ## J021 — door-shaped cuts remove redundant runtime geometry
 
-**Observation (owner, 28 September):** both Census exterior exits show wall
+**Observation (maintainer, 28 September):** both Census exterior exits show wall
 geometry protruding through the door. Reference camera: Seyda Neen XYZ396,-171,39,
 yaw170,pitch-3, v0.0.21-dev2. The proposed benefit is less unnecessary geometric
 work as well as a correct door surface; the actual FPS cost is unmeasured.
@@ -731,13 +731,13 @@ Do not add this to the lessons-confirmed-fixed list until the geometry and
 same-camera rendering/performance checks support the result.
 
 
-J021 owner refinement: leave a conservative margin concealed under the frame.
+J021 maintainer refinement: leave a conservative margin concealed under the frame.
 For a transition doorway whose opening is never revealed, a wall-coloured flat
 backing rectangle can replace unnecessary covered depth. Preserve actual openings
 for hinged doors. Planned assisted simplification defaults on, with a disable
 switch; record it as design until the converter, config and acceptance exist.
 
-Further owner clarification: "blank" only the concealed patch to the wall's base
+Further maintainer clarification: "blank" only the concealed patch to the wall's base
 colour/texture, beneath the door/frame margin. Do not blank or simplify exposed
 wall detail. The reason is to omit geometry which cannot contribute to the view
 from the runtime asset, reducing resident data and geometric work. Validate
@@ -746,7 +746,7 @@ concealment across door states and viewpoints before removal.
 
 ## J022 — accepted sub-cell loading presentation (30 September 2026)
 
-The owner tested Balmora's v0.0.24-dev3 sub-cell transitions and explicitly
+The maintainer tested Balmora's v0.0.24-dev3 sub-cell transitions and explicitly
 approved the frozen last frame with a small top-centred **Loading...** box.
 Keep this as the default method for exterior sub-cells, including Seyda Neen.
 Retain the existing blank-frame mode as an option. This acceptance concerns
@@ -769,20 +769,20 @@ loaded file, and performance claims need frame-time evidence.
 
 The arrival-area design name is `intro_seyda_neen_subcell_pier`; its short BSP
 filename remains `intro_docks.bsp` for the existing runtime/image workflow. The
-owner's annotated circle guides a conservative polygon footprint retaining
+maintainer's annotated circle guides a conservative polygon footprint retaining
 whole intersecting objects and the Strider silhouette across the water.
 A wider map-density study is explicitly deferred to the next version.
 
 
 ## J023 — Balmora dev3 acceptance and second stair report
 
-Owner acceptance, 30 September 2026: Balmora's region/sub-cell approach works
+Maintainer acceptance, 30 September 2026: Balmora's region/sub-cell approach works
 surprisingly well and is a promising foundation for streaming the wider game
 without disruptive scene transitions. Preserve the frozen frame and Loading...
 box. This is acceptance of the current synchronous approach, not a claim that
 asynchronous whole-world streaming is already implemented.
 
-The owner also accepts Balmora's Silt Strider in v0.0.24-dev3: **leave its
+The maintainer also accepts Balmora's Silt Strider in v0.0.24-dev3: **leave its
 geometry and conversion profile unchanged**. Earlier broken-Strider reports
 are superseded by this confirmation.
 
@@ -858,7 +858,7 @@ byte-specific per-model table. Three of 28 initially failing conversions fit the
 777-triangle trial; 25 still fail rather than discarding protected shell geometry.
 The source/engine baseline before this trial is retained with a checksum.
 
-The owner requested an interim RC2 while these investigations continue. The
+The maintainer requested an interim RC2 while these investigations continue. The
 candidate reports its 23 open contact findings and reproducible walking stalls;
 it does not assert a passed production placement gate or final visual acceptance.
 
@@ -913,10 +913,10 @@ worker to five, without treating the resident tmpfs game assets as spare RAM.
 *…and then their faces turned ashen.* What looked like a rough low-polygon
 conversion was also a colour-pipeline fault. Fewer triangles and small texture
 tiles can soften facial detail, but they do not explain warm pixels turning
-blue-grey. The owner had seen the effect for a long time, especially on pale
+blue-grey. The maintainer had seen the effect for a long time, especially on pale
 Nords and Bretons; darker skin concealed it more readily.
 
-**Symptom:** the owner reports longstanding grey blotches on pale faces, most
+**Symptom:** the maintainer reports longstanding grey blotches on pale faces, most
 noticeable on Nords and Bretons. The RC2 screenshot identifies Sjorvar Horse-Mouth.
 **Confirmed cause:** status-bar conversion repurposes palette indices 225–253,
 previously duplicate sky colours. Later NPC conversions legitimately choose those
@@ -992,7 +992,7 @@ insufficient evidence that each requested screen had appeared.
 
 ## J029 - Final v0.0.24 milestone and release imagery
 
-On 1 October the owner approved **v0.0.24 - Welcome to Balmora (and Vvardenfell!)**.
+On 1 October the maintainer approved **v0.0.24 - Welcome to Balmora (and Vvardenfell!)**.
 The presentation now calls out the whole-island mapping milestone, character
 creation, the complete gallery, Dagoth Ur's gold mask, M and the two-page J journal.
 The scope remains base-game Vvardenfell, excluding Bloodmoon/Solstheim and Tribunal.
@@ -1013,7 +1013,7 @@ harness enters the console before `quit`, requires the completion marker and
 profile, and checks the restored journal pixels. Keep the incomplete attempt
 separate rather than counting it as a passed run.
 
-The owner's release decision accepts 23 existing contact findings as known
+The maintainer's release decision accepts 23 existing contact findings as known
 issues. No audit result, threshold or classification changed, and the normal
 production image gate remains fail-closed. Release approval records acceptance
 of this milestone's scope; it does not grant future audit exceptions.
@@ -1042,7 +1042,7 @@ partitions; the 1 GiB cap in the previous builder was a project setting, not an
 FFS limit. Every payload file was read back and hashed, and native reads at the
 highest used range on the second partition passed.
 
-The owner's preferred future layout is **partition 1 for the main Morrowind
+The maintainer's preferred future layout is **partition 1 for the main Morrowind
 game**, with **partition 2 for future Bloodmoon/Tribunal, videos and content
 accessed less often**. Keep frequently visited interiors with the main game;
 move selected interiors only if capacity requires it. Expansion content becomes
@@ -1069,7 +1069,7 @@ acceptance or a full-island route certification.
 
 ## J031 — connected ground, shoreline samples and protected typing
 
-The owner reported disconnected Seyda Neen, flooded valleys, an apparently fixed
+The maintainer reported disconnected Seyda Neen, flooded valleys, an apparently fixed
 map marker, missing global coordinates/compass and M/N exposing AmigaDOS, even
 while entering console text. The requested candidate is **v0.0.25-rc1**.
 
@@ -1108,7 +1108,7 @@ IDCMP_RAWKEY arrives is too late. A priority-60 input handler removes that
 qualifier only for M/N when the active game window is on the front screen;
 debug Alt+M uses the documented `aw_desktop` command instead. Checking the front
 screen matters: ScreenToBack can leave the window's active flag set, so testing
-that flag alone also blocks the owner's way back to the game. The native probe
+that flag alone also blocks the maintainer's way back to the game. The native probe
 checks map access, literal console `nm`, intentional screen-back and return.
 
 Keep bindings in `keymaps.cfg`, separate from settings, and maintain KEYMAPS.md
@@ -1132,5 +1132,5 @@ of this source handoff.
 
 Positive selection of the base ESM/BSA and known asset folders replaces scanning
 unrelated root files as inputs. Remote-work transfer ZIPs are not installation
-assets in GOG/Steam. Preserve original files and the owner's archives unchanged.
+assets in GOG/Steam. Preserve original files and the maintainer's archives unchanged.
 See RELEASE-v0.0.25-rc2.md and BUG_JOURNAL.md for reproduction and validation.

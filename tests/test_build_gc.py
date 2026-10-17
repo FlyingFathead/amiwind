@@ -73,7 +73,7 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual(got['mw'][0], 'keep')                      # another line (MiniWind recipe) keeps its own
         self.assertEqual(got['old'][0], 'expire')                   # superseded, owner done
         self.assertEqual(got['scratch'][0], 'expire')               # scratch left in a finished run
-        self.assertEqual(got['failed'][0], 'keep')                  # owner still active
+        self.assertEqual(got['failed'][0], 'keep')                  # maintainer still active
         self.assertEqual(got['stray'][0], 'unregistered')           # nobody owns it: reported, never deleted
         self.assertEqual(got['live'], ('keep', 'still building'))
         self.assertEqual(got['smoke-copy'][0], 'expire')

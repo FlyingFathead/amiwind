@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Player third-person jumping |
 | Reproduction | unknown |
@@ -22,7 +22,7 @@
 
 ## Symptom
 
-The owner reports no jump animation in third-person view in v0.0.38-dev2.
+The maintainer reports no jump animation in third-person view in v0.0.38-dev2.
 
 ## Where
 
@@ -46,7 +46,7 @@ No attached exact-package third-person takeoff, airborne and landing acceptance.
 
 Jump in third person on flat ground and over a ledge. Record takeoff, rising,
 falling and landing poses, appearance and equipment; compare original/OpenMW.
-Owner report only; native reproduction remains pending.
+Maintainer report only; native reproduction remains pending.
 
 ## Repair
 

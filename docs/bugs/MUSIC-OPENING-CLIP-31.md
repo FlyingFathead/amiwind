@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.31-dev3 |
 | Where | opening scene load, music resume (engine music code) |
 | Reproduction | always |
@@ -21,7 +21,7 @@
 
 ## Status: 7 October 2026
 
-Found by the owner in v0.0.31-dev3 (WinUAE). Cause read in source; repaired in
+Found by the maintainer in v0.0.31-dev3 (WinUAE). Cause read in source; repaired in
 source, not yet packaged.
 
 ## Symptom
@@ -60,7 +60,7 @@ ignored until the opening track (or the title) starts and ends the hold.
 ## Verification
 
 Native music test: the hold is silent and flushed, a CD resume does not
-restart it, the opening track ends it. Owner listening check pending.
+restart it, the opening track ends it. Maintainer listening check pending.
 
 ## Prevention
 

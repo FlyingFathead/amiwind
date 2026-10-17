@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 7 October 2026, in v0.0.30-rc1 |
 | Where | Main menu, New Game confirmation (WinUAE) |
 | Reproduction | once |

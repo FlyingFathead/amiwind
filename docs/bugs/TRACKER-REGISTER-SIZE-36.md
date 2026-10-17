@@ -85,11 +85,11 @@ The exact RC2 full-suite snapshot stops after 402 tests because the live registe
 
 The current rotation rule already moved all eligible fixed/closed, non-persisting issues first found through v0.0.33. Only one additional fixed/non-persisting v0.0.34–v0.0.35 record is currently eligible for the planned second archive; moving it cannot solve this growth without changing the status or history of open issues. No open/persisting record is archived and the existing archive remains byte-identical.
 
-Instead, the canonical live writer emits one complete issue object per line in the same JSON array. Only indentation/nesting whitespace changes: every field, value, array/issue order and report history round-trips unchanged. Readable status remains in the generated register and reports. Add a real save/load Unicode and nested-history regression, retain the size guard and hard limit unchanged, and require exact focused tracker/export/link checks. The archive remains on its existing format and rotation rule; future legitimate rotations remain separate work. This is a tooling source candidate, not game/owner acceptance.
+Instead, the canonical live writer emits one complete issue object per line in the same JSON array. Only indentation/nesting whitespace changes: every field, value, array/issue order and report history round-trips unchanged. Readable status remains in the generated register and reports. Add a real save/load Unicode and nested-history regression, retain the size guard and hard limit unchanged, and require exact focused tracker/export/link checks. The archive remains on its existing format and rotation rule; future legitimate rotations remain separate work. This is a tooling source candidate, not game/maintainer acceptance.
 
 ## Focused validation, 13 October 2026
 
-The isolated corrected snapshot passes 56 tracker/export tests with zero failures, errors or skips, including the actual size guard and save/load history regression. Its independently read-back source ZIP contains all 2,871 allowlisted files and the exact compact register bytes. Existing archive bytes remain unchanged. The earlier full-suite failure is retained; this focused result is not a full-suite, game build, native or owner acceptance claim. Final integrated source pin and its gates remain required.
+The isolated corrected snapshot passes 56 tracker/export tests with zero failures, errors or skips, including the actual size guard and save/load history regression. Its independently read-back source ZIP contains all 2,871 allowlisted files and the exact compact register bytes. Existing archive bytes remain unchanged. The earlier full-suite failure is retained; this focused result is not a full-suite, game build, native or maintainer acceptance claim. Final integrated source pin and its gates remain required.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -127,12 +127,14 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TOOLKIT-CULL-DIAGNOSTICS-38](TOOLKIT-CULL-DIAGNOSTICS-38.md): Collision-only diagnostics disable terrain culling preview
 - [TOOLKIT-MAP-SCALING-36](TOOLKIT-MAP-SCALING-36.md): The CHIM Progress Tracker map scales badly: a small box in the middle with inner scrollbars, controls far away, the island cropped
 - [TOOLKIT-MONITOR-BLIND-PHASES-36](TOOLKIT-MONITOR-BLIND-PHASES-36.md): The Toolkit Monitor shows nothing during silent build phases: no activity, no phases, no time since the last log line
+- [TRACKER-AREA-CELLS-RUN-WIDE-42](TRACKER-AREA-CELLS-RUN-WIDE-42.md): The CHIM tracker gives every area of a build all of the build's cells: Balmora holds 811 cells, so an area or shipped-towns plan selector takes most of the island
 - [TRACKER-CHIM-LINK-MERGE-33](TRACKER-CHIM-LINK-MERGE-33.md): A merge dropped the CHIM Engine tracker link from the register; the integration head fails a tracker test
 - [TRACKER-FIXED-LEFT-OPEN-36](TRACKER-FIXED-LEFT-OPEN-36.md): Fixed work whose bug entry stayed open (LAVA-NOT-IMPLEMENTED-33)
 - [TRACKER-MAP-BLANK-31](TRACKER-MAP-BLANK-31.md): World progress map vanished when the mouse moved over it
 - [TRACKER-OCEAN-COUNTED-DONE-36](TRACKER-OCEAN-COUNTED-DONE-36.md): The tracker counts the 867 open-ocean cells as done, although the engine does not place the ocean chunk yet
 - [TRACKER-REGISTER-LINK-MERGE-33](TRACKER-REGISTER-LINK-MERGE-33.md): An integration merge dropped the CHIM Engine tracker link from the bug register
 - [TRACKER-REGISTER-SIZE-33](TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit
+- [TRACKER-RELEASE-HEADROOM-MISSING-42](TRACKER-RELEASE-HEADROOM-MISSING-42.md): The CHIM tracker keeps no memory headroom per cell from a full build, and older CHIMport results replace a newer full build's audits: every headroom figure dates from the v0.0.36-v0.0.40 builders
 - [TRACKER-SEA-CELL-SET-36](TRACKER-SEA-CELL-SET-36.md): The CHIM tracker's island view leaves out 37 land cells that hold only terrain and sea; one is labelled Solstheim
 - WIN-02 (no report page): Cancelled Windows stage leaves child workers alive
 

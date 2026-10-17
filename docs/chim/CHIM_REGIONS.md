@@ -85,7 +85,7 @@ bytes of the open-world maps they replace (copies with the routed hull: 4.3 and 
 - `seabed`: the empty sea cells (a LAND record, nothing placed);
 - `coast`: the finished land cells of ring 1 (the cells that touch the sea);
 - `sea-ring`: both;
-- `coast2`: the whole coastline of v0.0.36 (owner decision 11 October 2026): every cell of rings 1 and 2 from
+- `coast2`: the whole coastline of v0.0.36 (project decision 11 October 2026): every cell of rings 1 and 2 from
   the sea. A cell that cannot go on CHIM (not finished in CHIMport, open sea, inside a town's frame) is left
   out and listed with its reason under `dropped` in the ownership table; nothing in it is refused;
 - a region name (`"Bitter Coast"` finds "Bitter Coast Region"): its finished cells;

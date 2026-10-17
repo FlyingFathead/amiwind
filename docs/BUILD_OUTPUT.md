@@ -7,6 +7,7 @@ coverage and protected model quality remain mandatory.
 ## Contents
 
 - [HDF capacity versus installed content](#hdf-capacity-versus-installed-content)
+- [Size ledger](#size-ledger)
 - [Completion footer](#completion-footer)
 - [HDFs and emulator runners](#hdfs-and-emulator-runners)
 - [Timing](#timing)
@@ -37,6 +38,49 @@ file counts after readback of the completed HDF. Capacity minus payload also
 includes filesystem overhead; use the recorded bitmap free bytes for available
 space. Allocated host-disk blocks, compressed download size and runtime RAM are
 different measurements again.
+
+## Size ledger
+
+From v0.0.42 every image build also says what its game data weighs, folder by
+folder, in GiB (two decimals; the exact bytes are kept in the files). The
+builder (`tools/size_ledger.py`) reads the image receipt and the file lists of
+the partitions it just wrote and groups the payload into: classic maps, CHIM
+world (CHIM frame maps, far terrain and the CHIM volume), NPC gallery, sound,
+music, video, progs and other. It also lists each drive image's size. Each
+partition's grouped bytes are checked against the bytes the image step read
+back; a difference is named and the ledger is marked "partial". A run without an
+image receipt (no image step) has no ledger; a receipt that cannot be read is
+judged like a failed guard.
+
+The result is compared with:
+
+- the previous release, `tools/size-baseline.json` (v0.0.41: 3.81 GiB of game
+  data, of which the NPC gallery is 0.21 GiB), and
+- a previous build, when you give its record: `--size-baseline FILE`
+  (that run's `size-ledger.json`).
+
+Only builds with the same content are compared like-for-like. An image built
+without the NPC gallery, a partial-area (MiniWind) image or one with excluded
+content (for example video) is labelled, its differences are printed as
+"NOT like-for-like" with the reason, and the size guard does not judge it.
+
+The size guard: a folder that grew by more than `--size-growth-margin`
+(default 0.05 GiB) against a like-for-like record needs a reason,
+`--size-growth-reason TEXT`, which is recorded. Without one, an rc or final
+build ends with exit code 4 (the stages passed; their outputs stay valid and
+reusable), while a `-devN` build prints a warning. `--size-guard fail|warn|off`
+overrides that choice (`off` is for debugging only).
+
+The table is printed in the completion footer, written to `size-ledger.json`
+in the run folder and copied into `build-summary.json` (`size_ledger`). It can
+be shown again for any finished run without writing anything:
+
+```text
+python3 tools/size_ledger.py show RUN [--baseline OTHER/size-ledger.json]
+```
+
+and `python3 tools/size_ledger.py baseline RUN OUT` writes a new baseline
+record from a finished run (refused when that run's ledger is partial).
 
 ## Completion footer
 
@@ -194,6 +238,41 @@ v0.0.27 also passed hosted Windows launcher parity. Those results do not certify
 every build mode or full-game reliability; see the remaining limits in
 [the Windows roadmap](WINDOWS_BUILD_ROADMAP.md).
 
+
+### Release readiness
+
+Before the first stage every AGA build prints a release readiness block: each
+option a release candidate or final would refuse, with its tracker ID. It
+lists the private-test waivers (taken from the builder's own refusal check,
+`require_private_test_version`, so nothing is listed twice: accepted actor or
+stair findings, quick-test exclusions such as `--no-npc-gallery`, MiniWind and
+direct-start options), an accepted entity loss (`--accept-entity-loss`), retired
+flags used with `--override`, and debugging opt-outs of shipped features
+(`--no-tree-sprites`, `--only-core-towns`, `--skip-dressing`,
+`--no-entity-baseline`). The block is saved in `build-state.json` as
+`release_readiness`.
+
+```text
+========================================================================
+Release readiness: what a release candidate or final would refuse in this build
+  1. --allow-known-actor-ground-findings [private-test waiver]: known actor ground findings accepted -> VIVEC-ARENA-ACTORS-32 (--readiness-id)
+  2. --exclude npc-gallery [skipped shipped feature]: quick test build leaves out NPC gallery -> NO TRACKER ID (name it: --readiness-id exclude-npc-gallery=ID)
+  3. --accept-entity-loss [accepted entity loss]: reason: harvest loss on six cells, HARVEST-CHIM-REGION-LOSS-41 -> HARVEST-CHIM-REGION-LOSS-41 (reason text)
+  3 release blocker(s) until fixed, or maintainer-accepted for the release with their tracker links
+========================================================================
+```
+
+Every item needs a tracker ID registered in `docs/bugs/bugs.json`: the IDs of
+`--accept-known-stair-findings`, the IDs written in the `--accept-entity-loss`
+reason, or `--readiness-id KEY=ID[,ID]` (KEY is the option without its dashes,
+as the block prints it; an exclusion group also answers to its other names,
+e.g. `no-npc-gallery`). A full build with an item that has no registered ID
+stops before any stage. MiniWind area tests (never a release) and `--plan`,
+`--check` and `--dry-run` print the block without that requirement. An empty
+block reads `none: nothing here stops a release candidate or final`. Origin:
+v0.0.41-dev5 passed with a waiver, an accepted plant loss and no NPC gallery,
+and the final found all three on its first run
+([BUILD-RELEASE-READINESS-HIDDEN-41](bugs/BUILD-RELEASE-READINESS-HIDDEN-41.md)).
 
 Private diagnostic builds with explicitly accepted actor findings use the footer
 `Private test image assembled; production actor gate DID NOT PASS`. They do not

@@ -10,7 +10,7 @@
 | Reproduction | always |
 | Duplicate of | no |
 | Persists in | v0.0.36-dev5 (last seen) |
-| Severity | high: owner: v0.0.37 show-stopper; HOLD-LEVEL key bug (resume key misses lava and code inputs), CHIMport only |
+| Severity | high: maintainer: v0.0.37 show-stopper; HOLD-LEVEL key bug (resume key misses lava and code inputs), CHIMport only |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -89,7 +89,7 @@ This repairs the CHIM source-stage retry boundary; it does not establish visible
 Synthetic regression reproduces acceptance of a pre-lava receipt before repair. Candidate checks cover fresh
 collection, preservation of earlier evidence, matching-stage reuse, lava mode/code identity, and refusal of changed
 owned inputs. The same25 cells have rerun: all converted and passed format validation, with19 passing measured offline
-audits and6 retaining hull holds. Matched original-game/native visible-lava and complete package acceptance remain pending. No shipped fix or owner acceptance.
+audits and6 retaining hull holds. Matched original-game/native visible-lava and complete package acceptance remain pending. No shipped fix or maintainer acceptance.
 
 ## Prevention
 
@@ -102,7 +102,7 @@ Proposed update in **v0.0.38-dev1 candidate**, recorded 2026-10-12 13:44 UTC.
 History clarified 2026-10-12 13:56 UTC: the scoped evidence below does not close the issue.
 Later regressions remain attached to this history and require fresh verification.
 
-Proposed update in v0.0.38-dev1 candidate source: all25 formerly stale-source cells converted and passed format validation;19 passed measured offline audits and6 retained hull holds. Retry/source invalidation is repaired at the tested boundary; complete visible/gameplay coverage and owner acceptance remain open.
+Proposed update in v0.0.38-dev1 candidate source: all25 formerly stale-source cells converted and passed format validation;19 passed measured offline audits and6 retained hull holds. Retry/source invalidation is repaired at the tested boundary; complete visible/gameplay coverage and maintainer acceptance remain open.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

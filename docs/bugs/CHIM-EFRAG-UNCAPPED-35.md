@@ -9,7 +9,7 @@
 | Where | CHIM engine chim_chunks.c ChimChunks_Link / AddEfrags, r_efrag.c pool limit; builder CHIM heap gate |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.35 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: A larger draw distance or a dense town can end the map with a fatal error. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

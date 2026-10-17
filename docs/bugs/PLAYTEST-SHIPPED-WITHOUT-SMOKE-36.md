@@ -9,7 +9,7 @@
 | Where | the playtest ship flow and the gates (no emulator boot of the engine or the image) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | critical: a playtest that cannot load a map reached the playtester; nothing in the flow could stop it |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | v0.0.36-dev3 |

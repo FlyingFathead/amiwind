@@ -113,7 +113,7 @@ Vvardenfell's exterior cells, one square per cell, north up.
 - **Layers**: topomap, heatmap of original entities, share of entities placed,
   full town/area maps (white border, black outline), content missing, interiors,
   named places, points of interest (interior entrances: green converted, white
-  not converted), owner-checked cells, cell grid. More switches behind the
+  not converted), maintainer-checked cells, cell grid. More switches behind the
   cog (Options).
 - **Map metrics** (only when a metrics layer is loaded): the estimated heap and
   BSP limits of every exterior cell; see [Map metrics layer](#map-metrics-layer).
@@ -292,7 +292,7 @@ A headline sits at the top of the Toolkit page, on every tab: **Done: N of 1,292
 completion levels beside it, and Solstheim reported separately. A cell counts as passed only when it is converted **and
 every audit that was measured passed**. Audits that were not measured are
 counted apart ("unmeasured audits on N converted cells") and are never counted as passed. Under the headline are the
-breakdown (owner-approved, playtested, audits passed, converted with failing audits, converted with nothing measured,
+breakdown (maintainer-approved, playtested, audits passed, converted with failing audits, converted with nothing measured,
 not started) and a history line (passed cells per day). Click a number to highlight those cells on the map.
 
 ### Making the data
@@ -324,7 +324,7 @@ Other commands, all of them go through the same ingester:
 ```bash
 python3 tools/cell_progress.py result --out DIR --file RESULT.json    # per-cell stats, audits, errors from the conversion job
 python3 tools/cell_progress.py record --out DIR --mechanism seam_tears --build NAME --status passed --cells "-3,-2 -3,-1"
-python3 tools/cell_progress.py owner  --out DIR --status playtested --cells "-3,-2"    # or approved
+python3 tools/cell_progress.py maintainer  --out DIR --status playtested --cells "-3,-2"    # or approved
 python3 tools/cell_progress.py export --out DIR --csv cells.csv --json cells.json
 python3 tools/cell_progress.py status --out DIR
 python3 tools/cell_progress.py render-md --out DIR    # writes docs/chim/CELL_TRACKER.md (generated, compact, public)
@@ -435,7 +435,7 @@ header shows. The standalone 3D inspector export carries the header too, without
 The **legend** has a checkbox on every row (an unticked row dims its cells), **all** and **none** buttons, a **Preset**
 pull-down (everything, eligible for the next release, awaiting lighting, problems only, not started, lighting, release
 content; a hand tick switches it to Custom) and a **Version** pull-down with a summary line per release. Your choices are
-remembered in the browser. The full explanation, every status and the owner's release commands are in the
+remembered in the browser. The full explanation, every status and the maintainer's release commands are in the
 [CHIM Progress Tracker guide](chim/PROGRESS_TRACKER.md); the live figures are on the generated
 [CHIM cell tracker](chim/CELL_TRACKER.md). The **Included in build** pull-down shows what each packaged build really
 holds; how its data is made is in [Included in build](chim/PROGRESS_TRACKER.md#included-in-build-what-each-packaged-build-holds).
@@ -656,6 +656,6 @@ The private Game world map background can be preloaded with
 Keep `island-world.png` and matching `island-world.json` in the data directory;
 choose **Bottom layer > Game world map**. The tracker directory is independent.
 A PNG alone has no geographic bounds. See
-[owner-supplied reference background](ORIGINAL_MAP_DATA.md#load-an-owner-supplied-reference-background)
+[user-supplied reference background](ORIGINAL_MAP_DATA.md#load-an-user-supplied-reference-background)
 for sidecar format, local file selection and acceptance limits. Keep game-derived
 backgrounds outside public source and source exports.

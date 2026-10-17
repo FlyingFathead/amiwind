@@ -2,7 +2,7 @@
  "format": "aw-hull-chain-accepted-1",
  "about": "Meshes whose standing hull stays a chain deeper than the shared limit (routed_hull.CHAIN_DEPTH_LIMIT) because the router cannot split it (COLLISION-ROUTE-NO-SPLIT-36). The CHIMport hull audit passes them with the kept-as-chain outcome (tools/chimport.py accepted_chains).",
  "meshes": [
-  {"mesh": "flora_kelp_03", "reason": "owner decision 2026-10-11 12:01 +0300: thin underwater kelp, one chain of overlapping blades (305 deep, about 0.4 ms per trace on the slow preset); closes the CHIM coast ring at cell -9,-4"},
-  {"mesh": "flora_kelp_04", "reason": "owner decision 2026-10-11 12:01 +0300: thin underwater kelp, one chain of overlapping blades (304 deep); closes the CHIM coast ring at cell -9,-4"}
+  {"mesh": "flora_kelp_03", "reason": "project decision 2026-10-11 12:01 +0300: thin underwater kelp, one chain of overlapping blades (305 deep, about 0.4 ms per trace on the slow preset); closes the CHIM coast ring at cell -9,-4"},
+  {"mesh": "flora_kelp_04", "reason": "project decision 2026-10-11 12:01 +0300: thin underwater kelp, one chain of overlapping blades (304 deep); closes the CHIM coast ring at cell -9,-4"}
  ]
 }

@@ -66,7 +66,7 @@ to hard-wire for Balmora.
 | `town.return` | `{"travel_npc": id, "config": file}`: return travel into another area; or `null` (the directory then records `0 0 0 0`) |
 | `handoff_core` | The frame-local rectangle this town owns in the world handoff, `[[x0, y0], [x1, y1]]`; it must stay `draw_distance + 32` inside the frame's ground box (`bounds` plus `terrain_margin`), so the frame edge is never in view from a point the player can stand in. `"inset"` selects `bounds` inset by 96 (the Arena): it leaves no ground between the frame edge and the fog plane, so a handoff row (`world_slot` -1) must name it; rows without the key (Seyda Neen, Balmora) keep the inset. The town table refuses a handoff row whose core is closer than draw distance + 32 to the frame edge without `"inset"` |
 | `terrain_margin` | Optional, default 0: a terrain-only margin (whole 128-unit tiles) the CHIM frame's ground reaches past `bounds`, with no placements of its own, like the legacy region maps' overlap; a CHIMport block inside the legacy world owns its cell box (`handoff_core` = `bounds`) and carries a margin of at least draw distance + 32 |
-| `interiors` | Optional: `[{"cell": original interior cell, "exclude": reason}]`, the rooms reached through the town's load doors. Append only: a room's position gives its map name `<prefix>i000` upwards and its save ID. `exclude` keeps the slot and leaves the room unconverted; its doors show it as unavailable |
+| `interiors` | Optional: `[{"cell": original interior cell, "exclude": reason}]`, the rooms reached through the town's load doors. Append only: a room's position gives its map name `<prefix>i000` upwards and its save ID. `exclude` keeps the slot and leaves the room unconverted; its doors show it as unavailable. `"recentre": [x, y, z]` (original units) moves a room past the +-4,096 coordinate range toward the origin: every position of the room and every arrival into it has the offset subtracted (`town_interiors.room_offsets`). `"plants": "sprites"` draws the room's nonsolid plants as sprites from the start, for a room over its heap budget (a room over its model limit gets them by itself; docs/INTERIOR_SECTIONS.md) |
 
 `config/towns.json` lists the runtime towns in stable save order (append,
 never reorder) with the engine-only facts:
@@ -191,7 +191,7 @@ door-bank rows; 7 residents (3 NPC records, classified as standing in
 region's leaves (TOWN-VIS-OCCLUSION-31).
 
 Shipped in v0.0.32 as an outside-only preview (`shipped_since`). Withdrawn from
-v0.0.33 by owner decision (`withdrawn`: the canton bodies do not fit the CHIM
+v0.0.33 by project decision (`withdrawn`: the canton bodies do not fit the CHIM
 zone, CHIM-ARENA-MEMORY-33): a default build no longer imports it, and
 `--extra-town vivec_arena` still builds it (BUILD-EXTRA-TOWN-OPTIN-32).
 

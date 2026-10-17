@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | engine: only the greeting plays (world.qc aw_greet); the voice pool already holds the lines |
 | Reproduction | always |

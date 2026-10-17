@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 13 October 2026, in v0.0.39-rc1 |
 | Where | Seyda Neen: Eldafire unarmed combat and armed guard control |
 | Reproduction | unknown |
@@ -15,14 +15,14 @@
 | Playtest version | v0.0.39-rc1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
-| Unknown because | Owner named RC1; the exact running image and binary were not independently read back for this report. |
+| Unknown because | Maintainer named RC1; the exact running image and binary were not independently read back for this report. |
 | Platform or emulator | unknown (Emulator not restated for this specific observation.) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
 
-The owner observes Eldafire bare-fist hits lowering the green fatigue bar while the red health bar remains unchanged, and confirms the armed guard can kill the player. Upright unarmed fatigue damage is expected; this observation does not prove a health-damage regression.
+The maintainer observes Eldafire bare-fist hits lowering the green fatigue bar while the red health bar remains unchanged, and confirms the armed guard can kill the player. Upright unarmed fatigue damage is expected; this observation does not prove a health-damage regression.
 
 ## Where
 
@@ -35,7 +35,7 @@ The clarified upright bare-fist observation follows the existing hand-to-hand fa
 
 ## Why it was not caught
 
-The initial report did not identify the attacker or weapon. The owner subsequently identified Eldafire using bare fists and confirmed that the armed guard can kill the player.
+The initial report did not identify the attacker or weapon. The maintainer subsequently identified Eldafire using bare fists and confirmed that the armed guard can kill the player.
 
 ## Reproduction
 
@@ -47,7 +47,7 @@ No damage-rule change is warranted by this observation. Preserve the original di
 
 ## Verification
 
-Source comparison finds the combat bridge/rules unchanged from published v0.0.38 through RC1. AW_CombatSwing selects fatigue for upright unarmed victims and health while knocked out, matching OpenMW getHandToHandDamage. The owner confirms armed guard lethality. Natural player knockout followed by a landed unarmed health hit remains a separate native check; it has not been claimed verified.
+Source comparison finds the combat bridge/rules unchanged from published v0.0.38 through RC1. AW_CombatSwing selects fatigue for upright unarmed victims and health while knocked out, matching OpenMW getHandToHandDamage. The maintainer confirms armed guard lethality. Natural player knockout followed by a landed unarmed health hit remains a separate native check; it has not been claimed verified.
 
 ## Prevention
 

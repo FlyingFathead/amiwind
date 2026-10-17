@@ -15,7 +15,7 @@ run; the old build and private-test HDF remain untouched.
 The source handoff includes one publication script that validates the archive,
 commits/pushes main, waits for the exact commit's source-check workflow to pass,
 and only then tags and creates the source prerelease. It verifies downloaded
-release assets against their checksums. The owner runs it. Local checks do not
+release assets against their checksums. The maintainer runs it. Local checks do not
 claim that GitHub CI or a private game-image build has passed.
 
 See [release notes](RELEASE-v0.0.25-rc7.md), [image recovery](IMAGE_RECOVERY.md),

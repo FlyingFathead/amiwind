@@ -1,7 +1,7 @@
 # Preserved ship rendering methods
 
 `method_001` is the exterior ship from **v0.0.14-dev1 / checkpoint-015**, specifically
-preserved at the owner's request because its distant appearance is the reference.
+preserved at the maintainer's request because its distant appearance is the reference.
 Its full source and private image ZIPs remain immutable.
 
 `config/ship_methods/method_001.json` records the original assembly/LOD recipe and
@@ -22,7 +22,7 @@ into the furnished room; do not call it the preserved exterior baseline.
 
 ## Whole-exterior comparison baseline
 
-The owner's 22:50 report additionally preserves the **checkpoint-016 exterior**
+The maintainer's 22:50 report additionally preserves the **checkpoint-016 exterior**
 as the whole-scene method_001 for texture/poly-count A/B work. This is a broader
 scope than the existing ship-only method_001 pinned to checkpoint-015. Keep the
 checkpoint-016 public/private ZIPs immutable; camera (-44,259,75), yaw328/pitch-14

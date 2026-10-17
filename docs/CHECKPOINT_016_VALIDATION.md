@@ -140,4 +140,4 @@ and terrain/rock formation near (235,596,29) need source/topology/coverage check
 No geometry fix for those reports is claimed here. Joined-plank pier and distant
 building backdrops are planned A/B recipes. Census office, opening actors,
 NPC collision/wandering, combat, inventory, dialogue and save/load remain upcoming.
-Owner acceptance is pending. See PLAYTEST_STATUS.md and ROADMAP.md.
+Maintainer acceptance is pending. See PLAYTEST_STATUS.md and ROADMAP.md.

@@ -7,6 +7,7 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_clock.h"
+#include "aw_state.h"
 #include "aw_sky.h"
 #include "aw_mappath.h"
 static int modal,hours=1,help_page;
@@ -462,6 +463,9 @@ int AW_WaitKey(int key) {
     if(key==K_ENTER){
         if(!allowed() || daynight_hold || AW_PlayerInCombat()){close_modal();return 1;}
         if(!AW_ClockAdvance(hours*3600000)){close_modal();AW_UISubtitle("","Could not advance the clock.",4);return 1;}
+        /* Waiting recharges enchanted items by the game hours over the time scale
+         * (OpenMW World::advanceTime, not incremental). */
+        if(timescale.value>0 && aw_magic_frame)aw_magic_frame(hours*3600.0f/timescale.value);
         clock_fraction=0;
         AW_ClockDate(&y,&m,&d,&h,&n);close_modal();
         sprintf(line,"Waited %ld hour%s. %02ld:%02ld, %02ld/%02ld/%ld",(long)hours,hours==1?"":"s",(long)h,(long)n,(long)d,(long)m,(long)y);

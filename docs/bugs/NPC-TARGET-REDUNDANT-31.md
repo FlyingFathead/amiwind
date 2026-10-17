@@ -9,7 +9,7 @@
 | Where | engine NPC target search (AW_SceneDraw, AW_NPCTarget) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31 (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | medium: Per-frame cost: several searches testing every NPC each frame, measured in Balmora. |
 | Family | Rendering cost and visibility (`render-performance`) |
 | Playtest version | v0.0.31 |

@@ -39,7 +39,7 @@ SHIPPED_STAGES = {
     'area': 'area interiors', 'balmora-interiors': 'Balmora interiors',
     # CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): Balmora prepared CHIM-native, no legacy region maps (bm*).
     'chim-town-balmora': 'Balmora residents, frame entities, region table and door bank from the game data',
-    # all of Vivec in one CHIM frame, CHIM-native (owner decision 2026-10-11 09:55; replaces the Arena-only frame)
+    # all of Vivec in one CHIM frame, CHIM-native (project decision 2026-10-11 09:55; replaces the Arena-only frame)
     'chim-town-vivec_city': 'Vivec residents, frame entities, region table and door bank from the game data',
     # v0.0.36-dev5: Seyda Neen CHIM-native (no legacy region maps; BUILD-LEGACY-TOWN-MAPS-SHIPPED-36)
     'chim-town-seyda': 'Seyda Neen frame and opening-scene entities, activated objects and region table from the town',
@@ -97,7 +97,7 @@ OPTIONS = {
     'chim_areas': 'shipped default',
     # CHIM texture effects (.chimfx, e.g. autumn_glitter_leaves): an opt-in look, none by default.
     'chim_texture_effects': 'opt-in, not shipped',
-    # CHIM lighting type (config/build-defaults.json: hybrid, owner decision 2026-10-09; lamps = the v0.0.33 lighting,
+    # CHIM lighting type (config/build-defaults.json: hybrid, project decision 2026-10-09; lamps = the v0.0.33 lighting,
     # none, and reserved types refused; tests/test_chim_light_types.py).
     'chim_lighting_type': 'shipped default',
     # Morrowind's stair/slope collision rules (config/build-defaults.json, true); --no-... is the debug way out.
@@ -130,11 +130,13 @@ OPTIONS = {
     # Engine profile (docs/ENGINE_PROFILES.md, tests/test_engine_profile.py): c is what ships and adds nothing to the
     # engine command; upstream and the --engine-asm / --engine-opt overrides are EXPERIMENTAL.
     'engine_profile': 'shipped default', 'engine_asm': 'opt-in, not shipped', 'engine_opt': 'opt-in, not shipped',
+    # --engine-cpu 68060: the 68060-targeted engine (docs/68060.md), EXPERIMENTAL; 68040 is what ships.
+    'engine_cpu': 'shipped default',
     # NPC model levels of detail (docs/NPC_MODEL_CACHE.md; tests/test_npc_lod.py): on, 3 levels, the face
     # LOD policy and the level-file disk budget; --npc-lod off is the earlier single model (kept).
     'npc_lod': 'shipped default', 'npc_lod_levels': 'shipped default', 'npc_face_lod': 'shipped default',
     'npc_face_lod_list': 'input', 'npc_lod_disk_mib': 'shipped default',
-    # Opt-in content no release ships (owner decisions, private inputs or experiments).
+    # Opt-in content no release ships (project decisions, private inputs or experiments).
     # --extra-town adds towns not shipped yet; shipped towns are built by default.
     'extra_town': 'opt-in, not shipped', 'intro_captions': 'opt-in, not shipped',
     'amiga_libs': 'opt-in, not shipped', 'shared_sky_source': 'opt-in, not shipped',
@@ -153,22 +155,26 @@ OPTIONS = {
     # how the engine sends positions: wide by default since v0.0.36 (tools/coord_range.py)
     'coord_range': 'shipped default',
     'chim_draw_distance': 'opt-in, not shipped', 'chim_terrain_shoreline': 'shipped default',
-    # the compiled terrain hull and terrain references: defaults from v0.0.36 (owner decision 2026-10-11)
+    # the compiled terrain hull and terrain references: defaults from v0.0.36 (project decision 2026-10-11)
     'chim_terrain_hull': 'shipped default', 'chim_terrain_refs': 'shipped default',
     # original LAND samples under ground residents (CHIM-VIVEC-FRAME-WIDE-41)
     'chim_terrain_resident_detail': 'shipped default',
     # the actor support search's wide ring (CHIM-VIVEC-FRAME-WIDE-41)
     'actor_search': 'shipped default',
+    # creatures in converted interiors: the listed ones (Vivec) by default; all = experimental, off = before v0.0.42
+    'interior_creatures': 'shipped default',
     'chim_model_hull_patch': 'shipped default',
     # how a CHIM model variant shares its vertices (base by default; placed = the earlier per-placement weld)
     'chim_model_weld': 'shipped default',
     # how CHIM meshes become faces (table by default: config/mesh-methods.json)
     'chim_mesh_method': 'shipped default',
-    'stair_walk_cache': 'check', 'stair_walk_sample': 'check',
+    'stair_walk_cache': 'check', 'stair_walk_sample': 'check', 'stair_walk_area': 'check',
+    # the general underside collision rules of CHIM models: EXPERIMENTAL (names, the list, by default)
+    'collision_underside': 'opt-in, not shipped',
     # Entity tracker against the release baseline (BUILD-DRESSING-EXCLUDED-32).
-    'no_entity_baseline': 'debug opt-out', 'accept_entity_loss': 'check',
+    'no_entity_baseline': 'debug opt-out', 'accept_entity_loss': 'check', 'readiness_id': 'check',
     'skip_dressing': 'debug opt-out',
-    # Optional recorded input (BUILD-SEYDA-REGEN-30, not needed from v0.0.34): the owner's own recorded
+    # Optional recorded input (BUILD-SEYDA-REGEN-30, not needed from v0.0.34): the maintainer's own recorded
     # v0.0.31 Seyda Neen maps, kept byte for byte (tests/test_recorded_stage.py).
     'seyda_recorded': 'recorded-stage exception input',
     'seyda_scene_source': 'Seyda Neen scene source (auto: carrier for CHIM-native; compiled = retired A/B)',
@@ -185,7 +191,8 @@ OPTIONS = {
     'rdbtool': 'tooling', 'gallery_cache': 'tooling', 'gallery_seed_run': 'tooling',
     'estimate_world': 'mode', 'estimate_sample': 'mode', 'jobs': 'tooling', 'serial_stages': 'tooling',
     # Build profile and development stage reuse (docs/BUILD_PROFILE.md): outputs unchanged.
-    'no_profile': 'tooling', 'perf_guard': 'tooling', 'perf_guard_baselines': 'tooling', 'log_level': 'tooling', 'quiet': 'tooling', 'reuse_from': 'tooling', 'reuse_mode': 'tooling', 'rebuild_stage': 'tooling',
+    'no_profile': 'tooling', 'perf_guard': 'tooling', 'perf_guard_baselines': 'tooling', 'size_guard': 'tooling', 'size_baseline': 'tooling',
+    'size_growth_margin': 'tooling', 'size_growth_reason': 'tooling', 'log_level': 'tooling', 'quiet': 'tooling', 'reuse_from': 'tooling', 'reuse_mode': 'tooling', 'rebuild_stage': 'tooling',
     'accept_rebuild': 'tooling', 'any_run_name': 'tooling', 'source_commit': 'tooling',
     'developer_mode': 'tooling', 'working_version': 'tooling', 'accept_version_mismatch': 'tooling',
     # Build recipes (tools/build_recipe.py, docs/BUILD_RECIPES.md): where the options come from and where they go.
@@ -306,9 +313,10 @@ class DefaultBuildShipsTheRelease(unittest.TestCase):
         self.assertEqual(engine_args.engine_profile, 'c')
         self.assertIsNone(engine_args.engine_asm)
         self.assertIsNone(engine_args.engine_opt)
+        self.assertEqual(engine_args.engine_cpu, '68040')
         engine = dict(steps())['engine']
         for flag in ('--cpu', '--disallow-luma-controls', '--no-luma-controls', '--allow-compiler-warnings',
-                     '--engine-profile', '--engine-asm', '--engine-opt', '--check-profiles'):
+                     '--engine-profile', '--engine-asm', '--engine-opt', '--engine-cpu', '--check-profiles'):
             self.assertNotIn(flag, engine)
 
 
@@ -328,12 +336,12 @@ def arena_shipped():
 
 
 class WithdrawnTowns(unittest.TestCase):
-    """v0.0.33 leaves the Vivec Arena out by owner decision (CHIM-ARENA-MEMORY-33): as data
+    """v0.0.33 leaves the Vivec Arena out by project decision (CHIM-ARENA-MEMORY-33): as data
     ("withdrawn" on its town row), not a deletion; --extra-town still builds it."""
 
     def test_the_arena_is_withdrawn_from_legacy_and_ships_on_chim(self):
         # withdrawn from legacy images in v0.0.33 (CHIM-ARENA-MEMORY-33); from v0.0.36 a default CHIM area,
-        # CHIM-native (owner decision 2026-10-11, Vivec stage A): the CHIM plan converts it, the legacy plan does not
+        # CHIM-native (project decision 2026-10-11, Vivec stage A): the CHIM plan converts it, the legacy plan does not
         from town_config import extra_towns, registry_row, shipped_extra_towns, withdrawn_towns
         self.assertEqual(shipped_extra_towns(), [])
         self.assertEqual(withdrawn_towns(), ['vivec_arena'])

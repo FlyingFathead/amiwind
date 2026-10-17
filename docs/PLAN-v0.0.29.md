@@ -1,6 +1,6 @@
 # v0.0.29 immediate fixes and follow-up work
 
-Recorded from owner playtesting on 4 October 2026, after the published
+Recorded from maintainer playtesting on 4 October 2026, after the published
 [v0.0.28 release](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.28).
 The latest published development checkpoint is v0.0.29-dev4; the next is
 v0.0.29-rc1, followed by final More Mushrooms after its release gates pass.
@@ -25,7 +25,7 @@ authored foliage placements and Balmora's mesh-foliage comparison area.
 - [Protected sunrise and sunset baseline for v0.0.29](#protected-sunrise-and-sunset-baseline-for-v0029)
 - [Later combat scope](#later-combat-scope)
   - [Horizon coordinate transcription correction](#horizon-coordinate-transcription-correction)
-- [5 October afternoon owner follow-up](#5-october-afternoon-owner-follow-up)
+- [5 October afternoon maintainer follow-up](#5-october-afternoon-maintainer-follow-up)
   - [5 October radius and grip follow-up](#5-october-radius-and-grip-follow-up)
   - [Standing full-screen UI resource rule](#standing-full-screen-ui-resource-rule)
   - [5 October map interaction split](#5-october-map-interaction-split)
@@ -57,7 +57,7 @@ P1 means lost controls or major visual/gameplay failure; P2 means presentation
 or fidelity work. Priority does not replace evidence or native acceptance.
 Every bug remains **Fixed: N** until its own acceptance is supported.
 
-| Priority / ID | Owner report and required result | Current evidence / next step |
+| Priority / ID | Maintainer report and required result | Current evidence / next step |
 | --- | --- | --- |
 | P1 TERRAIN-TRAP-29 | v0.0.29-dev1: Player stuck on rocks beside structures. | Global -21794,-17467,545; reproduce movement and compare placement/collision/streaming evidence. Cause and correction pending. |
 | P1 TORCH-INPUT-29 | F no longer raises hands in debug play; V prints torch on/off but no hands or working torch appear. Restore the full input-to-visible-equipment path. | Released-world metadata defect reproduced. All 2,532 corrected staged maps pass readback; source/VM tests and sampled native F/V checks in town, one world transition and a Hlaalu Council interior pass. One ordinary Council/Balmora roundtrip preserves the torch; after quickload, initially lowered hands can redraw/re-equip with F/V. Full state/save/light acceptance remains open. |
@@ -65,12 +65,12 @@ Every bug remains **Fixed: N** until its own acceptance is supported.
 | P1 MAP-VIEW-SWITCH-28 | Clicking DEBUG / IN-GAME fails to switch views. | Overlay/input-order fixes pass focused C tests and cross-host Amiga builds. One emulator replay sends oversized positive guest deltas; manual tab input remains unaccepted. |
 | P2 MAP-RIGHT-DRAG-29 | Teleport picker advertises right-drag but only middle starts panning on Amiga. | Both secondary codes now accepted locally. Baseline failure, corrected fixture and Amiga build checks pass; manual native drag remains open. |
 | P1 TREE-PILLAR-28 | Sprite-tree roots stretch into striped pillars on slopes. | Scale/authored-origin mismatch reproduced: 90 wrong pixels of 105 before repair; seven corrected raster cases pass. Three native views of one scale-2 tree on a roughly 20-degree slope show a tapered root without the broad pillar. Exact reported placement and broader sprite/slope coverage remain open. |
-| P2 CONSOLE-CAPS-29 | FS-UAE F10 Caps Lock state sticks in v0.0.29-dev1. | Reproduce modifier/focus lifecycle; owner toggle-on/off workaround recorded, cause unknown. |
-| P2 CONSOLE-WHEEL-29 | FS-UAE F10 scroll works initially then emits repeated unbound warnings in v0.0.29-dev1. | Recurring owner report; inspect console wheel consumption/binding fallback with preserved settings. No fix accepted. |
+| P2 CONSOLE-CAPS-29 | FS-UAE F10 Caps Lock state sticks in v0.0.29-dev1. | Reproduce modifier/focus lifecycle; maintainer toggle-on/off workaround recorded, cause unknown. |
+| P2 CONSOLE-WHEEL-29 | FS-UAE F10 scroll works initially then emits repeated unbound warnings in v0.0.29-dev1. | Recurring maintainer report; inspect console wheel consumption/binding fallback with preserved settings. No fix accepted. |
 | P1 MODAL-WORLD-29 | Freeze world and optionally black out head/race, journal and modal backgrounds. | Source candidate: independent aw_modal_freeze/aw_modal_black defaults1; original name entry preserved. Soundtrack always serviced. Revised Linux tests and cross-host Amiga binary parity pass; native timing/lifecycle acceptance pending. |
 | P1 SHACK-VISIBILITY-29 | Indrele Rathryon shack walls were missing in dev1. | Fixed in dev3: matched native restoration and playtester confirmation. Preserve the restored walls as a regression baseline; unrelated structures and horizon gaps remain separate. |
-| P1 SEYDA-TRANSITION-29 | v0.0.29-dev1: Cell/sub-cell passage remains problematic; investigate fewer sub-cells. | Owner report, exact failing crossing unconfirmed. Capture region/hysteresis/collision and memory evidence; merging cells is not yet a verified remedy. |
-| P2 INLAND-SHORE-29 | v0.0.29-dev1: Check angular inland-water shoreline topology. | Owner view at global -39785,-30636,379; cause unconfirmed. Compare source LAND/water intersection and converted topology without changing authored water placement or height. |
+| P1 SEYDA-TRANSITION-29 | v0.0.29-dev1: Cell/sub-cell passage remains problematic; investigate fewer sub-cells. | Maintainer report, exact failing crossing unconfirmed. Capture region/hysteresis/collision and memory evidence; merging cells is not yet a verified remedy. |
+| P2 INLAND-SHORE-29 | v0.0.29-dev1: Check angular inland-water shoreline topology. | Maintainer view at global -39785,-30636,379; cause unconfirmed. Compare source LAND/water intersection and converted topology without changing authored water placement or height. |
 | P1 HORIZON-POP-29 | Distant terrain/features abruptly appear or become a mesh mess when turning. | Authored opaque terrain_rock_rm_18 is rejected by far culling. Exact diagnostic geometry visually restores one sample, but the latest lossless OFF baselines drift by 36.11%; controlled pose/view-angle replay is required before acceptance. |
 | P2 MAP-SPOTS-28 | In-game map is covered with unintended white/yellow dots. | AWM1 palette-index data missed the sky remap; candidate corrects pixels/ocean without changing area metadata. Wide and closer native samples show clean terrain with labels/player marker retained; wheel zoom works. Explicit mode selection does not establish mouse-tab acceptance; exact owner view and broader coverage remain open. |
 | P2 HUD-STATS-29 | Healthy character's red bar appears partly empty; all three bars need independent current/max values. | Independent current/max source and pixel fixtures pass. Native health fills match 55/55, 25/55 and controlled 5/55; quickload restores the 25-health frame exactly. Magicka/fatigue stayed full, so their independent depletion remains untested natively. Sampled heading/time is correct; broader state/damage/healing checks remain open. |
@@ -124,7 +124,7 @@ continuity and target allocation headroom remain required. Explicit travel keeps
 authored facing. See the journal for causes, reproduction and refusal limits.
 
 Investigate the new shack view and cell/sub-cell passage reports separately.
-The owner also reports that horizon drawing looks better, but that observation
+The maintainer also reports that horizon drawing looks better, but that observation
 does not establish complete horizon acceptance or resolve streaming. Record
 exact active and previous regions before attributing either issue to cell size.
 Any reduction in sub-cell count must retain source geometry/collision/placement
@@ -146,7 +146,7 @@ established by the reported image.
   values. A 55/55 health character is full, 27.5/55 is half; zero/invalid maxima
   are handled safely. Keep live gameplay health authoritative when applicable.
 - **God-mode switch, later:** requested `dbg god on/off`, also `true/false` and
-  `1/0`, with query/invalid-input behavior. Development is described by the owner
+  `1/0`, with query/invalid-input behavior. Development is described by the maintainer
   as god mode; the future explicit switch still needs defined runtime/save
   semantics and tests. Do not silently refill stats to imitate god mode.
 - **Optional veil clouds:** retain every existing sky/cloud type and current
@@ -189,7 +189,7 @@ effects still require a source-data and runtime audit.
 
 ## Evidence and acceptance before a patch release
 
-- Retain the owner's Ashlands horizon coordinates: global **38205, 29437, 1380**;
+- Retain the maintainer's Ashlands horizon coordinates: global **38205, 29437, 1380**;
   local **335, 191, -294**. Screenshots show raw **DEG 263 / P -9** and
   **DEG 321 / P -23**. Pitch differs, so this is not a controlled yaw-only A/B.
 - Preserve the reported tree root, map spots, health bar and navigation views
@@ -295,7 +295,7 @@ nights, and retains moon/star depth ordering. Native acceptance remains pending.
 
 ## Protected sunrise and sunset baseline for v0.0.29
 
-The owner explicitly likes the v0.0.28 sunrise/sunset clouds and asks that they
+The maintainer explicitly likes the v0.0.28 sunrise/sunset clouds and asks that they
 remain unchanged, or change as little as possible. Preserve classic dawn, dusk,
 golden-hour and twilight cloud appearance as the visual baseline. Night-coverage
 changes must stay outside those protected windows and pass byte-identity
@@ -330,7 +330,7 @@ Reinspection corrects it to **51855** (global51855 39125 3502, local-348 565107,
 rawDEG265/P0), consistent with the scene transform. Preserve this transcription
 correction when reproducing the view; it is not a changed player position.
 
-## 5 October afternoon owner follow-up
+## 5 October afternoon maintainer follow-up
 
 - Preserve UI V1; default to `aw_ui_mode 2` with focused/clickable footer OK on
   appearance, class, birthsign and review. Native button acceptance remains open.
@@ -343,7 +343,7 @@ correction when reproducing the view; it is not a changed player position.
   identify the placed object, source mesh/material and camera before attribution.
 
 - Immediate priority: TRANSITION-EQUIPMENT-29, preserving complete equipped
-  and animation state before the first cell/sub-cell arrival frame. The owner
+  and animation state before the first cell/sub-cell arrival frame. The maintainer
   confirms held-torch surface light works; guard illumination and
   TORCH-HAND-SEPARATION-29 remain separate open reports.
 - Torch controls now implemented in source candidate: saved universal
@@ -359,7 +359,7 @@ correction when reproducing the view; it is not a changed player position.
 
 ### 5 October radius and grip follow-up
 
-Owner requests a universal player+guard radius control. Proposed source bounds
+Maintainer requests a universal player+guard radius control. Proposed source bounds
 are 32–288 with a proposed default of 192 (prior value 144); current post-reboot
 target is not assumed to contain this candidate. Keep native acceptance open.
 Study the reported first-person torch hand/torso appearance against OpenMW and
@@ -409,7 +409,7 @@ remain open.
 
 ## Conditional release milestone: More Mushrooms
 
-Recorded 2026-10-06T04:49:51Z from owner direction. The planned public release title is **AmiWind v0.0.29 -- More Mushrooms**. Shipping v0.0.29 is a conditional checkpoint after original mushrooms are placed worldwide, can be picked with persistent state behaving correctly, and the relevant release gates pass. This is a future target, not a claim that worldwide coverage or release readiness is complete. The current dev4 six-placement mushroom pilot may be photographed as progress evidence only and must be labeled as a six-placement pilot, not worldwide coverage. Take final release screenshots from the completed worldwide candidate. The later Caius quest milestone is separate and is not this release title.
+Recorded 2026-10-06T04:49:51Z from maintainer direction. The planned public release title is **AmiWind v0.0.29 -- More Mushrooms**. Shipping v0.0.29 is a conditional checkpoint after original mushrooms are placed worldwide, can be picked with persistent state behaving correctly, and the relevant release gates pass. This is a future target, not a claim that worldwide coverage or release readiness is complete. The current dev4 six-placement mushroom pilot may be photographed as progress evidence only and must be labeled as a six-placement pilot, not worldwide coverage. Take final release screenshots from the completed worldwide candidate. The later Caius quest milestone is separate and is not this release title.
 
 ## Required More Mushrooms! debug checkpoint
 

@@ -20,7 +20,7 @@ the Arena fighters keep their weapon baked into the model (always fighting).
 
 The item keeps its own size: the original also scales attached items with the
 actor's race width and height, which a shared alias model cannot (the grip sits
-exactly on the bone; measured on the owner's data: exact for a Hlaalu guard, up to
+exactly on the bone; measured on the maintainer's data: exact for a Hlaalu guard, up to
 3.3 units at the blade tip for an Imperial guard).
 
 Tag file (ASCII, LF):

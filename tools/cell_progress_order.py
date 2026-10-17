@@ -212,7 +212,7 @@ def draw_curve(path, series, title, ring_marks=(), size=(1000, 560)):
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# The store-once chart (owner, 2026-10-09: "what the hell is this chart trying to tell?"): the title is the takeaway,
+# The store-once chart (maintainer, 2026-10-09: "what the hell is this chart trying to tell?"): the title is the takeaway,
 # computed from the data; two panels with big text and every legend outside the plot; the no-reuse line is on a log scale
 # so it fits; ring labels are staggered above the plot.
 

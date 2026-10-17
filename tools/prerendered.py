@@ -26,7 +26,7 @@ A build with `tools/build.py --prerendered DIR`:
     when the whole build passed (every later gate included). A failed or cancelled build
     stores nothing. Release candidates and finals write but do not read (from-scratch rule).
 
-Commands (the files never leave the store; deleting entries is the owner's decision):
+Commands (the files never leave the store; deleting entries is the maintainer's decision):
   prerendered.py list DIR                 entries, sizes, ages and the builds that used them
   prerendered.py verify DIR [--jobs N]    SHA-256 of every stored file against its manifest
   prerendered.py prune DIR [--days N]     report removal candidates (superseded, unused); deletes nothing
@@ -573,7 +573,7 @@ def action_verify(store, jobs=None):
 
 
 def action_prune(store, days=14):
-    """Report removal candidates; never deletes (the owner decides)."""
+    """Report removal candidates; never deletes (the maintainer decides)."""
     table = rows(store)
     groups = {}
     for row in table:

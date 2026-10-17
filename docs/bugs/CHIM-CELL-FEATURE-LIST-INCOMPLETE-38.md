@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Exterior CHIM cell coverage and release feature lists |
 | Reproduction | always |
@@ -33,7 +33,7 @@
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
-- [Owner evidence reconciliation, 13 October 2026](#owner-evidence-reconciliation-13-october-2026)
+- [Maintainer evidence reconciliation, 13 October 2026](#maintainer-evidence-reconciliation-13-october-2026)
 - [Entrance metadata audit, 14 October 2026](#entrance-metadata-audit-14-october-2026)
 - [Ring-0 runtime ownership, 14 October 2026](#ring-0-runtime-ownership-14-october-2026)
 - [Planned original map-reference views, 14 October 2026](#planned-original-map-reference-views-14-october-2026)
@@ -112,7 +112,7 @@ Exact-package follow-up: 51 map and harvest files covering the five cells were e
 
 ## Repair
 
-Owner feedback on 12 October identifies Vivec gondola travel as not implemented.
+Maintainer feedback on 12 October identifies Vivec gondola travel as not implemented.
 The dev2 image shows Dalse Adren with a talk prompt at global 33524,-89237,643
 in cell (4,-11), heading 281, pitch 11, time 06:50. Visible NPC presence is not
 travel-service acceptance. Track inter-canton destinations, fares and successful
@@ -152,9 +152,9 @@ Generate feature manifests independently from original references and account fo
 12 October feature-path reconciliation: all 310 lava-script references in 24 Molag Mar exterior cells are deferred from static geometry with reason lava liquid. Their per-cell counts match the separate CHIM liquid records and generated terrain-liquid prisms, with zero count mismatches across all 123 cells. This establishes count coverage, not an independent reference-to-prism geometry match or native damage/audio acceptance. The same reference-ID join finds converted geometry for 262 steam-sound objects, 33 rotating signs and nine outside banners; sound looping and script-driven animation must be verified separately. The original steam script requests a positional loop, the sign script swings around its starting angle, and the banner script selects animations using weather and randomness. Static geometry alone does not implement these behaviors.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.
@@ -164,15 +164,15 @@ or runtime acceptance. Missing build or pose information remains unknown.
 
 ## Entrance metadata audit, 14 October 2026
 
-The owner requests recorded exterior entrance locations and original interior destinations even when the interior remains deferred to the next pass. The existing source census and compact entrance tree are useful, but the tree deduplicates destination interiors and does not retain every doorway location as a separate visible entrance. Nonvisual marker DOOR records must stay separate.
+The maintainer requests recorded exterior entrance locations and original interior destinations even when the interior remains deferred to the next pass. The existing source census and compact entrance tree are useful, but the tree deduplicates destination interiors and does not retain every doorway location as a separate visible entrance. Nonvisual marker DOOR records must stay separate.
 
 A bounded original-master audit finds 19 visible directed teleport-door references in rings 0–2, with 19 destination labels; none has a configured destination map. Pelagiad (0,-7) has 22 visible directed doors to 11 interior cells plus one PrisonMarker. Its 22 door meshes convert in the new offline cell result, but no Pelagiad activation bank or interior payload is produced by that converter-only run.
 
-In the inspected RC2 image stage, one of these 42 original DOOR references has an activation row: Ansi reference 300699 in cell (6,-14), with target `-`; the remaining 18 ring-door references and 22 Pelagiad doors have no row in the scanned banks. Stage metadata is not exact-package/native verification. Ansi's cell remains a partial town overlap excluded from whole-cell packaged counts. The owner's unnamed Dwemer example still needs its exact cell/reference binding.
+In the inspected RC2 image stage, one of these 42 original DOOR references has an activation row: Ansi reference 300699 in cell (6,-14), with target `-`; the remaining 18 ring-door references and 22 Pelagiad doors have no row in the scanned banks. Stage metadata is not exact-package/native verification. Ansi's cell remains a partial town overlap excluded from whole-cell packaged counts. The maintainer's unnamed Dwemer example still needs its exact cell/reference binding.
 
 The existing handler already shows `Interior not found.` on normal activation when a registered door's target is invalid or unavailable, and the normal invalid-target prompt is `Interior unavailable`. Quick-build exclusions and MiniWind use their own area-unavailable wording. This requires an aimed door-bank row; missing metadata never reaches the handler. Reuse the original-reference/bounds/label row generation with unavailable target `-` while interiors are deferred. No interior implementation is claimed here.
 
-Preserve per-reference statuses for geometry, activation metadata, destination configuration, actual payload, native entry/return and owner verification. The current `door_links` result measures converted door placements after marker exclusion; it does not establish playable interior links. Deferred interiors must not be described as implemented because a door mesh or label exists.
+Preserve per-reference statuses for geometry, activation metadata, destination configuration, actual payload, native entry/return and maintainer verification. The current `door_links` result measures converted door placements after marker exclusion; it does not establish playable interior links. Deferred interiors must not be described as implemented because a door mesh or label exists.
 
 ## Ring-0 runtime ownership, 14 October 2026
 
@@ -182,7 +182,7 @@ The Pelagiad selection preserves seven outside-frame static references rather th
 
 ## Planned original map-reference views, 14 October 2026
 
-The owner requests original World/Local views at least in the progress tracker.
+The maintainer requests original World/Local views at least in the progress tracker.
 Reuse existing local-input/background navigation and calibrate detailed local
 reference layers independently from the terrain/placement schematic. Original
 imagery and exploration never increase converted/audited/native/package counts;
@@ -231,7 +231,7 @@ references. Emitted source catalogues classify owned origins separately from
 whole-object footprint dependencies and reject duplicate identities within
 one frame. Actual adjacent catalogues, resident budgets and original/native
 terrain, water and collision seams are still pending. These source fixtures do
-not establish converted, packaged or owner-accepted coverage.
+not establish converted, packaged or maintainer-accepted coverage.
 
 Five ocean frames were converted, but the reporting step failed on an empty
 scenery-model list. See [the reporting repair](CHIM-EMPTY-MODEL-REPORT-40.md).
@@ -321,8 +321,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 Related bugs in other categories:

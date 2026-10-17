@@ -80,23 +80,23 @@ Do not mark a requirement complete merely because it is documented.
 
 ## Rc2 reports and rc3 correction status
 
-The owner reported Ctrl/Shift flight-speed modifiers resetting while held
+The maintainer reported Ctrl/Shift flight-speed modifiers resetting while held
 across cell/sub-cell changes during noclip. Rc2 cleared all held buttons when
 scheduling a map load, including automatic region crossings. Rc3 retains
 held buttons on automatic region crossings while retaining
 clearing at doors, teleports and focus loss. The real transition harness passes
 in both test variants, including noclip, health, magicka/fatigue, level, inventory,
 hands and torch restoration.
-Owner held-Shift/Ctrl and focus/release playtesting remains pending; for rc2 the
+Maintainer held-Shift/Ctrl and focus/release playtesting remains pending; for rc2 the
 temporary workaround: release and press the modifier again after the load. Do not treat
 retained noclip mode or velocity alone as proof of complete input continuity.
 
-The owner also reported Seyda Neen's landscape changing sharply at its town
+The maintainer also reported Seyda Neen's landscape changing sharply at its town
 boundary. The old ground ended only 64 units beyond the eastern exit against
 540 units of draw distance. A surrounding-ground apron and shared world terrain
 sampling are being rebuilt and require a separate owner boundary playtest.
 
-The owner accepted the rc2 giant-mushroom cap correction. That acceptance does
+The maintainer accepted the rc2 giant-mushroom cap correction. That acceptance does
 not cover these transition defects. See [bug journal](BUG_JOURNAL.md).
 
 ## Visible overlap and terrain handoff policy
@@ -133,7 +133,7 @@ not create ground, and declaring overlap does not prove that geometry exists.
 
 ### Seyda Neen: town-to-world and internal town subdivisions
 
-The rc2 owner screenshots near the eastern town exit show a missing landscape
+The rc2 maintainer screenshots near the eastern town exit show a missing landscape
 followed by a sudden hillside after a few steps. The town remained resident to
 local X=1600 while its ground stopped at X=1664: only 64 units ahead against a
 540-unit draw distance. A sea/sky backdrop could not supply the missing LAND.
@@ -142,7 +142,7 @@ The candidate correction adds a 768-unit real-ground apron, uses the streamed
 world sampler/triangulation/material choice outside the detailed port approach,
 and extends subdivision coverage without moving town ownership cores. An older
 candidate also raised a per-cell sky enclosure to follow measured surrounding
-hill height; that part is superseded by the owner requirement to remove local
+hill height; that part is superseded by the project requirement to remove local
 sky-enclosure render geometry and use a separate shared/background sky path.
 The detailed Silt Strider approach retains fine ground samples. Outer coverage
 records must still enclose all subdivision cores, including the legacy outer
@@ -152,7 +152,7 @@ Test town-to-world and world-to-town crossings at the reported eastern exit,
 then other exits and diagonal views. Test internal town subdivisions and the
 north bridge separately: an internal region change and leaving the town are
 separate transitions. Confirm rocks, ground materials, collision, player height
-and performance together. The corrected rc3 owner playtest remains pending.
+and performance together. The corrected rc3 maintainer playtest remains pending.
 
 ### Balmora: FPS subdivisions and surrounding-world boundary
 
@@ -232,7 +232,7 @@ Every replacement must pass the same headroom gate and target crossing tests.
 
 ## Boundary placement is a measured choice, not an FPS guarantee
 
-Owner clarification, 3 October 2026: the suggested off-centre cut near sn017 is illustrative, not a required coordinate. Candidates may move boundaries or use nonuniform subdivision where actual payload measurements support it. Record the layout and map identity: sn017 in the original 25-region directory is not the same region as sn017 in the adaptive 64-region proposal.
+Maintainer clarification, 3 October 2026: the suggested off-centre cut near sn017 is illustrative, not a required coordinate. Candidates may move boundaries or use nonuniform subdivision where actual payload measurements support it. Record the layout and map identity: sn017 in the original 25-region directory is not the same region as sn017 in the adaptive 64-region proposal.
 
 Evaluate both sides of every changed boundary. Preserve the coverage apron, collision continuity and gameplay state; avoid merely transferring a failure to the neighbour. Density heatmap bins guide investigation but do not predict resident visibility, collision or loader allocation costs.
 
@@ -247,7 +247,7 @@ Begin the delay at a safe loading-screen checkpoint after blocking reads; never
 interrupt or time out a blocking read to satisfy the delay. This changes screen
 presentation timing, not loader throughput, map residency or frame performance.
 Nine source checks pass and the rc5 candidate was packaged/read back; target
-crossing timing and owner playtesting remain pending.
+crossing timing and maintainer playtesting remain pending.
 
 ## Large interiors: subdivision at natural boundaries
 

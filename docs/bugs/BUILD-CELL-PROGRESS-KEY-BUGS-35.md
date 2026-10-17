@@ -9,7 +9,7 @@
 | Where | tools/build_cache.py source closure (script-name rule); reuse preflight stop |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: A docs-only change (any new bug) stopped every build with --reuse-from before any stage ran |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | MiniWind animkit-abi build |

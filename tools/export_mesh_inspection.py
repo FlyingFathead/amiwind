@@ -192,7 +192,7 @@ def main():
     parser.add_argument('bsp', type=Path)
     parser.add_argument('--out', required=True, type=Path, help='Fresh PRIVATE output directory')
     parser.add_argument('--viewer', type=Path, default=Path(__file__).resolve().parents[1] / 'amiwind-toolkit' / 'map-inspector.html')
-    parser.add_argument('--palette', type=Path, help='Optional owner-supplied 768-byte palette; private export only')
+    parser.add_argument('--palette', type=Path, help='Optional user-supplied 768-byte palette; private export only')
     args = parser.parse_args()
     if args.out.exists():
         parser.error('Output exists: use a fresh numbered directory')

@@ -9,7 +9,7 @@
 | Where | image step partition and drive writers; the asset-free dry-run image |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | low: Every over-limit layout was still refused, but only after its partitions and drives were written (up to 4 GiB each); the dry-run image was not measured at all. |
 | Family | Disk images, partitions and launchers (`disk-image-layout`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

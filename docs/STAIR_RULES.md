@@ -1,8 +1,109 @@
 # Stairs: Morrowind's own rules, and a gate that proves them
 
-Status: 8 October 2026 (v0.0.32 development). Bug record:
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Findings, in order](#findings-in-order)
+- [Why AmiWind checks stairs and OpenMW does not](#why-amiwind-checks-stairs-and-openmw-does-not)
+- [Known-good stair records](#known-good-stair-records)
+- [The flight margin](#the-flight-margin)
+- [Workers and memory](#workers-and-memory)
+- [The rules we follow](#the-rules-we-follow)
+- [The stair rule (shared collision layer)](#the-stair-rule-shared-collision-layer)
+- [The switch](#the-switch)
+- [Large models: the routed standing hull](#large-models-the-routed-standing-hull)
+- [The gate](#the-gate)
+
+<!-- contents end -->
+
+Status: the stair rule and the stair gate are on for every build since v0.0.33; the v0.0.42 line walks each
+flight once, keeps every pass, ships known-good records and sizes the walk by memory (below). First bug record:
 [COLLISION-STAIR-SLOPE-32](bugs/COLLISION-STAIR-SLOPE-32.md). Background:
-[collision meshes](COLLISION_MESHES.md), [stair ramp walkability](STAIR_RAMP_WALKABILITY.md).
+[collision meshes](COLLISION_MESHES.md), [stair ramp walkability](STAIR_RAMP_WALKABILITY.md),
+[build profile](BUILD_PROFILE.md).
+
+## Findings, in order
+
+Dates and versions from the bug register.
+
+- 30 September 2026, v0.0.24-rc1: a Balmora staircase whose authored collision is one ramp steeper than walkable
+  stopped the player: the first stair finding ([stair ramp walkability](STAIR_RAMP_WALKABILITY.md)).
+- 8 October 2026, v0.0.32 development: convex collision proxies close treads or turn flights into slopes too steep
+  to stand on. We built the stair rule (authored plates where a proxy buries a tread) and the stair gate (every
+  flight walked up and down by the player's box at build time)
+  ([COLLISION-STAIR-SLOPE-32](bugs/COLLISION-STAIR-SLOPE-32.md)); the stair option at first did nothing
+  ([BUILD-STAIR-FLAG-INERT-32](bugs/BUILD-STAIR-FLAG-INERT-32.md)).
+- 8 October 2026, v0.0.32-dev2: the gate found five flights that could not be walked: Addamasartus, two Balmora
+  houses, the Seyda Neen lighthouse and warehouse ([STAIRS-ADDAMASARTUS-32](bugs/STAIRS-ADDAMASARTUS-32.md),
+  [STAIRS-BALMORA-B01-32](bugs/STAIRS-BALMORA-B01-32.md),
+  [STAIRS-BALMORA-WESTSOUTH-32](bugs/STAIRS-BALMORA-WESTSOUTH-32.md),
+  [STAIRS-SEYDA-LIGHTHOUSE-32](bugs/STAIRS-SEYDA-LIGHTHOUSE-32.md),
+  [STAIRS-SEYDA-WAREHOUSE-32](bugs/STAIRS-SEYDA-WAREHOUSE-32.md)); all fixed in v0.0.33.
+- 9 October 2026, v0.0.33 development: the Vivec palace steps and High Fane flights failed on the CHIM Vivec frame
+  ([VIVEC-TEMPLE-STAIRS-33](bugs/VIVEC-TEMPLE-STAIRS-33.md)); fixed in v0.0.36.
+- 10-11 October 2026, v0.0.36 development: CHIM frames were walked again on every build (about 69 minutes for 270
+  frames), so each frame walk became a SHA-256-keyed record, reused while its collision is unchanged
+  ([BUILD-CHIM-STAIR-WALK-UNCACHED-36](bugs/BUILD-CHIM-STAIR-WALK-UNCACHED-36.md), fixed in v0.0.36-dev5). The
+  image step walked one map per worker ([BUILD-IMAGE-STAIR-WALK-SERIAL-36](bugs/BUILD-IMAGE-STAIR-WALK-SERIAL-36.md)),
+  stair pieces meeting in three Vivec rooms blocked six steps
+  ([STAIRS-VIVEC-ROOMS-JOINT-36](bugs/STAIRS-VIVEC-ROOMS-JOINT-36.md)), and the keys also counted bookkeeping code
+  ([BUILD-STAIR-KEY-BOOKKEEPING-36](bugs/BUILD-STAIR-KEY-BOOKKEEPING-36.md)).
+- 16 October 2026, v0.0.41-dev5: a build stopped after 1 h 35 min on one step of a Vos walkway under the Velothi
+  temple ([CHIM-VOS-TEMPLE-WALKWAY-41](bugs/CHIM-VOS-TEMPLE-WALKWAY-41.md), fixed in v0.0.41), found in the border
+  copies of two other cells: every frame walked its whole border, so each flight was walked about three times. Now
+  each flight is walked once, in the frame that owns it
+  ([BUILD-STAIR-WALK-BORDER-COPIES-41](bugs/BUILD-STAIR-WALK-BORDER-COPIES-41.md)), and the stair gate runs first
+  among the CHIM checks.
+- 16 October 2026, v0.0.41-dev5: a passed walk was not kept when its build failed later, and converter edits
+  changed the walker's key. Now a pass is a pass
+  ([BUILD-STAIR-PASS-NOT-KEPT-41](bugs/BUILD-STAIR-PASS-NOT-KEPT-41.md)).
+- 16 October 2026, v0.0.41: 39 flight steps lost their flight mark where a flight crosses a 1024-unit core line
+  ([STAIR-FLIGHT-CORE-SPLIT-41](bugs/STAIR-FLIGHT-CORE-SPLIT-41.md)), and a few borderline steps were found in one
+  frame's copy and not in another's ([STAIR-DETECT-POSITION-41](bugs/STAIR-DETECT-POSITION-41.md)). On the v0.0.42
+  line: 39 -> 0 lost marks, 107 -> 63 copy-only places (the rest open). See "The flight margin" below.
+- 16-17 October 2026, v0.0.42 development: a general rule to replace the list of temple mesh names (a convex piece
+  that fills space under an authored ceiling becomes plates) was built and measured on every exterior mesh. It stays
+  experimental and the list stays the default (table in
+  [CHIM-VOS-TEMPLE-WALKWAY-41](bugs/CHIM-VOS-TEMPLE-WALKWAY-41.md)).
+- 17 October 2026, v0.0.42 development: known-good stair records shipped with the source (below).
+- 17 October 2026, v0.0.42 development: two Vivec palace sandboxes died in the stair gate with a bare "broken
+  process pool" (CHIM-STAIR-GATE-POOL-BROKEN-42): 22 whole-Vivec walks at once ran the container out of memory.
+  See "Workers and memory" below.
+
+## Why AmiWind checks stairs and OpenMW does not
+
+OpenMW collides every frame against the authored triangles (the NIF `RootCollisionNode`, else every triangle:
+`components/nifbullet/bulletnifloader.cpp`) and steps up by its own rule as the player moves
+(`apps/openmw/mwphysics/stepper.cpp`, `apps/openmw/mwphysics/movementsolver.hpp`), so a staircase works when its
+triangles do. Quake, and AmiWind, collide against hulls compiled ahead of time for one fixed player box and a fixed
+step (8.5 units here), which is cheap enough for a 68k. Turning triangles into those hulls can close a tread or
+invent a slope, so the collision of every converted mesh is proven once, at build time, by walking each flight.
+
+## Known-good stair records
+
+A pass is a pass: a frame whose walk inputs and walker are unchanged (the SHA-256 of what the walk reads, and the
+walker's code digest) is not walked again. The walks of the v0.0.41 release world ship with the source in
+`config/stair-records/` (726 frames, about 500 KB; hashes, references and coordinates only, no game data), so a build
+from the same game data makes the same collision and skips the walk. `--stair-walk-cache records` is the default of
+a build without `--developer-mode`: a frame found neither in the workspace's walks nor in the records is named and
+walked only on request; `cached` (development builds) walks what changed; `full` walks everything. Details:
+[BUILD_PROFILE.md](BUILD_PROFILE.md), "Known-good stair records".
+
+## The flight margin
+
+Only steps of flights (3 or more in a row) stop a build. The gate walks a frame in 1024-unit cores, so a flight cut
+by a core line was two short runs and lost its flight mark. Steps are now found on the core plus 128 units to mark
+the flights, and only the core's own steps are walked (STAIR-FLIGHT-CORE-SPLIT-41: 39 lost marks -> 0 on the v0.0.41
+world).
+
+## Workers and memory
+
+Each walk worker reads a whole frame: about 0.3-0.5 GiB for a region frame, 2.6 GiB for whole-city Vivec (measured).
+The gate runs no more workers than its container's own memory limit holds, says which bound won (cores or memory),
+and a worker that is killed anyway stops the gate with the unfinished units, their frames and the memory named
+(CHIM-STAIR-GATE-POOL-BROKEN-42). The Vivec palace frame passed in a 12 GiB container on 3 workers.
 
 ## The rules we follow
 

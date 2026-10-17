@@ -8,7 +8,7 @@ exterior, grouped by region, with a rough type and conversion status. Interiors
 reached only through other interiors are attached to their parent through the
 door graph. Writes a Markdown checklist (for the "building inspector" pass) and
 a JSON file. The output names the game's places: keep it private unless the
-owner decides otherwise.
+maintainer decides otherwise.
 
 Conversion status comes from config/seyda_area.json and
 config/balmora_interiors.json. The type is a hint from the cell name and the

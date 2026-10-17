@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 10 October 2026, in v0.0.36-dev3 |
 | Where | engine/aga/src: Cmd_AddCommand (low hunk) and Cvar_RegisterVariable (zone) registrations |
 | Reproduction | always |
@@ -58,7 +58,7 @@ console variables (7,704 bytes of structures and 10,496 bytes of zone), no stati
 out, included `.inc` files and string macros resolved) and counts the registrations and their bytes.
 `tests/test_resident_registry.py` compares them with `tests/resident_registry_budget.json`: above the budget it
 fails and names the new entries, with the advice to route debug commands through the on-disk `dbg` catalogue
-(`aw_console.c`, AWDC1) or to raise the budget in the same commit with the owner-approved, dated reason
+(`aw_console.c`, AWDC1) or to raise the budget in the same commit with the maintainer-approved, dated reason
 (`--raise-budget`); below the budget it asks for the budget to be lowered (`--lower-budget`). The test also
 checks that the engine structures still have the sizes the counts assume.
 
@@ -69,7 +69,7 @@ command fails with its name, comments and disabled code are not counted, and low
 
 ## Prevention
 
-The ratchet runs in every gate: the registries can only shrink unless the owner approves growth.
+The ratchet runs in every gate: the registries can only shrink unless the maintainer approves growth.
 
 ## Race-command registration recurrence, 14 October 2026
 
@@ -126,6 +126,7 @@ Family: Engine table limits (`engine-limits`). Fixed engine tables (models, enti
 - GEO-04 (no report page): Canonical-terrain world rebuild fails VIS (too many portals)
 - [IMPORT-DOORBANK-LIMIT-32](IMPORT-DOORBANK-LIMIT-32.md): Town importer did not check the engine's 128-row door bank limit
 - [INTERIOR-COORDS-31](INTERIOR-COORDS-31.md): Some interiors place objects beyond the +/-4096 coordinate range
+- [INTERIOR-EXCLUDE-STALE-41](INTERIOR-EXCLUDE-STALE-41.md): Two Vivec rooms stayed left out on heap numbers from an older build
 - [INTERIOR-INLINE-LIMIT-31](INTERIOR-INLINE-LIMIT-31.md): Every interior object is its own inline model: 220 objects per interior at most
 - [LAMPS-CACHE-31](LAMPS-CACHE-31.md): Night lamps beyond 96 per 3x3 cells are silently dropped (Vivec)
 - [MODEL-MARKSURF-SIGNED-31](MODEL-MARKSURF-SIGNED-31.md): Face indices above 32,767 in leaf face lists become bad pointers

@@ -30,7 +30,7 @@ STATUS_TEXT = collections.OrderedDict([
                                'once lit.' % (cp.TERRAIN_COMPLETE_UNLIT_LABEL, cp.TERRAIN_COMPLETE_LABEL.lower(),
                                               cp.TERRAIN_COMPLETE_LABEL.lower())),
     ('audits_passed', 'Passed: converted and every measured audit passed, but something placed is still deferred or skipped '
-                      '(owner-approved and playtested cells also count here).'),
+                      '(maintainer-approved and playtested cells also count here).'),
     ('empty_sea', 'Empty sea: terrain and water only, nothing placed. Counts as done.'),
     ('ocean', 'Open sea: a map cell without terrain data (no LAND record), the water surface over the flat seabed at the '
               'default depth, stored once as one shared ocean chunk and referenced by every such cell. Shown in silver; the '
@@ -132,7 +132,7 @@ def policy_lines():
             'there is nothing to convert there but the terrain and the water.' % (
                 cp.COMPLETE_LABEL.lower(), cp.TERRAIN_COMPLETE_LABEL.lower(), cp.COMPLETE_UNLIT_LABEL.lower(),
                 cp.TERRAIN_COMPLETE_UNLIT_LABEL.lower()), '',
-            'Eligible for the next release = every done cell: %s, %s, %s, %s, passed (owner-approved and playtested included) and '
+            'Eligible for the next release = every done cell: %s, %s, %s, %s, passed (maintainer-approved and playtested included) and '
             'empty sea (it passes as it is; the open world needs the water around the coast). Lighting does not have to '
             'be done.' % (
                 cp.COMPLETE_LABEL.lower(), cp.TERRAIN_COMPLETE_LABEL.lower(),
@@ -162,10 +162,10 @@ def policy_lines():
 
 
 def release_lines(doc):
-    """Per-release table: which cells the owner approved for which release, and how they stand."""
+    """Per-release table: which cells the maintainer approved for which release, and how they stand."""
     rows = doc.get('releases') or []
     out = ['## Release assignments', '',
-           'Which cells are approved for which release (set by the owner with `cell_progress.py release`; conversion results '
+           'Which cells are approved for which release (set by the maintainer with `cell_progress.py release`; conversion results '
            'never change it).', '']
     if not any(r['approved'] for r in rows if r['release']):
         return out + ['No cells are assigned in this planning ledger. Packaged inclusion is recorded separately above.', '']

@@ -9,7 +9,7 @@
 | Where | Engine map loader (AW_LoadBrushSection lump staging) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | medium: Staged lump copies raise the loader heap peak. |
 | Family | Map heap and memory budget (`heap-memory`) |
 

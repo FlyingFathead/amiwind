@@ -20,7 +20,7 @@ agree; a mismatch fails the build.
 
 | Part | File | Holds |
 | --- | --- | --- |
-| Register | [`bugs.json`](bugs.json) (schema: [`bugs.schema.json`](bugs.schema.json)), shown as [`docs/BUGS.md`](../BUGS.md) | Every bug exactly once: ID, title, state (open/fixed/closed), fixed in, owner accepted, current status, report link, the [facts](#facts) (who reported it, when and in which version, where, reproduction, duplicate, persistence, severity, family, related bugs) and optional tags (`performance`: listed together below the table; add with `--tag performance`). The only place for current status. Edit the JSON, or use `tools/bug_register.py add` / `set`, then `tools/bug_register.py render`; never edit generated parts by hand (the register in BUGS.md, the fact table and the "Bugs in the same category" section of each page, the [families](#families) table below). |
+| Register | [`bugs.json`](bugs.json) (schema: [`bugs.schema.json`](bugs.schema.json)), shown as [`docs/BUGS.md`](../BUGS.md) | Every bug exactly once: ID, title, state (open/fixed/closed), fixed in, maintainer accepted, current status, report link, the [facts](#facts) (who reported it, when and in which version, where, reproduction, duplicate, persistence, severity, family, related bugs) and optional tags (`performance`: listed together below the table; add with `--tag performance`). The only place for current status. Edit the JSON, or use `tools/bug_register.py add` / `set`, then `tools/bug_register.py render`; never edit generated parts by hand (the register in BUGS.md, the fact table and the "Bugs in the same category" section of each page, the [families](#families) table below). |
 | Archive | [`archive/bugs-v0.0.29-v0.0.33.json`](archive/bugs-v0.0.29-v0.0.33.json) | Frozen rotation of `bugs.json`, same schema: bugs that are fixed or closed, were first found in v0.0.33 or earlier and are not persisting. `tools/bug_register.py` reads both files, IDs stay unique across them, report pages stay where they are, and `render` moves a bug between the files by that rule; never edit the split by hand. Keeps `bugs.json` under its release size limit. |
 | Families | [`families.json`](families.json) | The categories bugs are grouped in: key, title and the shared cause or rule. |
 | CHIM Engine tracker | [`CHIM_TRACKER.md`](CHIM_TRACKER.md) | Every [CHIM bug](#chim-bugs) by part, open first, with the build it was found in and the latest journal changes. Generated whole with the register. |
@@ -59,15 +59,15 @@ Frozen history (read-only; current status is in the register):
 - **Fixed** (`state: fixed` with `fixed_in`) means a correction shipped in a named version and was verified.
   A candidate, mitigation or source-only change is not fixed, and a development line
   (`v0.0.32-dev`) is never a `fixed_in` value; numbered builds (`v0.0.31-dev2`) are. Keep reported,
-  source-checked, packaged, native-verified and owner-accepted distinct, and
-  set `owner_accepted` only when the owner has played the fixed build.
+  source-checked, packaged, native-verified and maintainer-accepted distinct, and
+  set `owner_accepted` only when the maintainer has played the fixed build.
 - **Wording for unshipped repairs:** write "fixed in source on <branch> (<commit>), not shipped at the time of
   writing". Statuses describe the state when they were written; say so instead of "not yet shipped".
 - **Regressions** get their own ID, linked to the older bug they resemble.
 - Old IDs keep their records; their register row is updated when their status
   changes.
 
-The live `bugs.json` array stores one complete issue object per line. This
+The live `bugs.json` array and the archive store one complete issue object per line. This
 canonical serialization avoids repeated nesting whitespace without removing
 fields or report history; use `bug_register.py` to save/render it. The existing
 archive schema, rotation rule and release size guard remain unchanged.
@@ -80,7 +80,7 @@ a guess.
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `reported_by` | `owner`, `developer`, `review`, `audit`, `test`, `build`, `ci`, `gate:<name>`, `unknown` | Who first reported it: the owner in play, work on the code or data, an independent review, a data audit or measurement, a test, a build run, hosted CI, or a named gate or validator (`gate:stair-walk`). |
+| `reported_by` | `owner`, `developer`, `review`, `audit`, `test`, `build`, `ci`, `gate:<name>`, `unknown` | Who first reported it: the maintainer in play, work on the code or data, an independent review, a data audit or measurement, a test, a build run, hosted CI, or a named gate or validator (`gate:stair-walk`). |
 | `found_date` | `YYYY-MM-DD` or `unknown` | When it was first noticed (not when it was fixed). |
 | `found_in` | a version (`v0.0.32-dev3`, `v0.0.31`, or a development line such as `v0.0.32-dev` for source work) or `unknown` | The build or line it was found in. |
 | `where` | one line, at most 100 characters | Place or component: a map and spot, a builder stage, an engine part. |
@@ -128,7 +128,7 @@ the file.
 
 ## Status: <date>
 
-<Open / fixed in vX / owner-accepted in vX>. Present in <versions>.
+<Open / fixed in vX / maintainer-accepted in vX>. Present in <versions>.
 
 ## Symptom
 
@@ -156,7 +156,7 @@ What changed, and the gates on the result.
 
 ## Verification
 
-What was run on which build, and what remains (for example owner playtest).
+What was run on which build, and what remains (for example maintainer playtest).
 
 ## Prevention
 
@@ -169,7 +169,7 @@ The check or gate added so it cannot recur unnoticed.
 
 ## Found in build
 
-Owner requirement (9 October 2026): a bug says exactly which build it was found in. The `build` record
+Project requirement (9 October 2026): a bug says exactly which build it was found in. The `build` record
 is required for every [CHIM bug](#chim-bugs) and for every bug found from v0.0.30 on in a numbered build
 (`found_in` such as `v0.0.32-dev3`, `v0.0.30-rc1` or `v0.0.32`); the tracker test fails without it.
 
@@ -192,10 +192,10 @@ names the build when it differs from `found_in`; the page's fact table shows eve
 
 ## Platform or emulator
 
-Owner requirement (11 October 2026): a bug the owner saw while playing names the platform or emulator it was
+Project requirement (11 October 2026): a bug the maintainer saw while playing names the platform or emulator it was
 seen on, in `platform` (one line, at most 120 characters), with the CPU preset when it matters: `FS-UAE 3.1.66, JIT`,
 `FS-UAE 3.1.66, interpreter, 68040 cycle-approximate`, `WinUAE 6.0.1`, `A1200 + 68060 accelerator`. It is required
-for the owner's reports on numbered builds (`found_in` such as `v0.0.36-dev5`) from v0.0.36 on, except in the
+for the maintainer's reports on numbered builds (`found_in` such as `v0.0.36-dev5`) from v0.0.36 on, except in the
 builder and tooling families (build speed, build reuse, missing content, from-scratch builds, tooling, tests, disk
 images). `unknown` or `not in game` are allowed only with `platform_reason` (one line): why it is not known, or why
 the bug was not seen while playing. Set it with `tools/bug_register.py set ID --platform TEXT` (and
@@ -270,40 +270,40 @@ family links to its list in the register.
 
 | Family | Key | Bugs (open of total) | Shared cause or rule |
 | --- | --- | --- | --- |
-| [Vivec preview frame and its joins to the world](../BUGS.md#vivec-preview-frame-and-its-joins-to-the-world-vivec-frame-edge) | `vivec-frame-edge` | 8 of 8 | The Vivec Arena preview is one isolated frame: what lies at or beyond its edge (canton cuts, sea, bridges, the open-world maps around it) is missing, cut or wrong until the world streamer joins Vivec to the world. |
-| [Collision shapes and climbing (stairs, ramps, walkways)](../BUGS.md#collision-shapes-and-climbing-stairs-ramps-walkways-stairs-collision) | `stairs-collision` | 28 of 31 | Convex collision proxies invent steep faces or bury authored surfaces; Morrowind collides with authored geometry (step up 34 units, slope up to 46 degrees). Rule: follow_original_stair_rules plus a walkability gate. |
-| [Distance drawing (horizon, fog, sky, far edges)](../BUGS.md#distance-drawing-horizon-fog-sky-far-edges-distance-drawing) | `distance-drawing` | 14 of 14 | Far-plane fog, the skyline fill, distant sprites and resident ground. |
-| [Seyda Neen recorded stage](../BUGS.md#seyda-neen-recorded-stage-seyda-recorded) | `seyda-recorded` | 6 of 8 | Recorded v0.0.31 maps are kept byte for byte; their heap headroom limits what can be added and the public builder cannot regenerate them. |
-| [Content silently missing from a build](../BUGS.md#content-silently-missing-from-a-build-build-content-missing) | `build-content-missing` | 25 of 29 | Every omission is receipted; payload and entity counts are compared with the last release; shipped features are on by default. |
-| [Builder breaks and reproducibility](../BUGS.md#builder-breaks-and-reproducibility-builder-from-scratch) | `builder-from-scratch` | 31 of 36 | The repository builder builds the whole game from the owner's data with no private step, byte for byte the same each time. |
-| [Build speed](../BUGS.md#build-speed-build-speed) | `build-speed` | 59 of 67 | Every stage on the shared worker pool; per-stage time and CPU in the build profile. |
-| [Build reuse keys and output attribution](../BUGS.md#build-reuse-keys-and-output-attribution-build-cache-reuse) | `build-cache-reuse` | 38 of 41 | A unit is rebuilt only when the content hash of all its inputs changes or its output is missing or damaged. Keys never under-declare (a missed input allows a wrong reuse) and should not over-declare (a file no output depends on forces rebuilds); outputs carry no wall-clock values; every changed file is credited to the stage that wrote it. |
-| [Console, keyboard and mouse input](../BUGS.md#console-keyboard-and-mouse-input-console-input) | `console-input` | 13 of 15 | The console line editor, qualifier keys and the emulator key path. |
-| [Music and sound](../BUGS.md#music-and-sound-audio) | `audio` | 24 of 27 | The mixer must stay fed through loads and scene changes; music starts after loads settle. |
-| [Lighting, lamps and night](../BUGS.md#lighting-lamps-and-night-lighting-night) | `lighting-night` | 30 of 33 | Morrowind lights become Quake light entities baked by the light compiler and animated with lightstyles; night tables and dynamic lights follow the original. |
+| [Vivec preview frame and its joins to the world](../BUGS.md#vivec-preview-frame-and-its-joins-to-the-world-vivec-frame-edge) | `vivec-frame-edge` | 6 of 8 | The Vivec Arena preview is one isolated frame: what lies at or beyond its edge (canton cuts, sea, bridges, the open-world maps around it) is missing, cut or wrong until the world streamer joins Vivec to the world. |
+| [Collision shapes and climbing (stairs, ramps, walkways)](../BUGS.md#collision-shapes-and-climbing-stairs-ramps-walkways-stairs-collision) | `stairs-collision` | 17 of 34 | Convex collision proxies invent steep faces or bury authored surfaces; Morrowind collides with authored geometry (step up 34 units, slope up to 46 degrees). Rule: follow_original_stair_rules plus a walkability gate. |
+| [Distance drawing (horizon, fog, sky, far edges)](../BUGS.md#distance-drawing-horizon-fog-sky-far-edges-distance-drawing) | `distance-drawing` | 12 of 14 | Far-plane fog, the skyline fill, distant sprites and resident ground. |
+| [Seyda Neen recorded stage](../BUGS.md#seyda-neen-recorded-stage-seyda-recorded) | `seyda-recorded` | 0 of 8 | Recorded v0.0.31 maps are kept byte for byte; their heap headroom limits what can be added and the public builder cannot regenerate them. |
+| [Content silently missing from a build](../BUGS.md#content-silently-missing-from-a-build-build-content-missing) | `build-content-missing` | 13 of 31 | Every omission is receipted; payload and entity counts are compared with the last release; shipped features are on by default. |
+| [Builder breaks and reproducibility](../BUGS.md#builder-breaks-and-reproducibility-builder-from-scratch) | `builder-from-scratch` | 15 of 42 | The repository builder builds the whole game from the user's own data with no private step, byte for byte the same each time. |
+| [Build speed](../BUGS.md#build-speed-build-speed) | `build-speed` | 30 of 74 | Every stage on the shared worker pool; per-stage time and CPU in the build profile. |
+| [Build reuse keys and output attribution](../BUGS.md#build-reuse-keys-and-output-attribution-build-cache-reuse) | `build-cache-reuse` | 8 of 41 | A unit is rebuilt only when the content hash of all its inputs changes or its output is missing or damaged. Keys never under-declare (a missed input allows a wrong reuse) and should not over-declare (a file no output depends on forces rebuilds); outputs carry no wall-clock values; every changed file is credited to the stage that wrote it. |
+| [Console, keyboard and mouse input](../BUGS.md#console-keyboard-and-mouse-input-console-input) | `console-input` | 5 of 15 | The console line editor, qualifier keys and the emulator key path. |
+| [Music and sound](../BUGS.md#music-and-sound-audio) | `audio` | 22 of 27 | The mixer must stay fed through loads and scene changes; music starts after loads settle. |
+| [Lighting, lamps and night](../BUGS.md#lighting-lamps-and-night-lighting-night) | `lighting-night` | 25 of 33 | Morrowind lights become Quake light entities baked by the light compiler and animated with lightstyles; night tables and dynamic lights follow the original. |
 | [First-person hands and torch](../BUGS.md#first-person-hands-and-torch-torch-hands) | `torch-hands` | 12 of 15 | First-person hands, punches and the carried torch. |
-| [Map heap and memory budget](../BUGS.md#map-heap-and-memory-budget-heap-memory) | `heap-memory` | 21 of 25 | The heap model must match what the loader actually allocates; strict heap gate, hard ceiling always fatal. |
-| [Engine table limits](../BUGS.md#engine-table-limits-engine-limits) | `engine-limits` | 28 of 31 | Fixed engine tables (models, entities, faces, texinfo, flames, lamps, door rows) are checked by the builder before a map ships, never discovered in play. |
-| [Mesh converter geometry](../BUGS.md#mesh-converter-geometry-converter-geometry) | `converter-geometry` | 27 of 32 | Converted faces must be planar, wound to their plane, non-degenerate and within engine ranges; checked by the face validator. |
-| [World storage and duplication](../BUGS.md#world-storage-and-duplication-world-storage) | `world-storage` | 9 of 9 | Every asset stored once and placed by reference (world streamer); map lumps carry only what the engine uses. |
-| [Loading and disk reads](../BUGS.md#loading-and-disk-reads-disk-loading) | `disk-loading` | 10 of 11 | Load time follows bytes read and seeks on FFS; measured with read counters, not wall time alone. |
-| [Rendering cost and visibility](../BUGS.md#rendering-cost-and-visibility-render-performance) | `render-performance` | 17 of 17 | Read the visibility data and renderer counters before any performance claim. |
-| [CHIM world streamer](../BUGS.md#chim-world-streamer-chim-streamer) | `chim-streamer` | 75 of 80 | The CHIM streamer keeps Quake's visibility effective and its renderer counters must not get worse. |
-| [FPU and CPU behaviour (68040/68060)](../BUGS.md#fpu-and-cpu-behaviour-6804068060-fpu-cpu) | `fpu-cpu` | 9 of 9 | Results must not depend on the FPU; unimplemented instructions trap on a real 68040 without a support library. |
-| [Emulator measurement method](../BUGS.md#emulator-measurement-method-benchmark-method) | `benchmark-method` | 8 of 8 | Emulator numbers are relative until a hardware number exists; same-session runs with a drift control. |
-| [Disk images, partitions and launchers](../BUGS.md#disk-images-partitions-and-launchers-disk-image-layout) | `disk-image-layout` | 9 of 12 | Classic FFS limits: partitions under 2 GiB, few files per directory; launchers list every disk. |
-| [Morrowind editions, archives and inputs](../BUGS.md#morrowind-editions-archives-and-inputs-game-data-editions) | `game-data-editions` | 9 of 9 | The builder reads the owner's data the way Morrowind does (archive order, loose files) and checks inputs against known versions. |
+| [Map heap and memory budget](../BUGS.md#map-heap-and-memory-budget-heap-memory) | `heap-memory` | 10 of 25 | The heap model must match what the loader actually allocates; strict heap gate, hard ceiling always fatal. |
+| [Engine table limits](../BUGS.md#engine-table-limits-engine-limits) | `engine-limits` | 14 of 32 | Fixed engine tables (models, entities, faces, texinfo, flames, lamps, door rows) are checked by the builder before a map ships, never discovered in play. |
+| [Mesh converter geometry](../BUGS.md#mesh-converter-geometry-converter-geometry) | `converter-geometry` | 18 of 32 | Converted faces must be planar, wound to their plane, non-degenerate and within engine ranges; checked by the face validator. |
+| [World storage and duplication](../BUGS.md#world-storage-and-duplication-world-storage) | `world-storage` | 7 of 9 | Every asset stored once and placed by reference (world streamer); map lumps carry only what the engine uses. |
+| [Loading and disk reads](../BUGS.md#loading-and-disk-reads-disk-loading) | `disk-loading` | 7 of 11 | Load time follows bytes read and seeks on FFS; measured with read counters, not wall time alone. |
+| [Rendering cost and visibility](../BUGS.md#rendering-cost-and-visibility-render-performance) | `render-performance` | 13 of 17 | Read the visibility data and renderer counters before any performance claim. |
+| [CHIM world streamer](../BUGS.md#chim-world-streamer-chim-streamer) | `chim-streamer` | 32 of 80 | The CHIM streamer keeps Quake's visibility effective and its renderer counters must not get worse. |
+| [FPU and CPU behaviour (68040/68060)](../BUGS.md#fpu-and-cpu-behaviour-6804068060-fpu-cpu) | `fpu-cpu` | 7 of 11 | Results must not depend on the FPU; unimplemented instructions trap on a real 68040 without a support library. |
+| [Emulator measurement method](../BUGS.md#emulator-measurement-method-benchmark-method) | `benchmark-method` | 7 of 8 | Emulator numbers are relative until a hardware number exists; same-session runs with a drift control. |
+| [Disk images, partitions and launchers](../BUGS.md#disk-images-partitions-and-launchers-disk-image-layout) | `disk-image-layout` | 7 of 12 | Classic FFS limits: partitions under 2 GiB, few files per directory; launchers list every disk. |
+| [Morrowind editions, archives and inputs](../BUGS.md#morrowind-editions-archives-and-inputs-game-data-editions) | `game-data-editions` | 5 of 9 | The builder reads the user's data the way Morrowind does (archive order, loose files) and checks inputs against known versions. |
 | [Object placement and in-game geometry](../BUGS.md#object-placement-and-in-game-geometry-placement-geometry) | `placement-geometry` | 7 of 11 | Placed objects match the original (OpenMW A/B at the same pose). |
-| [Actors and NPCs](../BUGS.md#actors-and-npcs-actors-npc) | `actors-npc` | 23 of 28 | Actor placement, models and behaviour; the actor placement gate. |
-| [Harvestable plants](../BUGS.md#harvestable-plants-harvest) | `harvest` | 12 of 12 | Harvest catalogues are built by the builder for the shipped maps and counted by the entity tracker. |
-| [Town and interior import](../BUGS.md#town-and-interior-import-town-import) | `town-import` | 8 of 9 | The town importer converts every town and interior within engine limits; doors lead somewhere. |
-| [Scene changes, arrivals and handoffs](../BUGS.md#scene-changes-arrivals-and-handoffs-transitions-arrivals) | `transitions-arrivals` | 9 of 13 | Cell, region and scene changes keep the player, view, equipment and sound intact. |
-| [Menus, HUD, map screen and text](../BUGS.md#menus-hud-map-screen-and-text-ui-text) | `ui-text` | 23 of 28 | Menus, HUD, map screen, fonts and messages. |
-| [Debug commands and remote control](../BUGS.md#debug-commands-and-remote-control-debug-commands) | `debug-commands` | 17 of 19 | dbg commands, teleports, debug map loads and the remote console. |
-| [Boot and engine start-up](../BUGS.md#boot-and-engine-start-up-boot-startup) | `boot-startup` | 10 of 12 | The boot check and engine start-up report problems clearly and never stop the game silently. |
-| [Game logic (QuakeC) and saves](../BUGS.md#game-logic-quakec-and-saves-game-logic) | `game-logic` | 35 of 39 | QuakeC entities, saves and game state. |
-| [Gates, CI and tests](../BUGS.md#gates-ci-and-tests-tests-ci) | `tests-ci` | 51 of 62 | A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. |
-| [Development tooling, receipts and packaging](../BUGS.md#development-tooling-receipts-and-packaging-tracker-tooling) | `tracker-tooling` | 30 of 39 | Receipts, packaging, development tools and the tracker itself. |
+| [Actors and NPCs](../BUGS.md#actors-and-npcs-actors-npc) | `actors-npc` | 19 of 28 | Actor placement, models and behaviour; the actor placement gate. |
+| [Harvestable plants](../BUGS.md#harvestable-plants-harvest) | `harvest` | 7 of 12 | Harvest catalogues are built by the builder for the shipped maps and counted by the entity tracker. |
+| [Town and interior import](../BUGS.md#town-and-interior-import-town-import) | `town-import` | 5 of 9 | The town importer converts every town and interior within engine limits; doors lead somewhere. |
+| [Scene changes, arrivals and handoffs](../BUGS.md#scene-changes-arrivals-and-handoffs-transitions-arrivals) | `transitions-arrivals` | 8 of 14 | Cell, region and scene changes keep the player, view, equipment and sound intact. |
+| [Menus, HUD, map screen and text](../BUGS.md#menus-hud-map-screen-and-text-ui-text) | `ui-text` | 21 of 33 | Menus, HUD, map screen, fonts and messages. |
+| [Debug commands and remote control](../BUGS.md#debug-commands-and-remote-control-debug-commands) | `debug-commands` | 8 of 19 | dbg commands, teleports, debug map loads and the remote console. |
+| [Boot and engine start-up](../BUGS.md#boot-and-engine-start-up-boot-startup) | `boot-startup` | 6 of 12 | The boot check and engine start-up report problems clearly and never stop the game silently. |
+| [Game logic (QuakeC) and saves](../BUGS.md#game-logic-quakec-and-saves-game-logic) | `game-logic` | 32 of 39 | QuakeC entities, saves and game state. |
+| [Gates, CI and tests](../BUGS.md#gates-ci-and-tests-tests-ci) | `tests-ci` | 14 of 62 | A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. |
+| [Development tooling, receipts and packaging](../BUGS.md#development-tooling-receipts-and-packaging-tracker-tooling) | `tracker-tooling` | 18 of 41 | Receipts, packaging, development tools and the tracker itself. |
 
 <!-- END GENERATED FAMILIES -->
 

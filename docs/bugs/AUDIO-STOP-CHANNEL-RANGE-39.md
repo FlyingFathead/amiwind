@@ -24,7 +24,7 @@
 An entity sound assigned to dynamic mixer slots 8 through 11 can continue after
 S_StopSound is called for its entity and channel. Speech-pose timing is cleared
 first, so the model can stop speaking while its audio continues. This is a
-source finding; an owner-visible occurrence has not been isolated.
+source finding; a maintainer-visible occurrence has not been isolated.
 
 ## Where
 

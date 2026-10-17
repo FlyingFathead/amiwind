@@ -164,7 +164,7 @@
 
 [BUILD-INVENTORY-PALETTE-41](bugs/BUILD-INVENTORY-PALETTE-41.md) — 15 October 2026, v0.0.41 source candidate: image assembly prepares inventory before the sky palette pass, which rejected current AWIC icons and AWI2/AWST metadata as unknown images. The source repair validates each inventory format at its exact path, remaps only icon pixels and preserves metadata bytes. Scoped evidence contains 15 passing palette checks and 2 passing inventory-asset checks on matching unchanged source. Actual image assembly, native verification, packaging and shipment remain pending.
 
-[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or owner acceptance is promoted.
+[CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41 source candidate: the 941 world stopped at the unchanged ownership guard because ten explicitly deferred Seyda references reappeared through a named-town apron. The candidate applies the existing exact owner dispositions to named and regional neighbours alike. All ten original deferred IDs are verified and 38 focused checks pass. Fresh affected-world conversion and renewed boundary/memory checks remain pending; no coverage, native, package or maintainer acceptance is promoted.
 
 15 October 2026, v0.0.41: Toolkit own version advances to 0.1.4 for the placed-model heap mirror correction; its header names AmiWind v0.0.41. See [CHIM-MODEL-ARENA-RESERVE-41](bugs/CHIM-MODEL-ARENA-RESERVE-41.md).
 
@@ -777,7 +777,7 @@ shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
   corner mirroring the left and no resize control. Plan bounded active-effect
   icons with complete per-source detail/overflow access, preserving all gameplay
   effects; original row versus AGA-grid adaptation and costs remain explicit.
-  [HUD/roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-owner-request-1-october-2026).
+  [HUD/roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-maintainer-request-1-october-2026).
 
 - Clarify literal "Inventory" title and the actual player-name header on the
   planned full-black paused O stats modal. O is a planned rebindable gameplay
@@ -886,7 +886,7 @@ shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
   (4,072 pass, three Windows skips, three tracked expected failures). Actual
   male-Nord equipped sword/shield visibly holds/releases third-person guard;
   no incoming block in that sequence. All appearances/balance/recovery and
-  owner acceptance remain pending. These observations do not validate the
+  maintainer acceptance remain pending. These observations do not validate the
   later Guard-label or no-dice source changes.
   [COMBAT-BLOCKING-36](bugs/COMBAT-BLOCKING-36.md).
 
@@ -930,7 +930,7 @@ shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
 
 - Scoped female-Nord WALK3 shore entry and depth control: z39.5â†’-66.4, idle5s
   holds depth; pitch45+forward descends to-175.3 and settles, pitch-45+forward
-  ascends to-37.9. Upright-body/surface-entry/original parity and owner acceptance
+  ascends to-37.9. Upright-body/surface-entry/original parity and maintainer acceptance
   remain open. [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md).
 
 - Scope native Nord male-to-female confirmation: same world point, expected
@@ -960,7 +960,7 @@ shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
 
 - Subsequent native diagnostic shows selected actual item names/icons and physical
   equip of Steel Longsword/Steel Shield; RMB visibly raises the first-person
-  shield. Third-person pose and complete inventory/package/owner acceptance
+  shield. Third-person pose and complete inventory/package/maintainer acceptance
   remain pending. Male-Nord W+LMB3s in inventory holds position/hands time
   and attack0; closing/F resumes time. This is scoped pause/input evidence.
   The original inset black name plaque within the gold top
@@ -1031,7 +1031,7 @@ shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
 - Document and validate the existing user-supplied Game world map overlay with
   eight synthetic route/source-contract checks. No additional runtime loader,
   original pixels, map coverage or native parity claim.
-  [Original map data](ORIGINAL_MAP_DATA.md#load-an-owner-supplied-reference-background).
+  [Original map data](ORIGINAL_MAP_DATA.md#load-an-user-supplied-reference-background).
 
 - Converted Pelagiad (0,-7) with the cross-cell window mounting source candidate: all measured offline gates pass and selected placement ownership is unchanged. The cell is not yet native-verified or packaged; deferred actors, lighting, seven pre-existing outside-frame placements and interior activation remain separate limitations. [CHIM-WINDOW-MOUNT-CROSS-CELL-33](bugs/CHIM-WINDOW-MOUNT-CROSS-CELL-33.md).
 - Audited original CHIM exterior entrance locations and directed interior destinations separately from geometry coverage, preserving unavailable-interior behavior and explicit deferred destination/activation states. No new interior, native or packaged coverage is claimed. [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md).
@@ -1082,7 +1082,7 @@ shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
   updates, preserving health, fatigue and knockdown. Saves capture wear before
   copying state. Combat and existing save fixtures pass; the complete inventory
   feature remains under development.
-  [Inventory roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-owner-request-1-october-2026).
+  [Inventory roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-maintainer-request-1-october-2026).
 
 
 - The existing hands diagnostic now reports attack latch, last sent movement
@@ -1117,14 +1117,14 @@ shipment remain pending. [Candidate notes](RELEASE-v0.0.40-dev2.md).
 
 ## v0.0.39 continuation - renewed gameplay findings, 14 October 2026
 
-Public source v0.0.39 was published by the owner at
-`751e1efa6b28e7fc58453fc81c73100715b88195`. The owner identifies the inspected
+Public source v0.0.39 was published by the maintainer at
+`751e1efa6b28e7fc58453fc81c73100715b88195`. The maintainer identifies the inspected
 RC2 gameplay as the same as final. These new records describe unresolved
 findings in a mutable follow-up candidate; they do not rewrite sealed releases
 or establish a gameplay fix.
 
-- [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md): Repeated physical-LMB third-person animation failure remains open. A baseline input/damage control is narrower than visible owner-case acceptance.
-- [PLAYER-READY-MOVEMENT-39](bugs/PLAYER-READY-MOVEMENT-39.md): Register inability to move with fists drawn, separate from skipped gait frames. One Nord ready-movement control succeeds; cause and owner reproduction remain open.
+- [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md): Repeated physical-LMB third-person animation failure remains open. A baseline input/damage control is narrower than visible maintainer-case acceptance.
+- [PLAYER-READY-MOVEMENT-39](bugs/PLAYER-READY-MOVEMENT-39.md): Register inability to move with fists drawn, separate from skipped gait frames. One Nord ready-movement control succeeds; cause and maintainer reproduction remain open.
 - [COMBAT-BLOCKING-36](bugs/COMBAT-BLOCKING-36.md): Repeated missing block presentation in both views remains open; eligible shield control shows guarding without the expected visible shield pose. First-person shield model remains unfinished.
 - [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): Repeated sinking and upright submerged body remain open despite earlier scoped water controls.
 
@@ -1149,17 +1149,17 @@ coverage is claimed by these gameplay findings.
 
 RC1 inspection stopped final preparation and requested RC2. The changes below
 are candidate repairs or confirmed findings, with their checks scoped explicitly.
-At the 13 October checkpoint final preparation was held for owner inspection.
+At the 13 October checkpoint final preparation was held for maintainer inspection.
 Post-pin checks on 14 October verify the assembled RC2 package and scoped native
 behavior; its inspection artifacts were finalized at 2026-10-13T22:15:44Z.
-The owner subsequently authorized and published final source v0.0.39; that
+The maintainer subsequently authorized and published final source v0.0.39; that
 publication does not close the renewed gameplay findings recorded above.
 
 Candidate repairs:
 
 - [NPC-NO-RUN-ANIM-35](bugs/NPC-NO-RUN-ANIM-35.md) and [ANIMKIT-COVERAGE-35](bugs/ANIMKIT-COVERAGE-35.md): Reset animation scene caches on server spawn so same-map reload registers resident movers again, and report declared mover fallback. Seven animation, 21 combat and 42 NPC focused checks pass. The corrected Amiga target compiles; scoped native reload shows changing guard chase/attack poses and continuing damage with unchanged RC1 NPC assets. Actual AmigaDOS exit and post-exit engine, bootcheck and command-catalogue readbacks pass. Authored spear stance, all NPCs, performance and complete RC2 package acceptance remain separate.
-- [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md) and [PLAYER-MOVEMENT-FRAME-SKIP-39](bugs/PLAYER-MOVEMENT-FRAME-SKIP-39.md): Compact action grids bind authored punch timing and preserve normal/ready walk 8/run 6 instead of losing gait samples. Isolated Nord and Khajiit male bakes/readbacks contain 105 frames with 512x96 atlases, 357/358 triangles and 520,564/521,876 bytes, within the unchanged 512 KiB limit; 83 affected automated checks pass. Scoped Nord male/Orc female candidate footage shows torso/arm punch motion and ready movement. Damage, LMB input, matched A/B, leg seams, speed-linked gait and all-appearance/package/owner acceptance remain unverified. The owner reports v0.0.38 as the last known good fast-gait comparison; that is not independent native acceptance.
-- [PLAYER-BODY-LEG-SHAPE-39](bugs/PLAYER-BODY-LEG-SHAPE-39.md): All 20 body and companion sets are present in the exact RC2 package. The scoped Nord package footage does not establish knee/calf continuity or fix the owner-reported thin legs. Prior section metrics and possible simplification gaps remain diagnostic; matched original/v0.0.38, all-appearance and owner acceptance remain pending.
+- [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md) and [PLAYER-MOVEMENT-FRAME-SKIP-39](bugs/PLAYER-MOVEMENT-FRAME-SKIP-39.md): Compact action grids bind authored punch timing and preserve normal/ready walk 8/run 6 instead of losing gait samples. Isolated Nord and Khajiit male bakes/readbacks contain 105 frames with 512x96 atlases, 357/358 triangles and 520,564/521,876 bytes, within the unchanged 512 KiB limit; 83 affected automated checks pass. Scoped Nord male/Orc female candidate footage shows torso/arm punch motion and ready movement. Damage, LMB input, matched A/B, leg seams, speed-linked gait and all-appearance/package/maintainer acceptance remain unverified. The maintainer reports v0.0.38 as the last known good fast-gait comparison; that is not independent native acceptance.
+- [PLAYER-BODY-LEG-SHAPE-39](bugs/PLAYER-BODY-LEG-SHAPE-39.md): All 20 body and companion sets are present in the exact RC2 package. The scoped Nord package footage does not establish knee/calf continuity or fix the maintainer-reported thin legs. Prior section metrics and possible simplification gaps remain diagnostic; matched original/v0.0.38, all-appearance and maintainer acceptance remain pending.
 - [DBG-ENTITY-INSPECT-39](bugs/DBG-ENTITY-INSPECT-39.md): Add an explicitly enabled click-to-pin identity HUD, default off and separate from ordinary overlays; clicking consumes attack while active. Seventeen focused automated checks pass. Correct the missing character declaration exposed by the first target gate; corrected source 4b968c2 compiles. Its native view exposes a broad all-pose bounds false pick. The subsequent source repair uses the current resident client-frame box and rendered pose, reusing renderer bounds/pitch/scale without disk loads, and labels printed server frame/positions separately. Actual C UBSan regressions cover the false pick, differing client/server frames and prior controls. Grouped boxes remain approximate; the corrected selector's target/native/package acceptance is pending.
 
 - [RELEASE-PATCH-TARGET-VERSION-39](bugs/RELEASE-PATCH-TARGET-VERSION-39.md): Prepare the RC2 published-file baseline with matching target version, linked canonical known issues and release allowlist entry. Exact pinned guard/export/strict kit checks remain pending; candidate release hold is preserved.
@@ -1168,27 +1168,27 @@ Candidate repairs:
 
 Remaining findings and limits:
 
-- [BUILD-PLAYER-BODY-BUDGET-FALLBACK-39](bugs/BUILD-PLAYER-BODY-BUDGET-FALLBACK-39.md): Full RC2 disk readback and independent package extraction verify all 20 declared base bodies and140 torch/held/swim companion files within the unchanged 512 KiB model cap. Exact played readback preserves186 engine/metadata/body files. Binary coverage does not certify all 20 visual appearances, native memory, leg seams or owner acceptance.
-- [NPC-SPEAR-ATTACK-REGRESSION-39](bugs/NPC-SPEAR-ATTACK-REGRESSION-39.md): Exact-source 690 staged diagnostic footage shows guard pursuit and changing strike poses, with hits reducing health 995 to 899 then 882.3. Post-exit readback verifies 21 movers plus engine, bootcheck and catalogue (24 files). This supports scoped chase/attack and preserved damage, not damage balance or complete spear attachment alignment. Final RC2 disk readback separately verifies the 21 equipped-resident files and palette binding; it does not turn the staged diagnostic into final-package guard native acceptance. Matched OpenMW and owner acceptance remain pending.
-- [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md): The independently extracted RC2 package shows a raised left arm and carried torch on Nord, then torch-off and water/land model selection. Full disk readback verifies all 20 body/held-torch companions. Scoped native evidence is not all-appearance or matched-original visual acceptance; owner acceptance remains pending.
-- [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): The extracted RC2 package holds origin (704, -320, -25) for a four-second no-input water control after noclip is disabled. Pitch45 with forward movement descends to origin (832.7, -320, -153.7) at waterlevel 3 and shows changing swim poses. Both readied first-person fists remain visible at default horizontal FOV 90/viewsize 100. Actual OpenMW0.48 reference holds depth and retains first-person fists; no dedicated first-person stroke or blanket body pitch is established. Broader drowning, fatigue, combat, all appearances and owner acceptance remain pending.
+- [BUILD-PLAYER-BODY-BUDGET-FALLBACK-39](bugs/BUILD-PLAYER-BODY-BUDGET-FALLBACK-39.md): Full RC2 disk readback and independent package extraction verify all 20 declared base bodies and140 torch/held/swim companion files within the unchanged 512 KiB model cap. Exact played readback preserves186 engine/metadata/body files. Binary coverage does not certify all 20 visual appearances, native memory, leg seams or maintainer acceptance.
+- [NPC-SPEAR-ATTACK-REGRESSION-39](bugs/NPC-SPEAR-ATTACK-REGRESSION-39.md): Exact-source 690 staged diagnostic footage shows guard pursuit and changing strike poses, with hits reducing health 995 to 899 then 882.3. Post-exit readback verifies 21 movers plus engine, bootcheck and catalogue (24 files). This supports scoped chase/attack and preserved damage, not damage balance or complete spear attachment alignment. Final RC2 disk readback separately verifies the 21 equipped-resident files and palette binding; it does not turn the staged diagnostic into final-package guard native acceptance. Matched OpenMW and maintainer acceptance remain pending.
+- [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md): The independently extracted RC2 package shows a raised left arm and carried torch on Nord, then torch-off and water/land model selection. Full disk readback verifies all 20 body/held-torch companions. Scoped native evidence is not all-appearance or matched-original visual acceptance; maintainer acceptance remains pending.
+- [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): The extracted RC2 package holds origin (704, -320, -25) for a four-second no-input water control after noclip is disabled. Pitch45 with forward movement descends to origin (832.7, -320, -153.7) at waterlevel 3 and shows changing swim poses. Both readied first-person fists remain visible at default horizontal FOV 90/viewsize 100. Actual OpenMW0.48 reference holds depth and retains first-person fists; no dedicated first-person stroke or blanket body pitch is established. Broader drowning, fatigue, combat, all appearances and maintainer acceptance remain pending.
 - [PLAYER-MOVEMENT-STATS-PARITY-39](bugs/PLAYER-MOVEMENT-STATS-PARITY-39.md): Fixed debug speed lacks original Speed/Athletics/encumbrance integration and running-fatigue debit. Faithful gameplay formulas, transient maxstats/godmode speed and all eight attribute effects are future work while convenient debug defaults are preserved. Correct roadmap wording that made a proposed maxstats option look implemented. The affected catalogue-doc check passes; retain the full suite's 1824-test result with one documentation failure/two skips, without promoting it to a full pass or inventing a handler.
 - [NPC-ORDINATOR-APPEARANCE-39](bugs/NPC-ORDINATOR-APPEARANCE-39.md): Original and exact packaged Ordinators are male Dark Elves with Indoril helmets; nearby Eloroth is Wood Elf. The native view reproduces a foreground unhelmeted elf, but the coarse background bounds pin does not bind that actor's identity. Collision restoration was refused at the requested pose, so it remains a noclip diagnostic; no cast substitution or appearance repair is established.
-- [MESH-VIVEC-CAP-GAP-38](bugs/MESH-VIVEC-CAP-GAP-38.md): Owner inspection repeats the visible giant mushroom cap opening. [CHIM-SEYDA-HUNK-GAP-33](bugs/CHIM-SEYDA-HUNK-GAP-33.md): Corrected-engine diagnostics repeat existing reserve warnings with inconsistent current/peak presentation; reserve and performance acceptance remain open. [DEBUG-MAP-SAVE-VALIDATION-32](bugs/DEBUG-MAP-SAVE-VALIDATION-32.md): Direct diagnostic vhi015 loading repeats save-validation refusal while retaining previous saves; ordinary transitions/save contents are unverified, with no new regression or lost-save claim.
+- [MESH-VIVEC-CAP-GAP-38](bugs/MESH-VIVEC-CAP-GAP-38.md): Maintainer inspection repeats the visible giant mushroom cap opening. [CHIM-SEYDA-HUNK-GAP-33](bugs/CHIM-SEYDA-HUNK-GAP-33.md): Corrected-engine diagnostics repeat existing reserve warnings with inconsistent current/peak presentation; reserve and performance acceptance remain open. [DEBUG-MAP-SAVE-VALIDATION-32](bugs/DEBUG-MAP-SAVE-VALIDATION-32.md): Direct diagnostic vhi015 loading repeats save-validation refusal while retaining previous saves; ordinary transitions/save contents are unverified, with no new regression or lost-save claim.
 
 The source audit exports no original game content. Converted, audited, native-cell
 and packaged coverage are unchanged. Current status remains in the bug register;
-these scoped findings do not promote issue-specific owner acceptance.
+these scoped findings do not promote issue-specific maintainer acceptance.
 
 ### Post-pin package and shipment evidence, 14 October 2026
 
-These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Maintainer acceptance and final v0.0.39 clearance remain pending.
 
-- [BUILD-PLAYER-BODY-BUDGET-FALLBACK-39](bugs/BUILD-PLAYER-BODY-BUDGET-FALLBACK-39.md): Full RC2 disk readback and independent package extraction verify all 20 declared base bodies and140 torch/held/swim companion files within the unchanged 512 KiB model cap. Exact played readback preserves186 engine/metadata/body files. Binary coverage does not certify all 20 visual appearances, native memory, leg seams or owner acceptance.
-- [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md): The independently extracted RC2 package shows Nord third-person torso/arm punch changes in an unaltered native clip. Post-exit readback preserves exact assets. Console attack control does not prove physical LMB input or damage; all appearances, matched original comparison, seams and owner acceptance remain pending.
-- [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md): The independently extracted RC2 package shows a raised left arm and carried torch on Nord, then torch-off and water/land model selection. Full disk readback verifies all 20 body/held-torch companions. Scoped native evidence is not all-appearance or matched-original visual acceptance; owner acceptance remains pending.
-- [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): The extracted RC2 package holds origin (704, -320, -25) for a four-second no-input water control after noclip is disabled. Pitch45 with forward movement descends to origin (832.7, -320, -153.7) at waterlevel 3 and shows changing swim poses. Both readied first-person fists remain visible at default horizontal FOV 90/viewsize 100. Actual OpenMW0.48 reference holds depth and retains first-person fists; no dedicated first-person stroke or blanket body pitch is established. Broader drowning, fatigue, combat, all appearances and owner acceptance remain pending.
-- [DOCS-CHIM-PROGRESS-STALE-38](bugs/DOCS-CHIM-PROGRESS-STALE-38.md): RC2 full disk readback and independent extraction verify360 whole regional CHIM cells; six partial town overlaps remain excluded. The exact inspection package and matching source artifacts were finalized at 2026-10-13T22:15:44Z. Conversion/audit/native-cell coverage and owner acceptance are unchanged. Historical empty RC1 plan remains incorrectly selected as next by the existing selector; no supported historical flag permits a truthful metadata-only correction.
+- [BUILD-PLAYER-BODY-BUDGET-FALLBACK-39](bugs/BUILD-PLAYER-BODY-BUDGET-FALLBACK-39.md): Full RC2 disk readback and independent package extraction verify all 20 declared base bodies and140 torch/held/swim companion files within the unchanged 512 KiB model cap. Exact played readback preserves186 engine/metadata/body files. Binary coverage does not certify all 20 visual appearances, native memory, leg seams or maintainer acceptance.
+- [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md): The independently extracted RC2 package shows Nord third-person torso/arm punch changes in an unaltered native clip. Post-exit readback preserves exact assets. Console attack control does not prove physical LMB input or damage; all appearances, matched original comparison, seams and maintainer acceptance remain pending.
+- [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md): The independently extracted RC2 package shows a raised left arm and carried torch on Nord, then torch-off and water/land model selection. Full disk readback verifies all 20 body/held-torch companions. Scoped native evidence is not all-appearance or matched-original visual acceptance; maintainer acceptance remains pending.
+- [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): The extracted RC2 package holds origin (704, -320, -25) for a four-second no-input water control after noclip is disabled. Pitch45 with forward movement descends to origin (832.7, -320, -153.7) at waterlevel 3 and shows changing swim poses. Both readied first-person fists remain visible at default horizontal FOV 90/viewsize 100. Actual OpenMW0.48 reference holds depth and retains first-person fists; no dedicated first-person stroke or blanket body pitch is established. Broader drowning, fatigue, combat, all appearances and maintainer acceptance remain pending.
+- [DOCS-CHIM-PROGRESS-STALE-38](bugs/DOCS-CHIM-PROGRESS-STALE-38.md): RC2 full disk readback and independent extraction verify360 whole regional CHIM cells; six partial town overlaps remain excluded. The exact inspection package and matching source artifacts were finalized at 2026-10-13T22:15:44Z. Conversion/audit/native-cell coverage and maintainer acceptance are unchanged. Historical empty RC1 plan remains incorrectly selected as next by the existing selector; no supported historical flag permits a truthful metadata-only correction.
 - [ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md): Exact RC2 package native inspection repeats zone-full chunks 100/107 retries after water and land return. Scoped gameplay and successful AmigaDOS exit do not clear blocking streaming, heavy loading, memory/performance or all-cell traversal issues.
 
 ## v0.0.39: Cell By Cell, Piece By Piece - final preparation, 13 October 2026
@@ -1196,7 +1196,7 @@ These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85
 Final preparation retains the implemented RC1 scope below. Exact RC1
 package/readback and scoped inspection evidence now accompany that scope. New features and
 unfinished repairs continue in v0.0.40. Source checks, image assembly, native
-checks and publication remain separate gates. The owner approved RC1 on
+checks and publication remain separate gates. The maintainer approved RC1 on
 13 October 2026 as the final-release basis; issue-specific acceptance and
 open statuses are preserved.
 
@@ -1259,7 +1259,7 @@ size are distinct measurements; these figures do not identify a final039 ZIP.
 RC1 package and matching source delivery finalized on 13 October 2026 at
 18:06:05 UTC (21:06 in Finland), with source `57a8699` and image `fbf9a6c`
 kept distinct. The six partial overlaps remain outside the shipped whole-cell
-count. The owner approved RC1 on 13 October 2026 as the basis for final
+count. The maintainer approved RC1 on 13 October 2026 as the basis for final
 v0.0.39. This release-level approval does not supply universal gameplay
 acceptance or close unrelated issues; final-image checks remain separate.
 
@@ -1289,7 +1289,7 @@ highlight/selection acceptance is not claimed. Existing unsafe saves remain.
 
 Hunk reserve warnings and repeated chunk20 allocation/repack warnings remain.
 No complete cell-wide native, streaming, actor, lighting, gameplay or
-performance acceptance is established. Owner approval and final-image checks
+performance acceptance is established. Maintainer approval and final-image checks
 remain separate; RC1 evidence does not identify a final v0.0.39 executable.
 
 [CHIM-SEYDA-HUNK-GAP-33](bugs/CHIM-SEYDA-HUNK-GAP-33.md),
@@ -1448,9 +1448,9 @@ Public source published 13 October 2026 at
   [builder profile](performance/BUILDER_PROFILE.md#builder-fixes-and-time-savings-v0033-and-beyond).
 - The image step's stair walk gives the same rows for about a quarter of the processor time
   (BUILD-STAIR-WALK-SLOW-33); release candidates and finals walk only the steps of flights, the rows
-  that can stop a build (`--stair-walk`, owner decision).
+  that can stop a build (`--stair-walk`, project decision).
 - Release candidates and finals may reuse the image step's per-map pass results with
-  `--allow-release-reuse` (owner decision); every pass receipt counts its hits.
+  `--allow-release-reuse` (project decision); every pass receipt counts its hits.
 - A build on a new workspace reads the per-file caches of its `--reuse-from` run
   (BUILD-CACHE-PER-WORKSPACE-33): a MiniWind on its own volume no longer converts every sound again.
 - The world survey keeps its wall time out of its outputs (BUILD-SURVEY-NOT-REPRODUCIBLE-33).
@@ -1730,7 +1730,7 @@ Details of the v0.0.32 development line:
 ## v0.0.30: The Temple
 
 - Release of the dev3-rc1 work; no changes after rc1 apart from the version.
-- rc1 owner playtest (WinUAE, 7 October 2026): Balmora Temple, Census office,
+- rc1 maintainer playtest (WinUAE, 7 October 2026): Balmora Temple, Census office,
   Balmora, torches and roadside mushroom picking work. WinUAE music crackles
   at some transitions remain open (AUDIO-LOAD-29 and related).
 - Bug tracking unified: [`docs/bugs/bugs.json`](bugs/bugs.json) generates
@@ -1836,7 +1836,7 @@ This is a release candidate for continued playtesting. Final source, package che
   bounded same-XY clear-start search and unchanged standing/floor checks.
 - Expanded the OST source queue to four stereo PCM blocks (64 KiB), with
   4 KiB refill slices and buffer-size diagnostics. Shared mixer timing,
-  speech and guard voices are unchanged. An initially positive owner
+  speech and guard voices are unchanged. An initially positive maintainer
   listening report was immediately qualified: audible artifacts remain,
   mostly at load-ins and in heavy scenes. The music issue stays open, with
   further investigation deferred until after publication; this is a
@@ -1851,7 +1851,7 @@ This is a release candidate for continued playtesting. Final source, package che
   The 137 fresh captures, 10,766-file readback and three partition checks passed.
   Minimum logged peak clearance was 1,812,304 bytes, below the unchanged 2 MiB
   safety reference; production memory gate did not pass. Music artifacts remain
-  an owner-deferred known issue. Hosted CI, tag and publication remain pending.
+  a maintainer-deferred known issue. Hosted CI, tag and publication remain pending.
 - Corrected reversed LAND edge winding across the bounded 64-map batch. Image015
   passed all eight day and four night gallery stages, bounded sky inspection and
   renderer-state restoration. Broader routes and unrestricted play remain outside
@@ -2043,7 +2043,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   launcher and configurable five-autosave fixes.
 - Select original named containers and supported assets in known game folders;
   ignore personal transfer ZIPs before validation/hashing.
-- Retain only the current dev1 journal screenshot; preserve owner cleanup.
+- Retain only the current dev1 journal screenshot; preserve maintainer cleanup.
 - Source-only handoff for local compilation; native rc2 acceptance remains open.
 
 ## v0.0.25-rc1 â€” 1 October 2026
@@ -2076,7 +2076,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 
 ## v0.0.24 - Welcome to Balmora (and Vvardenfell!) - 1 October 2026
 
-- Owner-approved milestone release of RC4's game/features, with freshly compiled
+- Maintainer-approved milestone release of RC4's game/features, with freshly compiled
   final-version runtime and preflight identities.
 - Present the whole-island base-game map and density survey as a major mapping
   milestone; explicitly exclude Solstheim/Bloodmoon and Tribunal content.
@@ -2099,7 +2099,7 @@ remain open. See [scope and evidence](RELEASE-v0.0.24-rc4.md).
 
 ## v0.0.24-rc3 â€” 1 October 2026
 
-Owner-requested recovery candidate: complete gallery conversion, bounded exact-model
+Maintainer-requested recovery candidate: complete gallery conversion, bounded exact-model
 allowances up to 1,024 triangles, preserved Dagoth mask detail, two authored airborne
 inspection poses, repaired skin-tone lookup tables, gallery cursor/paging and a
 collision-trace correction for the three RC2 walking stalls. Adds the island
@@ -2108,7 +2108,7 @@ contact findings remain open. See [scope and evidence](RELEASE-v0.0.24-rc3.md).
 
 ## v0.0.24-rc2 â€” 1 October 2026
 
-Interim owner-testing checkpoint: gallery browser/help/return, bounded per-model
+Interim maintainer-testing checkpoint: gallery browser/help/return, bounded per-model
 geometry allowances, canonical ground placement and independent contact audit,
 close NPC targeting, birthsign ordering, guarded hill-material repair, Options
 scrolling and measured experimental read-ahead. The strict contact and walking
@@ -2130,7 +2130,7 @@ Full selected interior geometry is retained, including distant-origin towers
 and previously omitted dressing. The checklist records stair collision and
 slope classification, ground-material repairs, clearer gold e/H glyphs, shared
 NPC targeting, the guard's final dock post and filename packaging corrections.
-These are local checks, not owner acceptance of every route or the full game.
+These are local checks, not maintainer acceptance of every route or the full game.
 
 The accepted Strider, frozen-frame Loading... box, Shift+V, 90-degree FOV,
 base player hull and race/sex eye heights remain. Balmora has 64 overlapping
@@ -2140,7 +2140,7 @@ whole-map polygon-density analysis, full NPC services, schedules, combat and
 quest simulation remain future work. Greetings use a bounded authored fixture.
 
 Stable v0.0.23 and the published dev5 prerelease remain unchanged. Final
-v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
+v0.0.24 needs the maintainer's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
 [complete checklist](INVESTIGATION-v0.0.24-rc1.md),
 [conversion lessons](BALMORA_CONVERSION_LESSONS.md) and
 [Amiga naming constraints](RELEASE_WORKFLOW.md#amiga-limitations).
@@ -2223,7 +2223,7 @@ See `RELEASE-v0.0.23-dev2.md` for measured checks and incomplete gameplay.
 ## v0.0.23-dev1 - parallel builds, 29 September 2026
 
 - Public package revision 2 removes two trailing-whitespace defects that blocked
-  owner publication and enforces whitespace checks before packaging/delivery.
+  maintainer publication and enforces whitespace checks before packaging/delivery.
   Runtime identity and private compiled images remain unchanged.
 - Resume numbered development checkpoints after the v0.0.22 public release.
 - Schedule independent build stages concurrently under one automatic CPU budget.
@@ -2347,7 +2347,7 @@ Correct compound rotations of the 22 collision-only opening references. Preserve
 the original positions, dimensions and CharGenState lifetime. Add converter and
 state regression coverage, an indexed journal incident, and persistent opening
 access/research priorities. See RELEASE-v0.0.21-dev2.md for exact validation
-coverage and pending owner acceptance.
+coverage and pending maintainer acceptance.
 
 ## Portable launcher helper â€” 28 September 2026
 
@@ -2420,7 +2420,7 @@ One-command confirmed dependency setup and continuation, isolated fresh tools,
 bounded game-directory discovery, actionable download failures, corrected tool
 probes, QuakeC preflight, and one authoritative VERSION file. CI exercises the
 same installer with public tools and an asset-free image. Test-004 completed the
-owner's full game-data build; the owner subsequently confirmed test-006 works.
+maintainer's full game-data build; the maintainer subsequently confirmed test-006 works.
 See [validation scope](VALIDATION-v0.0.17.md) and [release notes](RELEASE-v0.0.17.md).
 
 - Optional FS-UAE autorun checks the emulator and owned ROM before building,
@@ -2467,7 +2467,7 @@ See REPOSITORY_LAYOUT.md for migration and verification.
   floating-point depth-table rebuilds with integer threshold bands.
 - Add default-off FPS HUD using existing profiler timing.
 - Add a private base-master NPC/door/container audit and synthetic deletion tests.
-- Preserve exterior method_001 and record the complete owner follow-up list.
+- Preserve exterior method_001 and record the complete maintainer follow-up list.
 - Keep underwater tint, audio pops, exterior formation and performance reports open.
 
 See CHECKPOINT_017_VALIDATION.md for measured scope and remaining limits.
@@ -2517,7 +2517,7 @@ See CHECKPOINT_014_VALIDATION.md for native scope and remaining limits.
 - Turn nearby NPCs toward the player; add bounded proximity Hello/reset.
 - Replace the compound E binding so console key releases cannot trigger speech.
 - Preserve original ordered wander settings for the next walking milestone.
-- Add the owner FS-UAE guide and versioned FS-UAE/WinUAE presets to both packages.
+- Add the maintainer FS-UAE guide and versioned FS-UAE/WinUAE presets to both packages.
 - Retain existing Quake bob, stairs, music and rendering implementation.
 
 See CHECKPOINT_013_VALIDATION.md for evidence and remaining limits.
@@ -2585,9 +2585,9 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
 - Reproduced the reported 80000027 failure with 4 MiB Fast RAM.
 - Added a small 68000 preflight before the engine: OS, CPU/FPU, AGA, free and contiguous memory checks.
 - Replaced the large malloc request with checked, aligned Exec Fast-memory allocation and matching cleanup.
-- Added current WinUAE setup guidance, corrected owner config and explicit 2 MiB Chip / 16 MiB Fast reference.
+- Added current WinUAE setup guidance, corrected maintainer config and explicit 2 MiB Chip / 16 MiB Fast reference.
 - Scene, textures and all 18 music streams remain byte-identical to checkpoint-007.
-- Owner reports v0.0.9 boots in WinUAE after complete-ROM selection, and that selecting maximum CPU speed resolved the slow/glitching run; corrected config preserves that setting. No new hardware-performance claim.
+- Maintainer reports v0.0.9 boots in WinUAE after complete-ROM selection, and that selecting maximum CPU speed resolved the slow/glitching run; corrected config preserves that setting. No new hardware-performance claim.
 
 # Runtime v0.0.9 / source 0.8.1 â€” 27 September 2026
 
@@ -2717,7 +2717,7 @@ Earlier checkpoint notes follow unchanged.
 - Enforced external original/derived-data paths and explicit source packaging.
 - Added synthetic workflow tests and immutable, validated source archives.
 - Documented fan-tribute status, original-game requirement and GOG/Steam links.
-- Added a separate owner-only development bundle with external game data.
+- Added a separate maintainer-only development bundle with external game data.
 - Recorded stereo music/channel-sharing and character sprite pipeline proposals.
 
 
@@ -2727,7 +2727,7 @@ Earlier checkpoint notes follow unchanged.
   final image payload. The 23 placement defects remain unresolved.
 - Add explicit exact-report private-test acceptance, preserving failed audits,
   strict production defaults, changed-payload rejection and distinct HDF names.
-- Record owner-reported successful rc3 private assembly; retain rc6 game/runtime
+- Record maintainer-reported successful rc3 private assembly; retain rc6 game/runtime
   validation limits. Include both rc3 hotfixes in the complete rc6 overlay.
 
 ## Validation finding â€” 14 October 2026, v0.0.40-dev1

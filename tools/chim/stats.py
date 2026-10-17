@@ -99,8 +99,13 @@ def resident_rings(world, model_tex):
     settings = world['settings']
     models, textures = world['models'], world['textures']
     rows = []
+    # every frame's chunks by cell, in one pass over the chunks (once per frame read every chunk of the world
+    # again: quadratic in a world of 726 frames, BUILD-CHIM-STAGE-SERIAL-TAIL-36); the same dicts
+    chunks_of = collections.defaultdict(dict)
+    for c in world['chunks']:
+        chunks_of[c['frame']][c['cell']] = c
     for path, frame, _ in world['frames']:
-        by_cell = {c['cell']: c for c in world['chunks'] if c['frame'] == path}
+        by_cell = chunks_of[path]
         offs = ring_offsets(frame['grain'], settings['draw_distance'] + settings['hysteresis'])
         for cell in sorted(by_cell):
             ring = [by_cell[k] for k in ((cell[0] + dx, cell[1] + dy) for dx, dy in offs) if k in by_cell]

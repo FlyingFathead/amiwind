@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Player deep-water entry with weapon readied or torch out |
 | Reproduction | unknown |
@@ -16,13 +16,13 @@
 | From commit | source c2eaa5a, engine c2eaa5a, CHIM world c2eaa5a |
 | CHIM engine version | CHIM 0.2.0, engine c2eaa5a, world format unknown |
 | Unknown because | World format not transcribed into this report. |
-| Platform or emulator | unknown (Owner did not specify emulator.) |
+| Platform or emulator | unknown (Maintainer did not specify emulator.) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
 
-The owner reports that weapon-unsheathed or torch-out mode effectively allows
+The maintainer reports that weapon-unsheathed or torch-out mode effectively allows
 walking on water. Expected swimming transitions need checking against original
 Morrowind/OpenMW; legitimate Water Walking effects must remain a separate override.
 
@@ -49,7 +49,7 @@ states with and without an active Water Walking effect is attached.
 
 Enter sufficiently deep water unarmed, with fists raised, with a weapon drawn,
 and with a torch out. Record position, waterlevel, movement type and spell state.
-Compare against matched original/OpenMW conditions. Owner report only so far;
+Compare against matched original/OpenMW conditions. Maintainer report only so far;
 exact location, spell state and independent reproduction remain unknown.
 
 ## Repair
@@ -72,7 +72,7 @@ including valid Water Walking, effect expiry and save/load transitions.
 
 RC2 package native water/land selection and changing swim poses are verified in the scoped Nord control, with both default-camera first-person fists visible. This does not close the historical water-walking report or establish all states, appearances and original behavior parity.
 
-These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Maintainer acceptance and final v0.0.39 clearance remain pending.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

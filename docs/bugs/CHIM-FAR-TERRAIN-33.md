@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | CHIM frames (engine draw, builder data): no resident low-detail terrain layer; CHIM Preview 1 build |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: Release blocker: the distant view is worse than v0.0.32's HORSTATOR APPROVED horizon in many places. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Stairs and collision on CHIM worlds ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -39,15 +39,15 @@
 ## Status: 9 October 2026
 
 Repaired in source on branch v0.0.33-chim-farterrain (not merged, not yet in a build); release
-blocker for v0.0.33 until the owner has seen it in a build. Present in CHIM Preview 1 and every
+blocker for v0.0.33 until the maintainer has seen it in a build. Present in CHIM Preview 1 and every
 CHIM build before the repair. Design and measurements: [FAR_TERRAIN.md](../chim/FAR_TERRAIN.md).
 
 ## Symptom
 
 On CHIM the ground ends where the active ring ends. Beyond the view distance there is only fog and
-sky colour, so valleys look empty (the owner's frame beyond the Balmora bridge at -17541 -15916) and
+sky colour, so valleys look empty (the maintainer's frame beyond the Balmora bridge at -17541 -15916) and
 Vivec is not visible from the world. The legacy region maps draw these places much better: the
-owner rated them "5/5 (or 4/5) in many places with the old one".
+maintainer rated them "5/5 (or 4/5) in many places with the old one".
 
 ## Where
 
@@ -98,21 +98,21 @@ A far terrain layer per frame, stored once, small, resident for the whole map:
   block culling; the loader on the builder's files (damaged, foreign-frame, short and missing
   files refused; the Hunk reserve); the frame map's layer through the CHIM world test; the
   builder (exact LAND samples, stamps, file versions 1 and 2).
-- FS-UAE, standard profile, headlamp off and on, at the owner's bridge poses (19:54, 19:58), the
+- FS-UAE, standard profile, headlamp off and on, at the maintainer's bridge poses (19:54, 19:58), the
   HORIZON-HOLES-31 east-bank position (18:00), the town centre north and south (13:00), the west
   at 19:30 and a raised view south-west: v0.0.32 release image, CHIM Preview 1, the repair at the
   default depth, CHIM before on the same engine (`chim_far 0`), the whole layer, legacy region
   maps in the same image with and without entities, and a drift-control rerun (identical
   counters). The renderer counters for the world and entities (`bm`, `bf`, `e`, `pl`) are equal
   with `chim_far` 1 and 0.
-- At the owner's bridge pose v0.0.32 itself shows sky in the band below the horizon past the fog
+- At the maintainer's bridge pose v0.0.32 itself shows sky in the band below the horizon past the fog
   distance; the repair adds the fogged land outline there, as v0.0.32 drew it, continuous instead
   of the legacy far plane's fragments. At the east-bank pose most of v0.0.32's outline is houses
   (CHIM-FAR-OBJECTS-33); the ground layer does not replace them.
 - Slow FS-UAE preset (68040, x14 cycle-exact; emulated time, relative): 30.6 to 43.7 ms a frame at
   the default depth (measured with object stamps on), 3 to 5 % of the frame; the whole layer 194 to 229 ms.
 - Not yet: a build from the repository builder with the layer, Seyda Neen in FS-UAE (no CHIM image
-  of it yet), the owner's look.
+  of it yet), the maintainer's look.
 
 ## Prevention
 

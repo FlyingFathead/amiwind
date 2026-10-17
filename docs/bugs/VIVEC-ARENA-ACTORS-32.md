@@ -24,7 +24,7 @@
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Private-test waiver (tracked)](#private-test-waiver-tracked)
-- [Owner reports in dev1 play (8 October 2026)](#owner-reports-in-dev1-play-8-october-2026)
+- [Maintainer reports in dev1 play (8 October 2026)](#maintainer-reports-in-dev1-play-8-october-2026)
 - [Where](#where)
 - [How it happened](#how-it-happened)
 - [Why it was not caught](#why-it-was-not-caught)
@@ -51,7 +51,7 @@ tolerance; 2 of 7 residents are grounded.
 
 ## Private-test waiver (tracked)
 
-Owner decision, 8 October 2026: these five residents, and only these, are accepted for the
+Project decision, 8 October 2026: these five residents, and only these, are accepted for the
 private v0.0.32-dev1 test so Vivec can be looked at. It is not a fix and not accepted for any
 release.
 
@@ -65,21 +65,21 @@ release.
 | Build | Approved audit SHA-256 | Failing references |
 |---|---|---|
 
-Owner evidence from real play of the dev1 test (8 October 2026), the visible effect of cause 1
+Maintainer evidence from real play of the dev1 test (8 October 2026), the visible effect of cause 1
 below: at global position 39859 -86712 706 (local 876 81 176) a canton sewer outflow hangs in the
-air with no canton body around it, and at night the exterior looks empty. The owner reported it as
+air with no canton body around it, and at night the exterior looks empty. The maintainer reported it as
 "the exterior isn't rendering at all". The frame-by-origin rule kept the small piece (its origin
 inside the frame) and dropped its parent canton body (origin outside). Fixed in source by the
 footprint rule (merged into the v0.0.32 development line, 9a2992b); an in-game check at that pose
 is pending.
 
-## Owner reports in dev1 play (8 October 2026)
+## Maintainer reports in dev1 play (8 October 2026)
 
-The same two causes explain the owner's dev1 reports in the Arena frame. Each pose was compared
+The same two causes explain the maintainer's dev1 reports in the Arena frame. Each pose was compared
 offline on the dev1-source maps and the fixed maps (a textured render of every BSP model, no
 fog, plus standing-hull checks and a stepped walk with the engine's step height):
 
-| Owner report (local pose) | dev1 maps | Fixed maps |
+| Maintainer report (local pose) | dev1 maps | Fixed maps |
 |---|---|---|
 | Sewer outflow hanging in the air, no canton (876 81 176, E100) | Telvanni canton body (ref 466153) missing; outflow and banners float | Canton body present around the outflow |
 | Exterior missing at night, same spot (E086) | Same: nothing but the outflow east of the Arena | Canton body present |
@@ -128,7 +128,7 @@ game drops the resident onto it.
    top under 241614 was still missing and 259450 was buried by the Telvanni canton
    ([COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md)).
 
-A/B/C/D on the owner's data (Arena import plus the actor stage on the dev1 actor-contact maps;
+A/B/C/D on the maintainer's data (Arena import plus the actor stage on the dev1 actor-contact maps;
 A reproduces dev1's maps and audit byte for byte):
 
 | Variant | Frame by footprint | Architecture surfaces | Failing residents |
@@ -176,7 +176,7 @@ Generic, for every converted town; no reference or model is named in the code.
 
 ## Verification
 
-Branch v0.0.32-arena-actors, owner's data, inside Docker, 8 October 2026:
+Branch v0.0.32-arena-actors, maintainer's data, inside Docker, 8 October 2026:
 
 - Actor audit (all packaged towns): passed, 165 grounded, 3 explicit exceptions, 0 errors. All
   7 Arena residents keep their authored X/Y and stand on the source surface (+0.45: plate top plus
@@ -194,7 +194,7 @@ Branch v0.0.32-arena-actors, owner's data, inside Docker, 8 October 2026:
   `ArenaFootprint` (footprint selection, resume, architecture profile). All fail on the dev1
   source.
 - Pending: a from-scratch build of the release candidate and an in-game look at the Arena,
-  including the owner's pose above (no floating sewer outflow, canton bodies present).
+  including the maintainer's pose above (no floating sewer outflow, canton bodies present).
 
 ## Prevention
 
@@ -224,6 +224,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
+- [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
 - [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
@@ -235,6 +236,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
+- [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
+- [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

@@ -58,7 +58,7 @@ RETIRED_FLAGS = (
     ('--chim-native-towns', 'off', 'CHIM towns are prepared CHIM-native; "off" brings back the retired legacy town '
                                    'chains'),
     # a Vivec district frame (the Arena-only frame and the other cantons): all of Vivec is one CHIM frame,
-    # vivec_city (owner decision 2026-10-11 09:55 +0300); tools/retired_flags.py VIVEC_DISTRICTS
+    # vivec_city (project decision 2026-10-11 09:55 +0300); tools/retired_flags.py VIVEC_DISTRICTS
     *((flag, district, 'Vivec is one CHIM frame (vivec_city); a district frame is a retired legacy area')
       for flag in ('--chim-area', '--miniwind-town', '--extra-town')
       for district in ('vivec_arena', 'vivec_foreign', 'vivec_hlaalu', 'vivec_redoran', 'vivec_telvanni',
@@ -152,7 +152,7 @@ else:
                rebuilt=len(cache.get("not_reused") or {}), failed_stage=failed[0] if failed else None,
                not_started=len(state.get("not_started") or []), elapsed_seconds=state.get("elapsed_seconds"),
                reuse_from=cache.get("reuse_from"), storage_pool=state.get("storage_pool"))
-    # every CHIM frame over its memory budget, worst first, with how much (owner 2026-10-16: "whenever something is
+    # every CHIM frame over its memory budget, worst first, with how much (maintainer 2026-10-16: "whenever something is
     # over budget, I'd know how much over budget")
     over = []
     for report in sorted(run.glob("chim*/chim-heap.json")):
@@ -1105,7 +1105,15 @@ def submit_build(config, request, dry_run, runner):
         # every stage passed and its outputs are valid; the perf guard step below fails the result
         steps['build']['ok'] = True
         steps['build']['detail'] += ' (stages passed; the perf guard failed the build)'
-    if code in (0, PERF_GUARD_EXIT) and summary.get('found') and summary.get('status') != 'passed':
+    if code == SIZE_GUARD_EXIT and summary.get('found') and summary.get('status') == 'passed':
+        # every stage passed and its outputs are valid; a payload folder grew past the margin without a named
+        # reason (tools/size_ledger.py, size-ledger.json in the run): the size guard fails the result
+        steps['build']['ok'] = True
+        steps['build']['detail'] += ' (stages passed; the size guard failed the build)'
+        steps['size-guard'] = {'exit': code, 'ok': False,
+                               'detail': 'size guard FAILED: a payload folder grew past the margin without '
+                                         '--size-growth-reason (size-ledger.json in the run)'}
+    if code in (0, PERF_GUARD_EXIT, SIZE_GUARD_EXIT) and summary.get('found') and summary.get('status') != 'passed':
         steps['build']['ok'] = False
         steps['build']['detail'] += f', but build-state says {summary.get("status")}'
     guard = None
@@ -1148,7 +1156,8 @@ def submit_build(config, request, dry_run, runner):
     return finish_build(config, request, run_name, lease, started, t0, facts, steps, notes, shown, reuse_info, [],
                         numbers=numbers, timings=timings,
                         failed_stage=summary.get('failed_stage') or (
-                            'perf-guard' if steps.get('perf-guard', {}).get('ok') is False else None),
+                            'perf-guard' if steps.get('perf-guard', {}).get('ok') is False else
+                            'size-guard' if steps.get('size-guard', {}).get('ok') is False else None),
                         logs=[str(log_path)], artifacts=[commands['run_dir']], inputs=inputs, recipe=recipe_info,
                         **({'stair_walk': stair} if stair else {}), **({'perf_guard': guard} if guard else {}),
                         **({'over_budget': summary['over_budget']} if summary.get('over_budget') else {}),
@@ -1156,6 +1165,7 @@ def submit_build(config, request, dry_run, runner):
 
 
 PERF_GUARD_EXIT = 3   # tools/build.py: every stage passed, the perf guard failed the build result
+SIZE_GUARD_EXIT = 4   # tools/build.py: every stage passed, the size guard failed the build result
 
 
 def perf_guard_result(runner, command, build_code):

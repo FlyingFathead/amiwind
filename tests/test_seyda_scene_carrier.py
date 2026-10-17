@@ -172,6 +172,14 @@ class BuildPlanTests(unittest.TestCase):
                 self.assertEqual(command[command.index('--seyda-source') + 1], 'carrier')
                 self.assertEqual(command[command.index('--data-files') + 1], str(Path('/owned')))
 
+    def test_chim_miniwind_of_another_town_takes_the_carrier(self):
+        # BUILD-MINIWIND-SEYDA-COMPILE-42: the whole town exceeds BSP29; the MiniWind image leaves Seyda Neen out
+        for argv in (['--jobs', '4', '--miniwind', '--miniwind-town', 'vivec_city'],
+                     ['--jobs', '4', '--miniwind-preset', 'vivec-palace'], ['--jobs', '4', '--miniwind']):
+            with self.subTest(argv=argv):
+                command = self.bsp(argv)
+                self.assertEqual(command[command.index('--seyda-source') + 1], 'carrier')
+
     def test_legacy_chains_keep_the_compiled_town(self):
         for argv in (['--jobs', '4', '--builder', 'legacy'], ['--jobs', '4', '--legacy-area', 'seyda'],
                      ['--jobs', '4', '--chim-area', 'balmora'],

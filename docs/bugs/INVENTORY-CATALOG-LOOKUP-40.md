@@ -105,7 +105,7 @@ checks remain active.
 The original native failure is preserved. The refused sword/shield grants mean
 that run's shield checks do not verify actual equipped blocking. Rebuilt target,
 physical I with names/icons, actual equip, first/third-person shield rendering,
-pause, drop/pickup, save/load and owner acceptance remain pending. No fixed
+pause, drop/pickup, save/load and maintainer acceptance remain pending. No fixed
 version is assigned. CHIM conversion and coverage are unchanged.
 
 ## Prevention
@@ -122,7 +122,7 @@ Both actual steel longsword and steel_shield grants succeed, and physical
 inventory controls equip them with visible held equipment. This is native
 evidence for those selected records, not every catalogue row or complete item
 semantics. The earlier raw-ID/icon/grant failure remains preserved. Complete
-final suite, package readback and owner acceptance remain pending.
+final suite, package readback and maintainer acceptance remain pending.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

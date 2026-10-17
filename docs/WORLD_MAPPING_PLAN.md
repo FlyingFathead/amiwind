@@ -27,7 +27,7 @@ uses 64 overlapping runtime regions with synchronous replacement of one resident
 BSP. Player state crosses those boundaries. Dev3 adds optional frozen-frame
 loading presentation; background prefetch/shared resource streaming remains a
 future extension, described in [PERSISTENCE_AND_STREAMING.md](PERSISTENCE_AND_STREAMING.md).
-Seyda Neen subdivision is a profiling candidate after the owner's faster-Balmora
+Seyda Neen subdivision is a profiling candidate after the maintainer's faster-Balmora
 playtest report. The broader architecture below is not all implemented.
 
 > Source cells preserve Morrowind's world structure; smaller runtime chunks
@@ -60,7 +60,7 @@ NPC movement across artificial interior subdivisions, walkable exterior cells an
 
 ## Source cells are not RAM allocation units
 
-Start with the owner's [Seyda Neen vicinity](SEYDA_NEEN_SCOPE.md). Inventory a
+Start with the maintainer's [Seyda Neen vicinity](SEYDA_NEEN_SCOPE.md). Inventory a
 neighboring source-cell region, then select the desired coverage using bounds.
 Accept the connected exteriors, including the opposing shore and Silt Strider
 approach, before the first interior. Keep local containers, actors and opening
@@ -120,7 +120,7 @@ This is design work only; no region converter or loader is claimed as complete.
 
 ### Elevated views and the topographic map
 
-Major unresolved risk, owner follow-up at 20:36 Helsinki: POI-region boundaries
+Major unresolved risk, maintainer follow-up at 20:36 Helsinki: POI-region boundaries
 may conflict with open-world traversal and continuous topographic coverage,
 especially when the player can see above a concealing horizon or canopy.
 Experiment with an elevated view/residency mode above configurable height X
@@ -143,7 +143,7 @@ culls or unloads data. Apply it to both streaming and optional BSP regions.
 
 ## Next milestone: entire-world terrain topomesh
 
-Owner priority, 28 September 2026, 20:38–20:39 Helsinki: export the entire map's
+Project priority, 28 September 2026, 20:38–20:39 Helsinki: export the entire map's
 terrain into a topographic mesh and provide a separate terrain inspection scene.
 This is full source-world coverage, not another bounded Seyda Neen export.
 
@@ -279,7 +279,7 @@ Before enabling runtime chunk streaming, record:
 Compare equivalent scenes and camera routes. A broken renderer that drops faces
 is not a valid faster baseline. Oversized render buffers can evict model caches;
 measure their full effect, not just allocation success. Preserve earlier results
-in OPTIMIZATION_HISTORY.md and distinguish local passes from owner confirmations
+in OPTIMIZATION_HISTORY.md and distinguish local passes from maintainer confirmations
 in PLAYTEST_STATUS.md. The current 040/FPU/JIT emulator remains a reference only;
 stock A1200 and the preserved A500 experiment have separate budgets and evidence.
 
@@ -287,4 +287,4 @@ Storage profiles and conservative legacy image limits remain in STORAGE.md
 and ROADMAP.md where applicable; validate the actual driver/filesystem path before
 larger images. No raw asset archive design bypasses its device-offset limits.
 
-- 2026-10-14: Existing Toolkit owner-data overlay routing validated with synthetic HTTP checks. Reuse the PNG/sidecar loader and independent data/progress directories. Next acceptance: verify actual served binding, load the exact private image/sidecar in a browser, and check calibrated bounds plus known landmarks. No original-save FMAP importer or textured local-map render was added. [Usage](ORIGINAL_MAP_DATA.md#load-an-owner-supplied-reference-background).
+- 2026-10-14: Existing Toolkit maintainer-data overlay routing validated with synthetic HTTP checks. Reuse the PNG/sidecar loader and independent data/progress directories. Next acceptance: verify actual served binding, load the exact private image/sidecar in a browser, and check calibrated bounds plus known landmarks. No original-save FMAP importer or textured local-map render was added. [Usage](ORIGINAL_MAP_DATA.md#load-an-user-supplied-reference-background).

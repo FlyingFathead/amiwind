@@ -46,7 +46,7 @@ Always: punch a resident until it dies, save, load.
 ## Repair
 
 Not yet. Needs a save record per hostile or dead NPC (record reference, health, fatigue, state) or
-the original game's own dead-actor handling; a save format change, so it waits for an owner
+the original game's own dead-actor handling; a save format change, so it waits for a maintainer
 decision.
 
 ## Verification

@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 6 October 2026, in v0.0.29-rc1 |
 | Where | Balmora Temple lower rooms |
 | Reproduction | always |
@@ -38,13 +38,13 @@
 ## Status: 7 October 2026
 
 Fixed in v0.0.30-dev3 (Temple rebuilt with the converter correction); carried
-through v0.0.30-rc1. Owner playtest of the lower rooms pending. The sections
+through v0.0.30-rc1. Maintainer playtest of the lower rooms pending. The sections
 below are kept as recorded.
 
 ## Cause found, candidate repair: 7 October 2026
 
 Status: **cause identified; repair is a v0.0.30-dev candidate, not shipped and
-not yet owner-accepted.** First shipped fixed version: none yet.
+not yet maintainer-accepted.** First shipped fixed version: none yet.
 
 **What was wrong.** Some Morrowind meshes carry a transform on the NIF *root*
 node. When Morrowind places an object, it ignores that root node's authored
@@ -99,7 +99,7 @@ Balmora. Those maps need rebuilding with the repaired converter. Root offsets
 such as the crate's were already handled correctly.
 
 **Still to verify.** Normal walking and collision across the whole lower level,
-the remaining door-frame seam, the other affected maps, and owner acceptance.
+the remaining door-frame seam, the other affected maps, and maintainer acceptance.
 
 ## RC2 entrance-level traversal report: 6 October 2026
 
@@ -192,7 +192,7 @@ regions near local 931,1052,3701 and 1063,1048,3700 in FS-UAE. Noclip placement,
 rounded positions and quantized view angles make this a rendering diagnostic;
 ordinary walking collision acceptance was not established. The intact upper
 route was not revisited in this bounded run. Some areas remain intact as the
-owner reported. No Temple repair has been implemented or delivered.
+maintainer reported. No Temple repair has been implemented or delivered.
 
 All 185 inline entity origins fit the transport range and touch the same empty
 world leaf at the checked poses. The actual loader passed address/undefined
@@ -243,13 +243,13 @@ changes, once justified, remain explicitly limited to Balmora Temple.
 
 ## Lower-section follow-ups and pipeline regression requirement: 2026-10-06T14:01:20+00:00
 
-Additional owner RC1 captures show thin horizontal remnants and open lower
+Additional maintainer RC1 captures show thin horizontal remnants and open lower
 structures at local1016,1033,3701 (SW204/pitch13,08:56), 1061,1056,3700
 (E072/pitch31,09:24), and1062,888,3697 (SW207/pitch46,09:50).
 The last view shows a largely open damaged section. The earlier correction
 still applies: other sections, including the tested upper route/stairs, are intact.
 
-Curved/hollow structural conversion and offset handling are owner-suggested
+Curved/hollow structural conversion and offset handling are maintainer-suggested
 diagnostic leads, not confirmed causes. Identify each apparent strip's source
 piece before labeling it a collapsed wall; a retained trim/rope can coexist
 with an omitted wall. Match source placement IDs, surfaces and collision.
@@ -265,14 +265,14 @@ These regression requirements are recorded; no repair is claimed yet.
 
 ## Scope correction and pipeline audit: 2026-10-06T13:57:39+00:00
 
-The owner clarified that the damage is **partial**, not a wholly absent interior:
+The maintainer clarified that the damage is **partial**, not a wholly absent interior:
 some Temple areas retain walls and ceilings. The upper area and the stairs
 leading to it looked usable in the latest RC1 playtest. Preserve this intact
 route as a regression control while repairing the broken sections.
 
 Additional evidence: thin horizontal strips where walls should be, local
 1033,885,3701, NE050/pitch7 at06:50; missing ceiling sections near
-1035,882,3701, NE046/pitch-49 at07:13. The owner-approved upper-area control is
+1035,882,3701, NE046/pitch-49 at07:13. The maintainer-approved upper-area control is
 near1170,1036,3700, S183/pitch-5 at08:29. HUD readings are approximate integer
 poses. Seven screenshots now support the issue; captures remain private.
 
@@ -304,11 +304,11 @@ Updated 2026-10-06T13:53:32+00:00. **Open, major geometry/collision defect; fina
 | Reported build / environment | v0.0.29-rc1 private playtest / WinUAE |
 | First report date | 6 October 2026 |
 | Location | Balmora, Temple interior; configured map `bmtemple` |
-| Primary owner-reported local XYZ | 1063, 1048, 3700 |
+| Primary maintainer-reported local XYZ | 1063, 1048, 3700 |
 | Direction / pitch / game time | E 076 / 65 / approximately 05:28 |
 | Additional screenshot positions | 1072,1063,3701 at 05:22; 975,1026,3701 at 05:50; 1071,870,3700 at 06:11 |
 | Coordinate qualification | Local HUD coordinates; no exterior global coordinate. Preserve the typed primary position as reported; pixel transcription is not a higher-precision pose. |
-| Symptoms | Multiple absent/broken wall, floor and connecting structural surfaces; owner can accidentally pass through gaps |
+| Symptoms | Multiple absent/broken wall, floor and connecting structural surfaces; maintainer can accidentally pass through gaps |
 | Cause / introducing version | Unknown; no last-known-good comparison established |
 | Fixed / first shipped fixed version | N / none |
 | Repair candidate | Not yet established |
@@ -318,7 +318,7 @@ Updated 2026-10-06T13:53:32+00:00. **Open, major geometry/collision defect; fina
 Enter Balmora Temple in RC1. Walk the interior toward the primary position and
 the additional locations above, turn through the reported views and look up/down
 across the connecting surfaces. Several black/open gaps appear where room walls,
-floors or adjoining structures should be. The owner reports ordinary movement
+floors or adjoining structures should be. The maintainer reports ordinary movement
 can cross the missing geometry. Four retained private captures document the
 progression from one suspected missing wall to multiple wall/floor failures.
 An independent FS-UAE-in-Docker reproduction remains pending.
@@ -346,7 +346,7 @@ repair is packaged and verified; keep RC1 and its evidence immutable.
 
 ## Related lighting observation
 
-The owner twice reports carried torches work noticeably better indoors than
+The maintainer twice reports carried torches work noticeably better indoors than
 outdoors, including the Temple. Compare near/far surface and NPC response at
 fixed radius/strength/time without assuming this causes missing architecture.
 Track the surface-strength work in [torch notes](../TORCH.md) separately from

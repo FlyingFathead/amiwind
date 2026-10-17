@@ -9,7 +9,7 @@
 | Where | tools/chim/zone_sim.py require_zone_walk (library built in tempfile.mkdtemp) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: The CHIM stage stops in a build container whose /tmp is a noexec tmpfs (the Docker default). |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

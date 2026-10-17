@@ -82,7 +82,7 @@ translation, arbitrary rigid transforms, surface deformation, a degenerate
 reference, a collapsed later frame, thin triangles and bounded nonuniform scale. The broader 115-check converter suite also passes.
 Original-asset rebakes, model budgets, native gait/anatomy and matched original
 comparisons must still pass before an inspection candidate is shipped.
-The issue and the related leg/gait reports remain open; no owner acceptance
+The issue and the related leg/gait reports remain open; no maintainer acceptance
 or repaired-package claim follows from synthetic tests.
 
 ## Prevention

@@ -4,7 +4,7 @@
 
 ## PERSISTING: reported 2 times; something has to be done
 
-- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Owner repeats missing block presentation in both views. Eligible shield control guards but shows fists/Guard HUD and low third-person arms. Original shield eligibility preserved.
+- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Maintainer repeats missing block presentation in both views. Eligible shield control guards but shows fists/Guard HUD and low third-person arms. Original shield eligibility preserved.
 - Reported with v0.0.40-dev1 at 2026-10-14 (time not recorded): Target FPU gate recurrence in block orientation; safe-math repair and focused pose checks pass, linked target/native gates pending.
 
 <!-- END GENERATED PERSISTING -->
@@ -13,13 +13,13 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 11 October 2026, in v0.0.36-dev5 |
 | Where | Engine and QuakeC: combat blocking, block animations, input bindings |
 | Reproduction | always |
 | Duplicate of | no |
 | Persists in | v0.0.36-dev5, v0.0.39-rc2 (last seen) |
-| Severity | high: Owner repeatedly sees no block presentation in either view; a shield-equipped control also lacks the expected visible shield pose. |
+| Severity | high: Maintainer repeatedly sees no block presentation in either view; a shield-equipped control also lacks the expected visible shield pose. |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.36-dev5 |
 | From commit | source 6c29a23, engine 6c29a23, CHIM world 6c29a23 |
@@ -42,7 +42,7 @@
 - [Repair](#repair)
 - [Verification](#verification)
 - [Prevention](#prevention)
-- [Renewed owner failure and shield control, 14 October 2026](#renewed-owner-failure-and-shield-control-14-october-2026)
+- [Renewed maintainer failure and shield control, 14 October 2026](#renewed-maintainer-failure-and-shield-control-14-october-2026)
 - [Development audit, 14 October 2026](#development-audit-14-october-2026)
 - [Inventory-backed equipment candidate, 14 October 2026](#inventory-backed-equipment-candidate-14-october-2026)
 - [Integration gate follow-up, 14 October 2026](#integration-gate-follow-up-14-october-2026)
@@ -62,8 +62,8 @@
 
 ## Historical source plan: 11 October 2026
 
-Open feature request from the owner on 11 October 2026, after playing the v0.0.36-dev5 playtest build on FS-UAE with JIT (widened the same day). Target: v0.0.37 or later.
-Repaired in source on v0.0.36-blocking for v0.0.36-rc1 (owner order: into rc1), not yet in a build.
+Open feature request from the maintainer on 11 October 2026, after playing the v0.0.36-dev5 playtest build on FS-UAE with JIT (widened the same day). Target: v0.0.37 or later.
+Repaired in source on v0.0.36-blocking for v0.0.36-rc1 (maintainer order: into rc1), not yet in a build.
 
 ## Symptom
 
@@ -95,7 +95,7 @@ Always: start a fight. The right button does nothing in a fight, and an NPC with
 
 ## Repair
 
-- Hold to block (an AmiWind extension, the default by owner decision, `aw_combat_block 1`): the right mouse
+- Hold to block (an AmiWind extension, the default by project decision, `aw_combat_block 1`): the right mouse
   button (the Block action in Options > Controls) raises the shield while it is held. Each blow is still
   decided by the original formula and settings (Block skill, Agility, Luck, swing, fatigue, facing, the
   10..50 % clamp); the button decides when the player blocks. No swing while guarding. Without a usable shield
@@ -118,16 +118,16 @@ while not held under hold-to-block, blocks without the button under the automati
 shield, the attack masked while guarding. `tests/test_combat.py`
 `test_blocking_hold_to_block_default_and_original_kept` pins the default, the bindings, the menu, the body
 group and the docs. Pending: the gate with its boot smoke, a MiniWind fight with the `sword_shield` loadout
-counting BLOCKED lines, and the owner's playtest.
+counting BLOCKED lines, and the maintainer's playtest.
 
 ## Prevention
 
 The default bindings and the block default are pinned by tests; `dbg combat` reports blocks per fight so a
 smoke can count them.
 
-## Renewed owner failure and shield control, 14 October 2026
+## Renewed maintainer failure and shield control, 14 October 2026
 
-The owner reports absent blocking animation in both first and third person in
+The maintainer reports absent blocking animation in both first and third person in
 RC2. The earlier source plan below is historical implementation evidence, not
 current visible acceptance. The first-person shield model was explicitly left
 unimplemented; the Guard HUD alone does not satisfy a visible blocking pose.
@@ -137,7 +137,7 @@ shield to block with. That control cannot validate shield animation. A separate
 shield-equipped loadout reaches guarding from physical RMB: first person shows
 ordinary fists and Guard HUD without a raised shield; the third-person body
 keeps its arms low. This is a scoped presentation failure, with exact repair
-and matched original/native/owner checks pending.
+and matched original/native/maintainer checks pending.
 
 Keep the original usable-shield and one-handed-weapon eligibility rule.
 Unarmed blocking is not requested. Verify no-shield refusal, eligible held and
@@ -193,7 +193,7 @@ Its full suite ran 4,072 checks, with 4,066 passes, no unexpected failures or
 errors, three Windows skips and three tracked expected failures. Visible
 native blocking remains pending. Existing shield eligibility,
 eight-frame AWB1 and unchanged player-body frames are preserved; no asset
-rebake or owner-case acceptance is claimed.
+rebake or maintainer-case acceptance is claimed.
 
 ## Subsequent native inventory failure, 14 October 2026
 
@@ -218,7 +218,7 @@ item admission/equip precondition is established for this later control.
 
 Third-person blocking posture remains unaccepted. Visible first-person raising
 does not establish the original block formula, every appearance, pacing,
-package completeness or owner acceptance. The issue stays open; shield and
+package completeness or maintainer acceptance. The issue stays open; shield and
 one-handed-weapon eligibility remains unchanged.
 
 ## Third-person hold selects the start sample, 14 October 2026
@@ -234,7 +234,7 @@ A repair must bake the real authored block-hit sample and select it for the
 hold, preserving normal body frames and the original eligibility rules.
 A bounded repair and executable regression are in progress; all-appearance
 body/tag regeneration and actual native pose validation are still pending.
-No repaired body output or owner acceptance is established here.
+No repaired body output or maintainer acceptance is established here.
 The separate actual first-person shield-raise observation remains valid.
 
 ## Actual incoming-hit block control, 14 October 2026
@@ -254,7 +254,7 @@ This is positive held-block mechanic evidence for one actual equipped case.
 The separately observed first-person shield raise remains valid. Third-person
 guard presentation still holds the wrong start pose and fails visible
 acceptance; real-hit sampling/all-appearance repair is pending. Do not turn
-this scoped mechanic result into all-appearance, package or owner acceptance.
+this scoped mechanic result into all-appearance, package or maintainer acceptance.
 
 ## Authored-hit source correction and producer limits, 14 October 2026
 
@@ -286,11 +286,11 @@ The new source and HUD change still need their exact combined full suite,
 Amiga target/FPU gate, staged readback and matched normal-speed native check.
 The previous first-person raise and incoming-block mechanic evidence remains
 scoped; the older third-person pose is still a failure. All appearances,
-packaging and owner acceptance remain pending.
+packaging and maintainer acceptance remain pending.
 
 ## Blocking balance and recovery scope, 14 October 2026
 
-The owner asks that shield-block testing also account for losing grounding and
+The maintainer asks that shield-block testing also account for losing grounding and
 stagger while blocking. The one credited incoming block does not establish
 balance, stagger, knockdown, recovery or every incoming weapon case.
 
@@ -312,11 +312,11 @@ third-person shield/arm pose and release returns it, at normal speed.
 This is scoped visible hold/release evidence, not an incoming block in that
 sequence. The earlier female-Nord incoming BLOCKED control is separate.
 All appearances, balance/stagger/knockdown/recovery, detailed asset quality,
-packaging and owner acceptance remain pending. Male beast guarded fits retain
+packaging and maintainer acceptance remain pending. Male beast guarded fits retain
 gait counts/timing but production adoption needs texture/jump/death comparison;
 other group and fitting differences must not be hidden.
 
-The owner also rejects the normal HUD's temporary centre Guard label. Its new
+The maintainer also rejects the normal HUD's temporary centre Guard label. Its new
 source removal changes only the draw call; guard logic and debug readout remain.
 Real pixel and actual combat controls pass, while the preceding HUD fails the
 new pixel regression. This change and the separate no-dice readout repair

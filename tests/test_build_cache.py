@@ -797,7 +797,12 @@ class ReuseTests(unittest.TestCase):
     def test_reuse_preflight_stops_an_unexplained_rebuild_before_any_stage_runs(self):
         """BUILD-REUSE-KEYS-TOO-BROAD-35: with --reuse-from, a stage rebuilt for a source key change that no changed
         file explains stops the build before any stage runs, unless --accept-rebuild; --reuse-plan says the same,
-        read only. A real edit is explained and named."""
+        read only. A real edit is explained and named. (With the whole key: a narrowed reuse (B7) reuses alpha,
+        whose record of what it used is unchanged; NarrowedReuseTests.)"""
+        with patch.dict(os.environ, {build_cache.NARROWING_ENV: 'off'}):
+            self._reuse_preflight_stops_an_unexplained_rebuild()
+
+    def _reuse_preflight_stops_an_unexplained_rebuild(self):
         first, _, _ = self.build('first')
         index = build_cache.SourceIndex(self.repository)
         state_path = first / 'build-state.json'
@@ -1145,7 +1150,8 @@ class DiagnosticOutputTests(unittest.TestCase):
             'tools/aw.py': 'the master builder command line (not a builder stage) names its own gate console log',
             'tools/aw_service.py': 'the build server (not a builder stage) names its own build console log',
             'tools/build_profile.py': 'the builder heartbeat (Heartbeat.check) only stats the size of a stage log under RUN/logs (run-private) to see whether it is silent; it never reads it',
-            'tools/toolkit_serve.py': 'the Toolkit Monitor (not a builder stage) shows logs to a person, read-only',
+            'tools/build_progress.py': 'the live progress (in the builder, not a stage) reads the last counted progress line of a running stage log under RUN/logs (run-private) for the ETA; never a stage input or output',
+            'tools/toolkit_serve.py':'the Toolkit Monitor (not a builder stage) shows logs to a person, read-only',
             'tools/monitor_read.py': 'the Toolkit Monitor reader (not a builder stage) shows logs to a person, read-only'}
         found = []
         for path in sorted((ROOT / 'tools').rglob('*.py')):
@@ -1326,5 +1332,217 @@ class ApplyTraceTests(unittest.TestCase):
         self.assertEqual(sorted(outside), ['/elsewhere/tools/converter.py'])
 
 
+class SharedParseTests(unittest.TestCase):
+    """Every SourceIndex of a process shares one parse per source text (_PARSE_MEMO / _SYMBOL_MEMO): a shared
+    result is the one a fresh parse gives, and an edited file (new text) is parsed again."""
+
+    def test_shared_parse_equals_a_fresh_parse_and_an_edit_parses_again(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'tools').mkdir()
+            (root / 'config').mkdir()
+            (root / 'tools' / 'stage.py').write_text('import helper\nhelper.run()\n', encoding='utf-8')
+            text = "def run():\n    open('config/a.json')\n"
+            (root / 'tools' / 'helper.py').write_text(text, encoding='utf-8')
+            (root / 'tools' / 'other.py').write_text('X = 1\n', encoding='utf-8')
+            (root / 'config' / 'a.json').write_text('{}', encoding='utf-8')
+            stage = root / 'tools' / 'stage.py'
+            first = build_cache.SourceIndex(root)
+            closure = first.closure(stage)
+            self.assertEqual(first._parse('tools/helper.py'), build_cache._parse_text(text))
+            self.assertEqual(build_cache.SourceIndex(root).closure(stage), closure)
+            self.assertEqual(build_cache.SourceIndex(root).digest(stage), first.digest(stage))
+            (root / 'tools' / 'helper.py').write_text('import other\n' + text, encoding='utf-8')
+            edited = build_cache.SourceIndex(root)
+            self.assertNotIn('tools/other.py', closure[0])
+            self.assertIn('tools/other.py', edited.closure(stage)[0])
+            self.assertNotEqual(edited.digest(stage), first.digest(stage))
+
+
 if __name__ == '__main__':
     unittest.main()
+
+
+NARROW = '''
+import os
+import subprocess
+import sys
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]
+def run(mode):
+    if mode == 'list':
+        return ','.join(sorted(os.listdir(ROOT / 'config')))
+    if mode == 'child':
+        env = {'PATH': os.environ.get('PATH', '')}
+        return subprocess.run([sys.executable, '-c', 'print(7)'], env=env, capture_output=True, text=True).stdout
+    return fast() if mode == 'fast' else slow()
+def fast():
+    return 'fast:' + (ROOT / 'config' / 'fast.json').read_text()
+def slow():
+    return 'slow:' + (ROOT / 'config' / 'slow.json').read_text()
+'''
+STAGE_N = '''
+import sys
+from pathlib import Path
+import narrow
+out = Path(sys.argv[sys.argv.index('--out') + 1]); out.mkdir(parents=True)
+(out / 'n.txt').write_text(narrow.run(sys.argv[sys.argv.index('--mode') + 1]))
+'''
+
+
+@unittest.skipUnless(MANIFESTS, 'stage wrapper, trace and manifests are exercised on POSIX')
+class NarrowedReuseTests(unittest.TestCase):
+    """B7 (v0.0.42), BUILD-REUSE-KEYS-TOO-BROAD-35: a stage whose key changed only in code or files it never ran or
+    read is reused (its record of what it used is unchanged); a change to what it used rebuilds it."""
+    # in this order each stage waits for the one before it (the default chain): a stage after a rebuilt one
+    # whose outputs changed runs again (early cutoff), so the narrowed ones come first
+    MODES = ('fast', 'list', 'slow', 'child')
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.repository = self.root / 'repo'
+        make_repository(self.repository)
+        (self.repository / 'tools' / 'narrow.py').write_text(NARROW)
+        (self.repository / 'tools' / 'stage_n.py').write_text(STAGE_N)
+        (self.repository / 'config' / 'fast.json').write_text('"f1"')
+        (self.repository / 'config' / 'slow.json').write_text('"s1"')
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def steps(self, run):
+        return [(mode, [sys.executable, str(self.repository / 'tools' / 'stage_n.py'), '--mode', mode,
+                        '--out', str(run / mode)]) for mode in self.MODES]
+
+    def build(self, name, reuse_from=None):
+        run = self.root / 'workspace' / name
+        meta = dict(metadata(), runtime_version='0.0.0-dev1')
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            steps = build_cache.prepare(self.steps(run), run, meta, reuse_from, 'copy',
+                                        build_cache.SourceIndex(self.repository))
+            build.execute(steps, run, meta)
+        state = json.loads((run / 'build-state.json').read_text())
+        self.assertEqual(state['status'], 'passed')
+        return run, state, output.getvalue()
+
+    def reused(self, state):
+        return sorted(name for name, row in state['stage_cache']['reused'].items() if not row.get('refused'))
+
+    def outputs(self, run):
+        return {mode: (run / mode / 'n.txt').read_text() for mode in self.MODES}
+
+    def edit(self, relative, old, new):
+        path = self.repository / relative
+        text = path.read_text()
+        self.assertIn(old, text)
+        path.write_text(text.replace(old, new))
+
+    def test_records_name_what_each_stage_used(self):
+        first, _, _ = self.build('first')
+        fast = build_cache.load_manifest(first, 'fast')['used']
+        self.assertTrue(fast['complete'], fast)
+        self.assertIn('fast', fast['units']['tools/narrow.py'])
+        self.assertNotIn('slow', fast['units']['tools/narrow.py'])
+        self.assertEqual(sorted(fast['data']), ['config/fast.json'])
+        self.assertEqual(list(build_cache.load_manifest(first, 'list')['used']['listed']), ['L:config'])
+        child = build_cache.load_manifest(first, 'child')['used']
+        self.assertFalse(child['complete'])
+        self.assertIn('without the trace', child['why'][0])
+
+    def test_unused_code_change_reuses_byte_identically_and_used_change_rebuilds(self):
+        first, _, _ = self.build('first')
+        # every key changes (each stage can reach slow()), but only the slow stage ran it
+        self.edit('tools/narrow.py', "'slow:'", "'SLOW:'")
+        second, state, printed = self.build('second', reuse_from=first)
+        self.assertEqual(self.reused(state), ['fast', 'list'])
+        self.assertIn('sources (tools/narrow.py)', state['stage_cache']['not_reused']['slow'])
+        self.assertIn('sources (tools/narrow.py)', state['stage_cache']['not_reused']['child'])   # incomplete record
+        self.assertEqual(sorted(state['stage_cache']['narrowed']), ['fast', 'list'])
+        self.assertIn('never ran or read: tools/narrow.py', printed)
+        fresh, _, _ = self.build('fresh')
+        self.assertEqual(self.outputs(second), self.outputs(fresh))
+        self.assertEqual(self.outputs(second)['slow'], 'SLOW:"s1"')
+        # the reused run is a source again (its record is the one where the stage ran)
+        self.edit('config/slow.json', 's1', 's2')
+        third, state, _ = self.build('third', reuse_from=second)
+        self.assertEqual(self.reused(state), ['fast', 'list'])
+        self.assertEqual(self.outputs(third)['slow'], 'SLOW:"s2"')
+        # a change to what the fast stage used rebuilds it
+        self.edit('tools/narrow.py', "'fast:'", "'FAST:'")
+        fourth, state, _ = self.build('fourth', reuse_from=third)
+        self.assertIn('sources (tools/narrow.py)', state['stage_cache']['not_reused']['fast'])
+        self.assertEqual(self.outputs(fourth)['fast'], 'FAST:"f1"')
+
+    def test_a_new_file_in_a_listed_folder_rebuilds_the_lister(self):
+        first, _, _ = self.build('first')
+        (self.repository / 'config' / 'new.json').write_text('{}')
+        self.edit('tools/narrow.py', "'slow:'", "'SLOW:'")
+        second, state, _ = self.build('second', reuse_from=first)
+        self.assertEqual(self.reused(state), ['fast'])
+        self.assertIn('new.json', self.outputs(second)['list'])
+
+    def test_off_and_predict(self):
+        first, _, _ = self.build('first')
+        self.edit('tools/narrow.py', "'slow:'", "'SLOW:'")
+        predicted = build_cache.predict(first, root=self.repository)
+        self.assertEqual(sorted(name for name, reason in predicted.items() if reason is None), ['fast', 'list'])
+        with patch.dict(os.environ, {build_cache.NARROWING_ENV: 'off'}):
+            _, state, _ = self.build('off', reuse_from=first)
+        self.assertEqual(self.reused(state), [])
+
+    def test_trace_form_one_records_are_never_narrowed(self):
+        index = build_cache.SourceIndex(self.repository)
+        record = build_cache.used_record(['tools/narrow.py', '@tools/narrow.py\tfast'], index)
+        self.assertFalse(record['complete'])
+        self.assertIn('trace form 1', record['why'][0])
+
+
+class ParallelApplyTests(unittest.TestCase):
+    """B8 (v0.0.42): a reused stage's files are staged by several threads (same digests one after another);
+    the same temporaries, in the same order, as the method before (AMIWIND_APPLY_THREADS=1)."""
+
+    def setUp(self):
+        import hashlib
+        self.temp = tempfile.TemporaryDirectory()
+        self.old = Path(self.temp.name) / 'old'
+        self.items = []
+        for i in range(300):
+            relative = 'stage/%03d/f%d.bin' % (i % 7, i)
+            data = b'same' if i % 5 == 0 else ('file %d' % i).encode() * 50
+            (self.old / relative).parent.mkdir(parents=True, exist_ok=True)
+            (self.old / relative).write_bytes(data)
+            self.items.append((relative, {'sha256': hashlib.sha256(data).hexdigest(), 'mode': 0o644,
+                                          'size': len(data)}))
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def stage(self, name, threads):
+        run = Path(self.temp.name) / name
+        for relative, _ in self.items:
+            (run / relative).parent.mkdir(parents=True, exist_ok=True)
+        with patch.dict(os.environ, {build_cache.APPLY_THREADS_ENV: str(threads)}):
+            staged = build_cache._stage_files(self.items, run, self.old, None, False)
+        return run, [(t.relative_to(run).as_posix(), t.read_bytes()) for t, _ in staged]
+
+    def test_threads_stage_the_same_files_in_the_same_order(self):
+        self.assertGreater(build_cache.apply_threads(len(self.items)), 1)
+        _, serial = self.stage('serial', 1)
+        _, threaded = self.stage('threaded', 8)
+        self.assertEqual(threaded, serial)
+        self.assertEqual(len(threaded), 300)
+
+    def test_a_damaged_file_lists_every_temporary_for_cleanup(self):
+        (self.old / self.items[150][0]).write_bytes(b'damaged')
+        run = Path(self.temp.name) / 'damaged'
+        for relative, _ in self.items:
+            (run / relative).parent.mkdir(parents=True, exist_ok=True)
+        with patch.dict(os.environ, {build_cache.APPLY_THREADS_ENV: '8'}):
+            with self.assertRaises(ValueError) as caught:
+                build_cache._stage_files(self.items, run, self.old, None, False)
+        staged = caught.exception.staged
+        self.assertTrue(staged)
+        self.assertTrue(all(t.is_file() for t, _ in staged))
+        self.assertIn('SHA-256', str(caught.exception))

@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-rc1 |
 | Where | resident models (idle-only default profile); aw_companion.c animate; aw_npcpath.c |
 | Reproduction | always |
@@ -15,13 +15,13 @@
 | Playtest version | v0.0.33-rc1 |
 | From commit | source 7ae3ea7, engine 7ae3ea7, CHIM world unknown |
 | CHIM engine version | CHIM 0.1.0, engine 7ae3ea7, world format unknown |
-| Unknown because | owner playtest report names no image commit or world format |
+| Unknown because | maintainer playtest report names no image commit or world format |
 
 <!-- END GENERATED FACTS -->
 
 ## Status: 9 October 2026
 
-Open. Found in the owner's playtest with Dralsea Arethi (Balmora) as the companion. The animation
+Open. Found in the maintainer's playtest with Dralsea Arethi (Balmora) as the companion. The animation
 side belongs to the animation kit line (walk and run cycles); the follow rules to the companion code.
 
 ## Symptom

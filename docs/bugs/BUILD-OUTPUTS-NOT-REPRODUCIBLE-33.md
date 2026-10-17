@@ -9,7 +9,7 @@
 | Where | Stage outputs (tool logs, receipts) and the reuse comparison (tools/build_cache.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-rc1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: rc1d: census, area, balmora and the Balmora interiors differed from rc1c only in logs; 13 later stages ran again. |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | v0.0.33-rc1 builds rc1b, rc1c and rc1d |

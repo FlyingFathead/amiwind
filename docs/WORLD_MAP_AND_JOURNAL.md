@@ -18,7 +18,7 @@
 
 ## Open map reports - 4 October 2026
 
-The owner reports three post-release v0.0.28 map issues: both F10 command aliases
+The maintainer reports three post-release v0.0.28 map issues: both F10 command aliases
 `dbg tp map` / `dbg map tp` failed (a later `dbg tp map` retry worked), the
 IN-GAME MAP PROTOTYPE screen has many
 white/yellow spots, and mouse clicks do not switch DEBUG / IN-GAME views.
@@ -204,7 +204,7 @@ The existing final-placement gate remains independent and unchanged.
 
 ## v0.0.27-rc4 selector regression and rc5 source correction
 
-Owner playtesting of the rc4 prototype showed the In-Game Map Prototype title,
+Maintainer playtesting of the rc4 prototype showed the In-Game Map Prototype title,
 a Debug button, a pale active selector button with an unreadable light label,
 and no Seyda Neen/Balmora settlement markers. The retained map payload includes
 two town landmarks; rc4 rendering hid the landmark loop outside Debug mode. The

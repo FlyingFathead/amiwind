@@ -4,12 +4,12 @@
 
 ## PERSISTING: reported 6 times; something has to be done
 
-- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): RC1: absent swimming/diving, owner reports sinking; underwater upright pose inspected. Missing swim groups source-confirmed; physics/reference comparison pending.
-- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Owner repeats missing swimming AND diving animation in BOTH first-person and third-person views. Keep four view/action acceptance items distinct; no repaired water candidate.
+- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): RC1: absent swimming/diving, maintainer reports sinking; underwater upright pose inspected. Missing swim groups source-confirmed; physics/reference comparison pending.
+- Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Maintainer repeats missing swimming AND diving animation in BOTH first-person and third-person views. Keep four view/action acceptance items distinct; no repaired water candidate.
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Original third-person swim families confirmed; no dedicated dive key in16 base NIF/KF members. First-person visuals need state/camera/fallback parity; local0.52 source is not native0.48 acceptance.
-- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Owner requires reported swimming/diving in RC2. Both-view original 0.48 reference and source integration in progress; original clip inventory is separate. Native/package/owner acceptance pending.
+- Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Maintainer requires reported swimming/diving in RC2. Both-view original 0.48 reference and source integration in progress; clip inventory is separate. Native/package/maintainer acceptance pending.
 - Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): 20 swim companions built; native water selects and animates them. No-input sinking reproduced at 42 units/s. Remove Quake idle descent in source; native/reference repair checks pending.
-- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Owner repeats sinking and upright submerged body in RC2. Private screenshot retained; earlier short depth-hold/pose controls do not accept this scenario.
+- Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Maintainer repeats sinking and upright submerged body in RC2. Private screenshot retained; earlier short depth-hold/pose controls do not accept this scenario.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -17,13 +17,13 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in v0.0.38-dev2 |
 | Where | Surface, swimming and submerged gameplay; screenshot in Grazelands cell 12,6 |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.38-dev2, v0.0.39-rc1, v0.0.39-rc2 (last seen) |
-| Severity | high: Repeated owner-visible failure in RC1; exact repair remains unverified. |
+| Severity | high: Repeated maintainer-visible failure in RC1; exact repair remains unverified. |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.38-dev2 |
 | From commit | source c2eaa5a, engine c2eaa5a, CHIM world c2eaa5a |
@@ -46,15 +46,15 @@
 - [Verification](#verification)
 - [Prevention](#prevention)
 - [Related reports](#related-reports)
-- [Owner follow-up, 12 October 2026](#owner-follow-up-12-october-2026)
-- [Owner evidence reconciliation, 13 October 2026](#owner-evidence-reconciliation-13-october-2026)
-- [RC1 owner evidence, 13 October 2026](#rc1-owner-evidence-13-october-2026)
+- [Maintainer follow-up, 12 October 2026](#maintainer-follow-up-12-october-2026)
+- [Maintainer evidence reconciliation, 13 October 2026](#maintainer-evidence-reconciliation-13-october-2026)
+- [RC1 maintainer evidence, 13 October 2026](#rc1-maintainer-evidence-13-october-2026)
 - [Both-view swimming and diving follow-up, 13 October 2026](#both-view-swimming-and-diving-follow-up-13-october-2026)
 - [Original clip inventory and both-view reference limits, 13 October 2026](#original-clip-inventory-and-both-view-reference-limits-13-october-2026)
 - [Required RC2 swimming and diving scope, 13 October 2026](#required-rc2-swimming-and-diving-scope-13-october-2026)
 - [Native candidate findings, 14 October 2026](#native-candidate-findings-14-october-2026)
 - [Post-pin RC2 package observation, 14 October 2026](#post-pin-rc2-package-observation-14-october-2026)
-- [Renewed owner sinking and upright-body report, 14 October 2026](#renewed-owner-sinking-and-upright-body-report-14-october-2026)
+- [Renewed maintainer sinking and upright-body report, 14 October 2026](#renewed-maintainer-sinking-and-upright-body-report-14-october-2026)
 - [Development audit, 14 October 2026](#development-audit-14-october-2026)
 - [Scoped female-Nord mechanical control, 14 October 2026](#scoped-female-nord-mechanical-control-14-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
@@ -64,7 +64,7 @@
 ## Symptom
 
 Water gameplay lacks a demonstrated comparison against original Morrowind/OpenMW
-across surface, swimming and submerged states. Related owner reports identify
+across surface, swimming and submerged states. Related maintainer reports identify
 apparent water-walking while equipment is readied and lighting a torch underwater.
 This is an audit gap; not every behavior below is established to be broken.
 
@@ -119,14 +119,14 @@ implementation and original-game comparison remain pending. Reuse SV_CheckWater,
 SV_WaterMove and the existing player damage path. Establish breath timing,
 effects, equipment transitions and save/load behavior from the matched reference
 before choosing state or damage rules. Preserve the current underwater
-visual effects: the owner explicitly approves their appearance and requests no
+visual effects: the maintainer explicitly approves their appearance and requests no
 changes to them. Reuse existing contents and movement state, avoid redundant
 per-frame work and allocations, and measure CPU/memory on the baseline target.
 
 ## Verification
 
 Open. Source paths reviewed; no runtime change or executed water regression is
-claimed. Owner screenshot preserved; independent reproduction, matched reference
+claimed. Maintainer screenshot preserved; independent reproduction, matched reference
 matrix and measured candidate acceptance remain pending. The screenshot alone
 does not establish movement physics, spell state or torch fuel behavior.
 
@@ -143,9 +143,9 @@ baseline resource costs for repairs and preserve visual controls.
 - [Lava coverage](BUILD-LAVA-COVERAGE-38.md)
 
 
-## Owner follow-up, 12 October 2026
+## Maintainer follow-up, 12 October 2026
 
-The owner reports walking poses at the water surface and underwater, missing
+The maintainer reports walking poses at the water surface and underwater, missing
 swim/dive animations, and no observed breath-exhaustion damage. Cover the player
 and all relevant NPCs, including future companion following. Compare original
 drowning damage, red-screen feedback and audio before choosing behavior; the
@@ -155,16 +155,16 @@ SV_CheckWater (sv_phys.c) where suitable; existing machinery is not proof that
 all integration or animation works, nor proof of zero additional CPU/RAM cost.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.
 
 - `OWNER-20261012-152017`: SHA-256 `e53bd537e39bdae534cd1a83ca7e5c3d3093ef284a94a760eaa18654becaea8e`. Underwater view shows a torch. Still frame cannot establish swimming animation.
 
-## RC1 owner evidence, 13 October 2026
+## RC1 maintainer evidence, 13 October 2026
 
 The original images remain private. Rounded HUD readings are location aids,
 not exact source/package bindings or proof of motion.
@@ -174,7 +174,7 @@ not exact source/package bindings or proof of motion.
 
 ## Both-view swimming and diving follow-up, 13 October 2026
 
-The latest owner report explicitly covers missing swimming animation AND missing diving animation in both first-person and third-person views. The earlier third-person sinking report remains. Verify swimming and diving separately in each view against the original: appropriate first-person hands/equipment and action feedback, third-person body swim/dive poses, actual surface/submerged movement, breath and damage. Do not use a still frame or the existing water-movement dispatch as evidence that swimming or diving gameplay is implemented or accepted. Underwater visual effects remain an approved visual control, not mechanics acceptance.
+The latest maintainer report explicitly covers missing swimming animation AND missing diving animation in both first-person and third-person views. The earlier third-person sinking report remains. Verify swimming and diving separately in each view against the original: appropriate first-person hands/equipment and action feedback, third-person body swim/dive poses, actual surface/submerged movement, breath and damage. Do not use a still frame or the existing water-movement dispatch as evidence that swimming or diving gameplay is implemented or accepted. Underwater visual effects remain an approved visual control, not mechanics acceptance.
 
 ## Original clip inventory and both-view reference limits, 13 October 2026
 
@@ -184,13 +184,13 @@ All16 original base-animation NIF/KF members were read without conversion. None 
 
 The locally available pinned OpenMW source declares0.52-dev. It is distinct from the installed headless0.48 reference binary, and no local0.48 source ref was available. The0.52 source selects swimming movement/idle states, falls back from absent swim groups to available ordinary/weapon movement and idle, and updates first-person neck/camera orientation. Its third-person swim pitch and optional upward corrections have conditional/settings behavior; they must not be transplanted as blanket original0.48 rules. Those source findings are design guidance, not behavioral acceptance.
 
-AmiQuake already provides SV_CheckWater and pitch-directed SV_WaterMove. The latter also applies inherited no-input downward drift; its existence is not Morrowind parity. Preserve these reusable mechanisms while calibrating original water depth, look/up/down inputs and idle behavior. The existing owner reports remain open in both views, including diving as a distinct transition/action.
+AmiQuake already provides SV_CheckWater and pitch-directed SV_WaterMove. The latter also applies inherited no-input downward drift; its existence is not Morrowind parity. Preserve these reusable mechanisms while calibrating original water depth, look/up/down inputs and idle behavior. The existing maintainer reports remain open in both views, including diving as a distinct transition/action.
 
 Before acceptance, capture matched installed0.48 and target surface entry, idle swim, forward/back/side swim, look-up/down movement, dive/submerge, surface and land exit at the same scene/pose/clock. Cover human/beast/female, fists/torch states and view switches. Compare first-person camera/hand/equipment feedback and third-person actual pose/orientation separately from movement, fatigue, breath/damage and save/load. Read back baked group coverage and measure baseline costs. No new native comparison, water gameplay implementation or RC2 scope expansion follows from this audit.
 
 ## Required RC2 swimming and diving scope, 13 October 2026
 
-The latest owner instruction requires reported swimming/diving, gait and combat
+The latest maintainer instruction requires reported swimming/diving, gait and combat
 repairs in RC2; swimming/diving is no longer deferred by the earlier scope note.
 Player water-pose integration and matched installed OpenMW 0.48 reference work
 are in progress. Both first-person and third-person visual/state behavior need
@@ -198,7 +198,7 @@ actual reference captures; the 0.52 source inventory cannot replace that evidenc
 Original clip availability and absence of a standalone dive key do not establish
 first-person visual behavior, gameplay parity or repaired native acceptance.
 Keep the complete reported water requirements open until exact source, automated,
-target/native, package and owner evidence is supplied. Release hold remains.
+target/native, package and maintainer evidence is supplied. Release hold remains.
 
 ## Native candidate findings, 14 October 2026
 
@@ -206,13 +206,13 @@ All 20 third-person swim companions bake successfully; target native ordinary-co
 
 ## Post-pin RC2 package observation, 14 October 2026
 
-The extracted RC2 package holds origin (704, -320, -25) for a four-second no-input water control after noclip is disabled. Pitch45 with forward movement descends to origin (832.7, -320, -153.7) at waterlevel 3 and shows changing swim poses. Both readied first-person fists remain visible at default horizontal FOV 90/viewsize 100. Actual OpenMW0.48 reference holds depth and retains first-person fists; no dedicated first-person stroke or blanket body pitch is established. Broader drowning, fatigue, combat, all appearances and owner acceptance remain pending.
+The extracted RC2 package holds origin (704, -320, -25) for a four-second no-input water control after noclip is disabled. Pitch45 with forward movement descends to origin (832.7, -320, -153.7) at waterlevel 3 and shows changing swim poses. Both readied first-person fists remain visible at default horizontal FOV 90/viewsize 100. Actual OpenMW0.48 reference holds depth and retains first-person fists; no dedicated first-person stroke or blanket body pitch is established. Broader drowning, fatigue, combat, all appearances and maintainer acceptance remain pending.
 
-These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Owner acceptance and final v0.0.39 clearance remain pending.
+These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Maintainer acceptance and final v0.0.39 clearance remain pending.
 
-## Renewed owner sinking and upright-body report, 14 October 2026
+## Renewed maintainer sinking and upright-body report, 14 October 2026
 
-The owner again reports sinking and an upright submerged third-person body in
+The maintainer again reports sinking and an upright submerged third-person body in
 RC2, whose gameplay is the same as final v0.0.39. The original supplied screenshot
 is retained privately; no public image or invented appearance/pose identity is
 added. The exact owner-running binary, depth, equipment, spell and input state
@@ -220,7 +220,7 @@ remain to be bound in a repeatable reproduction.
 
 The earlier four-second no-input depth hold and changing swim-pose observations
 remain valid only for their recorded control. They do not establish that the
-owner scenario is repaired, that an upright body is appropriate at that depth,
+maintainer scenario is repaired, that an upright body is appropriate at that depth,
 or that every race/equipment/view state matches the original.
 
 Reproduce surface entry, no-input depth, forward movement with pitch, dive,
@@ -232,7 +232,7 @@ No new gameplay acceptance or CHIM cell coverage is recorded.
 
 ## Development audit, 14 October 2026
 
-Fresh exact-RC2 Nord/Seyda controls explicitly verify WALK movetype 3, noclip off and waterlevel 3. At local 704,-320,-25, six seconds without input retain the same origin. Physical forward movement with downward pitch changes depth; after release velocity decays to zero and depth holds. Physical shore entry likewise reaches water and holds depth for six seconds. The swim companion is selected without a missing-companion warning. The upright-looking body, the owner's sinking scenario and matched original behavior remain unresolved. A failed Vivec destination attempt is not Vivec acceptance.
+Fresh exact-RC2 Nord/Seyda controls explicitly verify WALK movetype 3, noclip off and waterlevel 3. At local 704,-320,-25, six seconds without input retain the same origin. Physical forward movement with downward pitch changes depth; after release velocity decays to zero and depth holds. Physical shore entry likewise reaches water and holds depth for six seconds. The swim companion is selected without a missing-companion warning. The upright-looking body, the maintainer's sinking scenario and matched original behavior remain unresolved. A failed Vivec destination attempt is not Vivec acceptance.
 
 ## Scoped female-Nord mechanical control, 14 October 2026
 
@@ -248,8 +248,8 @@ privately. These are positive scoped water-motion/depth-hold observations.
 
 The upright-looking submerged body, original inventory-independent swim posture,
 surface-entry behavior and matched original comparison remain open. This does
-not verify every appearance, the reported owner location/state, breath/drowning,
-complete gameplay parity or owner acceptance. It adds no CHIM cell coverage.
+not verify every appearance, the reported maintainer location/state, breath/drowning,
+complete gameplay parity or maintainer acceptance. It adds no CHIM cell coverage.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

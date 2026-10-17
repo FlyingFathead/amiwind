@@ -41,6 +41,10 @@ static const char *const marker_keys[3]={"amiwind:map:marker:x","amiwind:map:mar
 #define INV_CONTROLS_Y 176
 #define INV_CLOSE_X 132
 #define INV_CLOSE_W 44
+#define INV_PREVIEW_X 7
+#define INV_PREVIEW_Y 22
+#define INV_PREVIEW_W 116
+#define INV_PREVIEW_H 168
 typedef struct {
     aw_inventory_item_t item[AW_STATE_VALUES];
     unsigned char known[AW_STATE_VALUES];
@@ -48,6 +52,12 @@ typedef struct {
     int icon_row[INV_VISIBLE],icon_ok[INV_VISIBLE];
     byte icons[INV_VISIBLE][1024];
     char message[96];float angle;
+    /* The still character picture (UI-INVENTORY-PREVIEW-STILL-42): rendered once when the
+     * window opens and after each equipment change, then only copied. 0 = render next frame,
+     * 1 = picture ready, -1 = unavailable. */
+    int preview_state,preview_renders;
+    unsigned preview_frames;double preview_seconds,preview_render_seconds;
+    byte preview[INV_PREVIEW_W*INV_PREVIEW_H];
 } inventory_panel_t;
 static inventory_panel_t *inventory;
 int AW_InventoryActive(void){return modal==3;}
@@ -92,6 +102,10 @@ static void cursor(void){
     AW_UIFill(x+1,y+1,1,6,c);AW_UIFill(x+1,y+1,6,1,c);
 }
 static void close_panel(void){
+    if(inventory && inventory->preview_frames)
+        Con_Printf("Inventory preview (%s): %d renders, last %d ms; %u frames, %d us per frame; picture %d bytes kept, pose model freed after each render.\n",
+            AW_ViewInventoryLive()?"live":"still",inventory->preview_renders,(int)(inventory->preview_render_seconds*1000),
+            inventory->preview_frames,(int)(inventory->preview_seconds*1e6/inventory->preview_frames),INV_PREVIEW_W*INV_PREVIEW_H);
     free(inventory);inventory=NULL;AW_InventoryPreviewClear();
     free(map_data);map_data=map_pixels=NULL;lava_pools=lava_points=NULL;lava_count=0;free(book);book=NULL;
     if(modal && key_dest==key_menu)key_dest=key_game;
@@ -166,6 +180,7 @@ static int inventory_droppable(const aw_inventory_item_t *item){
 static void inventory_action(int action){
     aw_inventory_item_t *item=inventory_selected();int ok=0;
     if(!item)return;
+    inventory->preview_state=0;   /* equipment may change: one new still picture */
     if(action==1 && inventory_equippable(item)){
         AW_CombatEquipmentStore();
         if(AW_InventoryEquipped(&aw_state,item->id))ok=AW_InventoryUnequip(&aw_state,item->id);
@@ -195,8 +210,9 @@ static void inventory_key(int key){
     int i,x,y,row,top;aw_inventory_item_t *item=inventory_selected();
     if(!inventory)return;
     drag=0;
-    if(key==K_LEFTARROW){inventory->angle-=.25f;return;}
-    if(key==K_RIGHTARROW){inventory->angle+=.25f;return;}
+    /* The original picture does not turn; turning is the live preview's (aw_inventory_preview_live 1). */
+    if(key==K_LEFTARROW){if(AW_ViewInventoryLive())inventory->angle-=.25f;return;}
+    if(key==K_RIGHTARROW){if(AW_ViewInventoryLive())inventory->angle+=.25f;return;}
     if(key==K_UPARROW || key=='w' || key==K_MWHEELUP)inventory->selected--;
     if(key==K_DOWNARROW || key=='s' || key==K_MWHEELDOWN)inventory->selected++;
     if(key==K_PGUP)inventory->selected-=INV_VISIBLE;
@@ -293,6 +309,37 @@ static void inventory_status(const char *value,int color){
     value+=split;while(*value==' ')value++;
     inventory_text(132,INV_STATUS_Y+8,180,5,value,color);
 }
+/* The character picture (UI-INVENTORY-PREVIEW-STILL-42). The original shows a still picture of
+ * the character in the inventory pose of the equipped weapon type, facing the viewer; OpenMW
+ * renders it once into a texture (mwrender/characterpreview.cpp: DrawOnceCallback,
+ * CharacterPreview::redraw; InventoryPreview::update picks the pose) and redraws it only when the
+ * equipment changes (mwgui/inventorywindow.cpp dirtyPreview). Here: one render into the window,
+ * copied into a 116 x 168 picture, the pose model and depth buffer freed at once; every later
+ * frame only copies the picture back. aw_inventory_preview_live 1: the old live, turnable preview. */
+static void inventory_preview(int muted){
+    model_t *model=NULL;int frame,y,ok;double t0=Sys_FloatTime(),t1;byte *row;
+    if(AW_ViewInventoryLive()){
+        if(!AW_ViewInventoryBody(&model,&frame) || !AW_InventoryPreviewDraw(model,frame,INV_PREVIEW_X,INV_PREVIEW_Y,
+                                                                            INV_PREVIEW_W,INV_PREVIEW_H,inventory->angle))
+            inventory_text(10,80,108,40,"Character preview unavailable",muted);
+    }else{
+        if(!inventory->preview_state){
+            ok=AW_ViewInventoryBody(&model,&frame) &&
+               AW_InventoryPreviewDraw(model,frame,INV_PREVIEW_X,INV_PREVIEW_Y,INV_PREVIEW_W,INV_PREVIEW_H,(float)M_PI);
+            if(ok)for(y=0;y<INV_PREVIEW_H;y++)
+                memcpy(inventory->preview+y*INV_PREVIEW_W,vid.buffer+(INV_PREVIEW_Y+y)*vid.rowbytes+INV_PREVIEW_X,INV_PREVIEW_W);
+            AW_InventoryPreviewClear();      /* pose model and depth buffer are not kept */
+            inventory->preview_state=ok?1:-1;inventory->preview_renders++;
+            t1=Sys_FloatTime();inventory->preview_render_seconds=t1-t0;t0=t1;
+        }else if(inventory->preview_state>0){
+            for(y=0;y<INV_PREVIEW_H;y++){
+                row=vid.buffer+(INV_PREVIEW_Y+y)*vid.rowbytes+INV_PREVIEW_X;memcpy(row,inventory->preview+y*INV_PREVIEW_W,INV_PREVIEW_W);
+            }
+        }
+        if(inventory->preview_state<0)inventory_text(10,80,108,40,"Character preview unavailable",muted);
+    }
+    inventory->preview_seconds+=Sys_FloatTime()-t0;inventory->preview_frames++;
+}
 static void inventory_draw(void){
     int i,j,x,row,index,frame,right=inventory_list_right();model_t *model=NULL;aw_inventory_item_t *item;char line[160];
     int gold=AW_UIColor(223,199,144),muted=AW_UIColor(150,135,104);
@@ -301,10 +348,7 @@ static void inventory_draw(void){
     AW_UISmallBegin();
     AW_UITextBox(6,4,308,12,"Inventory",gold);
     AW_UISmallEnd();
-    if(AW_ViewInventoryBody(&model,&frame)){
-        if(!AW_InventoryPreviewDraw(model,frame,7,22,116,168,inventory->angle))
-            inventory_text(10,80,108,40,"Character preview unavailable",muted);
-    }else inventory_text(10,80,108,40,"Character preview unavailable",muted);
+    inventory_preview(muted);
     for(row=0;row<2;row++){
         x=130;
         for(i=row*4;i<row*4+4;i++){
@@ -350,7 +394,8 @@ static void inventory_draw(void){
     AW_UIFill(132,INV_CONTROLS_Y-2,180,1,muted);
     inventory_text(INV_CLOSE_X,INV_CONTROLS_Y,INV_CLOSE_W,5,"I/Esc close",gold);
     inventory_text(192,INV_CONTROLS_Y,120,5,"Tab category",gold);
-    inventory_text(132,INV_CONTROLS_Y+8,180,5,"Up/Down select   Left/Right turn",gold);
+    /* Turning belongs to the old live preview only (UI-INVENTORY-PREVIEW-STILL-42). */
+    inventory_text(132,INV_CONTROLS_Y+8,180,5,AW_ViewInventoryLive()?"Up/Down select   Left/Right turn":"Up/Down select",gold);
 }
 static void map_fit(void){
     float sx=(float)map_w/310,sy=(float)map_h/150;

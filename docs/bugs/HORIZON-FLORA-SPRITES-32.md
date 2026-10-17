@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 8 October 2026, in v0.0.32-dev1 |
 | Where | Seyda Neen horizon (skyline fill with far trees) |
 | Reproduction | always |
@@ -28,7 +28,7 @@
 - [Why it was not caught](#why-it-was-not-caught)
 - [Reproduction](#reproduction)
 - [Repair](#repair)
-- [Planned improvements (owner, 8 October 2026)](#planned-improvements-owner-8-october-2026)
+- [Planned improvements (maintainer, 8 October 2026)](#planned-improvements-maintainer-8-october-2026)
 - [Verification](#verification)
 - [Prevention](#prevention)
 - [Bugs in the same category](#bugs-in-the-same-category)
@@ -37,26 +37,26 @@
 
 ## Status: 8 October 2026
 
-Owner verdict, 8 October 2026 (playing v0.0.32-dev3, default `aw_skyline_fill 0`): the horizon
-draws are excellent. The default method is owner-accepted and ships in v0.0.32; this page stays
+Maintainer verdict, 8 October 2026 (playing v0.0.32-dev3, default `aw_skyline_fill 0`): the horizon
+draws are excellent. The default method is maintainer-accepted and ships in v0.0.32; this page stays
 open for the experimental skyline fill (object silhouetting), which is kept, selectable and not
 yet good enough.
 
-Open: not yet perfect. Reported by the owner on v0.0.32-dev1 (8 October 2026), who notes it was
+Open: not yet perfect. Reported by the maintainer on v0.0.32-dev1 (8 October 2026), who notes it was
 partly his own call. Not a v0.0.32 blocker. Default restored in source (v0.0.32-final-blockers):
 the game config selects the land-outline horizon (`aw_skyline_fill 0`); the object silhouetting
 method stays, selectable, as "experimental and buggy" (sprites need their shapes from the alpha
 channel): "tested but subpar results; kept for future improvement".
 
-Decisions (owner, 8 October 2026): the earlier horizon system is the default again. The
+Decisions (maintainer, 8 October 2026): the earlier horizon system is the default again. The
 silhouetting stays as an alternative mode, documented as "tested but subpar results"; it is kept
-because it has potential and must not be removed. The owner, after the A/B frames:
+because it has potential and must not be removed. The maintainer, after the A/B frames:
 `aw_skyline_fill 0` "is way better"; a fog wall like the one below will not do.
 
 ## Symptom
 
-Design intent (owner): the horizon is drawn from the highest topography, so the distant skyline is
-the outline of the land. In dev1 the sprite trees break it (owner). Two dev1 screenshots from real
+Design intent (maintainer): the horizon is drawn from the highest topography, so the distant skyline is
+the outline of the land. In dev1 the sprite trees break it (maintainer). Two dev1 screenshots from real
 play, kept in private evidence:
 
 1. Seyda Neen, global position -11037 -70598 317 (local 56 270 79), heading 165, pitch -14, game
@@ -128,7 +128,7 @@ Default restored, no method removed (v0.0.32-final-blockers):
 
 Still open: the planned improvements below.
 
-## Planned improvements (owner, 8 October 2026)
+## Planned improvements (maintainer, 8 October 2026)
 
 1. The skyline fill must not let the topography show through.
 2. Sprites must become silhouettes of their actual form, honouring their transparent (alpha)

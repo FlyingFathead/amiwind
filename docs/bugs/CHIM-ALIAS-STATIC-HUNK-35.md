@@ -9,7 +9,7 @@
 | Where | CHIM engine chim_statics.c ChimStatics_Step, chim_world.c CheckRest |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.35 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: A cache request larger than the Hunk gap ends the game (Cache_Alloc out of memory). |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

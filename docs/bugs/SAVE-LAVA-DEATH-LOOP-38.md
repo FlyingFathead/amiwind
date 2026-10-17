@@ -4,9 +4,9 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 13 October 2026, in v0.0.38 |
-| Where | Owner v0.0.38 playtest: teleport, lava contact and death screen |
+| Where | Maintainer v0.0.38 playtest: teleport, lava contact and death screen |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.38 (last seen) |
@@ -15,18 +15,18 @@
 | Playtest version | v0.0.38 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
-| Unknown because | Reported during the owner playtest; exact running image binding needs confirmation. |
-| Platform or emulator | unknown (Earlier owner session was WinUAE; emulator not restated for this specific report.) |
+| Unknown because | Reported during the maintainer playtest; exact running image binding needs confirmation. |
+| Platform or emulator | unknown (Earlier maintainer session was WinUAE; emulator not restated for this specific report.) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
 
-Owner reports an autosave death loop after falling into a lava pool. The autosave trigger, timing and saved health/contents are not yet established.
+Maintainer reports an autosave death loop after falling into a lava pool. The autosave trigger, timing and saved health/contents are not yet established.
 
 ## Where
 
-Owner-reported v0.0.38 gameplay on 13 October 2026. Exact map, pose and save identity remain to be recorded.
+Maintainer-reported v0.0.38 gameplay on 13 October 2026. Exact map, pose and save identity remain to be recorded.
 
 ## How it happened
 
@@ -46,9 +46,9 @@ Reproduce with a fresh test save and compare the existing save and arrival machi
 
 ## Verification
 
-The original owner trigger still needs exact-image reproduction. Source
+The original maintainer trigger still needs exact-image reproduction. Source
 correction and compiled regression evidence are recorded below; these do not
-establish native or owner acceptance. Compare original/OpenMW behavior and
+establish native or maintainer acceptance. Compare original/OpenMW behavior and
 verify the exact candidate on the target engine.
 
 ## Candidate diagnosis and verification, 13 October 2026
@@ -61,7 +61,7 @@ Add a regression for the demonstrated cause, then a target-native safe/unsafe tr
 
 ## Exact RC1 evidence, 13 October 2026
 
-The same exact-package session entered lava (watertype -5), took damage and died without subsequent save messages. Reload returned to the prior sequence-3 arrival checkpoint, health 55, watertype -1, and subsequent observation retained health 55. Three AWS saves decode and match the exact catalogue/content. This is a scoped native observation; existing unsafe saves, other liquid/fall cases and owner acceptance remain open. AWS alone contains no ground/content/movement flags.
+The same exact-package session entered lava (watertype -5), took damage and died without subsequent save messages. Reload returned to the prior sequence-3 arrival checkpoint, health 55, watertype -1, and subsequent observation retained health 55. Three AWS saves decode and match the exact catalogue/content. This is a scoped native observation; existing unsafe saves, other liquid/fall cases and maintainer acceptance remain open. AWS alone contains no ground/content/movement flags.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

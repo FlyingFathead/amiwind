@@ -9,7 +9,7 @@
 | Where | Image content fingerprint after exterior payload pruning |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38 (last seen) |
+| Persists in | fixed in v0.0.39-rc1 |
 | Severity | critical: Full image cannot finish; failure occurs before HDF creation. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | v0.0.38 |
@@ -95,8 +95,8 @@ CHIM owner or changed assignment fails instead of triggering a BSP fallback.
 
 The integrated regression starts with no superseded map file, passes the real
 fingerprint through the same omission helper used by image assembly, and
-checks that changing the CHIM owner changes the fingerprint. A further integration check follows the actual image CLI: the prebuild planner passes --exterior-terrain independently of the optional refined-terrain installer. All 65 focused checks pass. It also rejects
-an undeclared omission, duplicate BSP, unused catalogue and missing CHIM owner.
+checks that changing the CHIM maintainer changes the fingerprint. A further integration check follows the actual image CLI: the prebuild planner passes --exterior-terrain independently of the optional refined-terrain installer. All 65 focused checks pass. It also rejects
+an undeclared omission, duplicate BSP, unused catalogue and missing CHIM maintainer.
 Complete image and native acceptance remain pending.
 
 ## Exact RC1 evidence, 13 October 2026
@@ -120,8 +120,8 @@ size are distinct measurements; these figures do not identify a final039 ZIP.
 RC1 package and matching source delivery finalized on 13 October 2026 at
 18:06:05 UTC (21:06 in Finland), with source `57a8699` and image `fbf9a6c`
 kept distinct. The six partial overlaps remain outside the shipped whole-cell
-count. Final v0.0.39 remains in preparation pending explicit owner inspection
-approval; RC1 shipment does not supply owner or universal gameplay acceptance.
+count. Final v0.0.39 remains in preparation pending explicit maintainer inspection
+approval; RC1 shipment does not supply maintainer or universal gameplay acceptance.
 
 Conversion/audit data is the unchanged 13 October 2026, 14:04:49 UTC snapshot:
 1,190 converted cells including 15 failed audits, 99 empty sea, three not

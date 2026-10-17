@@ -62,7 +62,7 @@ Included means verified in a packaged image. Packaged does not mean published or
 
 ## Release assignments
 
-Which cells are approved for which release (set by the owner with `cell_progress.py release`; conversion results never change it).
+Which cells are approved for which release (set by the maintainer with `cell_progress.py release`; conversion results never change it).
 
 | Release | State | Cells | Complete | Awaiting lighting | Lit | Empty sea | Failing | Hull policy pending |
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: |
@@ -131,7 +131,7 @@ Generated from the constants of the tracker code, so it cannot drift from what t
 - Terrain complete: all measured audits passed and every placed object except actors converted (statics, flora, lights, doors, containers, activators, items); actors may still be deferred. Nonvisual markers are not required. The cell must also be lit like the original (lighting audit: lit).
 - Cell complete, awaiting lighting: everything cell complete needs except the lighting audit (lit). Counts as done; becomes cell complete once lit.
 - Terrain complete, awaiting lighting: everything terrain complete needs except the lighting audit (lit). Counts as done; becomes terrain complete once lit.
-- Passed: converted and every measured audit passed, but something placed is still deferred or skipped (owner-approved and playtested cells also count here).
+- Passed: converted and every measured audit passed, but something placed is still deferred or skipped (maintainer-approved and playtested cells also count here).
 - Empty sea: terrain and water only, nothing placed. Counts as done.
 - Open sea: a map cell without terrain data (no LAND record), the water surface over the flat seabed at the default depth, stored once as one shared ocean chunk and referenced by every such cell. Shown in silver; the engine does not place the chunk yet, so it is not counted as done and never as land.
 - Hull policy pending: converted; the only problem is a standing-hull chain deeper than the limit below, waiting for one shared routing rule. Neither passed nor failed.
@@ -141,7 +141,7 @@ Generated from the constants of the tracker code, so it cannot drift from what t
 
 Done = cell complete + terrain complete + cell complete, awaiting lighting + terrain complete, awaiting lighting + passed + empty sea, each kept on its own line. Empty sea cells count as done: there is nothing to convert there but the terrain and the water.
 
-Eligible for the next release = every done cell: cell complete, terrain complete, cell complete, awaiting lighting, terrain complete, awaiting lighting, passed (owner-approved and playtested included) and empty sea (it passes as it is; the open world needs the water around the coast). Lighting does not have to be done.
+Eligible for the next release = every done cell: cell complete, terrain complete, cell complete, awaiting lighting, terrain complete, awaiting lighting, passed (maintainer-approved and playtested included) and empty sea (it passes as it is; the open world needs the water around the coast). Lighting does not have to be done.
 
 Status precedence, strongest first: cell complete > terrain complete > cell complete, awaiting lighting > terrain complete, awaiting lighting > passed > hull policy pending > failed > not converted > not started.
 

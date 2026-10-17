@@ -151,7 +151,7 @@ static void speeds(void) {
     assert(AW_PathSpeed(0,300,180,96)==AW_PATH_WALK_SPEED && AW_PathSpeed(0,0,250,96)==AW_PATH_RUN_SPEED);
 }
 
-/* Stuck responses per actor kind (owner decision, 9 October 2026). */
+/* Stuck responses per actor kind (project decision, 9 October 2026). */
 static void stuck_policy(void) {
     int combat,view;
     /* followers and escorts: 0 always placed (the first prototype), 1 only out of view, 2 never */

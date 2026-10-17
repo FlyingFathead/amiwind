@@ -755,6 +755,8 @@ static void think(slot_t *s,edict_t *p,float dt) {
         return;
     }
     if(you.dead){if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);return;}
+    /* Quake notarget (the camera orbit detaches the player, dbg cam orbit): no chase, no attack */
+    if((int)p->v.flags&FL_NOTARGET){if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);return;}
     /* Unreachable player (no path): flee, never warp, no combat timeout.
      * OpenMW 0.51 aicombat.cpp 295-339 and 363-467: with no route the actor
      * drops the attack and flees; without a pathgrid it runs directly away
@@ -829,7 +831,7 @@ void AW_CombatPhysics(void) {
         if(s->e->free){AW_ItemsHide(s->item);memset(s,0,sizeof(*s));continue;}
         any=1;s->state_time+=dt;
         if(s->state==S_SWING){
-            if(!s->struck && s->state_time>=s->swing_time*s->hit_fraction){s->struck=1;if(!you.dead)npc_strike(s,p);}
+            if(!s->struck && s->state_time>=s->swing_time*s->hit_fraction){s->struck=1;if(!you.dead && !((int)p->v.flags&FL_NOTARGET))npc_strike(s,p);}
             if(s->state_time>=s->swing_time){
                 s->f.attacking=0;set_state(s,S_CHASE,G_IDLE);
                 s->cooldown=aw_combat_settings.fCombatDelayNPC+.01f*AW_CombatRoll100(&rng);

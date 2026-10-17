@@ -9,7 +9,7 @@
 | Where | CHIM Vivec frame plan; engine hand-over bounds in aw_world.c |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: Blocks the planned one-frame Vivec, not any shipped build: the district frames work, and the bound stays 4,000. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | World format ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -105,7 +105,7 @@ Not yet decided. The options are:
 
 Until then, the eight district frames stay in place and the bound stays at 4,000.
 
-Owner decision (10 October 2026): option 2 first, as a measured spike, then one city frame. In source
+Project decision (10 October 2026): option 2 first, as a measured spike, then one city frame. In source
 (branch v0.0.36-vivec-chim), behind the engine compile switch `AW_EXP_WIDECOORD`, off by default:
 
 - `engine/aga/src/aw_coord.h`: a coordinate travels as 24 bits of 1/256 units (+/-32,768 units, the

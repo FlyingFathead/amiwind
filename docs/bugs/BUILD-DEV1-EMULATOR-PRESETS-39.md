@@ -9,7 +9,7 @@
 | Where | FS-UAE launch preparation after the version bump |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.39-dev1 (last seen) |
+| Persists in | fixed in v0.0.39 |
 | Severity | high: The Linux launcher cannot locate the versioned emulator preset. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | v0.0.39-dev1 |

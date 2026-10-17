@@ -9,7 +9,7 @@
 | Where | engine/aga/src/vid_amiga.c VID_Update (native AGA path) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: A later rectangle below the first was not shown |
 | Family | Rendering cost and visibility (`render-performance`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

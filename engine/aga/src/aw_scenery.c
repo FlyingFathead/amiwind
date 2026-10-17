@@ -13,6 +13,8 @@ extern void AW_MergeCollisionTrace(trace_t *,trace_t *,edict_t *);
  * and leave with it, link with it and clip with it. */
 void (*aw_chim_map_begin)(const char *);
 void (*aw_chim_map_end)(void);
+/* demo playback (cl_parse.c): the CHIM frame world started from the client's map (chim_world.c DemoMap) */
+void (*aw_demo_map_begin)(void);
 void (*aw_chim_link)(void);
 void (*aw_chim_clip)(vec3_t,vec3_t,vec3_t,vec3_t,trace_t *);
 typedef struct {

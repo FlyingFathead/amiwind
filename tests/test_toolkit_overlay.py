@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Owner-data map routes through a real temporary local server; synthetic bytes only.
+"""User-data map routes through a real temporary local server; synthetic bytes only.
 Page checks below are source contracts, not browser or rendered-map acceptance.
 """
 import json

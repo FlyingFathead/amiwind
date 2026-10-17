@@ -14,7 +14,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 11 October 2026, in v0.0.36-dev3 |
 | Where | Image step: Seyda Neen legacy region maps (65 sn files) and every per-map pass over them |
 | Reproduction | always |
@@ -55,7 +55,7 @@
 
 ## Status: 11 October 2026
 
-Open. PERSISTING, NOT RESOLVED. Found by the owner from the harvest step's "not admitted" list in the v0.0.36-dev3 build log. Corrected on 11 October 2026 after the finished dev3 run was checked: the legacy Seyda maps do not ship, they cost build time. The ID keeps its first wording ("shipped"); IDs are never renamed.
+Open. PERSISTING, NOT RESOLVED. Found by the maintainer from the harvest step's "not admitted" list in the v0.0.36-dev3 build log. Corrected on 11 October 2026 after the finished dev3 run was checked: the legacy Seyda maps do not ship, they cost build time. The ID keeps its first wording ("shipped"); IDs are never renamed.
 
 Progress on v0.0.36-image-speed (not shipped): the CHIM region frame maps are made from the game data
 (`--chim-region-rows game-data`, docs/BUILD_MANIFEST.md step 2), so the image step no longer reads the legacy map of a
@@ -67,9 +67,9 @@ skip CHIM cells (world terrain, scenery, flora, with the entity tracker counting
 own round, not dropped.
 
 
-Repaired in source on v0.0.36-image-speed (not shipped; persisting until a build shows it): the world map manifest is made from the CHIM coverage before the first stage, and a collision check refuses the plan before any stage when a CHIM cell has a second owner (a cell claimed twice, an open-world stage whose work list would make the legacy map of a CHIM region cell, or a legacy map of a CHIM cell made with no recorded reason), listing the cells. World terrain, world scenery and world flora take the CHIM region cells (--chim-regions-cells) and make no map for them (world terrain keeps their directory rows); the image refuses a staged legacy map of such a cell, writes the cell's frame map from the game data, and the entity tracker counts the cell's CHIM placements. The Seyda Neen legacy chain stayed, recorded as "kept because" (source of its frame maps until Seyda Neen is CHIM-native); see below. Tests: tests/test_world_manifest.py (a mixed plan refused with its cells, a cell claimed twice, the legacy method kept with its reason, the builder giving the cells to every open-world stage, the stages making no map for a region cell).
+Repaired in source on v0.0.36-image-speed (not shipped; persisting until a build shows it): the world map manifest is made from the CHIM coverage before the first stage, and a collision check refuses the plan before any stage when a CHIM cell has a second maintainer (a cell claimed twice, an open-world stage whose work list would make the legacy map of a CHIM region cell, or a legacy map of a CHIM cell made with no recorded reason), listing the cells. World terrain, world scenery and world flora take the CHIM region cells (--chim-regions-cells) and make no map for them (world terrain keeps their directory rows); the image refuses a staged legacy map of such a cell, writes the cell's frame map from the game data, and the entity tracker counts the cell's CHIM placements. The Seyda Neen legacy chain stayed, recorded as "kept because" (source of its frame maps until Seyda Neen is CHIM-native); see below. Tests: tests/test_world_manifest.py (a mixed plan refused with its cells, a cell claimed twice, the legacy method kept with its reason, the builder giving the cells to every open-world stage, the stages making no map for a region cell).
 
-Repaired in source on v0.0.36-seyda-chim (not shipped; persisting until a build shows it), owner order 11 October 2026
+Repaired in source on v0.0.36-seyda-chim (not shipped; persisting until a build shows it), maintainer order 11 October 2026
 ("we can't have that kind of a workflow, first builds it, then throws them away"): Seyda Neen is CHIM-native. A new
 `chim-town-seyda` stage (`tools/chim_town.py` `prepare_seyda`) takes the town frame's and the two opening scenes' (intro
 docks, Census courtyard) entities from the scene stage's complete converted town, by the same cut and flora rules and the
@@ -116,7 +116,7 @@ Each fix changed one flag or one town. None decided per map, before the first st
 
 ## Repair
 
-Design default (owner, 11 October 2026): when a cell moves onto CHIM, its previous map format is out of the build by default.
+Design default (maintainer, 11 October 2026): when a cell moves onto CHIM, its previous map format is out of the build by default.
 The builder derives the legacy map list from one place, the CHIM coverage (CHIM areas and region cells); every stage that
 converts, optimizes, harvests or packs legacy maps skips the covered cells (world terrain, scenery, flora, harvest, the BSP
 optimizer, the image), unless a recorded engine need keeps one map (for example a door target). The towns' sn0xx/bm0xx maps
@@ -174,8 +174,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 Related bugs in other categories:

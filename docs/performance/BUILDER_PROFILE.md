@@ -18,7 +18,7 @@ host are compared only with wall times of the same session.
 - [Top items and what was done](#top-items-and-what-was-done)
 - [The stair walk in detail](#the-stair-walk-in-detail)
 - [Passes measured and left unchanged](#passes-measured-and-left-unchanged)
-- [Decisions for the owner](#decisions-for-the-owner)
+- [Decisions for the maintainer](#decisions-for-the-maintainer)
 
 <!-- contents end -->
 
@@ -44,7 +44,7 @@ builds with its `compare` mode ([BUILD_PROFILE.md](../BUILD_PROFILE.md)).
 - [Top items and what was done](#top-items-and-what-was-done)
 - [The stair walk in detail](#the-stair-walk-in-detail)
 - [Passes measured and left unchanged](#passes-measured-and-left-unchanged)
-- [Decisions for the owner](#decisions-for-the-owner)
+- [Decisions for the maintainer](#decisions-for-the-maintainer)
 
 ## Builder fixes and time savings, v0.0.33 and beyond
 
@@ -205,9 +205,9 @@ read the whole map's tree and are keyed per map instead.
   workers it went from 31 to 48 s serial to 26 to 37 s, within the noise of the host, so it was not
   kept.
 
-## Decisions for the owner
+## Decisions for the maintainer
 
-Both proposals below were accepted by the owner on 9 October 2026 and are in the builder (v0.0.34
+Both proposals below were accepted by the maintainer on 9 October 2026 and are in the builder (v0.0.34
 development line): `pass_cache.setting(..., allow_release_reuse)` and `tools/build.py --stair-walk`,
 tested by `tests/test_release_pass_rules.py`.
 

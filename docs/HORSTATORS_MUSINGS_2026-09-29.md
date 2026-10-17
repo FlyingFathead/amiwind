@@ -2,7 +2,7 @@
 
 29 September 2026, evening, 22:53 Helsinki.
 Current released baseline: v0.0.23-dev4. Working checkpoint: v0.0.23-dev5.
-Owner's design direction, not a list of implemented streaming features.
+Maintainer's design direction, not a list of implemented streaming features.
 
 <!-- contents start -->
 ## Contents
@@ -138,7 +138,7 @@ Related entries: [28 September journal](HORSTATORS_JOURNAL_2026-09-28.md),
 
 ## From Seyda Neen to Balmora: evening notes, 30 September 2026
 
-Continued into 1 October, Helsinki. Owner's direction for the v0.0.24 follow-up;
+Continued into 1 October, Helsinki. Maintainer's direction for the v0.0.24 follow-up;
 implementation and measured acceptance remain recorded separately.
 
 ### A town is beginning to feel like a town
@@ -234,7 +234,7 @@ from a plausible explanation. The dancers question is settled: the remembered
 trio belongs to Desele's in Suran, not Balmora's South Wall Cornerclub.
 
 Take a few more honest native screenshots of Balmora along the way. Once the
-fixes and checks are complete, the owner's intended release is **v0.0.24 —
+fixes and checks are complete, the maintainer's intended release is **v0.0.24 —
 Welcome to Balmora**, rather than another RC1 label. Record the remaining limits
 plainly; a release milestone should make the project's progress easy to see.
 
@@ -255,7 +255,7 @@ against a known state, without carrying test changes back into the adventure.
 Full topic and result-script support remains separate work. Scrolling will be
 needed for longer topic lists and text panels.
 
-The immediate build is RC2 for another owner test where necessary; final
+The immediate build is RC2 for another maintainer test where necessary; final
 **v0.0.24 — Welcome to Balmora** remains the goal after the outstanding checks.
 
 ### An inspection checkpoint before the final release — 1 October 2026
@@ -333,7 +333,7 @@ next task is to make that knowledge travel with every new settlement.
 
 ## 1 October: give the island a common map
 
-Balmora's stairs are behaving much better in the owner's latest roaming, and
+Balmora's stairs are behaving much better in the maintainer's latest roaming, and
 the obvious floating residents have stopped spoiling the streets. That is a
 welcome change in the feel of the place. The precise outstanding contact and
 wedge reports still belong in the investigation ledger; a pleasant walk and a
@@ -367,7 +367,7 @@ terrain conversions can build on a common coordinate system. Character creation
 and the complete model gallery give the project faces as well as geography;
 Dagoth Ur has earned a place on the main page, gold mask and all.
 
-The owner chose to close v0.0.24 as a milestone release after RC playtesting.
+The maintainer chose to close v0.0.24 as a milestone release after RC playtesting.
 Known placement findings remain written down and the strict audit remains
 failed. A release number records the work we are shipping; it does not erase
 the work still ahead.

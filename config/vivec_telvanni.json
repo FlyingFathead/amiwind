@@ -87,7 +87,7 @@
     },
     {
       "cell": "Vivec, Telvanni Plaza",
-      "exclude": "inline models 267 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md); heap 144452 B over the 11,534,336 B budget after the optimizer (VIVEC-HEAP-31)"
+      "exclude": "model slots 222 > 220 after same-lit sharing and plants as sprites (INTERIOR-INLINE-LIMIT-31); needs a section cut at a doorway or hallway, proposed for maintainer review (docs/INTERIOR_SECTIONS.md)"
     },
     {
       "cell": "Vivec, Telvanni Prison Cells"
@@ -100,7 +100,7 @@
     },
     {
       "cell": "Vivec, Telvanni Tower",
-      "exclude": "heap 141380 B over the 11,534,336 B budget after the optimizer (VIVEC-HEAP-31)"
+      "exclude": "model precaches 257 > 256 (MAX_MODELS) with its residents and the fixed slots, although its own model slots (210) are within 220 (VIVEC-ROOM-PRECACHE-LIMIT-42); needs plants or furniture as sprites or a section cut (docs/INTERIOR_SECTIONS.md)"
     },
     {
       "cell": "Vivec, Telvanni Underworks"
@@ -113,7 +113,7 @@
     },
     {
       "cell": "Vivec, Telvanni Waistworks",
-      "exclude": "inline models 231 > 220 (INTERIOR-INLINE-LIMIT-31); needs a section split at real doors (docs/INTERIOR_SECTIONS.md)"
+      "exclude": "model slots 231 > 220 after same-lit sharing and plants as sprites (INTERIOR-INLINE-LIMIT-31); needs a section cut at a doorway or hallway, proposed for maintainer review (docs/INTERIOR_SECTIONS.md)"
     },
     {
       "cell": "Vivec, Temporary Telvanni Housing"

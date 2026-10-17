@@ -58,7 +58,7 @@ around and below), 139 of the 150 show the sky through the model where the sourc
 1 % of the pixels, 39 on more than 5 %, the worst 48 % (`terrain_ashland_rock_01`). meshoptimizer with
 locked borders at the same ratio closes them (38 rocks: 14.4 % to 0.0 % on average) but keeps 4.6 times the
 triangles (2,409 to 11,154), because every open rim stays where it is: not a free repair for heap-limited
-open-world maps. Options for the owner: a triangle floor per rock, the CHIM mesh method `meshopt+merge` for
+open-world maps. Options for the maintainer: a triangle floor per rock, the CHIM mesh method `meshopt+merge` for
 rocks once the open world is on CHIM, or a rim-aware target.
 
 ## Symptom
@@ -119,7 +119,7 @@ minutes on 3 workers); the ranked list is in the report.
 
 Not yet. Options per profile: `lock_boundaries` (keeps rims; reaches lower reductions on closed
 parts), `preserve_shape_prefixes` for structural parts, or a lower reduction. Each changes face and
-heap budgets of many maps and needs the heap gate and an owner look.
+heap budgets of many maps and needs the heap gate and a maintainer look.
 
 ## Verification
 

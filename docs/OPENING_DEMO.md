@@ -10,7 +10,7 @@ places the same version on the opening image. Keep this generated from
 
 ## What runs
 
-Two 320x200, 16-colour stills captured from the owner's Morrowind installation
+Two 320x200, 16-colour stills captured from the maintainer's Morrowind installation
 through OpenMW: the ship deck and a Seyda Neen street. The native runtime fades
 in the image, streams complete stereo music tracks and plays a short
 original voice cue after two seconds. The voice is centred and ducks the music.
@@ -43,7 +43,7 @@ Use RDB autodetection; the previous plain-partition geometry no longer applies.
 There is no ADF for this HDD-streaming checkpoint.
 
 Use a stock-speed A500/68000, OCS, PAL, 512 KiB Chip and 512 KiB slow expansion
-RAM, with no Fast RAM or JIT. Use the owner's supplied Kickstart 1.3 identified
+RAM, with no Fast RAM or JIT. Use the maintainer's supplied Kickstart 1.3 identified
 in OPENING_VALIDATION.md. The private bundle may contain that ROM only when
 explicitly requested by its owner. The public source archive never includes it.
 

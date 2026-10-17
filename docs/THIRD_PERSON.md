@@ -163,6 +163,10 @@ cycles keep 3 to 5 frames).
 Keys typed in the console (the command itself, closing the console) do not count as input, so an orbit started
 from the console keeps running until the first key or mouse movement in the game.
 
+Named shots for inspection and screenshots: `dbg cam mark NAME` saves where you stand and look (with the
+time of day, headlamp and fog distance), `dbg cam recall NAME` brings that shot back, `dbg cam list` lists the
+marks ([CAMERA_MARKS.md](CAMERA_MARKS.md)).
+
 ## Build switches
 
 | Switch | Default | Meaning |

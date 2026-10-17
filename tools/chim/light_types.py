@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """CHIM lighting types: the builder's --chim-lighting-type (docs/chim/LIGHTING.md, docs/chim/LIGHTING_ROADMAP.md).
 
-Owner decision 2026-10-09: "hybrid" is the default. The types that need more memory than today's CHIM zone stay
+Project decision 2026-10-09: "hybrid" is the default. The types that need more memory than today's CHIM zone stay
 reserved for an increased-memory version of the game and are refused with a message saying so. Nothing here
 imports numpy (the builder reads it before its tools exist).
 """

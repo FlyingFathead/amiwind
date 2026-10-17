@@ -4,7 +4,7 @@
   "description": "MiniWind preset --miniwind-vivec-arena-pit: Vivec Arena Pit: combat test",
   "options": {
     "miniwind": true,
-    "miniwind_scope": "full",
+    "miniwind_scope": "interior",
     "miniwind_description": "Vivec Arena Pit: combat test",
     "direct_to_game_map": "interior:Vivec, Arena Pit",
     "exclude": [

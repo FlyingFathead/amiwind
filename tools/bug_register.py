@@ -78,12 +78,12 @@ CAT_HEADING = '## Bugs in the same category'
 ID_RE = re.compile(r'^(AW-\d{8}-\d{2}|[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-[0-9]{2,3}|[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-0[0-9])$')
 FIELDS = {'id': str, 'title': str, 'state': str, 'fixed_in': (str, type(None)),
           'owner_accepted': (str, type(None)), 'status': str, 'report': (str, type(None))}
-# Facts every bug found from v0.0.30 on must carry (owner requirement, 9 October 2026).
+# Facts every bug found from v0.0.30 on must carry (project requirement, 9 October 2026).
 FACTS = ('reported_by', 'found_date', 'found_in', 'where', 'reproduction', 'duplicate_of', 'persists_in',
          'severity', 'severity_reason', 'family', 'related')
 OPTIONAL = ('tags', 'chim', 'build', 'reports', 'platform', 'platform_reason')
-# Platform or emulator a bug was seen on (owner requirement, 11 October 2026): "platform" in bugs.json, e.g.
-# "FS-UAE 3.1.66, JIT, A1200 68040 preset", "WinUAE 6.0.1", "A1200 + 68060 accelerator". Required for the owner's
+# Platform or emulator a bug was seen on (project requirement, 11 October 2026): "platform" in bugs.json, e.g.
+# "FS-UAE 3.1.66, JIT, A1200 68040 preset", "WinUAE 6.0.1", "A1200 + 68060 accelerator". Required for the maintainer's
 # game-side reports on numbered builds from v0.0.36 on; "unknown" or "not in game" only with platform_reason.
 PLATFORM_FROM_SERIES = 36
 PLATFORM_UNKNOWN = ('unknown', 'not in game')
@@ -98,7 +98,7 @@ CHIM_PARTS = (('streaming', 'Engine streaming and memory'), ('format', 'World fo
               ('performance', 'Performance'))
 CHIM_PART_KEYS = tuple(k for k, _ in CHIM_PARTS)
 CHIM_FAMILY = 'chim-streamer'
-# The build a bug was found in (owner requirement, 9 October 2026): "build" in bugs.json.
+# The build a bug was found in (project requirement, 9 October 2026): "build" in bugs.json.
 BUILD_KEYS = ('name', 'source_commit', 'engine_commit', 'world_commit', 'chim_version', 'chim_format',
               'unknown_reason', 'note')
 BUILD_SOURCE = 'source'
@@ -118,6 +118,8 @@ STATES = ('open', 'fixed', 'closed')
 REPRODUCTION = ('always', 'sometimes', 'once', 'unknown')
 SEVERITIES = ('critical', 'high', 'medium', 'low')
 REPORTERS = ('owner', 'developer', 'review', 'audit', 'test', 'build', 'ci', 'unknown')
+# How a reporter value reads in the pages: the value 'owner' stays in the data, the page says who that is.
+REPORTER_SHOWN = {'owner': 'maintainer'}
 REPORTER_RE = re.compile(r'^(%s|gate:[a-z0-9][a-z0-9-]*)$' % '|'.join(REPORTERS))
 DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 FACTS_FROM_SERIES = 30
@@ -160,7 +162,8 @@ def split(bugs):
 
 
 def archive_text(old):
-    return json.dumps(old, indent=2, ensure_ascii=False) + '\n'
+    """The archive in the live register's one-issue-per-line form (same schema, same values)."""
+    return live_text(old)
 
 
 def live_text(live):
@@ -329,7 +332,7 @@ def validate_build(b, where):
 
 
 def needs_platform(b):
-    """The owner's game-side reports on numbered builds from v0.0.36 on name their platform or emulator."""
+    """The maintainer's game-side reports on numbered builds from v0.0.36 on name their platform or emulator."""
     m = re.match(r'v0\.0\.(\d+)-?(dev|rc)?\d*$', str(b.get('found_in') or ''))
     return (b.get('reported_by') == 'owner' and bool(m) and BUILD_RE.match(b['found_in']) is not None
             and int(m.group(1)) >= PLATFORM_FROM_SERIES and b.get('family') not in PLATFORM_EXEMPT_FAMILIES)
@@ -342,7 +345,7 @@ def validate_platform(b, where):
         if 'platform_reason' in b:
             errors.append('%s: platform_reason without a platform' % where)
         if needs_platform(b):
-            errors.append('%s: missing platform (the platform or emulator the owner saw it on, e.g. "FS-UAE 3.1.66, '
+            errors.append('%s: missing platform (the platform or emulator the maintainer saw it on, e.g. "FS-UAE 3.1.66, '
                           'JIT"; "unknown" or "not in game" with platform_reason)' % where)
         return errors
     if not _line_ok(v, 120):
@@ -626,7 +629,7 @@ def persists_text(b):
 def facts_table(b, by_id, families):
     fam = families.get(b.get('family'))
     dup = b.get('duplicate_of')
-    rows = [('Reported by', b.get('reported_by', 'unknown')),
+    rows = [('Reported by', REPORTER_SHOWN.get(b.get('reported_by', 'unknown'), b.get('reported_by', 'unknown'))),
             ('First noticed', first_noticed(b)),
             ('Where', b.get('where', 'unknown')),
             ('Reproduction', b.get('reproduction', 'unknown')),
@@ -878,7 +881,7 @@ def table(bugs):
     out = persisting_section(bugs)
     if out:
         out += ['### All bugs', '']
-    out += ['| ID | Issue | Severity | Found in | State | Fixed in | Owner accepted | Status |',
+    out += ['| ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Status |',
            '| --- | --- | --- | --- | --- | --- | --- | --- |']
     for b in sorted(bugs, key=lambda b: (ORDER[b['state']], b['id'])):
         out.append('| %s | %s | %s | %s | %s | %s | %s | %s |' % (
@@ -975,7 +978,7 @@ def symmetric(bugs):
                                    and not (b.get('family') and by_id[r].get('family') == b.get('family'))})
 
 
-REPORTER_WORDS = (('owner', 'owner'), ('harry', 'owner'), ('playtest', 'owner'), ('review', 'review'),
+REPORTER_WORDS = (('owner', 'owner'), ('maintainer', 'owner'), ('harry', 'owner'), ('playtest', 'owner'), ('review', 'review'),
                   ('hosted ci', 'ci'), ('unit test', 'test'), ('test suite', 'test'), ('build', 'build'),
                   ('audit', 'audit'), ('census', 'audit'), ('a/b', 'audit'), ('measure', 'audit'))
 DATE_TEXT_RE = re.compile(r'\b(\d{1,2}) (%s) (\d{4})\b' % '|'.join(MONTHS))

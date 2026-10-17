@@ -12,12 +12,21 @@ import math
 from town_config import load_settings, town_field
 
 
-def visual_profile(source, triangles):
+# Meshes whose convex collision closes an authored underpass, kept as authored plates by name (the method before
+# v0.0.42). The CHIM model builder finds them by a general rule instead (mesh_geometry.collision_parts underside,
+# AMIWIND_COLLISION_UNDERSIDE rule, CHIM-VOS-TEMPLE-WALKWAY-41); 'names' keeps this list for it too.
+UNDERPASS_NAMES = ('ex_velothi_temple_01.nif', 'ex_velothi_temple_02.nif')
+
+
+def visual_profile(source, triangles, underpass_names=True):
     """Reduce organic props only; open architectural shells must stay intact.
 
     Global triangle quotas collapse the boundaries of Hlaalu facade panels.
     Their original triangles are already modest and are merged into coplanar
     BSP surfaces by the subsequent conversion stage.
+
+    underpass_names: the meshes of UNDERPASS_NAMES keep their authored collision surfaces (default; the legacy
+    town builder); False when the converter applies the general underside rule instead (chim.build).
     """
     stem = source.replace('\\', '/').rsplit('/', 1)[-1].casefold()
     target = triangles
@@ -36,8 +45,8 @@ def visual_profile(source, triangles):
     # Convex approximation closes these authored underpasses. Keep each
     # collision surface instead, independent of visible mesh reduction.
     if stem.startswith(('ex_hlaalu_b_', 'ex_hlaalu_bal_', 'ex_hlaalu_bridge_',
-                        'ex_hlaalu_dsteps_', 'ex_hlaalu_steps_', 'ex_hlaalu_wall_gate_')) or stem in (
-            'ex_velothi_temple_01.nif', 'ex_velothi_temple_02.nif'):
+                        'ex_hlaalu_dsteps_', 'ex_hlaalu_steps_', 'ex_hlaalu_wall_gate_')) or (
+            underpass_names and stem in UNDERPASS_NAMES):
         # ex_velothi_temple_01: its convex pieces reach 2-5 units below the slab a walkway runs under (Vos, the
         # Vivec-style walkway into the temple base: 38 units of visible headroom over the top step, the
         # proxies leave less than the standing box; CHIM-VOS-TEMPLE-WALKWAY-41)
@@ -53,12 +62,12 @@ def visual_profile(source, triangles):
     return profile
 
 
-def town_model_profile(group_profile, source, triangles):
+def town_model_profile(group_profile, source, triangles, underpass_names=True):
     """The profile a town converter uses for one mesh: the scenery index's group profile with
     visual_profile on top. One reading for the legacy town builder (import_town), the CHIM model
     builder (chim.build) and the seam audit (seam_audit), so the audit measures what is built
-    (MESH-LOD-OPEN-SEAMS-33)."""
-    return {**group_profile, **visual_profile(source, triangles)}
+    (MESH-LOD-OPEN-SEAMS-33). underpass_names as visual_profile."""
+    return {**group_profile, **visual_profile(source, triangles, underpass_names)}
 
 
 def config(town='balmora'):

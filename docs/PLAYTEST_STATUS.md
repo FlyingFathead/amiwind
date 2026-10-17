@@ -1,6 +1,6 @@
 # Playtest status by development version
 
-Keep owner reports separate from local acceptance tests. A fix at one location
+Keep maintainer reports separate from local acceptance tests. A fix at one location
 is not evidence that every collision/rendering issue is solved. New reports
 append to the relevant version; do not rewrite earlier observations as passes.
 
@@ -17,12 +17,12 @@ append to the relevant version; do not rewrite earlier observations as passes.
 - [v0.0.15-dev1 / checkpoint-016](#v0015-dev1--checkpoint-016)
 - [v0.0.15-dev1 follow-up reports, 27 September 22:17–22:40 Helsinki](#v0015-dev1-follow-up-reports-27-september-22172240-helsinki)
 - [v0.0.15-dev2 / checkpoint-017](#v0015-dev2--checkpoint-017)
-- [Owner checkpoint-017 playtest, 27 September 23:28 Helsinki](#owner-checkpoint-017-playtest-27-september-2328-helsinki)
-- [Latest owner playtest and default decision, 27 September 23:29–23:31 Helsinki](#latest-owner-playtest-and-default-decision-27-september-23292331-helsinki)
+- [Maintainer checkpoint-017 playtest, 27 September 23:28 Helsinki](#maintainer-checkpoint-017-playtest-27-september-2328-helsinki)
+- [Latest maintainer playtest and default decision, 27 September 23:29–23:31 Helsinki](#latest-maintainer-playtest-and-default-decision-27-september-23292331-helsinki)
 - [Final recovery handover update, 27 September 23:32–23:35 Helsinki](#final-recovery-handover-update-27-september-23322335-helsinki)
-- [28 September 15:50 owner follow-up](#28-september-1550-owner-follow-up)
+- [28 September 15:50 maintainer follow-up](#28-september-1550-maintainer-follow-up)
 - [v0.0.21-dev1 regression / v0.0.21-dev2 correction](#v0021-dev1-regression--v0021-dev2-correction)
-- [v0.0.21-dev2 owner follow-up / dev3 maintenance](#v0021-dev2-owner-follow-up--dev3-maintenance)
+- [v0.0.21-dev2 maintainer follow-up / dev3 maintenance](#v0021-dev2-maintainer-follow-up--dev3-maintenance)
 
 <!-- contents end -->
 
@@ -42,7 +42,7 @@ Full selected interior geometry is retained, including distant-origin towers
 and previously omitted dressing. The checklist records stair collision and
 slope classification, ground-material repairs, clearer gold e/H glyphs, shared
 NPC targeting, the guard's final dock post and filename packaging corrections.
-These are local checks, not owner acceptance of every route or the full game.
+These are local checks, not maintainer acceptance of every route or the full game.
 
 The accepted Strider, frozen-frame Loading... box, Shift+V, 90-degree FOV,
 base player hull and race/sex eye heights remain. Balmora has 64 overlapping
@@ -52,7 +52,7 @@ whole-map polygon-density analysis, full NPC services, schedules, combat and
 quest simulation remain future work. Greetings use a bounded authored fixture.
 
 Stable v0.0.23 and the published dev5 prerelease remain unchanged. Final
-v0.0.24 needs the owner's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
+v0.0.24 needs the maintainer's green light. See [RC scope](RELEASE-v0.0.24-rc1.md),
 [complete checklist](INVESTIGATION-v0.0.24-rc1.md),
 [conversion lessons](BALMORA_CONVERSION_LESSONS.md) and
 [Amiga naming constraints](RELEASE_WORKFLOW.md#amiga-limitations).
@@ -72,20 +72,20 @@ build timings and remaining audio/interior work.
 
 | Item | Status | Evidence / remaining scope |
 | --- | --- | --- |
-| Invisible obstruction in the middle of Seyda Neen town square | **User-confirmed fixed** | Owner confirmation, 27 September 2026, 19:22 Helsinki. Local bounded-hull comparison also removed a reproduced remote solid spike; see CHECKPOINT_013_VALIDATION.md. |
-| Standing startup, slopes and tested stair route | Local tests passed; owner said walking worked greatly | Preserve those routes in later acceptance. Other locations are not certified. |
+| Invisible obstruction in the middle of Seyda Neen town square | **User-confirmed fixed** | Maintainer confirmation, 27 September 2026, 19:22 Helsinki. Local bounded-hull comparison also removed a reproduced remote solid spike; see CHECKPOINT_013_VALIDATION.md. |
+| Standing startup, slopes and tested stair route | Local tests passed; maintainer said walking worked greatly | Preserve those routes in later acceptance. Other locations are not certified. |
 | Door panels and town details | User previously reported working | Retain as regression coverage; exact earlier repair version was not supplied in that report. |
-| Pier deck / abrupt walkway end | **Open** | Owner screenshots show missing surfaces and an abrupt end. Separate conversion bounds from clipping and source geometry. |
-| Suspended geometry / incomplete Seyda Neen portion | **Open** | Owner screenshots, 27 September. Need exact camera coordinates and reference/terrain audit. |
+| Pier deck / abrupt walkway end | **Open** | Maintainer screenshots show missing surfaces and an abrupt end. Separate conversion bounds from clipping and source geometry. |
+| Suspended geometry / incomplete Seyda Neen portion | **Open** | Maintainer screenshots, 27 September. Need exact camera coordinates and reference/terrain audit. |
 | Blinking blue square | Identified as generated RAM-cache indicator | `showram` was enabled. Default-off change is staged for the next checkpoint, not retroactively delivered in dev2. |
-| Shack walls disappearing at a specific viewpoint | **Open** | Owner screenshot, 27 September 2026, 19:34 Helsinki. Needs exact XYZ/yaw; do not equate every visibility fault with the pier fix. |
+| Shack walls disappearing at a specific viewpoint | **Open** | Maintainer screenshot, 27 September 2026, 19:34 Helsinki. Needs exact XYZ/yaw; do not equate every visibility fault with the pier fix. |
 | Repeated NPC voice | Known prototype limitation | One preselected Hello sample per appearance. Full condition-driven selection not implemented. |
 
 ## v0.0.13-dev1 / checkpoint-014
 
 | Item | Status | Evidence / remaining scope |
 | --- | --- | --- |
-| Missing pier deck faces | Locally reproduced and repaired | Unsigned 16-bit plane indices; same-camera native comparison restores planks. Owner acceptance pending. |
+| Missing pier deck faces | Locally reproduced and repaired | Unsigned 16-bit plane indices; same-camera native comparison restores planks. Maintainer acceptance pending. |
 | Dock edge/surface exhaustion | Buffer budget adjusted | Restored geometry exposed the old limit. Final native counters are recorded in CHECKPOINT_014_VALIDATION.md. |
 | Nord hands and punch | Visual prototype | F toggles draw/sheath; Mouse1 punches. No combat damage. |
 | Escape menu | Implemented | Return and confirmed Exit; future options greyed out. |
@@ -93,7 +93,7 @@ build timings and remaining audio/interior work.
 | Noclip flight / recall | Local focused acceptance | Full camera pitch, E/Q vertical movement, Shift speed and checked recall point 0; see checkpoint record. |
 | Live coordinates/debug master | Implemented | Reserved bottom strip included in video updates; individual settings preserved. |
 | Extended sea | Temporary placeholder | Z=0 flat surface, +/-2048 bounds, independently toggled with amiwind_debug_sealevel. Not actual surrounding map coverage. |
-| Position-specific shack-wall disappearance | **Owner reports no longer reproducing** | 27 September, 20:37 Helsinki, latest checkpoint-014 playtest. Preserve the route; the exact failing camera and individual causal fix remain unconfirmed. |
+| Position-specific shack-wall disappearance | **Maintainer reports no longer reproducing** | 27 September, 20:37 Helsinki, latest checkpoint-014 playtest. Preserve the route; the exact failing camera and individual causal fix remain unconfirmed. |
 | Abrupt land/object boundary | **Open** | Terrain/selected references remain bounded; expanding the sea does not fill missing land/structures. |
 | Orphan ship hatch / missing hull | **Identified, not repaired** | Scenery filter omits ACTI hull; origin cutoff also excludes it. See SEYDA_NEEN_SCOPE.md. |
 | Connected starting-area exteriors | Next major milestone | Port/islets/bridges/opposing shore/mainland approach; current bounded slice is incomplete. |
@@ -104,7 +104,7 @@ build timings and remaining audio/interior work.
 The private voice index preserves original conditions and ordered records.
 Its actor lists are static candidates, not approved random-playback pools.
 Native NPC speech still uses one Hello per appearance; varied native dialogue
-is not implemented. Owner feedback is recorded per item above; this is not blanket acceptance.
+is not implemented. Maintainer feedback is recorded per item above; this is not blanket acceptance.
 
 ## Reporting a regression
 
@@ -117,9 +117,9 @@ or generated lookup tables into public source archives.
 
 ## New terrain/formation report, 27 September 20:55 Helsinki
 
-Checkpoint-014 owner screenshots show a terrain/rock formation rendered
+Checkpoint-014 maintainer screenshots show a terrain/rock formation rendered
 incompletely left of the road, with a pointed fragment and sky where the rest
-of the formation is expected. The owner explicitly clarified that it should
+of the formation is expected. The maintainer explicitly clarified that it should
 not be described as an intended overhang. **Open, cause unknown**:
 compare the source LAND heights, placed rocks and converted triangles at the
 same camera before classifying it. Candidate checks: cell edge/corner indexing,
@@ -128,7 +128,7 @@ geometry and depth/culling. The visible appearance alone cannot identify a
 boulder or prove a terrain error. XYZ was unavailable to the reporter; the next
 checkpoint provides `dbg coords on`, `dbg pos` and underscore-free recall.
 Preserve this as a distinct issue from the fixed pier index defect and the
-owner-reported improvement at the shacks. Private screenshot retained; no
+maintainer-reported improvement at the shacks. Private screenshot retained; no
 commercial game image is included in public source.
 
 ## v0.0.14-dev1 / checkpoint-015
@@ -137,10 +137,10 @@ commercial game image is included in public source.
 | --- | --- | --- |
 | Arrival hull/gangplank/hatch/cabin | Locally rendered | Named complete assembly; simplified exterior; opening state not executed. |
 | Ship deck/gangplank collision | Bounded local check passed | Short deck walk and gangplank standing; not the entire opening route. |
-| Console solid background/font/aliases | Locally verified | Typed commands, blue/black, retro/readable, close/reopen, dbg coordinates and long-prefix recall. Owner acceptance pending. |
+| Console solid background/font/aliases | Locally verified | Typed commands, blue/black, retro/readable, close/reopen, dbg coordinates and long-prefix recall. Maintainer acceptance pending. |
 | Actor/hand cache failure in 8 MiB trial | Final trial passed with 9 MiB heap | Same 16 MiB Fast hardware profile; failed run preserved. |
 | Quit and amiWind relaunch | Locally verified twice | Focused same-session relaunch, hands and clean exit; no ERROR.TXT. |
-| Incomplete terrain/rock formation | Open | Two owner screenshots from checkpoint-014; same-camera source comparison needed. |
+| Incomplete terrain/rock formation | Open | Two maintainer screenshots from checkpoint-014; same-camera source comparison needed. |
 | Low-light ship interior/day-night | Planned | No interior or daycycle commands active yet; see DAY_NIGHT_AND_SKY.md. |
 
 ## v0.0.15-dev1 / checkpoint-016
@@ -148,34 +148,34 @@ commercial game image is included in public source.
 | Item | Status | Evidence / remaining scope |
 | --- | --- | --- |
 | Prison interior and both E hatch links | Local native pass | Both builds load/walk; final routes exercise both directions. No full opening quest or Census office. |
-| Compact console, fullscreen, scrollback, overlay alias | Local host/native pass | Small default; normal and retained retro available. Finnish physical key mapping still needs owner confirmation. |
+| Compact console, fullscreen, scrollback, overlay alias | Local host/native pass | Small default; normal and retained retro available. Finnish physical key mapping still needs maintainer confirmation. |
 | Player eye height | Corrected prototype calibration | 33.0588 above feet; collision unchanged. Full original-camera parity not claimed. |
 | DEG/pitch in coordinates | Implemented | Include both with XYZ for future visibility reports. |
 | Hands blink/dark appearance | Partially addressed, still open for visual acceptance | Post-fog 3D drawing and optional sprite build; some sprite animation poses are empty/offscreen. |
-| Deck/bow gaps and detached rail details | **Open** | Owner XYZ (804,-311,61), (615,-548,74), (777,-373,61), (790,-413,62). |
-| Disappearing house | **Open** | Owner XYZ (-41,715,69). Ordinary scenery origin cutoff is an audit lead, not a confirmed cause. |
-| Malformed terrain/rock formation | **Open** | Owner XYZ (235,596,29); source and converted topology comparison required. |
+| Deck/bow gaps and detached rail details | **Open** | Maintainer XYZ (804,-311,61), (615,-548,74), (777,-373,61), (790,-413,62). |
+| Disappearing house | **Open** | Maintainer XYZ (-41,715,69). Ordinary scenery origin cutoff is an audit lead, not a confirmed cause. |
+| Malformed terrain/rock formation | **Open** | Maintainer XYZ (235,596,29); source and converted topology comparison required. |
 | Joined-plank pier and distant building backdrops | Planned A/B | Existing converter retained; no new flattening experiment claimed. |
 
-Owner acceptance of checkpoint-016 is pending. Earlier user-confirmed fixes stay
+Maintainer acceptance of checkpoint-016 is pending. Earlier user-confirmed fixes stay
 recorded against their original versions.
 
 ## v0.0.15-dev1 follow-up reports, 27 September 22:17–22:40 Helsinki
 
-Owner rejects lower hold: flattened hull intersects furnishings and hides the
+Maintainer rejects lower hold: flattened hull intersects furnishings and hides the
 stair route. Exterior formation persists at XYZ211/447/47 DEG4/P0; Silt Strider
-port is a hypothesis. Owner also reports slower performance, occasional music
+port is a hypothesis. Maintainer also reports slower performance, occasional music
 clicks and red/brown immersion. Preserve these as open until individually verified.
 
 ## v0.0.15-dev2 / checkpoint-017
 
 | Item | Status | Evidence / remaining scope |
 | --- | --- | --- |
-| Curved interior hull / stair visibility | Local visual repair | Same-source reduction reproduces fault; structural preservation restores native views. Owner acceptance and continuous stair route pending. |
+| Curved interior hull / stair visibility | Local visual repair | Same-source reduction reproduces fault; structural preservation restores native views. Maintainer acceptance and continuous stair route pending. |
 | Scene-picker popup | Host/native pass | dbg/debug/amiwind debug scene change, both choices and cancellation; missing files covered by host tests. |
 | E links and music continuity | Native regression pass | Four successful scene transitions; no music read errors; audio late updates still occur. |
 | Vicinity NPC/door/container lookup | Host audit complete | 15 exterior / 28 directly linked interior NPC references; no new native actors or interaction logic. |
-| Exterior formation and Silt Strider omission | Open | Owner viewpoint reproduced; strider ACTI omission known, malformed formation identity not established. |
+| Exterior formation and Silt Strider omission | Open | Maintainer viewpoint reproduced; strider ACTI omission known, malformed formation identity not established. |
 | Water color, damage/audio, slowdown | Open | Recorded in follow-up register; current inherited water tint is warm brown. |
 
 Default 3D image only in this hotfix. Previous sprite experiment and exterior
@@ -187,24 +187,24 @@ Graphics slider with 10/1-unit normal/Shift nudges, default700, and default-off
 675→665→664→700 and FPS/overlay acceptance passed and is recorded separately in CHECKPOINT_017_VALIDATION.md. All latest
 slow-view/ship/deck screenshots and hypotheses remain in SEYDA_NEEN_NEXT_STEPS.md.
 
-## Owner checkpoint-017 playtest, 27 September 23:28 Helsinki
+## Maintainer checkpoint-017 playtest, 27 September 23:28 Helsinki
 
-v0.0.15-dev2 prison-ship interior: owner reports improved appearance, but lower
+v0.0.15-dev2 prison-ship interior: maintainer reports improved appearance, but lower
 hull flicker from the pictured angle and performance dips. Screenshot:
 image(20260927-202651).png; coordinates are not enabled, so no exact pose is
 claimed. Preserve it privately and reproduce after restoring the workspace.
 Structural shape repair did not certify all depth/clipping or performance issues.
 Intro/UI/font work remains the next planned milestone; recovery ZIPs take priority.
 
-## Latest owner playtest and default decision, 27 September 23:29–23:31 Helsinki
+## Latest maintainer playtest and default decision, 27 September 23:29–23:31 Helsinki
 
-Owner says the previously slow town-building view no longer lags in dev2.
+Maintainer says the previously slow town-building view no longer lags in dev2.
 Screenshot image(20260927-202925).png has no coordinates. Record this as an
-owner-reported improvement with unconfirmed cause, not a proven targeted fix;
+maintainer-reported improvement with unconfirmed cause, not a proven targeted fix;
 checkpoint-017 exterior BSP is byte-identical to checkpoint-016. The fog table
 rebuild was optimized, but that runs on distance changes, not every frame.
 
-Owner chooses450 local units as the default fog/cull distance from the NEXT
+Maintainer chooses450 local units as the default fog/cull distance from the NEXT
 build onward. Released dev2 still defaults to700; `dbg fog distance 450` works
 now. Next implementation must update renderer/config/UI reset/docs/tests together;
 keep700 available as a selectable value and preserve existing frozen packages.
@@ -218,13 +218,13 @@ proposal above. Current frozen dev2 still starts at700; live command:
 the next build, preserving the old packages and selectable distances.
 
 New persistent rock/Silt Strider-port report: XYZ337 643 34, DEG304, P-16,
-v0.0.15-dev2, image(20260927-203433).png. Owner screenshot shows a projecting
+v0.0.15-dev2, image(20260927-203433).png. Maintainer screenshot shows a projecting
 terrain/rock section with missing-looking lower geometry; exact source identity
 and cause still require comparison. HUD reads28.4FPS in that one screenshot,
 not a benchmark. Do not conflate the already-known omitted Silt Strider ACTI
 with proof of this formation's geometry cause. Backup first; keep this open.
 
-## 28 September 15:50 owner follow-up
+## 28 September 15:50 maintainer follow-up
 
 The Silt Strider-port defect persists in v0.0.19 at XYZ260/417/30, DEG11, P-19;
 the strider and driver are still absent. Track as AW-20260928-03 in [BUGS.md](BUGS.md).
@@ -234,21 +234,21 @@ The v0.0.20 maintenance work does not close this scene-conversion issue.
 
 | Item | Status | Evidence / remaining scope |
 | --- | --- | --- |
-| Invisible opening walls obstruct plank and redirect player into sea | Owner-reported dev1 regression; dev2 locally verified correction | Compound rotation order corrected; original placements and state condition retained. |
-| Deck/plank passage to dock race screen | Local FS-UAE 3.1.66 pass in dev2 | Debug setup at hatch arrival; ordinary walking thereafter, noclip off. Both lateral plank pushes blocked. Owner retest pending. |
+| Invisible opening walls obstruct plank and redirect player into sea | Maintainer-reported dev1 regression; dev2 locally verified correction | Compound rotation order corrected; original placements and state condition retained. |
+| Deck/plank passage to dock race screen | Local FS-UAE 3.1.66 pass in dev2 | Debug setup at hatch arrival; ordinary walking thereafter, noclip off. Both lateral plank pushes blocked. Maintainer retest pending. |
 | Full natural intro-to-release, every escape route and courtyard edge | Still open acceptance scope | A focused plank pass does not certify the whole opening. See journal J015 and CHARACTER_CREATION.md. |
 | Compiler/host checks | 93 warnings, none new; 210 host tests pass | The new converter regression fails against the old code. Unrelated intermittent freezes remain open. |
 
 
-## v0.0.21-dev2 owner follow-up / dev3 maintenance
+## v0.0.21-dev2 maintainer follow-up / dev3 maintenance
 
-Owner reports: dock guard misses interception; pier escape; missing Census floor
+Maintainer reports: dock guard misses interception; pier escape; missing Census floor
 and wall; blurred hanging art; unreadable papers; downstairs doors unavailable;
 punch fails after leaving the office; barrel falsely says Empty. Source-confirmed
 causes/candidates and fixed Y/N/version fields are maintained in [BUGS.md](BUGS.md).
 
 The selected default interaction layout is
-[npc_interaction_layout_template_001](INTERACTION_LAYOUTS.md). The latest owner
+[npc_interaction_layout_template_001](INTERACTION_LAYOUTS.md). The latest maintainer
 console capture separately shows unbound MOUSE3/right click; attack is MOUSE1/left.
 Repeated `No valid compatible save generation` messages in that capture need
 exact selected-slot context before being treated as corruption: F9 requests the

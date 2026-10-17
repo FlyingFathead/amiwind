@@ -9,7 +9,7 @@
 | Where | Linux publication-kit patch baseline metadata |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.39-rc1 (last seen) |
+| Persists in | fixed in v0.0.39 |
 | Severity | high: Strict publication-kit preparation is blocked; dry-run success is not handoff acceptance. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | v0.0.39-rc1 |
@@ -72,7 +72,7 @@ new baseline document. Retain RC1 metadata and stopped final preparation.
 This is completion of unfinished candidate metadata, not a failed previously
 passed gate. The exact pinned release guard, exported-source check and strict
 publication-kit validation remain required. No image, package, shipment,
-issue closure or owner acceptance follows from these metadata edits.
+issue closure or maintainer acceptance follows from these metadata edits.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

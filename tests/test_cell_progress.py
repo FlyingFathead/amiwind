@@ -234,6 +234,31 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(doc['cells']['4,4']['set'], 'vvardenfell')     # metrics said another island
         self.assertEqual(doc['cells']['9,9']['set'], 'bloodmoon')       # Solstheim land
 
+    def test_a_full_run_records_each_cells_headroom_from_its_frame(self):
+        """TRACKER-RELEASE-HEADROOM-MISSING-42: the frame's least headroom, peak and budget reach its cells."""
+        chim_run(self.run)
+        c = ingest(self.out, [self.run_spec()])['cells']['2,2']
+        n = c['audits']['memory_fit']['numbers']
+        self.assertEqual((n['least_headroom'], n['peak_bytes'], n['budget_bytes']), (500, 500, 1000))
+        self.assertEqual(c['audits']['memory_fit']['build'], 'syn')
+
+    def test_an_older_chimport_result_does_not_replace_a_newer_full_runs_audit(self):
+        """TRACKER-RELEASE-HEADROOM-MISSING-42: results made before the full run keep their stats, not its audits."""
+        chim_run(self.run)
+        old = {'format': cp.RESULT_FORMAT, 'build': 'chimport-old', 'generated': '2020-01-01T00:00:00+00:00',
+               'cells': {'2,2': {'converted': True, 'audits': {
+                   'memory_fit': {'status': 'passed', 'numbers': {'least_headroom': 9}},
+                   'hidden_faces': {'status': 'passed'}}}}}
+        cp.record_result(self.out, old)
+        c = ingest(self.out, [self.run_spec()])['cells']['2,2']
+        self.assertEqual(c['audits']['memory_fit']['build'], 'syn')
+        self.assertEqual(c['audits']['memory_fit']['numbers']['least_headroom'], 500)
+        self.assertEqual(c['audits']['hidden_faces']['build'], 'chimport-old')    # the run did not measure it
+        newer = dict(old, build='chimport-new', generated='2099-01-01T00:00:00+00:00')
+        cp.record_result(self.out, newer)
+        c = ingest(self.out)['cells']['2,2']
+        self.assertEqual(c['audits']['memory_fit']['build'], 'chimport-new')       # a later measurement wins
+
     def test_a_chim_run_converts_its_cell_and_audits_it_per_mechanism(self):
         chim_run(self.run)
         doc = ingest(self.out, [self.run_spec()], labels={'syn': 'Synthetic run'}, commits={'syn': 'abc1234'})
@@ -295,7 +320,7 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(c['audits']['sprite_shape']['status'], 'failed')
         self.assertEqual(c['audits']['hidden_faces']['status'], 'not_measured')
         self.assertTrue(c['audits']['hidden_faces']['stale'])
-        self.assertEqual(c['chim']['bucket'], 'converted_failing', 'a failing audit beats the owner verdict')
+        self.assertEqual(c['chim']['bucket'], 'converted_failing', 'a failing audit beats the maintainer verdict')
         cp.record_audit(self.out, 'sprite_shape', 'syn', ['2,2'], 'accepted', 'owner accepted', now='2026-10-09T06:00:00+03:00')
         doc = ingest(self.out)
         self.assertEqual(doc['cells']['2,2']['chim']['bucket'], 'approved')
@@ -480,6 +505,20 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(h['not_started'], 23)         # the empty land cell 0,1 is neither started nor passed
         nxt = json.loads((self.out / 'next.json').read_text())
         self.assertNotIn((0, 1), {(c['x'], c['y']) for c in nxt['spiral']['cells']})
+
+    def test_a_seabed_cell_with_a_land_record_is_never_open_ocean(self):
+        """CHIMPORT-OCEAN-LAND-41: an ocean run's result for a cell whose LAND record has no heights (seabed) does not
+        make it open ocean; it stays not started, with the reason, until it is converted as its own cell."""
+        census = census_doc()
+        census['land_records'] = census['land'] + ['6,6']
+        cp.record_result(self.out, self.result(**{'6,6': {'converted': True, 'status': 'ocean', 'ocean': True},
+                                                  '7,7': {'converted': True, 'status': 'ocean', 'ocean': True}}))
+        doc = ingest(self.out, census=census)
+        seabed, sea = doc['cells']['6,6']['chim'], doc['cells']['7,7']['chim']
+        self.assertEqual(sea['bucket'], 'ocean')
+        self.assertNotEqual(seabed['bucket'], 'ocean')
+        self.assertTrue(seabed['seabed_land'])
+        self.assertIn('CHIMPORT-OCEAN-LAND-41', seabed['blockers'][0])
 
     def test_open_sea_cells_are_done_map_cells_but_never_land(self):
         """K-OCEAN: cells without LAND written as references to the shared ocean chunk (chimport.py ocean)."""
@@ -938,7 +977,7 @@ class CompleteAndPageTests(unittest.TestCase):
 
 
 class ReleaseUiTests(unittest.TestCase):
-    """The owner's release field, the legend filter, the reference file, and tracking your own build."""
+    """The maintainer's release field, the legend filter, the reference file, and tracking your own build."""
     KIT = ROOT / 'amiwind-toolkit'
 
     def setUp(self):
@@ -1050,7 +1089,7 @@ class ReleaseUiTests(unittest.TestCase):
         self.assertIn('legend ok', r.stdout)
 
     def test_toolkit_header_is_unchanged_from_the_lighting_branch(self):
-        # Owner rule (2026-10-09): the Toolkit's logo header (logo, "Toolkit", "Last updated with AmiWind ...", the World / Local /
+        # Project rule (2026-10-09): the Toolkit's logo header (logo, "Toolkit", "Last updated with AmiWind ...", the World / Local /
         # 3D Inspector buttons, the browser note, then the headline line and chips) keeps its layout, logo, fonts and colours.
         # New controls go below it or into the legend panel. These fingerprints are those of the lighting branch
         # (v0.0.34-chim-light); change them only on purpose, together with the header.
@@ -1063,18 +1102,19 @@ class ReleaseUiTests(unittest.TestCase):
         # The version number is not layout: tools/toolkit_version.py bumps it when the Toolkit changes in a release
         # (fingerprint of the lighting branch's header with its v0.0.33 written as vX).
         header = re.sub(r'Last updated with AmiWind v\d+\.\d+\.\d+', 'Last updated with AmiWind vX', header)
-        # 2026-10-10 (owner): one more tab button, "Monitor" (amiwind-toolkit/monitor.html), after 3D Inspector; nothing
+        # 2026-10-10 (maintainer): one more tab button, "Monitor" (amiwind-toolkit/monitor.html), after 3D Inspector; nothing
         # else in the header changed (the CSS rules are the lighting branch's; the CSS fingerprint also spans the header
         # markup up to the first script brace, so it moves with the new button).
-        # 2026-10-11 (owner): one more tab button, "Mesh Compare" (amiwind-toolkit/mesh-compare.html), after Monitor;
+        # 2026-10-11 (maintainer): one more tab button, "Mesh Compare" (amiwind-toolkit/mesh-compare.html), after Monitor;
         # nothing else changed (same reason the CSS fingerprint moves with it).
-        # 2026-10-11 (owner): the "Everything here runs in your browser ..." sentence moved behind a small grey circled "?"
+        # 2026-10-11 (maintainer): the "Everything here runs in your browser ..." sentence moved behind a small grey circled "?"
         # (the same text as its mouseover title); nothing else changed.
         self.assertEqual(sha(header), '8671d753f463c2fccbdace4b0a568d2f3ea99c39f1b2dce0cff6d4b58b305e31')
         self.assertEqual(sha(css), 'fe54d571c143bc412f9d7c7ca224031a8d0a193d390e8b8a6f7347b34637a602')
         head = (self.KIT / 'chim-head.js').read_bytes()
-        # K-OCEAN (v0.0.36) added the open-sea row on purpose; TRACKER-OCEAN-COUNTED-DONE-36 (owner, 2026-10-11) made it silver and renamed it.
-        self.assertEqual(hashlib.sha256(head).hexdigest(), '75dd04747ef2f4f09e305702541046252809b55c2d0552db4358ee65b534aef6')
+        # K-OCEAN (v0.0.36) added the open-sea row on purpose; TRACKER-OCEAN-COUNTED-DONE-36 (maintainer, 2026-10-11) made it silver and renamed it.
+        # 2026-10-17: the approved row's label reads "maintainer-approved" (public wording); nothing else changed.
+        self.assertEqual(hashlib.sha256(head).hexdigest(), 'c436722e86770a56f50a02656cf7e1bc8fb67f311ed33888a6daca50af1574a4')
 
     def test_one_header_for_every_toolkit_page(self):
         # The shared header (header.js) is the logo block of index.html: same logo file, same version line. Pages opened on their

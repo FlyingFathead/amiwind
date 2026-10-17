@@ -5,7 +5,7 @@
 The grounding policy (config/actor_grounding.json, tools/actor_grounding.py) is an explicit list: every
 placed NPC is either standing on the ground or a documented exception, and an unclassified NPC is an
 error, so no behaviour is guessed. This tool fills that list for the whole island by MEASUREMENT from
-the owner's own game data, instead of town by town:
+the maintainer's own game data, instead of town by town:
 
   census     every NPC placed in an exterior cell of the base master. For each placement the feet
              (the reference position) are compared with the highest support under them: the LAND

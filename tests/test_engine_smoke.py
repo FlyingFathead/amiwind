@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """tools/engine_smoke.py (with its emulator-side PROBE script): the FS-UAE boot + map-load smoke (CHIM-DEV3-MAPLOAD-CRASH-36).
 
-The emulator run itself needs Docker, an image and the owner's Kickstart, so it runs in the gate (step "smoke"), not
+The emulator run itself needs Docker, an image and the maintainer's Kickstart, so it runs in the gate (step "smoke"), not
 here. These checks keep the scripts runnable and the steps that caught the dev3 crash in place.
 """
 import contextlib

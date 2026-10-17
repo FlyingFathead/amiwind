@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Measure Morrowind path grids (PGRD) and actor behaviour packages, island-wide.
 
-Reads the owner's own master files read-only and prints aggregate numbers
+Reads the maintainer's own master files read-only and prints aggregate numbers
 only: grids, nodes and edges, nodes per grid, interiors against exteriors,
 cells with placed actors but no grid, behaviour package use and the bytes a compact
 node graph would take. No record is copied out; the per-grid list (cell

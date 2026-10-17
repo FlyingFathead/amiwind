@@ -7,6 +7,7 @@
 - [Current Windows checkpoint, 2 October 2026](#current-windows-checkpoint-2-october-2026)
 - [Start directly from PowerShell](#start-directly-from-powershell)
 - [Public versioned preset](#public-versioned-preset)
+- [68060 presets](#68060-presets)
 - [Mouse works, but WASD cannot move at initial spawn](#mouse-works-but-wasd-cannot-move-at-initial-spawn)
 - [“Error validating AMIWIND / Block 1146049281 out of range”](#error-validating-amiwind--block-1146049281-out-of-range)
 - [Reference settings and historical v0.0.10 / checkpoint-008 record](#reference-settings-and-historical-v0010--checkpoint-008-record)
@@ -19,13 +20,14 @@
 
 Full-game assembly writes `AmiWind-v<VERSION>-WinUAE.uae` and
 `AmiWind-v<VERSION>-FS-UAE.fs-uae` beside the HDFs. The verified image receipt
-is the source of the drive list: load every required HDF simultaneously.
-The boot disk comes first; additional world disks are not interchangeable
-and do not require disk swapping.
+is the source of the drive list, and every HDF on it is mounted at the same
+time. The boot disk comes first. The world disks that follow are not
+interchangeable, and no disk swapping is needed during play.
 
-Supply `--kickstart-file /path/to/owned.rom` to the build to fill both local
-ROM paths, or select your licensed ROM in the emulator afterward. ROMs and
-playable images are private build outputs, never public source assets.
+With `--kickstart-file /path/to/owned.rom`, the build fills in the ROM path in
+both configurations; without it, the licensed ROM is selected in the emulator
+afterwards. ROMs and playable images are private build outputs, never public
+source assets.
 At the end of the build the same step also copies `AmiWind-FS-UAE-launcher.py`
 beside the image. The FS-UAE configuration names its HDFs relative to itself, so
 the folder can be moved or copied as a whole; the WinUAE configuration needs
@@ -64,7 +66,7 @@ and a clean exit returned to AmigaDOS. See the
 The first Windows-generated test image failed on its AmigaDOS startup script
 because it contained CRLF line endings. Writing LF fixed the test-image boot;
 this was a builder defect, not evidence of incorrect emulator settings. Historical
-owner configuration issues (RAM capacity, split ROM selection and real CPU speed)
+maintainer configuration issues (RAM capacity, split ROM selection and real CPU speed)
 are described below and should not be confused with this defect.
 
 ## Start directly from PowerShell
@@ -108,7 +110,7 @@ game data. Its description and filename identify the development version.
 The preset describes the WinUAE 6.0.3 reference configuration. The current
 Windows smoke-test scope is recorded above; earlier Linux execution tests used
 FS-UAE 3.1.66. Neither establishes stock A1200 speed. See [v0.0.16 validation](VALIDATION-v0.0.16.md)
-for the tested machine and scope. Historical startup thresholds and owner
+for the tested machine and scope. Historical startup thresholds and maintainer
 reports remain below for comparison.
 
 The v0.0.23-dev2 preflight requires 14 MiB free Fast RAM before loading the
@@ -121,16 +123,25 @@ to restart; run `AmiWindCheck` separately for diagnostics. Historical private
 checkpoints used the tested KS3.1 ROM; supply your own licensed copy. The current
 public source and private stable playtest package do not include a ROM.
 
+## 68060 presets
+
+[AmiWind-68060-WinUAE.uae](../resources/emulators/AmiWind-68060-WinUAE.uae) (an A1200 with a 68060, JIT)
+and [AmiWind-68060-A4000-WinUAE.uae](../resources/emulators/AmiWind-68060-A4000-WinUAE.uae) (an A4000
+with a 68060 and 128 MB of Fast RAM, like our first tester's machine) are the 68040 reference preset with
+the CPU and memory changed; not checked in WinUAE by the developers. The game disk needs your
+`68060.library` ([FPU support library](FPU_SUPPORT_LIBRARY.md)) and then starts its 68060 engine
+([68060](68060.md#both-engines-on-the-game-disk)).
+
 ## Mouse works, but WASD cannot move at initial spawn
 
-Dev3's nominal player start overlaps converted collision. The owner escaped
+Dev3's nominal player start overlaps converted collision. The maintainer escaped
 with noclip; a fresh native test reproduced the same lock. Dev4 finds grounded
 standing space with room to step in every direction. Use the new image, keeping
 your working ROM. For the old image: F10, `noclip`, close the console, move clear
 of the obstruction, then toggle `noclip` again. This is a workaround, not a key
 binding fix. See [checkpoint-011](CHECKPOINT_011_VALIDATION.md).
 
-The owner resolved the reported ROM/flicker startup issue with their correct
+The maintainer resolved the reported ROM/flicker startup issue with their correct
 licensed ROM. Its effective checksum is not yet recorded. The packaged test ROM
 has been byte-checked against the earlier package and has a valid checksum; no
 ROM modification is part of dev4.
@@ -143,7 +154,7 @@ the shipped dev2 image reproduced the requester; correcting this field allowed
 the same native filesystem to revalidate. A clean ZIP extraction postpones that
 failure but retains the defective metadata. Use the corrected dev3 image.
 
-This does not establish what originally dirtied the owner's volume. See
+This does not establish what originally dirtied the maintainer's volume. See
 [diagnosis and targeted copy repair](FILESYSTEM_REVALIDATION.md). Keep the
 original archive; never attempt repair on the only copy. This repair does not
 require changing the known-working ROM or increasing memory.
@@ -188,7 +199,7 @@ The check does not certify FPU instruction emulation, disk speed or frame rate.
 
 ### ROM selection
 
-The owner package supplies two complete, previously tested ROM files:
+The maintainer package supplies two complete, previously tested ROM files:
 
 | File | Revision | SHA-256 |
 | --- | --- | --- |
@@ -204,7 +215,7 @@ under this checkpoint's guard; the KS1.3 A500 demo remains separate.
 
 ### Failure report from 27 September 2026
 
-Two owner-supplied configs identify WinUAE 6.0.3. One had 4 MiB Z2 Fast and no Z3
+Two user-supplied configs identify WinUAE 6.0.3. One had 4 MiB Z2 Fast and no Z3
 RAM; the other had 16 MiB Z3 Fast. Both selected a split ROM member, real CPU
 speed, JIT cache 16 MiB and 040/internal FPU. Do not describe both as low-memory
 configs: the second already had the requested capacity.
@@ -212,12 +223,12 @@ configs: the second already had the requested capacity.
 The exact `80000027` requester was reproduced in FS-UAE by reducing v0.0.9 to
 2 MiB Chip + 4 MiB Fast. The 16 MiB case, including its 0x40000000 Z3 mapping
 and real CPU speed, rendered the town with the complete KS3.1.4 ROM in FS-UAE.
-The owner subsequently reported that v0.0.9 loaded in WinUAE 6.0.3 after selecting
+The maintainer subsequently reported that v0.0.9 loaded in WinUAE 6.0.3 after selecting
 the complete bundled KS3.1 ROM with 16 MiB Z3 RAM. The submitted "Tester 2"
-configuration still had `cpu_speed=real`; the owner reported severe audio
+configuration still had `cpu_speed=real`; the maintainer reported severe audio
 repetition/breakup and low speed. Set CPU and FPU > Fastest possible and restart.
-The owner then selected Fastest possible and reported that it ran OK. This is
-an owner-reported v0.0.9 result, not a local WinUAE run or a quantitative audio
+The maintainer then selected Fastest possible and reported that it ran OK. This is
+a maintainer-reported v0.0.9 result, not a local WinUAE run or a quantitative audio
 certification. v0.0.10 remains locally tested with FS-UAE.
 
 Paula DMA plays a looping buffer that the game loop must refill. A late frame
@@ -271,7 +282,7 @@ have buffered metadata after the program returns.
 ## Audio snapping investigation
 
 Local v0.0.27-rc1 playtesting reported occasional snapping in WinUAE, while the
-owner did not hear the same symptom in earlier Linux FS-UAE runs. This does not
+maintainer did not hear the same symptom in earlier Linux FS-UAE runs. This does not
 isolate the engine, emulator backend or host audio driver. The reference config
 uses `sound_max_buff=16384`; a separate local A/B config tries `32768`. A larger
 buffer trades response latency for more buffering; improvement remains unverified.

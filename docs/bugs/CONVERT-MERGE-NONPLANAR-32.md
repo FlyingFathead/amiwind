@@ -42,7 +42,7 @@ Measure vertex distances to each merged face's plane.
 
 ## Repair
 
-One repair for all three (owner, 8 October 2026: no path-specific patches): a single
+One repair for all three (maintainer, 8 October 2026: no path-specific patches): a single
 face builder used by every converter path (plane from the whole polygon, refit after
 merging, the engine's extent rule, texture-coordinate range, lightmap size from stored
 values), and a face validator run on every map as a builder gate. The validator runs

@@ -9,7 +9,7 @@
 | Where | Image-recovery test fixture and coordinate-range audit after original-cell town expansion |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.40-dev2 (last seen) |
+| Persists in | fixed in v0.0.40 |
 | Severity | medium: Nine full-suite checks fail after town coverage changes, blocking the candidate source gate. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

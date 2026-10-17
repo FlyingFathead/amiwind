@@ -11,6 +11,8 @@ renderer does every frame and reports per-frame averages once a second.
 | --- | --- |
 | `dbg rcount 1` (`aw_rcount 1`) | once a second: a `rcount ...` line in the console, and the same line in the remote state file |
 | `dbg rcount 2` | the state file line only (no console text over the measured view) |
+| `dbg rcount 3` | as 2, plus the brush-model profile line `rprof ...` in the state file ([below](#the-brush-model-profile-dbg-rcount-3)) |
+| `dbg rcount 4` | both lines, also in the console |
 | `dbg rcount 0` | off (default; nothing is timed) |
 
 With the remote console on (`aw_remote 1`, see the headless test notes) the state file
@@ -45,10 +47,39 @@ All figures are averages per frame over the last second, except `frames`, `fps10
 | `vd`, `ne` | entities refused because the visible list was full; entities in the visible list / sprites drawn |
 | `at` | alias model triangles sent to the alias renderer (`R_AliasDrawModel`, the hands included) |
 | `ln` near/coarse/resident | NPCs drawn with their near level (level 0) / with a coarse level (2 or 3) / NPC level models resident ([NPC model levels of detail](../NPC_MODEL_CACHE.md#npc-model-levels-of-detail)) |
+| `ft` on/depth/why models/faces/size/detail | the far test ([FAR-TEST.md](FAR-TEST.md)): the share of frames (percent) the fog-exact test applied (`aw_cull 2`), its depth and why it was off; the brush model passes and front faces it proved invisible, passes the size-scaled cut-off dropped (`aw_cull 3`, `4`, `6`), front faces the far detail step dropped (`aw_cull 5`, `6`) |
 
 The counters are plain integer increments, like Quake's `c_faceclip` and
 `r_polycount`; the timers run only while `dbg rcount` is on. The output uses integer
 formatting only.
+
+## The brush-model profile (`dbg rcount 3`)
+
+The brush-model slot (`us` second figure) split into its parts, the faces it sends
+by distance and model size, and how many world leaves each placement touches. Nothing
+of it runs below `dbg rcount 3` (each site tests one integer); its timers read the
+EClock, so the slot itself is slower while it is on.
+
+```
+rprof 1 frames | r 15.20 us | walk 270731 us nodes 20409 | emit 162309 us frag 2746 | oneleaf 0 us lf 0
+  | setup 23116 us passes 42 | added 148121 us | so 0/0 eo 0/0 | hp 2.0,2.0,5.0,0.0/... hf ... hs ...
+  | lv 0.0/5.0/10.0/12.0/7.0/4.0/4.0/0.0 mean 11.6 vis 11.1
+```
+
+| Field | Meaning |
+| --- | --- |
+| `r` | measured cost of one clock read (microseconds, two decimals); every timer below is corrected for it (its own reads cost `r`, each timer nested inside it `2r`) |
+| `walk` / `nodes` | `R_RecursiveClipBPoly` without the fragments it emits / its calls (world BSP nodes visited) |
+| `emit` / `frag` | `R_RenderBmodelFace` calls on the clipped path / fragments |
+| `oneleaf` / `lf` | `R_DrawSubmodelPolygons` (backface test and `R_RenderFace`) / faces on that path |
+| `setup` / `passes` | the rest of an in-view pass (rotation, lights, box split, backface tests on the clipped path) / in-view passes |
+| `added` | what the timers themselves added to the slot |
+| `so`, `eo` | frames with surfaces / edges past `r_maxsurfs` / `r_maxedges`, and the average shortage per frame (faces dropped from the view) |
+| `hp`, `hf`, `hs` | in-view passes, front faces and sent faces (fragments plus one-leaf faces) per distance band x model size: five rows (model centre depth along the view at 0-25, 25-50, 50-75, 75-100 percent of the draw distance, beyond it), four columns (model radius under 32, 32-128, 128-512, 512 and over units), one decimal |
+| `lv` ... `mean` `vis` | in-view passes by the world leaves their box touches (1, 2, 3-4, 5-8, 9-16, 17-32, 33-64, 65 and more), the mean leaves per pass, and the mean of those leaves in the current PVS |
+
+The times are the slow-CPU currency of the speed work (cycle-exact emulation); the
+split adds up to the slot measured with the profile off within a few percent.
 
 ## Ten fixed cameras (8 October 2026)
 

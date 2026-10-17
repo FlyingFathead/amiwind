@@ -9,7 +9,7 @@
 | Where | config town budgets; tools/import_town.py; engine MAX_EDICTS, MAX_MODELS, scenery catalogue |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: A map over an engine table stops the game at load (no free edicts, precache overflow, scenery catalogue) |
 | Family | Engine table limits (`engine-limits`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -17,6 +17,22 @@
 | CHIM engine version | none: legacy engine |
 
 <!-- END GENERATED FACTS -->
+
+<!-- contents start -->
+## Contents
+
+- [Status: 10 October 2026](#status-10-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 10 October 2026
 
@@ -78,7 +94,7 @@ models, sounds or statics pass the engine's tables.
   model budget passes `MAX_MODELS` less the fixed precaches.
 - The engine's literal 1000 became `AW_SCENERY_MAX_PLACEMENTS` (`aw_town.h`), read by the builder.
 
-CHIMport cell settings (`tools/chimport.py`) keep `"entity_budget": 1000` (owner decision, 10 October 2026):
+CHIMport cell settings (`tools/chimport.py`) keep `"entity_budget": 1000` (project decision, 10 October 2026):
 their region maps are not scenery towns, but they only feed the CHIM builder and never ship as maps; the final
 gate covers every map that does.
 
@@ -137,6 +153,7 @@ Family: Engine table limits (`engine-limits`). Fixed engine tables (models, enti
 - GEO-04 (no report page): Canonical-terrain world rebuild fails VIS (too many portals)
 - [IMPORT-DOORBANK-LIMIT-32](IMPORT-DOORBANK-LIMIT-32.md): Town importer did not check the engine's 128-row door bank limit
 - [INTERIOR-COORDS-31](INTERIOR-COORDS-31.md): Some interiors place objects beyond the +/-4096 coordinate range
+- [INTERIOR-EXCLUDE-STALE-41](INTERIOR-EXCLUDE-STALE-41.md): Two Vivec rooms stayed left out on heap numbers from an older build
 - [INTERIOR-INLINE-LIMIT-31](INTERIOR-INLINE-LIMIT-31.md): Every interior object is its own inline model: 220 objects per interior at most
 - [LAMPS-CACHE-31](LAMPS-CACHE-31.md): Night lamps beyond 96 per 3x3 cells are silently dropped (Vivec)
 - [MODEL-MARKSURF-SIGNED-31](MODEL-MARKSURF-SIGNED-31.md): Face indices above 32,767 in leaf face lists become bad pointers
@@ -145,5 +162,9 @@ Family: Engine table limits (`engine-limits`). Fixed engine tables (models, enti
 - [RENDER-VISEDICTS-OVERFLOW-32](RENDER-VISEDICTS-OVERFLOW-32.md): Entities beyond MAX_VISEDICTS (1,112) are dropped silently
 - TOWN-FLORA-BUDGET-004 (no report page): World 4 MiB file budget wrongly applied to town flora maps
 - [VIVEC-TEXINFO-31](VIVEC-TEXINFO-31.md): Dense Vivec canton regions exceed the 32,767 texture-mapping limit
+
+Related bugs in other categories:
+
+- [VIVEC-ROOM-PRECACHE-LIMIT-42](VIVEC-ROOM-PRECACHE-LIMIT-42.md): Telvanni Tower was listed again although its map needs 257 model precaches; the engine holds 256
 
 <!-- END GENERATED CATEGORY -->

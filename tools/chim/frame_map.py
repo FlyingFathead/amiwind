@@ -501,7 +501,7 @@ ACCEPTED_ACTORS_VARIABLE = 'AMIWIND_ACCEPTED_FRAME_ACTORS'
 
 
 def accepted_actor_refs():
-    """Original references of frame actors the owner accepted as known findings for a private test build
+    """Original references of frame actors the maintainer accepted as known findings for a private test build
     (build_aga.py exports them from --allow-known-actor-ground-findings; empty otherwise)."""
     import os
     return {r for r in os.environ.get(ACCEPTED_ACTORS_VARIABLE, '').split(',') if r.isdigit()}
@@ -555,7 +555,7 @@ def actor_contact(id1, rows, world, index):
                    minimum_gap=round(min(gaps), 3) if gaps else None, maximum_gap=round(max(gaps), 3) if gaps else None,
                    failures=failures[:4])
         if failures and str(row['reference']) in accepted_actor_refs():
-            # an owner-accepted known finding of a private test build: recorded, not refused
+            # a maintainer-accepted known finding of a private test build: recorded, not refused
             row['status'] = 'owner-accepted-known-finding'
             print('WARNING: PRIVATE TEST ONLY: frame actor %s does not stand on the CHIM frame (accepted): %s'
                   % (row['reference'], failures[0]), flush=True)

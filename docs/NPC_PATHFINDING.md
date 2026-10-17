@@ -1,6 +1,6 @@
 # NPC pathfinding: how NPCs find their way
 
-Investigation, 9 October 2026 (owner request). How Morrowind, OpenMW and Quake
+Investigation, 9 October 2026 (maintainer request). How Morrowind, OpenMW and Quake
 move their characters around, what AmiWind does today, what the options cost
 on a 68040, and a staged plan. The CHIM side (where the walkable graph lives
 in the world format, budgets and gates) is in
@@ -13,7 +13,7 @@ in the world format, budgets and gates) is in
 - [How Morrowind does it](#how-morrowind-does-it)
   - [The path grid record](#the-path-grid-record)
   - [How the game uses it](#how-the-game-uses-it)
-  - [Measured island-wide (owner's data, 9 October 2026)](#measured-island-wide-owners-data-9-october-2026)
+  - [Measured island-wide (maintainer's data, 9 October 2026)](#measured-island-wide-maintainers-data-9-october-2026)
 - [How OpenMW does it](#how-openmw-does-it)
 - [How Quake does it](#how-quake-does-it)
 - [What AmiWind does today](#what-amiwind-does-today)
@@ -24,7 +24,7 @@ in the world format, budgets and gates) is in
 <!-- contents end -->
 
 Status: design and measurement. No engine or QuakeC change has been made.
-Every number below is an aggregate measured from the owner's own master files
+Every number below is an aggregate measured from the maintainer's own master files
 or from builder output; no record is copied. Emulator and cycle figures are
 relative or estimated, as stated at each one.
 
@@ -74,7 +74,7 @@ coordinates) and holds, little-endian:
 Public format references: the OpenMW loader
 ([`components/esm3/loadpgrd.hpp`](https://gitlab.com/OpenMW/openmw/-/blob/master/components/esm3/loadpgrd.hpp))
 and the [UESP file format page](https://en.uesp.net/wiki/Morrowind_Mod:Mod_File_Format/PGRD).
-Our measurement confirms the layout on the owner's data: every grid's point
+Our measurement confirms the layout on the maintainer's data: every grid's point
 count matches its `PGRP` size, 133 of the 134 exterior grids lie inside
 their cell's 8,192-unit square, and every link is stored both ways (0 one-way
 links island-wide). Granularity is the editor's sampling step when it
@@ -105,7 +105,7 @@ public reference: an A\* over the current cell's grid, with straight lines
 where there is no grid. Players know the visible result: actors stuck on rocks
 and corners, unable to reach a player standing on a ledge or a rock.
 
-### Measured island-wide (owner's data, 9 October 2026)
+### Measured island-wide (maintainer's data, 9 October 2026)
 
 Tool: [`tools/path_grid_stats.py`](../tools/path_grid_stats.py) (reads the
 masters read-only, prints aggregates only; test `tests/test_path_grid_stats.py`).
@@ -351,7 +351,7 @@ AmiWind map change: [followers across doors and cells](chim/CHIM_NPC_PATHFINDING
 ## Recommendation and staged plan
 
 Option D, built as a ladder that starts with what Quake already gives us
-(owner direction, 9 October 2026). Every stage has a measurement before it is
+(maintainer direction, 9 October 2026). Every stage has a measurement before it is
 called done, a regression test, and the full gate.
 
 1. **Quake chase with stair climbing.** NPCs move with `AW_ActorStep` (the

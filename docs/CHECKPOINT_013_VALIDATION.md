@@ -20,7 +20,7 @@ Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
   impulse on key-up, including console typing, and could cause phantom greetings.
 - Authored NPC ratings/packages are retained privately; Wander range, duration,
   time, idle weights and repeat are decoded. No walking routes are executed yet.
-- Both packages include the owner FS-UAE guide and versioned FS-UAE/WinUAE presets
+- Both packages include the maintainer FS-UAE guide and versioned FS-UAE/WinUAE presets
   under resources/emulators. Public presets contain placeholders only.
 
 ## Focused verification
@@ -37,7 +37,7 @@ scene broadphase, so it is a diagnostic, not 246 proven in-game obstructions.
 Native comparison separately reproduces a real defect at (0,136,90): dev1
 refuses to disable noclip as 'inside solid'. The new image permits walking,
 settles around (0,135,68), then crosses to approximately (93,135,66).
-This does not prove that it is the exact location in the owner's screenshot.
+This does not prove that it is the exact location in the maintainer's screenshot.
 
 `startup012-dev2-r2` validates final engine/scene geometry: initial WASD before
 any recovery/noclip, square crossing, stationary support, stair ascent to about

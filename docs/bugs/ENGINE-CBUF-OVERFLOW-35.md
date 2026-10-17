@@ -9,7 +9,7 @@
 | Where | engine/aga/src/cmd.c Cbuf_InsertText, Cbuf_Execute |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | medium: exec of a large or long-line file crashed or overwrote the stack |
 | Family | Console, keyboard and mouse input (`console-input`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -63,7 +63,7 @@ Family: Console, keyboard and mouse input (`console-input`). The console line ed
 - AW25-04 (no report page): M/N switched to the desktop, including while typing in the console
 - AW25-05 (no report page): Console typed only uppercase letters and shifted digits
 - CONSOLE-CAPS-29 (no report page): FS-UAE F10 Caps Lock appears stuck
-- [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the owner's FS-UAE (Ubuntu)
+- [CONSOLE-HISTORY-ARROWS-32](CONSOLE-HISTORY-ARROWS-32.md): Console Up/Down arrows recall nothing on the maintainer's FS-UAE (Ubuntu)
 - [CONSOLE-HISTORY-EMPTY-32](CONSOLE-HISTORY-EMPTY-32.md): Console Up past the oldest command shows an empty line and stays there
 - CONSOLE-WHEEL-29 (no report page): FS-UAE console wheel starts working then reports unbound
 - [ENGINE-COM-TOKEN-UNBOUNDED-35](ENGINE-COM-TOKEN-UNBOUNDED-35.md): COM_Parse wrote tokens of any length into the 1 KiB com_token

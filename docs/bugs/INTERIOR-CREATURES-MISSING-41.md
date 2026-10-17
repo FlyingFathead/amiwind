@@ -4,7 +4,7 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 16 October 2026, in v0.0.41-dev4 |
 | Where | tools/prepare_area.py populate (cast filter NPC_ only); every converted interior |
 | Reproduction | always |
@@ -44,15 +44,28 @@ Any full build since the CHIM town rooms: `chim-rooms-vivec_city/scene/vivec_cit
 residents and none in vpi015; reference 405515 is in no actor record.
 
 ## Repair
-Pending (v0.0.42, Complete Vivec). A creature branch in the resident stage for listed creatures, Vivec first:
-his model posed on his own skeleton at the authored crossed-leg idle (as the NPC gallery already does,
-`config/gallery_model_quality.json`), keeping the height the animation gives him; he is already classed as
-levitating (`config/actor_grounding.json`), so the ground check and the engine's floor snap leave him floating.
-Then the island-wide question: which interior creatures to place, and how they behave.
+In the builder on the v0.0.42 line (not in a build yet): `tools/creature_residents.py`, called by the resident
+stage (`tools/prepare_area.py` populate). `--interior-creatures listed` (the default) places the creatures in
+`config/interior_creatures.json`, Vivec first; `all` (experimental) every creature the grounding policy
+classifies; `off` is the method before. A creature's model is its own NIF on its own skeleton, 8 frames over one
+loop of its idle group (Vivec: `idle2`, 4.33 to 7.0 s; his AI_W idle chances give Idle2 60 and his model has no
+`idle` group), source origin kept: his posed body runs from 13.9 to 33.1 Quake units above his reference point
+(438 triangles, 196,208 bytes). His support state is the policy's `levitating` class (aw_ground_mode 1): the
+contact fit, the image-stage ground check and the engine's floor snap leave him where the reference puts him,
+0.15 units under the converted dais top. OpenMW 0.51 keeps the actor on the floor (the record has neither Flies
+nor a Levitate effect) and the lift is the animation's, which is the same within those 0.15 units. A placed
+creature is an idle actor like the placed NPCs: no greeting, dialogue or combat yet. Details:
+`docs/NPC_GROUND_CONTACT.md` "Interior creatures and the levitating class".
+
+The island-wide case stays open: the base master places 530 creature references in interiors (178 records,
+222 cells); with `all`, 494 have no grounding classification yet and 35 are authored dead (no creature death
+pose bake). Every one of them is listed with its reason in the stage report.
 
 ## Verification
-Pending: Vivec in vpi015 compared with OpenMW at the same position; a regression test that a listed creature
-reaches the room's cast and map.
+Regression tests: `tests/test_creature_residents.py` (selection per mode with reasons, the idle range, the
+policy class, and a listed creature reaching the room's cast and map with aw_ground_mode 1). OpenMW 0.51 at the
+same spot shows him meditating above the dais in the `idle2` loop. Pending: the in-game pair (headlamp off/on)
+from the MiniWind preset `vivec-palace`.
 
 ## Prevention
 Every reference the resident stage leaves out is listed with its reason, as the rooms' geometry pass does.
@@ -90,5 +103,11 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-SPEAR-ATTACK-REGRESSION-39](NPC-SPEAR-ATTACK-REGRESSION-39.md): Seyda Neen guard spear attack animation is missing in first-person view
 - [NPC-WANDER-NOT-EXECUTED-35](NPC-WANDER-NOT-EXECUTED-35.md): Residents stand still: the original's Wander AI packages (radius, duration, idles) are decoded but not executed
 - [NPC-WEAPON-MESH-33](NPC-WEAPON-MESH-33.md): NPCs hold no weapons or shields; combat uses them unseen
+
+Related bugs in other categories:
+
+- [BUILD-MINIWIND-SEYDA-COMPILE-42](BUILD-MINIWIND-SEYDA-COMPILE-42.md): A CHIM MiniWind of another town stops at its bsp stage: it compiles the whole Seyda Neen town, which exceeds the BSP29 node limit
+- [BUILD-TORCH-CREATURE-RESIDENT-42](BUILD-TORCH-CREATURE-RESIDENT-42.md): Image step stops in the torch guard on Vivec, an interior creature resident placed as an NPC entity
+- [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 
 <!-- END GENERATED CATEGORY -->

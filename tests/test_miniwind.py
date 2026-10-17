@@ -815,9 +815,9 @@ class ScopeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'require --miniwind'):
             build_aga.miniwind_options(Normal())
         # the image command accepts the option with the same values
-        self.assertIn("i.add_argument('--miniwind-scope',choices=('full','exterior')",
+        self.assertIn("i.add_argument('--miniwind-scope',choices=('full','exterior','interior')",
                       (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8'))
-        self.assertEqual(miniwind.SCOPES, ('full', 'exterior'))
+        self.assertEqual(miniwind.SCOPES, ('full', 'exterior', 'interior'))
 
     def test_exterior_refused_for_release_candidates_and_finals(self):
         for version in ('0.0.33-rc1', '0.0.33'):

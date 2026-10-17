@@ -22,7 +22,26 @@ typedef struct {
     float weight;
     int weapon,weapon_skill,damage[6],shield_class,armor_skill_base;
     float reach,speed,health,armor;
+    /* Catalogue bytes 496..: 0 none, else the ENDT type + 1 (AW_ENCH_*), and the
+     * maximum charge (OpenMW getEnchantmentCharge, computed by the builder). */
+    int enchant_kind;
+    float charge_max;
 } aw_inventory_item_t;
+enum {AW_ENCH_NONE,AW_ENCH_ONCE,AW_ENCH_STRIKES,AW_ENCH_USED,AW_ENCH_CONSTANT};
+/* Selected magic item and enchantment charge (aw_magic_state_t). Pure rules:
+ * select only an owned Cast Once / Cast When Used item (OpenMW SpellModel);
+ * charge is full unless recorded; recharge only When Used / When Strikes
+ * items, by fMagicItemRechargePerSecond per second (OpenMW recharge.cpp). */
+int AW_MagicSelectable(const aw_inventory_item_t *);
+int AW_MagicSelect(aw_state_t *,const aw_inventory_item_t *);
+void AW_MagicClear(aw_state_t *);
+float AW_MagicCharge(const aw_state_t *,const aw_inventory_item_t *);
+int AW_MagicSetCharge(aw_state_t *,const aw_inventory_item_t *,float);
+int AW_MagicRecharge(aw_state_t *,const aw_inventory_item_t *,float seconds,float rate);
+float AW_InventoryCondition(const char *id);
+int AW_MagicSelectedItem(aw_inventory_item_t *out);
+void AW_MagicFrame(float seconds);
+float AW_MagicRechargeRate(void);
 /* Pure transactional rules. A failed operation leaves all state unchanged.
  * Placement must already have passed the world's trace/model admission. */
 int AW_InventoryEquipped(const aw_state_t *,const char *id);

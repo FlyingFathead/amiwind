@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert an owner's intro movie to bounded native AWV1 video/PCM streaming."""
+"""Convert a maintainer's intro movie to bounded native AWV1 video/PCM streaming."""
 import argparse
 import hashlib
 import json

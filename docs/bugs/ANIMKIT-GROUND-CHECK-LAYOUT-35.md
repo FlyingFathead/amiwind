@@ -9,7 +9,7 @@
 | Where | tools/check_actor_ground.py contact_samples; tools/actor_grounding.py |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.35-dev1 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: Every default build failed in the image step once the kit became the default (first seen in a MiniWind build) |
 | Family | Actors and NPCs (`actors-npc`) |
 | Playtest version | v0.0.35-dev1 MiniWind animkit 853d9b2 |

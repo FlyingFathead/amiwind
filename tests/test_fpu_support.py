@@ -8,6 +8,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -124,6 +125,30 @@ class FindAndStageTests(unittest.TestCase):
         self.assertEqual(fpu_support.startup_sequence({'status': 'installed'}),
                          'FailAt 10\nSYS:AmiWindFPU\nSYS:AmiWindCheck\nStack 300000\nSYS:AmiWind\n')
 
+    def test_setpatch_runs_first_when_given(self):
+        # FPU-SUPPORT-MMULIB-SETPATCH-41: MMULib's libraries need the system's SetPatch before them.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/'wb/LIBS').mkdir(parents=True)
+            (root/'wb/LIBS/68040.library').write_bytes(FAKE_040)
+            (root/'wb/LIBS/mmu.library').write_bytes(FAKE_MMU)
+            loader = root/'AmiWindFPU'
+            loader.write_bytes(LOADER)
+            (root/'boot').mkdir()
+            receipt = fpu_support.stage(root/'wb', root/'boot', loader)
+            self.assertNotIn('setpatch', receipt)
+            self.assertTrue(any('SetPatch' in warning for warning in receipt['warnings']))
+            self.assertNotIn('SetPatch', fpu_support.startup_sequence(receipt))
+            (root/'wb/C').mkdir()
+            setpatch = b'\x00\x00\x03\xf3synthetic setpatch'
+            (root/'wb/C/setpatch').write_bytes(setpatch)
+            receipt = fpu_support.stage(root/'wb', root/'boot', loader)
+            self.assertEqual(receipt['setpatch']['sha256'], sha(setpatch))
+            self.assertEqual((root/'boot/C/SetPatch').read_bytes(), setpatch)
+            self.assertEqual(fpu_support.startup_sequence(receipt),
+                             'FailAt 10\nSYS:C/SetPatch QUIET\nSYS:AmiWindFPU\nSYS:AmiWindCheck\nStack 300000\nSYS:AmiWind\n')
+            self.assertTrue(any('C/SetPatch' in line for line in fpu_support.summary_lines(receipt)))
+
     def test_receipt_loader_for_older_stages(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(fpu_support.load_receipt(Path(tmp)/'fpu-support.json')['status'], 'not_requested')
@@ -166,6 +191,7 @@ class BuilderWiringTests(unittest.TestCase):
             (tree/'build/AmiWindCheck').write_bytes(b'fixture checker')
             (tree/'build/awbench').write_bytes(b'fixture benchmark')
             (tree/'build/AmiWindFPU').write_bytes(LOADER)
+            (tree/'build/AmiWindCPU').write_bytes(b'fixture selector')
             argv = ['build_aga.py', 'engine', '--sdk', tmp, '--out', str(out), '--jobs', '1']
             with patch.object(sys, 'argv', argv), patch.object(build_aga, 'check_native_versions'), \
                  patch.object(build_aga, 'new_output', return_value=out), \
@@ -178,6 +204,23 @@ class BuilderWiringTests(unittest.TestCase):
             assembled = [call.args[0] for call in run.call_args_list if '-Fhunkexe' in call.args[0]]
             self.assertTrue(any(str(arg).endswith('boot/fpulib.asm') for command in assembled for arg in command))
             self.assertEqual(json.loads((out/'engine-build.json').read_text())['fpu_loader_sha256'], sha(LOADER))
+            # the engine selector for the 68040/68060 pair (docs/68060.md)
+            self.assertTrue(any(str(arg).endswith('boot/cpusel.asm') for command in assembled for arg in command))
+            row = json.loads((out/'engine-build.json').read_text())['engine_68060']
+            self.assertEqual(row['selector_sha256'], sha(b'fixture selector'))
+
+    def test_startup_sequence_picks_the_engine_for_the_cpu(self):
+        self.assertEqual(fpu_support.startup_sequence({'status': 'not_found'}, **fpu_support.engine_start(True)),
+                         'FailAt 10\nSYS:AmiWindCPU\nIf WARN\n  SYS:AmiWindCheck\n  Stack 300000\n  SYS:AmiWind060\n'
+                         'Else\n  SYS:AmiWindCheck\n  Stack 300000\n  SYS:AmiWind\nEndIf\n')
+        self.assertEqual(fpu_support.startup_sequence({'status': 'not_found'}, **fpu_support.engine_start(False)),
+                         fpu_support.startup_sequence({'status': 'not_found'}))
+        selector = (ROOT / 'engine/aga/boot/cpusel.asm').read_text(encoding='utf-8')
+        for word in ('moveq   #5,d7', 'S:AmiWind-68040', 'SYS:AmiWind060', 'probe_68060', 'find_fpu_library',
+                     '_LVOWaitForChar', 'COUNTDOWN       equ 10'):
+            self.assertIn(word, selector)
+        for text in re.findall(r'dc\.b\s+"([^"]*)"', selector):
+            self.assertLessEqual(len(text), 48, text)   # the boot console's width (as AmiWindCheck)
 
     def test_option_reaches_image_and_dry_run_steps_only(self):
         tools = {name: '/tools/' + name for name in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}

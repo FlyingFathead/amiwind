@@ -1,13 +1,13 @@
 # Licensing, provenance and credits
 
-**Last updated:** 9 October 2026 (Europe/Helsinki).
+**Last updated:** 16 October 2026 (Europe/Helsinki).
 
 <!-- contents start -->
 ## Contents
 
 - [Public source notice](#public-source-notice)
 - [The CHIM engine (from v0.0.33)](#the-chim-engine-from-v0033)
-- [Owner decision: upstream AmiQuake assembly, 10 October 2026](#owner-decision-upstream-amiquake-assembly-10-october-2026)
+- [Project decision: upstream AmiQuake assembly, 10 October 2026](#project-decision-upstream-amiquake-assembly-10-october-2026)
 - [Renderer adoption review, 27 September 2026](#renderer-adoption-review-27-september-2026)
 - [Acknowledgements](#acknowledgements)
 - [Primary references](#primary-references)
@@ -17,94 +17,111 @@
 <!-- contents end -->
 
 **All AmiWind code is free and open source under the GNU General Public
-License (GPL), using the component-specific versions described below.**
+License (GPL). Different parts use different GPL versions, as described below.**
 
-AmiWind's host tools and original 68000 runtime are GPL-3.0-only. The separate
-`engine/aga/` program additions and QuakeC are GPL-2.0-or-later; the selected
-AmiQuake port is built and distributed under GPLv2. These programs exchange
-asset files and do not link OpenMW or the GPLv3 host code into the Amiga binary. Preserve copyright notices,
-licence texts and modification history when incorporating third-party code;
-include the applicable corresponding source/build material with distributed
-binaries. A credit alone is not a replacement for licence compliance.
+AmiWind is made of two programs with two licences. The tools that run on your
+PC (the converter and the builder) and the original 68000 runtime are under
+GPL-3.0-only. The Amiga engine program additions in `engine/aga/` and its
+QuakeC game code are under GPL-2.0-or-later, and the AmiQuake port they build
+on is built and distributed under GPLv2. The two programs never share code:
+the PC tools only write the asset files that the Amiga engine reads. Neither
+OpenMW nor the GPLv3 host code is linked into the Amiga binary.
 
-Original Morrowind and Kickstart assets remain separately licensed. Owning the
-game and converting it locally does not relicense its assets under the GPL.
-The public source package contains source, tools, documentation and selected
-development screenshots and short clips for documentation. Playable images
-containing converted game assets are private local build outputs; a private
-checkpoint does not grant a public redistribution licence for its art, audio
-or ROM.
+If you reuse any of this code, keep the original copyright notices, licence
+texts and change history, and include the matching source and build material
+when you share binaries. The GPL asks for that, and a credit line alone is not
+enough.
+
+The original Morrowind assets and the Kickstart ROM have their own licences.
+Owning the game and converting it on your own machine does not put its assets
+under the GPL. The public source package holds source code, tools,
+documentation, and a few development screenshots and short clips used in the
+documentation. Playable disk images contain converted game assets, so they are
+private build outputs that stay with whoever built them. A private test build
+does not give anyone the right to share its art, audio or ROM.
 
 ## Public source notice
 
-**No original game assets or ROMs are redistributed with AmiWind's public
-source releases.** The GPL applies to the code under its applicable notices;
-it does not grant rights to original or converted game assets, music, voices,
-ROMs or Workbench files. Copyright remains with the respective contributors
-and rights holders. See also the [AmiWind FAQ](FAQ.md#do-i-need-my-own-morrowind-files-what-is-included-in-the-release).
+**AmiWind's public source releases contain no original game assets and no
+ROMs.** The GPL covers the code, as stated in each file's notice. It gives no
+rights to original or converted game assets, music, voices, ROMs or Workbench
+files. Copyright stays with the respective contributors and rights holders.
+See also the [AmiWind FAQ](FAQ.md#do-i-need-my-own-morrowind-files-what-is-included-in-the-release).
 
-The AGA runtime incorporates elements of id Software's Quake and the AmiQuake
-lineage, modified, extended and adapted for AmiWind. These components are
-distributed under GNU GPL version 2, with the applicable original copyright and
-licence notices retained. Individual v2-or-later grants remain intact.
-This is permitted source-code reuse under those licences, not a claim that
-Quake's commercial game assets are free to redistribute. Copyright in upstream
-work remains with its respective contributors. AmiWind modifications do not
-transfer their copyrights or replace their licence terms.
+The Amiga runtime contains parts of id Software's Quake and of the AmiQuake
+port, changed and extended for AmiWind. These parts are distributed under GNU
+GPL version 2, with their original copyright and licence notices kept in the
+files. Files that were granted under "version 2 or later" keep that grant. The
+licences allow this reuse of source code; they do not make Quake's commercial
+game assets free to share. Copyright in the upstream work stays with its
+contributors, and AmiWind's changes do not take over that copyright or replace
+its licence terms.
 
-No id Software or Bethesda game assets, Commodore/Cloanto ROM bytes or Workbench
-files are included in the public source package. It contains no compiled
-AmiWind executable. The upstream assembly identified as recovered from the
-NovaCoder binary is excluded from the selected build and corresponding-source
-package; independent C2P and GPL C span routines are used instead. The historical checksum-pinned upstream archive contains those files; the
-current checkout contains only the previously reviewed corresponding-source
-selection and builds directly from it without downloading that archive.
+The public source package contains no id Software or Bethesda game assets, no
+bytes from Commodore or Cloanto ROMs and no Workbench files. It also contains
+no compiled AmiWind executable. The default build uses AmiWind's own
+chunky-to-planar (C2P) routine and GPL C span routines. The upstream assembly
+that was recovered from NovaCoder's AmiQuake binary has been in the source tree
+since 10 October 2026, but only the experimental `upstream` engine profile
+links it (see the [project decision](#project-decision-upstream-amiquake-assembly-10-october-2026)
+below). The checkout builds directly from its own source tree; it does not
+download the historical, checksum-pinned upstream archive.
 
-The engine can be compiled without game files or a Kickstart ROM. Converting
-the demo requires the user's Morrowind installation. Emulator playback requires
-the user's suitable licensed ROM; physical hardware supplies its own firmware.
-Neither the GPL nor this fan-tribute notice grants rights in converted assets,
-sound recordings, trademarks or ROMs. The project is independent and is not
-endorsed by Bethesda/ZeniMax, id Software, Commodore, Cloanto or OpenMW.
+The engine compiles without any game files and without a Kickstart ROM.
+Converting the game needs your own Morrowind installation. Playing in an
+emulator needs a suitable, licensed Kickstart ROM; a real Amiga uses its own
+firmware. Neither the GPL nor this fan-project notice gives rights to converted
+assets, sound recordings, trademarks or ROMs. AmiWind is an independent project
+and is not endorsed by Bethesda/ZeniMax, id Software, Commodore, Cloanto or
+OpenMW.
 
 ## The CHIM engine (from v0.0.33)
 
-AmiWind runs on the CHIM engine, built on GPLv2 code from id Software's Quake
-(John Carmack and the id team) and its Amiga port AmiQuake (Peter McGavin,
-NovaCoder, Stephen Leary). The CHIM builder that converts your own Morrowind
-files is GPLv3.
+AmiWind runs on the CHIM engine. It is built on GPLv2 code from id Software's
+Quake (John Carmack and the id team) and from its Amiga port AmiQuake (Peter
+McGavin, NovaCoder, Stephen Leary). The CHIM builder, which converts your own
+Morrowind files, is under GPLv3.
 
-- **What CHIM is:** AmiWind's overhauled engine, in many places a rewrite of the
-  original AmiWind engine, still built on parts of Quake and the AmiQuake port.
-  Its main change is how the world is kept: every asset stored once and placed by
-  reference, streamed around the player, instead of one self-contained map at a
-  time. See [CHIM engine](chim/README.md).
-- **Licence:** the CHIM engine is an adaptation (a derivative work) of that GPL
-  code and is distributed under GNU GPL version 2; files whose notices say
-  "version 2 or later" keep that grant. Its complete source is in `engine/aga/`.
+- **What CHIM is:** AmiWind's overhauled engine. In many places it is a
+  rewrite of the original AmiWind engine, and it still uses parts of Quake and
+  the AmiQuake port. The main change is how the world is kept: every asset is
+  stored once, placed by reference and streamed in around the player, instead
+  of loading one self-contained map at a time. See [CHIM engine](chim/README.md).
+- **Licence:** the CHIM engine is an adaptation (a derivative work) of that
+  GPL code and is distributed under GNU GPL version 2. Files whose notices say
+  "version 2 or later" keep that grant. The complete source is in `engine/aga/`.
 - **Notices:** every original copyright notice (id Software, the AmiQuake
-  authors) stays in the files. Changes are recorded in the public history of this
-  repository and summarised in the [changelog](CHANGELOG.md).
-- **Two programs:** the GPLv2 engine and the GPLv3 builder and host tools stay
-  separate programs that exchange files only; neither is linked into the other.
-  The version notes above apply to both.
-- **Names:** "built on Quake code" is a factual description, not a brand; Quake
-  is a trademark of id Software. Nothing here implies endorsement by id Software,
-  the AmiQuake authors, Bethesda Softworks or ZeniMax. "CHIM" is a word from
-  Morrowind's lore, used here as the name of a free fan engine.
+  authors) stays in the files. The public history of this repository records
+  each change, and the [changelog](CHANGELOG.md) summarises them.
+- **Two programs:** the GPLv2 engine and the GPLv3 builder and host tools are
+  separate programs that only exchange files; neither is linked into the
+  other. The licence notes above apply to both.
+- **Names:** "built on Quake code" describes where the code comes from; it is
+  not a brand. Quake is a trademark of id Software. Nothing here implies
+  endorsement by id Software, the AmiQuake authors, Bethesda Softworks or
+  ZeniMax. "CHIM" is a word from Morrowind's lore, used here as the name of a
+  free fan engine.
 
-## Owner decision: upstream AmiQuake assembly, 10 October 2026
+## Project decision: upstream AmiQuake assembly, 10 October 2026
 
-AmiWind adopts upstream AmiQuake's own licence reading for its 68k assembly: the port and every file in it are GPL v2
-"as per original Quake source code license"; NovaCoder's AmiQuake is a port of GPL Quake, and the routines recovered
-from its v1.36 binary are published by upstream as readable, commented source. This replaces the 27 September 2026
-exclusion below. The files concerned: `d_scan_68k.s`, `d_scan_68k_nofpu.s`, `mathlib_68k.s`, `c2p8.s` (credited to
-NovaCoder's original AmiQuake, recovered and ported by Stephen Leary) and `fixedpoint_asm.s` (Stephen Leary). They are
-measured against AmiWind's C paths before any of them ships, kept under their GPL v2 terms with their notices, and the
-C paths stay selectable ([ENGINE-UPSTREAM-ASM-UNUSED-36](bugs/ENGINE-UPSTREAM-ASM-UNUSED-36.md)).
+AmiWind follows upstream AmiQuake's own licence reading for its 68k assembly.
+Upstream states that the port and every file in it are GPL v2 "as per original
+Quake source code license". NovaCoder's AmiQuake is a port of GPL Quake, and
+upstream publishes the routines recovered from its v1.36 binary as readable,
+commented source. This decision replaces the 27 September 2026 exclusion
+described below.
 
-Since 10 October 2026 the five files are in the source tree, linked only by the experimental `upstream` engine
-profile ([ENGINE_PROFILES.md](ENGINE_PROFILES.md)); the default `c` profile links none of them:
+Five files are concerned: `d_scan_68k.s`, `d_scan_68k_nofpu.s`,
+`mathlib_68k.s`, `c2p8.s` (credited to NovaCoder's original AmiQuake,
+recovered and ported by Stephen Leary) and `fixedpoint_asm.s` (Stephen Leary).
+Each one is measured against AmiWind's C code before it ships. They keep their
+GPL v2 terms and notices, and the C code stays selectable
+([ENGINE-UPSTREAM-ASM-UNUSED-36](bugs/ENGINE-UPSTREAM-ASM-UNUSED-36.md)).
+
+Since 10 October 2026 the five files are in the source tree. Only the
+experimental `upstream` engine profile links them
+([ENGINE_PROFILES.md](ENGINE_PROFILES.md)); the default `c` profile links none
+of them:
 
 | File in `engine/aga/src` | Credit | Linked by the `upstream` profile |
 | --- | --- | --- |
@@ -114,61 +131,72 @@ profile ([ENGINE_PROFILES.md](ENGINE_PROFILES.md)); the default `c` profile link
 | `fixedpoint_asm.s` | Stephen Leary | the 68020 build only |
 | `mathlib_68k.s` | NovaCoder's original AmiQuake maths routine, recovered and adapted by Stephen Leary | no (selectable) |
 
-Each file starts with a header naming upstream AmiQuake (TerribleFire's GCC port), the file and revision
-`9c62d905151614af3e788ae3145a0d4ecc8a7bb8`; below it the text is upstream's, except five lines marked `AmiWind:` in
-the two span files that assemble to the same machine code.
+Each file starts with a header that names upstream AmiQuake (TerribleFire's
+GCC port), the file and the revision
+`9c62d905151614af3e788ae3145a0d4ecc8a7bb8`. Below the header the text is
+upstream's, except for five lines marked `AmiWind:` in the two span files;
+those lines assemble to the same machine code.
 
 ## Renderer adoption review, 27 September 2026
 
+This table records the review as it was made on 27 September 2026. Its last
+row was later replaced by the project decision above.
+
 | Source | Observed licence/provenance | Current decision |
 | --- | --- | --- |
-| OpenMW | Repository declares GPLv3; review individual reused files/dependencies | Suitable candidate for a GPL host exporter; current converters are standalone; opening captures and reference checks run OpenMW externally, with no OpenMW source bundled |
-| id Software Quake | Inspected engine headers grant GPL v2 or later | Reusable engine foundation under applicable GPL terms; preserve id Software notices |
-| terriblefire/AmiQuake | README declares GPLv2 for port additions; inherited `r_main.c`, `d_scan.c`, `vid_amiga.c` headers say v2 or later | Review selected modifications before combining with GPLv3-only code; keep a separately licensed runtime option |
-| `src/c2p8.s` and `src/d_scan_68k.s` in that fork | Comments identify code extracted from NovaCoder's v1.36 binary; README asserts GPL compliance | Excluded from the AmiWind release build; independent C2P and GPL C spans are selected. **Superseded 10 October 2026** (owner decision, below) |
-| PyFFI | External Niftools dependency, package classifier identifies BSD licence | Not vendored; retain its licence if a later tool bundle distributes it |
+| OpenMW | The repository declares GPLv3; reused files and dependencies are reviewed one by one | A suitable candidate for a GPL host exporter. The current converters are standalone. Opening captures and reference checks run OpenMW as a separate program; no OpenMW source is bundled |
+| id Software Quake | The inspected engine headers grant GPL v2 or later | A reusable engine foundation under the applicable GPL terms; the id Software notices are kept |
+| terriblefire/AmiQuake | The README declares GPLv2 for the port's additions; the inherited `r_main.c`, `d_scan.c` and `vid_amiga.c` headers say v2 or later | Selected changes are reviewed before they are combined with GPLv3-only code; a separately licensed runtime option is kept |
+| `src/c2p8.s` and `src/d_scan_68k.s` in that fork | Comments say the code was extracted from NovaCoder's v1.36 binary; the README states GPL compliance | Excluded from the AmiWind release build; AmiWind's own C2P and GPL C spans are used instead. **Superseded 10 October 2026** (project decision, above) |
+| PyFFI | An external Niftools dependency; its package classifier names the BSD licence | Not vendored; its licence goes with it if a later tool bundle distributes it |
 
-GPLv2-only and GPLv3 code should not be treated as interchangeable. The
-v2-or-later permission permits selecting a later version for those files, but
-that does not automatically settle separate contributors' additions. Host tools
-and Amiga executables exchanging documented asset files can be developed as
-separate programs with their respective notices. Revisit compatibility if code
-is combined into one program. The source package includes the complete selected engine tree; `engine/aga/qc/defs.qc`
-retains id Software's field ABI declarations and copyright notice. Complete
-corresponding runtime source must accompany distributed runtime binaries.
+GPLv2-only code and GPLv3 code are not interchangeable. The "v2 or later"
+permission allows a later GPL version to be chosen for those files, but that
+does not settle the licence of other contributors' additions. Host tools and
+Amiga programs that only exchange documented asset files can be developed as
+separate programs, each with its own notices. If code is ever combined into one
+program, compatibility has to be checked again. The source package includes the
+complete selected engine tree; `engine/aga/qc/defs.qc` keeps id Software's
+field ABI declarations and copyright notice. Distributed runtime binaries must
+come with their complete corresponding runtime source.
 
 Inspected AmiQuake revision: `9c62d905151614af3e788ae3145a0d4ecc8a7bb8`.
 OpenMW music reference: `46bd4599203ee52ffc0f3e8edb3fc159a0303a49`,
-`files/data-mw/scripts/omw/music/music.lua` and `helpers.lua`. These describe
-playlist selection and shuffled orders. The 68000 playlist implementation is
-original project code; no Lua source is included.
+`files/data-mw/scripts/omw/music/music.lua` and `helpers.lua`. These files
+describe how OpenMW picks playlists and shuffles their order. The 68000
+playlist code is original project code; no Lua source is included.
 
 ## Acknowledgements
 
 Created by **FlyingFathead a.k.a. Horstator**. Thanks to **ChaosWhisperer**.
 
-- Bethesda Softworks and the Morrowind creators for the original game. Jeremy
-  Soule for its soundtrack. Purchase the original from [GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition)
-  or [Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/).
-- The OpenMW contributors for the open engine, content loader, documentation
-  and the host rendering used for the opening captures.
+- Bethesda Softworks and the Morrowind creators for the original game, and
+  Jeremy Soule for its soundtrack. The original is available from
+  [GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition)
+  and [Steam](https://store.steampowered.com/app/22320/The_Elder_Scrolls_III_Morrowind_Game_of_the_Year_Edition/).
+- The OpenMW contributors for the open engine, the content loader, the
+  documentation and the host rendering used for the opening captures.
 - id Software, including John Carmack, and the Quake source contributors.
-- Peter McGavin (Amiga video driver), NovaCoder (AmiQuake), and Stephen Leary
-  (the terriblefire GCC port), for the upstream Amiga engine lineage adapted
-  here. The selected source and excluded binary-derived assembly are described
-  above; this acknowledgement does not claim reuse of the excluded routines.
+- Peter McGavin (Amiga video driver), NovaCoder (AmiQuake) and Stephen Leary
+  (the terriblefire GCC port), for the upstream Amiga engine that AmiWind
+  adapts. Which of their source files AmiWind uses, including the upstream
+  assembly, is described above.
 - Timo Heimonen for the Hunter 68060 performance-patch study.
 - The Niftools/PyFFI developers for the external static-model reader.
-- Arseny Kapoulkine for [meshoptimizer](https://github.com/zeux/meshoptimizer) (MIT): its mesh simplifier
-  (v1.3, `src/simplifier.cpp`, `src/allocator.cpp`, `src/meshoptimizer.h`) is vendored unchanged in
-  `third_party/meshoptimizer` with its licence, compiled on the build host and used by the CHIM mesh method
-  `meshopt+merge` ([mesh methods](chim/MESH_METHODS.md)). It is a host build tool: nothing of it is linked
-  into the Amiga runtime.
-- Michael Garland and Paul S. Heckbert, "Surface Simplification Using Quadric Error Metrics" (SIGGRAPH
-  1997), the method of AmiWind's own boundary-locked reducer; Stefan Hertel and Kurt Mehlhorn's convex
-  partition, the method of AmiWind's own planar merge. Both are AmiWind implementations, not copies.
-- vasm, amitools and FS-UAE contributors for the separately installed build and
-  validation tools. These acknowledgements do not imply endorsement.
+- Arseny Kapoulkine for [meshoptimizer](https://github.com/zeux/meshoptimizer)
+  (MIT). Its mesh simplifier (v1.3, `src/simplifier.cpp`, `src/allocator.cpp`,
+  `src/meshoptimizer.h`) is vendored unchanged in `third_party/meshoptimizer`
+  with its licence. It is compiled on the build host and used by the CHIM mesh
+  method `meshopt+merge` ([mesh methods](chim/MESH_METHODS.md)). It is a host
+  build tool; nothing of it is linked into the Amiga runtime.
+- Michael Garland and Paul S. Heckbert, "Surface Simplification Using Quadric
+  Error Metrics" (SIGGRAPH 1997), the method behind AmiWind's own
+  boundary-locked reducer; and Stefan Hertel and Kurt Mehlhorn's convex
+  partition, the method behind AmiWind's own planar merge. Both are AmiWind
+  implementations, not copies.
+- The vasm, amitools and FS-UAE contributors for the build and validation
+  tools, which are installed separately. None of these acknowledgements implies
+  endorsement.
 
 ## Primary references
 
@@ -181,25 +209,31 @@ Created by **FlyingFathead a.k.a. Horstator**. Thanks to **ChaosWhisperer**.
 
 ## Host build tools
 
-External tools recorded for AGA development include the pinned AmigaPorts GCC SDK,
-ericw-tools 0.18.1 (GPLv3 host tools), id Software Quake-Tools qcc (GPLv2-or-later),
-fast-simplification 0.2.0 (MIT), meshoptimizer 1.3 (MIT, vendored, see above), SciPy (BSD), and NumPy (BSD). They are not linked
-into the Amiga runtime. The default readable interface glyphs are original AmiWind 5x7 bitmap designs
-in an 8x8 atlas. The unchanged optional retro atlas is generated locally from
-the host DejaVu Sans Mono font. No Amiga ROM/system font is extracted and no
-Quake artwork is bundled. Keep dependency notices if distributing tools. Exact reference versions
-and their verification scope are maintained in [build dependencies](BUILD_DEPENDENCIES.md).
+The Amiga build uses these external tools: the pinned AmigaPorts GCC SDK,
+ericw-tools 0.18.1 (GPLv3 host tools), id Software's Quake-Tools qcc
+(GPLv2-or-later), fast-simplification 0.2.0 (MIT), meshoptimizer 1.3 (MIT,
+vendored, see above), SciPy (BSD) and NumPy (BSD). None of them is linked into
+the Amiga runtime. Anyone who distributes these tools keeps their licence
+notices with them.
+
+The default interface glyphs are original AmiWind 5x7 bitmap designs in an 8x8
+atlas. The optional retro atlas is generated, unchanged, on the build machine
+from the DejaVu Sans Mono font installed there. No Amiga ROM or system font is
+extracted, and no Quake artwork is bundled. The exact reference versions, and
+how far each one has been verified, are listed in
+[build dependencies](BUILD_DEPENDENCIES.md).
 
 ## Proposed bundled QCC
 
 The [third-party compiler plan](THIRD_PARTY_COMPILERS.md) records the pinned
-GPL-2.0-or-later QCC source, licence/notices, proposed provider selection and
-corresponding-source requirements. QCC remains a separately installed host tool in the current dev4/RC1 build
-pipeline. Fresh setup can fetch the pinned, hash-checked source and build a
-managed compiler; later builds reuse it, and `--qcc` can select an external
-compiler. The proposed bundled source/provider is not implemented, and no
-QCC source or compiler binary is included in the public source package. See
-the [bootstrap implementation](../tools/fetch_native.py).
+GPL-2.0-or-later QCC source, its licence and notices, the proposed way of
+providing it, and what corresponding source would have to ship with it. Today
+QCC is still a separately installed host tool in the dev4/RC1 build pipeline.
+A fresh setup can fetch the pinned, hash-checked source and build a managed
+compiler, which later builds reuse; `--qcc` selects an external compiler
+instead. The proposed bundled source is not implemented yet, and the public
+source package contains no QCC source or compiler binary. See the
+[bootstrap implementation](../tools/fetch_native.py).
 
 ---
 

@@ -1,6 +1,6 @@
 # Hunter as an optimization study
 
-Inspiration suggested by the project owner:
+Inspiration suggested by the project maintainer:
 [Timo Heimonen's Hunter 68060 Performance Patch](https://github.com/timoheimonen/amiga-hunter-performance-68060).
 Reviewed its README, PATCH.md and changelog for version 1.1.0 on 27 September
 2026. This project does not bundle Hunter code, game files or the patch.

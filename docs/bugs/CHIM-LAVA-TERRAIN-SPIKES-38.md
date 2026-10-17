@@ -137,7 +137,7 @@ god mode and noclip off records water level 1, lava contents -5, and health
 falling from 100 to 76.8, 64.7 and 52.6. This confirms damage still occurs after
 the geometry change; it does not establish exact damage-rate or route parity.
 
-Final full-image verification, 13 October 2026: all 349 original lava references across 27 cells survive conversion and final HDF readback matches the rebuilt CHIM world. Scoped native views show a continuous shoreline with HUD and crosshair off. Contact with god mode and noclip off records health 100 -> 76.9 -> 64.8 -> 52.8, water level 1 and lava contents -5. This supersedes pending integration notes; sound, wider traversal and owner acceptance remain open.
+Final full-image verification, 13 October 2026: all 349 original lava references across 27 cells survive conversion and final HDF readback matches the rebuilt CHIM world. Scoped native views show a continuous shoreline with HUD and crosshair off. Contact with god mode and noclip off records health 100 -> 76.9 -> 64.8 -> 52.8, water level 1 and lava contents -5. This supersedes pending integration notes; sound, wider traversal and maintainer acceptance remain open.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -170,8 +170,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
+- [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
+- [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
 <!-- END GENERATED CATEGORY -->

@@ -12,6 +12,9 @@
 #include "aw_testbox.h"
 #define WEAK __attribute__((weak))
 WEAK int AW_QuickCharActive(void){return 0;}
+/* The inventory picture: still by default (aw_view.c); fixtures time it with a frozen clock. */
+WEAK int AW_ViewInventoryLive(void){return 0;}
+WEAK double Sys_FloatTime(void){return 0;}
 WEAK int AW_QuickCharKey(int key){(void)key;return 0;}
 WEAK void AW_QuickCharDraw(void){}
 WEAK void AW_QuickCharTick(void){}
@@ -30,6 +33,8 @@ WEAK const aw_miniwind_t *AW_Miniwind(void){static aw_miniwind_t none;return &no
 WEAK int AW_MenuHeaderLines(const char *text,int width,char lines[2][AW_MINIWIND_HEADER]){
     (void)text;(void)width;lines[0][0]=lines[1][0]=0;return 0;
 }
+/* Demo playback's CHIM hook (aw_scenery.c): fixtures linking cl_parse.c without aw_scenery.c. */
+WEAK void (*aw_demo_map_begin)(void);
 /* The animation kit console (aw_animkit.c): nothing to drive in fixtures without it. */
 WEAK void AW_AnimKitTick(void) {}
 WEAK void AW_AnimKitInit(void) {}

@@ -67,7 +67,7 @@ model (`items/<hash>.mdl`) and writes, beside each resident model with carried i
 model's space), for both animation methods (idle-only and the animation kit). The engine
 (`engine/aga/src/aw_items.c`) reads the table and precaches the items at spawn, shows the items as
 their own entities when the resident engages, places them every frame from the tag of the actor's
-current frame (the actor's yaw added) and removes them when the fight ends. Measured on the owner's
+current frame (the actor's yaw added) and removes them when the fight ends. Measured on the maintainer's
 data: the weapon rebuilt from the item model and the tag matches the directly attached weapon within
 0.001 units for a Hlaalu guard (steel longsword, Hlaalu tower shield); for an Imperial guard the
 item keeps its own size, up to 3.3 units off at the blade tip, because the original also stretches
@@ -82,7 +82,7 @@ passing the rules' pick and the collision-node skip; `test_item_tags_angles_and_
 round trip, tag rows, tag file, wiring); native `aga_items_test.c` (tag parsing, refusals, item pose
 at yaw 0 and 90); the combat fixture checks items are shown at engage and hidden at every release
 (it caught a leak on re-engage, fixed before commit). Real data: Mevil Molor (steel mace, chitin
-shield) and Ultis Salam (steel longsword) baked from the owner's data, the weapon rigid on the hand
+shield) and Ultis Salam (steel longsword) baked from the maintainer's data, the weapon rigid on the hand
 in every attack frame. Pending: an in-game frame (the evidence MiniWind, after the builder hold).
 
 ## Prevention

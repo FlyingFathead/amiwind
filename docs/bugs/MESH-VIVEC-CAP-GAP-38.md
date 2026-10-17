@@ -4,20 +4,20 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 12 October 2026, in an unknown version |
 | Where | Vivec exterior cell 5,-10, global 46983,-81758,835 |
 | Reproduction | once |
 | Duplicate of | no |
 | Persists in | v0.0.39-rc1 (last seen) |
-| Severity | high: Repeated owner-visible failure in RC1; exact repair remains unverified. |
+| Severity | high: Repeated maintainer-visible failure in RC1; exact repair remains unverified. |
 | Family | Mesh converter geometry (`converter-geometry`) |
 
 <!-- END GENERATED FACTS -->
 
 ## Symptom
 
-Owner screenshot shows a bright opening along a giant mushroom cap in Vivec. The owner suspects mesh reduction; cause is unconfirmed.
+Maintainer screenshot shows a bright opening along a giant mushroom cap in Vivec. The maintainer suspects mesh reduction; cause is unconfirmed.
 
 ## Where
 
@@ -45,7 +45,7 @@ placement identified, the seam audit run on its converted variants, compared wit
 
 ## Verification
 
-Original owner screenshot inspected and preserved. Matched OpenMW/native captures and topology comparison pending. The pinned full-game build predates this report and contains no repair for it.
+Original maintainer screenshot inspected and preserved. Matched OpenMW/native captures and topology comparison pending. The pinned full-game build predates this report and contains no repair for it.
 
 ## Prevention
 
@@ -53,7 +53,7 @@ Cover the identified model's material seams and reported viewing direction, reta
 
 
 
-Mesh checklist for Vivec giant mushrooms (owner follow-up, 12 October):
+Mesh checklist for Vivec giant mushrooms (maintainer follow-up, 12 October):
 
 - [ ] Inventory every large-mushroom model and placement in Vivec, including town-specific variants.
 - [ ] Bind the two reported views in cell 5,-10 to exact source and packaged model identities.
@@ -62,15 +62,15 @@ Mesh checklist for Vivec giant mushrooms (owner follow-up, 12 October):
 - [ ] Capture matched OpenMW/native views from above, beside and below the caps.
 - [ ] Verify the repaired models in the extracted playtest package, with memory and frame-time measurements.
 
-Second screenshot: global 47007,-81794,835, heading 069, pitch -38, time 09:44, same cell. It shows the same opening from another angle. The HUD shows the v0.0.38 series; exact suffix and binary hashes remain unverified. The owner's explanation that a Vivec-specific variant escaped the earlier island repair remains a hypothesis until model binding.
+Second screenshot: global 47007,-81794,835, heading 069, pitch -38, time 09:44, same cell. It shows the same opening from another angle. The HUD shows the v0.0.38 series; exact suffix and binary hashes remain unverified. The maintainer's explanation that a Vivec-specific variant escaped the earlier island repair remains a hypothesis until model binding.
 
 
 12 October diagnostic: nearest mushroom candidate is reference 171483, flora_emp_parasol_01, scale 1.49, in cell 5,-10. Its position agrees with the reported viewing direction, but exact installed-payload binding remains pending. The preserved dev2 CHIM model has 123 faces and 38,248 bytes at this scale. Using the retained town scenery and unchanged diagnostic helpers, the town profile reduces 428 source triangles to 135 and fails sampled material-boundary matching. A boundary-lock trial yields 160 triangles and passes that sampled check. This is not a repair acceptance or a native performance result. The legacy world scenery explicitly preserves mushroom shared seams; the town profile tested here does not. The model is already listed in the town seam audit under MESH-LOD-TORN-MESHES-33.
 
 
-## Owner evidence reconciliation, 13 October 2026
+## Maintainer evidence reconciliation, 13 October 2026
 
-The following owner screenshot evidence was visually reviewed. Original images
+The following maintainer screenshot evidence was visually reviewed. Original images
 remain in the private evidence archive; identifiers bind this report to those
 originals. This records reported symptoms and comparison controls, not a repair
 or runtime acceptance. Missing build or pose information remains unknown.
@@ -78,7 +78,7 @@ or runtime acceptance. Missing build or pose information remains unknown.
 - `OWNER-20261012-191710`: SHA-256 `ba11a8c78d05dc88dfb17459ec15729916a8adb882ad79553e527efb22d99839`. Screenshot association checked; no repair or behavioral acceptance inferred.
 - `OWNER-20261012-191925`: SHA-256 `70c2351f5d3d94f81b68192544c981323be3596ad8f9fd779197fd4168919688`. Screenshot association checked; no repair or behavioral acceptance inferred.
 
-## RC1 owner evidence, 13 October 2026
+## RC1 maintainer evidence, 13 October 2026
 
 The original images remain private. Rounded HUD readings are location aids,
 not exact source/package bindings or proof of motion.

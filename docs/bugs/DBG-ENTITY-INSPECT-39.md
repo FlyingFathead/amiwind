@@ -15,18 +15,18 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 13 October 2026, in v0.0.39-rc1 |
 | Where | Debug HUD and actor/scenery target identification |
 | Reproduction | unknown |
 | Duplicate of | no |
 | Persists in | v0.0.39-rc1 (last seen) |
-| Severity | medium: Owner-visible mechanics or diagnostic requirement; original parity and candidate native verification remain pending. |
+| Severity | medium: Maintainer-visible mechanics or diagnostic requirement; original parity and candidate native verification remain pending. |
 | Family | Debug commands and remote control (`debug-commands`) |
 | Playtest version | v0.0.39-rc1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine unknown, world format unknown |
-| Unknown because | Owner named RC1; the exact running binary was not independently read back for this report. The mutable RC2 source candidate has not been compiled or packaged. |
+| Unknown because | Maintainer named RC1; the exact running binary was not independently read back for this report. The mutable RC2 source candidate has not been compiled or packaged. |
 | Platform or emulator | unknown (Emulator not restated for this specific observation.) |
 
 <!-- END GENERATED FACTS -->
@@ -58,7 +58,7 @@ Candidate inspection mode defaults off and is not saved. Only explicit dbg hud o
 
 ## Verification
 
-Seventeen focused automated checks pass against an exact source snapshot, including an actual inspector C integration fixture for nearest actor identity, brush/world occlusion, client static selection and unavailable source fields, held-click consumption, off/release restoration, camera displacement, same-map reset, dead/menu/character gating and narrow-viewport bounds. General HUD, console and command-registry checks also pass. Target compilation, actual native inspection, package readback/delivery and owner acceptance remain pending. It supplies evidence for the Ordinator investigation; it does not itself repair actor appearance.
+Seventeen focused automated checks pass against an exact source snapshot, including an actual inspector C integration fixture for nearest actor identity, brush/world occlusion, client static selection and unavailable source fields, held-click consumption, off/release restoration, camera displacement, same-map reset, dead/menu/character gating and narrow-viewport bounds. General HUD, console and command-registry checks also pass. Target compilation, actual native inspection, package readback/delivery and maintainer acceptance remain pending. It supplies evidence for the Ordinator investigation; it does not itself repair actor appearance.
 
 ## Prevention
 
@@ -103,11 +103,11 @@ and the earlier click/attack/scene-reset controls. This is source and focused
 automated evidence. A fresh exact corrected-source target compile and native
 Hlaalu foreground pick are pending; the earlier native false-pick receipt stays
 historical and does not accept this correction. Noclip/pose, ordinary attack,
-complete RC2 package and owner acceptance remain separate.
+complete RC2 package and maintainer acceptance remain separate.
 
 ## Explicit server metadata labels, 13 October 2026
 
-The latest source candidate labels server runtime frame and server local/global positions explicitly, while the intersection still uses the rendered client pose/frame. One actual C UBSan integration check passes a differing client-frame/server-frame assertion along with the prior selection/control cases, against an unchanged isolated source snapshot. This addresses metadata ambiguity in source only. Fresh corrected-selector target compilation, native foreground identification, complete RC2 package and owner acceptance remain pending; earlier source and native snapshots stay historical.
+The latest source candidate labels server runtime frame and server local/global positions explicitly, while the intersection still uses the rendered client pose/frame. One actual C UBSan integration check passes a differing client-frame/server-frame assertion along with the prior selection/control cases, against an unchanged isolated source snapshot. This addresses metadata ambiguity in source only. Fresh corrected-selector target compilation, native foreground identification, complete RC2 package and maintainer acceptance remain pending; earlier source and native snapshots stay historical.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

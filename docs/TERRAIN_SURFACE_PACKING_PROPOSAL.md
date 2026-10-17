@@ -1,6 +1,6 @@
 # One possible approach: terrain cuts and compact shared surfaces
 
-Recorded 4 October 2026 from an owner-supplied external proposal. This is **one
+Recorded 4 October 2026 from an user-supplied external proposal. This is **one
 possible approach**, not a selected complete architecture or an implementation
 claim. The original text is preserved privately with its SHA-256. Its diagnosis
 and requirements must be tested against each new candidate.

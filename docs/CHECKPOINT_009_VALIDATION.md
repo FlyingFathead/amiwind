@@ -49,7 +49,7 @@ The private image contains owned/converted data; the public source contains none
 | Upstream | AmiQuake `9c62d905151614af3e788ae3145a0d4ecc8a7bb8` |
 | Upstream archive SHA-256 | `43353034beb2a43b1af82c735f93c0a8bee8129c1b93d7ba152dd8e60ad3721c` |
 
-The public WinUAE 6.0.3 preset is based on the owner's settings and has not been
+The public WinUAE 6.0.3 preset is based on the maintainer's settings and has not been
 executed locally in WinUAE. These JIT runs are correctness checks, **not a
 physical Amiga or stock A1200 benchmark**. Host load was not controlled for a
 matched speed comparison. Preflight still requires 12 MiB free Fast RAM; the

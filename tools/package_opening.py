@@ -127,8 +127,8 @@ not yet render that scenery or implement collision. It is private game-derived d
 
 ## Private content and source
 
-This package contains the owner's converted Morrowind terrain, artwork/audio
-and, at the owner's explicit request, the tested Kickstart ROM. Keep it private.
+This package contains the maintainer's converted Morrowind terrain, artwork/audio
+and, at the maintainer's explicit request, the tested Kickstart ROM. Keep it private.
 Only `amiwind/` is the source tree. Host tools and the A500 runtime are GPLv3;
 the separate AGA engine retains its GPLv2 notices. The content policy explains
 which material can be shared. All derived assets and ROMs remain

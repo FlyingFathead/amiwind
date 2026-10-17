@@ -46,11 +46,11 @@
           "null"
         ],
         "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-z]+[0-9]*)?$",
-        "description": "Version in which the owner confirmed the fix in play; null until then."
+        "description": "Version in which the maintainer confirmed the fix in play; null until then."
       },
       "status": {
         "type": "string",
-        "description": "Current evidence and next check, factual; keep reported, source-checked, packaged, native-verified and owner-accepted distinct. May contain markdown links."
+        "description": "Current evidence and next check, factual; keep reported, source-checked, packaged, native-verified and maintainer-accepted distinct. May contain markdown links."
       },
       "report": {
         "type": [
@@ -61,8 +61,8 @@
       },
       "reported_by": {
         "type": "string",
-        "pattern": "^(owner|developer|review|audit|test|build|ci|unknown|gate:[a-z0-9][a-z0-9-]*)$",
-        "description": "Who first reported it: owner, developer, review, audit, test, build, ci, gate:<name> or unknown."
+        "pattern": "^(maintainer|developer|review|audit|test|build|ci|unknown|gate:[a-z0-9][a-z0-9-]*)$",
+        "description": "Who first reported it: maintainer, developer, review, audit, test, build, ci, gate:<name> or unknown."
       },
       "found_date": {
         "type": "string",

@@ -102,7 +102,7 @@ def synthetic_bsp(layout, seed=7):
     return header + body
 
 
-@unittest.skipIf(os.name == 'nt', 'Owner workflow: no generated Windows test executables; run this native oracle on Linux')
+@unittest.skipIf(os.name == 'nt', 'Project workflow: no generated Windows test executables; run this native oracle on Linux')
 @unittest.skipUnless(COMPILER, 'install a host C compiler or set CC')
 class SliceLoadTests(unittest.TestCase):
     def test_lumps_span_several_slices(self):

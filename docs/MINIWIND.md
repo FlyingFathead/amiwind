@@ -63,7 +63,7 @@ and you choose the rest with options:
 | --- | --- |
 | `--miniwind` | select the MiniWind build type |
 | `--miniwind-preset NAME` or `--miniwind-NAME` | a named sandbox from the table below (`list` prints it) |
-| `--miniwind-scope full\|exterior` | `exterior` holds the town exterior only |
+| `--miniwind-scope full\|exterior\|interior` | `exterior` holds the town exterior only; `interior` converts only the start room of an `interior:<cell>` start |
 | `--miniwind-town TOWN` | another town table row than Balmora |
 | `--miniwind-description TEXT` | the startup screen's `Scene:` line |
 | `--direct-to-game-map START` | start in a room or at a spot instead of the arrival point |
@@ -107,6 +107,7 @@ preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
 | `vivec-arena-pit` | `--miniwind-vivec-arena-pit` | Vivec Arena Pit: combat test |
 | `vivec-arena-chim` | `--miniwind-vivec-arena-chim` | Vivec on CHIM (whole city) from the Arena arrival |
 | `vivec-city-chim` | `--miniwind-vivec-city-chim` | All of Vivec on CHIM, one frame: cantons, Temple, frame edge |
+| `vivec-palace` | `--miniwind-vivec-palace` | Palace of Vivec: Vivec meditating, interior creatures |
 | `opening-ship` | `--miniwind-opening-ship` | Opening ship: lantern and ship lighting check |
 | `animkit` | `--miniwind-animkit` | Animation kit: walk and run with a companion and hostiles |
 | `seyda-chim` | `--miniwind-seyda-chim` | Seyda Neen on CHIM (CHIM-native): arrival, residents, doors |
@@ -114,8 +115,9 @@ preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
 <!-- presets end -->
 
 Notes: `balmora-exterior` leaves out the interiors, so every door says
-"Area unavailable". `vivec-arena-pit` builds all of Vivec (one CHIM frame) with its rooms and starts inside
-the Arena Pit (`vai000`); `vivec-arena-chim` and `vivec-city-chim` start at the Arena arrival.
+"Area unavailable". `vivec-arena-chim` and `vivec-city-chim` start at the Arena arrival;
+`vivec-palace` and `vivec-arena-pit` use the interior scope: the Vivec frame and only their start room
+(the Palace of Vivec, `vpi015`, where Vivec meditates; the Arena Pit, `vai000`); every other door says "Area unavailable".
 `opening-ship` shows the quick character screen on arrival. `seyda-chim` (since v0.0.36-dev5: Seyda Neen is
 CHIM-native, so it is a MiniWind town) starts at Seyda Neen's arrival with its houses; the Census office and the
 prison ship are left out. A test
@@ -239,7 +241,9 @@ view with `--direct-to-game-map START`. START accepts a supported town,
 `interior:<cell id>`, `cell:X,Y`, or `pos:X,Y,Z@HEADING`; see the
 [direct-start guide](chim/build_guide/DIRECT_START.md) for coordinate units
 and build-coverage checks. The full MiniWind scope includes the chosen town's
-available interiors; the exterior scope omits them.
+available interiors; the exterior scope omits them; the interior scope (`--miniwind-scope interior`, with an
+`interior:<cell id>` start) converts only that room, leaves the island-wide mesh seam audit and the tracker data
+out, and its other doors say "Area unavailable".
 
 For another map already included in the image, the console command
 `aw_quick_start map MAP X Y Z YAW` starts a fresh inspection there using local

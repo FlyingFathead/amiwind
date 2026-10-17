@@ -258,7 +258,9 @@ with a reuse source, `--reuse-mode pool`. Afterwards the server reads the run's
 `build-state.json` (status, stages reused and rebuilt, failed stage), appends one line
 to the configured trial log, runs the configured perf ingest and writes the result. After
 a build that passed, and only then, it marks the run's stair-walk records as checked
-(`tools/stair_records.py promote --run RUN --request ID`), so later builds may reuse them;
+(`tools/stair_records.py promote --run RUN --request ID`), so later builds may reuse them
+(release candidates and finals reuse only checked records; development builds also reuse a CHIM frame walk that
+passed in a build that failed later, docs/BUILD_PROFILE.md);
 the result's `stair_walk` counts the records marked and the maps and frames the build
 reused and walked; `aw status` shows those counts with each recent build. The step `perf-guard` reads the
 verdict the builder's perf guard wrote (`tools/perf_guard.py show RUN --json`, result field `perf_guard`): a failed

@@ -96,7 +96,7 @@ The previously flat material-zero ground and water swatches now use the original
 default-land and water textures, quantized into the existing palette. The 92
 affected town BSPs receive only those texture pixels; every other lump is unchanged.
 There is no source evidence for adding curvature or a town-specific sea datum.
-The owner's old `9,484,102` report lacked a terrain region ID, so that exact camera
+The maintainer's old `9,484,102` report lacked a terrain region ID, so that exact camera
 cannot be identified uniquely. New GLOBAL/LOCAL rows and `aw_pos` solve that
 reporting ambiguity.
 
@@ -108,7 +108,7 @@ terrain. The packer balances their payloads. Both partitions stay below 2 GiB an
 the complete device stays below 4 GiB, following the [storage plan](STORAGE.md).
 The older 1 GiB boot cap was a build setting, not a filesystem limit.
 
-This measured capacity split is distinct from the owner's preferred future
+This measured capacity split is distinct from the maintainer's preferred future
 layout: main Morrowind on partition 1 where it fits, with future expansions,
 videos and selected infrequent assets on partition 2. No expansion conversions
 are included here. See [placement and loading costs](STORAGE.md#preferred-future-content-placement).

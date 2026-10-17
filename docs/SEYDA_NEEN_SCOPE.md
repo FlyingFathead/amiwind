@@ -1,6 +1,6 @@
 # Seyda Neen vicinity: first complete area
 
-Owner-selected scope, 27 September 2026:
+Maintainer-selected scope, 27 September 2026:
 [UESP map centered near -11394, -71667](https://gamemap.uesp.net/mw/?x=-11394&y=-71667&zoom=7).
 The supplied map screenshot is retained privately; it is not bundled as public
 artwork. Use the map as a coverage checklist, with the owned master as source.
@@ -19,7 +19,7 @@ together; additional towns are not the next coverage target.
 | Lighthouse peninsula, nearby islets and shoreline | Source terrain and water meet consistently; distinguish converted coverage from the temporary flat sea. |
 | Opposing shore, bridge connections and mainland approach | Reachable routes in both directions without falling through seams or meeting an invisible export boundary. |
 | Silt strider stop | Include its shore, approach and landing in the footprint now. Add the recognizable strider as a later creature/landmark conversion task; travel service is separate gameplay work. |
-| Bridge-side residential area described by the owner as Fargoth's house | Verify the house/cell/door identity from the owned data before assigning a name or destination. Include the connected residential route. |
+| Bridge-side residential area described by the maintainer as Fargoth's house | Verify the house/cell/door identity from the owned data before assigning a name or destination. Include the connected residential route. |
 | Town containers and nearby actors | Inventory placed references now; add visible containers and suitable collision, then their interaction/state milestone. The current three actors are only a subset. |
 
 1. Audit selected cells, transformed object bounds and connected assemblies.
@@ -116,7 +116,7 @@ Replace the placeholder as neighboring terrain/coastline is converted.
 
 ## Silt Strider omission audit
 
-Owner suspects the missing edge area is the Silt Strider landing. Source audit
+Maintainer suspects the missing edge area is the Silt Strider landing. Source audit
 finds the strider as ACTI `a_siltstrider` and its operator in the named town cell.
 The current ordinary scenery pass admits STAT/DOOR plus the explicit ship ACTI,
 so the strider itself is omitted. This is a confirmed selection omission, but

@@ -9,7 +9,7 @@
 | Where | config/lava_x1ym2.json |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev1 (last seen) |
+| Persists in | fixed in v0.0.38 |
 | Severity | low: Stops validation before a playtest build; no shipped gameplay affected |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | lava-sandbox-candidate |

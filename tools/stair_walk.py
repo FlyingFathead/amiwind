@@ -47,6 +47,11 @@ INCREMENT = 2.0
 EDGE_TOLERANCE = 2.0   # risers with a chamfered nosing
 MIN_OVERLAP = 16.0   # the standing box (14.6 wide) fits on the step
 RAMP_MIN_AREA = 48.0
+# Every threshold of the step search is met within GRACE (units; NZ_GRACE for normals): the same placement, placed
+# by two frames at their own coordinates, rounds a value lying exactly on a threshold (a 16.0-unit shared edge) to
+# either side of it; with the grace both copies find the same step (STAIR-DETECT-POSITION-41).
+GRACE = 1e-6
+NZ_GRACE = 1e-9
 SIDE_SHIFTS = (1., -1., 2., -2., 3., -3.)  # sideways retries of a grazing line (at most about a fifth of the box width)
 SHELL_MARGIN = .25   # authored collision plates stand 0.2 off each visible surface (mesh_geometry.shell_collision_parts)
 
@@ -81,6 +86,10 @@ def _faces(raw):
 
 
 def _normal(pts):
+    # relative to the first corner: the sums of a Newell normal taken at a frame's coordinates (thousands of units
+    # from its origin) round differently in two frames that place the same face (STAIR-DETECT-POSITION-41)
+    o = pts[0]
+    pts = [(p[0] - o[0], p[1] - o[1], p[2] - o[2]) for p in pts]
     nx = ny = nz = 0.
     for i in range(len(pts)):
         a, b = pts[i], pts[(i + 1) % len(pts)]
@@ -107,10 +116,24 @@ def _edge_z(a, b, ux, uy, s):
     return a[2] + (b[2] - a[2]) * t
 
 
-def candidates(polys, core=None):
-    """Steps (riser edges between level faces) and ramps of each placement."""
+FLIGHT_MARGIN = 128.0  # around a core: steps found there only to mark the core's flights (STAIR-FLIGHT-CORE-SPLIT-41)
+
+
+def candidates(polys, core=None, margin=FLIGHT_MARGIN):
+    """Steps (riser edges between level faces) and ramps of each placement whose riser point lies in CORE
+    ((x0, y0, x1, y1), half-open; None: everywhere). Flight marks are found on the steps of the core plus MARGIN
+    (the reach of the flight test, flights), then only the core's own steps are kept, so a flight that crosses a
+    core line keeps its mark in both cores, as on the whole map (STAIR-FLIGHT-CORE-SPLIT-41). POLYS must cover the
+    core plus MARGIN plus the reach of a step (chim.collision.stair_polys). Steps are found the same way at any
+    position of the placement (STAIR-DETECT-POSITION-41): every edge pair of two level faces is tested (lossless
+    bins), and of the pairs that make a step the one with the longest shared edge is taken, whatever order the
+    bins hold them in."""
     def inside(p):
         return core is None or (core[0] <= p[0] < core[2] and core[1] <= p[1] < core[3])
+
+    def near_core(p):
+        return core is None or (core[0] - margin <= p[0] < core[2] + margin and
+                                core[1] - margin <= p[1] < core[3] + margin)
     level, ramps, strips = {}, [], []
     for pts, ref in polys:
         if not _placement(ref):
@@ -118,7 +141,7 @@ def candidates(polys, core=None):
         n = _normal(pts)
         if not n or n[2] <= .1:
             continue
-        if n[2] < TREAD_NZ:
+        if n[2] < TREAD_NZ - NZ_GRACE:
             # A sloped face. Rising at most a step next to a level tread it is a
             # stair step (crossed by stepping up when steeper than walkable, as
             # in the original); a longer walkable slope is a ramp.
@@ -134,16 +157,19 @@ def candidates(polys, core=None):
             across = [p[1] * d[0] - p[0] * d[1] for p in pts]
             span = max(across) - min(across)
             slope = round(math.degrees(math.acos(n[2])), 2)
-            if not inside(low) or span < MIN_OVERLAP or width <= 0:
+            if span < MIN_OVERLAP - GRACE or width <= 0:
                 continue
-            if RISE_MIN < rise <= STEP_HEIGHT + 1e-3 and width <= 2 * CLEARANCE:
+            if RISE_MIN - GRACE < rise <= STEP_HEIGHT + 1e-3 and width <= 2 * CLEARANCE + GRACE:
+                if not near_core(low):
+                    continue
                 strips.append(dict(kind='step', ref=ref, point=low, high=high, direction=d, rise=round(rise, 3),
                                    top=high[2], reach=round(width + TREAD_MIN, 3), slope=slope, span=span))
-            elif n[2] >= WALKABLE_Z and n[3] >= RAMP_MIN_AREA and width >= TREAD_MIN:
+            elif (n[2] >= WALKABLE_Z - NZ_GRACE and n[3] >= RAMP_MIN_AREA - GRACE and width >= TREAD_MIN - GRACE
+                  and inside(low)):
                 ramps.append(dict(kind='ramp', ref=ref, point=low, high=high, direction=d,
                                   reach=round(width, 3), slope=slope))
             continue
-        if n[2] >= TREAD_NZ:
+        if n[2] >= TREAD_NZ - NZ_GRACE:
             z = sum(p[2] for p in pts) / len(pts)
             cx = sum(p[0] for p in pts) / len(pts); cy = sum(p[1] for p in pts) / len(pts)
             level.setdefault(ref, []).append((z, pts, (cx, cy)))
@@ -154,52 +180,64 @@ def candidates(polys, core=None):
             for i in range(len(pts)):
                 a, b = pts[i], pts[(i + 1) % len(pts)]
                 dx, dy = b[0] - a[0], b[1] - a[1]; length = math.hypot(dx, dy)
-                if length < MIN_OVERLAP:
+                if length < MIN_OVERLAP - GRACE:
                     continue
                 angle = math.atan2(dy, dx) % math.pi
                 ux, uy = math.cos(angle), math.sin(angle)
                 offset = -uy * a[0] + ux * a[1]
                 key = (round(angle / .02) % 157, round(offset))
-                bins.setdefault(key, []).append((index, a, b, ux, uy, offset))
-        seen = set()
+                bins.setdefault(key, []).append((index, i, a, b, ux, uy, offset))
+        # Every edge pair of two level faces that can make a riser, gathered first: the parallel test allows
+        # .03 (about 1.7 bins of angle) and the offset test EDGE_TOLERANCE (up to 3 bins of rounded offset), so
+        # the neighbouring bins searched hold every such pair at any position (STAIR-DETECT-POSITION-41).
+        found = {}
         for (ka, ko), group in bins.items():
-            near = [e for da in (-1, 0, 1) for do in (-2, -1, 0, 1, 2) for e in bins.get(((ka + da) % 157, ko + do), [])]
-            for i, a, b, ux, uy, off in group:
-                for j, c, d, vx, vy, off2 in near:
-                    if j == i or (min(i, j), max(i, j)) in seen:
-                        continue
+            near = [e for da in (-2, -1, 0, 1, 2) for do in (-3, -2, -1, 0, 1, 2, 3)
+                    for e in bins.get(((ka + da) % 157, ko + do), [])]
+            for i, ei, a, b, ux, uy, off in group:
+                for j, ej, c, d, vx, vy, off2 in near:
+                    if j <= i:
+                        continue                 # each face pair once, from its lower face: the same at any position
                     zi, zj = items[i][0], items[j][0]
                     rise = abs(zi - zj)
-                    if not RISE_MIN < rise <= STEP_HEIGHT + 1e-3 or abs(ux * vy - uy * vx) > .03 or abs(off - off2) > EDGE_TOLERANCE:
+                    if (not RISE_MIN - GRACE < rise <= STEP_HEIGHT + 1e-3 or abs(ux * vy - uy * vx) > .03 + NZ_GRACE
+                            or abs(off - off2) > EDGE_TOLERANCE + GRACE):
                         continue
                     s = sorted([ux * a[0] + uy * a[1], ux * b[0] + uy * b[1]]); t = sorted([ux * c[0] + uy * c[1], ux * d[0] + uy * d[1]])
                     lo, hi = max(s[0], t[0]), min(s[1], t[1])
-                    if hi - lo < MIN_OVERLAP:
+                    if hi - lo < MIN_OVERLAP - GRACE:
                         continue
                     # A riser is a drop at the shared edge itself, not a difference
                     # of the two faces' mean heights: two tilted floor triangles
                     # meeting along one edge (a cave floor) are not a step
                     # (STAIRS-ADDAMASARTUS-32).
                     mid = (lo + hi) / 2
-                    if abs(_edge_z(a, b, ux, uy, mid) - _edge_z(c, d, ux, uy, mid)) <= RISE_MIN:
+                    if abs(_edge_z(a, b, ux, uy, mid) - _edge_z(c, d, ux, uy, mid)) <= RISE_MIN - GRACE:
                         continue
-                    seen.add((min(i, j), max(i, j)))
                     low, high = (i, j) if zi < zj else (j, i)
                     m = (ux * (lo + hi) / 2 - uy * off, uy * (lo + hi) / 2 + ux * off)
                     hc = items[high][2]
                     nx, ny = -uy, ux
                     if (hc[0] - m[0]) * nx + (hc[1] - m[1]) * ny < 0:
                         nx, ny = -nx, -ny
-                    point = (m[0], m[1], items[low][0])
                     reach_up = max((p[0] - m[0]) * nx + (p[1] - m[1]) * ny for p in items[high][1])
                     reach_down = max((m[0] - p[0]) * nx + (m[1] - p[1]) * ny for p in items[low][1])
-                    if reach_up < TREAD_MIN or reach_down < TREAD_MIN:
+                    if reach_up < TREAD_MIN - GRACE or reach_down < TREAD_MIN - GRACE:
                         continue
-                    if inside(point):
-                        steps.append(dict(kind='step', ref=ref, point=point, direction=(nx, ny), reach=round(reach_up, 3),
-                                          rise=round(rise, 3), top=items[high][0], span=hi - lo))
+                    # the pair with the longest shared edge (then the first edges of the faces): no bin order decides
+                    rank = (-(hi - lo), ei, ej)
+                    if (i, j) not in found or rank < found[(i, j)][0]:
+                        found[(i, j)] = (rank, dict(kind='step', ref=ref, point=(m[0], m[1], items[low][0]),
+                                                    direction=(nx, ny), reach=round(reach_up, 3), rise=round(rise, 3),
+                                                    top=items[high][0], span=hi - lo))
+        for pair in sorted(found):
+            step = found[pair][1]
+            if near_core(step['point']):
+                steps.append(step)
     stairs = steps + strips
     flights(stairs)
+    # only the core's own steps: the others were found to mark flights that cross the core's edge
+    stairs = [s for s in stairs if inside(s['point'])]
     return stairs + ramps
 
 
@@ -225,7 +263,8 @@ def flights(stairs):
                 bx, by, bz = b['point']
                 along = (bx - ax) * d[0] + (by - ay) * d[1]
                 across = abs((bx - ax) * -d[1] + (by - ay) * d[0])
-                if 0 < along <= a.get('reach', TREAD_MIN) + 3 * CLEARANCE and across <= MIN_OVERLAP and abs(bz - a['top']) <= 1.:
+                if (0 < along <= a.get('reach', TREAD_MIN) + 3 * CLEARANCE + GRACE and across <= MIN_OVERLAP + GRACE
+                        and abs(bz - a['top']) <= 1. + GRACE):
                     nxt[i].append(j)
         depth = {}
 
@@ -675,7 +714,7 @@ def check_polys(polys, scene, core=None, contents=None, proxy=None):
     return _check_items(candidates(polys, core), polys, scene, contents, proxy)
 
 
-# What the walk covers (owner decision 9 October 2026): 'all' walks every step and ramp (development
+# What the walk covers (project decision 9 October 2026): 'all' walks every step and ramp (development
 # builds, the nightly full report); 'flights' walks only the steps of flights, the rows that can stop a
 # build (release candidates and finals). The builder sets the variable (tools/build.py --stair-walk).
 SCOPE_ENV = 'AMIWIND_STAIR_WALK'
@@ -779,16 +818,19 @@ def check_map(task):
     return Path(path).stem, rows
 
 
-WALK_CACHE_ENV = 'AMIWIND_STAIR_WALK_CACHE'     # cached (default) | full: walk everything again
+WALK_CACHE_ENV = 'AMIWIND_STAIR_WALK_CACHE'     # cached (default) | records | full: walk everything again
 WALK_SAMPLE_ENV = 'AMIWIND_STAIR_WALK_SAMPLE'   # reused maps/frames walked again per run to check the cache
-WALK_CACHE_MODES = ('cached', 'full')
+WALK_CACHE_MODES = ('cached', 'records', 'full')
 WALK_SAMPLE_DEFAULT = 2
 
 
 def walk_cache_mode():
-    """The stair walk's reuse (tools/build.py --stair-walk): 'cached' reuses a map's or frame's rows while
-    what the walk reads is unchanged (pass_cache, SHA-256 of the content); 'full' walks every one (the
-    from-scratch reference build). Results are the same either way (BUILD-CHIM-HEAP-GATE-LATE-36)."""
+    """The stair walk's reuse (tools/build.py --stair-walk-cache): 'cached' reuses a map's or frame's rows while
+    what the walk reads is unchanged (pass_cache, SHA-256 of the content); 'records' also takes a CHIM frame
+    from the known-good stair records shipped with the source (stair_records.load_shipped) and walks a frame
+    found in neither only on request (the default of a build without --developer-mode; legacy maps are walked
+    as with 'cached'); 'full' walks every one (the from-scratch reference build). Results are the same either way
+    (BUILD-CHIM-HEAP-GATE-LATE-36)."""
     mode = os.environ.get(WALK_CACHE_ENV, 'cached') or 'cached'
     if mode not in WALK_CACHE_MODES:
         raise ValueError('%s must be one of %s, not %r' % (WALK_CACHE_ENV, ', '.join(WALK_CACHE_MODES), mode))
@@ -930,7 +972,7 @@ def walk_key_sources():
 
 def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
     """The gate over a payload; exempt: maps whose blocking failures are
-    reported but do not fail it (a recorded, owner-approved stage); scope: 'all'
+    reported but do not fail it (a recorded, maintainer-approved stage); scope: 'all'
     (every step and ramp) or 'flights' (only the steps of flights, the rows that can
     fail the gate); default from AMIWIND_STAIR_WALK, else 'all'."""
     from build_parallel import ordered_map
@@ -948,7 +990,7 @@ def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
         json.dumps(models or {}, sort_keys=True).encode()).hexdigest()}
     if scope != 'all':
         options['scope'] = scope
-    cache = PassCache.open('stair-walk', options, *walk_key_sources()) if walk_cache_mode() == 'cached' else None
+    cache = PassCache.open('stair-walk', options, *walk_key_sources()) if walk_cache_mode() != 'full' else None
     # every run walks a seeded sample of the maps again and compares with their stored rows
     sample = set(pick_sample([t[0] for t in tasks], walk_sample(), 'legacy:%d' % len(tasks))) if cache else set()
     rows, how, stored = [], {}, []

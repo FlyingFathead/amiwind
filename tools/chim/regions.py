@@ -42,7 +42,7 @@ LAND_DONE = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete
              'playtested', 'audits_passed')
 OCEAN = ('ocean',)
 NAMED = ('seabed', 'coast', 'sea-ring', 'coast2')
-# The v0.0.36 coastline (owner decision 2026-10-11: "the entire coastline, all 1's, all possible 2's ... as CHIM"):
+# The v0.0.36 coastline (project decision 2026-10-11: "the entire coastline, all 1's, all possible 2's ... as CHIM"):
 # every cell of rings 1 and 2 from the sea; a cell that cannot go on CHIM is dropped with its reason, not refused.
 COAST2_RINGS = (1, 2)
 KIND_CODES = {'seabed': 's', 'land': 'l', 'ocean': 'o'}
@@ -334,7 +334,7 @@ def preflight(cells, explicit, statuses, town_boxes, one_map_only=False):
             continue
         towns = sorted(t for t, box in town_boxes.items() if boxes_meet(cell_box(cell), box))
         if towns:
-            # towns win, also over a cell listed by name (owner decision 2026-10-11 09:55: all of Vivec is one CHIM
+            # towns win, also over a cell listed by name (project decision 2026-10-11 09:55: all of Vivec is one CHIM
             # frame, so the coast lists' cells inside it leave the selection): dropped and recorded, never refused
             reason = 'inside the frame of %s (towns keep their own frame)' % ', '.join(towns)
             dropped.append({'cell': list(cell), 'reason': reason + ('; listed by name' if cell in explicit else '')})

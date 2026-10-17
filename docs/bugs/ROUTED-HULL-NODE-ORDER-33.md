@@ -9,7 +9,7 @@
 | Where | Routed standing hulls (tools/routed_hull.py, route_nested), legacy maps and CHIM models |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev1 (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | high: The engine stops the game the first time a trace enters such a model (the Arena Pit crashed on load). |
 | Family | Mesh converter geometry (`converter-geometry`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

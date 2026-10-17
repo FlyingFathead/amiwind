@@ -318,6 +318,11 @@ class NativeSourceTests(unittest.TestCase):
                 cflags=['-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-unused-parameter',
                         '-fsanitize=undefined','-fno-sanitize-recover=all'])
 
+    def test_hud_icon_table_boxes_bars_and_single_load(self):
+        # HUD-STATS-29: the original weapon/magic boxes from the one icon table.
+        self.compile_run('aga_hud_icons_test.c', [Path(SOURCE)/'src/aw_icons.c'],
+            cflags=['-Wall','-Werror=implicit-function-declaration','-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
     def test_inventory_real_drop_placement_capacity_and_no_loss(self):
         self.compile_run('aga_inventory_placement_test.c', [Path(SOURCE)/'src'/n for n in
             ('aw_inventory.c','aw_state.c','mathlib.c')],

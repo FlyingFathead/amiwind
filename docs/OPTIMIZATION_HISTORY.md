@@ -20,7 +20,7 @@ they were the same hardware.
 - [Next bottlenecks to measure](#next-bottlenecks-to-measure)
 - [Packaged HDF baseline](#packaged-hdf-baseline)
 - [2026-09-27: remove the desktop icon startup dependency](#2026-09-27-remove-the-desktop-icon-startup-dependency)
-- [Owner confirmation — v0.0.12-dev2, 27 September 2026](#owner-confirmation--v0012-dev2-27-september-2026)
+- [Maintainer confirmation — v0.0.12-dev2, 27 September 2026](#maintainer-confirmation--v0012-dev2-27-september-2026)
 - [v0.0.13-dev1 / checkpoint-014 — correct geometry and bounded render buffers](#v0013-dev1--checkpoint-014--correct-geometry-and-bounded-render-buffers)
 - [v0.0.14-dev1 / checkpoint-015 — ship conversion and cache budget](#v0014-dev1--checkpoint-015--ship-conversion-and-cache-budget)
 - [v0.0.15-dev1 / checkpoint-016 — interior policy and measured hand path](#v0015-dev1--checkpoint-016--interior-policy-and-measured-hand-path)
@@ -168,9 +168,9 @@ not been initialized. SetChipRev(SETCHIPREV_BEST), also used by the renderer,
 corrected this before release. Native checks cover RAM, CPU, FPU, chipset and
 KS1.3 rejection. Exact results and hashes are in CHECKPOINT_008_VALIDATION.md.
 
-The owner later reported a WinUAE 6.0.3 boot after selecting the complete KS3.1
+The maintainer later reported a WinUAE 6.0.3 boot after selecting the complete KS3.1
 ROM with 16 MiB Z3 RAM. Severe audio breakup remained with cpu_speed=real.
-The owner then selected maximum speed and reported that it ran OK. The
+The maintainer then selected maximum speed and reported that it ran OK. The
 corrected profile preserves that setting. Playback shares the game loop, so late frames can repeat
 stale DMA audio. Future work must measure and service that deadline, not infer
 sufficient playback from zero file-read errors. The current host test suite and
@@ -295,9 +295,9 @@ Optional network initialization is a candidate for a later startup audit;
 required display, audio, input, timer and filesystem services still remain.
 See CHECKPOINT_007_VALIDATION.md for hashes, counters and test scope.
 
-## Owner confirmation — v0.0.12-dev2, 27 September 2026
+## Maintainer confirmation — v0.0.12-dev2, 27 September 2026
 
-The owner confirms that the central town-square obstruction is fixed. This
+The maintainer confirms that the central town-square obstruction is fixed. This
 corroborates the bounded collision-hull work recorded in checkpoint-013; it
 does not close the separate pier, scene-boundary or terrain rendering reports.
 See [PLAYTEST_STATUS.md](PLAYTEST_STATUS.md) for per-version acceptance status.
@@ -425,7 +425,7 @@ saving from removing the entire ship assembly after the opening.
 
 ## Building culling investigation 001 (after checkpoint-017)
 
-Owner report at XYZ249 40 227 / DEG315 P25 linked roof-edge popping to culling
+Maintainer report at XYZ249 40 227 / DEG315 P25 linked roof-edge popping to culling
 cost. Native fixed-camera A/B with `dbg cull 1` and0 reproduces the lines in both
 states, also at XYZ288 42 171 / DEG332 P12. HUD-excluded scene crops are identical
 (zero changed pixels of166352 at each pair). This rules out the added fog-distance

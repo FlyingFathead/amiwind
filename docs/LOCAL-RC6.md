@@ -31,7 +31,7 @@ bash build.sh --autoinstall \
 See [rc6 release notes](RELEASE-v0.0.25-rc6.md) and the
 [source validation receipt](validation/rc6-source.json). Full game conversion,
 production image gates and emulator testing require their own evidence. The
-owner publishes the source prerelease with the provided script after review.
+maintainer publishes the source prerelease with the provided script after review.
 
 
 If rc3 conversion already completed, use [image recovery](IMAGE_RECOVERY.md)

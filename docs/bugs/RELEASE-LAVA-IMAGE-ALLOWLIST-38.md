@@ -9,7 +9,7 @@
 | Where | Source release preflight |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38 (last seen) |
+| Persists in | fixed in v0.0.39 |
 | Severity | medium: Source export refuses the release before packaging. |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | none |

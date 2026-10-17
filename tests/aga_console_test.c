@@ -345,6 +345,7 @@ int main(int count,char **values){
  assert(AW_ParseBoolean("FALSE")==0 && AW_ParseBoolean("off")==0 && AW_ParseBoolean("0")==0);
  assert(AW_ParseBoolean("2")==-1 && AW_ParseBoolean("truth")==-1);
  assert(AW_BooleanCvar("aw_fog") && !AW_BooleanCvar("aw_drawdistance"));
+ assert(!AW_BooleanCvar("aw_cull")); /* a far-test selector 0..6 (cvar.c), not a boolean */
  assert(!AW_BooleanCvar("aw_dialogue_box_layout") && !AW_BooleanCvar("aw_ui_font"));
  {
   char *indoor[]={"dbg","indoor","luma","1.1"};

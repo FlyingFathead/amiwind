@@ -474,6 +474,15 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(result['steps']['stair-records']['ok'])
         self.assertIn('FAILED (1 failing), 1 waived (X-36)', aw.perf_guard_text(result['perf_guard']))
 
+    def test_a_failed_size_guard_fails_the_result_but_keeps_the_stages(self):
+        code, result, _ = self.submit(self.request(), FakeRunner(build_exit=4))
+        self.assertEqual(result['status'], 'failed')
+        self.assertNotEqual(code, 0)
+        self.assertTrue(result['steps']['build']['ok'], result['steps']['build'])
+        self.assertFalse(result['steps']['size-guard']['ok'])
+        self.assertEqual(result['failed_stage'], 'size-guard')
+        self.assertTrue(result['steps']['stair-records']['ok'])
+
     def test_exit_3_with_a_failed_stage_is_a_failed_build(self):
         summary = {'found': True, 'status': 'failed', 'stages': 36, 'reused': 0, 'rebuilt': 3,
                    'failed_stage': 'image', 'not_started': 0}

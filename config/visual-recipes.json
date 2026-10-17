@@ -116,7 +116,7 @@
       "default_error_share": 0.01
     },
     "everywhere-v1": {
-      "status": "Owner decision 2026-10-16: replacements applied in every CHIM cell and town frame (the original mesh stays the collision). AMIWIND_VISUAL_EVERYWHERE=off keeps the original meshes.",
+      "status": "Project decision 2026-10-16: replacements applied in every CHIM cell and town frame (the original mesh stays the collision). AMIWIND_VISUAL_EVERYWHERE=off keeps the original meshes.",
       "models": {
         "meshes/l/light_de_streetlight_01.nif": {
           "sha256": "263615adcaf6805ca408a9572c96c96aef8646b0798ae090d9b4e69057772d8a",
@@ -136,7 +136,7 @@
       }
     },
     "telvanni-v1": {
-      "status": "Trial (16 October 2026): Tel Uvirith reductions plus roots and boats for the Telvanni towns over the CHIM memory budget, whole towns with their neighbouring cells (Sadrith Mora cells 16-19,3-6; Vos 11-14,12-15); per-mesh values pending owner inspection. Collision remains original.",
+      "status": "Trial (16 October 2026): Tel Uvirith reductions plus roots and boats for the Telvanni towns over the CHIM memory budget, whole towns with their neighbouring cells (Sadrith Mora cells 16-19,3-6; Vos 11-14,12-15); per-mesh values pending maintainer inspection. Collision remains original.",
       "models": {
         "meshes/x/ex_t_housepod_01.nif": {
           "sha256": "5aafbba6727de7df1e7345d07483a04ad3afec8a481b41d0b9d44e296e3f62a3",

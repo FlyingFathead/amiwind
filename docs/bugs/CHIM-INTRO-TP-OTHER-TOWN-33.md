@@ -74,6 +74,7 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 - AW25-01 (no report page): Seyda Neen walking reaches water before the island handoff
 - [ENGINE-SCENE-NAME-BOUND-35](ENGINE-SCENE-NAME-BOUND-35.md): Scene links copied map names into 16-byte fields with strcpy
 - INPUT-01 (no report page): Held Ctrl/Shift flight modifiers reset on cell changes
+- [INTERIOR-SPAWN-UNDERWATER-41](INTERIOR-SPAWN-UNDERWATER-41.md): Vivec underworks rooms spawn under their water
 - [INTRO-ROLES-30](INTRO-ROLES-30.md): NUM_FOR_EDICT bad-pointer crash on a Seyda Neen region change
 - SEYDA-TRANSITION-29 (no report page): v0.0.29-dev1: Cell/sub-cell passage problems around Seyda Neen
 - TRANSITION-EQUIPMENT-29 (no report page): Carried torch blinks out on cell/sub-cell arrival

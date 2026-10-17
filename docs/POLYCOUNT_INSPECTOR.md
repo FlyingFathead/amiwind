@@ -79,7 +79,7 @@ engine visibility simulation or gameplay are rendered.
 **Load textures** adds depth-tested, unlit solid surfaces from the BSP's embedded
 indexed base textures. **Wireframe overlay on solids** retains visible polygon
 edges; turning textures off restores the see-through wireframe. For actual
-colors choose an owner-supplied `gfx/palette.lmp` containing exactly 768 bytes.
+colors choose an user-supplied `gfx/palette.lmp` containing exactly 768 bytes.
 Without a palette, the view is explicitly a grayscale preview. Lightmaps are
 not rendered. Every palette index, including 255, is opaque for ordinary BSP
 textures; the viewer does not invent transparent holes.
@@ -263,7 +263,7 @@ reported independently. No universal elimination rule or fixed release is claime
 
 For screenshots accompanying public method documentation, use only the built-in
 asset-free synthetic scene or other project-authored synthetic geometry. Never
-substitute owner game-derived BSPs, textures, maps or private annotated media.
+substitute maintainer game-derived BSPs, textures, maps or private annotated media.
 
 ### File savings versus a current-source heap estimate
 

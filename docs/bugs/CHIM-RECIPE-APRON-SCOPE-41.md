@@ -83,7 +83,7 @@ limit or view distance is raised or lowered by this repair.
 source changes during the run. The later four-frame original-data conversion passed structural validation for all four; three memory gates still failed before the separate allocation repair.
 The previous current world passed structural validation with zero failures
 and unchanged source/inputs, then failed memory. No native regression image,
-package, shipment or owner acceptance is established. Native captures await a
+package, shipment or maintainer acceptance is established. Native captures await a
 passing fresh image; the memory report alone is not a visible-defect capture.
 
 ## Prevention

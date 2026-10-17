@@ -1,20 +1,20 @@
 # rc1 Balmora checklist and investigation
 
-30 September 2026. Dev5 source is pushed as `1e1823d`; owner publication is a prerelease.
+30 September 2026. Dev5 source is pushed as `1e1823d`; maintainer publication is a prerelease.
 Keep v0.0.23 as the stable release. Delivered dev5 archives are immutable.
 
 <!-- contents start -->
 ## Contents
 
-- [Owner acceptance checklist](#owner-acceptance-checklist)
+- [Maintainer acceptance checklist](#maintainer-acceptance-checklist)
 - [Initial findings](#initial-findings)
 - [Verification still required](#verification-still-required)
-- [Additional owner direction](#additional-owner-direction)
+- [Additional maintainer direction](#additional-maintainer-direction)
 - [Stable release presentation gate](#stable-release-presentation-gate)
 - [Part 3: NPC targeting](#part-3-npc-targeting)
 - [Confirmed: interior coordinate culling](#confirmed-interior-coordinate-culling)
 - [Confirmed: recurring stair-ramp classification mismatch](#confirmed-recurring-stair-ramp-classification-mismatch)
-- [Owner pavement reference](#owner-pavement-reference)
+- [Maintainer pavement reference](#maintainer-pavement-reference)
 - [Native acceptance record](#native-acceptance-record)
 - [Legacy disk filename correction](#legacy-disk-filename-correction)
 - [Latest doorway and wedged-player follow-up](#latest-doorway-and-wedged-player-follow-up)
@@ -25,7 +25,7 @@ The [Balmora conversion lessons](BALMORA_CONVERSION_LESSONS.md) consolidate
 problem, cause, implications and resolution for future regions. This file keeps
 the complete coordinate checklist and remaining release acceptance gates.
 
-## Owner acceptance checklist
+## Maintainer acceptance checklist
 
 Every report starts open. Conversion alone is not native traversal acceptance.
 Keep the accepted Strider, 90-degree FOV, player hull/race eye heights, Shift+V
@@ -65,7 +65,7 @@ and frozen-frame Loading... presentation.
 | ground6 (Part 8) | 121, -49, 56 | 54 / 47 | Source tile (-3,-2)/(9,7): default 0 replaced by adjoining WG_road 34; native repaired view checked |
 | ground7 (Part 9) | 198, 34, 62 | 230 / 34 | Same source tile (9,7) as ground6, viewed from the opposite side; native repaired view checked |
 | ground8 (Part 9) | 252, 169, 60 | 68 / 27 | Source tile (-3,-2)/(10,9), checked 0-to-34 paving repair; native repaired view checked |
-| ground9 (Part 10) | 547, -1182, 59 | 336 / 44 | Same source tile (-3,-3)/(12,14) as ground3; owner reference at 556,-1108 confirms road34; native repaired view checked |
+| ground9 (Part 10) | 547, -1182, 59 | 336 / 44 | Same source tile (-3,-3)/(12,14) as ground3; maintainer reference at 556,-1108 confirms road34; native repaired view checked |
 | archdoor4 (Part 11) | 112, 37, 56 | 177 / 0 | Native ordinary approach reaches the doorway; linked entrance round trip passed |
 | ground10 (Part 12a) | -42, 233, 83 | 23 / 67 | Same source tile (-3,-2)/(7,9) as ground1/2/4; road34 repair rebuilt; latest native view checked |
 | door7 (Part 12b) | -539, 46, 218 | 180 / 13 | The Razor Hole, source reference 32816; native aimed door 49 and label confirmed; included in the 70 round trips |
@@ -93,20 +93,20 @@ The original `CharGenDoorEnterCaptain` script checks ring_keley, blocks activati
 until it is held, and explicitly tells the player to check the barrel to the left.
 Retain this source-authored tutorial gate.
 
-The dev5 release helper assumed `gh api --slurp`. The owner CLI rejected it before
+The dev5 release helper assumed `gh api --slurp`. The maintainer CLI rejected it before
 tag/release creation. Standalone release kit r2 uses explicit JSON-array pagination;
 source/game packages remain identical. Local Git fixtures and simulated legacy API
 responses verify retry, pagination, conflict handling and asset integrity.
 
 ## Verification still required
 
-Owner playtesting of the full natural introduction and city roaming remains.
+Maintainer playtesting of the full natural introduction and city roaming remains.
 The positive-Y stairs10 coordinate and exact wedge1 trap are unresolved; retain
 them as RC limitations. Local route, door, room, representative NPC and font
 checks are recorded below. Packaged-HDF results are in the RC release notes.
 Null-audio tests can verify selection/triggering but not subjective sound quality.
 
-## Additional owner direction
+## Additional maintainer direction
 
 The intro dock guard should finish to the left of the Census door, back toward
 the wall, facing the docks. Record the inspected route, final transform and
@@ -117,7 +117,7 @@ A reusable conversion/troubleshooting guide accompanies the findings.
 
 ## Stable release presentation gate
 
-After owner approval, v0.0.24 is titled **Welcome to Balmora**. In README.md,
+After maintainer approval, v0.0.24 is titled **Welcome to Balmora**. In README.md,
 place release information and verified-build Balmora screenshots directly below
 the AmiWind PNG, at the top of **Current state of the project**. Include exterior
 and interior views where representative; do not use mockups or stale dev captures.
@@ -167,10 +167,10 @@ See [Stair ramp walkability](STAIR_RAMP_WALKABILITY.md) for cause, implications,
 measured limits, test evidence and the repeatable diagnosis procedure. Other
 checklist routes remain open until separately validated.
 
-## Owner pavement reference
+## Maintainer pavement reference
 
 XYZ `(193,346,61)`, yaw146/pitch80: source cell `(-3,-2)`, tile `(9,10)`,
-material34 `WG_road`, texture `Tx_WG_road_01.tga`. This is the owner-approved
+material34 `WG_road`, texture `Tx_WG_road_01.tga`. This is the maintainer-approved
 reference for the Part8/Part9 canal-side paving repairs.
 
 ## Native acceptance record
@@ -201,7 +201,7 @@ subjective sound quality and physical Amiga performance are not certified.
   readable e/H changes retain metrics; the original remains selectable.
 - Guard post check reaches `(302,-199,31)` and holds actor yaw225 toward the
   docks. This is a targeted post-race route check; the entire natural intro
-  remains an owner acceptance gate.
+  remains a maintainer acceptance gate.
 - A normal Hors→Balmora→Caius sequence saves and restores with health55 intact.
   Earlier diagnostic bare `map` commands reset the engine player to health100,
   exceeding Hors's maximum55 and correctly failing save validation. Keep this

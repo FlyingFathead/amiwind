@@ -9,7 +9,7 @@
 | Where | tests/test_aga_native_source.py compile_run (version header generation) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | low: Only a native test run alone failed (no chim_version.h); the full suite and gate used the right file. |
 | Family | Gates, CI and tests (`tests-ci`) |
 

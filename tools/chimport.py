@@ -154,12 +154,15 @@ def category_of(tag, object_id):
     return 'other'
 
 
-def census(esm):
+def census(esm, land_records=()):
     """{(x, y): {land, name, region, refs, by_type, categories, meshes}} for every exterior cell that has land
-    or placed records (the base master's own records; deleted references left out)."""
+    or placed records (the base master's own records; deleted references left out). land_records: every live LAND
+    record of the masters, also those without height data: such a cell with nothing placed is a seabed cell
+    (`seabed`: True), converted as its own cell with flat ground, never open ocean (CHIMPORT-OCEAN-LAND-41)."""
     from mwad.audit import normpath
     out = {}
-    for key in set(esm['cells']) | set(esm['lands']):
+    seabed = set(land_records) - set(esm['lands'])
+    for key in set(esm['cells']) | set(esm['lands']) | seabed:
         cell = esm['cells'].get(key, {'name': '', 'region': '', 'refs': []})
         refs = [r for r in cell['refs'] if not r.get('deleted')]
         by_type, cats, meshes, missing = collections.Counter(), collections.Counter(), set(), 0
@@ -173,11 +176,13 @@ def census(esm):
             cats[category_of(obj['type'], r['id'])] += 1
             if obj['model']:
                 meshes.add('meshes/' + normpath(obj['model']))
-        if key not in esm['lands'] and not refs:
+        if key not in esm['lands'] and not refs and key not in seabed:
             continue
         out[key] = {'land': key in esm['lands'], 'name': cell['name'], 'region': cell['region'], 'refs': len(refs),
                     'by_type': dict(by_type), 'categories': dict(cats), 'missing_objects': missing,
                     'meshes': sorted(meshes)}
+        if key in seabed:
+            out[key]['seabed'] = True
     return out
 
 
@@ -222,7 +227,7 @@ def order_cells(cells):
     """[(cell, ring)]: ring 0 (sea cells with content, walked around the island's centre), then the land
     rings outside in. cells: {cell: {land, refs}}."""
     land = {c for c, v in cells.items() if v['land']}
-    sea = {c for c, v in cells.items() if not v['land'] and v['refs']}
+    sea = {c for c, v in cells.items() if not v['land'] and (v['refs'] or v.get('seabed'))}
     centre = ((sum(c[0] for c in land) / len(land), sum(c[1] for c in land) / len(land)) if land else (0.0, 0.0))
     ring_of = rings(land)
     out = [(c, 0) for c in walk(sea, None, centre)]
@@ -242,14 +247,16 @@ def make_plan(data_files):
     from mwad.paths import child_ci, resolve_data_files
     data = resolve_data_files(data_files)
     esm = load_esm(child_ci(data, 'Morrowind.esm'))
-    cells = census(esm)
+    from chim.ocean_runtime import land_cells
+    cells = census(esm, land_cells(data, ('Morrowind.esm',)))   # the base master's own seabed cells only
     order = order_cells(cells)
     rows = []
     for i, (c, ring) in enumerate(order, 1):
         v = cells[c]
         rows.append(dict(v, x=c[0], y=c[1], ring=ring, order=i))
     return {'format': PLAN_FORMAT, 'generated': now_iso(), 'master': 'Morrowind.esm', 'esm_sha256': esm['sha256'],
-            'rule': 'ring 0 = sea cells without land that hold records; ring 1 = land touching the sea; inwards',
+            'rule': 'ring 0 = sea cells without land that hold records, and seabed cells (a LAND record without '
+                    'heights); ring 1 = land touching the sea; inwards',
             'cells': rows}
 
 
@@ -387,7 +394,7 @@ ACCEPTED_CHAINS = ROOT / 'config' / 'hull-chain-accepted.json'
 
 
 def accepted_chains(path=ACCEPTED_CHAINS):
-    """{mesh stem: reason} of meshes the owner accepted as standing-hull chains (config/hull-chain-accepted.json):
+    """{mesh stem: reason} of meshes the maintainer accepted as standing-hull chains (config/hull-chain-accepted.json):
     models whose collision the router cannot split (COLLISION-ROUTE-NO-SPLIT-36); the hull audit passes them with
     the kept-as-chain outcome, as the meshes the heap fallback keeps for memory. {} without the file."""
     path = Path(path)
@@ -494,7 +501,7 @@ def audits_of(validate_report, stairs, heap, hulls, measured, records, receipt):
     else:
         kept = kept_as_chain(receipt)
         kept_stems = {_mesh_stem(k) for k in kept}
-        accepted = accepted_chains()     # owner-accepted chains (COLLISION-ROUTE-NO-SPLIT-36): kept as chain too
+        accepted = accepted_chains()     # maintainer-accepted chains (COLLISION-ROUTE-NO-SPLIT-36): kept as chain too
         over = [h for h in hulls if h.get('over', h['depth'] >= LEGACY_CHAIN_DEPTH)]
         # meshes the heap fallback kept as chains for memory: their own outcome, not a failure
         owner = [h for h in over if _mesh_stem(h['name']) in accepted and _mesh_stem(h['name']) not in kept_stems]
@@ -505,7 +512,7 @@ def audits_of(validate_report, stairs, heap, hulls, measured, records, receipt):
             '%d models over the hull-chain limit (max depth %d)%s%s' % (
                 len(deep), max([h['depth'] for h in hulls] or [0]),
                 '; %d kept as chain for memory' % len(for_memory) if for_memory else '',
-                '; kept as chain, owner-accepted: %s' % ', '.join(
+                '; kept as chain, maintainer-accepted: %s' % ', '.join(
                     '%s (%s)' % (m, accepted[m]) for m in owner_stems) if owner_stems else ''),
             over_limit=len(deep), max_depth=max([h['depth'] for h in hulls] or [0]),
             kept_as_chain_for_memory=sorted({_mesh_stem(h['name']) for h in for_memory} | kept_stems),

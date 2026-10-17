@@ -4,20 +4,20 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.33-dev |
 | Where | Gallery model of r/dagothr.nif (dagoth_ur_1, dagoth_ur_2) |
 | Reproduction | always |
 | Duplicate of | no |
 | Persists in | v0.0.33-dev (last seen) |
-| Severity | medium: One model loses 1,351 of 2,254 triangles; the owner wants it whole; needs a format or engine choice. |
+| Severity | medium: One model loses 1,351 of 2,254 triangles; the maintainer wants it whole; needs a format or engine choice. |
 | Family | Actors and NPCs (`actors-npc`) |
 
 <!-- END GENERATED FACTS -->
 
 ## Status: 9 October 2026
 
-Fixed in source on v0.0.34-npc-heads, not shipped at the time of writing: the owner chose option 1, the
+Fixed in source on v0.0.34-npc-heads, not shipped at the time of writing: the maintainer chose option 1, the
 shared-vertex encoding. Nothing else changes in the engine.
 
 ## Symptom
@@ -49,7 +49,7 @@ Convert `r\Dagothr.NIF` with the gallery converter and compare its 903 triangles
 
 ## Repair
 
-Options put to the owner: (1) a shared-vertex encoding (chosen), (2) splitting him into at least three alias
+Options put to the maintainer: (1) a shared-vertex encoding (chosen), (2) splitting him into at least three alias
 models (the body alone is over 1,024 triangles), (3) a larger engine ceiling for one model (its stack work
 arrays would not fit the 300,000-byte task stack).
 

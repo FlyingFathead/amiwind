@@ -5,7 +5,7 @@ Date: 29 September 2026. Target: v0.0.21-dev8 source prerelease.
 ## Exact inputs
 
 Base: `amiwind-2026-09-29_025822.zip`, SHA-256
-`a4a660e8cad92e554cbc45c07b42b935cf3aadc36ab6aac04ceeba688a0309c3`. This is the owner's dev7 working snapshot;
+`a4a660e8cad92e554cbc45c07b42b935cf3aadc36ab6aac04ceeba688a0309c3`. This is the maintainer's dev7 working snapshot;
 its uncommitted boot/launcher work is authoritative for this merge.
 
 Paper changes: `AmiWind-v0.0.21-dev6-paper-002-public-source.zip`, with the
@@ -45,7 +45,7 @@ optional geometry dependencies. No test was weakened or given a dummy replacemen
 The CPU-query error from the older run is fixed; all three CPU-job tests pass.
 These counts are not a claim of a clean fully provisioned host run.
 
-The supplied apply/release helper selects the owner's existing sibling
+The supplied apply/release helper selects the maintainer's existing sibling
 amiwind-tools/venv by default and requires the dependencies and full host suite
 to pass before it edits the checkout or publishes. It does not silently install
 packages, skip failing tests or overwrite conflicting newer local source.
@@ -56,5 +56,5 @@ tests are not a new Amiga build or emulator playtest. The source merge includes
 neither an HDF nor the pending whole-pipeline parallelization implementation.
 
 The approved font preview and earlier source-font measurements are historical
-checkpoint evidence, retained in CHECKPOINT-v0.0.21-dev6-paper-002.md. The owner's
+checkpoint evidence, retained in CHECKPOINT-v0.0.21-dev6-paper-002.md. The maintainer's
 complete dev5 Steam build is also historical, not a new dev8 test.

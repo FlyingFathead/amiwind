@@ -4,7 +4,7 @@
 Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
 reduced or bypassed, including model/asset generation, catalogue coverage,
 quality and validation, without a specific documented case or scenario **and
-explicit approval from the project owner**. A builder or contributor cannot
+explicit approval from the project maintainer**. A builder or contributor cannot
 approve its own exception. Build time, disk pressure and convenience do not
 supply that approval. An opt-out flag is a mechanism for an approved exceptional
 debugging case, not permission to choose that exception independently.
@@ -105,7 +105,7 @@ final hashing, not the original terrain run or prerequisite recovery checks.
 
 Disk space is still required for the copied scene and image staging. Recovery
 provenance guards are covered by synthetic fixtures. A full rc7 game HDF has
-not been validated here; consult the current [validation receipt](validation/rc7-source.json). The owner reported a completed rc3 private-test HDF
+not been validated here; consult the current [validation receipt](validation/rc7-source.json). The maintainer reported a completed rc3 private-test HDF
 from the image-only hotfix in 144.664 seconds; its actor gate remained failed.
 
 ## Explicit private-test acceptance
@@ -153,7 +153,7 @@ It is a debugging and regression-inspection tool, not optional content selected
 silently by the builder. A missing catalogue, selected model, footprint,
 inspection map or budget receipt fails the default build.
 
-Only the owner's explicit `--no-npc-gallery` flag permits an exceptional
+Only the maintainer's explicit `--no-npc-gallery` flag permits an exceptional
 debugging build without it, for example to isolate a gallery-specific failure.
 This must not be used as a time/space optimization. The build receipt, final
 summary and image metadata record the choice; the console explains

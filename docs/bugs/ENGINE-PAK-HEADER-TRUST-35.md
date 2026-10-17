@@ -9,7 +9,7 @@
 | Where | engine/aga/src/common.c COM_LoadPackFile |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.34 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | high: A damaged or hostile pak overwrote the stack instead of stopping with a message |
 | Family | Loading and disk reads (`disk-loading`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

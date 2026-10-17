@@ -9,7 +9,7 @@
 | Where | Interior lighting bake and light-source mapping (tools) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31-dev (last seen) |
+| Persists in | fixed in v0.0.31 |
 | Severity | medium: Off-by-default lights would bake as lit; no shipped map affected. |
 | Family | Lighting, lamps and night (`lighting-night`) |
 

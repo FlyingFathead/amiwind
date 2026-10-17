@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Owner-run first GitHub release. Check locally by default; --publish opts in."""
+"""Maintainer-run first GitHub release. Check locally by default; --publish opts in."""
 import argparse
 import hashlib
 import json

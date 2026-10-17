@@ -100,7 +100,7 @@ def contact_interval_choice(low, high, preferred):
 
 OFFSETS = sorted(((x*.5, y*.5) for x in range(-64, 65) for y in range(-64, 65)
                   if x*x+y*y <= 4096), key=lambda p: (p[0]*p[0]+p[1]*p[1], p))
-# The wide ring (CHIM-VIVEC-FRAME-WIDE-41, owner decision 2026-10-16): offsets past the 32-unit search, up to 48
+# The wide ring (CHIM-VIVEC-FRAME-WIDE-41, project decision 2026-10-16): offsets past the 32-unit search, up to 48
 # units, nearest first. Tried only after every OFFSETS spot failed, so an actor the 32-unit search places never
 # moves; it serves ground residents on slopes too steep for any spot within 32 units (the Vivec frame's Dreamer,
 # reference 297836, on a 28-degree slope: nearest fitting spot 37.5 units away).

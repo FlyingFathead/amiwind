@@ -11,7 +11,7 @@
 #define AW_TOWN_EXTRA_COUNT 11
 #define AW_TOWN_EXTRA_NAMES {"vivec_arena","vivec_foreign","vivec_hlaalu","vivec_redoran","vivec_telvanni","vivec_temple","vivec_delyn","vivec_olms","bcoast_x7y2","vivec_city","lava_x1ym2"}
 #define AW_TOWN_EXTRA_TITLES {"Vivec, Arena","Vivec, Foreign Quarter","Vivec, Hlaalu","Vivec, Redoran","Vivec, Telvanni","Vivec, Temple","Vivec, St. Delyn","Vivec, St. Olms","Bitter Coast (CHIMport test)","Vivec","Molag Mar lava test"}
-#define AW_TOWN_INTERIOR_COUNT 144
+#define AW_TOWN_INTERIOR_COUNT 149
 #define AW_TOWN_INTERIOR_NAMES {\
     "vai000","vqi000","vqi001","vqi002","vqi003","vqi004","vqi005","vqi006",\
     "vqi007","vqi008","vqi009","vqi010","vqi011","vqi012","vqi013","vqi014",\
@@ -30,7 +30,8 @@
     "vdi017","vdi018","vdi019","vdi020","vdi021","voi000","voi001","voi002",\
     "voi003","voi004","voi005","voi006","voi007","voi008","voi009","voi010",\
     "voi011","voi012","voi013","voi014","voi015","voi016","voi017","voi018",\
-    "voi019","voi020","voi021","voi022","voi023","voi024","voi025","voi026"\
+    "voi019","voi020","voi021","voi022","voi023","voi024","voi025","voi026",\
+    "vci000","vci001","vci002","vci003","vci004"\
 }
 #define AW_TOWN_INTERIOR_TITLES {\
     "Vivec, Arena Pit",\
@@ -176,7 +177,12 @@
     "Vivec, St. Olms Waist South-Two",\
     "Vivec, St. Olms Waistworks",\
     "Vivec, St. Olms Yngling Manor",\
-    "Vivec, St. Olms Yngling Manor Basement"\
+    "Vivec, St. Olms Yngling Manor Basement",\
+    "Vivec, Arena Waistworks",\
+    "Vivec, Arena Canalworks",\
+    "Vivec, Arena Fighters Quarters",\
+    "Vivec, Arena Fighters Training",\
+    "Vivec, Arena Holding Cells"\
 }
 /* Town row (AW_Town index) whose door bank leads into each interior. */
 #define AW_TOWN_INTERIOR_TOWNS {\
@@ -184,7 +190,7 @@
     4,4,4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,6,6,6,6,6,6,6,6,6,\
     6,6,6,6,6,6,6,6,6,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,8,\
     8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9,9,9,9,\
-    9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9\
+    9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,11,11,11,11,11\
 }
 /* name,title,prefix,regions,travel_npc,travel_target,region_cap,draw_distance,
    world_slot,flags,travel_return,handoff,origin[3],core[4] */

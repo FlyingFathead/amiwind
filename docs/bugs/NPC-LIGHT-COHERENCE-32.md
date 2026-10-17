@@ -4,12 +4,12 @@
 
 | Fact | Value |
 | --- | --- |
-| Reported by | owner |
+| Reported by | maintainer |
 | First noticed | 9 October 2026, in v0.0.32 |
 | Where | Actor static light in converted interiors (engine r_light.c R_LightPoint) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32 (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | medium: Characters do not match the room around them (Jiub, Socucius Ergalla); no gameplay effect. |
 | Family | Lighting, lamps and night (`lighting-night`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -42,7 +42,7 @@ by the changed converter functions (see "Verification").
 
 ## Symptom
 
-Owner, playing CHIM Preview 1 (v0.0.32 content): "I think once again the NPC lighting isn't
+Maintainer, playing CHIM Preview 1 (v0.0.32 content): "I think once again the NPC lighting isn't
 following any coherence." Characters do not match the light of the room around them: Jiub stands
 under the hold's lantern but is lit like the dark wall behind him; in the Census and Excise Office
 Socucius Ergalla is nearly black in front of a candle-lit wall.

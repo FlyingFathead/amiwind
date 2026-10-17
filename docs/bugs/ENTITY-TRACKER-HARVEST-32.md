@@ -9,7 +9,7 @@
 | Where | Entity tracker (tools/entity_tracker.py), harvest catalogues |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.32 |
 | Severity | medium: Tracker undercounts catalogue plants, so a plant loss could be hidden. |
 | Family | Harvestable plants (`harvest`) |
 

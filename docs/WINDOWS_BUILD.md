@@ -30,11 +30,11 @@ See [known issues and recovery limits](#windows-build-and-known-issues).
 
 <!-- contents end -->
 
-After a failed Windows run, preserve its logs and validated caches, then use a
-fresh run name. Compatible model-cache entries can be reused; general resumption
-of every completed stage is not implemented. Do not assume a retry rate or treat
-repeated retries as a fix. Windows-specific development must preserve the Linux
-build path and its validation gates.
+After a failed Windows run, its logs and validated caches are worth keeping,
+and the next attempt uses a fresh run name. Compatible model-cache entries can
+be reused, but resuming every completed stage is not implemented. How often a
+retry succeeds is not known, and a retry that works is not a fix. Changes made
+for Windows keep the Linux build path and its validation gates working.
 
 `setup-windows.cmd` / `setup-windows.ps1` provision a native Windows environment.
 `build.cmd` / `build.ps1` use the same `tools/build.py` pipeline as Linux.
@@ -122,7 +122,7 @@ From PowerShell or Command Prompt in the checkout:
 ```
 
 The first command previews without requiring Python, downloads or writes.
-`-Yes` explicitly authorizes installation. `-ToolsDir C:\AmiWind\amiwind-tools`
+`-Yes` explicitly authorizes installation. `-ToolsDir C:\Projects\AmiWind\amiwind-tools`
 selects a different external tools folder; use a short local ASCII path without
 spaces as recommended by MSYS2. The Amiga SDK installer may request Windows
 administrator approval. Other than installer registration/shortcuts and normal
@@ -187,7 +187,7 @@ network. No game assets or ROMs are downloaded by setup.
 Keep the checkout, tools and private game inputs separate under a common parent:
 
 ```text
-C:\AmiWind\
+C:\Projects\AmiWind\
   amiwind\          Git checkout
   amiwind-tools\    Python, venv, MSYS2, SDK and conversion tools
   builds\           Optional external build workspace
@@ -201,7 +201,7 @@ From PowerShell in the checkout:
 .\build.cmd --host-plan
 .\build.cmd --setup-python --plan
 .\build.cmd --setup-python
-.\build.cmd --dry-run --workspace 'C:\AmiWind\builds' --jobs 4
+.\build.cmd --dry-run --workspace 'C:\Projects\AmiWind\builds' --jobs 4
 ```
 
 `--setup-python` explicitly installs packages using pip and then exits. Its
@@ -246,7 +246,7 @@ policy and forwards its exit code; it does not change the saved execution policy
 After the asset-free compile and QCC checks succeed, the same pipeline accepts:
 
 ```powershell
-.\build.cmd --data-files 'C:\AmiWind\GOG Games\Morrowind' --workspace 'C:\AmiWind\builds' --jobs 4
+.\build.cmd --data-files 'C:\Projects\AmiWind\GOG Games\Morrowind' --workspace 'C:\Projects\AmiWind\builds' --jobs 4
 ```
 
 Use your actual installation path. `--jobs 4` is a conservative first trial,

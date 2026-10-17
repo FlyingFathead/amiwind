@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Per-cell lighting audit of the CHIM Progress Tracker: is a cell lit like the original?
 
-Owner rule (2026-10-09): a cell is only complete when it is lit like Morrowind. This module is the one shared
+Project rule (2026-10-09): a cell is only complete when it is lit like Morrowind. This module is the one shared
 implementation of that test. It is used by the tracker (tools/cell_progress.py), by the CHIM builder's lighting stats
 and by the conversion runner, so all of them count lights and lit surfaces the same way.
 

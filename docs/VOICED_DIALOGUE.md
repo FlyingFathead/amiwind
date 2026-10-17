@@ -109,7 +109,7 @@ crime and conversation dialogue are not wired into this NPC runtime.
    combat attack/hit, then crime reporting. Define per-actor voice-busy rules,
    subtitles, range and cooldown behavior before connecting further topics.
    Conversation GREETING and topic selection need their own UI/state design.
-4. Test media conversion separately with owner-provided files: codec and sample
+4. Test media conversion separately with user-provided files: codec and sample
    rate acceptance, duration bounds, deterministic output metadata, missing or
    corrupt input, playback completion and actor voice-busy behavior. Keep audio
    and outputs private. Do not include original dialogue, sound files, extracted

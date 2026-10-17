@@ -17,13 +17,18 @@ static int audio_sets,audio_draws;
 static int highlight_y,highlight_w,scroll_top,scroll_total;
 /* Controls > Combat style / Dice rolls / Blocking (aw_combat.c's saved options). */
 static float combat_miss=1,combat_dice=1,combat_block=1;
+/* Options > Far detail (aw_cull, aw_fog.c; the engine default 4 = Strong). */
+static float far_detail=4;static int far_sets;
 float Cvar_VariableValue(char *name){
+    if(!strcmp(name,"aw_cull"))return far_detail;
     if(!strcmp(name,"aw_combat_miss"))return combat_miss;
     if(!strcmp(name,"aw_combat_dice"))return combat_dice;
     if(!strcmp(name,"aw_combat_block"))return combat_block;
     assert(0);return 0;
 }
-void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&effectsvolume,&dialoguevolume};int i;assert(value>=0 && value<=1);
+void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&effectsvolume,&dialoguevolume};int i;
+    if(!strcmp(name,"aw_cull")){assert(value==1 || value==3 || value==4 || value==6);far_detail=value;far_sets++;return;}
+    assert(value>=0 && value<=1);
     if(!strcmp(name,"aw_combat_miss")){combat_miss=value;return;}
     if(!strcmp(name,"aw_combat_dice")){combat_dice=value;return;}
     if(!strcmp(name,"aw_combat_block")){combat_block=value;return;}
@@ -47,9 +52,10 @@ int AW_UIColor(int r,int g,int b){return r;}
 void AW_UIFill(int x,int y,int w,int h,int c){if(c==62){highlight_y=y;highlight_w=w;}}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0 && x+10<=320 && y+h<=200);assert(top>=0 && top+visible<=total);scroll_top=top;scroll_total=total;}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
-static char crosshair_label[64],photo_label[64];static int photo_colour;
+static char crosshair_label[64],photo_label[64],far_label[64];static int photo_colour;
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200);if(!strcmp(s,"Audio"))audio_draws++;
  if(!strncmp(s,"Show crosshairs",15))strcpy(crosshair_label,s);
+ if(!strncmp(s,"Far detail",10)){strcpy(far_label,s);assert(AW_UIWidth(s)<=w-4);}
  if(!strcmp(s,"Photo mode") || !strcmp(s,"Leave photo mode")){strcpy(photo_label,s);photo_colour=c;}}
 /* Photo mode and the crosshair preference (aw_photo.c). */
 static int crosshair_on=1,photo_on,photo_available=1,photo_sets;
@@ -71,7 +77,7 @@ static void check_controls(void){
  int i;
  keybindings['w']="+forward";keybindings[K_UPARROW]="+forward";keybindings[K_F9]="aw_quickload";
  open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw();
- for(i=0;i<7;i++)M_Keydown(K_DOWNARROW);
+ for(i=0;i<8;i++)M_Keydown(K_DOWNARROW);
  M_Keydown(K_ENTER);M_Draw();assert(highlight_y==54); /* Forward */
  M_Keydown(K_ENTER);M_Draw();M_Keydown('k');
  assert(!strcmp(keybindings['k'],"+forward") && !*keybindings['w'] && !*keybindings[K_UPARROW]);
@@ -99,20 +105,20 @@ static void check_controls(void){
 static void open_options(void){open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw();}
 static void check_photo_rows(void){
  int i;
- open_options();for(i=0;i<3;i++)M_Keydown(K_DOWNARROW);
- M_Draw();assert(!strcmp(crosshair_label,"Show crosshairs: On") && highlight_y==54+3*19);
+ open_options();for(i=0;i<4;i++)M_Keydown(K_DOWNARROW);
+ M_Draw();assert(!strcmp(crosshair_label,"Show crosshairs: On") && highlight_y==54+4*19);
  M_Keydown(K_ENTER);assert(!crosshair_on);M_Draw();assert(!strcmp(crosshair_label,"Show crosshairs: Off"));
  M_Keydown(K_RIGHTARROW);assert(crosshair_on);M_Keydown(K_LEFTARROW);assert(!crosshair_on);
  M_Keydown(K_ENTER);assert(crosshair_on && key_dest==key_menu);
  M_Keydown(K_DOWNARROW);photo_available=0;M_Draw();assert(!strcmp(photo_label,"Photo mode") && photo_colour==114);
  M_Keydown(K_ENTER);assert(key_dest==key_menu && !photo_sets);
- photo_available=1;M_Draw();assert(photo_colour==210 && highlight_y==54+4*19);
+ photo_available=1;M_Draw();assert(photo_colour==210 && highlight_y==54+5*19);
  M_Keydown(K_ENTER);assert(key_dest==key_game && photo_on && photo_sets==1);
- open_options();for(i=0;i<4;i++)M_Keydown(K_DOWNARROW);
+ open_options();for(i=0;i<5;i++)M_Keydown(K_DOWNARROW);
  M_Draw();assert(!strcmp(photo_label,"Leave photo mode"));
  M_Keydown(K_ENTER);assert(key_dest==key_game && !photo_on && photo_sets==2);
  front();M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
- for(i=0;i<4;i++)M_Keydown(K_DOWNARROW);
+ for(i=0;i<5;i++)M_Keydown(K_DOWNARROW);
  M_Draw();assert(photo_colour==114);M_Keydown(K_ENTER);assert(photo_sets==2 && key_dest==key_menu);
  M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
 }
@@ -121,14 +127,15 @@ static void check_setup_endpoints(void){
  front();M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
  for(j=0;j<4;j++){
   for(i=0;i<24;i++)M_Keydown(down[j]);
-  M_Draw();assert(scroll_total==13 && scroll_top==6 && highlight_y==168 && highlight_w==230);
-  M_Keydown(K_UPARROW);M_Draw();assert(scroll_top==6 && highlight_y==149);
+  M_Draw();assert(scroll_total==14 && scroll_top==7 && highlight_y==168 && highlight_w==230);
+  M_Keydown(K_UPARROW);M_Draw();assert(scroll_top==7 && highlight_y==149);
   for(i=0;i<24;i++)M_Keydown(up[j%3]);
   M_Draw();assert(scroll_top==0 && highlight_y==54 && highlight_w==230);
   M_Keydown(K_DOWNARROW);M_Draw();assert(scroll_top==0 && highlight_y==73);
  }
  /* Reversing at either end works; the Interface subpanel shares the rule. */
- M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
+ for(i=0;i<5;i++)M_Keydown(K_DOWNARROW);
+ M_Keydown(K_ENTER);
  for(i=0;i<24;i++)M_Keydown(K_MWHEELUP);
  M_Draw();assert(highlight_y==54 && highlight_w==232);
  for(i=0;i<24;i++)M_Keydown(K_DOWNARROW);
@@ -154,6 +161,15 @@ int main(void){
  open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw(); /* last pixel in Options */
  M_Keydown('a');assert(distance==530);keydown[K_SHIFT]=true;M_Keydown('D');assert(distance==531);keydown[K_SHIFT]=false;
  M_Keydown('s');M_Keydown(K_ENTER);assert(distance==540);
+ /* Far detail: plain names, Enter and the arrows step Full, Light, Strong,
+  * Strong + small faces (aw_cull 1, 3, 4, 6); a console-only value reads Custom. */
+ M_Keydown(K_DOWNARROW);M_Draw();assert(!strcmp(far_label,"Far detail: Strong") && highlight_y==54+2*19);
+ M_Keydown(K_ENTER);M_Draw();assert(far_detail==6 && !strcmp(far_label,"Far detail: Strong + small faces"));
+ M_Keydown(K_ENTER);M_Draw();assert(far_detail==1 && !strcmp(far_label,"Far detail: Full"));
+ M_Keydown(K_RIGHTARROW);M_Draw();assert(far_detail==3 && !strcmp(far_label,"Far detail: Light"));
+ M_Keydown(K_LEFTARROW);M_Keydown(K_LEFTARROW);assert(far_detail==6);
+ far_detail=2;M_Draw();assert(!strcmp(far_label,"Far detail: Custom"));
+ M_Keydown(K_RIGHTARROW);assert(far_detail==1);M_Keydown(K_RIGHTARROW);M_Keydown(K_RIGHTARROW);assert(far_detail==4 && far_sets==8);
  M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(gold_frame);
  M_Keydown(K_ENTER);assert(!gold_frame);
  M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW); /* Show crosshairs, Photo mode: check_photo_rows */

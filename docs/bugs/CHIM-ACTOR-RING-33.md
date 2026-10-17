@@ -9,7 +9,7 @@
 | Where | Actor steps (aw_walk.c AW_ActorStep) through the player's walk, which loads the CHIM ring |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | fixed in v0.0.33 |
 | Severity | low: Latent: today the player always moves first in a frame, so the ring stayed on the player. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

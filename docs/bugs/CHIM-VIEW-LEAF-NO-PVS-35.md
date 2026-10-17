@@ -9,7 +9,7 @@
 | Where | CHIM engine chim_chunks.c (link pass), chim_world.c dbg rcount |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.35 (last seen) |
+| Persists in | fixed in v0.0.35 |
 | Severity | low: Frames at the ring edge or in the air draw the whole ring; only visible as a frame-rate drop. |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Performance ([CHIM Engine tracker](CHIM_TRACKER.md)) |

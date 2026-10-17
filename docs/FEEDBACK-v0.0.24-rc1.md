@@ -1,6 +1,6 @@
-# RC1 owner feedback, 30 September 2026
+# RC1 maintainer feedback, 30 September 2026
 
-Development starts from the owner's source snapshot `amiwind-2026-09-30_231610.zip`,
+Development starts from the maintainer's source snapshot `amiwind-2026-09-30_231610.zip`,
 version 0.0.24-rc1, published commit `04c1ecc`. Keep the published RC1 immutable.
 Fix the reported UI, targeting and NPC placement issues before the character gallery.
 
@@ -29,10 +29,10 @@ placement. Match the original reference before changing an actor's transform.
 | Were there dancing women in Balmora's Cornerclub? | Cornerclub | N/A | Check original cell/NPC records before treating as missing content. |
 
 Release preparation: capture additional native Balmora screenshots after fixes.
-The owner subsequently approved final **v0.0.24, Welcome to Balmora**, after this
+The maintainer subsequently approved final **v0.0.24, Welcome to Balmora**, after this
 work is completed and verified. Prepare final source/private packages and more
-native Balmora screenshots; the owner still handles GitHub publication.
-On 1 October (Helsinki), the owner also authorized **v0.0.24-rc2** if the new
+native Balmora screenshots; the maintainer still handles GitHub publication.
+On 1 October (Helsinki), the maintainer also authorized **v0.0.24-rc2** if the new
 features need another test cycle. That is the selected next package; final
 v0.0.24 remains the destination after candidate acceptance.
 
@@ -72,9 +72,9 @@ the same placed guard, and the unnamed lady report is a view of Balyn Omavel.
 Those camera reports remain individually retained. The strict broader audit still
 has 23 contact findings, and both the new city-centre and region walking stalls
 remain reproducible. See the RC2 release notes for exact acceptance boundaries.
-# RC2 owner follow-up — 1 October 2026, 02:30 Helsinki
+# RC2 maintainer follow-up — 1 October 2026, 02:30 Helsinki
 
-During further Balmora roaming in RC2, the owner reported that the city looked
+During further Balmora roaming in RC2, the maintainer reported that the city looked
 clean and no unintended floating residents had been found. This is positive
 playtest evidence for the reported Balmora placements; it is not an exhaustive
 inspection of every room or an override of the outstanding host contact audit.
