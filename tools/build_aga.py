@@ -1164,10 +1164,10 @@ def empty_miniwind_actor_evidence(args, maps):
             'source_resident_count': 0, 'deferred_creature_spawns': deferred_spawns, 'bounds': settings['bounds']}
 
 
-def chim_town_placements(args, id1):
+def chim_town_placements(args, id1, world=None):
     """{'<town>-chim': reference numbers} for each --chim-town town: its CHIM world placements, its frame
     actors and its region harvest catalogues (the entity tracker counts them as the legacy region maps
-    would have)."""
+    would have). world: the CHIM world already read (chim_world_once); without it each town reads it again."""
     if not getattr(args,'chim_town',None):
         return {}
     from chim.frame_map import chim_placements
@@ -1176,7 +1176,7 @@ def chim_town_placements(args, id1):
     out={}
     for town, rows in chim_town_rows(args).items():
         refs={int(e['aw_ref']) for e in rows if str(e.get('aw_ref','')).isdigit()}
-        refs|=set(chim_placements(args.chim_world, town_source_cell(town)))
+        refs|=set(chim_placements(args.chim_world, town_source_cell(town), world=world))
         row=next(t for t in runtime_towns() if t['id']==town)
         for name in town_region_map_names(Path(id1)/row['regions'], row['prefix']):
             catalogue=Path(id1)/('harvest-'+Path(name).stem+'.txt')
@@ -1186,11 +1186,11 @@ def chim_town_placements(args, id1):
     return out
 
 
-def chim_region_placements(args, id1):
+def chim_region_placements(args, id1, world=None):
     """{'vfNNNN': reference numbers} of each CHIM region cell whose legacy map no stage made (docs/BUILD_MANIFEST.md
     step 2): the CHIM world's placements of its frame and the plants of the catalogue the harvest step wrote for its
     frame map (harvest-vfNNNN.txt, HARVEST-CHIM-REGION-LOSS-41), which the entity tracker counts as the cell's map
-    would have."""
+    would have. world: the CHIM world already read (chim_world_once)."""
     if not getattr(args, 'chim_world', None):
         return {}
     from chim.frame_map import chim_placements, load, region_map_names
@@ -1200,7 +1200,7 @@ def chim_region_placements(args, id1):
     if not owned:
         return {}
     from entity_tracker import harvest_refs
-    world = load(args.chim_world)
+    world = world if world is not None else load(args.chim_world)
     out = {}
     for name, cell in sorted(owned.items()):
         refs = set(chim_placements(args.chim_world, cell, world=world))
@@ -1275,8 +1275,27 @@ def chim_region_table(chim_world):
     return read_table(Path(chim_world)/TABLE_FILE) if chim_world else None
 
 
+def chim_world_once(chim_world, held):
+    """The CHIM world read and checked ONCE for the whole image step (chim.frame_map.load, a timed phase): the
+    entity tracker's placements, the frame maps and the frame-map heap gate all take this one copy (read only by
+    them). HELD: a dict the image step keeps ({} at first); the world is read the first time and held there. Each
+    of them used to read the whole world again: six reads of about 30 s each on one core in the dev2 image step
+    (BUILD-IMAGE-REGION-MAPS-SERIAL-43). None without a CHIM world."""
+    if not chim_world:
+        return None
+    if 'world' not in held:
+        import build_profile
+        from chim.frame_map import load
+        with build_profile.phase('Image: CHIM world read', detail=str(Path(chim_world).name)) as timer:
+            held['world'] = load(chim_world)
+            timer.done('Image: CHIM world read: %d frames, %d models (read once for the image step; serial: one '
+                       'pass over the world files, checked and held in this process for its readers)'
+                       % (len(held['world']['frames']), len(held['world']['models'])))
+    return held['world']
+
+
 def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, special_rows=None, activated=None,
-                    keep_catalogues=None):
+                    keep_catalogues=None, world=None):
     """Check a CHIM world's receipts and write its frame maps into id1: maps/<town>-chim.chim for each
     area (.bsp with chim_frame_ext bsp; tools/map_files.py; the engine loads it instead of the town's
     region maps when CHIM is on), and for Seyda Neen its special maps (format 0.5). Each is checked against the town's final legacy maps, which must
@@ -1289,39 +1308,41 @@ def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, s
     (chim_town_specials): those frame maps take them instead of legacy maps.
     keep_catalogues: {map name: SHA-256} of the harvest step's catalogues for the region frame maps (they stay with
     their frame map: chim.frame_map.install_region, HARVEST-CHIM-REGION-LOSS-41).
+    world: the CHIM world already read (chim_world_once); without it it is read here.
     Returns {'areas', 'receipt', 'frame_maps', 'region_maps', 'region_cache'}."""
     import build_profile
     import progress_line
     chim_world = Path(chim_world)
     receipt, areas = chim_world_receipt(chim_world)
     # Written before the partition, so a refused entity stops the image here.
-    from chim.frame_map import SPECIALS, build as build_frame_map, build_docks, load as load_chim_world
-    with build_profile.phase('Image: CHIM world read', detail=str(chim_world.name)) as timer:
-        world = load_chim_world(chim_world)
-        timer.done('Image: CHIM world read: %d frames, %d models' % (len(world['frames']), len(world['models'])))
+    from chim.frame_map import SPECIALS
+    world = chim_world_once(chim_world, {'world': world} if world is not None else {})
     town_rows = town_rows or {}
     special_rows, activated = special_rows or {}, activated or {}
     specials = list(SPECIALS) if 'seyda' in areas else []
-    with build_profile.phase('Image: CHIM town frame maps', detail=', '.join(list(areas) + specials),
-                             total=len(areas) + len(specials), unit='maps') as timer:
+    # Each area's frame map, and Seyda Neen's special maps (the intro docks, the Census courtyard: further frame maps
+    # of its frame, format 0.5, maps/intro_docks-chim.chim, maps/sncourt-chim.chim), on the shared worker pool: each
+    # unit gets only its frame's part of the world (chim.frame_map.frame_subworld) and writes only its own map;
+    # results in this order, the same bytes with any worker count (BUILD-IMAGE-REGION-MAPS-SERIAL-43).
+    from build_parallel import ordered_map
+    from chim.frame_map import frame_subworld, town_cell, town_unit
+    units = [('town', area, town_rows.get(area)) for area in areas] +             [('special', name, special_rows.get(name)) for name in specials]
+    town_workers = max(1, min(resolve_jobs(jobs), len(units) or 1))
+    with build_profile.phase('Image: CHIM town frame maps', detail='%s; %d workers (one per map)'
+                             % (', '.join(list(areas) + specials), town_workers),
+                             total=len(units), unit='maps') as timer:
+        tasks = [(kind, str(id1), name, str(chim_world),
+                  frame_subworld(world, town_cell(name) if kind == 'town' else town_cell('seyda')),
+                  [dict(e) for e in rows] if rows is not None else None,
+                  activated.get(name) if rows is not None else None)
+                 for kind, name, rows in units]
         frame_maps = []
-        for area in areas:
-            frame_maps.append(build_frame_map(id1, area, chim_world, world=world,
-                                              **({'entity_rows': town_rows[area], 'activated_rows': activated.get(area)}
-                                                 if area in town_rows else {})))
-            timer.step(label=area)
-            build_profile.progress(progress_line.line('Image: CHIM town frame maps', area, frame_maps[-1]['map'][5:],
-                                                      (timer.count, timer.total, 'maps')))
-        # Seyda Neen's special maps (the intro docks, the Census courtyard) become further frame maps of
-        # its frame (format 0.5): maps/intro_docks-chim.chim, maps/sncourt-chim.chim.
-        for name in specials:
-            frame_maps.append(build_docks(id1, chim_world, name=name, world=world,
-                                          **({'entity_rows': special_rows[name], 'activated_rows': activated.get(name)}
-                                             if name in special_rows else {})))
+        for (kind, name, _), record in zip(units, ordered_map(town_unit, tasks, town_workers)):
+            frame_maps.append(record)
             timer.step(label=name)
-            build_profile.progress(progress_line.line('Image: CHIM town frame maps', name, frame_maps[-1]['map'][5:],
+            build_profile.progress(progress_line.line('Image: CHIM town frame maps', name, record['map'][5:],
                                                       (timer.count, timer.total, 'maps')))
-        timer.done('Image: CHIM town frame maps: %d written' % len(frame_maps))
+        timer.done('Image: CHIM town frame maps: %d written on %d workers' % (len(frame_maps), town_workers))
     # CHIM region frames (EXPERIMENTAL, --chim-regions): each cell's open-world map is replaced in place by
     # its frame map (chim.frame_map.build_regions; the legacy file is recorded in 'replaced').
     region_maps, region_cache = [], None
@@ -2324,10 +2345,13 @@ def finalize_image(args):
     from entity_tracker import build_gate as entity_gate
     from mwad.paths import child_ci
     from prepare_mesh_bsp import DRESSING_EXCLUDED
+    # the CHIM world is read once here and held for the frame maps and their heap gate below
+    chim_world_held = {}
+    chim_world_data = chim_world_once(getattr(args, 'chim_world', None), chim_world_held)
     entity_tracker = entity_gate(out, boot/'id1/maps', child_ci(args.data_files,'Morrowind.esm'),
         getattr(args,'entity_baseline',None), getattr(args,'accept_entity_loss',None), jobs=jobs,
-        dressing_terms=DRESSING_EXCLUDED, extra_maps={**chim_town_placements(args, boot/'id1'),
-                                                     **chim_region_placements(args, boot/'id1')})
+        dressing_terms=DRESSING_EXCLUDED, extra_maps={**chim_town_placements(args, boot/'id1', world=chim_world_data),
+                                                     **chim_region_placements(args, boot/'id1', world=chim_world_data)})
     # World progress map data: topomap coverage plus entity and POI layers.
     from world_progress import build_step as world_progress_step
     if getattr(args, 'miniwind', False):
@@ -2368,7 +2392,8 @@ def finalize_image(args):
                             .get('chim_region_catalogues', {}).items()} if staging_path.is_file() else {})
         chim_frames = chim_frame_maps(args.chim_world, boot/'id1', town_rows=chim_town_rows(args), jobs=jobs,
                                       special_rows=special_rows, activated=activated_rows,
-                                      hand_fields=hand_metadata['worldspawn_fields'], keep_catalogues=keep_catalogues)
+                                      hand_fields=hand_metadata['worldspawn_fields'], keep_catalogues=keep_catalogues,
+                                      world=chim_world_data)
         from chim.frame_map import remove_legacy_areas, remove_towns_not_on_chim
         removed_legacy = remove_legacy_areas(boot/'id1', chim_frames['areas'], 'the town runs on CHIM')
         # Extra towns not on CHIM yet (the Vivec Arena) leave a CHIM image whole: exterior maps, region and
@@ -2409,11 +2434,15 @@ def finalize_image(args):
                                             extra_maps=[r['map'][5:] for r in chim_frames['region_maps']],
                                             # all frames over the shared pool, unchanged frames from the image pass
                                             # cache by their SHA-256 content key (maintainer order 2026-10-11 10:08)
-                                            jobs=resolve_jobs(args.jobs), cache_dir=_frame_heap_cache())
+                                            jobs=resolve_jobs(args.jobs), cache_dir=_frame_heap_cache(),
+                                            world=chim_world_data)
         for name, m in sorted(frame_heap.get('maps', {}).items()):
             print(f"[chim] frame-map heap {name}: zone {m['zone_bytes']} B (after the map {m['after_zone_bytes']} B), "
                   f"active ring {m['peak_bytes']} / load ring {m['load_ring']['peak_bytes']} of {m['budget_bytes']} B, "
                   f"streamed models {m['streamed_bytes']} B, largest block {m['largest_block_bytes']} B", flush=True)
+        # the CHIM world read once for the image step is not needed after its last reader (the heap gate)
+        chim_world_held.clear()
+        chim_world_data = None
         # The optimizer receipt follows the new map set (frame maps in, removed maps out) before the gates.
         from optimize_world_maps import rebind_chim_maps
         optimization = rebind_chim_maps(boot/'id1/maps', optimization, optimization_path,

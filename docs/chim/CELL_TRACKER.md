@@ -4,27 +4,27 @@
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export.
 
-**Conversion/audit progress: 1,372 of 1,390 (98.7 %)**
+**Conversion/audit progress: 1,390 of 1,390 (100.0 %)**
 
 These audit totals do not count cells included in a playable build; see Included in builds below.
 
-Map cells 2,157: land and empty-sea cells 1,390 (done 1,372, 98.7 %) and open-ocean cells 767 (shared ocean chunk made, not yet placed in the game: not counted as done).
+Map cells 2,157: land and empty-sea cells 1,390 (done 1,390, 100.0 %) and open-ocean cells 767 (shared ocean chunk made, not yet placed in the game: not counted as done).
 
 - Cell complete: 0
 - Terrain complete: 0
-- Cell complete, awaiting lighting: 12
-- Terrain complete, awaiting lighting: 787
+- Cell complete, awaiting lighting: 13
+- Terrain complete, awaiting lighting: 804
 - Passed (something still deferred): 376
 - Empty sea: 197
 - Open ocean (silver, not counted as done): 767
 
-**Conversion-eligible: 1,372 of 1,390** (every audit-done cell, lighting done or not; this is not a release assignment).
+**Conversion-eligible: 1,390 of 1,390** (every audit-done cell, lighting done or not; this is not a release assignment).
 
 Lighting: lit 0, partial 137, unlit 1,056, not measured 99 (cells; lit is required for both completion levels).
 
 Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 694 night lamps only, 2,280 not represented.
 
-Generated 2026-10-18 08:03 +0300. Tracker data generated 2026-10-18T05:02:24+00:00.
+Generated 2026-10-18 15:51 +0300. Tracker data generated 2026-10-18T12:50:45+00:00.
 
 ## Totals
 
@@ -32,13 +32,13 @@ Generated 2026-10-18 08:03 +0300. Tracker data generated 2026-10-18T05:02:24+00:
 | :-- | --: | --: |
 | Cell complete | 0 | 0.0 % |
 | Terrain complete | 0 | 0.0 % |
-| Cell complete, awaiting lighting | 12 | 0.9 % |
-| Terrain complete, awaiting lighting | 787 | 56.6 % |
+| Cell complete, awaiting lighting | 13 | 0.9 % |
+| Terrain complete, awaiting lighting | 804 | 57.8 % |
 | Passed (something still deferred) | 376 | 27.1 % |
 | Empty sea | 197 | 14.2 % |
 | Open sea | 767 | 55.2 % |
-| Hull policy pending | 14 | 1.0 % |
-| Failed | 4 | 0.3 % |
+| Hull policy pending | 0 | 0.0 % |
+| Failed | 0 | 0.0 % |
 | Not converted | 0 | 0.0 % |
 | Not started | 0 | 0.0 % |
 
@@ -50,6 +50,7 @@ Included means verified in a packaged image. Packaged does not mean published or
 
 | Version | Evidence state | Included |
 | :-- | --: | --: |
+| v0.0.43-dev2 | packaged | 1,351 (97.2 %) |
 | v0.0.43-dev1 | packaged | 1,313 (94.5 %) |
 | v0.0.42 | packaged | 1,171 (84.2 %) |
 | v0.0.42-dev1 | packaged | 779 (56.0 %) |
@@ -70,7 +71,7 @@ Which cells are approved for which release (set by the maintainer with `cell_pro
 | Release | State | Cells | Complete | Awaiting lighting | Lit | Empty sea | Failing | Hull policy pending |
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: |
 | v0.0.41-dev4 | shipped | 639 | 0 | 187 | 0 | 99 | 0 | 0 |
-| unassigned | - | 1,664 | 0 | 612 | 0 | 98 | 4 | 14 |
+| unassigned | - | 1,664 | 0 | 630 | 0 | 98 | 0 | 0 |
 
 ## Per ring (ring 1 touches the sea)
 
@@ -81,23 +82,19 @@ Which cells are approved for which release (set by the maintainer with `cell_pro
 | 2 | 160 | 0 | 0 | 1 | 1 | 157 | 1 | 0 | 0 | 0 | 0 | 0 |
 | 3 | 149 | 0 | 0 | 3 | 79 | 67 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 4 | 138 | 0 | 0 | 1 | 114 | 23 | 0 | 0 | 0 | 0 | 0 | 0 |
-| 5 | 125 | 0 | 0 | 1 | 107 | 14 | 0 | 0 | 3 | 0 | 0 | 0 |
-| 6 | 114 | 0 | 0 | 0 | 104 | 8 | 0 | 0 | 2 | 0 | 0 | 0 |
-| 7 | 104 | 0 | 0 | 2 | 96 | 3 | 0 | 0 | 2 | 1 | 0 | 0 |
-| 8 | 94 | 0 | 0 | 1 | 86 | 3 | 0 | 0 | 4 | 0 | 0 | 0 |
-| 9 | 81 | 0 | 0 | 0 | 70 | 6 | 0 | 0 | 3 | 2 | 0 | 0 |
+| 5 | 125 | 0 | 0 | 1 | 110 | 14 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 6 | 114 | 0 | 0 | 0 | 106 | 8 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 7 | 104 | 0 | 0 | 2 | 99 | 3 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 8 | 94 | 0 | 0 | 2 | 89 | 3 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 9 | 81 | 0 | 0 | 0 | 75 | 6 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 10 | 66 | 0 | 0 | 0 | 53 | 13 | 0 | 0 | 0 | 0 | 0 | 0 |
-| 11 | 50 | 0 | 0 | 0 | 40 | 9 | 0 | 0 | 0 | 1 | 0 | 0 |
+| 11 | 50 | 0 | 0 | 0 | 41 | 9 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 12 | 33 | 0 | 0 | 0 | 31 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 13 | 7 | 0 | 0 | 0 | 6 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 ## Failures by mechanism class
 
-| Mechanism | Cells |
-| :-- | --: |
-| Stair walk | 4 |
-
-A cell can fail more than one mechanism. Hull policy pending cells are not failures; they have their own line.
+No failing cells.
 
 ## Per object type (converted cells, island-wide)
 

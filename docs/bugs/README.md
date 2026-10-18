@@ -1,7 +1,6 @@
 # Bug tracking
 
-One system, three parts. A test (`tests/test_bug_tracker.py`) checks that they
-agree; a mismatch fails the build.
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +17,9 @@ agree; a mismatch fails the build.
 
 <!-- contents end -->
 
+One system, three parts. A test (`tests/test_bug_tracker.py`) checks that they
+agree; a mismatch fails the build.
+
 | Part | File | Holds |
 | --- | --- | --- |
 | Register | [`bugs.json`](bugs.json) (schema: [`bugs.schema.json`](bugs.schema.json)), shown as [`docs/BUGS.md`](../BUGS.md) | Every bug exactly once: ID, title, state (open/fixed/closed), fixed in, maintainer accepted, current status, report link, the [facts](#facts) (who reported it, when and in which version, where, reproduction, duplicate, persistence, severity, family, related bugs) and optional tags (`performance`: listed together below the table; add with `--tag performance`). The only place for current status. Edit the JSON, or use `tools/bug_register.py add` / `set`, then `tools/bug_register.py render`; never edit generated parts by hand (the register in BUGS.md, the fact table and the "Bugs in the same category" section of each page, the [families](#families) table below). |
@@ -28,6 +30,7 @@ agree; a mismatch fails the build.
 | Journal | [`docs/BUG_JOURNAL.md`](../BUG_JOURNAL.md) | Dated, short entries as things happen: reported, cause found, fixed, shipped, accepted. Each entry starts with the bug ID. |
 
 Frozen history (read-only; current status is in the register):
+[v0.0.37-v0.0.41 journal entries](../journals/BUG_JOURNAL-v0.0.37-v0.0.41.md),
 [selected v0.0.35-v0.0.36 journal entries](../journals/BUG_JOURNAL-v0.0.35-v0.0.36.md),
 [journal before 7 October 2026](../journals/BUG_JOURNAL-v0.0.29.md),
 [earlier register notes](../journals/BUGS-NOTES-v0.0.29.md),
@@ -271,16 +274,16 @@ family links to its list in the register.
 | Family | Key | Bugs (open of total) | Shared cause or rule |
 | --- | --- | --- | --- |
 | [Vivec preview frame and its joins to the world](../BUGS.md#vivec-preview-frame-and-its-joins-to-the-world-vivec-frame-edge) | `vivec-frame-edge` | 6 of 8 | The Vivec Arena preview is one isolated frame: what lies at or beyond its edge (canton cuts, sea, bridges, the open-world maps around it) is missing, cut or wrong until the world streamer joins Vivec to the world. |
-| [Collision shapes and climbing (stairs, ramps, walkways)](../BUGS.md#collision-shapes-and-climbing-stairs-ramps-walkways-stairs-collision) | `stairs-collision` | 17 of 34 | Convex collision proxies invent steep faces or bury authored surfaces; Morrowind collides with authored geometry (step up 34 units, slope up to 46 degrees). Rule: follow_original_stair_rules plus a walkability gate. |
+| [Collision shapes and climbing (stairs, ramps, walkways)](../BUGS.md#collision-shapes-and-climbing-stairs-ramps-walkways-stairs-collision) | `stairs-collision` | 18 of 35 | Convex collision proxies invent steep faces or bury authored surfaces; Morrowind collides with authored geometry (step up 34 units, slope up to 46 degrees). Rule: follow_original_stair_rules plus a walkability gate. |
 | [Distance drawing (horizon, fog, sky, far edges)](../BUGS.md#distance-drawing-horizon-fog-sky-far-edges-distance-drawing) | `distance-drawing` | 12 of 14 | Far-plane fog, the skyline fill, distant sprites and resident ground. |
 | [Seyda Neen recorded stage](../BUGS.md#seyda-neen-recorded-stage-seyda-recorded) | `seyda-recorded` | 0 of 8 | Recorded v0.0.31 maps are kept byte for byte; their heap headroom limits what can be added and the public builder cannot regenerate them. |
 | [Content silently missing from a build](../BUGS.md#content-silently-missing-from-a-build-build-content-missing) | `build-content-missing` | 13 of 31 | Every omission is receipted; payload and entity counts are compared with the last release; shipped features are on by default. |
 | [Builder breaks and reproducibility](../BUGS.md#builder-breaks-and-reproducibility-builder-from-scratch) | `builder-from-scratch` | 15 of 42 | The repository builder builds the whole game from the user's own data with no private step, byte for byte the same each time. |
-| [Build speed](../BUGS.md#build-speed-build-speed) | `build-speed` | 31 of 78 | Every stage on the shared worker pool; per-stage time and CPU in the build profile. |
+| [Build speed](../BUGS.md#build-speed-build-speed) | `build-speed` | 34 of 81 | Every stage on the shared worker pool; per-stage time and CPU in the build profile. |
 | [Build reuse keys and output attribution](../BUGS.md#build-reuse-keys-and-output-attribution-build-cache-reuse) | `build-cache-reuse` | 8 of 41 | A unit is rebuilt only when the content hash of all its inputs changes or its output is missing or damaged. Keys never under-declare (a missed input allows a wrong reuse) and should not over-declare (a file no output depends on forces rebuilds); outputs carry no wall-clock values; every changed file is credited to the stage that wrote it. |
 | [Console, keyboard and mouse input](../BUGS.md#console-keyboard-and-mouse-input-console-input) | `console-input` | 5 of 15 | The console line editor, qualifier keys and the emulator key path. |
 | [Music and sound](../BUGS.md#music-and-sound-audio) | `audio` | 22 of 27 | The mixer must stay fed through loads and scene changes; music starts after loads settle. |
-| [Lighting, lamps and night](../BUGS.md#lighting-lamps-and-night-lighting-night) | `lighting-night` | 26 of 34 | Morrowind lights become Quake light entities baked by the light compiler and animated with lightstyles; night tables and dynamic lights follow the original. |
+| [Lighting, lamps and night](../BUGS.md#lighting-lamps-and-night-lighting-night) | `lighting-night` | 27 of 34 | Morrowind lights become Quake light entities baked by the light compiler and animated with lightstyles; night tables and dynamic lights follow the original. |
 | [First-person hands and torch](../BUGS.md#first-person-hands-and-torch-torch-hands) | `torch-hands` | 12 of 15 | First-person hands, punches and the carried torch. |
 | [Map heap and memory budget](../BUGS.md#map-heap-and-memory-budget-heap-memory) | `heap-memory` | 10 of 25 | The heap model must match what the loader actually allocates; strict heap gate, hard ceiling always fatal. |
 | [Engine table limits](../BUGS.md#engine-table-limits-engine-limits) | `engine-limits` | 14 of 32 | Fixed engine tables (models, entities, faces, texinfo, flames, lamps, door rows) are checked by the builder before a map ships, never discovered in play. |
@@ -288,7 +291,7 @@ family links to its list in the register.
 | [World storage and duplication](../BUGS.md#world-storage-and-duplication-world-storage) | `world-storage` | 7 of 9 | Every asset stored once and placed by reference (world streamer); map lumps carry only what the engine uses. |
 | [Loading and disk reads](../BUGS.md#loading-and-disk-reads-disk-loading) | `disk-loading` | 7 of 11 | Load time follows bytes read and seeks on FFS; measured with read counters, not wall time alone. |
 | [Rendering cost and visibility](../BUGS.md#rendering-cost-and-visibility-render-performance) | `render-performance` | 13 of 17 | Read the visibility data and renderer counters before any performance claim. |
-| [CHIM world streamer](../BUGS.md#chim-world-streamer-chim-streamer) | `chim-streamer` | 34 of 85 | The CHIM streamer keeps Quake's visibility effective and its renderer counters must not get worse. |
+| [CHIM world streamer](../BUGS.md#chim-world-streamer-chim-streamer) | `chim-streamer` | 37 of 92 | The CHIM streamer keeps Quake's visibility effective and its renderer counters must not get worse. |
 | [FPU and CPU behaviour (68040/68060)](../BUGS.md#fpu-and-cpu-behaviour-6804068060-fpu-cpu) | `fpu-cpu` | 7 of 11 | Results must not depend on the FPU; unimplemented instructions trap on a real 68040 without a support library. |
 | [Emulator measurement method](../BUGS.md#emulator-measurement-method-benchmark-method) | `benchmark-method` | 7 of 8 | Emulator numbers are relative until a hardware number exists; same-session runs with a drift control. |
 | [Disk images, partitions and launchers](../BUGS.md#disk-images-partitions-and-launchers-disk-image-layout) | `disk-image-layout` | 7 of 12 | Classic FFS limits: partitions under 2 GiB, few files per directory; launchers list every disk. |

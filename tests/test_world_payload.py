@@ -293,9 +293,9 @@ class OceanChecklistTests(unittest.TestCase):
         E, plan, rows = self.fixture()
         with self.assertRaisesRegex(ValueError, 'survey cells'):
             E.classify_regions(plan, rows[:1], 'master', {(1, 0)})
-        with self.assertRaisesRegex(ValueError, 'absent'):
+        with self.assertRaisesRegex(ValueError, 'without an open-world map'):
             E.make([(0, 0)], [(1, 0)], master_sha256='master')
-        with self.assertRaisesRegex(ValueError, 'explicitly selected'):
+        with self.assertRaisesRegex(ValueError, 'not selected'):
             E.make([(0, 0)], [], master_sha256='master', ocean_cells=[(1, 0)])
         with self.assertRaisesRegex(ValueError, 'selection differs'):
             E.classify_regions(plan, rows, 'master', set())

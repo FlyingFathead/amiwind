@@ -1,0 +1,116 @@
+# CHIM-VIVEC-DOCK-WALKWAY-43: the walkway at the Vivec Hlaalu canton dock cannot be climbed
+
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.43-dev2 at 2026-10-18 20:29 +0300: maintainer, third person: the player sinks into the dock walkway up to the knees; the collision surface sits below the drawn planks, so the next edge is a step too high
+- Reported with v0.0.43-dev2 at 2026-10-18 20:30 +0300: maintainer: likely every walkway of this kind (copied or similar meshes); sweep island-wide: every placement of the dock/walkway meshes, collision top against drawn top
+- Reported with v0.0.43-dev2 at 2026-10-18 20:44 +0300: maintainer: another stuck spot on a wooden stair/walkway by the Vivec Arena canton (cell 4,-11, global 33216 -89297 727, local 112 715 181); same family
+
+<!-- END GENERATED PERSISTING -->
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | maintainer |
+| First noticed | 18 October 2026, in v0.0.43-dev2 |
+| Where | Vivec, Hlaalu canton dock, cell 2,-11 (local -2198 1067 164); ex_v_dock_01 (ref 278930) |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.43-dev2 (last seen) |
+| Severity | medium: a walkway in Vivec cannot be climbed; the player is stuck at the spot |
+| Family | Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`) |
+| CHIM | Stairs and collision on CHIM worlds ([CHIM Engine tracker](CHIM_TRACKER.md)) |
+| Playtest version | 2026_10_18_v0.0.43-dev2_full-batch3_b55a5ce |
+| From commit | source b55a5ce, engine b55a5ce, CHIM world b55a5ce |
+| CHIM engine version | CHIM 0.2.1, engine b55a5ce, world format 0.7 |
+| Platform or emulator | FS-UAE (maintainer playtest) |
+
+<!-- END GENERATED FACTS -->
+
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
+## Status: 18 October 2026
+
+Open. Reported by the maintainer during the v0.0.43-dev2 playtest; cause not measured.
+
+## Symptom
+
+At the Hlaalu canton dock in Vivec the player cannot walk up the walkway and stays stuck at its foot.
+
+## Where
+
+Vivec, Hlaalu canton dock, cell 2,-11 (global position 23975 -87889 656, local -2198 1067 164); the dock model is
+`ex_v_dock_01` (source reference 278930).
+
+## How it happened
+
+Not known yet. The stair gate walks every flight it finds; a walkway that it does not treat as a flight, or whose
+collision does not match its visible surface, can still block the player.
+
+## Why it was not caught
+
+To be found: whether the stair gate walked this walkway at all, and what it recorded.
+
+## Reproduction
+
+In v0.0.43-dev2, go to the Hlaalu canton dock in Vivec and walk up the walkway at the spot above.
+
+## Repair
+
+Planned: check the spot in v0.0.43-dev3, which carries the shared stair fix; read the stair gate's record for this
+walkway; compare the visible surface with the collision at the blocking step; fix in the shared converter, never
+as a single exception.
+
+## Verification
+
+Walking up the walkway in the next build, and the stair gate's walk record for it.
+
+## Prevention
+
+If the walkway was not walked by the stair gate, the gate learns to find walkways of this kind island-wide.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`). Convex collision proxies invent steep faces or bury authored surfaces; Morrowind collides with authored geometry (step up 34 units, slope up to 46 degrees). Rule: follow_original_stair_rules plus a walkability gate. See [families](README.md#families).
+
+- [BUILD-ACTOR-GATE-CHIM-FRAMES-36](BUILD-ACTOR-GATE-CHIM-FRAMES-36.md): The actor placement gate ignores CHIM frame residents: a CHIM-only build fails with no actors, and a blocked frame resident passes silently
+- [BUILD-FLORA-STAIR-PLATES-BUDGET-36](BUILD-FLORA-STAIR-PLATES-BUDGET-36.md): The stair-plate collision rules raised a legacy open-world map past the BSP clip-node limit: world-flora failed on vf0779 (33,172 aggregate clipnodes > 32,767)
+- [BUILD-HULL-ROUTE-BUDGET-33](BUILD-HULL-ROUTE-BUDGET-33.md): Routed standing hulls with copies overflow a legacy map's shared clipnode budget
+- [BUILD-ROUTED-FLORA-RESERVE-33](BUILD-ROUTED-FLORA-RESERVE-33.md): Routed standing hulls push a legacy open-world map past the flora collision reserve: the full build stops in world-flora (vf0779)
+- [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
+- [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
+- [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
+- [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
+- [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
+- [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
+- [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
+- [COLLISION-NC-FLAGS-32](COLLISION-NC-FLAGS-32.md): Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters
+- [COLLISION-RCN-SCOPE-32](COLLISION-RCN-SCOPE-32.md): Authored collision meshes (RootCollisionNode) are used by some converters only
+- [COLLISION-ROUTE-NO-SPLIT-36](COLLISION-ROUTE-NO-SPLIT-36.md): Routed standing hulls of dense flora (kelp, kreshweed) stay one chain 277-305 clipnodes deep: the router finds no cut, so the cell stays hull-pending
+- [COLLISION-SEYDA-PREVIEW-BYPASS-32](COLLISION-SEYDA-PREVIEW-BYPASS-32.md): The legacy Seyda Neen preview builds its own convex collision
+- [COLLISION-STAIR-SLOPE-32](COLLISION-STAIR-SLOPE-32.md): Convex collision proxies make stairs unclimbable
+- [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
+- [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
+- [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
+- [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
+- [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
+- [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
+- [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
+- [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot
+- [STAIRS-EBONHEART-CHIM-36](STAIRS-EBONHEART-CHIM-36.md): Three Ebonheart flights fail the CHIM stair gate in the whole-city Vivec frame
+- [STAIRS-MOLAG-ACCESS-38](STAIRS-MOLAG-ACCESS-38.md): Tel Uvirith walkway step and door stairs block normal walking
+- [STAIRS-SEYDA-LIGHTHOUSE-32](STAIRS-SEYDA-LIGHTHOUSE-32.md): Seyda Neen lighthouse stairs are blocked (outside and inside)
+- [STAIRS-SEYDA-WAREHOUSE-32](STAIRS-SEYDA-WAREHOUSE-32.md): A spiral stair in the Seyda Neen warehouse tower is blocked
+- [STAIRS-VIVEC-ROOMS-JOINT-36](STAIRS-VIVEC-ROOMS-JOINT-36.md): Six flight steps in three Vivec rooms are blocked where one stair piece meets the next
+- TERRAIN-TRAP-29 (no report page): v0.0.29-dev1: Player reportedly stuck on rocks beside structures
+- [VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md): Five Vivec Arena residents fail the actor placement gate
+- [VIVEC-ARENA-TP-ARRIVAL-32](VIVEC-ARENA-TP-ARRIVAL-32.md): dbg tp vivec_arena leaves the player at the frame origin under the water
+- [VIVEC-TEMPLE-STAIRS-33](VIVEC-TEMPLE-STAIRS-33.md): Palace steps and High Fane quarter flights fail the stair gate on the CHIM Vivec Temple frame
+- [WORLD-SLOPE-STUCK-38](WORLD-SLOPE-STUCK-38.md): Player reports being stuck beside Ashlands terrain
+
+<!-- END GENERATED CATEGORY -->

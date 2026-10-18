@@ -98,6 +98,20 @@ class ChimCellListTests(unittest.TestCase):
                                  str(self.tmp / 'prev.json'), '--drop', '9,0=', '--out', str(out)]), 2)
         self.assertFalse(out.exists())
 
+    def test_classic_cells_name_open_sea_cells_with_a_cell_record(self):
+        """CHIM-OCEAN-CELL-RECORD-CLASSIC-43: cells left classic are counted by tracker status; ocean cells
+        that the master still lists (a CELL record, no LAND) are named apart, town-covered cells are not left."""
+        cells = {'1,1': dict(island=1, status='terrain_complete_unlit'), '2,2': dict(island=1, status='ocean'),
+                 '3,3': dict(island=1, status='converted_failing'), '4,4': dict(island=1, status='audits_passed'),
+                 '1,30': dict(island=2, status='not_started')}
+        (self.tmp / 'status.json').write_text(json.dumps({'cells': cells}))
+        lines = L.classic_cells([(1, 1), (2, 2), (3, 3), (4, 4), (1, 30)], {'1,1'}, {'4,4'},
+                                self.tmp / 'status.json')
+        self.assertEqual(lines[0], 'classic: 2 exterior cell(s) of island 1 stay on the classic open world with '
+                                   'this list; converted_failing 1; ocean 1')
+        self.assertIn('classic converted_failing: 3,3', lines)
+        self.assertTrue(any(line.startswith('classic ocean: 2,2 (open sea with a CELL record') for line in lines))
+
 
 if __name__ == '__main__':
     unittest.main()

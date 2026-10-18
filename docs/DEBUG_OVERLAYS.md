@@ -1,5 +1,7 @@
 # Development overlays
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 <!-- contents start -->
 ## Contents
 
@@ -327,7 +329,7 @@ depth, not a radius or a real-world metre measurement.
 Escape → Options → Graphics has a live slider. Select Fog distance and use
 Left/Right (10-unit steps), Shift+Left/Right (1-unit nudges), or click the bar. Select Medium/default to restore
 700. Escape/Back returns to the main menu; Return to game resumes. Try 500 or
-400 for a shorter view. **Shift+V** cycles requested 450/540/1000 distance.
+400 for a shorter view. **Alt+V** cycles requested 450/540/1000 distance (Shift+V before v0.0.43).
 Bare 1/2/3 no longer set distance. Startup removes only the exact old generated
 numeric distance bindings; unrelated custom bindings survive. Both Balmora and
 Seyda Neen region exteriors cap effective distance at 540 so the view stays within
@@ -516,7 +518,7 @@ apply. Final combined native acceptance is pending. See [guard torch policy,
 source rules and resource limits](TORCH.md#guard-torches-and-the-clock--scoped-native-verification-passed).
 
 Frame CSV now also records server time and surface-order mode, separating
-movement/logic cost from world rendering. Shift+V stays unchanged.
+movement/logic cost from world rendering. Alt+V (Shift+V before v0.0.43) stays unchanged.
 
 ## Reconciled input and defaults
 
@@ -554,7 +556,7 @@ terrain is submerged. A blocked arrival uses the existing checked scene-spawn
 fallback and reports it. The four focused Linux native fixtures pass; emulator/target acceptance is pending.
 
  **F, then V** equips the temporary
-[carried torch](TORCH.md); Shift+V continues to cycle draw distance.
+[carried torch](TORCH.md); Alt+V (Shift+V before v0.0.43) continues to cycle draw distance.
 
 ## Version, world and original region
 

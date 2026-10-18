@@ -1,5 +1,7 @@
 # Keyboard and command reference
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 <!-- contents start -->
 ## Contents
 
@@ -115,7 +117,7 @@ all remappable through gameplay bindings.
 | Console | Ctrl+U / Ctrl+K | Cut to the start / end of the line |
 | Console | Up / Down | Previous / next command; Down past the newest returns the typed line |
 | Console | Tab | Complete a command or variable name |
-| Gameplay | Shift+V | Cycle requested draw distance |
+| Gameplay | Alt+V | Cycle requested draw distance |
 | Photo mode | Ctrl+F | Fog on/off (the fog setting from before photo mode returns when it ends) |
 | Photo mode | Ctrl+H | Debug HUD on/off, the same as `dbg hud on/off` |
 | Inspect mode (`dbg hud on`) | Left click / right click | Pin the target under the crosshair / leave inspect mode (the same as `dbg hud off`); the hint and the pin are the bottom lines of the screen, under the stat bars |

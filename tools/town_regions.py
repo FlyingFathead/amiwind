@@ -68,6 +68,12 @@ def visual_profile(source, triangles, underpass_names=True):
         # mesh_geometry.collision_pieces, the same test for every town.
         from player_hull import STEP_HEIGHT
         profile['surface_collision_beyond'] = STEP_HEIGHT
+        if stem.startswith('ex_hlaalu_canal_'):
+            # the canal walkways that Hlaalu flights lead onto: a convex piece inventing a slope more than a step
+            # over the visible walkway is split (mesh_geometry.clear_visible_treads, walkways; Suran,
+            # CHIM-STAIR-STEPS-SOLID-43). Measured on every exterior mesh: the walkway test for all architecture
+            # would change 234 meshes in 858 CHIM frames, for this family 2 meshes
+            profile['visible_walkways'] = True
     return profile
 
 

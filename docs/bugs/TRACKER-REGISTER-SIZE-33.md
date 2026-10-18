@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.33 at 2026-10-09 (time not recorded): first: the register outgrew the 256 KiB release text limit (gate preflight)
 - Reported with v0.0.36-dev5 at 2026-10-11 14:55 +0300: bugs.json 789,008 of 1 MiB passed the 75 % warning again; follow-up TRACKER-REGISTER-SIZE-36 (second archive)
 - Reported with v0.0.40-dev2 at 2026-10-14 (time not recorded): Journal reached196510B,98B below its warning. Rotate133 older entries; preserve newer/CHIM entries, history, links and all limits. Unreleased documentation follow-up.
+- Reported with v0.0.43-dev2 at 2026-10-18 15:28 +0300: Journal reached 196,648 B, 40 B past its warning. Rotated 130 entries of 11-16 October into the v0.0.37-v0.0.41 archive.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -25,10 +26,12 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev2 (18 October 2026)._
+
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -40,6 +43,7 @@
 - [Prevention](#prevention)
 - [Journal headroom follow-up, 14 October 2026](#journal-headroom-follow-up-14-october-2026)
 - [Focused journal validation, 14 October 2026](#focused-journal-validation-14-october-2026)
+- [Journal rotation, 18 October 2026](#journal-rotation-18-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -124,6 +128,19 @@ byte-identical. Every moved entry was checked against its original with only
 relative-link relocation permitted. No text limit or warning was increased.
 Full-suite, target and native results for the earlier game build do not
 validate this later source. Shipment remains separate.
+
+## Journal rotation, 18 October 2026
+
+The v0.0.43-dev2 source journal reached 196,648 bytes, 40 bytes past the
+75 % warning of 196,608 bytes, and the tracker test failed. The 130 entries
+dated 11-16 October 2026 (the v0.0.37 to v0.0.41 releases) moved into the
+[v0.0.37-v0.0.41 archive](../journals/BUG_JOURNAL-v0.0.37-v0.0.41.md), as in
+the rotation of 14 October: entry bodies and order unchanged, only relative
+links rewritten for the new directory, and links between the current journal
+and the archive repointed to where each entry now lives. The current journal
+is now about 28 KB (11 % of the limit) and keeps the entries from 17 October
+on, which hold the latest ten CHIM summary entries. The hard text limit and
+the warning are unchanged.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

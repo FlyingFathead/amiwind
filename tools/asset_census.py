@@ -194,7 +194,7 @@ def mesh_census(vertices, faces, collision, profile, materials):
     out['textures'] = sorted({texture_key(materials[m], texsize) for m in used if m < len(materials)})
     if not profile.get('collision_none'):
         cv, cf = collision if (collision is not None and profile.get('collision_source')) else (v, f)
-        pieces, exact, _ = collision_pieces(cv, cf, profile)
+        pieces, exact, _ = collision_pieces(cv, cf, profile, visible=(visual_v, visual_f))
         cpl = set()
         for k, (points, hull, ids, error) in enumerate(pieces):
             point_eq = np.unique(np.round(hull.equations, 5), axis=0)

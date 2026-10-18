@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-*Harry Horsperg's perspective as the project's author.*
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026). FAQ revision 17._
 
 <!-- contents start -->
 ## Contents
@@ -17,6 +17,8 @@
 - [Why can AmiWind in FS-UAE run better than native OpenMW on a small PC?](#why-can-amiwind-in-fs-uae-run-better-than-native-openmw-on-a-small-pc)
 - [Does running in WinUAE or FS-UAE prove real-hardware performance?](#does-running-in-winuae-or-fs-uae-prove-real-hardware-performance)
 - [Why not use PiStorm32, RTG and MiniGL?](#why-not-use-pistorm32-rtg-and-minigl)
+- [Can a MiSTer run AmiWind?](#can-a-mister-run-amiwind)
+- [Can a Vampire (Apollo 68080) run AmiWind?](#can-a-vampire-apollo-68080-run-amiwind)
 - [Is this a Ship of Theseus question about what counts as an Amiga?](#is-this-a-ship-of-theseus-question-about-what-counts-as-an-amiga)
 - [Why start from AmiQuake?](#why-start-from-amiquake)
 - [Why not just run OpenMW under Linux on a PowerPC Amiga?](#why-not-just-run-openmw-under-linux-on-a-powerpc-amiga)
@@ -28,17 +30,18 @@
 - [Do I need my own Morrowind files? What is included in the release?](#do-i-need-my-own-morrowind-files-what-is-included-in-the-release)
   - [Is AmiWind official? Do I need the game?](#is-amiwind-official-do-i-need-the-game)
   - [Copyright and public distribution notice](#copyright-and-public-distribution-notice)
+  - [Is AmiWind a decompilation of Morrowind?](#is-amiwind-a-decompilation-of-morrowind)
 - [What would help establish what lower-spec Amigas can do?](#what-would-help-establish-what-lower-spec-amigas-can-do)
 
 <!-- contents end -->
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026). FAQ revision 10._
+*Harry Horsperg's perspective as the project's author.*
 
-**Latest release:** v0.0.41 - More Fixes, Fewer Planes (A Telvanni Root Story), the first
-regional CHIM release: 723 cells of Vvardenfell on the CHIM engine ([release notes](RELEASE-v0.0.41.md)).
-**Next (v0.0.42):** faster and more precise build tools, all of Vivec's interiors and creatures in
-interiors, then the remaining cells by weight. See the [v0.0.42 plan](PLAN-v0.0.42.md), the
-[roadmap](ROADMAP.md) and the [tracker](BUGS.md).
+**Latest release:** v0.0.42 - Things Are Starting To Look Pretty Khuul: 1,168 of Vvardenfell's 1,395
+exterior cells on the CHIM engine ([release notes](RELEASE-v0.0.42.md)).
+**Next (v0.0.43):** every exterior cell of Vvardenfell on CHIM; the development snapshots reached 1,348 cells
+with v0.0.43-dev2. Then (v0.0.44) an audit of every entrance and a tracker for the interiors. See the
+[progress tracker](chim/PROGRESS_TRACKER.md), the [roadmap](ROADMAP.md) and the [bug tracker](BUGS.md).
 
 ## What is possible on the Amiga?
 
@@ -394,9 +397,54 @@ work first.
 
 More CPU power or another display backend can expand the available budget.
 Loading, memory use and gameplay systems still need their own work. AGA remains
-a deliberate part of the project's identity while these additional avenues
-can be investigated. For how another PC role-playing game port fares on
+a deliberate part of the project's identity, out of the maintainer's love of
+the Amiga's own OCS and AGA graphics modes and their palettes. RTG is a
+possible future path to look into, beside AGA rather than instead of it, for
+the faster machines where the screen starts to matter (PiStorm, Vampire,
+graphics-card Amigas); see the [roadmap](ROADMAP.md#long-term-possibility-an-rtg-display-path). For how another PC role-playing game port fares on
 PiStorm, Vampire and 68060 hardware, see [Comparisons](COMPARISONS.md).
+
+## Can a MiSTer run AmiWind?
+
+Not at present. MiSTer rebuilds classic machines in an FPGA rather than emulating them in software, and its
+Amiga core, [Minimig-AGA](https://github.com/MiSTer-devel/Minimig-AGA_MiSTer), has the AGA chipset AmiWind
+draws to. Its CPU is the limit: the core offers a 68000, 68010, 68EC020 or 68030, and its documentation states
+that there is no FPU (read 18 October 2026).
+
+AmiWind's engine is built for a 68040 or 68060 with an FPU and uses floating-point instructions throughout, so
+it stops on a machine without one. A version without the FPU would mean rewriting the engine's arithmetic, and
+a 68030-class CPU would still be far below the frame budget of the [hardware AmiWind targets](#what-hardware-is-the-current-version-targeting).
+The core's large Fast RAM option and its RTG output would not change that: AmiWind uses extra Fast RAM as its
+world cache, but the CPU and FPU come first.
+
+Machines with a 68040 or 68060 accelerator, or a [PiStorm](REAL_HARDWARE.md#pistorm) (which presents a 68040
+with an FPU), are the ones to try. If a later version of the core gains a 68040-class CPU with an FPU, this
+answer changes.
+
+## Can a Vampire (Apollo 68080) run AmiWind?
+
+Possibly, but nobody has tried it yet. The Vampire cards and the Vampire V4 standalone use the
+[Apollo 68080](http://www.apollo-core.com/), a 68k-compatible CPU in an FPGA that, unlike the
+[MiSTer core](#can-a-mister-run-amiwind), has an FPU. Its makers state that it outperforms a 68060.
+
+What speaks for it:
+
+- **The FPU.** AmiWind's engine uses ordinary single- and double-precision floating point, as Quake does. It does
+  not rely on the 68882's 80-bit extended precision, the area where FPGA floating-point units have differed most
+  from the original chips.
+- **The speed.** A CPU in the 68060 class or above is what AmiWind targets.
+- **The SAGA chipset.** It is compatible with AGA and adds chunky screen modes (one byte per pixel). AmiWind draws
+  every frame into such a buffer, so a SAGA screen could skip the chunky-to-planar conversion that AGA needs. The
+  engine's inherited RTG display path is a starting point for that, untested on SAGA.
+
+What is unknown:
+
+- The 68080 is its own design, not an exact 68040 or 68060. An FPU instruction it implements differently would
+  only show up in a real run, and it may suit a build profile of its own, as the 68060 has.
+- The A1200 card and the standalone V4 may behave differently on the AGA path.
+
+A first report (which card or model, the core version, Fast RAM, the `awbench` results and whether the game
+reaches the world) would answer this. See [what to send back](REAL_HARDWARE.md#what-to-send-back).
 
 ## Is this a Ship of Theseus question about what counts as an Amiga?
 
@@ -437,12 +485,22 @@ that helped make this starting point possible.
 
 ## Why not just run OpenMW under Linux on a PowerPC Amiga?
 
-OpenMW is available in Linux repositories for some PowerPC architectures.
-Those architecture names matter: for example,
-[Debian's OpenMW package](https://packages.debian.org/sid/openmw) lists
-64-bit PowerPC variants, which are not interchangeable with every older
-PowerPC Amiga configuration. CPU, operating-system and graphics support
-determine whether that route is usable on a particular machine.
+There have been ready-made OpenMW packages for 32-bit PowerPC, the kind of CPU on PowerPC accelerator
+cards: Ubuntu 16.04 LTS shipped OpenMW 0.38.0 for its `powerpc` port
+([the package files](https://mirrors.mit.edu/ubuntu-ports/pool/multiverse/o/openmw), checked 18 October
+2026). That was the last such build: later Ubuntu releases dropped 32-bit PowerPC, Debian never shipped OpenMW
+for it in a release, and the current build for its `powerpc` port is
+[waiting on missing dependencies](https://buildd.debian.org/status/package.php?p=openmw&suite=sid). Newer
+versions exist for 64-bit PowerPC (`ppc64`, `ppc64el`; [Debian's OpenMW package](https://packages.debian.org/sid/openmw)),
+which a 32-bit PowerPC card cannot run. So the route exists, with a version from 2016, and whether it is
+usable on a particular machine still depends on running Linux on it and on its graphics support: OpenMW needs
+OpenGL, which an AGA Amiga's chipset does not provide.
+
+If you want to enjoy Morrowind through OpenMW on 68k hardware, as well as it runs there: Debian's m68k port has
+built OpenMW and it is available ([Debian's OpenMW package](https://packages.debian.org/sid/openmw), the m68k entry
+under the ports). It is outdated, though: the m68k build is OpenMW 0.47, while the latest OpenMW release is 0.51.0
+and 0.52.0 has been in development since August 2026 ([openmw.org](https://openmw.org/)). OpenMW also needs
+hardware OpenGL, which a classic 68k Amiga does not have.
 
 **Even where it works, that would not fulfil the purpose of AmiWind.** I want
 this retro Amiga adaptation: Morrowind's identity, an Amiga runtime, AGA's
@@ -496,12 +554,13 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **16 October 2026**, the latest release is **v0.0.41: More Fixes, Fewer Planes (A Telvanni
-Root Story)**. 723 cells of Vvardenfell run on the CHIM engine: rings 0 to 4 from the coast inwards
-plus the whole Bitter Coast and Azura's Coast regions, with Seyda Neen, Balmora, the whole city of
-Vivec, Hla Oad, Sadrith Mora and Vos. The rest of the island is still in the classic world; the
-[CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows which cell is which. "Release" here
-identifies the project's release track; AmiWind as a whole is still an early work in progress.
+As of **18 October 2026**, the latest release is **v0.0.42: Things Are Starting To Look Pretty Khuul**:
+1,168 of Vvardenfell's 1,395 exterior cells run on the CHIM engine, with Seyda Neen, Balmora, the whole city of
+Vivec, Khuul, Sadrith Mora, Vos, Molag Mar, Pelagiad, Gnisis and Ghostgate among them. The v0.0.43 development
+snapshots carry it further (1,348 cells in v0.0.43-dev2), and v0.0.43 aims at every exterior cell; the rest of
+the island is still in the classic world until then. The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows
+which cell is which. "Release" here identifies the project's release track; AmiWind as a whole is still an early
+work in progress.
 
 The documented playable scope now includes:
 
@@ -529,7 +588,8 @@ The documented playable scope now includes:
   Seyda Neen first (v0.0.33); fixes to the Silt Strider and the Bitter Coast mushrooms (v0.0.34).
 - The coast converted first and inwards from there (v0.0.35, v0.0.36), the whole city of Vivec as
   one CHIM area (v0.0.36), lava regions and Tel Uvirith (v0.0.38), rings 0 to 2 of the island in
-  full CHIM (v0.0.40), and whole regions with compact collision for the Telvanni towns (v0.0.41).
+  full CHIM (v0.0.40), whole regions with compact collision for the Telvanni towns (v0.0.41), and the cells by
+  weight with the clouds back in the sky and the first look of the original HUD and inventory (v0.0.42).
 
 World coverage and converted assets do not mean complete Morrowind gameplay.
 Full combat, quest simulation, services, schedules, conversations and the
@@ -549,7 +609,7 @@ without them, started automatically on a 68060:
 [trapped instructions per frame](68060.md#trapped-instructions-per-frame).
 
 See the [current overview](../README.md),
-[v0.0.41 release notes](RELEASE-v0.0.41.md),
+[v0.0.42 release notes](RELEASE-v0.0.42.md),
 [project state](PROJECT_STATE.md) and [roadmap](ROADMAP.md) for maintained scope
 and outstanding work.
 
@@ -560,7 +620,6 @@ was developed specifically for AmiWind. It helps examine the converted world's
 geometry and the density of its scenes. Automated builds and tests support the
 conversion pipeline; the source and applicable licenses are available in this
 repository.
-
 
 ## What can future Amiga and m68k developers get out of this?
 
@@ -646,6 +705,21 @@ keep their own licences; the GPL that covers the code gives no right to share
 them. More detail is in [LICENSE](../LICENSE), the
 [AGA runtime licence](../engine/aga/COPYING) and
 [licensing and credits](LICENSING_AND_CREDITS.md).
+
+### Is AmiWind a decompilation of Morrowind?
+
+No. AmiWind is not a decompile, a recompile, a decompilation, a recompilation, a disassembly or a source port of
+Morrowind. It contains no code from the game: nothing from Morrowind's executable has been decompiled,
+disassembled, recompiled or translated, and no part of it is used. The engine is AmiQuake, the Amiga port of id Software's
+Quake under the GPL, extended by AmiWind's own code.
+
+What AmiWind uses from Morrowind is its data, read from your own installation when you build: the world and
+object records, meshes, textures, sounds and music. The tools convert that data into a form the Amiga engine can
+load, in the same way that mod tools read and write it. Game behaviour (movement, combat, dialogue conditions,
+lighting rules and so on) is written from scratch in AmiWind's own code. The reference for what it should do is
+the original game itself and its documented records and settings, and the open-source
+[OpenMW](https://openmw.org/) project, a clean reimplementation of the Morrowind engine, as a readable description
+of how the pieces fit together; no OpenMW code is copied either.
 
 ## What would help establish what lower-spec Amigas can do?
 

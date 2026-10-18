@@ -1,10 +1,6 @@
 # AGA checkpoint build and controls
 
-Published v0.0.27 includes detailed Seyda Neen and Balmora, the island's
-2,526 terrain regions, 37,960 exterior rocks and 816 giant mushrooms. Other
-settlements and wider gameplay remain incomplete. See [current scope and
-validation limits](RELEASE-v0.0.27.md). The A500 runtime remains a separate
-experiment; this accelerated AGA profile is not stock-A1200 performance proof.
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +14,12 @@ experiment; this accelerated AGA profile is not stock-A1200 performance proof.
 - [Checkpoint-016 interior and hand variants](#checkpoint-016-interior-and-hand-variants)
 
 <!-- contents end -->
+
+Published v0.0.27 includes detailed Seyda Neen and Balmora, the island's
+2,526 terrain regions, 37,960 exterior rocks and 816 giant mushrooms. Other
+settlements and wider gameplay remain incomplete. See [current scope and
+validation limits](RELEASE-v0.0.27.md). The A500 runtime remains a separate
+experiment; this accelerated AGA profile is not stock-A1200 performance proof.
 
 ## Reference configuration
 
@@ -60,7 +62,7 @@ copies: exiting the game writes profiling files to their filesystems.
 | Left / right arrow | Turn |
 | Shift | Run |
 | Space | Jump; upward swim input when submerged |
-| Shift+V | Cycle requested draw distance: 450 / 540 / 1000; region exteriors cap at 540 |
+| Alt+V | Cycle requested draw distance: 450 / 540 / 1000; region exteriors cap at 540 |
 | Shift+F5 / Shift+F6 | Previous / next song in playback history, then shuffled selection |
 | F6 | Next song (legacy alias) |
 | F8 | Audition battle/exploration music mode; not combat detection |

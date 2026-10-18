@@ -585,6 +585,23 @@ def owned_land_problems(kinds, data_files):
             % (len(bad), ' '.join(cell_key(c) for c in bad))]
 
 
+def ocean_map_split(kinds, data_files):
+    """(replaced, routing, problems) of the selected cells by the world terrain planner's own rule
+    (exterior_plan.ocean_routing), read from the base master in seconds before any stage: an open-sea cell with a
+    CELL record has an open-world map, which its CHIM frame map replaces in place (replaced); one with no record
+    gets a routing row (routing); a land or seabed cell without a map refuses the build here instead of 30 minutes
+    in, in world terrain (CHIM-OCEAN-CELL-RECORD-ROUTING-43). Nothing is read without ocean cells or data files."""
+    ocean = sorted(c for c, k in kinds.items() if k == 'ocean')
+    if not ocean or not data_files:
+        return [], [], []
+    from mwad.paths import child_ci
+    from exterior_plan import ocean_routing, source_cells
+    mapped = set(source_cells(child_ci(Path(data_files), 'Morrowind.esm'))[0])
+    routing, problems = ocean_routing(kinds, ocean, mapped)
+    replaced = sorted(set(ocean) & mapped)
+    return replaced, routing, ['world terrain would refuse the selection: %s' % p for p in problems]
+
+
 def table_kinds(table):
     return {parse_cell(k): v['kind'] for k, v in table['cells'].items()}
 

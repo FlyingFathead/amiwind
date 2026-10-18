@@ -30,7 +30,7 @@ static const struct {const char *command,*action;} help_bindings[]={
 /* keys.c and AW_PhotoKey handle these before ordinary bindings. Console
  * keys stay in the footer on every page. Keep photo-only scope explicit. */
 static const struct {const char *key,*action;} help_fixed[]={
-    {"Esc","Pause / back"},{"Shift+V","Draw distance"},
+    {"Esc","Pause / back"},{"Alt+V","Draw distance"},
     {"Shift+F5","Previous music"},{"Shift+F6","Next music"},
     {"Ctrl+F","Fog (photo mode)"},{"Ctrl+H","Debug HUD (photo mode)"},
     {"Right click","Leave inspect (dbg hud)"}

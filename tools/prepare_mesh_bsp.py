@@ -176,7 +176,8 @@ def _prepare_model(task):
         if m.get('source_collision', {}).get('mode') == 'nonsolid':
          collision_profile = {**profile, 'collision_none': True}
          lod['source_collision'] = m['source_collision']
-        pieces,exact,note=collision_pieces(collision_v,collision_f,collision_profile)
+        # the mesh as drawn: collision over its visible stair treads is checked against it (CHIM-STAIR-STEPS-SOLID-43)
+        pieces,exact,note=collision_pieces(collision_v,collision_f,collision_profile,visible=(visual_v,visual_f))
         if note:lod['collision'] = note
         if exact is True:
          lod['collision_bevels'] = 'exact standing-box convex sum'

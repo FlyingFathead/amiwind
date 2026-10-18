@@ -22,6 +22,9 @@ The first v0.0.43 snapshot: the build system fixes found while building v0.0.42,
 - **Seabed cells with no height data can go onto CHIM.** A LAND record without heights is taken as flat seabed at
   the game's default height, as CHIMport already did; the full build refused these 98 cells and named none of them
   ([CHIM-REGION-SEABED-NO-HEIGHTS-42](bugs/CHIM-REGION-SEABED-NO-HEIGHTS-42.md)).
+- **Two tree meshes no longer keep 14 cells off CHIM.** Their collision was one long chain even after routing; it
+  is now compiled into a compact tree (285 to 29 and 465 to 37 steps deep)
+  ([CHIM-HULL-ROUTE-NO-CUT-43](bugs/CHIM-HULL-ROUTE-NO-CUT-43.md)).
 
 ## Known in this build
 

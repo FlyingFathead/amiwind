@@ -1,5 +1,15 @@
 # CHIM-READ-RUNS-33: CHIM crossings read little but in many separate runs, so FFS seeks dominate
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.43-dev2 at 2026-10-18 16:46 +0300: maintainer, 128 MB: small load pauses ('yoinks') when crossing the world now that most cells are CHIM
+- Reported with v0.0.43-dev2 at 2026-10-18 16:48 +0300: maintainer: the same route was smoother in v0.0.42, so the crossing pauses got worse (regression); prefetch into spare RAM proposed
+- Reported with v0.0.43-dev2 at 2026-10-18 16:59 +0300: maintainer: the pause matches 'maps/vf0866.chim first-presented' (frame map load) at cell -2,1, also entering Caldera
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |

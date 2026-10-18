@@ -82,7 +82,8 @@ class Scene:
         best_fraction = None
         nodes = self.nodes
         planes = self.planes
-        limit = max(4096, len(nodes)*32)
+        # the visit guard: a column scene (chim.collision.FrameScene column=) counts its whole frame's nodes
+        limit = max(4096, getattr(self, 'full_nodes', len(nodes))*32)
         s0, s1, s2 = start
         e0, e1, e2 = end
         for root, origin, basis, ref in self._trace_brushes(start, end):

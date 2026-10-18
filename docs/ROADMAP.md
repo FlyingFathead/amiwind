@@ -5,6 +5,7 @@
 <!-- contents start -->
 ## Contents
 
+- [Next: the outdoors complete, then every entrance and every interior, 18 October 2026](#next-the-outdoors-complete-then-every-entrance-and-every-interior-18-october-2026)
 - [Near future: the baseline stays, extra RAM becomes speed, 16 October 2026](#near-future-the-baseline-stays-extra-ram-becomes-speed-16-october-2026)
 - [Near future: one game for the 68040 and the 68060, 16 October 2026](#near-future-one-game-for-the-68040-and-the-68060-16-october-2026)
 - [Goal: every exterior on CHIM, 16 October 2026](#goal-every-exterior-on-chim-16-october-2026)
@@ -50,6 +51,7 @@
   - [Sea skirt: the sea runs to the horizon](#sea-skirt-the-sea-runs-to-the-horizon)
   - [Weather: ash storms and blight winds](#weather-ash-storms-and-blight-winds)
   - [Long-term possibility: a reusable Amiga game engine](#long-term-possibility-a-reusable-amiga-game-engine)
+  - [Long-term possibility: an RTG display path](#long-term-possibility-an-rtg-display-path)
   - [Long-term possibility: Lua scripting](#long-term-possibility-lua-scripting)
   - [From Quake Arena to Vivec Arena: two-Amiga 1v1 duels](#from-quake-arena-to-vivec-arena-two-amiga-1v1-duels)
 - [Older history](#older-history)
@@ -75,6 +77,46 @@
 [CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) — 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
+
+## Next: the outdoors complete, then every entrance and every interior, 18 October 2026
+
+**v0.0.43 (in progress): every exterior cell of Vvardenfell on CHIM.** After v0.0.43-dev2 the cells still classic
+are the ones held by the stair walk (Ald-ruhn, Maar Gan, Suran and one rope bridge cell, with the town cells
+around them), eight Balmora border cells and fourteen open-sea cells; the last two are fixed, the stair fix is
+in the shared converter. v0.0.43-dev3 is meant to be the first build with the whole outdoors on CHIM
+([progress tracker](chim/PROGRESS_TRACKER.md#current-state-18-october-2026)).
+
+**v0.0.44, the next step, decided for the project on 18 October 2026: entrances and interiors.**
+
+1. **An entrance audit, island-wide.** From the game data, every load door (outside to inside, inside to
+   inside, inside to outside) is checked against the build: the destination interior is converted and in the
+   image, the door shows its prompt, the player arrives standing inside the room and not in a wall, and a door
+   leads back near the entrance. Doors to rooms left out on purpose are named with the reason. It is a data
+   check, not a walk through every door.
+2. **An interior progress tracker,** the interior twin of the exterior cell tracker: one row per interior cell
+   with its entrances, whether it is converted and in which build, its limits (inline models, room memory,
+   coordinate range), its audits (stairs, lighting, actors, harvestables) and a status colour with the reason
+   for anything left out. It is shown in the Toolkit, linked from the doors on the exterior map, published as a
+   reference with every build, and fed after every build like the cell tracker.
+3. **Missing interiors become conversion batches,** through the interior procedure
+   ([interiors over a limit](INTERIOR_SECTIONS.md)): numerous decorative meshes as sprites, per-mesh recipes,
+   sections cut at hallways and doorways. Vivec's rooms left out so far come first.
+
+**After the interiors and the fixes that come with them: the game logic.** With the world and its rooms in
+place, the work turns to what happens in it: an interpreter for MWScript, the game's own script language, that
+runs the original scripts from the game data; dialogue conditions and quests; NPC and creature behaviour; combat, magic,
+inventory and services. As everywhere else, the original game's records and behaviour are the reference for what
+it should do, OpenMW the readable reference for how it fits together, and AmiQuake's machinery (QuakeC, entities,
+the server loop) the means, measured for its cost on the 68040 and 68060.
+
+**MWScript compiled at build time, decided for the project on 18 October 2026.** The Amiga does not interpret the
+game's script text while it plays. The builder parses every script once into compact bytecode (or QuakeC), folds
+constants, drops dead branches, and turns the scripts that run on every frame into cheap event checks. Behaviour
+stays identical, quirks included: some of the original scripts depend on odd timing and corner cases, and quests
+rely on them, so each optimization is checked side by side against the original game (and OpenMW) before it is
+kept. Optimized, never changed. The one exception is the original's known script and engine bugs that OpenMW
+fixes: AmiWind takes the same fixes, written in its own code and each named with the OpenMW issue or change it
+follows, so a player sees the behaviour OpenMW players see. These fixes are on by default.
 
 ## Near future: the baseline stays, extra RAM becomes speed, 16 October 2026
 
@@ -1355,6 +1397,17 @@ Someone making their own Amiga RPG, dungeon crawler or adventure game could
 start from this instead of from zero. The aim: document the engine and tools as
 reusable on their own, separate from the Morrowind conversion, with a small
 example project that uses no game data.
+
+### Long-term possibility: an RTG display path
+
+AGA stays the primary display, and the project's look is built around the Amiga's own OCS and AGA graphics
+modes. On fast CPUs (a PiStorm, a Vampire, a quick 68060) the screen starts to take a real share of the frame,
+and a graphics card screen could take the renderer's 8-bit chunky buffer as it is, without the chunky-to-planar
+conversion AGA needs. Picasso96 also provides the CyberGraphX interface, so one path would serve both, and the
+engine already carries an inherited, untested CyberGraphX path. The emulators' virtual graphics card (UAEgfx)
+makes it testable without hardware. Possible scope: choose an RTG screen at startup when one is present (AGA
+otherwise), the palette and double buffering, the HUD, menus and video, and a measured comparison with AGA. A
+future path to look into, not a planned release item ([FAQ](FAQ.md#why-not-use-pistorm32-rtg-and-minigl)).
 
 ### Long-term possibility: Lua scripting
 

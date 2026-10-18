@@ -931,7 +931,9 @@ void Key_Event (int key, qboolean down)
     /* aw_view.c: the death prompt (load the last save / main menu / retry). */
     if (down && aw_view_key && aw_view_key(key)) return;
 
-    if (down && key_dest == key_game && keydown[K_SHIFT] && key == 'v') {
+    /* Alt+V (maintainer 18 October 2026, was Shift+V: a Shift latched by a lost key-up,
+     * AW25-05, turned plain V into a draw-distance change). */
+    if (down && key_dest == key_game && keydown[K_ALT] && key == 'v') {
         Cbuf_AddText("aw_viewdistance_cycle\n");return;
     }
 

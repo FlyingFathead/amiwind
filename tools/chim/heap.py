@@ -656,7 +656,7 @@ def actor_cache(id1, rows, sizes, gap_bytes, movers=MOVERS_AT_ONCE):
 
 
 def frame_map_heap(world_dir, id1, sizes, heap_mb=None, zone_kib=None, pool_kib=None, streamed=None, extra_maps=(),
-                   jobs=1, cache_dir=None):
+                   jobs=1, cache_dir=None, world=None):
     """The whole-map CHIM heap of each frame map in id1/maps (found by its "_chim_frame" key, .chim or .bsp:
     tools/map_files.py): the zone the engine can take
     (engine_limits.whole_map_zone: the Hunk minus the start-up Hunk, the frame map's BSP, its stated
@@ -665,16 +665,20 @@ def frame_map_heap(world_dir, id1, sizes, heap_mb=None, zone_kib=None, pool_kib=
     frames, which keep their open-world map names). Returns {map name: ring_peak frame report}.
     All frames go through ONE ring_peak (jobs: the shared worker pool, a big frame's positions split over it;
     cache_dir: each frame's result kept by the SHA-256 content key of everything it reads), the same reports as
-    frame by frame (tests/test_chim_heap.py)."""
+    frame by frame (tests/test_chim_heap.py). world: the CHIM world the image step already read and checked
+    (chim.frame_map.load, read only here); without it the world is read again (BUILD-IMAGE-REGION-MAPS-SERIAL-43)."""
     from pathlib import Path
     from engine_limits import MEASURED_HUNK, chim_memory, whole_map_zone
     from chim.frame_map import FRAME_KEY, HUNK_KEY, entities
     from chim.validate import Failures, load_world
     memory = chim_memory(heap_mb=heap_mb)
-    fails = Failures()
-    settings, files, disk, textures, models, frames = load_world(world_dir, fails)
-    if fails:
-        raise ValueError('CHIM heap gate: the world does not read back (%s)' % fails[0])
+    if world is not None:
+        settings, textures, models, frames = world['settings'], world['textures'], world['models'], world['frames']
+    else:
+        fails = Failures()
+        settings, files, disk, textures, models, frames = load_world(world_dir, fails)
+        if fails:
+            raise ValueError('CHIM heap gate: the world does not read back (%s)' % fails[0])
     policy = streamed or STREAMED_MODELS
     if policy not in ('chunk', 'shared'):
         raise ValueError('Unknown streamed-model policy: %s' % policy)
@@ -721,9 +725,10 @@ def frame_map_heap(world_dir, id1, sizes, heap_mb=None, zone_kib=None, pool_kib=
 
 
 def require_frame_map_heap(world_dir, id1, sdk=None, sizes=None, heap_mb=None, report_path=None, extra_maps=(),
-                           jobs=1, cache_dir=None):
+                           jobs=1, cache_dir=None, world=None):
     """The image step's CHIM heap gate per frame map (frame_map_heap): report_path (JSON), and a
-    ValueError naming the first frame map whose gated ring does not fit its whole-map zone."""
+    ValueError naming the first frame map whose gated ring does not fit its whole-map zone. world: the CHIM
+    world already read (frame_map_heap)."""
     import json
     from pathlib import Path
     if sizes is None and sdk is None:
@@ -732,7 +737,8 @@ def require_frame_map_heap(world_dir, id1, sdk=None, sizes=None, heap_mb=None, r
         if sizes is None:
             from check_world_map_heap import compile_target_sizes
             sizes = compile_target_sizes(sdk)[0]
-        maps = frame_map_heap(world_dir, id1, sizes, heap_mb, extra_maps=extra_maps, jobs=jobs, cache_dir=cache_dir)
+        maps = frame_map_heap(world_dir, id1, sizes, heap_mb, extra_maps=extra_maps, jobs=jobs, cache_dir=cache_dir,
+                              world=world)
         report = {'maps': maps, 'ok': all(m['ok'] for m in maps.values()),
                   'method': 'frame map: zone = engine_limits.whole_map_zone(start-up Hunk + frame-map BSP, '
                             '_chim_hunk_rest); rings as the CHIM heap gate with each chunk\'s streamed statics'}

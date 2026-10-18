@@ -1779,6 +1779,15 @@ def resolve_chim_regions(args, builder=None):
                                         one_map_only=one_map)
     problems += chim_regions.ocean_land_problems(chim_regions.table_kinds(table), getattr(args, 'data_files', None))
     problems += chim_regions.owned_land_problems(chim_regions.table_kinds(table), getattr(args, 'data_files', None))
+    # the world terrain planner's ocean rule, from the master in seconds (CHIM-OCEAN-CELL-RECORD-ROUTING-43)
+    replaced, routing, more = chim_regions.ocean_map_split(chim_regions.table_kinds(table),
+                                                           getattr(args, 'data_files', None))
+    problems += more
+    if replaced or routing:
+        print('CHIM regions ocean cells: %d with a CELL record replace their classic map in place%s; %d get a '
+              'routing row%s' % (len(replaced), (' (%s)' % ' '.join('%d,%d' % c for c in replaced)) if replaced else '',
+                                 len(routing), (' (%s)' % ' '.join('%d,%d' % c for c in routing)) if routing else ''),
+              flush=True)
     if problems:
         raise ValueError('CHIM regions preflight failed before any stage:\n  ' + '\n  '.join(problems))
     args.chim_regions_cells = chim_regions.encode_cells(chim_regions.table_kinds(table))

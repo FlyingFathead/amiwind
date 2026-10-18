@@ -121,4 +121,17 @@ class TownGrid(unittest.TestCase):
         frame={'centre':s['centre'],'owned':s['bounds'],'low':[-4608,-5376],'span':[10752,9984]}
         self.assertEqual(frame_box(frame),(-24576,-90112,8192,-57344))
 
+    def test_town_cores_leave_no_classic_slivers(self):
+        """CHIM-BALMORA-INSET-SLIVERS-43: a town core off the cell grid leaves strips of its border cells to the
+        classic open world (Balmora's 96-unit inset kept 15 legacy maps for 8 cells); every town of the default
+        build owns whole cells, so the exterior checklist has no town-owned classic cell."""
+        import exterior_plan
+        towns=exterior_plan.town_cores(['seyda','balmora','vivec_city'])
+        for town in towns:
+            self.assertTrue(all(v % 2048 == 0 for v in town['core']), town)
+        cells=[(x,y) for x in range(-5,8) for y in range(-15,1)]
+        plan=exterior_plan.make(cells,[],towns)
+        self.assertEqual([r['cell'] for r in plan['cells'] if r['format']=='bsp' and r['town_owners']],[])
+        self.assertEqual(cfg('balmora.json')['handoff_core'],cfg('balmora.json')['bounds'])
+
 if __name__=='__main__':unittest.main()

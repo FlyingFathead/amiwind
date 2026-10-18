@@ -778,6 +778,38 @@ def build(id1, town, world_dir, entity_rows=None, world=None, activated_rows=Non
                 entities=len(rows))
 
 
+def town_cell(town):
+    """The CHIM frame cell of an area's frame map (build): Seyda Neen's source cell (format 0.5) or the town's."""
+    if town == 'seyda':
+        from chim.seyda import source_cell
+        return tuple(source_cell())
+    from town_config import load_settings
+    return tuple(load_settings(town)['source_cell'])
+
+
+def frame_subworld(world, cell):
+    """The part of a loaded CHIM world (load) that one frame's map reads: that frame, and the models its
+    placements use at their indexes (every other model None), for a pool worker (town_unit). build and
+    build_docks find their frame by its cell and read only its chunks and its placements' models, so a frame
+    map made from it is byte for byte the one made from the whole world (BUILD-IMAGE-REGION-MAPS-SERIAL-43)."""
+    frame = next((f for f in world['frames'] if tuple(f[1]['cell']) == tuple(cell)), None)
+    if frame is None:
+        return world            # no such frame: the map maker refuses it as it did with the whole world
+    used = {r['model'] for c in frame[2] for r in c['owned']}
+    return {'settings': world.get('settings'), 'frames': [frame],
+            'models': [m if i in used else None for i, m in enumerate(world['models'])]}
+
+
+def town_unit(task):
+    """Pool worker: one area frame map (build) or one of Seyda Neen's special frame maps (build_docks) from its
+    frame's subworld; each writes only its own maps/<name>-chim.chim. Returns the record."""
+    kind, id1, name, world_dir, world, rows, activated = task
+    extra = {'entity_rows': rows, 'activated_rows': activated} if rows is not None else {}
+    if kind == 'town':
+        return build(id1, name, world_dir, world=world, **extra)
+    return build_docks(id1, world_dir, name=name, world=world, **extra)
+
+
 # ---------------------------------------------------------------- CHIM region frames (open world)
 
 REGION_POINT_CLASSES = ('info_player_start', 'aw_flora', 'aw_static', 'aw_sound', 'ambient_sound')
@@ -1052,7 +1084,9 @@ def frame_ground(world, cell, point=(0.0, 0.0), top=None, bottom=None):
     bottom = min(c['zmin'] for c in chunks) - FLOOR_MARGIN if bottom is None else bottom
     from chim.collision import FrameScene
     index = next(i for i, (_, frame, _) in enumerate(world['frames']) if tuple(frame['cell']) == tuple(cell))
-    return ground_trace(FrameScene(world, index, hull=0), point, top, bottom)
+    # only the chunks and placements on the traced line: the same result as the whole frame's scene, in a
+    # fraction of the time (it was ~45 s of 1,295 frames on one core, BUILD-IMAGE-REGION-MAPS-SERIAL-43)
+    return ground_trace(FrameScene(world, index, hull=0, column=tuple(point)), point, top, bottom)
 
 
 def ground_trace(scene, point, top, bottom):
@@ -1078,9 +1112,12 @@ def ground_trace(scene, point, top, bottom):
 
 def region_cache():
     """The CHIM region frame maps' share of the image pass cache (tools/pass_cache.py), or None when it is off.
-    Keyed by the code the worker (_region_map) reaches, not the whole module."""
+    Keyed by the code the map maker (_region_frame_map: both row methods) reaches, not the whole module. Until
+    v0.0.43-dev2 the key named _region_map, the legacy-rows method only, so an edit of the default game-data
+    method (_region_map_game_data, static_check, native_activated_check) kept stale results
+    (BUILD-IMAGE-REGION-MAPS-SERIAL-43)."""
     from pass_cache import PassCache
-    return PassCache.open(REGION_CACHE, {}, (__file__, '_region_map'))
+    return PassCache.open(REGION_CACHE, {}, (__file__, '_region_frame_map'))
 
 
 def _sha256(data):
@@ -1130,13 +1167,27 @@ def region_map(task):
         found = cache.load(key)
         if found is not None and found[1] is not None and isinstance(found[0], dict):
             return found[1], found[0], True
-    data, record = (_region_map_game_data(task) if legacy is None else _region_map(task, legacy))
+    data, record = _region_frame_map(task, legacy)
     record = json.loads(json.dumps(record))
     if cache is not None:
         import cache_provenance
         cache_provenance.name_unit(cache, key, lambda: task['name'], lambda: [('legacy map', legacy if legacy is not None else 'game-data'), ('frame', task['frame']), ('placed', task['placed']), ('bounds', task['bounds']), ('grid', task['grid']), ('stream statics', task['stream'])])
         cache.store(key, record, data)
     return data, record, False
+
+
+def _region_frame_map(task, legacy):
+    """(frame map bytes, record) of one region frame, by its row method: from the game data (legacy None) or
+    from the cell's legacy map. The code this reaches keys the pass cache (region_cache)."""
+    return _region_map_game_data(task) if legacy is None else _region_map(task, legacy)
+
+
+def region_unit(task):
+    """Pool worker of build_regions: region_map's (bytes, record, reused) and the frame's door bank rows
+    (region_door_rows: it reads the frame's scenery index, read only), so the parent only writes."""
+    data, record, hit = region_map(task)
+    doors = region_door_rows(task['world_dir'], task['frame'], task.get('rooms'), task['placed'])
+    return data, record, hit, doors
 
 
 def _region_map(task, legacy):
@@ -1407,28 +1458,36 @@ def install_region_doors(id1, name, rows):
 def build_regions(id1, frames, world_dir, world=None, jobs=1, cache=None, progress=None, rows=None,
                   hand_fields=None, keep_catalogues=None, rooms=None):
     """build_region for every CHIM region frame: the frame maps are made on the shared worker pool
-    (build_parallel.ordered_map; independent read-only workers) and written here in table order, so the image
-    is byte-identical with any worker count (BUILD-IMAGE-CHIM-MAPS-SERIAL-36). cache: a PassCache (region_cache):
+    (build_parallel.ordered_map; independent read-only workers: the map and its door bank rows, region_unit) and
+    written here in table order, so the image is byte-identical with any worker count
+    (BUILD-IMAGE-CHIM-MAPS-SERIAL-36, BUILD-IMAGE-REGION-MAPS-SERIAL-43). cache: a PassCache (region_cache):
     an unchanged frame map (region_inputs, by SHA-256) is taken from it. progress(record, reused): called after
     each map is written. keep_catalogues: the harvest step's frame map catalogues (install_region). rooms: the
     converted rooms by original cell (region_door_rows); each frame with load doors gets its door bank. Returns
     (records, number taken from the cache)."""
+    import time
     from build_parallel import ordered_map
     id1 = Path(id1)
+    started = time.perf_counter()
     directory = world_directory(id1)
     source_sections = region_source_sections(world_dir)
     tasks = [region_task(id1, frame, world_dir, world=world, directory=directory, rows=rows,
                          hand_fields=hand_fields, source_sections=source_sections)
              for frame in frames]
+    if tasks:
+        print('CHIM region frame maps: %d tasks prepared in %.1f s in this process (serial: each reads the CHIM '
+              'world held here: its placements, bounds and ground on the column scene); maps and door rows on %d '
+              'workers' % (len(tasks), time.perf_counter() - started, max(1, int(jobs or 1))), flush=True)
     if len({t['name'] for t in tasks}) != len(tasks):
         raise ValueError('CHIM region frames: two frames replace the same open-world map')
-    if cache is not None:
-        tasks = [dict(t, cache=cache) for t in tasks]
+    extra = dict({'world_dir': str(world_dir)}, **({'cache': cache} if cache is not None else {}),
+                 **({'rooms': rooms} if rooms else {}))
+    tasks = [dict(t, **extra) for t in tasks]
     records, reused, heights = [], 0, {}
-    for task, (data, record, hit) in zip(tasks, ordered_map(region_map, tasks, jobs)):
+    for task, (data, record, hit, door_rows) in zip(tasks, ordered_map(region_unit, tasks, jobs)):
         records.append(install_region(id1, task, data, record, keep_catalogues))
         # the frame's load doors: a door bank under the map's name, so every door shows its prompt
-        doors = install_region_doors(id1, task['name'], region_door_rows(world_dir, task['frame'], rooms, task['placed']))
+        doors = install_region_doors(id1, task['name'], door_rows)
         if doors:
             records[-1]['door_bank'] = doors
         for n in [task['name']] + task['aliases']:     # a divided cell's alias rows stay equal to its row

@@ -214,7 +214,8 @@ class FrameMapTests(unittest.TestCase):
         # (tools/build.py passes it only for --builder chim).
         tree = ast.parse((ROOT / 'tools/build_aga.py').read_text(encoding='utf-8'))
         callers = [f.name for f in ast.walk(tree) if isinstance(f, ast.FunctionDef)
-                   and any(isinstance(n, ast.Name) and n.id == 'build_frame_map' for n in ast.walk(f))]
+                   and any(isinstance(n, ast.Name) and n.id in ('build_frame_map', 'town_unit')   # the pool unit
+                           for n in ast.walk(f))]
         self.assertEqual(callers, ['chim_frame_maps'])
         image = next(f for f in ast.walk(tree) if isinstance(f, ast.FunctionDef) and f.name == 'finalize_image')
         for name in ('add_chim_volume', 'chim_frame_maps'):

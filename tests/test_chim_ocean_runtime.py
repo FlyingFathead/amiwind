@@ -194,6 +194,53 @@ class Installation(unittest.TestCase):
             self.assertFalse(list((scene/'id1/maps').glob('*.bsp')))
 
 
+class CellRecordOceanCells(unittest.TestCase):
+    """CHIM-OCEAN-CELL-RECORD-ROUTING-43: an open-sea cell with a CELL record and no LAND, selected for CHIM, has a
+    classic map of its own; the planner, the checklist and the preflight replace it in place like a land cell."""
+
+    def test_one_rule_replaced_in_place_or_routed(self):
+        import exterior_plan as E
+        routing, problems = E.ocean_routing({(-16, 7), (-19, 14), (0, 0)}, {(-16, 7), (-19, 14)}, {(-16, 7), (0, 0)})
+        self.assertEqual((routing, problems), ([(-19, 14)], []))
+        _, problems = E.ocean_routing({(0, 0)}, {(-16, 7)}, {(0, 0), (-16, 7)})
+        self.assertIn('not selected', problems[0])
+        _, problems = E.ocean_routing({(0, 0), (3, 3)}, set(), {(0, 0)})
+        self.assertIn('3,3', problems[0])
+        plan = E.make([(0, 0), (-16, 7)], [(-16, 7)], master_sha256='m', ocean_cells=[(-16, 7)])
+        self.assertNotIn('ocean_cells', plan)
+        self.assertEqual({tuple(r['cell']): r['format'] for r in plan['cells']}[(-16, 7)], 'chim-region')
+
+    def test_world_terrain_replaces_the_classic_map_of_a_cell_record_ocean_cell(self):
+        import prepare_world_regions as P
+        import hashlib
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);survey=root/'survey';survey.mkdir();data=root/'owned';data.mkdir()
+            for name in ['Morrowind.esm','Morrowind.bsa']:(data/name).write_bytes(b'')
+            for name in ['world-survey.json','terrain-source.npz']:(survey/name).write_bytes(b'')
+            scene=root/'scene';(scene/'id1/gfx').mkdir(parents=True);(scene/'id1/gfx/palette.lmp').write_bytes(bytes(768))
+            report={'master_sha256':hashlib.sha256(b'').hexdigest(),'bsa_sha256':hashlib.sha256(b'').hexdigest(),'cells':[]}
+            town=dict(origin=[0,0,0],core=[[-1,-1],[1,1]])
+            # the classic seafloor map the survey made for the CELL record, and one routed cell without a record
+            entry=dict(name='vf0000',cell=[-16,7],origin=[-16*2048+1024,7*2048+1024,0.0],core=[[-1024,-1024],[1024,1024]],
+                       coverage=[[-1920,-1920],[1920,1920]],divisions=1)
+            serial=lambda function, items, jobs=None, **_: (dict(item[2], converted=None, chim_region=True) for item in items)
+            with patch.object(P,'plan',return_value=(report,[entry])),patch.object(P,'terrain_wad',return_value=b''),                     patch.object(P,'town_handoffs',return_value=[town,town]),patch('lava.lava_mode',return_value='static'),                     patch('build_parallel.ordered_map',side_effect=serial),                     patch.object(P,'compile_region',side_effect=AssertionError('a CHIM cell must not compile a BSP')):
+                result=P.prepare(survey,data,scene,root/'out',root/'bin',1,chim_cells={(-16,7),(-19,14)},
+                                 ocean_cells={(-16,7),(-19,14)})
+            self.assertEqual([r['cell'] for r in result['ocean_routing_rows']],[[-19,14]])
+            self.assertEqual([(r['name'],r['cell'],r['chim_region']) for r in result['regions']],
+                             [('vf0000',[-16,7],True),('vf0001',[-19,14],True)])
+            self.assertFalse(list((scene/'id1/maps').glob('*.bsp')))
+
+    def test_preflight_names_the_split_in_seconds(self):
+        with patch('exterior_plan.source_cells',return_value=([(-16,7),(0,0)],'m')),                 patch('mwad.paths.child_ci',return_value=Path('Morrowind.esm')):
+            replaced, routing, problems = R.ocean_map_split({(-16,7):'ocean',(-19,14):'ocean',(0,0):'land'}, '/data')
+            self.assertEqual((replaced, routing, problems), ([(-16,7)], [(-19,14)], []))
+            _, _, problems = R.ocean_map_split({(-16,7):'ocean',(5,5):'land'}, '/data')
+            self.assertIn('world terrain would refuse', problems[0]); self.assertIn('5,5', problems[0])
+        self.assertEqual(R.ocean_map_split({(0,0):'land'}, '/nowhere'), ([], [], []))
+
+
 class OriginalTerrain(unittest.TestCase):
     @staticmethod
     def land(x,y,height=-2048,material=1):

@@ -6,6 +6,7 @@ import struct
 import sys
 import unittest
 from pathlib import Path
+from pathlib import Path
 
 import numpy as np
 
@@ -185,6 +186,24 @@ class DeepFernUnionTests(unittest.TestCase):
             self.assertFalse(depth_compile_candidate('o/flora_fire_fern_02', mode))
         self.assertFalse(depth_compile_candidate('o/flora_fire_fern_02', 'auto', True))
         self.assertFalse(depth_compile_candidate('x/terrain_rock_ma_02', 'auto'))
+
+    def test_compiled_hull_meshes_come_from_the_measured_table(self):
+        # CHIM-HULL-ROUTE-NO-CUT-43: the deep chains the routing cannot divide are data, not code
+        import json
+        import tempfile
+        from chim.models import compiled_hull_meshes, depth_compile_candidate
+        table = compiled_hull_meshes()
+        for stem in ('o/flora_fire_fern_01', 'o/flora_fire_fern_02', 'f/flora_tree_gl_08', 'f/flora_emp_parasol_02'):
+            self.assertIn(stem, table)
+            self.assertTrue(table[stem])
+        self.assertTrue(depth_compile_candidate('meshes/f/Flora_Tree_GL_08.nif', 'auto'))
+        self.assertFalse(depth_compile_candidate('meshes/f/flora_tree_gl_08.nif', 'chain'))
+        self.assertFalse(depth_compile_candidate('f/flora_tree_gl_08', 'auto', meshes={}))
+        with tempfile.TemporaryDirectory() as d:
+            bad = Path(d, 'x.json')
+            bad.write_text(json.dumps({'format': 2, 'meshes': {}}))
+            with self.assertRaisesRegex(ValueError, 'format 1'):
+                compiled_hull_meshes(bad)
 
     def test_deep_fern_union_preserves_point_hull_and_rejects_failed_check(self):
         import os

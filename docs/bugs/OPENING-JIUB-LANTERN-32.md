@@ -9,7 +9,7 @@
 | Where | Prison ship lantern (light_com_lantern_02_200_Boat): converter bake and renderer colour table |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.33 |
+| Persists in | v0.0.43-dev2 (last seen) |
 | Severity | medium: The opening scene's key light reads as a grey box; no gameplay effect. |
 | Family | Lighting, lamps and night (`lighting-night`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

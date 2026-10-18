@@ -125,7 +125,10 @@ class WorldRegionsTests(unittest.TestCase):
         self.assertEqual(towns[0]['core'],[[-3328,-4608],[4864,3584]])
         self.assertEqual(towns[0]['owned_bounds'],towns[0]['core'])
         self.assertEqual(towns[0]['ground_bounds'],[[-4096,-5376],[5632,4352]])
-        self.assertEqual(towns[1]['core'],[[-2976,-2976],[2976,2976]])
+        # Balmora owns its 3x3 cells since v0.0.43 (CHIM-BALMORA-INSET-SLIVERS-43): core on the cell grid
+        self.assertEqual(towns[1]['core'],[[-3072,-3072],[3072,3072]])
+        self.assertEqual(towns[1]['owned_bounds'],towns[1]['core'])
+        self.assertEqual(towns[1]['ground_bounds'],[[-3840,-3840],[3840,3840]])
         for town in towns:
             for k in range(2):
                 self.assertGreaterEqual(town['core'][0][k]-32,town['ground_bounds'][0][k]+64)

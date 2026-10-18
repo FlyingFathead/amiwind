@@ -76,18 +76,39 @@ def residual(box, towns):
     return parts
 
 
+def ocean_routing(selected, ocean_cells, mapped):
+    """(routing cells, problems): the one rule for CHIM cells taken as open ocean (kind 'ocean': no LAND record),
+    shared by the exterior checklist (make), the world terrain planner (prepare_world_regions.prepare) and the
+    regions preflight (tools/build.py, in seconds before any stage). selected: every CHIM region cell; mapped: the
+    exterior cells that have an open-world directory row of their own (source_cells: a CELL record, or LAND with
+    heights). An ocean cell with a row is replaced in place like any land region cell (its classic map is not
+    made; its CHIM frame map takes the row); only an ocean cell without one gets an appended routing row
+    (chim.ocean_runtime.append_routing_rows). Every selected land/seabed cell must have a row
+    (CHIM-OCEAN-CELL-RECORD-ROUTING-43)."""
+    selected, mapped = {tuple(c) for c in selected}, {tuple(c) for c in mapped}
+    ocean = {tuple(c) for c in ocean_cells}
+    problems = []
+    loose = sorted(ocean - selected)
+    if loose:
+        problems.append('%d cell(s) taken as ocean are not selected for CHIM (%s)'
+                        % (len(loose), ' '.join('%d,%d' % c for c in loose)))
+    unmapped = sorted(selected - mapped - ocean)
+    if unmapped:
+        problems.append('%d CHIM region cell(s) without an open-world map that are not open ocean (%s)'
+                        % (len(unmapped), ' '.join('%d,%d' % c for c in unmapped)))
+    return sorted((ocean & selected) - mapped), problems
+
+
 def make(cells, chim_cells, towns=(), master_sha256=None, *, ocean_cells=()):
     """One row per original exterior LAND; partially covered cells name the BSP remainder."""
     cells = [tuple(c) for c in cells]
     selected = [tuple(c) for c in chim_cells]
     if len(cells) != len(set(cells)) or len(selected) != len(set(selected)):
         raise ValueError('Duplicate exterior cell owner')
-    ocean = {tuple(c) for c in ocean_cells}
-    if not ocean <= set(selected):
-        raise ValueError('Ocean routing must be explicitly selected for CHIM')
-    extra_ocean = ocean - set(cells)
-    if set(selected) - set(cells) != extra_ocean:
-        raise ValueError('CHIM selection contains cells absent from the source LAND inventory')
+    routing, problems = ocean_routing(selected, ocean_cells, cells)
+    if problems:
+        raise ValueError('Exterior checklist: ' + '; '.join(problems))
+    extra_ocean = set(routing)
     selected = set(selected)
     rows = []
     for x, y in sorted(set(cells) | extra_ocean):

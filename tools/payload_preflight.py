@@ -190,10 +190,51 @@ def check_engine_map_limits(id1, removed):
     return check_maps(id1/'maps', skip=skip)['maps']
 
 
+# A CHIM region frame map's size before the image step writes it (chim.frame_map._region_map_game_data): the empty
+# world shell, the worldspawn and the player start, plus one entity row per recipe sprite. Recorded upper bound,
+# measured on v0.0.43-dev2 (2026_10_18_v0.0.43-dev2_full-batch3_f29d984, 1,295 region frame maps): 808 to 9,996
+# bytes; 812 bytes for 2 rows, at most 236 bytes per further row. The bound keeps about 2x headroom over both.
+FRAME_MAP_BASE_BOUND = 1024
+FRAME_MAP_ROW_BOUND = 512
+
+
+def frame_map_bound(sprite_rows):
+    """Recorded upper bound in bytes of one region frame map with SPRITE_ROWS recipe sprite rows."""
+    return FRAME_MAP_BASE_BOUND + FRAME_MAP_ROW_BOUND * int(sprite_rows)
+
+
+def planned_region_frame_maps(id1, chim_world):
+    """({map name: PlannedMap}, {boot-relative file: bytes}) of the CHIM region frame maps the image step writes
+    (chim.frame_map.build_regions), read only: one frame map per frame under its primary open-world name, sized by
+    frame_map_bound from the frame's recipe sprite rows (chim-source.json); and the files that go with them into the
+    boot partition, exact sizes from the CHIM world: each frame's far terrain sidecar (far/<cx>_<cy>.far ->
+    maps/<name>.far, build_aga.chim_far_sidecar) and the recipe sprite assets (region_task). A frame map already on
+    disk keeps its real size (the caller keeps its file)."""
+    from chim.far import file_name, sidecar_name
+    from chim.frame_map import region_map_names, region_source_sections
+    from map_files import frame_ext
+    from world_volumes import PlannedMap
+    names = region_map_names(id1, chim_world, primary_only=True)
+    if not names:
+        return {}, {}
+    sections = region_source_sections(chim_world)
+    planned, sidecars = {}, {}
+    for name, cell in sorted(names.items()):
+        section = sections.get(tuple(cell), {})
+        map_name = name + frame_ext()
+        planned[name] = PlannedMap(map_name, frame_map_bound(len(section.get('sprite_entities', []))), bound=True)
+        far = Path(chim_world)/'far'/file_name(list(cell))
+        if far.is_file():
+            sidecars['id1/' + sidecar_name('maps/' + map_name)] = far.stat().st_size
+        for asset in section.get('sprite_assets', []):
+            sidecars['id1/' + asset['path']] = int(asset['bytes'])
+    return planned, sidecars
+
+
 def check_disk_layout(boot, removed, music_files, chim_world):
     """The planned partitions and drives through the disk-layout gate, before anything is written."""
-    from world_volumes import (RDB_BYTES, partition_batches, plan_drives, plan_partitions, planned_partition,
-                               require_partition_plans)
+    from world_volumes import (RDB_BYTES, PlannedMap, map_bytes, partition_batches, plan_drives, plan_partitions,
+                               partition_starts, planned_partition, require_partition_plans)
     id1 = boot/'id1'
     files = {p.relative_to(boot).as_posix(): p.stat().st_size for p in boot.rglob('*') if p.is_file()}
     for rel in removed:
@@ -201,7 +242,7 @@ def check_disk_layout(boot, removed, music_files, chim_world):
     # The soundtrack is copied before world_volumes.pack measures the boot payload: count it first.
     for name, size in music_files:
         files['id1/music/' + name] = size
-    worlds = []
+    worlds, frame_maps = [], []
     directory = id1/'world/regions.awr'
     if directory.exists():
         import struct
@@ -216,17 +257,38 @@ def check_disk_layout(boot, removed, music_files, chim_world):
         paths = [p for p in paths if p.relative_to(id1).as_posix() not in removed]
         # a CHIM region cell's map is its frame map, written later in the image step: no legacy map is made for it
         # (docs/BUILD_MANIFEST.md step 2); any other missing map stays an error
+        planned = {}
         if chim_world:
             from chim.frame_map import region_map_names
+            from map_files import is_chim_frame
             owned = region_map_names(id1, chim_world)
-            paths = [p for p in paths if p.is_file() or p.stem not in owned]
-        terrain = sum(p.stat().st_size for p in paths)
-        _, batches = partition_batches(paths, sum(files.values()) - terrain)
+            # ... but it IS a world map of the image: the frame maps join the partition plan by their planned size,
+            # so the plan is the one world_volumes.pack makes after they are written (an all-CHIM world has no
+            # legacy open-world map left: BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43). A legacy map an earlier stage still
+            # made for an owned cell leaves when its frame map is written (chim.frame_map.install_region): not counted.
+            written = {p.stem for p in paths if p.stem in owned and p.is_file() and is_chim_frame(p)}
+            for p in paths:
+                if p.stem in owned and p.stem not in written and p.is_file():
+                    files.pop(p.relative_to(boot).as_posix(), None)
+            paths = [p for p in paths if p.stem not in owned or p.stem in written]
+            planned, sidecars = planned_region_frame_maps(id1, chim_world)
+            for rel, size in sidecars.items():
+                files.setdefault(rel, size)
+            paths += [m for name, m in sorted(planned.items()) if name not in written
+                      and 'maps/' + m.name not in removed]
+        # the boot payload: every staged file but the world maps on disk (a planned map is not in FILES yet)
+        terrain = sum(map_bytes(p) for p in paths if not isinstance(p, PlannedMap))
+        kept, batches = partition_batches(paths, sum(files.values()) - terrain)
+        for path in kept:          # a planned map the boot partition keeps is a boot file once written
+            if isinstance(path, PlannedMap):
+                files['id1/maps/' + path.name] = path.bytes
         worlds = plan_partitions(batches)
         require_partition_plans(worlds)
         for batch in batches:
             for path in batch:
-                files.pop(path.relative_to(boot).as_posix(), None)
+                if not isinstance(path, PlannedMap):
+                    files.pop(path.relative_to(boot).as_posix(), None)
+        frame_maps = [m for m in kept + [m for batch in batches for m in batch] if isinstance(m, PlannedMap)]
     if chim_world and (Path(chim_world)/'chim').is_dir():
         base = Path(chim_world)/'chim'
         chim = planned_partition('DW%d' % len(worlds), [dict(path=p.relative_to(base).as_posix(), bytes=p.stat().st_size)
@@ -237,7 +299,16 @@ def check_disk_layout(boot, removed, music_files, chim_world):
     boot_plan = planned_partition('DH0', [dict(path=k, bytes=v) for k, v in sorted(files.items())], 'AMIWIND')
     plans = plan_drives(boot_plan, worlds)
     return dict(drives=len(plans), partitions=1 + len(worlds),
-                bytes=sum(p['bytes'] for p in plans), rdb_bytes=RDB_BYTES)
+                bytes=sum(p['bytes'] for p in plans), rdb_bytes=RDB_BYTES,
+                planned_frame_maps=dict(count=len(frame_maps), bytes=sum(m.bytes for m in frame_maps),
+                                        bound=sum(1 for m in frame_maps if m.bound)),
+                plan=[dict(drive=d['file'], bytes=d['bytes'],
+                           partitions=[dict(partition=m['partition'], volume=m.get('volume'), bytes=m['bytes'],
+                                            start=start, files=len(m.get('files', ())),
+                                            payload=sum(f['bytes'] for f in m.get('files', ())),
+                                            largest_file=max((f['bytes'] for f in m.get('files', ())), default=0))
+                                       for m, start in zip(d['members'], partition_starts(RDB_BYTES, d['members']))])
+                      for d in plans])
 
 
 def check_file_formats(id1):

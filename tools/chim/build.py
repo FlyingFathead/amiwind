@@ -1252,6 +1252,9 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         # CHIM models take the stair-plate rules (mesh_geometry.collision_pieces; legacy open-world maps do not,
         # BUILD-FLORA-STAIR-PLATES-BUDGET-36)
         profile['stair_plates'] = True
+        # collision over the visible stair treads (and architecture's walkways) checked against the mesh as drawn
+        # (mesh_geometry.clear_visible_treads, CHIM-STAIR-STEPS-SOLID-43)
+        profile['visible_treads'] = True
         if underside == 'whole':
             profile['underside_whole'] = UNDERSIDE_DEPTH
         elif underside in ('rule', 'split'):

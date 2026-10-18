@@ -104,7 +104,7 @@ static void help_paging(void){
     keybindings[K_ESCAPE]="unreachable";keybindings[K_F10]="unreachable";keybindings['`']="unreachable";
     help_draw();
     assert(!strcmp(help_line(12,66),"Esc: Pause / back"));
-    assert(!strcmp(help_line(12,75),"Shift+V: Draw distance"));
+    assert(!strcmp(help_line(12,75),"Alt+V: Draw distance"));
     assert(!strcmp(help_line(12,84),"Shift+F5: Previous music"));
     assert(!strcmp(help_line(12,93),"Shift+F6: Next music"));
     assert(!strcmp(help_line(12,102),"Ctrl+F: Fog (photo mode)"));

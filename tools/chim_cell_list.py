@@ -12,6 +12,11 @@ A build's cell list (tools/build.py --chim-regions @FILE) is the union of:
                    --cells-out); any cell file tools/chim/regions.py reads
   --keep FILE      cells that are already on CHIM (the previous release's list, or a build run's
                    world-scenery/world-scenery.json, whose chim_region_cells it reads); repeatable
+  --master FILE    the base master (Morrowind.esm): report every exterior cell that stays on the classic
+                   open world with this list, as the build's exterior checklist sees it (a CELL record or a
+                   LAND record with heights, not listed, not inside a town frame given by --covered), with
+                   its tracker status. Open-sea cells with a CELL record are named apart: the build keeps a
+                   classic map for each until the list selects them (CHIM-OCEAN-CELL-RECORD-CLASSIC-43)
 
 A kept cell is never dropped silently: --drop X,Y=REASON names each one that leaves CHIM, and any other
 kept cell missing from the result refuses the list. Origin: a hand-made rings 0-2 list dropped 35 cells
@@ -96,8 +101,27 @@ def open_legacy_pockets(chosen, kept, progress, island, limit=64, covered=()):
     raise ValueError('legacy pockets still open after %d rounds' % limit)
 
 
+def classic_cells(source, chosen, covered, progress, island=1):
+    """Report lines for the exterior cells that stay classic with this list. source: the master's exterior
+    cells (exterior_plan.source_cells); chosen / covered: cell keys on CHIM (listed / inside a town frame)."""
+    cells = json.loads(Path(progress).read_text(encoding='utf-8'))['cells']
+    left = sorted((c for c in map(key, source) if c not in chosen and c not in covered
+                   and cells.get(c, {}).get('island', island) == island),
+                  key=lambda k: tuple(int(v) for v in k.split(',')))
+    by_status = {}
+    for c in left:
+        by_status.setdefault(cells.get(c, {}).get('status', 'unknown'), []).append(c)
+    lines = ['classic: %d exterior cell(s) of island %d stay on the classic open world with this list%s'
+             % (len(left), island, ''.join('; %s %d' % (k, len(v)) for k, v in sorted(by_status.items())))]
+    for status, group in sorted(by_status.items()):
+        note = (' (open sea with a CELL record and no LAND: the build keeps a classic map for each; select them, '
+                'they are admitted as ocean cells)' if status == 'ocean' else '')
+        lines.append('classic %s: %s%s' % (status, ' '.join(group), note))
+    return lines
+
+
 def make(progress, rings, island=1, include=(), keep=(), drop=None, reason='', leave_out=None, open_pockets=False,
-         regions=(), covered=()):
+         regions=(), covered=(), master=None):
     """(document, report lines). Refuses (ValueError) when a kept cell is missing without a --drop reason."""
     if not rings and not regions and not include:
         # an --include alone is a batch list made from data (tools/chim_weight_table.py --cells-out)
@@ -156,6 +180,13 @@ def make(progress, rings, island=1, include=(), keep=(), drop=None, reason='', l
     doc = {'format': CELLS_FORMAT, 'cells': [[int(v) for v in k.split(',')] for k in ordered],
            'reason': reason, 'notes': 'Made by tools/chim_cell_list.py: ' + notes}
     lines.append('total %d cells' % len(ordered))
+    if master:
+        src = str(Path(__file__).resolve().parents[1] / 'src')   # the mwad package, not the tools/mwad.py command
+        if src not in sys.path[:1]:
+            sys.path.insert(0, src)
+            sys.modules.pop('mwad', None)
+        from exterior_plan import source_cells
+        lines += classic_cells(source_cells(master)[0], chosen, town, progress, island)
     return doc, lines
 
 
@@ -175,6 +206,8 @@ def main(argv=None):
                     help='leave out, by name, the outermost neighbour of every legacy pocket the list would enclose')
     ap.add_argument('--covered', action='append', default=[], metavar='FILE',
                     help='cells on CHIM inside a town frame (no legacy map left): CHIM for the pocket test, not listed')
+    ap.add_argument('--master', metavar='FILE',
+                    help='the base master (Morrowind.esm): report the exterior cells that stay classic with this list')
     ap.add_argument('--reason', default='')
     ap.add_argument('--out', required=True)
     a = ap.parse_args(argv)
@@ -182,7 +215,7 @@ def main(argv=None):
         drop = dict(d.partition('=')[::2] for d in a.drop)
         leave = dict(d.partition('=')[::2] for d in a.leave_out)
         doc, lines = make(a.progress, a.rings, a.island, a.include, a.keep, drop, a.reason, leave, a.open_pockets,
-                          a.region, a.covered)
+                          a.region, a.covered, a.master)
     except ValueError as error:
         print('REFUSED: %s' % error, file=sys.stderr)
         return 2

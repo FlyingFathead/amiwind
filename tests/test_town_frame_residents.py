@@ -22,8 +22,10 @@ PILUS = {'number': 388940, 'id': 'pilus amatius', 'type': 'NPC_', 'position': [1
 
 class ResidentOwnership(unittest.TestCase):
     def test_town_frames_see_each_others_owned_cells(self):
-        self.assertEqual(town_grid.foreign_owned_cells('vivec_city'), [('seyda', (-3, -11), (1, -7))])
-        self.assertEqual(town_grid.foreign_owned_cells('seyda'), [('vivec_city', (1, -14), (7, -8))])
+        self.assertEqual(town_grid.foreign_owned_cells('vivec_city'), [('seyda', (-3, -11), (1, -7)),
+                                                                       ('balmora', (-4, -3), (-1, 0))])
+        self.assertEqual(town_grid.foreign_owned_cells('seyda'), [('balmora', (-4, -3), (-1, 0)),
+                                                                  ('vivec_city', (1, -14), (7, -8))])
 
     def test_a_resident_in_a_neighbours_owned_cell_is_left_to_that_town(self):
         from import_town import resident_cast
@@ -42,15 +44,15 @@ class ResidentOwnership(unittest.TestCase):
         self.assertEqual(left, [])
 
     def test_no_resident_is_placed_by_two_town_frames(self):
-        """Seyda Neen and Vivec own disjoint cells, so resident_owner gives every cell at most one town."""
+        """Seyda Neen, Balmora and Vivec own disjoint cells, so resident_owner gives every cell at most one town."""
         owners = {}
-        for town in ('seyda', 'vivec_city'):
+        for town in ('seyda', 'balmora', 'vivec_city'):
             for other, low, high in town_grid.foreign_owned_cells(town):
                 for x in range(low[0], high[0]):
                     for y in range(low[1], high[1]):
                         owners.setdefault((x, y), set()).add(other)
         self.assertTrue(all(len(v) == 1 for v in owners.values()))
-        self.assertEqual(len(owners), 16 + 36)
+        self.assertEqual(len(owners), 16 + 9 + 36)
 
 
 class ResidentLandDetail(unittest.TestCase):

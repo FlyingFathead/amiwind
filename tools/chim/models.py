@@ -17,6 +17,7 @@ and "angles 0 yaw 0").
 """
 import math
 import struct
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -351,11 +352,25 @@ def base_frame(ref, centre):
     return lambda p: ((np.asarray(p, dtype=float) - delta) / scale) @ r
 
 
-def depth_compile_candidate(source, mode, keep_chain=False):
-    """Measured fire-fern chains only; explicit hull selections and heap fallbacks remain unchanged."""
+COMPILED_HULL_MESHES = Path(__file__).resolve().parents[2] / 'config' / 'chim-compiled-hull-meshes.json'
+
+
+def compiled_hull_meshes(path=COMPILED_HULL_MESHES):
+    """{mesh stem: measured reason} of config/chim-compiled-hull-meshes.json: meshes whose chain is deeper than the
+    limit and which the routing cannot divide (the fire ferns, CHIM-HULL-ROUTE-NO-CUT-43)."""
+    import json
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    if data.get('format') != 1 or not isinstance(data.get('meshes'), dict):
+        raise ValueError('%s: format 1 with a meshes table expected' % path)
+    return {k.lower(): v for k, v in data['meshes'].items()}
+
+
+def depth_compile_candidate(source, mode, keep_chain=False, meshes=None):
+    """Measured deep chains only (compiled_hull_meshes); explicit hull selections and heap fallbacks remain
+    unchanged."""
     from routed_hull import mesh_stem
-    return (mode == 'auto' and not keep_chain and mesh_stem(source) in
-            ('o/flora_fire_fern_01', 'o/flora_fire_fern_02'))
+    return (mode == 'auto' and not keep_chain
+            and mesh_stem(source) in (compiled_hull_meshes() if meshes is None else meshes))
 
 
 def variant_unit(task):

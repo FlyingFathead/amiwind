@@ -31,26 +31,65 @@ def partition_mib(payload_bytes):
     return max(128, ((payload_bytes * 6 // 5 + 16 * MIB + 127 * MIB) // (128 * MIB)) * 128)
 
 
+class PlannedMap:
+    """A world map the image step writes later (a CHIM region frame map, maps/vfNNNN.chim), planned by name and
+    size before it exists, so the payload preflight partitions the same set of maps the writer will
+    (BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43). `bytes` is its exact size or a recorded upper bound (`bound` says which)."""
+    def __init__(self, name, bytes, bound=False):
+        self.name, self.bytes, self.bound = str(name), int(bytes), bool(bound)
+
+    @property
+    def stem(self):
+        return self.name.rsplit('.', 1)[0]
+
+    def __repr__(self):
+        return 'PlannedMap(%r, %d%s)' % (self.name, self.bytes, ', bound' if self.bound else '')
+
+
+def map_bytes(path):
+    """Size of a world map to partition: a file on disk, or a PlannedMap's planned bytes."""
+    return path.bytes if isinstance(path, PlannedMap) else path.stat().st_size
+
+
+def _sorted_maps(paths):
+    """Partition order: sorted paths (as before) when every map is a file; by file name when planned maps are mixed
+    in (every world map sits in one maps folder, so both orders agree there)."""
+    paths = list(paths)
+    if all(not isinstance(p, PlannedMap) for p in paths):
+        return sorted(paths)
+    return sorted(paths, key=lambda p: p.name)
+
+
 def balanced(paths, boot_bytes, limit=PAYLOAD_LIMIT):
-    paths=sorted(paths)
+    paths=_sorted_maps(paths)
     if not paths or boot_bytes<0:raise ValueError('Invalid partition inputs')
-    target=(boot_bytes+sum(p.stat().st_size for p in paths)+1)//2
+    target=(boot_bytes+sum(map_bytes(p) for p in paths)+1)//2
     keep=0;used=boot_bytes
-    while keep<len(paths)-1 and used+paths[keep].stat().st_size<=target:
-        used+=paths[keep].stat().st_size;keep+=1
+    while keep<len(paths)-1 and used+map_bytes(paths[keep])<=target:
+        used+=map_bytes(paths[keep]);keep+=1
     rest=paths[keep:]
-    if used>limit or sum(p.stat().st_size for p in rest)>limit:
+    if used>limit or sum(map_bytes(p) for p in rest)>limit:
         raise ValueError('Payload exceeds the two-partition budget; optimize or revise the layout')
     return paths[:keep],rest
 
 
 def partition_batches(paths, boot_bytes, limit=PAYLOAD_LIMIT):
     """Preserve the two-partition layout when it fits; otherwise use more volumes."""
-    paths = sorted(paths)
-    if not paths or not 0 <= boot_bytes <= limit:
-        raise ValueError('Invalid or oversized boot payload')
-    if any(p.stat().st_size > limit for p in paths):
-        raise ValueError('Individual world map exceeds the partition budget')
+    paths = _sorted_maps(paths)
+    # Each refusal names its unit and numbers (BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43: one message used to cover an
+    # empty map list and an oversized boot payload alike).
+    if not paths:
+        raise ValueError('No world maps to partition: the region directory names no open-world map that is a file '
+                         'or a planned frame map (boot payload %d bytes)' % boot_bytes)
+    if boot_bytes < 0:
+        raise ValueError('Invalid boot payload size: %d bytes' % boot_bytes)
+    if boot_bytes > limit:
+        raise ValueError('Boot payload %d bytes exceeds the partition budget of %d bytes by %d bytes'
+                         % (boot_bytes, limit, boot_bytes - limit))
+    big = [p for p in paths if map_bytes(p) > limit]
+    if big:
+        raise ValueError('Individual world map exceeds the partition budget of %d bytes: %s'
+                         % (limit, ', '.join('%s %d bytes' % (p.name, map_bytes(p)) for p in big[:8])))
     try:
         kept, additional = balanced(paths, boot_bytes, limit)
         return kept, [additional]
@@ -60,7 +99,7 @@ def partition_batches(paths, boot_bytes, limit=PAYLOAD_LIMIT):
     used = boot_bytes
     filling_boot = True
     for path in paths:
-        size = path.stat().st_size
+        size = map_bytes(path)
         if filling_boot and used + size <= limit:
             kept.append(path)
             used += size
@@ -326,8 +365,9 @@ def _pack_batch(task):
 
 def plan_partitions(batches):
     """The world partitions the writer will make of BATCHES (lists of map paths), before any write."""
-    return [planned_partition(f'DW{index}', [dict(path='id1/maps/' + Path(p).name, bytes=Path(p).stat().st_size)
-                                             for p in batch], f'AW_WORLD{index}')
+    return [planned_partition(f'DW{index}', [dict(path='id1/maps/' + p.name, bytes=map_bytes(p))
+                                             for p in [p if isinstance(p, PlannedMap) else Path(p) for p in batch]],
+                              f'AW_WORLD{index}')
             for index, batch in enumerate(batches)]
 
 
@@ -371,7 +411,13 @@ def pack(id1, out, version, xdftool, rdbtool=None, jobs=1, omitted=()):
     # use additional bounded partitions discovered through volumes.awv.
     terrain_bytes=sum(p.stat().st_size for p in paths)
     boot_bytes=sum(p.stat().st_size for p in id1.parent.rglob('*') if p.is_file())-terrain_bytes
-    _,batches=partition_batches(paths,boot_bytes)
+    try:
+        _,batches=partition_batches(paths,boot_bytes)
+    except ValueError as exc:
+        if not str(exc).startswith('Boot payload'):raise
+        boot=sorted(((p.stat().st_size,p.relative_to(id1.parent).as_posix()) for p in id1.parent.rglob('*')
+                     if p.is_file() and p not in set(paths)),reverse=True)[:8]
+        raise ValueError('%s; largest boot files: %s'%(exc,', '.join('%s %d'%(n,b) for b,n in boot))) from exc
     images=write_partitions(batches,out,xdftool,jobs)
     for batch in batches:
         for path in batch:path.unlink()

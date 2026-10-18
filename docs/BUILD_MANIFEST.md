@@ -1,6 +1,6 @@
 # World map manifest (design)
 
-Status: default build policy, updated 13 October 2026. The historical measurements below describe earlier builds; current builds use the manifest and final-payload gates described here.
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +18,8 @@ Status: default build policy, updated 13 October 2026. The historical measuremen
 - [Complete exterior checklist (v0.0.39-dev1 candidate)](#complete-exterior-checklist-v0039-dev1-candidate)
 
 <!-- contents end -->
+
+Status: default build policy, updated 13 October 2026. The historical measurements below describe earlier builds; current builds use the manifest and final-payload gates described here.
 
 CHIM replaces the selected exterior BSP maps by default: no additional cleanup flag is needed. Terrain, scenery and flora stages skip those legacy maps. The image step rejects duplicate legacy maps before partition packing, and records removed files and payload counts in `chim-removed-legacy.json` and `legacy-maps-of-chim-cells.json`. Required BSP interiors and other routed BSP cells remain. Historical build caches are separate from the playable HDF payload.
 
@@ -204,6 +206,6 @@ reason (v0.0.36-dev5): a CHIM area's legacy chain without a retired flag is refu
 
 `exterior-checklist.json` is resolved before any full-build stage. It inventories original exterior CELL and height-bearing LAND identities, pins the source master hash, and lists every cell as BSP, CHIM region or fully CHIM-town-owned. A partly covered cell lists its remaining BSP core separately from its town owners. Interior maps are outside this checklist.
 
-Every terrain/scenery/flora stage receives this same file. Before compiling, terrain classifies its subdivided regions: BSP work is scheduled only for required cores; CHIM regions and fully town-owned routing rows produce no BSP. Directory indices remain stable. Scenery and flora verify the ownership receipt before work and preserve required source placements. Stale source hashes, missing cells, overlapping CHIM region/town claims or changed stage selections fail.
+Every terrain/scenery/flora stage receives this same file. Before compiling, terrain classifies its subdivided regions: BSP work is scheduled only for required cores; CHIM regions and fully town-owned routing rows produce no BSP. Directory indices remain stable. Scenery and flora verify the ownership receipt before work and preserve required source placements. Stale source hashes, missing cells, overlapping CHIM region/town claims or changed stage selections fail. Open-sea cells selected as ocean (no LAND record) follow one rule in the checklist, terrain and the regions preflight (`exterior_plan.ocean_routing`): a cell whose CELL record gave it an open-world map is replaced in place like a land region cell, and only a cell without a map gets an appended routing row; the regions preflight prints this split from the base master before any stage (CHIM-OCEAN-CELL-RECORD-ROUTING-43).
 
 The checklist supplements final-image duplicate, orphan-catalogue and dependency checks. It does not remove rendering aprons needed at map boundaries or required interior and gameplay assets. Build artifacts and caches are separate from the packaged image.

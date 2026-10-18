@@ -82,5 +82,33 @@ class FrameSceneTests(unittest.TestCase):
         self.assertLess(abs(z + MINS[2] - top), 0.5)
 
 
+    def test_a_column_scene_traces_like_the_whole_frame(self):
+        # BUILD-IMAGE-REGION-MAPS-SERIAL-43: a ground trace builds only the chunks and placements on its line
+        # (frame_ground); every vertical trace there, on either hull, gives the whole scene's result
+        r = next(r for c in self.world['chunks'] for r in c['owned'] if r['ref'] == 12)
+        points = [(0.0, 0.0), (-256.0, 0.0), (-255.9, -0.1), (r['origin'][0], r['origin'][1]),
+                  (r['origin'][0] + 7.5, r['origin'][1] - 3.0), (300.0, -400.0), (511.0, 511.0)]
+        for hull in (0, 1):
+            whole = FrameScene(self.world, hull=hull)
+            for x, y in points:
+                with self.subTest(hull=hull, x=x, y=y):
+                    column = FrameScene(self.world, hull=hull, column=(x, y))
+                    self.assertEqual(column.full_nodes, len(whole.nodes))   # the same visit guard
+                    self.assertLess(len(column.brushes), len(whole.brushes))
+                    for top, bottom in ((600.0, -100.0), (120.0, 40.0), (40.0, -100.0), (-100.0, 600.0)):
+                        self.assertEqual(column.trace((x, y, top), (x, y, bottom)),
+                                         whole.trace((x, y, top), (x, y, bottom)))
+
+    def test_frame_ground_takes_the_column_scene(self):
+        from chim.frame_map import FLOOR_MARGIN, frame_ground, ground_trace
+        from chim.terrain import TERRAIN_CEILING
+        _, _, chunks = self.world['frames'][0]
+        cell = tuple(self.world['frames'][0][1]['cell'])
+        whole = FrameScene(self.world, hull=0)
+        for point in ((0.0, 0.0), (-100.0, -350.0)):
+            want = ground_trace(whole, point, float(TERRAIN_CEILING), min(c['zmin'] for c in chunks) - FLOOR_MARGIN)
+            self.assertIsNotNone(want)
+            self.assertEqual(frame_ground(self.world, cell, point), want)
+
 if __name__ == '__main__':
     unittest.main()

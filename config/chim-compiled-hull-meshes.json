@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "about": "Meshes whose standing hull is compiled by qbsp (the checked union, chim.models variant_unit) when the build's model hull mode is auto: their piece chain is deeper than routed_hull.CHAIN_DEPTH_LIMIT and the routing cannot divide it, so the routed hull stays one chain over the limit. Each entry is measured; a union that loses or adds pieces is refused and the routed hull is kept (collision_union_fallback_reasons).",
+  "meshes": {
+    "o/flora_fire_fern_01": "fire fern chains over the limit (v0.0.38, CHIM-FERN-NCO-SOLID-38)",
+    "o/flora_fire_fern_02": "fire fern chains over the limit (v0.0.38, CHIM-FERN-NCO-SOLID-38)",
+    "f/flora_tree_gl_08": "routed hull stays a 285-clipnode chain at every scale (12 Grazelands cells, 18 October 2026, CHIM-HULL-ROUTE-NO-CUT-43)",
+    "f/flora_emp_parasol_02": "routed hull stays a 464-465 clipnode chain at scales 0.59-0.66 (cells -2,20 and -1,22, 18 October 2026, CHIM-HULL-ROUTE-NO-CUT-43)"
+  }
+}

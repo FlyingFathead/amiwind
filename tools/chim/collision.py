@@ -23,7 +23,12 @@ HULL_ROOT = 10                  # dmodel field: head node 1, the standing hull
 class FrameScene(Scene):
     """Standing-hull scene of one frame (chunks and placements), traced like a region map."""
 
-    def __init__(self, world, frame_index=0, hull=1):
+    def __init__(self, world, frame_index=0, hull=1, column=None):
+        """column: (x, y) frame-local, for a scene that is only traced along the vertical line there (a ground
+        trace, chim.frame_map.frame_ground): only the chunks and placements whose box holds that line are
+        relocated (the others are never traced there: _trace_brushes tests the same boxes), in the same order,
+        and the trace's visit guard counts the whole frame's nodes (full_nodes), so every trace along the line
+        gives the same result as on the whole scene (BUILD-IMAGE-REGION-MAPS-SERIAL-43)."""
         if hull not in (0, 1):
             raise ValueError('Expected the point (0) or standing (1) hull')
         path, frame, chunks = world['frames'][frame_index]
@@ -56,21 +61,38 @@ class FrameScene(Scene):
             return images[key]
         margin = (abs(MINS[0]) + 2, abs(MINS[1]) + 2, abs(MINS[2]) + 2)
         g, (lx, ly) = frame['grain'], frame['low']
+        counted = {}
+
+        def held(key, image, box):
+            # a column scene: count the image's nodes (the whole scene's guard), relocate it only on the line
+            if column is None:
+                return True
+            if key not in counted:
+                counted[key] = _node_count(image, hull)
+            return box[0] <= column[0] <= box[3] and box[1] <= column[1] <= box[4]
         for c in chunks:
             cell = (c['cx'], c['cy'])
+            x0, y0 = lx + cell[0] * g, ly + cell[1] * g
+            box = (x0 - margin[0], y0 - margin[1], -1e9, x0 + g + margin[0], y0 + g + margin[1], 1e9)
+            if not held(('chunk', cell), c['image'], box):
+                continue
             root = add_image(('chunk', cell), c['image'])
             self.chunk_roots[cell] = root
-            x0, y0 = lx + cell[0] * g, ly + cell[1] * g
             self.brushes.append((root, (0., 0., 0.), axes((0., 0., 0.)), 'chunk %d,%d' % cell))
-            self.boxes.append((x0 - margin[0], y0 - margin[1], -1e9, x0 + g + margin[0], y0 + g + margin[1], 1e9))
+            self.boxes.append(box)
         for c in chunks:
             for r in c['owned']:
-                root = add_image(('model', r['model']), world['models'][r['model']]['image'])
+                lo, hi = r['box']
+                box = tuple(lo[k] - margin[k] for k in range(3)) + tuple(hi[k] + margin[k] for k in range(3))
+                image = world['models'][r['model']]['image']
+                if not held(('model', r['model']), image, box):
+                    continue
+                root = add_image(('model', r['model']), image)
                 # the source reference: a cut placement's pieces are one object (chim.cut)
                 self.brushes.append((root, tuple(r['origin']), axes((0., r['yaw'], 0.)), source_ref(r['ref'])))
-                lo, hi = r['box']
-                self.boxes.append(tuple(lo[k] - margin[k] for k in range(3)) +
-                                  tuple(hi[k] + margin[k] for k in range(3)))
+                self.boxes.append(box)
+        if column is not None:
+            self.full_nodes = sum(counted.values())
         self.frame = frame
         self.span = (frame['nx'], frame['ny'])
 
@@ -118,6 +140,18 @@ class FrameScene(Scene):
             box = self.boxes[i]
             if all(max(start[k], end[k]) >= box[k] and min(start[k], end[k]) <= box[k + 3] for k in range(3)):
                 yield self.brushes[i]
+
+
+def _node_count(image, hull):
+    """Nodes a brush image adds to a FrameScene (hull 0: its node tree, lump 5; hull 1: its clipnodes, lump 9),
+    from its lump directory (chim.format.read_brush_image's checks of that lump)."""
+    lump, size = (5, 24) if hull == 0 else (9, 8)
+    if len(image) < F.BSP_HEADER or struct.unpack_from('<i', image)[0] != F.BSPVERSION:
+        raise ValueError('Brush image is not BSP29')
+    offset, length = struct.unpack_from('<ii', image, 4 + 8 * lump)
+    if offset < F.BSP_HEADER or length < 0 or offset + length > len(image) or length % size:
+        raise ValueError('Brush image lump %s outside the image' % F.LUMPS[lump])
+    return length // size
 
 
 def frame_polys(world, frame_index=0):

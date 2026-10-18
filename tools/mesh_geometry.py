@@ -296,7 +296,7 @@ def split_surface(poly,ax):
   return split_surface(np.array(back),ax)+split_surface(np.array(front),ax)
  return [poly]
 
-def collision_pieces(v,f,profile,stairs=None):
+def collision_pieces(v,f,profile,stairs=None,visible=None):
  """Collision proxies of one mesh under its profile: (pieces, exact_bevels, note).
 
  One implementation for the converter and the size estimates. The convex
@@ -306,12 +306,38 @@ def collision_pieces(v,f,profile,stairs=None):
  when the deepest closed space exceeds that height, the engine's step height:
  the player cannot step over such invented solid and residents standing in it
  are buried (VIVEC-ARENA-ACTORS-32).
+
+ visible: (v, f) of the mesh as drawn (its collision mesh may be a separate RootCollisionNode); with the stair-plate
+ rules and a profile with visible_treads (the CHIM model builder), collision that stands more than a step over a
+ visible stair tread (or walkway, for architecture) with standing room is changed (clear_visible_treads,
+ CHIM-STAIR-STEPS-SOLID-43).
  """
  if not profile.get('stair_plates'):
   # the stair-plate rules (plate_toes, plates for open flat pieces, fill plates) are opted into by the converters
   # whose walkers need them: CHIM models (chim.build) and rooms (prepare_interior); legacy open-world maps keep
   # the classic proxies and their clip-node budget (BUILD-FLORA-STAIR-PLATES-BUDGET-36)
   return collision_pieces_classic(v,f,profile,stairs)
+ pieces,exact,note=_collision_pieces_stairs(v,f,profile,stairs)
+ mode=stair_mitigation_mode() if stairs is None else stairs
+ if visible is None or not profile.get('visible_treads') or mode=='off' or not pieces or profile.get('collision_none'):
+  return pieces,exact,note
+ # the visible flights of every mesh; a family with visible_walkways (town_regions.visual_profile: the walkways the
+ # Hlaalu flights lead onto) also its walkable faces, for slopes its convex proxy invented over them
+ pieces,exact,stats=clear_visible_treads(v,f,pieces,exact,visible[0],visible[1],
+                                         walkways=bool(profile.get('visible_walkways')))
+ if stats:
+  # exact standing bevels for the whole mesh: its new plates need them, and the CHIM model variants take the
+  # mesh-wide flag only (chim.build: collision_bevels), not the positions
+  exact=True
+  extra=('visible treads: %d collision pieces stood over the flight (%d split, %d made authored plates, %d ramp '
+         'plates and %d pieces at the flight replaced by %d visible plates, %d kept)'
+         %(stats['pieces'],stats['split'],stats['authored'],stats['replaced'],stats.get('flight_sides',0),
+           stats['visible_plates'],stats['kept']))
+  note=extra if not note else note+'; '+extra
+ return pieces,exact,note
+
+def _collision_pieces_stairs(v,f,profile,stairs=None):
+ """collision_pieces with the stair-plate rules, before the visible-tread rule."""
  if profile.get('collision_none'):
   return [],False,'explicit nonsolid source/category policy'
  exact=bool(profile.get('exact_collision_bevels'))
@@ -532,11 +558,12 @@ def _segment_distance(p0,p1,q0,q1):
  hit=(np.abs(den)>1e-12)&(tt>=0)&(tt<=1)&(uu>=0)&(uu<=1)
  return np.where(hit,0.,d)
 
-def stair_treads(v,f,step=None):
+def stair_treads(v,f,step=None,pairs=None):
  """Indices of the stair treads of a mesh: level upward triangles (at least
  2 square units) that a riser joins to another level triangle: the riser is
  a group of near-vertical triangles at least 4 units wide, touching (within
- 0.75 in plan) a level triangle at its top and another 1..step lower. Rock ledges, leaves and trinkets without such steps have none."""
+ 0.75 in plan) a level triangle at its top and another 1..step lower. Rock ledges, leaves and trinkets without such steps have none.
+ pairs: a list to collect (riser width, upper tread triangles, lower tread triangles) per riser (flight_treads)."""
  from player_hull import STEP_HEIGHT
  step=STEP_HEIGHT if step is None else step
  tris=v[f[:,:3],:3]*.25
@@ -578,8 +605,50 @@ def stair_treads(v,f,step=None):
   top=touching(np.flatnonzero(np.abs(lz-hi)<.15))
   if not len(top):continue
   low=touching(np.flatnonzero((lz>=max(lo-.15,hi-step-1e-3))&(lz<=hi-1.)))
-  if len(low):out.update(level[np.concatenate((top,low))].tolist())
+  if len(low):
+   out.update(level[np.concatenate((top,low))].tolist())
+   if pairs is not None:pairs.append((float(proj.max()-proj.min()),level[top].tolist(),level[low].tolist()))
  return np.array(sorted(out),int)
+
+FLIGHT_WIDTH=16.  # a riser the standing box (14.6 wide) can climb (the stair gate's MIN_OVERLAP)
+FLIGHT_LEVELS=3   # tread levels joined by risers that make a flight (the stair gate: 3+ steps in a row)
+
+def flight_treads(v,f,step=None):
+ """The stair treads of a mesh that belong to a flight: treads joined by risers at least FLIGHT_WIDTH wide
+ (stair_treads), level triangles of one tread joined where they share a corner, and at least FLIGHT_LEVELS tread
+ levels more than a unit apart in one such staircase. Decorative ledges (a carved door, a bed's frame) are not flights."""
+ pairs=[]
+ treads=stair_treads(v,f,step,pairs=pairs)
+ if not len(treads):return treads
+ tris=v[f[:,:3],:3]*.25
+ parent={int(t):int(t) for t in treads}
+ def root(x):
+  while parent[x]!=x:parent[x]=parent[parent[x]];x=parent[x]
+  return x
+ used=set()
+ for width,top,low in pairs:
+  if width<FLIGHT_WIDTH:continue
+  ids=[int(t) for t in top+low];used.update(ids)
+  for t in ids[1:]:parent[root(t)]=root(ids[0])
+ if not used:return np.array([],int)
+ # one tread's triangles: level, sharing a corner
+ ids=sorted(used);z=tris[ids][:,:,2].mean(axis=1);corner={}
+ for t,h in zip(ids,z):
+  for k in np.round(tris[t]*16).astype(np.int64).tolist():
+   other=corner.setdefault(tuple(k),[])
+   for o,oh in other:
+    if abs(oh-h)<.25:parent[root(t)]=root(o)
+   other.append((t,h))
+ levels={}
+ for t,h in zip(ids,z):levels.setdefault(root(t),[]).append(h)
+ def count(hs):
+  hs=sorted(hs);n=1
+  last=hs[0]
+  for b in hs[1:]:
+   if b-last>1.:n+=1;last=b        # risers under a unit are trim, not steps (the stair gate's RISE_MIN)
+  return n
+ keep=[t for t in ids if count(levels[root(t)])>=FLIGHT_LEVELS]
+ return np.array(sorted(keep),int)
 
 def mitigate_stairs(v,f,pieces,mode='on',walkable=None,step=None):
  """The one stair rule for every converter (towns, world, interiors, CHIM).
@@ -714,6 +783,252 @@ def vertical_risers(pieces,treads,walkable,tolerance=.25,touch=.75):
     continue
   out.append((points,hull,ids,error))
  return out,cut
+
+# The visible-tread rule (CHIM-STAIR-STEPS-SOLID-43). Morrowind collides with the authored collision mesh (a
+# RootCollisionNode) where a mesh has one; that mesh may run a ramp over a staircase well above its visible nosings
+# (ex_redoran_steps_02: a 45-degree ramp 7 to 14 units over the treads, one plate of four triangles), and a convex
+# proxy of a curved authored deck closes the space over it (ex_ropebridge_2048_01: one piece of 260 triangles, solid
+# 22.8 units over the sagging deck). The player then cannot stand on the visible steps the stair gate and the eye
+# see. The rule: over every visible stair tread with standing room, sampled across its area, a collision piece in the
+# open column more than VISIBLE_TREAD_MARGIN over the tread must be within a step of it and walkable on top (the
+# stair rule's own test, mitigate_stairs, which only reads tread centres of the collision mesh): a ramp through the
+# nosings, Quake's clip ramp, or an authored deck a little over the visible planks stays as it is. A piece over that
+# is split while
+# it has more than four authored triangles (as collision_parts splits), then made the authored plates of its
+# triangles; a plate that still stands there, is not a wall and lies over the flight (the authored surface itself is
+# a ramp over the steps) is replaced by the visible flight under it as plates, and then every other authored piece
+# that lies mostly in the flight (the standing box's width around its treads) by the visible faces where it stood (the
+# flight's cheeks and rails); a wall, a roof or a floor elsewhere stays. A family with visible_walkways also has its
+# walkable faces checked, for a slope its convex proxy invented more than a step over them (the walkway a flight leads
+# onto).
+# Visible geometry is never changed.
+VISIBLE_TREAD_MARGIN=.5
+VISIBLE_TREAD_INSET=.1   # samples keep this barycentric distance from a tread triangle's edges (risers stand .2 off)
+VISIBLE_TREAD_GRID=7     # samples per tread triangle edge
+VISIBLE_RAMP_COVER=.75   # an authored ramp plate with this share of its plan area at the flight under it ran over the flight
+
+def _proxy_piece(tris,ids):
+ """The convex proxy of triangles ids (their hull, a flat set thickened 0.2 each side), as collision_parts builds
+ it: (points, hull, ids, error) or None."""
+ p=np.unique(np.round(tris[ids].reshape(-1,3)*16)/16,axis=0)
+ if len(p)<3:return None
+ offset=p.mean(axis=0);_,sig,axes=np.linalg.svd(p-offset,full_matrices=False)
+ if sig[-1]<.15:
+  normal=axes[-1];p=np.vstack((p-normal*.2,p+normal*.2))
+ if len(p)<4 or np.linalg.matrix_rank(p-p[0])<3:return None
+ hull=ConvexHull(p)
+ samples=tris[ids].mean(axis=1)
+ error=float((-(samples@hull.equations[:,:3].T+hull.equations[:,3]).max(axis=1)).max())
+ return (p,hull,list(ids),error)
+
+def walkway_faces(v,f):
+ """Visible walkable faces of at least 2 square units (normal z at least WALKABLE_Z)."""
+ from player_hull import WALKABLE_Z
+ tris=v[f[:,:3],:3]*.25
+ n=np.cross(tris[:,1]-tris[:,0],tris[:,2]-tris[:,0]);a=np.linalg.norm(n,axis=1)
+ nz=np.zeros(len(f));ok=a>1e-6;nz[ok]=n[ok,2]/a[ok]
+ return np.flatnonzero(ok&(nz>=WALKABLE_Z)&(a/2>=2.))
+
+def visible_tread_samples(v,f,step=None,faces=None):
+ """Sample points over visible faces of a mesh (FACES; by default its flight treads, flight_treads) and, per point,
+ the lowest height collision may start over it (a step over the face) and the top of its open column (the standing
+ height: points with a visible surface over them lower than that are left out): (points, floor, top), or None when
+ there are no such points."""
+ from player_hull import STEP_HEIGHT, MINS, MAXS
+ step=STEP_HEIGHT if step is None else step
+ tris=v[f[:,:3],:3]*.25
+ faces=flight_treads(v,f,step) if faces is None else faces
+ if not len(faces):return None
+ g=np.linspace(VISIBLE_TREAD_INSET,1-2*VISIBLE_TREAD_INSET,VISIBLE_TREAD_GRID)
+ bary=np.array([(a,b) for a in g for b in g if a+b<=1-VISIBLE_TREAD_INSET+1e-9])
+ T=tris[faces]
+ pts=(T[:,None,0]+bary[None,:,0,None]*(T[:,None,1]-T[:,None,0])+bary[None,:,1,None]*(T[:,None,2]-T[:,None,0])).reshape(-1,3)
+ z=pts[:,2]
+ # collision within a step over the tread can be stepped onto (a ramp through the nosings, an authored deck a little
+ # over the visible planks); higher it closes the tread
+ floor=z+step
+ # the open column: up to the next visible surface over the point
+ height=MAXS[2]-MINS[2];top=z+height
+ a,b,c=tris[:,0],tris[:,1],tris[:,2]
+ m00=b[:,0]-a[:,0];m01=c[:,0]-a[:,0];m10=b[:,1]-a[:,1];m11=c[:,1]-a[:,1];det=m00*m11-m01*m10
+ good=np.abs(det)>1e-9;lo=tris.min(axis=1);hi=tris.max(axis=1)
+ for k,p in enumerate(pts):
+  near=good&(lo[:,0]<=p[0])&(hi[:,0]>=p[0])&(lo[:,1]<=p[1])&(hi[:,1]>=p[1])&(hi[:,2]>p[2]+.3)
+  if not near.any():continue
+  i=np.flatnonzero(near);d=det[i]
+  u=((p[0]-a[i,0])*m11[i]-(p[1]-a[i,1])*m01[i])/d;w=((p[1]-a[i,1])*m00[i]-(p[0]-a[i,0])*m10[i])/d
+  ok=(u>=-1e-6)&(w>=-1e-6)&(u+w<=1+1e-6)
+  if not ok.any():continue
+  hz=(a[i,2]+u*(b[i,2]-a[i,2])+w*(c[i,2]-a[i,2]))[ok]
+  hz=hz[hz>p[2]+.3]
+  if len(hz):top[k]=min(top[k],float(hz.min()))
+ # only where the visible mesh leaves the player's whole height free over the tread: space under a table top, a
+ # bed or a landing keeps the collision its authors gave it
+ keep=top>=z+height-1e-6
+ if not keep.any():return None
+ return pts[keep],floor[keep],top[keep]
+
+def _stands_over(piece,samples,steep=True):
+ """True when the piece is solid in the open column over a visible tread sample above the tread (more than
+ VISIBLE_TREAD_MARGIN) and either higher than a step there or (steep) under a top face too steep to stand on: the
+ stair rule's own test (mitigate_stairs), over the visible faces and their whole area."""
+ from player_hull import WALKABLE_Z
+ pts,floor,top=samples[:3]
+ points,hull=piece[0],piece[1]
+ lo=points.min(axis=0);hi=points.max(axis=0)
+ sel=(pts[:,0]>=lo[0]-1e-3)&(pts[:,0]<=hi[0]+1e-3)&(pts[:,1]>=lo[1]-1e-3)&(pts[:,1]<=hi[1]+1e-3)&(top>lo[2])&(pts[:,2]+VISIBLE_TREAD_MARGIN<hi[2])
+ if not sel.any():return False
+ p=pts[sel];eq=hull.equations
+ r=-(p[:,:2]@eq[:,:2].T+eq[:,3])            # c*z <= r per plane
+ c=eq[:,2]
+ with np.errstate(divide='ignore',invalid='ignore'):
+  ups=np.where(c[None,:]>1e-9,r/c[None,:],np.inf)
+  down=np.where(c[None,:]<-1e-9,r/c[None,:],-np.inf).max(axis=1)
+ k=np.argmin(ups,axis=1);up=ups[np.arange(len(p)),k];upn=c[k]
+ flat=np.where(np.abs(c)[None,:]<=1e-9,r,np.inf).min(axis=1)>=-1e-6
+ s0=np.maximum(down,p[:,2]+VISIBLE_TREAD_MARGIN);s1=np.minimum(up,top[sel]-VISIBLE_TREAD_MARGIN)
+ solid=flat&(s1-s0>.05)
+ return bool((solid&((s1>floor[sel]+.05)|((upn<WALKABLE_Z) if steep else False))).any())
+
+def _ramp_plate(piece):
+ """A thin piece (an authored plate) that is not a wall: its plane leans more than RISER_NZ from vertical (a floor,
+ a ramp, a slope over a flight)."""
+ p=piece[0]
+ if len(p)<3:return False
+ _,sig,axes=np.linalg.svd(p-p.mean(axis=0),full_matrices=False)
+ return bool(sig[-1]<.5*max(sig[0],1e-9) and np.ptp(p@axes[-1])<=.5 and abs(axes[-1][2])>=RISER_NZ)
+
+def clear_visible_treads(v,f,pieces,exact,vis_v,vis_f,step=None,walkways=False):
+ """The visible-tread rule (see VISIBLE_TREAD_MARGIN): v, f the collision mesh, pieces its proxies, exact their
+ bevel marker (True, False or the positions that need exact bevels); vis_v, vis_f the mesh as drawn. Returns
+ (pieces, exact, stats); stats is None when nothing changed. Every new plate is marked for exact bevels."""
+ flight=flight_treads(vis_v,vis_f,step)
+ samples=visible_tread_samples(vis_v,vis_f,step,flight) if len(flight) else None
+ walk=None
+ if walkways:
+  faces=np.setdiff1d(walkway_faces(vis_v,vis_f),flight)
+  walk=visible_tread_samples(vis_v,vis_f,step,faces) if len(faces) else None
+ if samples is None and walk is None:return pieces,exact,None
+ tris=v[f[:,:3],:3]*.25;vtris=vis_v[vis_f[:,:3],:3]*.25
+ def over(piece):
+  if samples is not None and _stands_over(piece,samples):return True
+  # a walkway: only a slope the convex proxy invented (no authored triangle in it) more than a step over it
+  ids=list(piece[2]) if piece[2] is not None else []
+  return bool(walk is not None and len(ids)>2 and _stands_over(piece,walk,steep=False) and
+              _invents_steep_face(piece[1],tris[np.array(ids,int)]))
+ flagged=[k for k,piece in enumerate(pieces) if over(piece)]
+ if not flagged:return pieces,exact,None
+ stats=dict(pieces=len(flagged),split=0,authored=0,replaced=0,kept=0,visible_plates=0)
+ out=[];marks=[];hidden=set();covered=set()
+ ft=vtris[flight]
+ def under(plate):
+  """The visible faces an authored ramp plate ran over, when the plate lies at the flight (VISIBLE_RAMP_COVER of
+  its plan area within the standing box's width of the flight treads under it; a deck or a floor that only reaches
+  over a flight stays): the faces in its plan outline (grown .5) under its surface, from a standing
+  height under the lowest flight tread there (the first riser) up to the highest (treads, risers, the stringers'
+  inner faces); True when replaced."""
+  from scipy.spatial import Delaunay
+  pts=plate[0];xy=pts[:,:2]
+  try:
+   outline=Delaunay(np.vstack((xy,xy+np.sign(xy-xy.mean(axis=0))*.5)))
+  except Exception:
+   return False
+  from player_hull import MINS, MAXS
+  if np.linalg.matrix_rank(xy-xy[0])<2:return False
+  inside=outline.find_simplex(ft.mean(axis=1)[:,:2])>=0
+  if not inside.any():return False
+  # the flight under the plate: its treads' outline grown by the standing box; the plate must lie there
+  fxy=ft[inside][:,:,:2].reshape(-1,2)
+  try:
+   ring=fxy[ConvexHull(fxy).vertices];m=ring-ring.mean(axis=0)
+   region=Delaunay(ring+m/np.maximum(np.linalg.norm(m,axis=1,keepdims=True),1e-9)*(max(MAXS[0],MAXS[1])+VISIBLE_TREAD_MARGIN))
+  except Exception:
+   return False
+  lo2,hi2=xy.min(axis=0),xy.max(axis=0)
+  grid=np.stack(np.meshgrid(np.linspace(lo2[0],hi2[0],24),np.linspace(lo2[1],hi2[1],24)),axis=-1).reshape(-1,2)
+  grid=grid[Delaunay(xy[ConvexHull(xy).vertices]).find_simplex(grid)>=0]
+  if not len(grid) or (region.find_simplex(grid)>=0).mean()<VISIBLE_RAMP_COVER:return False
+  lo=ft[inside][:,:,2].min()-(MAXS[2]-MINS[2]);hi=ft[inside][:,:,2].max()+.5
+  # the plate's plane: faces under it only
+  _,_,axes=np.linalg.svd(pts-pts.mean(axis=0),full_matrices=False);n=axes[-1]*np.sign(axes[-1][2]);d=float(n@pts.mean(axis=0))
+  c=vtris.mean(axis=1)
+  sel=(outline.find_simplex(c[:,:2])>=0)&(c[:,2]>=lo)&(c[:,2]<=hi)&((d-c[:,:2]@n[:2])/n[2]+.5>=c[:,2])
+  hidden.update(int(i) for i in np.flatnonzero(sel))
+  covered.update(int(i) for i in np.flatnonzero(inside))
+  return True
+ def settle(piece,depth,ex):
+  ids=list(piece[2]) if piece[2] is not None else []
+  if not over(piece):
+   out.append(piece);marks.append(ex);return
+  if len(ids)>4 and depth<8:
+   stats['split']+=1
+   centres=tris[ids].mean(axis=1);axis=int(np.argmax(np.ptp(centres,axis=0)));order=np.argsort(centres[:,axis],kind='stable')
+   mid=len(order)//2
+   for half in (np.array(ids)[order[:mid]],np.array(ids)[order[mid:]]):
+    q=_proxy_piece(tris,half)
+    if q is None:
+     for plate in shell_collision_parts(v,f[half]):settle(plate,8,True)
+    else:settle(q,depth+1,ex)
+   return
+  if ids:
+   stats['authored']+=1
+   for plate in shell_collision_parts(v,f[np.array(ids,int)]):
+    if over(plate):last(plate,True)
+    else:
+     out.append(plate);marks.append(True)
+   return
+  last(piece,ex)
+ def last(plate,ex):
+  # an authored surface over the flight that is not a wall and lies over the flight is a ramp the authors ran over
+  # the steps (the visible flight under it takes its place); a wall, a roof or a floor elsewhere stays
+  if _ramp_plate(plate) and under(plate):
+   stats['replaced']+=1
+  else:
+   stats['kept']+=1;out.append(plate);marks.append(ex)
+ for k,piece in enumerate(pieces):
+  ex=exact is True or (bool(exact) and exact is not True and k in exact)
+  if k in flagged:
+   settle(piece,0,ex)
+  else:
+   out.append(piece);marks.append(ex)
+ if stats['replaced'] and covered:
+  # the flight's collision now comes from the visible flight (the treads the replaced ramps ran over): every other
+  # authored piece that lies mostly in the flight (its plan outline grown by the standing box, between a standing
+  # height under its lowest tread and over its highest) goes too, and the visible faces there take its place: the
+  # sides of the flight are its visible cheeks and rails, not authored walls inset into the visible treads
+  from scipy.spatial import Delaunay
+  from player_hull import MINS, MAXS
+  height=MAXS[2]-MINS[2];grow=max(MAXS[0],MAXS[1])+VISIBLE_TREAD_MARGIN
+  cov=ft[np.array(sorted(covered),int)]       # the treads the replaced ramps ran over
+  fxy=cov[:,:,:2].reshape(-1,2)
+  zlo=cov[:,:,2].min()-height;zhi=cov[:,:,2].max()+height
+  try:
+   hull=ConvexHull(fxy);ring=fxy[hull.vertices];centre=ring.mean(axis=0)
+   d=ring-centre;ring=ring+d/np.maximum(np.linalg.norm(d,axis=1,keepdims=True),1e-9)*grow
+   region=Delaunay(ring)
+  except Exception:
+   region=None
+  if region is not None:
+   c=vtris.mean(axis=1)
+   keep_out,keep_marks=[],[]
+   for piece,mark in zip(out,marks):
+    pts=piece[0]
+    if pts[:,2].max()>=zlo and pts[:,2].min()<=zhi and (region.find_simplex(pts[:,:2])>=0).mean()>=.5:
+     # a piece mostly at the flight (a hull, a deck elsewhere stays)
+     stats['flight_sides']=stats.get('flight_sides',0)+1
+     lo=pts.min(axis=0)-.5;hi=pts.max(axis=0)+.5
+     sel=(np.all((c[:,:2]>=lo[:2])&(c[:,:2]<=hi[:2]),axis=1)&(c[:,2]>=max(lo[2],zlo))&(c[:,2]<=min(hi[2],zhi))
+          &(region.find_simplex(c[:,:2])>=0))
+     hidden.update(int(i) for i in np.flatnonzero(sel))
+    else:
+     keep_out.append(piece);keep_marks.append(mark)
+   out,marks=keep_out,keep_marks
+ if hidden:
+  plates=shell_collision_parts(vis_v,vis_f[np.array(sorted(hidden),int)])
+  stats['visible_plates']=len(plates)
+  out.extend(plates);marks.extend([True]*len(plates))
+ if exact is True:return out,True,stats
+ return out,frozenset(k for k,m in enumerate(marks) if m),stats
 
 def shell_collision_parts(v,f,thickness=.2):
  """Thin convex prisms preserve a hollow authored interior collision shell.

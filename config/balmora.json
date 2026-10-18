@@ -20,6 +20,27 @@
       3072
     ]
   ],
+  "owned_cells": [
+    [
+      -4,
+      -3
+    ],
+    [
+      -1,
+      0
+    ]
+  ],
+  "handoff_core": [
+    [
+      -3072,
+      -3072
+    ],
+    [
+      3072,
+      3072
+    ]
+  ],
+  "terrain_margin": 768,
   "core_size": 768,
   "overlap": 896,
   "hysteresis": 96,

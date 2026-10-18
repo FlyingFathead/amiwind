@@ -662,19 +662,19 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     cells=set(chim_cells or ())
     skipped={e['name'] for e in entries if chim_region(e,cells)}
     found={tuple(e['cell']) for e in entries if e['name'] in skipped}
-    ocean_cells = set(ocean_cells or ())
-    if not ocean_cells <= cells or ocean_cells & found:
-        # every failure names its unit (CHIM-OCEAN-ROUTING-UNNAMED-41): which cells, and which of the two rules
-        owned = sorted(ocean_cells & found)
-        loose = sorted(ocean_cells - cells)
-        raise ValueError('Ocean routing cells must be selected and have no existing core owner: %s%s'
-                         % (('%d taken as ocean already have an open-world map of their own (%s)'
-                             % (len(owned), ' '.join('%d,%d' % c for c in owned))) if owned else '',
-                            ('%s%d taken as ocean are not selected (%s)' % ('; ' if owned else '', len(loose),
-                             ' '.join('%d,%d' % c for c in loose))) if loose else ''))
-    if cells - found != ocean_cells:
-        raise ValueError('CHIM region cells without an open-world map: %s'
-                         %' '.join('%d,%d'%c for c in sorted(cells-found-ocean_cells)))
+    # One rule with the exterior checklist and the regions preflight (exterior_plan.ocean_routing): an ocean cell
+    # (no LAND) whose CELL record gave it an open-world map is replaced in place like any land region cell (it is in
+    # skipped); only ocean cells without a map get routing rows (CHIM-OCEAN-CELL-RECORD-ROUTING-43).
+    from exterior_plan import ocean_routing
+    routing, problems = ocean_routing(cells, ocean_cells or (), {tuple(e['cell']) for e in entries})
+    if problems:
+        # every failure names its unit (CHIM-OCEAN-ROUTING-UNNAMED-41)
+        raise ValueError('CHIM region cells do not match the open-world directory: ' + '; '.join(problems))
+    replaced = sorted(set(ocean_cells or ()) & found)
+    if replaced:
+        print('World terrain: %d open-sea cell(s) with a CELL record replace their classic map in place (%s); '
+              '%d get a routing row' % (len(replaced), ' '.join('%d,%d' % c for c in replaced), len(routing)), flush=True)
+    ocean_cells = set(routing)
     from chim.ocean_runtime import append_routing_rows
     entries, ocean_rows = append_routing_rows(entries, ocean_cells, data)
     compiled=[e for e in entries if e['name'] not in skipped | routing_only | {r['name'] for r in ocean_rows}]
