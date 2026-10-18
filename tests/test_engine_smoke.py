@@ -56,6 +56,89 @@ class EngineSmokeTests(unittest.TestCase):
                        'FAIL the run ended outside play'):
             self.assertIn(needle, text)
 
+    def test_map_change_repeats(self):
+        """CHIM-SEYDA-BALMORA-LOAD-HANG-43: one map change passed 3 of 5 runs; the smoke repeats it (default 3)."""
+        text = engine_smoke.PROBE
+        for needle in ('REPEAT=${REPEAT:-3}', '[ $r -ge $REPEAT ] && break', 'rc "map $MAP1"; loaded "$MAP1"',
+                       'load $r of $REPEAT', 'map change ran $r times'):
+            self.assertIn(needle, text)
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = Path(tmp, 'AmiWind')
+            engine.write_bytes(b'x')
+            roms = Path(tmp, 'roms')
+            roms.mkdir()
+            Path(roms, 'kickstart-3.1-a1200.rom').write_bytes(b'k')
+            calls = []
+
+            sha = engine_smoke.sha256(engine)
+
+            def fake(*args, **kw):
+                calls.append(args)
+                return subprocess.CompletedProcess(args, 0, 'world=\nreadback=%s\n' % sha, '')
+            with unittest.mock.patch.object(engine_smoke, 'docker', side_effect=fake):
+                self.run_main('--engine', str(engine), '--volume', 'v', '--image-dir', 'build/image', '--scratch', 'workspaces/s',
+                              '--roms', str(roms), '--out', str(Path(tmp, 'o')), '--repeat', '5')
+        run = next(c for c in calls if '/out/probe.sh' in c)
+        self.assertIn('REPEAT=5', run)
+
+    def test_stall_is_examined_with_the_monitor(self):
+        """CHIM-SEYDA-BALMORA-LOAD-HANG-43: a load that does not finish is examined (stall.py), not only timed out."""
+        text = engine_smoke.PROBE
+        for needle in ('console_debugger = 1', 'modifier_key = key_lalt', 'mkfifo $R/dbg.in', 'python3 $R/stall.py',
+                       'stall "dbg tp $TP did not load a map', 'stall "$1 did not load',
+                       'FAIL emulator disk stall (CHIM-SEYDA-BALMORA-LOAD-HANG-43)'):
+            self.assertIn(needle, text)
+        compile(engine_smoke.STALL_PY, 'stall.py', 'exec')
+
+    def stall_classify(self):
+        space = {'__name__': 'stall'}
+        exec(compile(engine_smoke.STALL_PY, 'stall.py', 'exec'), space)
+        return space['classify']
+
+    def test_stall_classes(self):
+        classify = self.stall_classify()
+        dh0 = 0x40010618
+        tasks = [('Initial CLI', 0x4000F8A8, 0x100, True), ('DH0', dh0, 0x40000100, True),
+                 ('input.device', 0x40008CFA, 0xC0000000, False)]
+        idle = [0xF81476, 0xF81478, 0xF81478]
+        stack = [0x00F8161A, dh0 + 0x5C + 0x14, 0x4000F904]
+        kind, details = classify(idle, tasks, stack)
+        self.assertEqual(kind, 'emulator-disk')
+        self.assertIn('request held by DH0', details)
+        # the engine running (a loop in its own code), no request held, or the game not in a file call: unknown
+        self.assertEqual(classify([0x400D85E2, 0xF81476], tasks, stack)[0], 'unknown')
+        self.assertEqual(classify(idle, tasks, [0x00F8161A])[0], 'unknown')
+        self.assertEqual(classify(idle, [('Initial CLI', 0x4000F8A8, 0x10, True)] + tasks[1:], stack)[0], 'unknown')
+        self.assertEqual(classify([], tasks, stack)[0], 'unknown')
+
+    def test_emulator_disk_stall_is_retried_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = Path(tmp, 'AmiWind')
+            engine.write_bytes(b'x')
+            roms = Path(tmp, 'roms')
+            roms.mkdir()
+            Path(roms, 'kickstart-3.1-a1200.rom').write_bytes(b'k')
+            sha = engine_smoke.sha256(engine)
+            results = iter(['FAIL emulator disk stall (CHIM-SEYDA-BALMORA-LOAD-HANG-43) dbg tp: x',
+                            'FAIL emulator disk stall (CHIM-SEYDA-BALMORA-LOAD-HANG-43) dbg tp: y'])
+            runs = []
+
+            def fake(*args, **kw):
+                if '/out/probe.sh' in args:
+                    out = Path(next(a for a in args if str(a).endswith(':/out'))[:-5])
+                    (out / 'logs').mkdir(parents=True, exist_ok=True)
+                    (out / 'logs' / 'steps.log').write_text('00:00 smoke RESULT %s\n' % next(results), encoding='utf-8')
+                    self.assertTrue((out / 'stall.py').is_file())   # the stall check goes with every run
+                    runs.append(out)
+                return subprocess.CompletedProcess(args, 0, 'world=\nreadback=%s\n' % sha, '')
+            with unittest.mock.patch.object(engine_smoke, 'docker', side_effect=fake):
+                code, text = self.run_main('--engine', str(engine), '--volume', 'v', '--image-dir', 'build/image',
+                                           '--scratch', 'workspaces/s', '--roms', str(roms), '--out', str(Path(tmp, 'o')))
+        self.assertEqual(len(runs), 2)                     # one retry, not more
+        self.assertEqual(runs[1].name, 'retry')
+        self.assertIn('retrying once on a fresh play copy', text)
+        self.assertEqual((code, text.splitlines()[-1]), (1, 'smoke-exit=1'))
+
     @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
     def test_probe_parses(self):
         with tempfile.TemporaryDirectory() as tmp:

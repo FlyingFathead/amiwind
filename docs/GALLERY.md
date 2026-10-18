@@ -4,6 +4,33 @@ In-game screenshots of the Amiga build, taken in an Amiga emulator, without reto
 The game art shown is converted from the original Morrowind data and belongs to ZeniMax Media Inc.
 What changed in each version: [changelog](CHANGELOG.md).
 
+## v0.0.42: Things Are Starting To Look Pretty Khuul
+
+Shots from the v0.0.42-dev1 playtest: the cloud sky back, Khuul and Ebonheart on CHIM, sunsets, a night and a dawn.
+
+| | |
+| --- | --- |
+| ![The Khuul docks, a ship at the pier, in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-khuul-2.png) | ![Khuul shacks under the new clouds in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-khuul.png) |
+| **The Khuul docks**, a ship at the pier. | **Khuul's shacks** under the new clouds. |
+| ![A sunset tree near Khuul in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-khuul-3.png) | ![The sun setting near Khuul, a wanderer in front, in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-sun-setting-near-khuul.png) |
+| **A tree against the sunset** near Khuul. | **The sun setting near Khuul.** |
+| ![The Ebonheart bridge between two towers at dusk in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-ebonheart-dusk.png) | ![Ebonheart rooftops and the sea at dusk in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-ebonheart-dusk-2.png) |
+| **Ebonheart at dusk**, lanterns on the bridge. | **Ebonheart rooftops** and the sea at dusk. |
+| ![Ebonheart roofs and towers at dawn in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-ebonheart-dawn.png) | ![Castle Ebonheart walls in the fog in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-castle-ebonheart-fog.png) |
+| **Ebonheart at dawn.** | **Castle Ebonheart** in the fog. |
+| ![The sun beside a tower in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-sunset-tower.png) | ![A wanderer against the evening sun in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-dusk-sunset-wanderer.png) |
+| **The sun beside a tower.** | **A wanderer against the evening sun.** |
+| ![A sunset through grey fog in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-sunset-fog.png) | ![The same sunset under a clear blue sky in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-sunset-blue.png) |
+| **A sunset through the fog** ... | **... and the same sunset under a clear sky.** |
+| ![A late sunset behind a hill in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-late-sunset.png) | ![The sun going down behind a hill in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-sunset.png) |
+| **A late sunset.** | **The sun going down.** |
+| ![Masser rising in a starry night sky in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-masser-night.png) | ![Early dawn on a grey hillside in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-early-dawn.png) |
+| **Masser** in a starry night. | **Early dawn.** |
+| ![Later in the dawn, the sky turning red, in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-later-dawn.png) | ![A dawn hillside with dead trees in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-dawn-hillside.png) |
+| **Later in the dawn**, the sky turning red. | **A dawn hillside.** |
+| ![A dawn valley with dead trees in v0.0.42-dev1](images/amiwind-v0.0.42-dev1-dawn-valley.png) |  |
+| **A dawn valley.** |  |
+
 ## v0.0.32: Vivec
 
 ![The ten v0.0.32 gallery shots in turn](images/amiwind-v0.0.32-gallery.gif)

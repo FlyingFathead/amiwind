@@ -12,7 +12,7 @@ disk is mounted read-only from the image, and the scratch folder is removed afte
 
 Usage (paths inside VOLUME are relative to its root):
   engine_smoke.py --engine FILE --volume VOLUME --image-dir DIR --scratch DIR --roms HOST_DIR --out HOST_DIR
-                  [--prof jit|interp] [--map seyda] [--tp "-21800 -12300"] [--play 10]
+                  [--prof jit|interp] [--map seyda] [--tp "-21800 -12300"] [--play 10] [--repeat 3]
                   [--builder-image IMAGE] [--fsuae-image IMAGE] [--cpus 2] [--cpu-shares N] [--name NAME]
 The builder image needs xdftool (amitools) at /opt/amiwind-tools/venv/bin/xdftool; the FS-UAE image (emulator side: PROBE below) needs fs-uae,
 Xvfb, xdotool and ffmpeg. Images are used as present (--pull never); containers run with --network none.
@@ -37,7 +37,7 @@ PROBE = r'''#!/bin/sh
 # Mounts: /w = the run's fresh boot-disk copy (play-boot.hdf), /img = the image folder (world disk, read-only),
 # /roms = the maintainer's Kickstart folder (read-only), /out = this run's output folder.
 # Env: WORLD (world disk file name in /img, may be empty), PROF jit|interp, KICK (Kickstart file name in /roms),
-# MAP1 (first map, default seyda), AFTER (after it loads: a console command, or key:NAME, e.g. key:Return for a MiniWind), TP (second load as "dbg tp X Y", default Balmora), PLAY (seconds of play, 10).
+# MAP1 (first map, default seyda), REPEAT (how many times the TP map change runs, default 3), AFTER (after it loads: a console command, or key:NAME, e.g. key:Return for a MiniWind), TP (second load as "dbg tp X Y", default Balmora), PLAY (seconds of play, 10).
 # TP "same X Y": a one-area image; teleport inside MAP1 and stay in it (no second map). TP "view X Y Z": noclip and
 # aw_view to a local point of MAP1; the client's view origin must arrive there (wide network coordinates).
 # START enter: press Enter on a MiniWind startup screen and through its quick character pages instead of "map MAP1".
@@ -45,7 +45,7 @@ PROBE = r'''#!/bin/sh
 # reads (aw_music_status reads=); dbg music off (no more reads, the game goes on); a second load (TP) with the music
 # off; dbg music on (reads again). Any emulator exit, stall or missing step fails. Last line: "smoke RESULT ...".
 R=/out; mkdir -p $R/logs $R/shots $R/home $R/awctl
-PROF=${PROF:-jit}; MAP1=${MAP1:-seyda}; TP=${TP:--21800 -12300}; PLAY=${PLAY:-10}; KICK=${KICK:-kickstart-3.1-a1200.rom}
+PROF=${PROF:-jit}; MAP1=${MAP1:-seyda}; TP=${TP:--21800 -12300}; PLAY=${PLAY:-10}; REPEAT=${REPEAT:-3}; KICK=${KICK:-kickstart-3.1-a1200.rom}
 N=$((60 + $(od -An -N1 -tu1 /dev/urandom)))
 cat > $R/smoke.fs-uae <<CFG
 [config]
@@ -70,6 +70,8 @@ window_width = 800
 window_height = 600
 initial_input_grab = 0
 automatic_input_grab = 0
+console_debugger = 1
+modifier_key = key_lalt
 screenshots_output_dir = $R/shots
 base_dir = $R/home
 CFG
@@ -84,7 +86,11 @@ else printf 'jit_compiler = 1\nuae_cpu_speed = max\n' >> $R/smoke.fs-uae; fi
 export HOME=$R/home DISPLAY=:$N LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy
 Xvfb :$N -screen 0 1024x768x24 -nolisten tcp > $R/logs/xvfb.log 2>&1 &
 XP=$!; sleep 2
-fs-uae $R/smoke.fs-uae > $R/logs/fsuae.log 2>&1 &
+# FS-UAE on a pseudo-terminal with its monitor (console_debugger) fed from a FIFO: a stalled load is examined in
+# place (stall.py, CHIM-SEYDA-BALMORA-LOAD-HANG-43). Without script(1) it runs as before, without the monitor.
+rm -f $R/dbg.in; mkfifo $R/dbg.in
+if command -v script >/dev/null; then (exec 7<>$R/dbg.in; exec script -qfc "fs-uae --stdout $R/smoke.fs-uae" $R/logs/fsuae.log <&7 >/dev/null 2>&1) &
+else fs-uae $R/smoke.fs-uae > $R/logs/fsuae.log 2>&1 & fi
 FP=$!
 log(){ echo "$(date -u +%T) $*" | tee -a $R/logs/steps.log; }
 alive(){ kill -0 $FP 2>/dev/null; }
@@ -123,9 +129,15 @@ inplay(){ s=0; while [ $s -lt $((30*K)) ]; do alive || finish "FAIL emulator exi
     [ "$(st screen)" = game ] && [ "$(st signon)" = 4 ] && [ "$(st world_leafs)" -gt 0 ] 2>/dev/null && { log "in play: $1 (map $(st map), $(st world_leafs) leaves, local $(st local))"; return 0; }
     sleep 1; s=$((s+1)); done
   finish "FAIL $1 is not in play: screen $(st screen), signon $(st signon), world leaves $(st world_leafs) (map $(st map))"; }
+# stall: a load that does not finish is examined with the FS-UAE monitor (stall.py): an emulator disk stall (the
+# processor idle, the game's file request taken by a handler and never answered, CHIM-SEYDA-BALMORA-LOAD-HANG-43)
+# is named as such; the launcher retries such a run once on a fresh play copy.
+stall(){ S=$( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>/dev/null | tail -n 1); log "$S"
+  case "$S" in "STALL emulator-disk"*) finish "FAIL emulator disk stall (CHIM-SEYDA-BALMORA-LOAD-HANG-43) $1: ${S#STALL emulator-disk: }";; esac
+  finish "FAIL $1 ($S)"; }
 # loaded SERVER: wait (max 150 s) for the map to run
 loaded(){ s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator exited loading $1";
-  [ "$(st server)" = "$1" ] && return 0; sleep 1; s=$((s+1)); done; finish "FAIL $1 did not load (server $(st server))"; }
+  [ "$(st server)" = "$1" ] && return 0; sleep 1; s=$((s+1)); done; stall "$1 did not load (server $(st server))"; }
 t0=$(date +%s)
 sleep $((9*K))
 n=0; while [ ! -s $R/awctl/state.txt ] && [ $n -lt $((200*K)) ]; do
@@ -182,9 +194,16 @@ map:*)  # a one-town image: the second load is another map it holds
   [ "$(st server)" != "$MAP1" ] && [ -n "$(st server)" ] && [ "$(st server)" != none ] && break; sleep 1; s=$((s+1)); done
 [ $s -lt $((150*K)) ] || finish "FAIL map ${TP#map:} did not load a map (server $(st server))";;
 *)
-rc "dbg tp $TP"; s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator exited after dbg tp $TP";
+# REPEAT: the map change runs REPEAT times (back to MAP1 with "map MAP1" in between), so an intermittent hang
+# fails the smoke instead of passing on a lucky run (CHIM-SEYDA-BALMORA-LOAD-HANG-43).
+r=1; while :; do
+rc "dbg tp $TP"; s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator exited after dbg tp $TP (load $r of $REPEAT)";
   [ "$(st server)" != "$MAP1" ] && [ -n "$(st server)" ] && [ "$(st server)" != none ] && break; sleep 1; s=$((s+1)); done
-[ $s -lt $((150*K)) ] || finish "FAIL dbg tp $TP did not load a map (server $(st server))";;
+[ $s -lt $((150*K)) ] || stall "dbg tp $TP did not load a map (server $(st server), load $r of $REPEAT)"
+[ $r -ge $REPEAT ] && break
+inplay "the second load ($(st server), load $r of $REPEAT)"; sleep $((3*K)); r=$((r+1))
+rc "map $MAP1"; loaded "$MAP1"; inplay "$MAP1 again (before load $r of $REPEAT)"; sleep $((3*K))
+done; log "map change ran $r times";;
 esac
 inplay "the second load ($(st server))"
 play $PLAY "$(st server) (music off)"; shot map2
@@ -194,6 +213,133 @@ rc "aw_music_status on"; sleep $((8*K)); rc "aw_music_status"; sleep $((3*K)); d
 [ -n "$d" ] && [ "$d" -gt "${c:-0}" ] || finish "FAIL music did not read again after dbg music on (reads $c -> $d)"
 play 5 "music on again"
 finish "PASS boot, $MAP1 and $(st server) loaded, music reads $a -> $b, off (reads stayed $c), on again ($c -> $d), $(( $(date +%s) - t0 )) s"
+'''
+
+
+# The emulator side of a stalled load (CHIM-SEYDA-BALMORA-LOAD-HANG-43), written to OUT/stall.py and run by PROBE's
+# stall step with the FS-UAE monitor on: break in (Alt+D), sample the program counter once a second, walk exec's
+# task lists and look for the file-system request the game waits on. One line on stdout:
+# "STALL <class>: <details>"; class "emulator-disk" = every sample in Kickstart's idle loop (STOP) and the game
+# process waiting on SIGF_DOS with its request taken by a file-system handler that never answered.
+STALL_PY = r'''#!/usr/bin/env python3
+import os, re, subprocess, sys, time
+R = '/out'
+LOG = R + '/logs/fsuae.log'
+FIFO = R + '/dbg.in'
+IDLE = (0xF81460, 0xF81480)     # Kickstart 3.1 exec idle loop (STOP)
+PROMPT = re.compile(r'(?:^|\r?\n)>[ \t]*$')
+
+
+def tail_from(pos):
+    with open(LOG, 'rb') as f:
+        f.seek(pos)
+        return f.read().decode('latin-1', 'replace')
+
+
+def size():
+    try:
+        return os.path.getsize(LOG)
+    except OSError:
+        return 0
+
+
+def wait_prompt(pos, timeout=20):
+    end = time.time() + timeout
+    while time.time() < end:
+        text = tail_from(pos)
+        if PROMPT.search(text.rstrip(' \t')):
+            return text
+        time.sleep(0.15)
+    return None
+
+
+def cmd(text, timeout=20):
+    pos = size()
+    with open(FIFO, 'w') as f:
+        f.write(text + '\n')
+    return wait_prompt(pos, timeout) or ''
+
+
+def break_in():
+    w = subprocess.run(['xdotool', 'search', '--name', 'FS-UAE'], capture_output=True, text=True).stdout.split()
+    if not w:
+        return False
+    pos = size()
+    for a in (['windowfocus', '--sync', w[0]], ['keydown', 'Alt_L'], ['key', '--delay', '150', 'd'], ['keyup', 'Alt_L']):
+        subprocess.run(['xdotool'] + a, capture_output=True)
+    return wait_prompt(pos) is not None
+
+
+def resume():
+    with open(FIFO, 'w') as f:
+        f.write('g\n')
+
+
+def mread(addr, n):
+    out = bytearray()
+    for line in cmd('m $%08X !%d' % (addr, (n + 15) // 16)).splitlines():
+        parts = line.split()
+        if not parts or not re.fullmatch(r'[0-9A-Fa-f]{8}', parts[0]):
+            continue
+        for p in parts[1:]:
+            if not re.fullmatch(r'[0-9A-Fa-f]{4}', p):
+                break
+            out += bytes.fromhex(p)
+    return bytes(out[:n])
+
+
+def be32(b, o):
+    return int.from_bytes(b[o:o + 4], 'big') if len(b) >= o + 4 else 0
+
+
+def classify(pcs, tasks, stack):
+    """pcs: sampled program counters; tasks: [(name, node, sigwait, is_process)]; stack: the game's stack words.
+    Returns (class, details)."""
+    idle = [p for p in pcs if IDLE[0] <= p < IDLE[1]]
+    game = next((t for t in tasks if t[0] == 'Initial CLI'), None)
+    lists = {t[1] + 0x5C + 0x14: t[0] for t in tasks if t[3] and t[0] != 'Initial CLI'}
+    holder = next((lists[w] for w in stack if w in lists), None)
+    details = 'pc %d of %d samples in exec idle; game %s; request held by %s' % (
+        len(idle), len(pcs), 'waits on SIGF_DOS' if game and game[2] & 0x100 else 'not in a file call',
+        holder or 'none found')
+    if pcs and len(idle) == len(pcs) and game and game[2] & 0x100 and holder:
+        return 'emulator-disk', details
+    return 'unknown', details
+
+
+def main():
+    pcs = []
+    for _ in range(int(sys.argv[1]) if len(sys.argv) > 1 else 5):
+        if not break_in():
+            continue
+        m = re.search(r'^([0-9A-Fa-f]{8}) ', cmd('d').strip(), re.M)
+        if m:
+            pcs.append(int(m.group(1), 16))
+        resume(); time.sleep(1)
+    tasks, stack = [], []
+    if break_in():
+        eb = be32(mread(4, 4), 0)
+        base = mread(eb, 0x1B0)
+        for off in (0x196, 0x1A4):
+            node, k = be32(base, off), 0
+            while node and k < 40:
+                t = mread(node, 0x60)
+                if not be32(t, 0):
+                    break
+                np = be32(t, 10)
+                name = mread(np, 32).split(b'\x00')[0].decode('latin-1', 'replace') if np else ''
+                tasks.append((name, node, be32(t, 22), len(t) > 8 and t[8] == 13))
+                if name == 'Initial CLI':
+                    s = mread(be32(t, 54) & ~1, 3072)
+                    stack = [be32(s, i) for i in range(0, len(s) - 3, 2)]
+                node, k = be32(t, 0), k + 1
+        resume()
+    kind, details = classify(pcs, tasks, stack)
+    print('STALL %s: %s; pc %s' % (kind, details, ' '.join('%08X' % p for p in pcs[:5])))
+
+
+if __name__ == '__main__':
+    main()
 '''
 
 
@@ -226,6 +372,11 @@ def main(argv=None):
                     help='second load as dbg tp X Y (default Balmora); "same X Y" for a one-area image: teleport inside --map; '
                          '"view X Y Z": noclip + aw_view to a local point of --map, checked on the client; map:NAME: a second map the image holds')
     ap.add_argument('--play', type=int, default=10)
+    ap.add_argument('--no-stall-retry', action='store_true',
+                    help='fail at once on an emulator disk stall instead of retrying the run once (used by the retry itself)')
+    ap.add_argument('--repeat', type=int, default=3,
+                    help='run the --tp map change this many times (back to --map in between), so an intermittent load hang '
+                         'fails the smoke (CHIM-SEYDA-BALMORA-LOAD-HANG-43); default 3')
     ap.add_argument('--after-load', default='', help='sent once the first map is loaded: a console command, or key:NAME for a key press, '
                     'e.g. key:Return for a MiniWind image, which holds its startup screen until Enter')
     ap.add_argument('--log-illegal', action='store_true',
@@ -258,6 +409,7 @@ def main(argv=None):
     out.mkdir(parents=True)
     shutil.copyfile(args.engine, out / 'engine.AmiWind')
     (out / 'probe.sh').write_text(PROBE, encoding='utf-8', newline='\n')
+    (out / 'stall.py').write_text(STALL_PY, encoding='utf-8', newline='\n')
     if args.script:
         shutil.copyfile(args.script, out / 'script.txt')
     (out / 'engine.txt').write_text('engine sha256 %s\nimage %s\nprofile %s\n' % (want, args.image_dir, args.prof),
@@ -293,7 +445,7 @@ echo "readback=$(sha256sum /tmp/back | cut -d' ' -f1)"'''
             return 2
         docker(*base, '--cpus', args.cpus, '--memory', '3g', '--name', args.name + '-run', '--entrypoint', 'sh',
                '-e', f'PROF={args.prof}', '-e', f'WORLD={world.group(1) if world else ""}', '-e', f'MAP1={args.map}',
-               '-e', f'TP={args.tp}', '-e', f'PLAY={args.play}', '-e', f'START={args.start}', '-e', f'AFTER={args.after_load}', '-e', f'ILLEGAL={int(args.log_illegal)}', '-e', f'KICK={args.kickstart}',
+               '-e', f'TP={args.tp}', '-e', f'PLAY={args.play}', '-e', f'REPEAT={max(1, args.repeat)}', '-e', f'START={args.start}', '-e', f'AFTER={args.after_load}', '-e', f'ILLEGAL={int(args.log_illegal)}', '-e', f'KICK={args.kickstart}',
                '--mount', f'type=volume,src={args.volume},dst=/w,volume-subpath={scratch}',
                '--mount', f'type=volume,src={args.volume},dst=/img,volume-subpath={args.image_dir},readonly',
                '-v', f'{args.roms.resolve()}:/roms:ro', '-v', f'{out}:/out', args.fsuae_image, '/out/probe.sh',
@@ -303,6 +455,12 @@ echo "readback=$(sha256sum /tmp/back | cut -d' ' -f1)"'''
     steps = (out / 'logs' / 'steps.log')
     lines = steps.read_text(encoding='utf-8', errors='replace').splitlines() if steps.is_file() else []
     result = next((l for l in reversed(lines) if 'smoke RESULT' in l), 'smoke RESULT FAIL no result line')
+    if 'FAIL emulator disk stall' in result and not args.no_stall_retry:
+        # CHIM-SEYDA-BALMORA-LOAD-HANG-43: a file request the emulator never answered (seen only under heavy host
+        # disk writes). Said as such and retried once on a fresh play copy (OUT/retry); a second stall fails.
+        print('engine smoke: %s; retrying once on a fresh play copy' % result.split('smoke RESULT ', 1)[-1])
+        again = list(sys.argv[1:] if argv is None else argv) + ['--out', str(out / 'retry'), '--no-stall-retry']
+        return main(again)
     print(result.split('smoke RESULT ', 1)[1] if 'smoke RESULT ' in result else result)
     code = 0 if 'smoke RESULT PASS' in result else 1
     print('smoke-exit=%d' % code)

@@ -44,7 +44,16 @@ still picture in the original pose.
 Running on CHIM Engine v0.2.1. See the [release notes](docs/RELEASE-v0.0.42.md) for what changed and what is
 known in this build, and the [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md) for every cell.
 
-<!-- v0.0.42 gallery: photo-mode captures from the release build go here -->
+| | |
+| --- | --- |
+| ![The Khuul docks, a ship at the pier, in v0.0.42-dev1](docs/images/amiwind-v0.0.42-dev1-khuul-2.png) | ![The Ebonheart bridge between two towers at dusk in v0.0.42-dev1](docs/images/amiwind-v0.0.42-dev1-ebonheart-dusk.png) |
+| **The Khuul docks**, a ship at the pier. | **Ebonheart at dusk**, lanterns on the bridge. |
+| ![A sunset tree near Khuul in v0.0.42-dev1](docs/images/amiwind-v0.0.42-dev1-khuul-3.png) | ![The sun beside a tower in v0.0.42-dev1](docs/images/amiwind-v0.0.42-dev1-sunset-tower.png) |
+| **A tree against the sunset** near Khuul. | **The sun beside a tower.** |
+| ![A dawn valley with dead trees in v0.0.42-dev1](docs/images/amiwind-v0.0.42-dev1-dawn-valley.png) | ![The same sunset under a clear blue sky in v0.0.42-dev1](docs/images/amiwind-v0.0.42-dev1-sunset-blue.png) |
+| **A dawn valley.** | **A sunset under a clear sky.** |
+
+More in the [gallery](docs/GALLERY.md#v0042-things-are-starting-to-look-pretty-khuul).
 
 ## v0.0.41: More Fixes, Fewer Planes (A Telvanni Root Story)
 

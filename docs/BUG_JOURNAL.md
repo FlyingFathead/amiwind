@@ -1,11 +1,14 @@
 # Bug journal
 
-[CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
+[CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): 18 October 2026, v0.0.43-dev1: the boot smoke hung on the Loading screen going from Seyda Neen to Balmora in two of about five runs (the v0.0.41-dev5 image in gate 2928 and the first v0.0.43-dev1 delivery smoke); each passed on a rerun. Seyda's CHIM zone runs full in every run. Cause unknown; open.
 
 <!-- contents start -->
 ## Contents
 
+- [CHIM-REGION-SEABED-NO-HEIGHTS-42 fixed, 17 October 2026](#chim-region-seabed-no-heights-42-fixed-17-october-2026)
 - [UI-INVENTORY-FONT-TABS-42, 17 October 2026](#ui-inventory-font-tabs-42-17-october-2026)
+- [BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42 and BUILD-CHIM-STAIR-NO-REUSE-42, 17 October 2026](#build-chim-stair-jobs-at-launch-42-and-build-chim-stair-no-reuse-42-17-october-2026)
+- [BUILD-SCHEDULER-MEMORY-STARVED-42, 17 October 2026](#build-scheduler-memory-starved-42-17-october-2026)
 - [SKY-STAR-TWINKLE-LATE-42, 17 October 2026](#sky-star-twinkle-late-42-17-october-2026)
 - [NOCLIP-BOB-DEFAULT-42, 17 October 2026](#noclip-bob-default-42-17-october-2026)
 - [CHIM-ZONE-RELEASE-FLICKER-42, 17 October 2026](#chim-zone-release-flicker-42-17-october-2026)
@@ -162,10 +165,39 @@
 
 <!-- contents end -->
 
+[CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): 18 October 2026, v0.0.43-dev1: reproduced with a repeat loop under host load (5 hangs; none in 100 loads on a quiet host, at 16 and at 128 MiB Fast RAM alike). The debugger shows a deadlock below the engine: the processor idle, the game waiting on a file request taken by the boot partition's file system (DH0) that never answers, the same class as SEYDA-LOAD-HANG-30. The boot smoke now runs its map change three times and, when a load stalls, examines it with the emulator's monitor: this stall is reported as an emulator disk stall and retried once on a fresh play copy. Still open (under observation): which layer loses the request; real hardware is not believed affected, unproven.
+
+[CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
+
+## CHIM-REGION-SEABED-NO-HEIGHTS-42 fixed, 17 October 2026
+
+[CHIM-REGION-SEABED-NO-HEIGHTS-42](bugs/CHIM-REGION-SEABED-NO-HEIGHTS-42.md): a region cell whose LAND record has no
+heights is now flat seabed at the original default height, as CHIMport converts it (rule from OpenMW's terrain
+storage); a cell without any LAND record is still refused, and the refusal names frame, cell and audit file. The CHIM
+stage alone on the 98 seabed cells and 50 new cells passed every gate.
+
 ## UI-INVENTORY-FONT-TABS-42, 17 October 2026
 
 [UI-INVENTORY-FONT-TABS-42](bugs/UI-INVENTORY-FONT-TABS-42.md): the inventory categories are plain text in the console
 font, not buttons in the game's font as in the original; asked for on 14 October and again on 17 October. Open.
+## BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42 and BUILD-CHIM-STAIR-NO-REUSE-42, 17 October 2026
+
+[BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42](bugs/BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42.md): the v0.0.42 final's stair gate
+walked on the 2 workers of its stage's launch share while the allowance said 12; the stage's pools now size by the
+build budget and follow the live allowance.
+[BUILD-CHIM-STAIR-NO-REUSE-42](bugs/BUILD-CHIM-STAIR-NO-REUSE-42.md): the same gate walked all 1,118 frames: 494
+passed in v0.0.42-dev1 but carry no check mark (the launcher never promotes walks), 392 are new, the rest changed
+with the boundary-locked mushroom caps (a true change).
+
+## BUILD-SCHEDULER-MEMORY-STARVED-42, 17 October 2026
+
+[BUILD-SCHEDULER-MEMORY-STARVED-42](bugs/BUILD-SCHEDULER-MEMORY-STARVED-42.md): in the v0.0.42 final build the
+scheduler's memory guard held the chim stage on 1 of its 6 workers for over an hour (26.5 of 28 GiB in use beside
+the NPC gallery and the world terrain; it grows a stage back only below 70 %); its visibility rows took 2 h 11 min.
+Given 42 GB live, the stage got 9 workers back. Repair: a fit check before each pooled stage starts, a
+[scheduler] ALARM for a stage starved over 5 minutes, both with the lease that fixes it, and the plan counts the
+memory beside a stage.
+
 ## SKY-STAR-TWINKLE-LATE-42, 17 October 2026
 
 [SKY-STAR-TWINKLE-LATE-42](bugs/SKY-STAR-TWINKLE-LATE-42.md): the maintainer saw no star twinkle early in a

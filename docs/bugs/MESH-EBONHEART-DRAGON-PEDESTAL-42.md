@@ -1,5 +1,14 @@
 # MESH-EBONHEART-DRAGON-PEDESTAL-42: Ebonheart: the Imperial dragon statue floats; its converted model starts 236 units above its origin, nothing below
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.42-dev1 at 2026-10-17 12:02 +0300: maintainer: statue floating in the air, no pedestal drawn
+- Reported with v0.0.43-dev1 at 2026-10-18 07:50 +0300: maintainer: the after image (test engine with the popping fix) still has the statue floating in the air
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |

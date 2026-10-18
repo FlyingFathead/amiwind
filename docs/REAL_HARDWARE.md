@@ -14,6 +14,7 @@ _Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
 - [A cache test plan](#a-cache-test-plan)
 - [Compatibility roadmap](#compatibility-roadmap)
 - [Not yet: non-blocking disk reads](#not-yet-non-blocking-disk-reads)
+- [PiStorm](#pistorm)
 - [What to send back](#what-to-send-back)
 
 <!-- contents end -->
@@ -187,6 +188,41 @@ Planned ([roadmap](ROADMAP.md), the cache plan above):
 - Disk reads that never stop a frame. Some reads during play still wait for the disk
   ([ENGINE-SYNC-IO-MAIN-LOOP-36](bugs/ENGINE-SYNC-IO-MAIN-LOOP-36.md)); a real hard disk or card is slower than an
   emulator's host disk, so this matters more on real hardware.
+
+## PiStorm
+
+[PiStorm](https://pistorm.github.io/) is an open-source accelerator: a Raspberry Pi takes the place of the Amiga's
+680x0 CPU, and Emu68, a bare-metal just-in-time translator, turns the 68k instruction stream into native ARM
+(AArch64) code as it runs. The Amiga's own chipset stays in place, so the picture still comes from AGA, as
+AmiWind expects. The hardware and software are published under open-source licences (BSD-like to MPLv2), and the
+JIT's speed can be adjusted while the machine runs, from timing-friendly settings up to full speed. Project page
+and documentation: [pistorm.github.io](https://pistorm.github.io/) (read 17 October 2026).
+
+What it means for AmiWind, on paper (no AmiWind run on a PiStorm has been reported yet):
+
+- **The CPU and FPU.** Emu68 presents itself as a 68040 with an FPU, the CPU the standard engine build targets
+  ([FAQ](FAQ.md#can-todays-heavily-upgraded-amigas-realistically-run-amiwind)).
+- **Memory.** A Pi gives the Amiga far more Fast RAM than the 16 MiB reference. AmiWind uses the extra Fast RAM by
+  itself as the CHIM cache ([above](#extra-ram-is-used-automatically)), so a PiStorm machine keeps more of the
+  world in memory and streams less from the disk.
+- **Use full speed for playing.** The timing-friendly JIT settings exist for software that needs exact 68k
+  timing; AmiWind does not, and benefits from the fastest setting.
+- **The disk.** The game's drive images still need a disk or card the Amiga can boot from, with the Kickstart 3.1
+  partition limits above.
+
+- **The picture goes through the chipset.** The PiStorm project's own
+  [performance page](https://pistorm.github.io/docs/benchmarks/) notes that drawing to an OCS/AGA bitplane screen is
+  limited by the chipset and by the PiStorm's link to the Amiga, not by the CPU. AmiWind draws every frame into
+  Chip RAM for the AGA screen, so on a PiStorm the CPU work (the 3D view) should shrink a great deal while the
+  per-frame copy to Chip RAM stays roughly where the chipset puts it. Measurements will tell how the two share the
+  frame.
+- **Comparable numbers.** The same page treats synthetic benchmarks with caution and uses real programs instead,
+  among them the DoomAttack timedemo (AGA and RTG modes, frames per second from the reported ticks). A report with
+  both AmiWind's own `awbench` / timedemo and that DoomAttack figure places AmiWind beside other PiStorm results.
+
+A first report from a PiStorm (which board, which Pi, the Emu68 version and its JIT settings, Fast RAM, the
+`awbench` results and, if you have it, the DoomAttack figure) would turn this section into measurements. See
+[what to send back](#what-to-send-back).
 
 ## What to send back
 

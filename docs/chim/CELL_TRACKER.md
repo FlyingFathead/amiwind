@@ -12,9 +12,9 @@ Map cells 2,157: land and empty-sea cells 1,390 (done 1,372, 98.7 %) and open-oc
 
 - Cell complete: 0
 - Terrain complete: 0
-- Cell complete, awaiting lighting: 11
-- Terrain complete, awaiting lighting: 781
-- Passed (something still deferred): 383
+- Cell complete, awaiting lighting: 12
+- Terrain complete, awaiting lighting: 787
+- Passed (something still deferred): 376
 - Empty sea: 197
 - Open ocean (silver, not counted as done): 767
 
@@ -24,7 +24,7 @@ Lighting: lit 0, partial 137, unlit 1,056, not measured 99 (cells; lit is requir
 
 Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 694 night lamps only, 2,280 not represented.
 
-Generated 2026-10-17 20:15 +0300. Tracker data generated 2026-10-17T17:14:33+00:00.
+Generated 2026-10-18 08:03 +0300. Tracker data generated 2026-10-18T05:02:24+00:00.
 
 ## Totals
 
@@ -32,9 +32,9 @@ Generated 2026-10-17 20:15 +0300. Tracker data generated 2026-10-17T17:14:33+00:
 | :-- | --: | --: |
 | Cell complete | 0 | 0.0 % |
 | Terrain complete | 0 | 0.0 % |
-| Cell complete, awaiting lighting | 11 | 0.8 % |
-| Terrain complete, awaiting lighting | 781 | 56.2 % |
-| Passed (something still deferred) | 383 | 27.6 % |
+| Cell complete, awaiting lighting | 12 | 0.9 % |
+| Terrain complete, awaiting lighting | 787 | 56.6 % |
+| Passed (something still deferred) | 376 | 27.1 % |
 | Empty sea | 197 | 14.2 % |
 | Open sea | 767 | 55.2 % |
 | Hull policy pending | 14 | 1.0 % |
@@ -50,6 +50,9 @@ Included means verified in a packaged image. Packaged does not mean published or
 
 | Version | Evidence state | Included |
 | :-- | --: | --: |
+| v0.0.43-dev1 | packaged | 1,313 (94.5 %) |
+| v0.0.42 | packaged | 1,171 (84.2 %) |
+| v0.0.42-dev1 | packaged | 779 (56.0 %) |
 | v0.0.41 | packaged | 779 (56.0 %) |
 | v0.0.41-dev5 | packaged | 779 (56.0 %) |
 | v0.0.41-dev4 | packaged | 657 (47.3 %) |
@@ -67,7 +70,7 @@ Which cells are approved for which release (set by the maintainer with `cell_pro
 | Release | State | Cells | Complete | Awaiting lighting | Lit | Empty sea | Failing | Hull policy pending |
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: |
 | v0.0.41-dev4 | shipped | 639 | 0 | 187 | 0 | 99 | 0 | 0 |
-| unassigned | - | 1,664 | 0 | 605 | 0 | 98 | 4 | 14 |
+| unassigned | - | 1,664 | 0 | 612 | 0 | 98 | 4 | 14 |
 
 ## Per ring (ring 1 touches the sea)
 
@@ -78,9 +81,9 @@ Which cells are approved for which release (set by the maintainer with `cell_pro
 | 2 | 160 | 0 | 0 | 1 | 1 | 157 | 1 | 0 | 0 | 0 | 0 | 0 |
 | 3 | 149 | 0 | 0 | 3 | 79 | 67 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 4 | 138 | 0 | 0 | 1 | 114 | 23 | 0 | 0 | 0 | 0 | 0 | 0 |
-| 5 | 125 | 0 | 0 | 1 | 106 | 15 | 0 | 0 | 3 | 0 | 0 | 0 |
-| 6 | 114 | 0 | 0 | 0 | 101 | 11 | 0 | 0 | 2 | 0 | 0 | 0 |
-| 7 | 104 | 0 | 0 | 1 | 94 | 6 | 0 | 0 | 2 | 1 | 0 | 0 |
+| 5 | 125 | 0 | 0 | 1 | 107 | 14 | 0 | 0 | 3 | 0 | 0 | 0 |
+| 6 | 114 | 0 | 0 | 0 | 104 | 8 | 0 | 0 | 2 | 0 | 0 | 0 |
+| 7 | 104 | 0 | 0 | 2 | 96 | 3 | 0 | 0 | 2 | 1 | 0 | 0 |
 | 8 | 94 | 0 | 0 | 1 | 86 | 3 | 0 | 0 | 4 | 0 | 0 | 0 |
 | 9 | 81 | 0 | 0 | 0 | 70 | 6 | 0 | 0 | 3 | 2 | 0 | 0 |
 | 10 | 66 | 0 | 0 | 0 | 53 | 13 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -100,22 +103,22 @@ A cell can fail more than one mechanism. Hull policy pending cells are not failu
 
 | Object type | Placed | Converted | Deferred | Skipped | Failed |
 | :-- | --: | --: | --: | --: | --: |
-| Statics | 77,479 | 77,453 | 0 | 26 | 0 |
-| Flora | 44,952 | in statics | - | - | - |
-| Lights | 1,750 | 408 | 1,342 | 0 | 0 |
-| Doors | 746 | 746 | 0 | 0 | 0 |
-| Containers | 19,099 | 19,099 | 0 | 0 | 0 |
-| Activators | 1,491 | 1,490 | 0 | 1 | 0 |
-| Items | 206 | 206 | 0 | 0 | 0 |
-| NPCs | 436 | 0 | 436 | 0 | 0 |
-| Creatures | 4,281 | 0 | 4,281 | 0 | 0 |
+| Statics | 78,241 | 78,215 | 0 | 26 | 0 |
+| Flora | 45,250 | in statics | - | - | - |
+| Lights | 1,767 | 421 | 1,346 | 0 | 0 |
+| Doors | 775 | 775 | 0 | 0 | 0 |
+| Containers | 19,205 | 19,205 | 0 | 0 | 0 |
+| Activators | 1,507 | 1,506 | 0 | 1 | 0 |
+| Items | 217 | 217 | 0 | 0 | 0 |
+| NPCs | 445 | 0 | 445 | 0 | 0 |
+| Creatures | 4,297 | 0 | 4,297 | 0 | 0 |
 | Markers | 12 | not drawn, not required | - | - | - |
 
 - Statics, skipped: not in the frame (outside the cell bounds or removed by a selection) (26)
-- Lights, deferred: light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33) (1,342)
+- Lights, deferred: light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33) (1,346)
 - Activators, skipped: not in the frame (outside the cell bounds or removed by a selection) (1)
-- NPCs, deferred: resident conversion (436)
-- Creatures, deferred: creature simulation pending (4,281)
+- NPCs, deferred: resident conversion (445)
+- Creatures, deferred: creature simulation pending (4,297)
 
 Counts are every placed reference in converted cells, from the conversion job. Door and light figures in the Toolkit contents panel (original census) and the door audit (links per cell) are different measures. Light emitters without a mesh stay under Lights: they cast light, so the lighting audit keeps a cell from both completion levels until it is lit.
 

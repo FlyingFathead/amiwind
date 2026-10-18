@@ -196,6 +196,13 @@ def store(cache, input_sha256, rows, outcome=None, derived_from=None):
     return {'root': str(cache.root), 'name': cache.name, 'key': full_key, 'record_sha256': record['record_sha256']}
 
 
+def listed(cache, input_sha256, record):
+    """The report's entry of a record a run reused without a check mark (a pass is a pass, development rule): the
+    same form as store()'s, so a passed build's promote marks it too (BUILD-CHIM-STAIR-NO-REUSE-42)."""
+    return {'root': str(cache.root), 'name': cache.name, 'key': cache.key(input_sha256),
+            'record_sha256': record['record_sha256']}
+
+
 def provenance(mark):
     """'reused from RUN (VERSION, COMMIT, TIME)' of a check mark."""
     return 'reused from %s (%s, %s, %s)' % (mark.get('run') or '?', mark.get('version') or '?',
@@ -233,7 +240,9 @@ def promote(run_dir, request=None, environ=None):
         taken = list((cache.get('frames') or cache.get('maps') or {}).values())
         out['reused'] = out.get('reused', 0) + sum(1 for t in taken if str(t).startswith('reused'))
         out['walked'] = out.get('walked', 0) + sum(1 for t in taken if not str(t).startswith('reused'))
-        stored = cache.get('stored') or []
+        # the walks it stored and the unmarked passes it reused: a build that passed every gate confirms both
+        # (a reused pass was checked by key and by the gate's sample walk; BUILD-CHIM-STAIR-NO-REUSE-42)
+        stored = (cache.get('stored') or []) + (cache.get('reused_records') or [])
         if not stored:
             continue
         out['reports'] += 1

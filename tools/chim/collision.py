@@ -711,6 +711,7 @@ def stair_gate(out, frames, jobs=1, models=None):
     rule = walk_reuse_rule() if cache is not None else None
     whole_parts, parts, keys = walk_input_keys(frames, models, areas) if cache is not None else (None, None, None)
     cached, todo, sample, origin, candidates, stored, passes = {}, tasks, [], {}, 0, [], 0
+    reused_records = []     # unmarked passes this run reuses: a passed build marks them too (BUILD-CHIM-STAIR-NO-REUSE-42)
     derived = {}                                 # frame index -> the whole-frame record its rows came from
     from_records, unmatched = {}, []             # frames taken from the shipped records; frames in neither
     if keys:
@@ -724,6 +725,7 @@ def stair_gate(out, frames, jobs=1, models=None):
                 cached[fi] = record['rows']      # a pass is a pass: kept whatever the rest of its build did
                 origin[fi] = stair_records.pass_provenance(record)
                 passes += 1
+                reused_records.append(stair_records.listed(cache_of(fi), key, record))
             elif record is not None:
                 candidates += 1                  # a failed walk, or (release rule) one no passed master build checked
                 why_not = (True if rule == 'checked' else
@@ -775,7 +777,10 @@ def stair_gate(out, frames, jobs=1, models=None):
     # polygons only, in parallel) and each reused frame's recorded rows; then the frames.
     walk_frames = sorted({t[1] for t in todo})
     cores = {fi: [t[2] for t in todo if t[1] == fi] for fi in walk_frames}
-    workers = max(1, resolve_jobs(jobs))
+    # the stage's ceiling, not its launch share: the scheduler's live allowance decides how many walk at each task
+    # (build_parallel.stage_ceiling, BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42)
+    from build_parallel import stage_ceiling
+    workers = max(1, stage_ceiling(jobs))
     from chim.stair_pool import (WORKER_BASE_MIB, frame_walk_mib, memory_killed, memory_room, memory_workers,
                                  stair_unit_sized)
     # Workers by cores and by memory (CHIM-STAIR-GATE-POOL-BROKEN-42): each worker reads a whole frame; the largest
@@ -798,7 +803,7 @@ def stair_gate(out, frames, jobs=1, models=None):
     to_check = {fi: sum(counts[fi]) for fi in walk_frames}
     reused_only = [fi for fi in sorted(cached) if fi not in sample]
     stairs_total = sum(to_check.values()) + sum(len(cached[fi]) for fi in reused_only)
-    units = stair_units(walk_frames, cores, counts, workers)
+    units = stair_units(walk_frames, cores, counts, max(workers, by_cores))   # enough units to grow back into
     print('CHIM stair gate: %d steps and ramps to check in %d frames (counted in %.1f s), %d recorded in %d reused '
           'frames; %d walk units on %d workers, largest first (%d of %d cores have steps or ramps)'
           % (sum(to_check.values()), len(walk_frames), time.monotonic() - count_started,
@@ -932,7 +937,7 @@ def stair_gate(out, frames, jobs=1, models=None):
                     'mode': walk_cache_mode(), 'reused': len(cached) - len(sample), 'walked': len(walk_frames) - len(sample),
                     'units': len(units), 'reuse_rule': rule, 'reused_passes': passes,
                     'sampled': [frames[fi][0] for fi in sample], 'unchecked_candidates': candidates,
-                    'stored': stored,
+                    'stored': stored, 'reused_records': reused_records,
                     'frames': {frames[fi][0]: origin.get(fi, 'walked') for fi in range(len(frames))}},
                 records=None if shipped is None else {
                     'files': shipped_notes['files'], 'damaged': shipped_notes['damaged'],

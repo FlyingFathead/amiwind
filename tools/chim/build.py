@@ -1220,8 +1220,16 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     with timer.section('source stage'):
         index = source_stage(data, work, jobs, settings)
         if settings.get('region_source_apron'):
+            from chim.ocean_runtime import land_cells
             from chim.regions import check_source_land
-            check_source_land(settings, json.loads((work / 'audit/audit.json').read_text()))
+            audit_path = work / 'audit/audit.json'
+            audit_bytes = audit_path.read_bytes()
+            admitted = check_source_land(settings, json.loads(audit_bytes), lambda: land_cells(data),
+                                         (str(audit_path), hashlib.sha256(audit_bytes).hexdigest()))
+            if admitted:
+                print('[chim] %s: owned cell %s has a LAND record without heights: flat seabed at the original '
+                      'default height (CHIM-REGION-SEABED-NO-HEIGHTS-42)' % (town, settings['source_cell']),
+                      flush=True)
     from visual_recipes import scope_reference_recipes
     index = scope_reference_recipes(index, settings)
     centre = settings['centre']

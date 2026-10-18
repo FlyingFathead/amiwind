@@ -116,6 +116,35 @@ class StairRecordTests(unittest.TestCase):
         self.assertTrue(stair_records.mark_path(here.root, stored['key']).is_file())   # pooled here
         self.assertIsNotNone(stair_records.lookup(here, 'input-a')[1])
 
+    def test_a_passed_build_that_reused_an_unmarked_pass_marks_it(self):
+        # BUILD-CHIM-STAIR-NO-REUSE-42: a development build reuses a pass of a failed run (no mark); when that build
+        # passes, its promote marks the reused record too, so a final reuses it instead of walking the frame again
+        cache = self.cache()
+        with patch.dict(os.environ, {'AMIWIND_RUN_NAME': 'failed-run'}):
+            stair_records.store(cache, 'input-a', ROWS[:1], outcome='passed')
+        record, mark = stair_records.lookup(cache, 'input-a')
+        self.assertIsNone(mark)
+        reused = stair_records.listed(cache, 'input-a', record)
+        run = self.root / 'runs' / 'passed-run' / 'chim-world'
+        run.mkdir(parents=True)
+        (run / 'chim-stairs.json').write_text(json.dumps({'pass_cache': {
+            'stored': [], 'reused_records': [reused], 'frames': {'f': 'reused pass from failed-run (v, c, t)'}}}),
+            encoding='utf-8')
+        counts = stair_records.promote(run.parent, 'req-9')
+        self.assertEqual((counts['reports'], counts['marked']), (1, 1))
+        record, mark = stair_records.lookup(cache, 'input-a')
+        self.assertEqual(mark['record_sha256'], record['record_sha256'])
+        # a record written again since the build reused it is not marked by that build
+        with patch.dict(os.environ, {'AMIWIND_RUN_NAME': 'later-run'}):
+            stair_records.store(cache, 'input-b', ROWS[:1], outcome='passed')
+        old = stair_records.listed(cache, 'input-b', stair_records.lookup(cache, 'input-b')[0])
+        with patch.dict(os.environ, {'AMIWIND_RUN_NAME': 'newer-run'}):
+            stair_records.store(cache, 'input-b', ROWS[:1], outcome='passed')
+        (run / 'chim-stairs.json').write_text(json.dumps({'pass_cache': {'stored': [], 'reused_records': [old],
+                                                                          'frames': {}}}), encoding='utf-8')
+        self.assertEqual(stair_records.promote(run.parent, 'req-9')['changed'], 1)
+        self.assertIsNone(stair_records.lookup(cache, 'input-b')[1])
+
     def test_promote_finds_legacy_and_chim_reports_and_prints_counts(self):
         cache = self.cache()
         run = self.root / 'runs' / 'r'

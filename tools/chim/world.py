@@ -371,6 +371,10 @@ def frame_visibility(specs, layouts, settings=None, jobs=1, cache=None):
         raise ValueError('%s=%s: choose %s' % (VIS_ROWS_ENV, mode, ' or '.join(VIS_ROWS_MODES)))
     results = [None] * len(specs)
     small = []
+    # the stage's ceiling, not its launch share: a stage started on one worker still sends its frames to the pool,
+    # which follows the scheduler's live allowance (build_parallel.stage_ceiling, BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42)
+    from build_parallel import stage_ceiling
+    jobs = stage_ceiling(jobs)
     for i, (spec, layout) in enumerate(zip(specs, layouts)):
         world, by_chunk = layout[0], layout[1]
         if mode == 'frames' and jobs > 1 and len(specs) > 1 and len(world.order) <= FRAME_VIS_CHUNKS:

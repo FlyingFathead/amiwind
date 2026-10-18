@@ -222,6 +222,10 @@ def measure(row, timeline=None):
     found = {'jobs': jobs, 'largest_mib': round(largest / MIB, 1), 'total_mib': round(total / MIB, 1),
              'worker_mib': round(max(0.0, total - largest) / MIB / jobs, 1),
              'wall': float(row.get('wall') or 0.0), 'cores': float(row.get('cores_avg') or 0.0)}
+    if cgroup:
+        # the whole container's peak while the stage ran: its own tree plus the stages beside it
+        # (BUILD-SCHEDULER-MEMORY-STARVED-42: the chim stage planned alone at 21 GB met 26.5 GB in use)
+        found['container_mib'] = round(cgroup / MIB, 1)
     if failed:
         # a failed stage still shows how much memory it reached (at least that much is needed); its time does not
         found.update(wall=None, cores=None, failed=True)
@@ -355,12 +359,15 @@ def stage_model(name, command, measurements, stair=None):
                  'parent_mib': parent, 'worker_mib': worker, 'unit_mib': max(parent, worker),
                  'largest_unit': 'the stage\'s largest process (measured %.0f MiB)' % parent,
                  'ref_jobs': newest['jobs'], 'ref_wall': round(newest['wall'], 1) if newest['wall'] is not None else None,
-                 'ref_cores': round(newest['cores'], 2) if newest['cores'] is not None else None, 'runs': sorted({r.get('run') or '' for r in rows} - {''})}
+                 'ref_cores': round(newest['cores'], 2) if newest['cores'] is not None else None, 'runs': sorted({r.get('run') or '' for r in rows} - {''}),
+                 # memory the stages beside it held at its peak, as measured (container peak less its own tree)
+                 'beside_mib': max([0.0] + [max(0.0, r['container_mib'] - r['total_mib']) for r in rows
+                                            if r.get('container_mib')])}
     else:
         model = {'source': 'estimated, no data yet', 'parent_mib': DEFAULT_PARENT_MIB,
                  'worker_mib': DEFAULT_WORKER_MIB, 'unit_mib': DEFAULT_WORKER_MIB,
                  'largest_unit': 'unknown (no measurement)', 'ref_jobs': None, 'ref_wall': None, 'ref_cores': None,
-                 'runs': []}
+                 'runs': [], 'beside_mib': 0.0}
     if stair and builds_chim_world(command):
         frame, mib, how = stair
         if mib >= model['worker_mib']:
@@ -406,10 +413,12 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None):
         # a stage without --jobs runs one process (the scheduler holds one worker for it)
         planned = jobs if '--jobs' in [str(part) for part in command or ()] else 1
         by_threads = min(planned, threads)
+        beside = model.get('beside_mib') or 0.0
         if room is None or model['worker_mib'] <= 0:
             by_memory = planned
         else:
-            by_memory = int((room - model['parent_mib']) // model['worker_mib']) if room > model['parent_mib'] else 0
+            fixed = model['parent_mib'] + beside
+            by_memory = int((room - fixed) // model['worker_mib']) if room > fixed else 0
         status, reasons = 'OK', []
         if room is not None and model['unit_mib'] > room:
             status = 'WILL NOT FIT'
@@ -421,19 +430,24 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None):
             if workers < planned:
                 status = 'WILL THROTTLE'
                 if by_memory < planned:
-                    reasons.append('memory holds %d worker%s at about %.0f MiB each beside a %.0f MiB parent'
+                    reasons.append('memory holds %d worker%s at about %.0f MiB each beside a %.0f MiB parent%s'
                                    % (max(1, by_memory), '' if by_memory == 1 else 's', model['worker_mib'],
-                                      model['parent_mib']))
+                                      model['parent_mib'], ' and %.0f MiB the stages beside it held when it was '
+                                      'measured' % beside if beside else ''))
                 if by_threads < planned:
                     reasons.append('%d threads (%s)' % (threads, got.get('threads_source')))
         peak = model['parent_mib'] + max(workers, 1) * model['worker_mib']
         need = model['parent_mib'] + planned * model['worker_mib']
+        lease_gb = math.ceil((need + beside) / HEADROOM / 1024.)   # the container memory for full speed
         row = {'stage': name, 'status': status, 'reasons': reasons, 'model': model['source'],
                'parent_mib': round(model['parent_mib'], 1), 'worker_mib': round(model['worker_mib'], 1),
                'largest_unit': model['largest_unit'], 'unit_mib': round(model['unit_mib'], 1),
                'planned_workers': planned, 'workers': workers, 'threads': min(workers or 1, threads),
                'peak_total_mib': round(peak, 1), 'full_speed_mib': round(need, 1),
-               'wall_s': _wall(model, workers or 1), 'full_speed_wall_s': _wall(model, planned)}
+               'wall_s': _wall(model, workers or 1), 'full_speed_wall_s': _wall(model, planned),
+               'beside_mib': round(beside, 1), 'lease_gb_full_speed': lease_gb}
+        if status != 'OK':
+            reasons.append('a lease of %d GB runs it at its %d planned workers' % (lease_gb, planned))
         if model.get('stair'):
             row['stair'] = model['stair']
         if model['runs']:
@@ -744,6 +758,14 @@ SCHEMA_DOCUMENT = json.loads(r"""
        "null"
       ]
      },
+     "beside_mib": {
+      "type": "number",
+      "minimum": 0
+     },
+     "lease_gb_full_speed": {
+      "type": "integer",
+      "minimum": 0
+     },
      "measured_in": {
       "type": "array",
       "items": {
@@ -807,6 +829,9 @@ SCHEMA_DOCUMENT = json.loads(r"""
        },
        "over_estimate": {
         "type": "boolean"
+       },
+       "container_mib": {
+        "type": "number"
        }
       }
      }
@@ -934,7 +959,8 @@ def after_build(run, workspace=None, log=print):
             continue
         stage['actual'] = {'total_mib': found['total_mib'], 'largest_mib': found['largest_mib'],
                            'worker_mib': found['worker_mib'], 'jobs': found['jobs'],
-                           'wall_s': round(found['wall'] or 0.0, 1), 'cores': found['cores'] or 0.0}
+                           'wall_s': round(found['wall'] or 0.0, 1), 'cores': found['cores'] or 0.0,
+                           **({'container_mib': found['container_mib']} if found.get('container_mib') else {})}
         estimate = stage['peak_total_mib']
         over = found['total_mib'] > OVER_ESTIMATE * estimate
         stage['actual']['over_estimate'] = bool(over)
@@ -1090,11 +1116,21 @@ def governor_for(planned, unit_mib=None, label='stage', environ=None):
 # back up to --jobs. Pools follow their allowance file at their next task; running units are never stopped.
 PRESSURE_HIGH = 0.90
 PRESSURE_LOW = 0.70
+GROW_ROOM = 0.80          # a capped stage grows back by the planned units that fit under this share of the limit
+# A pooled stage the guard holds below half its share for this long is an ALARM (BUILD-SCHEDULER-MEMORY-STARVED-42:
+# the v0.0.42 final's chim stage sat on 1 of 6 workers for over an hour): one [scheduler] ALARM line naming the stage,
+# its workers, the memory and the lease that would let it run, again every ALARM_SECONDS while it lasts.
+ALARM_SECONDS = 300.0
+ALARM_ENV = 'AMIWIND_SCHEDULER_ALARM_SECONDS'
 
 
 class SchedulerGuard:
-    def __init__(self, budget, units=None, reader=None, clock=time.monotonic, interval=None, log=None):
-        self.budget, self.units = budget, dict(units or {})
+    def __init__(self, budget, units=None, reader=None, clock=time.monotonic, interval=None, log=None, parents=None,
+                 alarm_seconds=None):
+        self.budget, self.units, self.parents = budget, dict(units or {}), dict(parents or {})
+        self.alarm_seconds = float(os.environ.get(ALARM_ENV, ALARM_SECONDS) if alarm_seconds is None else alarm_seconds)
+        self.starved = {}         # stage -> (since, last alarm) while held below half its share
+        self.alarms = []
         self.reader = reader or (lambda: (cgroup_memory(), cgroup_threads()))
         self.clock, self.at = clock, None
         self.interval = float(os.environ.get(GOVERNOR_ENV, GOVERNOR_SECONDS) if interval is None else interval)
@@ -1136,6 +1172,7 @@ class SchedulerGuard:
                 del self.caps[name]
         if limit is None or used is None or not pooled:
             return
+        self._alarm(pooled, now_share, limit, max(0, used - cache), now)
         live = max(0, used - cache)
         pressure = live / float(limit)
         gib = float(1 << 30)
@@ -1148,14 +1185,27 @@ class SchedulerGuard:
                          'beyond that until it frees up, running units go on' % (live / gib, limit / gib, name,
                                                                                  pooled[name], new))
                 self.changes.append({'what': 'memory', 'stage': name, 'from': pooled[name], 'to': new})
-        elif pressure < PRESSURE_LOW:
+        else:
+            # grow back whenever the free memory under GROW_ROOM of the limit holds a planned unit, not only below
+            # PRESSURE_LOW in use: a large parent kept the v0.0.42 final's chim stage above 70 % and on one worker
+            # for over an hour (BUILD-SCHEDULER-MEMORY-STARVED-42). Units granted here are counted against the free
+            # memory, so the stages together never plan past GROW_ROOM (below PRESSURE_HIGH, where the guard cuts).
+            free = max(0.0, limit * GROW_ROOM - live) / MIB
             for name in sorted(self.caps):
                 held = self.caps[name]
                 share = now_share.get(name, held)
                 unit = self.units.get(name)
-                free = max(0.0, limit * 0.8 - live) / float(1 << 20)
-                grow = max(1, int(free // unit)) if unit else 1
+                if unit:
+                    grow = int(free // unit)
+                elif pressure < PRESSURE_LOW:
+                    grow = 1                 # no size known: one at a time, only well below the limit, as before
+                else:
+                    grow = 0
+                if grow < 1:
+                    continue
                 new = min(share, held + grow)
+                if unit:
+                    free -= (new - held) * unit
                 if new >= share:
                     del self.caps[name]
                 else:
@@ -1164,3 +1214,60 @@ class SchedulerGuard:
                     self.log('[scheduler] memory freed up (%.1f of %.1f GiB in use): %s workers %d -> %d of %d' % (
                         live / gib, limit / gib, name, held, new, share))
                     self.changes.append({'what': 'memory', 'stage': name, 'from': held, 'to': new})
+
+    def lease_gb(self, live, extra_mib):
+        """The container memory (GB, whole) at which LIVE bytes in use plus EXTRA_MIB more stay under GROW_ROOM
+        (where a capped stage grows back by the units that fit)."""
+        return int(math.ceil((live / MIB + extra_mib) / GROW_ROOM / 1024.))
+
+    def _alarm(self, pooled, now_share, limit, live, now):
+        gib = float(1 << 30)
+        for name in list(self.starved):
+            if name not in pooled:
+                del self.starved[name]
+        for name, held in pooled.items():
+            share = now_share.get(name, held)
+            if share < 2 or held * 2 >= share:
+                self.starved.pop(name, None)
+                continue
+            since, last = self.starved.setdefault(name, (now, None))
+            if now - since < self.alarm_seconds or (last is not None and now - last < self.alarm_seconds):
+                continue
+            unit = self.units.get(name)
+            lease = self.lease_gb(live, (share - held) * unit) if unit else None
+            self.log('[scheduler] ALARM: %s held at %d of %d workers for %.0f min by the memory guard (%.1f of %.1f '
+                     'GiB in use, file cache not counted); %s' % (
+                         name, held, share, (now - since) / 60., live / gib, limit / gib,
+                         'a lease of %d GB would let it run at %d (%d more workers at about %.0f MiB each)'
+                         % (lease, share, share - held, unit) if lease else 'its worker size is not known: give the '
+                         'build more memory or fewer stages beside it'))
+            self.starved[name] = (since, now)
+            self.alarms.append({'stage': name, 'held': held, 'share': share, 'minutes': round((now - since) / 60., 1),
+                                'live_gib': round(live / gib, 1), 'limit_gib': round(limit / gib, 1),
+                                'lease_gb': lease})
+
+    def start_check(self, name, jobs, running=()):
+        """Before a pooled stage starts: does its parent plus JOBS workers fit beside what the container holds now
+        (the stages RUNNING)? Prints one [scheduler] line when it does not (the guard would hold it back), with the
+        lease that fits it; returns that line or None. Unknown sizes or no container limit: None."""
+        unit = self.units.get(name)
+        if not unit:
+            return None
+        (limit, used, cache), _quota = self.reader()
+        if limit is None or used is None:
+            return None
+        live = max(0, used - cache)
+        need = self.parents.get(name, 0.0) + jobs * unit
+        room = (limit * PRESSURE_HIGH - live) / MIB
+        if need <= room:
+            return None
+        gib = float(1 << 30)
+        line = ('[scheduler] WILL NOT FIT AT FULL SPEED: %s needs about %.1f GiB (a %.0f MiB parent + %d workers x '
+                '%.0f MiB) beside %.1f GiB in use%s, of %.1f GiB; the memory guard will hold it back; a lease of %d GB '
+                'fits it' % (name, need / 1024., self.parents.get(name, 0.0), jobs, unit, live / gib,
+                             ' (running: %s)' % ', '.join(sorted(running)) if running else '', limit / gib,
+                             int(math.ceil((live / MIB + need) / PRESSURE_HIGH / 1024.))))
+        self.log(line)
+        self.alarms.append({'stage': name, 'start_check': True, 'need_mib': round(need, 1),
+                            'live_gib': round(live / gib, 1), 'limit_gib': round(limit / gib, 1)})
+        return line

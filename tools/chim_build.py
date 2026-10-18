@@ -173,6 +173,7 @@ def _main(ap, a):
                 regions_table, problems = chim_regions.plan(a.chim_regions, a.chim_regions_status, towns=areas)
                 kinds = chim_regions.table_kinds(regions_table)
             problems += chim_regions.ocean_land_problems(kinds, a.data_files)
+            problems += chim_regions.owned_land_problems(kinds, a.data_files)
         except (OSError, ValueError) as exc:
             ap.exit(1, 'Error: CHIM regions: %s\n' % exc)
         if problems:

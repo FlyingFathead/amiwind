@@ -224,6 +224,42 @@ class FrameSettings(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'different owned cell or scope'):
             R.check_source_land(ocean, {'area': area})
 
+    def test_heightless_land_record_is_admitted_as_flat_seabed_and_refusals_name_the_cell(self):
+        # CHIM-REGION-SEABED-NO-HEIGHTS-42: a LAND record without heights (seabed) is admitted from the data;
+        # a cell with no LAND record at all is still refused, and every refusal names frame and cell.
+        s = R.frame_settings(R.frame_row((-17, 9)))
+        area = {'center': [-17, 9], 'radius_cells': 1, 'cells': [{'x': -17, 'y': 9}],
+                'default_land_cells': [[-17, 9]]}
+        calls = []
+        self.assertEqual(R.check_source_land(s, {'area': area}, lambda: calls.append(1) or {(-17, 9)}),
+                         'heightless-land')
+        self.assertEqual(calls, [1])
+        with self.assertRaisesRegex(ValueError, r'owned cell has no original LAND.*owned cell \(-17,9\).*'
+                                                r'audit a/audit.json sha256 ab.*no LAND record in the masters'):
+            R.check_source_land(s, {'area': area}, {(0, 0)}, ('a/audit.json', 'ab'))
+        with self.assertRaisesRegex(ValueError, r'frame \S+, owned cell \(-17,9\)'):
+            R.check_source_land(s, {'area': area})
+        area['default_land_cells'] = []
+        self.assertIsNone(R.check_source_land(s, {'area': area}, lambda: self.fail('read only when needed')))
+        area['center'] = [0, 0]
+        with self.assertRaisesRegex(ValueError, r'different owned cell or scope \(frame .*\(-17,9\)'):
+            R.check_source_land(s, {'area': area})
+
+    def test_land_cells_count_a_land_record_without_heights(self):
+        import struct
+        import tempfile
+        from chim.ocean_runtime import land_cells
+
+        def record(tag, subs, flags=0):
+            payload = b''.join(k + struct.pack('<I', len(v)) + v for k, v in subs)
+            return tag + struct.pack('<III', len(payload), 0, flags) + payload
+
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, 'Morrowind.esm').write_bytes(
+                record(b'LAND', [(b'INTV', struct.pack('<ii', -17, 9)), (b'DATA', b'\0' * 4)])
+                + record(b'STAT', [(b'NAME', b'x\0')]))
+            self.assertEqual(land_cells(d), {(-17, 9)})
+
     def test_neighboring_static_footprint_survives_source_and_frame_selection(self):
         # Empty cell next to a town: the neighbor owns the rock, while this
         # frame needs its overhang and a second object just past the core.
@@ -882,6 +918,18 @@ class OceanLandPreflight(unittest.TestCase):
         self.assertEqual(len(problems), 1)
         self.assertIn('1 cell(s) the status file calls open ocean have LAND', problems[0])
         self.assertIn('--cells "5,5"', problems[0])
+
+    def test_region_cell_without_any_land_record_is_named(self):
+        # CHIM-REGION-SEABED-NO-HEIGHTS-42: the chim stage refuses it; the preflight names it first. A LAND
+        # record without heights counts as land (land_cells reads every live LAND record).
+        from unittest import mock
+        with mock.patch('chim.ocean_runtime.land_cells', return_value={(5, 5), (-17, 9)}):
+            problems = R.owned_land_problems({(5, 5): 'land', (-17, 9): 'seabed', (6, 5): 'land', (7, 5): 'ocean'},
+                                             '/data')
+        self.assertEqual(len(problems), 1)
+        self.assertIn('1 region cell(s)', problems[0])
+        self.assertIn(': 6,5', problems[0])
+        self.assertEqual(R.owned_land_problems({(1, 1): 'ocean'}, '/nowhere'), [])
 
     def test_no_ocean_cells_reads_nothing(self):
         self.assertEqual(R.ocean_land_problems({(1, 1): 'land'}, '/nowhere'), [])

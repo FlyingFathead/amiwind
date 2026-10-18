@@ -486,22 +486,45 @@ def frame_settings(frame, margin=TERRAIN_MARGIN):
 
 
 
-def check_source_land(settings, audit):
+def check_source_land(settings, audit, land_records=None, source=None):
     """Allow heightless ocean in an apron, never a missing owned land cell.
 
     The wider reference survey must cross coastline cells with no LAND. Its
     fallback is recorded by mwad.audit; runtime terrain still follows the
     existing LAND/ocean terrain path. Explicit ocean cores retain admit_cell.
+
+    An owned cell whose LAND record carries no heights (no VHGT: the 98 seabed
+    cells, CHIM-REGION-SEABED-NO-HEIGHTS-42) is admitted as flat seabed at the
+    original default height, as CHIMport converts it: rule from OpenMW
+    components/esm3/loadland.hpp (Land::DEFAULT_HEIGHT -2048) and
+    components/esmterrain/storage.cpp (a LAND without DATA_VHGT reads
+    defaultHeight); mwad.audit.default_land is that height. land_records: a
+    callable or set of the cells with a live LAND record in the masters
+    (chim.ocean_runtime.land_cells), read only when the owned cell has no
+    heights; a cell with no LAND record at all is still refused. source: the
+    audit file (path, sha256) named in a refusal.
     """
     if not settings.get('region_source_apron'):
-        return
+        return None
     area = audit['area']
     cell = tuple(settings['source_cell'])
+    frame = (settings.get('town') or {}).get('id', '?')
+    where = 'frame %s, owned cell (%d,%d)%s' % (frame, cell[0], cell[1], (
+        ', source audit %s sha256 %s' % source) if source else '')
     if (list(area['center']) != list(cell) or area['radius_cells'] != settings['source_radius']
             or cell not in {(r['x'], r['y']) for r in area['cells']}):
-        raise ValueError('Regional scenery source audit has a different owned cell or scope')
-    if not settings.get('ocean_runtime') and cell in {tuple(c) for c in area['default_land_cells']}:
-        raise ValueError('Regional owned cell has no original LAND; explicit ocean admission required')
+        raise ValueError('Regional scenery source audit has a different owned cell or scope (%s; check: audit '
+                         'centre %s radius %s against source_cell, source_radius %s)'
+                         % (where, list(area['center']), area['radius_cells'], settings['source_radius']))
+    if settings.get('ocean_runtime') or cell not in {tuple(c) for c in area['default_land_cells']}:
+        return None
+    records = land_records() if callable(land_records) else land_records
+    if records is not None and cell in {tuple(c) for c in records}:
+        return 'heightless-land'
+    raise ValueError('Regional owned cell has no original LAND; explicit ocean admission required (%s; check: '
+                     'check_source_land, the cell has %s and the frame is not open ocean)'
+                     % (where, 'no LAND record in the masters' if records is not None
+                        else 'no heights and no LAND record list was given'))
 
 
 def town_boxes(towns, root=None):
@@ -543,6 +566,23 @@ def ocean_land_problems(kinds, data_files):
             'measure them again with this builder: python3 tools/chimport.py run --out RUN --cells "%s", then feed the '
             'tracker and publish the reference' % (len(bad), ' '.join(cell_key(c) for c in bad),
                                                    ' '.join(cell_key(c) for c in bad))]
+
+
+def owned_land_problems(kinds, data_files):
+    """Land/seabed region cells with no LAND record at all in the masters: check_source_land refuses them inside
+    the CHIM stage (no heights and no ocean admission), so the preflight names them in seconds first. A LAND
+    record without heights is fine (flat seabed, CHIM-REGION-SEABED-NO-HEIGHTS-42)."""
+    owned = sorted(c for c, k in kinds.items() if k != 'ocean')
+    if not owned or not data_files:
+        return []
+    from chim.ocean_runtime import land_cells
+    land = land_cells(data_files)
+    bad = [c for c in owned if tuple(c) not in land]
+    if not bad:
+        return []
+    return ['%d region cell(s) the status file calls land or seabed have no LAND record in the game data (the '
+            'CHIM stage would refuse them: no original LAND, no open-ocean admission): %s'
+            % (len(bad), ' '.join(cell_key(c) for c in bad))]
 
 
 def table_kinds(table):

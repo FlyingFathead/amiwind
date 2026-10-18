@@ -335,6 +335,21 @@ def live_jobs(jobs):
         return jobs
 
 
+def stage_ceiling(jobs):
+    """The most workers a pool of this stage may grow to: under the scheduler the build budget (its live allowance
+    file decides how many it holds at each task, _throttle), never less than JOBS; outside it JOBS (resolve_jobs).
+    For a stage's own sizing that is taken once (how many walk units to cut, how many workers memory admits): the
+    launch --jobs is only the scheduler's share at the moment the stage started (BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42:
+    the v0.0.42 final's stair gate stayed on the 2 workers of its launch while its allowance was 12)."""
+    count = resolve_jobs(jobs)
+    if not os.environ.get(ALLOWANCE_ENV):
+        return count
+    try:
+        return max(count, int(os.environ.get(BUDGET_ENV, count)))
+    except ValueError:
+        return count
+
+
 def _throttle(count):
     """(pool size, in-flight limit function or None) for a pool of `count` workers.
 
@@ -508,7 +523,10 @@ def governed_map(function, items, jobs=None, unit_mib=None, label='pool'):
     count = resolve_jobs(jobs)
     size, limit = _throttle(count)
     from resource_plan import governor_for
-    governor = governor_for(count, unit_mib, label)
+    # under the scheduler the pool is sized for the budget and follows the live allowance (_throttle): the memory
+    # governor plans for that ceiling, not the launch count, or it never lets the pool grow past it
+    # (BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42)
+    governor = governor_for(size if limit is not None else count, unit_mib, label)
     if size == 1 or governor is None:
         yield from completed_map(function, items, jobs)
         return
@@ -766,7 +784,7 @@ def execute_parallel(steps, run, metadata, root):
         return values[len(pooled):]
     profile = build_profile.start(run, steps, metadata, dependencies)
     from resource_plan import SchedulerGuard   # key-neutral module (build_cache.INSTRUMENTATION_MODULES)
-    guard = SchedulerGuard(budget, metadata.get('resource_plan_units'))
+    guard = SchedulerGuard(budget, metadata.get('resource_plan_units'), parents=metadata.get('resource_plan_parents'))
     try:
         while pending or active:
             ready = [item for item in pending if set(dependencies[item[1][0]]) <= passed]
@@ -801,6 +819,9 @@ def execute_parallel(steps, run, metadata, root):
                     if budget - sum(held(s) for s in active.values()) < 1:
                         break
                     jobs = 1
+                if '--jobs' in original:
+                    # BUILD-SCHEDULER-MEMORY-STARVED-42: say before it starts when its workers will not fit
+                    guard.start_check(name, jobs, running=list(active))
                 command = budget_command(original, jobs)
                 log = run / 'logs' / f'{number:02}-{name}.log'
                 entry = {'name': name, 'command': command, 'status': 'running',
@@ -865,6 +886,8 @@ def execute_parallel(steps, run, metadata, root):
         raise
     if guard.changes:
         receipt['scheduler_guard_changes'] = guard.changes
+    if guard.alarms:
+        receipt['scheduler_alarms'] = guard.alarms
     receipt.update(status='passed', elapsed_seconds=round(time.monotonic() - start, 3))
     save()
     profile.close(receipt)

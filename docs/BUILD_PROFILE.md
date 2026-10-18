@@ -307,6 +307,13 @@ Where the numbers come from, said on every line in brackets:
   on disk (about 2.03 placed bytes per stored byte, one calibration point).
 - **estimated, no data yet**: a stage never measured (512 MiB a worker beside a
   256 MiB parent).
+- **beside it**: the memory the other stages held at the stage's measured peak
+  (the container's peak while it ran less its own process tree) is counted too,
+  so a stage measured beside others is not planned as if it ran alone; every
+  throttled stage names the lease that runs it at its planned workers
+  (`lease_gb_full_speed`). Origin: the v0.0.42 final's chim stage was planned at
+  21 GB alone and met 26.5 of 28 GiB in use beside the NPC gallery and the world
+  terrain (BUILD-SCHEDULER-MEMORY-STARVED-42).
 
 Wall times are the measured wall fitted with Amdahl's law (the stage's average
 busy cores on its workers give its parallel share), so a stage that kept one
@@ -327,14 +334,41 @@ between tasks:
 
 - the scheduler (pooled stages): above 90 % of the memory limit in use (file
   cache not counted) the stage holding the most workers hands out no new units
-  beyond three quarters of them; below 70 % a capped stage grows back toward its
-  share, by as many workers as the free memory holds at the plan's size per
-  worker. A CPU quota lowered while the build runs (`docker update --cpus`)
+  beyond three quarters of them; a capped stage grows back toward its share
+  whenever the free memory under 80 % of the limit holds one of its units at the
+  plan's size per worker, by as many as fit (stages without a known size: one
+  at a time, below 70 % in use). Until 17 October 2026 it grew back only below
+  70 % in use, which a large parent could keep out of reach for hours
+  (BUILD-SCHEDULER-MEMORY-STARVED-42). A CPU quota lowered while the build runs (`docker update --cpus`)
   shrinks the shares; a raised one lets them grow back up to `--jobs`;
 - the CHIM stair gate: starts with the walks that fit now and grows back toward
   its cores' count when memory frees up (another container ends, a raised
   lease: `docker update --memory`), and stops starting walks when memory gets
   tight.
+
+Before a pooled stage starts, the scheduler compares its parent and its
+workers (the plan's sizes) with the memory the container holds beside it at
+that moment; when they will not fit under 90 % it prints one line, before the
+stage's first unit:
+
+```text
+[scheduler] WILL NOT FIT AT FULL SPEED: chim needs about 26.8 GiB (a 13000 MiB parent + 12 workers x 1200 MiB) beside 10.0 GiB in use (running: npc-gallery, world-terrain), of 28.0 GiB; the memory guard will hold it back; a lease of 41 GB fits it
+```
+
+A pooled stage the guard holds below half its share for 5 minutes
+(`AMIWIND_SCHEDULER_ALARM_SECONDS`, default 300) prints an alarm, again every 5
+minutes while it lasts, with the lease under which it would grow back (its
+missing workers fit under 80 % of the limit); the alarms are kept in `build-state.json` (`scheduler_alarms`):
+
+```text
+[scheduler] ALARM: chim held at 1 of 6 workers for 5 min by the memory guard (26.5 of 28.0 GiB in use, file cache not counted); a lease of 41 GB would let it run at 6 (5 more workers at about 1200 MiB each)
+```
+
+A stage sizes its own pools by its ceiling (the build budget under the
+scheduler, `build_parallel.stage_ceiling`), not by the `--jobs` it was launched
+with, which is only the scheduler's share at that moment: the CHIM stair gate
+cuts its walk units and plans its workers by it, and the live allowance and the
+memory decide how many run at each task (BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42).
 
 A running unit is never stopped: a smaller allowance only stops new units.
 Every change is printed with its reason (`[pool] ...: workers 8 -> 11 of 11

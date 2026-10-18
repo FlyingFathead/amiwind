@@ -341,6 +341,9 @@ the shot ends.
   left out with their pocket named (cells wholly inside a town frame no longer open a pocket:
   [CHIM-REGION-POCKET-TOWN-CELLS-42](bugs/CHIM-REGION-POCKET-TOWN-CELLS-42.md)); 1,252 cells in the list; region
   doors get their door table ([CHIM-REGION-DOORS-NO-PROMPT-42](bugs/CHIM-REGION-DOORS-NO-PROMPT-42.md)).
+  The first final build stopped on the 98 heightless seabed cells
+  ([CHIM-REGION-SEABED-NO-HEIGHTS-42](bugs/CHIM-REGION-SEABED-NO-HEIGHTS-42.md)): v0.0.42 builds 1,154 cells
+  (1,115 region frames) without them; they join after that repair.
 
 ### 3.3 The heavier cells, lightest first, each group measured again first
 

@@ -1778,6 +1778,7 @@ def resolve_chim_regions(args, builder=None):
     table, problems = chim_regions.plan(args.chim_regions, args.chim_regions_status, towns=builder['chim_areas'],
                                         one_map_only=one_map)
     problems += chim_regions.ocean_land_problems(chim_regions.table_kinds(table), getattr(args, 'data_files', None))
+    problems += chim_regions.owned_land_problems(chim_regions.table_kinds(table), getattr(args, 'data_files', None))
     if problems:
         raise ValueError('CHIM regions preflight failed before any stage:\n  ' + '\n  '.join(problems))
     args.chim_regions_cells = chim_regions.encode_cells(chim_regions.table_kinds(table))
@@ -1934,6 +1935,7 @@ def resource_preflight(args, steps, metadata):
     metadata['resource_plan'] = {'file': resource_plan.FILE, 'verdict': doc['verdict'],
                                  'advisory': (doc['advisory'] or {}).get('text'), 'refusals': doc['refusals']}
     metadata['resource_plan_units'] = {r['stage']: r['worker_mib'] for r in doc['stages'] if r['worker_mib'] >= 64}
+    metadata['resource_plan_parents'] = {r['stage']: r['parent_mib'] for r in doc['stages'] if r['worker_mib'] >= 64}
     if doc['refusals']:
         if mode == 'fail':
             raise ValueError('Resource plan refused the build before any stage (WILL NOT FIT):\n  '

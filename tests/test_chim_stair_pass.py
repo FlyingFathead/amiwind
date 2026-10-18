@@ -71,6 +71,11 @@ class PassIsAPass(unittest.TestCase):
                          (1, 0, 1, 'passes'))
         how = list(cache['frames'].values())[0]
         self.assertTrue(how.startswith('reused pass from %s (0.0.42-dev1, abc1234, ' % RUN), how)
+        # the reused pass is listed for the promotion: a passed build of this run marks it (BUILD-CHIM-STAIR-NO-REUSE-42)
+        [listed] = cache['reused_records']
+        [record] = self.records()
+        self.assertEqual(listed['record_sha256'], record['record_sha256'])
+        self.assertEqual(first['pass_cache']['reused_records'], [])
         strip = lambda r: {k: v for k, v in r.items() if k != 'pass_cache'}  # noqa: E731
         self.assertEqual(json.dumps(strip(again), sort_keys=True), json.dumps(strip(first), sort_keys=True))
 
