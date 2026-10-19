@@ -1,10 +1,6 @@
 # World mapping and streaming plan
 
-**Post-RC3 implementation:** the [whole-island survey](WORLD_SURVEY.md) now
-covers all base-master terrain grids and placed scenery geometry. The native
-[M map and J journal](WORLD_MAP_AND_JOURNAL.md) use on-demand assets. The plan
-below still governs playable world expansion; the atlas and terrain mesh do not
-replace its runtime acceptance gates.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +17,12 @@ replace its runtime acceptance gates.
 - [Acceptance and profiling gates](#acceptance-and-profiling-gates)
 
 <!-- contents end -->
+
+**Post-RC3 implementation:** the [whole-island survey](WORLD_SURVEY.md) now
+covers all base-master terrain grids and placed scenery geometry. The native
+[M map and J journal](WORLD_MAP_AND_JOURNAL.md) use on-demand assets. The plan
+below still governs playable world expansion; the atlas and terrain mesh do not
+replace its runtime acceptance gates.
 
 Core design recorded 27 September 2026; status updated 30 September. Balmora now
 uses 64 overlapping runtime regions with synchronous replacement of one resident

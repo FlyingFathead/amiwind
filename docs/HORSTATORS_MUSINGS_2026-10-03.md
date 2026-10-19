@@ -1,8 +1,6 @@
 # Horstator’s musings (3 Oct 2026): “In Hindsight: *cough* Sometimes Fog May Actually Hinder You”
 
-> Follow-up, 7 Oct 2026: the fog was the only thing removing hidden work because
-> converted buildings never blocked Quake's visibility. See
-> [Well, it looks like you should always check and recheck](HORSTATORS_MUSINGS_2026-10-07.md).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +16,10 @@
 - [Out of sight, still on the guest list](#out-of-sight-still-on-the-guest-list)
 
 <!-- contents end -->
+
+> Follow-up, 7 Oct 2026: the fog was the only thing removing hidden work because
+> converted buildings never blocked Quake's visibility. See
+> [Well, it looks like you should always check and recheck](HORSTATORS_MUSINGS_2026-10-07.md).
 
 Fog promises less work: hide the distant stuff, draw fewer polygons, enjoy better
 performance. Yet in central Balmora, increasing the view distance to 1000 seemed

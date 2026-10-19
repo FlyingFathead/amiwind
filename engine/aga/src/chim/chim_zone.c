@@ -38,6 +38,7 @@ static unsigned long	allocations, evictions, failures, trims;
 static unsigned long	unsatisfiable;
 static int			last_failed_need;	/* the last failed request, header included */
 static int			small_high;		/* ChimZone_SetEnds: blocks below this size come from the high end */
+static int			prefetch_blocks;	/* CHIM_KIND_PREFETCH blocks in the zone (none: the eviction walk is the first method's) */
 
 static chim_block_t *Block (const void *data)
 {
@@ -95,6 +96,7 @@ void ChimZone_Reset (void)
 	numbanks = 0;
 	lru.lru_next = lru.lru_prev = &lru;
 	allocations = evictions = failures = trims = unsatisfiable = 0;
+	prefetch_blocks = 0;
 	last_failed_need = 0;
 }
 
@@ -214,6 +216,7 @@ static void MergeNext (chim_block_t *b)
 static void Release (chim_block_t *b)
 {
 	chim_block_t *p;
+	prefetch_blocks -= b->kind == CHIM_KIND_PREFETCH;
 	if (b->user)
 		b->user->data = NULL;
 	UnlinkLRU (b);
@@ -270,7 +273,7 @@ void ChimZone_SetEnds (int small)
 }
 
 /* First fit: in the preferred banks first, then in the others. */
-static chim_block_t *TryAlloc (int need, int persistent)
+static chim_block_t *TryAlloc (int need, int persistent, int only)
 {
 	int pass, i;
 	chim_block_t *b, *rest;
@@ -278,7 +281,7 @@ static chim_block_t *TryAlloc (int need, int persistent)
 	for (pass=0 ; pass<2 ; pass++)
 		for (i=0 ; i<numbanks ; i++)
 		{
-			if (!banks[i].first || (banks[i].persistent == persistent) != !pass)
+			if (!banks[i].first || (banks[i].persistent == persistent) != !pass || (only && !banks[i].persistent))
 				continue;
 			if (need < small_high)
 			{
@@ -309,7 +312,43 @@ static chim_block_t *TryAlloc (int need, int persistent)
 	return NULL;
 }
 
+/* The least recently used unlocked block to evict for a request: read-ahead
+ * bytes (CHIM_KIND_PREFETCH) go before anything else is thrown out (only=1:
+ * blocks in banks that survive a map change). NULL: none. */
+static chim_block_t *Victim (int only)
+{
+	chim_block_t *b;
+	int pass;
+	for (pass=0 ; pass<2 ; pass++)
+		for (b=lru.lru_prev ; b != &lru ; b=b->lru_prev)
+			if (!b->locks && (pass || b->kind == CHIM_KIND_PREFETCH) && (!only || banks[b->bank].persistent))
+				return b;
+	return NULL;
+}
+
+static void *AllocIn (chim_user_t *user, int size, int kind, unsigned id, int only);
+
 void *ChimZone_Alloc (chim_user_t *user, int size, int kind, unsigned id)
+{
+	return AllocIn (user, size, kind, id, 0);
+}
+
+void *ChimZone_AllocPersistent (chim_user_t *user, int size, int kind, unsigned id)
+{
+	return AllocIn (user, size, kind, id, 1);
+}
+
+int ChimZone_PersistentBytes (void)
+{
+	int i;
+	long n = 0;
+	for (i=0 ; i<numbanks ; i++)
+		if (banks[i].first && banks[i].persistent)
+			n += banks[i].size;
+	return n > 0x7fffffffL ? 0x7fffffff : (int)n;
+}
+
+static void *AllocIn (chim_user_t *user, int size, int kind, unsigned id, int only)
 {
 	chim_block_t *b;
 	int need, i, largest = 0, persistent;
@@ -320,13 +359,13 @@ void *ChimZone_Alloc (chim_user_t *user, int size, int kind, unsigned id)
 		Sys_Error ("CHIM zone: already allocated");
 	need = CHIM_HEADER + ((size + 15) & ~15);
 	for (i=0 ; i<numbanks ; i++)
-		if (banks[i].first && banks[i].size > largest)
+		if (banks[i].first && banks[i].size > largest && (!only || banks[i].persistent))
 			largest = banks[i].size;
 	/* Shared models and textures prefer memory that survives a map change. */
-	persistent = kind == CHIM_KIND_MODEL || kind == CHIM_KIND_TEXTURE;
+	persistent = only || kind == CHIM_KIND_MODEL || kind == CHIM_KIND_TEXTURE;
 	while (need <= largest)
 	{
-		b = TryAlloc (need, persistent);
+		b = TryAlloc (need, persistent, only);
 		if (b)
 		{
 			b->kind = (unsigned char)kind;
@@ -338,6 +377,7 @@ void *ChimZone_Alloc (chim_user_t *user, int size, int kind, unsigned id)
 			if (user)
 				user->data = CHIM_DATA(b);
 			allocations++;
+			prefetch_blocks += kind == CHIM_KIND_PREFETCH;
 			return CHIM_DATA(b);
 		}
 		/* No run of adjacent unlocked blocks is large enough: evicting
@@ -348,11 +388,21 @@ void *ChimZone_Alloc (chim_user_t *user, int size, int kind, unsigned id)
 			unsatisfiable++;
 			break;
 		}
-		/* Evict the least recently used unlocked block and retry. */
-		for (b=lru.lru_prev ; b != &lru && b->locks ; b=b->lru_prev)
-			;
-		if (b == &lru)
-			break;
+		/* Evict the least recently used unlocked block and retry; read-ahead
+		 * bytes first (Victim). Without them, and for every request when the
+		 * prefetch is off, exactly the first method's walk. */
+		if (prefetch_blocks || only)
+		{
+			if (!(b = Victim (only)))
+				break;
+		}
+		else
+		{
+			for (b=lru.lru_prev ; b != &lru && b->locks ; b=b->lru_prev)
+				;
+			if (b == &lru)
+				break;
+		}
 		Evict (b);
 	}
 	failures++;
@@ -421,7 +471,7 @@ int ChimZone_FitsWithout (int need, void **unlock, int n)
  * texture, W frame world), size in KiB, '*' when locked. */
 void ChimZone_Map (void (*print)(const char *line))
 {
-	static const char letters[] = ".IBMCTXWS";
+	static const char letters[] = ".IBMCTXWSP";
 	char line[96];
 	chim_block_t *b;
 	int i, n, lines, more;
@@ -597,6 +647,7 @@ void ChimZone_DropBank (int bank)
 				b->user->data = NULL;
 			if (evict_callbacks[b->kind])
 				evict_callbacks[b->kind] (CHIM_DATA(b), b->id);
+			prefetch_blocks -= b->kind == CHIM_KIND_PREFETCH;
 			UnlinkLRU (b);
 		}
 	}

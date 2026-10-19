@@ -1,5 +1,7 @@
 # WinUAE setup
 
+_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+
 <!-- contents start -->
 ## Contents
 

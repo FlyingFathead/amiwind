@@ -4,7 +4,7 @@
 
 What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, where it stands, the gain that was measured (what was compared, how and when) and how Quake's visibility culling still works with it. Generated from [`features.json`](features.json); a test fails when this page is stale. Bugs are on the [CHIM bug tracker](../bugs/CHIM_TRACKER.md); ideas and held-back work are collected in [CHIM ideas](IDEAS.md). How far the open world has been converted, cell by cell, is on the [CHIM cell tracker](CELL_TRACKER.md).
 
-CHIM version: 0.2.1. 39 features: 21 shipped, 1 in this release, 11 in progress, 3 planned, 3 ideas. Updated 17 October 2026.
+CHIM version: 0.2.1. 40 features: 21 shipped, 1 in this release, 12 in progress, 3 planned, 3 ideas. Updated 19 October 2026.
 
 ## What CHIM has done so far
 
@@ -24,6 +24,7 @@ The headline measured gains. Each links to its feature, which says what was comp
 - **Ground stored once:** Seven CHIM region cells (coast and sea floor): 9.0 MB of frames to 1.9 MB with references and the compiled terrain hull, 0.91 times the 2.1 MB of open-world maps they replace. *builder output, 10 October 2026.* [Details](#ground-stored-once)
 - **Fewer faces per mesh (planar merge, meshoptimizer for large shells):** Every mesh of the v0.0.36-dev3 world's CHIM areas: 101,153 to 99,052 faces with planar merge; the arrival ship 4,046 to 3,690 faces with closed seams (torn seam 2.2 % to 0) and about a seventh of the shape error. *exact counts, 11 October 2026.* [Details](#fewer-faces-per-mesh-planar-merge-meshoptimizer-for-large-shells)
 - **Extra Fast RAM as CHIM cache, automatic:** 128 MiB against 16 MiB Fast RAM, two sessions each: failed zone loads 625-655 (Seyda Neen) and 288-312 (Ebonheart plaza) to 0, evictions on a 58 s flight 487-550 to 0; frame time unchanged within drift. *emulator, relative, quiet host, 17 October 2026.* [Details](#extra-fast-ram-as-chim-cache-automatic)
+- **Cells ahead read into spare Fast RAM:** Open-world cell crossings: median 452 ms to 209-223 ms, worst 724 ms to 477-498 ms; seconds with a frame of 300 ms or more 11 to 2-3 of 178; a four-cell corner 426 ms to 146-239 ms; one heavy crossing (cells 10,0 to 11,0) 598 ms to 245 ms. *emulator, relative, busy host, 18 October 2026.* [Details](#cells-ahead-read-into-spare-fast-ram)
 
 Several features also have a cost, listed under their caveats: CHIM leaves less of the Hunk free at the load peak, spends more time outside the 3D view and draws slightly more spans. Each shipped feature names the CHIM version it came with; the features marked "in this release" are in the development line of CHIM 0.2.1, not yet published.
 
@@ -33,7 +34,7 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | --- | --- | --- |
 | Shipped | in a published release | 21 |
 | In this release (CHIM 0.2.1) | in the line that becomes the next release; not yet published | 1 |
-| In progress | being built or measured; not finished | 11 |
+| In progress | being built or measured; not finished | 12 |
 | Planned | decided; no finished design or code | 3 |
 | Idea | written down, not decided | 3 |
 
@@ -84,6 +85,7 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | [Lit like the original](#lit-like-the-original) | Rendering and visibility | The hybrid lighting type (builder default, --chim-lighting-type): Morrowind lights as Quake light entities baked into CHIM terrain lightmaps with lightstyles for flicker and pulse, one light level per placed model, the nearest sources of every class as dynamic lights, and per-plant glow generated at build time. | not measured |
 | [Ground stored once](#ground-stored-once) | World format and disk | Terrain references (world format 0.7, --chim-terrain-refs, off by default): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record. | 9.0 MB to 1.9 MB for seven region cells |
 | [Fewer faces per mesh (planar merge, meshoptimizer for large shells)](#fewer-faces-per-mesh-planar-merge-meshoptimizer-for-large-shells) | Builder and tools | Every CHIM mesh's coplanar triangles with one texture mapping become one convex Quake face (planar merge, lossless, never more faces); large hard-surface shells that a profile reduces use meshoptimizer's simplifier with locked borders instead of the profile's reducer (the arrival ship). A method table chooses per mesh by a measured rule; the earlier method stays selectable. | -2.1 % faces island-wide; the ship -9 %, shape error /7 |
+| [Cells ahead read into spare Fast RAM](#cells-ahead-read-into-spare-fast-ram) | Streaming and memory | Outdoors a cell border is a map change. With extra Fast RAM the files of the cells ahead are read in 32 KiB slices, in frames where nothing else is read, into the CHIM banks; later reads of them are copied from RAM. The 2x2 block at the nearest corner first (the cell walked towards leading), then the 3x3 ring; the block moves only past a margin. The world index stays in RAM across maps. 16 MiB: unchanged. | crossings 452 ms to about 220 ms (median) at 128 MiB |
 
 ### Planned
 
@@ -115,13 +117,13 @@ Every mesh, collision hull and texture of an exterior is stored once and placed 
 
 - Balmora exterior: 162.1 MB of legacy region maps to 21.3 MB of CHIM world (7.62 times smaller). Compared: the 64 legacy region maps of a v0.0.32 development image against the CHIM world (index, frame and chunk sections) plus its frame map, world format 0.5; interiors are the same in both and left out. *builder output, 9 October 2026.*
 - Seyda Neen with the intro docks and the courtyard: 190.4 MB to 7.83 MB (24.3 times smaller). Compared: the 66 recorded legacy maps v0.0.32 ships against the CHIM world (51 files and 3 frame maps), world format 0.5. *builder output, 9 October 2026.*
-- Legacy layout: each exterior object is stored about 9.8 times (about 1.4 million copies of 143,147 placements over the island, about 20 GB of maps); CHIM stores each placement once. Compared: the whole-world estimate behind WORLD-REGION-DUPLICATION-31; the CHIM figure for the whole island comes with the open world on CHIM (milestone M4). *estimate, 8 October 2026.*
+- Legacy layout: each exterior object is stored about 9.8 times (about 1.4 million copies of 143,147 placements over the island, about 20 GB of maps); CHIM stores each placement once. Compared: the whole-world estimate behind WORLD-REGION-DUPLICATION-31; the island-wide CHIM figure is not measured yet, although every exterior cell of Vvardenfell has been on CHIM since v0.0.43. *estimate, 8 October 2026.*
 
 **Visibility:** Each placement is linked to the visibility leaves its box touches (Quake's efrags) and is drawn once, from its owner chunk, so the PVS still culls it. Sharing a model never turns it into a brush entity; placements over 16 leaves are counted by the validator.
 
 **Caveats:**
 
-- The island-wide CHIM size is not measured yet; only Balmora and Seyda Neen are built as CHIM worlds.
+- The island-wide CHIM size is not measured yet; the measured figures are for Balmora and Seyda Neen, although every exterior cell of Vvardenfell is built as a CHIM world since v0.0.43.
 
 **Read more:** [World streamer design](../WORLD_STREAMER.md); [CHIM world format](WORLD_FORMAT.md); [Draft v0.0.33 release notes, disk](../RELEASE-v0.0.33.md#disk-each-asset-once); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json).
 
@@ -140,7 +142,7 @@ Balmora and Seyda Neen (with the intro docks and the courtyard) are drawn only b
 **Caveats:**
 
 - CHIM builds still run part of the legacy exterior chain (the open world, the Vivec Arena and Balmora's region maps) and record which stages and who reads them; moving the frame maps and town flora off that chain is still to do (CHIM-LEGACY-CHAIN-33).
-- The countryside between the towns still ships as legacy region maps, marked "not yet CHIM", until milestone M4.
+- The countryside between the towns shipped as legacy region maps, marked "not yet CHIM", until v0.0.43; since then every exterior cell of Vvardenfell is a CHIM frame.
 
 **Read more:** [CHIM engine: towns](ENGINE.md#towns); [Builder types](build_guide/BUILDER_TYPES.md); [Draft v0.0.33 release notes](../RELEASE-v0.0.33.md).
 
@@ -372,9 +374,32 @@ Counts are exact; times are emulator-relative. First-time ground still reads in 
 **Caveats:**
 
 - Not measured on real hardware yet.
-- The game heap stays at its built size (a larger heap stays manual).
+- From v0.0.43 the game heap grows too, to 24 MiB at most, before the CHIM banks are taken (ENGINE-HEAP-FIXED-SIZE-43).
 
 **Read more:** [Memory guide](build_guide/MEMORY.md#more-fast-ram-the-automatic-chim-cache); [Real hardware](../REAL_HARDWARE.md#extra-ram-is-used-automatically).
+
+#### Cells ahead read into spare Fast RAM
+
+**Status:** In progress. **ID:** `prefetch-spare-ram`.
+
+Outdoors a cell border is a map change. With extra Fast RAM the files of the cells ahead are read in 32 KiB slices, in frames where nothing else is read, into the CHIM banks; later reads of them are copied from RAM. The 2x2 block at the nearest corner first (the cell walked towards leading), then the 3x3 ring; the block moves only past a margin. The world index stays in RAM across maps. 16 MiB: unchanged.
+
+**Measured gain:**
+
+- Open-world cell crossings: median 452 ms to 209-223 ms, worst 724 ms to 477-498 ms; seconds with a frame of 300 ms or more 11 to 2-3 of 178; a four-cell corner 426 ms to 146-239 ms; one heavy crossing (cells 10,0 to 11,0) 598 ms to 245 ms. Compared: the v0.0.43-dev2 image in FS-UAE (68040 JIT, 128 MiB): as built against this engine with the prefetch on, the same scripted route (Seyda Neen heading 30 degrees for 180 s, 12-13 crossings), corner square and crossings; "Scene ready" per map load. *emulator, relative, busy host, 18 October 2026.*
+
+Emulator-relative times, two FS-UAE sessions in parallel on a busy host; the counts (reads served from RAM, read-ahead bytes) are exact. The legacy maps still in the route (dev2) are not helped.
+
+**Visibility:** No change: the same bytes are read, from RAM instead of the disk; the same chunks and placements.
+
+**Caveats:**
+
+- Not measured on real hardware yet: a 32 KiB slice is a synchronous read in a frame where nothing else is read (about 1 ms on average in FS-UAE JIT, 25 ms at worst; on the cycle-exact slow preset 8 ms on average, 43 ms at worst, frames of about 820 ms unchanged).
+- The ring prime still decodes the arriving cell's chunks in one frame (60-480 ms in JIT); the bytes come from RAM.
+
+**Read more:** [Real hardware: extra RAM](../REAL_HARDWARE.md#extra-ram-is-used-automatically).
+
+**Bugs:** [CHIM-CROSSING-SYNC-LOAD-43](../bugs/CHIM-CROSSING-SYNC-LOAD-43.md), [CHIM-READ-RUNS-33](../bugs/CHIM-READ-RUNS-33.md), [ENGINE-HEAP-FIXED-SIZE-43](../bugs/ENGINE-HEAP-FIXED-SIZE-43.md).
 
 ### Rendering and visibility
 
@@ -808,7 +833,7 @@ A fixed grid of frames of 3 x 3 cells covers the whole island; the engine keeps 
 
 **Caveats:**
 
-- Until then the countryside between the towns ships as legacy region maps, marked "not yet CHIM".
+- Every exterior cell of Vvardenfell is on CHIM since v0.0.43, but not in this grid design: region frames own one cell each and a crossing between them is a map load (CHIM regions); the pauses at crossings are CHIM-CROSSING-SLUGGISH-43.
 
 **Read more:** [CHIM ideas: M4](IDEAS.md#m4-the-open-world); [CHIM engine: frame re-centring plan](ENGINE.md#frame-re-centring-plan-not-implemented); [CHIMport: the whole island converted cell by cell](CHIMPORT.md).
 

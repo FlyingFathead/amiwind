@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_local.h"
 #include "aw_npc_lod.h"
 #include "aw_rcount.h"
+#include "aw_spike.h"
 #include "aw_quickchar.h"
 #include "aw_testbox.h"
 
@@ -691,7 +692,7 @@ void _Host_Frame (float time)
     }
 
 // process console commands
-    Cbuf_Execute ();
+    AW_SPIKE_STAGE (AW_SP_CBUF, Cbuf_Execute ());
 
     if(AW_MovieActive()) {
         S_Update(vec3_origin,vec3_origin,vec3_origin,vec3_origin);
@@ -716,7 +717,7 @@ void _Host_Frame (float time)
     Host_GetConsoleCommands ();
 
     if (sv.active) {
-        AW_Mark(5);Host_ServerFrame ();AW_EndMark(5);
+        AW_Mark(5);AW_SPIKE_STAGE (AW_SP_SERVER, Host_ServerFrame ());AW_EndMark(5);
     }
 
 //-------------------
@@ -735,7 +736,7 @@ void _Host_Frame (float time)
 // fetch results from server
     if (cls.state == ca_connected)
     {
-        CL_ReadFromServer ();
+        AW_SPIKE_STAGE (AW_SP_CLIENT, CL_ReadFromServer ());
     }
 
 // update video
@@ -746,7 +747,7 @@ void _Host_Frame (float time)
      * Stopping music belongs to an explicit music stop or shutdown. */
     CDAudio_Update();
     S_ExtraUpdate();
-    SCR_UpdateScreen ();
+    AW_SPIKE_STAGE (AW_SP_SCREEN, SCR_UpdateScreen ());
 
     AW_StreamPresented();
 
@@ -757,7 +758,7 @@ void _Host_Frame (float time)
     AW_Mark(3);
     if (cls.signon == SIGNONS)
     {
-        S_Update (r_origin, vpn, vright, vup);
+        AW_SPIKE_STAGE (AW_SP_SNDUPD, S_Update (r_origin, vpn, vright, vup));
         if(!AW_ModalWorldFrozen())CL_DecayLights ();
     }
     else
@@ -769,12 +770,13 @@ void _Host_Frame (float time)
     if(!AW_ModalWorldFrozen())AW_IntroTick();
     if(!AW_ModalWorldFrozen())AW_WaitTick();
     AW_AnimKitTick();
-    AW_SaveTick();
-    if(!AW_ModalWorldFrozen())AW_SceneTick();
+    AW_SPIKE_STAGE (AW_SP_SAVE, AW_SaveTick());
+    if(!AW_ModalWorldFrozen())AW_SPIKE_STAGE (AW_SP_SCENE, AW_SceneTick());
     CDAudio_Update();
     AW_ProfileFrame();
     AW_FpuCountFrame();
     AW_RCountFrame();
+    AW_SpikeFrame();
 
     if (host_speeds.value)
     {

@@ -1,6 +1,6 @@
 # HUD: weapon and magic boxes
 
-Last updated with AmiWind v0.0.42-dev1.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -12,6 +12,8 @@ Last updated with AmiWind v0.0.42-dev1.
 - [Engine (aw_icons.c)](#engine-aw_iconsc)
 
 <!-- contents end -->
+
+Last updated with AmiWind v0.0.42-dev1.
 
 The lower-left HUD shows the three resource bars (health, magicka, fatigue)
 and, beside them, the two original boxes: the **weapon box** and the **magic

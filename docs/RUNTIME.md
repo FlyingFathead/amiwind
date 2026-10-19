@@ -1,5 +1,7 @@
 # Runtime component status
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 `runtime/include/terrain_packet.h` and `runtime/src/terrain_packet.c` implement
 an allocation-free decoder for the experimental MWT0 terrain packets. They use
 explicit byte reads, so input alignment and host endianness do not affect parsing.

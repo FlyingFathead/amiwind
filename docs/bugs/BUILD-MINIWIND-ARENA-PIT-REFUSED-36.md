@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 11 October 2026
 
 Fixed in source: the new stage `chim-rooms-<town>` makes a CHIM-native town's listed rooms, the Arena Pit among them;

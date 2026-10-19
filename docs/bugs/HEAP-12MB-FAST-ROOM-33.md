@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Status: 9 October 2026
 
 Open; measured. Applies only to a build with `--heap-mb 12` (the default is 11 MiB, which the

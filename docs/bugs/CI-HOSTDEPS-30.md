@@ -19,6 +19,25 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Status: 7 October 2026](#status-7-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Candidate regression, 12 October 2026](#candidate-regression-12-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 7 October 2026
 
 Fixed in source after the first v0.0.30 push; ships in the v0.0.30 release

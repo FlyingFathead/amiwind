@@ -1,5 +1,7 @@
 # Compiler troubleshooting options and evidence
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Producer requirement, 3 October 2026: compiler configuration must provide explicit
 options for troubleshooting. Diagnostic experiments are part of the development
 pipeline, not undocumented manual edits to production defaults. This document

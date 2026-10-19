@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Status: 8 October 2026
 
 Fixed in source on the cantons branch: the importer now enforces the limit.

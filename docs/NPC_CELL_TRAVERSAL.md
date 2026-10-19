@@ -1,5 +1,7 @@
 # NPC traversal across world boundaries
 
+_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+
 **Design requirement recorded 2026-10-06. Planned behavior; not shipped.** AmiWind currently preserves selected NPC reference, scene, pose, health and dialogue counters across scene changes. The current gameplay scripts do not implement hostile pursuit targets or a chase loop, so this persistence must not be described as cross-boundary pursuit.
 
 | Boundary | Hostile pursuers | Followers, escorts and scripted actors |

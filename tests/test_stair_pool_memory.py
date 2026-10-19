@@ -63,7 +63,8 @@ class Sizing(unittest.TestCase):
             real = stair_pool._read_int
             paths = {'/sys/fs/cgroup/memory.max': str(Path(tmp) / 'max'),
                      '/sys/fs/cgroup/memory.current': str(Path(tmp) / 'cur')}
-            with patch.object(stair_pool, '_read_int', lambda p: real(paths.get(p, p))):
+            with patch.object(stair_pool, '_read_int', lambda p: real(paths.get(p, p))), \
+                    patch.object(stair_pool, '_inactive_file', lambda p: 0):
                 free, note = stair_pool.memory_room()
             self.assertEqual(free, 12 * GIB)
             self.assertIn('cgroup v2', note)

@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Symptom
 
 With the debug HUD on, the weapon box under the stat bars is half covered by a black rectangle and the magic box

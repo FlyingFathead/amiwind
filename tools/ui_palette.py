@@ -55,7 +55,8 @@ def check_pixels(raw,label):
     if RESERVED.intersection(raw):raise ValueError('UI palette slots already used by '+label)
 
 def check_scene(game):
-    for path in game.glob('maps/*.bsp'):
+    from map_files import map_files      # x.bsp and the CHIM frame maps x.chim (their activated brush models)
+    for path in map_files(game/'maps'):
         b=lumps(path.read_bytes())[2];n=struct.unpack_from('<i',b)[0]
         if not 0<=n<=65536 or 4+n*4>len(b):raise ValueError('Invalid texture table')
         for at in struct.unpack_from('<'+str(n)+'i',b,4):

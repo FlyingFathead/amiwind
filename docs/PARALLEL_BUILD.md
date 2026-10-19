@@ -1,5 +1,7 @@
 # Parallel host builds
 
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
+
 <!-- contents start -->
 ## Contents
 

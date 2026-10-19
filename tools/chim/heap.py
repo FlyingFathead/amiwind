@@ -774,7 +774,8 @@ def require_heap(out, sdk=None, sizes=None, report_path=None, zone_kib=None, poo
             from check_world_map_heap import compile_target_sizes
             sizes = compile_target_sizes(sdk)[0]       # (sizes, probe receipt)
         try:
-            settings, files, disk, textures, models, frames = loaded_world(out, world)
+            # the frame files read on the worker pool when the world is not given (BUILD-CHIM-SERIAL-SECTIONS-44)
+            settings, files, disk, textures, models, frames = loaded_world(out, world, jobs)
         except ValueError as exc:
             raise ValueError('CHIM heap gate: the world does not read back (%s)' % exc)
         report = ring_peak({'settings': settings, 'textures': textures, 'models': models, 'frames': frames},

@@ -1,10 +1,6 @@
 # Storage profiles and disk-backed preprocessing
 
-Disk capacity is a design resource. Bake sprite directions, animation frames,
-scaled variants, surface colours and simplified geometry on the PC, then load
-only the active working set. Bigger images are acceptable when measurements show
-less runtime computation or fewer stalls. Extra bytes alone do not accelerate
-rendering. Repeated disk reads can consume CPU time and compete with audio.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -19,6 +15,12 @@ rendering. Repeated disk reads can consume CPU time and compete with audio.
 - [Profiling decisions](#profiling-decisions)
 
 <!-- contents end -->
+
+Disk capacity is a design resource. Bake sprite directions, animation frames,
+scaled variants, surface colours and simplified geometry on the PC, then load
+only the active working set. Bigger images are acceptable when measurements show
+less runtime computation or fewer stalls. Extra bytes alone do not accelerate
+rendering. Repeated disk reads can consume CPU time and compete with audio.
 
 ## Compatibility profiles
 

@@ -4,6 +4,8 @@
 
 # AmiWind
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
 conversion pipeline that builds the game from your own legally obtained copy of
@@ -32,6 +34,36 @@ The [gallery](docs/GALLERY.md) has in-game screenshots of every version, and
 
 More in the [gallery](docs/GALLERY.md).
 
+## Where AmiWind stands (19 October 2026)
+
+The newest release is **v0.0.45: CHIM Streaming Improved, Guard Torches Are Back**, running on CHIM Engine v0.2.1
+([release notes](docs/RELEASE-v0.0.45.md)). Since v0.0.43 every exterior cell of Vvardenfell is on CHIM: 1,409
+cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
+and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
+[the counting table](docs/chim/CELL_TRACKER.md#what-we-count); every cell: the
+[CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md). Interiors are still ordinary Quake maps, and many of the
+base game's interiors are not converted yet; Solstheim is not converted.
+
+What comes next is in the [plan](docs/PLAN-v0.0.45.md): smoother crossings from one CHIM cell to the next first
+(the frame switched in place instead of a level restart), then the open bugs from the playtests, then every
+interior of the base game. The sections below are
+dated records of earlier releases and are kept as written; where one disagrees with this section, this section is
+newer.
+
+## v0.0.45: CHIM Streaming Improved, Guard Torches Are Back
+
+Crossing from one CHIM cell to the next uses spare Fast RAM now: the frames around the player are read ahead into
+memory while you walk, and the engine's heap grows with the RAM the machine has. On a 128 MiB setup a crossing
+measured about half as long as before (about 450 ms down to about 230 ms); the 16 MiB baseline keeps today's sizes.
+The guards in the streets carry their torches at night again, and the builder keeps its finished stages when only
+its scheduling changes.
+
+More improvements to cell-to-cell streaming are on the way: most of what is left of a crossing is the engine
+restarting the game for every new frame, and the next step replaces that with a switch in place.
+
+Running on CHIM Engine v0.2.1. See the [release notes](docs/RELEASE-v0.0.45.md) for what changed and what is
+known in this build.
+
 ## v0.0.44: By Azura's Trees!
 
 A patch release for v0.0.43. Its fix for the floating tree crowns on Azura's Coast made the Bitter Coast trees too
@@ -51,6 +83,10 @@ What went wrong while building v0.0.44, and how it was fixed:
 - **Interior plant sprites missing outside Vivec.** The plant sprites of converted interiors were installed only
   for the Vivec rooms; every room type installs them now
   ([INTERIOR-MORAG-TONG-FPS-43](docs/bugs/INTERIOR-MORAG-TONG-FPS-43.md)).
+- **Outdoor guards without torches at night.** The guard torch step looked for guards only in the older map files and
+  ran before the CHIM town and region frames were written, so only guards indoors got a torch. It reads both kinds
+  of map now and runs after the frames: the guards in the streets carry their torches at night again, 19 guard types
+  instead of 13 ([GUARD-TORCH-CHIM-FRAMES-44](docs/bugs/GUARD-TORCH-CHIM-FRAMES-44.md)).
 
 Running on CHIM Engine v0.2.1. See the [release notes](docs/RELEASE-v0.0.44.md) for what changed and what is
 known in this build.
@@ -63,6 +99,10 @@ joined after the stair walk learned to replace collision that blocked visible st
 Suran are on CHIM too. The release also brings the fixes from the maintainer's playtest: Red Mountain's summit
 without a solid sky, invisible editor markers, Azura's Coast plants on their trunks, interior plants as sprites and
 NPC heads that keep their outline, the sea to the horizon at Vivec, and a builder that keeps its cores busy.
+
+Counted in full, that is 1,409 cells on CHIM: the 1,348 one-cell region frames above (where "sea floor" means
+empty sea cells) and 61 cells in the town frames of Balmora, Seyda Neen and Vivec, of which 46 were in the
+region list. [What these numbers count](docs/chim/CELL_TRACKER.md#what-we-count).
 
 Running on CHIM Engine v0.2.1. See the [release notes](docs/RELEASE-v0.0.43.md) for what changed and what is
 known in this build, and the [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md) for every cell.
@@ -81,6 +121,9 @@ and the lava fields. The clouds are back after two releases with a flat sky, bui
 where memory runs full, and the game uses extra Fast RAM by itself. The HUD and the inventory start to take their
 original shape: the original weapon and magic boxes, item icons from the game's own art, and the character as a
 still picture in the original pose.
+
+The 1,395 were the exterior cells planned for CHIM at the time; how today's counts are made up is in
+[what these numbers count](docs/chim/CELL_TRACKER.md#what-we-count).
 
 Running on CHIM Engine v0.2.1. See the [release notes](docs/RELEASE-v0.0.42.md) for what changed and what is
 known in this build, and the [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md) for every cell.
@@ -218,6 +261,12 @@ release-plan overlay.
 | Conversion/audit milestone | 1,275 of 1,292 land and empty-sea cells (98.7%); 15 failed and 2 not converted |
 | Native-checked cells | No complete island-wide count established; scene checks remain scoped |
 | Packaged region cells | 360 whole cells in the exact RC2 package, verified 14 October; six partial town overlaps remain outside this count |
+
+What each count means: [what we count](docs/chim/CELL_TRACKER.md#what-we-count).
+
+Update (v0.0.44, 19 October 2026): this snapshot is from 15 October 2026. Since v0.0.43 every exterior cell of
+Vvardenfell is on CHIM (1,409 cells), and the [cell tracker](docs/chim/CELL_TRACKER.md) lists all 1,390 cells with
+a LAND record as audit-done.
 
 The earlier combined v0.0.40 candidate passed conversion and structural, heap,
 zone-walk and stair checks for all 369 frames. Subsequent boundary repairs now
@@ -1118,6 +1167,9 @@ For a quick Balmora-only playtest image (a private test, never a release), add
 For quick test builds of one spot (fewer videos, voices, rooms or NPCs), see the
 [CHIM build guide](docs/chim/build_guide/README.md).
 
+Update (v0.0.44): the default CHIM areas are Balmora, Seyda Neen and the whole city of Vivec, and the exterior cells
+between them are CHIM region frames; every exterior cell of Vvardenfell is on CHIM since v0.0.43.
+
 **FPU support library (optional, your own copy):** a real 68040 or 68060 needs
 `68040.library` or `68060.library` for the rare FPU cases its hardware does not
 handle. Add `--amiga-libs DIR` with a folder from your own Workbench or
@@ -1161,6 +1213,10 @@ using this hardware profile; see the [test scope](docs/VALIDATION-WINDOWS-2026-1
 The public [dry-run build](docs/CI_DRY_RUN.md) contains no game assets or ROMs
 and boots to a test notice; it is not the playable demo.
 
+The presets of the newest release are
+[`AmiWind-v0.0.45-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.45-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.45-WinUAE.uae`](resources/emulators/AmiWind-v0.0.45-WinUAE.uae).
+
 ## Development
 
 The next work is the rest of the island on CHIM: the open world converted cell by
@@ -1168,6 +1224,10 @@ cell, Vivec back on CHIM and joined to the world, NPC animations and Arena comba
 Build-time profiling and [avoiding unnecessary recompilation](docs/BUILD_TOOLKIT_ROADMAP.md)
 remain priorities alongside [the gameplay roadmap](docs/ROADMAP.md) and the
 [CHIM features](docs/chim/FEATURES.md) page.
+
+Update (v0.0.44, 19 October 2026): the open world is on CHIM and so is the whole city of Vivec. The next work is
+in the [v0.0.45 plan](docs/PLAN-v0.0.45.md): cell crossings, the open playtest bugs and every interior of the
+base game.
 
 [FAQ](docs/FAQ.md) · [Gallery](docs/GALLERY.md) · [Project state](docs/PROJECT_STATE.md) · [Asset coverage](docs/ASSET_COVERAGE.md) ·
 [Open bug reports](docs/BUGS.md) · [Roadmap](docs/ROADMAP.md) ·
@@ -1223,3 +1283,7 @@ after the final bounded refit. Original-height comparison identifies coarse
 terrain distortion; repair and native checks remain open.
 Runtime placement of the five ring-0 ocean frames, matched native seams and
 complete package inclusion remain pending; dev2 has not shipped.
+
+Update (v0.0.44, 19 October 2026): the notes above are from 14 and 15 October 2026 and describe states that have
+since passed. The current state is in
+[Where AmiWind stands](#where-amiwind-stands-19-october-2026) near the top.

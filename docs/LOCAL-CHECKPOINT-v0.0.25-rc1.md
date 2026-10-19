@@ -1,5 +1,7 @@
 # Local checkpoint build and publication
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Historical checkpoint record. Current combined source status: [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md).
 
 Checkpoint 006 is incomplete rc1 source. It includes recovered shoreline source,

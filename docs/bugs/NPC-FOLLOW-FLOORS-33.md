@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+
 ## Status: 9 October 2026
 
 Open. A known limit of the first two stages of the companion's navigation; stage 3 is the repair.

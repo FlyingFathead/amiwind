@@ -21,6 +21,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Symptom
 
 The MiniWind CHIM stage stops with Sub-cell bounds must contain complete cores.

@@ -1,11 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-How the builder avoids doing work twice: after a failure it continues from the last
-finished unit, and after a small change it rebuilds only what the change reaches.
-This page states the rules every stage follows and why reuse is safe. The stage
-profiler and the stage cache commands are in [BUILD_PROFILE.md](BUILD_PROFILE.md).
-Storing every output once (the shared storage pool), the retention policy (the
-garbage collector) and leased workspaces (the work pool) are further down this page.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -32,6 +27,13 @@ garbage collector) and leased workspaces (the work pool) are further down this p
 - [Work pool: leased workspaces](#work-pool-leased-workspaces)
 
 <!-- contents end -->
+
+How the builder avoids doing work twice: after a failure it continues from the last
+finished unit, and after a small change it rebuilds only what the change reaches.
+This page states the rules every stage follows and why reuse is safe. The stage
+profiler and the stage cache commands are in [BUILD_PROFILE.md](BUILD_PROFILE.md).
+Storing every output once (the shared storage pool), the retention policy (the
+garbage collector) and leased workspaces (the work pool) are further down this page.
 
 Status: the rules below are in force. Items marked *planned* are the next steps
 (v0.0.35 line).

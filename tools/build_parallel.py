@@ -386,6 +386,13 @@ def _running(futures):
     return sum(not future.done() for future in futures)
 
 
+def _grow_seconds():
+    """How long a pool under the scheduler waits for a finished unit before it reads its allowance again: a raised
+    allowance (another stage finished) starts more units within this time, never only at the next finish
+    (BUILD-CHIM-SERIAL-SECTIONS-44). A function, not a module constant: scheduling only, it is one of the build
+    cache's SCHEDULING_UNITS and keys no stage."""
+    return 1.0
+
 # Results an ordered map may hold ahead of the one it hands back next, per worker:
 # with only two, one slow item at the head left the others idle (world terrain
 # ran at 14 of 24 cores; simulated on its 2,532 region times: 994 s with two,
@@ -536,7 +543,10 @@ def completed_map(function, items, jobs=None, cost=None):
         try:
             refill()
             while pending:
-                done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                # under the scheduler a short wait, so a raised allowance starts more units at once, not only when a
+                # unit finishes (maintainer 2026-10-19: pools follow the live allowance continuously)
+                done, pending = wait(pending, timeout=None if limit is None else _grow_seconds(),
+                                     return_when=FIRST_COMPLETED)
                 results = [future.result() for future in done]
                 refill()
                 yield from results
@@ -557,13 +567,19 @@ def _submit(pool, function, index, item, status):
     return future
 
 
-def governed_map(function, items, jobs=None, unit_mib=None, label='pool', cost=None):
+def governed_map(function, items, jobs=None, unit_mib=None, label='pool', cost=None, item_mib=None):
     """completed_map whose units in flight follow the container's memory and CPU quota while it runs
     (tools/resource_plan.py MemoryGovernor, fixlist A9): at most `jobs` (and the stage's allowance), and no more units
     of about UNIT_MIB each than the memory holds now, re-read every 30 s between tasks. A throttled map grows back
     when memory frees up (another container stopped, a raised lease) and stops handing out units when memory gets
     tight; a running unit is never stopped. Every change is printed with its reason. A new function of its own, so
-    the stages that use completed_map keep their keys."""
+    the stages that use completed_map keep their keys.
+
+    ITEM_MIB (item -> MiB): each unit is admitted at its own size (BUILD-CHIM-SERIAL-SECTIONS-44): units start while
+    the memory room holds them beside the units in flight, largest first; a larger unit at the head that does not fit
+    yet keeps its room reserved, so smaller units fill only what is left over and the head starts when enough frees
+    up. The count still follows the live allowance (grows when the scheduler raises it). Without ITEM_MIB every unit
+    counts as UNIT_MIB (the method before v0.0.44)."""
     count = resolve_jobs(jobs)
     size, limit = _throttle(count)
     from resource_plan import governor_for
@@ -578,6 +594,9 @@ def governed_map(function, items, jobs=None, unit_mib=None, label='pool', cost=N
     status = pool_status.watch(label, items)
     items = _by_cost(items, cost)
     stage = active_stage_pool()
+    if item_mib is not None:
+        yield from _sized_map(function, list(items), size, limit, governor, item_mib, status, stage, label)
+        return
     with worker_environment(), _map_pool(size) as pool:
         pending = set()
 
@@ -599,7 +618,9 @@ def governed_map(function, items, jobs=None, unit_mib=None, label='pool', cost=N
         try:
             refill()
             while pending:
-                done, pending = wait(pending, timeout=governor.interval, return_when=FIRST_COMPLETED)
+                # a short wait: a raised allowance or freed memory starts more units at once, not at the next finish
+                done, pending = wait(pending, timeout=max(0.05, min(governor.interval, _grow_seconds())),
+                                     return_when=FIRST_COMPLETED)
                 results = [future.result() for future in done]
                 refill()
                 yield from results
@@ -610,6 +631,59 @@ def governed_map(function, items, jobs=None, unit_mib=None, label='pool', cost=N
                 status.close()
     if stage is not None and governor.changes:
         print('[pool] %s: %d worker change(s) while it ran' % (label, len(governor.changes)), flush=True)
+
+
+def _sized_map(function, queue, size, limit, governor, item_mib, status, stage, label):
+    """governed_map with a size per unit (item_mib): QUEUE [(index, item)] largest first."""
+    queue = [(index, item, float(item_mib(item))) for index, item in queue]
+    if status and not queue:
+        status.end_of_input()
+    started = {'units': 0, 'peak': 0, 'held': 0}
+    with worker_environment(), _map_pool(size) as pool:
+        pending = {}
+
+        def refill():
+            while queue:
+                cap = size if limit is None else min(size, limit())
+                if len(pending) >= cap:
+                    return
+                flight = sum(pending.values())
+                head = queue[0][2]
+                pick = None
+                for k, (_, _, mib) in enumerate(queue):
+                    # the head first; a smaller unit only in the room left beside the head's reservation
+                    if governor.admits(flight, mib, len(pending), 0.0 if k == 0 else head):
+                        pick = k
+                        break
+                if pick is None:
+                    started['held'] += 1
+                    return
+                index, item, mib = queue.pop(pick)
+                pending[_submit(pool, function, index, item, status)] = mib
+                started['units'] += 1
+                started['peak'] = max(started['peak'], len(pending))
+                if not queue and status:
+                    status.end_of_input()
+
+        try:
+            refill()
+            while pending:
+                done, _ = wait(list(pending), timeout=max(0.05, min(governor.interval, _grow_seconds())),
+                               return_when=FIRST_COMPLETED)
+                results = []
+                for future in done:
+                    pending.pop(future)
+                    results.append(future.result())
+                refill()
+                yield from results
+        finally:
+            for future in pending:
+                future.cancel()
+            if status:
+                status.close()
+    print('[pool] %s: %d units sized one by one, up to %d at once (of %d workers)%s' % (
+        label, started['units'], started['peak'], size,
+        '; a larger unit waited for memory %d time(s)' % started['held'] if started['held'] else ''), flush=True)
 
 
 # Scene stages copy or mutate their predecessor's tree. Keep that chain ordered;

@@ -1,5 +1,7 @@
 # Docker validation - 2 October 2026
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Historical cold rc1 conversion and runtime checkpoint
 
 A cold full conversion using Docker Desktop on Windows 11 with the WSL 2

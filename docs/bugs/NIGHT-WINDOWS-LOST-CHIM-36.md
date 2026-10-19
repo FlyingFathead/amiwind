@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 
 At night the window glass of the towns no longer glows. Since v0.0.31 the engine lights the window-glass textures

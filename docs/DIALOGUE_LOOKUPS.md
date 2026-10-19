@@ -1,5 +1,7 @@
 # Ordered voice-record lookup export
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 `tools/prepare_dialogue_lookup.py` reads the user's base Morrowind master and
 writes a private JSON index. The guided AGA build runs it as `dialogue-lookup`;
 its output is beside the build stages, not embedded in the HDF yet.

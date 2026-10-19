@@ -1,5 +1,7 @@
 # Local source checkpoint: v0.0.25-rc9
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Use the complete update kit to apply rc9 over rc7 or rc8. Replacements are backed
 up, checksums are verified and conflicting local edits stop before writes.
 The maintainer's post-rc7 README cleanup is an accepted base and is preserved.

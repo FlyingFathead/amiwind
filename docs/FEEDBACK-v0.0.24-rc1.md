@@ -1,5 +1,7 @@
 # RC1 maintainer feedback, 30 September 2026
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Development starts from the maintainer's source snapshot `amiwind-2026-09-30_231610.zip`,
 version 0.0.24-rc1, published commit `04c1ecc`. Keep the published RC1 immutable.
 Fix the reported UI, targeting and NPC placement issues before the character gallery.

@@ -1,8 +1,6 @@
 # v0.0.17 build setup and test history
 
-This source snapshot is for a local clean setup/build test before publication.
-The published v0.0.16 archives and tag remain unchanged. Do not run the old
-`publish_first_release.py` helper: it is specific to the initial v0.0.16 release.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +16,10 @@ The published v0.0.16 archives and tag remain unchanged. Do not run the old
 - [Final source update](#final-source-update)
 
 <!-- contents end -->
+
+This source snapshot is for a local clean setup/build test before publication.
+The published v0.0.16 archives and tag remain unchanged. Do not run the old
+`publish_first_release.py` helper: it is specific to the initial v0.0.16 release.
 
 ## Quickest build
 

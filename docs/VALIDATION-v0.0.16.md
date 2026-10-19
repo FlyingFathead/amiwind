@@ -1,5 +1,7 @@
 # v0.0.16 validation
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Date: 28 September 2026. This records local validation before maintainer publication.
 
 ## Completed

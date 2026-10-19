@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
+
 ## Symptom
 
 With `dbg hud on` (click-to-pin inspection) the line "INSPECT: click pins / attack disabled / dbg hud off" is

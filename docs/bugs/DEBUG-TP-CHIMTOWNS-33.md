@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+
 ## Status: 9 October 2026
 
 Open. Seen in FS-UAE test sessions on the CHIM preview engine (0d8bf4f).

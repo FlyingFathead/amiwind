@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 10 October 2026
 
 Open. Workaround: start the launcher with Mesa's software OpenGL, `LIBGL_ALWAYS_SOFTWARE=1 ./RUN-FS-UAE.sh`.

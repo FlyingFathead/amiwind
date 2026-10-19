@@ -992,8 +992,10 @@ class StageKeyCoverageTests(unittest.TestCase):
     def test_no_builder_stage_keys_the_release_file_list_or_the_tracker(self):
         """Editing tools/release-files.json or adding a bug page rebuilds no stage (the real repository)."""
         import re
-        scripts = sorted(set(re.findall(r"tool\([\"']([a-z_]+\.py)", (ROOT / 'tools' / 'build.py').read_text())))
+        # tool( and its script may sit on two lines (the chim stage: BUILD-REUSE-KEYS-TOO-BROAD-35)
+        scripts = sorted(set(re.findall(r"tool\(\s*[\"']([a-z_]+\.py)", (ROOT / 'tools' / 'build.py').read_text())))
         self.assertIn('prepare_interior.py', scripts)
+        self.assertIn('chim_build.py', scripts)
         index = build_cache.SourceIndex(ROOT)
         for script in scripts:
             if script == 'build_aga.py':
@@ -1362,6 +1364,69 @@ class SharedParseTests(unittest.TestCase):
             self.assertNotIn('tools/other.py', closure[0])
             self.assertIn('tools/other.py', edited.closure(stage)[0])
             self.assertNotEqual(edited.digest(stage), first.digest(stage))
+
+
+class SchedulingKeysTest(unittest.TestCase):
+    """BUILD-REUSE-SCHEDULER-TOP-45: an edit to the pool scheduling functions of tools/build_parallel.py (their bodies,
+    their default values, adding or removing one) keys no stage, NPC gallery face or stair walk; an edit to code the
+    stage really reaches still does."""
+
+    STAGE = 'from build_parallel import ordered_map, governed_map\nordered_map(print, [])\ngoverned_map(print, [])\n'
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        (self.root / 'tools').mkdir()
+        self.source = (ROOT / 'tools' / 'build_parallel.py').read_text(encoding='utf-8')
+        (self.root / 'tools' / 'stage.py').write_text(self.STAGE, encoding='utf-8')
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def key(self, source, top_format):
+        (self.root / 'tools' / 'build_parallel.py').write_text(source, encoding='utf-8', newline='\n')
+        index = build_cache.SourceIndex(self.root, scope='units', top_format=top_format)
+        selected, uncertain = index.selection(self.root / 'tools' / 'stage.py')
+        self.assertFalse(uncertain)
+        return selected['tools/build_parallel.py']
+
+    def test_scheduling_edits_keep_the_key(self):
+        source = self.source
+        edits = {
+            'scheduling body': source.replace('    return 1.0\n', '    return 0.25\n', 1),
+            'scheduling default added': source.replace("label='pool', cost=None, item_mib=None):",
+                                                       "label='pool', cost=None, item_mib=None, spare=2):", 1),
+            'scheduling default on a new parameter': source.replace('def _grow_seconds():\n',
+                                                                    'def _grow_seconds(step=1.0):\n', 1),
+        }
+        for top_format in build_cache.TOP_FORMATS:
+            base = self.key(source, top_format)
+            for name, edited in edits.items():
+                self.assertNotEqual(edited, source, name)
+                self.assertEqual(self.key(edited, top_format), base, '%s rekeyed (top format %d)' % (name, top_format))
+
+    def test_v044_scheduler_matches_v045(self):
+        """The v0.0.44 -> v0.0.45 change itself: no _grow_seconds, no _sized_map, no item_mib."""
+        source = self.source
+        start, end = source.index('def _grow_seconds():'), source.index('# Results an ordered map may hold')
+        older = source[:start] + source[end:]
+        start, end = older.index('def _sized_map('), older.index('\nDEPENDENCIES = {')
+        older = older[:start] + older[end + 1:]
+        older = older.replace(', cost=None, item_mib=None):', ', cost=None):', 1)
+        self.assertNotEqual(older, source)
+        for top_format in build_cache.TOP_FORMATS:
+            self.assertEqual(self.key(older, top_format), self.key(source, top_format), 'top format %d' % top_format)
+
+    def test_reached_code_still_rekeys(self):
+        source = self.source
+        base = self.key(source, 1)
+        constant = source.replace('\nWINDOW = 4\n', '\nWINDOW = 5\n', 1)
+        self.assertNotEqual(constant, source)
+        self.assertNotEqual(self.key(constant, 1), base, 'an import-time constant must still rekey')
+        start = source.index('def ordered_map(')
+        body = source.index('\n', start)
+        reached = source[:body] + '\n    _changed = 1' + source[body:]
+        self.assertNotEqual(self.key(reached, 1), base, 'a reached function must still rekey')
 
 
 if __name__ == '__main__':

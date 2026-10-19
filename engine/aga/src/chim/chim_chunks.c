@@ -105,6 +105,12 @@ int ChimChunks_Begin (int cx, int cy)
 	int i, n, cells, bits, size, row = -1, sectors;
 	byte *raw = chim_world.buffer;
 	int per = chim_world.buffer_bytes / CHIM_CHUNK_ENTRY_BYTES;
+	/* With the prefetch on (spare Fast RAM): the frame's sector rows from one
+	 * pass over the file table, and the earlier frames' placement counts kept
+	 * from their first reading, instead of opening every earlier frame's file
+	 * on each map start (CHIM-CROSSING-SYNC-LOAD-43). Same values either way. */
+	int fast = ChimPrefetch_Active ();
+	int sector_row[256];
 
 	memset (&chim_frame, 0, sizeof(chim_frame));
 	memset (&counts, 0, sizeof(counts));
@@ -119,18 +125,28 @@ int ChimChunks_Begin (int cx, int cy)
 	chim_frame.settings = chim_world.settings;
 	/* Placement ids run on across the frames of a world, in pack order (the
 	 * index's file table): this frame's ids start after the earlier frames'. */
+	if (fast)
+		ChimPrefetch_SetOwned (row, chim_frame.frame.owned_total);
 	for (i=0 ; i<row ; i++)
 	{
 		byte other[CHIM_HEADER_BYTES + CHIM_FRAME_BYTES];
 		chim_header_t oh;
 		chim_frame_t of;
 		chim_pack_t *op;
+		unsigned kept;
 		if (strcmp (chim_world.file[i].kind, "FRAM"))
 			continue;
+		if (fast && ChimPrefetch_Owned (i, &kept))
+		{
+			chim_frame.first_pid += kept;
+			continue;
+		}
 		if (!(op = Chim_File (i)) || !Chim_PackRead (op, 0, other, sizeof(other)) ||
 			!ChimFormat_Header (other, op->bytes, "FRAM", &oh) || !ChimFormat_Frame (other + CHIM_HEADER_BYTES, &of))
 			return 0;
 		chim_frame.first_pid += of.owned_total;
+		if (fast)
+			ChimPrefetch_SetOwned (i, of.owned_total);
 	}
 	if (!(pack = Chim_File (row)))
 		return 0;
@@ -144,6 +160,20 @@ int ChimChunks_Begin (int cx, int cy)
 		h.data + (unsigned)sectors*CHIM_SECTOR_ENTRY_BYTES != h.bytes ||
 		chim_frame.frame.owned_total > 0x7fffffffu - 7)
 		return 0;
+	if (fast && sectors <= 256)
+	{
+		/* The first row of each sector, as Chim_FileRow finds it. */
+		for (i=0 ; i<sectors ; i++)
+			sector_row[i] = -1;
+		for (i=0 ; i<chim_world.files ; i++)
+		{
+			const chim_file_row_t *f = &chim_world.file[i];
+			if (f->cx == cx && f->cy == cy && f->sector < sectors && sector_row[f->sector] < 0 && !strcmp (f->kind, "SECT"))
+				sector_row[f->sector] = i;
+		}
+	}
+	else
+		fast = 0;
 	bits = (int)((chim_frame.frame.owned_total + 7) / 8);
 	size = n*sizeof(chim_entry_t) + cells*sizeof(short) + 2*bits;
 	if (!ChimZone_Alloc (&index_user, size, CHIM_KIND_INDEX, 1))
@@ -164,7 +194,8 @@ int ChimChunks_Begin (int cx, int cy)
 			raw, (long)((n - i < per ? n - i : per) * CHIM_CHUNK_ENTRY_BYTES))))
 			return 0;
 		ChimFormat_ChunkEntry (raw + (i % per)*CHIM_CHUNK_ENTRY_BYTES, &e->disk);
-		e->file = e->disk.sector < sectors ? Chim_FileRow ("SECT", cx, cy, e->disk.sector) : -1;
+		e->file = e->disk.sector >= sectors ? -1 : fast ? sector_row[e->disk.sector] :
+			Chim_FileRow ("SECT", cx, cy, e->disk.sector);
 		if (e->file < 0 || e->disk.cx >= chim_frame.frame.nx || e->disk.cy >= chim_frame.frame.ny)
 			return 0;
 		bytes = chim_world.file[e->file].bytes;

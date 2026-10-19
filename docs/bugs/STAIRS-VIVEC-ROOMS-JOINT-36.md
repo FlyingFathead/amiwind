@@ -29,6 +29,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Status: 11 October 2026
 
 Open; persisting since v0.0.36-dev4 (whole-city Vivec with rooms, try2 3734cf5, and again in v0.0.36-dev5

@@ -118,8 +118,177 @@ def lighting_lines(cells):
         parts = ['%s %s (%s without a mesh)' % (lt.CLASS_LABELS[k], n(v['mesh'] + v['meshless']), n(v['meshless']))
                  for k, v in h['lights'].items()]
         r = h['reach']
-        out += ['', 'Original lights in these cells: ' + ', '.join(parts) + '. In converted cells: %s baked, %s night lamps only, '
-                '%s not represented.' % (n(r['baked']), n(r['lamp_table']), n(r['none']))]
+        out += ['', 'Original light sources placed in these cells (numbers of lights, not of cells): ' + ', '.join(parts) +
+                '. In converted cells: %s lights baked, %s night lamps only, %s not represented.' % (
+                    n(r['baked']), n(r['lamp_table']), n(r['none']))]
+    return out
+
+
+# ------------------------------------------------------------------ what we count (DOCS-CELL-COUNTS-44)
+
+REGION_FRAME = re.compile(r'rc[mp]\d+_[mp]\d+')      # a CHIM region frame's area name (one cell), e.g. rcm18_p10
+COUNTING_ANCHOR = 'what-we-count'
+
+
+def newest_run(doc):
+    """(on_chim headline, run digest) of the newest ingested CHIM build, or (None, None)."""
+    o = (doc.get('headline') or {}).get('on_chim')
+    if not o:
+        return None, None
+    run = next((r for r in doc.get('runs') or [] if r.get('name') == o.get('build')), None)
+    return o, run
+
+
+def ledger_entry(o, inclusion):
+    """The packaged-inclusion ledger entry of the build (its version is the first word of the build's label)."""
+    version = ((o or {}).get('label') or '').split(' ')[0]
+    return next((b for b in (inclusion or {}).get('builds', []) if version and b.get('version') == version), None)
+
+
+def town_frame_cells(run):
+    """{area: set of cell keys} of the town frames of a run (frames whose area is not a one-cell region frame)."""
+    out = {}
+    for f in (run or {}).get('frame_ownership') or []:
+        if REGION_FRAME.fullmatch(str(f.get('area', ''))):
+            continue
+        box = f.get('owned_cells') or []
+        if len(box) == 2:
+            (x0, y0), (x1, y1) = box
+            out[f['area']] = {'%d,%d' % (x, y) for x in range(x0, x1) for y in range(y0, y1)}
+        else:
+            out[f['area']] = set()
+    return out
+
+
+def counting(doc, inclusion=None):
+    """Every cell count the tracker page states, from the tracker data, with what it counts. Keys are stable names."""
+    cells = doc.get('cells', {})
+    vv = {k: c for k, c in cells.items() if c.get('island') == MAIN_ISLAND and cp.on_map(c)}
+    b = lambda c: c['chim']['bucket']
+    c = collections.OrderedDict()
+    c['map'] = len(vv)
+    c['land'] = sum(1 for x in vv.values() if x['land'])
+    c['land_empty'] = sum(1 for x in vv.values() if x['land'] and b(x) == 'empty_sea')
+    c['land_content'] = c['land'] - c['land_empty']
+    c['seabed'] = sum(1 for x in vv.values() if not x['land'] and b(x) == 'empty_sea')
+    c['land_records'] = c['land'] + c['seabed']
+    c['empty_sea'] = c['land_empty'] + c['seabed']
+    c['ocean'] = sum(1 for x in vv.values() if not x['land'] and b(x) == 'ocean')
+    others = collections.Counter(x.get('island') for x in cells.values() if x['land'] and x.get('island') not in (None, MAIN_ISLAND))
+    c['other_land'] = [(cp.ISLAND_NAMES.get(i, 'island %d' % i), others[i]) for i in sorted(others)]
+    c['land_all'] = c['land'] + sum(v for _, v in c['other_land'])
+    o, run = newest_run(doc)
+    if o:
+        on = {k: x for k, x in vv.items() if o['build'] in (x['chim'].get('on_chim_builds') or [x['chim'].get('on_chim_build')])}
+        towns = town_frame_cells(run)
+        in_town = set().union(*towns.values()) if towns else set()
+        region = {k: x for k, x in on.items() if k not in in_town}
+        c['build'] = o.get('label') or o['build']
+        c['on'] = len(on)
+        c['on_land'] = sum(1 for x in on.values() if x['land'])
+        c['on_seabed'] = sum(1 for x in on.values() if not x['land'] and b(x) == 'empty_sea')
+        c['on_ocean'] = sum(1 for x in on.values() if not x['land'] and b(x) == 'ocean')
+        c['on_sea'] = c['on'] - c['on_land']
+        if run:
+            c['frames'] = len(run.get('frame_ownership') or [])
+            c['town_frames'] = [(a, len(v & set(on))) for a, v in sorted(towns.items())]
+            c['town_cells'] = sum(v for _, v in c['town_frames'])
+            c['region_frames'] = c['frames'] - len(towns)
+            c['region_cells'] = len(region)
+            c['region_land'] = sum(1 for x in region.values() if x['land'] and b(x) != 'empty_sea')
+            c['region_seabed'] = sum(1 for x in region.values() if b(x) == 'empty_sea')
+            c['region_ocean'] = sum(1 for x in region.values() if b(x) == 'ocean')
+        led = ledger_entry(o, inclusion)
+        if led is not None and run:
+            c['list_dropped'] = len(led.get('partial_town_overlap_cells') or [])
+            c['region_list'] = c['region_frames'] + c['list_dropped']
+    return c
+
+
+def counting_sums(c):
+    """(text, parts, total) for every relation between the counts; the parts must add up to the total."""
+    out = [('land cells + seabed cells = cells with a LAND record', (c['land'], c['seabed']), c['land_records']),
+           ('land cells with something placed + land cells with nothing placed = land cells', (c['land_content'], c['land_empty']),
+            c['land']),
+           ('empty land cells + seabed cells = empty sea', (c['land_empty'], c['seabed']), c['empty_sea']),
+           ('cells with a LAND record + open-ocean cells = map cells', (c['land_records'], c['ocean']), c['map'])]
+    if c['other_land']:
+        out.append(('Vvardenfell land cells + %s land cells = land cells of every island' % ' + '.join(nm for nm, _ in c['other_land']),
+                    (c['land'],) + tuple(v for _, v in c['other_land']), c['land_all']))
+    if 'on' in c:
+        out.append(('land + seabed + open ocean on CHIM = cells on CHIM', (c['on_land'], c['on_seabed'], c['on_ocean']), c['on']))
+    if 'frames' in c:
+        out.append(('region frames + town frames = frames', (c['region_frames'], len(c['town_frames'])), c['frames']))
+        out.append(('cells in region frames + cells in town frames = cells on CHIM', (c['region_cells'], c['town_cells']), c['on']))
+        out.append(('builder land + builder seabed + builder ocean = cells in region frames (one cell per region frame)',
+                    (c['region_land'], c['region_seabed'], c['region_ocean']), c['region_frames']))
+    if 'region_list' in c:
+        out.append(('region frames + listed cells dropped inside a town frame = cells in the builder\'s list',
+                    (c['region_frames'], c['list_dropped']), c['region_list']))
+    return out
+
+
+def counting_lines(doc, inclusion=None):
+    """The "What we count" section: one table of every count on this page and the pages that quote it."""
+    c = counting(doc, inclusion)
+    rows = [
+        (n(c['map']), 'Map cells: every cell of Vvardenfell\'s rectangle on the tracker map, land and sea.',
+         'tracker map'),
+        (n(c['land_records']), 'Cells with a LAND record (terrain data) in the game data: land cells and seabed cells. '
+         'The audit total ("Conversion/audit progress").', 'LAND records of the masters (asset census)'),
+        (n(c['land']), 'Land cells: a LAND record with terrain heights. "Vvardenfell land cells" means these.',
+         'LAND records with heights'),
+        (n(c['land_content']), 'Land cells with something placed (statics, flora, actors...).', 'tracker status'),
+        (n(c['land_empty']), 'Land cells with nothing placed (terrain under the water): status empty sea.', 'tracker status'),
+        (n(c['seabed']), 'Seabed cells: a LAND record without heights (flat sea floor), nothing placed: status empty sea.',
+         'LAND records without heights'),
+        (n(c['empty_sea']), 'Empty sea (status): empty land cells and seabed cells. The builder calls these "seabed".',
+         'tracker status'),
+        (n(c['ocean']), 'Open-ocean cells: no LAND record; water over the default sea floor (one shared ocean chunk).',
+         'ocean conversion'),
+    ]
+    if c['other_land']:
+        rows.append((n(c['land_all']), 'Land cells of every island: Vvardenfell %s and %s. Not a Vvardenfell figure; Solstheim '
+                     '(Bloodmoon) is not converted yet.' % (n(c['land']), ', '.join('%s %s' % (nm, n(v)) for nm, v in c['other_land'])),
+                     'LAND records with heights, all masters'))
+    if 'on' in c:
+        rows.append((n(c['on']), 'Cells on CHIM in the newest ingested build (%s): every cell a frame of that build\'s world '
+                     'owns: %s land, %s seabed and %s open ocean.' % (c['build'], n(c['on_land']), n(c['on_seabed']),
+                                                                      n(c['on_ocean'])), 'the build\'s CHIM world'))
+    if 'frames' in c:
+        rows.append((n(c['frames']), 'Frames in that build\'s CHIM world: %s region frames (one cell each) and %s town '
+                     'frames.' % (n(c['region_frames']), n(len(c['town_frames']))), 'the build\'s CHIM world'))
+        rows.append((n(c['town_cells']), 'Cells owned by the town frames: ' + ', '.join(
+            '%s %s' % (a, n(v)) for a, v in c['town_frames']) + '.', 'the build\'s CHIM world'))
+        rows.append((n(c['region_land']), 'The builder\'s "land" in its log line "N cells on CHIM (S seabed, L land, O ocean)": '
+                     'land cells with something placed, in region frames only (town frames not included). That line\'s '
+                     'seabed is %s and its ocean %s.' % (n(c['region_seabed']), n(c['region_ocean'])), 'builder log'))
+    if 'region_list' in c:
+        rows.append((n(c['region_list']), 'Cells in the cell list given to the builder: the region frames and %s listed cells '
+                     'that lie inside a town frame (the builder drops them: the town frame owns them). The other %s town-frame '
+                     'cells were never listed. Not the number of exterior cells.' % (
+                         n(c['list_dropped']), n(c['town_cells'] - c['list_dropped'])), 'builder log, inclusion ledger'))
+    out = ['## What we count', '',
+           'Every cell count on this page, and the counts other pages quote, from the same tracker data. Vvardenfell only '
+           '(base game, Morrowind.esm) unless a row says otherwise. Light sources are not cells: the light line above '
+           'counts light placements.', '']
+    short = 'In short: Vvardenfell has %s cells with a LAND record (%s land cells with terrain heights and %s flat seabed cells)' % (
+        n(c['land_records']), n(c['land']), n(c['seabed']))
+    if 'on' in c:
+        short += '. The newest ingested build has %s of them on CHIM, plus %s open-ocean cells: %s cells on CHIM in all' % (
+            n(c['on_land'] + c['on_seabed']), n(c['on_ocean']), n(c['on']))
+    out += [short + '.', '']
+    out += table(['Number', 'What it counts', 'From'], rows, right_from=3)
+    out += ['', 'How they add up:', '']
+    for text, parts, total in counting_sums(c):
+        ok = sum(parts) == total
+        out.append('- %s: %s = %s%s' % (text, ' + '.join(n(p) for p in parts), n(total), '' if ok else ' (DOES NOT ADD UP)'))
+    out += ['', 'Older notes use other totals. 1,436 (the tracker headline before v0.0.44) is the land cells of both '
+            'islands. "46 more inside the town frames" (v0.0.43 notes) is the listed cells the builder dropped; the town '
+            'frames own more cells than that (see above). 1,395 (v0.0.42 notes) is the cells with a LAND record plus the '
+            '5 open-sea cells then selected; 14 more open-sea cells joined in v0.0.43. 1,404 (world survey) is the exterior '
+            'CELL records of Morrowind.esm: the 1,390 cells with a LAND record and those 14 open-sea cells. The figures in '
+            'this table are the ones to use.', '']
     return out
 
 
@@ -221,8 +390,9 @@ def inclusion_lines(doc, inclusion):
         rows.append((build['version'], build['state'], '%s (%s)' % (n(count), pct(count, len(eligible)))))
     out = ['## Included in builds', '',
            'Included means verified in a packaged image. Packaged does not mean published or fully playtested. '
-           'Conversion audits and release plans do not establish inclusion. Percentages use the %s land and '
-           'empty-sea cells; open ocean is separate. Counts are per build, not additive.' % n(len(eligible)), '']
+           'Conversion audits and release plans do not establish inclusion. Counts and percentages use the %s cells '
+           'with a LAND record (land and seabed); open ocean is left out. Counts are per build, not additive '
+           '([what we count](#%s)).' % (n(len(eligible)), COUNTING_ANCHOR), '']
     return out + (table(['Version', 'Evidence state', 'Included'], rows) if rows else
                   ['No packaged inclusion evidence supplied.']) + ['']
 
@@ -240,10 +410,20 @@ def on_chim_lines(doc):
                 o.get('label') or o['build'], n(i['land']), n(i['land_cells']), i['name'], pct(i['land'], i['land_cells']),
                 n(i['sea'])), '',
             'A cell is on CHIM in a build when a frame of the CHIM world of that build owns it. The tracker records per cell '
-            'the newest build that carries it.', '']
+            'the newest build that carries it. Land cells have terrain heights; the sea cells are seabed and open ocean '
+            '([what we count](#%s)).' % COUNTING_ANCHOR, '']
 
 
-def render(doc, today=None, inclusion=None):
+def updated_line(version, today):
+    """The italic "Last updated with AmiWind vX (date)." line every public doc page carries."""
+    try:
+        day = datetime.datetime.strptime(today[:10], '%Y-%m-%d')
+    except ValueError:
+        return []
+    return ['_Last updated with AmiWind v%s (%d %s)._' % (version.lstrip('v'), day.day, day.strftime('%B %Y')), '']
+
+
+def render(doc, today=None, inclusion=None, version=None):
     """The page text (LF, no trailing whitespace) for one aw-cell-progress-1 document."""
     today = today or datetime.datetime.now().astimezone().strftime('%Y-%m-%d %H:%M %z')
     cells = island_cells(doc, MAIN_ISLAND)
@@ -253,12 +433,14 @@ def render(doc, today=None, inclusion=None):
     eligible = sum(1 for c in cells if c['chim']['bucket'] in cp.ELIGIBLE)
     map_total, total = total, total - cl['ocean']
     land_total, land_done = total, done
-    out = [HEADER, '', '# CHIM Cell Tracker', '',
+    out = [HEADER, '', '# CHIM Cell Tracker', ''] + (updated_line(version, today) if version else []) + [
            'Live status of the open world on CHIM, Vvardenfell (island %d). Generated page: do not edit by hand. '
-           'Per-cell detail is in the Toolkit and its CSV export.' % MAIN_ISLAND, '',
+           'Per-cell detail is in the Toolkit and its CSV export. What each number counts: [what we count](#%s).' % (
+               MAIN_ISLAND, COUNTING_ANCHOR), '',
            '**Conversion/audit progress: %s of %s (%s)**' % (n(done), n(total), pct(done, total)), '',
-           'These audit totals do not count cells included in a playable build; see Included in builds below.', ''] + on_chim_lines(doc) + [
-           'Map cells %s: land and empty-sea cells %s (done %s, %s) and open-ocean cells %s (shared ocean chunk made, not yet placed in the game: not counted as done).' % (
+           'These audit totals count the cells with a LAND record (land and seabed), not cells included in a playable '
+           'build; see Included in builds below.', ''] + on_chim_lines(doc) + [
+           'Map cells %s: cells with a LAND record %s (done %s, %s) and open-ocean cells %s (no LAND record; open ocean is not counted as done).' % (
                n(map_total), n(land_total), n(land_done), pct(land_done, land_total), n(cl['ocean'])), '',
            '- %s: %s' % (cp.COMPLETE_LABEL, n(cl['complete'])),
            '- %s: %s' % (cp.TERRAIN_COMPLETE_LABEL, n(cl['terrain_complete'])),
@@ -270,8 +452,8 @@ def render(doc, today=None, inclusion=None):
            '**Conversion-eligible: %s of %s** (every audit-done cell, lighting done or not; this is not a release assignment).' % (
                n(eligible), n(total)), ''] + lighting_lines(cells) + [
            '',
-           'Generated %s. Tracker data generated %s.' % (today, doc.get('generated', 'unknown')), '',
-           '## Totals', '']
+           'Generated %s. Tracker data generated %s.' % (today, doc.get('generated', 'unknown')), '']
+    out += counting_lines(doc, inclusion) + ['## Totals', '']
     labels = {'complete': cp.COMPLETE_LABEL, 'terrain_complete': cp.TERRAIN_COMPLETE_LABEL,
               'complete_unlit': cp.COMPLETE_UNLIT_LABEL, 'terrain_complete_unlit': cp.TERRAIN_COMPLETE_UNLIT_LABEL, 'audits_passed': 'Passed (something still deferred)', 'empty_sea': 'Empty sea', 'ocean': 'Open sea',
               'hull_policy_pending': 'Hull policy pending', 'converted_failing': 'Failed',

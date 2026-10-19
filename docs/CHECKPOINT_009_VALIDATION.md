@@ -1,5 +1,7 @@
 # Checkpoint-009 — v0.0.11-dev2
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Recorded 27 September 2026. Source package 0.8.3.dev2. This is a playable
 **development checkpoint**, not a completed graphics repair or stock-A1200 port.
 The private image contains owned/converted data; the public source contains none.

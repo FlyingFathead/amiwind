@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 8 October 2026
 
 Open (process). Found by the payload diff of the v0.0.32-dev1 playtest against v0.0.31.

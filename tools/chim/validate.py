@@ -435,11 +435,138 @@ def terrain_coverage(chunk, box, source, fails):
 
 # ---------------------------------------------------------------- the world
 
-def load_world(out, fails):
+def _frame_read(f, blob, sector_of, record_of, fails):
+    """One frame file of load_world: (frame row or None, terrain record ids its chunks reference), its failures
+    appended to FAILS in order. SECTOR_OF(cell, sector) -> the sector entry ({'row', 'path', 'records'}) or None;
+    RECORD_OF(row, offset) -> the record there or None; a referenced chunk's 'terrain_record' is that record's
+    bytes."""
+    terrain_used = set()
+    try:
+        frame, chunks, sector_rows = F.read_frame(blob)
+    except ValueError as e:
+        fails.append('%s: %s' % (f['path'], e))
+        return None, terrain_used
+    cell = tuple(f['cell'])
+    fails.check(tuple(frame['cell']) == cell and len(chunks) == f['entries'],
+                'frame file does not match its index row: ' + f['path'])
+    order, sector_list = F.sector_order(frame['nx'], frame['ny'], frame['sector_chunks'])
+    fails.check([(c['cx'], c['cy']) for c in chunks] == order, f['path'] + ': chunks not in pack order')
+    fails.check([(s['sx'], s['sy']) for s in sector_rows] == sector_list, f['path'] + ': sectors not in pack order')
+    per = frame['sector_chunks'] ** 2
+    for si, s in enumerate(sector_rows):
+        sec = sector_of(cell, si)
+        if not fails.check(sec is not None, f['path'] + ': sector %d missing' % si):
+            continue
+        sblob = sec['blob']
+        fails.check(s['bytes'] == len(sblob) and s['crc'] == F.crc32(sblob),
+                    f['path'] + ': sector %d size/CRC mismatch' % si)
+        ids = [r['id'] for r in sec['records'] if r['kind'] == b'CHNK']
+        fails.check(ids == list(range(si * per, (si + 1) * per)), sec['path'] + ': holds other chunks')
+    out_chunks = []
+    for c in chunks:
+        sec = sector_of(cell, c['sector'])
+        r = record_of(sec['row'], c['offset']) if sec else None
+        if not fails.check(r is not None and r['kind'] == b'CHNK' and r['id'] == c['index']
+                           and c['sector'] == c['index'] // per and r['bytes'] == c['render'] + c['collision'],
+                           f['path'] + ': chunk %d entry does not point at its record' % c['index']):
+            continue
+        try:
+            parts = F.read_chunk(r['data'])
+        except ValueError as e:
+            fails.append('chunk %d: %s' % (c['index'], e))
+            continue
+        fails.check(parts['render'] == c['render'] and len(parts['owned']) == c['owned_count']
+                    and len(parts['reach']) == c['reach_count'], 'chunk %d: head differs from its entry' % c['index'])
+        if 'ref' in parts:
+            # format 0.7: the chunk's terrain is a TERR record placed at the reference's shift; every
+            # reader below sees it where the engine's graft puts it (chim.format.translate_image)
+            ref = parts['ref']
+            t = record_of(ref['file'], ref['offset'])
+            if not fails.check(t is not None and t['kind'] == b'TERR' and t['id'] == ref['id']
+                               and t['bytes'] == ref['bytes'] and c['collision'] == 0,
+                               f['path'] + ': chunk %d terrain reference does not point at its record'
+                               % c['index']):
+                continue
+            why = F.refuse_shift(t['data'], ref['shift'])
+            if not fails.check(why is None, f['path'] + ': chunk %d: %s' % (c['index'], why)):
+                continue
+            terrain_used.add(ref['id'])
+            parts = dict(parts, image=F.translate_image(t['data'], ref['shift']), image_render=ref['render'],
+                         terrain_record=t['data'])
+        out_chunks.append(dict(c, **parts, file=sec['path']))
+    return (f['path'], frame, out_chunks), terrain_used
+
+
+_SECTORS = {}       # per worker process: (root, path, size, mtime) -> parsed sector records (read_frames_task)
+
+
+def _read_frames_task(task):
+    """Worker of load_world: the frame files of TASK (root, [(frame index row, file row)], files) read and checked
+    as _frame_read does in the parent, from the world's own files on disk. Returns [(failures, frame row or None,
+    terrain ids, {chunk index: (terrain record file row, offset)})]: a referenced chunk's 'terrain_record' bytes are
+    left out (the parent puts its own copy of that record back, so one copy of each record is kept)."""
+    root, rows, files = task
+    root = Path(root)
+
+    def parsed(row):
+        f = files[row]
+        if f['kind'] != b'SECT':
+            return None
+        p = root / f['path']
+        try:
+            st = p.stat()
+        except OSError:
+            return None
+        key = (str(p), st.st_size, st.st_mtime_ns)
+        if key not in _SECTORS:
+            if len(_SECTORS) > 256:
+                _SECTORS.clear()
+            blob = p.read_bytes()
+            try:
+                recs = F.read_sector(blob)
+            except ValueError:
+                recs = None
+            _SECTORS[key] = (blob, recs, {r['offset']: r for r in recs} if recs is not None else None)
+        return _SECTORS[key]
+    by_cell = {}
+    for row, f in enumerate(files):
+        if f['kind'] == b'SECT':
+            by_cell[(tuple(f['cell']), f['sector'])] = row
+
+    def sector_of(cell, si):
+        row = by_cell.get((cell, si))
+        found = parsed(row) if row is not None else None
+        if found is None or found[1] is None:
+            return None
+        return {'row': row, 'path': files[row]['path'], 'records': found[1], 'blob': found[0]}
+
+    def record_of(row, offset):
+        if not 0 <= row < len(files):
+            return None
+        found = parsed(row)
+        return found[2].get(offset) if found is not None and found[2] is not None else None
+    out = []
+    for row in rows:
+        f = files[row]
+        fails = Failures()
+        frame_row, used = _frame_read(f, (root / f['path']).read_bytes(), sector_of, record_of, fails)
+        refs = {}
+        if frame_row is not None:
+            for c in frame_row[2]:
+                if 'terrain_record' in c:
+                    refs[c['index']] = (c['ref']['file'], c['ref']['offset'])
+                    del c['terrain_record']
+        out.append((list(fails), frame_row, used, refs))
+    return out
+
+
+def load_world(out, fails, jobs=1):
     """Read every file of a CHIM world and check the file structure: the index lists exactly the
     files on disk, sizes and CRCs match, every sector file is tiled exactly by its records, the
     frame and index directories point at those records, and every chunk, model and texture is
-    stored in exactly one record."""
+    stored in exactly one record. JOBS > 1: the frame files are read on the worker pool, frames in groups
+    (BUILD-CHIM-SERIAL-SECTIONS-44: about 1.5 minutes on one core for 1,351 frames, mostly placing the referenced
+    terrain); the same frames, failures and order."""
     root = Path(out) / 'chim'
     sizes = ffs_rules(root, fails)
     settings, files, mdir, tdir = F.read_index((root / 'world.cwi').read_bytes())
@@ -489,63 +616,38 @@ def load_world(out, fails):
                     '%s records without a directory entry' % kind.decode())
     frames = []
     terrain_used = set()
-    for f in files:
-        if f['kind'] != b'FRAM':
-            continue
-        try:
-            frame, chunks, sector_rows = F.read_frame(blobs[f['path']])
-        except ValueError as e:
-            fails.append('%s: %s' % (f['path'], e))
-            continue
-        cell = tuple(f['cell'])
-        fails.check(tuple(frame['cell']) == cell and len(chunks) == f['entries'],
-                    'frame file does not match its index row: ' + f['path'])
-        order, sector_list = F.sector_order(frame['nx'], frame['ny'], frame['sector_chunks'])
-        fails.check([(c['cx'], c['cy']) for c in chunks] == order, f['path'] + ': chunks not in pack order')
-        fails.check([(s['sx'], s['sy']) for s in sector_rows] == sector_list, f['path'] + ': sectors not in pack order')
-        per = frame['sector_chunks'] ** 2
-        for si, s in enumerate(sector_rows):
+    fram_rows = [row for row, f in enumerate(files) if f['kind'] == b'FRAM']
+    from build_parallel import stage_ceiling
+    jobs = stage_ceiling(jobs)
+    if jobs > 1 and len(fram_rows) > 1:
+        # the frame files on the workers, in groups (a group's sectors and the records they reference are read
+        # there from the world's files, which match the blobs checked above); failures and frames in file order
+        from build_parallel import ordered_map
+        lean = [{k: f[k] for k in ('path', 'kind', 'cell', 'sector', 'entries')} for f in files]
+        size = max(1, -(-len(fram_rows) // (4 * jobs)))
+        groups = [fram_rows[k:k + size] for k in range(0, len(fram_rows), size)]
+        for found in ordered_map(_read_frames_task, [(str(root), group, lean) for group in groups],
+                                 min(jobs, len(groups)), cost=lambda t: sum(t[2][r]['entries'] for r in t[1])):
+            for found_fails, frame_row, used, refs in found:
+                fails.extend(found_fails)
+                terrain_used |= used
+                if frame_row is None:
+                    continue
+                for c in frame_row[2]:
+                    if c['index'] in refs:
+                        c['terrain_record'] = records[refs[c['index']]]['data']
+                frames.append(frame_row)
+    else:
+        def sector_of(cell, si):
             sec = sectors.get((cell, si))
-            if not fails.check(sec is not None, f['path'] + ': sector %d missing' % si):
-                continue
-            blob = blobs[sec['path']]
-            fails.check(s['bytes'] == len(blob) and s['crc'] == F.crc32(blob),
-                        f['path'] + ': sector %d size/CRC mismatch' % si)
-            ids = [r['id'] for r in sec['records'] if r['kind'] == b'CHNK']
-            fails.check(ids == list(range(si * per, (si + 1) * per)), sec['path'] + ': holds other chunks')
-        out_chunks = []
-        for c in chunks:
-            sec = sectors.get((cell, c['sector']))
-            r = records.get((sec['row'], c['offset'])) if sec else None
-            if not fails.check(r is not None and r['kind'] == b'CHNK' and r['id'] == c['index']
-                               and c['sector'] == c['index'] // per and r['bytes'] == c['render'] + c['collision'],
-                               f['path'] + ': chunk %d entry does not point at its record' % c['index']):
-                continue
-            try:
-                parts = F.read_chunk(r['data'])
-            except ValueError as e:
-                fails.append('chunk %d: %s' % (c['index'], e))
-                continue
-            fails.check(parts['render'] == c['render'] and len(parts['owned']) == c['owned_count']
-                        and len(parts['reach']) == c['reach_count'], 'chunk %d: head differs from its entry' % c['index'])
-            if 'ref' in parts:
-                # format 0.7: the chunk's terrain is a TERR record placed at the reference's shift; every
-                # reader below sees it where the engine's graft puts it (chim.format.translate_image)
-                ref = parts['ref']
-                t = records.get((ref['file'], ref['offset']))
-                if not fails.check(t is not None and t['kind'] == b'TERR' and t['id'] == ref['id']
-                                   and t['bytes'] == ref['bytes'] and c['collision'] == 0,
-                                   f['path'] + ': chunk %d terrain reference does not point at its record'
-                                   % c['index']):
-                    continue
-                why = F.refuse_shift(t['data'], ref['shift'])
-                if not fails.check(why is None, f['path'] + ': chunk %d: %s' % (c['index'], why)):
-                    continue
-                terrain_used.add(ref['id'])
-                parts = dict(parts, image=F.translate_image(t['data'], ref['shift']), image_render=ref['render'],
-                             terrain_record=t['data'])
-            out_chunks.append(dict(c, **parts, file=sec['path']))
-        frames.append((f['path'], frame, out_chunks))
+            return dict(sec, blob=blobs[sec['path']]) if sec is not None else None
+        for row in fram_rows:
+            f = files[row]
+            frame_row, used = _frame_read(f, blobs[f['path']], sector_of,
+                                          lambda r, o: records.get((r, o)), fails)
+            terrain_used |= used
+            if frame_row is not None:
+                frames.append(frame_row)
     fails.check(settings['models'] == len(models) and settings['textures'] == len(textures)
                 and settings['frames'] == len(frames), 'index totals do not match the files')
     stored_terrain = {k[1] for k in stored if k[0] == b'TERR'}
@@ -559,7 +661,7 @@ _FRAME_FILES = {}          # per process: (path, size, mtime) -> bytes, for load
 _FRAME_FILES_MAX = 96
 
 
-def loaded_world(out, world=None):
+def loaded_world(out, world=None, jobs=1):
     """(settings, files, sizes, textures, models, frames) of the CHIM world in OUT: the given world (the dict the
     step's validation read with load_world, which the gates after it use instead of reading and decoding every
     file again: about 13 s each on 726 frames, BUILD-CHIM-STAGE-SERIAL-TAIL-36), else load_world. Failures of
@@ -568,7 +670,7 @@ def loaded_world(out, world=None):
         return (world['settings'], world['files'], world['sizes'], world['textures'], world['models'],
                 world['frames'])
     fails = Failures()
-    loaded = load_world(out, fails)
+    loaded = load_world(out, fails, jobs)
     if fails:
         raise ValueError(fails[0])
     return loaded
@@ -783,19 +885,14 @@ def _chunk_checks(task):
     """Worker of validate(): one frame's per-chunk checks (brush image, world subtree, ground coverage, hull
     seams), each chunk's failures kept apart so validate() lists them in its own order. Pure: the same
     results in any worker and any order (BUILD-CHIM-STAGE-SERIAL-TAIL-36)."""
-    chunks, ntextures, section, cache = task
+    chunks, ntextures, section, cache = task[:4]
+    looked = len(task) > 4 and task[4]          # the parent's lookup already missed (_keyed_pool_map)
     key = None
     if cache is not None:
-        # the frame's checks are a unit keyed by SHA-256 of exactly what they read: every chunk's brush image,
-        # place and reference flag, the texture count and the frame's source section (reused while unchanged)
-        h = hashlib.sha256(json.dumps([ntextures, section], sort_keys=True, default=str).encode())
-        for c, box in chunks:
-            h.update(hashlib.sha256(c['image']).digest())
-            h.update(json.dumps([c['cx'], c['cy'], list(box), 'ref' in c]).encode())
-        key = h.hexdigest()
-        found = cache.load(key)
+        key = _chunk_key(task)
+        found = None if looked else cache.load(key)
         if found is not None:
-            return [dict(r, tree=_tree_from_json(r['tree'])) for r in found[0]]
+            return _chunk_hit(found)
     out = []
     for c, box in chunks:
         lumps = F.read_brush_image(c['image'])
@@ -817,6 +914,72 @@ def _chunk_checks(task):
     return out
 
 
+def _chunk_key(task):
+    """The unit key of a frame's chunk checks: SHA-256 of exactly what they read: every chunk's brush image, place
+    and reference flag, the texture count and the frame's source section (reused while unchanged)."""
+    chunks, ntextures, section = task[:3]
+    h = hashlib.sha256(json.dumps([ntextures, section], sort_keys=True, default=str).encode())
+    for c, box in chunks:
+        h.update(hashlib.sha256(c['image']).digest())
+        h.update(json.dumps([c['cx'], c['cy'], list(box), 'ref' in c]).encode())
+    return h.hexdigest()
+
+
+def _chunk_hit(found):
+    return [dict(r, tree=_tree_from_json(r['tree'])) for r in found[0]]
+
+
+def _model_key(task):
+    """The unit key of a group of models' checks (_model_checks)."""
+    items, ntextures = task[:2]
+    h = hashlib.sha256(json.dumps(ntextures).encode())
+    for i, name, image, render in items:
+        h.update(json.dumps([i, name, render]).encode())
+        h.update(hashlib.sha256(image).digest())
+    return h.hexdigest()
+
+
+def _model_hit(found):
+    return [(f, r, (tuple(b[0]), tuple(b[1]))) for f, r, b in found[0]]
+
+
+def _lookup_task(task):
+    """Worker of _keyed_pool_map: a unit's stored result by its key, made ready as its worker returns it, or None."""
+    kind, key, cache = task
+    found = cache.load(key)
+    if found is None:
+        return None
+    return _chunk_hit(found) if kind == 'chunks' else _model_hit(found)
+
+
+VALIDATE_LOOKUP_ENV = 'AMIWIND_CHIM_VALIDATE_LOOKUP'
+VALIDATE_LOOKUP_MODES = ('keys', 'in-task')
+
+
+def _keyed_pool_map(function, kind, key_of, tasks, jobs, cost, cache):
+    """_pool_map of the cached frame and model checks: the parent works out every unit's key (SHA-256 of what the
+    unit reads; hashing is quick), the workers look the keys up and hand back the stored results, and only the units
+    that missed go to the workers with their inputs (BUILD-CHIM-SERIAL-SECTIONS-44: the v0.0.44-dev1 try 3 build
+    validated 1,351 frames in 4 min 59 s on 2 of 24 cores with every unit stored: every chunk image went through the
+    pipes to a worker only to be hashed). AMIWIND_CHIM_VALIDATE_LOOKUP=in-task: each task carries its inputs and
+    looks itself up (the method before v0.0.44). Same results, same order, same hit and miss counts."""
+    import os
+    mode = os.environ.get(VALIDATE_LOOKUP_ENV, 'keys')
+    if mode not in VALIDATE_LOOKUP_MODES:
+        raise ValueError('%s=%s: choose %s' % (VALIDATE_LOOKUP_ENV, mode, ' or '.join(VALIDATE_LOOKUP_MODES)))
+    from build_parallel import stage_ceiling
+    if cache is None or mode == 'in-task' or stage_ceiling(jobs) <= 1 or len(tasks) < 2:
+        return _pool_map(function, tasks, jobs, cost)
+    keys = [key_of(t) for t in tasks]
+    results = _pool_map(_lookup_task, [(kind, key, cache) for key in keys], jobs, None)
+    missed = [i for i, r in enumerate(results) if r is None]
+    if missed:
+        for i, found in zip(missed, _pool_map(function, [tuple(tasks[i][:4] if kind == 'chunks' else tasks[i][:3])
+                                                         + (True,) for i in missed], jobs, cost)):
+            results[i] = found
+    return results
+
+
 def _tree_to_json(tree):
     nodes, leaves = tree
     return [[[float(v) for v in n[0]], n[1], n[2], n[3]] for n in nodes], list(leaves)
@@ -830,17 +993,14 @@ def _tree_from_json(value):
 
 def _model_checks(task):
     """Worker of validate(): brush checks and bounds of a group of models (index, name, image, render)."""
-    items, ntextures, cache = task
+    items, ntextures, cache = task[:3]
+    looked = len(task) > 3 and task[3]          # the parent's lookup already missed (_keyed_pool_map)
     key = None
     if cache is not None:
-        h = hashlib.sha256(json.dumps(ntextures).encode())
-        for i, name, image, render in items:
-            h.update(json.dumps([i, name, render]).encode())
-            h.update(hashlib.sha256(image).digest())
-        key = h.hexdigest()
-        found = cache.load(key)
+        key = _model_key(task)
+        found = None if looked else cache.load(key)
         if found is not None:
-            return [(f, r, (tuple(b[0]), tuple(b[1]))) for f, r, b in found[0]]
+            return _model_hit(found)
     out = []
     for i, name, image, render in items:
         fails = Failures()
@@ -976,7 +1136,7 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
         raise ValueError('cross_checks: pool or serial, not %r' % (cross_checks,))
     from world_chunk_estimate import placed_box
     fails = Failures()
-    settings, files, sizes, textures, models, frames = load_world(out, fails)
+    settings, files, sizes, textures, models, frames = load_world(out, fails, jobs)
     # textures: well formed and stored once
     tex_content = collections.Counter()
     for i, t in enumerate(textures):
@@ -1008,7 +1168,8 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
     rows = [(i, m['name'], m['image'], m['render']) for i, m in enumerate(models)]
     cache = check_cache(counted=True)
     groups = [(rows[k:k + MODEL_GROUP], len(textures), cache) for k in range(0, len(rows), MODEL_GROUP)]
-    for group in _pool_map(_model_checks, groups, jobs, lambda t: sum(len(m[2]) for m in t[0])):
+    for group in _keyed_pool_map(_model_checks, 'models', _model_key, groups, jobs,
+                                 lambda t: sum(len(m[2]) for m in t[0]), cache):
         for found, refs, bounds in group:
             fails.extend(found)
             models_tex.append(refs)
@@ -1068,7 +1229,8 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
         pieces = [rows[k:k + step] for k in range(0, len(rows), step)] or [rows]
         runs.append(len(pieces))
         tasks += [(piece, len(textures), sections.get(path), cache) for piece in pieces]
-    done = iter(_pool_map(_chunk_checks, tasks, jobs, lambda t: sum(len(c['image']) for c, _ in t[0])))
+    done = iter(_keyed_pool_map(_chunk_checks, 'chunks', _chunk_key, tasks, jobs,
+                                lambda t: sum(len(c['image']) for c, _ in t[0]), cache))
     checked = [[r for _ in range(n) for r in next(done)] for n in runs]
     del tasks, done
     if cache is not None:
@@ -1358,38 +1520,63 @@ def walk_measure(world, source, legacy_sizes=None, legacy_regions=None, extra_ca
     return out
 
 
-def visibility_report(world):
+def _frame_visibility_rows(task):
+    """Worker of visibility_report: one frame's rows. TASK: (its visibility record (vis, ring, pvl, tree depths),
+    {cell: (faces, [(pid, model, flags)])}, {pid: (model, flags)} of the placements anywhere, {model: faces})."""
+    v, by_cell, record_of, model_faces = task
+    rows = {k: [] for k in ('shares', 'frame_shares', 'world_faces', 'entity_faces', 'sent', 'sent_over',
+                            'pvl_sent', 'pvl_faces', 'pvl_over')}
+    for c, seen_p in v.get('pvl', {}).items():
+        rows['pvl_sent'].append(len(seen_p))
+        rows['pvl_faces'].append(sum(model_faces[record_of[q][0]] for q in seen_p if q in record_of))
+        rows['pvl_over'].append(sum(1 for q in seen_p if q in record_of and record_of[q][1] & F.FLAG_OVER_16_LEAVES))
+    for c, seen in v['vis'].items():
+        ring = v['ring'][c]
+        rows['shares'].append(len(seen) / len(ring))
+        rows['frame_shares'].append(len(seen) / len(v['vis']))
+        rows['world_faces'].append(sum(by_cell[b][0] for b in seen))
+        placed = {}
+        for b in seen:
+            for pid, model, flags in by_cell[b][1]:
+                placed[pid] = (model, flags)
+        rows['entity_faces'].append(sum(model_faces[m] for m, _ in placed.values()))
+        rows['sent'].append(len(placed))
+        rows['sent_over'].append(sum(1 for _, f in placed.values() if f & F.FLAG_OVER_16_LEAVES))
+    rows['depths'] = v['depths']
+    return rows
+
+
+def visibility_report(world, jobs=1):
     """What the cluster PVS leaves to draw, per chunk as the player's chunk.
 
     visible share: chunks in the PVS over chunks in the ring; world faces: ground
     and water faces of the visible chunks; entity faces: faces of the models
-    placed by the visible chunks (each placement once); placements over 16 leaves."""
+    placed by the visible chunks (each placement once); placements over 16 leaves.
+    JOBS > 1: one frame per worker task (BUILD-CHIM-SERIAL-SECTIONS-44); the same report."""
     model_faces = [len(F.read_brush_image(m['image'])[7]) // 20 for m in world['models']]
-    chunks_of = collections.defaultdict(dict)          # frame file -> {cell: chunk}
+    chunks_of = collections.defaultdict(dict)          # frame file -> {cell: (faces, [(pid, model, flags)])}
     for c in world['chunks']:
-        chunks_of[c['frame']][c['cell']] = c
+        chunks_of[c['frame']][c['cell']] = (c['faces'], [(r['pid'], r['model'], r['flags']) for r in c['records']])
     shares, frame_shares, world_faces, entity_faces, sent, sent_over, depths = [], [], [], [], [], [], []
     pvl_sent, pvl_faces, pvl_over = [], [], []
-    record_of = {r['pid']: r for c in world['chunks'] for r in c['owned']}
+    record_of = {r['pid']: (r['model'], r['flags']) for c in world['chunks'] for r in c['owned']}
+    tasks = []
     for v in world['visibility']:
         by_cell = chunks_of[v['file']]
-        for c, seen_p in v.get('pvl', {}).items():
-            pvl_sent.append(len(seen_p))
-            pvl_faces.append(sum(model_faces[record_of[q]['model']] for q in seen_p if q in record_of))
-            pvl_over.append(sum(1 for q in seen_p if q in record_of and record_of[q]['flags'] & F.FLAG_OVER_16_LEAVES))
-        for c, seen in v['vis'].items():
-            ring = v['ring'][c]
-            shares.append(len(seen) / len(ring))
-            frame_shares.append(len(seen) / len(v['vis']))
-            world_faces.append(sum(by_cell[b]['faces'] for b in seen))
-            placed = {}
-            for b in seen:
-                for r in by_cell[b]['records']:
-                    placed[r['pid']] = r
-            entity_faces.append(sum(model_faces[r['model']] for r in placed.values()))
-            sent.append(len(placed))
-            sent_over.append(sum(1 for r in placed.values() if r['flags'] & F.FLAG_OVER_16_LEAVES))
-        depths += [tree_depth(nodes) for nodes, _ in v['trees'].values()]
+        pids = {q for seen_p in v.get('pvl', {}).values() for q in seen_p}
+        models = {m for _, rs in by_cell.values() for _, m, _ in rs} | {record_of[q][0] for q in pids if q in record_of}
+        tasks.append(({'vis': v['vis'], 'ring': v['ring'], 'pvl': v.get('pvl', {}),
+                       'depths': [tree_depth(nodes) for nodes, _ in v['trees'].values()]},
+                      by_cell, {q: record_of[q] for q in pids if q in record_of}, {m: model_faces[m] for m in models}))
+    from build_parallel import ordered_map, stage_ceiling
+    jobs = stage_ceiling(jobs)
+    found = (ordered_map(_frame_visibility_rows, tasks, min(jobs, len(tasks)), cost=lambda t: len(t[0]['vis']))
+             if jobs > 1 and len(tasks) > 1 else map(_frame_visibility_rows, tasks))
+    for rows in found:
+        shares += rows['shares']; frame_shares += rows['frame_shares']; world_faces += rows['world_faces']
+        entity_faces += rows['entity_faces']; sent += rows['sent']; sent_over += rows['sent_over']
+        pvl_sent += rows['pvl_sent']; pvl_faces += rows['pvl_faces']; pvl_over += rows['pvl_over']
+        depths += rows['depths']
     grid_depth = max(math.ceil(math.log2(max(1, f['nx']))) + math.ceil(math.log2(max(1, f['ny'])))
                      for _, f, _ in world['frames'])
     totals = [w + e for w, e in zip(world_faces, entity_faces)]
@@ -1453,7 +1640,7 @@ def camera_report(world, cameras):
     return out
 
 
-def measure(world, source=None, legacy_maps=None, legacy_regions=None, cost=None, cameras=()):
+def measure(world, source=None, legacy_maps=None, legacy_regions=None, cost=None, cameras=(), jobs=1):
     files = world['files']
     by_kind = collections.Counter()
     for f in files:
@@ -1476,7 +1663,7 @@ def measure(world, source=None, legacy_maps=None, legacy_regions=None, cost=None
            'chunk_bytes': {'render': sum(c['render'] for c in chunks), 'collision': sum(c['collision'] for c in chunks)},
            'sectors': sum(1 for f in files if f['kind'] == b'SECT'),
            'largest_sector_bytes': max([f['bytes'] for f in files if f['kind'] == b'SECT'] or [0])}
-    res['visibility'] = visibility_report(world)
+    res['visibility'] = visibility_report(world, jobs)
     if cameras:
         res['cameras'] = camera_report(world, cameras)
     legacy_sizes = regions = None
@@ -1539,7 +1726,7 @@ def report_world(out, source=None, palette=None, legacy_maps=None, legacy_region
               'source_checked': source is not None, 'variant_audit': world.get('variant_audit')}
     replays = {}
     if not fails:
-        report['measured'] = measure(world, source, legacy_maps, legacy_regions, cost, list(cameras))
+        report['measured'] = measure(world, source, legacy_maps, legacy_regions, cost, list(cameras), jobs=jobs)
         replays = report['measured'].get('walk', {}).pop('_replay', {})
     return report, (world if not fails else None), replays
 

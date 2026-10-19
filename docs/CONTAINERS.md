@@ -1,5 +1,7 @@
 # Town containers and inventory plan
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Planning status, 27 September 2026, after checkpoint-014. Native containers and
 player inventory are not implemented. The current scenery pass selects STAT and
 DOOR placements; including a CONT mesh alone would not implement its contents.

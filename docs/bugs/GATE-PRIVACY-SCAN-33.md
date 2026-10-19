@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.40 (15 October 2026)._
+
 ## Status: 9 October 2026
 
 Open. The release-time transfer kit scan covers it; the source preflight gets the same scan next.

@@ -143,6 +143,29 @@ class FarLayerBuilderTests(unittest.TestCase):
             self.assertEqual(again[0]['sha256'], rows[0]['sha256'])          # deterministic
 
 
+class FarLayerPoolTests(unittest.TestCase):
+    def test_layers_on_the_workers_equal_the_serial_layers(self):
+        # BUILD-CHIM-SERIAL-SECTIONS-44: a frame per worker task, its boxes read from its own files there; the same
+        # files (SHA-256) and receipt rows as one frame after another
+        from chim.world import build_frames
+        from test_chim_frames import frame_specs
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            a, b, _ = frame_specs(tmp / 'specs')
+            build_frames(tmp / 'world', [a, b], {'grain': 256, 'sector_chunks': 2})
+            frames = [a['frame'], b['frame']]
+            cells = sorted(far.cells_needed(frames))
+            (tmp / 'data').mkdir()
+            (tmp / 'data/Morrowind.esm').write_bytes(b''.join(land_record(cx, cy, slope(cx, cy)) for cx, cy in cells))
+            shutil.copytree(tmp / 'world', tmp / 'pooled')
+            serial = far.write_layers(tmp / 'world', frames, tmp / 'data', jobs=1)
+            pooled = far.write_layers(tmp / 'pooled', frames, tmp / 'data', jobs=2)
+            self.assertEqual(pooled, serial)
+            self.assertGreater(sum(r['boxes_offered'] for r in serial), 0)
+            for row in serial:
+                self.assertEqual((tmp / 'pooled' / row['file']).read_bytes(), (tmp / 'world' / row['file']).read_bytes())
+
+
 class FarLayerImageTests(unittest.TestCase):
     def test_sidecar_beside_each_frame_map_checked_against_its_frame(self):
         from build_aga import chim_far_sidecar

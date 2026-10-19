@@ -1,12 +1,6 @@
 # v0.0.29 immediate fixes and follow-up work
 
-Recorded from maintainer playtesting on 4 October 2026, after the published
-[v0.0.28 release](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.28).
-The latest published development checkpoint is v0.0.29-dev4; the next is
-v0.0.29-rc1, followed by final More Mushrooms after its release gates pass.
-The original reports remain the baseline; current issue status is authoritative
-in [BUGS.md](BUGS.md). Preserve all published artifacts unchanged. Retain rocks, joined giant mushrooms,
-authored foliage placements and Balmora's mesh-foliage comparison area.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -39,6 +33,14 @@ authored foliage placements and Balmora's mesh-foliage comparison area.
 - [Mandatory issue and roadmap reconciliation](#mandatory-issue-and-roadmap-reconciliation)
 
 <!-- contents end -->
+
+Recorded from maintainer playtesting on 4 October 2026, after the published
+[v0.0.28 release](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.28).
+The latest published development checkpoint is v0.0.29-dev4; the next is
+v0.0.29-rc1, followed by final More Mushrooms after its release gates pass.
+The original reports remain the baseline; current issue status is authoritative
+in [BUGS.md](BUGS.md). Preserve all published artifacts unchanged. Retain rocks, joined giant mushrooms,
+authored foliage placements and Balmora's mesh-foliage comparison area.
 
 ## Current release sequence — 6 October 2026
 

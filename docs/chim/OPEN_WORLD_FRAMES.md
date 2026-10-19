@@ -1,5 +1,7 @@
 # CHIM frames in the open world (design)
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Status: design, 9 October 2026. The first step is built differently (10 October 2026, experimental):
 [CHIM regions](CHIM_REGIONS.md) puts finished cells on CHIM as one-cell frames whose frame maps replace the
 cells' open-world maps under the same names, with no town-table rows. The 3 x 3 grid frames below remain

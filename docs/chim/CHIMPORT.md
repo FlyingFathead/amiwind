@@ -1,6 +1,6 @@
 # CHIMport: the whole island on CHIM, cell by cell
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -47,7 +47,8 @@ last); no classic region maps are left outdoors. Solstheim is not converted yet,
 
 ## Island results (9 October 2026)
 
-The first island-wide run converted all 1,292 exterior cells of Vvardenfell (the base master), from the
+The first island-wide run converted all 1,292 land cells of Vvardenfell (cells with terrain heights in the base
+master; [what we count](CELL_TRACKER.md#what-we-count)), from the
 open sea at the edge of the map inwards over 13 rings, at low priority beside the release builds (4 to 8
 cells at once).
 

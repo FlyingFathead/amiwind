@@ -1,15 +1,19 @@
 # Bug journal
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [BUILD-REUSE-SCHEDULER-TOP-45: a scheduler-only edit rekeyed the gallery and the stair walks, 19 October 2026](#build-reuse-scheduler-top-45-a-scheduler-only-edit-rekeyed-the-gallery-and-the-stair-walks-19-october-2026)
+- [CHIM-ROCKS-OPEN-SHELLS-43: island-wide rock sweep finds no converter cause, 19 October 2026](#chim-rocks-open-shells-43-island-wide-rock-sweep-finds-no-converter-cause-19-october-2026)
 - [TRACKER-CHIM-COUNT-STALE-44: the tracker counted audits, not the build, 19 October 2026](#tracker-chim-count-stale-44-the-tracker-counted-audits-not-the-build-19-october-2026)
 - [INTERIOR-MORAG-TONG-FPS-43: every room installer copies its plant sprites, 19 October 2026](#interior-morag-tong-fps-43-every-room-installer-copies-its-plant-sprites-19-october-2026)
+- [BUILD-CHIM-SERIAL-SECTIONS-44: causes and repair; BUILD-IMAGE-STAIR-WALK-CORES-43 and BUILD-REUSE-KEYS-TOO-BROAD-35, 19 October 2026](#build-chim-serial-sections-44-causes-and-repair-build-image-stair-walk-cores-43-and-build-reuse-keys-too-broad-35-19-october-2026)
 - [NPC-HEAD-DECIMATION-33: the player body falls back to the previous head reducer, 19 October 2026](#npc-head-decimation-33-the-player-body-falls-back-to-the-previous-head-reducer-19-october-2026)
 - [CHIM-ROCKS-OPEN-SHELLS-43 and CHIM-CROSSING-SLUGGISH-43 registered, 19 October 2026](#chim-rocks-open-shells-43-and-chim-crossing-sluggish-43-registered-19-october-2026)
 - [CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43: two Bitter Coast frames over the heap zone, 19 October 2026](#chim-bittercoast-heap-shapeguard-43-two-bitter-coast-frames-over-the-heap-zone-19-october-2026)
+- [CHIM-CROSSING-SYNC-LOAD-43 and ENGINE-HEAP-FIXED-SIZE-43: the open-world pauses measured, 18 October 2026](#chim-crossing-sync-load-43-and-engine-heap-fixed-size-43-the-open-world-pauses-measured-18-october-2026)
 - [NPC-HEAD-DECIMATION-33 locked head reducer and INTERIOR-MORAG-TONG-FPS-43 decided, 18 October 2026](#npc-head-decimation-33-locked-head-reducer-and-interior-morag-tong-fps-43-decided-18-october-2026)
 - [INTERIOR-MORAG-TONG-FPS-43 and NPC-HEAD-DECIMATION-33 persisting, 18 October 2026](#interior-morag-tong-fps-43-and-npc-head-decimation-33-persisting-18-october-2026)
 - [VIVEC-ARENA-WATER-FALL-32: the sea to the horizon without the day/night sky, 18 October 2026](#vivec-arena-water-fall-32-the-sea-to-the-horizon-without-the-daynight-sky-18-october-2026)
@@ -66,6 +70,23 @@ _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents end -->
 
+## BUILD-REUSE-SCHEDULER-TOP-45: a scheduler-only edit rekeyed the gallery and the stair walks, 19 October 2026
+
+BUILD-REUSE-SCHEDULER-TOP-45: the v0.0.45 release build reconverted all 3,551 NPC gallery faces and walked all 1,351
+stair frames again because the v0.0.45 pool changes added scheduling functions (and a default value) to
+tools/build_parallel.py, and a module's import-time text lists every function's default values. Repaired in
+tools/build_cache.py (scheduling_top_text) with SchedulingKeysTest, which fails against the previous code. The first
+build after the repair recomputes those keys once. [Report](bugs/BUILD-REUSE-SCHEDULER-TOP-45.md).
+
+## CHIM-ROCKS-OPEN-SHELLS-43: island-wide rock sweep finds no converter cause, 19 October 2026
+
+[CHIM-ROCKS-OPEN-SHELLS-43](bugs/CHIM-ROCKS-OPEN-SHELLS-43.md): a new audit, `tools/rock_shell_audit.py`, compared
+every rock mesh on CHIM (168 meshes, 9,591 stored variants, 37,133 placements) with the original. Morrowind's rocks
+are one-sided shells left open where the game buries them, none drawn from both sides; the stored models keep every
+face and its winding; the converter turns placements in OpenMW's order, which buries the rims best. CHIM rims stand
+above the ground as rarely as the original's (0.99 % of rim samples against 1.07 %). Five meshes with more exposed
+rims are recorded. The in-game look at reference 476548 and the OpenMW view at the same pose come next.
+
 ## TRACKER-CHIM-COUNT-STALE-44: the tracker counted audits, not the build, 19 October 2026
 
 [TRACKER-CHIM-COUNT-STALE-44](bugs/TRACKER-CHIM-COUNT-STALE-44.md): after the v0.0.44-dev1 build was ingested the
@@ -81,6 +102,18 @@ converted interior are sprites, written next to each room's own map. The Vivec r
 the game; the Balmora interiors, area and harvest room installers copied only the map. The first v0.0.44-dev1 image
 step therefore stopped on a Mages Guild plant sprite that a map placed but the image did not have. One shared installer
 now copies a room's files for all four, and a test checks that every room installer uses it.
+## BUILD-CHIM-SERIAL-SECTIONS-44: causes and repair; BUILD-IMAGE-STAIR-WALK-CORES-43 and BUILD-REUSE-KEYS-TOO-BROAD-35, 19 October 2026
+
+[BUILD-CHIM-SERIAL-SECTIONS-44](bugs/BUILD-CHIM-SERIAL-SECTIONS-44.md): the CHIM stage's one-core stretches of the
+v0.0.44-dev1 build measured on 157 frames: quadratic ownership and overlap checks, layouts made in the parent while the
+workers waited, far terrain and the large JSON files on one core, the validation sending every stored unit its chunk
+images, and stair walks given the largest frame's memory share. Repaired on branch v0.0.44-serial with every output
+byte-identical (SHA-256): visibility rows 33 s at 3.8 cores -> 8 s at 12; stair gate 2 min 20 s at 8.5 cores -> 1 min
+2 s at 15.5; the pools read a raised allowance within a second.
+[BUILD-IMAGE-STAIR-WALK-CORES-43](bugs/BUILD-IMAGE-STAIR-WALK-CORES-43.md): a tail of heavy-room units; walk times
+recorded per map and heavy maps cut shorter (dev3 maps: 215-238 s -> 156 s, same report).
+[BUILD-REUSE-KEYS-TOO-BROAD-35](bugs/BUILD-REUSE-KEYS-TOO-BROAD-35.md) PERSISTING: the chim stage keyed
+tools/release-files.json through the words of a preflight refusal; that function is left out of the key closure.
 
 ## NPC-HEAD-DECIMATION-33: the player body falls back to the previous head reducer, 19 October 2026
 
@@ -119,7 +152,19 @@ grew: the Bitter Coast trees got about 60 % larger when the trunk shape guard of
 now first retries the same reducer at 1.5 to 4 times the target and uses the first copy that keeps the trunk's height:
 Bitter Coast trees 01 to 07 come out 16 to 42 % smaller, every trunk still keeps at least 90 % of its height, and the
 Azura's Coast trees are unchanged. Fixed in source; the next build checks it.
+## CHIM-CROSSING-SYNC-LOAD-43 and ENGINE-HEAP-FIXED-SIZE-43: the open-world pauses measured, 18 October 2026
 
+[CHIM-CROSSING-SYNC-LOAD-43](bugs/CHIM-CROSSING-SYNC-LOAD-43.md): the open-world "yoinks" in v0.0.43-dev2 are the cell
+crossings. Every exterior cell is its own CHIM frame map, and each crossing read and decoded the whole world index,
+opened every earlier frame's file for its placement count, then loaded the ring around the arrival in 300-580 small
+reads: two long frames per crossing, 0.3-1.1 s in FS-UAE. With extra Fast RAM the index and the counts now stay in
+memory across maps and the cells ahead are read into spare RAM (the 2x2 block at the nearest corner first, then the
+3x3 ring); crossings on the test route went from a 452 ms to a 209-223 ms median at 128 MiB. 16 MiB unchanged. On
+that route dev2 and v0.0.42 cross alike within drift ([CHIM-READ-RUNS-33](bugs/CHIM-READ-RUNS-33.md)).
+
+[ENGINE-HEAP-FIXED-SIZE-43](bugs/ENGINE-HEAP-FIXED-SIZE-43.md): the heap is now sized from the free Fast RAM at start
+(24 MiB at most, the built 11 MiB on 16 MiB machines); with 128 MiB no "hunk-gap safety" warning in five laps of
+Balmora, Caldera, Vivec and Seyda Neen, and the Hunk use was the same on every lap.
 ## NPC-HEAD-DECIMATION-33 locked head reducer and INTERIOR-MORAG-TONG-FPS-43 decided, 18 October 2026
 
 Decided for the project, 18 October 2026 (the maintainer): plants and trees in interiors are sprites by default

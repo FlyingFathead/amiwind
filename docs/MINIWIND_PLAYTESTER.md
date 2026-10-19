@@ -1,7 +1,6 @@
 # AmiWind "MiniWind" Playtester Build
 
-Start with [MiniWind: the test ground](MINIWIND.md) (what it is for, presets,
-how to add a sandbox). This page is the reference for the build type itself.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -19,6 +18,9 @@ how to add a sandbox). This page is the reference for the build type itself.
 - [What it is not](#what-it-is-not)
 
 <!-- contents end -->
+
+Start with [MiniWind: the test ground](MINIWIND.md) (what it is for, presets,
+how to add a sandbox). This page is the reference for the build type itself.
 
 A build type of the repository builder for quick playtests: Balmora only, with
 the Balmora exterior on the CHIM engine, the Balmora interiors and what the

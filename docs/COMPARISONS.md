@@ -1,5 +1,7 @@
 # Comparisons: other big PC games on the Amiga
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 Reference points for what AmiWind attempts: other PC role-playing and 3D games that run on Amiga hardware
 today, what they need, and how fast they run. Figures are as published by their authors or sellers, with the
 date they were read; AmiWind's own figures are linked to where they were measured.

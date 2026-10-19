@@ -21,6 +21,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Symptom
 
 First presentation reports a hunk gap of 2,004,064 bytes, 93,088 bytes below the 2 MiB safety threshold. The scene boots and remains running; this is a memory reserve warning, not an observed crash.

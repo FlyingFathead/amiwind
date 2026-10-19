@@ -353,6 +353,7 @@ void AW_FpuCountFrame(void);
 void AW_ProfileClose(void);
 void AW_Mark(int stage);
 void AW_EndMark(int stage);
+void AW_C2PRows(int rows, int height);
 void AW_AudioLate(int missed);
 void AW_MusicPaint(portable_samplepair_t *dst,int count);
 void AW_FogInit(void);

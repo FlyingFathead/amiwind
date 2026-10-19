@@ -1,5 +1,19 @@
 # Checkpoint-014: pier repair, hands, menu and diagnostics
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Delivered scope](#delivered-scope)
+- [Correctness and native evidence](#correctness-and-native-evidence)
+- [Memory and rendering measurements](#memory-and-rendering-measurements)
+- [Exact runtime context](#exact-runtime-context)
+- [Known limits and next milestone](#known-limits-and-next-milestone)
+- [Final flight/relaunch check and hashes](#final-flightrelaunch-check-and-hashes)
+
+<!-- contents end -->
+
 Runtime **v0.0.13-dev1**, public pipeline **0.10.0.dev1**, 27 September 2026.
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 

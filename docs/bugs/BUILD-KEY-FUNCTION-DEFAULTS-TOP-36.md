@@ -1,5 +1,15 @@
 # BUILD-KEY-FUNCTION-DEFAULTS-TOP-36: Adding a function to a shared module changed the key of every stage that imports it, although no stage runs the new code
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.36-dev1 at 2026-10-10 (time not recorded): First: adding a function to a shared module changed every stage fingerprint (fixed for stage keys with top format 2)
+- Reported with v0.0.36-dev3 at 2026-10-11 (time not recorded): Again in the image-pass keys: every head preview recomputed (BUILD-PASS-KEY-OVERBROAD-36)
+- Reported with v0.0.45 at 2026-10-19 21:24 +0300: Again in the v0.0.45 release build: NPC gallery face keys still on top format 1, CHIM stair walks re-keyed by the world loader rewrite in tools/chim/validate.py (BUILD-REUSE-SCHEDULER-TOP-45)
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,7 +19,7 @@
 | Where | Stage fingerprints, scope units: the import-time code of a module (tools/build_cache.py unit_texts) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.36 |
+| Persists in | v0.0.36, v0.0.45 (last seen) |
 | Severity | high: Hold-level: a new unused helper in one shared module rebuilt six stages; any shared module had the same effect |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | 2026_10_10_v0.0.36-dev1_full-bcoast-chimtest-try3_be5d6d3 |
@@ -17,6 +27,8 @@
 | CHIM engine version | CHIM 0.1.0, engine be5d6d3, world format 0.5 |
 
 <!-- END GENERATED FACTS -->
+
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
 
 ## Status: 10 October 2026
 
@@ -110,6 +122,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-REUSE-PLAN-ENV-36](BUILD-REUSE-PLAN-ENV-36.md): The standalone reuse plan reports environment changes the real build does not have
 - [BUILD-REUSE-RECORD-RETIRED-36](BUILD-REUSE-RECORD-RETIRED-36.md): Early cutoff and the reuse audit lost their records when an older run was retired: stages with byte-identical outputs counted as changed
 - [BUILD-REUSE-REDUCED-RECORD-36](BUILD-REUSE-REDUCED-RECORD-36.md): A stage reused from a run that had itself reused it came back without the files a later stage replaced there, so that later stage failed when it ran again
+- [BUILD-REUSE-SCHEDULER-TOP-45](BUILD-REUSE-SCHEDULER-TOP-45.md): A scheduler-only edit rekeys every stage, NPC gallery face and stair walk that reaches tools/build_parallel.py
 - [BUILD-REUSE-SCRATCH-UNDECLARED-33](BUILD-REUSE-SCRATCH-UNDECLARED-33.md): A rerun with --reuse-from reused 1 of 33 stages: the builder's scratch folder made the first stages non-reusable
 - [BUILD-SCENE-DIAGNOSTIC-COPY-35](BUILD-SCENE-DIAGNOSTIC-COPY-35.md): Scene-chain stages were never reusable: copying the previous scene (logs included) counted as reading another stage's diagnostics
 - [BUILD-SCHEDULER-TABLE-KEY-35](BUILD-SCHEDULER-TABLE-KEY-35.md): A new row in the build scheduler's stage table rebuilds stages that never read it: the table counted as import-time code of every stage

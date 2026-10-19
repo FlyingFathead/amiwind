@@ -1,7 +1,6 @@
 # Balmora fixes and dev4 follow-up
 
-Work in progress, 30 September 2026. Delivered dev4 archives are immutable.
-Results below distinguish maintainer reports, inspected causes and validation.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -19,6 +18,9 @@ Results below distinguish maintainer reports, inspected causes and validation.
 - [Packaged dev5 acceptance](#packaged-dev5-acceptance)
 
 <!-- contents end -->
+
+Work in progress, 30 September 2026. Delivered dev4 archives are immutable.
+Results below distinguish maintainer reports, inspected causes and validation.
 
 ## Guard chest armor
 

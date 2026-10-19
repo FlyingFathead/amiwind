@@ -21,6 +21,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 11 October 2026
 
 Open, reported by the maintainer on 11 October 2026 after playing the v0.0.36-dev5 playtest build on FS-UAE with JIT. The cause is not known yet. The vivec-b job will investigate on a v0.0.37 branch. Target: v0.0.37.

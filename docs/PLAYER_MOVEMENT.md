@@ -1,8 +1,6 @@
 # Player scale, collision and camera motion
 
-The maintainer reported blocked stairs, excessive resistance on mild slopes and
-idle downhill sliding in checkpoint-011. The old standing player used Quake's
-32 x 32 x 56 box although the imported Morrowind world is scaled by 0.25.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +16,10 @@ idle downhill sliding in checkpoint-011. The old standing player used Quake's
 - [dev4 Balmora stair entrance](#dev4-balmora-stair-entrance)
 
 <!-- contents end -->
+
+The maintainer reported blocked stairs, excessive resistance on mild slopes and
+idle downhill sliding in checkpoint-011. The old standing player used Quake's
+32 x 32 x 56 box although the imported Morrowind world is scaled by 0.25.
 
 ## Verified base dimensions
 

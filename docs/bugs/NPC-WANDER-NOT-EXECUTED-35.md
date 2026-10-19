@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 10 October 2026
 
 Open (maintainer playtest of v0.0.35). Depends on ANIMKIT-COVERAGE-35 (walk animations for every NPC that moves).

@@ -1,5 +1,7 @@
 # In-game action buttons
 
+_Last updated with AmiWind v0.0.29-dev4 (6 October 2026)._
+
 For UI mode 2, discrete confirmation and selection actions should have visible
 rectangular frames in both selected and unselected states. Match the existing
 OK button's UI skin and retain a distinct inset selection highlight. Do not

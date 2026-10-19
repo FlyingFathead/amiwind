@@ -1,11 +1,13 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Cell crossings: one continuous world, 19 October 2026](#cell-crossings-one-continuous-world-19-october-2026)
 - [The road after v0.0.44, 19 October 2026](#the-road-after-v0044-19-october-2026)
+- [Distant views without pop-in, and the screen the Amiga need not redraw, 19 October 2026](#distant-views-without-pop-in-and-the-screen-the-amiga-need-not-redraw-19-october-2026)
 - [Colour: AGA ramps for the ash, the blight and Red Mountain, 19 October 2026](#colour-aga-ramps-for-the-ash-the-blight-and-red-mountain-19-october-2026)
 - [Next: the outdoors complete, then every entrance and every interior, 18 October 2026](#next-the-outdoors-complete-then-every-entrance-and-every-interior-18-october-2026)
 - [Near future: the baseline stays, extra RAM becomes speed, 16 October 2026](#near-future-the-baseline-stays-extra-ram-becomes-speed-16-october-2026)
@@ -82,19 +84,66 @@ _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
+## Cell crossings: one continuous world, 19 October 2026
+
+v0.0.45 reads the frames around the player into spare Fast RAM, which roughly halves a crossing on a 128 MiB
+machine. What is left is mostly the engine restarting the game for every new frame: measured on the v0.0.44 data,
+about 220 to 260 ms of every crossing, the same with 16 or 128 MiB, because today every CHIM frame is its own
+Quake map and a crossing is a full level change (the game-logic half respawns everything, the display half
+reconnects and reloads its model and sound lists).
+
+The next method ("type 1") makes the outdoors one continuous world, with the frames as a sliding window:
+
+- **Nothing restarts.** The game-logic and display halves stay connected the whole time; a frame is only which part
+  of the island is loaded, not a map.
+- **The origin moves, rarely.** Since v0.0.36 the engine uses wide coordinates by default: ±32,768 units
+  (`engine/aga/src/aw_coord.h`), instead of Quake's ±4,096. A cell is 2,048 units wide, so the island is larger than
+  that range, but a rebase is a separate event from crossing a border: it is triggered by how far the loaded
+  surroundings reach, with a margin, and many borders are crossed at one origin. A rebase moves the loaded
+  geometry too (plane distances, vertices, bounds, texture offsets, as CHIM's terrain shift already does) and the
+  entities, as one coherent step. The one-cell frames are not forced by the coordinate range.
+- **Entities come and go by distance.** The next frame's NPCs and objects spawn a little before the border and the
+  last frame's are removed a little after, with a margin so standing on the line does not flicker; the read-ahead
+  already has their data in memory.
+- **One composite world from several frames.** CHIM already grafts its streamed chunks into one world model for
+  rendering, collision and visibility; it is extended so the active chunks can come from several frames, with one
+  owner per physical chunk so overlapping terrain margins are never loaded twice.
+- **Memory that does not depend on a level reset.** Today a level change also frees entity data in bulk (entity
+  strings, for example, are freed only when the map's memory is reset). Entities that come and go need their own
+  reclaimable or shared memory, checked by walking the same area again and again with memory staying bounded.
+- **Model and sound lists that grow.** Quake fixes these lists per map, with a hard limit of 256 each; type 1 adds
+  entries during play. Freeing an asset's loaded data and reusing its list slot are different things: an entity can
+  still refer to a slot, so slots get stable identities and are reused only when nothing refers to them. CHIM
+  scenery already needs no list slots; this concerns actors, animations, sounds and scripted entities.
+- **Saves keep a stable place.** A save records the source cell and the position inside it plus the changed object
+  state, so a game restores the same way whatever was loaded.
+- **Spread over many frames.** Each step runs in small pieces over many rendered frames before the border, so no
+  single frame pays for the switch.
+
+Today's method ("type 0", the level change) stays selectable, and Quake's networking stays in the code: the Vivec
+Arena duel idea is for the indoor Arena, an ordinary level. The order of work, each step measured: the restart
+split by its parts to find what is thrown away and rebuilt although it is the same in neighbouring frames; a design
+note reviewed for its weak points (the origin shift, the model-list limit, saved games); a prototype in a small
+sandbox of 2×2 frames; an A/B against type 0 on the same crossing route; then the whole island
+([plan section 1](PLAN-v0.0.45.md#1-cell-crossings); the full design: [Cell crossings](chim/CELL_CROSSINGS.md)).
+
 ## The road after v0.0.44, 19 October 2026
 
 Decided for the project on 19 October 2026, in this order. Each step ends in a build that works and is shipped,
 as with the outdoors: the world first, then what is in it, then what happens in it.
 
-1. **v0.0.44: By Azura's Trees!** The patch release with the Bitter Coast tree fix
-   ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md)).
+1. **v0.0.44: By Azura's Trees!** Published 19 October 2026: the patch release with the Bitter Coast tree fix
+   ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md); [release notes](RELEASE-v0.0.44.md)).
 2. **Bug fixes, cell crossings first.** Walking from one CHIM cell into the next still pauses the game, worst at
    cell corners ([CHIM-CROSSING-SLUGGISH-43](bugs/CHIM-CROSSING-SLUGGISH-43.md)). AmiWind uses the RAM an
    accelerator card has: 16 MB stays the baseline that must work, and memory past it holds the neighbouring frames
    ready, so a crossing becomes a copy in memory instead of a disk read. Loading is spread over many rendered
    frames before the border instead of one pause at it. Every change is an A/B/C run on a fixed route with edge and
-   corner crossings, measured with the profiler at 16 MB and at 128 MB, and kept only when it wins. The open bugs
+   corner crossings, measured with the profiler at 16 MB and at 128 MB, and kept only when it wins. The cache
+   adapts to the memory there is: 16 MB keeps what fits, 128 MB or 1 GiB keep more frames ready. It is designed
+   for the load still to come: most of the open world has no NPC placements yet, and each crossing will also bring
+   people, their models and their state, so those are prepared before the border too and measured on a busy town
+   frame with its people in place. The open bugs
    from the v0.0.43 playtests follow, among them rocks that do not close up
    ([CHIM-ROCKS-OPEN-SHELLS-43](bugs/CHIM-ROCKS-OPEN-SHELLS-43.md)).
 3. **Every interior of the base game, with an interior progress tracker, and interiors on CHIM too.** Measured on
@@ -118,6 +167,34 @@ as with the outdoors: the world first, then what is in it, then what happens in 
    globals, journal indexes and each object's script values as small tables, scripts as checks that run only when
    their inputs change, the whole machine measured for its size and its cost per frame on the 68040 and 68060.
 
+## Distant views without pop-in, and the screen the Amiga need not redraw, 19 October 2026
+
+Two engine items from the maintainer's playtest of v0.0.44, both measured before anything becomes a default.
+
+**Nothing is cut where the fog is still see-through.** Bridges that appear piece by piece and hillsides seen
+through before they turn solid ([CHIM-BRIDGE-POP-PIECES-44](bugs/CHIM-BRIDGE-POP-PIECES-44.md),
+[HORIZON-POP-29](BUGS.md#fix-index), [HORIZON-HOLES-31](bugs/HORIZON-HOLES-31.md),
+[VIVEC-DISTANT-BRIDGES-32](bugs/VIVEC-DISTANT-BRIDGES-32.md)) all come from a distance cut made while the fog in
+front of it is not yet fully opaque. Games with fog and little compute avoid this with one rule: the fog reaches
+full opacity before anything is dropped, so an object only ever emerges from the haze. First step: every distance
+cut (object draw distance, frame and chunk edges, the far band) at or beyond the fog's full-opacity distance, per
+region, with its cost measured, and a builder check that refuses a cut closer than the fog end. Then the
+[island cut-out](DISTANT_TERRAIN.md#horizon-ponderings-the-island-cut-out-19-october-2026) for the far skyline.
+Its form, settled the same day: one opaque far shell of the whole island (terrain plus the silhouettes of
+buildings, towers and bridges) in the fog's colour, drawn through the engine's existing solid-surface path
+(`D_DrawSolidSurface` in our AmiQuake source) as its own surface class with real depth, built as one coherent
+model, loaded before the detail it stands in for; its edge cost against the work it saves is measured on the
+68040 and 68060 profiles first.
+
+**Only the 3D window goes through the conversion.** The engine converts its chunky picture to AGA's bitplanes
+every frame, from the top row down to the lowest changed area (Quake's update rectangles), so the HUD's lines
+below the 3D view are skipped only when nothing in the HUD changed. To measure: rows converted per frame next to
+the conversion time, in a normal build and with the debug HUD. If the HUD is changed most frames, it moves to its
+own planar screen area set up by the Copper, redrawn only where a value changes, and the conversion covers only
+the 3D window. Hardware sprites take the small moving overlays (crosshair, pointer, text cursor); they cost Chip
+RAM DMA and few colours, and a scanline holds at most eight, so they are not for whole HUD bars or particles.
+Measured on the emulator first, and on a real accelerated Amiga before any claim.
+
 ## Colour: AGA ramps for the ash, the blight and Red Mountain, 19 October 2026
 
 Decided for the project on 19 October 2026: AmiWind uses what AGA can show. AGA picks each of its 256 on-screen colours
@@ -139,30 +216,35 @@ The plan:
    grey, brown and red, so Red Mountain looks menacing before the player gets there. Measured first: what the switch costs at a
    region border and what the surface cache needs.
 
+4. **Ash and blight storms with AmiQuake's own particles** (maintainer, 19 October 2026): windblown ash and blight
+   dust from Quake's particle system (`r_part.c`: the pool, its ramps and per-particle velocity and gravity),
+   blown along the storm's wind and coloured from the ash and red ramp, with the count set by what a frame can
+   afford on the 68040 and 68060. No new engine feature first; measured for its cost per frame.
+
 Every step is an A/B against the original game at the same place and time, with stills and a short clip.
 
 ## Next: the outdoors complete, then every entrance and every interior, 18 October 2026
 
-**v0.0.43, published 19 October 2026: every exterior cell of Vvardenfell on CHIM** (1,348 cells in the region
-list and 46 inside town frames; [release notes](RELEASE-v0.0.43.md)). **v0.0.44: By Azura's Trees!** is the patch
-release that follows: the trunk shape guard made the Bitter Coast trees too large for memory, and the fix is in
-v0.0.44-dev1 ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md)). After it come
-bug fixes, the pauses when crossing from cell to cell first, and every interior missing from the base game
-(below).
+**v0.0.43, published 19 October 2026: every exterior cell of Vvardenfell on CHIM** (1,409 cells: 1,348 in
+one-cell region frames and 61 in town frames, [what these numbers count](chim/CELL_TRACKER.md#what-we-count); [release notes](RELEASE-v0.0.43.md)). **v0.0.44: By Azura's Trees!**, the patch
+release that followed, was published on 19 October 2026: the trunk shape guard had made the Bitter Coast trees too
+large for memory, and v0.0.44 fixes it ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md);
+[release notes](RELEASE-v0.0.44.md)). After it come bug fixes, the pauses when crossing from cell to cell first, and
+every interior missing from the base game (below; step by step in the [v0.0.45 plan](PLAN-v0.0.45.md)).
 
-History, as written during v0.0.43: after v0.0.43-dev2 the cells still classic
+History, as written during v0.0.43 (all of it is done; v0.0.43 shipped the whole outdoors): after v0.0.43-dev2 the cells still classic
 are the ones held by the stair walk (Ald-ruhn, Maar Gan, Suran and one rope bridge cell, with the town cells
 around them), eight Balmora border cells and fourteen open-sea cells; the last two are fixed, the stair fix is
 in the shared converter. v0.0.43-dev3 is meant to be the first build with the whole outdoors on CHIM
 ([progress tracker](chim/PROGRESS_TRACKER.md#current-state-19-october-2026)).
 
 **Milestone, 18 October 2026: every exterior cell converted to CHIM.** The v0.0.43-dev3 build converted the
-whole outdoors of Vvardenfell to CHIM in one run (1,351 frames; the stair gate passed every flight it walks, but it
+whole outdoors of Vvardenfell to CHIM in one run (1,351 frames: 1,348 region frames and 3 town frames; the stair gate passed every flight it walks, but it
 does not catch everything: walkways where the player sinks into the planks, such as the Vivec docks, are still
 broken, [CHIM-VIVEC-DOCK-WALKWAY-43](bugs/CHIM-VIVEC-DOCK-WALKWAY-43.md)).
 Its image step then stopped on a check that had never seen a world with no classic maps left
-([BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43](bugs/BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43.md)); the build resumes from there once
-that check counts the CHIM maps.
+([BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43](bugs/BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43.md)); the check now counts the CHIM
+maps, and the whole outdoors shipped in v0.0.43.
 
 **After the v0.0.44 patch, decided for the project on 18 October 2026: entrances and interiors.**
 
@@ -1438,8 +1520,19 @@ in order of expected gain:
    disks. v0.0.42-rc1: the look-ahead doubles from 8 MiB of cache and triples from 32 MiB; first-time ground
    still reads in the frame (worst frames 0.19-0.29 s on a flight in FS-UAE, against 0.22-0.36 s on 16 MiB):
    that needs reads that finish in the background.
+   [x] v0.0.43 (CHIM-CROSSING-SYNC-LOAD-43): outdoors every cell is its own frame map, so the pauses were the cell
+   crossings themselves, a map change each. With extra RAM the files of the cells ahead are read into spare RAM in
+   slices (the 2x2 block at the nearest corner first, the cell walked towards leading, then the 3x3 ring; the block
+   moves only past a margin, so a corner or an edge does not load and drop the same cells), and the world index and
+   each frame's placement count stay in RAM instead of being read on every crossing. Measured in FS-UAE (JIT,
+   128 MiB, the same open-world route on the dev2 data): crossing median 452 ms to 223 ms, seconds with a frame of
+   300 ms or more 11 to 2 of 178; a four-cell corner 426 ms to 146 ms. 16 MiB unchanged.
 4. Visited interiors kept in RAM: going back through a door needs no loading pause.
-5. Read caching for the hard file: recently read blocks stay in memory.
+5. Read caching for the hard file: recently read blocks stay in memory. (v0.0.43: the CHIM prefetch above is this
+   for the world's files: read ahead, kept, served from RAM.)
+6. [x] The game heap sized from the free Fast RAM (v0.0.43, ENGINE-HEAP-FIXED-SIZE-43): the built 11 MiB on 16 MiB
+   machines, up to 24 MiB with plenty of RAM (128 MiB: 24 MiB heap, 82 MiB CHIM cache), so Quake's own cache keeps
+   actors and sounds across map changes and the maps keep their 2 MiB safety gap; `-heapmb` stays the override.
 
 ## Other ideas and wildcards
 

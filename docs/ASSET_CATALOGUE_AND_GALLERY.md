@@ -1,13 +1,6 @@
 # Asset catalogue, placement coverage and debug gallery
 
-**Outside approval is required for any exception affecting either gallery.**
-Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
-reduced or bypassed, including model/asset generation, catalogue coverage,
-quality and validation, without a specific documented case or scenario **and
-explicit approval from the project maintainer**. A builder or contributor cannot
-approve its own exception. Build time, disk pressure and convenience do not
-supply that approval. An opt-out flag is a mechanism for an approved exceptional
-debugging case, not permission to choose that exception independently.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -23,6 +16,15 @@ debugging case, not permission to choose that exception independently.
 - [Checkpoints and acceptance](#checkpoints-and-acceptance)
 
 <!-- contents end -->
+
+**Outside approval is required for any exception affecting either gallery.**
+Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,
+reduced or bypassed, including model/asset generation, catalogue coverage,
+quality and validation, without a specific documented case or scenario **and
+explicit approval from the project maintainer**. A builder or contributor cannot
+approve its own exception. Build time, disk pressure and convenience do not
+supply that approval. An opt-out flag is a mechanism for an approved exceptional
+debugging case, not permission to choose that exception independently.
 
 All NPCs and other game assets must remain intact, packaged and loadable by the
 engine for the complete game to function properly. Skipping their creation

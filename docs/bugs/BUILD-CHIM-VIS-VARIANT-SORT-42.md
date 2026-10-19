@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 
 The v0.0.42-dev1 full build stopped in its CHIM step after about 44 minutes, at the visibility rows of the

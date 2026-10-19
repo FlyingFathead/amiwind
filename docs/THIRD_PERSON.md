@@ -1,9 +1,6 @@
 # Third person, vanity camera and the death scene
 
-The player's view works as in the original game: first person at the start, a third-person view on the
-Toggle POV key, a slow orbit around the character after a while without input (the vanity camera), and on
-death the camera moves behind the falling body, the death music plays and the game asks whether to load the
-most recent save. AmiWind adds one choice to that question: **Retry fight** after a lost fight.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -16,6 +13,11 @@ most recent save. AmiWind adds one choice to that question: **Retry fight** afte
 - [Build switches](#build-switches)
 
 <!-- contents end -->
+
+The player's view works as in the original game: first person at the start, a third-person view on the
+Toggle POV key, a slow orbit around the character after a while without input (the vanity camera), and on
+death the camera moves behind the falling body, the death music plays and the game asks whether to load the
+most recent save. AmiWind adds one choice to that question: **Retry fight** after a lost fight.
 
 ## Keys
 

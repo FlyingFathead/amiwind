@@ -1,5 +1,7 @@
 # Animation kit
 
+_Last updated with AmiWind v0.0.39 (14 October 2026)._
+
 The animation kit maps Morrowind's own animation groups (the text keys of the skeleton files, such as
 `walkforward: loop start`) onto the engine's actor models. The builder samples the groups an actor needs
 into its model and writes a layout beside it; the engine plays walk, run or swim by the actor's real speed,

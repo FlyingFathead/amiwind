@@ -21,6 +21,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Symptom
 
 The maintainer reported missing objects, including Dwemer ruins, in the v0.0.36 CHIM coast. The roadmap previously named this issue without a canonical report page or register row. This report preserves the original ID.

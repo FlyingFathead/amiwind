@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+
 ## Symptom
 
 Pinning one of Vivec's giant mushrooms with `dbg hud on` shows "class/name: worldspawn / unnamed, source id:

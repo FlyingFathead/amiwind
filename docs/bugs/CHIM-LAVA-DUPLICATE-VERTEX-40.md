@@ -21,6 +21,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 15 October 2026, v0.0.41 candidate: 50 focused lava/polygon/terrain checks
 and 47 emulator preset/launcher checks pass. Both original failing chunks pass
 coverage against the unchanged cached geometry. Full combined-world, exact

@@ -1,7 +1,6 @@
 # Seyda Neen subdivision and Balmora follow-up
 
-30 September 2026. Delivered dev3 artifacts remain unchanged. This record
-separates reported symptoms, inspected causes, corrections and remaining limits.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +17,9 @@ separates reported symptoms, inspected causes, corrections and remaining limits.
 - [Validation and limits](#validation-and-limits)
 
 <!-- contents end -->
+
+30 September 2026. Delivered dev3 artifacts remain unchanged. This record
+separates reported symptoms, inspected causes, corrections and remaining limits.
 
 ## Accepted dev3 behavior
 

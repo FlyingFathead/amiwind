@@ -1,5 +1,7 @@
 # Checkpoint-012: first actors and scaled movement
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 Runtime **v0.0.12-dev1**, public pipeline **0.9.0.dev1**, 27 September 2026.
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 

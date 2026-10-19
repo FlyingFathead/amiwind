@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 ## Status: 19 October 2026
 
@@ -47,7 +47,7 @@ every island. Three things kept it at 1,193 of 1,436:
 - the 144 land cells of Solstheim were in the denominator, although no build covers that island yet;
 - 99 seabed cells with a LAND record were measured as empty sea by an earlier CHIMport run; that result sets the cell
   to "not converted, empty sea", so the build carrying the cell did not count;
-- the 98 seabed cells without a LAND record and the 19 open-ocean cells the build carries are not land, so the line
+- the 98 seabed cells whose LAND record has no heights and the 19 open-ocean cells the build carries are not land, so the line
   could never show them.
 
 The figure had stood at 1,193 since v0.0.43-dev1, the first build with every Vvardenfell land cell, so new builds did
@@ -76,8 +76,9 @@ islands". The older inputs (CHIMport results, audit files, the legacy progress t
 
 The real ingest of the v0.0.44-dev1 world (tracker commit of this repair) prints: on CHIM 1,409 cells, Vvardenfell
 land 1,292 of 1,292 (100 %) plus 117 sea cells, Solstheim 0 of 144. 1,292 is every Vvardenfell cell with a LAND
-record (1,132 region land cells, 61 town-frame cells, 99 seabed cells with a LAND record); 117 = 98 seabed cells
-without a LAND record and 19 open-ocean cells. Earlier builds read 1,253 (v0.0.43-dev2), 1,215 (v0.0.43-dev1) and
+record that has terrain heights (1,132 region land cells, 61 town-frame cells, 99 empty land cells under the sea);
+117 = 98 seabed cells whose LAND record has no heights and 19 open-ocean cells (corrected 19 October 2026,
+[DOCS-CELL-COUNTS-44](DOCS-CELL-COUNTS-44.md); every count: [what we count](../chim/CELL_TRACKER.md#what-we-count)). Earlier builds read 1,253 (v0.0.43-dev2), 1,215 (v0.0.43-dev1) and
 1,171 (v0.0.42) land cells. New tests in tests/test_cell_progress.py (`OnChimTests`): a synthetic build with 25 CHIM
 cells counts 25 (24 land, 1 sea; the second island is not mixed in), a cell an older CHIMport run called empty sea
 still counts when the build carries it, and the page shows the build figure.
@@ -104,6 +105,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [CHIMPORT-DOOR-MARKER-AUDIT-36](CHIMPORT-DOOR-MARKER-AUDIT-36.md): The CHIMport door audit counted marker DOOR records (PrisonMarker) as missing door links: 6 cells failed door_links, Seyda Neen among them
 - [CHIMPORT-STATUS-STALE-41](CHIMPORT-STATUS-STALE-41.md): The CHIM regions preflight refuses cells on old CHIMport audits without saying how old they are or how to measure them again
 - DOC-STATE-01 (no report page): Published release documentation retained stale candidate/current-version claims
+- [DOCS-CELL-COUNTS-44](DOCS-CELL-COUNTS-44.md): Cell counts in the docs and tracker are stated without saying what they count
 - [DOCS-CHANGELOG-STALE-39](DOCS-CHANGELOG-STALE-39.md): Maintained changelog stops at v0.0.35 while current development reaches v0.0.39-rc1
 - [DOCS-CHIM-PROGRESS-STALE-38](DOCS-CHIM-PROGRESS-STALE-38.md): Main README CHIM progress map still shows the v0.0.36 snapshot
 - [DOCS-DEAD-ANCHORS-32](DOCS-DEAD-ANCHORS-32.md): Seven documentation links point at headings that no longer exist

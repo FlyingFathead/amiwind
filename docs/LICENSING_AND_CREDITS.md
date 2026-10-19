@@ -1,6 +1,6 @@
 # Licensing, provenance and credits
 
-**Last updated:** 16 October 2026 (Europe/Helsinki).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +15,8 @@
 - [Proposed bundled QCC](#proposed-bundled-qcc)
 
 <!-- contents end -->
+
+**Last updated:** 16 October 2026 (Europe/Helsinki).
 
 **All AmiWind code is free and open source under the GNU General Public
 License (GPL). Different parts use different GPL versions, as described below.**

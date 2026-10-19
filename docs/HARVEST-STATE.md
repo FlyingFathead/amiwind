@@ -1,5 +1,7 @@
 # Persistent harvest state
 
+_Last updated with AmiWind v0.0.29-dev4 (6 October 2026)._
+
 The v0.0.29-dev4 source candidate gives harvestable placements a dedicated
 state store. It holds up to **4,096 original placement facts**, separately from
 the 32-entry global/quest tables. Inventory still has its existing 32 item-type

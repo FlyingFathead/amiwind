@@ -18,6 +18,23 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Symptom
 The full v0.0.43-dev3 build (run 2026_10_18_v0.0.43-dev3_full-batch5_0f8bbae) passed every stage, but its perf guard
 failed one section: the image step's stair walk (`walk_unit`) kept 45 % of its cores busy, against 95 % in the
@@ -27,8 +44,12 @@ recorded baseline for the same kind of work.
 Image step stair walk (`tools/stair_walk.py`), section `walk_unit`.
 
 ## How it happened
-Unknown yet. dev3 is the first build with every exterior cell on CHIM, so the stair walk had many more maps and
-units to hand out than the baseline build.
+Measured 19 October 2026 (BUILD-CHIM-SERIAL-SECTIONS-44): a tail. The dev3 build's timeline shows the walk at 16 of 16
+cores for about 97 s, then 5, 4, 2 and finally 1 core for about 165 s, while its parent process used 4.7 CPU seconds:
+nothing waited on the parent. Every map is cut into units of up to 128 steps and ramps, handed out largest first by
+the slice length times the map's file size; a heavy room walks about a second a step (failed and untestable steps
+probe further), so a few 128-step units of such rooms ran for minutes, alone, after every other unit had finished.
+The memory or the allowance was not the bound (the image stage held 16 of 16 throughout).
 
 ## Why it was not caught
 The perf guard caught it at the end of the build; there is no earlier per-section check of the stair walk's core use.
@@ -37,11 +58,18 @@ The perf guard caught it at the end of the build; there is no earlier per-sectio
 Always, on a full build with the dev3 cell list.
 
 ## Repair
-Open. Planned for v0.0.43-dev4: measure the unit sizes and the scheduling of the walk units, then keep every core busy.
+On branch v0.0.44-serial, 19 October 2026 (`tools/stair_parallel.py`): each walked map's walk is estimated from the
+seconds it took in earlier builds (cost history `image-stair-walk`, map name -> seconds, recorded by every walk;
+without one, its size times its steps as before, scaled to seconds by the maps that have both), and a heavy map is
+cut into shorter units (down to 4 steps) so that no unit costs much more than the walk's total over 16 units a
+worker; units are handed out largest first by that estimate. The rows, the report and the stored records are the
+same for any cut (the unit walk's rows are the whole-map walk's).
 v0.0.43-dev3 ships with this as a known issue by maintainer decision (the image itself is unaffected).
 
 ## Verification
-Pending: the next full build's perf guard passes the `walk_unit` section.
+The dev3 image's 205 maps (72,229 steps and ramps) walked with 16 workers on a busy host: before 215-238 s (7.6 cores);
+after, the first walk (no history yet) 232 s, the next one with its history 156 s at 12.6 cores; the four reports
+have the same SHA-256. Pending: the next full build's perf guard passes the `walk_unit` section.
 
 ## Prevention
 The perf guard already fails the build on this regression; the fix adds the same check while the stair walk runs.
@@ -55,6 +83,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [AW-CONCURRENT-BUILDS-OVERSUBSCRIBE-36](AW-CONCURRENT-BUILDS-OVERSUBSCRIBE-36.md): Concurrent master-builder builds oversubscribe the machine: a gate step fails with 'cp: Cannot allocate memory'
 - [AW-LEASE-MEMORY-DEADLOCK-36](AW-LEASE-MEMORY-DEADLOCK-36.md): Memory leases deadlocked builds: a 44 GiB build never fit while any gate held its 6 GiB, so builds queued for hours
 - [AW-LEASE-NO-GROW-36](AW-LEASE-NO-GROW-36.md): A running build's core lease did not grow back when gates ended, and its worker pools never grow
+- [BUILD-BODY-BAKE-SLOWER-44](BUILD-BODY-BAKE-SLOWER-44.md): The image step's player body bake ran 42 % slower than its baseline with the same 40 bodies
 - [BUILD-CACHE-ABSOLUTE-PATHS-33](BUILD-CACHE-ABSOLUTE-PATHS-33.md): Stage fingerprints contain absolute paths, so a moved workspace or checkout reuses nothing
 - [BUILD-CACHE-CHIM-UNITS-33](BUILD-CACHE-CHIM-UNITS-33.md): The chim stage's fingerprint changes whenever the CHIM unit cache gains units, so the stage is never reused
 - [BUILD-CACHE-CLOSURE-WIDE-33](BUILD-CACHE-CLOSURE-WIDE-33.md): Stage fingerprints count every module any imported module could import, so unrelated edits rebuild most stages
@@ -64,7 +93,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
 - [BUILD-CHIM-REGION-FRAMES-TAIL-43](BUILD-CHIM-REGION-FRAMES-TAIL-43.md): The CHIM region-frame step runs its last frames on one worker while the other cores sit idle
-- BUILD-CHIM-SERIAL-SECTIONS-44 (no report page): The CHIM stage runs five sections on one core while units wait: visibility rows starve their workers
+- [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers
 - [BUILD-CHIM-SOURCE-REPEAT-41](BUILD-CHIM-SOURCE-REPEAT-41.md): The CHIM stage parsed the whole master and read the same models again for every area: 723 source stages took 24,500 CPU seconds
 - [BUILD-CHIM-STAGE-IDLE-START-36](BUILD-CHIM-STAGE-IDLE-START-36.md): The chim stage of the 270-frame coast build spends its first 35-45 minutes on 1-4 cores while it holds 12-24 workers
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build)

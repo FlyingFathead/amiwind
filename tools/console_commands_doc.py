@@ -11,6 +11,7 @@ Usage:
   console_commands_doc.py check    fail if the page is out of date
   console_commands_doc.py sort     sort the catalogue: each group once, entries alphabetical
 """
+import re
 import sys
 from pathlib import Path
 
@@ -64,13 +65,31 @@ def esc(text):
     return text.replace('|', '\\|')
 
 
-def render(text):
+STAMP_RE = re.compile(r'^_Last updated with AmiWind v[0-9][^\n]*\._$', re.M)
+
+
+def page_stamp(page):
+    """The page's own "_Last updated with AmiWind vX (date)._" line, or None."""
+    match = STAMP_RE.search(page or '')
+    return match.group(0) if match else None
+
+
+def new_stamp(today=None):
+    """A stamp for a page regenerated now: the source's VERSION and the host date (every public page carries one,
+    a changed page gets a new one; maintainer 2026-10-18 / 2026-10-19)."""
+    import datetime
+    today = today or datetime.date.today()
+    version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+    return '_Last updated with AmiWind v%s (%d %s %d)._' % (version, today.day, today.strftime('%B'), today.year)
+
+
+def render(text, stamp=None):
     groups = {}
     for group, words, handler, help_text in entries(text):
         cmds = groups.setdefault(group, {})
         cmd = cmds.setdefault(handler, {'words': [], 'help': help_text})
         cmd['words'].append(words)
-    out = ['# AmiWind console commands', '',
+    out = ['# AmiWind console commands', ''] + ([stamp, ''] if stamp else []) + [
            'Open the console with F10 or the backquote key and type',
            'a command, for example `dbg headlamp on`. This page is generated from',
            '`config/debug-commands.txt`, the catalogue the game itself reads, by',
@@ -100,11 +119,16 @@ def main(argv=None):
         CATALOGUE.write_bytes(sorted_text(text).encode('utf-8'))
         print('sorted', CATALOGUE.relative_to(ROOT))
         return 0
-    page = render(CATALOGUE.read_text(encoding='utf-8'))
+    catalogue = CATALOGUE.read_text(encoding='utf-8')
+    current = PAGE.read_text(encoding='utf-8') if PAGE.is_file() else ''
+    stamp = page_stamp(current)
+    page = render(catalogue, stamp)
+    if argv == ['render'] and current != page:
+        page = render(catalogue, new_stamp())   # the commands changed (or no stamp yet): a new stamp
     if argv == ['check']:
-        current = PAGE.read_text(encoding='utf-8') if PAGE.is_file() else ''
-        if current != page:
-            print('docs/AMIWIND_CONSOLE_COMMANDS.md is stale: run tools/console_commands_doc.py render', file=sys.stderr)
+        if stamp is None or current != page:
+            print('docs/AMIWIND_CONSOLE_COMMANDS.md is stale or has no "Last updated" line: run '
+                  'tools/console_commands_doc.py render', file=sys.stderr)
             return 1
         print('console command page ok')
         return 0

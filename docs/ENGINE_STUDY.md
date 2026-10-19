@@ -1,5 +1,7 @@
 # Doom, DoomAttack and AmiQuake rendering study
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 Reviewed 27 September 2026. These are useful examples of software 3D on Amiga.
 The goal is to adapt useful techniques to the 68000/OCS experiment and an
 expanded 040/FPU/AGA renderer. The latter is an accepted option, not yet tested. No code or binaries from these projects are included here.

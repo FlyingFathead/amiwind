@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.40 (15 October 2026)._
+
 ## Status: 11 October 2026
 
 Open. Planned repair below. No earlier register entry covers compiler warnings beyond the gate's flags, so this is a

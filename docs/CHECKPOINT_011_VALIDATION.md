@@ -1,5 +1,7 @@
 # Checkpoint-011 — v0.0.11-dev4 / source 0.8.3.dev4
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 27 September 2026. Focused repair of a blocked fresh-boot player spawn.
 NPC conversion research is saved; NPCs are not in this playable image yet.
 

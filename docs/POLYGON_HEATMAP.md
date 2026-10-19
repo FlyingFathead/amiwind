@@ -1,5 +1,7 @@
 # Polygon density, cells and town subcells
 
+_Last updated with AmiWind v0.0.32-dev1 (8 October 2026)._
+
 `tools/generate_polygon_heatmap.py` takes **user-provided converted BSP29 assets**
 and creates a self-contained private HTML viewer plus optional numeric JSON.
 Convert your own legally obtained game data with AmiWind first. This tool does

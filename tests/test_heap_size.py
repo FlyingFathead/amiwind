@@ -181,6 +181,46 @@ class StartArgumentTests(unittest.TestCase):
         self.assertNotIn('cannot allocate the 11 MiB', text)
 
 
+@unittest.skipUnless(shutil.which('cc'), 'host C compiler required')
+class AutoHeapTests(unittest.TestCase):
+    """The heap grown into spare Fast RAM (aw_heapsize.c, ENGINE-HEAP-FIXED-SIZE-43): 16 MiB keeps the built
+    11 MiB exactly; a large machine grows it by a quarter of the room beyond it, to 24 MiB; -heapmb and
+    aw_autoram 0 win."""
+
+    def run_auto(self, *cases):
+        harness = ('#include <stdio.h>\n#include "aw_heapsize.h"\n'
+                   'int main(int argc,char **argv){int i,g;for(i=1;i+4<argc+1;i+=5){'
+                   'int h=AW_HeapAuto(atoi(argv[i]),atoi(argv[i+1]),strtoul(argv[i+2],0,10)*1048576UL,'
+                   'strtoul(argv[i+3],0,10)*1048576UL,atoi(argv[i+4]),&g);printf("%d %d\\n",h,g);}'
+                   'printf("off %d %d %d\\n",AW_HeapAutoOff("bind x y\\naw_autoram \\"0\\"\\n"),'
+                   'AW_HeapAutoOff("aw_autoram \\"1\\"\\n"),AW_HeapAutoOff("seta xaw_autoram \\"0\\"\\n"));return 0;}\n')
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / 'auto.c'
+            source.write_text('#include <stdlib.h>\n' + harness)
+            binary = Path(tmp) / 'auto'
+            subprocess.run(['cc', '-std=c99', '-Wall', '-Werror', '-I', str(ROOT / 'engine/aga/src'), '-o', str(binary),
+                            str(source), str(ROOT / 'engine/aga/src/aw_heapsize.c')], check=True)
+            args = [str(v) for case in cases for v in case]
+            return subprocess.run([str(binary), *args], capture_output=True, text=True, check=True).stdout.split('\n')
+
+    def test_sizes(self):
+        out = self.run_auto(
+            (11, 0, 14, 16, 0),     # 16 MiB board, 14 free: the built heap, not grown
+            (11, 0, 15, 16, 0),
+            (11, 0, 26, 32, 0),     # 32 MiB: room 26 - 6 = 20 < 19? no: 20 >= 19 -> 11 + 9/4 = 13
+            (11, 0, 113, 128, 0),   # 128 MiB: room 95 -> 11 + 21 = 32, at most 24
+            (11, 12, 113, 128, 0),  # -heapmb 12: as asked
+            (11, 0, 113, 128, 1),   # aw_autoram 0
+            (11, 0, 2000, 2048, 0))
+        self.assertEqual(out[:7], ['11 0', '11 0', '13 1', '24 1', '12 0', '11 0', '24 1'])
+        self.assertEqual(out[7], 'off 1 0 0')
+
+    def test_wired_into_the_start(self):
+        text = (ROOT / 'engine/aga/src/sys_amiga.c').read_text(encoding='utf-8')
+        self.assertIn('heap_mb = AW_HeapAuto(AMIWIND_HEAP_MB, 0, AvailMem(MEMF_FAST|MEMF_LARGEST),', text)
+        self.assertIn('aw_heapsize.c', (ROOT / 'engine/aga/Makefile').read_text())
+
+
 class BuilderHeapOptionTests(unittest.TestCase):
     def test_cli_beats_the_build_config_beats_the_engine_default(self):
         import build

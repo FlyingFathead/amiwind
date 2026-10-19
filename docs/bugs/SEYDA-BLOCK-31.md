@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Status: 7 October 2026
 
 Open. Maintainer report from the v0.0.31-dev3 playtest; cause unknown.

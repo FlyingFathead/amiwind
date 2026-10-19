@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 ## Symptom
 
 On 17 October 2026 the maintainer, playing v0.0.42-dev1 at night under Masser, asked whether the small star
@@ -131,6 +133,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [OPENING-BRIGHT-31](OPENING-BRIGHT-31.md): The prison ship hold is brighter than the original
 - [OPENING-JIUB-LANTERN-32](OPENING-JIUB-LANTERN-32.md): The lantern above Jiub gives no warm light and hides its candle
 - SKY-MIDNIGHT-29 (no report page): Dense clouds still hide the midnight sky
+- [SKY-REDMOUNTAIN-BLUE-44](SKY-REDMOUNTAIN-BLUE-44.md): Inside the Ghostfence at Red Mountain the sky and horizon are clear blue instead of the region's red ash weather
 - [TERRAIN-LIGHT-UNIFORM-32](TERRAIN-LIGHT-UNIFORM-32.md): Open-world terrain lightmaps are nearly uniform
 - TORCH-LIGHT-29 (no report page): Torch flames look weak and provide little immediate light
 - TORCH-NPC-LIGHT-29 (no report page): Nearby NPCs do not visibly respond to torchlight

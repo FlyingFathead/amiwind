@@ -1,5 +1,7 @@
 # Seyda Neen interiors — v0.0.23-dev2
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 29 September 2026. All thirteen town interiors are converted, plus the separate
 prison ship and Addamasartus. The expanded exterior retains the port approach and
 scenery whose full bounds intersect the selected area, including the previously

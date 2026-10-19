@@ -1,5 +1,7 @@
 # Complete media import and coverage
 
+_Last updated with AmiWind v0.0.29-dev4 (6 October 2026)._
+
 Normal AGA builds run a complete media stage alongside scene preparation. It
 imports available sound files, including voice recordings not referenced by the
 installed masters, converts the installed soundtrack, and converts all installed

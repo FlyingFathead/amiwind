@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
 ## Status: 7 October 2026
 
 Open. Cause found in source and measured in the shipped prison ship map.

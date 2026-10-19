@@ -1,5 +1,7 @@
 # AmiWind v0.0.6 / checkpoint-005 validation
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Tested 27 September 2026. Source release 0.7.0. This checkpoint changes playlist
 selection and adds host scenery conversion. The native renderer remains the
 A500 terrain renderer; no expanded-Amiga or native-scene performance is claimed.

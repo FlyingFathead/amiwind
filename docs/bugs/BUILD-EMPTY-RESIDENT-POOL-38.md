@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Symptom
 
 An exterior-only MiniWind build stops with max_workers must be greater than 0 after CHIM conversion passes.

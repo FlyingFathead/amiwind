@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Symptom
 
 Status separators displayed as mojibake, and the Local view button displayed a broken arrow before its label.

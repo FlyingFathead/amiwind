@@ -21,7 +21,7 @@
 
 <!-- END GENERATED FACTS -->
 
-15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See [development preparation](../RELEASE-v0.0.41-dev1.md).
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -39,6 +39,8 @@
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+15 October 2026: active preparation now targets v0.0.41-dev1. The planned final release title is **v0.0.41: Collisions And Boundaries**. Earlier source snapshots, checks and findings retain their recorded version identities; they do not establish acceptance of this development candidate. Matching source validation, completed image assembly/readback, native checks, packaging and delivery remain separate gates. See [development preparation](../RELEASE-v0.0.41-dev1.md).
 
 ## Symptom and location
 

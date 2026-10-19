@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Symptom
 The v0.0.41-dev5 build stopped at the end of its CHIM stage, after 1 h 35 min. The stair gate found two
 flight steps it cannot walk. Both are the same step, the top step of a walkway stair in Vos, walked in the

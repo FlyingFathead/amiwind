@@ -1,5 +1,7 @@
 # v0.0.25-dev1 feedback and v0.0.25-rc1 work
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Maintainer reports, 1 October 2026. Candidate name: **v0.0.25-rc1**.
 These are acceptance requirements; an item is not fixed merely because it is listed.
 

@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Status: 8 October 2026
 
 Fixed in source on v0.0.33-dev with the stair work ([COLLISION-STAIR-SLOPE-32](COLLISION-STAIR-SLOPE-32.md)),

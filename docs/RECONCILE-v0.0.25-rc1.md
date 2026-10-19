@@ -1,5 +1,7 @@
 # Reconciled v0.0.25-rc1 source
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Combines the original rc1 candidate with recovery checkpoint 006. Original
 archives remain unchanged. This is a source handoff for local compilation;
 no native executable or private HDF is delivered for this combined source.

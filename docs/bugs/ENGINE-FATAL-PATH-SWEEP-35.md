@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Status: 10 October 2026
 
 The record of the sweep. The paths that shipped data or a player can reach are fixed in source on

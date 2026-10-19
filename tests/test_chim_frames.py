@@ -109,6 +109,34 @@ class MultiFrameTests(unittest.TestCase):
         frames = [c.get('frame') for c in m['cameras']]
         self.assertEqual(frames, [[0, 0], [2, 0], None])
 
+    def test_visibility_report_on_the_workers_equals_one_worker(self):
+        # BUILD-CHIM-SERIAL-SECTIONS-44: one frame's rows per worker task, the same report
+        from chim.validate import visibility_report
+        fails, world = validate(self.out, self.source)
+        self.assertEqual(visibility_report(world, 2), visibility_report(world, 1))
+
+    def test_load_world_on_the_workers_reads_the_same_world(self):
+        # BUILD-CHIM-SERIAL-SECTIONS-44: the frame files read on the worker pool give the same frames, failures and
+        # order as one after another, for a sound world and for one with a damaged chunk entry
+        import shutil
+        from chim.validate import Failures, load_world
+        for damage in (False, True):
+            with tempfile.TemporaryDirectory() as tmp, self.subTest(damage=damage):
+                out = Path(tmp) / 'w'
+                shutil.copytree(self.out, out)
+                if damage:
+                    sector = sorted((out / 'chim').rglob('s*.ccs'))[0]
+                    data = bytearray(sector.read_bytes())
+                    data[-9] ^= 0x5A                      # a byte inside the last record (its CRC no longer matches)
+                    sector.write_bytes(bytes(data))
+                serial_fails, pooled_fails = Failures(), Failures()
+                serial = load_world(out, serial_fails, 1)
+                pooled = load_world(out, pooled_fails, 2)
+                self.assertEqual(list(pooled_fails), list(serial_fails))
+                self.assertEqual(pooled, serial)
+                if damage:
+                    self.assertTrue(serial_fails)
+
     def test_stats_split_disk_by_area(self):
         from chim.stats import chim_stats
         fails, world = validate(self.out, self.source)
@@ -118,6 +146,11 @@ class MultiFrameTests(unittest.TestCase):
         areas = s['disk']['areas']
         self.assertEqual(sum(a['chim_bytes'] for a in areas.values()) + s['disk']['index_bytes'], s['disk']['bytes'])
         self.assertEqual(areas['west']['chim_files'], areas['east']['chim_files'])
+        # BUILD-CHIM-SERIAL-SECTIONS-44: one frame's resident rings per worker, the same document
+        from chim.stats import dumps
+        pooled = chim_stats(world, m, dict(self.receipt, areas=['west', 'east']), ['west', 'east'],
+                            source=self.source, jobs=2)
+        self.assertEqual(dumps(pooled), dumps(s))
 
     def test_overlapping_or_duplicate_frames_are_refused(self):
         near = dict(self.b, frame=dict(self.b['frame'], centre=(CENTRE[0] + 1000, CENTRE[1])))

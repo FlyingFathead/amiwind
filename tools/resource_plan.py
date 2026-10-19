@@ -1047,6 +1047,7 @@ class MemoryGovernor:
         self.log = log or (lambda line: print(line, flush=True))
         self.reader = reader or (lambda: (cgroup_memory(self.root), cgroup_threads(self.root)))
         self.at, self.value, self.changes, self.base, self.start_quota = None, None, [], None, None
+        self.room_at, self.room = None, None       # admits(): the memory room of per-unit admission
 
     def _compute(self, in_flight):
         (limit, used, cache), quota = self.reader()
@@ -1073,6 +1074,36 @@ class MemoryGovernor:
                 allowed = by_quota
                 reasons.append('CPU quota lowered %d -> %d threads' % (self.start_quota, quota))
         return max(1, allowed), '; '.join(reasons) or 'no container limits'
+
+    def admits(self, in_flight_mib, unit_mib, in_flight=0, reserve_mib=0.0):
+        """Per-unit admission (BUILD-CHIM-SERIAL-SECTIONS-44): may a unit of about UNIT_MIB start beside the units in
+        flight (IN_FLIGHT of them, IN_FLIGHT_MIB together at their planned sizes)? Room = (limit - other) x HEADROOM,
+        other = what the container holds besides those units (re-read every interval, never less than with no unit
+        in flight); RESERVE_MIB is kept free for a larger unit waiting at the head of the queue. With nothing in
+        flight a unit always starts. The pool used to size every unit as its largest (the v0.0.44-dev1 stair gate:
+        4 of 24 workers at 2,855 MiB each for frames that hold about 300 MiB)."""
+        if in_flight == 0:
+            return True
+        now = self.clock()
+        if self.room_at is None or now - self.room_at >= self.interval:
+            self.room_at = now
+            (limit, used, cache), _quota = self.reader()
+            room = None
+            if limit is not None and used is not None:
+                other = max(0.0, (used - cache) / MIB - in_flight_mib)
+                if self.base is None:
+                    self.base = other
+                other = max(other, self.base)
+                room = (limit / MIB - other) * HEADROOM
+                why = ('memory: limit %.1f GiB, %.1f GiB in use besides %d unit%s in flight (%.0f MiB planned), '
+                       'room %.0f MiB') % (
+                    limit / GIB, other / 1024., in_flight, '' if in_flight == 1 else 's', in_flight_mib, room)
+                if self.room is None or abs(room - self.room) >= 1024:
+                    self.changes.append({'room_mib': round(room), 'why': why})
+            self.room = room
+        if self.room is None:
+            return True
+        return in_flight_mib + float(unit_mib) + float(reserve_mib or 0.0) <= self.room
 
     def limit(self, in_flight=0):
         now = self.clock()

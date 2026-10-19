@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Status: 8 October 2026
 
 Open: fixed on the CHIM branch (v0.0.33-chim-format, commit 66d316b), not merged into the v0.0.32

@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Status: 11 October 2026
 
 Fixed in v0.0.36. Reported by the maintainer on 11 October 2026 from the v0.0.36-dev5 playtest build on FS-UAE; the cause was the map, not the world.

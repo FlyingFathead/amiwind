@@ -1,6 +1,6 @@
 # Cell-transition pauses and read-ahead investigation (v0.0.29-dev4)
 
-**Status: open.** The measured route still spends roughly 1.1 seconds in the transition-ready/presentation timing path. A bounded source candidate corrects one prediction error. A fresh native comparison improves prefix reuse but has mixed timing results; actual first-world-frame acceptance remains unmeasured. No overall speedup is claimed.
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +18,8 @@
 - [Scope clarification — 6 October 2026](#scope-clarification--6-october-2026)
 
 <!-- contents end -->
+
+**Status: open.** The measured route still spends roughly 1.1 seconds in the transition-ready/presentation timing path. A bounded source candidate corrects one prediction error. A fresh native comparison improves prefix reuse but has mixed timing results; actual first-world-frame acceptance remains unmeasured. No overall speedup is claimed.
 
 ## What was measured
 

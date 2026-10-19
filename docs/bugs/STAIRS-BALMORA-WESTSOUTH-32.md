@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Status: 9 October 2026
 
 Fixed in source on branch v0.0.33-stairs-2 (gate classification; not in a build yet). Not a stair

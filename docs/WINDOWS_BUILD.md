@@ -1,12 +1,6 @@
 # Windows build entry points and WSL notes
 
-**Linux is the established build baseline. Native Windows 11 building is
-experimental.** A complete conversion of the then-current recipe and verified HDF, followed by WinUAE game
-entry, passed on 2 October 2026 after correcting/retrying image assembly.
-See [the validation record](VALIDATION-WINDOWS-2026-10-02.md) for scope and timing.
-Intermittent Python worker failures remain open; this success does not establish
-that the Windows path is consistently reliable.
-See [known issues and recovery limits](#windows-build-and-known-issues).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -29,6 +23,14 @@ See [known issues and recovery limits](#windows-build-and-known-issues).
   - [Historical WinError 206: bounded Windows image commands implemented](#historical-winerror-206-bounded-windows-image-commands-implemented)
 
 <!-- contents end -->
+
+**Linux is the established build baseline. Native Windows 11 building is
+experimental.** A complete conversion of the then-current recipe and verified HDF, followed by WinUAE game
+entry, passed on 2 October 2026 after correcting/retrying image assembly.
+See [the validation record](VALIDATION-WINDOWS-2026-10-02.md) for scope and timing.
+Intermittent Python worker failures remain open; this success does not establish
+that the Windows path is consistently reliable.
+See [known issues and recovery limits](#windows-build-and-known-issues).
 
 After a failed Windows run, its logs and validated caches are worth keeping,
 and the next attempt uses a fresh run name. Compatible model-cache entries can

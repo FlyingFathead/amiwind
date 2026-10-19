@@ -1,11 +1,6 @@
 # Seyda Neen cell-crossing performance
 
-Seyda Neen is split into 64 overlapping sub-cell maps. Each crossing between
-sub-cells is a full map load, and those loads are the pause players feel when
-walking through the town. This page records how the crossings were measured,
-what a crossing consists of, and what each optimization changed. Numbers come
-from the scripted benchmark below; physical Amiga timings are not measured
-here and will differ.
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -19,6 +14,13 @@ here and will differ.
 - [Not changed](#not-changed)
 
 <!-- contents end -->
+
+Seyda Neen is split into 64 overlapping sub-cell maps. Each crossing between
+sub-cells is a full map load, and those loads are the pause players feel when
+walking through the town. This page records how the crossings were measured,
+what a crossing consists of, and what each optimization changed. Numbers come
+from the scripted benchmark below; physical Amiga timings are not measured
+here and will differ.
 
 ## Benchmark
 

@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 9 October 2026
 
 Open (maintainer playtest). The NPC voice receiver (attack, hit, flee lines) exists on the animation kit line, not in v0.0.33; the player's own hit voice is not implemented anywhere.

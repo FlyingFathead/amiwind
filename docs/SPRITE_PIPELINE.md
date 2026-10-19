@@ -1,5 +1,7 @@
 # Character sprite pipeline proposal
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 This is a design for future work. No character baker or sprite renderer is
 implemented in the current version. OpenMW is the intended host-side rendering
 foundation; its capture integration still needs to be built. See `OPENMW_BAKER.md`.

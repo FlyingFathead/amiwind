@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 
 On an emulated 68060 (FS-UAE 3.1.66, Kickstart 3.1), with the `68060.library` 43.1 and `mmu.library` 43.11 of

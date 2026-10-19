@@ -1,5 +1,7 @@
 # Face validation
 
+_Last updated with AmiWind v0.0.32-dev1 (8 October 2026)._
+
 `tools/check_faces.py` checks every face of every model of a BSP29 map as the
 engine reads it (`engine/aga/src/model.c`: `Mod_LoadFaces`, `Mod_LoadTexinfo`,
 `Mod_LoadSurfedges`, `CalcSurfaceExtents`; `r_draw.c` for winding). It is

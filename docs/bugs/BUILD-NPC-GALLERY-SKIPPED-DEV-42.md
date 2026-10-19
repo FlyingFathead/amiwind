@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 
 Development and playtest builds are made with `--no-npc-gallery`: the NPC gallery, a shipped feature, is not in

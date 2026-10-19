@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found while checking `dbg fog`; repaired in source, not yet packaged.

@@ -1,5 +1,7 @@
 # Intended host-to-Amiga build pipeline
 
+_Last updated with AmiWind v0.0.29 (6 October 2026)._
+
 ## Geometry import validation update: 2026-10-06T20:06:10+03:00
 
 The RC1 Temple investigation confirmed that nearly collinear leading vertices

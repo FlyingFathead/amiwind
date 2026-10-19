@@ -1,6 +1,6 @@
 # The CHIM progress map: what CHIMport is and what every colour means
 
-[CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](../bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -34,6 +34,8 @@
 - [Reproducing the current image](#reproducing-the-current-image)
 
 <!-- contents end -->
+
+[CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](../bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
 
 [CHIM-FRAME-STATIC-SEAM-40](../bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1: whole-world metadata binding failed because tutorial barrel reference 172851 lacked its original CELL, while the original audit records [-2,-9]. A narrow source correction restores only that missing field before capture, rejecting nonempty wrong cells and every other identity/transform mismatch. Fifty focused Seyda/ownership checks pass, including three new semantic regressions. The preceding 4,247-test full-suite pass remains historical; the repaired world is pending. The prepared Linux source kit is held and undelivered. Native, image/package and playtest acceptance remain pending; coverage states are unchanged.
 
@@ -197,7 +199,8 @@ the successful successor does not transfer acceptance to a later repair.
 
 ## What CHIMport is
 
-Morrowind's world is one big outdoor space made of square cells (Vvardenfell has 1,292 land cells, Solstheim 144).
+Morrowind's world is one big outdoor space made of square cells (Vvardenfell has 1,292 land cells, Solstheim 144; with its 98 sea-floor cells and 19 open-sea cells Vvardenfell's
+outdoors on CHIM is 1,409 cells, see [what we count](CELL_TRACKER.md#what-we-count)).
 AmiWind started by cutting that space into many small Quake maps, one per region, and loading them one at a time.
 **CHIMport** is the work of moving the whole island from those legacy Quake region maps onto CHIM, the project's
 own way of storing and streaming a world ([CHIM](README.md)). It goes cell by cell, **starting at the coast and
@@ -244,6 +247,11 @@ island. The documented problems for an open world are:
 
 The current README map uses the public reference generated **15 October 2026, 10:50 UTC**. The [cell tracker](CELL_TRACKER.md) records the matching audit
 totals and a separate package ledger. These figures describe Vvardenfell only.
+
+Update, 19 October 2026: the table below is that 15 October snapshot and is kept as it was. Since v0.0.43 every
+exterior cell of Vvardenfell is on CHIM; the current counts (1,390 cells with a LAND record, all audit-done, and
+1,409 cells on CHIM) are on the [cell tracker](CELL_TRACKER.md) and explained in
+[what we count](CELL_TRACKER.md#what-we-count).
 
 | Status | Cells | Included in audit milestone |
 | --- | ---: | --- |

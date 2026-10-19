@@ -1,5 +1,14 @@
 # WORLD-SLOPE-STUCK-38: Player reports being stuck beside Ashlands terrain
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.44-dev1 at 2026-10-19 15:12 +0300: maintainer: cannot move forward up Red Mountain, cell 2,7 (global 20773 60884 11506), terrain likely too steep for the walk limit
+- Reported with v0.0.44-dev1 at 2026-10-19 15:13 +0300: maintainer: second spot nearby, cell 2,7 (global 21067 60839 11315), facing north up a slope the original lets you walk; no target within 2048 units, so terrain itself
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -19,6 +28,8 @@
 | Platform or emulator | unknown (Emulator not identified.) |
 
 <!-- END GENERATED FACTS -->
+
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 ## Symptom
 Maintainer reports being stuck beside a steep terrain face; slope involvement is suggested, not established.

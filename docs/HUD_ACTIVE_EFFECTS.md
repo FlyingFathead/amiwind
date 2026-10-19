@@ -1,5 +1,7 @@
 # Active-effect HUD, icons and magic indicators
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 14 October 2026. Source findings and planned follow-up for v0.0.40. This document does not implement the effect grid, original icon conversion, selected-magic gameplay or the display diagnostic. The current HUD's interim artwork does not establish original visual parity. See the [HUD roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-maintainer-request-1-october-2026) and [HUD-STATS-29](bugs/HUD-STATS-29.md).
 
 ## How many effects can be active?

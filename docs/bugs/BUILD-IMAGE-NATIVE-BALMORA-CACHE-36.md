@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 10 October 2026
 
 Fixed in v0.0.36-dev3 (found in the v0.0.36-dev2 build, which was not shipped: its content went into v0.0.36-dev3).

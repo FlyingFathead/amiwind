@@ -1,9 +1,6 @@
 # Distant building shells ("outer mold")
 
-Status (8 October 2026): **prototype tool and measurements only.** Nothing
-here is in the game, the engine is unchanged, and no map ships a shell. The
-face budget below is a candidate, not a promise. The FPS effect is not
-measured yet (see the planned A/B at the end).
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +15,11 @@ measured yet (see the planned A/B at the end).
 - [Open questions](#open-questions)
 
 <!-- contents end -->
+
+Status (8 October 2026): **prototype tool and measurements only.** Nothing
+here is in the game, the engine is unchanged, and no map ships a shell. The
+face budget below is a candidate, not a promise. The FPS effect is not
+measured yet (see the planned A/B at the end).
 
 ## Why
 

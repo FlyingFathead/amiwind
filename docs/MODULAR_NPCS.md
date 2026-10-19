@@ -1,11 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-**Request (maintainer, 9 October 2026):** humanoid NPCs are built from shared body
-parts, the way Morrowind builds them, instead of one complete model per actor.
-Two reasons: the builder wastes most of its NPC time converting the same parts
-again and again, and looting or changing equipment must change an actor's
-appearance, which a model baked whole cannot do. The baked whole-actor models
-stay in the builder as a selectable method (comparison and fallback).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -32,6 +27,13 @@ stay in the builder as a selectable method (comparison and fallback).
 - [Reproducing the numbers](#reproducing-the-numbers)
 
 <!-- contents end -->
+
+**Request (maintainer, 9 October 2026):** humanoid NPCs are built from shared body
+parts, the way Morrowind builds them, instead of one complete model per actor.
+Two reasons: the builder wastes most of its NPC time converting the same parts
+again and again, and looting or changing equipment must change an actor's
+appearance, which a model baked whole cannot do. The baked whole-actor models
+stay in the builder as a selectable method (comparison and fallback).
 
 Tracked as [NPC-BAKED-WHOLE-DUPLICATION-33](bugs/NPC-BAKED-WHOLE-DUPLICATION-33.md).
 Builds on the [model cache](NPC_MODEL_CACHE.md) ("Next experiment: component

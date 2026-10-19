@@ -21,6 +21,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.40 (15 October 2026)._
+
 ## Symptom
 
 Nine launcher tests raise FileNotFoundError for the current-version FS-UAE preset.

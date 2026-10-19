@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.39 (14 October 2026)._
+
 ## Status: 10 October 2026
 
 Open: registered from the engine review, not changed yet.

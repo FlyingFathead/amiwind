@@ -1,5 +1,7 @@
 # Weather, ashstorms, blight and NPC reactions: OpenMW source study
 
+_Last updated with AmiWind v0.0.29-dev4 (6 October 2026)._
+
 This note records source behavior observed in OpenMW at the pinned mirror commit
 [`def941246531187d27cc8ceea8baf8b1894a994e`](https://github.com/OpenMW/openmw/commit/def941246531187d27cc8ceea8baf8b1894a994e), dated 5 September 2026.
 [OpenMWâ€™s canonical project](https://gitlab.com/OpenMW/openmw) is on GitLab; the code links

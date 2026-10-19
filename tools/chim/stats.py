@@ -27,6 +27,7 @@ SCHEMA = 'chim-stats 1'
 TOP = 20
 FACE_BYTES = 20                     # BSP29 dface_t
 FACES_LUMP = 7
+MODEL_GROUP = 256                   # models per worker task (model_facts)
 # The developers' benchmark cameras (docs/HARDWARE-BENCHMARK.md, "Frame time in the game"):
 # original Morrowind positions, by town id of config/towns.json.
 BENCHMARK_CAMERAS = {
@@ -91,43 +92,83 @@ def chunk_cell(frame, x, y):
     return (min(frame['nx'] - 1, max(0, int((lxp - lx) // g))), min(frame['ny'] - 1, max(0, int((lyp - ly) // g))))
 
 
-def resident_rings(world, model_tex):
-    """Per chunk as the player's chunk: what its ring needs resident (file bytes; engine
-    structures differ, the engine reports its own zone use): the ring's chunk records, the
-    distinct models its placements use and the distinct textures of those and of the ground."""
-    from asset_census import ring_offsets
-    settings = world['settings']
-    models, textures = world['models'], world['textures']
+def _frame_rings(task):
+    """Worker of resident_rings: one frame's rows. TASK: (ring offsets, {cell: (models, terrain textures, chunk
+    bytes)}, {model: (bytes, render bytes, textures)}, {texture: bytes})."""
+    offs, by_cell, models, textures = task
     rows = []
-    # every frame's chunks by cell, in one pass over the chunks (once per frame read every chunk of the world
-    # again: quadratic in a world of 726 frames, BUILD-CHIM-STAGE-SERIAL-TAIL-36); the same dicts
-    chunks_of = collections.defaultdict(dict)
-    for c in world['chunks']:
-        chunks_of[c['frame']][c['cell']] = c
-    for path, frame, _ in world['frames']:
-        by_cell = chunks_of[path]
-        offs = ring_offsets(frame['grain'], settings['draw_distance'] + settings['hysteresis'])
-        for cell in sorted(by_cell):
-            ring = [by_cell[k] for k in ((cell[0] + dx, cell[1] + dy) for dx, dy in offs) if k in by_cell]
-            mids = sorted({r['model'] for c in ring for r in c['records']})
-            tids = {t for c in ring for t in c['terrain_textures']} | {t for m in mids for t in model_tex[m]}
-            chunk_bytes = sum(c['render'] + c['collision'] for c in ring)
-            model_bytes = sum(models[m]['bytes'] for m in mids)
-            model_render = sum(models[m]['render'] for m in mids)
-            texture_bytes = sum(textures[t]['bytes'] for t in tids)
-            rows.append({'cell': list(cell), 'chunks': len(ring), 'models': len(mids), 'textures': len(tids),
-                         'chunk_bytes': chunk_bytes, 'model_bytes': model_bytes, 'model_render_bytes': model_render,
-                         'texture_bytes': texture_bytes, 'total_bytes': chunk_bytes + model_bytes + texture_bytes})
+    for cell in sorted(by_cell):
+        ring = [by_cell[k] for k in ((cell[0] + dx, cell[1] + dy) for dx, dy in offs) if k in by_cell]
+        mids = sorted({m for c in ring for m in c[0]})
+        tids = {t for c in ring for t in c[1]} | {t for m in mids for t in models[m][2]}
+        chunk_bytes = sum(c[2] for c in ring)
+        model_bytes = sum(models[m][0] for m in mids)
+        model_render = sum(models[m][1] for m in mids)
+        texture_bytes = sum(textures[t] for t in tids)
+        rows.append({'cell': list(cell), 'chunks': len(ring), 'models': len(mids), 'textures': len(tids),
+                     'chunk_bytes': chunk_bytes, 'model_bytes': model_bytes, 'model_render_bytes': model_render,
+                     'texture_bytes': texture_bytes, 'total_bytes': chunk_bytes + model_bytes + texture_bytes})
     return rows
 
 
-def chim_stats(world, measured, receipt=None, areas=None, legacy=None, cameras=(), top=TOP, source=None):
+def resident_rings(world, model_tex, jobs=1):
+    """Per chunk as the player's chunk: what its ring needs resident (file bytes; engine
+    structures differ, the engine reports its own zone use): the ring's chunk records, the
+    distinct models its placements use and the distinct textures of those and of the ground.
+    One frame per worker task with JOBS > 1 (BUILD-CHIM-SERIAL-SECTIONS-44); the same rows in the same order."""
+    from asset_census import ring_offsets
+    settings = world['settings']
+    models, textures = world['models'], world['textures']
+    # every frame's chunks by cell, in one pass over the chunks (once per frame read every chunk of the world
+    # again: quadratic in a world of 726 frames, BUILD-CHIM-STAGE-SERIAL-TAIL-36): what a ring row reads of them
+    chunks_of = collections.defaultdict(dict)
+    for c in world['chunks']:
+        chunks_of[c['frame']][c['cell']] = ([r['model'] for r in c['records']], c['terrain_textures'],
+                                            c['render'] + c['collision'])
+    tasks = []
+    for path, frame, _ in world['frames']:
+        by_cell = chunks_of[path]
+        offs = ring_offsets(frame['grain'], settings['draw_distance'] + settings['hysteresis'])
+        mids = {m for c in by_cell.values() for m in c[0]}
+        own = {m: (models[m]['bytes'], models[m]['render'], model_tex[m]) for m in mids}
+        tids = {t for c in by_cell.values() for t in c[1]} | {t for m in mids for t in model_tex[m]}
+        tasks.append((offs, by_cell, own, {t: textures[t]['bytes'] for t in tids}))
+    from build_parallel import ordered_map, stage_ceiling
+    jobs = stage_ceiling(jobs)
+    if jobs > 1 and len(tasks) > 1:
+        found = ordered_map(_frame_rings, tasks, min(jobs, len(tasks)), cost=lambda t: len(t[1]) * len(t[0]))
+    else:
+        found = map(_frame_rings, tasks)
+    return [row for rows in found for row in rows]
+
+
+def _model_facts(images):
+    """Worker: [(faces, texture refs)] of model images."""
+    return [(faces_of(image), F.read_texture_refs(F.read_brush_image(image)[2])) for image in images]
+
+
+def model_facts(models, jobs=1):
+    """([faces], [texture refs]) of every model, in groups of MODEL_GROUP on the worker pool with JOBS > 1."""
+    images = [m['image'] for m in models]
+    groups = [images[k:k + MODEL_GROUP] for k in range(0, len(images), MODEL_GROUP)]
+    from build_parallel import ordered_map, stage_ceiling
+    jobs = stage_ceiling(jobs)
+    if jobs > 1 and len(groups) > 1:
+        found = ordered_map(_model_facts, groups, min(jobs, len(groups)), cost=lambda g: sum(len(i) for i in g))
+    else:
+        found = map(_model_facts, groups)
+    facts = [fact for group in found for fact in group]
+    return [f[0] for f in facts], [f[1] for f in facts]
+
+
+def chim_stats(world, measured, receipt=None, areas=None, legacy=None, cameras=(), top=TOP, source=None, jobs=1):
     """The chim-stats document (schema SCHEMA) from a validated world (chim.validate.validate),
-    its measurements (chim.validate.measure), the builder receipt and today's region maps."""
+    its measurements (chim.validate.measure), the builder receipt and today's region maps. JOBS: the models' faces
+    and textures and the resident rings go to the worker pool (BUILD-CHIM-SERIAL-SECTIONS-44: about a minute on
+    one core in v0.0.44-dev1); the same document."""
     receipt = receipt or {}
     models, textures, chunks = world['models'], world['textures'], world['chunks']
-    model_faces = [faces_of(m['image']) for m in models]
-    model_tex = [F.read_texture_refs(F.read_brush_image(m['image'])[2]) for m in models]
+    model_faces, model_tex = model_facts(models, jobs)
     owned = [(c, r) for c in chunks for r in c['owned']]
     uses = collections.Counter(r['model'] for _, r in owned)
     # models
@@ -215,7 +256,7 @@ def chim_stats(world, measured, receipt=None, areas=None, legacy=None, cameras=(
                        duplication_factor=round(legacy['bytes'] / chim_bytes, 2) if chim_bytes else None)
         disk['areas'][name] = row
     # memory
-    rings = resident_rings(world, model_tex)
+    rings = resident_rings(world, model_tex, jobs)
     peak = max(rings, key=lambda r: (r['total_bytes'], r['cell'])) if rings else {}
     walk = measured.get('walk', {})
     memory = {'ring_chunks': walk.get('ring_chunks'),
@@ -277,11 +318,18 @@ def chim_stats(world, measured, receipt=None, areas=None, legacy=None, cameras=(
     return out
 
 
-def dumps(stats):
+# the document's long lists, encoded on the worker pool (tools/parallel_json.py: the same bytes)
+SPLIT = [('placements', 'rows'), ('chunks', 'per_chunk'), ('models', 'per_model')]
+
+
+def dumps(stats, jobs=1):
+    if jobs > 1:
+        import parallel_json
+        return parallel_json.dumps(stats, SPLIT, jobs=jobs) + '\n'
     return json.dumps(stats, indent=1, sort_keys=True) + '\n'
 
 
-def main(argv=None, world=None, measured=None):
+def main(argv=None, world=None, measured=None, jobs=1, source=None):
     """WORLD and MEASURED: a world chim.validate.report_world validated in this process and its measurements
     (chim_build passes them): the stats then reuse them instead of validating and measuring the world a second
     time; the benchmark cameras are measured on top (chim.validate.camera_report), as measure() would.
@@ -297,8 +345,10 @@ def main(argv=None, world=None, measured=None):
                     help='a view at this Morrowind position (repeatable; default: the area\'s benchmark cameras)')
     ap.add_argument('--json', type=Path, help='write here (default OUT/chim-stats.json)')
     a = ap.parse_args(argv)
-    src = a.source or (a.out / 'chim-source.json')
-    source = json.loads(src.read_text(encoding='utf-8')) if src.is_file() else None
+    if source is None or a.source:
+        # (chim_build passes the manifest its validation read: the same file)
+        src = a.source or (a.out / 'chim-source.json')
+        source = json.loads(src.read_text(encoding='utf-8')) if src.is_file() else None
     rec = a.receipt or (a.out / 'chim-receipt.json')
     receipt = json.loads(rec.read_text(encoding='utf-8')) if rec.is_file() else {}
     # The build figures moved beside the receipt (chim.build.TIMING_FILE; BUILD-OUTPUTS-NOT-REPRODUCIBLE-33).
@@ -327,9 +377,10 @@ def main(argv=None, world=None, measured=None):
         measured = measure(world, source, a.legacy_maps, a.legacy_regions, None, cameras)
     measured.get('walk', {}).pop('_replay', None)
     legacy = legacy_summary(a.legacy_maps, a.legacy_regions) if a.legacy_maps and a.legacy_regions else None
-    stats = chim_stats(world, measured, receipt, area_list or None, legacy, cameras, source=source)
+    stats = chim_stats(world, measured, receipt, area_list or None, legacy, cameras, source=source, jobs=jobs)
     target = a.json or (a.out / 'chim-stats.json')
-    target.write_bytes(dumps(stats).encode('utf-8'))
+    # its long lists encoded on the worker pool (parallel_json), the rest of the document here
+    target.write_bytes(dumps(stats, jobs).encode('utf-8'))
     print('chim-stats: %s (%d models, %d placements, %d chunks)' % (target, len(world['models']),
                                                                      stats['counts']['placements'], len(world['chunks'])))
     return 0

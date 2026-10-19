@@ -28,6 +28,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 13 October 2026
 
 Still reported in RC1. Earlier source-only repair claims did not establish the current packaged chase behavior.

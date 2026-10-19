@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+
 ## Status: 9 October 2026
 
 Repaired in source on v0.0.33-arena-combat, not yet in a build or gated. Found in the maintainer's playtest.

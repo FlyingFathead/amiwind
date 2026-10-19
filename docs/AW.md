@@ -1,9 +1,6 @@
 # aw: the master builder command line
 
-`tools/aw.py` is the first part of the master builder: one owner of the shared build
-state (gate numbers, worktrees, run names, results) so that several workers on one machine
-never pick the same gate number, never share a worktree by accident and never read a red
-gate as green. Python 3.10 or newer, standard library only, no game data.
+_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -19,6 +16,11 @@ gate as green. Python 3.10 or newer, standard library only, no game data.
 - [Perf database step](#perf-database-step)
 
 <!-- contents end -->
+
+`tools/aw.py` is the first part of the master builder: one owner of the shared build
+state (gate numbers, worktrees, run names, results) so that several workers on one machine
+never pick the same gate number, never share a worktree by accident and never read a red
+gate as green. Python 3.10 or newer, standard library only, no game data.
 
     python3 tools/aw.py [--config FILE] enter
     python3 tools/aw.py [--config FILE] gate --repo PATH [--commit C] [--reason R] [--range NAME] [--number N]

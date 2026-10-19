@@ -1,5 +1,7 @@
 # Third-party compilers and bundled QCC proposal
 
+_Last updated with AmiWind v0.0.25-rc6 (1 October 2026)._
+
 Status: design proposal recorded in v0.0.25-rc5, 1 October 2026. QCC is still
 installed outside the repository. No bundled source provider, provider switch
 or native Windows QCC patch is implemented in this checkpoint.

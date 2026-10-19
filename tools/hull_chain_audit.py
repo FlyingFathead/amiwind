@@ -120,9 +120,11 @@ def model_refs(entity_lump):
 
 
 def maps_in(paths):
+    """The maps named: files as given, folders as every x.bsp and CHIM frame map x.chim in them (tools/map_files.py)."""
+    from map_files import map_files
     out = []
     for p in map(Path, paths):
-        out += sorted(p.glob('*.bsp')) if p.is_dir() else [p]
+        out += map_files(p) if p.is_dir() else [p]
     return out
 
 

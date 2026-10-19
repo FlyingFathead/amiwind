@@ -1,7 +1,6 @@
 # Build AmiWind on Linux
 
-Since rc10 the builder can [reuse verified NPC models from earlier builds](NPC_MODEL_CACHE.md).
-Full gallery coverage and protected model quality are still required.
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -29,6 +28,9 @@ Full gallery coverage and protected model quality are still required.
 - [Quick test builds](#quick-test-builds)
 
 <!-- contents end -->
+
+Since rc10 the builder can [reuse verified NPC models from earlier builds](NPC_MODEL_CACHE.md).
+Full gallery coverage and protected model quality are still required.
 
 **The NPC gallery stays in every complete build.** Neither the NPC gallery
 nor the planned static-asset gallery is disabled, reduced or bypassed, and that
@@ -97,7 +99,7 @@ See [paper font options](PAPER_FONT_OPTIONS.md). This option changes bitmap read
 TTF/FNT source selection is automatic and independent of the worker limit.
 
 The exterior world pipeline is `--builder chim` (the default from v0.0.33, with
-the CHIM areas Balmora and Seyda Neen from `config/build-defaults.json`; name
+the CHIM areas Balmora, Seyda Neen and the whole city of Vivec from `config/build-defaults.json`; name
 others with one or more `--chim-area TOWN`) or `--builder legacy` (every
 exterior as region maps, as in v0.0.32 and earlier; still selectable and
 tested). Startup screen: a CHIM build shows "RPG engine powered by CHIM" under
@@ -112,8 +114,9 @@ A CHIM build ships no
 legacy exterior map of a CHIM area: the image step writes the town's CHIM frame
 maps, removes its legacy region maps and fails the build if any is still in the
 image (`build.json` `chim_world.legacy_check`). Extra towns that are not CHIM
-areas (the Vivec Arena) are left out of a CHIM image; the open world ships with
-the legacy builder's maps until it is on CHIM. A CHIM build with Seyda Neen
+areas (the Vivec Arena preview) are left out of a CHIM image. The open world between the towns was made of the
+legacy builder's maps until the regional CHIM builds; since v0.0.43 every exterior cell of Vvardenfell is a CHIM
+frame and no legacy exterior map is left in the image ([release notes](RELEASE-v0.0.43.md)). A CHIM build with Seyda Neen
 converts it from your data and checks its frame maps against the converted
 region maps; from v0.0.35 the recorded v0.0.31 Seyda Neen maps
 (`--seyda-recorded DIR`) are optional and NOT RECOMMENDED since v0.0.31 (legacy; the default converts

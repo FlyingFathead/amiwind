@@ -1,10 +1,6 @@
 # Disk space: Amiga limits and what CHIM saves
 
-AmiWind has to fit a whole Morrowind on classic Amiga disks. This page states
-the disk limits the builder enforces, why the legacy region maps ran out of
-room, what CHIM saves (measured on the first two towns, estimated for the
-island), and what the whole game is expected to weigh once everything is
-CHIM-optimized. Every number is marked as measured or estimated.
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -17,6 +13,12 @@ CHIM-optimized. Every number is marked as measured or estimated.
 - [Whole game on CHIM: size budget](#whole-game-on-chim-size-budget)
 
 <!-- contents end -->
+
+AmiWind has to fit a whole Morrowind on classic Amiga disks. This page states
+the disk limits the builder enforces, why the legacy region maps ran out of
+room, what CHIM saves (measured on the first two towns, estimated for the
+island), and what the whole game is expected to weigh once everything is
+CHIM-optimized. Every number is marked as measured or estimated.
 
 *AmiWind is an unofficial, experimental project. Not affiliated with or
 endorsed by Bethesda Softworks or ZeniMax.*

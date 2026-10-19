@@ -1,5 +1,7 @@
 # Disk image size: what is in the game image, and where it is going
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 This page explains the size of the AmiWind disk images, file group by file group, and how the CHIM engine
 brings the whole game down to a single partition.
 
@@ -67,7 +69,7 @@ Summing each cell's own files without sharing gives 2.6 GB for the whole island 
 bound, since a combined world stores shared assets once. The gap grows inland as more assets are shared (at about
 742 cells: 1,011 MiB combined against 1,388 MB summed per cell).
 
-The island has 1,292 exterior cells, and the cells get denser inland, so the size per cell grows. A projection from
+The island has 1,292 land cells ([what we count](chim/CELL_TRACKER.md#what-we-count)), and the cells get denser inland, so the size per cell grows. A projection from
 the combined rings, not yet measured, puts the whole island at about 1.8-2.2 GB. That is at the edge of one
 partition, and it is not yet proven to fit.
 

@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+
 ## Status: 11 October 2026
 
 Open. Found while taking evidence frames in a Balmora MiniWind sandbox; worked around with `noclip` and

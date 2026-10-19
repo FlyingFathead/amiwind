@@ -1,5 +1,7 @@
 # Mutable character equipment and shared assets
 
+_Last updated with AmiWind v0.0.40 (15 October 2026)._
+
 Fixed, complete outfits are an interim conversion representation, not the final
 character architecture. A complete game must support taking clothing and armour
 from a dead NPC, equipping and removing items, and restoring the resulting

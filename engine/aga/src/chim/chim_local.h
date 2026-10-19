@@ -33,6 +33,7 @@ typedef struct
 	FILE		*file;
 	long		base, bytes;
 	int			pins;
+	int			row;		/* its file-table row (Chim_File), -1: opened by path */
 	char		path[CHIM_PATH_CHARS+8];
 } chim_pack_t;
 
@@ -154,6 +155,7 @@ typedef struct
 	int				buffer_bytes;
 	unsigned long	bytes_read, reads, model_loads, texture_loads, chunk_loads;
 	unsigned long	streamed_models, failed_loads, opens;
+	unsigned long	prefetch_hits, prefetch_bytes;	/* the prefetch (chim_prefetch.c): reads served, bytes read ahead */
 	int				minor;			/* the world's format minor */
 } chim_world_t;
 
@@ -173,12 +175,28 @@ extern cvar_t	chim_debug;			/* 1: a console line per CHIM stage (map, prime, reb
 int Chim_PackOpen (chim_pack_t *pack, const char *relative);
 void Chim_PackClose (chim_pack_t *pack);
 int Chim_PackRead (chim_pack_t *pack, long offset, void *out, long bytes);
+int Chim_PackReadRaw (chim_pack_t *pack, long offset, void *out, long bytes);
 chim_pack_t *Chim_File (int row);
 long ChimStatics_AliasBytes (void);
 int Chim_FarOnly (void);
 void Chim_FilesClose (void);
 int Chim_FileRow (const char *kind, int cx, int cy, int sector);
 const char *Chim_FilePath (int row);
+
+/* chim_prefetch.c: read-ahead into spare Fast RAM (CHIM-CROSSING-SYNC-LOAD-43) */
+void ChimPrefetch_Init (void);
+void ChimPrefetch_Command (int argc, char **argv);
+void ChimPrefetch_SetOn (int on);
+int ChimPrefetch_Active (void);
+int ChimPrefetch_Read (int row, long offset, void *out, long bytes);
+void ChimPrefetch_Step (const vec3_t origin, int spare);
+void ChimPrefetch_MapBegin (void);
+void ChimPrefetch_Report (void);
+int ChimPrefetch_Owned (int row, unsigned *count);
+void ChimPrefetch_SetOwned (int row, unsigned count);
+int ChimPrefetch_Wanted (int i, int *cx, int *cy, int *state);
+long ChimPrefetch_Held (int *count);
+unsigned long ChimPrefetch_Passes (void);
 
 /* chim_models.c */
 void ChimModels_Init (void);

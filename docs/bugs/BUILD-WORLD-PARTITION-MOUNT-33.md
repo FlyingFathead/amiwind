@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Status: 9 October 2026
 
 Open, repair ready on branch `v0.0.33-world-partition`. Verified on a repacked copy of the dev1 world

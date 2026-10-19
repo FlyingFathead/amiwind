@@ -54,6 +54,8 @@ REASONS = {
     'tools/chim/units.py:run_units': 'blocks of one frame cut to about the same size (PVS_BLOCKS)',
     'tools/chim/world.py:frame_visibility': ('a generator in largest-first order of the frames\' own size: each '
                                              'layout is made when the pool asks for it (STREAM)'),
+    'tools/chim/world.py:frame_rows': ('a generator in largest-first order of the frames\' own size (placements and '
+                                       'chunks); each task makes its frame\'s layout and rows on the worker (STREAM)'),
     'tools/chim/zone_sim.py:walk': SORTED,
     'tools/entity_tracker.py:refs_by_map': UNIFORM,
     'tools/exterior_sky_build.py:configure_staged_maps': SORTED,
@@ -95,7 +97,8 @@ REASONS = {
     'tools/repair_balmora_maps.py:repair': FEW,
     'tools/seam_audit.py:audit': GATE,
     'tools/sky_palette_overlay.py:convert': 'batches cut to about the same size (_batches by sizes)',
-    'tools/stage_gallery.py:stage': UNIFORM,
+    'tools/rock_shell_audit.py:audit': LATER,
+    'tools/stage_gallery.py:greetings': UNIFORM,
     'tools/stair_records.py:_chim_part': SORTED,
     'tools/survey_vvardenfell.py:run': UNIFORM,
     'tools/world_estimate_data.py:scan_meshes': UNIFORM,

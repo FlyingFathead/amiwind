@@ -1,7 +1,6 @@
 # Build and compiler toolkit roadmap
 
-rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
-coverage and protected model quality remain mandatory.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -22,6 +21,9 @@ coverage and protected model quality remain mandatory.
 - [Mutable NPC equipment](#mutable-npc-equipment)
 
 <!-- contents end -->
+
+rc10 adds [verified persistent NPC model reuse](NPC_MODEL_CACHE.md). Full gallery
+coverage and protected model quality remain mandatory.
 
 **Outside approval is required for any exception affecting either gallery.**
 Neither the NPC gallery nor the upcoming static-asset gallery may be disabled,

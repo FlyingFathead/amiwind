@@ -1,5 +1,7 @@
 # Missing media references and separate video soundtracks
 
+_Last updated with AmiWind v0.0.29-dev4 (6 October 2026)._
+
 Status: investigation open, 5 October 2026. This supplements
 [complete media import](MEDIA_IMPORT.md). It records source references and
 validation tasks; it does not distribute game audio, video or dialogue.

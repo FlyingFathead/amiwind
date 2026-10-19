@@ -1,5 +1,7 @@
 # Hunter as an optimization study
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Inspiration suggested by the project maintainer:
 [Timo Heimonen's Hunter 68060 Performance Patch](https://github.com/timoheimonen/amiga-hunter-performance-68060).
 Reviewed its README, PATCH.md and changelog for version 1.1.0 on 27 September

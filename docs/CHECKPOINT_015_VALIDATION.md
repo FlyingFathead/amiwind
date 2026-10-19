@@ -1,7 +1,6 @@
 # Checkpoint-015: arrival ship and readable debug console
 
-Runtime **v0.0.14-dev1**, public pipeline **0.11.0.dev1**, 27 September 2026.
-Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +14,9 @@ Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 - [Remaining work](#remaining-work)
 
 <!-- contents end -->
+
+Runtime **v0.0.14-dev1**, public pipeline **0.11.0.dev1**, 27 September 2026.
+Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 
 ## Delivered scope
 

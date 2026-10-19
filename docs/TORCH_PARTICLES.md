@@ -1,5 +1,7 @@
 # Torch particles and light reach
 
+_Last updated with AmiWind v0.0.29-dev4 (6 October 2026)._
+
 The dev4 source candidate adds an optional first-person spark variant:
 
 ```text

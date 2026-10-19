@@ -28,6 +28,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Status: 9 October 2026
 
 Open. The worker pool is not wrong; the test needs a repair.

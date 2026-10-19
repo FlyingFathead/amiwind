@@ -1,8 +1,6 @@
 # Lava
 
-How AmiWind finds Morrowind's lava in your own game data and turns it into Quake liquid: the census, the map layer,
-the converter, and the engine side (damage, view tint, glow, embers). Tracked as
-[LAVA-NOT-IMPLEMENTED-33](bugs/LAVA-NOT-IMPLEMENTED-33.md).
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -17,6 +15,10 @@ the converter, and the engine side (damage, view tint, glow, embers). Tracked as
 - [On the world map](#on-the-world-map)
 
 <!-- contents end -->
+
+How AmiWind finds Morrowind's lava in your own game data and turns it into Quake liquid: the census, the map layer,
+the converter, and the engine side (damage, view tint, glow, embers). Tracked as
+[LAVA-NOT-IMPLEMENTED-33](bugs/LAVA-NOT-IMPLEMENTED-33.md).
 
 ## What Morrowind calls lava
 

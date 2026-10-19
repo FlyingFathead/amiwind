@@ -1,7 +1,6 @@
 # Balmora and opening regression investigation
 
-Development correction, 30 September 2026. The released v0.0.24-dev1 archives
-remain unchanged. Focused acceptance results and unresolved limits follow.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +14,9 @@ remain unchanged. Focused acceptance results and unresolved limits follow.
 - [Remaining work](#remaining-work)
 
 <!-- contents end -->
+
+Development correction, 30 September 2026. The released v0.0.24-dev1 archives
+remain unchanged. Focused acceptance results and unresolved limits follow.
 
 ## Missing Balmora facades: reproduced and isolated
 

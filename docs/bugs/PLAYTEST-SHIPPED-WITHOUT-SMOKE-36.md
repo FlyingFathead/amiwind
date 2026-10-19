@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Status: 11 October 2026
 
 Repaired in the flow (rule, automated check, merge rounds). Verified when the next playtest (v0.0.36-dev4) passes its

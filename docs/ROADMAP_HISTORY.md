@@ -1,7 +1,6 @@
 # Roadmap history: v0.0.29 and earlier
 
-The roadmap entries written up to the v0.0.29 release, kept as they were. The current roadmap is
-[ROADMAP.md](ROADMAP.md).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -137,6 +136,9 @@ The roadmap entries written up to the v0.0.29 release, kept as they were. The cu
 - [Original-cell coverage reporting - 15 October 2026](#original-cell-coverage-reporting---15-october-2026)
 
 <!-- contents end -->
+
+The roadmap entries written up to the v0.0.29 release, kept as they were. The current roadmap is
+[ROADMAP.md](ROADMAP.md).
 
 ## HARVEST-BITTERCOAST-29: one of three nearby mushrooms usable, 6 October 2026
 

@@ -1,5 +1,7 @@
 # AmiWind AGA runtime source
 
+_Last updated with AmiWind v0.0.30 (7 October 2026)._
+
 ## Default configuration comments
 
 Keep unquoted semicolons out of `//` comments in `config/game.cfg`: the command

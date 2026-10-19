@@ -1,5 +1,7 @@
 # Movement speed study
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 14 October 2026. Source analysis for v0.0.39 and the v0.0.40-dev1 candidate. Current status: [PLAYER-MOVEMENT-STATS-PARITY-39](bugs/PLAYER-MOVEMENT-STATS-PARITY-39.md) remains open. No movement setting or implementation is changed by this study.
 
 ## What the current defaults request

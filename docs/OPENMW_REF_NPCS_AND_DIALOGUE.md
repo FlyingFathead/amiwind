@@ -1,12 +1,6 @@
 # NPC appearance, greetings and dialogue study
 
-Status: checkpoint-013 adds facing/proximity Hello to checkpoint-012
-nonblocking idle actors. E remains a voice audition. Walking, full original
-dialogue filtering and quests are not implemented.
-The requested content includes Fargoth's missing-ring interaction and guard
-move-along greetings. Resolve their actual record IDs and conditions from the
-installation before implementation; do not assume a remembered phrase is a
-voiced line or invent a sound mapping for a text-only response.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +14,14 @@ voiced line or invent a sound mapping for a text-only response.
 - [Expanded host roster and activity work](#expanded-host-roster-and-activity-work)
 
 <!-- contents end -->
+
+Status: checkpoint-013 adds facing/proximity Hello to checkpoint-012
+nonblocking idle actors. E remains a voice audition. Walking, full original
+dialogue filtering and quests are not implemented.
+The requested content includes Fargoth's missing-ring interaction and guard
+move-along greetings. Resolve their actual record IDs and conditions from the
+installation before implementation; do not assume a remembered phrase is a
+voiced line or invent a sound mapping for a text-only response.
 
 ## References and observed behaviour
 

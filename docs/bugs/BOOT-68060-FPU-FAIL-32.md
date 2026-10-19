@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found by the FPU support library work (FS-UAE, Kickstart 3.1, JIT off).

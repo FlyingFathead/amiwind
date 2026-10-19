@@ -1,7 +1,7 @@
 {
   "schema": "chim-features 1",
   "chim_version": "0.2.1",
-  "updated": "2026-10-17",
+  "updated": "2026-10-19",
   "features": [
     {
       "id": "stored-once",
@@ -27,14 +27,14 @@
         },
         {
           "text": "Legacy layout: each exterior object is stored about 9.8 times (about 1.4 million copies of 143,147 placements over the island, about 20 GB of maps); CHIM stores each placement once",
-          "compared": "the whole-world estimate behind WORLD-REGION-DUPLICATION-31; the CHIM figure for the whole island comes with the open world on CHIM (milestone M4)",
+          "compared": "the whole-world estimate behind WORLD-REGION-DUPLICATION-31; the island-wide CHIM figure is not measured yet, although every exterior cell of Vvardenfell has been on CHIM since v0.0.43",
           "basis": "estimate",
           "date": "2026-10-08"
         }
       ],
       "gain_short": "7.62 times smaller for Balmora, 24.3 times for Seyda Neen",
       "caveats": [
-        "The island-wide CHIM size is not measured yet; only Balmora and Seyda Neen are built as CHIM worlds."
+        "The island-wide CHIM size is not measured yet; the measured figures are for Balmora and Seyda Neen, although every exterior cell of Vvardenfell is built as a CHIM world since v0.0.43."
       ],
       "vis": "Each placement is linked to the visibility leaves its box touches (Quake's efrags) and is drawn once, from its owner chunk, so the PVS still culls it. Sharing a model never turns it into a brush entity; placements over 16 leaves are counted by the validator.",
       "links": [
@@ -71,7 +71,7 @@
       "gain_note": "The gain is the disk figure of the entry above; the effect on build time of the legacy exterior chain is not measured yet.",
       "caveats": [
         "CHIM builds still run part of the legacy exterior chain (the open world, the Vivec Arena and Balmora's region maps) and record which stages and who reads them; moving the frame maps and town flora off that chain is still to do (CHIM-LEGACY-CHAIN-33).",
-        "The countryside between the towns still ships as legacy region maps, marked \"not yet CHIM\", until milestone M4."
+        "The countryside between the towns shipped as legacy region maps, marked \"not yet CHIM\", until v0.0.43; since then every exterior cell of Vvardenfell is a CHIM frame."
       ],
       "vis": "A town runs as one frame map: terrain is world geometry, so Quake's visibility and collision work on it as on any map.",
       "links": [
@@ -1000,7 +1000,7 @@
       "gains": [],
       "gain_note": "Not measured. The first slice is Balmora with the grid frames east and west of it.",
       "caveats": [
-        "Until then the countryside between the towns ships as legacy region maps, marked \"not yet CHIM\"."
+        "Every exterior cell of Vvardenfell is on CHIM since v0.0.43, but not in this grid design: region frames own one cell each and a crossing between them is a map load (CHIM regions); the pauses at crossings are CHIM-CROSSING-SLUGGISH-43."
       ],
       "vis": "The ring is centred on the player, so the memory peak does not depend on where frame edges are; dense places fit only by simpler distant models, a stated view budget or a larger zone.",
       "links": [
@@ -1321,7 +1321,7 @@
       "gain_note": "Counts are exact; times are emulator-relative. First-time ground still reads in the frame (non-blocking reads are separate work).",
       "caveats": [
         "Not measured on real hardware yet.",
-        "The game heap stays at its built size (a larger heap stays manual)."
+        "From v0.0.43 the game heap grows too, to 24 MiB at most, before the CHIM banks are taken (ENGINE-HEAP-FIXED-SIZE-43)."
       ],
       "vis": "No change: the same chunks and placements, kept in memory longer.",
       "links": [
@@ -1335,6 +1335,43 @@
         }
       ],
       "bugs": [],
+      "commits": []
+    },
+    {
+      "id": "prefetch-spare-ram",
+      "name": "Cells ahead read into spare Fast RAM",
+      "area": "streaming",
+      "summary": "Outdoors a cell border is a map change. With extra Fast RAM the files of the cells ahead are read in 32 KiB slices, in frames where nothing else is read, into the CHIM banks; later reads of them are copied from RAM. The 2x2 block at the nearest corner first (the cell walked towards leading), then the 3x3 ring; the block moves only past a margin. The world index stays in RAM across maps. 16 MiB: unchanged.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [
+        {
+          "headline": true,
+          "text": "Open-world cell crossings: median 452 ms to 209-223 ms, worst 724 ms to 477-498 ms; seconds with a frame of 300 ms or more 11 to 2-3 of 178; a four-cell corner 426 ms to 146-239 ms; one heavy crossing (cells 10,0 to 11,0) 598 ms to 245 ms",
+          "compared": "the v0.0.43-dev2 image in FS-UAE (68040 JIT, 128 MiB): as built against this engine with the prefetch on, the same scripted route (Seyda Neen heading 30 degrees for 180 s, 12-13 crossings), corner square and crossings; \"Scene ready\" per map load",
+          "basis": "emulator",
+          "host": "busy",
+          "date": "2026-10-18"
+        }
+      ],
+      "gain_short": "crossings 452 ms to about 220 ms (median) at 128 MiB",
+      "gain_note": "Emulator-relative times, two FS-UAE sessions in parallel on a busy host; the counts (reads served from RAM, read-ahead bytes) are exact. The legacy maps still in the route (dev2) are not helped.",
+      "caveats": [
+        "Not measured on real hardware yet: a 32 KiB slice is a synchronous read in a frame where nothing else is read (about 1 ms on average in FS-UAE JIT, 25 ms at worst; on the cycle-exact slow preset 8 ms on average, 43 ms at worst, frames of about 820 ms unchanged).",
+        "The ring prime still decodes the arriving cell's chunks in one frame (60-480 ms in JIT); the bytes come from RAM."
+      ],
+      "vis": "No change: the same bytes are read, from RAM instead of the disk; the same chunks and placements.",
+      "links": [
+        {
+          "title": "Real hardware: extra RAM",
+          "path": "docs/REAL_HARDWARE.md#extra-ram-is-used-automatically"
+        }
+      ],
+      "bugs": [
+        "CHIM-CROSSING-SYNC-LOAD-43",
+        "CHIM-READ-RUNS-33",
+        "ENGINE-HEAP-FIXED-SIZE-43"
+      ],
       "commits": []
     }
   ]

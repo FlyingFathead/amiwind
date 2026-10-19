@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 The MiniWind build `vivec-palace` (all of Vivec, starting in the Palace of Vivec) stopped after 10 minutes in its
 bsp stage: qbsp on `seyda.map` reported "Map exceeds BSP29 node/leaf limit. Recompile with -bsp2 flag." The

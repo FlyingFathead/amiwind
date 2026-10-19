@@ -1,5 +1,7 @@
 # CHIM reference models
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 A reference model is a model the project holds up as the good version of something: the one to measure
 other conversions against, to take scale from, and to keep from regressing. AmiWind ships no game data,
 so a reference model is never a file in this repository or in a release. It is a recipe: the source mesh

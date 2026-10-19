@@ -1,5 +1,7 @@
 # rc3 full-runtime map memory profile
 
+_Last updated with AmiWind v0.0.27 (3 October 2026)._
+
 The complete staged runtime map set contains **2,678 BSPs**: 2,526 `vfNNNN` world cells and 152 named maps. The target-ABI audit estimates one map at a time, including ordered decoded allocations and temporary input peaks. It uses an 11 MiB target Hunk, reserves 3 MiB for non-BSP engine state, and keeps a separate 2 MiB safety margin. **2,650 maps pass the estimate and 28 need reduction**; none of those failures are world-cell `vfNNNN` maps. A storage partition does not increase runtime heap. This is the rc3 baseline profile from before the latest member-relative stream-reader change; use it to prioritize map work, not as clearance evidence for a newly built engine. The image gate now compares the engine receipt with current hashes for `Makefile`, `model.c`/`model.h`, `zone.c`/`zone.h`, `common.c` and `sys_amiga.c`, and records those hashes with each new map audit.
 
 The runtime selects one current world BSP for the active scene or cell. `AW_WorldDestination` selects a single `vfNNNN`; `AW_RegionWorldModel` selects one `bmNNN` or `snNNN` (or a special scene). `SV_SpawnServer` clears map memory before loading the next scene. The audit’s 2,678 rows are candidate maps, not simultaneous residency. Lookahead transitions and global/cache allocations still require the runtime Hunk reports described in [Memory Allocation](MEMORY_ALLOCATION.md).

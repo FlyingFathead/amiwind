@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // snd_mem.c: sound caching
 
 #include "quakedef.h"
+#include "aw_spike.h"
 
 int			cache_full_cycle;
 
@@ -103,6 +104,7 @@ sfxcache_t *S_LoadSound (sfx_t *s)
 	float	stepscale;
 	sfxcache_t	*sc;
 	byte	stackbuf[1*1024];		// avoid dirtying the cache heap
+	double	spike_t0;
 
 // see if still in memory
 	sc = Cache_Check (&s->cache);
@@ -111,6 +113,7 @@ sfxcache_t *S_LoadSound (sfx_t *s)
 
 //Con_Printf ("S_LoadSound: %x\n", (int)stackbuf);
 // load it in
+	AW_SPIKE_BEGIN (spike_t0);
     Q_strcpy(namebuffer, "sound/");
     Q_strcat(namebuffer, s->name);
 
@@ -147,6 +150,7 @@ sfxcache_t *S_LoadSound (sfx_t *s)
 	sc->stereo = info.channels;
 
 	ResampleSfx (s, sc->speed, sc->width, data + info.dataofs);
+	AW_SPIKE_END (AW_SP_SOUND, spike_t0, (long)com_filesize);
 
 	return sc;
 }

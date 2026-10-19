@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.40 (15 October 2026)._
+
 ## Status: 9 October 2026
 
 Open. Failed in two gates on a busy host and passed in the gate before on the same code. Run alone on 2 CPUs

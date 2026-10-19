@@ -46,6 +46,8 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents end -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Status: 18 October 2026
 
 Partly fixed. The editor-marker part (MRK, hidden markers) is repaired for v0.0.43-dev4. The

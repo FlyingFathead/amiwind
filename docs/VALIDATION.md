@@ -1,5 +1,7 @@
 # Host validation (terrain pipeline)
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 Validated on Linux with Python 3.12 and a host C compiler. Windows-compatible
 paths and Python 3.10 syntax are used, but this version has not been run on Windows.
 

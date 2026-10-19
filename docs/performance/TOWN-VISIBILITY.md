@@ -1,5 +1,22 @@
 # Town visibility: why buildings do not hide what is behind them
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [How Quake decides what to draw](#how-quake-decides-what-to-draw)
+- [What the converter does today](#what-the-converter-does-today)
+- [Not only towns: every converted map type](#not-only-towns-every-converted-map-type)
+- [And the visibility that exists is the rough kind](#and-the-visibility-that-exists-is-the-rough-kind)
+- [First prototype result (8 October 2026): occluders alone are not enough](#first-prototype-result-8-october-2026-occluders-alone-are-not-enough)
+- [Second prototype result (8 October 2026): the tested occluders give negligible benefit](#second-prototype-result-8-october-2026-the-tested-occluders-give-negligible-benefit)
+- [What the sent models cost (8 October 2026)](#what-the-sent-models-cost-8-october-2026)
+- [Interiors: still to test](#interiors-still-to-test)
+- [Method](#method)
+
+<!-- contents end -->
+
 Measured 7 October 2026 on the v0.0.31-dev5 maps. Bug:
 [TOWN-VIS-OCCLUSION-31](../bugs/TOWN-VIS-OCCLUSION-31.md).
 

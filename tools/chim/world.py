@@ -310,12 +310,23 @@ def frame_order(frames):
     if len(set(cells)) != len(cells):
         raise ValueError('Two frames share the cell %s' % (sorted(c for c in cells if cells.count(c) > 1)[0],))
     boxes = [frame_box(f['frame']) for f in frames]
-    for i in range(len(boxes)):
-        for j in range(i + 1, len(boxes)):
-            a, b = boxes[i], boxes[j]
-            if a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]:
-                raise ValueError('Frames %s and %s overlap: a placement or tile would be stored twice'
-                                 % (cells[i], cells[j]))
+    # every pair of frames that share a grid bucket (a cell) is compared, not every pair of the world (1,351 frames:
+    # 912,000 pairs on one core, BUILD-CHIM-SERIAL-SECTIONS-44); the first overlapping pair in frame order is named
+    grid = {}
+    for k, (x0, y0, x1, y1) in enumerate(boxes):
+        for bx in range(int(math.floor(x0 / 8192.0)), int(math.floor(x1 / 8192.0)) + 1):
+            for by in range(int(math.floor(y0 / 8192.0)), int(math.floor(y1 / 8192.0)) + 1):
+                grid.setdefault((bx, by), []).append(k)
+    pairs = set()
+    for members in grid.values():
+        for n, i in enumerate(members):
+            for j in members[n + 1:]:
+                a, b = boxes[i], boxes[j]
+                if a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]:
+                    pairs.add((min(i, j), max(i, j)))
+    if pairs:
+        i, j = min(pairs)
+        raise ValueError('Frames %s and %s overlap: a placement or tile would be stored twice' % (cells[i], cells[j]))
     lo = (min(c[0] for c in cells), min(c[1] for c in cells))
     side = 1
     while side < max(max(c[0] - lo[0], c[1] - lo[1]) + 1 for c in cells):
@@ -325,7 +336,9 @@ def frame_order(frames):
 
 
 VIS_ROWS_ENV = 'AMIWIND_CHIM_VIS_ROWS'
-VIS_ROWS_MODES = ('frames', 'serial')
+# frames (default since v0.0.44): each frame's layout and visibility rows made together on a worker; frames-parent
+# (the method of v0.0.43): the layouts made in the parent while the pool works out the rows; serial (before v0.0.42)
+VIS_ROWS_MODES = ('frames', 'frames-parent', 'serial')
 # A frame of at most this many chunks (a region frame: one cell, 15 x 15 chunks) has its visibility rows worked out
 # whole on one worker; larger frames (towns: 576 to 2,916 chunks in dev5) spread their own blocks over every
 # worker, one frame after another.
@@ -357,6 +370,167 @@ def _frame_visibility_task(task):
     return result, cache.stats, getattr(cache, 'pool_stats', None)
 
 
+def _layout_inputs(spec):
+    """What frame_layout and the visibility rows read of one frame, sent to a worker: the placements whole, of each
+    variant its bounds and occluders, of each chunk's terrain the tree a placement's leaves are counted on (or the
+    referenced image it is made from) and its top; no model lumps, textures or terrain images otherwise."""
+    variants = {}
+    for k in {p['variant'] for p in spec['placements']}:
+        v = spec['variants'][k]
+        variants[k] = {'lo': v['lo'], 'hi': v['hi'], 'occluders': v['occluders'],
+                       **({'occluder_grid': v['occluder_grid']} if v.get('occluder_grid') else {})}
+    terrain = {}
+    for c, t in spec['terrain'].items():
+        row = {'info': {'zmax': t['info']['zmax']}}
+        if 'offset' in t:
+            row.update(offset=t['offset'], lumps=t['lumps'])
+        if not t.get('offset'):
+            row['info']['tree'] = t['info']['tree']
+        terrain[c] = row
+    return {'frame': spec['frame'], 'placements': spec['placements'], 'variants': variants, 'terrain': terrain,
+            'visibility': spec.get('visibility')}
+
+
+def packed_rows(order, base, owned_total, pvs, pvl, chunks=None):
+    """{chunk: (compressed PVS row, compressed placement row)} of one frame: the parts of its chunk records that do
+    not depend on the model and texture ids the pack walk hands out, so they are made on the workers
+    (BUILD-CHIM-SERIAL-SECTIONS-44). ORDER: the frame's chunks in pack order; BASE: its first placement id;
+    CHUNKS: only these (default every chunk of ORDER)."""
+    index = {c: k for k, c in enumerate(order)}
+    out = {}
+    for c in order if chunks is None else chunks:
+        bits = [False] * len(order)
+        for b in pvs[c]:
+            bits[index[b]] = True
+        pbits = [False] * owned_total
+        for q in pvl[c]:
+            pbits[q - base] = True
+        out[c] = (compress_row(bits_to_row(bits)), compress_row(bits_to_row(pbits)))
+    return out
+
+
+def shift_refusals(terrain):
+    """{chunk: why} of the referenced chunk terrain that cannot be placed at its shift (F.refuse_shift on the
+    unit's own image: the check reads the texture axes, which the pack's texture ids leave as they are)."""
+    out = {}
+    for c, t in terrain.items():
+        if 'offset' in t:
+            out[c] = F.refuse_shift(F.brush_image(t['lumps'])[0], t['offset'])
+    return out
+
+
+def _packed_rows_task(task):
+    """Worker: packed_rows of one large frame's chunk slice. TASK: (order, base, owned count, slice, pvs, pvl)."""
+    order, base, owned_total, part, pvs, pvl = task
+    return packed_rows(order, base, owned_total, pvs, pvl, part)
+
+
+def _frame_rows_task(task):
+    """Worker of frame_rows: one frame's placement layout (ids from BASE) and, with ROWS, its visibility rows.
+    Returns ((by_chunk, placement rows, first id, owned count, next id), rows or None, unit counts, pool counts)."""
+    inputs, settings, base, rows, cache = task
+    layout, end = frame_layout(inputs, settings, base)
+    world, by_chunk, rows_in, first, owned_total = layout
+    refused = shift_refusals(inputs['terrain'])
+    if not rows:
+        return (by_chunk, rows_in, first, owned_total, end, refused), None, {}, None
+    result, stats, pool_stats = _frame_visibility_task((*_visibility_inputs(inputs, layout, settings), cache))
+    pvs, pvl, vis_stats = result
+    packed = packed_rows(world.order, first, owned_total, pvs, pvl)
+    return (by_chunk, rows_in, first, owned_total, end, refused), (packed, vis_stats), stats, pool_stats
+
+
+def _add_unit_counts(cache, stats, pool_stats):
+    """A worker's unit counts added to the parent's cache counts."""
+    if cache is None:
+        return
+    for kind, counts in stats.items():
+        mine = cache.stats.setdefault(kind, {})
+        for k, v in counts.items():
+            mine[k] = mine.get(k, 0) + v
+    if pool_stats and hasattr(cache, 'pool_stats'):
+        for k, v in pool_stats.items():
+            cache.pool_stats[k] = cache.pool_stats.get(k, 0) + v
+
+
+def frame_rows(specs, bases, settings=None, jobs=1, cache=None):
+    """([layout], [rows], [shift refusals or None]) of every frame, in the order given (BUILD-CHIM-SERIAL-SECTIONS-44).
+    A frame's rows are (pvs, pvl, stats) (the earlier methods) or ({chunk: packed rows}, stats) (packed_rows); its
+    shift refusals ({chunk: why}, shift_refusals) or None when the pack checks them itself.
+
+    Each frame's placement layout (ids from BASES[i]) is made on a worker, and a frame of at most FRAME_VIS_CHUNKS
+    chunks works out its visibility rows on the same worker in the same task; larger frames (towns) get their
+    layout there too and then spread their own row blocks over every worker, one after another. In v0.0.43 the
+    layouts were made in the parent while the pool asked for them (frame_visibility with a layout function): the
+    parent could not keep up and the workers starved (v0.0.44-dev1: 3 min 7 s at 4.9 of 24 cores, 523 frames
+    queued and none running). Same layouts, same unit keys, same rows: the world files are byte-identical.
+    AMIWIND_CHIM_VIS_ROWS=frames-parent or serial keep the earlier methods."""
+    mode = os.environ.get(VIS_ROWS_ENV, 'frames')
+    if mode not in VIS_ROWS_MODES:
+        raise ValueError('%s=%s: choose %s' % (VIS_ROWS_ENV, mode, ' or '.join(VIS_ROWS_MODES)))
+    made = [None] * len(specs)
+
+    def check(i, end):
+        if end != bases[i] + len(specs[i]['placements']):
+            raise ValueError('Frame %s: placement ids %d-%d, expected %d' % (
+                specs[i]['frame'].get('cell'), bases[i], end, len(specs[i]['placements'])))
+
+    def layout_of(i):
+        if made[i] is None:
+            layout, end = frame_layout(specs[i], settings, bases[i])
+            check(i, end)
+            made[i] = layout
+        return made[i]
+    from build_parallel import stage_ceiling
+    if mode != 'frames' or stage_ceiling(jobs) <= 1 or len(specs) <= 1:
+        results = frame_visibility(specs, layout_of, settings, jobs, cache)
+        return [layout_of(i) for i in range(len(specs))], results, [None] * len(specs)
+    from build_parallel import ordered_map
+    import progress_line
+    jobs = stage_ceiling(jobs)
+    worlds = [World(spec['frame'], settings) for spec in specs]
+    chunks = [w.nx * w.ny for w in worlds]
+    small = {i for i in range(len(specs)) if chunks[i] <= FRAME_VIS_CHUNKS}
+    results = [None] * len(specs)
+    prepared = [None] * len(specs)      # per frame: the shift refusals of its referenced terrain
+    # largest first by the frame's own size (its placements and chunks): the towns' layouts lead
+    order = sorted(range(len(specs)), key=lambda i: (-(len(specs[i]['placements']) + chunks[i]), i))
+
+    def tasks():
+        for i in order:
+            yield (_layout_inputs(specs[i]), settings, bases[i], i in small, _unit_cache_copy(cache))
+    done = 0
+    for i, (parts, result, stats, pool_stats) in zip(order, ordered_map(_frame_rows_task, tasks(),
+                                                                        max(1, min(jobs, len(specs))))):
+        by_chunk, rows_in, first, owned_total, end, refused = parts
+        check(i, end)
+        made[i] = (worlds[i], by_chunk, rows_in, first, owned_total)
+        prepared[i] = refused
+        if result is not None:
+            results[i] = result
+            _add_unit_counts(cache, stats, pool_stats)
+        done += 1
+        if done % 50 == 0 or done == len(specs):
+            progress_line.emit('CHIM visibility rows', 'frames', 'layout and rows, one frame per worker',
+                               (done, len(specs), 'frames'))
+    for i in range(len(specs)):
+        if results[i] is None:
+            # a large frame spreads its own blocks over every worker (one frame after another), then its packed
+            # rows in slices of chunks (a town: thousands of chunks times thousands of placements)
+            world, by_chunk, _, first, owned_total = made[i]
+            pvs, pvl, vis_stats = chunk_visibility(world, specs[i]['terrain'], by_chunk, specs[i]['variants'],
+                                                   specs[i].get('visibility'), jobs, cache)
+            step = max(1, -(-len(world.order) // (4 * jobs)))
+            parts = [world.order[k:k + step] for k in range(0, len(world.order), step)]
+            packed = {}
+            for found in ordered_map(_packed_rows_task, [(world.order, first, owned_total, part,
+                                                          {c: pvs[c] for c in part}, {c: pvl[c] for c in part})
+                                                         for part in parts], max(1, min(jobs, len(parts)))):
+                packed.update(found)
+            results[i] = (packed, vis_stats)
+    return made, results, prepared
+
+
 def frame_visibility(specs, layouts, settings=None, jobs=1, cache=None):
     """[(pvs, pvl, stats)] of every frame, in the order given (B5, v0.0.42).
 
@@ -375,6 +549,7 @@ def frame_visibility(specs, layouts, settings=None, jobs=1, cache=None):
     mode = os.environ.get(VIS_ROWS_ENV, 'frames')
     if mode not in VIS_ROWS_MODES:
         raise ValueError('%s=%s: choose %s' % (VIS_ROWS_ENV, mode, ' or '.join(VIS_ROWS_MODES)))
+    mode = 'frames' if mode == 'frames-parent' else mode
     layout_of = layouts if callable(layouts) else layouts.__getitem__
     results = [None] * len(specs)
     small, large = [], []
@@ -551,22 +726,24 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     for fi in order:
         bases.append(pid)
         pid += len(frames[fi]['placements'])
-    made = [None] * len(order)
-
-    def layout_at(k):
-        if made[k] is None:
-            layout, end = frame_layout(frames[order[k]], settings, bases[k])
-            if end != bases[k] + len(frames[order[k]]['placements']):
-                raise ValueError('Frame %s: placement ids %d-%d, expected %d' % (
-                    frames[order[k]]['frame'].get('cell'), bases[k], end, len(frames[order[k]]['placements'])))
-            made[k] = layout
-        return made[k]
     import build_profile      # timed phases: start/end lines with time and cores (never part of a key)
     with section('visibility rows'), build_profile.phase('CHIM world: visibility rows', '%d frames' % len(frames)):
-        visible = frame_visibility([frames[fi] for fi in order], layout_at, settings, jobs, cache)
-    layouts = [layout_at(k) for k in range(len(order))]
+        layouts, visible, refusals = frame_rows([frames[fi] for fi in order], bases, settings, jobs, cache)
     pack_timer = build_profile.phase('CHIM world: pack', '%d frames' % len(frames)).__enter__()
-    for fi, layout, (pvs, pvl, vis_stats) in zip(order, layouts, visible):
+    # The pack itself stays one walk in this process: model, texture and terrain ids are handed out in the order
+    # the walk first meets them and every sector holds the records first met there, so each frame depends on the
+    # ids of every frame before it (inherently serial). The parts that do not depend on the ids (the packed
+    # visibility rows, the terrain shift checks) were made on the workers with the rows (frame_rows).
+    if len(frames) > 1:
+        print('CHIM world: pack: one walk in pack order (ids are handed out as the walk first meets them: serial); '
+              'visibility rows and terrain shift checks %s' % (
+                  'came packed from the workers' if all(len(v) == 2 for v in visible) else 'packed here'), flush=True)
+    for fi, layout, rows_of, refused in zip(order, layouts, visible, refusals):
+        if len(rows_of) == 2:
+            packed, vis_stats = rows_of
+        else:
+            pvs, pvl, vis_stats = rows_of
+            packed = None
         spec = frames[fi]
         world, by_chunk, rows_in, base, owned_total = layout
         variants, terrain = spec['variants'], spec['terrain']
@@ -591,7 +768,7 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                     referenced = 'offset' in terrain[c]
                     if referenced:
                         shift = terrain[c]['offset']
-                        why = F.refuse_shift(image, shift)
+                        why = refused[c] if refused is not None else F.refuse_shift(image, shift)
                         if why:
                             raise ValueError('Chunk %s of frame %s: terrain cannot be referenced: %s' % (c, cell, why))
                         digest = hashlib.sha256(image).hexdigest()
@@ -607,23 +784,25 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                                                   p['cell'][1] - cell[1], p['_box'], p['_leaves'],
                                                   p.get('story_hidden', False))
                                       for p in sorted(by_chunk[c][kind], key=lambda q: q['_pid'])]
-                    bits = [False] * len(world.order)
-                    for b in pvs[c]:
-                        bits[world.chunk_index[b]] = True
-                    pbits = [False] * owned_total
-                    for q in pvl[c]:
-                        pbits[q - base] = True
+                    if packed is not None:
+                        pvs_row, pvl_row = packed[c]
+                    else:
+                        bits = [False] * len(world.order)
+                        for b in pvs[c]:
+                            bits[world.chunk_index[b]] = True
+                        pbits = [False] * owned_total
+                        for q in pvl[c]:
+                            pbits[q - base] = True
+                        pvs_row, pvl_row = compress_row(bits_to_row(bits)), compress_row(bits_to_row(pbits))
                     if referenced:
                         # the reference block is written with its record's place once the sector is laid out
                         tid, shift = ref_at[c]
                         data, render, collision = F.chunk_record_ref(
-                            rows['owned'], rows['reach'], compress_row(bits_to_row(bits)),
-                            F.terrain_ref(tid, 0, 0, 0, 0, shift), info.get('leaves', 0),
-                            compress_row(bits_to_row(pbits)))
+                            rows['owned'], rows['reach'], pvs_row,
+                            F.terrain_ref(tid, 0, 0, 0, 0, shift), info.get('leaves', 0), pvl_row)
                     else:
-                        data, render, collision = F.chunk_record(rows['owned'], rows['reach'],
-                                                                 compress_row(bits_to_row(bits)), image, image_render,
-                                                                 info.get('leaves', 0), compress_row(bits_to_row(pbits)))
+                        data, render, collision = F.chunk_record(rows['owned'], rows['reach'], pvs_row, image,
+                                                                 image_render, info.get('leaves', 0), pvl_row)
                     records.append((b'CHNK', world.chunk_index[c], data))
                     chunk_meta.append((c, render, collision, len(rows['owned']), len(rows['reach']),
                                        int(math.floor(info['zmin'])), int(math.ceil(info['zmax']))))
@@ -737,5 +916,12 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     return receipt
 
 
-def write_json(path, value):
-    Path(path).write_text(json.dumps(value, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
+def write_json(path, value, split=(), jobs=1):
+    """VALUE as indented JSON (sorted keys) at PATH. SPLIT: paths of large lists encoded on the worker pool
+    (tools/parallel_json.py: the same bytes; BUILD-CHIM-SERIAL-SECTIONS-44)."""
+    if split:
+        import parallel_json
+        text = parallel_json.dumps(value, split, jobs=jobs)
+    else:
+        text = json.dumps(value, indent=1, sort_keys=True)
+    Path(path).write_text(text + '\n', encoding='utf-8', newline='\n')

@@ -21,6 +21,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Symptom
 
 The expanded Seyda CHIM frame fails 15 stair-flight probes across original

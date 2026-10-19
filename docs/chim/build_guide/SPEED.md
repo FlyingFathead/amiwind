@@ -1,5 +1,7 @@
 # Speed
 
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
+
 How the repository builder saves time: the worker count (`--jobs`, see
 [Parallel build](../../PARALLEL_BUILD.md)), stage reuse from one earlier run
 (`--reuse-from`) and the build profile (see [Build profile](../../BUILD_PROFILE.md)),

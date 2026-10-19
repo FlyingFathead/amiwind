@@ -1,9 +1,12 @@
 # Builder types
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 ## How CHIM builds relate to the legacy chain today
 
-A build is `--builder chim` (the default from v0.0.33: the CHIM areas Balmora and Seyda Neen from
-`config/build-defaults.json`, or the towns named with one or more `--chim-area TOWN`, as a CHIM world)
+A build is `--builder chim` (the default from v0.0.33: the CHIM areas Balmora, Seyda Neen and the whole city of Vivec from
+`config/build-defaults.json`, plus the exterior cells put on CHIM as region frames (every exterior cell of
+Vvardenfell since v0.0.43), or the towns named with one or more `--chim-area TOWN`, as a CHIM world)
 or `--builder legacy` (every exterior as region maps, as in v0.0.32; selectable and tested). From
 v0.0.35 a CHIM build with Seyda Neen needs no recorded input: Seyda Neen is converted from your data
 (`--seyda-recorded DIR`, the legacy recorded v0.0.31 maps, is optional and NOT RECOMMENDED since v0.0.31;

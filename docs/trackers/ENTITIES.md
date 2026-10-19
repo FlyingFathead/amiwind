@@ -1,5 +1,7 @@
 # Entity tracker
 
+_Last updated with AmiWind v0.0.32-dev1 (8 October 2026)._
+
 **Status: first version in the image build (v0.0.31 development).**
 
 Keeps track of which kinds of things are placed in AmiWind, so nothing is left

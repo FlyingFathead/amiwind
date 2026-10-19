@@ -1,5 +1,7 @@
 # Demo v0.0.5 / checkpoint-004 validation
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Test date: 27 September 2026, Europe/Helsinki. Source release 0.6.0.
 Interactive build uses the corrected async4k scheduler. Prior releases are immutable.
 

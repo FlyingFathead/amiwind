@@ -1,5 +1,7 @@
 # Dialogue, character confirmation and waiting — v0.0.23-dev4
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 ## Dialogue display
 
 Options → Interface exposes UI font, voice identity, dialogue style, aimed NPC

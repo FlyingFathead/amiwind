@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found by the builder harvest step work (BUILD-HARVEST-NOT-BUILT-32, commit 0331f76).

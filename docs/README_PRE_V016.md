@@ -1,6 +1,6 @@
 # Historical README before v0.0.16
 
-This preserves the prior source snapshot; its versions and status are historical.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +14,8 @@ This preserves the prior source snapshot; its versions and status are historical
 - [Project layout](#project-layout)
 
 <!-- contents end -->
+
+This preserves the prior source snapshot; its versions and status are historical.
 
 > Development checkpoint **v0.0.15-dev2 / source 0.12.1.dev1**: see
 > [setup](AGA_BUILD.md), [validation](CHECKPOINT_017_VALIDATION.md)

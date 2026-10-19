@@ -1,10 +1,6 @@
 # Map optimization findings: 4 October 2026
 
-Companion to [AmiWind Map Optimization Toolkit](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md).
-This integrates the maintainer's supplied documentation draft with measured local
-artifacts and host tests. Public summaries contain no game geometry or private
-host paths. The supplied draft and independent reviews remain unchanged in the
-private archive. Diagnostic numbers are experiment identifiers, not game releases.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -22,6 +18,12 @@ private archive. Diagnostic numbers are experiment identifiers, not game release
 - [Memory, shared sky and production gates](#memory-shared-sky-and-production-gates)
 
 <!-- contents end -->
+
+Companion to [AmiWind Map Optimization Toolkit](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md).
+This integrates the maintainer's supplied documentation draft with measured local
+artifacts and host tests. Public summaries contain no game geometry or private
+host paths. The supplied draft and independent reviews remain unchanged in the
+private archive. Diagnostic numbers are experiment identifiers, not game releases.
 
 ## Trial ledger at a glance
 

@@ -1,5 +1,7 @@
 # One AmiWind repository
 
+_Last updated with AmiWind v0.0.28 (4 October 2026)._
+
 Official project home: https://github.com/FlyingFathead/amiwind
 
 **`amiwind/` is the only repository root.** Open or initialize that directory as

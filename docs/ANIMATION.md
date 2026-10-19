@@ -1,6 +1,6 @@
 # Character animation
 
-The build switch (`--anim-kit`), the `dbg animkit` console commands, the group table and the walk/run rules with their sources: [ANIMKIT.md](ANIMKIT.md).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -16,6 +16,8 @@ The build switch (`--anim-kit`), the `dbg animkit` console commands, the group t
 - [Tests](#tests)
 
 <!-- contents end -->
+
+The build switch (`--anim-kit`), the `dbg animkit` console commands, the group table and the walk/run rules with their sources: [ANIMKIT.md](ANIMKIT.md).
 
 How AmiWind animates its people: which of the original animation groups a
 character model carries, how the builder samples them, and how the engine plays

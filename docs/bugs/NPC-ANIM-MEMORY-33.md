@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Status: 9 October 2026
 
 Open: the maintainer chooses the shipped profile. Measured on the 15 Balmora exterior residents (v0.0.33

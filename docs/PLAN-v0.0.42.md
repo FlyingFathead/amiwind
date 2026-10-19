@@ -1,10 +1,6 @@
 # v0.0.42 working plan: Things Are Starting To Look Pretty Khuul
 
-The step-by-step checklist behind the [roadmap's v0.0.42 items](ROADMAP.md#v0042-complete-vivec-the-city-16-october-2026).
-Written 16 October 2026 from the maintainer's decisions of that day. A step is ticked only with its evidence (a commit,
-a gate, a build run, a measurement or a clip); a step that turns out wrong is struck through with the reason,
-never deleted. Every measurement is taken with the current builder; every builder change comes with a test and a
-gate; every failure found becomes a bug page.
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -33,6 +29,12 @@ gate; every failure found becomes a bug page.
 - [5. Release](#5-release)
 
 <!-- contents end -->
+
+The step-by-step checklist behind the [roadmap's v0.0.42 items](ROADMAP.md#v0042-complete-vivec-the-city-16-october-2026).
+Written 16 October 2026 from the maintainer's decisions of that day. A step is ticked only with its evidence (a commit,
+a gate, a build run, a measurement or a clip); a step that turns out wrong is struck through with the reason,
+never deleted. Every measurement is taken with the current builder; every builder change comes with a test and a
+gate; every failure found becomes a bug page.
 
 Order: tools first (they make the rest faster), then Vivec, then the CHIMport batches by weight.
 Project decision, 17 October 2026: once the builder fixes are in, v0.0.42-dev1 is pushed and the easy CHIMport

@@ -899,6 +899,8 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
         meshes += count
     if turn_timer is not None:
         turn_timer.__exit__(None, None, None)
+    # timed (no silent phase): between the areas and the visibility rows (BUILD-CHIM-SERIAL-SECTIONS-44)
+    between = build_profile.phase('CHIM world: aprons, ownership and effects', '%d frames' % len(specs)).__enter__()
     from chim.apron_policy import reconcile
     apron_dispositions = reconcile(specs, sections, out, set(regional), flora)
     from chim.apron_policy import supplement_seyda
@@ -928,6 +930,7 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
     for spec in specs:
         spec['textures'], record = apply_effects(spec['textures'], effects, pal_bytes)
         applied.append(record)
+    between.__exit__(None, None, None)
     receipt = build_frames(out, specs, settings_override, TERRAIN_LIGHT, jobs=jobs, cache=cache, timer=timer)
     receipt['apron_dispositions'] = apron_dispositions
     receipt['collision_union_fallbacks'] = sorted({m for s in specs for m in s['fallbacks']})
@@ -945,14 +948,16 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
         'patched': sorted('%s +%d nodes' % (n, c.get('patched_nodes', 0)) for n, c in found.items()
                           if c.get('patched_rounds'))}
     # The frames' far terrain (chim.far): resident distant land, a sidecar of each frame map.
-    with timer.section('far terrain'):
+    with timer.section('far terrain'), build_profile.phase('CHIM world: far terrain', '%d frames' % len(specs)):
         from chim.far import write_layers
-        receipt['far_terrain'] = write_layers(out, [s['frame'] for s in specs], data) if far_terrain else []
+        receipt['far_terrain'] = (write_layers(out, [s['frame'] for s in specs], data, jobs=jobs)
+                                    if far_terrain else [])
+    written = build_profile.phase('CHIM world: source and receipt', '%d frames' % len(specs)).__enter__()
     source = {'builder': BUILDER, 'chim_version': CHIM_VERSION, 'world_format': receipt['world_format'],
               'areas': areas, 'frames': sections}
     from chim.ownership import bind_index
     bind_index(out, source)
-    write_json(out / 'chim-source.json', source)
+    write_json(out / 'chim-source.json', source, split=[('frames',)], jobs=jobs)
     # Lava pools converted, by source cell (the trackers' converted status, tools/cell_lava.py).
     lava_cells = {}
     for s in sections:
@@ -989,11 +994,12 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
             'original_records': sum(len(s['references']) for s in ocean_sources),
             'deferred_records': sum(len(s['references']) for s in ocean_sources),
             'converted_records': 0, 'native_verified': False, 'packaged': False}
-    write_json(out / 'chim-receipt.json', receipt)
+    write_json(out / 'chim-receipt.json', receipt, split=RECEIPT_LISTS, jobs=jobs)
     # Worker count, unit cache hits and wall time: a diagnostic beside the receipt, so the receipt is
     # byte-reproducible (BUILD-OUTPUTS-NOT-REPRODUCIBLE-33); chim/stats.py reads it for its build figures.
     write_json(out / TIMING_FILE, {'jobs': jobs, 'units': cache.stats, 'timing': timer.report(),
                                    'wall_seconds': round(time.time() - t0, 1)})
+    written.__exit__(None, None, None)
     _log('units: ' + ', '.join('%s %d built %d reused' % (k, v.get('built', 0), v.get('reused', 0))
                                for k, v in sorted(cache.stats.items())))
     refused = sum(v.get('write_refused', 0) for v in cache.stats.values())
@@ -1001,6 +1007,10 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
         _log('cache write refused: %d units built locally, not stored (BUILD-CACHE-OWNER-FAILS-STAGE-34)' % refused)
     _log('wrote %s (%.1f s wall, %.1f s CPU)' % (out / 'chim', time.time() - t0, timer.report()['cpu_seconds']))
     return receipt
+
+
+# The receipt's long lists, encoded on the worker pool when it is written (chim.world.write_json split)
+RECEIPT_LISTS = [('files',), ('frames',), ('far_terrain',), ('model_aliases',)]
 
 
 def detail_budget(name):

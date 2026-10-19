@@ -1,5 +1,7 @@
 # v0.0.21-dev6 paper-font checkpoint 002
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Date: 29 September 2026. Status: source working checkpoint, not a completed
 release, parallel-build delivery, or validated new private playable.
 

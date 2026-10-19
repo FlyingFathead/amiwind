@@ -89,6 +89,39 @@ class ChimStageSpeedTests(unittest.TestCase):
         self.assertEqual(list(first[0]), list(again[0]))
         self.assertEqual(digest(first[1]), digest(again[1]))
 
+    def test_keyed_lookups_equal_lookups_in_the_task(self):
+        # BUILD-CHIM-SERIAL-SECTIONS-44: the parent keys the units and the workers look them up; only misses get
+        # their inputs. The same failures, world and hit/miss counts as each task looking itself up, on a cold cache
+        # and on a warm one; on the warm one no task receives the chunk images
+        import chim.validate as V
+        from pass_cache import PassCache
+        runs = {}
+        for mode in ('in-task', 'keys'):
+            counts = []
+            real = PassCache.summary
+
+            def summary(self):
+                counts.append(real(self))
+                return counts[-1]
+            with tempfile.TemporaryDirectory() as cache, patch.dict(os.environ, {'AMIWIND_PASS_CACHE': cache,
+                                                                                  V.VALIDATE_LOOKUP_ENV: mode}), \
+                    patch.object(PassCache, 'summary', summary), patch.object(V, 'MODEL_GROUP', 1):
+                cold = validate(self.out, self.source, jobs=2)
+                sent = []
+                real_map = V._pool_map
+
+                def watched(function, tasks, jobs, cost):
+                    sent.append(function.__name__)
+                    return real_map(function, tasks, jobs, cost)
+                with patch.object(V, '_pool_map', watched):
+                    warm = validate(self.out, self.source, jobs=2)
+            runs[mode] = (list(cold[0]), digest(cold[1]), list(warm[0]), digest(warm[1]),
+                          [(c['hits'], c['misses']) for c in counts])
+            if mode == 'keys':
+                self.assertNotIn('_chunk_checks', sent)
+                self.assertNotIn('_model_checks', sent)
+        self.assertEqual(runs['keys'], runs['in-task'])
+
     def test_stair_gate_with_several_workers_equals_one_worker(self):
         from chim.collision import stair_gate
         _, _, _, _, models, frames = load_world(self.out, Failures())
@@ -155,7 +188,8 @@ class ChimStageSpeedTests(unittest.TestCase):
     def test_the_stage_passes_its_workers_to_the_validation(self):
         source = (ROOT / 'tools' / 'chim_build.py').read_text(encoding='utf-8')
         self.assertIn('report_world(', source)
-        self.assertEqual(source.count('jobs=resolve_jobs(a.jobs)'), 3)
+        # validation, heap gate, zone walk and (BUILD-CHIM-SERIAL-SECTIONS-44) the statistics
+        self.assertEqual(source.count('jobs=resolve_jobs(a.jobs)'), 4)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,7 @@
 # Points-of-interest checklist
 
+_Last updated with AmiWind v0.0.30 (7 October 2026)._
+
 `tools/poi_checklist.py` reads the user's own `Morrowind.esm` and lists every
 named exterior place and every interior cell, grouped by region, as a
 checklist for converting and inspecting the world place by place.

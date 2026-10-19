@@ -1,5 +1,7 @@
 # v0.0.23-dev4 tester feedback
 
+_Last updated with AmiWind v0.0.23-dev5 (29 September 2026)._
+
 Recorded 29 September 2026; follow-up checkpoint v0.0.23-dev5.
 
 | Report | Follow-up |

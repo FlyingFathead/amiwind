@@ -1,10 +1,6 @@
 # NPC pathfinding: how NPCs find their way
 
-Investigation, 9 October 2026 (maintainer request). How Morrowind, OpenMW and Quake
-move their characters around, what AmiWind does today, what the options cost
-on a 68040, and a staged plan. The CHIM side (where the walkable graph lives
-in the world format, budgets and gates) is in
-[CHIM NPC pathfinding](chim/CHIM_NPC_PATHFINDING.md).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -22,6 +18,12 @@ in the world format, budgets and gates) is in
 - [Recommendation and staged plan](#recommendation-and-staged-plan)
 
 <!-- contents end -->
+
+Investigation, 9 October 2026 (maintainer request). How Morrowind, OpenMW and Quake
+move their characters around, what AmiWind does today, what the options cost
+on a 68040, and a staged plan. The CHIM side (where the walkable graph lives
+in the world format, budgets and gates) is in
+[CHIM NPC pathfinding](chim/CHIM_NPC_PATHFINDING.md).
 
 Status: design and measurement. No engine or QuakeC change has been made.
 Every number below is an aggregate measured from the maintainer's own master files

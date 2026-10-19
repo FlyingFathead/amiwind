@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Symptom and location
 Release preflight rejects the authored CHIM inclusion metadata script. The live
 tracker page-copy list also omits that script and its JSON equivalent.

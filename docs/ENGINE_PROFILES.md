@@ -1,7 +1,6 @@
 # Engine profiles
 
-The AGA engine (`engine/aga/`) can be compiled two ways. Which one a build used is recorded in its
-engine receipt, its image receipt, its build summary and on the boot check screen.
+_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +14,9 @@ engine receipt, its image receipt, its build summary and on the boot check scree
 - [Measurements](#measurements)
 
 <!-- contents end -->
+
+The AGA engine (`engine/aga/`) can be compiled two ways. Which one a build used is recorded in its
+engine receipt, its image receipt, its build summary and on the boot check screen.
 
 | Profile | What it compiles | Default |
 | --- | --- | --- |

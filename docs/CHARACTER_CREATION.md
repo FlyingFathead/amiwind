@@ -1,13 +1,6 @@
 # Next milestone: dock and Census Office character creation
 
-**Status:** bounded implementation present in v0.0.21-dev1; acceptance remains
-in progress. See [checkpoint scope](RELEASE-v0.0.21-dev1.md). The audit below
-remains the behavioral target. Numeric journal indices, globals and inventory
-counts are distinct from the intro UI stage; no universal linear quest enum.
-NPCs retain individual local state and timers. A general script/condition
-interpreter and full dialogue-topic state remain future work.
-The maintainer chose maintenance first on 28 September 2026, then this work. Keep
-[the intermittent freezes](BUGS.md) open throughout implementation and testing.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -24,6 +17,15 @@ The maintainer chose maintenance first on 28 September 2026, then this work. Kee
 - [Character UI V2: completion controls and remaining artwork](#character-ui-v2-completion-controls-and-remaining-artwork)
 
 <!-- contents end -->
+
+**Status:** bounded implementation present in v0.0.21-dev1; acceptance remains
+in progress. See [checkpoint scope](RELEASE-v0.0.21-dev1.md). The audit below
+remains the behavioral target. Numeric journal indices, globals and inventory
+counts are distinct from the intro UI stage; no universal linear quest enum.
+NPCs retain individual local state and timers. A general script/condition
+interpreter and full dialogue-topic state remain future work.
+The maintainer chose maintenance first on 28 September 2026, then this work. Keep
+[the intermittent freezes](BUGS.md) open throughout implementation and testing.
 
 ## Original source audit
 

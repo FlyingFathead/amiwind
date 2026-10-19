@@ -1,5 +1,7 @@
 # Filled terrain and fog
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 Checkpoint-002 adds a 97x97 heightfield over the nine exported Seyda Neen cells.
 The 68000 samples 80 screen columns, four pixels wide, from near to far. Each
 column retains its highest filled pixel; terrain below that boundary is hidden.

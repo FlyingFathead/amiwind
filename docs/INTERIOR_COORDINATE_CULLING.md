@@ -1,5 +1,7 @@
 # Interior geometry lost to an exterior distance filter
 
+_Last updated with AmiWind v0.0.24-rc1 (30 September 2026)._
+
 Discovered during the v0.0.24-rc1 Balmora conversion, 30 September 2026.
 
 ## 1. What was broken

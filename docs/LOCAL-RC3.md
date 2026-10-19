@@ -1,5 +1,7 @@
 # Local source checkpoint — v0.0.25-rc3
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Verify `AmiWind-v0.0.25-rc3-SHA256SUMS` beside the downloaded archives. Extract the
 patch into a fresh directory outside the checkout. Apply with the included
 `tools/apply_source_update.py`, supplying `--source`, `--target` and a new external

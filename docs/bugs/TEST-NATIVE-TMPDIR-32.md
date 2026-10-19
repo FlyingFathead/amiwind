@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.40 (15 October 2026)._
+
 ## Status: 8 October 2026
 
 Fixed in source on v0.0.32-dev. Found by the parallel test runner work.

@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.40 (15 October 2026)._
+
 ## Status: 11 October 2026
 
 Fixed in v0.0.36-dev5: the terrain watcher now runs until it sees the freed budget (8 workers), for at most 20 s.

@@ -1,5 +1,7 @@
 # Horstator’s musings (7 Oct 2026): “Well, It Looks Like You Should Always Check and Recheck—”
 
+_Last updated with AmiWind v0.0.31 (8 October 2026)._
+
 —and then check again, and then, just to be thorough, look at the thing you
 were sure you had already looked at.
 

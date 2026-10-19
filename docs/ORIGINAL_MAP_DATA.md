@@ -1,5 +1,7 @@
 # Original map data and private reference layers
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 14 October 2026. This is a source/format audit and implementation plan, not a map import, rendered comparison or coverage change. The inspected OpenMW reference is revision `a882697616a186ef394ae049df79f96de793d053`; generation details can differ between versions. The original executable's renderer was not inspected.
 
 ## What is stored and what is generated

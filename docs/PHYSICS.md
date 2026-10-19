@@ -1,5 +1,7 @@
 # Physics: how AmiWind uses Quake's physics
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 How AmiWind uses the physics of the AmiQuake engine it runs on (movement, collision, water, NPC movement), what
 it keeps, what it bypasses and what comes next. Review of 10 October 2026 (v0.0.36 development line), read from the
 source; the costs quoted come from the measurements on the linked bug pages (FS-UAE, relative figures).

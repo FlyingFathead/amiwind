@@ -1,5 +1,7 @@
 # AmiWind v0.0.17 validation
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Observed results
 
 - Maintainer test-004: all 12 conversion, engine and HDF stages completed using the

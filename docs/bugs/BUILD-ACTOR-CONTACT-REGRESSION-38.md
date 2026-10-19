@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 The full development rebuild stops at actor contact: 116 failed contacts and
 three explicit exceptions. The dev2 control has116 grounded and the same three

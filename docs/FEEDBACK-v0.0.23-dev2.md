@@ -1,5 +1,7 @@
 # Maintainer playtest feedback — v0.0.23-dev2
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Received 29 September 2026 (Europe/Helsinki), following publication of commit
 `e368511551657b67cf84049934b093c97749d0ae`. These are observed playtest reports;
 a passing synthetic test does not close a maintainer-reported gameplay defect.

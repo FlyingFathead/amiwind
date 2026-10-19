@@ -23,6 +23,10 @@ extern int AW_DrawDistance(void);
 extern cvar_t aw_surface_order;
 void AW_Mark(int stage) {marks[stage]=Sys_FloatTime();}
 void AW_EndMark(int stage) {last_stage[stage]=Sys_FloatTime()-marks[stage];stages[stage]+=last_stage[stage];}
+/* Rows the chunky-to-planar conversion handled this run (vid_amiga.c converts rows 0 down to the lowest changed
+ * area): how often the HUD below the 3D view went through it, against conversions of the 3D view alone. */
+static unsigned long c2p_rows, c2p_calls, c2p_full;static int c2p_height;
+void AW_C2PRows(int rows, int height) {c2p_rows+=rows>0?rows:0;c2p_calls++;if(rows>=height)c2p_full++;c2p_height=height;}
 void AW_ProfileFrame(void) {
     double now,dt;vec3_t *p;
     if(cls.state!=ca_connected || !cl.worldmodel)return;
@@ -52,7 +56,7 @@ void AW_ProfileClose(void) {
     AW_LogPrintf(AW_LOG_FRAME,"efrag_peak=%d\nefrag_capacity=%d\nefrag_limit=%d\n",aw_efrags_peak,aw_efrags_capacity,AW_EFRAG_LIMIT);
     AW_LogPrintf(AW_LOG_FRAME,"surface_overflow_frames=%lu\nedge_overflow_frames=%lu\nmax_surfaces_seen=%d\nmax_edges_seen=%d\n",surface_overflow_frames,edge_overflow_frames,r_maxsurfsseen,r_maxedgesseen);
     AW_LogPrintf(AW_LOG_FRAME,"audio_warmup_updates=%lu\naudio_warmup_missed_frames=%lu\n",audio_warmup,warmup_frames);
-    {AW_LogPrintf(AW_LOG_FRAME,"frames=%d\nelapsed_ms=%ld\nworst_frame_us=%ld\nheap_used_bytes=%d\n",frames,(long)(sum*1000),(long)(worst*1000000),Hunk_LowMark()+Hunk_HighMark());AW_LogPrintf(AW_LOG_FRAME,"audio_late_updates=%lu\nmissed_audio_frames=%lu\nfree_chip_bytes=%lu\nfree_fast_bytes=%lu\n",audio_late,missed_frames,AvailMem(MEMF_CHIP),AvailMem(MEMF_FAST));AW_LogPrintf(AW_LOG_FRAME,"world_ms=%ld\nentities_ms=%ld\nc2p_ms=%ld\naudio_ms=%ld\n",(long)(stages[0]*1000),(long)(stages[1]*1000),(long)(stages[2]*1000),(long)(stages[3]*1000));AW_LogPrintf(AW_LOG_FRAME,"hands_ms=%ld\nserver_ms=%ld\n",(long)(stages[4]*1000),(long)(stages[5]*1000));}
+    {AW_LogPrintf(AW_LOG_FRAME,"frames=%d\nelapsed_ms=%ld\nworst_frame_us=%ld\nheap_used_bytes=%d\n",frames,(long)(sum*1000),(long)(worst*1000000),Hunk_LowMark()+Hunk_HighMark());AW_LogPrintf(AW_LOG_FRAME,"audio_late_updates=%lu\nmissed_audio_frames=%lu\nfree_chip_bytes=%lu\nfree_fast_bytes=%lu\n",audio_late,missed_frames,AvailMem(MEMF_CHIP),AvailMem(MEMF_FAST));AW_LogPrintf(AW_LOG_FRAME,"world_ms=%ld\nentities_ms=%ld\nc2p_ms=%ld\naudio_ms=%ld\n",(long)(stages[0]*1000),(long)(stages[1]*1000),(long)(stages[2]*1000),(long)(stages[3]*1000));AW_LogPrintf(AW_LOG_FRAME,"hands_ms=%ld\nserver_ms=%ld\n",(long)(stages[4]*1000),(long)(stages[5]*1000));AW_LogPrintf(AW_LOG_FRAME,"c2p_rows=%lu\nc2p_calls=%lu\nc2p_full_height_calls=%lu\nscreen_rows=%d\n",c2p_rows,c2p_calls,c2p_full,c2p_height);}
     AW_LogEnd(AW_LOG_FRAME);
 }
 /* dbg fpucount (aw_fpucount 1): once a second, the per-frame average and peak

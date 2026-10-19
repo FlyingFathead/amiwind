@@ -1,5 +1,7 @@
 # Architecture
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Core world/cell/chunk design: [WORLD_MAPPING_PLAN.md](WORLD_MAPPING_PLAN.md).
 
 The host reads the maintainer's game data, converts a selected region, and writes a

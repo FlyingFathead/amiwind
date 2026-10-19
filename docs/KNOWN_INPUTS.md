@@ -1,5 +1,7 @@
 # Known inputs: which files did the builder get?
 
+_Last updated with AmiWind v0.0.32-dev1 (8 October 2026)._
+
 The builder converts files you supply: your Morrowind data, optionally your own Amiga
 FPU support libraries (`--amiga-libs`) and your Kickstart ROM (`--kickstart-file`).
 At the start of every build it identifies each of them by size, SHA-256 and the version

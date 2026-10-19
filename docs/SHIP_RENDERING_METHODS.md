@@ -1,5 +1,7 @@
 # Preserved ship rendering methods
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 `method_001` is the exterior ship from **v0.0.14-dev1 / checkpoint-015**, specifically
 preserved at the maintainer's request because its distant appearance is the reference.
 Its full source and private image ZIPs remain immutable.

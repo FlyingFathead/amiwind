@@ -1,5 +1,7 @@
 # Camera marks
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 A camera mark is a named shot: the map (or the original Morrowind position), the position, heading and pitch, the
 time of day, the headlamp and the fog distance. One console command saves the shot you are looking at, another
 brings you back to exactly that shot, so speed measurements, bug reports and before/after screenshots can name a

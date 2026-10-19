@@ -1,5 +1,7 @@
 # Morrowind editions: what the builder reads
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 AmiWind converts only the master files in `Data Files`: the three ESM masters and
 their BSA archives. This page records which editions have been checked against
 each other. It lists names, sizes and SHA-256 hashes only; no game files are part of

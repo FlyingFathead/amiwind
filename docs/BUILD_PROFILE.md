@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -1094,9 +1094,12 @@ How many workers walk at once is set by cores AND by memory (CHIM-STAIR-GATE-POO
 Each worker reads a whole frame (its scenes and polygons): measured high-water marks were 259-548 MiB for region
 frames and 2,643 MiB for the whole-city Vivec frame, about 100 MiB plus 17 times the frame's placed bytes (chunk
 images plus the model image of every owned placement). The gate estimates every frame to walk as 128 MiB plus 18
-times its placed MiB, gives each worker the share of the largest, and runs no more workers than 80 % of the memory
-left in its container holds (cgroup `memory.max` minus `memory.current`; the host's MemAvailable only when the
-container has no limit). The line `CHIM stair gate: workers: ...` says which bound won and why. A worker lets go of
+times its placed MiB and, since v0.0.44, admits each walk unit at its own frame's size: units start while 80 % of the
+memory left in its container holds them beside the units in flight (cgroup `memory.max` minus `memory.current` less
+the reclaimable file cache; the host's MemAvailable only when the container has no limit), largest first, and a
+larger unit waiting at the head keeps its room reserved (`tools/build_parallel.py governed_map(item_mib=...)`).
+Before, every worker got the share of the largest frame: the v0.0.44-dev1 build walked on 4 of 24 workers at
+2,855 MiB each while its region frames hold about 300 MiB (BUILD-CHIM-SERIAL-SECTIONS-44). The line `CHIM stair gate: workers: ...` says which bound won and why. A worker lets go of
 the frames it keeps built, oldest first, until the next frame fits its share. A map in the step's shared worker pool
 keeps to the tasks it asked for (`tools/build_parallel.py completed_map`): before, 11 walk workers asked meant 22
 frame walks at once in the 24-worker stage pool, and the Vivec palace sandboxes ran out of memory. A worker that is
@@ -1323,8 +1326,26 @@ time and build-machine threads used:
 | --- | --- | --- |
 | `CHIM world: areas side by side` | every region frame and, when the region frames fill the workers at least four times over, the towns too (towns first), one area per worker | the stage pool |
 | `CHIM world: areas in turn` | areas not prepared side by side (a sandbox with few region frames, or `AMIWIND_CHIM_TOWN_PREP=after`), one after another, each with every worker | inside each area |
-| `CHIM world: visibility rows` | every frame's visibility rows: towns first, their blocks over every worker; then the one-cell frames whole on the workers, largest first (`AMIWIND_CHIM_VIS_ROWS=serial`: one frame after another) | the stage pool |
-| `CHIM world: pack` | the world files, frame by frame in pack order | one |
+| `CHIM world: aprons, ownership and effects` | the apron dispositions, the ownership checks of every frame's source (cores found through a grid of cells) and the texture effects | one |
+| `CHIM world: visibility rows` | every frame's placement layout and visibility rows on the workers, one frame per task, largest first; a town's layout there too, then its row blocks over every worker (`AMIWIND_CHIM_VIS_ROWS=frames-parent`: the layouts in the parent, the v0.0.43 method; `serial`: one frame after another) | the stage pool |
+| `CHIM world: pack` | the world files, frame by frame in pack order: one walk, because model, texture and terrain ids are handed out as the walk first meets them (serial by nature; the visibility rows come packed from the workers) | one |
+| `CHIM world: far terrain` | each frame's far terrain layer, one frame per task | the stage pool |
+| `CHIM world: source and receipt` | `chim-source.json` and `chim-receipt.json`, their long lists encoded on the workers (`tools/parallel_json.py`, the same bytes as `json.dumps`) | the stage pool |
+
+Measured 19 October 2026 (BUILD-CHIM-SERIAL-SECTIONS-44) on 156 region frames around Balmora plus Balmora, the inputs of
+the v0.0.44-dev1 build, 16 CPUs and 16 GiB, the unit cache warm, a build and gate suites running beside it (after: three
+runs); every world file, the receipt, the source manifest,
+the validation, stair and heap reports byte for byte (SHA-256) the same before and after:
+
+| Section | before | after |
+| --- | ---: | ---: |
+| between the areas and the visibility rows | 4 s, 1 core | 1.6-2.1 s, 1 core |
+| visibility rows | 33.1 s, 3.8 cores | 7.7-14.7 s, 9.5-12.7 cores |
+| pack | 7.0 s, 1 core | 3.3-5.5 s, 1 core (the walk alone) |
+| end of the conversion (far terrain, source, receipt, heap check) | 22 s, 1 core | 8-11 s, far terrain 4-7 cores |
+| validation | 1 min 13 s, 8.5 cores | 45-55 s, 11.6-11.8 cores |
+| stair gate | 2 min 20 s, 8.5 cores (9 of 16 workers by memory) | 1 min 2 s - 1 min 33 s, 12.4-15.5 cores (16 of 16) |
+| statistics | 6.8 s, 1 core | 4.3-6.2 s, 1.5 cores |
 
 Each area's source stage parses the game's master once per worker process and remembers the
 models it read by their SHA-256 (`tools/chim/source_memo.py`; `AMIWIND_SOURCE_MEMO=off` reads

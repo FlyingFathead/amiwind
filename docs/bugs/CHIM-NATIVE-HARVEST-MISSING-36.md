@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+
 ## Status: 10 October 2026
 
 Open. Found while fixing BUILD-IMAGE-CHIM-NATIVE-TOWN-36.

@@ -1,5 +1,7 @@
 # CHIM cell result format (aw-cell-result-1)
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 A cell result file is how a conversion run (CHIMport, or any tool that converts cells) tells the [CHIM Progress Tracker](PROGRESS_TRACKER.md) what happened to each exterior cell: whether it converted, what each audit found, what went wrong and the figures that were measured. The tracker stores the file and folds it into `cell-progress.json`; the conversion run never edits that file itself.
 
 ```bash

@@ -1,5 +1,7 @@
 # First repository release: v0.0.16
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 The maintainer runs this workflow on Linux or WSL. It creates a **private** repository
 at `FlyingFathead/amiwind`, pushes `main`, waits for that commit's GitHub Actions
 source/asset-free build to succeed, then creates tag `v0.0.16` and a demo

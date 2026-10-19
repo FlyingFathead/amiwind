@@ -1,5 +1,7 @@
 # Checkpoint-016: first interior and repeatable conversion stages
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Runtime **v0.0.15-dev1**, source **0.12.0.dev1**, 27 September 2026.
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 

@@ -1,5 +1,7 @@
 # Legacy filesystem revalidation fault
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Confirmed cause
 
 The maintainer reported `Error validating AMIWIND / Block 1146049281 out of range`.

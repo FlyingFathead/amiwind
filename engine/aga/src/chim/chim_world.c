@@ -21,6 +21,7 @@
 #include "chim_local.h"
 #include "aw_town.h"
 #include "aw_mappath.h"
+#include "aw_spike.h"
 #ifdef AMIGA
 #include <proto/exec.h>
 #include <exec/memory.h>
@@ -187,6 +188,7 @@ int Chim_PackOpen (chim_pack_t *pack, const char *relative)
 	int bytes;
 
 	memset (pack, 0, sizeof(*pack));
+	pack->row = -1;
 	if (strlen (relative) > CHIM_PATH_CHARS)
 		return 0;
 	sprintf (pack->path, "chim/%s", relative);
@@ -211,16 +213,40 @@ void Chim_PackClose (chim_pack_t *pack)
 	pack->file = NULL;
 }
 
-int Chim_PackRead (chim_pack_t *pack, long offset, void *out, long bytes)
+/* The disk read itself (the prefetch reads ahead through it, uncounted). */
+int Chim_PackReadRaw (chim_pack_t *pack, long offset, void *out, long bytes)
 {
 	if (!pack->file || offset < 0 || bytes < 0 || offset > pack->bytes || bytes > pack->bytes - offset)
 		return 0;
 	if (fseek (pack->file, pack->base + offset, SEEK_SET) ||
 		fread (out, 1, (size_t)bytes, pack->file) != (size_t)bytes)
 		return 0;
-	chim_world.bytes_read += bytes;
-	chim_world.reads++;
 	return 1;
+}
+
+/* A read of a file-table file whose bytes the prefetch holds is copied from
+ * spare Fast RAM (chim_prefetch.c, the same bytes); every other read goes to
+ * the disk and is counted (dbg rcount "rd", the "chim" loads line). */
+int Chim_PackRead (chim_pack_t *pack, long offset, void *out, long bytes)
+{
+	double spike_t0;
+	int ok;
+	if (!pack->file || offset < 0 || bytes < 0 || offset > pack->bytes || bytes > pack->bytes - offset)
+		return 0;
+	if (pack->row >= 0 && ChimPrefetch_Read (pack->row, offset, out, bytes))
+	{
+		chim_world.prefetch_hits++;
+		return 1;
+	}
+	AW_SPIKE_BEGIN (spike_t0);
+	ok = Chim_PackReadRaw (pack, offset, out, bytes);
+	AW_SPIKE_END (AW_SP_READ, spike_t0, ok ? bytes : 0);
+	if (ok)
+	{
+		chim_world.bytes_read += bytes;
+		chim_world.reads++;
+	}
+	return ok;
 }
 
 /* A file of the index's file table, opened on demand; a few stay open (the
@@ -259,6 +285,7 @@ chim_pack_t *Chim_File (int row)
 		return NULL;
 	}
 	chim_world.opens++;
+	open_files[slot].row = row;
 	open_rows[slot] = row;
 	open_stamp[slot] = ++open_clock;
 	return &open_files[slot];
@@ -439,6 +466,42 @@ static int AssetsValid (const chim_asset_t *a, unsigned count)
 	return 1;
 }
 
+/* The decoded index kept in spare Fast RAM across maps (CHIM-CROSSING-SYNC-LOAD-43):
+ * every map of the world reads the same chim/world.cwi, so with the prefetch
+ * on and banks that survive a map change it is read once per start and
+ * checked against the file's size and head on every later map. */
+static int		index_resident;
+static byte		index_head[CHIM_HEADER_BYTES + CHIM_SETTINGS_BYTES + CHIM_TOC_BYTES];
+static long		index_file_bytes;
+static chim_world_t	index_saved;		/* the index fields of chim_world after the read */
+static unsigned long	index_reused;
+
+static void IndexDrop (void)
+{
+	if (index_resident && index_user.data)
+	{
+		ChimZone_Unlock (index_user.data);
+		ChimZone_Free (&index_user);
+	}
+	index_resident = 0;
+}
+
+static void IndexFields (chim_world_t *to, const chim_world_t *from)
+{
+	to->settings = from->settings;
+	to->toc = from->toc;
+	to->files = from->files;
+	to->file = from->file;
+	to->paths = from->paths;
+	to->models = from->models;
+	to->textures = from->textures;
+	to->model = from->model;
+	to->texture = from->texture;
+	to->model_slot = from->model_slot;
+	to->texture_slot = from->texture_slot;
+	to->minor = from->minor;
+}
+
 /* world.cwi: header, settings, table of contents, then the file table and
  * the model and texture directories, kept in the zone while the map runs.
  * Names are not read: the engine finds models and textures by id. */
@@ -454,6 +517,22 @@ static int ReadIndex (void)
 		return 0;
 	if (!Chim_PackRead (&pack, 0, head, sizeof(head)))
 		goto done;
+	if (index_resident && (!ChimPrefetch_Active () || !index_user.data))
+		IndexDrop ();
+	if (index_resident && pack.bytes == index_file_bytes && !memcmp (head, index_head, sizeof(head)))
+	{
+		/* The same world: the decoded tables are still in RAM. The slots
+		 * start empty as after a fresh read and take the models and textures
+		 * the banks kept (ChimModels_IndexSlots). */
+		IndexFields (&chim_world, &index_saved);
+		memset (chim_world.model_slot, 0, chim_world.models*sizeof(chim_model_t *));
+		memset (chim_world.texture_slot, 0, chim_world.textures*sizeof(texture_t *));
+		ChimModels_IndexSlots ();
+		index_reused++;
+		ok = 1;
+		goto done;
+	}
+	IndexDrop ();
 	if (!ChimFormat_Header (head, pack.bytes, "INDX", &h))
 	{
 		/* Said with the version found: a world of another format is refused
@@ -478,7 +557,11 @@ static int ReadIndex (void)
 	size = t->files*sizeof(chim_file_row_t) + (t->models + t->textures)*sizeof(chim_asset_t) +
 		t->models*sizeof(chim_model_t *) + t->textures*sizeof(texture_t *) +
 		(CHIM_INDEX_KEEP_PATHS ? t->files*(CHIM_PATH_CHARS+1) : 0);
-	if (!ChimZone_Alloc (&index_user, size, CHIM_KIND_INDEX, 0))
+	/* With the prefetch on, in RAM that survives the map (else, or when it
+	 * has no room: the map's zone, the first method). */
+	if (ChimPrefetch_Active () && ChimZone_AllocPersistent (&index_user, size, CHIM_KIND_INDEX, 0))
+		index_resident = 1;
+	else if (!ChimZone_Alloc (&index_user, size, CHIM_KIND_INDEX, 0))
 		goto done;
 	ChimZone_Lock (index_user.data);
 	/* Pointers first: every table stays aligned for its type. */
@@ -499,8 +582,16 @@ static int ReadIndex (void)
 		goto done;
 	/* Models and textures kept from an earlier map (the cache bank). */
 	ChimModels_IndexSlots ();
+	if (index_resident)
+	{
+		memcpy (index_head, head, sizeof(head));
+		index_file_bytes = pack.bytes;
+		IndexFields (&index_saved, &chim_world);
+	}
 	ok = 1;
 done:
+	if (!ok && index_resident)
+		IndexDrop ();
 	Chim_PackClose (&pack);
 	return ok;
 }
@@ -541,7 +632,8 @@ static void MapEnd (void)
 	ChimStatics_End ();
 	ChimModels_Abort ();
 	Chim_FilesClose ();
-	if (index_user.data)
+	/* A resident index stays (locked) for the next map of the world. */
+	if (index_user.data && !index_resident)
 	{
 		ChimZone_Unlock (index_user.data);
 		ChimZone_Free (&index_user);
@@ -675,13 +767,24 @@ static void Refuse (int cx, int cy, const char *why)
 		MapModel () ? MapModel ()->name : "?", (long)cx, (long)cy, why);
 }
 
+static void MapBeginWork (const char *entities, double spike_t0);
+
 static void MapBegin (const char *entities)
+{
+	double spike_t0;
+	AW_SPIKE_BEGIN (spike_t0);
+	MapBeginWork (entities, spike_t0);
+}
+
+static void MapBeginWork (const char *entities, double spike_t0)
 {
 	int cx, cy, size, free_bytes;
 	void *memory;
+	double index_t0;
 
 	MapEnd ();
 	failure[0] = 0;
+	ChimPrefetch_MapBegin ();
 	if (!available || !WorldspawnFrame (entities, &cx, &cy))
 		return;
 	{
@@ -731,11 +834,13 @@ static void MapBegin (const char *entities)
 	}
 	ChimZone_Lock (buffer_user.data);
 	chim_world.buffer = buffer_user.data;
+	AW_SPIKE_BEGIN (index_t0);
 	if (!ReadIndex ())
 	{
 		Refuse (cx, cy, "its CHIM world (chim/world.cwi) cannot be read");
 		return;
 	}
+	AW_SPIKE_END (AW_SP_CHIM_INDEX, index_t0, 0);
 	if (!ChimChunks_Begin (cx, cy))
 	{
 		Refuse (cx, cy, "the CHIM world has no valid pack for this frame");
@@ -770,6 +875,7 @@ static void MapBegin (const char *entities)
 			(long)cx, (long)cy, (long)chim_frame.count, (long)chim_world.files, (long)chim_world.models,
 			(long)chim_world.textures, (long)(size/1024));
 	Con_DPrintf ("CHIM %s: frame %ld %ld, zone %ld KiB\n", CHIM_VERSION, (long)cx, (long)cy, (long)(size/1024));
+	AW_SPIKE_END (AW_SP_CHIM_BEGIN, spike_t0, 0);
 }
 
 /* ---------------------------------------------------------------- per frame */
@@ -797,10 +903,16 @@ static void Tick (vec3_t origin)
 	tick_frame = host_framecount;
 	/* Each frame reads its budget plus one unit (0: one unit a frame). */
 	budget = (long)(chim_read_kib.value * 1024);
-	/* The first tick loads the whole ring before the player moves. */
-	ChimChunks_Tick (origin, budget, !primed);
-	primed = 1;
-	Work (started);
+	{
+		/* The first tick loads the whole ring before the player moves. */
+		unsigned long reads = chim_world.reads;
+		ChimChunks_Tick (origin, budget, !primed);
+		primed = 1;
+		Work (started);
+		AW_SpikeAdd (AW_SP_TICK, Sys_FloatTime () - started, 0);
+		/* Spare: the ring read nothing from the disk this frame. */
+		ChimPrefetch_Step (origin, chim_world.reads == reads);
+	}
 }
 
 /* A closed frame edge: the player walking at one of the frame's bounds (its
@@ -882,6 +994,7 @@ static void Spawn (vec3_t origin)
 	if (chim_debug.value)
 		Con_Printf ("CHIM: prime at %ld %ld\n", (long)origin[0], (long)origin[1]);
 	ChimChunks_Prime (origin, (long)chim_read_kib.value * 1024);
+	AW_SpikeAdd (AW_SP_PRIME, Sys_FloatTime () - started, 0);
 	if (chim_debug.value)
 		Con_Printf ("CHIM: primed: %ld active, %ld loaded, %lu models, %lu textures, %lu KiB in %lu reads, %ld ms\n",
 			(long)chim_frame.active, (long)chim_frame.loaded, chim_world.model_loads, chim_world.texture_loads,
@@ -907,6 +1020,7 @@ static void Link (void)
 	started = Sys_FloatTime ();
 	ChimChunks_Link ();
 	Work (started);
+	AW_SpikeAdd (AW_SP_LINK, Sys_FloatTime () - started, 0);
 }
 
 /* The view distance CHIM's ring follows: the effective one (aw_fog.c), which
@@ -1069,9 +1183,51 @@ static void Teleport (void)
 
 /* ---------------------------------------------------------------- status */
 
+#ifdef AMIGA
+void AW_ZoneLine (int blocks);		/* zone.c */
+#endif
+
+/* "chim prefetch ...", "chim spikes MS / report", "chim zone [blocks]":
+ * settings and reports without registered commands or cvars of their own
+ * (tests/resident_registry_budget.json). 1 when handled. */
+static int Subcommand (void)
+{
+	char *argv[4];
+	int i, argc = Cmd_Argc () - 1;
+	if (argc < 1 || argc > 4)
+		return 0;
+	for (i=0 ; i<argc ; i++)
+		argv[i] = Cmd_Argv (i + 1);
+	if (!strcmp (argv[0], "prefetch"))
+	{
+		ChimPrefetch_Command (argc, argv);
+		return 1;
+	}
+	if (!strcmp (argv[0], "spikes"))
+	{
+		if (argc == 2 && !strcmp (argv[1], "report"))
+			AW_SpikeReport ();
+		else if (argc == 2)
+			AW_SpikeSet (atoi (argv[1]));
+		else
+			Con_Printf ("chim spikes MS (0: off; now %ld) / chim spikes report\n", (long)AW_SpikeThreshold ());
+		return 1;
+	}
+	if (!strcmp (argv[0], "zone"))
+	{
+#ifdef AMIGA
+		AW_ZoneLine (argc == 2 && !strcmp (argv[1], "blocks"));
+#endif
+		return 1;
+	}
+	return 0;
+}
+
 static void Status (void)
 {
 	chim_zone_stats_t s;
+	if (Subcommand ())
+		return;
 	ChimZone_Stats (&s);
 	Con_Printf ("CHIM %s, reads world format %ld.%ld-%ld.%ld (this world: %ld.%ld): %s\n", CHIM_VERSION,
 		(long)CHIM_FORMAT_MAJOR, (long)CHIM_FORMAT_MINOR_OLDEST, (long)CHIM_FORMAT_MAJOR, (long)CHIM_FORMAT_MINOR,
@@ -1091,6 +1247,9 @@ static void Status (void)
 		chim_world.failed_loads, chim_world.bytes_read/1024, chim_world.reads, chim_world.opens);
 	Con_Printf ("zone: %lu allocations, %lu evictions, %lu failures; prefetch held for room %lu times\n",
 		s.allocations, s.evictions, s.failures, ChimChunks_PrefetchHeld ());
+	ChimPrefetch_Report ();
+	Con_Printf ("index: %s, reused on %lu map starts\n", index_resident ? "kept in spare Fast RAM across maps" :
+		"read with each map", index_reused);
 	if (active)
 		Con_Printf ("Hunk: zone %ld KiB; the map loads %ld KiB after it (stated %ld KiB, measured on its last load %ld KiB); chim_reserve_kib %ld kept beside both\n",
 			(long)(zone_bytes/1024), (long)(rest_used/1024), (long)(rest_stated/1024), (long)(RestMeasured (sv.name)/1024),
@@ -1219,6 +1378,26 @@ static int RCount (char *out, int size, long frames)
 	last_opens = chim_world.opens;
 	last_evictions = s.evictions;
 	return 1;
+}
+
+/* The spike line's CHIM counters (aw_spike.c): bytes read, reads, models,
+ * textures and chunks loaded, zone evictions, prefetch hits and bytes. */
+static void SpikeCounts (unsigned long *out, int count)
+{
+	chim_zone_stats_t s;
+	unsigned long v[AW_SPIKE_CHIM_COUNTS];
+	int i;
+	ChimZone_Stats (&s);
+	v[0] = chim_world.bytes_read;
+	v[1] = chim_world.reads;
+	v[2] = chim_world.model_loads;
+	v[3] = chim_world.texture_loads;
+	v[4] = chim_world.chunk_loads;
+	v[5] = s.evictions;
+	v[6] = chim_world.prefetch_hits;
+	v[7] = chim_world.prefetch_bytes;
+	for (i=0 ; i<count && i<AW_SPIKE_CHIM_COUNTS ; i++)
+		out[i] = v[i];
 }
 
 /* ---------------------------------------------------------------- start-up */
@@ -1471,6 +1650,9 @@ void Chim_Init (void)
 	Cmd_AddCommand ("chim", Status);
 	Cmd_AddCommand ("chim_tp", Teleport);
 	ChimZone_Reset ();
+	index_resident = 0;
+	index_user.data = NULL;
+	ChimPrefetch_Init ();
 	ChimModels_Init ();
 	ChimChunks_Init ();
 	COM_FOpenFile (CHIM_INDEX_NAME, &f);
@@ -1497,6 +1679,9 @@ void Chim_Init (void)
 	chim_story_hidden = AW_OpeningStoryHidden;		/* aw_opening.c */
 #endif
 	aw_chim_view_reach = ViewReach;
+#ifdef AMIGA
+	aw_chim_spike_counts = SpikeCounts;
+#endif
 	ChimFar_Hook ();
 	Con_Printf ("CHIM %s: %ld of %ld towns on CHIM (\"chim\" lists them)\n", CHIM_VERSION,
 		(long)TownReport (0), (long)AW_TOWN_COUNT);

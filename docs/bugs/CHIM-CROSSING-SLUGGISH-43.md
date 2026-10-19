@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -76,6 +76,9 @@ Planned for v0.0.45-dev1, in this order:
    the player just left stay until the memory is needed, so a crossing is a copy in memory instead of a disk read.
    The prefetch on branch `v0.0.43-prefetch` does the first part (measured: median crossing about 450 ms down to
    about 230 ms with 128 MB of RAM).
+   The cache adapts to the memory there is (maintainer, 19 October 2026): with 16 MB the game keeps what fits and
+   loads the rest at the border, as today; with 128 MB, 1 GiB or more it keeps proportionally more frames ready,
+   up to every frame the player can reach next. One build for all, sized at start from the free memory.
 2. Spread the loading over many frames: read a small piece (a chunk or a model) per rendered frame while the
    player walks through the band between the load radius and the active ring, instead of one blocking read at the
    border.
@@ -93,6 +96,11 @@ an edge and at a corner. The options, chosen by those numbers:
   frame, so the crossing only switches the active frame.
 - No whole-frame switch: chunks come and go one by one as they enter and leave the ring around the player.
 - The surface cache kept across the switch.
+
+Today's crossings carry almost no NPCs: most of the open world has no NPC placements yet (they come after the
+interiors and the object state, [roadmap](../ROADMAP.md#the-road-after-v0044-19-october-2026)). The streaming is
+designed and measured for the load they will add: each frame's actors, their models and their state are part of
+what is prepared before the border, and the measurements include a heavy town frame with its people in place.
 
 ## Verification
 

@@ -1,5 +1,7 @@
 # Intro movie conversion and playback
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Startup branding decision: 6 October 2026
 
 Keep AmiWind's own startup branding. Do not add a Bethesda/ZeniMax logo video

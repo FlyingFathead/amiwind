@@ -1,5 +1,7 @@
 # Installed Morrowind game inputs
 
+_Last updated with AmiWind v0.0.25-rc3 (1 October 2026)._
+
 Point `--data-files` at the installed game's `Data Files` directory or its
 installation root. The builder locates the named `Morrowind.esm` and
 `Morrowind.bsa` pair beneath that root. Use your own installed game files.

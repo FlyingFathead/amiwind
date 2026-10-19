@@ -1,5 +1,7 @@
 # OpenMW music and audio reference
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Behaviour reference for AmiWind, recorded 27 September 2026. This document is
 also a regression checklist: having all OST files on disk does not establish
 correct playback, automatic rotation, or uninterrupted audio.

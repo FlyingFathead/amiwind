@@ -1,5 +1,7 @@
 # Static scenery conversion experiment
 
+_Last updated with AmiWind v0.0.30 (7 October 2026)._
+
 Checkpoint-005 contains a working host exporter, not a native scene loader.
 Output is derived Morrowind content and must stay outside the source repository.
 

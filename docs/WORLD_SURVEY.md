@@ -1,5 +1,7 @@
 # Vvardenfell terrain and cell-density survey
 
+_Last updated with AmiWind v0.0.25-dev1 (1 October 2026)._
+
 The first complete base-master survey places Seyda Neen and Balmora in a shared
 world coordinate system. It is a conversion plan and inspection dataset. The
 native **M** screen uses its island overview. The v0.0.25-dev1

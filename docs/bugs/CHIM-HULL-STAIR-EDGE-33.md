@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Status: 9 October 2026
 
 Fixed in source on v0.0.33-chim-format (4b15583, 9904a04, b9093f3), ported to v0.0.33-miniwind

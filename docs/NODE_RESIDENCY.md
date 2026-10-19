@@ -1,5 +1,7 @@
 # Renderer nodes and point-collision nodes
 
+_Last updated with AmiWind v0.0.30 (7 October 2026)._
+
 The v0.0.27-rc3 memory investigation identified another representation cost:
 converted scenery's point-collision BSP nodes were expanded to renderer-sized
 `mnode_t` records, then copied into compact hull0 collision records. The scenery

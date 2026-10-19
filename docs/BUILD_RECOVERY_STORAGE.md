@@ -1,5 +1,7 @@
 # Build storage and recoverable checkpoints
 
+_Last updated with AmiWind v0.0.25 (2 October 2026)._
+
 Check available storage and memory **before** an expensive build. Include game
 inputs, tools, conversion output, persistent caches, staging, temporary/final
 images and verification copies. Shared-memory scratch consumes RAM as well as

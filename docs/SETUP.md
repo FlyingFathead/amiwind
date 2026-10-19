@@ -1,5 +1,7 @@
 # Setup with an existing Morrowind installation
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 The user supplies original game data. No game downloads, installer execution or
 account access happen in these tools. Install your purchased copy normally, then
 point this project at its `Data Files` directory or its parent game directory.

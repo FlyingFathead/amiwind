@@ -7,6 +7,7 @@
 #include "aw_region.h"
 #include "aw_world.h"
 #include "aw_log.h"
+#include "aw_spike.h"
 #ifdef AMIGA
 #include <proto/dos.h>
 #endif
@@ -237,7 +238,7 @@ void AW_DebugInit(void) {
     AW_InspectInit();
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
     AW_GalleryInit();AW_WorldUIInit();AW_DebugTorchInit();
-    AW_StreamInit();AW_PhotoInit();Chim_Init();
+    AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
     AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_CompanionInit();AW_CombatInit();AW_ViewInit();AW_LavaInit();AW_AnimInit();AW_AnimKitInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);

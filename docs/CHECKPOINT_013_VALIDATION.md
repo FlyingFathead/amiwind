@@ -1,5 +1,7 @@
 # Checkpoint-013: bounded collision and nearby greetings
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Runtime **v0.0.12-dev2**, public pipeline **0.9.0.dev2**, 27 September 2026.
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 

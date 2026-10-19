@@ -11,9 +11,17 @@ import console_commands_doc as doc
 
 class ConsoleCommandPageTests(unittest.TestCase):
     def test_page_matches_catalogue(self):
-        page = doc.render(doc.CATALOGUE.read_text(encoding='utf-8'))
-        self.assertEqual(doc.PAGE.read_bytes().decode('utf-8'), page,
-                         'run tools/console_commands_doc.py render')
+        current = doc.PAGE.read_bytes().decode('utf-8')
+        stamp = doc.page_stamp(current)
+        self.assertIsNotNone(stamp, 'the page carries its "Last updated" line: run tools/console_commands_doc.py render')
+        page = doc.render(doc.CATALOGUE.read_text(encoding='utf-8'), stamp)
+        self.assertEqual(current, page, 'run tools/console_commands_doc.py render')
+
+    def test_stamp_sits_under_the_title(self):
+        page = doc.render('AWDC1\nG|luma|s|\n', '_Last updated with AmiWind v0.0.45 (19 October 2026)._')
+        self.assertTrue(page.startswith('# AmiWind console commands\n\n_Last updated with AmiWind v0.0.45 '
+                                        '(19 October 2026)._\n\n'))
+        self.assertEqual(doc.page_stamp(page), '_Last updated with AmiWind v0.0.45 (19 October 2026)._')
 
     def test_aliases_share_one_row(self):
         page = doc.render('AWDC1\nG|luma indoor|h|<0..4>\nG|indoor luma|h|old\nG|luma|s|\n')

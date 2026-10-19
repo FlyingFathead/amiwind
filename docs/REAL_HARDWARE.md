@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.43-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -97,9 +97,25 @@ first, each under 2 GiB, so 2 GiB and more works too.
 - **Off for good:** Options > Extra RAM: Off (saved in `config.cfg` as `aw_autoram 0`; takes effect at the next
   start).
 - **If the memory cannot be taken,** the console says so and the game plays on the standard memory.
-- **The game heap stays at its built size** (11 MiB unless `-heapmb` or the builder's `--heap-mb` say otherwise):
-  the extra goes to CHIM's cache, where the streaming memory runs full (Ebonheart, Khuul). A larger heap for
-  Quake's own cache (actors and sounds) stays a manual setting until it is measured to help.
+- **The game heap grows with the machine** (from v0.0.43, ENGINE-HEAP-FIXED-SIZE-43): the heap is sized at start,
+  before CHIM's cache, from the largest free Fast RAM block less the same margin. It stays at the built size
+  (11 MiB) unless that room holds the built size plus 8 MiB, then grows by a quarter of the room beyond it, to
+  24 MiB at most; 128 MiB of Fast RAM gives a 24 MiB heap and an 82 MiB CHIM cache. Quake's own cache (actors and
+  sounds) then keeps what it loaded across map changes, and the maps keep their 2 MiB safety gap. 16 MiB keeps
+  exactly the built 11 MiB. `-heapmb N` sets the heap by hand (used as asked); Options > Extra RAM: Off keeps the
+  built size.
+- **The way ahead is read before you get there** (from v0.0.43, CHIM-CROSSING-SYNC-LOAD-43). Outdoors every cell is
+  its own map, so walking over a cell border is a map change. With extra RAM the engine reads the files of the
+  cells you are likely to enter next into spare RAM, a slice per frame while nothing else is read, and the
+  crossing takes them from there instead of the disk. Which cells: your cell is split into four quarters; the
+  corner nearest to you names the 2x2 block of cells that meet there, and its three neighbours are read first, the
+  one you are heading for first (the largest first when the RAM is short for all three); then your own cell, then
+  the rest of the 3x3 ring. The block moves to another corner only when you are 1,024 units past the cell's middle,
+  so walking along an edge or standing on a corner does not read and drop the same cells over and over. What was
+  read ahead is dropped first when a real load needs memory, and on its own only for cells more than half a cell
+  beyond the ring. The same RAM keeps the world's index and each map's placement counts, which every crossing read
+  again before. The bytes are the same, so the game looks and collides the same; 16 MiB machines read everything
+  from the disk exactly as before.
 
 ### The settings
 
@@ -109,7 +125,10 @@ These are in the engine now ([CHIM engine](chim/ENGINE.md), [memory guide](chim/
 | --- | --- | --- |
 | `-chimcache KIB` (start argument) | Extra Fast RAM for CHIM's cache, by hand: shared models and textures stay in memory across map changes instead of being read again. Taken once at start; if the memory is not there, the console says so and the standard budget is used. Given, it replaces the automatic size (`-chimcache 0`: no cache bank at all). | automatic |
 | `aw_autoram` (Options > Extra RAM, saved) | 1: free Fast RAM beyond the margin becomes CHIM's cache at the next start; 0: the standard memory always. | 1 |
-| `-heapmb N` (start argument) | The game heap in MiB for this start (1 to 2047). | 11 (the built size) |
+| `-heapmb N` (start argument) | The game heap in MiB for this start (1 to 2047), used as asked. | automatic: 11 (the built size), up to 24 with plenty of Fast RAM |
+| `chim prefetch 0` / `1` (console, not saved) | 1: read the cells ahead into spare Fast RAM and keep the world index there (only with extra RAM); 0: every read from the disk, the first method. `chim prefetch` alone prints what it did. | 1 |
+| `chim prefetch mib N` / `kib N` | The most it reads ahead, in MiB (also at most a quarter of CHIM's cache); how much it reads per frame, in KiB (one 32 KiB block at least), only in frames where nothing else is read. | 24 / 32 |
+| `chim spikes MS` (console) | Prints one console line for every frame of MS milliseconds or more, naming what ran in it (map start, index, ring prime, reads, sounds); `chim spikes report` sums them; `chim zone` prints the engine's small memory zone. For measurements. | 0 (off) |
 | `chim_prefetch` | How far ahead of the visible ring CHIM loads chunks (-1: the world's own value). | -1 |
 | `chim_lookahead` | Loads ahead in the direction you walk (-1: the world's prefetch margin, two or three times that with an automatic cache of 8 or 32 MiB and more). | -1 |
 | `chim_prefetch_room` | Prefetch only into free memory, so it never pushes out what is in use. | 1 |

@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Symptom and reproduction
 
 Run the full suite after expanding the town owners to original cell boundaries.

@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found by the world streamer measurement (Balmora's 64 shipped maps,

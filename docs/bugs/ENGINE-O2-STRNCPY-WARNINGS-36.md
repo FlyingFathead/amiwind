@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Status: 10 October 2026
 
 Fixed on the engine profile branch (v0.0.36-engine-profile): the copies use `Q_strcpy_bounded` (`common.h`), which

@@ -1,11 +1,6 @@
 # Builder profile: where a full build spends its time
 
-Measured 9 October 2026 from the build profiles (`build-profile.json`, section timers, one-second
-core samples) of the v0.0.33-rc1 builds, and from side-by-side runs of single passes. Every number
-says what host load it was taken under: all full builds of that day ran on a **busy host** (other
-builds and gates used 25 to 60 % of the 24 threads), so core counts and wall times are lower and
-longer than on a quiet host. Processor-seconds (CPU-s) are the steadier currency; wall times on a busy
-host are compared only with wall times of the same session.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +16,13 @@ host are compared only with wall times of the same session.
 - [Decisions for the maintainer](#decisions-for-the-maintainer)
 
 <!-- contents end -->
+
+Measured 9 October 2026 from the build profiles (`build-profile.json`, section timers, one-second
+core samples) of the v0.0.33-rc1 builds, and from side-by-side runs of single passes. Every number
+says what host load it was taken under: all full builds of that day ran on a **busy host** (other
+builds and gates used 25 to 60 % of the 24 threads), so core counts and wall times are lower and
+longer than on a quiet host. Processor-seconds (CPU-s) are the steadier currency; wall times on a busy
+host are compared only with wall times of the same session.
 
 How to read the columns:
 

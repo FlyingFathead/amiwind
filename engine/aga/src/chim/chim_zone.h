@@ -26,7 +26,8 @@
 #define CHIM_KIND_TEXTURE	6	/* a shared texture, id = texture id */
 #define CHIM_KIND_WORLD		7	/* the frame world pool (chim_graft.c) */
 #define CHIM_KIND_STATIC	8	/* streamed statics: their list, and each sprite model (chim_statics.c) */
-#define CHIM_KINDS			9
+#define CHIM_KIND_PREFETCH	9	/* raw file bytes read ahead into spare Fast RAM (chim_prefetch.c) */
+#define CHIM_KINDS			10
 
 /* Like cache_user_t: data is cleared when the block is evicted or freed. */
 typedef struct
@@ -72,6 +73,10 @@ unsigned long ChimZone_AutoStep (unsigned long largest, unsigned long *budget, i
 int ChimZone_AutoLookahead (unsigned long auto_bytes);
 
 void *ChimZone_Alloc (chim_user_t *user, int size, int kind, unsigned id);
+/* Only from banks that survive a map change (none: NULL, nothing evicted
+ * elsewhere); for the prefetch and what it keeps across maps. */
+void *ChimZone_AllocPersistent (chim_user_t *user, int size, int kind, unsigned id);
+int ChimZone_PersistentBytes (void);
 void *ChimZone_Check (chim_user_t *user);
 void ChimZone_Free (chim_user_t *user);
 void ChimZone_FreeData (void *data);

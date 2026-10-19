@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "aw_anim.h"
 #include "amiwind_version.h"
+#include "aw_spike.h"
 
 extern cvar_t	pausable;
 extern void SV_SaveSpawnparms (void);
@@ -290,6 +291,7 @@ command from the console.  Active clients are kicked off.
 void Host_Map_f (void)
 {
 	char	name[MAX_QPATH];
+	double	spike_t0;
 
 	if (cmd_source != src_command)
 		return;
@@ -316,11 +318,13 @@ void Host_Map_f (void)
 
 	svs.serverflags = 0;			// haven't completed an episode yet
 	COM_FormatPath (name, sizeof(name), "%s", Cmd_Argv(1));	// fits: SV_MapNameFits
+	AW_SPIKE_BEGIN (spike_t0);
 #ifdef QUAKE2
 	SV_SpawnServer (name, NULL);
 #else
 	SV_SpawnServer (name);
 #endif
+	AW_SPIKE_END (AW_SP_SPAWN, spike_t0, 0);
 	if (!sv.active)
 	{
         S_CancelSceneVoice();

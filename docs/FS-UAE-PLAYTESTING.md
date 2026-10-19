@@ -1,5 +1,7 @@
 # AmiWind playtesting with FS-UAE
 
+_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
+
 <!-- contents start -->
 ## Contents
 

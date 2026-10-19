@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.39 (14 October 2026)._
+
 ## Status: 9 October 2026
 
 Open. Found by the voice study.

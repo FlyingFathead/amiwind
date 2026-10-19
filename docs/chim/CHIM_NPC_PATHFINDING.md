@@ -1,11 +1,6 @@
 # CHIM NPC pathfinding
 
-Design, 9 October 2026. How hostile NPCs on the CHIM engine get to the player:
-smarter than both Quake's monsters and Morrowind's actors, inside the slow-CPU
-budget, with the walkable graph stored once in the CHIM world data. The
-background (how Morrowind, OpenMW and Quake do it, what AmiWind does today,
-island-wide path grid numbers) is in [NPC pathfinding](../NPC_PATHFINDING.md);
-the world format this extends is [CHIM world format](WORLD_FORMAT.md).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -32,6 +27,13 @@ the world format this extends is [CHIM world format](WORLD_FORMAT.md).
 - [Staged plan and the measurement each stage needs](#staged-plan-and-the-measurement-each-stage-needs)
 
 <!-- contents end -->
+
+Design, 9 October 2026. How hostile NPCs on the CHIM engine get to the player:
+smarter than both Quake's monsters and Morrowind's actors, inside the slow-CPU
+budget, with the walkable graph stored once in the CHIM world data. The
+background (how Morrowind, OpenMW and Quake do it, what AmiWind does today,
+island-wide path grid numbers) is in [NPC pathfinding](../NPC_PATHFINDING.md);
+the world format this extends is [CHIM world format](WORLD_FORMAT.md).
 
 Status: a plan with costs, not a promise. Nothing here is implemented. Cycle
 figures are estimates unless marked measured; emulator figures are relative.

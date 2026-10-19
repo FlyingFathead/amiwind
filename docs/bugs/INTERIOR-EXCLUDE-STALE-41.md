@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 16 October 2026
 
 Fixed on the v0.0.42 line (the rooms are listed again; measured below). Present in v0.0.41.

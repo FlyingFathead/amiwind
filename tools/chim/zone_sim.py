@@ -59,7 +59,7 @@ int ChimZone_StatsSize (void)
 
 # chim_zone.h chim_zone_stats_t, field for field (CHIM_KINDS entries per kind; the byte sums are unsigned
 # long: banks together may pass 2 GiB).
-CHIM_KINDS = 9
+CHIM_KINDS = 10
 
 
 class Stats(ctypes.Structure):
@@ -648,7 +648,7 @@ def require_zone_walk(out, sdk=None, sizes=None, report_path=None, memory=None, 
             from check_world_map_heap import compile_target_sizes
             sizes = compile_target_sizes(sdk)[0]
         try:
-            settings, files, disk, textures, models, frames = loaded_world(out, world)
+            settings, files, disk, textures, models, frames = loaded_world(out, world, jobs)
         except ValueError as exc:
             raise ValueError('CHIM zone walk gate: the world does not read back (%s)' % exc)
         world = {'settings': settings, 'textures': textures, 'models': models, 'frames': frames}

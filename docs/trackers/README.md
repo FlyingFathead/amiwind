@@ -1,5 +1,7 @@
 # Trackers
 
+_Last updated with AmiWind v0.0.32-dev1 (8 October 2026)._
+
 Progress trackers for converting Morrowind's world to AmiWind. They answer
 "what exists, what is done, what is missing" before content is built at scale.
 None of them contains Morrowind game data: they hold cell coordinates, record

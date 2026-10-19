@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Symptom
 On the v0.0.41 final CHIM world, 39 of the 5,646 flight steps lose their flight mark when the steps are found core
 by core, as the gate does, instead of on the whole frame: Balmora 11, Vivec 10, the others in region frames. A step

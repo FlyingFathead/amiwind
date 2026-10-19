@@ -2,17 +2,19 @@
 
 # CHIM Cell Tracker
 
-Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export.
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
+Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export. What each number counts: [what we count](#what-we-count).
 
 **Conversion/audit progress: 1,390 of 1,390 (100.0 %)**
 
-These audit totals do not count cells included in a playable build; see Included in builds below.
+These audit totals count the cells with a LAND record (land and seabed), not cells included in a playable build; see Included in builds below.
 
-**On CHIM in the newest ingested build (v0.0.44-dev1 every exterior cell on CHIM (793d7c1)): 1,292 of 1,292 Vvardenfell land cells (100.0 %), plus 117 sea cells.**
+**On CHIM in the newest ingested build (v0.0.44 release, every exterior cell on CHIM (c84f850)): 1,292 of 1,292 Vvardenfell land cells (100.0 %), plus 117 sea cells.**
 
-A cell is on CHIM in a build when a frame of the CHIM world of that build owns it. The tracker records per cell the newest build that carries it.
+A cell is on CHIM in a build when a frame of the CHIM world of that build owns it. The tracker records per cell the newest build that carries it. Land cells have terrain heights; the sea cells are seabed and open ocean ([what we count](#what-we-count)).
 
-Map cells 2,157: land and empty-sea cells 1,390 (done 1,390, 100.0 %) and open-ocean cells 767 (shared ocean chunk made, not yet placed in the game: not counted as done).
+Map cells 2,157: cells with a LAND record 1,390 (done 1,390, 100.0 %) and open-ocean cells 767 (no LAND record; open ocean is not counted as done).
 
 - Cell complete: 0
 - Terrain complete: 0
@@ -26,9 +28,45 @@ Map cells 2,157: land and empty-sea cells 1,390 (done 1,390, 100.0 %) and open-o
 
 Lighting: lit 0, partial 137, unlit 1,056, not measured 99 (cells; lit is required for both completion levels).
 
-Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 694 night lamps only, 2,280 not represented.
+Original light sources placed in these cells (numbers of lights, not of cells): lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 lights baked, 694 night lamps only, 2,280 not represented.
 
-Generated 2026-10-19 14:34 +0300. Tracker data generated 2026-10-19T11:34:12+00:00.
+Generated 2026-10-19 20:09 +0300. Tracker data generated 2026-10-19T17:09:14+00:00.
+
+## What we count
+
+Every cell count on this page, and the counts other pages quote, from the same tracker data. Vvardenfell only (base game, Morrowind.esm) unless a row says otherwise. Light sources are not cells: the light line above counts light placements.
+
+In short: Vvardenfell has 1,390 cells with a LAND record (1,292 land cells with terrain heights and 98 flat seabed cells). The newest ingested build has 1,390 of them on CHIM, plus 19 open-ocean cells: 1,409 cells on CHIM in all.
+
+| Number | What it counts | From |
+| :-- | :-- | :-- |
+| 2,157 | Map cells: every cell of Vvardenfell's rectangle on the tracker map, land and sea. | tracker map |
+| 1,390 | Cells with a LAND record (terrain data) in the game data: land cells and seabed cells. The audit total ("Conversion/audit progress"). | LAND records of the masters (asset census) |
+| 1,292 | Land cells: a LAND record with terrain heights. "Vvardenfell land cells" means these. | LAND records with heights |
+| 1,193 | Land cells with something placed (statics, flora, actors...). | tracker status |
+| 99 | Land cells with nothing placed (terrain under the water): status empty sea. | tracker status |
+| 98 | Seabed cells: a LAND record without heights (flat sea floor), nothing placed: status empty sea. | LAND records without heights |
+| 197 | Empty sea (status): empty land cells and seabed cells. The builder calls these "seabed". | tracker status |
+| 767 | Open-ocean cells: no LAND record; water over the default sea floor (one shared ocean chunk). | ocean conversion |
+| 1,436 | Land cells of every island: Vvardenfell 1,292 and Solstheim 144. Not a Vvardenfell figure; Solstheim (Bloodmoon) is not converted yet. | LAND records with heights, all masters |
+| 1,409 | Cells on CHIM in the newest ingested build (v0.0.44 release, every exterior cell on CHIM (c84f850)): every cell a frame of that build's world owns: 1,292 land, 98 seabed and 19 open ocean. | the build's CHIM world |
+| 1,351 | Frames in that build's CHIM world: 1,348 region frames (one cell each) and 3 town frames. | the build's CHIM world |
+| 61 | Cells owned by the town frames: balmora 9, seyda 16, vivec_city 36. | the build's CHIM world |
+| 1,132 | The builder's "land" in its log line "N cells on CHIM (S seabed, L land, O ocean)": land cells with something placed, in region frames only (town frames not included). That line's seabed is 197 and its ocean 19. | builder log |
+
+How they add up:
+
+- land cells + seabed cells = cells with a LAND record: 1,292 + 98 = 1,390
+- land cells with something placed + land cells with nothing placed = land cells: 1,193 + 99 = 1,292
+- empty land cells + seabed cells = empty sea: 99 + 98 = 197
+- cells with a LAND record + open-ocean cells = map cells: 1,390 + 767 = 2,157
+- Vvardenfell land cells + Solstheim land cells = land cells of every island: 1,292 + 144 = 1,436
+- land + seabed + open ocean on CHIM = cells on CHIM: 1,292 + 98 + 19 = 1,409
+- region frames + town frames = frames: 1,348 + 3 = 1,351
+- cells in region frames + cells in town frames = cells on CHIM: 1,348 + 61 = 1,409
+- builder land + builder seabed + builder ocean = cells in region frames (one cell per region frame): 1,132 + 197 + 19 = 1,348
+
+Older notes use other totals. 1,436 (the tracker headline before v0.0.44) is the land cells of both islands. "46 more inside the town frames" (v0.0.43 notes) is the listed cells the builder dropped; the town frames own more cells than that (see above). 1,395 (v0.0.42 notes) is the cells with a LAND record plus the 5 open-sea cells then selected; 14 more open-sea cells joined in v0.0.43. 1,404 (world survey) is the exterior CELL records of Morrowind.esm: the 1,390 cells with a LAND record and those 14 open-sea cells. The figures in this table are the ones to use.
 
 ## Totals
 
@@ -50,10 +88,11 @@ Definitions are in the import policy below.
 
 ## Included in builds
 
-Included means verified in a packaged image. Packaged does not mean published or fully playtested. Conversion audits and release plans do not establish inclusion. Percentages use the 1,390 land and empty-sea cells; open ocean is separate. Counts are per build, not additive.
+Included means verified in a packaged image. Packaged does not mean published or fully playtested. Conversion audits and release plans do not establish inclusion. Counts and percentages use the 1,390 cells with a LAND record (land and seabed); open ocean is left out. Counts are per build, not additive ([what we count](#what-we-count)).
 
 | Version | Evidence state | Included |
 | :-- | --: | --: |
+| v0.0.44-dev1 | packaged | 1,390 (100.0 %) |
 | v0.0.43-dev2 | packaged | 1,351 (97.2 %) |
 | v0.0.43-dev1 | packaged | 1,313 (94.5 %) |
 | v0.0.42 | packaged | 1,171 (84.2 %) |

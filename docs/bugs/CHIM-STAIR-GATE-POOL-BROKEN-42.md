@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Symptom
 The vivec-palace MiniWind (eb7fad7) stopped in its chim stage after 23 minutes: the stair gate walked the whole
 Vivec frame (83,236 steps and ramps, 29 walk units on 8 workers; the walker code had changed, so nothing was

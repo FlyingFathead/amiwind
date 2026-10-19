@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Status: 8 October 2026
 
 Open (emulator behaviour). Found by the CHIM world-format follow-up (FFS sweep, branch

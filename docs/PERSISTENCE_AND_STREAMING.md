@@ -1,10 +1,6 @@
 # Proposed approach: persistent world state and disk loading
 
-**Status, 30 September 2026:** bounded character/world state and save/load are
-implemented; broader object persistence and background region streaming remain
-planned. Balmora replaces one resident BSP synchronously among 64 overlapping
-regions, carrying player state across the boundary. Method 1 does not prefetch. Experimental method 2 reads a bounded destination
-prefix ahead of a crossing; neither keeps two complete regions resident.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +17,12 @@ prefix ahead of a crossing; neither keeps two complete regions resident.
 - [dev5 Seyda centre boundary](#dev5-seyda-centre-boundary)
 
 <!-- contents end -->
+
+**Status, 30 September 2026:** bounded character/world state and save/load are
+implemented; broader object persistence and background region streaming remain
+planned. Balmora replaces one resident BSP synchronously among 64 overlapping
+regions, carrying player state across the boundary. Method 1 does not prefetch. Experimental method 2 reads a bounded destination
+prefix ahead of a crossing; neither keeps two complete regions resident.
 
 Dev3 can hold the last rendered frame with a small top Loading box during these
 swaps; Options retains the previous black-screen method. This masks the blank

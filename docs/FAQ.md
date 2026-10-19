@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026). FAQ revision 18._
+_Last updated with AmiWind v0.0.45 (19 October 2026). FAQ revision 20._
 
 <!-- contents start -->
 ## Contents
@@ -37,12 +37,14 @@ _Last updated with AmiWind v0.0.44-dev1 (19 October 2026). FAQ revision 18._
 
 *Harry Horsperg's perspective as the project's author.*
 
-**Latest release:** v0.0.43 - Let There Be CHIM: Vvardenfell's Outdoors, All of It: every exterior cell of
-Vvardenfell on the CHIM engine, 1,348 cells in the region list and 46 more inside the town frames
-([release notes](RELEASE-v0.0.43.md)).
-**Next:** v0.0.44, a patch release that makes the Bitter Coast trees fit in memory again
-([v0.0.44-dev1](RELEASE-v0.0.44-dev1.md)); then bug fixes, the pauses when crossing from cell to cell first, and
-every interior of the base game that is still missing. See the
+**Latest release:** v0.0.45 - CHIM Streaming Improved, Guard Torches Are Back. Crossing from one CHIM cell to the
+next reads the frames around the player ahead into spare Fast RAM, and the engine's heap grows with the RAM the
+machine has; the guards in the streets carry their torches at night again ([release notes](RELEASE-v0.0.45.md)).
+Since v0.0.43 every exterior cell of Vvardenfell is on the CHIM engine: 1,409 cells, 1,348 in one-cell region
+frames and 61 in the town frames of Balmora, Seyda Neen and Vivec
+([what these numbers count](chim/CELL_TRACKER.md#what-we-count)).
+**Next:** crossings without a level restart (the frame switched in place), then every interior of the base game
+that is still missing, as listed in the [plan](PLAN-v0.0.45.md). See the
 [progress tracker](chim/PROGRESS_TRACKER.md), the [roadmap](ROADMAP.md) and the [bug tracker](BUGS.md).
 
 ## What is possible on the Amiga?
@@ -223,8 +225,8 @@ configuration**:
 | Default game display | 320 × 200, 8-bit indexed colour |
 
 These settings are recorded in the
-[FS-UAE preset](../resources/emulators/AmiWind-v0.0.43-FS-UAE.fs-uae),
-[WinUAE preset](../resources/emulators/AmiWind-v0.0.43-WinUAE.uae) and
+[FS-UAE preset](../resources/emulators/AmiWind-v0.0.44-FS-UAE.fs-uae),
+[WinUAE preset](../resources/emulators/AmiWind-v0.0.44-WinUAE.uae) and
 [AGA build guide](AGA_BUILD.md). The Zorro III setting describes the emulator's
 memory configuration; it is not a specification for an ordinary A1200 expansion.
 
@@ -552,11 +554,12 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **19 October 2026**, the latest release is **v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of
-It**: every exterior cell of Vvardenfell runs on the CHIM engine (1,348 cells in the region list and 46 more inside
-the town frames), from Seyda Neen, Balmora and the whole city of Vivec to Ald-ruhn, Maar Gan, Suran and Red
-Mountain; no classic region maps are left outdoors. Interiors are still classic Quake maps, and some of the base
-game's interiors are not in the build yet. The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows
+As of **19 October 2026**, the latest release is **v0.0.44: By Azura's Trees!**, a patch release for **v0.0.43: Let
+There Be CHIM: Vvardenfell's Outdoors, All of It**. Since v0.0.43 every exterior cell of Vvardenfell runs on the CHIM
+engine (1,409 cells: 1,292 land cells, 98 sea-floor cells and 19 open-sea cells; [what these numbers count](chim/CELL_TRACKER.md#what-we-count)), from Seyda Neen, Balmora and the whole city of Vivec to Ald-ruhn, Maar Gan, Suran and Red
+Mountain; no classic region maps are left outdoors. Interiors are still classic Quake maps, and many of the base
+game's interiors are not in the build yet: on 19 October 2026, 176 of Vvardenfell's 1,134 interior cells were
+converted and reachable ([v0.0.45 plan](PLAN-v0.0.45.md#3-every-interior-of-the-base-game)). The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows
 which cell is which. "Release" here identifies the project's release track; AmiWind as a whole is still an early
 work in progress.
 
@@ -588,7 +591,8 @@ The documented playable scope now includes:
   one CHIM area (v0.0.36), lava regions and Tel Uvirith (v0.0.38), rings 0 to 2 of the island in
   full CHIM (v0.0.40), whole regions with compact collision for the Telvanni towns (v0.0.41), and the cells by
   weight with the clouds back in the sky and the first look of the original HUD and inventory (v0.0.42), and
-  every exterior cell of Vvardenfell on CHIM (v0.0.43).
+  every exterior cell of Vvardenfell on CHIM (v0.0.43), and the Bitter Coast trees back inside the memory budget
+  with the guards' night torches restored (v0.0.44).
 
 World coverage and converted assets do not mean complete Morrowind gameplay.
 Full combat, quest simulation, services, schedules, conversations and the
@@ -608,7 +612,7 @@ without them, started automatically on a 68060:
 [trapped instructions per frame](68060.md#trapped-instructions-per-frame).
 
 See the [current overview](../README.md),
-[v0.0.43 release notes](RELEASE-v0.0.43.md),
+[v0.0.44 release notes](RELEASE-v0.0.44.md),
 [project state](PROJECT_STATE.md) and [roadmap](ROADMAP.md) for maintained scope
 and outstanding work.
 
@@ -746,9 +750,9 @@ take it further.
 ---
 
 Technical baseline for this FAQ: the published
-[v0.0.43 release](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.43) (commit
-[6577578](https://github.com/FlyingFathead/amiwind/commit/65775785c9b0008164e19100099355d3d368e2f1)),
-19 October 2026; the line in development is v0.0.44-dev1. Emulator results in this FAQ are not
+[v0.0.44 release](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.44) (commit
+[ddaac34](https://github.com/FlyingFathead/amiwind/commit/ddaac346fc2f01f27d9d7b5c4b26da21289154fd)),
+19 October 2026; the next line is v0.0.45. Emulator results in this FAQ are not
 real-hardware acceptance.
 The linked project documents provide more detailed and evolving status.
 

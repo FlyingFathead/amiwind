@@ -19,6 +19,24 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Status: 9 October 2026](#status-9-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 9 October 2026
 
 Repaired in source, not shipped at the time of writing: the shared routed standing hull from the CHIM

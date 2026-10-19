@@ -21,6 +21,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Symptom
 
 The full suite stops at `Table.test_every_preset_parses` after adding the lava-pools preset. The recipe parser succeeds but the expected inventory omits the new name.

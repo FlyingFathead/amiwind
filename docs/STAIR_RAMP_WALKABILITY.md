@@ -1,5 +1,7 @@
 # Recurring stair failure: authored ramps below the walkable-floor cutoff
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Since 8 October 2026 every converted map is checked by the stair walkability gate and stairs
 follow Morrowind's own rules: [STAIR_RULES.md](STAIR_RULES.md). Everything found since, in order:
 [STAIR_RULES.md, Findings, in order](STAIR_RULES.md#findings-in-order).

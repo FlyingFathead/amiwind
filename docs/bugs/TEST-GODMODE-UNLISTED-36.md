@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.40 (15 October 2026)._
+
 ## Status: 10 October 2026
 
 Fixed in source: the test is in the public file list and checks the C escape.

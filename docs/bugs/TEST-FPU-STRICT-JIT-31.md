@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (17 October 2026)._
+
 ## Status: 8 October 2026
 
 Open (test method; no game code affected). Workaround in use: strict FPU runs

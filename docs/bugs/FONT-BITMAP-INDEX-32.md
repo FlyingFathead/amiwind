@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found by the font A/B (TrueType path from the GOG edition, bitmap path from the Steam edition). Affects Steam builds now; little visible in today's shipped text.

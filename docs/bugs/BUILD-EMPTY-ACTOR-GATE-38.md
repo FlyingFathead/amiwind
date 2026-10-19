@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Symptom
 
 The lava-pools image stops with No actor placements found, although its original exterior contains no NPC residents. Five leveled-creature spawn markers remain unconverted gameplay coverage.

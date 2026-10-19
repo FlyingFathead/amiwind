@@ -1,5 +1,7 @@
 # Project development rules
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 These requirements apply to changes in the public project.
 
 ## Required Linux and Windows compatibility

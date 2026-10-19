@@ -40,16 +40,33 @@ def _read_int(path):
     return None if text in ('', 'max') else int(text)
 
 
+def _inactive_file(path):
+    try:
+        for line in Path(path).read_text().splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[0] in ('inactive_file', 'total_inactive_file'):
+                return int(parts[1])
+    except (OSError, ValueError):
+        pass
+    return 0
+
+
 def memory_room():
     """(bytes a stage may still use, note): the container's own memory limit minus what it uses now (cgroup v2
     memory.max and memory.current, else cgroup v1), else the host's MemAvailable. The workers of the stair gate are
     sized by it, never by the host's total (other containers run beside a build)."""
-    for limit_path, used_path, name in (('/sys/fs/cgroup/memory.max', '/sys/fs/cgroup/memory.current', 'cgroup v2'),
-                                        ('/sys/fs/cgroup/memory/memory.limit_in_bytes',
-                                         '/sys/fs/cgroup/memory/memory.usage_in_bytes', 'cgroup v1')):
+    for limit_path, used_path, stat_path, name in (
+            ('/sys/fs/cgroup/memory.max', '/sys/fs/cgroup/memory.current', '/sys/fs/cgroup/memory.stat', 'cgroup v2'),
+            ('/sys/fs/cgroup/memory/memory.limit_in_bytes', '/sys/fs/cgroup/memory/memory.usage_in_bytes',
+             '/sys/fs/cgroup/memory/memory.stat', 'cgroup v1')):
         limit, used = _read_int(limit_path), _read_int(used_path)
         if limit is not None and used is not None and limit < (1 << 50):
-            return max(0, limit - used), '%s limit %.1f GiB, in use %.1f GiB' % (name, limit / 2.0 ** 30, used / 2.0 ** 30)
+            # the reclaimable file cache is not in use (BUILD-CHIM-SERIAL-SECTIONS-44: counted as used it shrank the
+            # stair gate's pool); the same reading as the scheduler's memory guard (resource_plan.cgroup_memory)
+            cache = _inactive_file(stat_path)
+            used = max(0, used - cache)
+            return max(0, limit - used), '%s limit %.1f GiB, in use %.1f GiB besides %.1f GiB file cache' % (
+                name, limit / 2.0 ** 30, used / 2.0 ** 30, cache / 2.0 ** 30)
     try:
         for line in Path('/proc/meminfo').read_text().splitlines():
             if line.startswith('MemAvailable:'):

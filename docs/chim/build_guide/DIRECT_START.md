@@ -1,9 +1,6 @@
 # Start straight in the game
 
-A development build can boot straight into a town, a room or a spot of your
-choice, with a ready-made character: no intro movie, no prison ship, no
-character creation. Use it to test one place again and again. A normal build
-without these options still starts with the full intro.
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +12,11 @@ without these options still starts with the full intro.
 - [With `--exclude-unreferenced`](#with---exclude-unreferenced)
 
 <!-- contents end -->
+
+A development build can boot straight into a town, a room or a spot of your
+choice, with a ready-made character: no intro movie, no prison ship, no
+character creation. Use it to test one place again and again. A normal build
+without these options still starts with the full intro.
 
 ```sh
 ./build.sh --data-files "/path/to/Morrowind" --direct-to-game-map balmora

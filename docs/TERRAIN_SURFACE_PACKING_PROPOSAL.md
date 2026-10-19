@@ -1,5 +1,7 @@
 # One possible approach: terrain cuts and compact shared surfaces
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Recorded 4 October 2026 from an user-supplied external proposal. This is **one
 possible approach**, not a selected complete architecture or an implementation
 claim. The original text is preserved privately with its SHA-256. Its diagnosis

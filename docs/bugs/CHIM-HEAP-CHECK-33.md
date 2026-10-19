@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found by the first CHIM engine slice (branch v0.0.33-chim-engine).

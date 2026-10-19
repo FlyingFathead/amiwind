@@ -1,11 +1,6 @@
 # The far test (`aw_cull`, `dbg cull`)
 
-Which brush models (placed meshes) and faces the renderer leaves out at a distance. Brush
-models are 60-79 % of the 3D view on a slow 68040 in Balmora, and 40-63 % of the faces they
-send come from models in the far half of the draw distance
-([renderer counters](RENDERER-COUNTERS.md), `dbg rcount 3`). This page is step 1 of the
-render speed plan: draw the same picture with less work first, then offer detail options
-that change the picture for the maintainer to judge.
+_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +13,13 @@ that change the picture for the maintainer to judge.
 - [Counters](#counters)
 
 <!-- contents end -->
+
+Which brush models (placed meshes) and faces the renderer leaves out at a distance. Brush
+models are 60-79 % of the 3D view on a slow 68040 in Balmora, and 40-63 % of the faces they
+send come from models in the far half of the draw distance
+([renderer counters](RENDERER-COUNTERS.md), `dbg rcount 3`). This page is step 1 of the
+render speed plan: draw the same picture with less work first, then offer detail options
+that change the picture for the maintainer to judge.
 
 | `aw_cull` | Far test | Picture |
 | --- | --- | --- |

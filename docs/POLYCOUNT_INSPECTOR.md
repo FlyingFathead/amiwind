@@ -1,6 +1,6 @@
 # AmiWind 3D Map Inspector
 
-**Geometry analysis and optimization planning**
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -23,6 +23,8 @@
 - [CHIM maps and CHIM worlds](#chim-maps-and-chim-worlds)
 
 <!-- contents end -->
+
+**Geometry analysis and optimization planning**
 
 Updated alongside v0.0.38: [loading scene links and copying inspection evidence](../amiwind-toolkit/README.md#v0038-inspection-controls).
 The terrain, selection and scene panels each have their own Copy JSON button.

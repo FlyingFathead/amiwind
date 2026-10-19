@@ -20,11 +20,29 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Status: 19 October 2026](#status-19-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 19 October 2026
 
-Reported by the maintainer; cause not yet found.
+Reported by the maintainer. Island-wide sweep done (19 October 2026, below): the converter keeps every rock's faces,
+winding and rotation as the original has them; no converter cause found. The in-game look at the reported spot and an
+OpenMW comparison at the same pose are still to do.
 
 ## Symptom
 
@@ -42,9 +60,42 @@ Unknown. A first look at `terrain_rocks_ai_02` (18 October 2026) found that the 
 faces kept) and that its open edges match a one-sided source mesh. The maintainer's lead: an incorrect angle
 calculation, such as a face orientation or rotation that comes out wrong for some rocks.
 
+19 October 2026, island-wide sweep (`tools/rock_shell_audit.py` over the v0.0.44 release build, every rock mesh the
+open-world converter knows: 246 meshes, 168 of them on CHIM in 9,591 stored variants with 37,133 measured
+placements):
+
+- Morrowind's rocks are one-sided shells that are open where the game buries them: 151 of the 168 CHIM rock meshes
+  have open rims in the source itself. A boulder is open at the bottom; a rock cluster such as `terrain_rocks_ai_02`
+  is ten small cups (36 or 42 triangles each, ten or twelve open edges each), every cup open on the side that faces
+  into the ground or into a neighbouring cup. None of the 246 asks to be drawn from both sides: no rock has a
+  NiStencilProperty, and OpenMW turns face culling off only for that property's "both" draw mode, so the original
+  draws these rocks one-sided too.
+- The stored CHIM models keep the source: for the 68 unreduced meshes (219 stored variants compared, scaled and
+  tilted copies included) every sampled source point has a stored face within 1.4 source units facing the same
+  way: 0 % missing, 0 % turned. Their open rim length matches the source's (ratio 0.96 to 1.08). No source rock has
+  a face wound against its neighbours. The three faces `terrain_rocks_ai_02` loses (393 of 396) are slivers below the
+  converter's minimum face area; their neighbours still cover them.
+- The rotation is right. The converter turns a placement Z first, then Y, then X (`prepare_scenery.reference_rotation`),
+  the order OpenMW uses for statics. Placed that way, the original rims lie under the original LAND: 2.8 % of rim
+  samples stand more than 4 units above the ground, against 5.5 % to 9.4 % with the other three readings (other
+  order, other sign, both), and the converter's reading buries the rims best for 173 of 210 placed meshes. For
+  `terrain_rocks_ai_02` (80 of its 82 placements tilted): 0.8 % against 7.5 % to 30.8 %.
+- In the CHIM world the stored rims, placed with the engine's own origin and yaw, lie under the CHIM chunk terrain as
+  often as the original rims lie under the LAND: 0.99 % of rim samples above the ground against 1.07 % (37,132
+  placements). The mirrored yaw would expose them (reference 476548: 217 of 560 samples instead of 35).
+- Five meshes stand out: their CHIM rims are above the ground 9 to 15 percentage points more often than the original's
+  (`terrain_rock_wg_15` over 154 placements, `terrain_rock_bc_10`, `_bc_13`, `_ai_01`, `_ai_05`). Three are reduced
+  to 64 triangles (a reduced rim may rise); two are not reduced, so part of the gap is the audit's reading of the
+  ground (CHIM terrain triangles against a bilinear LAND reading). Recorded in `config/rock-shell-known.json`.
+
+So the converter does not open the rocks. What remains: whether the original also shows the open cups at the
+reported spot (a rim the original leaves visible), or whether the engine shows a buried rim through the terrain
+(software Quake orders brush models against the world by its BSP leaves, not by depth).
+
 ## Why it was not caught
 
-No check compares the closed surfaces of converted meshes with their source over the whole island.
+No check compared the closed surfaces of converted meshes with their source over the whole island. Since
+19 October 2026 `tools/rock_shell_audit.py` does, for every rock mesh.
 
 ## Reproduction
 
@@ -55,13 +106,30 @@ Always, at the reported spot.
 To do: sweep every rock mesh on CHIM for open edges against its source, compare the worst ones with OpenMW at the
 same pose, and check the converter's face winding and rotation for the meshes that differ.
 
+19 October 2026: the sweep, the winding and the rotation are done (How it happened); no converter change, because
+the converter has nothing to repair there. Drawing every rock from both sides was measured as an alternative and
+not done: the rock models hold 1,574,349 stored faces (200.8 MB of the 691.3 MB of model render data); back faces
+would add about as much again and double the rock faces drawn per frame, to show surfaces the original culls. Next:
+an orbit at reference 476548 (headlamp off and on) and OpenMW at the same pose; if the original shows a closed rock
+there and CHIM does not, the engine's ordering of the rock against the terrain is the place to look.
+
 ## Verification
 
-To do.
+19 October 2026: data only, on the v0.0.44 release build (`2026_10_19_v0.0.44_release-try2_c84f8506`):
+`rock_shell_audit.py audit` then `check`: 246 meshes, 0 two-sided, 0 unreduced stored models missing or turning
+faces, the converter's rotation best, 0 failures with the five known meshes. Not yet seen in game: the orbit at
+reference 476548 and the OpenMW view at the same pose are still to do.
 
 ## Prevention
 
 To do: an island-wide open-edge audit of converted meshes against their source, kept as a gate.
+
+19 October 2026: `tools/rock_shell_audit.py` (tests in `tests/test_rock_shell_audit.py`) checks every rock mesh: a
+source that draws both sides, an unreduced stored model that misses or turns more than 1 % of its source, a mesh
+whose CHIM rims stand above the ground clearly more often than the original's (known ones in
+`config/rock-shell-known.json`, each no worse than recorded), and another rotation reading burying the rims better
+than the converter's. The test pins the rotation order to OpenMW's. It reads a finished CHIM world and the game data
+(about 15 minutes on 8 cores) and is not yet a builder stage.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -107,5 +175,6 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 Related bugs in other categories:
 
 - [CHIM-AZURA-FLOATING-FLORA-43](CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7)
+- [CHIM-DAGOTH-UR-RUIN-CYLINDER-44](CHIM-DAGOTH-UR-RUIN-CYLINDER-44.md): Graphics translation glitch at Dagoth Ur: the blight cloud whirlwind (nested translucent cylinders) is drawn solid and still
 
 <!-- END GENERATED CATEGORY -->

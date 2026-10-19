@@ -1,7 +1,6 @@
 # rc1 Balmora checklist and investigation
 
-30 September 2026. Dev5 source is pushed as `1e1823d`; maintainer publication is a prerelease.
-Keep v0.0.23 as the stable release. Delivered dev5 archives are immutable.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +19,9 @@ Keep v0.0.23 as the stable release. Delivered dev5 archives are immutable.
 - [Latest doorway and wedged-player follow-up](#latest-doorway-and-wedged-player-follow-up)
 
 <!-- contents end -->
+
+30 September 2026. Dev5 source is pushed as `1e1823d`; maintainer publication is a prerelease.
+Keep v0.0.23 as the stable release. Delivered dev5 archives are immutable.
 
 The [Balmora conversion lessons](BALMORA_CONVERSION_LESSONS.md) consolidate
 problem, cause, implications and resolution for future regions. This file keeps

@@ -1,5 +1,7 @@
 # AmiWind v0.0.10 / checkpoint-008 validation
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 27 September 2026. Public pipeline source 0.8.2; separate GPLv2 runtime.
 Created by FlyingFathead a.k.a. Horstator. Thanks to ChaosWhisperer.
 

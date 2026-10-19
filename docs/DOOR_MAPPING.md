@@ -1,5 +1,7 @@
 # Original door mapping
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 The converter reads base DOOR records and their placed CELL references from the
 maintainer's Morrowind.esm. A door's model/name/script and open/close sound IDs belong
 to its base record. Each placement has its own reference number, transform,

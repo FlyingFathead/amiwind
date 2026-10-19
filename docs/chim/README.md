@@ -1,6 +1,6 @@
 # CHIM
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -35,8 +35,8 @@ endorsed by Bethesda Softworks or ZeniMax.*
 world streamer added; it is not a second engine. The renderer, lighting,
 collision, sound and QuakeC are Quake's. What changes is the outdoor world:
 
-- **Exteriors are chunks, stored once.** The land is cut into frames of 3 x 3
-  Morrowind cells, frames into chunks of 256 units, chunks into sectors of
+- **Exteriors are chunks, stored once.** The land is cut into frames (a regional frame owns one Morrowind cell, a
+  town frame its configured group of cells, for example Balmora's 3 x 3), frames into chunks of 256 units, chunks into sectors of
   3 x 3 chunks. Each sector is one small file that a classic Amiga FFS disk
   reads whole, front to back. Every shared model and texture lives in the
   sector that first needs it; every placement is one record that names its
@@ -53,7 +53,8 @@ collision, sound and QuakeC are Quake's. What changes is the outdoor world:
   work on it as on any map.
 - **Interiors stay Quake maps.** Houses, caves and the prison ship are
   ordinary Quake maps behind doors, built as before; Quake's `vis` works well
-  indoors.
+  indoors. Moving the interiors onto CHIM's store-once layout is planned
+  ([v0.0.45 plan](../PLAN-v0.0.45.md#3-every-interior-of-the-base-game)).
 - **One frame map per area.** A small Quake map (`maps/<town>-chim.chim`) holds
   what is not chunk data: actors, flora sprites, the start point and the
   frame's position. Loading it switches the engine to CHIM for that area.
@@ -83,7 +84,7 @@ CHIM has its own version number, separate from AmiWind's:
 | | |
 | --- | --- |
 | First release | CHIM 0.1.0 with AmiWind v0.0.33 |
-| Current | CHIM 0.2.1, since AmiWind v0.0.41 (patch step: fixes: compiled collision for non-convex pieces, recorded audit provenance; world format unchanged) and still in v0.0.43 and v0.0.44-dev1. 0.2.0 shipped with AmiWind v0.0.36 |
+| Current | CHIM 0.2.1, since AmiWind v0.0.41 (patch step: fixes: compiled collision for non-convex pieces, recorded audit provenance; world format unchanged) and still in v0.0.43 and v0.0.44. 0.2.0 shipped with AmiWind v0.0.36 |
 | Where it is kept | the `CHIM_VERSION` file at the repository root, the one source for the builder receipts, the engine header and the boot check |
 | How it is shown | short form on the boot check, "AmiWind vX / CHIM vY"; long form "Running on CHIM Engine vY" in the README and release notes |
 | Numbering | semantic versions: a new world format major version is a new CHIM major version (the engine refuses a world of another major with a clear message); minor = features; patch = fixes |
@@ -146,10 +147,10 @@ their chosen format and Solstheim, see the [progress tracker](PROGRESS_TRACKER.m
 
 | Milestone | Area | Status |
 | --- | --- | --- |
-| M1 | Balmora exterior | Built and walked: five benchmark cameras, the street loop, gate exits and doors in and out of interiors pass in FS-UAE. Played in the first private test builds. Open: chunk loading when the memory zone is full ([CHIM-CHUNK-LOAD-FAIL-33](../bugs/CHIM-CHUNK-LOAD-FAIL-33.md), repair on a branch), the distant view ([CHIM-FAR-TERRAIN-33](../bugs/CHIM-FAR-TERRAIN-33.md)). |
+| M1 | Balmora exterior | Shipped (v0.0.33). Built and walked: five benchmark cameras, the street loop, gate exits and doors in and out of interiors pass in FS-UAE. Played in the first private test builds. Open: chunk loading when the memory zone is full ([CHIM-CHUNK-LOAD-FAIL-33](../bugs/CHIM-CHUNK-LOAD-FAIL-33.md), repair on a branch), the distant view ([CHIM-FAR-TERRAIN-33](../bugs/CHIM-FAR-TERRAIN-33.md)). |
 | M2 | Seyda Neen, the intro docks and the courtyard | Built; passes the validator, the stair gate, the strict heap gate (no exceptions) and the frame-map checks against the shipped maps. The temporary Seyda Neen heap bypass of the legacy builder ends here. Open: the Hunk safety margin at the default zone ([CHIM-SEYDA-HUNK-GAP-33](../bugs/CHIM-SEYDA-HUNK-GAP-33.md)). |
-| M3 | Vivec | Stage A (the Arena canton, with v0.0.32 parity gates) in progress; stage B (all of Vivec in one frame, format 0.6) designed. |
-| M4 | The open world between the towns | Designed: a fixed grid of frames, frames crossed without a map load. |
+| M3 | Vivec | The whole city of Vivec is one CHIM frame since v0.0.36. The status text of the original plan (stage A in progress, stage B designed) is superseded. |
+| M4 | The open world between the towns | Every exterior cell of Vvardenfell is on CHIM since v0.0.43, in one-cell region frames (a crossing is a map load, [CHIM regions](CHIM_REGIONS.md)) and three town frames. The fixed 3 x 3 frame grid of the original design is not built; the pauses at cell crossings are [CHIM-CROSSING-SLUGGISH-43](../bugs/CHIM-CROSSING-SLUGGISH-43.md), the first work of the [v0.0.45 plan](../PLAN-v0.0.45.md). |
 | M5 | The whole island | After M4; this is CHIM 1.0. The project is aiming for 1 May 2027, Morrowind's 25th anniversary: an aim, not a promise. |
 
 v0.0.33 ships when the areas v0.0.32 ships run on CHIM and the distant view
@@ -175,6 +176,7 @@ Leary). The CHIM builder is GPLv3. Details and the reviewed upstream revision:
 | [CHIM file format](../CHIM_FILE_FORMAT.md) | The overview for newcomers: what CHIM stores and why, the file types (`.bsp`, `.chim`, the CHIM world), the format versions so far, how to look inside, the roadmap |
 | [World format](WORLD_FORMAT.md) | The files the CHIM builder writes, byte by byte (the file-type table at the top), the M3 and M4 designs, the heap gate, the version rules |
 | [.chim map format](CHIM_MAP_FORMAT.md) | CHIM maps as `.chim` files, never Quake `.bsp`; the planned own header, loader and contents (approved 10 October 2026) |
+| [Cell crossings](CELL_CROSSINGS.md) | How the engine crosses from one frame to the next today (a level change) and the continuous-world method that replaces it |
 | [CHIM engine](ENGINE.md) | How the engine loads, keeps, draws and collides with a CHIM world; memory and tests |
 | [CHIMport](CHIMPORT.md) | The whole island converted cell by cell from the sea inwards, every audit per cell ; [when a cell does not fit the memory budget](CHIMPORT.md#when-a-cell-does-not-fit-the-memory-budget) |
 | [Border audit](STITCH_AUDIT.md) | Where a CHIM area meets the legacy world: heights, arrival, far layer and objects at its edges |

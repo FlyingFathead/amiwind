@@ -1,10 +1,6 @@
 # Shared models for harvestable mushrooms
 
-`tools/prepare_harvest_alias.py` is a bounded, opt-in conversion path for
-harvestable mushrooms. It leaves the retained BSP files byte-identical and
-stores shared one-frame MDL models separately. AWH4 catalogues bind original
-placements to those models. Existing AWH3 brush catalogues can coexist with
-AWH4 when they use the same original placement index.
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -16,6 +12,12 @@ AWH4 when they use the same original placement index.
 - [Current limits](#current-limits)
 
 <!-- contents end -->
+
+`tools/prepare_harvest_alias.py` is a bounded, opt-in conversion path for
+harvestable mushrooms. It leaves the retained BSP files byte-identical and
+stores shared one-frame MDL models separately. AWH4 catalogues bind original
+placements to those models. Existing AWH3 brush catalogues can coexist with
+AWH4 when they use the same original placement index.
 
 This path requires the corresponding AWH4 runtime. A generated payload is
 diagnostic evidence, not proof of native appearance, memory headroom or

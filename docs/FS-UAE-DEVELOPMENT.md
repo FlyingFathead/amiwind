@@ -1,14 +1,6 @@
 # FS-UAE development access
 
-For the persistent headless Linux setup, see [FS-UAE in Docker](FS-UAE-DOCKER.md). For proposed headless automation and throughput measurement, see [FS-UAE headless development throughput](FS-UAE-HEADLESS-THROUGHPUT.md).
-A ROM-only Ubuntu 24.04 / FS-UAE 3.1.66 session produced fresh full/cropped
-frames, a visibly booted Kickstart screen, prompt-synchronized PTY replies for
-registers, memory map and disassembly, and one bounded guest-memory read. A
-synthetic audio route also passed; that does not verify Amiga game audio. This
-is emulator-level evidence. Later separate headless runs have booted the
-AmiWind development package, reached gameplay, observed a restored building
-and quit cleanly. Those scene checks do not add stepping/watchpoint or complete
-game-audio acceptance to the original debugger probe.
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -25,6 +17,16 @@ game-audio acceptance to the original debugger probe.
 - [Proposed AmiWind development loop](#proposed-amiwind-development-loop)
 
 <!-- contents end -->
+
+For the persistent headless Linux setup, see [FS-UAE in Docker](FS-UAE-DOCKER.md). For proposed headless automation and throughput measurement, see [FS-UAE headless development throughput](FS-UAE-HEADLESS-THROUGHPUT.md).
+A ROM-only Ubuntu 24.04 / FS-UAE 3.1.66 session produced fresh full/cropped
+frames, a visibly booted Kickstart screen, prompt-synchronized PTY replies for
+registers, memory map and disassembly, and one bounded guest-memory read. A
+synthetic audio route also passed; that does not verify Amiga game audio. This
+is emulator-level evidence. Later separate headless runs have booted the
+AmiWind development package, reached gameplay, observed a restored building
+and quit cleanly. Those scene checks do not add stepping/watchpoint or complete
+game-audio acceptance to the original debugger probe.
 
 FS-UAE can expose the emulated Amiga through its UAE console debugger and its
 serial interface. These are useful starting points for inspecting state and

@@ -1,5 +1,7 @@
 # Morrowind demo v0.0.6 — checkpoint-005
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 A native opening study for an A500 with 512 KiB Chip plus 512 KiB expansion RAM,
 Kickstart 1.3 and OCS. Source release: 0.7.0. Both version numbers are recorded
 because the host pipeline existed before the first native opening demo.

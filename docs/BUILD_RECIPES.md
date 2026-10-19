@@ -1,9 +1,6 @@
 # Build recipes
 
-A build recipe is one small JSON file that holds everything that makes a build what it is: its
-options by name, the input files it reads with their SHA-256, and the build that checked it. Build
-from it with `--recipe FILE`; write the recipe of any build with `--save-recipe FILE`. The MiniWind
-presets are recipes too (`config/recipes/miniwind/`).
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +15,11 @@ presets are recipes too (`config/recipes/miniwind/`).
 - [Option changes](#option-changes)
 
 <!-- contents end -->
+
+A build recipe is one small JSON file that holds everything that makes a build what it is: its
+options by name, the input files it reads with their SHA-256, and the build that checked it. Build
+from it with `--recipe FILE`; write the recipe of any build with `--save-recipe FILE`. The MiniWind
+presets are recipes too (`config/recipes/miniwind/`).
 
     ./build.sh --data-files "/path/to/Morrowind" --recipe config/recipes/release.json
     ./build.sh --data-files "/path/to/Morrowind" --recipe my-coast.json --chim-terrain-hull compiled

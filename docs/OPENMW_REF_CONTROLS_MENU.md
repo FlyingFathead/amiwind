@@ -1,5 +1,7 @@
 # First-person hands and menu reference
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 Checkpoint-014 provides an independent prototype of the requested controls.
 No OpenMW implementation or Morrowind interface artwork is copied into source.
 

@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 10 October 2026
 
 Cause found and fixed in source for v0.0.34 (engine pick rule plus an island-wide pick audit that

@@ -30,6 +30,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Status: 11 October 2026
 
 Open; persisting since v0.0.36-dev4 (CHIMport one-cell frames 1,-13 and 2,-13 on 9 October 2026, then the

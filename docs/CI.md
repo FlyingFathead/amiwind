@@ -1,5 +1,7 @@
 # Build audit and the local pipeline
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 The public GitHub Actions workflow (`.github/workflows/source-check.yml`) checks
 the source on every push. Builds of the game itself need the user's own
 Morrowind data, so they cannot run there. A local pipeline runs the checks that

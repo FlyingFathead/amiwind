@@ -1,5 +1,7 @@
 # AmiWind console commands
 
+_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
+
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
 `config/debug-commands.txt`, the catalogue the game itself reads, by

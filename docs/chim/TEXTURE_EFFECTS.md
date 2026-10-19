@@ -1,5 +1,7 @@
 # CHIM texture effects
 
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
+
 A CHIM texture effect is a small text file (`.chimfx`) that changes chosen textures of a CHIM world
 on purpose, the same way in every build. Effects are off by default: a build applies only the
 effects you select. The shipped library is `tools/chim/effects/`; anyone can add effects there or

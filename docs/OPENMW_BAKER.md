@@ -1,5 +1,7 @@
 # OpenMW as the host-side character baker
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 The intended rendering backend is OpenMW itself: use its original-data loading,
 equipped actor assembly, animation evaluation and renderer on the PC. The Amiga
 receives converted assets and runs a separate native runtime. The actor backend is

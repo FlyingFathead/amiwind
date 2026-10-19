@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Status: 10 October 2026
 
 Open. Found in source by a review during the Vivec on CHIM preflight (milestone M3). Not yet seen in a

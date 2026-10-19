@@ -1,5 +1,7 @@
 # World bounds: the sea current at the edge of the world
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 An AmiWind extension: in the original game the open sea goes on past the island. AmiWind's open world ends a
 little past its outermost cells (896 units, the overlap of the open-world maps), and until v0.0.36 an
 invisible wall stopped you there.
@@ -43,7 +45,7 @@ Measured on the v0.0.36 development builds (both tables agree cell for cell):
 
 | | |
 | --- | --- |
-| Cells in the open world | 1,404 (1,292 with land data, 112 open sea) |
+| Cells in the open world | 1,404 exterior CELL records (1,292 with land heights and 112 without: 98 sea-floor cells with a LAND record and 14 open-sea cells; [what we count](chim/CELL_TRACKER.md#what-we-count)) |
 | Box | cells -18,-19 to 23,27 (42 x 47 cells) |
 | Edge ring | 176 cells: 83 open sea (no land data), 67 seabed (land data, nothing placed), 26 land; 141 with an open side (48 east, 48 west, 44 north, 44 south; a cell can have more than one), 35 open only at a corner |
 | Pockets inside the box that no map covers | none |

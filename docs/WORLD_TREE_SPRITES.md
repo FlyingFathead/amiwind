@@ -1,5 +1,7 @@
 # World tree sprites and the Balmora comparison zone
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Open sprite-root regression - 4 October 2026
 
 A maintainer screenshot from the post-release v0.0.28 playtest shows an unintended

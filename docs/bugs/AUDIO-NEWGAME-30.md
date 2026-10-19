@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 7 October 2026
 
 Open; reported, not yet reproduced. Present in v0.0.30-rc1 (WinUAE).

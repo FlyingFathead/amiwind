@@ -1,5 +1,7 @@
 # Paper font conversion options
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 The preferred Magic Cards TTF path remains unchanged. The bitmap paper correction
 is a separate build choice, not storefront detection or a global font filter.
 

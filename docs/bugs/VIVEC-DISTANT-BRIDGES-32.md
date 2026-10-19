@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 ## Status: 8 October 2026
 
 Open; cause unknown. Project decision: ship v0.0.32 as is; known in v0.0.32. Found by the maintainer in
@@ -57,6 +59,13 @@ private evidence.
 
 Not yet. First record the pose, then check whether the missing bridges are in the frame's maps at
 all, and at what distance they are culled.
+
+Plan of 19 October 2026 (maintainer): no distance cut where the fog is still see-through, then a far shell of the
+whole island drawn in one fog colour through the engine's existing solid-surface path, with the real world emerging
+from it and grouped, overlapping switches so no transition leaves a hole ([distant terrain
+notes](../DISTANT_TERRAIN.md#horizon-ponderings-the-island-cut-out-19-october-2026),
+[roadmap](../ROADMAP.md#distant-views-without-pop-in-and-the-screen-the-amiga-need-not-redraw-19-october-2026)).
+This bug is fixed on its own as well; the shell does not merely hide it.
 
 ## Verification
 

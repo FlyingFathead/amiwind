@@ -1,5 +1,7 @@
 # Data streaming: how AmiWind loads the world today
 
+_Last updated with AmiWind v0.0.32-dev1 (8 October 2026)._
+
 **Status: describes v0.0.31 (8 October 2026).** Decided next: a world streamer
 with no duplicated assets; see [the roadmap](ROADMAP.md).
 

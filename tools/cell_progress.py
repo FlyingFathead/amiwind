@@ -1542,7 +1542,8 @@ def main(argv=None):
             return 1
         page.parent.mkdir(parents=True, exist_ok=True)
         ledger = a.inclusion or Path(__file__).resolve().parents[1] / 'amiwind-toolkit' / 'chim-inclusion.json'
-        page.write_bytes(MD.render(doc, a.now, read_json(ledger)).encode('utf-8'))
+        version = (Path(__file__).resolve().parents[1] / 'VERSION').read_text(encoding='utf-8').strip()
+        page.write_bytes(MD.render(doc, a.now, read_json(ledger), version).encode('utf-8'))
         print('wrote', page)
         return 0
     if a.cmd == 'export':

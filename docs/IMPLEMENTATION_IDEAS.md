@@ -1,5 +1,7 @@
 # Implementation ideas and research queue
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Proposals recorded 27 September 2026, after checkpoint-014. These are not
 implemented features. Verified mappings, causes and accepted fixes belong in
 [IMPLEMENTATION_JOURNAL.md](IMPLEMENTATION_JOURNAL.md); priority is governed by

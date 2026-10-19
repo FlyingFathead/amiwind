@@ -1,5 +1,7 @@
 # Local rc10 checkpoint
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Character conversion now uses a persistent, verified host-side appearance cache
 across build and recovery runs. Unchanged models are reused; corrupt, partial or
 incompatible entries are rebuilt. The complete NPC gallery, strict actor/model

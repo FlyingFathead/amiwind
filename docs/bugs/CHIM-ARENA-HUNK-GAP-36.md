@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Status: 11 October 2026
 
 Open: a memory review of the Arena frame is due before Vivec stage B (all of Vivec in one frame).

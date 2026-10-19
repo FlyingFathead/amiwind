@@ -1,6 +1,6 @@
 # v0.0.25-rc1 recovery checkpoints
 
-Historical checkpoint record. Current combined source status: [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +15,8 @@ Historical checkpoint record. Current combined source status: [RECONCILE-v0.0.25
 - [Checkpoint 006: autosave default and local handoff](#checkpoint-006-autosave-default-and-local-handoff)
 
 <!-- contents end -->
+
+Historical checkpoint record. Current combined source status: [RECONCILE-v0.0.25-rc1.md](RECONCILE-v0.0.25-rc1.md).
 
 Current handoff: **checkpoint 006**, incomplete source prerelease.
 See [local apply/build/publication commands](LOCAL-CHECKPOINT-v0.0.25-rc1.md).

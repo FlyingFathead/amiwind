@@ -1,5 +1,7 @@
 # v0.0.9 checkpoint-007: startup dependency hotfix
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 Date: 27 September 2026. Pipeline source: 0.8.1. Supersedes checkpoint-006 for
 boot compatibility; the old image and performance evidence remain immutable.
 

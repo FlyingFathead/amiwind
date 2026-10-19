@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 9 October 2026
 
 Fixed in source for v0.0.35 (first built on the v0.0.34-dev1 line, renumbered to v0.0.35): the recorded maps are an optional input. Without

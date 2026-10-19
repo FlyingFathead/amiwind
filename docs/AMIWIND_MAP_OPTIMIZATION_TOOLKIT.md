@@ -1,6 +1,6 @@
 # AmiWind Map Optimization Toolkit
 
-*Geometry analysis, compile-time optimization, and validation for AmiWind.*
+_Last updated with AmiWind v0.0.41-dev4 (16 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +20,8 @@
 - [Current implementation and next steps](#current-implementation-and-next-steps)
 
 <!-- contents end -->
+
+*Geometry analysis, compile-time optimization, and validation for AmiWind.*
 
 7 October 2026: this toolkit is now the map optimisation part of the wider
 [AmiWind Toolkit](AMIWIND_TOOLKIT.md); the 3D Map Inspector moved to

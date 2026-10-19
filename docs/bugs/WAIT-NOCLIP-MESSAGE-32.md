@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Status: 8 October 2026
 
 Open, low priority (message wording); cause found in source. Project decision: fix later, no code

@@ -1,5 +1,7 @@
 # Profiling by runtime
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 For the AGA branch, see [OPTIMIZATION_HISTORY.md](OPTIMIZATION_HISTORY.md),
 [checkpoint-006](CHECKPOINT_006_VALIDATION.md) and `tools/profile_aga.py`.
 The following historical records describe the separate A500 reader.

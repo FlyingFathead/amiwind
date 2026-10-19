@@ -21,6 +21,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 Location correction, 13 October 2026: the inspected cell (10,1) is Tel Uvirith
 at Uvirith's Grave in Molag Amur, not Molag Mar. The established bug ID and
 diagnostic filenames are retained for traceability. This correction does not

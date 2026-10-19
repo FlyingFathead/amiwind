@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Symptom
 
 When the player dies in lava, the red damage overlay also tints the death-menu text and selected option. The maintainer clarified that the UI does not appear above the gameplay damage effect.

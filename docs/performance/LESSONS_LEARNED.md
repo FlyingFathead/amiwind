@@ -1,5 +1,7 @@
 # Performance lessons learned
 
+_Last updated with AmiWind v0.0.41-dev4 (16 October 2026)._
+
 Lessons from measuring AmiWind's loading on the emulated reference machine.
 Newest first.
 

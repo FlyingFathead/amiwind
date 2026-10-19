@@ -1,5 +1,7 @@
 # Checkpoint-010 — v0.0.11-dev3 / pipeline 0.8.3.dev3
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Date: 27 September 2026. Repair checkpoint; no NPCs or second town yet.
 
 ## Final artifacts and configuration

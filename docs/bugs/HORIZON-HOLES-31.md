@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 <!-- contents start -->
 ## Contents
 
@@ -150,6 +152,13 @@ building) drawn in the fog colour beyond the fog plane, and cull objects whole
 rather than piece by piece near the limit. Cost to be measured with an FS-UAE
 frame-time sweep before enabling.
 
+Plan of 19 October 2026 (maintainer): no distance cut where the fog is still see-through, then a far shell of the
+whole island drawn in one fog colour through the engine's existing solid-surface path, with the real world emerging
+from it and grouped, overlapping switches so no transition leaves a hole ([distant terrain
+notes](../DISTANT_TERRAIN.md#horizon-ponderings-the-island-cut-out-19-october-2026),
+[roadmap](../ROADMAP.md#distant-views-without-pop-in-and-the-screen-the-amiga-need-not-redraw-19-october-2026)).
+This bug is fixed on its own as well; the shell does not merely hide it.
+
 ## Verification
 
 Pending: the same views without holes, and the frame-time cost.
@@ -183,6 +192,7 @@ or runtime acceptance. Missing build or pose information remains unknown.
 
 Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Far-plane fog, the skyline fill, distant sprites and resident ground. See [families](README.md#families).
 
+- [CHIM-BRIDGE-POP-PIECES-44](CHIM-BRIDGE-POP-PIECES-44.md): Bridges pop into view piece by piece as the player approaches (Balmora)
 - [CHIM-TERRAIN-TEXTURE-BLOCKY-43](CHIM-TERRAIN-TEXTURE-BLOCKY-43.md): Roads and paths on the ground look blocky: each texture square is drawn with hard edges instead of blending into its neighbours
 - [FOG-TOWN-HEAVY-32](FOG-TOWN-HEAVY-32.md): Heavy fog at the Vivec Arena and in Balmora in v0.0.32-dev1
 - GEO-02 (no report page): Seyda Neen ground ends before the world terrain handoff
@@ -197,6 +207,7 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - SKY-VISUAL-01 (no report page): Sky-only day/night remap clashed with gray distance fog
 - TREE-PILLAR-28 (no report page): Sprite-tree roots extend into unintended striped pillars
 - [TREE-VIEW-FLOAT-38](TREE-VIEW-FLOAT-38.md): Sprite tree appears detached from terrain from particular viewing directions
+- [WATER-UNDERWATER-SKY-44](WATER-UNDERWATER-SKY-44.md): Under water the distance shows the sky's clouds instead of blue water
 
 Related bugs in other categories:
 

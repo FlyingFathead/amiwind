@@ -1,5 +1,7 @@
 # Native Windows 11 build and WinUAE checkpoint, 2 October 2026
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 **AmiWind's complete current v0.0.25 conversion recipe was built on native
 Windows 11, packaged into a verified HDF after an image-stage correction, and
 booted into the 3D prison scene in WinUAE.** Linux remains the established build

@@ -1,10 +1,6 @@
 # Exterior hidden surfaces and one-sided drawing
 
-Recorded 4 October 2026. The source/provenance checks below are complete for the
-named inputs. An optional source-bound per-asset shape/triangle exclusion stage is now
-implemented and synthetically tested. Asset-local volumes, placement overrides
-and the inspector-zone connection remain proposals. No production house geometry
-was removed by this investigation; no target-rendering acceptance is implied.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -26,6 +22,12 @@ was removed by this investigation; no target-rendering acceptance is implied.
 - [Inspector plans and the compiler boundary](#inspector-plans-and-the-compiler-boundary)
 
 <!-- contents end -->
+
+Recorded 4 October 2026. The source/provenance checks below are complete for the
+named inputs. An optional source-bound per-asset shape/triangle exclusion stage is now
+implemented and synthetically tested. Asset-local volumes, placement overrides
+and the inspector-zone connection remain proposals. No production house geometry
+was removed by this investigation; no target-rendering acceptance is implied.
 
 ## Maintainer imperative: default compile-time hidden-surface culling
 

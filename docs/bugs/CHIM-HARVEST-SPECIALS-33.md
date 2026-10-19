@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+
 ## Status: 9 October 2026
 
 Mitigated for v0.0.33; the repair is planned for the next release. Known issue of v0.0.33.

@@ -1,5 +1,7 @@
 # Heap crash report: v0.0.27-rc3 Seyda Neen load
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Incident: CRASH-01. Status: **OPEN — no verified fixed build**.
 Recorded/updated: 3 October 2026. The repair source is included in published
 [v0.0.27](RELEASE-v0.0.27.md); the stable private image passed static gates and

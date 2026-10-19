@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
 ## Status: 9 October 2026
 
 Fixed in source on the v0.0.33 integration line, with a regression test. The next full build verifies.

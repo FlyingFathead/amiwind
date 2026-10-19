@@ -1,5 +1,7 @@
 # Intro script mapping — v0.0.18-dev2
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 The owned base master and its ordered script/voice records are authoritative.
 Private conversion writes `intro-conversion.json` with extracted scripts, source
 voice hashes, actor appearances, navigation and sound-emitter provenance. The

@@ -1,10 +1,6 @@
 # Development and source packaging
 
-All documentation lives in `docs/`; keep the root limited to core project files.
-Original/converted game content stays outside distributable source. Build output
-uses ignored out/ or a selected external workspace.
-The project maintainer handles all Git/GitHub pushes. No remote is configured by the
-source package, and packaging does not commit, tag, push or publish anything.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -34,6 +30,12 @@ source package, and packaging does not commit, tag, push or publish anything.
 - [Headless development container](#headless-development-container)
 
 <!-- contents end -->
+
+All documentation lives in `docs/`; keep the root limited to core project files.
+Original/converted game content stays outside distributable source. Build output
+uses ignored out/ or a selected external workspace.
+The project maintainer handles all Git/GitHub pushes. No remote is configured by the
+source package, and packaging does not commit, tag, push or publish anything.
 
 ## Source authority
 

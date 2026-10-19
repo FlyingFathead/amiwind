@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -36,18 +36,24 @@ Where the conversion of the open world to CHIM stands, and how the tracker that 
 ## Current state, 19 October 2026
 
 The open world is converted to CHIM release by release, lightest cells first. Exterior cells of Vvardenfell on CHIM
-in each packaged build (1,395 in all, sea cells included):
+in each packaged build, as counted at the time, out of 1,395: the 1,390 cells with a LAND record (1,292 land cells
+and 98 sea-floor cells) and the 5 open-sea cells then selected. 14 more open-sea cells joined in v0.0.43, so the
+whole outdoors is 1,409 cells. Every count and what it means: [what we count](CELL_TRACKER.md#what-we-count). The cell
+tracker's "Included in builds" table counts from the packaged images instead (cells with a LAND record only), so its
+figures differ by a few cells.
 
 | Build | Cells on CHIM | Notes |
 | --- | --- | --- |
 | v0.0.42 (released 17 October) | 1,168 of 1,395 (84 %) | |
 | v0.0.43-dev1 (pre-release) | 1,310 (94 %) | Seabed cells without height data admitted; medium cells |
 | v0.0.43-dev2 | 1,348 (97 %) | 38 more cells; the cells that waited for a hull policy pass |
-| v0.0.43 (released 19 October) | every exterior cell: 1,348 in the region list + 46 inside town frames | The stair-walk cells (Ald-ruhn, Maar Gan, Suran), Balmora's border cells and 14 open-sea cells joined |
+| v0.0.43 (released 19 October) | every exterior cell: 1,409 (1,348 in one-cell region frames + 61 in the three town frames) | The stair-walk cells (Ald-ruhn, Maar Gan, Suran), Balmora's border cells and 14 open-sea cells joined |
 | v0.0.44-dev1 | as v0.0.43 | Bitter Coast trees fit in memory again ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](../bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md)) |
+| v0.0.44 (released 19 October) | as v0.0.43 | The patch release: the Bitter Coast trees fit in memory again; the same cells as v0.0.43 ([release notes](../RELEASE-v0.0.44.md)) |
 
-The [cell tracker](CELL_TRACKER.md) holds the per-cell results: 1,189 of the 1,436 land cells (Vvardenfell and
-Solstheim) have passed every measured audit, none is waiting for a hull policy, and four fail the stair walk.
+The [cell tracker](CELL_TRACKER.md) holds the per-cell results: 1,193 of Vvardenfell's 1,292 land cells have passed
+every measured audit; the other 99 land cells and the 98 sea-floor cells are empty sea (nothing placed, done as they
+are). None is waiting for a hull policy and none fails an audit. Solstheim's 144 land cells are not started.
 
 Since v0.0.43 no exterior cell of Vvardenfell is classic: no classic region maps are left outdoors. Interiors
 stay Quake maps, and some interiors of the base game are not in the build yet; bringing them in, with the
@@ -72,7 +78,8 @@ No cell outside these was over the memory budget or failing an audit.
 
 ## Why it exists
 
-The open world is 1,292 exterior cells on Vvardenfell (and 144 on Solstheim). Converting them one at a time and judging each by eye does not scale, and "it looks fine" does not catch a stair that cannot be walked or a frame that does not fit in memory. The tracker turns the conversion into numbers: one record per cell, one result per audit, one status per cell, and the same definitions everywhere (the Toolkit map, the generated page, the release notes). Anything that is not measured says "not measured": the tracker never guesses and never counts an unmeasured audit as passed.
+The open world of Vvardenfell is 1,409 exterior cells: 1,292 land cells, 98 sea-floor cells and 19 open-sea cells
+([what we count](CELL_TRACKER.md#what-we-count)); Solstheim adds 144 land cells. Converting them one at a time and judging each by eye does not scale, and "it looks fine" does not catch a stair that cannot be walked or a frame that does not fit in memory. The tracker turns the conversion into numbers: one record per cell, one result per audit, one status per cell, and the same definitions everywhere (the Toolkit map, the generated page, the release notes). Anything that is not measured says "not measured": the tracker never guesses and never counts an unmeasured audit as passed.
 
 ## Data flow
 

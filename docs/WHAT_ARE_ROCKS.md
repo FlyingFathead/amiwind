@@ -1,6 +1,6 @@
 # What are rocks? — terrain coverage and conversion workflow
 
-Findings from the owned base master and NIFs, 29 September 2026, v0.0.23-dev3.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +15,8 @@ Findings from the owned base master and NIFs, 29 September 2026, v0.0.23-dev3.
 - [v0.0.38 investigation: repeated shoreline rock gaps](#v0038-investigation-repeated-shoreline-rock-gaps)
 
 <!-- contents end -->
+
+Findings from the owned base master and NIFs, 29 September 2026, v0.0.23-dev3.
 
 ## LAND is only one part of the landscape
 

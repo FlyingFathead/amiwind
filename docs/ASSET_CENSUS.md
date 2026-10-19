@@ -1,12 +1,6 @@
 # Asset census: what the world streamer has to store
 
-The [world streamer](WORLD_STREAMER.md) stores every mesh, hull and texture
-once and places it by reference. The asset census measures what that means
-for the whole game from your own Morrowind files: how many unique meshes and
-textures are placed, how large they are in AmiWind form, how many converter
-variants scale and tilt create, how much a chunk ring holds, how much light
-each placement carries, what the terrain costs, and whether the whole game
-fits on one drive image.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -17,6 +11,14 @@ fits on one drive image.
 - [Recommendations](#recommendations)
 
 <!-- contents end -->
+
+The [world streamer](WORLD_STREAMER.md) stores every mesh, hull and texture
+once and places it by reference. The asset census measures what that means
+for the whole game from your own Morrowind files: how many unique meshes and
+textures are placed, how large they are in AmiWind form, how many converter
+variants scale and tilt create, how much a chunk ring holds, how much light
+each placement carries, what the terrain costs, and whether the whole game
+fits on one drive image.
 
 Status: measurement, 8 October 2026. No converter or engine change.
 

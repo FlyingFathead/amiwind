@@ -1,5 +1,7 @@
 # meshoptimizer (vendored subset)
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 Upstream: https://github.com/zeux/meshoptimizer, release v1.3 (tag archive `v1.3.tar.gz`, SHA-256
 ca4f47d451201593904b9e3067fa54b65db94bc34ab5173864950862b748a145). Licence: MIT (LICENSE.md, Arseny Kapoulkine).
 

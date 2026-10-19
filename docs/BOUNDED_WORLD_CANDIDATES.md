@@ -1,5 +1,7 @@
 # Bounded world candidates
 
+_Last updated with AmiWind v0.0.28 (4 October 2026)._
+
 `tools/prepare_bounded_world.py` is an offline candidate compiler introduced during
 the v0.0.27-rc3 memory repair. It addresses an identified cause of the Seyda Neen
 regression: selected town scenery could retain the entire parent terrain BSP,

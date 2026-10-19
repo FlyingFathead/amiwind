@@ -1,5 +1,7 @@
 # Asset-free compilation and boot image
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 The GitHub Actions workflow `.github/workflows/source-check.yml` runs on pushes,
 pull requests and manual dispatch. It uses an Ubuntu 24.04 runner and Python 3.12,
 installs public host/Python dependencies, checks the source allowlist, runs the

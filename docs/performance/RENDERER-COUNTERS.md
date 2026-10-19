@@ -1,5 +1,7 @@
 # Renderer counters (`dbg rcount`)
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Counts are the main currency for comparing builds: they do not depend on the emulator
 profile or the host PC, while frame times do
 ([BENCH-JIT-PROFILE-32](../bugs/BENCH-JIT-PROFILE-32.md)). The engine counts what its

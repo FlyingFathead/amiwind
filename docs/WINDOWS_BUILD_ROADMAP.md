@@ -1,5 +1,7 @@
 # Windows build roadmap
 
+_Last updated with AmiWind v0.0.28 (4 October 2026)._
+
 ## Current baseline — published v0.0.27
 
 The published [v0.0.27 release](RELEASE-v0.0.27.md) passed all four hosted jobs:

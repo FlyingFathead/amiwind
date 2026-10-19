@@ -1,10 +1,6 @@
 # Heap watcher: build estimates and complete scene lifecycles
 
-This is the memory review and implementation contract introduced during the
-v0.0.27-rc3 repair and carried into published v0.0.27. It extends [memory allocation](MEMORY_ALLOCATION.md) and
-[cell changing](CELL_CHANGING.md). A planned metric or checkpoint below is not
-implemented merely because it appears here. Target runtime acceptance remains
-pending; the original rc3 playtest image is not repaired by these documents.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +16,12 @@ pending; the original rc3 playtest image is not repaired by these documents.
 - [Required pipeline: Heap Watcher → Profiler → Optimizer](#required-pipeline-heap-watcher--profiler--optimizer)
 
 <!-- contents end -->
+
+This is the memory review and implementation contract introduced during the
+v0.0.27-rc3 repair and carried into published v0.0.27. It extends [memory allocation](MEMORY_ALLOCATION.md) and
+[cell changing](CELL_CHANGING.md). A planned metric or checkpoint below is not
+implemented merely because it appears here. Target runtime acceptance remains
+pending; the original rc3 playtest image is not repaired by these documents.
 
 ## Build receipts: used, free and growth margin
 

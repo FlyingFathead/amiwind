@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41-dev1 (15 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found by the asset census (tools/asset_census.py). Estimated from a 1-in-10 sample.

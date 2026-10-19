@@ -1,5 +1,7 @@
 # Original game content stays outside this repository
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 AmiWind is an unofficial fan tribute and a proof-of-concept porting pipeline.
 It needs the original Morrowind files, which each user provides from their own
 copy. The original game is sold on

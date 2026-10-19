@@ -1,5 +1,7 @@
 # Interior and exterior brightness
 
+_Last updated with AmiWind v0.0.29 (6 October 2026)._
+
 ## RC2 brightness measurement: 6 October 2026
 
 Recorded after the RC2 source snapshot was sealed. This is follow-up

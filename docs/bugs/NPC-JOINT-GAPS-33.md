@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
 ## Status: 9 October 2026
 
 Open. Present in every build that converts NPCs (measured on the v0.0.32 release gallery and on

@@ -1,5 +1,7 @@
 # Canonical exterior terrain culling
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 The host pass consumes the maintainer's local, authored LAND NPZ directly. No assets
 are shipped with these tools. Water is never an occlusion receiver. Negative
 LAND heights are the actual seabed; there is no invented bottom cutoff.

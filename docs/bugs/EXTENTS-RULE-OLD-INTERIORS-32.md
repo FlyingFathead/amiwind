@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found by the face validator (tools/check_faces.py) over every map of the shipped v0.0.31 image. Release blocker for any image that pairs the v0.0.32 engine with old interior maps.

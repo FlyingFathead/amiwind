@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.39 (14 October 2026)._
+
 ## Status: 11 October 2026
 
 Partly repaired in source on v0.0.36-dev3-crash: `dbg music on|off` (console variable `aw_music`). The audio settings menu switch and the builder option follow in a later version.

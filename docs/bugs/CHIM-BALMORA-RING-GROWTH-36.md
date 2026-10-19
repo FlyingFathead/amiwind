@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Status: 11 October 2026
 
 Cause found: the build settings, not a change in the code. v0.0.36-dev3 and dev4 are built with

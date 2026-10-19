@@ -434,10 +434,12 @@ def check_always_included(id1, exterior=True, maps=None):
 
 
 def worldspawn_sky_keys(maps_dir):
-    """{map name: {sky key: value}} of the staged BSP29 maps (their worldspawn)."""
+    """{map name: {sky key: value}} of the staged BSP29 maps (their worldspawn), CHIM frame maps (x.chim)
+    included (tools/map_files.py): they name the shared sky as the legacy exteriors do."""
     import struct
+    from map_files import map_files
     found = {}
-    for path in sorted(Path(maps_dir).glob('*.bsp')):
+    for path in map_files(maps_dir):
         with path.open('rb') as stream:
             head = stream.read(124)
             if len(head) < 124 or struct.unpack_from('<i', head)[0] != 29:

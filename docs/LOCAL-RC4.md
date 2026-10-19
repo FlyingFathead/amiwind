@@ -1,5 +1,7 @@
 # Local source checkpoint — v0.0.25-rc4
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Verify `AmiWind-v0.0.25-rc4-SHA256SUMS` beside the downloaded files. Extract the
 patch outside the checkout and apply the standalone source updater with a new
 external backup directory. The baseline is the published rc3 source archive

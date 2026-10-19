@@ -23,6 +23,8 @@ What changed in each version: [changelog](CHANGELOG.md).
 
 <!-- contents end -->
 
+_Last updated with AmiWind v0.0.44 (19 October 2026)._
+
 ## v0.0.44: By Azura's Trees!
 
 A patch release for v0.0.43 with lighter Bitter Coast trees; the world looks as in the v0.0.43 shots below.

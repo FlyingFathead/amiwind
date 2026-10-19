@@ -1,5 +1,7 @@
 # Voiced dialogue: event lookup and runtime plan
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 AmiWind currently auditions one generic voiced HELLO for a small NPC set. The
 source records contain a wider event vocabulary, ordered response records,
 conditions, response scripts and voice-file references. A static match cannot

@@ -113,6 +113,41 @@ class ChimZoneTests(unittest.TestCase):
         self.assertIn('many banks ok', out[0])
 
 
+@unittest.skipIf(os.name == 'nt', 'native helper fixtures run on Linux, including the Docker gate')
+@unittest.skipUnless(COMPILER, 'install a host C compiler')
+class ChimPrefetchTests(unittest.TestCase):
+    """Read-ahead into spare Fast RAM (chim_prefetch.c, CHIM-CROSSING-SYNC-LOAD-43) with the real zone."""
+
+    def test_baseline_plan_reads_hysteresis_eviction_and_budget(self):
+        out = compile_and_run(self, 'aga_chim_prefetch_test.c',
+                              [SRC / 'chim/chim_zone.c', SRC / 'chim/chim_prefetch.c'])[0]
+        # 16 MiB machine (no bank survives a map change): off, nothing read or held.
+        self.assertIn('baseline ok', out)
+        # The 2x2 block at the player's corner, the neighbour walked towards first, then the cell, then the ring.
+        self.assertRegex(out, r'plan 0,1 (1,0 1,1|1,1 1,0) 0,0 ')
+        for line in ('reads ok', 'hysteresis ok', 'evict first ok', 'budget ok', 'standing ok', 'chim prefetch ok'):
+            self.assertIn(line, out)
+        self.assertIn('corner: 0 plan changes', out)
+
+    def test_off_path_and_wiring(self):
+        world = (SRC / 'chim/chim_world.c').read_text()
+        read = world[world.index('int Chim_PackRead (chim_pack_t *pack'):]
+        read = read[:read.index('\n}\n')]
+        # RAM first only for file-table files; the disk read and its counters otherwise, as before.
+        self.assertIn('pack->row >= 0 && ChimPrefetch_Read (pack->row, offset, out, bytes)', read)
+        self.assertIn('chim_world.reads++;', read)
+        prefetch = (SRC / 'chim/chim_prefetch.c').read_text()
+        self.assertIn('return prefetch_on && ChimZone_PersistentBytes () > 0;', prefetch)
+        self.assertIn('static int	prefetch_on = 1;', prefetch)
+        # Settings and reports as "chim" subcommands: no new registered commands or cvars.
+        self.assertNotIn('Cvar_RegisterVariable', prefetch)
+        self.assertIn('ChimPrefetch_Command (argc, argv);', world)
+        zone = (SRC / 'chim/chim_zone.c').read_text()
+        # Without read-ahead blocks the eviction walk is the first method's.
+        self.assertIn('if (prefetch_blocks || only)', zone)
+        self.assertIn('chim/chim_prefetch.c', (ROOT / 'engine/aga/Makefile').read_text())
+
+
 def boxes(n, size=48, step=128):
     return [((i % 20 * step, i // 20 * step, 0), (i % 20 * step + size, i // 20 * step + size, size)) for i in range(n)]
 
@@ -350,7 +385,7 @@ class ChimWorldTests(unittest.TestCase):
     """The CHIM world through aw_scenery.c's hooks, world.c and r_efrag.c."""
 
     SOURCES = [SRC / 'chim' / n for n in ('chim_format.c', 'chim_zone.c', 'chim_models.c', 'chim_chunks.c', 'chim_graft.c',
-                                          'chim_world.c', 'chim_statics.c', 'chim_far.c')] + \
+                                          'chim_world.c', 'chim_statics.c', 'chim_far.c', 'chim_prefetch.c')] + \
         [SRC / n for n in ('aw_scenery.c', 'world.c', 'r_efrag.c', 'mathlib.c', 'aw_format.c', 'aw_harvest.c',
                            'aw_harvest_runtime.c', 'aw_harvest_proxy.c', 'aw_state.c')]
 

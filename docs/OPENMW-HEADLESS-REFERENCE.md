@@ -1,6 +1,6 @@
 # OpenMW headless reference testing in Docker
 
-Suggested repository location: docs/OPENMW-HEADLESS-REFERENCE.md.
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -12,6 +12,8 @@ Suggested repository location: docs/OPENMW-HEADLESS-REFERENCE.md.
 - [5. Direct upstream links](#5-direct-upstream-links)
 
 <!-- contents end -->
+
+Suggested repository location: docs/OPENMW-HEADLESS-REFERENCE.md.
 
 Source links checked: 5 October 2026. This is a source-based setup and workflow reference, not a report of a successful OpenMW run in any particular AmiWind environment. Launch commands below are examples requiring a prepared local configuration. OpenMW is an open-source reimplementation of the Morrowind engine, not the original game executable; it still requires game data supplied by the user. OpenMW and AmiWind are independent renderers, so matching a scene does not imply pixel-identical output. Original game data, saves, and captured reference images remain private and are never part of this public source package. The proposed comparison workflow is not yet claimed implemented.
 ## 1. Can OpenMW run headless?

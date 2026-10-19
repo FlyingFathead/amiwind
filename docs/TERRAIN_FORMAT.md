@@ -1,5 +1,7 @@
 # Experimental terrain packets, version 1
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 `terrain.mwt` concatenates independently readable packets. `terrain-index.json`
 provides PC-side offsets; a compact runtime index is not implemented. Numbers
 are big-endian. All packets are padded with zeroes to a 32-byte boundary.

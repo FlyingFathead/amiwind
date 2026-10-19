@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Symptom
 The same placement, placed by two CHIM frames at their own frame-local coordinates, gives a few different steps:
 on the v0.0.41 final world 107 of 869,846 places are found only in a neighbour frame's copy, not in the frame that

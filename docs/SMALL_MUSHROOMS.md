@@ -1,10 +1,6 @@
 # Optional small mushrooms
 
-The flora pipeline can include the original small Bitter Coast mushroom
-placements with `prepare_tree_sprites.py --include-small-mushrooms`. Existing
-flora selection remains the default. A custom world-flora policy can instead
-add `small_mushroom` to `source_categories`; keep that policy separate so the
-previous selection remains available.
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +10,12 @@ previous selection remains available.
 - [Dev4 pickup confirmation and repeatable release checkpoint](#dev4-pickup-confirmation-and-repeatable-release-checkpoint)
 
 <!-- contents end -->
+
+The flora pipeline can include the original small Bitter Coast mushroom
+placements with `prepare_tree_sprites.py --include-small-mushrooms`. Existing
+flora selection remains the default. A custom world-flora policy can instead
+add `small_mushroom` to `source_categories`; keep that policy separate so the
+previous selection remains available.
 
 Run conversion inside the development container with original inputs mounted
 read-only and a new private output directory:

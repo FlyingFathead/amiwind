@@ -1,5 +1,7 @@
 # Local source build — rc2
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Use the reconciled public-source ZIP. Extract it into a fresh directory outside
 /path/to/amiwind; do not overlay either earlier source candidate blindly.
 The release version remains 0.0.25-rc2. No private playable is delivered.

@@ -1,8 +1,6 @@
 # Cell-change continuity checklist - a growing list
 
-A streaming boundary changes the resident map, not the player's ongoing game.
-Seyda Neen and Balmora subdivisions are required to bound frame cost; preserving
-continuity must not require loading the entire world at once.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -26,6 +24,10 @@ continuity must not require loading the entire world at once.
   - [Dense ramps: subdivide first, then measure](#dense-ramps-subdivide-first-then-measure)
 
 <!-- contents end -->
+
+A streaming boundary changes the resident map, not the player's ongoing game.
+Seyda Neen and Balmora subdivisions are required to bound frame cost; preserving
+continuity must not require loading the entire world at once.
 
 ## How this list grows
 

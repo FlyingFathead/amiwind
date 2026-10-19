@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 11 October 2026
 
 Repaired in source on v0.0.36-vivec-b. HOLD-LEVEL builder error: reported to every worker.

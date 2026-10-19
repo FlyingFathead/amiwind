@@ -244,7 +244,7 @@ def _main(ap, a):
     if receipt_path.is_file():
         receipt = json.loads(receipt_path.read_bytes().decode('utf-8'))
         receipt['lighting'] = lighting_record(lighting_type)
-        receipt_path.write_bytes((json.dumps(receipt, indent=1, sort_keys=True) + '\n').encode('utf-8'))
+        receipt_path.write_bytes((receipt_text(receipt, a.jobs) + '\n').encode('utf-8'))
     validated = None
     if a.validate:
         # One validation per build (BUILD-CHIM-STATS-SERIAL-TAIL-36): the stats below reuse its world and
@@ -253,8 +253,8 @@ def _main(ap, a):
         from chim.validate import report_text, report_world
         with build_profile.phase('CHIM validation', '%d frames' % len(areas)) as timer:
             src_path = a.out / 'chim-source.json'
-            report, world, _ = report_world(a.out, json.loads(src_path.read_text(encoding='utf-8'))
-                                            if src_path.is_file() else None, a.palette.read_bytes(),
+            source_doc = json.loads(src_path.read_text(encoding='utf-8')) if src_path.is_file() else None
+            report, world, _ = report_world(a.out, source_doc, a.palette.read_bytes(),
                                             jobs=resolve_jobs(a.jobs),
                                             cross_checks='serial' if a.pool == 'batch' else 'pool')
             text = report_text(report)
@@ -264,6 +264,9 @@ def _main(ap, a):
                                                                report['failure_count']))
         if not report['ok']:
             ap.exit(1, 'Error: the CHIM world fails validation (%s)\n' % (a.out / 'chim-validate.json'))
+        # the source manifest is let go (about 700 MB of JSON for 1,351 frames, several GB as objects: the stair
+        # gate's workers need that memory); the stats read it again (one C JSON parse, seconds)
+        source_doc = None
         validated = (world, report['measured'])
         # the gates below read the world the validation read (--pool stage), instead of reading and decoding
         # every file again each (--pool batch: the method before v0.0.42); the same world, the same reports
@@ -293,7 +296,7 @@ def _main(ap, a):
             # (the candidate records this run stored are listed in chim-stairs.json, which the promotion reads)
             receipt['stair_walk'] = dict({k: v for k, v in reuse.items() if k != 'stored'}, status=report['status'],
                                          tested=report.get('tested', 0))
-            receipt_path.write_text(json.dumps(receipt, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
+            receipt_path.write_text(receipt_text(receipt, a.jobs) + '\n', encoding='utf-8', newline='\n')
             if a.accept_known_stair_findings:
                 # the receipt records the waiver (private test only)
                 path = a.out / 'chim-receipt.json'
@@ -364,12 +367,22 @@ def _main(ap, a):
     return 0
 
 
+def receipt_text(receipt, jobs):
+    """The CHIM receipt as JSON (indent 1, sorted keys), its long lists encoded on the worker pool (the same
+    bytes as json.dumps; chim.build.RECEIPT_LISTS, BUILD-CHIM-SERIAL-SECTIONS-44)."""
+    import parallel_json
+    from build_jobs import resolve_jobs
+    from chim.build import RECEIPT_LISTS
+    return parallel_json.dumps(receipt, RECEIPT_LISTS, jobs=resolve_jobs(jobs))
+
+
 def write_stats(a, build_profile, validated):
     """chim-stats.json (chim.stats), timed; with VALIDATED (world, measurements) of this build's validation the
     world is not validated a second time."""
     from chim.stats import main as stats
     with build_profile.phase('CHIM stats', 'reusing this build\'s validation' if validated else 'validating the world'):
-        code = stats([str(a.out)], *(validated or (None, None)))
+        from build_jobs import resolve_jobs
+        code = stats([str(a.out)], *(validated or (None, None)), jobs=resolve_jobs(a.jobs))
     return code
 
 

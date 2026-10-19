@@ -1,5 +1,7 @@
 # early_game_demo_start_1
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 This was the default AGA demo opening for v0.0.17. From v0.0.18-dev4 the
 game boots into `aw_main_menu`; this town opening remains an optional console
 command, `aw_demo_start`. The notes below describe the older startup wiring.

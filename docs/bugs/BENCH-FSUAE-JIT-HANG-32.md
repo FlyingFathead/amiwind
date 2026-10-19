@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Cause unknown. Found by the CHIM world-format follow-up (FFS sweep, branch

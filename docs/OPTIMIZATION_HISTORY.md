@@ -1,9 +1,6 @@
 # Optimization history
 
-Preserve a measured baseline before changing the renderer, asset format, memory
-layout or I/O scheduler. Keep rejected candidates: a failed experiment is useful
-evidence. Never compare a maximum-speed JIT run to a stock-speed machine as if
-they were the same hardware.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -29,6 +26,11 @@ they were the same hardware.
 - [Building culling investigation 001 (after checkpoint-017)](#building-culling-investigation-001-after-checkpoint-017)
 
 <!-- contents end -->
+
+Preserve a measured baseline before changing the renderer, asset format, memory
+layout or I/O scheduler. Keep rejected candidates: a failed experiment is useful
+evidence. Never compare a maximum-speed JIT run to a stock-speed machine as if
+they were the same hardware.
 
 Verified asset mappings and symptom/cause/fix records are indexed in
 [IMPLEMENTATION_JOURNAL.md](IMPLEMENTATION_JOURNAL.md); untried proposals are in

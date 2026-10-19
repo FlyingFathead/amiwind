@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 9 October 2026
 
 Open (maintainer playtest), cause unknown. The code plays the death track once when the player dies in a fight; suspects: the track missing from the build's music catalogue, music held at that moment, or a death outside a fight (the call sits in the combat layer only).

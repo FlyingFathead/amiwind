@@ -15,6 +15,28 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Overflow repair candidate - 15 October 2026](#overflow-repair-candidate---15-october-2026)
+- [Original carrier failure: 15 October 2026](#original-carrier-failure-15-october-2026)
+- [Source carrier completion: 15 October 2026](#source-carrier-completion-15-october-2026)
+- [Status: 9 October 2026](#status-9-october-2026)
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Overflow repair candidate - 15 October 2026
 
 Expanded original-cell coverage admitted Tarhiel at his original transform.

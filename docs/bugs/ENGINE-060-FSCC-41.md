@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 A static scan of the v0.0.41-dev5 engine found 263 `fscc` instructions, e.g. `ftst %fp0` followed by
 `fsgt d0`: GCC's code for turning a floating-point comparison into a true or false value. The 68040 runs `fscc` in

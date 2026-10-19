@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 ## Status: 10 October 2026
 
 Fixed in source on the v0.0.35 line; ships with v0.0.35.
@@ -60,7 +62,7 @@ Untrusted input and unusual values are checked where they enter the engine; each
 
 Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and game state. See [families](README.md#families).
 
-- AW-20260928-10 (no report page): Interior door animation and sound missing
+- [AW-20260928-10](AW-20260928-10.md): Interior door animation and sound missing
 - AW-20260928-12 (no report page): Downstairs interior doors cannot open
 - AW-20260928-19 (no report page): Courtyard barrel incorrectly says empty
 - AW25-06 (no report page): Quicksave shown as empty; save ordering confusing

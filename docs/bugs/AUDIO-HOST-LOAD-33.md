@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 9 October 2026
 
 Open. Seen in CHIM Preview 1 on a PC running heavy builds; not seen on a second PC. The cause is the

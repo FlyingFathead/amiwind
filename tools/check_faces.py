@@ -739,10 +739,12 @@ def merge(reports, config=None, errors=()):
 
 
 def bsp_paths(paths):
+    """Files as given; folders as every map in them, x.bsp and CHIM frame maps x.chim (tools/map_files.py)."""
+    from map_files import is_map_name
     for path in paths:
         path = Path(path)
         if path.is_dir():
-            yield from sorted(p for p in path.rglob('*') if p.suffix.lower() == '.bsp')
+            yield from sorted(p for p in path.rglob('*') if p.is_file() and is_map_name(p.name))
         else:
             yield path
 

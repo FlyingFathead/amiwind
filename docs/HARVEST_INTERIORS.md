@@ -1,5 +1,7 @@
 # Source-bound mushroom interiors
 
+_Last updated with AmiWind v0.0.29 (6 October 2026)._
+
 The opt-in `tools/prepare_harvest_room.py` prototype builds one original interior,
 its external mushroom catalogue/models and original directed door-bank deltas.
 It requires the owned standalone base master and assets. Generated game data and

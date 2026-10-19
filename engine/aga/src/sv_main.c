@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_mappath.h"
 #include "aw_anim.h"
 #include "amiwind_version.h"
+#include "aw_spike.h"
 
 server_t		sv;
 server_static_t	svs;
@@ -1164,7 +1165,12 @@ void SV_SpawnServer (char *server)
     }
     AW_HeapAuditPhase(sv.modelname,"before-bsp");
     AW_StreamLoadBegin(sv.modelname);aw_world_start=Sys_FloatTime();
-    sv.worldmodel = Mod_ForName (sv.modelname, false);
+    {
+        double spike_t0;
+        AW_SPIKE_BEGIN (spike_t0);
+        sv.worldmodel = Mod_ForName (sv.modelname, false);
+        AW_SPIKE_END (AW_SP_MAPFILE, spike_t0, 0);
+    }
     aw_world_time=Sys_FloatTime()-aw_world_start;
     if (!sv.worldmodel)
     {

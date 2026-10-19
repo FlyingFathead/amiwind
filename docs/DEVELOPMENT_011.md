@@ -4,6 +4,8 @@
 
 # v0.0.11-dev1 archived development record — 27 September 2026
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 This is a development source checkpoint, not a replacement for released
 v0.0.10/checkpoint-008. Host package: 0.8.3.dev1. Runtime builds identify
 themselves as v0.0.11-dev1. Native geometry and sustained audio acceptance are

@@ -1,5 +1,7 @@
 # Prison-ship interior preview
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 The current checkpoint starts in a locally converted Imperial Prison Ship cell. This is
 a walkable lighting/loading experiment, not the opening quest or character
 creation. Jiub, guards, dialogue, confiscation, container contents and the Census

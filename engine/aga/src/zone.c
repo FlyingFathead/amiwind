@@ -940,6 +940,39 @@ Cache_Init
 
 ============
 */
+/* "chim zone": the small zone (Z_Malloc) in one line, for the long-trip leak
+ * check: its size, free bytes in how many runs, the
+ * largest run, and the used blocks with their bytes (headers included). A
+ * leak grows the used blocks lap after lap; the largest run alone also moves
+ * as Z_Malloc's rover walks the zone. "chim zone blocks" lists every block
+ * (chim_world.c Status; no registered command of its own). */
+void AW_ZoneLine (int blocks)
+{
+	memblock_t *block;
+	int free_bytes = 0, free_runs = 0, largest = 0, used = 0, used_bytes = 0;
+	if (!mainzone)
+		return;
+	for (block = mainzone->blocklist.next ; block != &mainzone->blocklist ; block = block->next)
+	{
+		if (blocks)
+			Con_Printf ("  %s %ld\n", block->tag ? "used" : "free", (long)block->size);
+		if (block->tag)
+		{
+			used++;
+			used_bytes += block->size;
+		}
+		else
+		{
+			free_runs++;
+			free_bytes += block->size;
+			if (block->size > largest)
+				largest = block->size;
+		}
+	}
+	Con_Printf ("zone: %ld bytes; free %ld in %ld runs, largest %ld; used %ld blocks, %ld bytes\n",
+		(long)(free_bytes + used_bytes), (long)free_bytes, (long)free_runs, (long)largest, (long)used, (long)used_bytes);
+}
+
 void Cache_Init (void)
 {
 	cache_head.next = cache_head.prev = &cache_head;

@@ -29,6 +29,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 
 The targeted actor is labelled Ordinator but appears unhelmeted, pointed-eared and brown/red-clothed. The maintainer compares the appearance to Fargoth. Exact actor/model identity is not yet established; no intentional placeholder is claimed.

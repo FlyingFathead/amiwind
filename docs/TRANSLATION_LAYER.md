@@ -1,5 +1,7 @@
 # AmiWind: host conversion and native runtime
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 AmiWind is the working title. The repository identifier remains
 `morrowind-amiga-demake`. The project is a GPL fan-made proof of concept requiring
 the user's original Morrowind installation. It is not a complete game port.

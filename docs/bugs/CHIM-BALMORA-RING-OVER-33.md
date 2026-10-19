@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Status: 9 October 2026
 
 Fixed in source on the v0.0.33 integration line (CHIM builder change f85baa8), with a test. The next

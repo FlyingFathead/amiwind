@@ -1,5 +1,7 @@
 # Fatal error reports
 
+_Last updated with AmiWind v0.0.28 (4 October 2026)._
+
 When an engine error reaches `Sys_Error`, AmiWind attempts to save `ERROR.TXT`
 in its current AmigaDOS launch directory. It verifies the file by reading its
 complete contents back before reporting success. After closing the game screen,

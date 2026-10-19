@@ -1,6 +1,6 @@
 # CHIM ideas and held-back work
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -8,6 +8,7 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 - [Modular NPCs](#modular-npcs)
 - [NPC pathfinding](#npc-pathfinding)
 - [The Ghostfence as a Quake turbulent surface](#the-ghostfence-as-a-quake-turbulent-surface)
+- [Angle impostors for heavy plants and rocks](#angle-impostors-for-heavy-plants-and-rocks)
 - [The distant view: far terrain and mold shells](#the-distant-view-far-terrain-and-mold-shells)
 - [M3: Vivec on CHIM](#m3-vivec-on-chim)
   - [M3 preflight (10 October 2026)](#m3-preflight-10-october-2026)
@@ -135,6 +136,29 @@ engine feature: the existing mechanism, mapped onto the Morrowind data.
 teleporter colours, which ignore lightmaps and the night, so it reads as a shining wall across the rim of Red
 Mountain from far away, through the fog as well. Its cost at a distance is measured with the far-terrain layer.
 
+## Angle impostors for heavy plants and rocks
+
+**Status: idea (maintainer, 19 October 2026), to measure before building.** Some meshes cost a lot every frame for
+how they look from a distance: emperor parasols, giant mushrooms, big Bitter Coast trees. Quake's own sprite
+renderer already draws our distant tree sprites and the interior plant sprites: z-buffered, so a sprite still
+disappears behind a building, with transparent texels skipped so it keeps its outline. An angle impostor goes one
+step further: the builder renders a heavy mesh from 8 directions once and stores the 8 views as one Quake sprite
+with a frame group; the engine shows the view closest to the player's direction, so the object still turns as the
+player walks around it, at the cost of one sprite. Near the player the real mesh stays.
+
+What decides it is the pixels drawn, not the polygon count: a large sprite covering many screen pixels can cost
+more than a few small polygons. The A/B per mesh type, at the same poses: spans and pixels drawn (`dbg rcount`) and
+frame time with the mesh, with an upright sprite and with the 8-view impostor, plus the memory of 8 views against
+the mesh. Hardware sprites are no option here: the chipset knows no depth, so they suit the HUD, the crosshair and
+the pointer, not objects in the world.
+
+**Distant silhouettes (maintainer, 19 October 2026).** The same path as a far ring for buildings, rocks and big
+plants: past a set distance the engine draws the object's sprite instead of its mesh, so it keeps its outline
+against the sky and the fog, as the distant trees already do. Two things to measure with it: the light (a sprite
+rendered in daylight needs the fog colour and the night tint applied when it is drawn, as the distant trees get
+them now) and the pixels (only the far ring, where a sprite covers few pixels). It belongs with the distance layers
+below: far terrain and mold shells.
+
 ## The distant view: far terrain and mold shells
 
 **Status: release blocker for v0.0.33; designed, a first layer is being
@@ -157,6 +181,18 @@ seen from the world. The legacy region maps drew these views much better.
   cantons, so they stand on the horizon without their full cost. The shell
   tool exists and was measured on Balmora; the engine switch is designed
   ([distant shells](../DISTANT_SHELLS.md)).
+- **The island cut-out (maintainer, 19 October 2026: the target for
+  [HORIZON-HOLES-31](../bugs/HORIZON-HOLES-31.md) and
+  [VIVEC-DISTANT-BRIDGES-32](../bugs/VIVEC-DISTANT-BRIDGES-32.md)).** Distant views break up where tall
+  things meet the sky: Vivec's cantons and bridges, mountainsides; Balmora's low roofs on flat ground hold up.
+  One far model of the whole island, the topography with every building and tree baked in as a cut-out, built
+  once by the builder and streamed by region like the far terrain. The simplest form is a coarse height grid
+  (for each point the highest thing standing there: ground, roof, canopy, canton top) drawn as flat fog-coloured
+  spans beyond the frames: no seams of its own, so far geometry never breaks. Cheaper still for the far skyline:
+  a horizon profile per cell (the highest elevation angle of all distant geometry in a few hundred directions,
+  a few hundred bytes), one fill per screen column. A height grid cannot show an arch, so a bridge seen from far
+  becomes a band down to the water; for those few objects the low-poly shells (mold shells, collision hulls)
+  sit on top. A/B against today at the same poses (the Vivec bridges, Balmora across the river at sunset).
 - **No artificial clamps.** The CHIM view distance follows the ring and the
   memory budget, with any remaining limit measured and stated.
 

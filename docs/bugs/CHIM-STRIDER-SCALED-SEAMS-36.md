@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
 ## Status: 10 October 2026
 
 Closed, not a bug. The report was a misunderstanding: the maintainer meant that Balmora's strider is the good one and should be the

@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+
 ## Status: 9 October 2026
 
 Fixed in source on v0.0.33-chim-engine; not in a build yet. Found by an audit of every `dbg tp`

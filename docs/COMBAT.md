@@ -1,8 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-Melee combat is one shared layer for every NPC. The Vivec Arena minigame in
-the debugger is its test room: pick an opponent, fight, read the result,
-rematch. Development builds only; nothing here changes saved games.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +12,10 @@ rematch. Development builds only; nothing here changes saved games.
 - [Known limits](#known-limits)
 
 <!-- contents end -->
+
+Melee combat is one shared layer for every NPC. The Vivec Arena minigame in
+the debugger is its test room: pick an opponent, fight, read the result,
+rematch. Development builds only; nothing here changes saved games.
 
 ## Playing the Vivec Arena (testing guide)
 

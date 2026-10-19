@@ -1,5 +1,7 @@
 # Waiting and resting: the original's rules
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Status: study, 10 October 2026. Not implemented yet; planned for a later version (see [ROADMAP.md](ROADMAP.md)).
 Today **T** only moves the clock forward ([DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md)).
 

@@ -1,8 +1,6 @@
 # AmiWind Toolkit
 
-Current controls are documented below. The Toolkit header currently names
-v0.0.38, its last update; that label is independent of the game release.
-Screenshots in this guide are historical and do not supply current coverage totals.
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -28,6 +26,10 @@ Screenshots in this guide are historical and do not supply current coverage tota
 - [Other parts](#other-parts)
 
 <!-- contents end -->
+
+Current controls are documented below. The Toolkit header currently names
+v0.0.38, its last update; that label is independent of the game release.
+Screenshots in this guide are historical and do not supply current coverage totals.
 
 The AmiWind Toolkit is the browser workbench for anyone developing AmiWind: it
 shows how much of Morrowind's world has been converted to the Amiga, what is
@@ -288,8 +290,9 @@ exterior cell, the interiors reached from it, what is converted, what each audit
 mapped there before, and the order to convert the rest in. It is built on the data the Toolkit already has (the
 World progress table for the legacy mapping quality, the Map metrics layer for risk and cost) and adds the CHIM side.
 
-A headline sits at the top of the Toolkit page, on every tab: **Done: N of 1,292 (percent)** for Vvardenfell with the
-completion levels beside it, and Solstheim reported separately. A cell counts as passed only when it is converted **and
+A headline sits at the top of the Toolkit page, on every tab: **Done: N of 1,390 (percent)** for Vvardenfell (its
+1,390 cells with a LAND record: 1,292 land cells and 98 sea-floor cells; open ocean is apart, see
+[what we count](chim/CELL_TRACKER.md#what-we-count)) with the completion levels beside it, and Solstheim reported separately. A cell counts as passed only when it is converted **and
 every audit that was measured passed**. Audits that were not measured are
 counted apart ("unmeasured audits on N converted cells") and are never counted as passed. Under the headline are the
 breakdown (maintainer-approved, playtested, audits passed, converted with failing audits, converted with nothing measured,
@@ -331,7 +334,8 @@ python3 tools/cell_progress.py render-md --out DIR    # writes docs/chim/CELL_TR
 python3 tools/cell_progress.py check-md               # header, private content and policy section of the committed page
 ```
 
-`render-md` writes the public page [docs/chim/CELL_TRACKER.md](chim/CELL_TRACKER.md): the headline ("Done: N of 1,292"),
+`render-md` writes the public page [docs/chim/CELL_TRACKER.md](chim/CELL_TRACKER.md): the headline ("Done: N of 1,390"), a
+"What we count" table that names every cell count and checks that they add up,
 totals, a table per ring, failures by mechanism class, objects by type and an import policy generated from the code's own
 constants. Re-run it after every ingest; the page is never edited by hand. `check-md` (and the test suite) fails when the
 committed page lacks its generated header, mentions a private path, or has an import policy that no longer matches the code.

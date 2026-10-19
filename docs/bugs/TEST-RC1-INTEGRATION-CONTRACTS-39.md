@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Symptom
 
 The first exact RC1 suite at 88aba74 fails four image-wiring checks and the guard cache-key assertion.

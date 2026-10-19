@@ -1,5 +1,7 @@
 # Original-font and message-box direction
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Project decisions, 28 September 2026. In v0.0.21-dev1, 14 px is the default
 and Options cycles through 16, 14, 12 px and fallback. All existing atlases are
 preserved. The main-menu panel follows font metrics and sits lower to expose

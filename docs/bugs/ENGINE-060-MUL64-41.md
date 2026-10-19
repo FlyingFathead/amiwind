@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (17 October 2026)._
+
 ## Symptom
 
 The engine built for the 68040 (`-m68040 -m68881`) holds 156 64-bit multiplies (`MULS.L`/`MULU.L` with a

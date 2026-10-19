@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 ## Status: 10 October 2026
 
 Open. Found by an independent read-only engine review; confirmed in the source. Part of the "engine C speed pass".

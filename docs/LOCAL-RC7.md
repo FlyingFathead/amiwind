@@ -1,5 +1,7 @@
 # Local source checkpoint: v0.0.25-rc7
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Apply the complete update to the published rc6 source after any active build has
 finished. The updater checks overlapping edits, backs up changed files and
 verifies the installed source against the full public-source archive. No rc4/rc5

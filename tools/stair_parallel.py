@@ -29,6 +29,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 UNITS_PER_WORKER = 16   # units handed out per worker: the slowest unit bounds the pass's tail
 UNIT_MIN = 16           # steps and ramps per unit at least (each unit reads the map and builds its scenes)
 UNIT_MAX = 128          # and at most: a heavy room walks 0.4 s per step (the Arena Pit), so a unit stays under a minute
+UNIT_MIN_HEAVY = 4      # a heavy map's units may be this short (BUILD-IMAGE-STAIR-WALK-CORES-43: 128-step units of a
+                        # room walking about a second a step ran alone for minutes at the end of the pass)
+COST_POOL = 'image-stair-walk'   # cost history (build_costs): map name -> seconds its walk took
 _SCENES = {}            # per worker process: the last maps' polygons, candidates and scenes (units of one map come in a row)
 _SCENES_KEPT = 2
 
@@ -104,6 +107,26 @@ def unit_size(total, workers):
     return min(UNIT_MAX, max(UNIT_MIN, int(math.ceil(total / float(max(1, workers) * UNITS_PER_WORKER)))))
 
 
+def plan_units(maps, workers, total_steps):
+    """[(map index, start, stop, cost)] of the maps to walk, MAPS [(index, count, cost)] where cost is the map's
+    estimated walk (seconds from the cost history, else the fallback measure on the same scale). Every map is cut
+    into units of unit_size steps, and a heavy map (its cost per step high) into shorter ones, so no unit costs much
+    more than the pass's total over UNITS_PER_WORKER units per worker: a heavy map's units no longer run alone at
+    the end of the pass (BUILD-IMAGE-STAIR-WALK-CORES-43). A unit's cost is its share of the map's cost."""
+    base = unit_size(total_steps, workers)
+    total = sum(cost for _, count, cost in maps if count)
+    target = total / float(max(1, workers) * UNITS_PER_WORKER) if total else 0.0
+    units = []
+    for index, count, cost in maps:
+        per_step = cost / float(count) if count else 0.0
+        size = base
+        if target > 0 and per_step * size > target:
+            size = max(UNIT_MIN_HEAVY, int(target // per_step) if per_step else base)
+        for start, stop in split(count, size):
+            units.append((index, start, stop, per_step * (stop - start)))
+    return units
+
+
 def split(count, size):
     """(start, stop) slices of COUNT candidates, at most SIZE each, in order."""
     return [(start, min(count, start + size)) for start in range(0, count, size)] or [(0, 0)]
@@ -138,17 +161,30 @@ def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
     stairs_total = sum(count for _, count, _, _ in plans)
     print('Stair walk: %d steps and ramps to check or reuse in %d maps' % (stairs_total, len(tasks)), flush=True)
     size = unit_size(walk_total, workers)
-    units, owner = [], []
-    for index, ((path, core, models_, *_), (action, count, _, _)) in enumerate(zip(tasks, plans)):
-        if action != 'walk':
-            continue
-        for start, stop in split(count, size):
-            units.append((path, core, models_, scope, start, stop))
-            owner.append(index)
-    walked_maps = len(set(owner))
-    print('Stair walk: %d maps reused, %d maps to walk (%d steps and ramps) in %d units of up to %d on %d workers'
-          % (len(tasks) - walked_maps, walked_maps, walk_total, len(units), size, workers), flush=True)
+    # each map's walk estimated in seconds by the cost history of earlier builds (build_costs, map name -> seconds),
+    # else by its size times its steps (the measure before v0.0.44), scaled to seconds by the maps that have both
+    import build_costs
     sizes = {t[0]: sw._map_cost(t) for t in tasks}
+    walking = [i for i, plan in enumerate(plans) if plan[0] == 'walk']
+    names = [Path(tasks[i][0]).stem for i in walking]
+    measure = {Path(tasks[i][0]).stem: float(max(1, sizes[tasks[i][0]]) * max(1, plans[i][1])) for i in walking}
+    estimate = build_costs.estimator(COST_POOL, names, lambda name: measure[name]) if names else None
+    known = sum(1 for name in names if name in build_costs.load(COST_POOL)) if names else 0
+    planned = plan_units([(i, plans[i][1], estimate(Path(tasks[i][0]).stem)) for i in walking], workers, walk_total)
+    units, owner, unit_cost = [], [], []
+    for index, start, stop, cost in planned:
+        path, core, models_ = tasks[index][0], tasks[index][1], tasks[index][2]
+        units.append((path, core, models_, scope, start, stop))
+        owner.append(index)
+        unit_cost.append(cost)
+    walked_maps = len(set(owner))
+    print('Stair walk: %d maps reused, %d maps to walk (%d steps and ramps) in %d units of up to %d on %d workers '
+          '(largest first by %s; heavy maps in shorter units, %d units under %d steps)'
+          % (len(tasks) - walked_maps, walked_maps, walk_total, len(units), size, workers,
+             'the walk times of %d of %d maps in earlier builds' % (known, len(names)) if known
+             else 'map size x steps (no walk times recorded yet)',
+             sum(1 for u in units if 0 < u[5] - u[4] < min(size, UNIT_MIN)), min(size, UNIT_MIN)), flush=True)
+    cost_of = {id(u): c for u, c in zip(units, unit_cost)}
     # largest first: the slice length times the map's size (heavy rooms have long hull chains); rows come back in
     # unit order, so a map's units arrive in order and the map is complete at its last unit
     rows_of = {i: list(plan[2]) for i, plan in enumerate(plans) if plan[0] == 'reused'}
@@ -160,8 +196,9 @@ def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
             stairs_done += plan[1]
     last = {i: k for k, i in enumerate(owner)}
     try:
+        timings = []
         for k, found in enumerate(ordered_map(walk_unit, units, max(1, min(workers, len(units) or 1)),
-                                              cost=lambda u: (u[5] - u[4]) * max(1, sizes.get(u[0], 0)))):
+                                              cost=lambda u: cost_of[id(u)], timings=timings)):
             i = owner[k]
             pending.setdefault(i, []).extend(found)
             if last[i] != k:
@@ -196,6 +233,12 @@ def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
                 (stairs_done, stairs_total, 'stairs'), (done_maps, len(tasks), 'maps'))
     finally:
         cached = cache.summary() if cache is not None else None
+    # this run's walk time of each walked map for the next build's order and unit sizes (never part of a key)
+    seconds = {}
+    for i, t in zip(owner, timings):
+        seconds[i] = seconds.get(i, 0.0) + t
+    walked = sorted(seconds)
+    build_costs.record(COST_POOL, [Path(tasks[i][0]).stem for i in walked], [seconds[i] for i in walked])
     rows = [r for i in range(len(tasks)) for r in rows_of.get(i, [])]
     exempt = set(exempt)
     failures = [r for r in rows if sw._gating(r) and r['map'] not in exempt]

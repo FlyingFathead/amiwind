@@ -21,6 +21,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+
 ## Status: 11 October 2026
 
 Fixed on the v0.0.36 line (branch v0.0.36-thirdperson), found while reproducing

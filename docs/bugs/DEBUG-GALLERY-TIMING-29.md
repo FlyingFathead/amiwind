@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.39 (14 October 2026)._
+
 ## Explicit test-room input restriction, 2026-10-06T18:59:52+03:00
 
 Native follow-up identified a separate control failure: after appearance

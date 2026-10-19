@@ -1,5 +1,7 @@
 # Light sources: Morrowind lights mapped onto Quake's light machinery
 
+_Last updated with AmiWind v0.0.31 (8 October 2026)._
+
 Status: 7 October 2026. Census and mapping done; converters not yet wired.
 
 AmiWind runs on AmiQuake, so light sources are handled the way Quake handles

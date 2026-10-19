@@ -24,6 +24,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
 <!-- contents start -->
 ## Contents
 

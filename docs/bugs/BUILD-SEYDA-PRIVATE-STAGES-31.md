@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.35 (10 October 2026)._
+
 ## Status: 8 October 2026
 
 Closed: duplicate of [BUILD-SEYDA-REGEN-30](../journals/BUG_JOURNAL-v0.0.31.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026),

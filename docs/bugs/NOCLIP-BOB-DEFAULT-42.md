@@ -28,6 +28,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Symptom
 
 In v0.0.42-dev1 the view still bobs (and rolls in strafes) while flying in noclip, although on 13 October 2026

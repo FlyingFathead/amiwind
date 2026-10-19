@@ -1,6 +1,6 @@
 # Memory on the Amiga: the game heap, the CHIM zone and what the builder checks
 
-On a real Amiga with more Fast RAM: [real hardware](../../REAL_HARDWARE.md) (cache and heap settings).
+_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +18,8 @@ On a real Amiga with more Fast RAM: [real hardware](../../REAL_HARDWARE.md) (cac
 - [Reading the numbers](#reading-the-numbers)
 
 <!-- contents end -->
+
+On a real Amiga with more Fast RAM: [real hardware](../../REAL_HARDWARE.md) (cache and heap settings).
 
 This page explains, in plain terms, where AmiWind's memory goes on an Amiga, what the CHIM
 engine adds, which rules keep a map from running out, and how to read the numbers the game and the

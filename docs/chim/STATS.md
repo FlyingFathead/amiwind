@@ -1,5 +1,7 @@
 # CHIM build statistics (`chim-stats.json`)
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 Every CHIM build writes `chim-stats.json` next to `chim/`. It holds the polycounts,
 disk, memory, streaming and build figures of the world that is actually on disk: the
 numbers come from the world files as the validator reads them

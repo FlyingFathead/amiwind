@@ -1,5 +1,7 @@
 # Experimental flags
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 Work that is in the source but not finished, or not yet the default, ships behind a switch that is
 off by default. A default build is unchanged by everything on this page; each switch has a test that
 checks it is off by default.
@@ -31,7 +33,8 @@ More rows are added as the remaining side branches are gathered into this releas
 `--chim-native-towns on` left this table in v0.0.36: it is the default (CHIM-native areas: every CHIM area
 prepared through the CHIM pipeline from the game data, with no legacy town chain; Seyda Neen too since
 v0.0.36-dev5, whose frame maps are made from the scene stage's town with no region maps cut). The
-open world outside the CHIM areas is still made of legacy region maps.
+open world outside the town frames was made of legacy region maps until the regional CHIM builds; since v0.0.43
+every exterior cell of Vvardenfell is a CHIM frame and no legacy region map is left outdoors.
 
 ## Retired flags
 

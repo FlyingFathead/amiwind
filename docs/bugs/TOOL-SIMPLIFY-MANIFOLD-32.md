@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found by the distant shell prototype; effect on current users not yet checked.

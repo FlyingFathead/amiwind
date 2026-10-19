@@ -1,5 +1,7 @@
 # Save/load milestone: compact state and a manageable save list
 
+_Last updated with AmiWind v0.0.24-rc4 (1 October 2026)._
+
 **Status:** the post-RC3 checkpoint adds AWS2 dated journal history, retaining
 AWS1 decoding without invented history. See [journal schema and limits](WORLD_MAP_AND_JOURNAL.md).
 The original AWS1 prototype was implemented for the v0.0.21-dev1 opening slice,

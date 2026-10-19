@@ -1,8 +1,6 @@
 # Horstator's musings: keeping the world continuous
 
-29 September 2026, evening, 22:53 Helsinki.
-Current released baseline: v0.0.23-dev4. Working checkpoint: v0.0.23-dev5.
-Maintainer's design direction, not a list of implemented streaming features.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -28,6 +26,10 @@ Maintainer's design direction, not a list of implemented streaming features.
 - [1 October 2026 - Welcome to Balmora (and Vvardenfell!)](#1-october-2026---welcome-to-balmora-and-vvardenfell)
 
 <!-- contents end -->
+
+29 September 2026, evening, 22:53 Helsinki.
+Current released baseline: v0.0.23-dev4. Working checkpoint: v0.0.23-dev5.
+Maintainer's design direction, not a list of implemented streaming features.
 
 ## Why load the entire map at once?
 

@@ -184,7 +184,9 @@ def audit_payload(id1, removed_maps=()):
             frames_of[rel] = numframes((id1 / rel).read_bytes())
         return frames_of[rel]
 
-    for path in sorted((id1 / 'maps').glob('*.bsp')):
+    # every map, CHIM frame maps (x.chim) included: town frames place the residents (tools/map_files.py)
+    from map_files import map_files
+    for path in map_files(id1 / 'maps'):
         if 'maps/' + path.name in removed or path.stem in removed:
             continue
         actors = _map_actors(path)

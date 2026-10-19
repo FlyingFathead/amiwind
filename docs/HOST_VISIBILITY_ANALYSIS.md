@@ -1,10 +1,6 @@
 # Host visibility analysis and optimizer/profiler pipeline
 
-Status: proposed research and implementation plan, recorded 4 October 2026.
-This is part of the [AmiWind Map Optimization Toolkit](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md).
-It is not an implemented GPU visibility sweep, a completed interior-removal pass,
-or a performance claim about the Amiga. The current 3D Map Inspector provides
-geometry inspection and proposed exclusion annotations.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -17,6 +13,12 @@ geometry inspection and proposed exclusion annotations.
 - [Required report and first acceptance gates](#required-report-and-first-acceptance-gates)
 
 <!-- contents end -->
+
+Status: proposed research and implementation plan, recorded 4 October 2026.
+This is part of the [AmiWind Map Optimization Toolkit](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md).
+It is not an implemented GPU visibility sweep, a completed interior-removal pass,
+or a performance claim about the Amiga. The current 3D Map Inspector provides
+geometry inspection and proposed exclusion annotations.
 
 ## Start with a bounded, repeatable experiment
 

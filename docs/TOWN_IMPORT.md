@@ -1,10 +1,6 @@
 # Town import
 
-Balmora was the first town converted into bounded exterior sub-cells. The same
-converter now imports any town from a config file: `tools/import_town.py
---town <id>`. `tools/prepare_balmora.py` remains as a thin wrapper with the old
-command line and byte-identical Balmora outputs. The first new town is Vivec's
-Arena canton (`config/vivec_arena.json`).
+_Last updated with AmiWind v0.0.43-dev2 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +16,12 @@ Arena canton (`config/vivec_arena.json`).
 - [vis options](#vis-options)
 
 <!-- contents end -->
+
+Balmora was the first town converted into bounded exterior sub-cells. The same
+converter now imports any town from a config file: `tools/import_town.py
+--town <id>`. `tools/prepare_balmora.py` remains as a thin wrapper with the old
+command line and byte-identical Balmora outputs. The first new town is Vivec's
+Arena canton (`config/vivec_arena.json`).
 
 ## How Quake does it
 

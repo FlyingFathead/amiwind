@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found by the renderer counters work (branch v0.0.32-counters, not yet merged).

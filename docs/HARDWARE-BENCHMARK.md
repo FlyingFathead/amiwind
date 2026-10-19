@@ -1,6 +1,6 @@
 # Hardware benchmark for owners of accelerated Amigas
 
-Part of [running AmiWind on real Amiga hardware](REAL_HARDWARE.md).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +14,8 @@ Part of [running AmiWind on real Amiga hardware](REAL_HARDWARE.md).
 - [Emulator numbers are not hardware numbers](#emulator-numbers-are-not-hardware-numbers)
 
 <!-- contents end -->
+
+Part of [running AmiWind on real Amiga hardware](REAL_HARDWARE.md).
 
 Every frame rate and loading time measured so far comes from an emulator, mostly
 with its JIT compiler at unlimited speed on a fast PC disk. Those figures are only

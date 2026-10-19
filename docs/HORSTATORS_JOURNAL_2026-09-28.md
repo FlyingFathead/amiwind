@@ -1,6 +1,6 @@
 # Horstator's babblings on the state of AmiWind's development
 
-Captain's log, 28 September 2026, 05:10–05:24 Helsinki.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -41,6 +41,8 @@ Captain's log, 28 September 2026, 05:10–05:24 Helsinki.
 - [Later continuation: Balmora, 30 September–1 October](#later-continuation-balmora-30-september1-october)
 
 <!-- contents end -->
+
+Captain's log, 28 September 2026, 05:10–05:24 Helsinki.
 
 Maintainer's development direction, recorded before the captain gets some sleep.
 This is a request/decision log. Completion belongs in checkpoint validation records.

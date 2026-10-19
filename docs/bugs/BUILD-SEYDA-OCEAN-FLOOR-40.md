@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
 ## Symptom and reproduction
 
 Build the expanded original-cell Seyda scene. Some original ocean LAND heights

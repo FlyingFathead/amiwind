@@ -1,5 +1,7 @@
 # Perf database
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 <!-- contents start -->
 ## Contents
 

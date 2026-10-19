@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+
 ## Symptom
 
 With the inspect panel filling the view (INSPECT-OVER-VIEWPORT-42) the only way out was opening the console and

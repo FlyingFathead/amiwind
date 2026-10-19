@@ -237,6 +237,36 @@ class FrameVisibilityTests(unittest.TestCase):
         self.assertEqual(pooled, serial)
         self.assertEqual(pooled_receipt['visibility'], serial_receipt['visibility'])
 
+    def test_layouts_on_workers_match_every_earlier_method(self):
+        # BUILD-CHIM-SERIAL-SECTIONS-44: layouts and rows made together on the workers (frames, the default), the
+        # v0.0.43 method (layouts in the parent while the pool works, frames-parent) and the serial method write the
+        # same bytes; the parent itself never makes a layout in the default method
+        import chim.world as W
+        serial, serial_receipt = self.build('serial', 'serial', 1)
+        parent, _ = self.build('parent', 'frames-parent', 2)
+
+        def refuse(*args, **kwargs):
+            raise AssertionError('frame_layout ran in the parent')
+        with mock.patch.object(W, 'frame_layout', refuse):
+            pooled, pooled_receipt = self.build('pooled', 'frames', 2)
+        self.assertEqual(parent, serial)
+        self.assertEqual(pooled, serial)
+        self.assertEqual(pooled_receipt['visibility'], serial_receipt['visibility'])
+
+    def test_large_frames_take_their_layout_from_the_workers(self):
+        # every frame over FRAME_VIS_CHUNKS: layouts on the workers, rows in blocks over the pool; same bytes
+        from chim.world import build_frames
+        from test_chim_frames import frame_specs
+        results = {}
+        for mode, jobs in (('serial', 1), ('frames', 2)):
+            a, b, _ = frame_specs(Path(self.tmp.name) / ('large-specs-' + mode))
+            out = Path(self.tmp.name) / ('large-' + mode)
+            with mock.patch.dict(os.environ, {'AMIWIND_CHIM_VIS_ROWS': mode}), \
+                    mock.patch('chim.world.FRAME_VIS_CHUNKS', 0):
+                build_frames(out, [a, b], {'grain': 256, 'sector_chunks': 2}, jobs=jobs)
+            results[mode] = tree_bytes(out)
+        self.assertEqual(results['frames'], results['serial'])
+
     def test_mixed_variant_keys_are_ordered(self):
         # dev1 proof build 2026-10-17: model numbers beside ('tile', ...) terrain tile variants
         from types import SimpleNamespace

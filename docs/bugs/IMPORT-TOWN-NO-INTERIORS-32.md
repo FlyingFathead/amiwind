@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+
 ## Status: 11 October 2026
 
 Repaired for the Vivec Arena Pit: the importer's interior step converts it (`vai000`), and it shipped in v0.0.35

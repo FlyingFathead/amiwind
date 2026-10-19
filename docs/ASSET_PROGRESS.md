@@ -1,5 +1,7 @@
 # Asset progress and provenance
 
+_Last updated with AmiWind v0.0.29-dev4 (6 October 2026)._
+
 See the dated [asset coverage report](ASSET_COVERAGE.md) for current counts,
 known omissions and runtime coverage limits.
 

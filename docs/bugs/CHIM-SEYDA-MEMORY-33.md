@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Status: 8 October 2026
 
 Cause found and fixed in source on v0.0.33-chim-format (7e726c9), not shipped at the time of

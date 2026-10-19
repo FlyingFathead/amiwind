@@ -28,6 +28,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Symptom
 
 The inventory's category row (All, Weapons, Armour, Clothing, Potions, Ingredients, Books, Misc), the sort line

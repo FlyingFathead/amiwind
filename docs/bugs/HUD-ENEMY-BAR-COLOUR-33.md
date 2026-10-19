@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Status: 9 October 2026
 
 Repaired in source on v0.0.33-arena-combat (project decision: yellow in the reserved UI palette),

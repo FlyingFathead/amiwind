@@ -1,8 +1,6 @@
 # Implementation journal: mappings, failures and decisions
 
-Started 27 September 2026, after v0.0.13-dev1 / checkpoint-014. Record a finding
-when it changes a design or exposes an assumption. Append later corrections
-instead of erasing old results. Keep rejected trials and their evidence.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -56,6 +54,10 @@ instead of erasing old results. Keep rejected trials and their evidence.
 - [J033 — rc2 local builder inputs, 1 October 2026](#j033--rc2-local-builder-inputs-1-october-2026)
 
 <!-- contents end -->
+
+Started 27 September 2026, after v0.0.13-dev1 / checkpoint-014. Record a finding
+when it changes a design or exposes an assumption. Append later corrections
+instead of erasing old results. Keep rejected trials and their evidence.
 
 Entry format: **symptom -> confirmed cause (or hypothesis) -> change -> first
 fixed version -> evidence -> regression check -> remaining limitation**.

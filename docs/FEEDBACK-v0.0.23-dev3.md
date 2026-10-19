@@ -1,5 +1,7 @@
 # v0.0.23-dev3 tester feedback — 29 September 2026
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Recorded from the maintainer's playtest, including the follow-up layout and rider
 reports. Dates use Europe/Helsinki. Published dev3: commit
 `7e36e9051da477147f78cf22236a0a4c0c7201ae`, successful CI run 36601097418;

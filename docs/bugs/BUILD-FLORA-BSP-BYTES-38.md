@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 
 Full-world preparation stops at world-flora with FloraReserveError. The run processed 2,551 regions and reported two failed maps. No completed playable image was produced.

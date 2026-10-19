@@ -144,6 +144,14 @@ class ChimStatsTests(unittest.TestCase):
         self.assertEqual(S.dumps(again), S.dumps(self.stats))
         json.loads(S.dumps(self.stats))
 
+    def test_pooled_stats_equal_the_serial_stats(self):
+        # BUILD-CHIM-SERIAL-SECTIONS-44: models and resident rings on the workers, the same document byte for byte
+        from unittest import mock
+        with mock.patch.object(S, 'MODEL_GROUP', 1):
+            pooled = S.chim_stats(self.world, self.measured, self.receipt, ['fixture'], self.legacy, self.cameras,
+                                  jobs=2)
+        self.assertEqual(S.dumps(pooled), S.dumps(self.stats))
+
     def test_cli_refuses_an_invalid_world(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'w'

@@ -30,7 +30,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -48,6 +48,8 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 ## Status: 18 October 2026
 

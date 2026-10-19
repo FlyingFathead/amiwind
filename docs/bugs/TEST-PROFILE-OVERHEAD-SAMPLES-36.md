@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.40 (15 October 2026)._
+
 ## Status: 11 October 2026
 
 Fixed in v0.0.36-dev5. The test now samples until it has more than 20 samples, for at most 15 s.

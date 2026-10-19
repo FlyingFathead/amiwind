@@ -1,8 +1,12 @@
 # Current project state
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 <!-- contents start -->
 ## Contents
 
+- [19 October 2026: v0.0.45 - CHIM Streaming Improved, Guard Torches Are Back](#19-october-2026-v0045---chim-streaming-improved-guard-torches-are-back)
+- [19 October 2026: v0.0.44 - By Azura's Trees!](#19-october-2026-v0044---by-azuras-trees)
 - [7 October 2026: v0.0.30 - The Temple](#7-october-2026-v0030---the-temple)
 - [4 October 2026 (historical)](#4-october-2026-historical)
   - [In preparation: v0.0.28 — Trees and Grass, Day and Night](#in-preparation-v0028--trees-and-grass-day-and-night)
@@ -23,6 +27,41 @@
   - [28 September 15:50 maintainer follow-up](#28-september-1550-maintainer-follow-up)
 
 <!-- contents end -->
+
+## 19 October 2026: v0.0.45 - CHIM Streaming Improved, Guard Torches Are Back
+
+The newest release is [v0.0.45: CHIM Streaming Improved, Guard Torches Are Back](RELEASE-v0.0.45.md), running on
+CHIM Engine v0.2.1. Crossing from one CHIM cell to the next reads the frames around the player ahead into spare
+Fast RAM, and the engine's heap grows with the RAM the machine has; the 16 MiB baseline keeps its sizes. The
+guards in the streets carry their torches at night again. Most of what is left of a crossing is the engine
+restarting the game for every new frame; the next step switches the frame in place
+([roadmap](ROADMAP.md#cell-crossings-one-continuous-world-19-october-2026)).
+
+## 19 October 2026: v0.0.44 - By Azura's Trees!
+
+The newest release is [v0.0.44: By Azura's Trees!](RELEASE-v0.0.44.md), a patch release for
+[v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It](RELEASE-v0.0.43.md). Both run on CHIM Engine v0.2.1.
+
+- **The outdoors.** Every exterior cell of Vvardenfell is on CHIM since v0.0.43: 1,409 cells, of which 1,348 are
+  in one-cell region frames and 61 in the town frames of Balmora, Seyda Neen and Vivec (1,292 land cells, 98
+  sea-floor cells and 19 open-sea cells). No classic region maps are left outdoors. What each number counts:
+  [what we count](chim/CELL_TRACKER.md#what-we-count). Solstheim is not converted.
+- **v0.0.44.** The Bitter Coast trees are 16 to 42 % lighter and fit in memory again, the player body is built
+  for every race, the guards in the streets carry their torches at night again and every room installs its plant
+  sprites.
+- **Interiors.** They are still ordinary Quake maps. Measured on 19 October 2026, 176 of Vvardenfell's 1,134
+  interior cells are converted and reachable, and 919 are not converted yet
+  ([checklist](PLAN-v0.0.45.md#3-every-interior-of-the-base-game)).
+- **Known problems** are listed in the [v0.0.44 notes](RELEASE-v0.0.44.md#known-in-this-build) and the
+  [bug register](BUGS.md), among them the pauses when crossing from one CHIM cell to the next
+  ([CHIM-CROSSING-SLUGGISH-43](bugs/CHIM-CROSSING-SLUGGISH-43.md)).
+- **Next.** The [v0.0.45 plan](PLAN-v0.0.45.md): cell crossings first, then the bugs from the v0.0.43 playtests,
+  then every interior of the base game. Object and container state, NPC placement and compiled MWScript follow, in
+  the [roadmap](ROADMAP.md#the-road-after-v0044-19-october-2026).
+- **Where to look.** The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) and the [CHIM cell tracker](chim/CELL_TRACKER.md)
+  for the cells, the [FAQ](FAQ.md) for the aims, the [CHIM engine](chim/README.md) for how the world is streamed.
+
+The sections below are dated records of earlier states and are kept as written.
 
 ## 7 October 2026: v0.0.30 - The Temple
 

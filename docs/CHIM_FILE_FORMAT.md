@@ -1,5 +1,7 @@
 # CHIM file format
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 **We use `.chim` as the format for CHIM maps to avoid confusion: the format is no longer directly
 compatible with the Quake `.bsp` format.**
 
@@ -44,7 +46,8 @@ The full table, with every record kind and where each file is specified:
 ## Versions so far
 
 CHIM has its own version, separate from AmiWind's: CHIM 0.1.0 shipped with AmiWind v0.0.33 and
-CHIM 0.2.0 with AmiWind v0.0.36 (the `CHIM_VERSION` file; [versions](chim/README.md#versions)). CHIM 1.0 is the
+CHIM 0.2.0 with AmiWind v0.0.36; CHIM 0.2.1 (a patch step, the world format unchanged) with v0.0.41 and still
+current in v0.0.44 (the `CHIM_VERSION` file; [versions](chim/README.md#versions)). CHIM 1.0 is the
 release in which the whole island runs on CHIM. The world files carry a format version of their
 own, in every file header; each step below was measured before it was kept
 ([version rules](chim/WORLD_FORMAT.md#version-rules)).

@@ -1,5 +1,7 @@
 # World progress tracker
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 **Status: first version in the image build (v0.0.31 development).**
 
 One view of the whole conversion: Vvardenfell's exterior cell grid with

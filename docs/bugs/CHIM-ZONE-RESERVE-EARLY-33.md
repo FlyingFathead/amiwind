@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Status: 9 October 2026
 
 Open; cause measured. CHIM area: memory (zone and Hunk). Build: the test image of

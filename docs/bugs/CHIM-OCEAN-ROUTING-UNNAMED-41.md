@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 The second try of the first regional build stopped in world terrain with "Ocean routing cells must be selected
 and have no existing core owner", naming no cell and not saying which of the two rules failed.

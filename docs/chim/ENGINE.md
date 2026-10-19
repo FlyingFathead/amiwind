@@ -1,21 +1,6 @@
 # CHIM engine: shared models, chunk placements and the ring loader
 
-Status: engine slices 1 to 3 for CHIM 0.1.0 (the engine side of the
-[world streamer](../WORLD_STREAMER.md)). It reads the CHIM world formats 0.4
-to 0.6 written by the CHIM builder ([world format](WORLD_FORMAT.md)) and
-refuses any other version whole, saying which it found (0.6 only moves a
-large frame's sector files into one folder per sector row, which the index's
-file table names): the index
-(`chim/world.cwi`: settings, file table, model and texture directories, kept
-in the zone), one frame file per 3 x 3 cell frame (chunk directory, sector
-table) and the frame's sector files (chunk records, then the models and
-textures first needed there, each stored once). Host-tested with
-synthetic worlds and with worlds the CHIM builder writes; run in FS-UAE on the
-converted Balmora (the town's frame map and world format 0.4 beside its region
-maps, both modes in one session); not yet on hardware. All new code is in `engine/aga/src/chim/`; the legacy engine files
-only gained small hooks (`aw_scenery.c`, `aw_walk.c`, `aw_scene.c`,
-`aw_debug.c`, `sv_phys.c`, `model.c`), each a NULL pointer test unless
-`chim/world.cwi` exists.
+_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -36,6 +21,23 @@ only gained small hooks (`aw_scenery.c`, `aw_walk.c`, `aw_scene.c`,
 - [Tests](#tests)
 
 <!-- contents end -->
+
+Status: engine slices 1 to 3 for CHIM 0.1.0 (the engine side of the
+[world streamer](../WORLD_STREAMER.md)). It reads the CHIM world formats 0.4
+to 0.6 written by the CHIM builder ([world format](WORLD_FORMAT.md)) and
+refuses any other version whole, saying which it found (0.6 only moves a
+large frame's sector files into one folder per sector row, which the index's
+file table names): the index
+(`chim/world.cwi`: settings, file table, model and texture directories, kept
+in the zone), one frame file per 3 x 3 cell frame (chunk directory, sector
+table) and the frame's sector files (chunk records, then the models and
+textures first needed there, each stored once). Host-tested with
+synthetic worlds and with worlds the CHIM builder writes; run in FS-UAE on the
+converted Balmora (the town's frame map and world format 0.4 beside its region
+maps, both modes in one session); not yet on hardware. All new code is in `engine/aga/src/chim/`; the legacy engine files
+only gained small hooks (`aw_scenery.c`, `aw_walk.c`, `aw_scene.c`,
+`aw_debug.c`, `sv_phys.c`, `model.c`), each a NULL pointer test unless
+`chim/world.cwi` exists.
 
 ## When CHIM runs
 
@@ -563,6 +565,10 @@ line, and the player is held there while the world has no ground under it.
 Noclip and flight never ask.
 
 ## Frame re-centring (plan, not implemented)
+
+_Update (v0.0.45, 19 October 2026): the coordinate range is ±32,768 units since v0.0.36 (wide coordinates,
+`aw_coord.h`), not ±4,096, and region frames hold one cell. The current design for crossings without a level change,
+re-centring included, is in [Cell crossings](CELL_CROSSINGS.md)._
 
 Coordinates must stay within about +-4,096 units. A CHIM frame is 3 x 3
 cells with origins relative to its centre, so the first slice keeps one

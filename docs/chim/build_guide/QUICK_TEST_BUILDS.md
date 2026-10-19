@@ -1,10 +1,6 @@
 # Quick test builds
 
-A normal build makes everything a release ships. When you only want to test
-one thing (a door, a town, the dialogue of one area), you can leave whole
-groups of content out and get a playable image sooner. Such an image is a
-**quick test build**: the game, the receipts and the image name say so, and it
-never matches a release.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -16,6 +12,12 @@ never matches a release.
 - [What release builds refuse](#what-release-builds-refuse)
 
 <!-- contents end -->
+
+A normal build makes everything a release ships. When you only want to test
+one thing (a door, a town, the dialogue of one area), you can leave whole
+groups of content out and get a playable image sooner. Such an image is a
+**quick test build**: the game, the receipts and the image name say so, and it
+never matches a release.
 
 Quick test builds are for development versions only (a `VERSION` such as
 `0.0.33-dev1`). Release candidates and finals refuse every exclusion; see

@@ -1,5 +1,7 @@
 # Local source checkpoint: v0.0.25-rc8
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Apply this complete source update to the published rc7 checkout after any build
 finishes. APPLY.sh verifies checksums, backs up replacements, rejects conflicting
 edits and validates the installed source against the full archive.

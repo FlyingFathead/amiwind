@@ -1,8 +1,6 @@
 # Playtest status by development version
 
-Keep maintainer reports separate from local acceptance tests. A fix at one location
-is not evidence that every collision/rendering issue is solved. New reports
-append to the relevant version; do not rewrite earlier observations as passes.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -25,6 +23,10 @@ append to the relevant version; do not rewrite earlier observations as passes.
 - [v0.0.21-dev2 maintainer follow-up / dev3 maintenance](#v0021-dev2-maintainer-follow-up--dev3-maintenance)
 
 <!-- contents end -->
+
+Keep maintainer reports separate from local acceptance tests. A fix at one location
+is not evidence that every collision/rendering issue is solved. New reports
+append to the relevant version; do not rewrite earlier observations as passes.
 
 ## v0.0.24-rc1
 

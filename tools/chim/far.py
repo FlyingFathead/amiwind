@@ -222,24 +222,33 @@ def cells_needed(frames, margin=DEFAULT_MARGIN, step=DEFAULT_STEP):
     return need
 
 
+def frame_boxes(frame_path):
+    """(frame cell, [(mins, maxs)]): the drawn boxes of every placement one frame owns, read from its frame file and
+    the sector files below it (placement_boxes for one frame)."""
+    from chim import format as F
+    frame_path = Path(frame_path)
+    raw = frame_path.read_bytes()
+    v = F.FRAME_BLOCK.unpack_from(raw, F.HEADER.size)
+    boxes = []
+    for sector in sorted(frame_path.parent.rglob('s*.ccs')):
+        data = sector.read_bytes()
+        magic, kind, major, _minor, _hb, count, diro, _datao, total = F.HEADER.unpack_from(data)
+        if magic != F.MAGIC or kind != b'SECT' or major != 0 or total != len(data):
+            raise ValueError('Not a CHIM sector file: %s' % sector)
+        for k in range(count):
+            rkind, _rid, o, n = F.RECORD_ENTRY.unpack_from(data, diro + k * F.RECORD_ENTRY.size)
+            if rkind == b'CHNK':
+                boxes += [r['box'] for r in F.read_chunk(data[o:o + n])['owned']]
+    return (v[0], v[1]), boxes
+
+
 def placement_boxes(chim_root):
     """{frame cell: [(mins, maxs)]}: the drawn boxes of every placement a CHIM world owns (reach
     copies left out), read from its frame and sector files (any format minor of major 0)."""
-    from chim import format as F
     out = {}
     for frame_path in sorted(Path(chim_root).rglob('frame.ccf')):
-        raw = frame_path.read_bytes()
-        v = F.FRAME_BLOCK.unpack_from(raw, F.HEADER.size)
-        boxes = out.setdefault((v[0], v[1]), [])
-        for sector in sorted(frame_path.parent.rglob('s*.ccs')):
-            data = sector.read_bytes()
-            magic, kind, major, _minor, _hb, count, diro, _datao, total = F.HEADER.unpack_from(data)
-            if magic != F.MAGIC or kind != b'SECT' or major != 0 or total != len(data):
-                raise ValueError('Not a CHIM sector file: %s' % sector)
-            for k in range(count):
-                rkind, _rid, o, n = F.RECORD_ENTRY.unpack_from(data, diro + k * F.RECORD_ENTRY.size)
-                if rkind == b'CHNK':
-                    boxes += [r['box'] for r in F.read_chunk(data[o:o + n])['owned']]
+        cell, boxes = frame_boxes(frame_path)
+        out.setdefault(cell, []).extend(boxes)
     return out
 
 
@@ -248,13 +257,32 @@ def file_name(cell):
     return '%d_%d%s' % (cell[0], cell[1], SUFFIX)
 
 
+def _layer_task(task):
+    """Worker of write_layers: one frame's layer written to PATH; (record, sha256). TASK: (the lands the frame
+    samples, frame, margin, step, block, its boxes or the frame file to read them from, path)."""
+    lands, frame, margin, step, block, boxes, path = task
+    if isinstance(boxes, str):
+        cell, found = frame_boxes(boxes)
+        boxes = found if tuple(cell) == tuple(frame['cell']) else ()
+    data, record = layer(lands, frame, margin, step, block, boxes)
+    Path(path).write_bytes(data)
+    return record, hashlib.sha256(data).hexdigest()
+
+
 def write_layers(out, frames, data_dir, margin=DEFAULT_MARGIN, step=DEFAULT_STEP, block=DEFAULT_BLOCK,
-                 boxes=None):
+                 boxes=None, jobs=1):
     """Write OUT/far/<cx>_<cy>.far for every frame from Morrowind.esm in data_dir; the receipt rows.
-    boxes: {frame cell: [(mins, maxs)]} to stamp (default: read from OUT/chim when it exists)."""
+    boxes: {frame cell: [(mins, maxs)]} to stamp (default: read from OUT/chim when it exists).
+    JOBS > 1: one frame per worker task (its boxes read there from its own frame and sector files), largest
+    first; the same files and rows (BUILD-CHIM-SERIAL-SECTIONS-44: the layers of 1,351 frames were most of the
+    54 s on one core at the end of the v0.0.44-dev1 world conversion). JOBS 1: one frame after another, the
+    method before v0.0.44."""
     from mwad.paths import child_ci
     esm = child_ci(Path(data_dir), 'Morrowind.esm')
     lands = land_heights(esm, cells_needed(frames, margin, step))
+    from build_parallel import stage_ceiling
+    if stage_ceiling(jobs) > 1 and len(frames) > 1:
+        return _write_layers_pool(out, frames, data_dir, lands, margin, step, block, boxes, stage_ceiling(jobs))
     if boxes is None:
         boxes = placement_boxes(Path(out) / 'chim') if (Path(out) / 'chim').is_dir() else {}
     folder = Path(out) / 'far'
@@ -281,6 +309,51 @@ def write_layers(out, frames, data_dir, margin=DEFAULT_MARGIN, step=DEFAULT_STEP
         path = folder / file_name(frame['cell'])
         path.write_bytes(data)
         rows.append(dict(record, file='far/' + path.name, sha256=hashlib.sha256(data).hexdigest()))
+    return rows
+
+
+def _write_layers_pool(out, frames, data_dir, lands, margin, step, block, boxes, jobs):
+    """write_layers on the worker pool: the same files and rows, in frame order."""
+    from build_parallel import ordered_map
+    from chim.world import frame_dir, frame_subdir
+    folder = Path(out) / 'far'
+    folder.mkdir(parents=True, exist_ok=True)
+    ocean_frames = [f for f in frames if f.get('ocean_runtime')]
+    ocean_lands, ocean_sources = dict(lands), None
+    if ocean_frames:
+        from chim.ocean_terrain import resolve_grids
+        needed = cells_needed(ocean_frames, margin, step)
+        original_grids, _, ocean_sources = resolve_grids(data_dir, needed)
+        for frame in ocean_frames:
+            if frame.get('ocean_masters') != ocean_sources['masters']:
+                raise ValueError('Original ocean masters changed before far terrain')
+        ocean_lands.update({xy: np.asarray(g['heights'], dtype=np.float64)
+                            for xy, g in original_grids.items()})
+    chim_root = Path(out) / 'chim'
+    if boxes is None and chim_root.is_dir():
+        # each frame's boxes are read on its worker from its own folder; placement_boxes keys every frame file by
+        # the cell its header names, so a world with a frame file anywhere else (none written by chim.world) has
+        # its boxes read here, the method before v0.0.44
+        expected = {chim_root / 'frames' / frame_dir(f['cell']) / frame_subdir(f['cell']) / 'frame.ccf'
+                    for f in frames}
+        if set(chim_root.rglob('frame.ccf')) - expected:
+            boxes = placement_boxes(chim_root)
+    tasks = []
+    for frame in frames:
+        source = ocean_lands if frame.get('ocean_runtime') else lands
+        own = {xy: source[xy] for xy in cells_needed([frame], margin, step) if xy in source}
+        if boxes is not None:
+            frame_box_list = boxes.get(tuple(frame['cell']), ())
+        else:
+            path = chim_root / 'frames' / frame_dir(frame['cell']) / frame_subdir(frame['cell']) / 'frame.ccf'
+            frame_box_list = str(path) if path.is_file() else ()
+        tasks.append((own, frame, margin, step, block, frame_box_list, str(folder / file_name(frame['cell']))))
+    rows = []
+    for frame, (record, digest) in zip(frames, ordered_map(_layer_task, tasks, max(1, min(jobs, len(tasks))),
+                                                            cost=lambda t: len(t[0]))):
+        if frame.get('ocean_runtime'):
+            record['original_terrain_sources'] = ocean_sources
+        rows.append(dict(record, file='far/' + file_name(frame['cell']), sha256=digest))
     return rows
 
 

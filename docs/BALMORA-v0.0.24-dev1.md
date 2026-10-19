@@ -1,5 +1,7 @@
 # Balmora exterior — v0.0.24-dev1
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 This checkpoint starts from the maintainer's `amiwind-2026-09-30_120052.zip` (v0.0.23).
 The earlier failed-session ideas have been recovered as a development direction:
 keep complete placements, bound residency with smaller cells, cross boundaries

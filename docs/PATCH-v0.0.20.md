@@ -1,5 +1,7 @@
 # Apply v0.0.20
 
+_Last updated with AmiWind v0.0.21-dev4 (28 September 2026)._
+
 Exact incremental base: GitHub main commit
 `3305c9861718553acdbec76f825bfad884e0bb94` (v0.0.19, including the README/media
 corrections). This is not the earlier frozen v0.0.19 release ZIP. Use the full

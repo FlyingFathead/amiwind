@@ -1,10 +1,6 @@
 # World estimate
 
-How big would every map of a whole-world import be, and which engine limits
-would each one hit? The world estimate answers that from your own Morrowind
-files in about ten minutes (seconds on a rerun), without converting the world: one row per
-interior cell and per exterior town-converter region, with BSP sizes, the
-target heap, entity counts and every limit ratio, plus charts.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -19,6 +15,12 @@ target heap, entity counts and every limit ratio, plus charts.
 - [Loading the results into the Toolkit](#loading-the-results-into-the-toolkit)
 
 <!-- contents end -->
+
+How big would every map of a whole-world import be, and which engine limits
+would each one hit? The world estimate answers that from your own Morrowind
+files in about ten minutes (seconds on a rerun), without converting the world: one row per
+interior cell and per exterior town-converter region, with BSP sizes, the
+target heap, entity counts and every limit ratio, plus charts.
 
 It is a builder command:
 

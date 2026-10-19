@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-15 October 2026 current checkpoint: 15 October 2026: the complete 369-frame successor passes structural, active-heap, scoped stair and exact 928 zone-recheck gates; 17 serialized actor contacts also pass their scoped check. Model measurements, 14 sprite provenance bindings and nine Vivec boundary findings remain under review. Native and package acceptance remain pending. See [CHIM-MODEL-ARENA-RESERVE-41](CHIM-MODEL-ARENA-RESERVE-41.md#zone-actor-and-model-checkpoint-15-october-2026).
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -36,6 +36,8 @@
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+15 October 2026 current checkpoint: 15 October 2026: the complete 369-frame successor passes structural, active-heap, scoped stair and exact 928 zone-recheck gates; 17 serialized actor contacts also pass their scoped check. Model measurements, 14 sprite provenance bindings and nine Vivec boundary findings remain under review. Native and package acceptance remain pending. See [CHIM-MODEL-ARENA-RESERVE-41](CHIM-MODEL-ARENA-RESERVE-41.md#zone-actor-and-model-checkpoint-15-october-2026).
 
 15 October 2026: complete369-frame successor structural/source and active-heap checks pass after recipe and point-hull allocation repairs. Maximum active heap6,072,752 of6,242,304bytes. Scoped369-frame stair gate also passes with14,960advisory failures retained. Updated zone recheck, actor/seam/model/sprite equivalence, native and package gates remain pending. See [CHIM-MODEL-ARENA-RESERVE-41](CHIM-MODEL-ARENA-RESERVE-41.md#complete-suite-and-world-checkpoint-15-october-2026).
 

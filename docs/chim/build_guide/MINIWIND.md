@@ -1,5 +1,7 @@
 # MiniWind playtest builds
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 A MiniWind build is a quick partial-area test of Balmora on the CHIM engine,
 for development versions only. The build type itself (`--miniwind`,
 `--miniwind-scope full|exterior`, `--miniwind-description`, the startup screen

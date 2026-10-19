@@ -1,10 +1,6 @@
 # Inventory
 
-The v0.0.40-dev1 source candidate adds **I** as a full-screen inventory modal.
-It captures gameplay input and freezes the world simulation and rendering while
-UI and audio service continue. Escape or I closes it. It reuses the existing
-map modal and the original-art UI frame, with a nearly full-height player body
-on the left and carried items on the right.
+_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +16,12 @@ on the left and carried items on the right.
 - [Icons and the HUD boxes, 17 October 2026](#icons-and-the-hud-boxes-17-october-2026)
 
 <!-- contents end -->
+
+The v0.0.40-dev1 source candidate adds **I** as a full-screen inventory modal.
+It captures gameplay input and freezes the world simulation and rendering while
+UI and audio service continue. Escape or I closes it. It reuses the existing
+map modal and the original-art UI frame, with a nearly full-height player body
+on the left and carried items on the right.
 
 ## Items and actions
 

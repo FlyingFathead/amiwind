@@ -29,6 +29,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 11 October 2026
 
 Fixed on the v0.0.36 line (branch v0.0.36-thirdperson). The maintainer reported it twice from the v0.0.36-dev5 playtest

@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found while checking the unsigned texinfo change (VIVEC-TEXINFO-31);

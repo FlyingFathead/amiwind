@@ -1,5 +1,7 @@
 # Local source checkpoint: v0.0.25-rc6
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Use the single complete-update bundle and its handoff instructions. It applies
 directly to the rc3 checkout with backup and conflict detection. Earlier rc4/rc5
 updates and separate roadmap patches are included and need not be applied.

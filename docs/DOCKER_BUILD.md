@@ -1,8 +1,6 @@
 # Docker builder
 
-The tools/source-only builder wraps the established Linux pipeline. Native
-Linux remains the reference; Windows Docker testing uses Docker Desktop's WSL 2
-Linux engine. Docker sign-in is not required for this local builder.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +12,10 @@ Linux engine. Docker sign-in is not required for this local builder.
 - [Watch a build in the Monitor](#watch-a-build-in-the-monitor)
 
 <!-- contents end -->
+
+The tools/source-only builder wraps the established Linux pipeline. Native
+Linux remains the reference; Windows Docker testing uses Docker Desktop's WSL 2
+Linux engine. Docker sign-in is not required for this local builder.
 
 Install Docker separately and start its Linux engine before using this helper.
 Do not enable Windows login autostart unless you want it. Shut Docker down after

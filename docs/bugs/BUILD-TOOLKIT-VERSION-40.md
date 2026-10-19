@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41 (16 October 2026)._
+
 ## Symptom and reproduction
 
 The dev2 checkout originally compared Toolkit content against v0.0.38 even

@@ -1,5 +1,7 @@
 # Format and hardware references
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 The initial tools are standalone Python. They use the file layouts described by
 OpenMW's sources; they do not bundle or link an OpenMW engine or Hunter binary.
 OpenMW was inspected at commit `46bd4599203ee52ffc0f3e8edb3fc159a0303a49`.

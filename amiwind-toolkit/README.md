@@ -1,5 +1,7 @@
 # AmiWind Toolkit
 
+_Last updated with AmiWind v0.0.39 (14 October 2026)._
+
 The AmiWind Toolkit is a set of web pages for looking at AmiWind's world: where the conversion stands on the
 island map, any converted map in 3D, and its polygon and memory figures. Everything runs in your own browser.
 The views are made from your own Morrowind files and your own build output; nothing is uploaded, and no game data

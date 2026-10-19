@@ -755,6 +755,7 @@ void	VID_Update (vrect_t *rects)
         rows = vid.height;
       if (rows > 0)
         aw_c2p (nextc2p, nextsbuffer->sb_BitMap, vid.buffer, vid.width, rows);
+      AW_C2PRows (rows, vid.height);
     }
     AW_EndMark(2);
 #endif

@@ -1,10 +1,6 @@
 # CHIM lighting
 
-Status: design and measurements, 9 October 2026. Project rule: a cell is only complete when it is lit like the
-original. The [cell tracker](CELL_TRACKER.md) checks this per cell with the lighting audit (`tools/cell_lighting.py`).
-The open bugs are CHIM-MESHLESS-LIGHTS-33 (lights without a mesh give no light on CHIM),
-LIGHT-ENTITIES-UNWIRED-33 (Morrowind lights never become Quake light entities, legacy maps included) and
-CHIM-LIGHT-CONTENTS-33 (actors are not lit by CHIM terrain).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +17,12 @@ CHIM-LIGHT-CONTENTS-33 (actors are not lit by CHIM terrain).
 - [How the numbers were measured](#how-the-numbers-were-measured)
 
 <!-- contents end -->
+
+Status: design and measurements, 9 October 2026. Project rule: a cell is only complete when it is lit like the
+original. The [cell tracker](CELL_TRACKER.md) checks this per cell with the lighting audit (`tools/cell_lighting.py`).
+The open bugs are CHIM-MESHLESS-LIGHTS-33 (lights without a mesh give no light on CHIM),
+LIGHT-ENTITIES-UNWIRED-33 (Morrowind lights never become Quake light entities, legacy maps included) and
+CHIM-LIGHT-CONTENTS-33 (actors are not lit by CHIM terrain).
 
 The steps from here, with their checks and the pending decisions, are in the [CHIM lights roadmap](LIGHTING_ROADMAP.md).
 

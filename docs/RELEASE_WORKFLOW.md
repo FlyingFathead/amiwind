@@ -1,6 +1,6 @@
 # AmiWind release workflow
 
-Official project: https://github.com/FlyingFathead/amiwind/
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -26,6 +26,8 @@ Official project: https://github.com/FlyingFathead/amiwind/
 - [Source ZIP portability](#source-zip-portability)
 
 <!-- contents end -->
+
+Official project: https://github.com/FlyingFathead/amiwind/
 
 Published public-source base for the current v0.0.39 final preparation:
 **[v0.0.38 - Lava Is All You Need (And A Hint Of Tel Uvirith)](RELEASE-v0.0.38.md)**,

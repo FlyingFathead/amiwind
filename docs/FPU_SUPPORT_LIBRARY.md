@@ -1,6 +1,6 @@
 # FPU support library (optional, your own copy)
 
-Part of [running AmiWind on real Amiga hardware](REAL_HARDWARE.md).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +14,8 @@ Part of [running AmiWind on real Amiga hardware](REAL_HARDWARE.md).
 - [Tested](#tested)
 
 <!-- contents end -->
+
+Part of [running AmiWind on real Amiga hardware](REAL_HARDWARE.md).
 
 AmiWind can put your own `68040.library` or `68060.library` on its boot disk
 and open it at start-up. It is optional: without one the game builds and boots

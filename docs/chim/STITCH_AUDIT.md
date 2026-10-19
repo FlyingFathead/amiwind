@@ -1,5 +1,7 @@
 # CHIM/legacy border audit (the stitcher, step 1)
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 A CHIM area inside the legacy open world (a town table row with a world handoff, such as a CHIMport test
 block) meets the legacy region maps at its handoff core. The engine changes maps there
 (`aw_world.c` `AW_WorldDestination`): a player standing in a legacy region map enters the CHIM area as

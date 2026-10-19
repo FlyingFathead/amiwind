@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Found by the CHIM Balmora build; the legacy dev1 conversion shows the same fallbacks.

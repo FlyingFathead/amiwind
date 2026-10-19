@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "aw_anim.h"
+#include "aw_spike.h"
 
 extern void (*aw_demo_map_begin)(void);   /* aw_scenery.c, with the other CHIM map hooks */
 
@@ -847,7 +848,12 @@ void CL_ParseServerMessage (void)
 			break;
 
 		case svc_serverinfo:
-			CL_ParseServerInfo ();
+			{
+				double spike_t0;
+				AW_SPIKE_BEGIN (spike_t0);
+				CL_ParseServerInfo ();
+				AW_SPIKE_END (AW_SP_CLINFO, spike_t0, 0);
+			}
 			vid.recalc_refdef = true;	// leave intermission full screen
 			break;
 

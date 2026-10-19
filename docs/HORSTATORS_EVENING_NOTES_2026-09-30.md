@@ -1,5 +1,7 @@
 # Horstator's evening notes, 30 September 2026
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Progress from Seyda Neen to Balmora has been good, including the optimizations.
 The short Loading pauses in Balmora's centre remain disappointing. Investigate
 whether assets can enter and leave memory smoothly based on player coordinates.

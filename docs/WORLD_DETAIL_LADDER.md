@@ -1,5 +1,7 @@
 # Further terrain development: world-detail and topology ladder
 
+_Last updated with AmiWind v0.0.28 (4 October 2026)._
+
 Recorded 3 October 2026. **Future TODO / roadmap direction — NOT implementation
 work for now.** Continue the current Rocks and Mushrooms work and resolve its
 memory/transition blockers first. This ladder is a content-planning guide, not

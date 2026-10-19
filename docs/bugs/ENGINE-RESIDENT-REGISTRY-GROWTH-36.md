@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 10 October 2026
 
 Guarded in source: a ratchet test fails when any resident registry grows above its committed budget. The

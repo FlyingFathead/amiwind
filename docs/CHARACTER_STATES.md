@@ -1,5 +1,7 @@
 # Character presence, progression and placement
 
+_Last updated with AmiWind v0.0.25 (2 October 2026)._
+
 ## Status
 
 Source review and implementation requirements, 1 October 2026. AmiWind has

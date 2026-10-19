@@ -1,5 +1,7 @@
 # Local v0.0.25 checkpoint
 
+_Last updated with AmiWind v0.0.25 (2 October 2026)._
+
 NPC gallery workers now collect finished jobs immediately and refill a bounded
 submission window before reporting results. Slow earlier models no longer block
 later submissions. Existing order-dependent scene stages retain ordered execution.

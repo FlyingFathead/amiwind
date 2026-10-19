@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Measured in the Vivec dry run with the repaired converter; nothing

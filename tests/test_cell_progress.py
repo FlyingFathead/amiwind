@@ -1505,6 +1505,90 @@ class PlanTests(ReleaseUiTests):
         self.assertNotIn('\r', text)
 
 
+class CountingTests(unittest.TestCase):
+    """DOCS-CELL-COUNTS-44: one table of every cell count, each named, and the counts add up."""
+
+    @staticmethod
+    def cell(island, land, bucket, builds=()):
+        builds = list(builds)
+        return {'island': island, 'land': land, 'chim': {'bucket': bucket, 'on_chim_build': builds[-1] if builds else None,
+                                                         'on_chim_builds': builds}}
+
+    def doc(self):
+        """A synthetic island: 6 x 3 land cells (2 of them empty), 3 seabed and 4 ocean cells, 3 more on island 2.
+        Build 'b1': one town frame over cells x 0..1, y 0..1 (4 cells) and one region frame for every other cell on CHIM."""
+        cells = {}
+        for x in range(6):
+            for y in range(3):
+                cells['%d,%d' % (x, y)] = self.cell(1, True, 'empty_sea' if (x, y) in ((5, 0), (5, 1)) else 'audits_passed', ['b1'])
+        for x in range(3):
+            cells['%d,-1' % x] = self.cell(1, False, 'empty_sea', ['b1'])
+        for x in range(4):
+            cells['%d,-2' % x] = self.cell(1, False, 'ocean', ['b1'] if x < 2 else [])
+        for x in range(3):
+            cells['%d,9' % x] = self.cell(2, True, 'not_started')
+        town = {'area': 'synthetic_town', 'cells': 4, 'owned_cells': [[0, 0], [2, 2]]}
+        on = [k for k, c in cells.items() if c['chim']['on_chim_build'] == 'b1']
+        towncells = {'0,0', '0,1', '1,0', '1,1'}
+        regions = [{'area': 'rcp%d_p%d' % (i, i), 'cells': 1} for i, k in enumerate(k for k in on if k not in towncells)]
+        return {'cells': cells,
+                'headline': {'on_chim': {'build': 'b1', 'label': 'v9.9.9-dev1 synthetic (abc1234)'}},
+                'runs': [{'name': 'b1', 'frame_ownership': [town] + regions}]}
+
+    def ledger(self):
+        return {'builds': [{'version': 'v9.9.9-dev1', 'state': 'packaged', 'evidence_sha256': 'c' * 64, 'cells': {},
+                            'partial_town_overlap_cells': ['0,0', '1,1']}]}
+
+    def test_the_counts_name_their_terms_and_add_up(self):
+        import cell_progress_md as md
+        c = md.counting(self.doc(), self.ledger())
+        self.assertEqual((c['map'], c['land'], c['land_empty'], c['land_content'], c['seabed'], c['land_records'],
+                          c['empty_sea'], c['ocean'], c['land_all']), (25, 18, 2, 16, 3, 21, 5, 4, 21))
+        self.assertEqual((c['on'], c['on_land'], c['on_seabed'], c['on_ocean'], c['on_sea']), (23, 18, 3, 2, 5))
+        self.assertEqual((c['frames'], c['region_frames'], c['town_cells'], c['region_cells']), (20, 19, 4, 19))
+        self.assertEqual((c['region_land'], c['region_seabed'], c['region_ocean']), (12, 5, 2))
+        self.assertEqual((c['list_dropped'], c['region_list']), (2, 21))
+        sums = md.counting_sums(c)
+        self.assertGreaterEqual(len(sums), 10)
+        for text, parts, total in sums:
+            self.assertEqual(sum(parts), total, text)
+
+    def test_the_page_carries_the_table_and_flags_a_sum_that_does_not_add_up(self):
+        import cell_progress_md as md
+        lines = md.counting_lines(self.doc(), self.ledger())
+        text = '\n'.join(lines)
+        self.assertTrue(text.startswith('## What we count'))
+        for needle in ('In short: Vvardenfell has 21 cells with a LAND record (18 land cells with terrain heights and 3 flat '
+                       'seabed cells). The newest ingested build has 21 of them on CHIM, plus 2 open-ocean cells: 23 cells on '
+                       'CHIM in all.', 'synthetic_town 4', 'Light sources are not cells', '- region frames + town frames = '
+                       'frames: 19 + 1 = 20'):
+            self.assertIn(needle, text)
+        self.assertNotIn('DOES NOT ADD UP', text)
+        broken = md.counting(self.doc(), self.ledger())
+        broken['land_records'] += 1
+        self.assertTrue(any(sum(p) != t for _, p, t in md.counting_sums(broken)))
+
+    def test_without_a_build_the_table_keeps_the_game_data_rows(self):
+        import cell_progress_md as md
+        d = self.doc()
+        d['headline'] = {}
+        c = md.counting(d)
+        self.assertNotIn('on', c)
+        self.assertNotIn('DOES NOT ADD UP', '\n'.join(md.counting_lines(d)))
+
+    def test_the_rendered_page_links_the_table_and_names_light_sources(self):
+        import cell_progress_md as md
+        d = self.doc()
+        for c in d['cells'].values():
+            c['chim'].update({'converted': False, 'build': None})
+            c.update({'audits': {}, 'ring': None})
+        page = md.render(d, '2026-10-19 12:00 +0300', self.ledger(), '0.0.44')
+        self.assertIn('_Last updated with AmiWind v0.0.44 (19 October 2026)._', page)
+        self.assertIn('[what we count](#what-we-count)', page)
+        self.assertIn('\n## What we count\n', page)
+        self.assertEqual(md.check(page), [])
+
+
 class PageTests(unittest.TestCase):
     KIT = ROOT / 'amiwind-toolkit'
 

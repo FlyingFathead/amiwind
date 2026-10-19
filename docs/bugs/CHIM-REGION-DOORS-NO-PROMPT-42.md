@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42 (17 October 2026)._
+
 ## Symptom
 Reported by the maintainer while playing v0.0.42-dev1: none of Khuul's doors show that there is an entrance, not
 even "Interior unavailable"; the same in other CHIM region cells. Doors in Balmora, Seyda Neen and Vivec work.

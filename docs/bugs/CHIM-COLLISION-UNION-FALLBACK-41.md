@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43 (19 October 2026)._
+
 ## Symptom
 The v0.0.41-dev3 build refused three ring-3 cells at the CHIM heap gate: frames (-8,-5),
 (-8,-4) and (-7,-5) need 7,048,640 to 7,298,624 bytes against a 6,242,304-byte zone. They

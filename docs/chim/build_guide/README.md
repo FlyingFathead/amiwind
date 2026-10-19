@@ -1,5 +1,7 @@
 # CHIM build guide
 
+_Last updated with AmiWind v0.0.35 (10 October 2026)._
+
 How to build AmiWind with the repository builder (`./build.sh`, `tools/build.py`),
 from a complete release-style image to a quick test of one spot. Every build
 uses your own Morrowind files; the builder never downloads or ships game data.

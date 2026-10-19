@@ -1,8 +1,6 @@
 # Initial NPC placement and ground-contact workflow
 
-Ground residents must stand on the converted walkable surface, including stairs,
-bridges, platforms and interior floors. Original placement Z is an input, not
-proof of foot contact after geometry conversion.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +16,10 @@ proof of foot contact after geometry conversion.
 - [rc7 mesh-aware correction](#rc7-mesh-aware-correction)
 
 <!-- contents end -->
+
+Ground residents must stand on the converted walkable surface, including stairs,
+bridges, platforms and interior floors. Original placement Z is an input, not
+proof of foot contact after geometry conversion.
 
 ## Classify the intended initial state first
 

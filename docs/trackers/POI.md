@@ -1,5 +1,7 @@
 # Points of interest
 
+_Last updated with AmiWind v0.0.31 (8 October 2026)._
+
 **Status: checklist available; in-game `dbg poi` menu planned.**
 
 - **Checklist:** `tools/poi_checklist.py` lists every named place in your own

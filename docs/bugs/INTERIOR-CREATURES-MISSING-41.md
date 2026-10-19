@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 The Palace of Vivec (room map vpi015) is converted and reachable, but Vivec is not in it. In the original the
 demigod floats above the floor, meditating in the lotus position. No other creature is placed in any converted

@@ -1,6 +1,13 @@
 # CHIM regions: exterior cells on CHIM inside the legacy open world
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 Status: EXPERIMENTAL builder option, off by default (`--chim-regions`), v0.0.36 development.
+
+Update, 19 October 2026: this page describes how a cell joins a build, as designed in v0.0.36. Since v0.0.43 every
+exterior cell of Vvardenfell is a CHIM frame (one cell per region frame, 1,348 of them, besides the three town
+frames; [release notes](../RELEASE-v0.0.43.md)), so "the legacy open world stays the default" below describes
+v0.0.36, not the releases.
 
 CHIMport ([CHIMPORT.md](CHIMPORT.md)) converts the island cell by cell and grades every cell
 ([cell tracker](CELL_TRACKER.md)). `--chim-regions` puts finished cells on CHIM in a normal build, inside

@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
+
 ## Status: 8 October 2026
 
 Open. Prototype only (tools/mold_shell.py, not in the game).
@@ -58,6 +60,7 @@ Frame comparison in the shell tests.
 
 Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Far-plane fog, the skyline fill, distant sprites and resident ground. See [families](README.md#families).
 
+- [CHIM-BRIDGE-POP-PIECES-44](CHIM-BRIDGE-POP-PIECES-44.md): Bridges pop into view piece by piece as the player approaches (Balmora)
 - [CHIM-TERRAIN-TEXTURE-BLOCKY-43](CHIM-TERRAIN-TEXTURE-BLOCKY-43.md): Roads and paths on the ground look blocky: each texture square is drawn with hard edges instead of blending into its neighbours
 - [FOG-TOWN-HEAVY-32](FOG-TOWN-HEAVY-32.md): Heavy fog at the Vivec Arena and in Balmora in v0.0.32-dev1
 - GEO-02 (no report page): Seyda Neen ground ends before the world terrain handoff
@@ -72,5 +75,6 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - SKY-VISUAL-01 (no report page): Sky-only day/night remap clashed with gray distance fog
 - TREE-PILLAR-28 (no report page): Sprite-tree roots extend into unintended striped pillars
 - [TREE-VIEW-FLOAT-38](TREE-VIEW-FLOAT-38.md): Sprite tree appears detached from terrain from particular viewing directions
+- [WATER-UNDERWATER-SKY-44](WATER-UNDERWATER-SKY-44.md): Under water the distance shows the sky's clouds instead of blue water
 
 <!-- END GENERATED CATEGORY -->

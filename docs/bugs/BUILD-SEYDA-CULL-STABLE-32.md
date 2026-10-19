@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.35 (10 October 2026)._
+
 ## Status: 9 October 2026
 
 Open, for the legacy builder only. Reproduced on 9 October 2026 with a current from-scratch scene

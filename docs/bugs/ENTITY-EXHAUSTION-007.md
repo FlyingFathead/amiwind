@@ -15,9 +15,7 @@
 
 <!-- END GENERATED FACTS -->
 
-The following journal entry is retained verbatim. Moving its detailed
-history here keeps the main journal within the public source size gate.
-Current status remains in [the issue index](../BUGS.md).
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -44,6 +42,10 @@ Current status remains in [the issue index](../BUGS.md).
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+The following journal entry is retained verbatim. Moving its detailed
+history here keeps the main journal within the public source size gate.
+Current status remains in [the issue index](../BUGS.md).
 
 ## ENTITY-EXHAUSTION-007: interactive entity exhaustion recovery
 

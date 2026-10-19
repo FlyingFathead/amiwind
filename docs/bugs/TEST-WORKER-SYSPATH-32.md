@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.40 (15 October 2026)._
+
 ## Status: 10 October 2026
 
 Fixed in v0.0.35. The single-interpreter release suite hit it (actor ground bake test, worker died unpickling

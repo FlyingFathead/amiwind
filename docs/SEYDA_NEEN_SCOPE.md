@@ -1,5 +1,7 @@
 # Seyda Neen vicinity: first complete area
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Maintainer-selected scope, 27 September 2026:
 [UESP map centered near -11394, -71667](https://gamemap.uesp.net/mw/?x=-11394&y=-71667&zoom=7).
 The supplied map screenshot is retained privately; it is not bundled as public

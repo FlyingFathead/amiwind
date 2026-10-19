@@ -20,6 +20,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 
 In first-person view the maintainer no longer sees the guard spear-attack animation that worked before. The maintainer separately confirms the guard can kill the player; missing attack animation and actual combat damage are different observations.

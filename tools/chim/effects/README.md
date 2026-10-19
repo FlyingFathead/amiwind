@@ -1,5 +1,7 @@
 # CHIM effects library
 
+_Last updated with AmiWind v0.0.33 (9 October 2026)._
+
 Texture effects for CHIM worlds, one `.chimfx` file each. They are off by default; select one with
 the builder's `--chim-texture-effect NAME` (or `tools/chim_build.py --texture-effect NAME`), where
 NAME is the file name without `.chimfx`.

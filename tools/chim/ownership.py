@@ -6,7 +6,6 @@ remain in both frames. Source identity and original position choose one logical
 owner; compiled piece records retain their own local chunk owners. This sidecar
 contract changes neither the engine nor CHIM's binary format.
 """
-import copy
 import hashlib
 import math
 import struct
@@ -31,7 +30,9 @@ def original(ref):
             len(value['position']) != 3 or len(value['rotation_radians']) != 3 or
             any(not math.isfinite(v) for v in value['position'] + value['rotation_radians'] + [value['scale']])):
         raise ValueError('Invalid original reference identity or transform')
-    return copy.deepcopy(value)
+    # VALUE is built of new lists of numbers and strings: nothing in it is shared with REF, so it is returned as it
+    # is (a deep copy of it was most of the time of every ownership check: BUILD-CHIM-SERIAL-SECTIONS-44)
+    return value
 
 
 def capture(ref):
@@ -145,9 +146,25 @@ def manifest(spec, references):
     return {'schema': 1, 'core': core, 'coverage': coverage, 'references': rows, 'pieces': pieces}
 
 
+# Grid of the core index (source_failures): one bucket per this many Morrowind units (a cell); a core is listed in
+# every bucket its box touches, so a point or box only meets the cores of its own buckets
+CORE_GRID = 8192.0
+
+
+def _buckets(box):
+    """The grid buckets (bx, by) a box [x0, y0, x1, y1] touches (edges included)."""
+    x0, y0 = int(math.floor(box[0] / CORE_GRID)), int(math.floor(box[1] / CORE_GRID))
+    x1, y1 = int(math.floor(box[2] / CORE_GRID)), int(math.floor(box[3] / CORE_GRID))
+    return [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+
+
 def source_failures(sections):
-    """Fail closed for conflicting origins/identities or missing included owners."""
-    failures = [];by_number = {};cores = []
+    """Fail closed for conflicting origins/identities or missing included owners.
+
+    The cores are found through a grid of buckets (CORE_GRID): every reference used to be tested against every
+    frame's core (about 469,000 references x 1,351 cores in v0.0.44-dev1: most of the 70 s on one core between the
+    areas and the visibility rows, BUILD-CHIM-SERIAL-SECTIONS-44). Same failures, same order."""
+    failures = [];by_number = {};cores = [];grid = {}
     for s in sections:
         m = s.get('frame_ownership')
         if not isinstance(m, dict) or m.get('schema') != 1:
@@ -157,9 +174,14 @@ def source_failures(sections):
                 any(not math.isfinite(x) for x in core + cover) or
                 any(not cover[k] <= core[k] < core[k+2] <= cover[k+2] for k in range(2))):
             failures.append('invalid ownership core/coverage');continue
-        for old in cores:
+        # the earlier cores that share a bucket, in the order they were added (one line per overlapping pair)
+        near = sorted({k for b in _buckets(core) for k in grid.get(b, ())})
+        for k in near:
+            old = cores[k]
             if core[0] < old[2] and old[0] < core[2] and core[1] < old[3] and old[1] < core[3]:
                 failures.append('logical ownership cores overlap')
+        for b in _buckets(core):
+            grid.setdefault(b, []).append(len(cores))
         cores.append(core)
         seen = set()
         for row in m.get('references', []):
@@ -186,7 +208,13 @@ def source_failures(sections):
         if any(other != src for other, _ in copies):
             failures.append('reference %s original identity/transform differs between frames' % n)
         owners = sum(role == 'owner' for _, role in copies)
-        included = any(contains(core, src['position']) for core in cores)
+        position = src['position']
+        try:
+            bucket = (int(math.floor(position[0] / CORE_GRID)), int(math.floor(position[1] / CORE_GRID)))
+            near = grid.get(bucket, ())
+        except (TypeError, ValueError, OverflowError):
+            near = range(len(cores))          # not a finite point: every core, as before
+        included = any(contains(cores[k], position) for k in near)
         if owners != int(included):
             failures.append('reference %s has %d logical owners; expected %d' % (n, owners, int(included)))
     return failures

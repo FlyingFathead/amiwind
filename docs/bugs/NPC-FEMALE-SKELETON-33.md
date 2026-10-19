@@ -15,6 +15,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+
 ## Status: 9 October 2026
 
 Open. Found by the animation kit study. The kit takes the groups the female file overrides

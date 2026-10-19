@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Symptom
 A flora integration guard rejects a diagnostic scenery palette mismatch.
 Earlier diagnostic colour captures do not establish correct palette parity.

@@ -1,5 +1,7 @@
 # v0.0.8 checkpoint-006 validation
 
+_Last updated with AmiWind v? (28 September 2026)._
+
 Date: 27 September 2026. Public pipeline source: 0.8.0. This is the first
 AGA textured-town HDF checkpoint. The previous A500 releases remain unchanged.
 

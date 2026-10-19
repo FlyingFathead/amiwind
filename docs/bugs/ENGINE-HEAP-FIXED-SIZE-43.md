@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 ## Status: 18 October 2026
 
@@ -51,13 +51,23 @@ Start v0.0.43-dev2 on a machine with 128 MB of Fast RAM and enter Vivec; read th
 
 ## Repair
 
-Planned: size the heap from the Fast RAM actually free at start (the largest free block, minus a reserve for the
-system and sound), never below the built size; `-heapmb N` stays the override. Designed together with the
-prefetch of neighbouring areas into spare memory. The 16 MB baseline behaves exactly as today.
+v0.0.43 (branch v0.0.43-prefetch, `aw_heapsize.c`, called from `sys_amiga.c` `Sys_Init`): the heap is sized at
+start, before CHIM's cache banks. The room is the largest free Fast RAM block less CHIM's margin for the system
+(2 MiB plus an eighth of all Fast RAM, the same margin as the cache banks). The heap stays at the built size unless
+that room holds the built size plus 8 MiB; then it grows by a quarter of the room beyond the built size, to 24 MiB
+at most, and the rest stays for CHIM's cache and the read-ahead of the cells ahead
+([CHIM-CROSSING-SYNC-LOAD-43](CHIM-CROSSING-SYNC-LOAD-43.md)). `-heapmb N` is used as asked; `aw_autoram 0` in
+`config.cfg` (Options > Extra RAM: Off) keeps the built size. 16 MiB of Fast RAM (about 14 MiB free, margin 4 MiB)
+never grows: the same 11 MiB allocation as before. The console says when the heap grew.
 
 ## Verification
 
-Heap lines and the Vivec warning on 16, 64 and 128 MB presets; crossing pauses measured before and after.
+18 October 2026, FS-UAE (68040 JIT), the dev2 data with this engine: 128 MiB of Fast RAM gives a 24 MiB heap
+("Heap ... / 25165824") and an 82 MiB CHIM cache (before: 11 MiB and 95 MiB); five laps of Balmora, the Caldera
+area, Vivec and Seyda Neen printed no "hunk-gap safety below 2 MiB" warning, where dev2 as built printed four on one
+open-world route; the Hunk use at each spot was the same on every lap. Quake's cache kept 14-15 MB across the laps
+(1.5-2.5 MB with the 11 MiB heap), and Balmora's client start (precache) took 29 ms instead of 431 ms. 16 MiB: the
+built 11 MiB, "Memory: 1 MiB Fast RAM free of 16 MiB", unchanged. Unit test: tests/test_heap_size.py AutoHeapTests.
 
 ## Prevention
 

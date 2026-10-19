@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 ## Status: 9 October 2026
 
 Open. Found while listing the Arena Pit (`vai000`) for IMPORT-TOWN-NO-INTERIORS-32.

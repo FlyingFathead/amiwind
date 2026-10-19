@@ -817,23 +817,30 @@ def stair_gate(out, frames, jobs=1, models=None):
     workers = max(1, stage_ceiling(jobs))
     from chim.stair_pool import (WORKER_BASE_MIB, frame_walk_mib, memory_killed, memory_room, memory_workers,
                                  stair_unit_sized)
-    # Workers by cores and by memory (CHIM-STAIR-GATE-POOL-BROKEN-42): each worker reads a whole frame; the largest
-    # frame to walk sets every worker's share, and the container's own limit how many shares fit
+    # Workers by cores and by memory (CHIM-STAIR-GATE-POOL-BROKEN-42): each worker reads a whole frame. Each unit is
+    # admitted at its own frame's size (BUILD-CHIM-SERIAL-SECTIONS-44: the largest frame used to set every worker's
+    # share, 4 of 24 workers at 2,855 MiB each in v0.0.44-dev1 for region frames of about 300 MiB), and the pool
+    # follows the live allowance (more units start when the scheduler raises it or memory frees up)
     frame_mib = {fi: frame_walk_mib(frames[fi], models) for fi in walk_frames}
     per_worker = max(frame_mib.values()) if frame_mib else WORKER_BASE_MIB
     room = memory_room()
     by_cores = workers
-    workers, memory_note = memory_workers(workers, per_worker, room)
+    fit, memory_note = memory_workers(workers, sum(frame_mib.values()) / len(frame_mib) if frame_mib else per_worker,
+                                      room)
     if walk_frames:
         big = max(walk_frames, key=lambda fi: frame_mib[fi])
-        print('CHIM stair gate: workers: %s; largest frame %s about %.0f MiB a worker' % (
-            memory_note, frames[big][0], frame_mib[big]), flush=True)
+        print('CHIM stair gate: workers: up to %d by cores, each unit admitted at its own frame size (%s; frames '
+              'about %.0f to %.0f MiB a worker, %d at once at the mean); largest frame %s about %.0f MiB a worker'
+              % (by_cores, room[1], min(frame_mib.values()), per_worker, fit, frames[big][0], frame_mib[big]),
+              flush=True)
     count_started = time.monotonic()
-    # per core: the steps and ramps it will check (the scheduler's cost; a core without any walks nothing)
-    counts = dict(completed_map(stair_progress.chim_core_counts_task,
-                                sorted([(str(out), fi, cores[fi]) + ((areas[fi],) if fi in areas else ())
-                                        for fi in walk_frames], key=lambda t: -len(t[2])),
-                                max(1, min(workers, len(walk_frames) or 1))))
+    # per core: the steps and ramps it will check (the scheduler's cost; a core without any walks nothing); each
+    # count reads its frame (polygons only): admitted at the frame's own size like the walks
+    count_tasks = sorted([(str(out), fi, cores[fi]) + ((areas[fi],) if fi in areas else ()) for fi in walk_frames],
+                         key=lambda t: -len(t[2]))
+    counts = dict(governed_map(stair_progress.chim_core_counts_task, count_tasks,
+                               max(1, min(by_cores, len(walk_frames) or 1)), unit_mib=per_worker,
+                               label='CHIM stair gate counts', item_mib=lambda t: frame_mib.get(t[1], WORKER_BASE_MIB)))
     to_check = {fi: sum(counts[fi]) for fi in walk_frames}
     reused_only = [fi for fi in sorted(cached) if fi not in sample]
     stairs_total = sum(to_check.values()) + sum(len(cached[fi]) for fi in reused_only)
@@ -844,9 +851,7 @@ def stair_gate(out, frames, jobs=1, models=None):
              sum(len(cached[fi]) for fi in reused_only), len(reused_only), len(units),
              max(1, min(workers, len(units) or 1)), sum(len(u[2]) for u in units),
              sum(len(c) for c in cores.values())), flush=True)
-    if workers < by_cores:
-        print('CHIM stair gate: %d of %d workers to start: the memory left in the container holds no more frames of '
-              'this size; more start when memory frees up (re-read every 30 s)' % (workers, by_cores), flush=True)
+
     if keys and walk_frames:
         why = {}
         for fi in walk_frames:
@@ -913,10 +918,14 @@ def stair_gate(out, frames, jobs=1, models=None):
     try:
         # the walks in flight follow the container's memory while the gate runs (fixlist A9): it starts with the
         # workers that fit now and grows back toward the cores' count when memory frees up, never killing a walk
+        # each unit at its frame's size: a worker keeps built only the frames that fit in that unit's share
+        # (stair_unit_sized), so a worker holds about the frame it walks
         for uid, found, peak in governed_map(
                 stair_unit_sized, [((str(out), u[1], u[2], u[3]) + ((areas[u[1]],) if u[1] in areas else ()),
-                                    frame_mib.get(u[1], WORKER_BASE_MIB), per_worker) for u in units],
-                max(1, min(by_cores, len(units) or 1)), unit_mib=per_worker, label='CHIM stair gate'):
+                                    frame_mib.get(u[1], WORKER_BASE_MIB), frame_mib.get(u[1], WORKER_BASE_MIB))
+                                   for u in units],
+                max(1, min(by_cores, len(units) or 1)), unit_mib=per_worker, label='CHIM stair gate',
+                item_mib=lambda task: task[1]):
             fi = unit_frame[uid]
             parts_of[fi][uid] = found
             done_units.add(uid)
@@ -1002,7 +1011,7 @@ def require_stairs(out, jobs=1, report_path=None, accepted=(), world=None):
         report = dict(format=1, status='skipped', stair_rule='off')
     else:
         try:
-            world = loaded_world(out, world)
+            world = loaded_world(out, world, jobs)
         except ValueError as exc:
             raise ValueError('Stair gate: the CHIM world does not read back (%s)' % exc)
         frames = world[5]

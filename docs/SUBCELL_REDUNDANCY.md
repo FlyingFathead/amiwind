@@ -1,5 +1,7 @@
 # Sub-cell redundancy and cell map
 
+_Last updated with AmiWind v0.0.30 (7 October 2026)._
+
 `tools/analyze_subcell_redundancy.py` measures how much geometry a set of
 sub-cell maps (for example the Seyda Neen `sn` or Balmora `bm` subdivisions)
 duplicates between neighbours, and draws a density map of the whole area with

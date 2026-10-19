@@ -18,6 +18,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+
 ## Status: 10 October 2026
 
 Open. Found by the harvest pick audit built for [HARVEST-BITTERCOAST-29](HARVEST-BITTERCOAST-29.md). Since

@@ -1,5 +1,7 @@
 # FS-UAE in a persistent Docker development container
 
+_Last updated with AmiWind v0.0.29-dev4 (6 October 2026)._
+
 This recipe runs FS-UAE in a private Xvfb display with Mesa software rendering. It requires Docker with Linux containers. The [probe script](../tools/fsuae_headless_probe.py) runs a ROM-only smoke check. Supply an A1200 Kickstart ROM you are entitled to use; ROMs and Amiga game data stay outside the image and build context.
 
 The Dockerfile below is a clean-image reproduction recipe and remains unverified as a Docker build. An equivalent Ubuntu 24.04 / FS-UAE 3.1.66 stack was exercised in its deployed environment: llvmpipe, fresh full/cropped PNG captures, a visible Kickstart screen, PTY replies for registers/map/disassembly, a bounded guest-memory read, and synthetic audio capture were observed. Debugger commands synchronized on fresh PTY prompts. This verifies the equivalent runtime stack, not the clean Dockerfile recipe. No game disk, gameplay, game audio, stepping, breakpoints, watchpoint hit, memory writes, or game progress was verified.

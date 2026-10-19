@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.43-dev2 at 2026-10-18 17:03 +0300: maintainer: stuck on a rock, CHIM placement 89952, terrain_rocks_wg_01 (scaled), source ref 475844, cell -1,2, global -7617 17684 1259
 - Reported with v0.0.43-dev2 at 2026-10-18 17:05 +0300: maintainer: a second stuck-on-a-rock spot in the same playtest
+- Reported with v0.0.44-dev1 at 2026-10-19 15:01 +0300: maintainer: stuck on a rock again, West Gash cell -2,-1 (global -11842 -3885 614), CHIM placement 85930, mesh f/terrain_rocks_wg_01 tilted copy (model 8849), source ref 362864
 
 <!-- END GENERATED PERSISTING -->
 
@@ -23,6 +24,8 @@
 | Family | Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`) |
 
 <!-- END GENERATED FACTS -->
+
+_Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
@@ -107,5 +110,9 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [VIVEC-ARENA-TP-ARRIVAL-32](VIVEC-ARENA-TP-ARRIVAL-32.md): dbg tp vivec_arena leaves the player at the frame origin under the water
 - [VIVEC-TEMPLE-STAIRS-33](VIVEC-TEMPLE-STAIRS-33.md): Palace steps and High Fane quarter flights fail the stair gate on the CHIM Vivec Temple frame
 - [WORLD-SLOPE-STUCK-38](WORLD-SLOPE-STUCK-38.md): Player reports being stuck beside Ashlands terrain
+
+Related bugs in other categories:
+
+- [CHIM-DAGOTH-UR-RUIN-CYLINDER-44](CHIM-DAGOTH-UR-RUIN-CYLINDER-44.md): Graphics translation glitch at Dagoth Ur: the blight cloud whirlwind (nested translucent cylinders) is drawn solid and still
 
 <!-- END GENERATED CATEGORY -->

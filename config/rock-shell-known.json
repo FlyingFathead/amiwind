@@ -1,0 +1,11 @@
+{
+ "format": 1,
+ "note": "Rock meshes whose CHIM rims stand above the ground more often than the original's (tools/rock_shell_audit.py, v0.0.44 release build, 19 October 2026). Reduced (ai_01, bc_13, wg_15): the 64-triangle reduction may lift a rim; unreduced (ai_05, bc_10): CHIM terrain triangles against the audit's bilinear LAND reading. Not yet seen in game; extra = CHIM share minus original share of rim samples more than 4 source units above the ground.",
+ "known": [
+  {"model": "meshes/f/terrain_rock_ai_01.nif", "extra": 0.121, "compared": 8, "bug": "CHIM-ROCKS-OPEN-SHELLS-43"},
+  {"model": "meshes/f/terrain_rock_ai_05.nif", "extra": 0.089, "compared": 15, "bug": "CHIM-ROCKS-OPEN-SHELLS-43"},
+  {"model": "meshes/f/terrain_rock_bc_10.nif", "extra": 0.117, "compared": 45, "bug": "CHIM-ROCKS-OPEN-SHELLS-43"},
+  {"model": "meshes/f/terrain_rock_bc_13.nif", "extra": 0.103, "compared": 11, "bug": "CHIM-ROCKS-OPEN-SHELLS-43"},
+  {"model": "meshes/f/terrain_rock_wg_15.nif", "extra": 0.145, "compared": 154, "bug": "CHIM-ROCKS-OPEN-SHELLS-43"}
+ ]
+}

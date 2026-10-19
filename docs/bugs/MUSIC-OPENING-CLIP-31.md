@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 ## Status: 7 October 2026
 
 Found by the maintainer in v0.0.31-dev3 (WinUAE). Cause read in source; repaired in

@@ -1,11 +1,6 @@
 # World streamer: every asset stored once
 
-**Decision (maintainer, 8 October 2026):** AmiWind gets a world streamer in which no
-asset is duplicated. Mesh geometry, collision hulls and textures are stored
-once and placed by reference, the way Morrowind places its meshes; only
-per-placement data (origin, angles, scale, and per-placement lighting where it
-is kept) is stored per placement. Today's overlapping region maps remain only
-as the baseline this design is measured against.
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -32,6 +27,13 @@ as the baseline this design is measured against.
 - [Engine changes and their size (estimate)](#engine-changes-and-their-size-estimate)
 
 <!-- contents end -->
+
+**Decision (maintainer, 8 October 2026):** AmiWind gets a world streamer in which no
+asset is duplicated. Mesh geometry, collision hulls and textures are stored
+once and placed by reference, the way Morrowind places its meshes; only
+per-placement data (origin, angles, scale, and per-placement lighting where it
+is kept) is stored per placement. Today's overlapping region maps remain only
+as the baseline this design is measured against.
 
 Open and fixed CHIM bugs, by part and with the build each was found in, are on the
 [CHIM Engine tracker](bugs/CHIM_TRACKER.md), generated from the bug register.

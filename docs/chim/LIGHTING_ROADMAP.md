@@ -1,5 +1,7 @@
 # CHIM lights roadmap
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 How CHIM gets every exterior cell lit like the original, step by step. The design and the measurements behind each
 step are in [CHIM lighting](LIGHTING.md). Progress per cell is in the [cell tracker](CELL_TRACKER.md): a cell whose
 only missing criterion is light shows as "awaiting lighting" (zebra) and turns solid green when its lighting audit

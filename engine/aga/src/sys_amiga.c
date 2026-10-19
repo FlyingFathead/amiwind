@@ -261,6 +261,7 @@ void Sys_LowFPPrecision (void)
  * largest size measured to run the whole game on the 16 MiB Fast RAM
  * profile, the start says so and goes on. */
 #include "amiwind_heap.h"
+#include "aw_heapsize.h"
 #ifndef AMIWIND_HEAP_MB
 /* Expanded starting area plus renderer and actor cache, within the existing
  * 16 MiB Fast RAM playtest profile. Chip RAM remains reserved for hardware. */
@@ -287,13 +288,36 @@ static int Sys_HeapArgument(int argc, char **argv) {
     return 0;
 }
 
+/* The heap grown into spare Fast RAM for this start (aw_heapsize.c), said on
+ * the console once it runs; 0: the built size or -heapmb. */
+static int aw_heap_grown;
+
+/* config.cfg's aw_autoram 0 (Options > Extra RAM: Off) keeps the built heap. */
+static int Sys_AutoRamOff(void) {
+    static char text[8192];
+    FILE *f = fopen("PROGDIR:id1/config.cfg", "rb");
+    size_t n;
+    if (!f)
+        return 0;
+    n = fread(text, 1, sizeof(text) - 1, f);
+    fclose(f);
+    text[n] = 0;
+    return AW_HeapAutoOff(text);
+}
+
 static void Sys_Init(int heap_mb) {
-    char line[160];
+    char line[200];
 
     // Allocate memory.
     if (heap_mb <= 0)
-        heap_mb = AMIWIND_HEAP_MB;
-    if (heap_mb > AMIWIND_HEAP_SAFE_MB) {
+        heap_mb = AW_HeapAuto(AMIWIND_HEAP_MB, 0, AvailMem(MEMF_FAST|MEMF_LARGEST),
+                              AvailMem(MEMF_FAST|(1L<<19)), Sys_AutoRamOff(), &aw_heap_grown);
+    if (aw_heap_grown) {
+        sprintf(line, "AmiWind: game heap %d MiB (built %d MiB), grown into spare Fast RAM; -heapmb N sets it.\n",
+                heap_mb, AMIWIND_HEAP_MB);
+        PutStr(line);
+    }
+    else if (heap_mb > AMIWIND_HEAP_SAFE_MB) {
         sprintf(line, "AmiWind: WARNING: game heap %d MiB is above the %d MiB measured to run the whole game on 16 MiB Fast RAM; starting as asked.\n",
                 heap_mb, AMIWIND_HEAP_SAFE_MB);
         PutStr(line);
@@ -649,6 +673,9 @@ int main(int argc, char *argv[]) {
     quakeparms.argc = com_argc;
     quakeparms.argv = com_argv;
     Host_Init(&quakeparms);
+    if (aw_heap_grown)
+        Con_Printf("Memory: game heap %ld MiB, grown from the built %ld MiB into spare Fast RAM (-heapmb N sets it)\n",
+                   (long)(quakeparms.memsize/1048576), (long)AMIWIND_HEAP_MB);
     RunGameLoop();
     return EXIT_SUCCESS;
 }

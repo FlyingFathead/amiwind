@@ -1,5 +1,7 @@
 # The .chim map format (planned: its own format)
 
+_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
 Status: approved 10 October 2026; planned for after v0.0.36-dev3. Nothing below is implemented yet except
 the `.chim` file name itself.
 

@@ -1,5 +1,7 @@
 # Project media
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 `resources/media/AmiWind_logo.png` is the AmiWind logo: the gold AmiWind name
 under the line "An open-source RPG engine for the Commodore Amiga", on a
 transparent background. It is the project's own logo, supplied by FlyingFathead

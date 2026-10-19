@@ -143,6 +143,42 @@ INSTRUMENTATION_MODULES = frozenset({'tools/build_profile.py', 'tools/build_prog
                                      'tools/resource_plan.py', 'tools/pool_status.py', 'tools/stage_watch.py',
                                      'tools/build_digest.py'})
 OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
+# Single functions that can never change a stage's outputs although they read files: the closure does not follow them
+# (explicit list with the reason, tested in tests/test_build_cache.py; add one only if no output can depend on it).
+# - tools/chim/regions.py converter_note: words of a CHIM regions preflight refusal (a refused build writes nothing);
+#   it hashes the whole converter (chimport.code_identity: every file of tools/, src/ and config/), so every stage
+#   that can reach the preflight keyed tools/release-files.json and the other files there, and a release file list
+#   edit rebuilt the chim stage (BUILD-REUSE-KEYS-TOO-BROAD-35, v0.0.44-dev1 build try 2).
+OUTPUT_NEUTRAL_UNITS = frozenset({('tools/chim/regions.py', 'converter_note')})
+# Pool scheduling functions: how many units run at once, in which order and how long a pool waits before it starts
+# more. They hand each unit to the same function with the same item and return its result, so no output depends on
+# their code. Unlike OUTPUT_NEUTRAL_UNITS they are still followed (what they call, such as worker_environment(),
+# keys every stage that reaches it); only their own text is left out of the digests. Origin: v0.0.45, the
+# BUILD-CHIM-SERIAL-SECTIONS-44 pool changes turned 34 of 37 reusable stages into rebuilds. A function joins this
+# list only if it schedules and never builds, reads or writes a unit's data (tests/test_build_cache.py).
+SCHEDULING_UNITS = frozenset({
+    ('tools/build_parallel.py', '_running'),
+    ('tools/build_parallel.py', '_grow_seconds'),
+    ('tools/build_parallel.py', '_submit'),
+    ('tools/build_parallel.py', 'completed_map'),
+    ('tools/build_parallel.py', 'governed_map'),
+    ('tools/build_parallel.py', '_sized_map'),
+})
+
+
+def scheduling_top_text(relative, top):
+    """A module's import-time text without the default-value lines of its SCHEDULING_UNITS functions. Top format 1
+    lists every plain function's defaults (`\\0defaults NAME: ...`), so adding a scheduling function, or a default to
+    one, still changed the import-time code of tools/build_parallel.py and with it every stage, NPC gallery face and
+    stair walk that reaches it (BUILD-REUSE-SCHEDULER-TOP-45: the v0.0.45 release build reconverted all 3,551 gallery
+    faces and walked all 1,351 stair frames again for _grow_seconds and governed_map's item_mib=None)."""
+    names = {unit for path, unit in SCHEDULING_UNITS if path == relative}
+    if not names:
+        return top
+    prefixes = tuple('\0defaults %s: ' % name for name in names)
+    return ''.join(line for line in top.splitlines(keepends=True) if not line.startswith(prefixes))
+
+
 INSTRUMENTATION_STEMS = frozenset(path.rsplit('/', 1)[-1][:-3] for path in INSTRUMENTATION_MODULES)
 # The reuse step of a reused stage (`build_cache.py apply`) also loads the storage pool (tools/storage_pool.py) to
 # link verified files; it never changes their bytes, so where it was loaded from is no reason to refuse the stage's
@@ -515,14 +551,24 @@ class SourceIndex:
         self._analysis(script)
         return self._reached.get(str(script))
 
+    def _unit_texts(self, relative, top_format):
+        """{unit: text} as unit_digest and unit_hashes hash them: the import-time text without the default-value
+        lines of the module's scheduling functions (scheduling_top_text)."""
+        texts = dict(self._module_symbols(relative).get('texts') or {})
+        top = TOP_TEXT[top_format]
+        if top in texts:
+            texts[top] = scheduling_top_text(relative, texts[top])
+        return texts
+
     def unit_digest(self, relative, units, top_format=None):
         """SHA-256 over a module's import-time code and the source of each reached function.
         TOP_FORMAT (default: the index's): which form of the import-time code (TOP_FORMATS)."""
         top_format = top_format or self.top_format
-        texts = self._module_symbols(relative).get('texts') or {}
+        texts = self._unit_texts(relative, top_format)
         text = {'<top>': TOP_TEXT[top_format]}
         rows = {unit: hashlib.sha256(texts[text.get(unit, unit)].encode('utf-8', 'surrogateescape')).hexdigest()
-                for unit in sorted(set(units) | {'<top>'}) if text.get(unit, unit) in texts}
+                for unit in sorted(set(units) | {'<top>'}) if text.get(unit, unit) in texts
+                and (relative, unit) not in SCHEDULING_UNITS}
         return UNIT_PREFIX[top_format] + digest_json(rows)
 
     def _closure_symbols(self, start, key=None, entry=None):
@@ -540,7 +586,8 @@ class SourceIndex:
         whole_done = set()
 
         def reach(relative, unit):
-            if relative in OUTPUT_NEUTRAL or relative not in self.files or (relative, unit) in reached:
+            if relative in OUTPUT_NEUTRAL or relative not in self.files or (relative, unit) in reached \
+                    or (relative, unit) in OUTPUT_NEUTRAL_UNITS:
                 return
             reached.add((relative, unit))
             pending.append((relative, unit))
@@ -810,10 +857,11 @@ class SourceIndex:
         symbols = self._module_symbols(relative)
         if symbols.get('broken'):
             return None
-        texts = symbols.get('texts') or {}
+        texts = self._unit_texts(relative, top_format)
         text = {'<top>': TOP_TEXT[top_format]}
         return {unit: (hashlib.sha256(texts[text.get(unit, unit)].encode('utf-8', 'surrogateescape')).hexdigest()
-                       if text.get(unit, unit) in texts else None) for unit in sorted(units)}
+                       if text.get(unit, unit) in texts else None) for unit in sorted(units)
+                if (relative, unit) not in SCHEDULING_UNITS}
 
     def selection(self, script, top_format=None):
         """({path: digest} a stage's fingerprint covers, uncertain).
@@ -2291,6 +2339,8 @@ def narrowed_unchanged(old_run, name, index):
         return False, 'record incomplete: ' + '; '.join(record.get('why') or ['unknown'])
     top_format = record.get('top_format')
     for path, hashes in (record.get('units') or {}).items():
+        # scheduling units key no stage, also in records written before SCHEDULING_UNITS existed
+        hashes = {u: h for u, h in hashes.items() if (path, u) not in SCHEDULING_UNITS}
         now = index.unit_hashes(path, hashes, top_format)
         if now != hashes:
             changed = sorted(u for u in hashes if (now or {}).get(u) != hashes[u])

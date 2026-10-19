@@ -19,6 +19,8 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.36 (11 October 2026)._
+
 ## Status: 11 October 2026
 
 Open: to check whether these are benign JIT traps or engine accesses to unmapped memory.
