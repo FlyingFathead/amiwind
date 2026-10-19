@@ -1,11 +1,6 @@
 # Persistent NPC model conversion cache
 
-Normal builds and image recovery MUST include the complete NPC/creature gallery.
-This optimization reuses verified conversion work; it never omits models,
-reduces catalogue coverage, changes polygon budgets or bypasses validation.
-Any exception to either gallery's mandatory coverage/quality requires a specific
-documented case and explicit approval from the project maintainer, outside the builder.
-Build time, disk pressure and convenience are not approval.
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -28,6 +23,13 @@ Build time, disk pressure and convenience are not approval.
   - [Engine](#engine)
 
 <!-- contents end -->
+
+Normal builds and image recovery MUST include the complete NPC/creature gallery.
+This optimization reuses verified conversion work; it never omits models,
+reduces catalogue coverage, changes polygon budgets or bypasses validation.
+Any exception to either gallery's mandatory coverage/quality requires a specific
+documented case and explicit approval from the project maintainer, outside the builder.
+Build time, disk pressure and convenience are not approval.
 
 ## What rc10 implements
 
@@ -162,6 +164,15 @@ and gallery models against the code before the rule). The resolved mode is part
 of this cache's key (`npc_head_detail` in the identity; `None` for creatures)
 and of the stage fingerprint of every builder stage that reaches the bake, so
 the two bakes never share a cache entry.
+
+**The head reducer** (decided for the project, 18 October 2026; NPC-HEAD-DECIMATION-33):
+`--npc-head-reducer locked|default` (build config `npc_head_reducer`, shipped default `locked`, exported as
+`AMIWIND_NPC_HEAD_REDUCER`). In a budget-head bake the head and hair shapes keep their triangle share, but are
+reduced with the boundary-locked reducer of the static meshes (`npc_geometry.simplify_head_locked`:
+`mold_shell.quadric_simplify` with every rim vertex locked and the face turn limit of `static_lod`), so the
+reduction opens no new hole and leaves no gap at the neck; a shape whose rim leaves too few collapses keeps a few
+faces over its share. `default` is the previous reducer, byte for byte. Original heads do not reduce the head and
+are unchanged. The gallery cache key carries the reducer of a budget-head bake (`npc_head_reducer`).
 
 **Allowances:** a model past 2,000 vertices (666 triangles) loads in the engine
 only with a byte-matching `model-budgets.txt` line. The gallery already writes

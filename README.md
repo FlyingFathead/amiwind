@@ -32,6 +32,24 @@ The [gallery](docs/GALLERY.md) has in-game screenshots of every version, and
 
 More in the [gallery](docs/GALLERY.md).
 
+## v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It
+
+Every exterior cell of Vvardenfell is on CHIM now: no classic region maps are left outdoors. The region list holds
+1,348 cells (1,132 land, 197 sea floor and 19 open sea), and 46 more are inside the town frames. The last cells
+joined after the stair walk learned to replace collision that blocked visible steps, so Ald-ruhn, Maar Gan and
+Suran are on CHIM too. The release also brings the fixes from the maintainer's playtest: Red Mountain's summit
+without a solid sky, invisible editor markers, Azura's Coast plants on their trunks, interior plants as sprites and
+NPC heads that keep their outline, the sea to the horizon at Vivec, and a builder that keeps its cores busy.
+
+Running on CHIM Engine v0.2.1. See the [release notes](docs/RELEASE-v0.0.43.md) for what changed and what is
+known in this build, and the [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md) for every cell.
+
+<p align="center">
+  <img src="docs/images/amiwind-v0.0.43-dev2-ghostgate.png" width="800" alt="Ghostgate in the fog seen from the valley below, in v0.0.43-dev2">
+</p>
+
+More in the [gallery](docs/GALLERY.md).
+
 ## v0.0.42: Things Are Starting To Look Pretty Khuul
 
 More of the island on CHIM, the clouds back in the sky, and the first look of the original interface. 1,168 of

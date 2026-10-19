@@ -295,7 +295,8 @@ class FingerprintTests(unittest.TestCase):
         self.assertEqual(build_cache.INSTRUMENTATION_MODULES,
                          {'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
                           'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py',
-                          'tools/resource_plan.py'})
+                          'tools/resource_plan.py', 'tools/pool_status.py', 'tools/stage_watch.py',
+                          'tools/build_digest.py'})
         tools = self.repository / 'tools'
         (tools / 'build_progress.py').write_text('def show(text):\n    print(text)\n')
         (tools / 'build_profile.py').write_text('from build_progress import show\ndef instrument(stage):\n    show(stage)\n')

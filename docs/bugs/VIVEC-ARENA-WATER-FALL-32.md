@@ -18,6 +18,19 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
+## Status: 18 October 2026
+
+Reported again by the maintainer in v0.0.43-dev2 from the St. Olms ledge (whole-city CHIM Vivec,
+cell 4,-12, GLOBAL 39260 -91135 1859, LOCAL 1623 256 464, heading NE 037, pitch 18, time 00:00):
+the sea no longer reached the horizon; sky and clouds showed below it. Cause: the day/night sky was
+switched off in that session (`aw_daynight 0`, a saved setting, confirmed by the maintainer); the
+build data is unchanged since v0.0.42. Repaired in the fog pass (branch v0.0.43-farsea): with the
+day/night sky off, sky below the horizon takes the fog colour too, so the sea meets the horizon with
+either setting. The fall out through the water (report 1 below, v0.0.32 Arena preview) still waits
+for its recheck in whole-city CHIM Vivec, so the bug stays open.
+
 ## Status: 8 October 2026
 
 Open; cause unknown. Project decision: fix later, not a v0.0.32 blocker; known in v0.0.32. Reported by
@@ -67,7 +80,21 @@ v0.0.32 (or dev3): `dbg tp vivec_arena`, walk east to the Telvanni side of the A
 
 ## Repair
 
-Not yet (project decision: later). First measure what the frame map holds at both poses (water
+18 October 2026 (the sea below the horizon, branch v0.0.43-farsea): the CHIM far layer draws the sea
+in the fog colour only up to `chim_far_reach` (896 local units, the legacy overlap depth). From a
+ledge 464 units above the water, that is everything more than about 28 degrees below eye level;
+between that and the horizon the view is sky. With the day/night sky on, that sky is painted in the
+full fog colour (`R_DayNightSkyPixel` in `engine/aga/src/r_sky.c`: rays below the horizon take
+gradient band 0, which is the fog colour at every time of day), so it joins the fogged sea: the
+"water into eternity" look. With `aw_daynight 0` the fog pass used the static fog table and left
+those sky pixels raw, so clouds showed below the horizon (dev2 frame: flat 102 119 136 = level 15 of
+`gfx/fog.lmp`, the raw daytime sky at midnight). Now `AW_FogDraw` (`engine/aga/src/aw_fog.c`) paints
+sky pixels whose ray points below the horizon in the static fog's level 15 when the day/night sky is
+off: one comparison per sky pixel, only on that path. The day/night path, the horizon row and the
+sky above it are unchanged; `aw_land_fill 0` keeps the previous picture. Regression test:
+`tests/aga_daynight_test.c` (`fog_projection`), run by `tests/test_aga_native_source.py`.
+
+8 October 2026: not yet (project decision: later). First measure what the frame map holds at both poses (water
 brushes, terrain, sea bed, map bounds). Related:
 [VIVEC-ARENA-FRAME-EDGE-32](VIVEC-ARENA-FRAME-EDGE-32.md) (the visual cut where neighbouring canton
 bodies end at the frame edge), [VIVEC-ARENA-TP-ARRIVAL-32](VIVEC-ARENA-TP-ARRIVAL-32.md) (the

@@ -1,5 +1,7 @@
 # Interior sections
 
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
 An interior that does not fit its limits is split or lightened, never just left out. This page holds the
 order of the repairs, how sections are cut and how cuts are tried in the inspector.
 
@@ -32,14 +34,21 @@ next:
   alone on every sample, so equal placements of the same mesh share one model; what is drawn does not change
   (`prepare_mesh_bsp.unlit_placement`, `tests/test_shared_ambient.py` checks every sample). Earlier rule:
   `AMIWIND_SHARED_AMBIENT=off`. Rooms with light zones never share.
-- **Step 1, plants as sprites,** only for a room still over its model limit: the room converter converts it
-  again with its nonsolid static plants (an NC/NCO marker or ground vegetation without an authored collision
-  node) as sprites (`tools/interior_plants.py`). A sprite keeps the plant's outline from its alpha; since
+- **Step 1, plants as sprites,** in every converted interior (from v0.0.43-dev3, the default by decision for
+  the project, 18 October 2026; [INTERIOR-MORAG-TONG-FPS-43](bugs/INTERIOR-MORAG-TONG-FPS-43.md), which also
+  ranks the meshes that draw the most faces after it and the step that fits each): a converted room is one vis leaf, so every
+  plant mesh in view is drawn every frame. The room converter draws its nonsolid static plants (an NC/NCO
+  marker or ground vegetation without an authored collision node) and its static trees as sprites
+  (`tools/interior_plants.py`); a tree that is solid in the original keeps its collision as a collision-only
+  model, so the trunk still blocks the player. Logs keep their meshes. Measured on the v0.0.43-dev2 interiors:
+  nonsolid plants 397 placements, 78,502 faces in 74 rooms; trees 10 placements, 8,121 faces in 6 rooms.
+  `AMIWIND_INTERIOR_PLANTS=plants` keeps the trees as meshes; `over-limit` is the v0.0.42 rule (sprites only for
+  a room still over its model limit, converted again). A sprite keeps the plant's outline from its alpha; since
   sprites are not lit by the renderer, each one is shaded with the room's colormap at the light its
   placement gets, one sprite file per plant mesh and light step. A sprite file counts as one model slot.
   Harvestable plants (containers) and plants you can bump into keep their mesh. The receipt
-  (`conversion.json` `plant_sprites`, `limit_steps`) lists every plant and what it became. Earlier rule:
-  `AMIWIND_INTERIOR_PLANTS=meshes` (the room fails as before). A room over its heap budget, which the room
+  (`conversion.json` `plant_sprites`, `limit_steps`) lists every plant and what it became. Every plant a mesh:
+  `AMIWIND_INTERIOR_PLANTS=meshes` (a room over its model limit fails as before). A room over its heap budget, which the room
   converter cannot see (the heap is estimated in the image step), asks for plant sprites in its town config row:
   `"plants": "sprites"` (Vivec, Hlaalu Underworks).
 - **Step 3, cut proposal:** `tools/propose_interior_cuts.py ROOM_FOLDER ... --out proposal.json` reads

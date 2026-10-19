@@ -433,6 +433,12 @@ class ChimWorldTests(unittest.TestCase):
         self.assertIn('flicker ok', first)
         self.assertNotIn('flicker chim_release 1: 0 changes', first)
 
+    def test_flight_over_a_low_frame_keeps_drawing(self):
+        # CHIM-RED-MOUNTAIN-SOLID-SKY-43: at 6,000 over a frame whose map closes at 2,048 the eye's leaf is empty,
+        # its PVS row is the ground's, the ring and the placements stay, and every face is inside its node box
+        out = self.run_world(['flight'])[0]
+        self.assertIn('flight ok', out)
+
     def test_index_keeps_file_rows_without_their_paths(self):
         # CHIM-ZONE-RELEASE-FLICKER-42: the file table's paths are written again from each row (the zone keeps
         # some 600 KiB more on the whole island); every row still opens; built with CHIM_INDEX_KEEP_PATHS 1 it

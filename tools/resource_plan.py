@@ -1122,12 +1122,102 @@ GROW_ROOM = 0.80          # a capped stage grows back by the planned units that 
 # its workers, the memory and the lease that would let it run, again every ALARM_SECONDS while it lasts.
 ALARM_SECONDS = 300.0
 ALARM_ENV = 'AMIWIND_SCHEDULER_ALARM_SECONDS'
+# Measured worker memory (BUILD-STAGE-ALLOWANCE-STUCK-43). When the scheduler can read a stage's own processes
+# (/proc: its main process and the pool workers under it), the guard decides from what the workers really hold, not
+# from the plan's unit estimate:
+# - a cut is made only when the workers' own memory (above an idle worker's) can free what is over PRESSURE_HIGH; when
+#   the memory is held by the stage's main process, fewer workers free nothing and the workers stay (one line says
+#   so). Above PRESSURE_CRITICAL the guard cuts anyway, by as many workers as the excess needs;
+# - a capped stage grows back by the workers whose measured size fits under MEASURED_GROW_ROOM of the limit.
+# The v0.0.43-dev3 chim stage was cut 20 -> 1 worker in 3.5 minutes while its main process held about 35 of the
+# container's 40 GiB: the cuts freed nothing (36.3 GiB in use at 20 workers, 36.8 at 2), and grow-back waited for room
+# under 80 % for a planned 2,842 MiB unit that never came, while the visibility-row workers needed about 100 MiB each.
+PRESSURE_CRITICAL = 0.96
+MEASURED_GROW_ROOM = 0.88
+MIN_WORKER_MIB = 64.0
+
+
+def _proc_tree(root):
+    """[(pid, ppid, rss MiB)] of ROOT and its live descendants (Linux /proc), or None when unreadable."""
+    proc = Path('/proc')
+    if not (proc / str(root)).is_dir():
+        return None
+    parents, rss = {}, {}
+    try:
+        names = os.listdir(proc)
+    except OSError:
+        return None
+    for name in names:
+        if not name.isdigit():
+            continue
+        try:
+            raw = (proc / name / 'stat').read_bytes()
+            fields = raw[raw.rfind(b')') + 2:].split()
+            parents[int(name)] = int(fields[1])
+            rss[int(name)] = int(fields[21]) * PAGE_BYTES / MIB
+        except (OSError, IndexError, ValueError):
+            continue
+    if root not in parents:
+        return None
+    children = {}
+    for pid, parent in parents.items():
+        children.setdefault(parent, []).append(pid)
+    tree, pending = [], [root]
+    while pending:
+        pid = pending.pop()
+        tree.append((pid, parents.get(pid), rss.get(pid, 0.0)))
+        pending.extend(children.get(pid, ()))
+    return tree
+
+
+try:
+    PAGE_BYTES = os.sysconf('SC_PAGE_SIZE')
+except (AttributeError, ValueError, OSError):
+    PAGE_BYTES = 4096
+
+
+def stage_memory(root):
+    """{'main_mib', 'workers_mib': [...]} of a stage's process tree: the main process is the one with the most
+    direct children (its pool workers; ties: the largest), the workers are every process below it. None when the
+    tree cannot be read (not Linux, the stage gone)."""
+    tree = _proc_tree(root)
+    if not tree:
+        return None
+    direct = {}
+    for pid, parent, _ in tree:
+        direct[parent] = direct.get(parent, 0) + 1
+    sizes = {pid: mib for pid, _, mib in tree}
+    main = max(sizes, key=lambda pid: (direct.get(pid, 0), sizes[pid]))
+    below, pending, by_parent = [], [main], {}
+    for pid, parent, _ in tree:
+        by_parent.setdefault(parent, []).append(pid)
+    while pending:
+        pid = pending.pop()
+        for child in by_parent.get(pid, ()):
+            below.append(sizes[child])
+            pending.append(child)
+    return {'main_mib': round(sizes[main], 1), 'workers_mib': [round(m, 1) for m in below]}
+
+
+def worker_sizes(measured):
+    """(freeable MiB, one more worker's MiB) from stage_memory: what the workers hold above an idle one, and the
+    largest worker (a new worker may have to be started whole). None without workers."""
+    workers = (measured or {}).get('workers_mib') or []
+    if not workers:
+        return None
+    floor = min(workers) if len(workers) > 1 else 0.0
+    return sum(w - floor for w in workers), max(MIN_WORKER_MIB, max(workers))
 
 
 class SchedulerGuard:
     def __init__(self, budget, units=None, reader=None, clock=time.monotonic, interval=None, log=None, parents=None,
-                 alarm_seconds=None):
+                 alarm_seconds=None, stage_reader=None):
         self.budget, self.units, self.parents = budget, dict(units or {}), dict(parents or {})
+        # stage name -> its process (the scheduler's track()); stage_reader(pid) -> stage_memory(...) or None
+        self.pids = {}
+        self.stage_reader = stage_reader or stage_memory
+        self.holding = set()      # stages the guard left alone this episode: their main process holds the memory
+        self.measured = {}        # stage -> its last stage_memory reading
         self.alarm_seconds = float(os.environ.get(ALARM_ENV, ALARM_SECONDS) if alarm_seconds is None else alarm_seconds)
         self.starved = {}         # stage -> (since, last alarm) while held below half its share
         self.alarms = []
@@ -1150,6 +1240,27 @@ class SchedulerGuard:
     def cap(self, name, value):
         held = self.caps.get(name)
         return value if held is None else max(1, min(value, held))
+
+    def track(self, name, pid):
+        """The scheduler started stage NAME as process PID: its workers' memory is measured from now on."""
+        self.pids[name] = pid
+
+    def untrack(self, name):
+        self.pids.pop(name, None)
+        self.measured.pop(name, None)
+        self.holding.discard(name)
+
+    def _measure(self, name):
+        pid = self.pids.get(name)
+        if pid is None:
+            return None
+        try:
+            reading = self.stage_reader(pid)
+        except (OSError, ValueError):
+            reading = None
+        if reading is not None:
+            self.measured[name] = reading
+        return reading
 
     def tick(self, pooled, now_share):
         """POOLED: {stage: workers held now}; NOW_SHARE: {stage: its share without a memory cap}."""
@@ -1176,10 +1287,34 @@ class SchedulerGuard:
         live = max(0, used - cache)
         pressure = live / float(limit)
         gib = float(1 << 30)
+        measured = {name: self._measure(name) for name in pooled}
+        if pressure <= PRESSURE_HIGH:
+            self.holding.clear()
         if pressure > PRESSURE_HIGH:
             name = max(pooled, key=lambda n: (pooled[n], n))
-            if pooled[name] > 1:
-                new = max(1, (pooled[name] * 3) // 4)
+            sizes = worker_sizes(measured.get(name))
+            excess = (live - limit * PRESSURE_HIGH) / MIB
+            if pooled[name] <= 1:
+                pass
+            elif sizes is not None and pressure <= PRESSURE_CRITICAL and sizes[0] < excess:
+                # the workers do not hold the memory: fewer of them would free nothing (BUILD-STAGE-ALLOWANCE-STUCK-43)
+                if name not in self.holding:
+                    self.holding.add(name)
+                    self.log('[scheduler] memory tight (%.1f of %.1f GiB in use), but %s\'s main process holds '
+                             '%.1f GiB and its %d worker process(es) only %.0f MiB above an idle worker: fewer '
+                             'workers would not free it; %s keeps %d workers (cut only above %d %%)' % (
+                                 live / gib, limit / gib, name, measured[name]['main_mib'] / 1024.,
+                                 len(measured[name]['workers_mib']), sizes[0], name, pooled[name],
+                                 round(PRESSURE_CRITICAL * 100)))
+                    self.changes.append({'what': 'memory-hold', 'stage': name, 'workers': pooled[name],
+                                         'main_mib': measured[name]['main_mib'], 'freeable_mib': round(sizes[0], 1)})
+            else:
+                if sizes is not None:
+                    # by as many workers as the excess needs, at the largest worker's size
+                    need = int(math.ceil(excess / sizes[1]))
+                    new = max(1, pooled[name] - max(1, need))
+                else:
+                    new = max(1, (pooled[name] * 3) // 4)
                 self.caps[name] = new
                 self.log('[scheduler] memory tight (%.1f of %.1f GiB in use): %s workers %d -> %d; no new units '
                          'beyond that until it frees up, running units go on' % (live / gib, limit / gib, name,
@@ -1191,11 +1326,17 @@ class SchedulerGuard:
             # for over an hour (BUILD-SCHEDULER-MEMORY-STARVED-42). Units granted here are counted against the free
             # memory, so the stages together never plan past GROW_ROOM (below PRESSURE_HIGH, where the guard cuts).
             free = max(0.0, limit * GROW_ROOM - live) / MIB
+            free_measured = max(0.0, limit * MEASURED_GROW_ROOM - live) / MIB
             for name in sorted(self.caps):
                 held = self.caps[name]
                 share = now_share.get(name, held)
+                sizes = worker_sizes(measured.get(name))
                 unit = self.units.get(name)
-                if unit:
+                if sizes is not None:
+                    # the workers' measured size, up to MEASURED_GROW_ROOM (BUILD-STAGE-ALLOWANCE-STUCK-43)
+                    unit = sizes[1]
+                    grow = int(free_measured // unit)
+                elif unit:
                     grow = int(free // unit)
                 elif pressure < PRESSURE_LOW:
                     grow = 1                 # no size known: one at a time, only well below the limit, as before
@@ -1206,6 +1347,7 @@ class SchedulerGuard:
                 new = min(share, held + grow)
                 if unit:
                     free -= (new - held) * unit
+                    free_measured -= (new - held) * unit
                 if new >= share:
                     del self.caps[name]
                 else:
@@ -1233,7 +1375,8 @@ class SchedulerGuard:
             since, last = self.starved.setdefault(name, (now, None))
             if now - since < self.alarm_seconds or (last is not None and now - last < self.alarm_seconds):
                 continue
-            unit = self.units.get(name)
+            sizes = worker_sizes(self.measured.get(name))
+            unit = sizes[1] if sizes is not None else self.units.get(name)   # measured first (STUCK-43)
             lease = self.lease_gb(live, (share - held) * unit) if unit else None
             self.log('[scheduler] ALARM: %s held at %d of %d workers for %.0f min by the memory guard (%.1f of %.1f '
                      'GiB in use, file cache not counted); %s' % (

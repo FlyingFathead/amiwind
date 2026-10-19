@@ -125,8 +125,10 @@ static qboolean map_place(edict_t *p,const float *xy,float ceiling)
     top[2]=sv.worldmodel->maxs[2]-p->v.maxs[2]-4;
     if(ceiling<top[2])top[2]=ceiling;
     bottom[2]=sv.worldmodel->mins[2]-p->v.mins[2]+4;
-    if(top[2]>3990)top[2]=3990;
-    if(bottom[2]<-3990)bottom[2]=-3990;
+    /* the coordinate range less a margin (aw_coord.h): 3,990 with narrow coordinates; with wide ones the search
+     * starts over Red Mountain's ground (4,730 frame-local) instead of inside it (CHIM-RED-MOUNTAIN-SOLID-SKY-43) */
+    if(top[2]>AW_COORD_BOUND-10)top[2]=AW_COORD_BOUND-10;
+    if(bottom[2]<-(AW_COORD_BOUND-10))bottom[2]=-(AW_COORD_BOUND-10);
     if(!isfinite(top[2]) || !isfinite(bottom[2]) || top[2]<=bottom[2])return false;
     aw_map_place_failure="no clear space at the top of the search";
     if(!map_clear_start(p,top,bottom))return false;
@@ -142,7 +144,7 @@ static qboolean map_place(edict_t *p,const float *xy,float ceiling)
 }
 qboolean AW_MapPlace(edict_t *p,const float *xy)
 {
-    return map_place(p,xy,4000);
+    return map_place(p,xy,AW_COORD_BOUND);
 }
 /* dbg tp X Y Z: the first walkable surface at or below Z (the player's centre
  * there; a solid start steps down up to 128 units), so a bridge, a roof or an

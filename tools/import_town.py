@@ -193,9 +193,15 @@ def fixed_state_references(out, settings, references):
     return references
 
 
-def split_references(references):
-    """Visible scenery to convert, and the deferred residents and markers."""
-    selected, deferred = [], []
+def split_references(references, data):
+    """Visible scenery to convert, and the deferred residents and markers.
+
+    data: the game's Data Files. Editor markers (tools/editor_markers.py: hidden markers and
+    MRK models whose only shape is the editor marker) are deferred before any conversion,
+    kept as invisible records with their role (COLLISION-NC-FLAGS-32)."""
+    from editor_markers import EditorMarkers, split_markers
+    references, markers = split_markers(references, _editor_markers(data, EditorMarkers))
+    selected, deferred = [], list(markers)
     for r in references:
         model = normpath(r.get('model', ''))
         if r.get('type') in ('NPC_', 'CREA', 'LEVC', 'LEVI'):
@@ -205,6 +211,25 @@ def split_references(references):
         else:
             selected.append(r)
     return selected, deferred
+
+
+_MARKERS = {}
+
+
+def _editor_markers(data, kind):
+    """One editor-marker classifier per Data Files folder in this process (its model cache is shared)."""
+    key = str(Path(data).resolve()) if data is not None else None
+    if key not in _MARKERS:
+        _MARKERS[key] = kind(data)
+    return _MARKERS[key]
+
+
+def write_emitters(data, out, deferred):
+    """The area's emitter table (emitters.json): its kept invisible marker placements."""
+    from editor_markers import EditorMarkers, area_emitters
+    doc = area_emitters(deferred, _editor_markers(data, EditorMarkers), 'import_town.collect ' + out.name)
+    write_json(out / 'emitters.json', doc)
+    return doc
 
 
 def lava_split(data, selected, deferred):
@@ -249,7 +274,7 @@ def footprint_references(data, out, placements, settings, jobs):
     """Numbers of the audited visible placements whose converted bounds reach
     into the frame. Bounds exist only after conversion, so every visible
     placement of the audited cells is measured once in a scratch export."""
-    candidates, _ = split_references(placements)
+    candidates, _ = split_references(placements, data)
     probe = out / 'frame-footprint'
     if probe.exists():
         shutil.rmtree(probe)
@@ -277,7 +302,8 @@ def collect(data, out, jobs, settings):
     references = [r for r in placements if in_frame(r, settings) or r['number'] in footprint]
     write_fixed_visibility(data, out, settings)
     references = fixed_state_references(out, settings, references)
-    selected, deferred = split_references(references)
+    selected, deferred = split_references(references, data)
+    write_emitters(data, out, deferred)
     selected, deferred, pools = lava_split(data, selected, deferred)
     import lava
     write_json(out / 'lava-pools.json', {'mode': lava.lava_mode(), 'pools': pools})
@@ -292,6 +318,8 @@ def collect(data, out, jobs, settings):
     if report['errors'] or report['converted_references'] != len(selected):
         raise ValueError(title + ' conversion incomplete; inspect scenery/conversion-errors.json')
     index = json.loads((out / 'scenery/scenery-index.json').read_text())
+    from editor_markers import EditorMarkers, require_none_drawn
+    require_none_drawn(index, _editor_markers(data, EditorMarkers), title + ' scenery')
     entries = regions(settings)
     write_json(out / 'coverage.json', audit_coverage(index, entries, settings))
     return settings, index, entries, references

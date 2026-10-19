@@ -50,7 +50,11 @@ class CoordRangeAuditTests(unittest.TestCase):
         self.assertEqual(world.count('AW_COORD_BOUND'), 6)   # valid_town (2), region cover (2), two arrival checks
         self.assertNotRegex(world, r'[^0-9]4000[^0-9]')
         spawn = (ROOT / 'engine/aga/src/aw_spawn.c').read_text(encoding='utf-8')
-        self.assertEqual(spawn.count('AW_COORD_BOUND'), 3)
+        # map placement x/y (2) and below-point z (1); the search band and AW_MapPlace's start height follow the bound
+        # too (CHIM-RED-MOUNTAIN-SOLID-SKY-43: the 3,990 / 4,000 clamps started the search inside Red Mountain)
+        self.assertEqual(spawn.count('AW_COORD_BOUND'), 8)
+        self.assertNotIn('3990', spawn)
+        self.assertNotRegex(spawn, r'[^0-9]4000[^0-9]')
         scene = (ROOT / 'engine/aga/src/aw_scene.c').read_text(encoding='utf-8')
         self.assertIn('fabs(local[2])<AW_COORD_BOUND', scene)
         protocol = (ROOT / 'engine/aga/src/protocol.h').read_text(encoding='utf-8')

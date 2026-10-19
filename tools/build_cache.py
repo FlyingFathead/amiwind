@@ -135,9 +135,13 @@ PATH_CALLS = {'Path', 'PurePath', 'PurePosixPath', 'joinpath', 'join', 'open', '
 # (strip_provenance below).
 # tools/resource_plan.py: the resource plan and the memory governor (how many units a pool keeps in flight, never what
 # a unit computes or the order of any output; tests/test_resource_plan.py checks a governed map against the serial one).
+# tools/pool_status.py, tools/stage_watch.py: the scheduler's live supervisor (queued and running units, cores used,
+# worker shares lent to queued work, underuse warnings; BUILD-STAGE-ALLOWANCE-STUCK-43), never what a unit computes.
+# tools/build_digest.py: the build summary's digest and build-summary.md (reads the run's records only).
 INSTRUMENTATION_MODULES = frozenset({'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
                                      'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py',
-                                     'tools/resource_plan.py'})
+                                     'tools/resource_plan.py', 'tools/pool_status.py', 'tools/stage_watch.py',
+                                     'tools/build_digest.py'})
 OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
 INSTRUMENTATION_STEMS = frozenset(path.rsplit('/', 1)[-1][:-3] for path in INSTRUMENTATION_MODULES)
 # The reuse step of a reused stage (`build_cache.py apply`) also loads the storage pool (tools/storage_pool.py) to
@@ -148,7 +152,10 @@ APPLY_STEMS = INSTRUMENTATION_STEMS | {'storage_pool'}
 # only transient per-use folders; counted as an undeclared output, it made every stage running when it first
 # appeared non-reusable, and every later stage with them (BUILD-REUSE-SCRATCH-UNDECLARED-33).
 RUN_PRIVATE = {'logs', 'profile', 'scratch', 'build-state.json', 'build-state.tmp', 'build-profile.json',
-               'build-profile.json.tmp', 'build-summary.json', 'build-summary.tmp'}
+               'build-profile.json.tmp', 'build-summary.json', 'build-summary.tmp',
+               # the scheduler's live summary and supervisor (tools/build_digest.py, tools/stage_watch.py), written
+               # while stages run; never a stage's output
+               'build-summary.md', 'build-summary.md.tmp', 'underused.jsonl'}
 TEMPORARY_SUFFIX = '.amiwind-reuse-tmp'
 
 

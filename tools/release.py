@@ -107,6 +107,8 @@ DOCUMENTATION_IMAGES.update({"docs/images/amiwind-v0.0.40-dev1-grytewake.png", "
 # v0.0.42 gallery (README and docs/GALLERY.md): the 3D view of the maintainer's v0.0.42-dev1 playtest shots
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.42-dev1-{name}.png" for name in (
     "castle-ebonheart-fog", "dawn-hillside", "dawn-valley", "dusk-sunset-wanderer", "early-dawn", "ebonheart-dawn", "ebonheart-dusk", "ebonheart-dusk-2", "khuul", "khuul-2", "khuul-3", "late-sunset", "later-dawn", "masser-night", "sun-setting-near-khuul", "sunset", "sunset-blue", "sunset-fog", "sunset-tower"))
+# v0.0.43 gallery (README and docs/GALLERY.md): the maintainer's Ghostgate shot from the v0.0.43-dev2 playtest
+DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.43-dev2-ghostgate.png")
 # Toolkit screenshots (amiwind-toolkit/README.md): World with the CHIM progress tracker, the 3D Inspector on a .chim map
 # and on a CHIM world with the memory overlay.
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.36-toolkit-{name}.png" for name in ("world-chim-tracker", "inspector-chim-map", "inspector-chim-world-memory", "monitor"))

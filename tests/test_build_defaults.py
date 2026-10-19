@@ -124,6 +124,7 @@ OPTIONS = {
     # NPC heads (config/build-defaults.json auto = budget, the previous bake: NPC-HEAD-DECIMATION-33);
     # --npc-head-detail original is EXPERIMENTAL (docs/EXPERIMENTAL_FLAGS.md)
     'npc_head_detail': 'shipped default',
+    'npc_head_reducer': 'shipped default',
     # The game heap: the engine's 11 MiB unless --heap-mb / heap_mb asks otherwise (used as asked, warned above
     # the measured safe size; tests/test_heap_size.py).
     'heap_mb': 'shipped default',

@@ -147,15 +147,22 @@ class Dependencies:
 
 
 def identity(spec, palette, dependencies, sources, env):
-    from prepare_gallery import head_detail
-    from prepare_gallery import model_quality
+    from prepare_gallery import head_detail, model_quality
+    from mesh_geometry_env import npc_head_reducer
+
+    def head_reducer(spec):
+        # only a budget-head bake reduces heads (npc_geometry.bake); None for creatures and original heads
+        return npc_head_reducer() if head_detail(spec) == 'budget' else None
+
     # head_detail: --npc-head-detail original|budget (npc_geometry.head_plan); the
     # two bakes of one appearance never share a cache entry.
     return {'format': FORMAT, 'spec': spec, 'palette_sha256': digest(palette),
             'dependencies': dependencies, 'sources': sources, 'environment': env,
             'cache_implementation': file_sha(Path(__file__)),
             'quality': model_quality(spec), 'retry_policy': 'unchanged bounded 666 then 1024',
-            'npc_head_detail': head_detail(spec)}
+            'npc_head_detail': head_detail(spec),
+            # the head/hair reducer of a budget-head bake (NPC-HEAD-DECIMATION-33); None for creatures
+            'npc_head_reducer': head_reducer(spec)}
 
 
 def checked_result(raw, result, key, palette_sha):

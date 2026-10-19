@@ -22,7 +22,7 @@ static byte palette[768],tile[128*128],night[128*128],baseline_fog[4096];
 static unsigned short tile16[128*128];
 static int opens,inside,cloud_fixture,particle_seen,night_fixture,night_coverage_fixture;
 static cvar_t *night_light,*night_tint;
-static cvar_t *enabled,*fog_enabled,*type,*sun_enabled,*clouds_enabled,*cloud_speed,*cloud_type,*night_clouds,*cloud_control,*day_clouds,*stars_enabled,*night_enabled,*night_mode,*star_twinkle;
+static cvar_t *land_fill,*enabled,*fog_enabled,*type,*sun_enabled,*clouds_enabled,*cloud_speed,*cloud_type,*night_clouds,*cloud_control,*day_clouds,*stars_enabled,*night_enabled,*night_mode,*star_twinkle;
 static int nargs=1;static char *argument="";static void (*type_command)(void),(*speed_command)(void),(*cloud_type_command)(void),(*night_clouds_command)(void),(*cloud_control_command)(void),(*day_clouds_command)(void),(*night_mode_command)(void);
 server_t sv;
 client_state_t cl;
@@ -38,7 +38,7 @@ vec3_t vpn={1,0,0},vright={0,-1,0},vup={0,0,1},r_origin;
 cvar_t aw_drawdistance={"aw_drawdistance","540",0,0,540};
 int AW_Interior(void){return inside;}
 void Con_Printf(char *fmt,...){}
-void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_night_light"))night_light=c;if(!strcmp(c->name,"aw_night_tint"))night_tint=c;if(!strcmp(c->name,"aw_nightsky_mode"))night_mode=c;if(!strcmp(c->name,"aw_starsky"))stars_enabled=c;if(!strcmp(c->name,"aw_star_twinkle"))star_twinkle=c;if(!strcmp(c->name,"aw_nightsky"))night_enabled=c;if(!strcmp(c->name,"aw_daynight"))enabled=c;if(!strcmp(c->name,"aw_fog"))fog_enabled=c;if(!strcmp(c->name,"aw_sky_type"))type=c;if(!strcmp(c->name,"aw_sun"))sun_enabled=c;if(!strcmp(c->name,"aw_clouds"))clouds_enabled=c;if(!strcmp(c->name,"aw_skyspeed"))cloud_speed=c;if(!strcmp(c->name,"aw_cloud_type"))cloud_type=c;if(!strcmp(c->name,"aw_night_clouds"))night_clouds=c;if(!strcmp(c->name,"aw_cloud_control"))cloud_control=c;if(!strcmp(c->name,"aw_day_clouds"))day_clouds=c;}
+void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_land_fill"))land_fill=c;if(!strcmp(c->name,"aw_night_light"))night_light=c;if(!strcmp(c->name,"aw_night_tint"))night_tint=c;if(!strcmp(c->name,"aw_nightsky_mode"))night_mode=c;if(!strcmp(c->name,"aw_starsky"))stars_enabled=c;if(!strcmp(c->name,"aw_star_twinkle"))star_twinkle=c;if(!strcmp(c->name,"aw_nightsky"))night_enabled=c;if(!strcmp(c->name,"aw_daynight"))enabled=c;if(!strcmp(c->name,"aw_fog"))fog_enabled=c;if(!strcmp(c->name,"aw_sky_type"))type=c;if(!strcmp(c->name,"aw_sun"))sun_enabled=c;if(!strcmp(c->name,"aw_clouds"))clouds_enabled=c;if(!strcmp(c->name,"aw_skyspeed"))cloud_speed=c;if(!strcmp(c->name,"aw_cloud_type"))cloud_type=c;if(!strcmp(c->name,"aw_night_clouds"))night_clouds=c;if(!strcmp(c->name,"aw_cloud_control"))cloud_control=c;if(!strcmp(c->name,"aw_day_clouds"))day_clouds=c;}
 void Cvar_SetValue(char *name,float value){if(!strcmp(name,"aw_nightsky_mode")){night_mode->value=value;return;}if(!strcmp(name,"aw_skyspeed")){cloud_speed->value=value;return;}if(!strcmp(name,"aw_sky_type")){type->value=value;return;}if(!strcmp(name,"aw_cloud_type")){cloud_type->value=value;return;}if(!strcmp(name,"aw_night_clouds")){night_clouds->value=value;return;}if(!strcmp(name,"aw_cloud_control")){cloud_control->value=value;return;}if(!strcmp(name,"aw_day_clouds")){day_clouds->value=value;return;}assert(!strcmp(name,"aw_drawdistance"));aw_drawdistance.value=value;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_nightsky_mode_set"))night_mode_command=fn;if(!strcmp(name,"aw_sky_type_set"))type_command=fn;if(!strcmp(name,"aw_skyspeed_set"))speed_command=fn;if(!strcmp(name,"aw_cloud_type_set"))cloud_type_command=fn;if(!strcmp(name,"aw_night_clouds_set"))night_clouds_command=fn;if(!strcmp(name,"aw_cloud_control_set"))cloud_control_command=fn;if(!strcmp(name,"aw_day_clouds_set"))day_clouds_command=fn;}
 int Cmd_Argc(void){return nargs;}char *Cmd_Argv(int n){return n?argument:"aw_sky_type_set";}
@@ -173,6 +173,35 @@ static void fog_projection(void){
     vup[0]=0;vup[2]=1;vright[0]=-1;vright[2]=0;
     memset(pixels,7,15);inside=1;AW_FogDraw();for(i=0;i<15;i++)assert(pixels[i]==7);inside=0;
     fog_enabled->value=0;AW_FogDraw();for(i=0;i<15;i++)assert(pixels[i]==7);fog_enabled->value=1;
+    /* VIVEC-ARENA-WATER-FALL-32: with the day/night sky off (aw_daynight 0),
+     * sky below the horizon takes the static fog's level 15, so the fogged sea
+     * meets the horizon; the horizon row and the sky above stay raw;
+     * aw_land_fill 0 keeps the previous picture. */
+    {
+        byte saved_row[256],before[15],mark=99;const byte *again;
+        while(mark==far || mark==sky)mark++;
+        memcpy(saved_row,baseline_fog+15*256,256);memset(baseline_fog+15*256,mark,256);
+        assert(land_fill && land_fill->value==1);
+        enabled->value=0;assert(!R_DayNightFogColours());
+        for(i=0;i<15;i++)depths[i]=AW_SKY_BACKGROUND_DEPTH;
+        memset(storage,77,sizeof storage);memset(pixels,sky,15);
+        AW_FogDraw();
+        assert(storage[0]==77 && storage[1]==77 && storage[17]==77 && storage[18]==77);
+        for(i=0;i<10;i++)assert(pixels[i]==sky);         /* above and at the horizon: raw sky */
+        for(i=10;i<15;i++)assert(pixels[i]==mark);         /* below: the static fog's level 15 */
+        pixels[11]=5;depths[11]=32767;pixels[12]=sky;AW_FogDraw();
+        assert(pixels[11]==baseline_fog[5]);              /* geometry: the fog table as before */
+        land_fill->value=0;memset(pixels,sky,15);
+        for(i=0;i<15;i++)depths[i]=AW_SKY_BACKGROUND_DEPTH;
+        AW_FogDraw();for(i=0;i<15;i++)assert(pixels[i]==sky);land_fill->value=1;
+        fog_enabled->value=0;AW_FogDraw();for(i=0;i<15;i++)assert(pixels[i]==sky);fog_enabled->value=1;
+        /* Day/night on: the new branch is never reached; same pixels as the
+         * day/night sky pass gives them. */
+        enabled->value=1;capture(6,0);again=R_DayNightFogColours();assert(again);
+        memset(pixels,sky,15);AW_FogDraw();memcpy(before,pixels,15);
+        assert(before[0]==sky);for(i=10;i<15;i++)assert(before[i]==again[15*256] && before[i]!=mark);
+        memcpy(baseline_fog+15*256,saved_row,256);
+    }
     capture(0,0);fog=R_DayNightFogColours();assert(fog[15*256]!=far);
 }
 static byte sample(int index,float x,float y,float z){return R_DayNightSkyPixel(index,x,y,z,1);}

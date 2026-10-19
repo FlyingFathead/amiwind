@@ -122,7 +122,7 @@ class RepositoryReuseTests(unittest.TestCase):
                  if 'ordered_map' in (self.index.reached_units(self.repository / 'tools' / script) or {})
                  .get('tools/build_parallel.py', ())}
         self.assertTrue({'scenery', 'bsp', 'interior', 'census', 'balmora'} <= users, users)
-        signature = 'def ordered_map(function, items, jobs=None, cost=None, timings=None):\n'
+        signature = 'def ordered_map(function, items, jobs=None, cost=None, timings=None, history=None, key=None):\n'
         edited = self.edit('tools/build_parallel.py', signature, signature + '    items = list(items)\n')
         self.assertEqual(self.changed(edited), users)
 

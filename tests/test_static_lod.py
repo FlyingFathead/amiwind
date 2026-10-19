@@ -192,10 +192,12 @@ class BoundaryLockedLODTests(unittest.TestCase):
         self.assertLessEqual(shared['ratio'], 0.45)
         self.assertNotIn('preserve_shape_prefixes', shared)
         self.assertEqual(profile_reduction(shared), {'preserve_shared_seams': False, 'lock_boundaries': True,
-                                                     'agg': 7.0, 'preserve_border': False})
+                                                     'agg': 7.0, 'preserve_border': False, 'shape_guard': 0.0,
+                                                     'shape_guard_min': 0, 'shape_guard_axes': (0, 1, 2)})
         self.assertEqual(visual_profile('meshes/r/siltstrider.nif', 5600), shared)
         self.assertEqual(profile_reduction({}), {'preserve_shared_seams': False, 'lock_boundaries': False,
-                                                 'agg': 7.0, 'preserve_border': False})
+                                                 'agg': 7.0, 'preserve_border': False, 'shape_guard': 0.0,
+                                                 'shape_guard_min': 0, 'shape_guard_axes': (0, 1, 2)})
 
     def test_converter_and_estimates_share_one_profile_reduction(self):
         root = Path(__file__).resolve().parents[1] / 'tools'
@@ -219,6 +221,129 @@ class BoundaryLockedLODTests(unittest.TestCase):
             reduce_for_profile(v, f, profile, None, 'fixture')
         self.assertIs(reduce_for_profile(v, f, {}, materials)[0], v)
 
+
+def _tube(segments=12, rings=20, radius=4., height=400.):
+    """An open tube standing on z=0 (a tree trunk): rings x segments x 2 triangles, one component."""
+    import math
+    import numpy as np
+    vv, ff = [], []
+    for r in range(rings + 1):
+        for s in range(segments):
+            a = 2 * math.pi * s / segments
+            vv.append([radius * math.cos(a), radius * math.sin(a), height * r / rings, s / segments, r / rings,
+                       255, 255, 255, 255])
+    for r in range(rings):
+        for s in range(segments):
+            a, b = r * segments + s, r * segments + (s + 1) % segments
+            ff.extend([[a, b, b + segments, 0], [a, b + segments, a + segments, 0]])
+    return np.array(vv, float), np.array(ff)
+
+
+@unittest.skipUnless(all(importlib.util.find_spec(n) for n in
+    ('numpy','scipy','fast_simplification')), 'optional geometry dependencies')
+class ShapeGuardTests(unittest.TestCase):
+    """CHIM-AZURA-FLOATING-FLORA-43: the default reducer collapsed Azura's Coast tree trunks (flora_tree_ac_01:
+    the bark kept 12 % of its area and nothing below the crown), so the crowns floated. The guard keeps the height
+    of big components. The collapse is reproduced by a simplifier that returns only the top half of the tube."""
+
+    def collapsing(self):
+        import numpy as np
+        from unittest import mock
+        def top_only(points, triangles, target_count, **_):
+            keep = [t for t in triangles if points[t, 2].min() >= 200]
+            return points, np.array(keep[:max(1, target_count)], dtype=np.int32)
+        return mock.patch('fast_simplification.simplify', side_effect=top_only)
+
+    def test_collapsed_trunk_is_reduced_again_boundary_locked(self):
+        from static_lod import reduce_mesh
+        v, f = _tube()
+        with self.collapsing():
+            out_v, guarded, report = reduce_mesh(v, f, .07, shape_guard=.9, shape_guard_min=96,
+                                                 shape_guard_axes=(2,))
+        self.assertAlmostEqual(float(out_v[:, 2].min()), 0.0)
+        self.assertAlmostEqual(float(out_v[:, 2].max()), 400.0)
+        self.assertEqual(report['shape_guard'], {'share': .9, 'components_relocked': 1, 'components_kept': 0})
+        self.assertLess(len(guarded), len(f))
+
+    def test_guard_off_is_the_previous_method(self):
+        import numpy as np
+        from static_lod import reduce_mesh
+        v, f = _tube()
+        with self.collapsing():
+            a = reduce_mesh(v, f, .07)
+            b = reduce_mesh(v, f, .07, shape_guard=0.0)
+        self.assertTrue(np.array_equal(a[0], b[0]) and np.array_equal(a[1], b[1]))
+        self.assertGreaterEqual(float(a[0][:, 2].min()), 200)      # the collapse the guard exists for
+        self.assertNotIn('shape_guard', a[2])
+
+    def test_small_components_and_other_axes_are_not_guarded(self):
+        import numpy as np
+        from static_lod import keeps_shape, reduce_mesh
+        v, f = _tube()
+        with self.collapsing():
+            _, _, report = reduce_mesh(v, f, .07, shape_guard=.9, shape_guard_min=len(f) + 1)
+        self.assertEqual(report['shape_guard']['components_relocked'], 0)
+        points = v[:, :3]
+        narrow = points * np.array([.5, .5, 1.])
+        tris = np.arange(len(points) // 3 * 3).reshape(-1, 3)
+        self.assertTrue(keeps_shape(points, narrow, tris, .9, axes=(2,)))
+        self.assertFalse(keeps_shape(points, narrow, tris, .9))
+
+    def test_flora_profile_guards_trunk_height(self):
+        from static_lod import SHAPE_GUARD, SHAPE_GUARD_AXES, SHAPE_GUARD_MIN, profile_reduction
+        from town_regions import visual_profile
+        options = profile_reduction(visual_profile('meshes/f/flora_tree_ac_01.nif', 1672))
+        self.assertEqual((options['shape_guard'], options['shape_guard_min'], options['shape_guard_axes']),
+                         (SHAPE_GUARD, SHAPE_GUARD_MIN, SHAPE_GUARD_AXES))
+        self.assertNotIn('lod_shape_guard', visual_profile('meshes/f/flora_tree_ac_01.nif', 100))
+        self.assertNotIn('lod_shape_guard', visual_profile('meshes/x/ex_hlaalu_b_01.nif', 1000))
+
+def _own_mesh(name):
+    """A mesh of the tester's own Morrowind (AMIWIND_TEST_MORROWIND = the Data Files folder): the loose file first,
+    then Morrowind.bsa. None when it is not set. Nothing of it is stored."""
+    import os
+    root = os.environ.get('AMIWIND_TEST_MORROWIND')
+    if not root:
+        return None
+    root = Path(root)
+    loose = {p.relative_to(root).as_posix().lower(): p for p in (root / 'Meshes').rglob('*') if p.is_file()} \
+        if (root / 'Meshes').is_dir() else {}
+    if name.lower() in loose:
+        return loose[name.lower()].read_bytes()
+    import prepare_scenery  # noqa: F401  (puts src/, the mwad package, on the path first)
+    from mwad.audit import BSA
+    from mwad.esm import read_bsa_asset
+    return read_bsa_asset(BSA(root / 'Morrowind.bsa'), name)
+
+
+@unittest.skipUnless(__import__('os').environ.get('AMIWIND_TEST_MORROWIND'), "requires the tester's own Morrowind data")
+class AzuraTreeTrunkTests(unittest.TestCase):
+    """CHIM-AZURA-FLOATING-FLORA-43 on the real mesh: flora_tree_ac_01's trunk (Tx_bark_01) keeps over 0.9 of its
+    height with the flora profile; the profile without the guard is the reducer's previous output, unchanged."""
+
+    def test_ac_01_trunk_keeps_its_height(self):
+        import numpy as np
+        from prepare_scenery import model_geometry, nif_reader       # puts src/ (mwad) on the path first
+        from mwad.scene import unpack_geometry
+        from static_lod import reduce_for_profile, reduce_mesh
+        from town_regions import visual_profile
+        packet, materials, _, _ = model_geometry(_own_mesh('meshes/f/flora_tree_ac_01.nif'), nif_reader())
+        v, f, _ = unpack_geometry(packet)
+        v, f = np.array(v, float), np.array(f)
+        profile = visual_profile('meshes/f/flora_tree_ac_01.nif', len(f))
+        bark = [i for i, m in enumerate(materials) if m['texture_source'].lower() == 'tx_bark_01.tga']
+        self.assertEqual(len(bark), 1)
+        def height(vertices, faces):
+            points = vertices[faces[faces[:, 3] == bark[0], :3].ravel(), 2]
+            return float(points.max() - points.min()) if len(points) else 0.0
+        guarded_v, guarded_f, report = reduce_for_profile(v, f, profile, materials, 'flora_tree_ac_01')
+        self.assertGreater(height(guarded_v, guarded_f), .9 * height(v, f))
+        self.assertGreaterEqual(report['shape_guard']['components_relocked'], 1)
+        off = {k: x for k, x in profile.items() if not k.startswith('lod_shape_guard')}
+        plain_v, plain_f, _ = reduce_for_profile(v, f, dict(off, lod_shape_guard=0), materials, 'flora_tree_ac_01')
+        old_v, old_f, _ = reduce_mesh(v, f, off['ratio'])
+        self.assertTrue(np.array_equal(plain_v, old_v) and np.array_equal(plain_f, old_f))
+        self.assertLess(height(plain_v, plain_f), .6 * height(v, f))     # the collapse of v0.0.43-dev2
 
 @unittest.skipUnless(importlib.util.find_spec('numpy'), 'optional numpy dependency')
 class CollisionTreeTests(unittest.TestCase):

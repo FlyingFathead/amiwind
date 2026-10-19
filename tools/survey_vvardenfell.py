@@ -160,6 +160,8 @@ def run(a):
     areas = area_catalogue(ROOT); assets = Assets(data, BSA(child_ci(data,'Morrowind.bsa')))
     bounds, terrain, terrain_report = terrain_arrays(master, out, assets)
     grouped = defaultdict(list); issues = []; types = Counter(); excluded = Counter(); per_cell = defaultdict(Counter)
+    from editor_markers import EditorMarkers
+    markers = EditorMarkers(data)
     for cell, record in master['cells'].items():
         for r in record['refs']:
             if r.get('deleted'):
@@ -173,6 +175,9 @@ def run(a):
             model = normpath(obj['model'])
             if not model or model.rsplit('/',1)[-1].startswith('marker_'):
                 excluded['nonvisual-or-marker'] += 1; continue
+            # editor markers never drawn (tools/editor_markers.py, COLLISION-NC-FLAGS-32)
+            if markers.kind({'id': r.get('id', ''), 'type': kind, 'model': obj['model']}):
+                excluded['editor-marker'] += 1; continue
             if 'position' not in r:
                 issues.append(dict(cell=list(cell), reference=r['number'], reason='missing-transform')); continue
             if not model.startswith('meshes/'):

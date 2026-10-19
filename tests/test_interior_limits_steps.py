@@ -75,6 +75,57 @@ class PlantSpriteTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 plants.plant_mode()
 
+    def test_every_room_by_default_and_the_earlier_rules_stay(self):
+        # INTERIOR-MORAG-TONG-FPS-43: a converted room is one vis leaf, so its plants are sprites in every room by
+        # default; over-limit keeps the v0.0.42 rule (only a room asked for it), meshes never
+        self.assertTrue(plants.room_wants_sprites({}, 'auto'))
+        self.assertTrue(plants.room_wants_sprites({}, 'plants'))
+        self.assertFalse(plants.room_wants_sprites({}, 'over-limit'))
+        self.assertTrue(plants.room_wants_sprites({'plant_sprites': True}, 'over-limit'))
+        self.assertFalse(plants.room_wants_sprites({'plant_sprites': True}, 'meshes'))
+        self.assertTrue(plants.trees_too('auto'))
+        self.assertFalse(plants.trees_too('plants'))
+        self.assertFalse(plants.trees_too('over-limit'))
+        with mock.patch.dict(os.environ, {plants.PLANTS_ENV: ''}):
+            self.assertTrue(plants.room_wants_sprites({}))
+            self.assertTrue(plants.trees_too())
+
+    def test_tree_meshes(self):
+        self.assertTrue(plants.is_tree_mesh('x/flora_ashtree_05.nif'))
+        self.assertTrue(plants.is_tree_mesh('meshes\\f\\Flora_tree_ai_05.nif'))
+        self.assertFalse(plants.is_tree_mesh('x/flora_ash_log_01.nif'))
+        self.assertFalse(plants.is_tree_mesh('f/flora_ash_grass_r_01.nif'))
+        self.assertFalse(plants.is_tree_mesh('x/ex_ashtree_01.nif'))
+
+    def test_tree_candidates_keep_collision_of_solid_trees(self):
+        # the Morag Tong planter: a solid ash tree (no authored collision node: the visual fallback) becomes a
+        # sprite with a collision-only model; a nonsolid tree is only a sprite; a usable one keeps its mesh
+        refs = [{'number': 378691, 'type': 'STAT', 'model': 'x\\flora_ashtree_05.nif'},
+                {'number': 2, 'type': 'STAT', 'model': 'f/flora_tree_01.nif'},
+                {'number': 3, 'type': 'CONT', 'model': 'f/flora_tree_02.nif'},
+                {'number': 4, 'type': 'STAT', 'model': 'f/flora_ash_grass_r_01.nif'},
+                {'number': 5, 'type': 'STAT', 'model': 'x/flora_ash_log_01.nif'}]
+        modes = {'x/flora_ashtree_05.nif': 'visual_fallback', 'f/flora_tree_01.nif': 'nonsolid'}
+        chosen, solid, rows = plants.tree_candidates(refs, lambda m: {'mode': modes[m], 'reason': modes[m]})
+        self.assertEqual(chosen, [378691, 2])
+        self.assertEqual(solid, ['meshes/x/flora_ashtree_05.nif'])
+        kept = {r['reference']: r['kept'] for r in rows}
+        self.assertEqual(kept, {378691: 'sprite, collision kept', 2: 'sprite', 3: 'mesh'})
+        # the plant rule never takes a tree (the tree rule does) and still takes the grass
+        chosen, _ = plants.candidates(refs, lambda m: {'mode': 'nonsolid', 'reason': 'test'})
+        self.assertEqual(chosen, [4])
+
+    def test_room_converter_wires_the_tree_rule(self):
+        # the solid tree's model is collision-only (profile before the export), the nonsolid ones are skipped,
+        # the room cache key carries the mode, and only mode over-limit converts a room again
+        source = (Path(__file__).resolve().parents[1] / 'tools/prepare_area.py').read_text(encoding='utf-8')
+        self.assertIn("profiles[model]={**profiles.get(model,{}),'collision_only':True}", source)
+        self.assertIn('interior_plants.room_wants_sprites(entry)', source)
+        self.assertIn("'plants': plant_mode()", source)
+        self.assertLess(source.index("'collision_only':True"), source.index('export_refs(data, parts'))
+        rooms = (Path(__file__).resolve().parents[1] / 'tools/town_interiors.py').read_text(encoding='utf-8')
+        self.assertIn("interior_plants.plant_mode() != 'over-limit'", rooms)
+
 
 class RecentreTests(unittest.TestCase):
     def test_config_accepts_three_numbers_only(self):

@@ -5,8 +5,26 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [NPC-HEAD-DECIMATION-33 locked head reducer and INTERIOR-MORAG-TONG-FPS-43 decided, 18 October 2026](#npc-head-decimation-33-locked-head-reducer-and-interior-morag-tong-fps-43-decided-18-october-2026)
+- [INTERIOR-MORAG-TONG-FPS-43 and NPC-HEAD-DECIMATION-33 persisting, 18 October 2026](#interior-morag-tong-fps-43-and-npc-head-decimation-33-persisting-18-october-2026)
+- [VIVEC-ARENA-WATER-FALL-32: the sea to the horizon without the day/night sky, 18 October 2026](#vivec-arena-water-fall-32-the-sea-to-the-horizon-without-the-daynight-sky-18-october-2026)
+- [COLLISION-NC-FLAGS-32: editor markers, 18 October 2026](#collision-nc-flags-32-editor-markers-18-october-2026)
+- [CHIM-AZURA-FLOATING-FLORA-43 cause found and CHIM-AZURA-DWEMER-RUIN-SHAPES-43 measured, 18 October 2026](#chim-azura-floating-flora-43-cause-found-and-chim-azura-dwemer-ruin-shapes-43-measured-18-october-2026)
 - [BUILD-IMAGE-STAIR-WALK-CORES-43, 18 October 2026](#build-image-stair-walk-cores-43-18-october-2026)
 - [CHIM-OCEAN-CELL-RECORD-ROUTING-43, 18 October 2026](#chim-ocean-cell-record-routing-43-18-october-2026)
+- [BUILD-STAGE-ALLOWANCE-STUCK-43 and BUILD-CHIM-REGION-FRAMES-TAIL-43: causes and repair, 18 October 2026](#build-stage-allowance-stuck-43-and-build-chim-region-frames-tail-43-causes-and-repair-18-october-2026)
+- [BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43, 18 October 2026](#build-image-all-chim-preflight-43-18-october-2026)
+- [CHIM-VIVEC-DOCK-WALKWAY-43, 18 October 2026](#chim-vivec-dock-walkway-43-18-october-2026)
+- [ENGINE-HEAP-FIXED-SIZE-43, 18 October 2026](#engine-heap-fixed-size-43-18-october-2026)
+- [CHIM-TERRAIN-TEXTURE-BLOCKY-43, 18 October 2026](#chim-terrain-texture-blocky-43-18-october-2026)
+- [BUILD-STAGE-ALLOWANCE-STUCK-43, 18 October 2026](#build-stage-allowance-stuck-43-18-october-2026)
+- [MESH-MUCKSPUNGE-SEAM-43, 18 October 2026](#mesh-muckspunge-seam-43-18-october-2026)
+- [CHIM-AZURA-DWEMER-RUIN-SHAPES-43, 18 October 2026](#chim-azura-dwemer-ruin-shapes-43-18-october-2026)
+- [CHIM-AZURA-FLOATING-FLORA-43, 18 October 2026](#chim-azura-floating-flora-43-18-october-2026)
+- [INTERIOR-MORAG-TONG-FPS-43, 18 October 2026](#interior-morag-tong-fps-43-18-october-2026)
+- [BUILD-CHIM-REGION-FRAMES-TAIL-43, 18 October 2026](#build-chim-region-frames-tail-43-18-october-2026)
+- [CHIM-RED-MOUNTAIN-SOLID-SKY-43: cause and repair, 18 October 2026](#chim-red-mountain-solid-sky-43-cause-and-repair-18-october-2026)
+- [CHIM-RED-MOUNTAIN-SOLID-SKY-43, 18 October 2026](#chim-red-mountain-solid-sky-43-18-october-2026)
 - [OPENING-JIUB-LANTERN-32 persisting, 18 October 2026](#opening-jiub-lantern-32-persisting-18-october-2026)
 - [TRACKER-REGISTER-SIZE-33: journal rotation, 18 October 2026](#tracker-register-size-33-journal-rotation-18-october-2026)
 - [CHIM-STAIR-STEPS-SOLID-43 repaired in the converter, 18 October 2026](#chim-stair-steps-solid-43-repaired-in-the-converter-18-october-2026)
@@ -43,7 +61,62 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents end -->
 
+## NPC-HEAD-DECIMATION-33 locked head reducer and INTERIOR-MORAG-TONG-FPS-43 decided, 18 October 2026
+
+Decided for the project, 18 October 2026 (the maintainer): plants and trees in interiors are sprites by default
+([INTERIOR-MORAG-TONG-FPS-43](bugs/INTERIOR-MORAG-TONG-FPS-43.md); the page ranks the 20 meshes that draw the
+most interior faces after that, with the step that fits each, and the A/B plan for the tramaroot planters), and
+budget NPC heads are reduced with the boundary-locked reducer
+([NPC-HEAD-DECIMATION-33](bugs/NPC-HEAD-DECIMATION-33.md), `--npc-head-reducer locked`, the previous reducer kept
+as `default`): no rim moves on any of the 2,675 NPC records, for a median of 10 more triangles per model. Fix in
+source, not yet built.
+
+## INTERIOR-MORAG-TONG-FPS-43 and NPC-HEAD-DECIMATION-33 persisting, 18 October 2026
+
+[INTERIOR-MORAG-TONG-FPS-43](bugs/INTERIOR-MORAG-TONG-FPS-43.md): the maintainer found the Balmora Morag Tong
+Guild very slow in v0.0.43-dev2. Measured: 34,801 faces in one vis leaf (everything in view is drawn); the
+planter ash tree is 1,454 faces (4.2 %), its grass 240; the converter keeps each mesh at about its original
+triangle count, and the suspected desk's planes and clipnodes are collision the renderer does not walk; the 15
+chairs are 19.8 %. Builder rule: plants and static trees of every interior as sprites, a solid tree keeping
+its collision (island-wide 86,623 faces, 2.7 % of all interior faces). Open: in-game A/B, furniture recipes.
+
+[NPC-HEAD-DECIMATION-33](bugs/NPC-HEAD-DECIMATION-33.md) persisting: Angahran (a gash in her head) and Shannat
+Pansamsi (a crude, flat face) in the same room. The original-head bake exists since v0.0.35 but is
+experimental and off: the shipped default `npc_head_detail` auto resolves to `budget` (decided for the project,
+10 October 2026), so every humanoid head is still reduced. Angahran's head keeps 57 of 450 triangles and gains
+open edges (10 to 15); Shannat's head 101 of 524, his hair 42 of 326 with 36 new open edges.
+
+## VIVEC-ARENA-WATER-FALL-32: the sea to the horizon without the day/night sky, 18 October 2026
+
+The maintainer's v0.0.43-dev2 report from the Vivec St. Olms ledge: sky and clouds below the horizon instead of the
+sea. Cause: the day/night sky was off in that session (`aw_daynight 0`, confirmed by the maintainer); with it on, the
+sky below the horizon takes the fog colour and joins the fogged sea past the far layer's reach. Repaired in the fog
+pass: with the day/night sky off, sky below the horizon takes the static fog's last level (one comparison per sky
+pixel; the day/night path unchanged; `aw_land_fill 0` keeps the old picture), with a native regression test. The
+v0.0.32 fall through the water still waits for its recheck in whole-city CHIM Vivec.
+
+## COLLISION-NC-FLAGS-32: editor markers, 18 October 2026
+
+[COLLISION-NC-FLAGS-32](bugs/COLLISION-NC-FLAGS-32.md): in v0.0.43-dev2 the maintainer saw red editor-marker shapes
+under the West Gash bridges (references 481808, 481815, 481812) and in a Khuul longboat (465744). All four are sound
+activators whose model is `EditorMarker.nif`; the CHIM source stage only left out models named `marker_*`. The rule
+now follows OpenMW (hidden marker ids, root `MRK` hides `Tri EditorMarker` shapes from drawing and collision), in one
+place for every converter. Marker placements stay as invisible objects with their role in an emitter table. Island-wide:
+4,705 marker placements (2,565 sound, 778 effect, 1,318 hidden, 30 collision, 14 script). The source stage stops if one
+would be drawn. NC, NCC and AvoidNode stay open.
+
 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): 18 October 2026, v0.0.43-dev1: the boot smoke hung on the Loading screen going from Seyda Neen to Balmora in two of about five runs (the v0.0.41-dev5 image in gate 2928 and the first v0.0.43-dev1 delivery smoke); each passed on a rerun. Seyda's CHIM zone runs full in every run. Cause unknown; open.
+
+## CHIM-AZURA-FLOATING-FLORA-43 cause found and CHIM-AZURA-DWEMER-RUIN-SHAPES-43 measured, 18 October 2026
+
+[CHIM-AZURA-FLOATING-FLORA-43](bugs/CHIM-AZURA-FLOATING-FLORA-43.md): along Azura's Coast the tree crowns hung in the
+air with no trunk. The flora reducer collapsed the trunk of `flora_tree_ac_01` and `_02` (bark kept 12 % and 8 % of its
+area); the placements are correct and not doubled. The flora profile now guards the height of trunks and stems: 31 of
+250 reduced meshes change, +5.3 % triangles per variant. Fixed in source; in-game check to do.
+
+[CHIM-AZURA-DWEMER-RUIN-SHAPES-43](bugs/CHIM-AZURA-DWEMER-RUIN-SHAPES-43.md): Daedric ruin pillars at cell 19,4 looked
+like twisted shapes in the air. Their placements and models match the original data and the pillars stand on the ruin
+base (placement 394429); whether that base is drawn in game is still to be checked. Open.
 
 ## BUILD-IMAGE-STAIR-WALK-CORES-43, 18 October 2026
 
@@ -58,6 +131,89 @@ v0.0.43-dev3 ships with it as a known issue by maintainer decision; the fix is p
 a cell without a map, although these 14 have one each. One rule now serves the checklist, world terrain and the
 regions preflight: an ocean cell with a map is replaced in place like a land cell, and the preflight shows the split
 in seconds. World terrain on the failed run's own inputs passed. Fixed.
+
+## BUILD-STAGE-ALLOWANCE-STUCK-43 and BUILD-CHIM-REGION-FRAMES-TAIL-43: causes and repair, 18 October 2026
+
+[BUILD-STAGE-ALLOWANCE-STUCK-43](bugs/BUILD-STAGE-ALLOWANCE-STUCK-43.md): the scheduler's memory guard cut the CHIM
+stage 20 -> 1 workers while the stage's main process, not its workers, held the memory, and grew it back only by a
+planned 2,842 MiB unit that never fit. The guard now measures the stage's own processes, cuts only what the workers
+hold and grows back by their measured size; idle stages lend their workers to queued work; a stage under half its
+share with units queued for a minute is named in the log and `underused.jsonl` (a warning, never a failure); the
+build summary is written at every stage end.
+[BUILD-CHIM-REGION-FRAMES-TAIL-43](bugs/BUILD-CHIM-REGION-FRAMES-TAIL-43.md): the region frames go to the pool
+largest first (cost history, else references), the placement layouts overlap the visibility rows, and a sweep test
+makes every pool caller give a cost or a reason. Verification waits for the next full build.
+
+## BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43, 18 October 2026
+
+The v0.0.43-dev3 build, the first with every exterior cell on CHIM, converted everything and stopped in the image
+preflight: with no classic world maps left, the disk layout check refused an empty list with a message naming no
+file or limit. Nothing was lost; the fix counts the planned CHIM frame maps.
+
+Cause confirmed on the run's own files (none of the 2,526 directory rows had a map on disk yet; the boot payload
+was within budget). Repair: the preflight plans the 1,348 CHIM region frame maps by a recorded size bound, with
+their far terrain and sprites in the boot plan; each partition refusal names its numbers. On the dev3 run the
+preflight passes: one drive, boot, frame-map and CHIM world partitions, all within the Amiga limits.
+
+## CHIM-VIVEC-DOCK-WALKWAY-43, 18 October 2026
+
+The maintainer's v0.0.43-dev2 playtest: the walkway at the Vivec Hlaalu canton dock cannot be climbed; the player
+gets stuck at its foot. Registered open; to be checked in v0.0.43-dev3 with the shared stair fix.
+
+## ENGINE-HEAP-FIXED-SIZE-43, 18 October 2026
+
+The maintainer's v0.0.43-dev2 playtest with 128 MB of RAM: the game heap stays at the build's 11 MiB, so Vivec
+warns about its memory gap and loads pause. Registered open; the heap will be sized from the free memory at start.
+
+## CHIM-TERRAIN-TEXTURE-BLOCKY-43, 18 October 2026
+
+The maintainer's v0.0.43-dev2 playtest: roads and paths look blocky, each texture square drawn with hard edges
+instead of blending into its neighbours as in the original. Registered open; an A/B of blending methods planned.
+
+## BUILD-STAGE-ALLOWANCE-STUCK-43, 18 October 2026
+
+The v0.0.43-dev3 build ran the CHIM visibility rows on one core for about 40 minutes: the stage's worker allowance
+stood at 1 after the other stages had finished. Raised by hand during the build; registered open.
+
+## MESH-MUCKSPUNGE-SEAM-43, 18 October 2026
+
+The maintainer's v0.0.43-dev2 playtest: a tilted muckspunge on Azura's Coast (cell 14,7) shows a black six-sided seam
+where its cap meets its body. Registered open (small); cause not measured.
+
+## CHIM-AZURA-DWEMER-RUIN-SHAPES-43, 18 October 2026
+
+The maintainer's v0.0.43-dev2 playtest: a Dwemer ruin on Azura's Coast (cell 19,4) is drawn as twisted shapes that do
+not match the original. Registered open; checked together with the floating plant pieces in the same cells.
+
+## CHIM-AZURA-FLOATING-FLORA-43, 18 October 2026
+
+The maintainer's v0.0.43-dev2 playtest: leafy plant or tree pieces hang in the air at Azura's Coast (cell 16,7).
+Registered open; cause not measured.
+
+## INTERIOR-MORAG-TONG-FPS-43, 18 October 2026
+
+The maintainer's v0.0.43-dev2 playtest: the Morag Tong Guild interior runs at a very low frame rate; suspects
+pinned in game are the planter tree with its roots and grass, and a table. Registered open; being measured.
+
+## BUILD-CHIM-REGION-FRAMES-TAIL-43, 18 October 2026
+
+The v0.0.43-dev3 build ended its CHIM region-frame step on one worker with the other cores idle: the frames are
+started in list order, not largest first. Registered open; the fix passes each frame's cost to the scheduler.
+
+## CHIM-RED-MOUNTAIN-SOLID-SKY-43: cause and repair, 18 October 2026
+
+[CHIM-RED-MOUNTAIN-SOLID-SKY-43](bugs/CHIM-RED-MOUNTAIN-SOLID-SKY-43.md): the CHIM terrain and the frame maps closed
+at a fixed 2,048 frame-local units, and Red Mountain's ground reaches 4,730 (69 of the 1,298 dev2 frames go over
+2,048). Faces over their node boxes were drawn without clipping, so the view broke apart near 2,048; the region start
+and the map teleport searched down from inside the mountain. Frames with ground near or over the ceiling now get the
+ground plus a 4,096-unit flight band (9,216 there), every other frame keeps its bytes; the map placement search uses
+the coordinate range. The validation checks faces against their boxes; a height audit covers the island. In-game
+verification waits for a build with the fix.
+
+## CHIM-RED-MOUNTAIN-SOLID-SKY-43, 18 October 2026
+
+The maintainer's v0.0.43-dev2 playtest: climbing to the Red Mountain summit (cell 2,9, new on CHIM in dev2) left
+the player inside solid with only the sky drawn. Registered open; cause not measured.
 
 ## OPENING-JIUB-LANTERN-32 persisting, 18 October 2026
 

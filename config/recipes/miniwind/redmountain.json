@@ -1,0 +1,20 @@
+{
+  "schema": "build-recipe-1",
+  "name": "redmountain",
+  "description": "MiniWind preset --miniwind-redmountain: Red Mountain summit: terrain ceiling, standing, high flight",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Red Mountain summit: terrain ceiling, standing, high flight",
+    "direct_to_game_map": "redmtn_x3y8",
+    "exclude": [
+      "npc-gallery"
+    ],
+    "exclude_unreferenced": "voice,npcs",
+    "miniwind_boot": "dbg headlamp off"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

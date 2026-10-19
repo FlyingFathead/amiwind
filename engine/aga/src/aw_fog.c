@@ -121,7 +121,7 @@ void AW_FogDepths(byte *table,int distance) {
     }
 }
 void AW_FogDraw(void) {
-    int distance,i,x,y,w,h,level,fog,fill;byte *pixels;short *z;
+    int distance,i,x,y,w,h,level,fog,fill,sea;byte *pixels;short *z;
     const byte *environment,*ramp;
     float extent,u,v,step,ray[3],delta[3];int k;
     if(AW_Interior())return;
@@ -134,6 +134,13 @@ void AW_FogDraw(void) {
     if(extent<=0)return;
     step=2.0f/extent;for(k=0;k<3;k++)delta[k]=vright[k]*step;
     fill=fog && aw_skyline_fill.value>0 && w<=SKYLINE_MAX;
+    /* Sea to the horizon without the day/night sky (aw_daynight 0): the
+     * day/night pass maps sky below the horizon (ray z < 0) to the full fog
+     * colour, which joins the fogged sea and the far layer. With the pass off
+     * that sky stayed raw clouds below the horizon (VIVEC-ARENA-WATER-FALL-32);
+     * it takes the static fog's level 15 instead. aw_land_fill 0 keeps the
+     * previous picture. One comparison per sky pixel, only on this path. */
+    sea=fog && !environment && aw_land_fill.value>0;
     if(fill)memset(skyline,0,w);
     if(fog || environment)for(y=r_refdef.vrect.y;y<r_refdef.vrect.y+h;y++){
         pixels=vid.buffer+y*vid.rowbytes+r_refdef.vrect.x;
@@ -146,6 +153,7 @@ void AW_FogDraw(void) {
             if(i==AW_SKY_BACKGROUND_DEPTH){
                 if(fill && skyline[x])pixels[x]=ramp[(15<<8)+pixels[x]];
                 else if(environment)pixels[x]=R_DayNightSkyPixel(pixels[x],ray[0],ray[1],ray[2],fog);
+                else if(sea && ray[2]<0)pixels[x]=ramp[(15<<8)+pixels[x]];
             }else if(fog){
                 if(i<0)i=0;
                 level=depths[i];pixels[x]=ramp[(level<<8)+pixels[x]];

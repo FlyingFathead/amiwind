@@ -649,9 +649,40 @@
       "to": null,
       "source": "tools/build.py (resource plan, fixlist B41)",
       "note": "null = this container's CPU quota (cgroup cpu.max), else the machine; N = the threads the build will run with"
+    },
+    {
+      "version": "0.0.43-dev3",
+      "option": "npc_head_reducer",
+      "flag": "--npc-head-reducer",
+      "change": "added",
+      "to": "locked",
+      "source": "config/build-defaults.json (NPC-HEAD-DECIMATION-33)",
+      "note": "locked = boundary-locked reducer for budget heads (no new holes); default = the previous reducer"
     }
   ],
   "current": {
+    "build_defaults": {
+      "bitmap_paper_ink": "filled",
+      "builder": "chim",
+      "chim_areas": [
+        "balmora",
+        "seyda",
+        "vivec_city"
+      ],
+      "chim_lighting_type": "hybrid",
+      "chim_stream_statics": true,
+      "chim_texture_effects": [],
+      "follow_original_stair_rules": true,
+      "lava": "quake",
+      "model_hull": "chain",
+      "npc_face_lod": "all",
+      "npc_head_detail": "auto",
+      "npc_head_reducer": "locked",
+      "npc_lod": "off",
+      "npc_lod_disk_mib": 96,
+      "npc_lod_levels": 3,
+      "world_map": "v2"
+    },
     "options": {
       "accept_entity_loss": null,
       "accept_known_stair_findings": [],
@@ -731,6 +762,7 @@
       "npc_face_lod": null,
       "npc_face_lod_list": null,
       "npc_head_detail": null,
+      "npc_head_reducer": null,
       "npc_lod": null,
       "npc_lod_disk_mib": null,
       "npc_lod_levels": null,
@@ -768,27 +800,6 @@
       "with_video": false,
       "world_bounds": null,
       "world_map": null
-    },
-    "build_defaults": {
-      "bitmap_paper_ink": "filled",
-      "builder": "chim",
-      "chim_areas": [
-        "balmora",
-        "seyda",
-        "vivec_city"
-      ],
-      "chim_lighting_type": "hybrid",
-      "chim_stream_statics": true,
-      "chim_texture_effects": [],
-      "follow_original_stair_rules": true,
-      "lava": "quake",
-      "model_hull": "chain",
-      "npc_face_lod": "all",
-      "npc_head_detail": "auto",
-      "npc_lod": "off",
-      "npc_lod_disk_mib": 96,
-      "npc_lod_levels": 3,
-      "world_map": "v2"
     }
   }
 }

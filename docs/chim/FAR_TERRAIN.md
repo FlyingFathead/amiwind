@@ -1,9 +1,6 @@
 # CHIM far terrain: the distant view
 
-Status: CHIM 0.1.0, first version (Balmora and Seyda Neen frames). Tracked as
-[CHIM-FAR-TERRAIN-33](../bugs/CHIM-FAR-TERRAIN-33.md), a v0.0.33 release
-blocker: the CHIM distant view must look at least as good as v0.0.32's, the
-HORSTATOR APPROVED horizon.
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -23,6 +20,11 @@ HORSTATOR APPROVED horizon.
 - [Tests](#tests)
 
 <!-- contents end -->
+
+Status: CHIM 0.1.0, first version (Balmora and Seyda Neen frames). Tracked as
+[CHIM-FAR-TERRAIN-33](../bugs/CHIM-FAR-TERRAIN-33.md), a v0.0.33 release
+blocker: the CHIM distant view must look at least as good as v0.0.32's, the
+HORSTATOR APPROVED horizon.
 
 ## The problem
 
@@ -229,6 +231,13 @@ quoted.
   as deep as v0.0.32's; 0 draws the whole layer (the land up to a cell past
   the frame: much more land than v0.0.32 showed, high ridges cover the low
   sky and the sun at sunset).
+- The sea up to the horizon: past the reach the layer draws nothing, so from
+  a high point (the Vivec canton ledges) the band just below the horizon is
+  sky. The day/night sky pass paints sky below the horizon in the full fog
+  colour, which joins the fogged sea. With the day/night sky off
+  (`aw_daynight 0`) the fog pass does the same with the static fog's last
+  level, one comparison per sky pixel; `aw_land_fill 0` turns it off with the
+  far layer ([VIVEC-ARENA-WATER-FALL-32](../bugs/VIVEC-ARENA-WATER-FALL-32.md)).
 - `chim_far_objects` (default 0, read at map start): 1 raises the object
   stamps into the layer. Experimental: on a 128-unit grid a house becomes a
   steep peak or tent, not the boxy outline the legacy overlap drew, so it is

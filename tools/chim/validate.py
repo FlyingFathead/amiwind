@@ -145,10 +145,43 @@ def world_tree(lumps, label, fails):
                 owner[f] += 1
                 fails.check(faces[f][0] == n[0], label + ': face %d not on its node plane' % f)
     fails.check(all(k == 1 for k in owner), label + ': faces not on exactly one node')
+    # Every face inside its node's and its leaves' height bounds: Quake's renderer clips nothing against a frustum
+    # plane its node box is wholly inside, so a face over its box is projected unclipped (the Red Mountain view
+    # breaking apart, CHIM-RED-MOUNTAIN-SOLID-SKY-43). Height only: a referenced chunk moves in x and y.
+    zs = face_heights(lumps)
+    for n in nodes:
+        over = [zs[f] for f in range(n[9], n[9] + n[10]) if f < len(zs) and zs[f] is not None
+                and (zs[f][1] > n[8] + 0.5 or zs[f][0] < n[5] - 0.5)]
+        if not fails.check(not over, label + ': face heights %.1f..%.1f outside their node bounds z %d..%d'
+                           % (min(z[0] for z in over or [(0, 0)]), max(z[1] for z in over or [(0, 0)]), n[5], n[8])):
+            break
+    for lf in leafs:
+        if lf[0] != -1:
+            continue                # water and lava leaves list the ground faces over them (their tile's faces)
+        over = [zs[marks[m]] for m in range(lf[8], lf[8] + lf[9]) if m < len(marks) and marks[m] < len(zs)
+                and zs[marks[m]] is not None and zs[marks[m]][1] > lf[7] + 0.5]
+        if not fails.check(not over, label + ': face heights up to %.1f over their leaf bounds top %d'
+                           % (max(z[1] for z in over or [(0, 0)]), lf[7])):
+            break
     if not ok:
         return [], [-2]
     out = [(np.array(planes[n[0]][:3]), planes[n[0]][3], n[1], n[2]) for n in nodes]
     return out, [lf[0] for lf in leafs]
+
+
+def face_heights(lumps):
+    """[(lowest z, highest z) or None] of a brush image's faces (by its vertexes)."""
+    verts = [v[2] for v in struct.iter_unpack('<3f', lumps[3])] if lumps[3] else []
+    edges = list(struct.iter_unpack('<HH', lumps[12]))
+    surfedges = [v[0] for v in struct.iter_unpack('<i', lumps[13])]
+    out = []
+    for f in struct.iter_unpack('<HhihH4Bi', lumps[7]):
+        try:
+            zs = [verts[edges[e][0] if e >= 0 else edges[-e][1]] for e in surfedges[f[2]:f[2] + f[3]]]
+        except IndexError:
+            zs = []                 # out of range: brush_checks names it
+        out.append((min(zs), max(zs)) if zs else None)
+    return out
 
 
 def face_polygons(lumps):

@@ -87,6 +87,18 @@ static int compare(int distance) {
     }
     return seen;
 }
+#ifdef HORIZON_FOG_TEST
+/* VIVEC-ARENA-WATER-FALL-32: without the day/night sky (this stub returns
+ * NULL), the fog pass paints sky whose ray points below the horizon in the
+ * static fog's level 15 (aw_land_fill 1); the sky above stays as it was.
+ * The ray as AW_FogDraw steps it: vid centre, step 2 / the longer side. */
+static int below_horizon(int i) {
+    int x=i%80,y=i/80;float step=2.0f/64;
+    if(x<3 || x>=67 || y<5 || y>=53)return 0;
+    return vpn[2]+(x-40)*step*vright[2]+(30-y)*step*vup[2]<0;
+}
+static int sky_kept(int i){return depth[i]==AW_SKY_BACKGROUND_DEPTH && screen[i]==(below_horizon(i)?173:77);}
+#endif
 int main(void) {
     patch_t plane={210,1200,-780,810,0,0,-81};
     patch_t valley[2]={{210,1200,-810,-73,0,0,-81},{210,1200,93,810,0,0,-81}};
@@ -131,11 +143,11 @@ int main(void) {
     scene(&plane,1);world.nummodelsurfaces=world.numsurfaces=8193;AW_HorizonDraw(201,540);AW_HorizonReport();assert(strstr(report,"limit 1"));
 #ifdef HORIZON_FOG_TEST
     scene(&plane,1);memset(fog_colours,173,sizeof fog_colours);AW_FogInit();assert(horizon_switch && horizon_switch->value==0);
-    reset();AW_FogDraw();for(i=0;i<80*60;i++)assert(screen[i]==77 && depth[i]==AW_SKY_BACKGROUND_DEPTH);
-    horizon_switch->value=1;AW_FogDraw();seen=0;for(i=0;i<80*60;i++)if(screen[i]==173)seen++;assert(seen>0);
+    reset();AW_FogDraw();n=0;for(i=0;i<80*60;i++){assert(sky_kept(i));n+=below_horizon(i);}assert(n>0);
+    horizon_switch->value=1;AW_FogDraw();seen=0;for(i=0;i<80*60;i++)if(screen[i]==173 && depth[i]!=AW_SKY_BACKGROUND_DEPTH)seen++;assert(seen>0);
     reset();inside=1;AW_FogDraw();for(i=0;i<80*60;i++)assert(screen[i]==77 && depth[i]==AW_SKY_BACKGROUND_DEPTH);inside=0;
     assert(land_fog_switch && land_fog_switch->value==1 && land_fog_switch->archive);
-    fog_switch->value=0;AW_FogDraw();seen=0;for(i=0;i<80*60;i++)if(screen[i]==173)seen++;assert(seen>0);
+    fog_switch->value=0;AW_FogDraw();seen=0;for(i=0;i<80*60;i++)if(screen[i]==173 && depth[i]!=AW_SKY_BACKGROUND_DEPTH)seen++;assert(seen>0);
     reset();land_fog_switch->value=0;AW_FogDraw();for(i=0;i<80*60;i++)assert(screen[i]==77 && depth[i]==AW_SKY_BACKGROUND_DEPTH);
     land_fog_switch->value=1;horizon_switch->value=0;aw_chim_far_draw=far_probe;AW_FogDraw();assert(far_calls==1);
     inside=1;AW_FogDraw();assert(far_calls==1);inside=0;
@@ -144,19 +156,20 @@ int main(void) {
     land_fog_switch->value=1;AW_FogDraw();assert(far_calls==2);
     missing_palette=1;AW_FogInit();AW_FogDraw();assert(far_calls==2);
     missing_palette=0;AW_FogInit();aw_chim_far_draw=NULL;
-    fog_switch->value=1;horizon_switch->value=0;AW_FogDraw();for(i=0;i<80*60;i++)assert(screen[i]==77 && depth[i]==AW_SKY_BACKGROUND_DEPTH);
+    fog_switch->value=1;horizon_switch->value=0;reset();AW_FogDraw();for(i=0;i<80*60;i++)assert(sky_kept(i));
     puts("fog integration: enabled LAND persists with fog off; rollback, missing palette and interiors are guarded");
     /* Horizon draw methods (HORIZON-FLORA-SPRITES-32). One far scenery pixel
      * (fog level 15) above open sky in column 10. Object silhouetting
      * (aw_skyline_fill 1, tested but subpar results, kept) paints the sky below
-     * it in the fog colour; the land-outline default (0) leaves the sky. */
+     * it in the fog colour; the land-outline default (0) leaves the sky (below
+     * the horizon it takes the fog colour without the day/night sky). */
     assert(skyline_switch && skyline_switch->value==1 && defaults_switch && defaults_switch->value==0 && horizon_migrate);
     horizon_switch->value=0;
     reset();depth[10*80+10]=30;AW_FogDraw();
     assert(screen[10*80+10]==173);for(j=11;j<53;j++)assert(screen[j*80+10]==173);
-    for(j=5;j<53;j++)assert(screen[j*80+11]==77);
+    for(j=5;j<53;j++)assert(sky_kept(j*80+11));
     skyline_switch->value=0;reset();depth[10*80+10]=30;AW_FogDraw();
-    assert(screen[10*80+10]==173);for(j=11;j<53;j++)assert(screen[j*80+10]==77 && depth[j*80+10]==AW_SKY_BACKGROUND_DEPTH);
+    assert(screen[10*80+10]==173);for(j=11;j<53;j++)assert(sky_kept(j*80+10));
     /* Migration: a saved 1 becomes 0 once; a later explicit 1 is kept. */
     skyline_switch->value=1;horizon_migrate();assert(skyline_switch->value==0 && defaults_switch->value==1);
     skyline_switch->value=1;horizon_migrate();assert(skyline_switch->value==1);

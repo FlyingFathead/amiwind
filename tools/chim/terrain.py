@@ -33,6 +33,16 @@ TERRAIN_LIGHT = 12      # the stored sample value of today's terrain bake (minli
 WATER_LEVEL = 0.0
 TEX_SPECIAL = 1
 TERRAIN_CEILING = 2048   # import_town: the legacy frame box closes here; leaves of open air reach it
+# Ground near or over TERRAIN_CEILING (Red Mountain reaches 4,730 frame-local units; 69 frames of the island go
+# past 2,048) raises the ceiling of its frame and its chunks to the ground plus a flight band, so node and leaf
+# bounds hold every face, the placed models standing on it and the levitating player
+# (CHIM-RED-MOUNTAIN-SOLID-SKY-43: Quake's renderer drops frustum clipping inside a node box it accepts whole, so
+# faces over their node's box were projected unclipped, and the frame's player start was traced from inside the
+# mountain). Frames under the ceiling keep it, so their units stay byte-identical.
+CHUNK_HEADROOM = 64       # a chunk's own safety: its highest corner plus this must fit its ceiling
+FRAME_HEADROOM = 512      # a frame keeps TERRAIN_CEILING while its highest ground plus this fits (eye, jump)
+FLIGHT_BAND = 4096        # a raised ceiling: the highest ground plus this (levitation, tall placements) ...
+HIGH_CEILING_STEP = 1024  # ... rounded up to a multiple of this (4,730 -> 9,216; wide coordinates reach 32,000)
 TERRAIN_HULL_GRID = 64    # lattice of the compiled terrain hull's expanded corners (collision_bsp.compile_standing;
                           # 1024 leaves qbsp slivers: seam holes in tests/test_chim_ground.py)
 CONTENTS_EMPTY, CONTENTS_SOLID, CONTENTS_WATER = -1, -2, -3
@@ -252,6 +262,47 @@ def box_leaves(nodes, leaves, lo, hi, root=0):
         if near < dist:
             stack.append(back)
     return out
+
+
+def covering_ceiling(zmax, headroom, ceiling=TERRAIN_CEILING):
+    """The ceiling over ground reaching ZMAX: CEILING while ZMAX + HEADROOM fits under it, else ZMAX + FLIGHT_BAND
+    rounded up to a whole HIGH_CEILING_STEP (CHIM-RED-MOUNTAIN-SOLID-SKY-43)."""
+    if float(zmax) + float(headroom) <= ceiling:
+        return ceiling
+    return max(ceiling, int(math.ceil((float(zmax) + FLIGHT_BAND) / HIGH_CEILING_STEP) * HIGH_CEILING_STEP))
+
+
+def frame_ceiling(ground_zmax, placement_top=None, ceiling=TERRAIN_CEILING):
+    """The terrain ceiling of a frame: CEILING while its highest ground plus FRAME_HEADROOM and its highest placement
+    top plus CHUNK_HEADROOM fit under it, else the higher of the two plus FLIGHT_BAND, rounded up to a whole
+    HIGH_CEILING_STEP. A placement is linked into the leaves of its chunk: a leaf box under the model's top culls the
+    model while its top is in view (dev2: 23 frames under the ceiling had placements up to 2,253 over it, a tower on
+    ground of 1,392 among them; CHIM-RED-MOUNTAIN-SOLID-SKY-43)."""
+    need = float(ground_zmax) + FRAME_HEADROOM
+    high = float(ground_zmax)
+    if placement_top is not None:
+        need = max(need, float(placement_top) + CHUNK_HEADROOM)
+        high = max(high, float(placement_top))
+    if need <= ceiling:
+        return ceiling
+    return max(ceiling, int(math.ceil((high + FLIGHT_BAND) / HIGH_CEILING_STEP) * HIGH_CEILING_STEP))
+
+
+def task_zmax(task):
+    """Highest z a chunk terrain task holds: its corner heights or tile triangles, and its lava tops."""
+    zs = []
+    if task.get('heights') is not None:
+        zs += [float(v) for row in task['heights'] for v in row]
+    for _, _, rows in task.get('triangles') or ():
+        zs += [float(r[k]) for r in rows for k in (2, 5, 8)]
+    zs += [float(l['top']) for l in task.get('liquids') or () if 'top' in l]
+    return max(zs) if zs else float(task.get('water', WATER_LEVEL))
+
+
+def chunk_ceiling(task, ceiling=TERRAIN_CEILING):
+    """The ceiling of a chunk terrain task: CEILING (the frame's), raised when the chunk's own ground reaches it
+    (covering_ceiling with CHUNK_HEADROOM: a ring corner past the frame's edge can be higher than the frame)."""
+    return covering_ceiling(task_zmax(task), CHUNK_HEADROOM, ceiling)
 
 
 def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_id,
@@ -660,6 +711,10 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
         raise ValueError('Unknown terrain hull: %s' % hull)
     zmin = min(zs + ([water_level] if counts['water_faces'] else []))
     zmax = max(zs + ([water_level] if counts['water_faces'] else []))
+    if zmax > ceiling:
+        raise ValueError('Chunk terrain at %s reaches z %.1f, over its ceiling %s: its node and leaf bounds would not '
+                         'hold its faces (chim.terrain.chunk_ceiling, CHIM-RED-MOUNTAIN-SOLID-SKY-43)'
+                         % (list(box), zmax, ceiling))
     lumps = w.finish([x0, y0, floor], [x1, y1, ceiling], 0, croot, 0, len(faces),
                      lighting=bytes([light]) * samples)
     info = {'tiles': counts['tiles'], 'faces': counts['ground_faces'], 'water_faces': counts['water_faces'],

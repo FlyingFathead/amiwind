@@ -17,5 +17,6 @@
   "npc_lod_levels": 3,
   "npc_face_lod": "all",
   "npc_lod_disk_mib": 96,
-  "npc_head_detail": "auto"
+  "npc_head_detail": "auto",
+  "npc_head_reducer": "locked"
 }

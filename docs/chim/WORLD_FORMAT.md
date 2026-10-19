@@ -1,13 +1,6 @@
 # CHIM world format
 
-CHIM is the world streamer that replaces today's overlapping region maps (the
-legacy builder). This page specifies the files the CHIM builder writes and the
-engine will read: every shared model, texture and terrain face stored once,
-every placement stored once and pointing at a shared model, in small sector
-files that a classic Amiga FFS disk reads whole, front to back. The builder
-writes world format 0.5, or 0.7 when terrain references are on; the engine
-reads 0.4 to 0.7 ("Version rules" below). A short overview for newcomers, with
-the roadmap of the format: [CHIM file format](../CHIM_FILE_FORMAT.md).
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -55,6 +48,15 @@ the roadmap of the format: [CHIM file format](../CHIM_FILE_FORMAT.md).
 - [Version rules](#version-rules)
 
 <!-- contents end -->
+
+CHIM is the world streamer that replaces today's overlapping region maps (the
+legacy builder). This page specifies the files the CHIM builder writes and the
+engine will read: every shared model, texture and terrain face stored once,
+every placement stored once and pointing at a shared model, in small sector
+files that a classic Amiga FFS disk reads whole, front to back. The builder
+writes world format 0.5, or 0.7 when terrain references are on; the engine
+reads 0.4 to 0.7 ("Version rules" below). A short overview for newcomers, with
+the roadmap of the format: [CHIM file format](../CHIM_FILE_FORMAT.md).
 
 ## File types
 
@@ -416,9 +418,12 @@ world BSP, for the chunk's tiles:
   then, where the ground dips below the water level, the water plane (back:
   water leaf, front: air leaf). Node 0 is the root; dmodel head node 0 is the
   root (the world's point hull is its node tree), head node 1 the standing
-  hull. Leaf bounds reach the frame ceiling (2048) above the ground; every
-  non-solid leaf lists its tile's faces as marksurfaces; no visibility lump
-  (visibility is the chunk's PVS row);
+  hull. Leaf bounds reach the frame ceiling above the ground: 2048, or, in a
+  frame whose ground comes within 512 units of it (Red Mountain, up to 4,730),
+  the highest ground plus a 4,096-unit flight band rounded up to 1,024 (9,216
+  there), so every node and leaf box holds its faces; every non-solid leaf
+  lists its tile's faces as marksurfaces; no visibility lump (visibility is
+  the chunk's PVS row);
 - faces sit on their node's plane, `side` set for faces seen from the plane's
   back (the downward water face), as in a Quake world;
 - tiles of the converter's terrain step (128 units, every fourth LAND sample),
@@ -1125,8 +1130,9 @@ model loader picks the loader from the file header, not the extension.
   leaves, the standing hull is empty everywhere, and there is no visibility
   data, so every leaf sees every other. The bounds cover the frame:
   frame-local x and y from the frame record, z from 256 units below the
-  lowest chunk to the terrain ceiling. Ground and objects come from the
-  chunks.
+  lowest chunk to the frame's terrain ceiling (2048, raised over high ground
+  as for the chunks). The player start is traced down from that top, never
+  from inside the ground. Ground and objects come from the chunks.
 - Entities: everything the chunks do not hold, copied with its frame-local
   coordinates. The region maps use the same coordinates:
   (Morrowind position - town centre) x 0.25.

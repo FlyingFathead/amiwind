@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "comment": "MiniWind test area (v0.0.43, CHIM-RED-MOUNTAIN-SOLID-SKY-43): the 3 x 3 block of Red Mountain's summit centred on cell (3, 8): cells 2..4, 7..9, the highest ground of the island (4,730 frame-local, about 18,920 game units, at cells 3,9 3,8 4,9 4,8), Odrosal (3, 7) and Dagoth Ur's surroundings. Checks the raised terrain ceiling in game: standing on the summit, the terrain drawn from the eye, a high flight over it. Centre = the middle of cell (3, 8). Bounds +-3072 = the three cells per axis = the handoff core; the ground reaches 768 units further (terrain_margin, as the Bitter Coast test block). Not shipped (no shipped_since): built only by its MiniWind preset. No interiors: their doors show as unavailable.",
+  "source_cell": [
+    3,
+    8
+  ],
+  "source_radius": 1,
+  "centre": [
+    28672,
+    69632
+  ],
+  "scale": 0.25,
+  "bounds": [
+    [
+      -3072,
+      -3072
+    ],
+    [
+      3072,
+      3072
+    ]
+  ],
+  "reference_margin": 0,
+  "terrain_margin": 768,
+  "handoff_core": [
+    [
+      -3072,
+      -3072
+    ],
+    [
+      3072,
+      3072
+    ]
+  ],
+  "core_size": 768,
+  "overlap": 896,
+  "hysteresis": 96,
+  "draw_distance": 540,
+  "terrain_step": 128,
+  "terrain_material_repairs": [],
+  "entity_budget": 1000,
+  "model_budget": 220,
+  "collision_margin": 224,
+  "region_core_overrides": {},
+  "town": {
+    "id": "redmtn_x3y8",
+    "title": "Red Mountain summit (test)",
+    "map": "redmtn_x3y8",
+    "map_prefix": "rm",
+    "region_cap": 64,
+    "message": "Red Mountain summit (test)",
+    "region_file": "redmtn_x3y8-regions.txt",
+    "door_file": "scene-doors-redmtn_x3y8.txt",
+    "visual_group": "redmtn_x3y8",
+    "arrival": {
+      "source_position": [
+        28672,
+        69632,
+        18096
+      ],
+      "source_rotation_z": 0.0,
+      "reason": "The block centre on the summit: ground 18,032 game units there (4,508 frame-local, measured on the v0.0.43-dev2 CHIM world), plus 64."
+    },
+    "return": null
+  },
+  "interiors": []
+}

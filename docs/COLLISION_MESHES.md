@@ -1,8 +1,6 @@
 # Morrowind collision meshes: where they are and how AmiWind uses them
 
-Status: 8 October 2026 (v0.0.32 development). Measured on the maintainer's own GOG Game of the Year
-data with the repository's NIF reader (PyFFI, `tools/prepare_scenery.py`) and the OpenMW 0.51.0
-source. Only names, counts and numbers are reported here; no game data is included.
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +18,10 @@ source. Only names, counts and numbers are reported here; no game data is includ
 - [References](#references)
 
 <!-- contents end -->
+
+Status: 8 October 2026 (v0.0.32 development). Measured on the maintainer's own GOG Game of the Year
+data with the repository's NIF reader (PyFFI, `tools/prepare_scenery.py`) and the OpenMW 0.51.0
+source. Only names, counts and numbers are reported here; no game data is included.
 
 Related: [COLLISION-RCN-SCOPE-32](bugs/COLLISION-RCN-SCOPE-32.md),
 [COLLISION-NC-FLAGS-32](bugs/COLLISION-NC-FLAGS-32.md),
@@ -209,7 +211,13 @@ One reader, one proxy function, but the collision **source** is chosen per conve
     (`ex_velothi_temple_01`, `_02`; `--collision-underside names`, the default). General rules for every mesh
     are experimental (`rule`, `split`, `whole`, see [EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md) and
     [CHIM-VOS-TEMPLE-WALKWAY-41](bugs/CHIM-VOS-TEMPLE-WALKWAY-41.md)).
-- No converter reads `NC`/`NCC`/`MRK` strings, `AvoidNode`s or `Bounding Box` nodes. Only the
+- Editor markers (`MRK`, since v0.0.43-dev4): the shared NIF reader `model_geometry` drops the
+  `Tri EditorMarker*` shapes of a root-`MRK` model from drawing and collision, and
+  `tools/editor_markers.py` takes every marker placement (hidden markers, MRK models with nothing
+  else to draw) out of the drawn scenery at the input, keeping it as an invisible sound, effect
+  or collision object in the build's emitter table (`emitters.json`). The rules are in
+  `src/mwad/markers.py`; [COLLISION-NC-FLAGS-32](bugs/COLLISION-NC-FLAGS-32.md).
+- No converter reads `NC`/`NCC` strings, `AvoidNode`s or `Bounding Box` nodes. Only the
   flora sprite path (`tools/prepare_tree_sprites.py` `collision_metadata`) honours `NC`/`NCO`
   and makes ground plants nonsolid; it does not know `NCC`. AmiWind has no camera collision.
 - Collision is static; animated (`x`-prefixed) collision is not modelled.

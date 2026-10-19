@@ -2,10 +2,15 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 7 times; something has to be done
 
 - Reported with v0.0.33 at 2026-10-09 (time not recorded): found by the island-wide seam audit: 49 reduced meshes tear their seams
 - Reported with v0.0.36-dev3 at 2026-10-11 03:36 +0300: measured as visible holes: 39 of 150 open-world rocks at 64 triangles show the sky through on more than 5 of 100 pixels, worst 48 (terrain_ashland_rock_01)
+- Reported with v0.0.43-dev2 at 2026-10-18 19:03 +0300: maintainer: Ashlands rocks still open underneath (cell -4,12, func_wall model *52, source ref 283924); 'the same rocks I've mentioned', should not be open
+- Reported with v0.0.43-dev2 at 2026-10-18 19:04 +0300: maintainer: another open rock, cell -4,13 (func_wall model *44, ref 245627); fixed in some map spots but not in others
+- Reported with v0.0.43-dev2 at 2026-10-18 19:06 +0300: open rocks at -4,12/-4,13 are on classic region maps in dev2 (not CHIM); one step into CHIM cell -5,13 the same rocks are closed; dev3 has all three on CHIM
+- Reported with v0.0.43-dev2 at 2026-10-18 19:20 +0300: maintainer: two long spikes hang from a rock/terrain face in Balmora (cell -3,-3, global -20051 -19320 80, local 107 -1758 20); Balmora is a CHIM town frame
+- Reported with v0.0.43-dev2 at 2026-10-18 19:21 +0300: maintainer: the Balmora spikes may be the overpass poking through the rocks; wants its ends hidden inside the rocks
 
 <!-- END GENERATED PERSISTING -->
 
@@ -30,7 +35,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -162,6 +167,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [MESH-EBONHEART-DRAGON-PEDESTAL-42](MESH-EBONHEART-DRAGON-PEDESTAL-42.md): Ebonheart: the Imperial dragon statue floats; its converted model starts 236 units above its origin, nothing below
 - [MESH-EXTENT-GRID-31](MESH-EXTENT-GRID-31.md): Grid-exact mesh faces exceed the 256-texel surface limit on the 68040
 - [MESH-LOD-OPEN-SEAMS-33](MESH-LOD-OPEN-SEAMS-33.md): Static mesh reduction pulls open parts apart: the Silt Strider's hull shows the sky through its shell seams
+- [MESH-MUCKSPUNGE-SEAM-43](MESH-MUCKSPUNGE-SEAM-43.md): A muckspunge shows a black six-sided seam line across its top
 - [MESH-VIVEC-CAP-GAP-38](MESH-VIVEC-CAP-GAP-38.md): Vivec giant mushroom cap has a visible opening
 - [NPC-GALLERY-SPIKE-33](NPC-GALLERY-SPIKE-33.md): One gallery model has a vertex 12 units outside its source shape (simplifier spike)
 - [NPC-JOINT-GAPS-33](NPC-JOINT-GAPS-33.md): NPC bodies open at the joints: each body part is reduced on its own and pulls back from the part it meets

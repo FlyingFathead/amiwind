@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-[CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -58,6 +58,8 @@
 
 <!-- contents end -->
 
+[CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
+
 [CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1: whole-world metadata binding failed because tutorial barrel reference 172851 lacked its original CELL, while the original audit records [-2,-9]. A narrow source correction restores only that missing field before capture, rejecting nonempty wrong cells and every other identity/transform mismatch. Fifty focused Seyda/ownership checks pass, including three new semantic regressions. The preceding 4,247-test full-suite pass remains historical; the repaired world is pending. The prepared Linux source kit is held and undelivered. Native, image/package and playtest acceptance remain pending; coverage states are unchanged.
 
 [CHIM-FRAME-STATIC-SEAM-40](bugs/CHIM-FRAME-STATIC-SEAM-40.md) — 15 October 2026, v0.0.41-dev1 image integration follow-up: added Seyda dependency numbers and model digests are checked against the world-index-bound source manifest before source-carrier static parity includes them. Frames without supplements retain prior behavior. The focused ownership/apron module now passes 33 checks, including five new semantic regressions and missing/rebound-model rejection. The issue remains OPEN; exact world rebuild, held-boundary/native and image/package checks remain pending.
@@ -86,6 +88,14 @@ around them), eight Balmora border cells and fourteen open-sea cells; the last t
 in the shared converter. v0.0.43-dev3 is meant to be the first build with the whole outdoors on CHIM
 ([progress tracker](chim/PROGRESS_TRACKER.md#current-state-18-october-2026)).
 
+**Milestone, 18 October 2026: every exterior cell converted to CHIM.** The v0.0.43-dev3 build converted the
+whole outdoors of Vvardenfell to CHIM in one run (1,351 frames; the stair gate passed every flight it walks, but it
+does not catch everything: walkways where the player sinks into the planks, such as the Vivec docks, are still
+broken, [CHIM-VIVEC-DOCK-WALKWAY-43](bugs/CHIM-VIVEC-DOCK-WALKWAY-43.md)).
+Its image step then stopped on a check that had never seen a world with no classic maps left
+([BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43](bugs/BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43.md)); the build resumes from there once
+that check counts the CHIM maps.
+
 **v0.0.44, the next step, decided for the project on 18 October 2026: entrances and interiors.**
 
 1. **An entrance audit, island-wide.** From the game data, every load door (outside to inside, inside to
@@ -101,6 +111,14 @@ in the shared converter. v0.0.43-dev3 is meant to be the first build with the wh
 3. **Missing interiors become conversion batches,** through the interior procedure
    ([interiors over a limit](INTERIOR_SECTIONS.md)): numerous decorative meshes as sprites, per-mesh recipes,
    sections cut at hallways and doorways. Vivec's rooms left out so far come first.
+4. **Ambient sound from the game's own sound markers, if it is cheap enough to fit, decided for the project on
+   18 October 2026.** Morrowind places invisible marker objects that play a looping sound where they stand (boats
+   creaking at a pier, a hull under the planks) or carry an effect (waterfall mist, steam, sprays): 2,565 sound
+   markers and 778 effect markers across the game data. Since v0.0.43 the builder keeps them as invisible
+   objects, never drawn and never solid, and writes a table of them with each build (position, sound file,
+   volume and range from the original records). The sound markers then become looping ambient sounds through
+   Quake's own static sounds, with their range from the original record (a fallback where the record stores
+   none), measured for their cost in the mixer. The effect markers follow later, as Quake particle emitters.
 
 **After the interiors and the fixes that come with them: the game logic.** With the world and its rooms in
 place, the work turns to what happens in it: an interpreter for MWScript, the game's own script language, that

@@ -1,9 +1,6 @@
 # MiniWind: the test ground
 
-MiniWind is AmiWind's quick test ground: a small, fast build of one area,
-scene or mechanism, started straight inside it. Use it to try a fix, a mechanism
-or a lighting case without building the whole game. A full build is for
-releases and whole-island checks; a MiniWind build is for everything else.
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +18,11 @@ releases and whole-island checks; a MiniWind build is for everything else.
 - [Setting the scene up on arrival](#setting-the-scene-up-on-arrival)
 
 <!-- contents end -->
+
+MiniWind is AmiWind's quick test ground: a small, fast build of one area,
+scene or mechanism, started straight inside it. Use it to try a fix, a mechanism
+or a lighting case without building the whole game. A full build is for
+releases and whole-island checks; a MiniWind build is for everything else.
 
 ## What it is
 
@@ -113,6 +115,7 @@ preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
 | `animkit` | `--miniwind-animkit` | Animation kit: walk and run with a companion and hostiles |
 | `seyda-chim` | `--miniwind-seyda-chim` | Seyda Neen on CHIM (CHIM-native): arrival, residents, doors |
 | `lava-pools` | `--miniwind-lava-pools` | Molag Mar lava pools: visibility, contact and damage |
+| `redmountain` | `--miniwind-redmountain` | Red Mountain summit: terrain ceiling, standing, high flight |
 <!-- presets end -->
 
 Notes: `balmora-exterior` leaves out the interiors, so every door says
@@ -121,7 +124,9 @@ Notes: `balmora-exterior` leaves out the interiors, so every door says
 (the Palace of Vivec, `vpi015`, where Vivec meditates; the Arena Pit, `vai000`); every other door says "Area unavailable".
 `opening-ship` shows the quick character screen on arrival. `seyda-chim` (since v0.0.36-dev5: Seyda Neen is
 CHIM-native, so it is a MiniWind town) starts at Seyda Neen's arrival with its houses; the Census office and the
-prison ship are left out. A test
+prison ship are left out. `redmountain` (v0.0.43) is the 3 x 3 cells around Red Mountain's summit, the island's
+highest ground, arriving on the summit: for the terrain ceiling over high ground (standing, the terrain drawn from the
+eye, a high flight). A test
 (`tests/test_miniwind_docs.py`) fails when a preset is missing from this table.
 
 ## What is left out

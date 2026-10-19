@@ -400,7 +400,7 @@ def _timed_call(function, item):
     return time.monotonic() - started, result
 
 
-def ordered_map(function, items, jobs=None, cost=None, timings=None):
+def ordered_map(function, items, jobs=None, cost=None, timings=None, history=None, key=None):
     """Yield in input order; at most the current limit running.
 
     Up to WINDOW times the limit are submitted and not yet handed back, so a slow
@@ -409,10 +409,22 @@ def ordered_map(function, items, jobs=None, cost=None, timings=None):
     do not finish last on a few workers; results still come back in input order,
     held until their turn. `timings` (a list): the seconds each item took in its
     worker are appended in input order (item cost history, build_costs.py).
+    `history` (a pool name) with `key` (item -> stable name): largest first by the
+    seconds recorded for the items in earlier builds, by default whenever such a
+    history exists, and this run's times recorded for the next one
+    (build_costs.costed_map; BUILD-CHIM-REGION-FRAMES-TAIL-43).
     Workers return data; the caller alone writes shared archives and indices.
     Spawn avoids inherited archive handles and numerical-library thread state.
+    The running map's queued and running units go to the scheduler's supervisor
+    (tools/pool_status.py; status only, never the order of results).
     """
     from functools import partial
+    if history is not None and cost is None:
+        from build_costs import costed_map
+        items = list(items)
+        yield from costed_map(history, function, items, [(key or str)(item) for item in items], jobs)
+        return
+    import pool_status
     count = resolve_jobs(jobs)
     size, limit = _throttle(count)
     call = function if timings is None else partial(_timed_call, function)
@@ -433,6 +445,7 @@ def ordered_map(function, items, jobs=None, cost=None, timings=None):
         source = ((index, items[index]) for index in order)
     else:
         source = enumerate(items)
+    status = pool_status.watch(getattr(function, '__name__', 'map'), items)
     with worker_environment(), _map_pool(size) as pool:
         pending = {}
         following = 0          # next input index to hand back
@@ -447,10 +460,15 @@ def ordered_map(function, items, jobs=None, cost=None, timings=None):
                         index, item = next(source)
                     except StopIteration:
                         exhausted = True
+                        if status:
+                            status.end_of_input()
                         break
                     pending[index] = pool.submit(call, item)
                     submitted += 1
                     _count_task()
+                    if status:
+                        status.submit(index, item)
+                        pending[index].add_done_callback(lambda _f, i=index: status.finish(i))
                 if following in pending and pending[following].done():
                     yield deliver(pending.pop(following).result())
                     following += 1
@@ -466,22 +484,35 @@ def ordered_map(function, items, jobs=None, cost=None, timings=None):
         finally:
             for future in pending.values():
                 future.cancel()
+            if status:
+                status.close()
 
 
-def completed_map(function, items, jobs=None):
+def _by_cost(items, cost):
+    """ITEMS largest first by COST (ties in input order) as [(index, item)], or enumerate(items) without a cost."""
+    if cost is None:
+        return enumerate(items)
+    items = list(items)
+    return iter([(index, items[index]) for index in sorted(range(len(items)), key=lambda i: -cost(items[i]))])
+
+
+def completed_map(function, items, jobs=None, cost=None):
     """Yield independent work as it finishes, with a bounded submission window.
 
     Refill freed slots before handing results to the caller. A slow early task
     must not prevent later tasks from being submitted or reported. Callers must
     restore stable key order before exporting catalogues or shared receipts.
     Existing order-dependent conversion stages continue to use ordered_map.
+    `cost` (item -> number): submitted largest first (BUILD-CHIM-REGION-FRAMES-TAIL-43).
     """
+    import pool_status
     count = resolve_jobs(jobs)
     size, limit = _throttle(count)
     if size == 1:
-        yield from map(function, items)
+        yield from map(function, (item for _, item in _by_cost(items, cost)))
         return
-    items = iter(items)
+    status = pool_status.watch(getattr(function, '__name__', 'map'), items)
+    items = _by_cost(items, cost)
     # In a pool of its own (exactly `size` workers) two tasks per worker are kept in flight, so a worker never
     # waits for its next task. In the stage's shared pool, which may hold more workers than this map asked for,
     # every submitted task runs at once: there the map keeps to `count` tasks in flight, as it asked
@@ -495,11 +526,12 @@ def completed_map(function, items, jobs=None):
         def refill():
             while len(pending) < (window if limit is None else limit()):
                 try:
-                    item = next(items)
+                    index, item = next(items)
                 except StopIteration:
+                    if status:
+                        status.end_of_input()
                     return
-                pending.add(pool.submit(function, item))
-                _count_task()
+                pending.add(_submit(pool, function, index, item, status))
 
         try:
             refill()
@@ -511,9 +543,21 @@ def completed_map(function, items, jobs=None):
         finally:
             for future in pending:
                 future.cancel()
+            if status:
+                status.close()
 
 
-def governed_map(function, items, jobs=None, unit_mib=None, label='pool'):
+def _submit(pool, function, index, item, status):
+    """One task of a completed or governed map, counted for the stage pool and shown to the supervisor."""
+    future = pool.submit(function, item)
+    _count_task()
+    if status:
+        status.submit(index, item)
+        future.add_done_callback(lambda _f: status.finish(index))
+    return future
+
+
+def governed_map(function, items, jobs=None, unit_mib=None, label='pool', cost=None):
     """completed_map whose units in flight follow the container's memory and CPU quota while it runs
     (tools/resource_plan.py MemoryGovernor, fixlist A9): at most `jobs` (and the stage's allowance), and no more units
     of about UNIT_MIB each than the memory holds now, re-read every 30 s between tasks. A throttled map grows back
@@ -528,9 +572,11 @@ def governed_map(function, items, jobs=None, unit_mib=None, label='pool'):
     # (BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42)
     governor = governor_for(size if limit is not None else count, unit_mib, label)
     if size == 1 or governor is None:
-        yield from completed_map(function, items, jobs)
+        yield from completed_map(function, items, jobs, **({'cost': cost} if cost is not None else {}))
         return
-    items = iter(items)
+    import pool_status
+    status = pool_status.watch(label, items)
+    items = _by_cost(items, cost)
     stage = active_stage_pool()
     with worker_environment(), _map_pool(size) as pool:
         pending = set()
@@ -543,11 +589,12 @@ def governed_map(function, items, jobs=None, unit_mib=None, label='pool'):
                 if len(pending) >= cap:
                     return
                 try:
-                    item = next(items)
+                    index, item = next(items)
                 except StopIteration:
+                    if status:
+                        status.end_of_input()
                     return
-                pending.add(pool.submit(function, item))
-                _count_task()
+                pending.add(_submit(pool, function, index, item, status))
 
         try:
             refill()
@@ -559,6 +606,8 @@ def governed_map(function, items, jobs=None, unit_mib=None, label='pool'):
         finally:
             for future in pending:
                 future.cancel()
+            if status:
+                status.close()
     if stage is not None and governor.changes:
         print('[pool] %s: %d worker change(s) while it ran' % (label, len(governor.changes)), flush=True)
 
@@ -770,7 +819,13 @@ def execute_parallel(steps, run, metadata, root):
         share = max(count, guard.effective_budget() - serial - waiting)
         base, extra = divmod(share, count)
         values = [base + (1 if index < extra else 0) for index in range(count)]
-        for value, state in zip(values, sorted(pooled, key=lambda s: s['start'])):
+        ordered = sorted(pooled, key=lambda s: s['start'])
+        if not incoming:
+            # the free-core checker: a stage with nothing queued keeps what it runs, the rest goes to the stages
+            # with queued units (stage_watch.lend_shares, BUILD-STAGE-ALLOWANCE-STUCK-43)
+            lent = lend_shares({s['entry']['name']: v for v, s in zip(values, ordered)}, watch.demand)
+            values = [lent[s['entry']['name']] for s in ordered]
+        for value, state in zip(values, ordered):
             state['share'] = value
             value = guard.cap(state['entry']['name'], value)   # memory guard (SchedulerGuard)
             if value != state['allowance']:
@@ -785,12 +840,25 @@ def execute_parallel(steps, run, metadata, root):
     profile = build_profile.start(run, steps, metadata, dependencies)
     from resource_plan import SchedulerGuard   # key-neutral module (build_cache.INSTRUMENTATION_MODULES)
     guard = SchedulerGuard(budget, metadata.get('resource_plan_units'), parents=metadata.get('resource_plan_parents'))
+    # live supervisor (key-neutral modules): free cores to queued work, underuse named (BUILD-STAGE-ALLOWANCE-STUCK-43)
+    from stage_watch import StageWatch, lend_shares
+    import build_digest
+    watch = StageWatch(run)
+
+    def digest():
+        try:
+            build_digest.update(run, receipt, watch, now_seconds=time.monotonic() - start)
+        except Exception as exc:          # the summary never fails a build
+            print('[summary] not updated: %s' % exc, flush=True)
     try:
         while pending or active:
             ready = [item for item in pending if set(dependencies[item[1][0]]) <= passed]
             pooled_now = {n: s['allowance'] for n, s in active.items() if s['parallel']}
             if pooled_now:
                 guard.tick(pooled_now, {n: s.get('share', s['allowance']) for n, s in active.items() if s['parallel']})
+                if watch.due():
+                    watch.sample({n: (s['allowance'], s.get('share', s['allowance']))
+                                  for n, s in active.items() if s['parallel']})
             rebalance(len(ready))
             for item in ready:
                 number, (name, original) = item
@@ -843,6 +911,9 @@ def execute_parallel(steps, run, metadata, root):
                     entry['status'] = 'failed'
                     raise RuntimeError(f'{name} failed to start. Read {log}.') from exc
                 profile.started(name, process.pid)
+                if pooled_stage:
+                    guard.track(name, process.pid)
+                    watch.started(name, process.pid, allowance_file, time.monotonic())
                 active[name] = {'process': process, 'writer': writer, 'reader': log.open(errors='replace'),
                                 'entry': entry, 'start': time.monotonic(), 'parallel': pooled_stage,
                                 'allowance': jobs, 'allowance_file': allowance_file}
@@ -862,8 +933,15 @@ def execute_parallel(steps, run, metadata, root):
                 del active[name]
                 state['entry'].update(status='passed' if code == 0 else 'failed',
                                       returncode=code, elapsed_seconds=round(time.monotonic() - state['start'], 3))
+                guard.untrack(name)
+                guard.at = None           # the memory a finished stage held is free now: look again at once
+                watch.finished(name)
+                seen = watch.summary(name)
+                if seen:
+                    state['entry']['cores'] = seen
                 profile.finished(name, state['entry'])
                 save()
+                digest()
                 if code:
                     raise RuntimeError(f"{name} failed. Earlier results are retained. Read {state['entry']['log']}; use a new --name after fixing the problem.")
                 passed.add(name)
@@ -881,13 +959,20 @@ def execute_parallel(steps, run, metadata, root):
         receipt['status'] = 'cancelled' if isinstance(exc, KeyboardInterrupt) else 'failed'
         receipt['not_started'] = [name for _, (name, _) in pending]
         receipt['elapsed_seconds'] = round(time.monotonic() - start, 3)
+        if watch.occurrences:
+            receipt['stage_underused'] = watch.occurrences
         save()
+        digest()
         profile.close(receipt)
         raise
     if guard.changes:
         receipt['scheduler_guard_changes'] = guard.changes
     if guard.alarms:
         receipt['scheduler_alarms'] = guard.alarms
+    if watch.occurrences:
+        # warnings, never a failure (the maintainer, 18 October 2026); listed in the build summary
+        receipt['stage_underused'] = watch.occurrences
     receipt.update(status='passed', elapsed_seconds=round(time.monotonic() - start, 3))
     save()
+    digest()
     profile.close(receipt)

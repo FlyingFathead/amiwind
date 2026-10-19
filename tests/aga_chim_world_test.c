@@ -1917,6 +1917,54 @@ static void farfail(void){
     printf("farfail ok%c",10);
 }
 
+/* CHIM-RED-MOUNTAIN-SOLID-SKY-43: flying high over a frame whose map closes at 2,048 (this world's bounds, as every
+ * frame under the terrain ceiling). From 6,000 the eye is in an empty leaf whose PVS row sees the same leaves as on
+ * the ground, the same chunks stay active (the ring is by x and y), the same placements stay linked, every face
+ * lies inside its node's box (the renderer's clip invariant) and every upward ground face faces the eye, so the
+ * frame's terrain and objects still draw. */
+static int pvs_leaves(mleaf_t *l,unsigned long long *sum){
+    byte *vis=Mod_LeafPVS(l,&world);int i,n=0;*sum=0;
+    for(i=0;i<world.numleafs;i++)if(vis[i>>3]&(1<<(i&7))){n++;*sum+=leaf_key(&world.leafs[i+1])*0x100000001b3ULL;}
+    return n;
+}
+static void flight(void){
+    int ticks,i,k,n_ground,n_high,active_ground,linked_ground,faces=0,upward=0,facing=0;
+    unsigned long long s_ground,s_high;mleaf_t *ground,*high;vec3_t eye={64.37f,64.61f,6000};
+    reset_engine();Chim_Init();begin_map(frame_map);assert(Chim_Active() && world.maxs[2]<=2048);
+    for(ticks=0;ticks<300;ticks++)frame_at(64,64,40);
+    active_ground=active_count();linked_ground=check_once();
+    ground=leaf_at(64.37f,64.61f,5.3f);n_ground=pvs_leaves(ground,&s_ground);
+    for(ticks=0;ticks<300;ticks++)frame_at(64,64,6000);
+    high=Mod_PointInLeaf(eye,&world);
+    assert(high->contents==CONTENTS_EMPTY && high!=world.leafs);
+    n_high=pvs_leaves(high,&s_high);
+    assert(n_ground>0 && n_high==n_ground && s_high==s_ground);
+    assert(active_count()==active_ground && check_once()==linked_ground);
+    for(i=0;i<world.numnodes;i++){
+        mnode_t *nd=&world.nodes[i];
+        if(!nd->plane)continue;                       /* a free range of the incremental pool */
+        for(k=0;k<nd->numsurfaces;k++){
+            msurface_t *sf=&world.surfaces[nd->firstsurface+k];int e;
+            faces++;
+            for(e=0;e<sf->numedges;e++){
+                int se=world.surfedges[sf->firstedge+e];
+                float *v=world.vertexes[se>=0?world.edges[se].v[0]:world.edges[-se].v[1]].position;
+                assert(v[2]>=nd->minmaxs[2]-.5f && v[2]<=nd->minmaxs[5]+.5f);
+            }
+            if(nd->plane->normal[2]>.5f && !(sf->flags&SURF_PLANEBACK)){
+                upward++;
+                if(DotProduct(eye,nd->plane->normal)-nd->plane->dist>0)facing++;
+            }
+        }
+    }
+    assert(faces>0 && upward>0 && facing==upward);
+    printf("flight: eye 6000 over a 2048 frame top: leaf empty, pvs %d leaves (ground %d), active %d, linked %d, "
+           "faces %d in their boxes, %d of %d upward faces facing the eye%c",n_high,n_ground,active_ground,linked_ground,
+           faces,facing,upward,10);
+    end_map();
+    printf("flight ok%c",10);
+}
+
 int main(int argc,char **argv){
     setvbuf(stdout,NULL,_IONBF,0);
     heap=calloc(1,HEAP_BYTES);assert(heap);
@@ -1951,6 +1999,7 @@ int main(int argc,char **argv){
     else if(!strcmp(argv[1],"baddata"))baddata();
     else if(!strcmp(argv[1],"efragcap"))efragcap();
     else if(!strcmp(argv[1],"farfail"))farfail();
+    else if(!strcmp(argv[1],"flight"))flight();
     else return 2;
     return 0;
 }

@@ -45,6 +45,13 @@ def visual_profile(source, triangles, underpass_names=True):
         target = 64
         texture_size = 64
     profile = {'ratio': min(1., target / max(1, triangles)), 'texture_size': texture_size}
+    if stem.startswith('flora_') and profile['ratio'] < 1:
+        # the reduced copy keeps the height of every trunk and stem (static_lod.keeps_shape): a collapsed trunk
+        # left Azura's Coast tree crowns floating (CHIM-AZURA-FLOATING-FLORA-43). lod_shape_guard 0 = the method
+        # before v0.0.43-dev3
+        from static_lod import SHAPE_GUARD, SHAPE_GUARD_AXES, SHAPE_GUARD_MIN
+        profile.update(lod_shape_guard=SHAPE_GUARD, lod_shape_guard_min=SHAPE_GUARD_MIN,
+                       lod_shape_guard_axes=list(SHAPE_GUARD_AXES))
     if stem.startswith(MUSHROOM_CAP_PREFIXES):
         # MESH-VIVEC-CAP-GAP-38: the default reducer works per material and collapses rim edges, so a
         # mushroom's cap materials pulled apart where they meet (open bands on Vivec's giant mushrooms and

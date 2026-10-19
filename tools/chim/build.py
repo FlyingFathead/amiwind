@@ -28,7 +28,7 @@ from pathlib import Path
 import numpy as np
 
 from chim import BUILDER, CHIM_VERSION, FORMAT_VERSION
-from chim.terrain import TERRAIN_LIGHT, WATER_LEVEL, terrain_unit
+from chim.terrain import TERRAIN_LIGHT, WATER_LEVEL, chunk_ceiling, frame_ceiling, terrain_unit
 from chim.texfx import apply_effects, load_effect
 from chim.units import Timer, UnitCache, fingerprint, run_units
 from chim.world import build_frames, write_json
@@ -337,6 +337,10 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     textures = sky_bank_textures(textures, palette)
     low = frame['low']
     g = (settings or {}).get('grain', 256)
+    # ground or placements near or over the terrain ceiling raise the frame's ceiling (every chunk of it) to the
+    # highest plus a flight band (chim.terrain.frame_ceiling, CHIM-RED-MOUNTAIN-SOLID-SKY-43); other frames keep theirs
+    ceiling = frame_ceiling(frame_ground_zmax(heights, ground, liquids, WATER_LEVEL),
+                            frame_placement_top(references, variants, centre), ceiling)
     with timer.section('chunk terrain'):
         nx, ny = int(frame['span'][0] // g), int(frame['span'][1] // g)
         per = int(g // step)
@@ -388,6 +392,9 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             reach = [l for l in (liquids or ()) if lava_box_reaches(l, cbox)]
             if reach:
                 task = dict(task, liquids=reach)
+            # ground over the ceiling raises this chunk's ceiling only (CHIM-RED-MOUNTAIN-SOLID-SKY-43); every
+            # other chunk keeps its task, so its unit is reused
+            task['ceiling'] = chunk_ceiling(task, task['ceiling'])
             if refs:
                 # terrain references (format 0.7, docs/chim/WORLD_FORMAT.md "Terrain references"): the chunk's
                 # terrain in chunk-local units (its low corner at 0, 0), so the same ground anywhere is the same
@@ -542,6 +549,24 @@ def terrain_refs_on(settings):
     if mode not in TERRAIN_REFS:
         raise ValueError('Unknown terrain references mode: %s' % mode)
     return mode == 'on'
+
+
+def frame_ground_zmax(heights, ground, liquids, water):
+    """Highest ground of a frame's inputs: its corner heights or its tiles' triangles, and its lava tops."""
+    zs = [float(water)]
+    if heights is not None:
+        zs += [float(max(row)) for row in heights if len(row)]
+    elif ground is not None:
+        zs += [float(p[2]) for tris in ground.tiles.values() for t, _ in tris for p in t]
+    zs += [float(l['top']) for l in liquids or () if 'top' in l]
+    return max(zs)
+
+
+def frame_placement_top(references, variants, centre):
+    """Highest top of a frame's placed models (frame-local: position z x 0.25 plus the variant's top), or None."""
+    tops = [float(ref['position'][2]) * 0.25 + float(variants[variant_key(ref)]['hi'][2])
+            for ref in references if variant_key(ref) in variants and 'hi' in variants[variant_key(ref)]]
+    return max(tops) if tops else None
 
 
 def local_terrain_task(task, ox, oy):
@@ -1170,19 +1195,70 @@ def _prepare_area_task(task):
     return (spec, section, parity, count), early, timer.sections, cache.stats, getattr(cache, 'pool_stats', None)
 
 
+def cell_reference_counts(data):
+    """{(x, y): references} of every exterior cell of the game's master (Morrowind.esm in DATA), read in one pass
+    over its record headers; {} when it cannot be read. A scheduling hint only (the fallback cost of a region frame
+    without history), never an input of what a frame builds."""
+    import struct
+    from mwad.esm import records, subrecords
+    from mwad.paths import child_ci
+    counts = {}
+    try:
+        raw = Path(child_ci(data, 'Morrowind.esm')).read_bytes()
+        for tag, _flags, body in records(raw):
+            if tag != 'CELL':
+                continue
+            grid, refs = None, 0
+            for sub, value in subrecords(body):
+                if sub == 'DATA' and grid is None and len(value) >= 12:
+                    flags, x, y = struct.unpack_from('<Iii', value)
+                    if flags & 1:          # interior
+                        break
+                    grid = (x, y)
+                elif sub == 'FRMR':
+                    refs += 1
+            if grid is not None:
+                counts[grid] = counts.get(grid, 0) + refs
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, struct.error):
+        return {}          # no master to read (a test, a partial data folder): input order, as before
+    return counts
+
+
+def area_weights(towns, generated, data):
+    """{area: weight} for longest-first preparation: a region frame weighs the references in its source cells
+    (source_cell +- source_radius) plus one; a town (not a generated area) weighs more than any frame."""
+    counts = cell_reference_counts(data) if any(t in generated for t in towns) else {}
+    weights = {}
+    for town in towns:
+        settings = generated.get(town)
+        if not settings or 'source_cell' not in settings:
+            continue
+        (x, y), r = settings['source_cell'], int(settings.get('source_radius', 1))
+        weights[town] = 1 + sum(counts.get((x + dx, y + dy), 0) for dx in range(-r, r + 1) for dy in range(-r, r + 1))
+    heaviest = max(weights.values(), default=1)
+    for town in towns:
+        weights.setdefault(town, 10 * heaviest)
+    return weights
+
+
 def prepare_areas_parallel(towns, generated, data, out, pal_bytes, qbsp, jobs, cache, timer, settings_override,
                            rebuild_meshes, mesh_occluders, harvest_set, flora, legacy_run=None):
     """{town: prepare_area result} of generated areas (CHIM region frames) and towns, one area per worker
     (BUILD-CHIM-STAGE-IDLE-START-36). The first frame whose early checks fail stops the stage, named; unit
     counts and timings are merged into the caller's cache and timer. Towns (not generated) are listed first,
     so they start first."""
-    from build_parallel import ordered_map
+    from build_costs import costed_map
     tasks = [(t, generated.get(t), data, out / 'work' / t, pal_bytes, qbsp, _area_cache(cache), settings_override,
               rebuild_meshes, mesh_occluders, harvest_set, flora, legacy_run) for t in towns]
     results = {}
+    # Largest first (BUILD-CHIM-REGION-FRAMES-TAIL-43): each frame's seconds from the cost history of earlier
+    # builds, else the references placed in its source cells; towns (no generated settings) are the heaviest and
+    # start first, as before. Without a cost the heavy frames late in the list started last and ran alone.
+    weights = area_weights(towns, generated, data)
     with timer.section('region frames (side by side)'):
         for town, (result, early, sections, stats, pool_stats) in zip(
-                towns, ordered_map(_prepare_area_task, tasks, max(1, min(jobs, len(tasks))))):
+                towns, costed_map('chim-region-frames', _prepare_area_task, tasks, towns,
+                                  max(1, min(jobs, len(tasks))), fallback=weights.get)):
             if early:
                 raise ValueError('CHIM frame checks failed (%d): %s' % (len(early), '; '.join(early[:5])))
             results[town] = result

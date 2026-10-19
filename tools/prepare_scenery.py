@@ -13,6 +13,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.audit import BSA, normpath
 from mwad.esm import NIF_MAGIC, NIF_TES3_HEADER, read_bsa_asset
+from mwad.markers import is_hidden_marker, is_marker_shape, root_marked
 from mwad.paths import child_ci, ensure_external, read_workspace, resolve_data_files
 from mwad.scene import pack_geometry, unpack_geometry, visible_refs, resident_set, read_asset
 from build_jobs import add_jobs, resolve_jobs
@@ -78,6 +79,11 @@ def check_nif_reader():
 bsa_read = read_bsa_asset  # the one shared BSA asset read (mwad.esm)
 
 
+# model_geometry's error for an MRK model with nothing left to draw:
+# a placement of it must have been filtered out at the input (editor_markers.py) before conversion.
+EDITOR_MARKER_ONLY = 'Editor marker only (MRK): nothing to draw; the placement must be filtered at the input'
+
+
 def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
     import numpy as np
     if not raw.startswith(NIF_TES3_HEADER):
@@ -104,6 +110,10 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
         for child in getattr(node, 'children', []):
             if child is not None:collect(child, transform)
     for root in data.roots:collect(root, np.eye(4), root=True)
+    # An MRK model's "Tri EditorMarker" shapes are never drawn and never collide (mwad.markers,
+    # rules from OpenMW nifosg/nifloader.cpp and nifbullet/bulletnifloader.cpp; COLLISION-NC-FLAGS-32).
+    marked = root_marked(data.roots, getattr(N, 'NiStringExtraData', None))
+    markers = []
     def visit(node, parent, hidden=False, in_collision=False, path="root[0]", inherited_stencil=None):
         if not isinstance(node, N.NiAVObject):
             return
@@ -119,6 +129,11 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
             stencil = {'draw_mode': int(p.draw_mode), 'stencil_enabled': bool(p.stencil_enabled),
                        'property_flags': int(p.flags), 'origin_path': path,
                        'ambiguous_properties': len(local_stencils) > 1}
+        if isinstance(node, N.NiTriShape) and is_marker_shape(name, marked):
+            entry = {'shape': name, 'shape_path': path, 'reason': 'editor_marker',
+                     'triangles': int(node.data.num_triangles) if node.data else 0}
+            skipped.append(entry); markers.append(entry)
+            return
         if isinstance(node, N.NiTriShape) and not collision and (hidden or in_collision):
             skipped.append({'shape': name, 'shape_path': path,
                             'reason': 'collision_node' if in_collision else 'hidden_node',
@@ -190,6 +205,8 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
     for root_index, root in enumerate(data.roots):
         visit(root, np.eye(4), path='root[' + str(root_index) + ']')
     if not vertices or not faces:
+        if markers and not collision:
+            raise ValueError(EDITOR_MARKER_ONLY)
         raise ValueError('No supported visible static triangles')
     packet = pack_geometry(vertices, faces, len(materials))
     unpack_geometry(packet)
@@ -264,6 +281,11 @@ def world_bounds(bounds, ref):
     return [points.min(axis=0).tolist(), points.max(axis=0).tolist()]
 
 
+def drop_hidden_markers(refs):
+    """The placements without hidden editor markers (never drawn, never solid)."""
+    return [r for r in refs if not is_hidden_marker(r.get('id'))]
+
+
 def prepare(workspace, out, radius=11500, texture_size=64, jobs=None, visibility_policy=None):
     from PIL import Image
     workspace, state = read_workspace(workspace)
@@ -274,6 +296,9 @@ def prepare(workspace, out, radius=11500, texture_size=64, jobs=None, visibility
     from town_grid import scenery_radius
     radius = scenery_radius(AREA, centre, radius)
     refs, groups = select_source_refs(placements, centre, radius, load_groups())
+    # Editor markers (north/door/travel markers) are filtered at this input like every other area's
+    # (COLLISION-NC-FLAGS-32): the Seyda placements come straight from the record stage.
+    refs = drop_hidden_markers(refs)
     # Keep a generous origin margin while the actual geometry bounds are not yet
     # known. Runtime selection intersects the converted bounds, including rocks
     # whose origins lie outside the playable rectangle.
@@ -354,6 +379,14 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
         validate_policy(visibility_policy)
         if not metadata or metadata.get('scene_kind') != 'exterior':
             raise VisibilityPolicyError('Visibility exclusions require explicit exterior context')
+    # An editor marker never reaches the drawn scenery (COLLISION-NC-FLAGS-32). Hidden markers are dropped
+    # here by id for every caller, named in the log (the v0.0.43-dev4 build stopped on the Seyda input when
+    # this refused them); MRK-only models fail below with EDITOR_MARKER_ONLY, naming the model.
+    hidden = [r.get('number') for r in refs if is_hidden_marker(r.get('id'))]
+    if hidden:
+        print('scenery export: dropped %d hidden editor marker(s): references %s'
+              % (len(hidden), ', '.join(map(str, hidden[:20]))), flush=True)
+        refs = drop_hidden_markers(refs)
     out = ensure_external(out, 'scenery export'); out.mkdir(parents=True, exist_ok=False)
     bsa = BSA(child_ci(data_files, 'Morrowind.bsa'))
     profiles={name:profile for group in groups.values()

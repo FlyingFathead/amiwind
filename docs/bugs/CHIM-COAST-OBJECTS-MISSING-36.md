@@ -90,4 +90,8 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 
+Related bugs in other categories:
+
+- [CHIM-AZURA-DWEMER-RUIN-SHAPES-43](CHIM-AZURA-DWEMER-RUIN-SHAPES-43.md): A Dwemer ruin at Azura's Coast is drawn in the wrong shape
+
 <!-- END GENERATED CATEGORY -->

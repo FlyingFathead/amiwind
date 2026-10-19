@@ -141,12 +141,6 @@
    "note": "a size, count, buffer or flag value, not a position"
   },
   {
-   "file": "engine/aga/src/aw_spawn.c",
-   "contains": "map_place(p,xy,4000)",
-   "class": "kept",
-   "note": "trace start height for placing on the map (z), not an x/y bound"
-  },
-  {
    "file": "engine/aga/src/aw_state.h",
    "contains": "#define AW_HARVEST_SLOTS 4096",
    "class": "unrelated",
@@ -337,6 +331,12 @@
    "contains": "&& *p <= '9' && value < 4096; p++)",
    "class": "unrelated",
    "note": "a size, count, buffer or flag value, not a position"
+  },
+  {
+   "file": "tools/chim/terrain.py",
+   "contains": "FLIGHT_BAND = 4096",
+   "class": "kept",
+   "note": "a height band over the highest ground of a raised frame (levitation, tall placements; CHIM-RED-MOUNTAIN-SOLID-SKY-43), not a range limit: raised ceilings stay far under the wide range (9,216 on Red Mountain)"
   },
   {
    "file": "tools/town_config.py",

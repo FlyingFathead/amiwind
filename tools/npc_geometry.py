@@ -316,6 +316,23 @@ def simplify_shape(points, faces, quota, preserve_shell=False):
     return points, faces
 
 
+def simplify_head_locked(points, faces, quota):
+    """Head or hair reduction that opens no new hole (NPC-HEAD-DECIMATION-33, npc_head_reducer locked): the
+    boundary-locked quadric reducer of the static meshes (mold_shell.quadric_simplify, static_lod's
+    lock_boundaries rule): every rim vertex keeps its place, a rim edge never collapses, no face turns by
+    more than acos(LOCKED_MAX_TURN) from its original normal. points/faces: the welded shape. A shape whose rim
+    leaves fewer collapses than its quota keeps the smallest valid mesh (a few faces over the quota; the
+    alias face limit is checked by the bake as before)."""
+    from mold_shell import quadric_simplify
+    from static_lod import LOCKED_MAX_TURN, boundary_vertices
+    faces = np.asarray(faces, dtype=np.int64)
+    if quota >= len(faces):
+        return points, faces
+    v, f = quadric_simplify(points, faces, [int(quota)], max_turn=LOCKED_MAX_TURN,
+                            locked=boundary_vertices(faces), anchored=True)[int(quota)]
+    return np.asarray(v, float), np.asarray(f, dtype=np.int32)
+
+
 def simplify_shell_components(points, faces, quota):
     """Retain every disconnected panel under the existing shell tests.
 
@@ -546,6 +563,25 @@ def bake_quotas(shapes,budget=480,face_limit=666,minimum_faces=None,reference_fr
     """
     return head_plan(shapes,budget,face_limit,minimum_faces,reference_frames,head_detail)['quotas']
 
+def _retry_head_reducer(run, reducer):
+    """run(reducer); when the boundary-locked head reducer leaves an appearance over the alias vertex budget
+    (it keeps every rim vertex, so a head can stay a few faces over its quota), that appearance alone is baked
+    again with the previous reducer and the fallback is logged (v0.0.43-dev4 build: the npcs stage stopped
+    on 'Alias vertex budget exceeded'; NPC-HEAD-DECIMATION-33)."""
+    try:
+        return run(reducer)
+    except AliasOverflow as overflow:
+        if reducer != 'locked' or str(overflow) != 'Alias vertex budget exceeded':
+            raise
+        HEAD_REDUCER_FALLBACKS.append(overflow.over)
+        print('npc bake: locked head reducer over the alias vertex budget by %s; this appearance uses the '
+              'previous head reducer' % overflow.over, flush=True)
+        return run(None)
+
+
+HEAD_REDUCER_FALLBACKS = []
+
+
 def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_faces=None,reference_frames=None,
          quotas=None,shell_height=None,head_detail=None,lod_only='budget',preserve=None,body_skin_rows=None,
          body_leg_contour=False,face_parts=None,full_frame_budget=None):
@@ -566,7 +602,7 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
     preserve: explicit per-shape shell flags (the flag the whole-appearance bake
     would compute for that shape in its outfit), overriding shell_height.
     """
-    from mesh_geometry_env import npc_head_detail
+    from mesh_geometry_env import npc_head_detail, npc_head_reducer
     if full_frame_budget is not None and (type(full_frame_budget) is not int or full_frame_budget <= 0):
         raise ValueError('Invalid full-frame byte budget')
     if quotas is not None:
@@ -577,9 +613,11 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
         protected=frozenset() if npc_head_detail(head_detail)=='budget' else frozenset(
             i for i,s in enumerate(shapes) if s['part'] in HEAD_SLOTS and quotas[i]>=len(s['faces']))
         if face_parts is not None:face_parts.clear()
-        return _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shell_height,protected,False,
+        return _retry_head_reducer(lambda reducer:_bake(shapes,materials,textures,palette,face_limit,minimum_faces,
+                     quotas,shell_height,protected,False,
                      preserve=preserve,body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,
-                     face_parts=face_parts)
+                     face_parts=face_parts,head_reducer=reducer),
+                     npc_head_reducer() if npc_head_detail(head_detail)=='budget' else None)
     mode=npc_head_detail(head_detail)
     floors=classes=None;shell_set=None
     if mode=='original' and any(s['part'] in HEAD_SLOTS for s in shapes):
@@ -601,20 +639,25 @@ def bake(shapes,materials,textures,palette,budget=480,face_limit=666,minimum_fac
             raise ValueError('Original head does not fit the alias face limit (lod_only)')
         try:
             if face_parts is not None:face_parts.clear()
+            # head and hair of the budget bake: the boundary-locked reducer by default (npc_head_reducer)
+            head_reducer=npc_head_reducer() if plan['mode']=='budget' else None
             result=_bake(shapes,materials,textures,palette,plan['face_limit'],minimum_faces,plan['quotas'],
                          shell_height,plan['protected'],plan['face_limit']!=face_limit,
                          None if plan['mode']=='budget' else shell_set,preserve=preserve,
-                         body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,face_parts=face_parts)
+                         body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,face_parts=face_parts,
+                         head_reducer=head_reducer)
         except AliasOverflow as overflow:
             if str(overflow).startswith('Player leg'):raise
             if plan['mode']=='budget':
                 # NPC-BAKE-VERTEX-32: preserve every disconnected visible panel;
                 # successful normal bakes and all animation samples are unchanged.
                 if str(overflow) != 'Alias vertex budget exceeded':raise
-                result=_bake(shapes,materials,textures,palette,plan['face_limit'],minimum_faces,plan['quotas'],
-                             shell_height,plan['protected'],False,None,preserve=preserve,
+                retry=lambda reducer:_bake(shapes,materials,textures,palette,plan['face_limit'],minimum_faces,
+                             plan['quotas'],shell_height,plan['protected'],False,None,preserve=preserve,
                              body_skin_rows=body_skin_rows,body_leg_contour=body_leg_contour,
-                             face_parts=face_parts,shell_components=True,full_frame_budget=full_frame_budget)
+                             face_parts=face_parts,shell_components=True,full_frame_budget=full_frame_budget,
+                             head_reducer=reducer)
+                result=_retry_head_reducer(retry,head_reducer)
             else:
                 extra+=overflow.over+2;continue
         LAST_PLAN.clear()
@@ -662,9 +705,11 @@ def transfer_vertex(point, triangles):
 
 
 def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shell_height,protected,raised,
-          shell_set=None,preserve=None,body_skin_rows=None,body_leg_contour=False,face_parts=None,shell_components=False,full_frame_budget=None):
+          shell_set=None,preserve=None,body_skin_rows=None,body_leg_contour=False,face_parts=None,shell_components=False,full_frame_budget=None,
+          head_reducer=None):
     """shell_set None: the previous rule (large torso panels keep their shell); else the
-    shape indices whose reduction keeps its silhouette (original-head bake)."""
+    shape indices whose reduction keeps its silhouette (original-head bake). head_reducer 'locked': head and
+    hair shapes (HEAD_SLOTS) are reduced with simplify_head_locked; None/'default': the previous reducer."""
     from scipy.spatial import cKDTree
     minimum_faces=minimum_faces or {}
     actor_height = max(s['positions'][0,:,2].max() for s in shapes)-min(s['positions'][0,:,2].min() for s in shapes)
@@ -687,7 +732,10 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                 (shape['part']==3 and np.ptp(p[:,2]) >= .2*actor_height) if shell_set is None \
                 else index in shell_set
             source_points=points; source_faces=ff
-            points,ff=simplify_shape(points,ff.astype(np.int32),int(quota),preserve_shell)
+            if head_reducer=='locked' and shape['part'] in HEAD_SLOTS:
+                points,ff=simplify_head_locked(points,ff,int(quota))
+            else:
+                points,ff=simplify_shape(points,ff.astype(np.int32),int(quota),preserve_shell)
             if shell_components and preserve_shell:
                 candidate=simplify_shell_components(source_points,source_faces,int(quota))
                 if candidate is not None and len(candidate[1]) < len(ff):

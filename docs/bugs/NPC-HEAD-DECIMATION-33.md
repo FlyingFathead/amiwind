@@ -1,5 +1,14 @@
 # NPC-HEAD-DECIMATION-33: NPC heads decimated into unrecognisable faces
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.43-dev2 at 2026-10-18 17:55 +0300: maintainer: Angahran (Morag Tong Guild) has a dark gash/hole in the head mesh at close range; check head triangles against the original NIF
+- Reported with v0.0.43-dev2 at 2026-10-18 17:58 +0300: maintainer: Shannat Pansamsi (Morag Tong Guild, ref 67641, a_76b87bee3530.mdl) has a crude, flattened face
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -18,6 +27,7 @@
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -28,6 +38,7 @@
 - [Verification](#verification)
 - [Prevention](#prevention)
 - [Bounded character-menu preview quality follow-up, 14 October 2026](#bounded-character-menu-preview-quality-follow-up-14-october-2026)
+- [Persisting in v0.0.43-dev2; the locked head reducer, 18 October 2026](#persisting-in-v0043-dev2-the-locked-head-reducer-18-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -130,6 +141,39 @@ from 55 to 50 with the expected character-stat rebuild; carried original
 clothing remains equipped with quantity one, gold remains 87, and Luminous
 Russula quantity one remains in Ingredients. This is scoped state preservation,
 not verification of every character field, race, save/load path or visual.
+
+## Persisting in v0.0.43-dev2; the locked head reducer, 18 October 2026
+
+The maintainer's v0.0.43-dev2 playtest: Angahran (Morag Tong Guild) has a dark gash in her head, Shannat
+Pansamsi a crude, flat face. Cause: the original-head bake above ships off; the shipped default
+`npc_head_detail` auto resolves to `budget` (decided for the project, 10 October 2026: original heads are
+experimental), so every humanoid head is still reduced by the previous split and the previous reducer.
+Measured on the maintainer's own data: Angahran's head keeps 57 of 450 triangles, her hair 30 of 325; Shannat's
+head 101 of 524, his hair 42 of 326. The previous reducer (fast_simplification) does not keep a shape's rim:
+it pulls the head away from where it meets the neck and the hair away from the head, and leaves cracks
+(Angahran's head: 10 open edges in the source, 15 after it, a hole; Shannat's hair: 0 and 2 before, 32 and 6
+after).
+
+Decided for the project, 18 October 2026 (the maintainer, option "3b"): the whole-model triangle budget stays,
+and head and hair are reduced with the boundary-locked reducer of the static meshes
+(`npc_geometry.simplify_head_locked`: `mold_shell.quadric_simplify` with every rim vertex locked, the face turn
+limit `static_lod.LOCKED_MAX_TURN`, the rule of MESH-LOD-OPEN-SEAMS-33). Builder switch `--npc-head-reducer
+locked|default` (config `npc_head_reducer`, default `locked`, `AMIWIND_NPC_HEAD_REDUCER`); `default` is the
+previous reducer, byte for byte. A larger head share (option "3c") is not decided: it waits for a Balmora crowd
+A/B of the frame cost.
+
+Island-wide, all 2,675 NPC records (budget plan, rest pose): with the previous reducer every one of them has a
+head or hair shape whose rim changes; with the locked reducer none. The locked reducer keeps a few more
+triangles where a rim leaves too few collapses: median 10 per model, 90th percentile 51, maximum 227 (head and
+hair 296,355 to 349,622 triangles in total). 18 models then pass the 666-face limit at the first budget; all 18
+bake with the existing retry at budget 384 (the body gives up the triangles), checked one by one. Angahran:
+head 58 triangles, 10 open edges (the source's); hair 25 and 18. Shannat: head 100, 10 open edges; hair 28 and
+14 with the source's open edges.
+
+`tests/test_npc_head_reducer.py`: the rim is kept on a synthetic head, the previous reducer moves it; the
+`default` setting reproduces the previous bake's bytes (SHA-256 recorded from the code before the change); the
+switch, its builder option and the gallery cache key; original heads unchanged. Checked privately on the maintainer's data: Angahran's and
+Shannat's head and hair keep every rim, within 8 triangles of their share. The faces still keep only 13 to 19 % of their triangles: the flat look remains until a larger head share.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

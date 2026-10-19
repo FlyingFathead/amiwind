@@ -6,13 +6,13 @@ server_t sv;
 #include <stdarg.h>
 extern qboolean AW_FindSafeSpawn(edict_t *,vec3_t,vec3_t);
 extern qboolean AW_PlacePlayer(edict_t *,vec3_t);
-static int unavailable;static float water_height,ceiling;static int steep;
+static int unavailable;static float water_height,ceiling,mountain;static int steep;
 void Con_Printf(char *fmt,...) {}
 void SV_LinkEdict(edict_t *p,qboolean touch) {}
 /* Synthetic standing-hull space: floor at z=24 and an expanded block around
  * the preferred point. A narrow ledge on its top must fail exit clearance. */
 static int solid(vec3_t p) {
- return unavailable || (ceiling && p[2]>=ceiling) || p[2]<24 || (fabs(p[0])<24 && fabs(p[1])<24 && p[2]<72);
+ return unavailable || (ceiling && p[2]>=ceiling) || p[2]<24 || (mountain && p[2]<mountain) || (fabs(p[0])<24 && fabs(p[1])<24 && p[2]<72);
 }
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int kind,edict_t *skip) {
  trace_t t;int i;float u,previous=0;vec3_t p;
@@ -68,6 +68,14 @@ int main(void) {
  assert(!AW_MapPlace(&p,preferred) && !memcmp(saved,p.v.origin,sizeof saved));
  water_height=0;
  unavailable=0;preferred[0]=NAN;assert(!AW_MapPlace(&p,preferred));preferred[0]=AW_COORD_BOUND;assert(!AW_MapPlace(&p,preferred));
+#ifndef AW_COORD_NARROW
+ /* Red Mountain (CHIM-RED-MOUNTAIN-SOLID-SKY-43): ground at 4,730 frame-local under a 9,216 frame top. The
+  * search starts over the ground, not inside it (the old 3,990 clamp landed inside the mountain). */
+ mountain=4730;world.maxs[2]=9216;preferred[0]=50;preferred[1]=0;preferred[2]=NAN;
+ assert(AW_MapPlace(&p,preferred));
+ assert(p.v.origin[2]>=mountain && p.v.origin[2]<mountain+16); /* the stub traces in 1/1024 steps */
+ mountain=0;
+#endif
  }
  puts("blocked spawn, ledge rejection, grounded recovery, actual water surface and no-solution preservation passed");return 0;
 }

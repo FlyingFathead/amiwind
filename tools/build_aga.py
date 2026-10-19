@@ -1337,7 +1337,8 @@ def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, s
                   activated.get(name) if rows is not None else None)
                  for kind, name, rows in units]
         frame_maps = []
-        for (kind, name, _), record in zip(units, ordered_map(town_unit, tasks, town_workers)):
+        for (kind, name, _), record in zip(units, ordered_map(town_unit, tasks, town_workers,
+                                                                    history='image-town-frame-maps', key=lambda t: t[2])):
             frame_maps.append(record)
             timer.step(label=name)
             build_profile.progress(progress_line.line('Image: CHIM town frame maps', name, record['map'][5:],

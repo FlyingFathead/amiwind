@@ -358,7 +358,15 @@ class BuildSummary:
         import size_ledger
         sizes = size_ledger.read(self.run) if status == 'passed' else None
         elapsed = max(0, time.monotonic() - self.started)
-        result = {'schema': 'amiwind-build-summary-v1', 'version': self.version,
+        # v2: the digest (per stage, 'Needs attention', against the last build of the same kind) is kept in the file
+        # and written to build-summary.md too (tools/build_digest.py, updated at every stage end)
+        try:
+            import build_digest
+            kept = build_digest.digest(self.run) if self.run.is_dir() else None
+        except Exception as exc:          # the digest never fails a build
+            print('[summary] digest not made: %s' % exc, flush=True)
+            kept = None
+        result = {'schema': 'amiwind-build-summary-v2', 'version': self.version,
                   'mode': self.mode, 'status': status,
                   'started_at': self.started_at, 'finished_at': timestamp(),
                   'elapsed_seconds': round(elapsed, 3), 'elapsed': duration(elapsed),
@@ -377,7 +385,8 @@ class BuildSummary:
                   'retired_flags_used': self.retired_flags,
                   'build_recipe': self.build_recipe,
                   'profile': build_profile.summary_record(self.run),
-                  'validation': 'private-test-only' if diagnostic else 'selected-pipeline'}
+                  'validation': 'private-test-only' if diagnostic else 'selected-pipeline',
+                  **({'digest': kept} if kept else {})}
         saved, save_error = None, None
         if self.run.is_dir():
             saved = self.run / 'build-summary.json'
@@ -482,6 +491,11 @@ class BuildSummary:
                     temporary.replace(saved)
                 except OSError:
                     pass
+        if kept:
+            try:
+                build_digest.write_page(self.run, kept)
+            except OSError as exc:
+                print('[summary] %s not written: %s' % (build_digest.MD, exc), flush=True)
         if artifacts:
             from emulator_configs import print_outputs
             print_outputs(Path(identity['path']))

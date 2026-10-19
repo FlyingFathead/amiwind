@@ -273,7 +273,6 @@ def empty_world(lo, hi):
 def frame_record(world_dir, cell=None):
     """(cell, low corner, high corner, chunks, centre) of a frame of the CHIM world: the one with
     `cell`, or the only one."""
-    from chim.terrain import TERRAIN_CEILING
     root = Path(world_dir) / 'chim'
     _, files, _, _ = F.read_index((root / 'world.cwi').read_bytes())
     frames = [f for f in files if f['kind'] == b'FRAM' and (cell is None or tuple(f['cell']) == tuple(cell))]
@@ -282,8 +281,18 @@ def frame_record(world_dir, cell=None):
     frame, chunks, _ = F.read_frame((root / frames[0]['path']).read_bytes())
     g, (lx, ly) = frame['grain'], frame['low']
     zlo = min(c['zmin'] for c in chunks) - FLOOR_MARGIN
-    return (tuple(frame['cell']), (lx, ly, zlo), (lx + frame['nx'] * g, ly + frame['ny'] * g, float(TERRAIN_CEILING)),
+    return (tuple(frame['cell']), (lx, ly, zlo), (lx + frame['nx'] * g, ly + frame['ny'] * g, frame_top(chunks)),
             chunks, tuple(frame['centre']))
+
+
+def frame_top(chunks):
+    """Top of a frame's bounds: the terrain ceiling, raised over ground or placed models that reach it
+    (chim.terrain.frame_ceiling, CHIM-RED-MOUNTAIN-SOLID-SKY-43). Placements count when the chunks carry them
+    (a loaded world's chunks); a frame record alone gives the ground."""
+    from chim.terrain import frame_ceiling
+    zmax = max(c['zmax'] if 'zmax' in c else c['zmin'] for c in chunks)
+    tops = [r['box'][1][2] for c in chunks for r in c.get('owned', ()) if 'box' in r]
+    return float(frame_ceiling(zmax, max(tops) if tops else None))
 
 
 def frame_bounds(world_dir, cell=None):
@@ -974,11 +983,10 @@ def region_task(id1, frame, world_dir, world=None, directory=None, rows=None, ha
     stream = stream_enabled()
     if world is not None:
         # the frame's bounds and chunk grid from the world already read (as frame_record / frame_grid read them)
-        from chim.terrain import TERRAIN_CEILING
         _, record, chunks = next(f for f in world['frames'] if tuple(f[1]['cell']) == cell)
         g, (lx, ly) = record['grain'], record['low']
         lo = (lx, ly, min(c['zmin'] for c in chunks) - FLOOR_MARGIN)
-        hi = (lx + record['nx'] * g, ly + record['ny'] * g, float(TERRAIN_CEILING))
+        hi = (lx + record['nx'] * g, ly + record['ny'] * g, frame_top(chunks))
         grid = ([{'cx': c['cx'], 'cy': c['cy'], 'index': c['index']} for c in chunks], tuple(record['low']), g,
                 record['nx'], record['ny'])
     else:
@@ -1077,10 +1085,10 @@ def open_world_worldspawn(hand_fields):
 def frame_ground(world, cell, point=(0.0, 0.0), top=None, bottom=None):
     """Height of the first collision under POINT (frame-local) on the frame's own point hull (chunk terrain and
     placed models, chim.collision.FrameScene), traced from TOP down to BOTTOM (default: the frame's own height
-    range, from the terrain ceiling to its lowest chunk less FLOOR_MARGIN), or None."""
-    from chim.terrain import TERRAIN_CEILING
+    range, from the frame's top (frame_top: the terrain ceiling, raised over high ground) to its lowest chunk less
+    FLOOR_MARGIN), or None."""
     _, record, chunks = next(f for f in world['frames'] if tuple(f[1]['cell']) == tuple(cell))
-    top = float(TERRAIN_CEILING) if top is None else top
+    top = frame_top(chunks) if top is None else top
     bottom = min(c['zmin'] for c in chunks) - FLOOR_MARGIN if bottom is None else bottom
     from chim.collision import FrameScene
     index = next(i for i, (_, frame, _) in enumerate(world['frames']) if tuple(frame['cell']) == tuple(cell))
@@ -1484,7 +1492,9 @@ def build_regions(id1, frames, world_dir, world=None, jobs=1, cache=None, progre
                  **({'rooms': rooms} if rooms else {}))
     tasks = [dict(t, **extra) for t in tasks]
     records, reused, heights = [], 0, {}
-    for task, (data, record, hit, door_rows) in zip(tasks, ordered_map(region_unit, tasks, jobs)):
+    # largest first by the seconds each frame map took in earlier builds (BUILD-CHIM-REGION-FRAMES-TAIL-43)
+    results = ordered_map(region_unit, tasks, jobs, history='image-region-frame-maps', key=lambda t: t['name'])
+    for task, (data, record, hit, door_rows) in zip(tasks, results):
         records.append(install_region(id1, task, data, record, keep_catalogues))
         # the frame's load doors: a door bank under the map's name, so every door shows its prompt
         doors = install_region_doors(id1, task['name'], door_rows)

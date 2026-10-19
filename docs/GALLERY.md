@@ -4,6 +4,14 @@ In-game screenshots of the Amiga build, taken in an Amiga emulator, without reto
 The game art shown is converted from the original Morrowind data and belongs to ZeniMax Media Inc.
 What changed in each version: [changelog](CHANGELOG.md).
 
+## v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It
+
+From the maintainer's v0.0.43-dev2 playtest: every exterior cell of Vvardenfell on CHIM.
+
+![Ghostgate in the fog seen from the valley below, in v0.0.43-dev2](images/amiwind-v0.0.43-dev2-ghostgate.png)
+
+**Ghostgate** in the fog, seen from the valley below.
+
 ## v0.0.42: Things Are Starting To Look Pretty Khuul
 
 Shots from the v0.0.42-dev1 playtest: the cloud sky back, Khuul and Ebonheart on CHIM, sunsets, a night and a dawn.

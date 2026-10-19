@@ -107,6 +107,7 @@ locations; matched far views on fixed cameras before a playtest is packaged.
 
 Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Far-plane fog, the skyline fill, distant sprites and resident ground. See [families](README.md#families).
 
+- [CHIM-TERRAIN-TEXTURE-BLOCKY-43](CHIM-TERRAIN-TEXTURE-BLOCKY-43.md): Roads and paths on the ground look blocky: each texture square is drawn with hard edges instead of blending into its neighbours
 - GEO-02 (no report page): Seyda Neen ground ends before the world terrain handoff
 - [HORIZON-FLORA-SPRITES-32](HORIZON-FLORA-SPRITES-32.md): Horizon silhouetting: not yet perfect
 - [HORIZON-HOLES-31](HORIZON-HOLES-31.md): Distant buildings break up against the sky

@@ -23,6 +23,9 @@ npc_head_detail: humanoid heads in whole-model NPC bakes (tools/npc_geometry.py 
 keeps every original triangle, the body its silhouette, NPC-HEAD-DECIMATION-33), budget (the previous 480-triangle
 split that decimated heads) or auto (shipped default: budget; original heads are EXPERIMENTAL, off by default in v0.0.35 and
 chosen only with --npc-head-detail original; docs/EXPERIMENTAL_FLAGS.md).
+npc_head_reducer: how the budget-head bake reduces head and hair: locked (default from v0.0.43-dev3, decided for
+the project 18 October 2026: the boundary-locked reducer, no new holes, NPC-HEAD-DECIMATION-33) or default (the
+previous reducer, byte for byte).
 heap_mb: the game heap (Quake's Hunk) in MiB, used exactly as asked like --jobs; not in the shipped defaults:
 the engine source's AMIWIND_HEAP_MB is the default (tools/project_version.heap_plan).
 storage_pool_dir: the shared storage pool folder (tools/storage_pool.resolve_dir; --storage-pool-dir overrides it,
@@ -48,9 +51,10 @@ def export_world_map(value):
         raise ValueError("world_map must be v1 or v2")
     os.environ[WORLD_MAP_VARIABLE] = value
 NPC_HEAD_DETAILS = ("auto", "original", "budget")
+NPC_HEAD_REDUCERS = ("locked", "default")
 KNOWN_KEYS = {"bitmap_paper_ink", "follow_original_stair_rules", "builder", "chim_areas", "chim_texture_effects",
               "heap_mb", "model_hull", "chim_stream_statics", "lava", "world_map", "chim_lighting_type",
-              "storage_pool_dir", "npc_head_detail",
+              "storage_pool_dir", "npc_head_detail", "npc_head_reducer",
               # NPC model levels of detail: validated and resolved by tools/npc_lod.py.
               "npc_lod", "npc_lod_levels", "npc_face_lod", "npc_lod_disk_mib"}
 
@@ -77,6 +81,9 @@ def add_font_options(parser):
                         help="Humanoid NPC heads in baked models: auto (default: budget, the previous bake), original (EXPERIMENTAL, original (head keeps "
                              "every original triangle, body and clothing keep their silhouette) or budget (the "
                              "previous 480-triangle bake that decimated heads)")
+    parser.add_argument("--npc-head-reducer", choices=NPC_HEAD_REDUCERS, default=None,
+                        help="How the budget-head bake reduces NPC head and hair shapes: locked (default: the "
+                             "boundary-locked reducer, no new holes in a face) or default (the previous reducer)")
     stream = parser.add_mutually_exclusive_group()
     stream.add_argument("--chim-stream-statics", dest="chim_stream_statics", action="store_true", default=None,
                         help="CHIM frame maps tag their sprite and model statics to stream with their chunks (default on, "
@@ -125,6 +132,8 @@ def _read(path):
         raise ValueError(f"Invalid world_map in {path}: expected v1 or v2")
     if "npc_head_detail" in values and values["npc_head_detail"] not in NPC_HEAD_DETAILS:
         raise ValueError(f"Invalid npc_head_detail in {path}: expected auto, original or budget")
+    if "npc_head_reducer" in values and values["npc_head_reducer"] not in NPC_HEAD_REDUCERS:
+        raise ValueError(f"Invalid npc_head_reducer in {path}: expected locked or default")
     if "follow_original_stair_rules" in values and not isinstance(values["follow_original_stair_rules"], bool):
         raise ValueError(f"Invalid follow_original_stair_rules in {path}: expected true or false")
     if "storage_pool_dir" in values and not (isinstance(values["storage_pool_dir"], str) and values["storage_pool_dir"]):
@@ -185,6 +194,11 @@ def resolve_font_options(args):
         heads, heads_origin = values["npc_head_detail"], "build config"
     if getattr(args, "npc_head_detail", None) is not None:
         heads, heads_origin = args.npc_head_detail, "CLI override"
+    reducer, reducer_origin = defaults.get("npc_head_reducer", "locked"), "shipped default"
+    if selected is not None and "npc_head_reducer" in values:
+        reducer, reducer_origin = values["npc_head_reducer"], "build config"
+    if getattr(args, "npc_head_reducer", None) is not None:
+        reducer, reducer_origin = args.npc_head_reducer, "CLI override"
     heads_setting = heads
     if heads == "auto":
         # v0.0.35: original heads are EXPERIMENTAL and off by default (project decision 2026-10-10).
@@ -201,7 +215,8 @@ def resolve_font_options(args):
             "world_map": world_map, "world_map_selected_by": world_map_origin,
             "chim_stream_statics": stream, "chim_stream_statics_selected_by": stream_origin,
             "npc_head_detail": heads, "npc_head_detail_selected_by": heads_origin,
-            "npc_head_detail_setting": heads_setting}
+            "npc_head_detail_setting": heads_setting,
+            "npc_head_reducer": reducer, "npc_head_reducer_selected_by": reducer_origin}
 
 
 def add_heap_options(parser):

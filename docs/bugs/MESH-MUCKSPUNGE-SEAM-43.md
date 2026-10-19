@@ -1,0 +1,106 @@
+# MESH-MUCKSPUNGE-SEAM-43: a muckspunge shows a black six-sided seam line across its top
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | maintainer |
+| First noticed | 18 October 2026, in v0.0.43-dev2 |
+| Where | Azura's Coast, cell 14,7 (global 118239 61369 593), tilted copy of flora_muckspunge_03 |
+| Reproduction | unknown |
+| Duplicate of | no |
+| Persists in | v0.0.43-dev2 (last seen) |
+| Severity | low: a thin visual seam on one plant; marked small by the maintainer |
+| Family | Mesh converter geometry (`converter-geometry`) |
+| Playtest version | 2026_10_18_v0.0.43-dev2_full-batch3_b55a5ce |
+| From commit | source b55a5ce, engine b55a5ce, CHIM world b55a5ce |
+| CHIM engine version | CHIM 0.2.1, engine b55a5ce, world format 0.7 |
+| Platform or emulator | FS-UAE (maintainer playtest) |
+
+<!-- END GENERATED FACTS -->
+
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
+## Status: 18 October 2026
+
+Open, small. Reported by the maintainer during the v0.0.43-dev2 playtest; cause not measured.
+
+## Symptom
+
+A black six-sided line runs around the top of a muckspunge, where its cap meets its body: the background shows
+through a thin crack between two parts of the converted model.
+
+## Where
+
+Azura's Coast, cell 14,7 (global position 118239 61369 593). The pinned placement is a tilted copy of
+`flora_muckspunge_03` (model 29631, source reference 138377).
+
+## How it happened
+
+Not known yet. Suspects: a T-junction or crack between the cap and the body that opens when the vertices of a
+tilted copy are rotated and snapped, the same class as the Silt Strider seam
+([MESH-LOD-OPEN-SEAMS-33](MESH-LOD-OPEN-SEAMS-33.md)).
+
+## Why it was not caught
+
+The seam-tear audit checks each unique mesh; whether it also checks every tilted and scaled variant is to be
+confirmed.
+
+## Reproduction
+
+In v0.0.43-dev2, look down at the muckspunges in cell 14,7 on Azura's Coast.
+
+## Repair
+
+Planned: run the seam audit on this variant and on the untilted model, then fix the mechanism in the converter
+for every model on the same path.
+
+## Verification
+
+The same pose in the next build, headlamp off and on.
+
+## Prevention
+
+The seam audit covers every tilted and scaled variant, not only the unique meshes.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Mesh converter geometry (`converter-geometry`). Converted faces must be planar, wound to their plane, non-degenerate and within engine ranges; checked by the face validator. See [families](README.md#families).
+
+- AW-20260928-21 (no report page): Exterior Census door/wall overlap
+- AW25-02 (no report page): Dry valleys and rises rendered as flooded after coarse terrain conversion
+- [BALMORA-TEMPLE-GEOMETRY-29](BALMORA-TEMPLE-GEOMETRY-29.md): Balmora Temple lower rooms: missing walls and floors, collision holes
+- BSP-LIGHT-01 (no report page): Vodunius face lightmap range exceeded its lighting lump
+- [BUILD-INTERIOR-INDEX-ROUTED-33](BUILD-INTERIOR-INDEX-ROUTED-33.md): Full build stops in the interior stage: the prison ship collision index expects a convex-piece chain, but the converter now routes large standing hulls
+- [BUILD-SEYDA-OCEAN-FLOOR-40](BUILD-SEYDA-OCEAN-FLOOR-40.md): Expanded Seyda ocean terrain collapses onto the fixed BSP seal
+- [CHIM-STRIDER-SCALED-SEAMS-36](CHIM-STRIDER-SCALED-SEAMS-36.md): Seyda Neen's silt strider (scale 0.89 variant) still shows open seams; Balmora's (scale 1.0) is closed
+- [CHIM-TERRAIN-DIAGONAL-40](CHIM-TERRAIN-DIAGONAL-40.md): Terrain triangle diagonals differ from the OpenMW 0.48 reference
+- [CONVERT-COLLISION-FALLBACK-32](CONVERT-COLLISION-FALLBACK-32.md): Five Balmora meshes fall back to a collision union in qbsp
+- [CONVERT-DEGENERATE-FACES-32](CONVERT-DEGENERATE-FACES-32.md): The converter writes degenerate faces (no area, slivers, repeated vertices)
+- [CONVERT-FACE-PLANE-32](CONVERT-FACE-PLANE-32.md): Converter takes a merged face's plane from its first three vertices
+- [CONVERT-FACE-WINDING-32](CONVERT-FACE-WINDING-32.md): Six prison faces are wound opposite to their plane side
+- [CONVERT-MERGE-NONPLANAR-32](CONVERT-MERGE-NONPLANAR-32.md): Merged polygons can be slightly non-planar (up to about 0.05 units)
+- [CONVERT-QHULL-FLAT-32](CONVERT-QHULL-FLAT-32.md): Collision building fails on a flat mesh (chitin shortbow)
+- [CONVERT-TEXCOORD-RANGE-32](CONVERT-TEXCOORD-RANGE-32.md): Converter does not check the 16-bit texture-coordinate range
+- [EXTENTS-RULE-OLD-INTERIORS-32](EXTENTS-RULE-OLD-INTERIORS-32.md): The v0.0.32 extent rule breaks the lightmaps of interiors converted before the grid fix
+- GEO-01 (no report page): Giant mushroom cap gaps after material-wise mesh reduction
+- GEO-03 (no report page): Canonical clipping stored reversed-winding fragments
+- INLAND-SHORE-29 (no report page): v0.0.29-dev1: Angular/jagged inland shoreline
+- [INTERIOR-HULL-CHAIN-33](INTERIOR-HULL-CHAIN-33.md): The Arena Pit's main structure collides through one chain of 36,545 clipnodes; every trace in the room walks it
+- [LIGHTMAP-GRID-31](LIGHTMAP-GRID-31.md): Some baked lightmaps sit one sample row or column off
+- [LIGHTMAP-TAIL-31](LIGHTMAP-TAIL-31.md): Interior lightmap: the last face points past the end of the lighting lump
+- [MESH-EBONHEART-DRAGON-PEDESTAL-42](MESH-EBONHEART-DRAGON-PEDESTAL-42.md): Ebonheart: the Imperial dragon statue floats; its converted model starts 236 units above its origin, nothing below
+- [MESH-EXTENT-GRID-31](MESH-EXTENT-GRID-31.md): Grid-exact mesh faces exceed the 256-texel surface limit on the 68040
+- [MESH-LOD-OPEN-SEAMS-33](MESH-LOD-OPEN-SEAMS-33.md): Static mesh reduction pulls open parts apart: the Silt Strider's hull shows the sky through its shell seams
+- [MESH-LOD-TORN-MESHES-33](MESH-LOD-TORN-MESHES-33.md): Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship)
+- [MESH-VIVEC-CAP-GAP-38](MESH-VIVEC-CAP-GAP-38.md): Vivec giant mushroom cap has a visible opening
+- [NPC-GALLERY-SPIKE-33](NPC-GALLERY-SPIKE-33.md): One gallery model has a vertex 12 units outside its source shape (simplifier spike)
+- [NPC-JOINT-GAPS-33](NPC-JOINT-GAPS-33.md): NPC bodies open at the joints: each body part is reduced on its own and pulls back from the part it meets
+- [ROUTED-HULL-NODE-ORDER-33](ROUTED-HULL-NODE-ORDER-33.md): A routed standing hull can start above nodes it reaches; the engine stops with "SV_RecursiveHullCheck: bad node number"
+- SKY-GROUND-28 (no report page): Rebuilt LAND faces invisible; clouds scroll too fast
+- [TOOL-ALIAS-FRAMES-33](TOOL-ALIAS-FRAMES-33.md): The alias model writer refuses more than 32 frames
+- [TOOL-SIMPLIFY-MANIFOLD-32](TOOL-SIMPLIFY-MANIFOLD-32.md): Mesh reduction can return open or non-manifold meshes
+
+<!-- END GENERATED CATEGORY -->

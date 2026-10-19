@@ -106,6 +106,28 @@ def build_room(task):
         profile = interior_visual_profile(model, entry.get('area'))
         if profile is not None:
             profiles[model] = profile
+    retain_selected=entry.get('area')=='balmora' or entry.get('retain_selected_geometry',False)
+    # Plants drawn as sprites (interior_plants: every room by default, AMIWIND_INTERIOR_PLANTS; a room over its
+    # inline model limit in mode over-limit, town_interiors.build_room_checked): those placements are left out
+    # of the mesh models. A solid static tree is a sprite too and keeps its collision as a collision-only model
+    # (decided here, before the export, so the model's profile carries it; INTERIOR-MORAG-TONG-FPS-43).
+    sprite_numbers,plant_rows,tree_numbers,tree_solid=[],[],[],[]
+    import interior_plants
+    if retain_selected and interior_plants.room_wants_sprites(entry):
+        from prepare_scenery import bsa_read, nif_reader
+        from prepare_tree_sprites import collision_metadata
+        from world_flora import flora_kind
+        bsa=BSA(child_ci(data,'Morrowind.bsa'));reader=nif_reader();collisions={}
+        def collision_of(model):
+            if model not in collisions:
+                collisions[model]=collision_metadata(bsa_read(bsa,'meshes/'+model),reader,flora_kind(model))
+            return collisions[model]
+        sprite_numbers,plant_rows=interior_plants.candidates(refs,collision_of)
+        if interior_plants.trees_too() or entry.get('tree_sprites'):
+            tree_numbers,tree_solid,tree_rows=interior_plants.tree_candidates(refs,collision_of)
+            plant_rows=plant_rows+tree_rows
+        for model in tree_solid:
+            profiles[model]={**profiles.get(model,{}),'collision_only':True}
     groups = {slug:{'references':[r['number'] for r in refs], 'visual_profiles':profiles}}
     refs = [dict(r, scene_groups=[slug]) for r in refs]
     from interior_lighting import cell_lighting
@@ -173,37 +195,26 @@ def build_room(task):
             subprocess.run([str(Path(exe).resolve()),*args],cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True)
     base=root/'base.bsp';(root/'room.bsp').rename(base)
     rebuild_world_hull(base,root/'room.map',qbsp)
-    retain_selected=entry.get('area')=='balmora' or entry.get('retain_selected_geometry',False)
-    # A room over its inline model limit draws its nonsolid decorative plants as sprites (interior_plants;
-    # town_interiors.build_room_checked asks for it): those placements are left out of the mesh models.
-    sprite_numbers,plant_rows=[],[]
-    if entry.get('plant_sprites') and retain_selected:
-        import interior_plants
-        from prepare_scenery import bsa_read, nif_reader
-        from prepare_tree_sprites import collision_metadata
-        from world_flora import flora_kind
-        bsa=BSA(child_ci(data,'Morrowind.bsa'));reader=nif_reader();collisions={}
-        def collision_of(model):
-            if model not in collisions:
-                collisions[model]=collision_metadata(bsa_read(bsa,'meshes/'+model),reader,flora_kind(model))
-            return collisions[model]
-        sprite_numbers,plant_rows=interior_plants.candidates(refs,collision_of)
-    skipped=set(sprite_numbers)
+    # a solid tree's collision-only model stays placed (its collision); a nonsolid tree is left out like a plant
+    solid_models=set(tree_solid)
+    skipped=set(sprite_numbers)|{r['number'] for r in refs if r['number'] in tree_numbers and
+                                 'meshes/'+r['model'].replace('\\','/').casefold() not in solid_models}
     report=append_meshes(base,root/'room.bsp',parts,scene/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=1,
                          references=[r['number'] for r in index['references'] if r['number'] not in skipped] if retain_selected else None,
                          retain_dressing=True if retain_selected else dressing,
                          map_identity='bmtemple' if slug=='bmtemple' else None)
     sprite_files={}
-    if sprite_numbers:
-        import interior_plants
-        entities,plants=interior_plants.place(parts,refs,sprite_numbers,lighting,palette,
+    if sprite_numbers or tree_numbers:
+        entities,plants=interior_plants.place(parts,refs,sprite_numbers+tree_numbers,lighting,palette,
                                               (scene/'id1/gfx/colormap.lmp').read_bytes(),root/'id1')
         # the sprite files live in the room's folder (cached with it); the room converter installs them
         interior_plants.add_entities(root/'room.bsp',entities)
         sprite_files=plants['files']
-        report['plant_sprites']={'placements':len(sprite_numbers),'sprite_files':plants['files'],
-                                 'sprites':plants['sprites'],'decisions':plant_rows,
-                                 'rule':'nonsolid static plants drawn as shaded sprites (tools/interior_plants.py)'}
+        report['plant_sprites']={'placements':len(sprite_numbers)+len(tree_numbers),'sprite_files':plants['files'],
+                                 'sprites':plants['sprites'],'decisions':plant_rows,'mode':interior_plants.plant_mode(),
+                                 'trees':len(tree_numbers),'collision_only_models':tree_solid,
+                                 'rule':'nonsolid static plants and static trees drawn as shaded sprites; a solid '
+                                        'tree keeps its collision (tools/interior_plants.py)'}
         report['bytes']=(root/'room.bsp').stat().st_size
     elif plant_rows:
         report['plant_sprites']={'placements':0,'decisions':plant_rows}
@@ -238,7 +249,8 @@ def room_unit(task):
     vis_mode = task[8] if len(task) > 8 else 'fast'
     dressing = task[9] if len(task) > 9 else False
     palette = hashlib.sha256((Path(scene) / 'id1/gfx/palette.lmp').read_bytes()).hexdigest()
-    return cache, {'entry': entry, 'timings': timings, 'vis_mode': vis_mode, 'dressing': dressing,
+    from interior_plants import plant_mode
+    return cache, {'entry': entry, 'plants': plant_mode(), 'timings': timings, 'vis_mode': vis_mode, 'dressing': dressing,
                    'palette': palette, 'tools': tool_digest(qbsp, vis, light), 'game_data': data_identity}
 
 

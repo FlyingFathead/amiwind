@@ -1,5 +1,16 @@
 # CHIM-BALMORA-INSET-SLIVERS-43: Balmora's town frame hands over 96 units inside its cells
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 4 times; something has to be done
+
+- Reported with v0.0.43-dev2 at 2026-10-18 16:57 +0300: maintainer: a terrain band hangs across the sky at cell -2,-1 (West Gash, Balmora border), global -10263 -851 735, 19:00
+- Reported with v0.0.43-dev2 at 2026-10-18 18:04 +0300: maintainer: the Balmora exit is still rough at cell -2,-1 (West Gash, local 2534 2933 199): ground wedges and a slab across the sky; dev2 predates the fix, dev3 carries it
+- Reported with v0.0.43-dev2 at 2026-10-18 19:44 +0300: maintainer: rough terrain seam again at cell -2,-1 (global -8617 -4100); heap line shows the classic strip map vf0864.bsp; dev3 carries the fix
+- Reported with v0.0.43-dev2 at 2026-10-18 19:53 +0300: maintainer: same seam on the east side, cell -2,-3 (global -8650 -19436): classic strip map vf0859.bsp; a different border cell of the same Balmora ring
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -22,6 +33,7 @@
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

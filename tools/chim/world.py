@@ -365,31 +365,42 @@ def frame_visibility(specs, layouts, settings=None, jobs=1, cache=None):
     from the unit cache, looked up and decoded here) then kept one core busy for about four minutes (dev5).
     Now frames of at most FRAME_VIS_CHUNKS chunks go whole to the workers, largest first, beside each other;
     larger frames keep their blocks spread over every worker. The unit keys do not change, so the rows are the
-    same and the cached units are reused."""
+    same and the cached units are reused.
+
+    LAYOUTS: the frames' layouts (a list), or layout(i) -> the layout of frame i, made when first asked: the
+    small frames' layouts are then made while the workers already work out the rows of the frames before them
+    (BUILD-CHIM-REGION-FRAMES-TAIL-43: the layouts of 1,351 frames took 3 min 42 s on one core before the rows
+    started). The size order comes from the frames themselves (their placements and chunks), so no layout is
+    needed to choose it."""
     mode = os.environ.get(VIS_ROWS_ENV, 'frames')
     if mode not in VIS_ROWS_MODES:
         raise ValueError('%s=%s: choose %s' % (VIS_ROWS_ENV, mode, ' or '.join(VIS_ROWS_MODES)))
+    layout_of = layouts if callable(layouts) else layouts.__getitem__
     results = [None] * len(specs)
-    small = []
+    small, large = [], []
     # the stage's ceiling, not its launch share: a stage started on one worker still sends its frames to the pool,
     # which follows the scheduler's live allowance (build_parallel.stage_ceiling, BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42)
     from build_parallel import stage_ceiling
     jobs = stage_ceiling(jobs)
-    for i, (spec, layout) in enumerate(zip(specs, layouts)):
-        world, by_chunk = layout[0], layout[1]
-        if mode == 'frames' and jobs > 1 and len(specs) > 1 and len(world.order) <= FRAME_VIS_CHUNKS:
+    chunks = [World(spec['frame'], settings) for spec in specs]
+    chunks = [w.nx * w.ny for w in chunks]
+    for i in range(len(specs)):
+        if mode == 'frames' and jobs > 1 and len(specs) > 1 and chunks[i] <= FRAME_VIS_CHUNKS:
             small.append(i)
-            continue
-        results[i] = chunk_visibility(world, spec['terrain'], by_chunk, spec['variants'], spec.get('visibility'),
-                                      jobs, cache)
+        else:
+            large.append(i)
     if small:
         from build_parallel import ordered_map
         import progress_line
-        tasks = [(*_visibility_inputs(specs[i], layouts[i], settings), _unit_cache_copy(cache)) for i in small]
-        weight = {id(t): sum(len(r['owned']) + len(r['reach']) for r in t[3].values()) + len(t[3]) for t in tasks}
+        # largest first by the frame's own size; the generator makes each layout when the pool asks for the task
+        small.sort(key=lambda i: (-(len(specs[i]['placements']) + chunks[i]), i))
+
+        def tasks():
+            for i in small:
+                yield (*_visibility_inputs(specs[i], layout_of(i), settings), _unit_cache_copy(cache))
         done = 0
-        for i, (result, stats, pool_stats) in zip(small, ordered_map(_frame_visibility_task, tasks, max(1, min(jobs, len(tasks))),
-                                                         cost=lambda t: weight[id(t)])):
+        for i, (result, stats, pool_stats) in zip(small, ordered_map(_frame_visibility_task, tasks(),
+                                                                     max(1, min(jobs, len(small))))):
             results[i] = result
             if cache is not None:
                 for kind, counts in stats.items():
@@ -402,6 +413,11 @@ def frame_visibility(specs, layouts, settings=None, jobs=1, cache=None):
             done += 1
             if done % 50 == 0 or done == len(small):
                 progress_line.emit('CHIM visibility rows', 'frames', 'one frame per worker', (done, len(small), 'frames'))
+    for i in large:
+        # a large frame spreads its own blocks over every worker (one frame after another)
+        world, by_chunk = layout_of(i)[0], layout_of(i)[1]
+        results[i] = chunk_visibility(world, specs[i]['terrain'], by_chunk, specs[i]['variants'],
+                                      specs[i].get('visibility'), jobs, cache)
     return results
 
 
@@ -528,13 +544,27 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     vis_totals, reach_total, over_total, largest = {}, 0, 0, 0
     # Every frame's placement layout first (ids run on across frames in pack order), then the visibility rows of
     # all frames on the workers, then the pack in order (B5, v0.0.42; frame_visibility). Same files.
-    layouts = []
+    # A frame's ids start after every placement of the frames before it (each placement is owned by exactly one
+    # chunk), so each layout is made on its own, when the visibility rows first need it: the layouts overlap the
+    # rows on the workers instead of running before them on one core (BUILD-CHIM-REGION-FRAMES-TAIL-43). Same ids.
+    bases = []
     for fi in order:
-        layout, pid = frame_layout(frames[fi], settings, pid)
-        layouts.append(layout)
+        bases.append(pid)
+        pid += len(frames[fi]['placements'])
+    made = [None] * len(order)
+
+    def layout_at(k):
+        if made[k] is None:
+            layout, end = frame_layout(frames[order[k]], settings, bases[k])
+            if end != bases[k] + len(frames[order[k]]['placements']):
+                raise ValueError('Frame %s: placement ids %d-%d, expected %d' % (
+                    frames[order[k]]['frame'].get('cell'), bases[k], end, len(frames[order[k]]['placements'])))
+            made[k] = layout
+        return made[k]
     import build_profile      # timed phases: start/end lines with time and cores (never part of a key)
     with section('visibility rows'), build_profile.phase('CHIM world: visibility rows', '%d frames' % len(frames)):
-        visible = frame_visibility([frames[fi] for fi in order], layouts, settings, jobs, cache)
+        visible = frame_visibility([frames[fi] for fi in order], layout_at, settings, jobs, cache)
+    layouts = [layout_at(k) for k in range(len(order))]
     pack_timer = build_profile.phase('CHIM world: pack', '%d frames' % len(frames)).__enter__()
     for fi, layout, (pvs, pvl, vis_stats) in zip(order, layouts, visible):
         spec = frames[fi]

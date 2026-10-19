@@ -16,9 +16,18 @@ How it looks:
   - sprites are not lit by the renderer, so each sprite is shaded with the room's colormap at the light its
     placement gets (interior_lighting.point_light at the plant's centre, the light a lit face there gets,
     in steps of LIGHT_STEP), one sprite file per plant mesh and light step.
-The earlier rule (every plant a mesh) stays the default for rooms within their limits; the room converter
-uses sprites only for a room over its inline model limit (town_interiors.build_room_checked), and
-AMIWIND_INTERIOR_PLANTS=meshes turns this off.
+Which rooms (AMIWIND_INTERIOR_PLANTS, INTERIOR-MORAG-TONG-FPS-43):
+  - auto (the default from v0.0.43-dev3): every converted interior, whatever its limits. A converted room is
+    one vis leaf (its placements are inline models), so every plant mesh in front of the camera is drawn every
+    frame; island-wide the nonsolid static plants were 397 placements and 78,502 faces in 74 rooms (dev2).
+    Static trees of a room become sprites too (tree_candidates): a solid tree keeps its collision as a
+    collision-only model (the CHIM sprite recipe's rule, visual_recipes.prepare_sprite_replacements), so the
+    player still bumps into the trunk; island-wide 10 trees, 8,121 faces in 6 rooms (Morag Tong: the planter
+    ash tree, 1,454 faces). Logs keep their meshes (a lying log is no view-parallel shape);
+  - plants: the nonsolid plants of every room, trees keep their meshes;
+  - over-limit: the v0.0.42 rule: sprites only for a room over its inline model limit
+    (town_interiors.build_room_checked) or a room the town config lists with "plants": "sprites";
+  - meshes: every plant a mesh (a room over its model limit fails as before).
 """
 import hashlib
 import json
@@ -30,7 +39,7 @@ import struct
 import numpy as np
 
 PLANTS_ENV = 'AMIWIND_INTERIOR_PLANTS'
-PLANT_MODES = ('auto', 'meshes')
+PLANT_MODES = ('auto', 'plants', 'over-limit', 'meshes')
 # light quantum of a shaded sprite: the room light at a placement, rounded to this many of 255
 LIGHT_STEP = 16
 # Quake's normal lightstyle value ('m' = 12 * 22, the style 0 faces are drawn with)
@@ -44,6 +53,57 @@ def plant_mode():
     if value not in PLANT_MODES:
         raise ValueError('%s must be one of %s, not %r' % (PLANTS_ENV, ', '.join(PLANT_MODES), value))
     return value
+
+
+def every_room(mode=None):
+    """True when the plants of every converted room become sprites (modes auto and plants)."""
+    return (mode or plant_mode()) in ('auto', 'plants')
+
+
+def trees_too(mode=None):
+    """True when the static trees of a room become sprites as well (mode auto)."""
+    return (mode or plant_mode()) == 'auto'
+
+
+def room_wants_sprites(entry, mode=None):
+    """True when the room ENTRY (a prepare_area room entry) draws its plants as sprites: every room in modes
+    auto/plants; in mode over-limit only a room asked for it (entry 'plant_sprites': over its model limit, or
+    the town config row "plants": "sprites"); never in mode meshes."""
+    mode = mode or plant_mode()
+    if mode == 'meshes':
+        return False
+    return every_room(mode) or bool(entry.get('plant_sprites'))
+
+
+def is_tree_mesh(model):
+    """True for a flora tree mesh ('flora_' name, world_flora.flora_kind 'tree') that may become a sprite."""
+    from world_flora import flora_kind
+    stem = model.replace('\\', '/').casefold().rsplit('/', 1)[-1]
+    return stem.startswith('flora_') and stem.endswith('.nif') and flora_kind(stem) == 'tree'
+
+
+def tree_candidates(refs, collision_of):
+    """(sprite reference numbers, collision-kept models, receipt rows) of a room's static trees. A tree that is
+    solid in the original (collision_of(model)['mode'] not 'nonsolid') keeps its collision: its model becomes
+    collision-only ('meshes/...' paths in the second value); a harvestable or usable tree keeps its mesh."""
+    chosen, solid, rows = [], set(), []
+    for ref in refs:
+        model = ref.get('model', '').replace('\\', '/').casefold()
+        if not is_tree_mesh(model):
+            continue
+        if ref.get('type') != 'STAT':
+            rows.append({'reference': ref['number'], 'model': model, 'kept': 'mesh',
+                         'reason': 'harvestable or usable (%s): keeps its mesh' % ref.get('type')})
+            continue
+        collision = collision_of(model)
+        chosen.append(ref['number'])
+        if collision['mode'] == 'nonsolid':
+            rows.append({'reference': ref['number'], 'model': model, 'kept': 'sprite', 'reason': collision['reason']})
+        else:
+            solid.add('meshes/' + model)
+            rows.append({'reference': ref['number'], 'model': model, 'kept': 'sprite, collision kept',
+                         'reason': 'solid in the original (%s): collision-only model' % collision['reason']})
+    return chosen, sorted(solid), rows
 
 
 def is_flora_mesh(model):

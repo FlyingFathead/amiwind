@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib, math, struct
 from .audit import cell_data
 from .esm import is_deleted, records, require, string, subrecords
+from .markers import is_hidden_marker
 
 
 def original_doors(raw):
@@ -178,7 +179,7 @@ def omission_reason(ref,exclusions=()):
     if ref.get('deleted'):return 'deleted reference'
     if ref['number'] in exclusions:return 'external harvest reference'
     if not model:return 'no static model'
-    if 'marker' in model:return 'editor marker'
+    if 'marker' in model or is_hidden_marker(ref.get('id')):return 'editor marker'
     if ref['type'] not in ('STAT','DOOR','CONT','LIGH','ACTI'):return 'small item or actor deferred'
     if ref['type']=='ACTI' and 'active_de_bed' not in model and not (
             ref['id'].casefold()=='chargen stuff room' and

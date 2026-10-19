@@ -207,9 +207,10 @@ def build_room_checked(task):
     """prepare_area.build_room plus the coordinate range; returns (status, value). Finished rooms come from the
     room unit cache (prepare_area.build_room_cached; BUILD-IMAGE-NO-RESUME-33).
 
-    A room over its inline model limit is converted again with its nonsolid plants as sprites (step 1 of
-    docs/INTERIOR_SECTIONS.md "Interiors over a limit: the order"; interior_plants, AMIWIND_INTERIOR_PLANTS
-    =meshes keeps the earlier rule: the room fails). The receipt says which step the room needed."""
+    Every room draws its plants as sprites from the start (interior_plants modes auto/plants, the default). In
+    mode over-limit a room over its inline model limit is converted again with its nonsolid plants as sprites
+    (step 1 of docs/INTERIOR_SECTIONS.md "Interiors over a limit: the order"; AMIWIND_INTERIOR_PLANTS=meshes:
+    the room fails). The receipt says which step the room needed."""
     from prepare_area import build_room_cached as build_room
     import interior_plants
     data, scene, entry = task[:3]
@@ -218,7 +219,8 @@ def build_room_checked(task):
             report, cell = build_room(task)
             report['limit_steps'] = []
         except ValueError as error:
-            if 'inline model budget exceeded' not in str(error) or interior_plants.plant_mode() != 'auto':
+            # modes auto/plants drew the plants as sprites already; only mode over-limit converts again
+            if 'inline model budget exceeded' not in str(error) or interior_plants.plant_mode() != 'over-limit':
                 raise
             print('Interior over its model limit, plants as sprites:', entry['map'], str(error), flush=True)
             import shutil as _shutil
@@ -277,7 +279,7 @@ def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dr
     tasks = [(data, scene, {'map': room['map'], 'cell': room['cell'], 'interior': True, 'area': 'balmora',
                             **({} if room['cell'].casefold() in outside else {'original_door_arrivals': True}),
                             **({'recentre': room['recentre']} if room.get('recentre') else {}),
-                            **({'plant_sprites': True} if room.get('plants') == 'sprites' and plant_mode() == 'auto'
+                            **({'plant_sprites': True} if room.get('plants') == 'sprites' and plant_mode() != 'meshes'
                                else {})},
               qbsp, vis, light, timings, map_threads(jobs, workers), vis_mode) for room in work]
     from build_costs import costed_map, room_sizes

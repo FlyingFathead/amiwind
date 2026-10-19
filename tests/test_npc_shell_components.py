@@ -75,7 +75,8 @@ class ShellComponentTests(unittest.TestCase):
         plan={'mode':'budget','face_limit':666,'quotas':[4],'protected':frozenset(),'head_faces':0,
               'hair_reduced':False,'lod_only':False,'cuts':{}}
         for errors,count in [([g.AliasOverflow('Player leg section collapsed')],1),
-                             ([g.AliasOverflow('Alias vertex budget exceeded'),g.AliasOverflow('Alias vertex budget exceeded')],2)]:
+                             # the shell retry, then (locked head reducer, the default) the previous-reducer retry
+                             ([g.AliasOverflow('Alias vertex budget exceeded')]*3,3)]:
             with patch.object(g,'head_plan',return_value=plan),patch.object(g,'_bake',side_effect=errors) as bake:
                 with self.assertRaises(g.AliasOverflow):g.bake([],[],{},b'',head_detail='budget')
                 self.assertEqual(bake.call_count,count)

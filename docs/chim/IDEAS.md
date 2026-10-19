@@ -1,11 +1,6 @@
 # CHIM ideas and held-back work
 
-Every idea around [CHIM](README.md) that is not simply "done": what is
-planned, what is designed, what has a prototype, and what was measured and
-then dropped. Each item links to the document or bug that holds the detail.
-The status is honest and nothing here is a promise. Items that were measured
-and dropped stay on this page with the reason, so nobody spends a night
-measuring them again.
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -29,6 +24,13 @@ measuring them again.
 - [Measured and dropped](#measured-and-dropped)
 
 <!-- contents end -->
+
+Every idea around [CHIM](README.md) that is not simply "done": what is
+planned, what is designed, what has a prototype, and what was measured and
+then dropped. Each item links to the document or bug that holds the detail.
+The status is honest and nothing here is a promise. Items that were measured
+and dropped stay on this page with the reason, so nobody spends a night
+measuring them again.
 
 | Status | Meaning |
 | --- | --- |
@@ -128,6 +130,10 @@ ripples water, slime, lava and the upright teleporter fields), and our lava alre
 energy texture converted as a turbulent `*` texture on the fence walls, its glow given a flickering light style
 (Quake's animated light patterns) for the electric pulse; A/B against the original at the same pose. No new
 engine feature: the existing mechanism, mapped onto the Morrowind data.
+
+**Lit from afar (maintainer, 18 October 2026: yes).** The curtain uses fullbright colours, like Quake's lava and
+teleporter colours, which ignore lightmaps and the night, so it reads as a shining wall across the rim of Red
+Mountain from far away, through the fog as well. Its cost at a distance is measured with the far-terrain layer.
 
 ## The distant view: far terrain and mold shells
 

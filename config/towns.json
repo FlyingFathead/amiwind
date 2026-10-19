@@ -177,6 +177,18 @@
         "ground_place"
       ],
       "travel": null
+    },
+    {
+      "id": "redmtn_x3y8",
+      "config": "redmtn_x3y8.json",
+      "world_slot": -1,
+      "flags": [
+        "own_doors",
+        "scenery_catalogue",
+        "teleport_arrival",
+        "ground_place"
+      ],
+      "travel": null
     }
   ]
 }

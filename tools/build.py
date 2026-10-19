@@ -2798,7 +2798,7 @@ def main(argv=None):
         # Converter and image workers read the stair rule from the environment
         # (mesh_geometry.stair_mitigation_mode, stair_walk gate).
         from mesh_geometry_env import (export_chim_stream_statics, export_model_hull, export_npc_head_detail,
-                                       export_stair_rules)
+                                       export_npc_head_reducer, export_stair_rules)
         export_stair_rules(args.font_options["follow_original_stair_rules"])
         export_model_hull(args.font_options["model_hull"])
         from lava import export_lava
@@ -2813,6 +2813,7 @@ def main(argv=None):
         from chim.frame_map import DEFAULT_REGION_ROWS, export_region_rows
         export_region_rows(getattr(args, 'chim_region_rows', None) or DEFAULT_REGION_ROWS)
         export_npc_head_detail(args.font_options["npc_head_detail"])
+        export_npc_head_reducer(args.font_options["npc_head_reducer"])
         if args.recover_image_from and (args.stage != 'aga' or args.dry_run or args.host_plan or args.check_inputs or args.versions or args.install_dependencies or args.install_sdk):
             raise ValueError('--recover-image-from requires an AGA build/check/plan, with a new run name')
         if args.reuse_from is not None:
@@ -2964,7 +2965,9 @@ def main(argv=None):
                 print("World bounds: " + ("on" if args.world_bounds_record["on"] else "off") +
                       " (" + args.world_bounds_record["source"] + ")", flush=True)
             print("NPC heads: " + args.font_options["npc_head_detail"] +
-                  " (" + args.font_options["npc_head_detail_selected_by"] + ")", flush=True)
+                  " (" + args.font_options["npc_head_detail_selected_by"] + "); head reducer " +
+                  args.font_options["npc_head_reducer"] + " (" + args.font_options["npc_head_reducer_selected_by"] + ")",
+                  flush=True)
             print("Bitmap paper ink: " + args.font_options["bitmap_paper_ink"] +
                   " (" + args.font_options["selected_by"] +
                   "); preferred TTF conversion and dialogue/menu fonts unchanged.")
@@ -3166,6 +3169,15 @@ def main(argv=None):
                 print(f'[warning] Build succeeded; FS-UAE launch skipped: {exc}. HDF retained: {result}')
         pool_outputs(args, run, played=bool(emulator))
         code = perf_guard_step(args, run)
+        try:
+            # the build summary's digest again, now with the perf guard (tools/build_digest.py)
+            import build_digest
+            record = build_digest.update(run)
+            if record is not None:
+                print('Build summary: %s (%d needing attention)' % (run / build_digest.MD, len(record['needs_attention'])),
+                      flush=True)
+        except Exception as exc:
+            print('[summary] digest not updated: %s' % exc, flush=True)
         if size_verdict == 'failed':
             print('SIZE GUARD FAILED: a payload folder grew past the margin without a named reason (%s); the '
                   'stages passed and their outputs stay valid and reusable' % (run / 'size-ledger.json'), flush=True)

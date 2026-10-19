@@ -110,6 +110,31 @@ def npc_head_detail(mode=None):
     return mode
 
 
+# How a head or hair shape is reduced when the whole-model bake reduces it (head detail budget, or hair over the
+# limit in mode original; NPC-HEAD-DECIMATION-33, decided for the project 18 October 2026): locked (default) is the
+# boundary-locked quadric reducer of the static meshes (mold_shell.quadric_simplify with the rim locked, the face
+# turn limit static_lod.LOCKED_MAX_TURN), so the reduction opens no new hole in a face; default is the previous
+# reducer (fast_simplification, npc_geometry.simplify_shape), byte for byte.
+NPC_HEAD_REDUCERS = ('locked', 'default')
+NPC_HEAD_REDUCER_VARIABLE = 'AMIWIND_NPC_HEAD_REDUCER'   # read by npc_geometry._bake
+
+
+def npc_head_reducer(mode=None):
+    """The head/hair reducer of the whole-model NPC bake: locked (default) or default (the previous reducer).
+    An explicit MODE wins over the environment."""
+    if mode is None:
+        mode = os.environ.get(NPC_HEAD_REDUCER_VARIABLE, 'locked').strip() or 'locked'
+    if mode not in NPC_HEAD_REDUCERS:
+        raise ValueError(NPC_HEAD_REDUCER_VARIABLE + ' must be locked or default')
+    return mode
+
+
+def export_npc_head_reducer(mode):
+    """Export the resolved npc_head_reducer for every converter worker."""
+    os.environ[NPC_HEAD_REDUCER_VARIABLE] = npc_head_reducer(mode)
+    return os.environ[NPC_HEAD_REDUCER_VARIABLE]
+
+
 def export_npc_head_detail(mode):
     """Export the resolved npc_head_detail for every converter worker."""
     os.environ[NPC_HEAD_DETAIL_VARIABLE] = npc_head_detail(mode)

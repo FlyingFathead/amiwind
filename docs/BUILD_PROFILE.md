@@ -1,14 +1,6 @@
 # Build profile and stage reuse
 
-Every build measures itself. The builder records, for each stage, how long it
-ran, how much CPU it and all its child processes used, how many cores that
-was on average against the jobs it was given, its memory peak and its disk
-traffic. Long stages also time named sections. After the build the profiler
-works out the critical path, flags stages that left their cores idle and
-writes concrete suggestions. The same run records an input fingerprint and an
-output manifest per stage, so a later development build can reuse unchanged
-stages instead of running them again (`--reuse-from`, never silent, never for
-releases).
+_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -39,6 +31,16 @@ releases).
 - [Measured release builds (v0.0.33 -> v0.0.34)](#measured-release-builds-v0033---v0034)
 
 <!-- contents end -->
+
+Every build measures itself. The builder records, for each stage, how long it
+ran, how much CPU it and all its child processes used, how many cores that
+was on average against the jobs it was given, its memory peak and its disk
+traffic. Long stages also time named sections. After the build the profiler
+works out the critical path, flags stages that left their cores idle and
+writes concrete suggestions. The same run records an input fingerprint and an
+output manifest per stage, so a later development build can reuse unchanged
+stages instead of running them again (`--reuse-from`, never silent, never for
+releases).
 
 Goal: compile fast, with zero errors and zero regressions. Measure before
 optimizing; reuse only what is provably unchanged.
@@ -363,6 +365,55 @@ missing workers fit under 80 % of the limit); the alarms are kept in `build-stat
 ```text
 [scheduler] ALARM: chim held at 1 of 6 workers for 5 min by the memory guard (26.5 of 28.0 GiB in use, file cache not counted); a lease of 41 GB would let it run at 6 (5 more workers at about 1200 MiB each)
 ```
+
+When the scheduler can read a stage's own processes (Linux `/proc`: the stage's
+main process and the pool workers below it), the guard works from what the
+workers really hold (BUILD-STAGE-ALLOWANCE-STUCK-43: in v0.0.43-dev3 it cut the
+CHIM stage from 20 workers to 1 while the stage's main process held the memory,
+and never grew it back):
+
+- above 90 % it cuts only when the workers hold the memory over the line (what
+  they hold above an idle worker), by as many workers as the excess needs; when
+  the main process holds it, the workers stay and one line says so; above 96 %
+  it cuts anyway;
+- a held stage grows back by its measured worker size, up to 88 % of the limit;
+- when a stage ends, the guard looks again at once.
+
+The free-core checker: each pool map of a running stage writes its queued and
+running units, and the slowest running unit by name, beside the stage's
+allowance file (`jobs/NN-stage.pool`, `tools/pool_status.py`). The workers a
+stage with nothing queued does not use go, on loan, to the stages that have
+queued units; the loan ends at the scheduler's next look once that stage queues
+units again.
+
+The live supervisor (`tools/stage_watch.py`) looks every 5 s at the cores each
+pooled stage really uses. A stage under half its share for over 60 s while its
+pools have units queued is an occurrence: one warning line, and one JSON line in
+`RUN/underused.jsonl` (stage, cores used, allowance and share, queued and
+running units, the slowest unit, since when, who holds it). One line per
+occurrence; the build carries on, and the build summary lists it as a warning:
+
+```text
+[underused] WARNING: chim ran on 1.0 of 20 cores (allowance 1, share 20) for 65 s with 400 units queued and 1 running; slowest running unit: rcp16_p11 (42 s); held by: memory guard; the build carries on (RUN/underused.jsonl)
+```
+
+The build summary's digest (`tools/build_digest.py`) is written into
+`RUN/build-summary.json` (schema `amiwind-build-summary-v2`, key `digest`) and
+as `RUN/build-summary.md` (under about 60 lines) at every stage end and at the
+end of the build, after the perf guard: per stage the wall time, the mean cores
+used and allowed, the longest stretch under half its share, reuse and warnings
+(underuse, perf guard, size growth, waivers, retired flags); a 'Needs attention'
+list, empty when all is well, one stable key per entry (`underused:chim`,
+`perf-guard:chim:<section>`, `stage-failed:image`, `size-growth:<folder>`,
+`retired-flag:<flag>`, `slower:<stage>`); and stage times up or down by more
+than 20 % (and 30 s) against the last passed build of the same kind beside it.
+
+Pools hand out their heaviest units first: `ordered_map(..., history=NAME,
+key=...)` by the seconds recorded for each unit in earlier builds whenever such
+a history exists (this run's times are recorded for the next), `cost=` on
+`ordered_map`, `completed_map` and `governed_map`. Every caller gives a cost, a
+history or a recorded reason (`tests/test_pool_cost_sweep.py`,
+BUILD-CHIM-REGION-FRAMES-TAIL-43).
 
 A stage sizes its own pools by its ceiling (the build budget under the
 scheduler, `build_parallel.stage_ceiling`), not by the `--jobs` it was launched
