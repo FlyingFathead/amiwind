@@ -226,6 +226,7 @@ def convert_room(data_files, scene, cell_name, registry, palette, regions_raw, t
                harvest_references=refs,harvest_master_sha256=context['full']['master_sha256'])
     report,_=build_room((data,scene,entry,*tools,''))
     (scene/'id1/maps').mkdir();shutil.copyfile(scene/'area-work'/entry['map']/'room.bsp',scene/'id1/maps'/f"{entry['map']}.bsp")
+    from interior_plants import install_room_files;install_room_files(scene,entry['map'],report)
     return finish_room(data,scene,cell_name,registry,regions_raw,media_payload=media_payload)
 
 

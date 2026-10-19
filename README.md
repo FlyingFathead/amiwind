@@ -32,6 +32,29 @@ The [gallery](docs/GALLERY.md) has in-game screenshots of every version, and
 
 More in the [gallery](docs/GALLERY.md).
 
+## v0.0.44: By Azura's Trees!
+
+A patch release for v0.0.43. Its fix for the floating tree crowns on Azura's Coast made the Bitter Coast trees too
+heavy for memory; they are 16 to 42 % lighter now, and every trunk keeps at least 90 % of its height. The player
+body is built again for every race, and the roadmap describes the road after v0.0.44.
+
+What went wrong while building v0.0.44, and how it was fixed:
+
+- **Bitter Coast trees too heavy.** v0.0.43's fix for the floating tree crowns made the Bitter Coast trees about
+  60 % larger; two Bitter Coast areas no longer fit in memory and the image could not be built. The trunk shape
+  guard now tries lighter copies first: the trees are 16 to 42 % smaller and every trunk keeps at least 90 % of
+  its height ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](docs/bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md)).
+- **Player bodies and guard torches could not be built.** The new NPC head reducer, which keeps every head's
+  outline, left no fitting model for some player bodies and guard torch models. They fall back to the previous
+  reducer, and a rebuilt guard model within one rounding step of the original is accepted
+  ([NPC-HEAD-DECIMATION-33](docs/bugs/NPC-HEAD-DECIMATION-33.md)).
+- **Interior plant sprites missing outside Vivec.** The plant sprites of converted interiors were installed only
+  for the Vivec rooms; every room type installs them now
+  ([INTERIOR-MORAG-TONG-FPS-43](docs/bugs/INTERIOR-MORAG-TONG-FPS-43.md)).
+
+Running on CHIM Engine v0.2.1. See the [release notes](docs/RELEASE-v0.0.44.md) for what changed and what is
+known in this build.
+
 ## v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It
 
 Every exterior cell of Vvardenfell is on CHIM now: no classic region maps are left outdoors. The region list holds

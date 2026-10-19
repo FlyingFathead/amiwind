@@ -201,4 +201,9 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
 - [WORLD-SHORE-OPEN-GEOMETRY-38](WORLD-SHORE-OPEN-GEOMETRY-38.md): Shoreline objects show large open sections and thin disconnected edges
 
+Related bugs in other categories:
+
+- [CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md): Two Bitter Coast CHIM frames over the heap zone after the trunk shape guard
+- [CHIM-ROCKS-OPEN-SHELLS-43](CHIM-ROCKS-OPEN-SHELLS-43.md): Several rock meshes on CHIM do not close up: open faces where the rock should be solid
+
 <!-- END GENERATED CATEGORY -->

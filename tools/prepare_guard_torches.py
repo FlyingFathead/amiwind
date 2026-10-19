@@ -19,6 +19,7 @@ from npc_anim import BoneLayer
 from prepare_hand_sprites import decode_mdl
 from prepare_torch import source_nodes
 import actor_frames
+from map_files import map_files
 
 GUARD_CLASSES = frozenset(('guard', 'ordinator guard'))
 MAX_RECORDS = 32
@@ -108,6 +109,23 @@ class TorchLayer:
         return self.layer.pose(normal, torch_time)
 
 
+SKIPPABLE_PREFIX = 'progs/np_'
+
+
+class BaseNotReproduced(ValueError):
+    """A guard model this tool cannot rebake exactly. An intro actor's model (SKIPPABLE_PREFIX, baked by
+    tools/prepare_intro.py with its own settings) then gets no torch companion and is named in the receipt; any other
+    guard still fails the step (GUARD-TORCH-CHIM-FRAMES-44)."""
+
+
+def check_skips(skipped):
+    """Only the intro actors' own models (tools/prepare_intro.py bakes progs/np_*.mdl with its own settings) may be
+    skipped; any other guard that does not rebake exactly still fails the step, so torches are never lost silently."""
+    strict = [row for row in skipped if not row['base_model'].startswith(SKIPPABLE_PREFIX)]
+    if strict:
+        raise ValueError('; '.join(row['reason'] for row in strict))
+
+
 def _source_records(master):
     lights = {}
     for kind, flags, payload in records(master.read_bytes()):
@@ -134,7 +152,9 @@ def _creature_ids(master):
 
 def _guard_models(id1, kinds, lights, mesh, creatures=frozenset()):
     found = {}
-    for path in sorted((id1 / 'maps').glob('*.bsp')):
+    # every map, CHIM frame maps (x.chim) included: town and region frames hold the exterior guards
+    # (GUARD-TORCH-CHIM-FRAMES-44: a *.bsp-only scan found only interior guards since v0.0.36)
+    for path in map_files(id1 / 'maps'):
         with path.open('rb') as stream:
             header = stream.read(124)
             if len(header) != 124 or struct.unpack_from('<i', header)[0] != 29:
@@ -209,21 +229,80 @@ def _body(assets, appearance, base, raw, palette, layout=None):
         old['positions'] = np.concatenate((old['positions'], held['positions']))
     header = struct.unpack_from('<4si3f3ff3f8if', raw)
     scale = np.array(header[2:5]); origin = np.array(header[5:8])
-    for budget in (480, 384, 320, 256, 192):
-        positions, candidate_faces, candidate_uv, _ = bake(old_shapes, materials, textures, palette,
-            budget=budget, reference_frames=count)
-        if not np.array_equal(candidate_faces, faces) or not np.array_equal(candidate_uv, uv):
-            continue
-        rebaked = np.clip(np.rint((positions[:count]-origin)/scale), 0, 255)*scale+origin
-        if rebaked.shape == original.shape and np.array_equal(rebaked, original):
-            break
-    else:
-        raise ValueError('Guard source bake does not reproduce existing base geometry/UV exactly')
+    positions, reproduction = _reproduce_base(old_shapes, materials, textures, palette, count, faces, uv, original,
+                                              scale, origin, appearance)
     held_skin = Image.fromarray(skin, 'P'); held_skin.putpalette(palette)
     held = animated_mdl(positions[count:], faces, uv, held_skin)
     return held, layer, samples, {'frames': count, 'triangles': len(faces), 'vertices': original.shape[1],
-        'base_geometry_reproduced_exactly': True, 'base_file_changed': False, 'skin_indices_preserved_exactly': True,
+        'base_geometry_reproduced_exactly': reproduction['coordinates_off'] == 0, 'base_reproduction': reproduction,
+        'base_file_changed': False, 'skin_indices_preserved_exactly': True,
         **extra}
+
+
+# A rebuilt base pose counts as the existing model when every coordinate is within MAX_STEP_OFF quantisation steps
+# and at most MAX_SHARE_OFF of them differ at all: the boundary-locked head reducer reproduces a guard to within
+# floating-point rounding (v0.0.44-dev1: chargen boat guard 2, 8 of 85,050 coordinates one step off in one frame).
+MAX_STEP_OFF = 1
+MAX_SHARE_OFF = 0.001
+
+
+def _quantised_steps_off(positions, original, scale, origin):
+    """(largest difference in quantisation steps, number of coordinates that differ) between the rebuilt positions
+    and the existing model, or None when the shapes differ."""
+    if positions.shape != original.shape:
+        return None
+    rebuilt = np.clip(np.rint((positions-origin)/scale), 0, 255)
+    existing = np.rint((original-origin)/scale)
+    off = np.abs(rebuilt-existing)
+    return int(off.max()) if off.size else 0, int((off > 0).sum())
+
+
+def _reproduce_base(shapes, materials, textures, palette, count, faces, uv, original, scale, origin, appearance):
+    """The bake of the guard's held pose that reproduces its existing base model exactly. The base model may have
+    been baked with either head reducer (npc_geometry._retry_head_reducer falls back to the previous one for an
+    appearance the locked reducer leaves over budget), so both are tried, the configured one first; a budget too
+    small for the guard's shapes is skipped, not fatal (v0.0.44-dev1 image step: 'Too many separate shapes for
+    budget' stopped the guard torches; NPC-HEAD-DECIMATION-33). The error names the guard."""
+    import os
+    from mesh_geometry_env import NPC_HEAD_REDUCER_VARIABLE, npc_head_reducer
+    from npc_geometry import bake
+    configured = npc_head_reducer()
+    saved = os.environ.get(NPC_HEAD_REDUCER_VARIABLE)
+    tried = []
+    try:
+        for reducer in dict.fromkeys((configured, 'default')):
+            os.environ[NPC_HEAD_REDUCER_VARIABLE] = reducer
+            for budget in (480, 384, 320, 256, 192):
+                try:
+                    positions, candidate_faces, candidate_uv, _ = bake(shapes, materials, textures, palette,
+                        budget=budget, reference_frames=count)
+                except ValueError as error:
+                    if str(error) != 'Too many separate shapes for budget':
+                        raise
+                    tried.append('%s/%d: too many shapes' % (reducer, budget))
+                    continue
+                if not np.array_equal(candidate_faces, faces) or not np.array_equal(candidate_uv, uv):
+                    tried.append('%s/%d: faces or UV differ' % (reducer, budget))
+                    continue
+                steps = _quantised_steps_off(positions[:count], original, scale, origin)
+                if steps is not None and steps[0] <= MAX_STEP_OFF and steps[1] <= MAX_SHARE_OFF * original.size:
+                    if reducer != configured:
+                        print('guard torches %s: base model reproduced with the previous head reducer'
+                              % appearance.get('id', '?'), flush=True)
+                    if steps[1]:
+                        print('guard torches %s: base model reproduced within %d quantisation step(s): %d of %d '
+                              'coordinates off (floating-point rounding)' % (appearance.get('id', '?'), steps[0],
+                              steps[1], original.size), flush=True)
+                    return positions, {'max_quant_steps_off': int(steps[0]), 'coordinates_off': int(steps[1])}
+                tried.append('%s/%d: positions differ (%s)' % (reducer, budget,
+                             'shape' if steps is None else 'max %d steps, %d coordinates' % steps))
+    finally:
+        if saved is None:
+            os.environ.pop(NPC_HEAD_REDUCER_VARIABLE, None)
+        else:
+            os.environ[NPC_HEAD_REDUCER_VARIABLE] = saved
+    raise BaseNotReproduced('Guard %s: source bake does not reproduce existing base geometry/UV exactly (%s)'
+                     % (appearance.get('id', '?'), '; '.join(tried)))
 
 
 def _equipment(assets, appearance, layer, samples, mesh, palette):
@@ -296,7 +375,10 @@ def _convert_guard(task):
                         reused=True)
     assets = AuditedAssets(Path(data_files), BSA(child_ci(Path(data_files), 'Morrowind.bsa')))
     skeleton = Skeleton(assets, appearance['skeleton'])
-    body, layer, samples, proof = _body(assets, appearance, skeleton, original, palette, layout)
+    try:
+        body, layer, samples, proof = _body(assets, appearance, skeleton, original, palette, layout)
+    except BaseNotReproduced as error:
+        return {'skipped': str(error), 'reused': False}
     equipment, emitters = _equipment(assets, appearance, layer, samples, mesh, palette)
     row = json.loads(json.dumps({'proof': proof, 'emitters': emitters, 'layer': [layer.start, layer.stop],
                                  'base_sha256': sha(original), 'inputs': list(assets.inputs.items()),
@@ -326,10 +408,17 @@ def prepare(data_files, id1, output_id1=None, jobs=None):
     tasks = [(str(data_files), str(id1), entry, outfit(kinds, entry['source_id']), mesh, palette, cache)
              for entry in entries]
     jobs = max(1, min(resolve_jobs(jobs), len(tasks) or 1))
-    files = {}; rows = []; inputs = {}; reused = 0
+    files = {}; rows = []; inputs = {}; reused = 0; skipped = []
     with build_profile.phase('Guard torches', detail='%d models, %d workers' % (len(tasks), jobs),
                              total=len(tasks), unit='models') as timer:
         for (_, _, entry, appearance, *_), result in zip(tasks, ordered_map(_convert_guard, tasks, jobs)):
+            if 'skipped' in result:
+                skipped.append({'source_id': entry['source_id'], 'base_model': entry['base_model'],
+                                'reason': result['skipped']})
+                timer.step(label=entry['base_model'])
+                print('WARNING: guard torch skipped (no torch for this guard):', entry['source_id'],
+                      entry['base_model'], '-', result['skipped'], flush=True)
+                continue
             body, equipment = result['body'], result['equipment']
             body_path = 'progs/gt_b_'+sha(body)[:12]+'.mdl'
             equipment_path = 'progs/gt_t_'+sha(equipment)[:12]+'.mdl'
@@ -346,12 +435,13 @@ def prepare(data_files, id1, output_id1=None, jobs=None):
             build_profile.progress(progress_line.line('Guard torches', entry['base_model'],
                                                       'reused' if result['reused'] else 'made',
                                                       (timer.count, timer.total, 'models')))
-        timer.done('Guard torches: %d models (%d from the pass cache)' % (len(rows), reused))
+        timer.done('Guard torches: %d models (%d from the pass cache, %d skipped)' % (len(rows), reused, len(skipped)))
+    check_skips(skipped)
     files['gfx/guard-torches.awg'] = registry(rows)
     report = {'format': 'AmiWind original guard torch companions 1', 'registry': 'gfx/guard-torches.awg',
         'source_classes': sorted(GUARD_CLASSES), 'source_mesh': mesh, 'source_torch_triangles': 238,
         'source_master_sha256': sha(master.read_bytes()), 'source_assets': inputs,
-        'palette_sha256': sha(palette), 'records': rows, 'record_count': len(rows),
+        'palette_sha256': sha(palette), 'records': rows, 'record_count': len(rows), 'skipped': skipped,
         'unique_body_models': len({row['body_model'] for row in rows}),
         'unique_torch_models': len({row['torch_model'] for row in rows}),
         'unique_asset_bytes': sum(map(len, files.values())),

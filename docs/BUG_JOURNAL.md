@@ -1,10 +1,15 @@
 # Bug journal
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [TRACKER-CHIM-COUNT-STALE-44: the tracker counted audits, not the build, 19 October 2026](#tracker-chim-count-stale-44-the-tracker-counted-audits-not-the-build-19-october-2026)
+- [INTERIOR-MORAG-TONG-FPS-43: every room installer copies its plant sprites, 19 October 2026](#interior-morag-tong-fps-43-every-room-installer-copies-its-plant-sprites-19-october-2026)
+- [NPC-HEAD-DECIMATION-33: the player body falls back to the previous head reducer, 19 October 2026](#npc-head-decimation-33-the-player-body-falls-back-to-the-previous-head-reducer-19-october-2026)
+- [CHIM-ROCKS-OPEN-SHELLS-43 and CHIM-CROSSING-SLUGGISH-43 registered, 19 October 2026](#chim-rocks-open-shells-43-and-chim-crossing-sluggish-43-registered-19-october-2026)
+- [CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43: two Bitter Coast frames over the heap zone, 19 October 2026](#chim-bittercoast-heap-shapeguard-43-two-bitter-coast-frames-over-the-heap-zone-19-october-2026)
 - [NPC-HEAD-DECIMATION-33 locked head reducer and INTERIOR-MORAG-TONG-FPS-43 decided, 18 October 2026](#npc-head-decimation-33-locked-head-reducer-and-interior-morag-tong-fps-43-decided-18-october-2026)
 - [INTERIOR-MORAG-TONG-FPS-43 and NPC-HEAD-DECIMATION-33 persisting, 18 October 2026](#interior-morag-tong-fps-43-and-npc-head-decimation-33-persisting-18-october-2026)
 - [VIVEC-ARENA-WATER-FALL-32: the sea to the horizon without the day/night sky, 18 October 2026](#vivec-arena-water-fall-32-the-sea-to-the-horizon-without-the-daynight-sky-18-october-2026)
@@ -60,6 +65,60 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 - [INTERIOR-SPAWN-UNDERWATER-41, 17 October 2026](#interior-spawn-underwater-41-17-october-2026)
 
 <!-- contents end -->
+
+## TRACKER-CHIM-COUNT-STALE-44: the tracker counted audits, not the build, 19 October 2026
+
+[TRACKER-CHIM-COUNT-STALE-44](bugs/TRACKER-CHIM-COUNT-STALE-44.md): after the v0.0.44-dev1 build was ingested the
+tracker still printed 1,193 of 1,436 cells. That line counted audit-passed land cells over both islands (Solstheim
+included), and seabed cells an older CHIMport run had called empty sea never counted, although the build carries them.
+The tracker now records per cell the newest build that carries it and per build the cells on CHIM by island:
+v0.0.44-dev1 has every Vvardenfell land cell (1,292 of 1,292) plus 117 sea cells on CHIM.
+
+## INTERIOR-MORAG-TONG-FPS-43: every room installer copies its plant sprites, 19 October 2026
+
+[INTERIOR-MORAG-TONG-FPS-43](bugs/INTERIOR-MORAG-TONG-FPS-43.md): since v0.0.43-dev4 the plants and trees of every
+converted interior are sprites, written next to each room's own map. The Vivec room installer copied those sprites into
+the game; the Balmora interiors, area and harvest room installers copied only the map. The first v0.0.44-dev1 image
+step therefore stopped on a Mages Guild plant sprite that a map placed but the image did not have. One shared installer
+now copies a room's files for all four, and a test checks that every room installer uses it.
+
+## NPC-HEAD-DECIMATION-33: the player body falls back to the previous head reducer, 19 October 2026
+
+[NPC-HEAD-DECIMATION-33](bugs/NPC-HEAD-DECIMATION-33.md): the v0.0.44-dev1 build stopped in its image step on the
+Argonian female player body. With the boundary-locked head reducer no body fitted: the larger budgets were over the
+alias vertex budget and the smaller ones narrowed the legs. The NPC bake already falls back to the previous head reducer
+for such an appearance; the player body search now does the same, logged, and tests cover it.
+
+The next run stopped one step later, at the guard torch models: a guard's held-torch pose must reproduce its existing
+model exactly, that model had been baked with the previous head reducer, and the torch step tried only the locked one;
+a budget too small for the guard's shapes also stopped the step instead of being skipped, and the error named no
+guard. The step now tries both reducers, skips a budget that is too small, and names the guard if nothing fits.
+
+The third stop, at the same step: one guard (the Seyda Neen boat guard) was rebuilt with 8 of its 85,050 coordinates
+one quantisation step off in one frame, floating-point rounding with the locked reducer, and the step demanded a
+bit-exact match. A rebuilt base pose now counts when every coordinate is within one step and at most 0.1 % differ; the
+receipt records how many were off instead of claiming an exact match. All 13 guards were checked against that build's
+own files before the next build.
+
+## CHIM-ROCKS-OPEN-SHELLS-43 and CHIM-CROSSING-SLUGGISH-43 registered, 19 October 2026
+
+[CHIM-ROCKS-OPEN-SHELLS-43](bugs/CHIM-ROCKS-OPEN-SHELLS-43.md): the maintainer saw several rock types on CHIM that do
+not close up, first pinned at Bitter Coast cell -4,-6 (`terrain_rocks_ai_02`). Cause not found yet; an island-wide
+open-edge sweep against the source meshes comes next.
+
+[CHIM-CROSSING-SLUGGISH-43](bugs/CHIM-CROSSING-SLUGGISH-43.md): crossing between CHIM cells stalls, worst at cell
+corners. The prefetch into spare RAM (measured about 450 ms down to about 230 ms per crossing with 128 MB) is the
+first step, planned for v0.0.45-dev1.
+
+## CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43: two Bitter Coast frames over the heap zone, 19 October 2026
+
+[CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md): the v0.0.43-dev4 build stopped at the
+CHIM heap gate: frames x-07/y-04 and x-08/y-04 were 113 and 110 KiB (1.9 %) over their zone. Only the drawn models
+grew: the Bitter Coast trees got about 60 % larger when the trunk shape guard of
+[CHIM-AZURA-FLOATING-FLORA-43](bugs/CHIM-AZURA-FLOATING-FLORA-43.md) re-reduced their trunks boundary-locked. The guard
+now first retries the same reducer at 1.5 to 4 times the target and uses the first copy that keeps the trunk's height:
+Bitter Coast trees 01 to 07 come out 16 to 42 % smaller, every trunk still keeps at least 90 % of its height, and the
+Azura's Coast trees are unchanged. Fixed in source; the next build checks it.
 
 ## NPC-HEAD-DECIMATION-33 locked head reducer and INTERIOR-MORAG-TONG-FPS-43 decided, 18 October 2026
 

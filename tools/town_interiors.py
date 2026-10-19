@@ -298,12 +298,8 @@ def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dr
         report, cell = value
         shutil.copyfile(Path(scene) / 'area-work' / room['map'] / 'room.bsp', Path(scene) / 'id1/maps' / (room['map'] + '.bsp'))
         # files the room needs besides its map (its plant sprites, interior_plants): same bytes = same file
-        for name in (report.get('plant_sprites') or {}).get('sprite_files', {}):
-            source, target = Path(scene) / 'area-work' / room['map'] / 'id1' / name, Path(scene) / 'id1' / name
-            if target.is_file() and target.read_bytes() != source.read_bytes():
-                raise ValueError('Room file %s differs from the one another room wrote' % name)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, target)
+        from interior_plants import install_room_files
+        install_room_files(scene, room['map'], report)
         result['rooms'][room['map']] = cell
         result['cells'][room['cell'].casefold()] = room['map']
         result['reports'].append(report)

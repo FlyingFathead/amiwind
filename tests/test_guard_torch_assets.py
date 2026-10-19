@@ -106,6 +106,27 @@ class GuardTorchAssetsTests(unittest.TestCase):
             self.assertEqual(len(result),1);self.assertEqual(result[0]['source_id'],'actual')
             self.assertFalse(result[0]['auto_inventory_eligible']);self.assertEqual(p.read_bytes(),raw)
 
+    def test_guards_in_chim_frame_maps_are_found(self):
+        # GUARD-TORCH-CHIM-FRAMES-44: exterior guards live in CHIM frame maps (balmora-chim.chim); a *.bsp-only
+        # scan gave them no torch at night
+        with tempfile.TemporaryDirectory() as tmp:
+            id1=Path(tmp);(id1/'maps').mkdir()
+            for name,source,model in (('balmora-chim.chim','outside','progs/out.mdl'),('inside.bsp','inside','progs/in.mdl')):
+                entities=('{"classname" "aw_npc" "aw_source_id" "%s" "model" "%s"}\0'%(source,model)).encode()
+                (id1/'maps'/name).write_bytes(struct.pack('<i2i',29,124,len(entities))+bytes(112)+entities)
+            kinds={'NPC_':{'outside':[('CNAM',field('Guard'))],'inside':[('CNAM',field('Guard'))]}}
+            found=sorted(r['source_id'] for r in _guard_models(id1,kinds,{},'l/light_torch10.nif'))
+            self.assertEqual(found,['inside','outside'])
+
+    def test_image_step_runs_guard_torches_after_the_chim_frame_maps(self):
+        # GUARD-TORCH-CHIM-FRAMES-44: the scan must see the frame maps, so it runs after they are written and
+        # before the world heap gate and the content fingerprint that read its companions
+        source=(Path(__file__).resolve().parents[1]/'tools/build_aga.py').read_text(encoding='utf-8')
+        torches=source.index('guard_torches = prepare_guard_torches(')
+        self.assertLess(source.index('chim_frames = chim_frame_maps('),torches)
+        self.assertLess(torches,source.index('world_heap=audit_world_map_heap_with_receipt('))
+        self.assertLess(torches,source.index('omitted_maps = image_content_fingerprint('))
+
     def test_creature_residents_are_skipped_unknown_identities_still_refused(self):
         # dev1 2026-10-17: Vivec (a creature record) is placed as an aw_npc resident in his palace
         with tempfile.TemporaryDirectory() as tmp:
@@ -135,6 +156,71 @@ class GuardTorchAssetsTests(unittest.TestCase):
         self.assertEqual(original[3].tobytes(),added[3].tobytes())
         with self.assertRaisesRegex(ValueError,'Invalid reference frame'):
             bake([shape],mats,{},palette,reference_frames=17)
+
+
+class GuardBaseReproductionTests(unittest.TestCase):
+    """NPC-HEAD-DECIMATION-33 (v0.0.44-dev1 image step): a guard whose base model was baked with the previous
+    head reducer is reproduced by trying it after the configured one; a budget too small for the guard's shapes
+    is skipped; the final error names the guard."""
+
+    def arrays(self):
+        faces = np.array([[0, 1, 2]]); uv = np.zeros((3, 2)); original = np.zeros((2, 3, 3))
+        return faces, uv, original
+
+    def test_previous_reducer_reproduces_and_small_budgets_are_skipped(self):
+        import os
+        from unittest import mock
+        import prepare_guard_torches as guard
+        faces, uv, original = self.arrays()
+        calls = []
+        def fake_bake(shapes, materials, textures, palette, budget, reference_frames):
+            reducer = os.environ.get('AMIWIND_NPC_HEAD_REDUCER')
+            calls.append((reducer, budget))
+            if budget == 192:
+                raise ValueError('Too many separate shapes for budget')
+            if reducer == 'default' and budget == 384:
+                return np.zeros((4, 3, 3)), faces, uv, None
+            return np.zeros((4, 3, 3)), faces + 1, uv, None
+        with mock.patch('npc_geometry.bake', side_effect=fake_bake), \
+             mock.patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'locked'}):
+            positions, proof = guard._reproduce_base([], [], {}, b'', 2, faces, uv, original, np.ones(3),
+                                                     np.zeros(3), {'id': 'imperial guard'})
+            self.assertEqual(os.environ['AMIWIND_NPC_HEAD_REDUCER'], 'locked')
+        self.assertEqual(positions.shape, (4, 3, 3))
+        self.assertEqual(proof, {'max_quant_steps_off': 0, 'coordinates_off': 0})
+        self.assertEqual(calls[:5], [('locked', b) for b in (480, 384, 320, 256, 192)])
+        self.assertEqual(calls[5:], [('default', 480), ('default', 384)])
+
+    def test_no_reproduction_names_the_guard(self):
+        from unittest import mock
+        import prepare_guard_torches as guard
+        faces, uv, original = self.arrays()
+        with mock.patch('npc_geometry.bake', side_effect=ValueError('Too many separate shapes for budget')), \
+             mock.patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'locked'}):
+            # its own error type: prepare skips that guard and names it in the receipt (GUARD-TORCH-CHIM-FRAMES-44)
+            with self.assertRaisesRegex(guard.BaseNotReproduced, 'Guard imperial guard: source bake does not reproduce'):
+                guard._reproduce_base([], [], {}, b'', 2, faces, uv, original, np.ones(3), np.zeros(3),
+                                      {'id': 'imperial guard'})
+
+    def test_only_intro_actor_models_may_be_skipped(self):
+        from prepare_guard_torches import check_skips
+        check_skips([{'source_id': 'chargen boat guard 1', 'base_model': 'progs/np_deck.mdl', 'reason': 'x'}])
+        with self.assertRaisesRegex(ValueError, 'Guard hlaalu guard_outside'):
+            check_skips([{'source_id': 'hlaalu guard_outside', 'base_model': 'progs/a_bf6e2596469c.mdl',
+                          'reason': 'Guard hlaalu guard_outside: source bake does not reproduce'}])
+
+    def test_one_step_rounding_counts_as_reproduced_more_does_not(self):
+        """v0.0.44-dev1: the boat guard's rebuild was 8 of 85,050 coordinates one quantisation step off."""
+        import prepare_guard_torches as guard
+        original = np.zeros((2, 100, 3)); scale = np.ones(3); origin = np.zeros(3)
+        near = original.copy(); near[1, 0, 0] = 1.0
+        self.assertEqual(guard._quantised_steps_off(near, original, scale, origin), (1, 1))
+        far = original.copy(); far[1, 0, 0] = 3.0
+        self.assertEqual(guard._quantised_steps_off(far, original, scale, origin), (3, 1))
+        many = original.copy(); many[:, :, 0] = 1.0
+        steps = guard._quantised_steps_off(many, original, scale, origin)
+        self.assertGreater(steps[1], guard.MAX_SHARE_OFF * original.size)
+        self.assertIsNone(guard._quantised_steps_off(original[:1], original, scale, origin))
 
 
 if __name__=='__main__':unittest.main()

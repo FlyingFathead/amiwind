@@ -1,12 +1,6 @@
 # CHIMport: the whole island on CHIM, cell by cell
 
-CHIMport (`tools/chimport.py`) converts every exterior cell of your own
-Morrowind data to CHIM, one cell at a time, starting at the sea around the
-island and working inwards ring by ring. Every cell goes through every
-mechanism audit the CHIM builder has, and its figures and results are kept, so
-the CHIM Progress Tracker in the AmiWind Toolkit shows how far the island is
-and which mechanisms still fail. A failing cell never stops the run: it is
-recorded with the reason, and the run moves on.
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -39,9 +33,17 @@ recorded with the reason, and the run moves on.
 
 <!-- contents end -->
 
-On CHIM today: the towns (Seyda Neen's square, docks and census office courtyard, and Balmora); the open
-land outside them is still built the legacy way until CHIMport replaces it, coast first
-([IMAGE_SIZE.md](../IMAGE_SIZE.md#what-is-on-chim-today)).
+CHIMport (`tools/chimport.py`) converts every exterior cell of your own
+Morrowind data to CHIM, one cell at a time, starting at the sea around the
+island and working inwards ring by ring. Every cell goes through every
+mechanism audit the CHIM builder has, and its figures and results are kept, so
+the CHIM Progress Tracker in the AmiWind Toolkit shows how far the island is
+and which mechanisms still fail. A failing cell never stops the run: it is
+recorded with the reason, and the run moves on.
+
+On CHIM today: every exterior cell of Vvardenfell, since v0.0.43 (the last cells joined by weight, the heaviest
+last); no classic region maps are left outdoors. Solstheim is not converted yet, and interiors stay Quake maps
+([progress tracker](PROGRESS_TRACKER.md)).
 
 ## Island results (9 October 2026)
 
@@ -425,7 +427,7 @@ cell by cell with the stair gate.
 
 A failure in a cell's border can come from a classic neighbour: the gate also walks border copies
 ([BUILD-STAIR-WALK-BORDER-COPIES-41](../bugs/BUILD-STAIR-WALK-BORDER-COPIES-41.md)); fix the mesh all the same.
-Known-good stair records (planned, v0.0.42) will let a build skip every flight whose inputs are unchanged.
+Known-good stair records (since v0.0.42, `config/stair-records/`) let a build skip every flight whose inputs are unchanged.
 
 ## Cell results
 

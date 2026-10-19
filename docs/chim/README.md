@@ -1,16 +1,6 @@
 # CHIM
 
-CHIM is how AmiWind's world is stored and streamed from v0.0.33 on: the
-CHIM builder turns your own Morrowind data into a world where every mesh,
-collision hull and texture is stored once and placed by reference, and the
-CHIM Engine streams that world around the player on an Amiga. This page says
-what CHIM is, where it stands and where to read more. The ideas that are
-designed, measured or held back are collected in [CHIM ideas](IDEAS.md), and
-what CHIM has already achieved, with the measured gains, is in the
-[CHIM feature tracker](FEATURES.md). How far the open world has been
-converted, cell by cell, is on the generated
-[CHIM cell tracker](CELL_TRACKER.md), and the colours of its map are explained on
-[the CHIM progress map](CHIM_PROGRESS_MAP.md).
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -23,6 +13,18 @@ converted, cell by cell, is on the generated
 - [CHIM documents](#chim-documents)
 
 <!-- contents end -->
+
+CHIM is how AmiWind's world is stored and streamed from v0.0.33 on: the
+CHIM builder turns your own Morrowind data into a world where every mesh,
+collision hull and texture is stored once and placed by reference, and the
+CHIM Engine streams that world around the player on an Amiga. This page says
+what CHIM is, where it stands and where to read more. The ideas that are
+designed, measured or held back are collected in [CHIM ideas](IDEAS.md), and
+what CHIM has already achieved, with the measured gains, is in the
+[CHIM feature tracker](FEATURES.md). How far the open world has been
+converted, cell by cell, is on the generated
+[CHIM cell tracker](CELL_TRACKER.md), and the colours of its map are explained on
+[the CHIM progress map](CHIM_PROGRESS_MAP.md).
 
 *AmiWind is an unofficial, experimental project. Not affiliated with or
 endorsed by Bethesda Softworks or ZeniMax.*
@@ -81,7 +83,7 @@ CHIM has its own version number, separate from AmiWind's:
 | | |
 | --- | --- |
 | First release | CHIM 0.1.0 with AmiWind v0.0.33 |
-| Current | CHIM 0.2.1 with AmiWind v0.0.41 (patch step: fixes: compiled collision for non-convex pieces, recorded audit provenance; world format unchanged). 0.2.0 shipped with AmiWind v0.0.36 |
+| Current | CHIM 0.2.1, since AmiWind v0.0.41 (patch step: fixes: compiled collision for non-convex pieces, recorded audit provenance; world format unchanged) and still in v0.0.43 and v0.0.44-dev1. 0.2.0 shipped with AmiWind v0.0.36 |
 | Where it is kept | the `CHIM_VERSION` file at the repository root, the one source for the builder receipts, the engine header and the boot check |
 | How it is shown | short form on the boot check, "AmiWind vX / CHIM vY"; long form "Running on CHIM Engine vY" in the README and release notes |
 | Numbering | semantic versions: a new world format major version is a new CHIM major version (the engine refuses a world of another major with a clear message); minor = features; patch = fixes |
@@ -138,7 +140,9 @@ checked against them.
 
 Each milestone is a private test build made from scratch with the repository
 builder, walked in FS-UAE, gated and compared with the legacy maps at the
-same poses before it counts. Status on 9 October 2026:
+same poses before it counts. Status on 9 October 2026 (kept as written; since v0.0.43, 19 October 2026, every
+exterior cell of Vvardenfell is on CHIM, M1 to M4 for Vvardenfell's outdoors; M5 waits for the interiors on
+their chosen format and Solstheim, see the [progress tracker](PROGRESS_TRACKER.md)):
 
 | Milestone | Area | Status |
 | --- | --- | --- |

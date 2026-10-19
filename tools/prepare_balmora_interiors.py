@@ -49,6 +49,8 @@ def prepare(data_files, scene, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis
         rooms[slug] = cell
         reports.append(report)
         shutil.copyfile(scene / 'area-work' / slug / 'room.bsp', scene / 'id1/maps' / f'{slug}.bsp')
+        from interior_plants import install_room_files
+        install_room_files(scene, slug, report)
         print('Balmora interior ready:', slug, report['bytes'], flush=True)
     return populate(data, scene, rooms, reports, ffmpeg, jobs,
                     include_exterior=False, report_name='balmora-interiors.json')

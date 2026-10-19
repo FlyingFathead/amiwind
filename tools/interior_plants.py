@@ -252,3 +252,21 @@ def add_entities(bsp, entities):
     text = bytes(b[0]).rstrip(b'\0').decode('cp1252')
     b[0] = (text.rstrip('\n') + '\n' + '\n'.join(entities) + '\n\0').encode('cp1252')
     path.write_bytes(pack_lumps(b))
+
+
+def install_room_files(scene, slug, report):
+    """Copy the files a converted room needs besides its map (its plant sprites, written under the room's own
+    area-work/<slug>/id1 by place()) into the scene's id1. Same bytes = same file; a name another room wrote with
+    other bytes is refused. Every room installer calls this (v0.0.44-dev1: the Balmora interiors and area
+    installers copied only room.bsp, so the image step refused a Mages Guild plant sprite; town_interiors already
+    copied them). Returns the installed names."""
+    import shutil
+    from pathlib import Path
+    names = sorted((report.get('plant_sprites') or {}).get('sprite_files', {}))
+    for name in names:
+        source, target = Path(scene) / 'area-work' / slug / 'id1' / name, Path(scene) / 'id1' / name
+        if target.is_file() and target.read_bytes() != source.read_bytes():
+            raise ValueError('Room %s: file %s differs from the one another room wrote' % (slug, name))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+    return names

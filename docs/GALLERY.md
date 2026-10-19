@@ -4,6 +4,29 @@ In-game screenshots of the Amiga build, taken in an Amiga emulator, without reto
 The game art shown is converted from the original Morrowind data and belongs to ZeniMax Media Inc.
 What changed in each version: [changelog](CHANGELOG.md).
 
+<!-- contents start -->
+## Contents
+
+- [v0.0.44: By Azura's Trees!](#v0044-by-azuras-trees)
+- [v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It](#v0043-let-there-be-chim-vvardenfells-outdoors-all-of-it)
+- [v0.0.42: Things Are Starting To Look Pretty Khuul](#v0042-things-are-starting-to-look-pretty-khuul)
+- [v0.0.32: Vivec](#v0032-vivec)
+- [v0.0.31: Lamps, Lanterns and Loading](#v0031-lamps-lanterns-and-loading)
+- [v0.0.30: The Temple](#v0030-the-temple)
+- [v0.0.29: Let There Be (Just a Bit More) Light](#v0029-let-there-be-just-a-bit-more-light)
+- [v0.0.28: Trees and Grass, Day and Night](#v0028-trees-and-grass-day-and-night)
+- [v0.0.27: Rocks, Mushrooms, and Then Some](#v0027-rocks-mushrooms-and-then-some)
+- [v0.0.25](#v0025)
+- [v0.0.24: Balmora](#v0024-balmora)
+- [v0.0.23: The opening](#v0023-the-opening)
+- [v0.0.15: First steps in Seyda Neen](#v0015-first-steps-in-seyda-neen)
+
+<!-- contents end -->
+
+## v0.0.44: By Azura's Trees!
+
+A patch release for v0.0.43 with lighter Bitter Coast trees; the world looks as in the v0.0.43 shots below.
+
 ## v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It
 
 From the maintainer's v0.0.43-dev2 playtest: every exterior cell of Vvardenfell on CHIM.

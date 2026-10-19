@@ -193,11 +193,13 @@ class BoundaryLockedLODTests(unittest.TestCase):
         self.assertNotIn('preserve_shape_prefixes', shared)
         self.assertEqual(profile_reduction(shared), {'preserve_shared_seams': False, 'lock_boundaries': True,
                                                      'agg': 7.0, 'preserve_border': False, 'shape_guard': 0.0,
-                                                     'shape_guard_min': 0, 'shape_guard_axes': (0, 1, 2)})
+                                                     'shape_guard_min': 0, 'shape_guard_axes': (0, 1, 2),
+                                                     'shape_guard_steps': ()})
         self.assertEqual(visual_profile('meshes/r/siltstrider.nif', 5600), shared)
         self.assertEqual(profile_reduction({}), {'preserve_shared_seams': False, 'lock_boundaries': False,
                                                  'agg': 7.0, 'preserve_border': False, 'shape_guard': 0.0,
-                                                 'shape_guard_min': 0, 'shape_guard_axes': (0, 1, 2)})
+                                                 'shape_guard_min': 0, 'shape_guard_axes': (0, 1, 2),
+                                                     'shape_guard_steps': ()})
 
     def test_converter_and_estimates_share_one_profile_reduction(self):
         root = Path(__file__).resolve().parents[1] / 'tools'
@@ -262,8 +264,32 @@ class ShapeGuardTests(unittest.TestCase):
                                                  shape_guard_axes=(2,))
         self.assertAlmostEqual(float(out_v[:, 2].min()), 0.0)
         self.assertAlmostEqual(float(out_v[:, 2].max()), 400.0)
-        self.assertEqual(report['shape_guard'], {'share': .9, 'components_relocked': 1, 'components_kept': 0})
+        self.assertEqual(report['shape_guard'], {'share': .9, 'components_relocked': 1, 'components_kept': 0,
+                                                 'components_stepped': 0, 'steps': []})
         self.assertLess(len(guarded), len(f))
+
+    def test_stepped_retry_comes_before_the_locked_retry(self):
+        """CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43: a component whose reduced copy keeps its shape at a larger target
+        uses that copy (smallest step first) instead of the heavier boundary-locked one."""
+        import numpy as np
+        from unittest import mock
+        from static_lod import reduce_mesh
+        v, f = _tube()
+        asked = []
+        def collapses_when_small(points, triangles, target_count, **_):
+            asked.append(target_count)
+            if target_count < 2 * max(4, round(len(triangles) * .07)):
+                keep = [t for t in triangles if points[t, 2].min() >= 200]
+                return points, np.array(keep[:max(1, target_count)], dtype=np.int32)
+            spread = sorted(triangles.tolist(), key=lambda t: points[t, 2].min())
+            return points, np.array(spread[::max(1, len(spread) // target_count)], dtype=np.int32)
+        with mock.patch('fast_simplification.simplify', side_effect=collapses_when_small):
+            out_v, out_f, report = reduce_mesh(v, f, .07, shape_guard=.9, shape_guard_min=96, shape_guard_axes=(2,),
+                                               shape_guard_steps=(1.5, 2.0, 3.0))
+        self.assertEqual(report['shape_guard']['components_stepped'], 1)
+        self.assertEqual(report['shape_guard']['components_relocked'], 0)
+        self.assertEqual(asked[1:], [round(asked[0] * 1.5), round(asked[0] * 2.0)])     # stops at the first fit
+        self.assertLess(float(out_v[:, 2].min()), 40.0)
 
     def test_guard_off_is_the_previous_method(self):
         import numpy as np
@@ -290,11 +316,14 @@ class ShapeGuardTests(unittest.TestCase):
         self.assertFalse(keeps_shape(points, narrow, tris, .9))
 
     def test_flora_profile_guards_trunk_height(self):
-        from static_lod import SHAPE_GUARD, SHAPE_GUARD_AXES, SHAPE_GUARD_MIN, profile_reduction
+        from static_lod import (SHAPE_GUARD, SHAPE_GUARD_AXES, SHAPE_GUARD_MIN, SHAPE_GUARD_STEPS,
+                                profile_reduction)
         from town_regions import visual_profile
         options = profile_reduction(visual_profile('meshes/f/flora_tree_ac_01.nif', 1672))
-        self.assertEqual((options['shape_guard'], options['shape_guard_min'], options['shape_guard_axes']),
-                         (SHAPE_GUARD, SHAPE_GUARD_MIN, SHAPE_GUARD_AXES))
+        self.assertEqual((options['shape_guard'], options['shape_guard_min'], options['shape_guard_axes'],
+                          options['shape_guard_steps']),
+                         (SHAPE_GUARD, SHAPE_GUARD_MIN, SHAPE_GUARD_AXES, SHAPE_GUARD_STEPS))
+        self.assertEqual(profile_reduction({})['shape_guard_steps'], ())      # the v0.0.43-dev3 guard
         self.assertNotIn('lod_shape_guard', visual_profile('meshes/f/flora_tree_ac_01.nif', 100))
         self.assertNotIn('lod_shape_guard', visual_profile('meshes/x/ex_hlaalu_b_01.nif', 1000))
 
@@ -338,7 +367,8 @@ class AzuraTreeTrunkTests(unittest.TestCase):
             return float(points.max() - points.min()) if len(points) else 0.0
         guarded_v, guarded_f, report = reduce_for_profile(v, f, profile, materials, 'flora_tree_ac_01')
         self.assertGreater(height(guarded_v, guarded_f), .9 * height(v, f))
-        self.assertGreaterEqual(report['shape_guard']['components_relocked'], 1)
+        guard = report['shape_guard']
+        self.assertGreaterEqual(guard['components_relocked'] + guard['components_stepped'], 1)
         off = {k: x for k, x in profile.items() if not k.startswith('lod_shape_guard')}
         plain_v, plain_f, _ = reduce_for_profile(v, f, dict(off, lod_shape_guard=0), materials, 'flora_tree_ac_01')
         old_v, old_f, _ = reduce_mesh(v, f, off['ratio'])

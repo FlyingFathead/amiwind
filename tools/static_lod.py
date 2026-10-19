@@ -40,7 +40,8 @@ def profile_reduction(profile):
             'preserve_border': bool(profile.get('lod_preserve_border', False)),
             'shape_guard': float(profile.get('lod_shape_guard', 0.0)),
             'shape_guard_min': int(profile.get('lod_shape_guard_min', 0)),
-            'shape_guard_axes': tuple(profile.get('lod_shape_guard_axes', (0, 1, 2)))}
+            'shape_guard_axes': tuple(profile.get('lod_shape_guard_axes', (0, 1, 2))),
+            'shape_guard_steps': tuple(profile.get('lod_shape_guard_steps', ()))}
 
 
 def reduce_for_profile(vertices, faces, profile, materials=None, name='mesh'):
@@ -91,6 +92,12 @@ def reduce_for_profile(vertices, faces, profile, materials=None, name='mesh'):
 SHAPE_GUARD = 0.9
 SHAPE_GUARD_MIN = 96
 SHAPE_GUARD_AXES = (2,)
+# Before the boundary-locked retry, a guarded component that fails is first reduced again with the same reducer at
+# these multiples of its target, smallest first; the first copy that keeps its shape is used
+# (CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43: the locked retry or the source copy made the Bitter Coast trees ~60 %
+# larger and put two Bitter Coast frames 1.9 % over their heap zone). () = the v0.0.43-dev3 guard (locked retry
+# straight away), selectable per profile (lod_shape_guard_steps).
+SHAPE_GUARD_STEPS = (1.5, 2.0, 3.0, 4.0)
 
 
 def _extent(points):
@@ -110,7 +117,7 @@ def keeps_shape(source_points, points, triangles, guard, axes=(0, 1, 2)):
 
 def reduce_mesh(vertices, faces, ratio, preserve_materials=(), preserve_shared_seams=False,
                 lock_boundaries=False, agg=7.0, preserve_border=False, shape_guard=0.0, shape_guard_min=0,
-                shape_guard_axes=(0, 1, 2)):
+                shape_guard_axes=(0, 1, 2), shape_guard_steps=()):
     """Reduce each material component to about ratio of its triangles.
 
     Default reducer: fast_simplification, which also collapses rim edges, so
@@ -128,7 +135,9 @@ def reduce_mesh(vertices, faces, ratio, preserve_materials=(), preserve_shared_s
     that share of its extent on any axis is reduced boundary-locked instead,
     or kept as in the source (keeps_shape; CHIM-AZURA-FLOATING-FLORA-43);
     shape_guard_min (lod_shape_guard_min): only components of at least that
-    many source triangles are guarded."""
+    many source triangles are guarded; shape_guard_steps (lod_shape_guard_steps):
+    target multiples tried with the same reducer before the boundary-locked
+    retry (SHAPE_GUARD_STEPS; () = straight to the locked retry)."""
     import fast_simplification
     if not 0 < ratio <= 1:
         raise ValueError('Invalid static LOD ratio')
@@ -158,7 +167,7 @@ def reduce_mesh(vertices, faces, ratio, preserve_materials=(), preserve_shared_s
                 for point in np.round(vertices[mf[ids][:,:3],:3].reshape(-1,3),2):
                     owners.setdefault(tuple(point),set()).add((int(material),k))
         shared_points={point for point,group in owners.items() if len(group)>1}
-    guarded=0;guard_kept=0
+    guarded=0;guard_kept=0;guard_stepped=0
     def keep_source(original,material):
         for face in original:
             n=len(out_v);out_v.extend(vertices[face[:3]].tolist())
@@ -192,7 +201,22 @@ def reduce_mesh(vertices, faces, ratio, preserve_materials=(), preserve_shared_s
             else:
                 points,triangles=fast_simplification.simplify(
                     points,triangles.astype(np.int32),target_count=target,agg=agg,preserve_border=preserve_border)
+            stepped=False
             if shape_guard and not lock_boundaries and len(original)>=shape_guard_min and not keeps_shape(source_points,points,triangles,shape_guard,shape_guard_axes):
+                for step in shape_guard_steps:
+                    more=min(len(source_triangles),max(target+1,round(target*step)))
+                    if more>=len(source_triangles):
+                        break
+                    if agg == 7.0 and not preserve_border:
+                        p2,t2=fast_simplification.simplify(source_points,source_triangles.astype(np.int32),target_count=more)
+                    else:
+                        p2,t2=fast_simplification.simplify(source_points,source_triangles.astype(np.int32),target_count=more,
+                                                           agg=agg,preserve_border=preserve_border)
+                    if len(t2) and keeps_shape(source_points,p2,t2,shape_guard,shape_guard_axes):
+                        points,triangles,stepped=p2,t2,True
+                        guard_stepped+=1
+                        break
+            if shape_guard and not stepped and not lock_boundaries and len(original)>=shape_guard_min and not keeps_shape(source_points,points,triangles,shape_guard,shape_guard_axes):
                 from mold_shell import quadric_simplify
                 guarded+=1
                 locked=boundary_vertices(source_triangles)
@@ -235,7 +259,8 @@ def reduce_mesh(vertices, faces, ratio, preserve_materials=(), preserve_shared_s
     if lock_boundaries:
         details={'reducer':'boundary-locked quadric (rims and shared seams kept)','locked_vertices':locked_total}
     if shape_guard:
-        details['shape_guard']={'share':shape_guard,'components_relocked':guarded-guard_kept,'components_kept':guard_kept}
+        details['shape_guard']={'share':shape_guard,'components_relocked':guarded-guard_kept,'components_kept':guard_kept,
+                               'components_stepped':guard_stepped,'steps':list(shape_guard_steps)}
     return np.array(out_v),np.array(out_f),{**details,'source_triangles':len(faces),
         'lod_triangles':len(out_f),'material_components':groups,'ratio':ratio,
         'preserved_materials':sorted(int(x) for x in preserve_materials),

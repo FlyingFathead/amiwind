@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 6 times; something has to be done
+## PERSISTING: reported 8 times; something has to be done
 
 - Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Maintainer repeat: F unsheathes fists successfully; V after F produces world light but no third-person carried torch pose or animation.
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Original human/beast and common first-person torch groups confirmed. Player companion/pose remains unwired; guard overlay has layout limits. No torch/native acceptance.
@@ -10,6 +10,8 @@
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): RC2 torch source candidate implemented. All 20 companion bake/readbacks, 35 converter and 36 runtime checks pass. Exact target/native, matched original, package/maintainer acceptance pending.
 - Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Scoped native Nord F-then-V hold/movement/off and first-person control observed; original game/audio clip retained. Exact full package/reference and maintainer acceptance pending.
 - Reported with v0.0.43-dev2 at 2026-10-18 16:41 +0300: maintainer: the inventory character display does not show the equipped torch either; it should hold it
+- Reported with v0.0.44-dev1 at 2026-10-19 15:56 +0300: maintainer, vanity camera: the player shows the raised-arm torch pose but no torch in the hand
+- Reported with v0.0.44-dev1 at 2026-10-19 15:57 +0300: maintainer: every third-person camera, not only the vanity camera; the raised-arm pose shows, the torch model is missing
 
 <!-- END GENERATED PERSISTING -->
 
@@ -36,7 +38,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
+- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

@@ -4,6 +4,7 @@
 Every fixture is synthetic: made-up cell names, numbers and meshes. No game data.
 """
 import json
+import os
 import re
 import sys
 import tempfile
@@ -410,6 +411,79 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(doc['cells']['2,2']['last_build']['elapsed_s'], 90.0)
         self.assertEqual(doc['cells']['2,2']['last_build']['chim_stage_s'], 50.0)
         self.assertIsNone(doc['cells']['0,0']['last_build'])
+
+
+def multi_run(folder, cells, built_at=None):
+    """A synthetic CHIM run with one region frame per cell (each frame's chunks owned inside its own cell)."""
+    frames, per = [], []
+    for x, y in cells:
+        fr = {'cell': [x, y], 'centre': [x * 8192 + 4096.0, y * 8192 + 4096.0], 'grain': 256, 'low': [-1024.0, -1024.0],
+              'nx': 8, 'ny': 8}
+        frames.append({'frame': fr, 'placements': 1})
+        per += [{'frame': ch.frame_path(fr['cell']), 'cell': [i, j], 'owned': 1, 'terrain_faces': 1, 'placed_faces': 1,
+                 'bytes': 10} for i in range(8) for j in range(8)]
+    write(folder / 'chim-receipt.json', {'areas': ['rc%d' % i for i in range(len(cells))], 'builder': 'chim',
+                                         'chim_version': '9.9.9', 'frames': frames, 'placements': len(cells)})
+    write(folder / 'chim-stats.json', {'chim_version': '9.9.9', 'world_format': '0.7', 'chunks': {'per_chunk': per}})
+
+
+class OnChimTests(unittest.TestCase):
+    """TRACKER-CHIM-COUNT-STALE-44: "on CHIM in build X" comes from the build's own world, not the audit buckets."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.out = Path(self._tmp.name) / 'out'
+        self.root = Path(self._tmp.name)
+
+    def census(self):
+        c = census_doc()
+        c['land'] += ['9,9']
+        c['land_bloodmoon'] = ['9,9']              # a second island's land cell, never in the build
+        c['cells']['9,9'] = {'counts': {}, 'placements': 0, 'flora': 0, 'meshes': [], 'doors': []}
+        return c
+
+    def test_a_build_with_n_chim_cells_counts_n(self):
+        cells = [(x, y) for x, y in LAND if (x, y) != (4, 4)] + [(5, 5)]     # 24 land cells + one sea cell
+        multi_run(self.root / 'old', cells[:10])
+        multi_run(self.root / 'new', cells)
+        os.utime(self.root / 'new' / 'chim-receipt.json', (2000000000, 2000000000))      # built later than 'old'
+        ingest(self.out, ['old=%s' % (self.root / 'old')], census=self.census())
+        doc = ingest(self.out, ['new=%s' % (self.root / 'new')], census=self.census(), labels={'new': 'New build'})
+        o = doc['headline']['on_chim']
+        self.assertEqual(o['build'], 'new')
+        self.assertEqual(o['label'], 'New build')
+        self.assertEqual((o['cells'], o['land'], o['sea']), (25, 24, 1))
+        isl = {i['island']: i for i in o['islands']}
+        self.assertEqual((isl[1]['land'], isl[1]['land_cells'], isl[1]['sea']), (24, 25, 1))
+        self.assertEqual((isl[2]['land'], isl[2]['land_cells']), (0, 1))      # the other island is not mixed in
+        self.assertEqual([r['build'] for r in doc['headline']['on_chim_builds']], ['new', 'old'])
+        self.assertEqual(doc['headline']['on_chim_builds'][1]['cells'], 10)
+        self.assertEqual(doc['cells']['0,0']['chim']['on_chim_build'], 'new')
+        self.assertEqual(doc['cells']['0,0']['chim']['on_chim_builds'], ['old', 'new'])
+        self.assertIsNone(doc['cells']['4,4']['chim']['on_chim_build'])
+        self.assertIn('On CHIM in new: 25 cells (land 24, sea 1)', cp.on_chim_line(doc['headline']))
+
+    def test_a_cell_an_older_chimport_run_called_empty_sea_still_counts_when_the_build_carries_it(self):
+        cp.record_result(self.out, {'format': cp.RESULT_FORMAT, 'build': 'chimport-old',
+                                    'generated': '2020-01-01T00:00:00+00:00',
+                                    'cells': {'0,0': {'empty': True, 'converted': False}}})
+        multi_run(self.root / 'new', LAND)
+        doc = ingest(self.out, ['new=%s' % (self.root / 'new')])
+        c = doc['cells']['0,0']['chim']
+        self.assertEqual(c['bucket'], 'empty_sea')            # the audit bucket is kept (older input, still shown)
+        self.assertEqual(c['on_chim_build'], 'new')           # and the build carries it
+        self.assertEqual(doc['headline']['on_chim']['land'], 25)
+        self.assertEqual(doc['headline']['converted'], 24)   # the audit figure alone misses it
+
+    def test_the_page_shows_the_build_figure(self):
+        import cell_progress_md as md
+        multi_run(self.root / 'new', LAND)
+        doc = ingest(self.out, ['new=%s' % (self.root / 'new')], labels={'new': 'Synthetic build'})
+        page = md.render(doc, '2026-10-19 12:00 +0300')
+        self.assertIn('**On CHIM in the newest ingested build (Synthetic build): 25 of 25 Vvardenfell land cells (100.0 %), '
+                      'plus 0 sea cells.**', page)
+        self.assertEqual(md.check(page), [])
 
 
 class ResultTests(unittest.TestCase):

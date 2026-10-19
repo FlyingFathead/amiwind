@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.43-dev2 at 2026-10-18 17:56 +0300: maintainer pinned the suspect: the big planter tree in the middle, entity 93, func_wall, source ref 378691, model *90 (local 130 -5 18)
 - Reported with v0.0.43-dev2 at 2026-10-18 17:57 +0300: maintainer pinned a second suspect: a wooden table, entity 6, func_wall, source ref 65016, model *4 (local 7 125 20): 'feels like polycount 1 million'
 - Reported with v0.0.43-dev2 at 2026-10-18 20:12 +0300: maintainer: Vivec Redoran Plaza is a frame-rate killer too; the planter plants (func_wall model *79, ref 466735) should probably be sprites
+- Reported with v0.0.44-dev1 at 2026-10-19 13:28 +0300: image step stopped: the Balmora Mages Guild plant sprite was placed but not installed (only Vivec's room installer copied sprites); fixed for every installer
 
 <!-- END GENERATED PERSISTING -->
 
@@ -34,7 +35,7 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Status: 18 October 2026](#status-18-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

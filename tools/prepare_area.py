@@ -421,6 +421,7 @@ def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None,vis_mode='
                         if tasks else ()):
         slug=report['map'];rooms[slug]=cell;reports.append(report)
         replace_copy(scene/'area-work'/slug/'room.bsp',scene/'id1/maps'/f'{slug}.bsp')
+        from interior_plants import install_room_files;install_room_files(scene,slug,report)
         print('Interior ready:',slug,report['bytes'],'bytes',flush=True)
     return populate(data,scene,rooms,reports,ffmpeg,jobs)
 

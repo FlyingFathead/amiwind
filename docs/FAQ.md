@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026). FAQ revision 17._
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026). FAQ revision 18._
 
 <!-- contents start -->
 ## Contents
@@ -37,10 +37,12 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026). FAQ revision 17._
 
 *Harry Horsperg's perspective as the project's author.*
 
-**Latest release:** v0.0.42 - Things Are Starting To Look Pretty Khuul: 1,168 of Vvardenfell's 1,395
-exterior cells on the CHIM engine ([release notes](RELEASE-v0.0.42.md)).
-**Next (v0.0.43):** every exterior cell of Vvardenfell on CHIM; the development snapshots reached 1,348 cells
-with v0.0.43-dev2. Then (v0.0.44) an audit of every entrance and a tracker for the interiors. See the
+**Latest release:** v0.0.43 - Let There Be CHIM: Vvardenfell's Outdoors, All of It: every exterior cell of
+Vvardenfell on the CHIM engine, 1,348 cells in the region list and 46 more inside the town frames
+([release notes](RELEASE-v0.0.43.md)).
+**Next:** v0.0.44, a patch release that makes the Bitter Coast trees fit in memory again
+([v0.0.44-dev1](RELEASE-v0.0.44-dev1.md)); then bug fixes, the pauses when crossing from cell to cell first, and
+every interior of the base game that is still missing. See the
 [progress tracker](chim/PROGRESS_TRACKER.md), the [roadmap](ROADMAP.md) and the [bug tracker](BUGS.md).
 
 ## What is possible on the Amiga?
@@ -221,12 +223,13 @@ configuration**:
 | Default game display | 320 × 200, 8-bit indexed colour |
 
 These settings are recorded in the
-[FS-UAE preset](../resources/emulators/AmiWind-v0.0.30-FS-UAE.fs-uae),
-[WinUAE preset](../resources/emulators/AmiWind-v0.0.30-WinUAE.uae) and
+[FS-UAE preset](../resources/emulators/AmiWind-v0.0.43-FS-UAE.fs-uae),
+[WinUAE preset](../resources/emulators/AmiWind-v0.0.43-WinUAE.uae) and
 [AGA build guide](AGA_BUILD.md). The Zorro III setting describes the emulator's
 memory configuration; it is not a specification for an ordinary A1200 expansion.
 
-The standard engine build currently targets a 68040 and FPU, and the supplied
+The standard engine build currently targets a 68040 and FPU (the game disk also carries a 68060 engine, started
+automatically on a 68060), and the supplied
 startup checker requires AGA and sufficient memory. A stock A1200 or stock A500
 is therefore not a supported configuration for this build. The earlier A500
 experiment remains in the repository, alongside the current accelerated AGA
@@ -279,10 +282,10 @@ resolution. Neither is an AmiWind measurement or a direct prediction of its
 frame rate, Chip RAM bandwidth or loading performance.
 
 There is therefore a sound reason to pursue these machines. Extra installed
-RAM does not automatically enlarge AmiWind's current **11 MiB game heap**,
-defined in the [runtime allocation code](../engine/aga/src/sys_amiga.c), but it
-provides room to develop larger budgets where useful. Measurements show where
-that would help: a fully loaded Seyda Neen sub-cell leaves only about 2.6 MB
+RAM does not enlarge AmiWind's **11 MiB game heap**, defined in the
+[runtime allocation code](../engine/aga/src/sys_amiga.c); it goes to the CHIM
+engine's cache instead ([next answer](#can-amiwind-use-more-ram-if-my-amiga-has-it)).
+Earlier measurements on the classic world showed where more would help: a fully loaded Seyda Neen sub-cell leaves only about 2.6 MB
 of the heap for cached models, so each crossing evicts and re-reads actor
 models (see [Seyda Neen performance](SEYDA_NEEN_PERFORMANCE.md)). A larger heap
 on a high-memory machine could keep them across crossings; this is untested.
@@ -292,28 +295,23 @@ selected configuration.
 
 ## Can AmiWind use more RAM if my Amiga has it?
 
-**Not yet, but it is planned, as your choice.** Today the game heap is a fixed
-**11 MiB** however much memory is installed, so extra RAM sits unused.
+**Yes, for the CHIM engine's cache, and you can turn it off.** At start the engine
+looks at the Fast RAM that is free beyond a safety margin and uses it as CHIM's cache:
+shared models, textures and world chunks stay in memory across map changes instead of
+being read from disk again. The startup logo says how much it found; pressing **M** there
+starts that session on the standard memory, and Options > Extra RAM: Off keeps it off.
+See [real hardware](REAL_HARDWARE.md) for the settings (`-chimcache`, `aw_autoram`,
+`-heapmb`).
 
 The baseline stays the contract: **2 MiB Chip RAM and 16 MiB Fast RAM** is the
-machine AmiWind has to work on, and every route is tested there first. On top of that,
-the planned streaming engine (see the [roadmap](ROADMAP.md)) will let the player allow
-AmiWind to use more:
+machine AmiWind has to work on, and every route is tested there first. Extra memory
+means fewer loading pauses, not heavier frames: the view distance, detail and number of
+active characters stay the same.
 
-- **Your choice at start-up.** A short boot screen will offer the settings ("S for
-  settings, ENTER to start"): standard memory, automatic, or a maximum you set. Without
-  a key press the game starts with your remembered choice; the default is the standard
-  baseline.
-- **Fewer pauses, not heavier frames.** Extra memory keeps more of the world ready:
-  neighbouring and recently visited areas, shared models and textures, and data that
-  has already been unpacked, so crossings and doors load less from disk. The view
-  distance, detail and number of active characters stay the same, so the frame rate
-  does not depend on how much RAM you have.
-- **Faster memory first.** Expansion memory can sit on different cards at different
-  speeds. The engine will keep its busiest data in the fastest Fast RAM and use slower
-  banks only for caches, instead of one large block that might land on the slowest card.
-- **Always leaving headroom** for the operating system and for the moment two areas are
-  loaded at once during a transition.
+The game heap itself (Quake's own cache for actors and sounds) is still a fixed
+**11 MiB** from the build unless the start argument `-heapmb N` says otherwise; sizing it
+from the free Fast RAM is planned
+([ENGINE-HEAP-FIXED-SIZE-43](bugs/ENGINE-HEAP-FIXED-SIZE-43.md)).
 
 Two limits stay whatever the RAM: Chip RAM (the display and sound hardware can only
 use Chip RAM), and the map format's own limits. Classic expansions reached 128-256 MB
@@ -554,11 +552,11 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **18 October 2026**, the latest release is **v0.0.42: Things Are Starting To Look Pretty Khuul**:
-1,168 of Vvardenfell's 1,395 exterior cells run on the CHIM engine, with Seyda Neen, Balmora, the whole city of
-Vivec, Khuul, Sadrith Mora, Vos, Molag Mar, Pelagiad, Gnisis and Ghostgate among them. The v0.0.43 development
-snapshots carry it further (1,348 cells in v0.0.43-dev2), and v0.0.43 aims at every exterior cell; the rest of
-the island is still in the classic world until then. The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows
+As of **19 October 2026**, the latest release is **v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of
+It**: every exterior cell of Vvardenfell runs on the CHIM engine (1,348 cells in the region list and 46 more inside
+the town frames), from Seyda Neen, Balmora and the whole city of Vivec to Ald-ruhn, Maar Gan, Suran and Red
+Mountain; no classic region maps are left outdoors. Interiors are still classic Quake maps, and some of the base
+game's interiors are not in the build yet. The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows
 which cell is which. "Release" here identifies the project's release track; AmiWind as a whole is still an early
 work in progress.
 
@@ -589,7 +587,8 @@ The documented playable scope now includes:
 - The coast converted first and inwards from there (v0.0.35, v0.0.36), the whole city of Vivec as
   one CHIM area (v0.0.36), lava regions and Tel Uvirith (v0.0.38), rings 0 to 2 of the island in
   full CHIM (v0.0.40), whole regions with compact collision for the Telvanni towns (v0.0.41), and the cells by
-  weight with the clouds back in the sky and the first look of the original HUD and inventory (v0.0.42).
+  weight with the clouds back in the sky and the first look of the original HUD and inventory (v0.0.42), and
+  every exterior cell of Vvardenfell on CHIM (v0.0.43).
 
 World coverage and converted assets do not mean complete Morrowind gameplay.
 Full combat, quest simulation, services, schedules, conversations and the
@@ -609,7 +608,7 @@ without them, started automatically on a 68060:
 [trapped instructions per frame](68060.md#trapped-instructions-per-frame).
 
 See the [current overview](../README.md),
-[v0.0.42 release notes](RELEASE-v0.0.42.md),
+[v0.0.43 release notes](RELEASE-v0.0.43.md),
 [project state](PROJECT_STATE.md) and [roadmap](ROADMAP.md) for maintained scope
 and outstanding work.
 
@@ -746,10 +745,11 @@ take it further.
 
 ---
 
-Technical baseline for this FAQ:
-[published dev4 source commit eb08c92](https://github.com/FlyingFathead/amiwind/commit/eb08c9249d788ffa05e9e8d0aa393417cdc009bd),
-6 October 2026. RC1 is separately identified as in preparation; this FAQ does
-not turn candidate checks into published-release or real-hardware acceptance.
+Technical baseline for this FAQ: the published
+[v0.0.43 release](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.43) (commit
+[6577578](https://github.com/FlyingFathead/amiwind/commit/65775785c9b0008164e19100099355d3d368e2f1)),
+19 October 2026; the line in development is v0.0.44-dev1. Emulator results in this FAQ are not
+real-hardware acceptance.
 The linked project documents provide more detailed and evolving status.
 
 ---

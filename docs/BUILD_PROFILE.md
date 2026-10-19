@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -218,6 +218,11 @@ median of the exact, else same-units, runs.
 | `WAIVED` | a FAIL or FIX-NOW covered by a waiver in `config/perf-guard.json` (bug ID, owning job, expiry date) | no; shown in the table, the result and `aw status` |
 | `BUSY HOST` | other work loaded the machine (the profiler's `host_busy`) in this run or the only baseline: time is never compared; cores only when the section still had at least the baseline's cores free, or left most of its free cores idle (the reasons say which) | no |
 | `ok`, `no baseline` | | no |
+
+**A perf guard failure does not hold back a playtest, decided for the project on 19 October 2026.** When every
+stage and every other check of a build passed and only the perf guard failed, the image works: it is delivered as a
+playtest with the failing sections named as known builder bugs, and those bugs are fixed right after.
+The guard still fails the build's result, so the regression is never quietly accepted.
 
 Cores are compared only where at least 4 cores were usable (with two or three units one long unit
 sets the cores, not the code). A waiver ends at its date, or as soon as the bug register marks its

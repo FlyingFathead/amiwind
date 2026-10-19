@@ -515,6 +515,39 @@ def headline(cells):
     return out
 
 
+def on_chim_summary(cells, digests):
+    """Per ingested CHIM build, newest first: the cells it put on CHIM (cells its world's frames own), by island, land and
+    sea. This is the answer to "on CHIM in build X" (TRACKER-CHIM-COUNT-STALE-44); the audit buckets above are a separate
+    measure (a seabed cell measured as empty sea by a CHIMport run is still on CHIM when a build carries it)."""
+    islands = sorted({c.get('island') for c in cells.values() if c.get('island')})
+    land_total = {i: sum(1 for c in cells.values() if c['land'] and c.get('island') == i) for i in islands}
+    rows = []
+    for d in sorted(digests, key=lambda d: (d.get('built_at') or '', d['name']), reverse=True):
+        mine = [cells[k] for k, e in d['cells'].items() if e.get('converted') and k in cells]
+        per = []
+        for i in islands:
+            got = [c for c in mine if c.get('island') == i]
+            land = sum(1 for c in got if c['land'])
+            per.append({'island': i, 'name': ISLAND_NAMES.get(i, 'island %d' % i), 'land_cells': land_total[i],
+                        'land': land, 'sea': len(got) - land,
+                        'percent': round(100.0 * land / land_total[i], 2) if land_total[i] else 0.0})
+        land = sum(1 for c in mine if c['land'])
+        rows.append({'build': d['name'], 'label': d.get('label'), 'commit': d.get('commit'), 'built_at': d.get('built_at'),
+                     'cells': len(mine), 'land': land, 'sea': len(mine) - land,
+                     'no_island': sum(1 for c in mine if not c.get('island')), 'islands': per})
+    return rows
+
+
+def on_chim_line(h):
+    """One plain line: what the newest ingested build put on CHIM, per island."""
+    o = h.get('on_chim')
+    if not o:
+        return 'On CHIM: no CHIM build ingested'
+    isl = '; '.join('%s land %d / %d (%.2f%%)%s' % (i['name'], i['land'], i['land_cells'], i['percent'],
+                                                    ', sea %d' % i['sea'] if i['sea'] else '') for i in o['islands'])
+    return 'On CHIM in %s: %d cells (land %d, sea %d); %s' % (o['build'], o['cells'], o['land'], o['sea'], isl)
+
+
 # ------------------------------------------------------------------ bugs and ledger
 
 def link_bugs(bugs, areas_cfg, area_cells, explicit=True):
@@ -947,7 +980,7 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
             'x': x, 'y': y, 'name': d.get('name') or nm.get('name') or '', 'region': d.get('region') or nm.get('region') or '',
             'set': land_set.get(k) or (mc or {}).get('set') or '', 'land': k in land,
             'contents': contents, 'legacy': legacy_of(pc), 'risk': risk, 'cost': cost,
-            'chim': {'converted': False, 'builds': [], 'owner': None},
+            'chim': {'converted': False, 'builds': [], 'owner': None, 'on_chim_build': None, 'on_chim_builds': []},
             'audits': {m: {'status': 'not_measured', 'detail': None, 'build': None} for m in MECHANISMS},
             'bugs': [], 'last_build': None, 'provenance': None,
         }
@@ -970,6 +1003,11 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
                 continue
             for a in d['areas']:
                 area_cells[a].add(k)
+            # On CHIM in this build: its world's frames own the cell. Kept apart from the audit buckets, which a CHIMport
+            # result can set (empty sea, open ocean) although the build carries the cell (TRACKER-CHIM-COUNT-STALE-44).
+            ch['on_chim_build'] = d['name']
+            if d['name'] not in ch['on_chim_builds']:
+                ch['on_chim_builds'].append(d['name'])
             ch.pop('partial_terrain', None)
             ch['converted'] = True
             ch['build'] = d['name']
@@ -1115,7 +1153,9 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     for k, rec in cells.items():
         # a seabed cell measured as empty sea (CHIMport) is a sea cell too: without an island it would drop out of the
         # published reference and the build's regions preflight would call it unknown (CHIMPORT-SEABED-NO-ISLAND-42)
-        sea = rec['chim'].get('ocean') or (not rec['land'] and rec['chim'].get('empty'))
+        # a sea cell a CHIM build carries belongs to an island too, so the per-island on-CHIM figure counts it
+        # (TRACKER-CHIM-COUNT-STALE-44)
+        sea = rec['chim'].get('ocean') or (not rec['land'] and (rec['chim'].get('empty') or rec['chim'].get('on_chim_build')))
         if sea and not rec.get('island') and placed:
             x, y = parse_cell(k)
             mine = [p for p in placed if rec.get('set') and p[2] == rec['set']] or placed
@@ -1178,6 +1218,8 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
         write_json(out / OUT_FILES['curve'], curve, pretty=True)
     # --- summary, next lists, history
     head = headline(cells)
+    head['on_chim_builds'] = on_chim_summary(cells, digests)
+    head['on_chim'] = head['on_chim_builds'][0] if head['on_chim_builds'] else None
     per_mech = {m: {r: sum(1 for c in cells.values() if c['chim']['converted'] and c['audits'][m]['status'] == r)
                     for r in RESULTS} for m in MECHANISMS}
     runs_meta = [{'name': d['name'], 'label': d.get('label'), 'commit': d.get('commit'), 'chim_version': d.get('chim_version'),
@@ -1252,6 +1294,9 @@ def update_history(out, head, builds, now):
     lines = [x for x in every if x.get('type') is None]      # count lines; maintainer release lines (type "release") stay in the file
     entry = {'date': now, 'passed': head['passed'], 'land_cells': head['land_cells'], 'converted': head['converted'],
              'buckets': {b: head[b] for b in BUCKETS}, 'builds': builds}
+    if head.get('on_chim'):
+        entry['on_chim'] = {'build': head['on_chim']['build'], 'cells': head['on_chim']['cells'],
+                            'land': head['on_chim']['land']}
     same = lines and {k: v for k, v in lines[-1].items() if k != 'date'} == {k: v for k, v in entry.items() if k != 'date'}
     if not same:
         lines.append(entry)
@@ -1459,7 +1504,8 @@ def main(argv=None):
             print('no tracker data in %s yet; run ingest' % out)
             return 1
         h = doc['headline']
-        print('Cell complete %d | CHIM cells: %d / %d (%.2f%%) | approved %d, playtested %d, audits passed %d, converted with failing audits %d, '
+        print(on_chim_line(h))
+        print('Cell complete %d | audits passed, all islands: %d / %d land cells (%.2f%%) | approved %d, playtested %d, audits passed %d, converted with failing audits %d, '
               'converted unmeasured %d, not started %d' % (h['complete'], h['passed'], h['land_cells'], h['percent'], h['approved'],
               h['playtested'], h['audits_passed'], h['converted_failing'], h['converted_unmeasured'], h['not_started']))
         return 0
@@ -1592,7 +1638,10 @@ def main(argv=None):
                  getattr(a, 'now', None), getattr(a, 'png', False) or (out / OUT_FILES['png']).is_file(),
                  remembered.get('config_dir') or str(Path(__file__).resolve().parents[1] / 'config'))
     h = doc['headline']
-    print('CHIM cells: %d / %d (%.2f%%); converted %d, not started %d; %d cells recorded' %
+    print(on_chim_line(h))
+    # The audit figure: cells whose audits passed, over the LAND cells of every island (Solstheim included); empty-sea
+    # and open-ocean cells are not in it. It is not "on CHIM in the build" (TRACKER-CHIM-COUNT-STALE-44).
+    print('Audit progress, all islands: passed %d / %d land cells (%.2f%%); converted %d, not started %d; %d cells recorded' %
           (h['passed'], h['land_cells'], h['percent'], h['converted'], h['not_started'], len(doc['cells'])))
     return 0
 

@@ -529,7 +529,8 @@ class PlayerBodyBudgetTests(unittest.TestCase):
             kwargs['face_parts'].extend([17] * len(result[1]))
             return result
         with patch('npc_geometry.bake', side_effect=labeled_bake) as bake, \
-             patch('npc_anim.fit', side_effect=lambda *args: real_fit(*args, budget=48 * 1024)):
+             patch('npc_anim.fit', side_effect=lambda *args: real_fit(*args, budget=48 * 1024)), \
+             patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'default'}):
             with self.assertRaisesRegex(ValueError, 'synthetic body: no body fits') as caught:
                 view._fit_body('synthetic body', [], [], [], b'', self.groups())
         self.assertEqual(bake.call_count, 4 * len(view.BUDGETS))
@@ -540,6 +541,27 @@ class PlayerBodyBudgetTests(unittest.TestCase):
         self.assertEqual([c.kwargs['body_leg_contour'] for c in bake.call_args_list],
                          [0] * (2 * len(view.BUDGETS)) + [1] * len(view.BUDGETS) +
                          [2] * len(view.BUDGETS))
+
+    def test_locked_head_reducer_falls_back_to_the_previous_reducer(self):
+        """NPC-HEAD-DECIMATION-33 (v0.0.44-dev1 image step): when no body fits with the locked head reducer, the
+        whole search runs again with the previous head reducer, and the environment is restored afterwards."""
+        import os
+        import prepare_player_view as view
+        seen = []
+        def search(*args):
+            seen.append(os.environ.get('AMIWIND_NPC_HEAD_REDUCER'))
+            if len(seen) == 1:
+                raise ValueError('synthetic body: no body fits the existing budgets (480/96/plain: over)')
+            return 'fitted'
+        with patch.object(view, '_fit_body_search', side_effect=search), \
+             patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'locked'}):
+            self.assertEqual(view._fit_body('synthetic body', [], [], [], b'', self.groups()), 'fitted')
+            self.assertEqual(os.environ['AMIWIND_NPC_HEAD_REDUCER'], 'locked')
+        self.assertEqual(seen, ['locked', 'default'])
+        with patch.object(view, '_fit_body_search', side_effect=ValueError('synthetic body: malformed source')), \
+             patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'locked'}):
+            with self.assertRaisesRegex(ValueError, 'malformed source'):
+                view._fit_body('synthetic body', [], [], [], b'', self.groups())
 
     def test_unrelated_geometry_error_aborts_before_a_later_fit(self):
         import npc_anim as anim

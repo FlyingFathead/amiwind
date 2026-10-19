@@ -224,6 +224,31 @@ def _sources(data):
 
 
 def _fit_body(identifier, shapes, materials, textures, palette, groups):
+    """_fit_body_search with the configured head reducer; when the boundary-locked head reducer leaves no body
+    that fits (it keeps every rim vertex), the search runs again with the previous head reducer and the fallback
+    is logged, as the NPC bake does (npc_geometry._retry_head_reducer; v0.0.44-dev1 build: the image step
+    stopped on the Argonian female player body, NPC-HEAD-DECIMATION-33)."""
+    import os
+    from mesh_geometry_env import NPC_HEAD_REDUCER_VARIABLE, npc_head_reducer
+    try:
+        return _fit_body_search(identifier, shapes, materials, textures, palette, groups)
+    except ValueError as error:
+        if npc_head_reducer() != 'locked' or 'no body fits the existing budgets' not in str(error):
+            raise
+        print('player body %s: no fit with the locked head reducer; this body uses the previous head reducer'
+              % identifier, flush=True)
+        saved = os.environ.get(NPC_HEAD_REDUCER_VARIABLE)
+        os.environ[NPC_HEAD_REDUCER_VARIABLE] = 'default'
+        try:
+            return _fit_body_search(identifier, shapes, materials, textures, palette, groups)
+        finally:
+            if saved is None:
+                os.environ.pop(NPC_HEAD_REDUCER_VARIABLE, None)
+            else:
+                os.environ[NPC_HEAD_REDUCER_VARIABLE] = saved
+
+
+def _fit_body_search(identifier, shapes, materials, textures, palette, groups):
     """Keep the first model that fits full normal and ready gait plus actions.
 
     Search for a full-frame fit before accepting a reduced animation. If no

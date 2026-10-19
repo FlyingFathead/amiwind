@@ -227,6 +227,22 @@ def inclusion_lines(doc, inclusion):
                   ['No packaged inclusion evidence supplied.']) + ['']
 
 
+def on_chim_lines(doc):
+    """What the newest ingested CHIM build put on CHIM (TRACKER-CHIM-COUNT-STALE-44): the build's own world, not the audits."""
+    o = (doc.get('headline') or {}).get('on_chim')
+    if not o:
+        return []
+    isl = [i for i in o.get('islands', []) if i.get('island') == MAIN_ISLAND]
+    if not isl:
+        return []
+    i = isl[0]
+    return ['**On CHIM in the newest ingested build (%s): %s of %s %s land cells (%s), plus %s sea cells.**' % (
+                o.get('label') or o['build'], n(i['land']), n(i['land_cells']), i['name'], pct(i['land'], i['land_cells']),
+                n(i['sea'])), '',
+            'A cell is on CHIM in a build when a frame of the CHIM world of that build owns it. The tracker records per cell '
+            'the newest build that carries it.', '']
+
+
 def render(doc, today=None, inclusion=None):
     """The page text (LF, no trailing whitespace) for one aw-cell-progress-1 document."""
     today = today or datetime.datetime.now().astimezone().strftime('%Y-%m-%d %H:%M %z')
@@ -241,7 +257,7 @@ def render(doc, today=None, inclusion=None):
            'Live status of the open world on CHIM, Vvardenfell (island %d). Generated page: do not edit by hand. '
            'Per-cell detail is in the Toolkit and its CSV export.' % MAIN_ISLAND, '',
            '**Conversion/audit progress: %s of %s (%s)**' % (n(done), n(total), pct(done, total)), '',
-           'These audit totals do not count cells included in a playable build; see Included in builds below.', '',
+           'These audit totals do not count cells included in a playable build; see Included in builds below.', ''] + on_chim_lines(doc) + [
            'Map cells %s: land and empty-sea cells %s (done %s, %s) and open-ocean cells %s (shared ocean chunk made, not yet placed in the game: not counted as done).' % (
                n(map_total), n(land_total), n(land_done), pct(land_done, land_total), n(cl['ocean'])), '',
            '- %s: %s' % (cp.COMPLETE_LABEL, n(cl['complete'])),

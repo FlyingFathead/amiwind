@@ -1907,7 +1907,10 @@ function chimUi() {
   if (!chim) return;
   const isOn = chimOn(), h = chim.headline;
   const ts = chim.totals && chim.totals.all && chim.totals.all.stats || {};
-  $('chimcount').textContent = isOn ? (h.islands && h.islands.length ? h.islands[0].name + ' done ' + h.islands[0].done.toLocaleString() + ' of ' + h.islands[0].cells.toLocaleString() + ' (' + h.islands[0].percent + ' %)' : 'CHIM cells ' + h.passed + ' / ' + h.land_cells + ' (' + h.percent + '%)') + (h.converted ? ' · converted ' + h.converted + (ts['meshes.new'] != null ? ' · new meshes ' + nf(ts['meshes.new']) : '') +
+  // On CHIM in the newest ingested build (its own world), before the audit figure (TRACKER-CHIM-COUNT-STALE-44)
+  const oc = h.on_chim, oi = oc && (oc.islands || []).find(i => i.island === 1);
+  const onChim = oi ? 'on CHIM in ' + (oc.label || oc.build) + ': ' + oi.land.toLocaleString() + ' of ' + oi.land_cells.toLocaleString() + ' ' + oi.name + ' land cells (' + oi.percent + ' %) + ' + oi.sea.toLocaleString() + ' sea · audits: ' : '';
+  $('chimcount').textContent = isOn ? onChim + (h.islands && h.islands.length ? h.islands[0].name + ' done ' + h.islands[0].done.toLocaleString() + ' of ' + h.islands[0].cells.toLocaleString() + ' (' + h.islands[0].percent + ' %)' : 'CHIM cells ' + h.passed + ' / ' + h.land_cells + ' (' + h.percent + '%)') + (h.converted ? ' · converted ' + h.converted + (ts['meshes.new'] != null ? ' · new meshes ' + nf(ts['meshes.new']) : '') +
     (ts['time.convert_s'] != null ? ' · convert time ' + nf(ts['time.convert_s']) + ' s' : '') : '') : '';
   $('chimpanel').hidden = !isOn;
   if (isOn) { if (chimClicked) showChimCell(chimClicked.x, chimClicked.y); else if (chimShownInterior) showChimInterior(chimShownInterior); else $('chimpanel').innerHTML = chimOverview(); }

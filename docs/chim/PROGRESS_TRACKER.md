@@ -1,11 +1,11 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.43-dev2 (18 October 2026)._
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [Current state, 18 October 2026](#current-state-18-october-2026)
+- [Current state, 19 October 2026](#current-state-19-october-2026)
 - [Why it exists](#why-it-exists)
 - [Data flow](#data-flow)
 - [Statuses](#statuses)
@@ -33,7 +33,7 @@ _Last updated with AmiWind v0.0.43-dev2 (18 October 2026)._
 
 Where the conversion of the open world to CHIM stands, and how the tracker that measures it works.
 
-## Current state, 18 October 2026
+## Current state, 19 October 2026
 
 The open world is converted to CHIM release by release, lightest cells first. Exterior cells of Vvardenfell on CHIM
 in each packaged build (1,395 in all, sea cells included):
@@ -43,11 +43,20 @@ in each packaged build (1,395 in all, sea cells included):
 | v0.0.42 (released 17 October) | 1,168 of 1,395 (84 %) | |
 | v0.0.43-dev1 (pre-release) | 1,310 (94 %) | Seabed cells without height data admitted; medium cells |
 | v0.0.43-dev2 | 1,348 (97 %) | 38 more cells; the cells that waited for a hull policy pass |
+| v0.0.43 (released 19 October) | every exterior cell: 1,348 in the region list + 46 inside town frames | The stair-walk cells (Ald-ruhn, Maar Gan, Suran), Balmora's border cells and 14 open-sea cells joined |
+| v0.0.44-dev1 | as v0.0.43 | Bitter Coast trees fit in memory again ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](../bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md)) |
 
 The [cell tracker](CELL_TRACKER.md) holds the per-cell results: 1,189 of the 1,436 land cells (Vvardenfell and
 Solstheim) have passed every measured audit, none is waiting for a hull policy, and four fail the stair walk.
 
-What still keeps exterior cells classic after v0.0.43-dev2:
+Since v0.0.43 no exterior cell of Vvardenfell is classic: no classic region maps are left outdoors. Interiors
+stay Quake maps, and some interiors of the base game are not in the build yet; bringing them in, with the
+cell-to-cell crossing pauses first among the fixes, is the next work ([roadmap](../ROADMAP.md)). Solstheim is
+not converted yet. The per-cell numbers above and on the [cell tracker](CELL_TRACKER.md) come from the tracker
+ingest after each packaged build.
+
+History, as written after v0.0.43-dev2 (all three items were fixed in v0.0.43). What still kept exterior cells
+classic then:
 
 - **39 cells held by the stair walk**
   ([CHIM-STAIR-STEPS-SOLID-43](../bugs/CHIM-STAIR-STEPS-SOLID-43.md)): Ald-ruhn, Maar Gan, Suran and one rope bridge
@@ -59,8 +68,7 @@ What still keeps exterior cells classic after v0.0.43-dev2:
   [CHIM-OCEAN-CELL-RECORD-CLASSIC-43](../bugs/CHIM-OCEAN-CELL-RECORD-CLASSIC-43.md)); both are fixed for
   v0.0.43-dev3.
 
-No cell outside these is over the memory budget or failing an audit. If the stair fix holds, v0.0.43-dev3 is the
-first build with every exterior cell of Vvardenfell on CHIM; interiors stay Quake maps for now.
+No cell outside these was over the memory budget or failing an audit.
 
 ## Why it exists
 
@@ -231,7 +239,7 @@ All commands take `--out DIR`, the tracker folder, and are run with `python3 too
 ## History: v0.0.41 preparation notes, 15 October 2026
 
 These notes record the state during the v0.0.41 preparation and are kept as written. The current state is at the
-[top of this page](#current-state-18-october-2026).
+[top of this page](#current-state-19-october-2026).
 
 [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](../bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
 

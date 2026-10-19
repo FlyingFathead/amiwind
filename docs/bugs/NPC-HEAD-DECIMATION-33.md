@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.43-dev2 at 2026-10-18 17:55 +0300: maintainer: Angahran (Morag Tong Guild) has a dark gash/hole in the head mesh at close range; check head triangles against the original NIF
 - Reported with v0.0.43-dev2 at 2026-10-18 17:58 +0300: maintainer: Shannat Pansamsi (Morag Tong Guild, ref 67641, a_76b87bee3530.mdl) has a crude, flattened face
+- Reported with v0.0.44-dev1 at 2026-10-19 11:30 +0300: image step stopped on the Argonian female player body with the locked head reducer, fixed by the same fallback as the NPC bake
 
 <!-- END GENERATED PERSISTING -->
 
@@ -27,7 +28,7 @@
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

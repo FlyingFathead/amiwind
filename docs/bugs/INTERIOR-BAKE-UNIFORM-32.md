@@ -67,6 +67,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [FLAME-RANGE-NEAREST-32](FLAME-RANGE-NEAREST-32.md): A hearth fire shows only up close when many candles are nearer
 - GUARD-COLD-28 (no report page): Night-guard torches not admitted on cold visits
 - [GUARD-TORCH-BRIGHT-31](GUARD-TORCH-BRIGHT-31.md): Hlaalu guard torches over-bright at night
+- [GUARD-TORCH-CHIM-FRAMES-44](GUARD-TORCH-CHIM-FRAMES-44.md): Outdoor guards carry no torch at night: the torch step never read the CHIM frame maps
 - GUARD-TORCH-CYCLE-29 (no report page): Guard torch intermittently absent during night-cycle observation
 - [INTERIOR-LIGHT-29](INTERIOR-LIGHT-29.md): Interiors lack convincing local illumination
 - INTERIOR-NPC-LIGHT-29 (no report page): Census Office characters appear too dark under room lighting

@@ -8,6 +8,10 @@ Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: d
 
 These audit totals do not count cells included in a playable build; see Included in builds below.
 
+**On CHIM in the newest ingested build (v0.0.44-dev1 every exterior cell on CHIM (793d7c1)): 1,292 of 1,292 Vvardenfell land cells (100.0 %), plus 117 sea cells.**
+
+A cell is on CHIM in a build when a frame of the CHIM world of that build owns it. The tracker records per cell the newest build that carries it.
+
 Map cells 2,157: land and empty-sea cells 1,390 (done 1,390, 100.0 %) and open-ocean cells 767 (shared ocean chunk made, not yet placed in the game: not counted as done).
 
 - Cell complete: 0
@@ -24,7 +28,7 @@ Lighting: lit 0, partial 137, unlit 1,056, not measured 99 (cells; lit is requir
 
 Original lights in these cells: lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 baked, 694 night lamps only, 2,280 not represented.
 
-Generated 2026-10-18 15:51 +0300. Tracker data generated 2026-10-18T12:50:45+00:00.
+Generated 2026-10-19 14:34 +0300. Tracker data generated 2026-10-19T11:34:12+00:00.
 
 ## Totals
 

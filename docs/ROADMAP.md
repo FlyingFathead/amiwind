@@ -1,10 +1,12 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [The road after v0.0.44, 19 October 2026](#the-road-after-v0044-19-october-2026)
+- [Colour: AGA ramps for the ash, the blight and Red Mountain, 19 October 2026](#colour-aga-ramps-for-the-ash-the-blight-and-red-mountain-19-october-2026)
 - [Next: the outdoors complete, then every entrance and every interior, 18 October 2026](#next-the-outdoors-complete-then-every-entrance-and-every-interior-18-october-2026)
 - [Near future: the baseline stays, extra RAM becomes speed, 16 October 2026](#near-future-the-baseline-stays-extra-ram-becomes-speed-16-october-2026)
 - [Near future: one game for the 68040 and the 68060, 16 October 2026](#near-future-one-game-for-the-68040-and-the-68060-16-october-2026)
@@ -80,13 +82,79 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
+## The road after v0.0.44, 19 October 2026
+
+Decided for the project on 19 October 2026, in this order. Each step ends in a build that works and is shipped,
+as with the outdoors: the world first, then what is in it, then what happens in it.
+
+1. **v0.0.44: By Azura's Trees!** The patch release with the Bitter Coast tree fix
+   ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md)).
+2. **Bug fixes, cell crossings first.** Walking from one CHIM cell into the next still pauses the game, worst at
+   cell corners ([CHIM-CROSSING-SLUGGISH-43](bugs/CHIM-CROSSING-SLUGGISH-43.md)). AmiWind uses the RAM an
+   accelerator card has: 16 MB stays the baseline that must work, and memory past it holds the neighbouring frames
+   ready, so a crossing becomes a copy in memory instead of a disk read. Loading is spread over many rendered
+   frames before the border instead of one pause at it. Every change is an A/B/C run on a fixed route with edge and
+   corner crossings, measured with the profiler at 16 MB and at 128 MB, and kept only when it wins. The open bugs
+   from the v0.0.43 playtests follow, among them rocks that do not close up
+   ([CHIM-ROCKS-OPEN-SHELLS-43](bugs/CHIM-ROCKS-OPEN-SHELLS-43.md)).
+3. **Every interior of the base game, with an interior progress tracker, and interiors on CHIM too.** Measured on
+   19 October 2026: the base game has 1,328 interiors; 176 are in the game today and 919 on Vvardenfell are not
+   converted yet ([checklist](PLAN-v0.0.45.md#3-every-interior-of-the-base-game)). Today every interior is its own
+   Quake map that carries its own copy of every mesh and texture it uses, about 2 MB a room. About 950 more rooms
+   that way would add about 2 GB to an image of 3.62 GB, past the 4 GiB a drive image may hold. So the interiors go
+   the way the outdoors went: each mesh and texture stored once in the shared CHIM store and placed by reference in
+   every room that uses it. That comes first; then the entrance audit, the tracker and the conversion batches
+   described [below](#next-the-outdoors-complete-then-every-entrance-and-every-interior-18-october-2026).
+4. **Object and container state.** The game remembers what the player changes: an object moved, taken or
+   dropped, a door unlocked, a container's contents. As in the original game, only the changes are stored, each
+   against the object's original record in the game data, so an untouched object or an unopened chest costs
+   nothing. The changes are grouped by cell and applied as a cell loads. With 16 MB, only the cells around the
+   player keep their changes in memory and the rest wait in a state file on disk; with more RAM they stay in
+   memory. The saved game is that state.
+5. **NPC placement.** The people and creatures of every town and interior in their places, with their inventories
+   held in the object state of step 4.
+6. **MWScript compiled by the builder.** The game's scripts become compact bytecode run as one state machine
+   (details [below](#next-the-outdoors-complete-then-every-entrance-and-every-interior-18-october-2026)): the
+   globals, journal indexes and each object's script values as small tables, scripts as checks that run only when
+   their inputs change, the whole machine measured for its size and its cost per frame on the 68040 and 68060.
+
+## Colour: AGA ramps for the ash, the blight and Red Mountain, 19 October 2026
+
+Decided for the project on 19 October 2026: AmiWind uses what AGA can show. AGA picks each of its 256 on-screen colours
+from 16.7 million (24-bit), so smooth ramps are possible where the old 12-bit chipset banded them. Measured on the
+v0.0.44-dev1 palette: of a 160-colour grey, ash, brown, rust and red chart (20 hues by 8 brightness steps), today's
+single shared 256-colour palette has only 56 near matches; dark reds fall into brown, the darkest steps lose their
+red, and the mid reds jump. A smooth grey to red ramp gets 11 colours.
+
+The plan:
+
+1. **A reserved ash and red ramp** of about 30 to 40 palette slots for the Ashlands, the Red Mountain region and
+   blight storms, chosen from the original game's textures and fog colours of those regions.
+2. **Colour grading per region:** fog, sky and light tinted toward that ramp where the original weather does it
+   (ash storms, blight storms), measured for what it costs per frame.
+3. **A palette per region,** if one shared palette cannot hold it: AGA can switch its 256 colours between areas, so
+   the Ashlands can have more of their reds than the Bitter Coast needs. Decided the same day: a gradient, not a
+   switch: the closer the player is to Red Mountain, the more of the palette goes to the ash and red ramp, in rings
+   around the mountain, so the colours shift as the land does: the blue sky toward the mountain meets more and more
+   grey, brown and red, so Red Mountain looks menacing before the player gets there. Measured first: what the switch costs at a
+   region border and what the surface cache needs.
+
+Every step is an A/B against the original game at the same place and time, with stills and a short clip.
+
 ## Next: the outdoors complete, then every entrance and every interior, 18 October 2026
 
-**v0.0.43 (in progress): every exterior cell of Vvardenfell on CHIM.** After v0.0.43-dev2 the cells still classic
+**v0.0.43, published 19 October 2026: every exterior cell of Vvardenfell on CHIM** (1,348 cells in the region
+list and 46 inside town frames; [release notes](RELEASE-v0.0.43.md)). **v0.0.44: By Azura's Trees!** is the patch
+release that follows: the trunk shape guard made the Bitter Coast trees too large for memory, and the fix is in
+v0.0.44-dev1 ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md)). After it come
+bug fixes, the pauses when crossing from cell to cell first, and every interior missing from the base game
+(below).
+
+History, as written during v0.0.43: after v0.0.43-dev2 the cells still classic
 are the ones held by the stair walk (Ald-ruhn, Maar Gan, Suran and one rope bridge cell, with the town cells
 around them), eight Balmora border cells and fourteen open-sea cells; the last two are fixed, the stair fix is
 in the shared converter. v0.0.43-dev3 is meant to be the first build with the whole outdoors on CHIM
-([progress tracker](chim/PROGRESS_TRACKER.md#current-state-18-october-2026)).
+([progress tracker](chim/PROGRESS_TRACKER.md#current-state-19-october-2026)).
 
 **Milestone, 18 October 2026: every exterior cell converted to CHIM.** The v0.0.43-dev3 build converted the
 whole outdoors of Vvardenfell to CHIM in one run (1,351 frames; the stair gate passed every flight it walks, but it
@@ -96,7 +164,7 @@ Its image step then stopped on a check that had never seen a world with no class
 ([BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43](bugs/BUILD-IMAGE-ALL-CHIM-PREFLIGHT-43.md)); the build resumes from there once
 that check counts the CHIM maps.
 
-**v0.0.44, the next step, decided for the project on 18 October 2026: entrances and interiors.**
+**After the v0.0.44 patch, decided for the project on 18 October 2026: entrances and interiors.**
 
 1. **An entrance audit, island-wide.** From the game data, every load door (outside to inside, inside to
    inside, inside to outside) is checked against the build: the destination interior is converted and in the
@@ -121,8 +189,8 @@ that check counts the CHIM maps.
    none), measured for their cost in the mixer. The effect markers follow later, as Quake particle emitters.
 
 **After the interiors and the fixes that come with them: the game logic.** With the world and its rooms in
-place, the work turns to what happens in it: an interpreter for MWScript, the game's own script language, that
-runs the original scripts from the game data; dialogue conditions and quests; NPC and creature behaviour; combat, magic,
+place, the work turns to what happens in it: MWScript, the game's own script language, compiled by the builder
+from the original scripts in the game data (below); dialogue conditions and quests; NPC and creature behaviour; combat, magic,
 inventory and services. As everywhere else, the original game's records and behaviour are the reference for what
 it should do, OpenMW the readable reference for how it fits together, and AmiQuake's machinery (QuakeC, entities,
 the server loop) the means, measured for its cost on the 68040 and 68060.

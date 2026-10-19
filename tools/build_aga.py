@@ -2269,15 +2269,6 @@ def finalize_image(args):
         if args.hands!='3d':raise ValueError('The per-race hand catalogue applies to 3D hands only')
         hand_catalog=install_hand_catalog(args.hand_catalog,boot/'id1')
         (out/'hand-catalog-staging.json').write_text(json.dumps(hand_catalog,indent=2)+'\n',encoding='utf-8',newline='\n')
-    from prepare_guard_torches import prepare as prepare_guard_torches
-    guard_torches = prepare_guard_torches(args.data_files, boot / 'id1')
-    (out/'guard-torch-conversion.json').write_text(json.dumps(guard_torches,indent=2)+'\n', newline='\n')
-    # Original NPC heads take world, combat and guard models past 2,000 vertices:
-    # each gets its byte-matching model-budgets.txt line (NPC-HEAD-DECIMATION-33).
-    from audit_gallery_budgets import world_allowances
-    world_budgets = world_allowances(boot / 'id1')
-    (out/'world-model-budgets.json').write_text(json.dumps(world_budgets,indent=2)+'\n', newline='\n')
-    print(f"World model allowances: {len(world_budgets['added'])} extended NPC models listed in model-budgets.txt.", flush=True)
     # Apply explicit sky policy after every mesh/overlay, before all final gates.
     from exterior_sky_build import configure_staged_maps
     exterior_sky_path = out / 'exterior-sky' / 'exterior-sky.json'
@@ -2449,6 +2440,18 @@ def finalize_image(args):
         optimization = rebind_chim_maps(boot/'id1/maps', optimization, optimization_path,
                                         [row['file'] for row in removed_legacy], jobs=jobs,
                                         replaced=[r['map'][5:] for r in chim_frames['region_maps'] if r['replaced']])
+    # Guard torches after the CHIM frame maps are written: the towns and regions on CHIM hold the outdoor guards,
+    # so a scan before them found only the indoor ones (GUARD-TORCH-CHIM-FRAMES-44); before the heap gates and the
+    # content fingerprint, which read its companions.
+    from prepare_guard_torches import prepare as prepare_guard_torches
+    guard_torches = prepare_guard_torches(args.data_files, boot / 'id1')
+    (out/'guard-torch-conversion.json').write_text(json.dumps(guard_torches,indent=2)+'\n', newline='\n')
+    # Original NPC heads take world, combat and guard models past 2,000 vertices:
+    # each gets its byte-matching model-budgets.txt line (NPC-HEAD-DECIMATION-33).
+    from audit_gallery_budgets import world_allowances
+    world_budgets = world_allowances(boot / 'id1')
+    (out/'world-model-budgets.json').write_text(json.dumps(world_budgets,indent=2)+'\n', newline='\n')
+    print(f"World model allowances: {len(world_budgets['added'])} extended NPC models listed in model-budgets.txt.", flush=True)
     # Every map that ships fits the engine's per-map tables: edicts, model and sound precaches, static
     # entities, the scenery catalogue (tools/map_engine_limits.py, BUILD-BUDGET-ENGINE-LIMITS-35); a map
     # over one stops the game at load ("no free edicts", precache overflow), so it never ships.
