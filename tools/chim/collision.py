@@ -158,7 +158,7 @@ def frame_polys(world, frame_index=0):
     """World-space polygons of a frame as the stair gate reads a region map (stair_walk._faces):
     [(points, ref)], the chunks' terrain as 'world', each placement's model faces moved by its
     origin and yaw, by reference number; vertices in the faces' own order (their winding)."""
-    from chim.validate import face_polygons
+    from chim.faces import face_polygons
     _, _, chunks = world['frames'][frame_index]
     out = []
     for c in chunks:
@@ -190,13 +190,18 @@ STAIR_TILE = 1024.0     # frame-local units per gate task (a core, as a region m
 STAIR_MARGIN = 128.0    # geometry kept around a core: the walk's reach, the box and a ramp's far edge
 _STAIR_CACHE = {}
 _STAIR_CACHE_FRAMES = 4  # frames a worker keeps built: largest-first tasks of a few frames interleave
+_STAIR_DIGESTS = {}      # per worker process: (out, frame index) -> frame_stair_key of the frame as it was read
 
 
-def _stair_frame(out, frame_index):
+def _stair_frame(out, frame_index, expect=None):
     """Per worker process: the frame's scenes and polygons, built from the frame's own files
     (chim.validate.load_frame) and kept for the next cores of the same frame. Reading the whole
     world here (load_world, 8.9 s for 273 frames) for every frame a worker switched to cost most of
-    the dev3 stair walk (CHIM-STAIR-GATE-WORLD-RELOAD-36)."""
+    the dev3 stair walk (CHIM-STAIR-GATE-WORLD-RELOAD-36).
+    EXPECT: the frame_stair_key the walk's key holds (stair_gate: computed from the world it read). The frame as this
+    worker reads it must have exactly that key, else nothing is walked (ValueError naming the frame): the loader is
+    not part of the walk's code key (STAIR_FRAME_LOADER), so a walk is only ever stored or reused for the data it
+    really walked (BUILD-REUSE-SCHEDULER-TOP-45 part 2)."""
     key = (str(out), frame_index)
     if key not in _STAIR_CACHE:
         from chim.validate import load_frame
@@ -204,8 +209,14 @@ def _stair_frame(out, frame_index):
         world = {'frames': {frame_index: row}, 'models': models}
         while len(_STAIR_CACHE) >= _STAIR_CACHE_FRAMES:
             _STAIR_CACHE.pop(next(iter(_STAIR_CACHE)))
+        _STAIR_DIGESTS[key] = frame_stair_key(row, models)
         _STAIR_CACHE[key] = (row[0], FrameScene(world, frame_index),
                              FrameScene(world, frame_index, hull=0), frame_polys(world, frame_index))
+    if expect is not None and _STAIR_DIGESTS.get(key) != expect:
+        raise ValueError('Stair gate: frame %s (index %d of %s) as the walk worker reads it (chim.validate.load_frame) '
+                         'has the frame data key %s, but its walk is keyed by %s (the world the gate read): the '
+                         'loader returns other data than the world holds; nothing walked or stored for it'
+                         % (_STAIR_CACHE[key][0], frame_index, out, _STAIR_DIGESTS.get(key), expect))
     return _STAIR_CACHE[key]
 
 
@@ -415,40 +426,49 @@ def frame_stair_key(frame_row, models):
 
 # The walker's code in a frame walk's key (BUILD-STAIR-PASS-NOT-KEPT-41): the frame worker stair_task and the code
 # of it that a walk runs, in these files only: the stair rule and the walk (stair_walk.py), the frame's scene, its
-# polygons and its trace (this module, audit_walkability.py, player_hull.py), and the frame reader (chim/validate.py
-# load_frame and face_polygons, chim/format.py, chim/cut.py, chim/__init__.py's format numbers). Inside these files
-# only the units stair_task reaches count (build_cache.SourceIndex scope 'units'). Everything else the reach finds
-# is left out: chim/validate.py imports chim.terrain at import time, and that import chain names the collision
-# compilers (chim/models.py, prepare_mesh_bsp.py, routed_hull.py, scenery_reduce.py, collision_bsp.py ...), the
-# CHIM_VERSION label and two town configs. No walk runs any of them; what the compilers made is in the key already,
-# as the frame's collision lumps (frame_stair_parts, STAIR_WALK_LUMPS). Before this form an edit to any of them
-# rekeyed every frame: v0.0.41-dev5 walked 604 unchanged frames again because CHIM_VERSION went 0.2.0 -> 0.2.1.
-# tests/test_chim_stair_pass.py holds the list to the code a walk runs: a traced walk calls nothing outside it, and
-# no reached function of these files imports or names a repository module outside it.
-# STAIR_CODE_FORM names this key form; records written under the earlier form (the whole reach of stair_task,
-# chim-stair-key-2 parts) are not found under it, so nothing is reused across the change without being walked.
-STAIR_CODE_FORM = 'chim-stair-code-1'
+# polygons and its trace (this module, audit_walkability.py, player_hull.py), and the reading of the frame's brush
+# images (chim/faces.py face_polygons, chim/format.py read_brush_image, chim/cut.py, chim/__init__.py's format
+# numbers). Inside these files only the units stair_task reaches count (build_cache.SourceIndex scope 'units').
+# Everything else the reach finds is left out: the collision compilers (chim/models.py, prepare_mesh_bsp.py,
+# routed_hull.py, scenery_reduce.py, collision_bsp.py ...), the CHIM_VERSION label and two town configs, named by
+# import chains. No walk runs any of them; what the compilers made is in the key already, as the frame's collision
+# lumps (frame_stair_parts, STAIR_WALK_LUMPS). Before key form 1 an edit to any of them rekeyed every frame:
+# v0.0.41-dev5 walked 604 unchanged frames again because CHIM_VERSION went 0.2.0 -> 0.2.1.
+# The frame loader (STAIR_FRAME_LOADER, chim/validate.py load_frame) is not in the code key either (key form 2): a
+# walk is keyed by the SHA-256 of the frame data it walks (frame_stair_parts, computed from the world the gate
+# read) plus this code, and every walk worker checks that the frame it reads has exactly that data key before it
+# walks (_stair_frame EXPECT), so a loader rewrite with the same output reuses every walk, and a loader that returns
+# other data refuses to walk instead of storing rows under the wrong data. Before key form 2 the v0.0.45 rewrite of
+# chim/validate.py (frames loaded on the worker pool, BUILD-CHIM-SERIAL-SECTIONS-44) changed only that module's
+# import-time code, and all 1,351 frames of the v0.0.45 release build were walked again (BUILD-REUSE-SCHEDULER-TOP-45).
+# tests/test_chim_stair_pass.py holds the list to the code a walk runs: a traced walk calls nothing outside it and
+# the loader, and no reached function of these files imports or names a repository module outside it.
+# STAIR_CODE_FORM names this key form; records written under an earlier form are not found under it, so nothing is
+# reused across the change without being walked (tools/stair_records.py adopt carries a passed run's walks over
+# after walking a sample again).
+STAIR_CODE_FORM = 'chim-stair-code-2'
 STAIR_WALK_CODE = ('tools/stair_walk.py', 'tools/chim/collision.py', 'tools/audit_walkability.py',
-                   'tools/player_hull.py', 'tools/chim/validate.py', 'tools/chim/format.py', 'tools/chim/cut.py',
+                   'tools/player_hull.py', 'tools/chim/faces.py', 'tools/chim/format.py', 'tools/chim/cut.py',
                    'tools/chim/__init__.py')
+STAIR_AREA_CODE_FORM = 'chim-stair-area-code-2'     # the same for walks restricted to a walk area (stair_task_in)
+STAIR_FRAME_LOADER = ('tools/chim/validate.py', 'load_frame')
 _WALKER_SOURCES = {}
 
 
 def stair_code_selection(entry='stair_task'):
     """({repository path: SHA-256 of its reached units}, uncertain) of the walker's code (STAIR_WALK_CODE, the
-    units ENTRY reaches in those files: stair_task, or stair_task_in for a walk restricted to a walk area).
+    units ENTRY reaches in those files: stair_task, or stair_task_in for a walk restricted to a walk area), the reach
+    not followed into the frame loader (STAIR_FRAME_LOADER: what it returns is checked by content in every worker).
     uncertain: the reach could not be followed (a file that does not parse); then every repository file counts, as
     in every other pass key."""
     from build_cache import SourceIndex
     from pass_cache import PASS_KEY_FORM, PASS_KEY_NEUTRAL, ROOT
     index = SourceIndex(ROOT, top_format=PASS_KEY_FORM)
     script = Path(__file__).resolve()
-    _, _, uncertain = index.entry_digest(script, entry, PASS_KEY_NEUTRAL)
-    python, data, _, _ = index._closures['%s::%s' % (script, entry)]
+    python, data, uncertain, units = index.entry_units(script, entry, stop={STAIR_FRAME_LOADER})
     files = index.files
     if uncertain:
         return {path: files[path] for path in files if path not in PASS_KEY_NEUTRAL}, True
-    units = index._reached.get('%s::%s' % (script, entry)) or {}
     selected = {}
     for path in sorted(python | data):
         if path not in STAIR_WALK_CODE or path not in files:
@@ -473,7 +493,7 @@ def stair_key_sources():
 
 def stair_area_key_sources():
     """The walker's code digest in the keys of walks restricted to a walk area (stair_task_in, key form
-    'chim-stair-area-code-1'): stair_task_in and the code of it a walk runs, in STAIR_WALK_CODE only, as
+    STAIR_AREA_CODE_FORM): stair_task_in and the code of it a walk runs, in STAIR_WALK_CODE only, as
     stair_key_sources does for stair_task. Whole-frame walks keep stair_key_sources, so their records stay
     valid. Computed once per process."""
     if 'area' not in _WALKER_SOURCES:
@@ -481,7 +501,7 @@ def stair_area_key_sources():
         import json
         selected, uncertain = stair_code_selection('stair_task_in')
         _WALKER_SOURCES['area'] = hashlib.sha256(json.dumps(
-            ['chim-stair-area-code-1', sorted(selected.items()), uncertain], sort_keys=True).encode()).hexdigest()
+            [STAIR_AREA_CODE_FORM, sorted(selected.items()), uncertain], sort_keys=True).encode()).hexdigest()
     return _WALKER_SOURCES['area']
 
 
@@ -518,11 +538,15 @@ def walk_passed(rows):
 
 
 def stair_unit(task):
-    """Worker: one unit of a frame's walk, (out, frame index, [core...], unit id[, walk area]) -> (unit id, rows): the
-    cores' stair_task rows (stair_task_in with a walk area) in core order (a unit is a run of one frame's cores: one
-    frame read serves them all)."""
+    """Worker: one unit of a frame's walk, (out, frame index, [core...], unit id[, walk area or None[, frame key]]) ->
+    (unit id, rows): the cores' stair_task rows (stair_task_in with a walk area) in core order (a unit is a run of one
+    frame's cores: one frame read serves them all). With the frame key (frame_stair_key of the world the gate read,
+    the data part of the walk's key) the frame as this worker reads it must have that key (_stair_frame), so the rows
+    are always the walk of the data they are stored under."""
     out, frame_index, cores, uid = task[:4]
     area = task[4] if len(task) > 4 else None
+    expect = task[5] if len(task) > 5 else None
+    _stair_frame(out, frame_index, expect)
     rows = []
     for core in cores:
         rows.extend(stair_task((out, frame_index, core)) if area is None
@@ -913,6 +937,9 @@ def stair_gate(out, frames, jobs=1, models=None):
             finish(fi)                           # no step or ramp in any core: no rows, nothing to walk
     unit_frame = {u[3]: u[1] for u in units}
     unit_of = {u[3]: u for u in units}
+    # the data part of each walked frame's key: every worker checks the frame it reads against it (_stair_frame),
+    # so a walk is stored only under the data it walked (the loader is not in the code key, STAIR_FRAME_LOADER)
+    frame_keys = {fi: _parts_key(whole_parts[fi]) for fi in walk_frames} if whole_parts else {}
     done_units, peaks = set(), []
     from concurrent.futures.process import BrokenProcessPool
     try:
@@ -921,7 +948,7 @@ def stair_gate(out, frames, jobs=1, models=None):
         # each unit at its frame's size: a worker keeps built only the frames that fit in that unit's share
         # (stair_unit_sized), so a worker holds about the frame it walks
         for uid, found, peak in governed_map(
-                stair_unit_sized, [((str(out), u[1], u[2], u[3]) + ((areas[u[1]],) if u[1] in areas else ()),
+                stair_unit_sized, [((str(out), u[1], u[2], u[3], areas.get(u[1]), frame_keys.get(u[1])),
                                     frame_mib.get(u[1], WORKER_BASE_MIB), frame_mib.get(u[1], WORKER_BASE_MIB))
                                    for u in units],
                 max(1, min(by_cores, len(units) or 1)), unit_mib=per_worker, label='CHIM stair gate',

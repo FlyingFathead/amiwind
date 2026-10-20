@@ -1,5 +1,14 @@
 # CHIM-CROSSING-SLUGGISH-43: crossing between CHIM cells is sluggish, worst at cell corners
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.44-dev1 at 2026-10-19 14:54 +0300: maintainer playtest: still load-snags between cells even with 1 GiB of RAM expansion (no prefetch in this build); first job after v0.0.44
+- Reported with v0.0.45 at 2026-10-20 04:33 +0300: baseline measured on the crossing route: v0.0.45 at 128 MB about a third of v0.0.44 (light edge 293 to 123 ms), at 16 MB 1 to 7 % faster; CHIM frame start and chunk ring dominate
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -25,6 +34,7 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Status: 19 October 2026](#status-19-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

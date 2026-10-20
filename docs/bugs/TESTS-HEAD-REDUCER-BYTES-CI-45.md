@@ -1,0 +1,221 @@
+# TESTS-HEAD-REDUCER-BYTES-CI-45: a byte-exact head reducer test fails on some GitHub runners
+
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 4 times; something has to be done
+
+- Reported with v0.0.44 at 2026-10-19 19:28 +0300: v0.0.44 tag CI run 39285714408 failed in the same step; same commit passed on main
+- Reported with v0.0.45 at 2026-10-20 01:19 +0300: v0.0.45 release CI run 39332517956: digest 1da14f60 instead of 2e30b365
+- Reported with v0.0.45 at 2026-10-20 01:39 +0300: v0.0.45 tag CI run 39336489348 failed in the same step; its job log could not be read (gh returned nothing), so the failing test of this run is not confirmed
+- Reported with v0.0.45 at 2026-10-20 09:30 +0300: CI logs of run 39332517956: attempt 1 failed on this test with digest 1da14f60...3d34, attempt 2 of the same commit passed; reproduced locally: the digest of the OpenBLAS Haswell kernel
+
+<!-- END GENERATED PERSISTING -->
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | build |
+| First noticed | 20 October 2026, in v0.0.45 |
+| Where | NPC bake skin bytes vary with the OpenBLAS kernel (tools/npc_geometry.py); its test in GitHub CI |
+| Reproduction | sometimes |
+| Duplicate of | no |
+| Persists in | v0.0.45 (last seen) |
+| Severity | medium: stops a release publish in CI; the same game data also baked NPC skins with different bytes on different processors |
+| Family | Gates, CI and tests (`tests-ci`) |
+| Playtest version | none |
+| From commit | source and engine 73383de |
+| CHIM engine version | none: legacy engine |
+
+<!-- END GENERATED FACTS -->
+
+_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Status: 20 October 2026](#status-20-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Status: 20 October 2026
+
+Repaired on branch v0.0.46-ci-reducer (not merged). Cause proven: OpenBLAS, the linear algebra library inside the
+NumPy and SciPy packages, picks its kernels by the processor, and the NPC bake's skin bytes follow the kernel. The
+test was right to compare bytes; the bake was not reproducible across processors.
+
+## Symptom
+
+`test_npc_head_reducer.HeadReducer.test_previous_reducer_reproduces_the_previous_bytes` bakes a small head with the
+previous reducer and compares the SHA-256 of the baked bytes with a pinned value. In CI run 39332517956 (commit
+e4db8b78, 19 October 2026, 22:19 UTC), attempt 1 got `1da14f60…3d34` instead of the pinned `2e30b365…5f09`; attempt
+2 of the same commit, 11 minutes later, passed. The v0.0.44 tag run failed in the same step while the same commit
+had passed on `main`; the job log of the v0.0.45 tag run 39336489348 could not be read, so its failing test is not
+confirmed.
+
+## Where
+
+`tools/npc_geometry.py` `bake`: matrix products, pseudo-inverses and an SVD (NumPy `@`, `np.linalg.pinv`,
+`np.linalg.svd`, all handed to OpenBLAS) place the sample points and colours of every skin texel; the colour is then
+turned into a byte by truncation. `tests/test_npc_head_reducer.py` pins the bytes.
+
+## How it happened
+
+OpenBLAS in the NumPy and SciPy wheels is built for several processor families and chooses one when NumPy is first
+imported: SkylakeX on a processor with AVX-512, Haswell (also chosen for Zen) on AVX2 processors without AVX-512,
+Sandybridge, Nehalem or older ones below that. The families round the last bit of a product differently. In the
+bake a texel colour meant to be 220 comes out as 220.0 with one family and 219.99999999999997 with another; the
+float-to-byte step truncates the second to 219, and the palette step maps 219 and 220 to different palette entries.
+
+Measured on one machine by forcing the family (`OPENBLAS_CORETYPE`), same code, same packages:
+
+| Kernel family | Test fixture digest (previous reducer) | The same code before the locked reducer (46a05aa) |
+| --- | --- | --- |
+| SkylakeX (AVX-512: this project's build machine) | `2e30b365…` (the old pinned value) | `2e30b365…` |
+| Haswell / Zen (AVX2) | `1da14f60…3d34` (the CI failure, exactly) | `1da14f60…` |
+| Sandybridge, Nehalem, Prescott | `74719be5…` | not measured |
+
+What differs, first component first: face indices and UVs are identical under every family; the vertex coordinates
+differ by at most 1.4e-14 (last bits); the skin differs in 358 of 131,072 texels (Haswell vs SkylakeX), each 219 in one
+and 220 in the other (both ways) before the palette step. The shipped default (locked reducer, original heads) differs the same way.
+Thread count (`OPENBLAS_NUM_THREADS` 1 or 24), NumPy's own SIMD paths (`NPY_DISABLE_CPU_FEATURES`), the package
+versions CI resolved (NumPy 2.5.4, SciPy 1.18.1, Pillow 13.0.0 against the image's 2.5.3, 1.18.1, 12.3.0) and the
+order of the test modules do not change the digest (the failure reproduces in a fresh process running only this
+test). The `ubuntu-24.04` runners are not one processor model; the logs do not name the processor, but the failing
+digest is exactly the Haswell family's, so attempt 1 ran on an AVX2 processor without AVX-512 and attempt 2 on one
+with AVX-512 (the family of this project's build machine, where the old value was recorded). From now on CI prints
+the processor model.
+
+So the same game data baked NPC skins with different bytes on different processors: a build on another machine (an
+AVX2 one) would not reproduce this project's NPC models byte for byte, and the bake caches did not name the kernel,
+so their reuse could mix results of two kernels.
+
+## Why it was not caught
+
+The gate and the suite record always run on one machine, where the kernel never changes; only CI runs elsewhere, and
+only some of its runners use another kernel.
+
+## Reproduction
+
+Sometimes in CI (by runner). Always on one machine: run the test with `OPENBLAS_CORETYPE=Haswell` (or `Nehalem`) on a
+tree before this repair; it fails with the CI digest.
+
+## Repair
+
+- `tools/blas_kernel.py`: one kernel family for every build and test process. `pin()` sets `OPENBLAS_CORETYPE` to
+  `Haswell` before the first NumPy import (an explicit value wins; a processor without AVX2 + FMA, or another
+  architecture, stays unpinned and says so). Haswell runs on every x86-64 processor with AVX2 and FMA (2013-2015
+  onwards), the hosted CI runners included.
+- `tools/build.py` pins at its start, so the build and every stage it starts compute with that family;
+  `tools/run_tests.py` pins for its worker processes.
+- The bake caches key on the kernel: `gallery_cache.environment()` and `npc_lod.code_identity()` include
+  `blas_kernel.key()` (library, version, family). A result baked with another family is never reused as this one.
+- The test keeps the exact bytes and checks them under the pinned family whatever kernel its own process loaded: it
+  bakes in a child process with the pinned environment. The pinned values are those of the Haswell family; the code
+  before the locked reducer gives the same value there, so the previous reducer is still reproduced byte for byte.
+  It also pins the locked reducer's bytes (189 faces).
+- CI prints the processor model and the OpenBLAS configuration before the tests.
+
+Cost: the next build rebakes the NPC gallery and the resident NPC models once (the cache keys name the kernel now,
+and this machine moves from SkylakeX to Haswell). Not changed: the rounding of texel colours (truncation); with one
+kernel family it no longer varies, and rounding instead would change every skin.
+
+## Verification
+
+- Before: the old test under `OPENBLAS_CORETYPE=Haswell`, with the package versions of the CI run (NumPy 2.5.4,
+  SciPy 1.18.1, Pillow 13.0.0, fast-simplification 0.2.0 in a throwaway environment), fails with exactly the CI
+  digest `1da14f60…3d34`; under SkylakeX it passes (the two CI attempts).
+- After: the repaired test passes with the parent process on SkylakeX, Haswell, Nehalem and the native kernel, in the
+  project image and with the CI package versions.
+- The whole suite (tools/run_tests.py) in Docker: see the journal entry of 20 October 2026.
+
+## Prevention
+
+`tests/test_blas_kernel.py`: the builder pins before its first import, the test runner before its workers, an
+explicit choice wins, an incapable processor stays unpinned with a reason, and the bake cache keys change with the
+kernel. A test that pins bytes of linear-algebra output computes them under the pinned family.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. See [families](README.md#families).
+
+- [AW-RESULT-RECIPE-SAVED-36](AW-RESULT-RECIPE-SAVED-36.md): The master builder's result of a failed build from a requested recipe does not validate (recipe.saved left in)
+- [AW-RUN-NAME-LONG-REASON-36](AW-RUN-NAME-LONG-REASON-36.md): aw gate refuses a long --reason after leasing the gate number: the run name, used as the request id, passes 128 characters
+- [BUILD-CHECKLIST-JSON-CELLS-39](BUILD-CHECKLIST-JSON-CELLS-39.md): Exterior checklist rejects JSON cell coordinates before scenery conversion
+- [BUILD-DEV1-EMULATOR-PRESETS-39](BUILD-DEV1-EMULATOR-PRESETS-39.md): Version bump omitted the matching dev1 emulator presets
+- [BUILD-EMPTY-ACTOR-GATE-38](BUILD-EMPTY-ACTOR-GATE-38.md): Actor contact gate rejects a MiniWind exterior without residents
+- [BUILD-EMPTY-RESIDENT-POOL-38](BUILD-EMPTY-RESIDENT-POOL-38.md): Town conversion starts a zero-worker pool when no residents are present
+- [BUILD-EXECUTABLES-LIST-UNGATED-36](BUILD-EXECUTABLES-LIST-UNGATED-36.md): A file committed executable but missing from tools/release.py EXECUTABLES (tools/engine_smoke.py) broke the source ZIP only at kit time
+- [BUILD-LAVA-CORE-BOUNDS-38](BUILD-LAVA-CORE-BOUNDS-38.md): Lava sandbox bounds are not divisible by its core size
+- [BUILD-LAVA-PRESET-FIXTURE-38](BUILD-LAVA-PRESET-FIXTURE-38.md): Lava sandbox addition omitted the preset inventory fixture
+- [BUILD-SEYDA-CARRIER-VOICE-DIR-40](BUILD-SEYDA-CARRIER-VOICE-DIR-40.md): Fresh Seyda carrier cannot publish a resident voice without an inherited sound directory
+- [BUILD-SHADOWED-WORLD-MAPS-38](BUILD-SHADOWED-WORLD-MAPS-38.md): Full image retains BSP maps shadowed by higher-priority world routes
+- [BUILD-TOOLKIT-VERSION-40](BUILD-TOOLKIT-VERSION-40.md): Development source retains the prior Toolkit release label
+- [BUILD-VERSION-EMULATOR-PRESETS-38](BUILD-VERSION-EMULATOR-PRESETS-38.md): Version bump omitted matching emulator presets
+- [BUILD-WORLD-FINGERPRINT-RETIRED-38](BUILD-WORLD-FINGERPRINT-RETIRED-38.md): Content fingerprint requires an explicitly retired exterior BSP
+- [BUILD-WORLD-PACK-RETIRED-38](BUILD-WORLD-PACK-RETIRED-38.md): World disk packer requires explicitly omitted exterior BSP maps
+- [CHIM-SEYDA-RECEIPT-TEXT-40](CHIM-SEYDA-RECEIPT-TEXT-40.md): New Seyda metadata and carrier writers omit explicit UTF-8 and LF
+- CI-01 (no report page): Windows short aliases mismatch resolved discovery paths in tests
+- [CI-BOOTSTRAP-NUMPY-32](CI-BOOTSTRAP-NUMPY-32.md): The public CI tool bootstrap fails: tools/build.py imports numpy before the tools exist
+- [CI-ERICW-SKIP-31](CI-ERICW-SKIP-31.md): Torch test room test never runs in hosted CI or the builder image
+- [CI-HOSTDEPS-30](CI-HOSTDEPS-30.md): Host CI job fails: scenery export needs the NIF reader for non-NIF test data
+- [CI-NEW-BUILDER-RULES-35](CI-NEW-BUILDER-RULES-35.md): Hosted CI failed on v0.0.35: the previous-release check refused the one-commit checkout and the run-name rule refused the Docker check's run name
+- [CI-SKIPS-UNGUARDED-31](CI-SKIPS-UNGUARDED-31.md): Hosted CI does not fail on skipped tests; JavaScript test coverage unpinned
+- [CI-SUITE-TWICE-33](CI-SUITE-TWICE-33.md): Hosted CI runs the full test suite twice per revision
+- [ENGINE-O2-STRNCPY-WARNINGS-36](ENGINE-O2-STRNCPY-WARNINGS-36.md): At -O2 the engine build printed four -Wstringop-truncation warnings for bounded strncpy copies
+- [ENGINE-STRICT-WARNINGS-36](ENGINE-STRICT-WARNINGS-36.md): The engine builds warning-free only under -Wall -Wno-unused; stricter flags show 482 warnings
+- [GATE-EMBERS-31](GATE-EMBERS-31.md): Ember commit broke native torch tests and a header format check
+- [GATE-HOSTPARITY-TEMP-RACE-33](GATE-HOSTPARITY-TEMP-RACE-33.md): Two gates running at once share the host-parity step's log file, so one gate can report the other's error
+- [GATE-NODE-MISSING-31](GATE-NODE-MISSING-31.md): The local gate never runs the inspector JavaScript tests (no Node.js in the Docker images)
+- [GATE-NUMPY-PATH-SCRATCH-33](GATE-NUMPY-PATH-SCRATCH-33.md): The gate's NumPy and Pillow import folder lived in a temporary per-session folder, so gates broke once it was removed
+- [GATE-PRIVACY-SCAN-33](GATE-PRIVACY-SCAN-33.md): The source preflight does not scan file contents for tool or model names and private path prefixes
+- [GATE-SHARED-SOURCE-32](GATE-SHARED-SOURCE-32.md): The local gate always tested the main checkout, in one shared folder
+- [GATE-SOURCE-RACE-33](GATE-SOURCE-RACE-33.md): The local gate copies the working tree after its clean check, so edits during the copy reach the tested source
+- [GATE-SUITE-WRITABLE-32](GATE-SUITE-WRITABLE-32.md): The test suite needs a writable source copy and an executable /tmp; the documented command does not say so
+- LINUX-VALID-02 (no report page): Linux test fixtures failed to link (missing stubs)
+- [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
+- [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
+- [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
+- [RELEASE-KIT-NO-REPAIR-MODE-35](RELEASE-KIT-NO-REPAIR-MODE-35.md): The release kit has no repair mode for a commit already pushed
+- [RELEASE-KIT-PUSH-BEFORE-CI-45](RELEASE-KIT-PUSH-BEFORE-CI-45.md): The release kit pushes to main before CI has passed
+- [RELEASE-KIT-RETRY-REUSES-CI-45](RELEASE-KIT-RETRY-REUSES-CI-45.md): A kit retry after a CI failure reads the same failed run again
+- [RELEASE-LAVA-IMAGE-ALLOWLIST-38](RELEASE-LAVA-IMAGE-ALLOWLIST-38.md): Lava documentation images were listed without image-type approval
+- [RELEASE-PATCH-SIZE-33](RELEASE-PATCH-SIZE-33.md): The release preflight refuses the whitespace baseline of v0.0.33-dev1 as oversized text
+- [RELEASE-PATCH-TARGET-VERSION-39](RELEASE-PATCH-TARGET-VERSION-39.md): RC1 publication baseline lacks its target version
+- [SMOKE-PASSES-WITHOUT-MAP-36](SMOKE-PASSES-WITHOUT-MAP-36.md): The engine boot smoke passed while its first map ran under the title menu: a loaded server was taken for a played map
+- [TEST-CENSUS-CONTRACTS-40](TEST-CENSUS-CONTRACTS-40.md): Three quick-character expected failures lack reconciled contracts
+- [TEST-CHIM-BIG-FRAME-TIMEOUT-33](TEST-CHIM-BIG-FRAME-TIMEOUT-33.md): The Balmora-sized CHIM world test times out on a busy host
+- [TEST-COST-ORDER-LOAD-33](TEST-COST-ORDER-LOAD-33.md): The scheduler cost-order test fails on a fully loaded host (start times compared within a fraction of a second)
+- [TEST-ENV-LEAK-HULL-33](TEST-ENV-LEAK-HULL-33.md): A sequential run of the suite fails the CHIM unit fingerprint test: an earlier in-process test leaves AMIWIND_MODEL_HULL set
+- [TEST-GODMODE-UNLISTED-36](TEST-GODMODE-UNLISTED-36.md): The dbg godmode test was never run by the gate (missing from the public file list) and its escape check failed
+- [TEST-NATIVE-STALE-IMPORT-33](TEST-NATIVE-STALE-IMPORT-33.md): Native engine tests run alone generate their version headers with the builder image's old tools copy
+- [TEST-NATIVE-TMPDIR-32](TEST-NATIVE-TMPDIR-32.md): A native test overflows a 64-byte name buffer when the temp path is long
+- [TEST-PARALLEL-ORDER-FLAKY-36](TEST-PARALLEL-ORDER-FLAKY-36.md): test_processes_keep_order_and_limit_nested_threads is timing-sensitive and fails now and then
+- [TEST-PARALLEL-ORDER-LOAD-33](TEST-PARALLEL-ORDER-LOAD-33.md): The process-pool order test fails on a fully loaded host (one worker process takes every item)
+- [TEST-PARALLEL-SHARE-TIMING-36](TEST-PARALLEL-SHARE-TIMING-36.md): The fair-share scheduler test watched the freed budget for a fixed 4 s and failed on a busy host
+- TEST-PORT-01 (no report page): Focused tests depended on repo root and Windows UTF-8 mode
+- TEST-PORTABILITY-01 (no report page): Pre-release test fixtures assumed host features and links
+- [TEST-PROFILE-OVERHEAD-SAMPLES-36](TEST-PROFILE-OVERHEAD-SAMPLES-36.md): The profiler overhead test sampled for a fixed 2 s and got too few samples on a busy host
+- [TEST-PROFILE-SECTION-CPU-32](TEST-PROFILE-SECTION-CPU-32.md): The build profile section test fails on a loaded host (CPU time read in clock ticks)
+- [TEST-PROFILE-STAGE-WALL-32](TEST-PROFILE-STAGE-WALL-32.md): The build profile stage test needs an idle host (wall time compared with CPU time)
+- [TEST-PROFILE-TIMELINE-BOUND-33](TEST-PROFILE-TIMELINE-BOUND-33.md): A profiler test bounds the sampled CPU too tightly and fails on a busy host
+- [TEST-PROFILE-TIMELINE-SUM-33](TEST-PROFILE-TIMELINE-SUM-33.md): The build profile test's sampled-timeline check fails on a loaded host (timeline CPU above the stage's own CPU)
+- [TEST-RC1-INTEGRATION-CONTRACTS-39](TEST-RC1-INTEGRATION-CONTRACTS-39.md): RC1 regression tests assume the old fingerprint location and a separate class cache unit
+- [TEST-TOWN-BOUNDS-40](TEST-TOWN-BOUNDS-40.md): Town expansion left recovery fixtures and coordinate audit stale
+- [TEST-WORKER-SYSPATH-32](TEST-WORKER-SYSPATH-32.md): Pool workers started from tests import tools/mwad.py instead of the mwad package
+- [TESTS-SUPERVISOR-START-CLOCK-46](TESTS-SUPERVISOR-START-CLOCK-46.md): A scheduler test sorted units by the clock each worker read, and failed when the host delayed a thread
+- [TOOLKIT-TEST-POINTERLOCK-31](TOOLKIT-TEST-POINTERLOCK-31.md): Inspector test left pointer lock set, breaking later drag checks
+
+<!-- END GENERATED CATEGORY -->

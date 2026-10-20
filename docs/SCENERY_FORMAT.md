@@ -1,6 +1,6 @@
 # Static scenery conversion experiment
 
-_Last updated with AmiWind v0.0.30 (7 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 Checkpoint-005 contains a working host exporter, not a native scene loader.
 Output is derived Morrowind content and must stay outside the source repository.
@@ -43,10 +43,19 @@ Amiga renderer still needs palette/mip conversion. Texture paths are resolved
 against the original BSA, including a DDS alternative for NIF TGA names.
 
 Models are shared across references. Flattened local model transforms include
-NIF scale/rotation/translation, except the root node's rotation: like Morrowind,
-the converter ignores the authored root rotation but keeps the root translation
-and scale (see [BALMORA-TEMPLE-GEOMETRY-29](bugs/BALMORA-TEMPLE-GEOMETRY-29.md);
-applying it turned Velothi kit pieces 90 degrees). TES3 placement position/rotation/scale is retained;
+NIF scale/rotation/translation, except a root node's: like Morrowind (rule from
+OpenMW file components/nif/node.cpp), the converter drops the whole transform
+(rotation, translation and scale) of a root NiNode, the file's first record,
+named anything but Bip01, and keeps the whole transform of any other root, such
+as the NiTriShape root of `contain_crate_01` (offset z -32). Applying the root
+rotation turned Velothi kit pieces 90 degrees
+([BALMORA-TEMPLE-GEOMETRY-29](bugs/BALMORA-TEMPLE-GEOMETRY-29.md)); keeping a
+root NiNode's translation lifted the Ebonheart dragon statue 327 units off its
+plaza and sank 41 Daedric ruins 1,018 units
+([MESH-EBONHEART-DRAGON-PEDESTAL-42](bugs/MESH-EBONHEART-DRAGON-PEDESTAL-42.md);
+`tools/nif_root_audit.py` lists every placed model the rule moves). The earlier
+rules stay selectable (`model_geometry(..., root_rule='morrowind' or 'legacy')`).
+TES3 placement position/rotation/scale is retained;
 transformed bounds populate every intersected XY bucket, so a building crossing
 a chunk edge is not lost. Camera-sphere queries test bounds rather than object
 origins. Frustum and occlusion rejection are not implemented by this host query.

@@ -109,6 +109,37 @@ class GalleryCacheTests(unittest.TestCase):
                      'config/gallery_model_quality.json'):
             self.assertIn(path, real['files'])
 
+    def test_face_keys_use_key_form_2(self):
+        """BUILD-REUSE-SCHEDULER-TOP-45 part 2: the face keys hash import-time code in form 2 like the stage and pass
+        keys. A function with literal defaults added to a reached module, or a literal default added to an unreached
+        function, keeps every face's key (form 1 changed them all: the v0.0.45 release build converted 3,551 faces
+        again for two scheduling functions); a default that runs code on import and a reached edit still change it.
+        The form is part of every key, so the change itself is explicit."""
+        import build_cache
+        self.assertEqual(c.KEY_FORMAT, 'reached code 2')
+        self.assertEqual(c.KEY_TOP_FORMAT, build_cache.STAGE_TOP_FORMAT)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/'tools').mkdir()
+            (root/'tools/prepare_gallery.py').write_text('from shared import used\ndef main():\n    return used()\n'
+                                                         "if __name__ == '__main__': main()\n")
+            shared = 'def used():\n    return 1\ndef unused(path, flag=False):\n    return 2\n'
+            (root/'tools/shared.py').write_text(shared)
+
+            def key():
+                c._SOURCES.clear()
+                return c.token(c.converter_sources(root))
+            original = key()
+            for name, edited in (('new function', shared + 'def helper(x, size=4, name="a"):\n    return x\n'),
+                                 ('literal default added', shared.replace('flag=False)', 'flag=False, n=3)'))):
+                (root/'tools/shared.py').write_text(edited)
+                self.assertEqual(key(), original, name)
+            (root/'tools/shared.py').write_text(shared + 'def helper(x, size=print(1)):\n    return x\n')
+            self.assertNotEqual(key(), original)       # a default that runs code on import
+            (root/'tools/shared.py').write_text(shared.replace('return 1', 'return 4'))
+            self.assertNotEqual(key(), original)       # a reached edit
+        c._SOURCES.clear()
+
     def test_complete_pair_roundtrip_and_corrupt_or_missing_files_miss(self):
         with tempfile.TemporaryDirectory() as temp:
             cache=Path(temp);ident=self.ident();raw,result=self.pair()

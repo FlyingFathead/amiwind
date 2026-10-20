@@ -1,6 +1,6 @@
 # CHIM
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -177,6 +177,7 @@ Leary). The CHIM builder is GPLv3. Details and the reviewed upstream revision:
 | [World format](WORLD_FORMAT.md) | The files the CHIM builder writes, byte by byte (the file-type table at the top), the M3 and M4 designs, the heap gate, the version rules |
 | [.chim map format](CHIM_MAP_FORMAT.md) | CHIM maps as `.chim` files, never Quake `.bsp`; the planned own header, loader and contents (approved 10 October 2026) |
 | [Cell crossings](CELL_CROSSINGS.md) | How the engine crosses from one frame to the next today (a level change) and the continuous-world method that replaces it |
+| [Streaming research](STREAMING_RESEARCH.md) | How Morrowind, OpenMW, Godot and published games stream a world without loading screens, what fits a 68040, and what it means for the cell crossings |
 | [CHIM engine](ENGINE.md) | How the engine loads, keeps, draws and collides with a CHIM world; memory and tests |
 | [CHIMport](CHIMPORT.md) | The whole island converted cell by cell from the sea inwards, every audit per cell ; [when a cell does not fit the memory budget](CHIMPORT.md#when-a-cell-does-not-fit-the-memory-budget) |
 | [Border audit](STITCH_AUDIT.md) | Where a CHIM area meets the legacy world: heights, arrival, far layer and objects at its edges |

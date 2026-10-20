@@ -9,7 +9,7 @@
 | Where | tools/harvest_build.py plan_rows: CHIM-native harvest planned only for Seyda Neen and Balmora |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev1 (last seen) |
+| Persists in | fixed in v0.0.41 |
 | Severity | medium: Every CHIM area beyond the two towns loses harvestable plants that the legacy maps had |
 | Family | Harvestable plants (`harvest`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

@@ -173,7 +173,7 @@
    "description": "World map, journal, quests, region names and entry table",
    "steps": ["world-ui", "image"],
    "patterns": ["id1/world/map.awm", "id1/world/journal.awj", "id1/world/quests.awq", "id1/world/region-names.awn",
-                "id1/world/entries.dat"]
+                "id1/world/entries.dat", "id1/world/region-weather.aww"]
   },
   {
    "id": "night-lighting",

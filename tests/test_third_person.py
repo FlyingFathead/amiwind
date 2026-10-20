@@ -98,6 +98,20 @@ class ViewEngineContracts(unittest.TestCase):
         loop = relink[relink.index('for (i=1,ent=cl_entities+1'):]
         self.assertIsNone(re.search(r'(?<![\w.>=!<])\bent\s*=(?!=)', loop[loop.index('{'):]))
 
+    def test_held_torch_comes_back_after_eviction_and_shows_in_the_inventory(self):
+        # PLAYER-TORCH-THIRDPERSON-38: the held torch alias was drawn only while Cache_Check found it;
+        # after any eviction the raised arm stayed (the renderer reloads the body) and the torch never
+        # returned. The inventory picture never drew it at all.
+        view = code('aw_view.c')
+        held = body(view, 'static entity_t *view_held')
+        self.assertIn('held_ready()', held)
+        self.assertNotIn('Cache_Check(&held_model->cache)', held)
+        ready = body(view, 'static int held_ready')
+        self.assertIn('AW_ViewHeldRetry(', ready)
+        self.assertIn('Mod_ForName(held_path,false)', ready)
+        self.assertIn('held_ready()', body(view, 'int AW_ViewInventoryHeld'))
+        self.assertIn('AW_ViewInventoryHeld(', body(code('aw_head.c'), 'int AW_InventoryPreviewDraw'))
+
     def test_no_engine_loop_moves_its_pointer_cursor(self):
         # Island-wide sweep: a `for (...,p=array...; ...; ...,p++)` loop never reassigns p in its body.
         offenders = []

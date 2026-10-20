@@ -159,6 +159,12 @@
    "note": "downward trace depth"
   },
   {
+   "file": "engine/aga/src/aw_weather.c",
+   "contains": "dx*dx+dy*dy>4096.0*4096.0",
+   "class": "kept",
+   "note": "region weather teleport test: a jump of over half an original cell (8,192 units) in one frame switches the weather at once; a distance between two original-world (source) positions in double precision, not an engine position, so the engine coordinate bound does not apply"
+  },
+  {
    "file": "engine/aga/src/bspfile.h",
    "contains": "#define\tMAX_MAP_BRUSHES\t\t4096",
    "class": "unrelated",

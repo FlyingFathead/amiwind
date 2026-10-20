@@ -37,6 +37,8 @@ for p in (ROOT / 'tools', ROOT / 'src'):
         sys.path.insert(0, str(p))
 
 from chim import format as F  # noqa: E402
+# face_polygons lives in its own module (the stair walk reads it, and its key holds only the code it runs)
+from chim.faces import face_polygons  # noqa: E402,F401
 from chim.terrain import box_leaves, tree_depth  # noqa: E402
 from chim.visibility import decompress_row, row_to_bits  # noqa: E402
 
@@ -181,22 +183,6 @@ def face_heights(lumps):
         except IndexError:
             zs = []                 # out of range: brush_checks names it
         out.append((min(zs), max(zs)) if zs else None)
-    return out
-
-
-def face_polygons(lumps):
-    """[(points, normal, texinfo flags, lit)] of a brush image's faces."""
-    import numpy as np
-    verts = np.array(list(struct.iter_unpack('<3f', lumps[3]))) if lumps[3] else np.zeros((0, 3))
-    planes = list(struct.iter_unpack('<4fi', lumps[1]))
-    texinfo = list(struct.iter_unpack('<8fii', lumps[6]))
-    edges = list(struct.iter_unpack('<HH', lumps[12]))
-    surfedges = [v[0] for v in struct.iter_unpack('<i', lumps[13])]
-    out = []
-    for f in struct.iter_unpack('<HhihH4Bi', lumps[7]):
-        ids = [edges[e][0] if e >= 0 else edges[-e][1] for e in surfedges[f[2]:f[2] + f[3]]]
-        n = np.array(planes[f[0]][:3]) * (-1 if f[1] else 1)
-        out.append((verts[ids], n, texinfo[f[4]][9], f[9] >= 0))
     return out
 
 

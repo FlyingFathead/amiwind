@@ -1,5 +1,7 @@
 # CHIM feature tracker
 
+_Generated from `docs/chim/features.json` with AmiWind v0.0.46._
+
 <!-- Generated whole by tools/chim_features.py render from docs/chim/features.json; do not edit by hand. -->
 
 What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, where it stands, the gain that was measured (what was compared, how and when) and how Quake's visibility culling still works with it. Generated from [`features.json`](features.json); a test fails when this page is stale. Bugs are on the [CHIM bug tracker](../bugs/CHIM_TRACKER.md); ideas and held-back work are collected in [CHIM ideas](IDEAS.md). How far the open world has been converted, cell by cell, is on the [CHIM cell tracker](CELL_TRACKER.md).

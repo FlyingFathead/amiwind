@@ -1,10 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Collision from what the game already knows, 20 October 2026](#collision-from-what-the-game-already-knows-20-october-2026)
 - [Cell crossings: one continuous world, 19 October 2026](#cell-crossings-one-continuous-world-19-october-2026)
 - [The road after v0.0.44, 19 October 2026](#the-road-after-v0044-19-october-2026)
 - [Distant views without pop-in, and the screen the Amiga need not redraw, 19 October 2026](#distant-views-without-pop-in-and-the-screen-the-amiga-need-not-redraw-19-october-2026)
@@ -84,6 +85,38 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
+## Collision from what the game already knows, 20 October 2026
+
+Decided for the project, 20 October 2026. Today the converter cuts each drawn mesh into convex collision pieces as
+well as it can, and the builder then walks every step and ramp of the island to find out whether the result can be
+walked: about 1.5 million stair walks in a full build of the v0.0.46-dev1 line, and hours of build time. That is
+brute force on an answer the game already holds: each Morrowind mesh says what the player collides with (its
+collision node, or the drawn mesh when it has none), and the movement rules (the highest step, the steepest walkable
+slope, the player's size) are known from the original game and OpenMW. The dock walkway repair of 20 October
+showed the cost of the old way: keeping every point of each collision piece added 55 MB of stored planes and nodes
+over the island and pushed six frames over the memory budget.
+
+The plan, in order:
+
+1. A second collision method beside today's, selected by a builder switch. It builds collision from the game's
+   collision data and the movement rules, so stairs and walkways are walkable by construction: one plate per tread
+   or an invisible ramp under a flight, while the steps are still drawn as steps.
+2. A check that is arithmetic instead of a walk: no standing surface lower than drawn by more than a step, no step
+   higher than the step limit. Seconds instead of hours; the stair walk stays as a sample.
+3. Nothing is removed. Today's converter, stair rules, stair gate and walk records stay as the first method, and the
+   results they have already recorded (every passed and failed walk, by the SHA-256 of the data walked) are kept as
+   the reference the new method is compared against. Each kept result says how it was made: which method, which
+   rules and which build (the stair records already carry that provenance), so a later comparison can always tell
+   "this is what we did then, and with which workflow".
+4. A/B of both methods on the same frames: memory (bytes, planes, nodes), build time, the stair walk sample and
+   in-game clips at stairs, docks and ladders.
+5. The first test set is the places where we already know the answer: every flight that passes today (Balmora,
+   Seyda Neen, Vivec, the Temple) must give the same result, and every fixed stair or collision bug must stay fixed.
+   The new method becomes the default only after that.
+
+Tracked as [BUILD-STAIR-WALK-BRUTE-FORCE-46](bugs/BUILD-STAIR-WALK-BRUTE-FORCE-46.md); the walkway memory cost as
+[CHIM-VIVEC-DOCK-WALKWAY-43](bugs/CHIM-VIVEC-DOCK-WALKWAY-43.md).
+
 ## Cell crossings: one continuous world, 19 October 2026
 
 v0.0.45 reads the frames around the player into spare Fast RAM, which roughly halves a crossing on a 128 MiB
@@ -146,6 +179,23 @@ as with the outdoors: the world first, then what is in it, then what happens in 
    frame with its people in place. The open bugs
    from the v0.0.43 playtests follow, among them rocks that do not close up
    ([CHIM-ROCKS-OPEN-SHELLS-43](bugs/CHIM-ROCKS-OPEN-SHELLS-43.md)).
+   **Then, before the interiors: one model at any angle.** Decided for the project, 19 October 2026: right after
+   the cell crossings, a placement records its full rotation and scale, and the engine turns one shared model when
+   it draws it, instead of storing a separate copy of the model for every tilt or scale. Measured on the v0.0.45
+   world: 33,426 stored models made from only 1,400 distinct meshes, 26,477 of them tilted variants (550 MB), and
+   91 % of the 713 MB of model data copies beyond one per mesh (barnacles alone in 2,022 variants)
+   ([CHIM-TILT-VARIANTS-SPLIT-33](bugs/CHIM-TILT-VARIANTS-SPLIT-33.md)); the CHIM world is 1.32 GB of a 2.76 GB
+   payload. One shared model per mesh could save up to about 650 MB, less what collision copies keep. The first step
+   is a study, before any code: how the engine draws a turned model today (`R_RotateBmodel`: the viewer is moved
+   into the model's frame once per model, with all three angles), how far its collision with turned models holds
+   (the trace is turned into the model's frame but the player's box is not, so a tilted model is only approximated),
+   what CHIM's placements do (yaw only), and what scale needs, which Quake does not have: the drawing transform,
+   texture scale on scaled surfaces, the bounds used for culling, and collision sizes; then the cost per model on
+   the 68040 and 68060, and the collision decision. The interiors need the
+   same mechanism, so it comes first. Drawing a turned model is Quake's own path; collision is the open question,
+   because Quake's movement code only collides with unturned models: either a small baked collision copy stays, or
+   the collision code learns rotation, chosen by measurements on the 68040 and 68060 profiles. A world format and
+   engine step, with the old storage kept selectable.
 3. **Every interior of the base game, with an interior progress tracker, and interiors on CHIM too.** Measured on
    19 October 2026: the base game has 1,328 interiors; 176 are in the game today and 919 on Vvardenfell are not
    converted yet ([checklist](PLAN-v0.0.45.md#3-every-interior-of-the-base-game)). Today every interior is its own
@@ -175,16 +225,31 @@ Two engine items from the maintainer's playtest of v0.0.44, both measured before
 through before they turn solid ([CHIM-BRIDGE-POP-PIECES-44](bugs/CHIM-BRIDGE-POP-PIECES-44.md),
 [HORIZON-POP-29](BUGS.md#fix-index), [HORIZON-HOLES-31](bugs/HORIZON-HOLES-31.md),
 [VIVEC-DISTANT-BRIDGES-32](bugs/VIVEC-DISTANT-BRIDGES-32.md)) all come from a distance cut made while the fog in
-front of it is not yet fully opaque. Games with fog and little compute avoid this with one rule: the fog reaches
+front of it is not yet fully opaque. The maintainer's examples (19 October 2026): Vivec's walkways cut in the
+middle at a distance, Balmora's walls, hillsides and the Ghostfence; all of them should stay solid. Proposed order,
+cheapest first: (1) the fog rule below, a settings and builder change with no new drawing code; (2) long structures
+(walkways, town walls, the Ghostfence) cut as one piece at one distance, so they fade into the fog together instead
+of losing their middle; (3) the far shell in flat fog colour, measured in the sandbox; (4) as a fallback if the
+68040 cannot afford (3), a painted horizon: a 360-degree silhouette strip per frame, rendered by the builder and
+drawn like the sky with no 3D work, flat (no parallax) and so only for what lies far behind the fog. Games with fog
+and little compute avoid this with one rule: the fog reaches
 full opacity before anything is dropped, so an object only ever emerges from the haze. First step: every distance
 cut (object draw distance, frame and chunk edges, the far band) at or beyond the fog's full-opacity distance, per
-region, with its cost measured, and a builder check that refuses a cut closer than the fog end. Then the
+region, with its cost measured, and a builder check that refuses a cut closer than the fog end. Status, 20
+October 2026: (1) and (2) are in source as the switches `dbg fog rule` and `dbg cut groups` (bits of the far detail setting `aw_cull`; structures found by the
+CHIM builder, a `.cut` sidecar per frame map) with the builder's fog check; both off until the maintainer has seen
+the in-game A/B; the inventory of every cut and the cost on paper are on
+[CHIM-BRIDGE-POP-PIECES-44](bugs/CHIM-BRIDGE-POP-PIECES-44.md). Then the
 [island cut-out](DISTANT_TERRAIN.md#horizon-ponderings-the-island-cut-out-19-october-2026) for the far skyline.
 Its form, settled the same day: one opaque far shell of the whole island (terrain plus the silhouettes of
 buildings, towers and bridges) in the fog's colour, drawn through the engine's existing solid-surface path
 (`D_DrawSolidSurface` in our AmiQuake source) as its own surface class with real depth, built as one coherent
 model, loaded before the detail it stands in for; its edge cost against the work it saves is measured on the
-68040 and 68060 profiles first.
+68040 and 68060 profiles first. The shell and the world streaming are designed as one system (one handover
+distance tied to the fog, the shell split along the streamed chunks, a late chunk showing its silhouette instead of
+a hole): [near and far as one system](chim/CELL_CROSSINGS.md#near-and-far-as-one-system-upcoming-direction). Once it
+passes the sandbox measurement it becomes the default distant drawing; today's horizon methods stay selectable
+(decided for the project, 19 October 2026).
 
 **Only the 3D window goes through the conversion.** The engine converts its chunky picture to AGA's bitplanes
 every frame, from the top row down to the lowest changed area (Quake's update rectangles), so the HUD's lines

@@ -3,8 +3,10 @@
 
 After the image step the builder groups the payload bytes of every partition by folder (classic maps, CHIM world,
 NPC gallery, sound, music, video, progs, other), records each drive image's size, and compares the result with
-the previous release's record (tools/size-baseline.json) and, when given, a previous build's record
-(--size-baseline FILE). Exact bytes stay in size-ledger.json in the run folder (and in build-summary.json); the
+the previous release's own record and, when given, a previous build's record (--size-baseline FILE). The previous
+release is the one tools/previous-release.json names; its record is the ledger of its release build in the same
+workspace (the newest passed run named ..._v<version>_release[-tryN]_<git>), else tools/size-baseline.json when that
+is of the same release; a record of an older release is never compared (BUILD-SIZE-GUARD-OLD-BASELINE-45). Exact bytes stay in size-ledger.json in the run folder (and in build-summary.json); the
 table prints GiB with two decimals.
 
 Builds that do not hold the same content are never compared as like-for-like: an image without the NPC gallery,
@@ -283,12 +285,82 @@ def guard_line(guard):
     return 'Size guard: ' + text
 
 
+PREVIOUS_RELEASE = ROOT / 'tools' / 'previous-release.json'
+AUTO = 'auto'
+
+
+def previous_release_version(path=PREVIOUS_RELEASE):
+    """The version of the previous published release (tools/previous-release.json), or None."""
+    try:
+        version = json.loads(Path(path).read_text(encoding='utf-8')).get('version')
+    except (OSError, ValueError, AttributeError):
+        return None
+    return str(version).lstrip('v') if version else None
+
+
+def release_run_ledger(workspace, version, exclude=None):
+    """The size ledger of the previous release's own build in WORKSPACE (the folder holding the run folders): the
+    newest run named YYYY_MM_DD_v<VERSION>_release[-tryN]_<git> whose build passed and whose ledger is complete;
+    (path, run name) or None. EXCLUDE: a run name never taken (the build being measured)."""
+    pattern = re.compile(r'^\d{4}_\d{2}_\d{2}_v%s_release(?:-try(\d+))?_[0-9a-f]+$' % re.escape(version))
+    found = []
+    try:
+        names = os.listdir(workspace)
+    except OSError:
+        return None
+    for name in names:
+        match = pattern.match(name)
+        if not match or name == exclude:
+            continue
+        folder = Path(workspace) / name
+        try:
+            state = json.loads((folder / 'build-state.json').read_text(encoding='utf-8'))
+            record = load_record(folder / FILE_NAME)
+        except (OSError, ValueError):
+            continue
+        if state.get('status') == 'passed' and record.get('status') == 'complete':
+            found.append((name[:10], int(match.group(1) or 1), name))
+    if not found:
+        return None
+    name = max(found)[2]
+    return Path(workspace) / name / FILE_NAME, name
+
+
+def resolve_release_baseline(run, previous=None, committed=RELEASE_BASELINE):
+    """(record path or None, note) of the release record a build is compared with: the previous release's own
+    ledger (tools/previous-release.json names the release; its release build in the same workspace holds the
+    ledger), else the committed record tools/size-baseline.json when it is of that release. A committed record of
+    an older release is not used: it compared v0.0.45 with v0.0.41 and called 0.44 GiB of CHIM world growth that
+    v0.0.42 to v0.0.44 had already shipped a failure (BUILD-SIZE-GUARD-OLD-BASELINE-45)."""
+    previous = previous_release_version() if previous is None else previous
+    run = Path(run)
+    if not previous:
+        return committed, 'no previous release named (tools/previous-release.json): the committed record'
+    found = release_run_ledger(run.parent, previous, exclude=run.name)
+    if found is not None:
+        return found[0], 'v%s release build %s' % (previous, found[1])
+    try:
+        record = load_record(committed)
+    except (OSError, ValueError) as exc:
+        return None, 'no record of v%s (no release build of it in this workspace; %s)' % (previous, exc)
+    if str(record.get('version') or '').lstrip('v') == previous:
+        return committed, 'v%s committed record %s' % (previous, Path(committed).name)
+    return None, ('no record of v%s: no release build of it in this workspace, and %s is of v%s (a record of another '
+                  'release is not compared)' % (previous, Path(committed).name, record.get('version')))
+
+
 def build_ledger(run, version, baselines=(), mode='auto', margin_gib=DEFAULT_MARGIN_GIB, reason=None,
-                 release_baseline=RELEASE_BASELINE):
-    """Collect, compare and judge; returns the ledger (not written)."""
+                 release_baseline=AUTO):
+    """Collect, compare and judge; returns the ledger (not written). RELEASE_BASELINE: a record file, None (no
+    release comparison) or 'auto': the previous release's own record (resolve_release_baseline)."""
     ledger = collect(run)
     margin = int(round(margin_gib * GIB))
     comparisons = []
+    if isinstance(release_baseline, str) and release_baseline == AUTO:
+        release_baseline, note = resolve_release_baseline(run)
+        ledger['release_baseline'] = {'record': str(release_baseline) if release_baseline else None, 'note': note}
+        if release_baseline is None:
+            ledger['checks'].append('release record: ' + note)
     sources = ([('release', Path(release_baseline))] if release_baseline else []) + \
               [('build', Path(path)) for path in baselines or ()]
     for role, path in sources:
@@ -318,7 +390,7 @@ def read(run):
 
 
 def step(run, version, baselines=(), mode='auto', margin_gib=DEFAULT_MARGIN_GIB, reason=None,
-         release_baseline=RELEASE_BASELINE, log=print):
+         release_baseline=AUTO, log=print):
     """The builder's size ledger step: writes size-ledger.json; returns the guard verdict. A ledger that cannot
     be made is an "error" verdict: it fails the build where the guard would fail, else it warns."""
     if not (Path(run) / 'image' / 'build.json').is_file():
@@ -349,7 +421,8 @@ def main(argv=None):
     show = sub.add_parser('show', help='print the size table of a finished run (writes nothing)')
     show.add_argument('run', type=Path)
     show.add_argument('--baseline', type=Path, action='append', default=[], help='a previous build record')
-    show.add_argument('--release-baseline', type=Path, default=RELEASE_BASELINE)
+    show.add_argument('--release-baseline', default=AUTO,
+                      help='a release record (default auto: the previous release build\'s own ledger)')
     show.add_argument('--json', action='store_true')
     base = sub.add_parser('baseline', help='write a baseline record from a finished run')
     base.add_argument('run', type=Path)

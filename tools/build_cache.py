@@ -164,19 +164,38 @@ SCHEDULING_UNITS = frozenset({
     ('tools/build_parallel.py', 'governed_map'),
     ('tools/build_parallel.py', '_sized_map'),
 })
+# Pool sizing constants: module-level literals (one line each) that only size and order a pool's units. Their
+# assignment lines are left out of their module's import-time text, so a new or changed sizing constant keys no
+# stage and no walk. tools/stair_parallel.py: read only by unit_size and plan_units (how many candidate steps a unit
+# takes) and by the pass's orchestration check (a progress line; the cost history the next build orders its units
+# by); a map's rows are its units' rows put back in order whatever the unit sizes. Origin: v0.0.45 added
+# UNIT_MIN_HEAVY and COST_POOL there and the legacy-map stair walk key changed with them, although no row could
+# (BUILD-REUSE-SCHEDULER-TOP-45 part 2). tests/test_build_cache.py checks that each one is a one-line literal and
+# that only those functions name it.
+SCHEDULING_CONSTANTS = frozenset({
+    ('tools/stair_parallel.py', 'UNITS_PER_WORKER'),
+    ('tools/stair_parallel.py', 'UNIT_MIN'),
+    ('tools/stair_parallel.py', 'UNIT_MAX'),
+    ('tools/stair_parallel.py', 'UNIT_MIN_HEAVY'),
+    ('tools/stair_parallel.py', 'COST_POOL'),
+})
 
 
 def scheduling_top_text(relative, top):
-    """A module's import-time text without the default-value lines of its SCHEDULING_UNITS functions. Top format 1
-    lists every plain function's defaults (`\\0defaults NAME: ...`), so adding a scheduling function, or a default to
-    one, still changed the import-time code of tools/build_parallel.py and with it every stage, NPC gallery face and
-    stair walk that reaches it (BUILD-REUSE-SCHEDULER-TOP-45: the v0.0.45 release build reconverted all 3,551 gallery
-    faces and walked all 1,351 stair frames again for _grow_seconds and governed_map's item_mib=None)."""
+    """A module's import-time text without the default-value lines of its SCHEDULING_UNITS functions and without the
+    assignment lines of its SCHEDULING_CONSTANTS. Top format 1 lists every plain function's defaults
+    (`\\0defaults NAME: ...`), so adding a scheduling function, or a default to one, still changed the import-time
+    code of tools/build_parallel.py and with it every stage, NPC gallery face and stair walk that reaches it
+    (BUILD-REUSE-SCHEDULER-TOP-45: the v0.0.45 release build reconverted all 3,551 gallery faces and walked all 1,351
+    stair frames again for _grow_seconds and governed_map's item_mib=None)."""
     names = {unit for path, unit in SCHEDULING_UNITS if path == relative}
-    if not names:
+    constants = sorted(name for path, name in SCHEDULING_CONSTANTS if path == relative)
+    if not names and not constants:
         return top
     prefixes = tuple('\0defaults %s: ' % name for name in names)
-    return ''.join(line for line in top.splitlines(keepends=True) if not line.startswith(prefixes))
+    assigned = re.compile(r'(?:%s)\s*=(?!=)' % '|'.join(map(re.escape, constants))) if constants else None
+    return ''.join(line for line in top.splitlines(keepends=True)
+                   if not line.startswith(prefixes) and not (assigned is not None and assigned.match(line)))
 
 
 INSTRUMENTATION_STEMS = frozenset(path.rsplit('/', 1)[-1][:-3] for path in INSTRUMENTATION_MODULES)
@@ -571,7 +590,7 @@ class SourceIndex:
                 and (relative, unit) not in SCHEDULING_UNITS}
         return UNIT_PREFIX[top_format] + digest_json(rows)
 
-    def _closure_symbols(self, start, key=None, entry=None):
+    def _closure_symbols(self, start, key=None, entry=None, stop=frozenset()):
         """(python files, data files, uncertain, constants) reachable from START run as a script.
 
         A module's top level runs when it is imported (its `if __name__ == '__main__'`
@@ -580,6 +599,8 @@ class SourceIndex:
         re-export. Decorated definitions, `from m import *`, getattr()/vars() on a
         module and globals() count the whole module; import_module()/__import__()
         with a computed name, eval() or exec() make the closure uncertain (all files).
+        STOP: {(path, unit)} not followed in this closure only (entry_units: a loader whose output the caller
+        verifies by content).
         """
         reached, pending, constants = set(), [], []
         state = {'uncertain': False}
@@ -587,7 +608,7 @@ class SourceIndex:
 
         def reach(relative, unit):
             if relative in OUTPUT_NEUTRAL or relative not in self.files or (relative, unit) in reached \
-                    or (relative, unit) in OUTPUT_NEUTRAL_UNITS:
+                    or (relative, unit) in OUTPUT_NEUTRAL_UNITS or (relative, unit) in stop:
                 return
             reached.add((relative, unit))
             pending.append((relative, unit))
@@ -892,6 +913,24 @@ class SourceIndex:
         selected = {path: value for path, value in selected.items() if path not in exclude}
         return digest_json(selected), len(selected), uncertain
 
+    def entry_units(self, script, function, stop=()):
+        """(python files, data files, uncertain, {python file: reached units}) of the code FUNCTION of SCRIPT can
+        reach (as entry_digest). STOP: {(repository path, unit)} the reach does not follow, for a caller that keys
+        what such a unit returns by its content instead of by its code (chim.collision.stair_code_selection: the
+        frame loader, whose output every walk checks against its key)."""
+        script = Path(script).resolve()
+        stop = frozenset(stop)
+        key = '%s::%s' % (script, function) + (
+            '::stop ' + ' '.join(sorted('%s:%s' % unit for unit in stop)) if stop else '')
+        if key not in self._closures:
+            start = script.relative_to(self.root.resolve()).as_posix()
+            if function not in self._module_symbols(start)['units']:
+                raise ValueError('No function %s in %s' % (function, start))
+            python, data, uncertain, constants = self._closure_symbols(start, key, entry=function, stop=stop)
+            self._closures[key] = (python, data, uncertain, environment_names(constants, uncertain))
+        python, data, uncertain, _ = self._closures[key]
+        return python, data, uncertain, self._reached.get(key) or {}
+
     def entry_digest(self, script, function, exclude=()):
         """(digest, files, uncertain) of the code one function of SCRIPT can reach: the module's import-time code,
         the function, and everything they reach (scope 'units' or 'symbols'), not the script's main flow. A per-unit
@@ -899,20 +938,12 @@ class SourceIndex:
         digest()."""
         if self.scope == 'modules':
             return self.digest(script, exclude)
-        script = Path(script).resolve()
-        key = '%s::%s' % (script, function)
-        if key not in self._closures:
-            start = script.relative_to(self.root.resolve()).as_posix()
-            if function not in self._module_symbols(start)['units']:
-                raise ValueError('No function %s in %s' % (function, start))
-            python, data, uncertain, constants = self._closure_symbols(start, key, entry=function)
-            self._closures[key] = (python, data, uncertain, environment_names(constants, uncertain))
-        python, data, uncertain, _ = self._closures[key]
+        python, data, uncertain, units = self.entry_units(script, function)
         files = self.files
         if uncertain:
             selected = {path: value for path, value in files.items() if path not in exclude}
             return digest_json(selected), len(selected), True
-        units = self._reached.get(key) if self.scope == 'units' else None
+        units = units if self.scope == 'units' else None
         selected = {}
         for path in python | data:
             if path not in files or path in exclude:

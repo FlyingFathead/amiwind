@@ -107,13 +107,32 @@ void() aw_hands_update = {
 .float aw_face_until;
 .float aw_hello_count;
 .float aw_manual_count;
+.string aw_greeting;       // the conversation greeting of a first meeting (build time, original records)
+.string aw_greeting_again; // the one of later talks, when it differs
 float aw_voice_deadline;
 /* A voice bark (aw_anim.c AW_VoiceSay): topic 0 attack, 1 hit, 2 flee, 3 idle; odds in percent. The engine
  * rolls the odds and, for idle lines, checks sight and range (OpenMW Actors::playIdleDialogue). */
 float(entity actor, float topic, float odds) aw_bark = #82;
 entity aw_player;
+/* A manual talk opens with the NPC's conversation greeting (Greeting 0-9 records, OpenMW
+ * DialogueManager::startDialogue; pr_cmds.c PF_aw_converse); 0 when it has none, then
+ * the hello line below is said as before (the previous method). */
+float(entity npc, float again) aw_converse = #83;
 /* Small independent scene policy, not a full original dialogue evaluator. */
 void(entity npc, entity listener, float automatic) aw_greet = {
+    local float seconds;
+    if (!automatic) {
+        seconds = aw_converse(npc, npc.aw_manual_count > 0);
+        if (seconds > 0) {
+            /* startDialogue plays no sound for the greeting: the text alone */
+            npc.aw_hello_done = 1;
+            npc.aw_hello_polls = 0;
+            npc.aw_face_until = time + npc.aw_greet_duration;
+            npc.aw_manual_count = npc.aw_manual_count + 1;
+            aw_voice_deadline = time + 4;
+            return;
+        }
+    }
     sound(npc,2,npc.aw_voice,0.9,1);
     centerprint(listener,npc.netname,"\n",npc.aw_line);
     npc.aw_hello_done = 1;

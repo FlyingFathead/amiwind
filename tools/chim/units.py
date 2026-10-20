@@ -27,13 +27,13 @@ _GEOMETRY = ['tools/prepare_mesh_bsp.py', 'tools/mesh_geometry.py', 'tools/stati
              'config/surface-flattening.json']
 TOOLS = {
     'mesh': _GEOMETRY,
-    'variant': _GEOMETRY + ['tools/surface_grid.py', 'tools/collision_bsp.py', 'tools/prepare_scenery.py',
+    'variant': _GEOMETRY + ['tools/surface_grid.py', 'tools/collision_bsp.py', 'tools/prepare_scenery.py', 'tools/nif_common.py',
                             'tools/visual_offsets.py', 'config/visual-offsets.json', 'tools/chim/models.py',
                             'tools/chim/format.py', 'tools/chim/occluders.py'],
-    'tiles': _GEOMETRY + ['tools/surface_grid.py', 'tools/prepare_scenery.py', 'tools/visual_offsets.py',
+    'tiles': _GEOMETRY + ['tools/surface_grid.py', 'tools/prepare_scenery.py', 'tools/nif_common.py', 'tools/visual_offsets.py',
                           'config/visual-offsets.json', 'tools/chim/models.py', 'tools/chim/format.py',
                           'tools/chim/occluders.py', 'tools/chim/cut.py', 'tools/routed_hull.py'],
-    'cut': _GEOMETRY + ['tools/surface_grid.py', 'tools/prepare_scenery.py', 'tools/visual_offsets.py',
+    'cut': _GEOMETRY + ['tools/surface_grid.py', 'tools/prepare_scenery.py', 'tools/nif_common.py', 'tools/visual_offsets.py',
                         'config/visual-offsets.json', 'tools/chim/models.py', 'tools/chim/format.py',
                         'tools/chim/occluders.py', 'tools/chim/cut.py', 'tools/routed_hull.py'],
     'texture': ['tools/chim/models.py', 'tools/prepare_quake.py', 'tools/prepare_mesh_bsp.py', 'src/mwad/scene.py'],
@@ -43,6 +43,8 @@ TOOLS = {
     'ocean': ['tools/chim/ocean.py', 'tools/chim/terrain.py', 'tools/chim/models.py', 'tools/mesh_geometry.py',
               'tools/surface_grid.py', 'tools/prepare_mesh_bsp.py', 'tools/chim/format.py', 'tools/player_hull.py',
               'tools/sky_palette_overlay.py'],
+    # the collision surface gate (chim.build.hull_surface_gate, CHIM-VIVEC-DOCK-WALKWAY-43)
+    'hull-surface': ['tools/mesh_geometry.py', 'tools/player_hull.py', 'src/mwad/scene.py'],
     'pvs': ['tools/chim/visibility.py', 'tools/asset_census.py', 'tools/chim/occluders.py', 'tools/chim/ground.py'],
 }
 # Build switches read from the environment by the converter functions (the stair rule:

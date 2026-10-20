@@ -19,7 +19,7 @@
 | Where | Image step: Seyda Neen legacy region maps (65 sn files) and every per-map pass over them |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.36 |
 | Severity | medium: about 62 s of the Seyda chain plus per-map passes over maps removed before packing; the payload is not affected |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

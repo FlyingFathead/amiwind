@@ -20,7 +20,7 @@ extern int (*aw_chim_view_reach)(void);
 static int chim_reach;
 static int view_reach(void){return chim_reach;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_fog_distance"))distance_command=fn;}
-static cvar_t *cvar_list[32];static int cvar_list_count;
+static cvar_t *cvar_list[64];static int cvar_list_count;
 
 cvar_t aw_drawdistance={"aw_drawdistance","700",0,0,700};
 void Cvar_SetValue(char *name,float value){
@@ -35,7 +35,7 @@ vec3_t vright,vup,modelorg;
 static byte environment[4096];static int environment_on,sky_fogged;
 const unsigned char *R_DayNightFogColours(void){return environment_on?environment:NULL;}
 unsigned char R_DayNightSkyPixel(unsigned char c,float x,float y,float z,int fog){return sky_fogged && z<0 && fog?environment[15<<8]:c;}
-void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);assert(cvar_list_count<32);cvar_list[cvar_list_count++]=v;}
+void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);assert(cvar_list_count<64);cvar_list[cvar_list_count++]=v;}
 static byte fog_colours[4096];
 viddef_t vid;refdef_t r_refdef;short *d_pzbuffer;unsigned int d_zwidth;
 byte *COM_LoadHunkFile(char *p){return fog_colours;}
@@ -153,6 +153,80 @@ static void fog_exact_tests(void){
  assert(AW_BrushPassFar(box,40,box)==(AW_FAR_FACES|2<<4) && AW_BrushPassFar(box,10,box)==AW_FAR_DRAW);
  Cvar_SetValue("aw_cull",1);aw_flame_depth_limit=NULL;
 }
+/* A placement of radius r whose near side (centre depth less r) lies at
+ * `near` straight ahead. */
+static int piece_far(float near,float radius){
+ float origin[3],mm[6];origin[0]=near+radius;origin[1]=0;origin[2]=0;
+ mm[0]=origin[0]-radius;mm[1]=-radius;mm[2]=-radius;mm[3]=origin[0]+radius;mm[4]=radius;mm[5]=radius;
+ return AW_BrushPassFar(origin,radius,mm);
+}
+/* The fog rule (aw_cull + 8, AW_CULL_FOG_RULE; CHIM-BRIDGE-POP-PIECES-44): no cut nearer than
+ * the fog's full-opacity depth, the distance itself (AW_FogDepths: level 15
+ * from there). Without it the Strong preset (aw_cull 4) cuts a small piece
+ * at 40 % of the distance, where the fog is still clear. */
+static void fog_rule_tests(void){
+ static byte depths[32768];float radii[4]={10,100,300,600},near;int i,z;
+ environment_on=0;view(0,0);r_origin[0]=r_origin[1]=r_origin[2]=0;
+ assert(AW_DrawDistance()==540);
+ /* where the presets cut, the fog is not opaque: level under 15 */
+ AW_FogDepths(depths,540);
+ z=(int)(32768.0f/(540*.4f));assert(depths[z]<15);z=(int)(32768.0f/(540*.85f));assert(depths[z]<15);
+ assert(((int)cvar_value("aw_cull")&~AW_CULL_TEST)==0);   /* switches off: the method before, until the A/B */
+ Cvar_SetValue("aw_cull",4);AW_CullBegin();
+ assert(piece_far(300,10)==AW_FAR_SIZE);          /* today: a small piece gone at 300 of 540 */
+ assert(piece_far(300,100)==AW_FAR_DRAW && piece_far(400,100)==AW_FAR_SIZE);
+ assert(piece_far(480,300)==AW_FAR_SIZE);
+ for(i=0;i<4;i++){
+  int mode;
+  for(mode=3;mode<=6;mode++){
+   Cvar_SetValue("aw_cull",mode|AW_CULL_FOG_RULE);AW_CullBegin();
+   assert(AW_SizeCutDepthShare(radii[i])>=1);
+   for(near=0;near<540;near+=9)assert(piece_far(near,radii[i])==AW_FAR_DRAW);   /* no size cut, no detail step */
+  }
+  Cvar_SetValue("aw_cull",4|AW_CULL_FOG_RULE);AW_CullBegin();
+  assert(piece_far(560,radii[i])==AW_FAR_SIZE);   /* past the fog end it still cuts */
+ }
+ /* the far detail step starts at the fog end, not at half of it */
+ Cvar_SetValue("aw_cull",5|AW_CULL_FOG_RULE);AW_CullBegin();assert(piece_far(300,40)==AW_FAR_DRAW);
+ Cvar_SetValue("aw_cull",5);AW_CullBegin();assert(piece_far(300,40)==(AW_FAR_FACES|2<<4));
+ /* the switch bits leave the far test itself alone: 8 alone is no far test, 9 the far plane */
+ {vec3_t far_door={1000,1000,0};
+  Cvar_SetValue("aw_cull",AW_CULL_FOG_RULE);AW_CullBegin();assert(AW_ModelVisible(far_door,10) && piece_far(300,10)==AW_FAR_DRAW);
+  Cvar_SetValue("aw_cull",1|AW_CULL_FOG_RULE|AW_CULL_GROUPS);AW_CullBegin();assert(!AW_ModelVisible(far_door,10));}
+ /* indoors nothing changes */
+ Cvar_SetValue("aw_cull",4|AW_CULL_FOG_RULE);inside=1;AW_CullBegin();
+ assert(piece_far(300,10)==AW_FAR_DRAW);inside=0;
+ Cvar_SetValue("aw_cull",1);
+}
+/* Whole-structure cuts (aw_cull + 16, AW_CULL_GROUPS): the pieces of one structure are
+ * tested on the structure's box, so a walkway keeps its small middle piece
+ * and its far end while any of it is within the cut, and loses all of it
+ * together. */
+static void cut_group_tests(void){
+ float walkway[6]={200,-20,0,900,20,40},beyond[6]={600,-20,0,900,20,40};
+ vec3_t middle={450,0,20},end={800,0,20};
+ float mm_mid[6]={440,-10,10,460,10,30},mm_end[6]={700,-100,-80,900,100,120};
+ environment_on=0;view(0,0);r_origin[0]=r_origin[1]=r_origin[2]=0;
+ Cvar_SetValue("aw_cull",4);AW_CullBegin();
+ AW_FarGroup(walkway);                            /* setting off: each piece on its own */
+ assert(AW_BrushPassFar(middle,10,mm_mid)==AW_FAR_SIZE);       /* the middle gone at 440 */
+ assert(!AW_PassVisible(end,100));                /* the far end past the far plane */
+ Cvar_SetValue("aw_cull",4|AW_CULL_GROUPS);AW_CullBegin();
+ AW_FarGroup(walkway);
+ assert(AW_PassVisible(middle,10) && AW_BrushPassFar(middle,10,mm_mid)==AW_FAR_DRAW);
+ assert(AW_PassVisible(end,100) && AW_BrushPassFar(end,100,mm_end)==AW_FAR_DRAW);
+ AW_FarGroup(beyond);                             /* the whole structure past the far plane: all of it goes */
+ assert(!AW_PassVisible(middle,10) && !AW_PassVisible(end,100));
+ AW_FarGroup(NULL);                               /* not a structure piece: its own sphere */
+ assert(AW_BrushPassFar(middle,10,mm_mid)==AW_FAR_SIZE && !AW_PassVisible(end,100));
+ inside=1;AW_CullBegin();AW_FarGroup(walkway);assert(AW_PassVisible(end,100));inside=0;  /* indoors: no far test */
+ /* the structure's size class decides: a 640-unit walkway goes at 85 % of the
+  * distance (Strong, no fog rule), all of it, not its small pieces at 40 % */
+ AW_CullBegin();AW_FarGroup(walkway);
+ {float far_walk[6]={560,-20,0,1200,20,40};vec3_t piece={600,0,20};float mm[6]={590,-10,10,610,10,30};
+  AW_FarGroup(far_walk);assert(AW_BrushPassFar(piece,10,mm)==AW_FAR_SIZE);}
+ AW_FarGroup(NULL);Cvar_SetValue("aw_cull",1);
+}
 /* Far detail default (owner 2026-10-17): Strong (4) for a fresh install and in
  * every saved configuration that sets it; a config.cfg saved before aw_cull was
  * saved (up to v0.0.41) keeps Full (1). */
@@ -219,6 +293,8 @@ int main(void) {
  chim_reach=1200;argument="1100";distance_command();assert(AW_DrawDistance()==1100);
  aw_chim_view_reach=NULL;assert(AW_DrawDistance()==540);
  fog_exact_tests();
+ fog_rule_tests();
+ cut_group_tests();
  far_detail_default_tests();
  puts("forward-depth culling retains visible edge/door and rejects far bounds; the fog-exact far test leaves out only full-fog geometry below the horizon");return 0;
 }

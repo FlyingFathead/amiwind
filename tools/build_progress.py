@@ -39,7 +39,7 @@ never changes a stage's command, environment or outputs; writing it never
 fails a build. See docs/BUILD_PROFILE.md "Live progress and ETA".
 """
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import math
 import os
@@ -452,6 +452,32 @@ def estimate(order, dependencies, stages, expected, budget, live=None):
 # --------------------------------------------------------------------------
 # Tracker (in the builder; fed by the profiler session's hooks and sampler)
 
+def clock_text(iso):
+    """A clock time from an ISO stamp, in UTC and, when the host's offset is known, in local time.
+
+    The builder runs in a container whose clock is UTC; the launcher passes the host's offset in
+    AMIWIND_LOCAL_UTC_OFFSET (for example "+0300", the form `date +%z` prints) so a reader at the
+    host sees both; without it the builder's own local offset is used (BUILD-ETA-CLOCK-UTC-ONLY-46)."""
+    if not iso:
+        return ''
+    try:
+        moment = datetime.fromisoformat(iso)
+    except ValueError:
+        return iso[11:19]
+    if moment.tzinfo is None:
+        moment = moment.astimezone()
+    utc = moment.astimezone(timezone.utc)
+    text = utc.strftime('%H:%M:%S') + ' UTC'
+    offset = (os.environ.get('AMIWIND_LOCAL_UTC_OFFSET', '').strip()
+              or datetime.now().astimezone().strftime('%z'))
+    match = re.fullmatch(r'([+-])(\d\d):?(\d\d)', offset)
+    if match and (match.group(2), match.group(3)) != ('00', '00'):
+        sign = 1 if match.group(1) == '+' else -1
+        local = utc.astimezone(timezone(sign * timedelta(hours=int(match.group(2)), minutes=int(match.group(3)))))
+        text += f" / {local.strftime('%H:%M:%S')} local ({match.group(1)}{match.group(2)}{match.group(3)})"
+    return text
+
+
 def _now_iso(epoch=None):
     moment = datetime.fromtimestamp(time.time() if epoch is None else epoch).astimezone()
     return moment.isoformat(timespec='seconds')
@@ -763,7 +789,7 @@ def eta_line(progress):
         return None
     eta = progress.get('eta_seconds')
     head = (f"[eta] {progress.get('percent') or 0:.1f} %, ETA "
-            + (f"{duration(eta)} (at {(progress.get('eta_at') or '')[11:19]})" if eta is not None else 'unknown'))
+            + (f"{duration(eta)} (at {clock_text(progress.get('eta_at'))})" if eta is not None else 'unknown'))
     parts = []
     for row in running:
         text = row['name']
@@ -842,7 +868,7 @@ def status_lines(progress, now=None):
         head += f", elapsed {duration(progress['elapsed_seconds'])}"
     if progress.get('status') == 'running' and progress.get('eta_seconds') is not None:
         at = progress.get('eta_at') or ''
-        head += f", ETA {duration(progress['eta_seconds'])}" + (f" (at {at[11:19]}, {progress.get('eta_basis')})" if at else '')
+        head += f", ETA {duration(progress['eta_seconds'])}" + (f" (at {clock_text(at)}, {progress.get('eta_basis')})" if at else '')
     lines = [head,
              f"Stages: {counts.get('passed', 0)} done, {counts.get('running', 0)} running, {counts.get('pending', 0)} "
              f"pending, {counts.get('failed', 0)} failed/cancelled (of {counts.get('total', 0)})"]

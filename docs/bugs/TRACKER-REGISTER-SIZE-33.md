@@ -2,12 +2,13 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 5 times; something has to be done
 
 - Reported with v0.0.33 at 2026-10-09 (time not recorded): first: the register outgrew the 256 KiB release text limit (gate preflight)
 - Reported with v0.0.36-dev5 at 2026-10-11 14:55 +0300: bugs.json 789,008 of 1 MiB passed the 75 % warning again; follow-up TRACKER-REGISTER-SIZE-36 (second archive)
 - Reported with v0.0.40-dev2 at 2026-10-14 (time not recorded): Journal reached196510B,98B below its warning. Rotate133 older entries; preserve newer/CHIM entries, history, links and all limits. Unreleased documentation follow-up.
 - Reported with v0.0.43-dev2 at 2026-10-18 15:28 +0300: Journal reached 196,648 B, 40 B past its warning. Rotated 130 entries of 11-16 October into the v0.0.37-v0.0.41 archive.
+- Reported with v0.0.46-dev at 2026-10-20 09:12 +0300: The 2026-10-20 audit took the one archive to 232,832 B, 89 % of 256 KiB. Split into four found-in ranges and rotation to v0.0.35: archives 57-86 KB (22-33 %), bugs.json 688,666 B (66 %).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -26,12 +27,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -44,6 +45,7 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 - [Journal headroom follow-up, 14 October 2026](#journal-headroom-follow-up-14-october-2026)
 - [Focused journal validation, 14 October 2026](#focused-journal-validation-14-october-2026)
 - [Journal rotation, 18 October 2026](#journal-rotation-18-october-2026)
+- [Archive split by version range, 20 October 2026](#archive-split-by-version-range-20-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -143,6 +145,42 @@ and the archive repointed to where each entry now lives. The current journal
 is now about 28 KB (11 % of the limit) and keeps the entries from 17 October
 on, which hold the latest ten CHIM summary entries. The hard text limit and
 the warning are unchanged.
+
+## Archive split by version range, 20 October 2026
+
+Reported again with v0.0.46-dev. The register audit of 20 October 2026 closed
+47 bugs; the fixed and closed ones first found in v0.0.33 or earlier rotated
+into the single frozen archive `archive/bugs-v0.0.29-v0.0.33.json`, which
+reached 232,832 bytes, 89 % of its 256 KiB limit, and the tracker size test
+failed (gate 3323).
+
+Repair, in `tools/bug_register.py` (`ARCHIVES`): the archive is now one file
+per range of the version a bug was first found in, and the rotation reaches
+v0.0.35 (the second archive planned on
+[TRACKER-REGISTER-SIZE-36](TRACKER-REGISTER-SIZE-36.md)). `load()` reads
+`bugs.json` and then every archive in range order; `render` writes each
+rotated bug to the first range that covers it and removes the old single
+file once its bugs are written; `check` reports a retired file that is still
+there as stale. No record changed: the 930 records are identical before and
+after, each ID once.
+
+| File | Before | After | Share of its limit |
+| --- | ---: | ---: | ---: |
+| `bugs.json` | 746,571 | 689,209 | 66 % of 1 MiB |
+| `archive/bugs-v0.0.29-v0.0.33.json` | 232,832 | removed | |
+| `archive/bugs-to-v0.0.31.json` | | 75,110 | 29 % of 256 KiB |
+| `archive/bugs-v0.0.32.json` | | 72,082 | 27 % |
+| `archive/bugs-v0.0.33.json` | | 85,646 | 33 % |
+| `archive/bugs-v0.0.34-v0.0.35.json` | | 57,908 | 22 % |
+| `docs/BUGS.md` | 548,570 | 548,861 | 52 % of 1 MiB |
+
+Every tracker file warns at 75 % again (the temporary 85 % for `bugs.json`
+and the archive is gone); the hard limits are unchanged. If every open bug
+first found in v0.0.33 or earlier were closed, the largest archive would
+still stay under the warning line. A new test
+(`test_rotation_into_several_archives_keeps_every_bug_once`) checks the
+split, the load order, the removal of the retired file and that a second
+save changes nothing. Not shipped.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

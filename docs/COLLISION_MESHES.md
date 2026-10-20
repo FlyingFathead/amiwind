@@ -1,6 +1,6 @@
 # Morrowind collision meshes: where they are and how AmiWind uses them
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -203,7 +203,19 @@ One reader, one proxy function, but the collision **source** is chosen per conve
 - `tools/prepare_mesh_bsp.py` `_prepare_model` passes that mesh to
   `tools/mesh_geometry.py` `collision_pieces`, shared by every converter and the estimators:
   - convex parts (`collision_parts`, at most 14 support points per hull,
-    [COLLISION-CONVEX-LOSS-32](bugs/COLLISION-CONVEX-LOSS-32.md));
+    [COLLISION-CONVEX-LOSS-32](bugs/COLLISION-CONVEX-LOSS-32.md)). Those 14 points can leave the
+    source surface outside the hull: a walkway deck that runs level and then slopes was cut as a chord
+    up to 19.4 units under its planks, and the player sank into it
+    ([CHIM-VIVEC-DOCK-WALKWAY-43](bugs/CHIM-VIVEC-DOCK-WALKWAY-43.md)). CHIM models of the 484 meshes
+    measured in `config/collision-hull-surface.json` hold their walkable surface: a piece whose reduced hull
+    leaves a point of its walkable faces more than 0.5 units deep gets points of those faces added until
+    none is (`mesh_geometry.surface_hull`, since v0.0.46); walkable faces the stair rules then leave more than
+    a step deep become authored plates. Keeping every point of such a piece, as first shipped, grew the
+    memory of 1,196 of 1,351 frames and put six over the CHIM zone
+    ([CHIM-HULL-SURFACE-HEAP-46](bugs/CHIM-HULL-SURFACE-HEAP-46.md)). `AMIWIND_COLLISION_HULL_POINTS`:
+    `table`, the default; `all`, every mesh; `extremes`, the method before; `table-whole`, every point of
+    such a piece (as first shipped). The collision surface gate of the CHIM model builder fails a mesh whose
+    walkable collision lies more than a step over its pieces;
   - thin plates per authored surface for `hollow_collision`;
   - plates when the convex fill closes more than a step (`surface_collision_beyond`,
     exterior `x/` models of converted towns);

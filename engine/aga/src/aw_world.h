@@ -13,4 +13,5 @@ qboolean AW_MapPlace(edict_t *,const float *);
 int AW_WorldContains(const char *,const float *);
 int AW_WorldRegionCentres(float *,int);
 const char *AW_RegionNameAt(const float *source_coordinates);
+int AW_RegionIndexAt(const float *source_coordinates);
 #endif

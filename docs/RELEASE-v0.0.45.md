@@ -1,11 +1,13 @@
 # AmiWind v0.0.45: CHIM Streaming Improved, Guard Torches Are Back
 
-Released 19 October 2026. Running on CHIM Engine v0.2.1. Previous release: [v0.0.44](RELEASE-v0.0.44.md).
+Released 20 October 2026. Running on CHIM Engine v0.2.1. Previous release: [v0.0.44](RELEASE-v0.0.44.md).
 
 Crossing from one CHIM cell to the next uses spare Fast RAM now: the frames around the player are read ahead into
 memory while you walk, and the engine's heap grows with the RAM the machine has instead of staying at the built
-11 MiB. On a 128 MiB machine a crossing measured about half as long as before (about 450 ms down to about 230 ms);
-a 16 MiB machine keeps today's sizes. The guards in the streets carry their torches at night again. More
+11 MiB. On a 128 MiB machine a crossing takes about a third of the v0.0.44 time (light areas about 290-370 ms down to
+about 120 ms, Balmora about 650-820 ms down to about 200-220 ms); a 16 MiB machine keeps today's sizes and is only
+1-7 % faster. (Corrected 20 October 2026: first published as "about half as long", from one measurement; the
+figures here are from a fixed route, [CROSSING_BASELINE](performance/CROSSING_BASELINE.md).) The guards in the streets carry their torches at night again. More
 improvements to cell-to-cell streaming are on the way: the largest remaining part of a crossing is the engine
 restarting the game for every new frame, and the next step replaces that with a switch in place.
 
@@ -14,9 +16,10 @@ restarting the game for every new frame, and the next step replaces that with a 
 ### Streaming
 
 - **Frames read ahead into spare Fast RAM.** While the player walks, the frames around the current one are read
-  into memory beyond the 16 MiB baseline, so a crossing finds most of what it needs already loaded. Measured on
-  a 128 MiB setup: about 450 ms per crossing before, about 230 ms with the read-ahead
-  ([CHIM-CROSSING-SYNC-LOAD-43](bugs/CHIM-CROSSING-SYNC-LOAD-43.md)).
+  into memory beyond the 16 MiB baseline, so a crossing finds most of what it needs already loaded. Measured over a
+  fixed route on a 128 MiB setup: about a third of the v0.0.44 time (light areas 293-367 ms down to 117-123 ms,
+  Balmora 650-822 ms down to 201-223 ms); with 16 MiB, 1-7 % faster
+  ([CROSSING_BASELINE](performance/CROSSING_BASELINE.md), [CHIM-CROSSING-SYNC-LOAD-43](bugs/CHIM-CROSSING-SYNC-LOAD-43.md)).
 - **A heap sized from the free Fast RAM.** At start the engine sizes its heap from the largest free Fast RAM
   block, less a margin for the system and sound: 24 MiB and an 82 MiB CHIM cache on a 128 MiB setup, the built
   11 MiB on a 16 MiB one. The start option `-heapmb` still overrides it

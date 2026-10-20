@@ -179,9 +179,9 @@ def prepare(town, data_files, scene, chim_world, out, ffmpeg='ffmpeg', jobs=None
         raise ValueError('The CHIM world has no source stage for ' + town + ': ' + str(work))
     references = frame_references(work, settings)
     index = json.loads((work / 'scenery/scenery-index.json').read_text())
-    kinds, _, topics = load_master(child_ci(data, 'Morrowind.esm'))
+    kinds, cells, topics = load_master(child_ci(data, 'Morrowind.esm'))
     palette = (scene / 'id1/gfx/palette.lmp').read_bytes()
-    texts = residents(data, out, out, references, settings, kinds, topics, palette, ffmpeg, jobs)
+    texts = residents(data, out, out, references, settings, kinds, topics, palette, ffmpeg, jobs, cells)
     ext = lumps((scene / 'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
     timings = '\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"', ext))
     # The frame's own collision: the arrival is a standing spot on it and the actors stand on it.

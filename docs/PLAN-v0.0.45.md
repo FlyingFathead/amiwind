@@ -1,6 +1,16 @@
 # v0.0.45 working plan: crossings, then every interior
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [1. Cell crossings](#1-cell-crossings)
+- [2. Bugs from the v0.0.43 playtests](#2-bugs-from-the-v0043-playtests)
+- [3. Every interior of the base game](#3-every-interior-of-the-base-game)
+- [4. After the interiors](#4-after-the-interiors)
+
+<!-- contents end -->
 
 The step-by-step checklist behind the [roadmap's road after v0.0.44](ROADMAP.md#the-road-after-v0044-19-october-2026).
 Written 19 October 2026 from the maintainer's decisions of that day. A step is ticked only with its evidence (a
@@ -24,16 +34,26 @@ A run as drift control, and is kept only when it wins.
 
 ### 1a. What v0.0.45 ships
 
-- [ ] 1.1 A fixed route with edge and corner crossings, scripted; crossing time per section at 16 MB and at 128 MB:
-  the A of every comparison. First baseline 19 October 2026 on the v0.0.44 image (busy host, 128 MB): light edge
-  about 320 ms, light corner about 360 ms, Balmora edge about 680 ms, Balmora corner about 880 ms; about 220 to 260 ms
-  of each is the level change itself, the same at 16 and 128 MB. A quiet-host rerun with the v0.0.45 image follows
-  the release build.
-- [ ] 1.2 The prefetch into spare RAM (branch `v0.0.43-prefetch`, measured about 450 ms down to about 230 ms per
-  crossing at 128 MB): merged 19 October 2026 (1557f6c) and in the v0.0.45 build; ticked after the route measurement
-  with the v0.0.45 image.
-- [ ] 1.3 RAM past 16 MB as a frame cache and a heap that grows with RAM
-  ([ENGINE-HEAP-FIXED-SIZE-43](bugs/ENGINE-HEAP-FIXED-SIZE-43.md)): merged with 1.2; ticked with the same measurement.
+- [x] 1.1 A fixed route with edge and corner crossings, scripted; crossing time per section at 16 MB and at 128 MB:
+  the A of every comparison. The route is `tools/crossing_route.py` (edges, diagonal corners and corner loops in a
+  light area and at the Balmora frame; one boot per image and memory size, each leg three times; method and
+  limits: [Crossing baseline](performance/CROSSING_BASELINE.md)). Quiet-host baseline 20 October 2026 on the
+  v0.0.44 image, median ready time: 128 MB light edge 293 ms, light corner 367, Balmora edge 650, Balmora corner
+  822; 16 MB 448, 537, 665, 879 (table and causes:
+  [Cell crossings](chim/CELL_CROSSINGS.md#what-a-crossing-costs-today)). The route flies above the fogged ground, so
+  its approach frames are light; a walking route on the ground is still to come.
+
+Order (maintainer, 19 October 2026): measure the level change part by part first (1.6); of the type 0 quick wins
+only A, and only if the measurement shows a large share, at most one evening; then straight to the type 1 sandbox
+(1.9). Type 1, the outdoors as one running world, is the target; type 0 stays selectable.
+- [x] 1.2 The prefetch into spare RAM (branch `v0.0.43-prefetch`, measured about 450 ms down to about 230 ms per
+  crossing at 128 MB): merged 19 October 2026 (1557f6c) and in the v0.0.45 build. On the route, 20 October 2026,
+  v0.0.45 against v0.0.44 at 128 MB: light edge 293 to 123 ms, light corner 367 to 123, Balmora edge 650 to 201,
+  Balmora corner 822 to 223 (about a third, more than the "roughly halves" of the v0.0.45 notes); the longest
+  frame of a light crossing about 200 to 260 ms down to about 65. At 16 MB 1 to 7 % faster.
+- [x] 1.3 RAM past 16 MB as a frame cache and a heap that grows with RAM
+  ([ENGINE-HEAP-FIXED-SIZE-43](bugs/ENGINE-HEAP-FIXED-SIZE-43.md)): merged with 1.2; on the same measurement the heap
+  is 24 MiB with 128 MB (11 MiB on v0.0.44 and with 16 MB), the CHIM cache 82 MiB.
 - [ ] 1.4 Loading spread over many rendered frames before the border, no blocking read at the crossing. The v0.0.45
   prefetch reads a slice per rendered frame; what still blocks at the crossing is the level change (1.6 onwards).
 - [ ] 1.5 Corners: all three other frames queued, the one ahead first; hysteresis so a border is never loaded twice.
@@ -42,13 +62,20 @@ A run as drift control, and is kept only when it wins.
 
 ### 1b. The level change, part by part (type 0, v0.0.46)
 
-- [ ] 1.6 The level change split into its parts on the route: the reconnection handshake (each step), clearing the
+- [x] 1.6 The level change split into its parts on the route: the reconnection handshake (each step), clearing the
   old level, loading the game scripts, reading the frame map, starting the CHIM world, the renderer's new-map work and
   priming the chunk ring. A small buffered timeline with the host frame number of each event (server shut down and
   started, client model and sound lists, each reconnection reply queued and processed, the first real presentation of
   the new world) separates work from waiting between host frames: elapsed time is not all processor time. The end
   point is a frame of the new world actually shown, timed before any audit or logging work (today
   `aw_stream.c` `AW_StreamPresented` runs a heap audit before it takes the time).
+  Done 20 October 2026 with a timing build of the v0.0.45 engine on the v0.0.45 image (table:
+  [The level change, part by part](chim/CELL_CROSSINGS.md#the-level-change-part-by-part)). Four host frames from the
+  border to the first frame shown: 155 ms (light edge) and 305 ms (Balmora corner) with 128 MB, 540 and 906 ms with
+  16 MB. The largest parts: with 128 MB the chunk ring (38 to 54 ms), the CHIM start of the frame (21 to 28) and the
+  heap audit lines (17 to 21), in a town the entity spawn (96); with 16 MB the CHIM start of the frame (199 to 335,
+  the world index decoded again) and the chunk ring (95 to 231), in a town also the entity spawn (231) and the client
+  model list (92). Waiting between host frames is about 17 ms at the best and 1 to 4 ms otherwise.
 - [ ] 1.6b The worst rendered frame over the whole approach and crossing, and the longest piece of loading work that
   cannot be interrupted today (one model decoded, one terrain chunk grafted: the budgets allow one unit over). A
   change that only moves the pause a few metres before the border does not count as a win; a piece longer than the
@@ -57,9 +84,16 @@ A run as drift control, and is kept only when it wins.
   - [ ] A. the reconnection replies that are already waiting processed during loading, a bounded number, instead of
     one per host frame (same handlers and message order, no physics steps added to move them along, and client
     time, entity relinking and effects advanced once per host frame: the whole client read step advances them, so
-    only the waiting replies are exchanged); kept only if 1.6 shows real waiting;
+    only the waiting replies are exchanged); kept only if 1.6 shows real waiting. Not started: 1.6 measured about
+    17 ms of waiting at the best (one frame of the 72 Hz cap), 1 to 4 ms otherwise, not worth an evening ahead of
+    the items below;
+  - [ ] A2. no heap audit lines during a crossing (one summary line, or development builds only): 17 to 21 ms at every
+    memory size (measured 20 October 2026);
+  - [ ] A3. the 11 to 12 ms spent in the console command buffer in the handshake's second frame, found and removed
+    if it is not needed there;
   - [ ] B. the game scripts kept loaded when unchanged;
-  - [ ] C. the decoded world index kept with 16 MB too, if the memory gate allows it;
+  - [ ] C. the decoded world index kept with 16 MB too, if the memory gate allows it (the largest part with 16 MB:
+    the CHIM start of the frame, 199 to 335 ms, measured 20 October 2026);
   - [ ] D. the frame's entity text read once, not twice more, when sky and lighting settings are the same;
   - [ ] E. no double stop of all sounds and no loading screen draw for a crossing;
   - [ ] F. the chunks of the neighbouring frame that are still in reach kept.
@@ -69,7 +103,10 @@ A run as drift control, and is kept only when it wins.
 - [ ] 1.8 The method switch: type 0 and type 1 selectable; type 0 stays the default until type 1 wins on the route.
   A setting of its own (or an explicit migration): today's saved `aw_cell_change_method` 1 means the current method
   and 2 the read-ahead experiment, so a saved 1 must never turn into type 1.
-- [ ] 1.9 A sandbox of four light frames around one corner, at a fixed origin: the four frames' chunks in one
+- [ ] 1.9 Near and far together in the sandbox ([one system](chim/CELL_CROSSINGS.md#near-and-far-as-one-system-upcoming-direction)):
+  streamed detail near, the far shell beyond, one handover distance tied to the fog, the shell split along the
+  streamed chunks, one priority queue and one memory budget; a chunk held back on purpose shows its silhouette.
+  A sandbox of four light frames around one corner, at a fixed origin: the four frames' chunks in one
   composite world (one owner per physical chunk, so shared terrain margins are never loaded twice); the game logic,
   display, player and clock kept running; a model and sound set that fits today's lists. The player's logical cell is
   kept apart from the running session and the coordinate origin; after a seamless crossing the terrain, the doors and

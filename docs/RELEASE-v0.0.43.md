@@ -1,6 +1,6 @@
 # AmiWind v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It
 
-Released 18 October 2026. Running on CHIM Engine v0.2.1. Previous release:
+Released 19 October 2026. Running on CHIM Engine v0.2.1. Previous release:
 [v0.0.42](RELEASE-v0.0.42.md); development snapshots [v0.0.43-dev1](RELEASE-v0.0.43-dev1.md),
 [v0.0.43-dev2](RELEASE-v0.0.43-dev2.md), [v0.0.43-dev3](RELEASE-v0.0.43-dev3.md) and
 [v0.0.43-dev4](RELEASE-v0.0.43-dev4.md).

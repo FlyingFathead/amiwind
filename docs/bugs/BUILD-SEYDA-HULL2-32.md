@@ -9,7 +9,7 @@
 | Where | bsp stage, Seyda Neen full-town map (tools/prepare_quake.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.28, v0.0.32-dev, v0.0.40-dev2 (last seen) |
+| Persists in | fixed in v0.0.41 |
 | Severity | critical: From-scratch builds stop at qbsp because hull 2 exceeds the clipnode limit; release blocker for the builder. |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
 

@@ -1107,7 +1107,7 @@ $('metricsfile').onchange = e => {
   load(f, text => { if (setMetrics(JSON.parse(text))) metricsFileName = f.name; });
 };
 // Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
-const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.7'};
+const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.8'};
 let statusFileName = null;
 function stateJson() {
   const sel = picked && data ? data.cells.find(c => c.x === picked.x && c.y === picked.y) : null;
@@ -1239,6 +1239,20 @@ $('mode-local').onclick = () => setMode('local');
 window.addEventListener('message', e => {
   if (e.source === window.parent && e.data && e.data.type === 'amiwind-set-mode') setMode(e.data.mode === 'local' ? 'local' : 'world');
 });
+// Every time shown is a full stamp: local date, time and offset (the browser's clock) and the UTC date and time
+// (BUILD-ETA-CLOCK-UTC-ONLY-46). A stamp without a zone is shown as is, marked "zone unknown".
+const fullStamp = iso => {
+  if (!iso) return '';
+  const text = String(iso);
+  if (!/(?:[zZ]|[+-]\d\d:?\d\d)$/.test(text)) return text.replace('T', ' ') + ' (zone unknown)';
+  const d = new Date(text);
+  if (isNaN(d)) return text;
+  const p = n => String(n).padStart(2, '0'), off = -d.getTimezoneOffset();
+  const zone = (off >= 0 ? '+' : '-') + p(Math.floor(Math.abs(off) / 60)) + p(Math.abs(off) % 60);
+  const local = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  const utc = d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+  return local + ' ' + zone + ' / ' + utc + ' UTC';
+};
 function escapeHtml(t) { return String(t).replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch])); }
 function cellAt(e) {
   const g = geometry(), r = canvas.getBoundingClientRect(), k = vsize(g)[0] / r.width;
@@ -1833,7 +1847,7 @@ function chimOverview() {
       '</td><td>' + (n.not_measured || 0) + '</td></tr>'; }).join('');
   const runs = chim.runs.map(r => '<tr><td class="l">' + escapeHtml(r.name) + '</td><td class="l">' + escapeHtml(r.label || '') + '</td><td>' + escapeHtml((r.areas || []).join(', ')) +
     '</td><td>' + escapeHtml(r.chim_version || '?') + '</td><td>' + escapeHtml(r.world_format || '?') + '</td><td>' + escapeHtml(r.commit || 'not recorded') +
-    '</td><td>' + escapeHtml((r.built_at || '').replace('T', ' ').slice(0, 16)) + '</td></tr>').join('');
+    '</td><td>' + escapeHtml(fullStamp(r.built_at)) + '</td></tr>').join('');
   const mesh = chimMeshView();
   return '<h2>CHIM Progress Tracker</h2><p class="muted">' + escapeHtml(chimSource || '') + ' · generated ' + escapeHtml(chim.generated) + ' · ' +
     (h.islands || []).map(i => i.name + ' ' + i.cells.toLocaleString() + ' cells, done ' + i.done.toLocaleString() + ' (' + i.percent + ' %)').join(' · ') + ' · ' +
@@ -1895,7 +1909,7 @@ function showChimCell(x, y) {
       (lg.checked ? ' · maintainer checked' : '') + '</p>' : '<p>not measured</p>') +
     '<h3>Audits</h3>' + (c.chim.converted ? '<table class="mt"><thead><tr><th class="l">Mechanism</th><th class="l">Result</th><th class="l">Detail</th><th class="l">Build</th></tr></thead><tbody>' + audits + '</tbody></table>' : '<p>not converted yet: nothing to audit</p>') +
     '<h3>Provenance</h3><p>' + (pv ? 'build ' + escapeHtml(pv.build) + ' (' + escapeHtml(pv.label || '') + ') · source commit ' + escapeHtml(pv.source_commit || 'not recorded') + ' · CHIM ' + escapeHtml(pv.chim_version || '?') +
-      ' · world format ' + escapeHtml(pv.world_format || '?') + ' · built ' + escapeHtml((pv.built_at || '').replace('T', ' ').slice(0, 16)) : 'not in a CHIM build') +
+      ' · world format ' + escapeHtml(pv.world_format || '?') + ' · built ' + escapeHtml(fullStamp(pv.built_at)) : 'not in a CHIM build') +
     (c.last_build ? '<br>last build: ' + Math.round(c.last_build.elapsed_s / 60 * 10) / 10 + ' min elapsed' + (c.last_build.chim_stage_s ? ', CHIM stage ' + Math.round(c.last_build.chim_stage_s) + ' s' : '') +
       (c.last_build.host_busy ? ' (busy host)' : '') : '') + '</p>' +
     chimInteriorsBlock(c) +
@@ -2057,7 +2071,7 @@ function stripRender() {
 function stripFromDoc(doc) {
   if (liveStatus) return;                      // a running build's own timestamp wins
   const t = Date.parse(doc.generated);
-  stripUpdated = isFinite(t) ? t : null; stripUpdatedText = doc.generated ? String(doc.generated).replace('T', ' ').replace('+00:00', ' UTC') : '';
+  stripUpdated = isFinite(t) ? t : null; stripUpdatedText = doc.generated ? fullStamp(String(doc.generated)) : '';
 }
 function liveApply(st) {
   liveStatus = st; $('livestatus').textContent = liveText(st);

@@ -88,4 +88,8 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - PUNCH-AUDIO-COVERAGE-29 (no report page): Original punch swing/hit sound coverage unverified
 - WIN-05 (no report page): Intermittent WinUAE background-music snapping
 
+Related bugs in other categories:
+
+- [NPC-DREAMER-GREETING-DEFAULT-42](NPC-DREAMER-GREETING-DEFAULT-42.md): Dreamers (Sixth House sleepers) give a default greeting instead of their own Sixth House greeting
+
 <!-- END GENERATED CATEGORY -->

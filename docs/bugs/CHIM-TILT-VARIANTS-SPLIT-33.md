@@ -1,5 +1,14 @@
 # CHIM-TILT-VARIANTS-SPLIT-33: Tilted placements each get their own model variant
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.33 at 2026-10-09 (time not recorded): First: found in the v0.0.33 development line, 39,103 extra model variants on the base island (placements store yaw only)
+- Reported with v0.0.45 at 2026-10-19 23:10 +0300: v0.0.45 world: 33,426 stored models from 1,400 meshes; 91 % of model bytes are extra copies
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -25,6 +34,7 @@ _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

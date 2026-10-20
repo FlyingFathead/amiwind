@@ -19,12 +19,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [Status: 19 October 2026](#status-19-october-2026)
+- [Status: 20 October 2026](#status-20-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -37,12 +37,15 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents end -->
 
-## Status: 19 October 2026
+## Status: 20 October 2026
 
-Open. Part 1 repaired in v0.0.45: scheduling functions no longer change a module's import-time key
-(`tools/build_cache.py`, `SchedulingKeysTest`), which removes the NPC gallery's re-conversion. Part 2 for v0.0.46: the
-stair walks are keyed by the code of the world loader they reach (see "How it happened"); they should be keyed by
-the bytes of the frames they walk. The v0.0.45 release build ran before any repair and paid for it once.
+Open until a build verifies part 2. Part 1 repaired in v0.0.45: scheduling functions no longer change a module's
+import-time key (`tools/build_cache.py`, `SchedulingKeysTest`), which removes the NPC gallery's re-conversion. Part 2
+repaired on branch `v0.0.45-reuse-keys` (not merged, 20 October 2026): the NPC gallery face keys use key form 2, a
+CHIM frame's stair walk is keyed by the frame data it walks and the walk's own code (not the frame loader's), the
+pool sizing constants of `tools/stair_parallel.py` key no legacy-map walk, and the reuse preflight stops a build
+whose rebuilds only scheduling code, `VERSION` or prose explain (see "Repair"). The v0.0.45 release build ran before
+any repair and paid for it once; the first build after part 2 pays once more (below).
 
 PERSISTING: the same mechanism as [BUILD-KEY-FUNCTION-DEFAULTS-TOP-36](BUILD-KEY-FUNCTION-DEFAULTS-TOP-36.md).
 First ran into it with v0.0.36-dev1 (10 October 2026: stage keys, fixed there for stage keys only); ran into it
@@ -77,7 +80,13 @@ v0.0.45 build commit c9099fb8), each with its own code:
 | --- | --- |
 | NPC gallery faces (`tools/gallery_cache.py` `converter_sources`, key form 1) | `tools/build_parallel.py` only |
 | CHIM stair walks (`chim.collision.stair_code_selection`, form `chim-stair-code-1`) | `tools/chim/validate.py` only |
-| Legacy-map stair walks (`stair_walk.walk_key_sources`) | changed; inputs not yet measured |
+| Legacy-map stair walks (`stair_walk.walk_key_sources`) | `tools/stair_parallel.py` import-time code only |
+
+Measured per reached unit on 20 October 2026 (each tree with its own code, pass key form 2): the CHIM stair key
+changed only through the import-time code (`<top>`) of `tools/chim/validate.py`, no function the walk runs; the
+legacy-map walk key only through the import-time code of `tools/stair_parallel.py`, where v0.0.45 added the pool
+sizing constants `UNIT_MIN_HEAVY` and `COST_POOL` (BUILD-IMAGE-STAIR-WALK-CORES-43). Both are scheduling or loading
+changes that cannot change a row.
 
 So the gallery re-keyed through the form-1 import-time text (below). The CHIM stair walks re-keyed because the
 walker reaches `load_world` in `tools/chim/validate.py`, which v0.0.45 rewrote to load frames on the worker pool
@@ -112,10 +121,35 @@ they call keys the stages that reach it), and every other edit of the module sti
 The repair itself changes the import-time text of `tools/build_parallel.py` once, so the first build after it
 recomputes the keys that reach that module once more; from then on a scheduling edit keys nothing.
 
-Still to do in v0.0.46 (this page stays open until then): the NPC gallery face keys move to key form 2 like the
-stage and pass keys; a stair walk is keyed by the SHA-256 of the frame data it walks instead of by the loader's code
-(a loader rewrite with identical output reuses every walk, a changed frame walks again); the legacy-map walk key's
-changed inputs are measured; each with a test that edits only that input and expects the right key.
+Part 2 (branch `v0.0.45-reuse-keys`, 20 October 2026):
+
+- NPC gallery faces: `tools/gallery_cache.py` `converter_sources` hashes import-time code in key form 2
+  (`KEY_FORMAT` 'reached code 2', `KEY_TOP_FORMAT` = `build_cache.STAGE_TOP_FORMAT`). The form is part of every
+  face's identity: every face is converted once more in the first build after the change.
+- CHIM stair walks: key form `chim-stair-code-2`. A walk's key is the SHA-256 of the frame data it walks
+  (`frame_stair_parts`: the frame grid, each chunk's terrain walk lumps, each owned placement with its model's
+  walk lumps, computed from the world the gate read) plus the walk's own code. The frame loader
+  (`STAIR_FRAME_LOADER`, `chim/validate.py` `load_frame`) is no longer in the code part: the reach stops there
+  (`build_cache.SourceIndex.entry_units` with a stop list), and `face_polygons`, which the walk runs, moved to
+  `tools/chim/faces.py` (`chim/validate.py` still offers it), so `chim/validate.py` is out of the walk's code. In
+  exchange every walk worker checks the frame it reads against the walk's data key (`_stair_frame` EXPECT, passed
+  with every walk unit) and walks nothing on a mismatch: a walk is never stored or reused for data other than what
+  it walked. A loader rewrite with the same output reuses every walk; a changed frame gets another key and is
+  walked again.
+- Legacy-map stair walks: `build_cache.SCHEDULING_CONSTANTS` leaves the assignment lines of the pool sizing
+  constants of `tools/stair_parallel.py` (`UNITS_PER_WORKER`, `UNIT_MIN`, `UNIT_MAX`, `UNIT_MIN_HEAVY`,
+  `COST_POOL`) out of its import-time text. Measured with the new key code on both trees: the v0.0.44 and v0.0.45
+  trees give the same legacy-map walk key and the same NPC gallery face key.
+- The reuse preflight (`tools/reuse_report.py`, `CHECK=1` and `tools/build.py --reuse-plan`): a rebuild whose own
+  changed inputs are only the pool scheduling modules (`tools/build_parallel.py`, `tools/stair_parallel.py`),
+  `VERSION` (for a stage that does not write the version into its outputs; the chim stage does) or prose, with no
+  real change upstream, is cause "scheduling or version only" and stops the build before any stage runs, like an
+  over-broad key; `--accept-rebuild` with the reason builds anyway. The v0.0.45 release build's preflight would
+  have stopped on 16 such stages.
+
+One-time cost of part 2: the first build after it converts the NPC gallery faces and walks the CHIM frames and the
+legacy maps once more (new key forms). `tools/stair_records.py` `adopt` can carry a passed run's walks over to the
+new keys after walking a sample again.
 
 ## Verification
 
@@ -124,11 +158,25 @@ changed inputs are measured; each with a test that edits only that input and exp
 `item_mib`) has the same key as the v0.0.45 one; an import-time constant and a reached function still change it. The
 same tests run against the previous `tools/build_cache.py` fail twice.
 
+Part 2 (in a container; each test fails against the code before part 2):
+
+- `tests/test_gallery_cache.py` `test_face_keys_use_key_form_2`: a function or literal default added to a reached
+  module keeps every face key; a default that runs code and a reached edit change it.
+- `tests/test_chim_stair_pass.py` `test_loader_edits_keep_the_key_face_edits_change_it`: an import-time edit of
+  `chim/validate.py` (what v0.0.45 changed), an edit of `load_frame` and of a file reader only the loader uses keep
+  the walker key; an edit of `face_polygons` changes it. `WalkedDataIsKeyedData`: a walk worker given a frame key
+  other than its frame's, or whose loader returns other data, walks nothing; a gate whose loader reads other data
+  stores no walk; an unchanged world reuses its walks and a moved placement changes the frame's key. The traced
+  walk runs nothing outside the walk's code but the loader's own functions.
+- `tests/test_build_cache.py` `SchedulingConstantsTest`: the v0.0.44 stair pool's key equals v0.0.45's; a sizing
+  constant edit keeps it, another import-time edit or a walk edit changes it; every sizing constant is a one-line
+  literal read only by the pool sizing.
+- `tests/test_reuse_report.py` `test_a_rebuild_explained_only_by_scheduling_code_or_version_stops_the_build`.
+
 ## Prevention
 
-- The test above runs in every gate.
-- Before a build, every EXPECTED rebuild is read against the commit diff; one explained only by scheduling code
-  stops the build (planned: the reuse preflight refuses it itself).
+- The tests above run in every gate.
+- The reuse preflight refuses a rebuild explained only by scheduling code, `VERSION` or prose before any stage runs.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -182,5 +230,6 @@ Related bugs in other categories:
 
 - [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers
 - [BUILD-REUSE-KEYS-TOO-BROAD-35](BUILD-REUSE-KEYS-TOO-BROAD-35.md): A whole build reused no stage, and the cost was not visible before the build started
+- [BUILD-SIZE-GUARD-OLD-BASELINE-45](BUILD-SIZE-GUARD-OLD-BASELINE-45.md): The size guard compared a release build with an older release's record: v0.0.45, every folder the size of v0.0.44's, failed on 0.44 GiB of CHIM world growth against v0.0.41
 
 <!-- END GENERATED CATEGORY -->

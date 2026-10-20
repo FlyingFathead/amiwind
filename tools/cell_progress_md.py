@@ -414,13 +414,11 @@ def on_chim_lines(doc):
             '([what we count](#%s)).' % COUNTING_ANCHOR, '']
 
 
-def updated_line(version, today):
-    """The italic "Last updated with AmiWind vX (date)." line every public doc page carries."""
-    try:
-        day = datetime.datetime.strptime(today[:10], '%Y-%m-%d')
-    except ValueError:
-        return []
-    return ['_Last updated with AmiWind v%s (%d %s)._' % (version.lstrip('v'), day.day, day.strftime('%B %Y')), '']
+def updated_line(version, today=None):
+    """The generator-written line of a generated page (documentation policy, 19 October 2026): what it is generated
+    from and the AmiWind version, no date (doc_toc.generated_line). TODAY is no longer part of it."""
+    from doc_toc import generated_line
+    return [generated_line('cell-progress.json', version), '']
 
 
 def render(doc, today=None, inclusion=None, version=None):

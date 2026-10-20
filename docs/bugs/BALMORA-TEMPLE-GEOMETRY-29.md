@@ -15,7 +15,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -99,6 +99,12 @@ Tharys Ancestral Tomb (same Velothi kit), seven Seyda Neen interiors with
 `in_nord_fireplace_01` (180-degree root yaw) and one `furn_pathspear_03` in
 Balmora. Those maps need rebuilding with the repaired converter. Root offsets
 such as the crate's were already handled correctly.
+
+**Correction, 20 October 2026.** The crate keeps its offset because its root is the NiTriShape itself, not because
+the game keeps root translations: a root NiNode loses its whole transform, translation and scale included (rule from
+OpenMW file components/nif/node.cpp). The converter kept the translation of root NiNodes, which lifted the Ebonheart
+dragon statue off its plaza; repaired under
+[MESH-EBONHEART-DRAGON-PEDESTAL-42](MESH-EBONHEART-DRAGON-PEDESTAL-42.md). The rotation repair above is unchanged.
 
 **Still to verify.** Normal walking and collision across the whole lower level,
 the remaining door-frame seam, the other affected maps, and maintainer acceptance.

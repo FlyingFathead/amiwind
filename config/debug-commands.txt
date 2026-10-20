@@ -7,12 +7,14 @@ VIDEO|cam|aw_cam|[mark NAME / recall NAME / list / orbit [photo] [speed DEG] [re
 VIDEO|camera|aw_camera|[first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md)
 VIDEO|crosshair|aw_crosshair|[on/off, true/false or 1/0; no argument toggles] show the crosshair (saved; default on; also Options > Show crosshairs)
 VIDEO|crosshairs|aw_crosshair|same as crosshair
-VIDEO|cull|aw_cull|far detail (saved; also Options > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0
+VIDEO|cull|aw_cull|far detail (saved; also Options > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those)
+VIDEO|cut groups|aw_cull|[on/off, 1/0; no argument shows aw_cull] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own
 VIDEO|draw distance|aw_fog_distance|[100..4096 local units; default 540]
 VIDEO|drawdistance|aw_fog_distance|[100..4096 local units; default 540]
 VIDEO|fog|aw_fog|on/off or 1/0 (default on)
 VIDEO|fog distance|aw_fog_distance|[100..4096 local units; default 540]
 VIDEO|fog location|aw_fog_location|1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off)
+VIDEO|fog rule|aw_cull|[on/off, 1/0; no argument shows aw_cull] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster)
 VIDEO|foglocation|aw_fog_location|1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off)
 VIDEO|killhud|aw_photomode|[on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode)
 VIDEO|land fill|aw_land_fill|1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B
@@ -123,6 +125,7 @@ SKY / LIGHTING|torch flame|aw_torch_flame_set|[classic/brightbase/sparks or 1/2/
 SKY / LIGHTING|torch radius|aw_torch_radius_set|[32..288] (player + admitted guard lights; default 192, classic 144)
 SKY / LIGHTING|torch strength|aw_torch_strength_set|[0..1] (player + admitted guards; default 0.7; local light only)
 SKY / LIGHTING|warm light|aw_warm_light|1/0 torch, lamp and window light takes the light hue (default 1)
+SKY / LIGHTING|weather|aw_weather_set|[on/off / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard] region weather: sky and fog colours from the region's weather chances (default on, saved; off = clear sky everywhere); a weather name forces it until auto; no argument: the weather and the region's chances
 UI / CONSOLE|console bg color|aw_console_color|black/blue/gray or R G B
 UI / CONSOLE|console font|aw_console_size|small/normal
 UI / CONSOLE|font|aw_console_font|readable/retro

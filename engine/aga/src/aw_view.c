@@ -117,6 +117,8 @@ static model_t *body_model;
 static model_t *held_model;
 static int body_torch,body_water,torch_failed,water_failed,held_visible;
 static aw_view_torch_t body_emitter;
+static char held_path[64];   /* the admitted held torch alias, for its re-admission */
+static double held_next;      /* AW_ViewHeldRetry's clock */
 static entity_t held_body;
 static aw_anim_t body_anim;
 static aw_anim_play_t body_play;
@@ -166,7 +168,7 @@ static int body_ready(void) {
      * Relinking has discarded last frame's draw list before this switch. */
     if(body_model && body_model->type==mod_alias && body_model->cache.data)Cache_Free(&body_model->cache);
     if(held_model && held_model->type==mod_alias && held_model->cache.data)Cache_Free(&held_model->cache);
-    body_model=NULL;held_model=NULL;body_emitter.count=0;held_visible=0;
+    body_model=NULL;held_model=NULL;body_emitter.count=0;held_visible=0;held_path[0]=0;
     body_race=aw_character.valid?aw_character.race:-1;body_female=female;body_torch=body_water=0;
     for(i=0;i<body_count;i++)if(bodies[i].female==female && !Q_strcasecmp(bodies[i].race,(char *)race))break;
     if(i==body_count)for(i=0;i<body_count && bodies[i].female!=female;i++);
@@ -203,7 +205,7 @@ static int body_ready(void) {
         if(candidate && equipment && candidate->type==mod_alias && equipment->type==mod_alias &&
            candidate->numframes==equipment->numframes && Cache_Check(&candidate->cache) && Cache_Check(&equipment->cache) &&
            AW_ViewTorchParse(&body_emitter,text,com_filesize,candidate->numframes)){
-            body_model=candidate;held_model=equipment;body_torch=1;
+            body_model=candidate;held_model=equipment;body_torch=1;strcpy(held_path,held);held_next=0;
         }
         Hunk_FreeToLowMark(mark);
         if(!body_torch){
@@ -224,6 +226,23 @@ static int body_ready(void) {
         memset(&body_air,0,sizeof(body_air));
     }
     return 1;
+}
+/* PLAYER-TORCH-THIRDPERSON-38: 1 = the held torch alias is in the cache now.
+ * It is an optional model admitted once with its torch body; any later alias,
+ * map chunk or hunk load can evict it from the cache. The torch body survives
+ * that (the alias renderer reloads its own entity through Mod_Extradata), but
+ * the held torch was only ever drawn when Cache_Check found it, so after one
+ * eviction the raised arm stayed and the torch never came back. Load it again
+ * under its first admission's free-memory rule, at most once a second; the
+ * same slot (Mod_ForName finds it by name) and the body's frame count. */
+static int held_ready(void) {
+    extern int hunk_size,hunk_low_used,hunk_high_used;model_t *m;int cached;
+    if(!body_torch || !held_model || !body_model || !held_path[0])return 0;
+    cached=Cache_Check(&held_model->cache)!=NULL;
+    if(!AW_ViewHeldRetry(cached,hunk_size-hunk_low_used-hunk_high_used,realtime,&held_next))return cached;
+    m=Mod_ForName(held_path,false);
+    return m==held_model && m->type==mod_alias && m->numframes==body_model->numframes &&
+        Cache_Check(&m->cache)!=NULL;
 }
 /* Modal-only alias: original inventory frames do not replace locomotion or
  * advance its animation clock. One optional model, released on panel close. */
@@ -256,6 +275,17 @@ int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angle
         memcpy(origins[n],tag,3*sizeof(float));memcpy(angles[n],tag+3,3*sizeof(float));n++;
     }
     return n;
+}
+/* The carried torch in the inventory picture (PLAYER-TORCH-THIRDPERSON-38; rule from
+ * OpenMW characterpreview.cpp InventoryPreview::update: a light in the carried-left slot
+ * plays the torch group on the left arm and npcanimation.cpp showCarriedLeft shows its
+ * mesh). The torch body is already the picture's pose; its frame-aligned held alias is
+ * drawn at the same frame and placement. 1 = draw MODEL at FRAME with the body. */
+int AW_ViewInventoryHeld(model_t **model,int *frame){
+    model_t *actual;int shown;
+    if(!model || !frame || !AW_ViewInventoryBody(&actual,&shown) || !body_torch || actual!=body_model ||
+       !held_ready() || shown<0 || shown>=held_model->numframes)return 0;
+    *model=held_model;*frame=shown;return 1;
 }
 static cvar_t aw_inventory_preview_reserve={"aw_inventory_preview_reserve","0",true};
 static const char *unavailable_reason="the pose model did not load";
@@ -438,9 +468,10 @@ static entity_t *view_held(entity_t *draw) {
                 held_draws[held_draw_count++]=out;
             }
         }
-        if(held_draw_count<2 && body_torch && held_model && AW_TorchEquipped() &&
-           Cache_Check(&body.model->cache) && Cache_Check(&held_model->cache) &&
-           body.frame>=0 && body.frame<body_emitter.count){
+        /* The body needs no cache test here: the renderer reloads it itself, and the
+         * held torch only copies its frame and placement (PLAYER-TORCH-THIRDPERSON-38). */
+        if(held_draw_count<2 && body_torch && held_model && AW_TorchEquipped() && held_ready() &&
+           body.frame>=0 && body.frame<body_emitter.count && body.frame<held_model->numframes){
             held_body=body;held_body.model=held_model;
             held_body.frame=body.frame;
             VectorCopy(body.origin,held_body.origin);VectorCopy(body.angles,held_body.angles);
@@ -454,7 +485,7 @@ static entity_t *view_held(entity_t *draw) {
 static int view_torch_emitter(vec3_t out) {
     vec3_t forward,right,up;int j;edict_t *p=local_player();
     if(!owned || !chase_active.value || !held_visible || !body_torch || !p || p->v.waterlevel>=2 ||
-       !AW_TorchEquipped() || !body.model || !held_model || !Cache_Check(&body.model->cache) ||
+       !AW_TorchEquipped() || !body.model || !held_model ||
        !Cache_Check(&held_model->cache) || body.frame<0 || body.frame>=body_emitter.count)return 0;
     AngleVectors(body.angles,forward,right,up);
     for(j=0;j<3;j++)out[j]=body.origin[j]+body_emitter.point[body.frame][0]*forward[j]-
@@ -808,6 +839,7 @@ void AW_ViewSceneSpawn(void) {
     memset(&body_air,0,sizeof(body_air));
     if(death.stage!=AW_DEATH_NONE)end_death();
     body_model=held_model=NULL;body_race=-2;body_torch=body_water=held_visible=torch_failed=water_failed=0;body_emitter.count=0;
+    held_path[0]=0;held_next=0;
 }
 
 /* The vanity orbit now, until any input (dbg vanitycamera on, dbg camera vanity now). */

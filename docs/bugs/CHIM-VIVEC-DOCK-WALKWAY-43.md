@@ -30,31 +30,64 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Status: 18 October 2026](#status-18-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 18 October 2026
 
-Open. Reported by the maintainer during the v0.0.43-dev2 playtest; cause not measured.
+Cause found and fixed in the shared converter (not yet in a build): a convex collision piece was built from too few
+of its points, so its top cut under the walkway's planks. Island-wide the same cause leaves walkable collision more
+than a step under 535 meshes, rocks and buildings included. Verification waits for a build with the fix.
 
 ## Symptom
 
-At the Hlaalu canton dock in Vivec the player cannot walk up the walkway and stays stuck at its foot.
+At the Hlaalu canton dock in Vivec the player cannot walk up the walkway and stays stuck at its foot; in third person
+the player stands knee-deep in the planks. A second spot by the Arena canton (cell 4,-11, local 112 715 181) is the
+same: the player stops on the planks looking up the walkway.
 
 ## Where
 
 Vivec, Hlaalu canton dock, cell 2,-11 (global position 23975 -87889 656, local -2198 1067 164); the dock model is
-`ex_v_dock_01` (source reference 278930).
+`ex_v_dock_01` (source reference 278930). The second spot is another placement of the same model (source reference
+278913, frame-local origin 111.9 902.1 92.1); the pick found nothing there because that placement's origin is 187
+units from the spot.
 
 ## How it happened
 
-Not known yet. The stair gate walks every flight it finds; a walkway that it does not treat as a flight, or whose
-collision does not match its visible surface, can still block the player.
+Morrowind collides with the dock's authored collision mesh (its RootCollisionNode), which follows the visible planks
+to within 4 units. The CHIM converter turns that mesh into convex pieces (`mesh_geometry.collision_parts`). Since the
+first repository release each piece's hull was built from only its extreme points along 14 fixed directions, which
+gives fewer hull planes. On a deck that runs level and then slopes down, those points are the deck's far corners; the
+hull's top then cuts the bend as a straight chord. Measured on `ex_v_dock_01`, the piece tops lie up to 19.4 units
+(one unit here is four in the original) under the planks over the walkway's upper end (model-local y -157 to -205).
+In the v0.0.43-dev2 frame at the first spot the collision top is at 143.8 and the drawn planks at 160.8: the player
+stands 17 units low, and the next edge of the planks is more than a step (8.5) above his feet.
+
+The v0.0.43-dev3 stair fix ([CHIM-STAIR-STEPS-SOLID-43](CHIM-STAIR-STEPS-SOLID-43.md)) does not change it: that rule
+lowers collision that stands over visible steps, and this collision lies under them.
 
 ## Why it was not caught
 
-To be found: whether the stair gate walked this walkway at all, and what it recorded.
+The test that splits a convex piece measures only the source surface inside the hull (space the hull closes), never
+surface the hull leaves outside. The stair gate walked this walkway and recorded failures, but as ramps that are not
+part of a flight, which do not stop a build ([STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md) has the
+same blind spot).
 
 ## Reproduction
 
@@ -62,17 +95,39 @@ In v0.0.43-dev2, go to the Hlaalu canton dock in Vivec and walk up the walkway a
 
 ## Repair
 
-Planned: check the spot in v0.0.43-dev3, which carries the shared stair fix; read the stair gate's record for this
-walkway; compare the visible surface with the collision at the blocking step; fix in the shared converter, never
-as a single exception.
+`mesh_geometry.collision_parts` with `surface_loss` (SURFACE_LOSS, 0.5 units): a piece whose extreme-point hull leaves
+any of its source points more than that outside keeps the hull of all its points. The CHIM model builder applies it to
+the meshes listed in `config/collision-hull-surface.json` (setting `AMIWIND_COLLISION_HULL_POINTS`: `table` by
+default; `all` for every mesh; `extremes` keeps the method before for A/B tests). With it the dock becomes 22 pieces
+instead of 17, and no piece top lies under the planks by more than 0.5 units.
+
+The table holds the 484 meshes measured on 18 October 2026: every exterior mesh of the base master whose walkable
+collision lies more than a step over its extreme-point pieces and within a step with the rule (68,666 placements; 133
+terrain rocks and other `f/` meshes, 282 `x/` buildings and walkways). Cost for those meshes at scale 1: clipnodes
+132,874 to 203,984, standing-hull bytes 1,064,320 to 1,633,344 (one stored copy of each mesh). Every mesh in every
+frame was measured the same way; the rule for all meshes would change 857 meshes and double their standing-hull bytes,
+so it stays an option.
+
+Memory, estimated on the v0.0.43-dev2 world: 471 of the table meshes are CHIM models (18,322 variants, 17.7 MB more
+stored hull bytes on disk), placed in 1,119 of 1,298 frames. At each frame's heap peak the added hull bytes are at
+most 110,272; no frame goes over its budget. The tightest is frame x+17 y+04 (headroom 77,456 to 33,600 bytes).
+That estimate counted the standing hull only: in the v0.0.46-dev1 build the planes and nodes the extra hull facets
+add to every placed model put six frames over the zone (x+17 y+04 by 174,640 bytes). From v0.0.46 a piece holds its
+walkable surface only, not every point: [CHIM-HULL-SURFACE-HEAP-46](CHIM-HULL-SURFACE-HEAP-46.md).
+
+The ex_v_dock_01 numbers: 17 to 22 pieces, 114 to 159 planes, 164 to 220 clipnodes, 1,312 to 1,760 bytes.
 
 ## Verification
 
-Walking up the walkway in the next build, and the stair gate's walk record for it.
+Planned: the fixed frames through the stair gate and the heap gate, then walking up both walkways in the next build.
 
 ## Prevention
 
-If the walkway was not walked by the stair gate, the gate learns to find walkways of this kind island-wide.
+The collision surface gate (`chim.build.hull_surface_gate`) checks every CHIM mesh: the walkable surface of its
+collision mesh must lie within a step of the top of its convex pieces (`mesh_geometry.surface_loss_depth`), or the
+build stops naming the mesh and its depth. 35 measured meshes are still over a step with the rule, by other
+converter paths, and are listed as known in the table for a follow-up (boats, rope bridges, Dwemer entrances, tents).
+Ramps that the visible-tread rule replaces on purpose are not measured.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -85,6 +140,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-HULL-ROUTE-BUDGET-33](BUILD-HULL-ROUTE-BUDGET-33.md): Routed standing hulls with copies overflow a legacy map's shared clipnode budget
 - [BUILD-ROUTED-FLORA-RESERVE-33](BUILD-ROUTED-FLORA-RESERVE-33.md): Routed standing hulls push a legacy open-world map past the flora collision reserve: the full build stops in world-flora (vf0779)
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
+- [BUILD-STAIR-WALK-BRUTE-FORCE-46](BUILD-STAIR-WALK-BRUTE-FORCE-46.md): The builder walks every step of the island to find out whether its own collision can be walked, an answer the game data already holds
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
 - [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
@@ -114,5 +170,9 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [VIVEC-ARENA-TP-ARRIVAL-32](VIVEC-ARENA-TP-ARRIVAL-32.md): dbg tp vivec_arena leaves the player at the frame origin under the water
 - [VIVEC-TEMPLE-STAIRS-33](VIVEC-TEMPLE-STAIRS-33.md): Palace steps and High Fane quarter flights fail the stair gate on the CHIM Vivec Temple frame
 - [WORLD-SLOPE-STUCK-38](WORLD-SLOPE-STUCK-38.md): Player reports being stuck beside Ashlands terrain
+
+Related bugs in other categories:
+
+- [CHIM-HULL-SURFACE-HEAP-46](CHIM-HULL-SURFACE-HEAP-46.md): The walkway collision fix put six CHIM frames over the zone: every point of a convex piece kept, sides included
 
 <!-- END GENERATED CATEGORY -->

@@ -205,8 +205,23 @@ static void player_torch_emitters(void) {
     p[19]=1;assert(!AW_ViewTorchParse(&out,p,32,2) && !out.count && out.point[0][0]==0);
     assert(!AW_ViewTorchParse(&out,NULL,0,0));
 }
+/* PLAYER-TORCH-THIRDPERSON-38: an evicted held torch is loaded again (with room, at
+ * most once a second); a cached one never is, and caching resets the clock. */
+static void held_torch_readmission(void) {
+    double next=0;
+    assert(!AW_ViewHeldRetry(1,0,5,&next) && next==0);                     /* cached: nothing to do */
+    assert(AW_ViewHeldRetry(0,AW_VIEW_HELD_FREE,5,&next) && near((float)next,6));
+    assert(!AW_ViewHeldRetry(0,AW_VIEW_HELD_FREE,5.5,&next));               /* not twice a second */
+    assert(AW_ViewHeldRetry(0,AW_VIEW_HELD_FREE,6,&next) && near((float)next,7));
+    assert(!AW_ViewHeldRetry(0,AW_VIEW_HELD_FREE-1,7,&next) && near((float)next,8)); /* no room: wait, retry later */
+    assert(AW_ViewHeldRetry(0,AW_VIEW_HELD_FREE+1,8,&next));
+    assert(!AW_ViewHeldRetry(1,0,8.1,&next) && next==0);                   /* back in the cache */
+    assert(AW_ViewHeldRetry(0,AW_VIEW_HELD_FREE,8.2,&next));                /* a new eviction retries at once */
+    assert(!AW_ViewHeldRetry(0,AW_VIEW_HELD_FREE,8.2,NULL));
+}
 int main(void) {
     defaults();toggle();tap();vanity();zoom();death();body_layers();compact_body_layers();player_torch_emitters();
+    held_torch_readmission();
     puts("view rules ok");
     return 0;
 }

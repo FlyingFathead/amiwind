@@ -378,6 +378,15 @@ void AW_FarDetailSavedBefore(int config_without_setting);
 int AW_ConfigWithout(const char *name);
 int AW_FogFullDepthValue(int distance);
 float AW_SizeCutShare(int preset,float radius);
+/* aw_cull (aw_fog.c): the far test 0..7 in its low bits, then the fog rule and
+ * whole-structure cuts as switches (CHIM-BRIDGE-POP-PIECES-44). */
+#define AW_CULL_TEST 7
+#define AW_CULL_FOG_RULE 8
+#define AW_CULL_GROUPS 16
+#define AW_CULL_MAX 31
+float AW_SizeCutDepthShare(float radius);
+void AW_FarGroup(const float *box);
+int AW_PassVisible(vec3_t origin,float radius);
 extern float aw_far_depth[4],aw_far_down[4],aw_far_view[4],aw_far_detail_pixels;
 extern int aw_far_faces;
 extern int (*aw_flame_depth_limit)(void);
@@ -663,6 +672,8 @@ void AW_UIBookEnd(void);
 void AW_UISmallBegin(void);
 void AW_UISmallEnd(void);
 int AW_ReaderOpen(const char *stem,int action);
+/* The player's text defines of an original line (%PCName, %PCRace, %PCClass), as in books. */
+void AW_ExpandDialogue(char *out,int capacity,const char *source);
 int AW_ReaderActive(void);
 int AW_ReaderKey(int key);
 void AW_ReaderDraw(void);
@@ -707,6 +718,7 @@ int AW_ViewEquipmentReady(void);
 int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angles[2][3]);
 extern int (*aw_hand_block_item)(char id[64],char model[64]);
 int AW_ViewInventoryBody(model_t **model,int *frame);
+int AW_ViewInventoryHeld(model_t **model,int *frame);   /* the carried torch with the torch pose */
 int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int height,float angle);
 void AW_InventoryPreviewClear(void);
 int AW_ViewInventoryLive(void);   /* aw_view.c: the old live inventory preview selected */

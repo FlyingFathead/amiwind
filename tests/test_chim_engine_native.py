@@ -385,7 +385,8 @@ class ChimWorldTests(unittest.TestCase):
     """The CHIM world through aw_scenery.c's hooks, world.c and r_efrag.c."""
 
     SOURCES = [SRC / 'chim' / n for n in ('chim_format.c', 'chim_zone.c', 'chim_models.c', 'chim_chunks.c', 'chim_graft.c',
-                                          'chim_world.c', 'chim_statics.c', 'chim_far.c', 'chim_prefetch.c')] + \
+                                          'chim_world.c', 'chim_statics.c', 'chim_far.c', 'chim_cuts.c',
+                                          'chim_prefetch.c')] + \
         [SRC / n for n in ('aw_scenery.c', 'world.c', 'r_efrag.c', 'mathlib.c', 'aw_format.c', 'aw_harvest.c',
                            'aw_harvest_runtime.c', 'aw_harvest_proxy.c', 'aw_state.c')]
 

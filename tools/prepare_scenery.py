@@ -17,7 +17,7 @@ from mwad.markers import is_hidden_marker, is_marker_shape, root_marked
 from mwad.paths import child_ci, ensure_external, read_workspace, resolve_data_files
 from mwad.scene import pack_geometry, unpack_geometry, visible_refs, resident_set, read_asset
 from build_jobs import add_jobs, resolve_jobs
-from nif_common import root_local
+from nif_common import DEFAULT_SCENERY_ROOT_RULE, first_record, scenery_root_local
 from build_parallel import ordered_map
 from scenery_selection import load_groups, select_source_refs, validate_groups
 from area_config import BOUNDS, inside
@@ -84,7 +84,7 @@ bsa_read = read_bsa_asset  # the one shared BSA asset read (mwad.esm)
 EDITOR_MARKER_ONLY = 'Editor marker only (MRK): nothing to draw; the placement must be filtered at the input'
 
 
-def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
+def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None, root_rule=DEFAULT_SCENERY_ROOT_RULE):
     import numpy as np
     if not raw.startswith(NIF_TES3_HEADER):
         raise ValueError('Only base-game TES3 NIF 4.0.0.2 is supported')
@@ -96,14 +96,13 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None):
         if not isinstance(node, N.NiAVObject):return
         local = np.array(node.get_transform().as_list())
         if root:
-            # Morrowind ignores the root node's authored rotation (e.g. the
-            # 90-degree yaw on Velothi interior kit pieces) but keeps its
-            # translation and scale: crates with a -32 root offset rest exactly
-            # on the floor only when that offset is applied.
-            # BALMORA-TEMPLE-GEOMETRY-29.
-            # Round the recovered scale: a rotated unit-scale root gives e.g.
-            # 0.99999994, which breaks exact vertex sharing between pieces.
-            local = root_local(local)
+            # The game's root rule (nif_common.scenery_root_local, rule from OpenMW
+            # components/nif/node.cpp): a root NiNode loses its whole transform (the
+            # 90-degree yaw on Velothi interior kit pieces, BALMORA-TEMPLE-GEOMETRY-29;
+            # the 327-unit lift of the Ebonheart dragon statue and the 32-unit lift
+            # of the anvils, MESH-EBONHEART-DRAGON-PEDESTAL-42); any other root (the
+            # NiTriShape root of contain_crate_01, offset z -32) keeps it.
+            local = scenery_root_local(local, node, N, first_record(data, node), root_rule)
         transform = local @ parent
         if pose_world and isinstance(node,N.NiNode):transform=pose_world(node.name.decode('cp1252'))
         worlds[id(node)] = transform
@@ -223,7 +222,7 @@ def model_flames(raw, N, name=''):
 
     One entry per NiParticleSystemController emitter (candle, lantern, fire,
     brazier), skipping smoke/ash/spark-type emitters. Uses the same root-node
-    rule as model_geometry (rotation dropped, translation and scale kept).
+    rule as model_geometry (nif_common.scenery_root_local).
     x, y, z are NIF units; size is the legacy engine flame scale class;
     particle (particle size), rise (speed x lifetime) and spread (cone radius
     at the top of the rise) are NIF units taken from the emitter itself, so
@@ -240,7 +239,7 @@ def model_flames(raw, N, name=''):
         if not isinstance(node, N.NiAVObject): return
         local = np.array(node.get_transform().as_list())
         if root:
-            local = root_local(local)
+            local = scenery_root_local(local, node, N, first_record(data, node))
         world = local @ parent; worlds[id(node)] = world
         for child in getattr(node, 'children', []):
             if child is not None: collect(child, world)

@@ -1,6 +1,6 @@
 # Build completion output
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -56,10 +56,20 @@ judged like a failed guard.
 
 The result is compared with:
 
-- the previous release, `tools/size-baseline.json` (v0.0.41: 3.81 GiB of game
-  data, of which the NPC gallery is 0.21 GiB), and
+- the previous release, the one `tools/previous-release.json` names: the
+  `size-ledger.json` of its release build in the same workspace (the newest
+  passed run named `..._v<version>_release[-tryN]_<git>`), else the committed
+  record `tools/size-baseline.json` when it is of that release (v0.0.45: 2.57 GiB
+  of game data, of which the NPC gallery is 0.22 GiB). A record of another release
+  is never compared: the build prints "release record: no record of vX" and the
+  guard does not judge against a release; and
 - a previous build, when you give its record: `--size-baseline FILE`
   (that run's `size-ledger.json`).
+
+Until v0.0.45 the committed record was always used, whatever release it was of:
+the v0.0.45 release build was compared with v0.0.41 and its guard failed on
+0.44 GiB of CHIM world that v0.0.42 to v0.0.44 had already shipped, although every
+folder was the size of v0.0.44's (BUILD-SIZE-GUARD-OLD-BASELINE-45).
 
 Only builds with the same content are compared like-for-like. An image built
 without the NPC gallery, a partial-area (MiniWind) image or one with excluded

@@ -71,6 +71,10 @@ typedef struct entity_s
 											//  not split
     /* Appended: preserve prior entity member offsets used by assembly. */
     float aw_sprite_scale; /* Tagged aliases may also use this; legacy default is 1. */
+    /* CHIM placements of one long structure: the structure's cut box (frame
+     * mins x y z, maxs x y z; chim_cuts.c), shared by its pieces; NULL: cut on
+     * the entity's own sphere (aw_fog.c AW_FarGroup). */
+    const float *aw_cut_box;
 } entity_t;
 
 float R_SpriteEntityScale(const entity_t *ent);

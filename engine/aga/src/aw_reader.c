@@ -49,6 +49,10 @@ static void expand(char *out,int capacity,const char *source)
     }
     out[n]=0;
 }
+void AW_ExpandDialogue(char *out,int capacity,const char *source)
+{
+    if(capacity>0)expand(out,capacity,source);
+}
 int AW_ReaderOpen(const char *stem,int on_take)
 {
     char path[64],raw[8192],line[128],*body;const char *p,*before;

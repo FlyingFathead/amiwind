@@ -41,6 +41,14 @@ int AW_ViewLayerFrame(const aw_view_layers_t *layers,int action,int motion_frame
 #define AW_VIEW_TORCH_FRAMES 256
 typedef struct {int count;float point[AW_VIEW_TORCH_FRAMES][3];} aw_view_torch_t;
 int AW_ViewTorchParse(aw_view_torch_t *out,const unsigned char *bytes,int size,int frames);
+/* PLAYER-TORCH-THIRDPERSON-38: the held torch alias is optional and lives in the model
+ * cache; a later load can evict it while the torch body stays (the renderer reloads the
+ * body by itself, nothing reloaded the held torch). 1 = try to load it again now: it is
+ * not cached, the last try is at least AW_VIEW_HELD_RETRY seconds ago, and the free hunk
+ * meets the same AW_VIEW_HELD_FREE bytes as its first admission. */
+#define AW_VIEW_HELD_RETRY 1.0
+#define AW_VIEW_HELD_FREE (2*1024*1024)
+int AW_ViewHeldRetry(int cached,int free_bytes,double now,double *next);
 
 typedef struct {
     float switch_limit;   /* camera.lua updatePOV switchLimit: a shorter Toggle POV press switches, a longer one orbits */

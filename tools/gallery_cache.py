@@ -55,13 +55,23 @@ def token(value):
 
 
 def environment():
-    return {'python': sys.version, 'machine': platform.machine(),
+    # blas: the BLAS kernel family changes baked bytes (TESTS-HEAD-REDUCER-BYTES-CI-45), so it is part of the key.
+    import blas_kernel
+    return {'python': sys.version, 'machine': platform.machine(), 'blas': blas_kernel.key(),
             'platform': sys.platform, 'packages': {n: importlib.metadata.version(n) for n in PACKAGES}}
 
 
 # The model converter: its main() reaches convert_model and everything a model's conversion runs.
 CONVERTER_ENTRY = 'tools/prepare_gallery.py'
-KEY_FORMAT = 'reached code 1'
+# 'reached code 2': the converter's reached code with each module's import-time code in key form 2
+# (build_cache.STAGE_TOP_FORMAT, as the stage and pass keys): a function added to a shared module, or a literal
+# default value added to one, no longer changes every face's key; a default that runs code on import still does.
+# Form 1 listed every function's default values in the import-time code: the v0.0.45 release build converted all
+# 3,551 faces again for two scheduling functions added to tools/build_parallel.py (BUILD-REUSE-SCHEDULER-TOP-45).
+# The form is part of every face's identity, so entries of form 1 are not found under form 2: the change is
+# explicit and costs one conversion of every face.
+KEY_FORMAT = 'reached code 2'
+KEY_TOP_FORMAT = 2
 _SOURCES = {}
 
 
@@ -72,13 +82,14 @@ def converter_files(root=ROOT):
 
 def converter_sources(root=ROOT):
     """The code part of every model's key: {file: digest} of what the converter can reach (build_cache.SourceIndex,
-    scope 'units': each reached module's import-time code plus each reached function, the data files it names).
-    An edit the converter never reaches keeps every model; any reached edit changes every key. Dynamic code makes
-    the selection uncertain: then every repository file counts."""
+    scope 'units': each reached module's import-time code in form KEY_TOP_FORMAT plus each reached function, the data
+    files it names). An edit the converter never reaches keeps every model; any reached edit changes every key.
+    Dynamic code makes the selection uncertain: then every repository file counts."""
     root = Path(root).resolve()
     if root not in _SOURCES:
         from build_cache import SourceIndex
-        selected, uncertain = SourceIndex(root, scope='units').selection(root/CONVERTER_ENTRY)
+        selected, uncertain = SourceIndex(root, scope='units', top_format=KEY_TOP_FORMAT).selection(
+            root/CONVERTER_ENTRY)
         _SOURCES[root] = {'key_format': KEY_FORMAT, 'entry': CONVERTER_ENTRY, 'uncertain': uncertain,
                           'files': dict(sorted(selected.items()))}
     return _SOURCES[root]

@@ -283,6 +283,16 @@ void ChimFar_Report (void);
 void ChimFar_Init (void);
 void ChimFar_Hook (void);
 int ChimFar_Floor (const vec3_t origin, float *lowest, float *surface);	/* the terrain floor (aw_walk.c) */
+/* chim_cuts.c: the frame map's whole-structure cut groups (maps/<map>.cut). */
+int ChimCuts_Header (const unsigned char *p, long file_bytes, int cx, int cy, long *n, long *m, unsigned *crc);
+int ChimCuts_Body (const unsigned char *body, long n, long m, unsigned crc,
+	float *box_out, unsigned *pid_out, unsigned short *which_out);
+const float *ChimCuts_Find (const float *box_table, const unsigned *pid_table, const unsigned short *which_table,
+	long m, unsigned pid);
+const float *ChimCuts_Box (unsigned pid);
+void ChimCuts_Begin (const char *map_name, long hunk_spare);
+void ChimCuts_End (void);
+void ChimCuts_Report (void);
 
 /* chim_graft.c */
 int ChimGraft_Begin (model_t *world);

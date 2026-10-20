@@ -32,7 +32,7 @@ from build_parallel import ordered_map
 from prepare_scenery import export_refs, bsa_read
 from prepare_mesh_bsp import append_meshes, _prepare_model
 from prepare_quake import box, brush, miptex, wad
-from prepare_area import build_resident, entity
+from prepare_area import build_resident, entity, TalkGreetings
 import npc_lod
 from npc_anim import foot_class, publish as publish_anim, voices_of
 import npc_items
@@ -488,7 +488,7 @@ def resident_cast(references, settings, foreign=None):
     return cast, left
 
 
-def residents(data, scene, out, references, settings, kinds, topics, palette, ffmpeg, jobs):
+def residents(data, scene, out, references, settings, kinds, topics, palette, ffmpeg, jobs, cells=()):
     cast, left = resident_cast(references, settings)
     for row in left:
         print('%s resident left to %s (its cell %d,%d is owned there): %s (reference %s)'
@@ -511,12 +511,16 @@ def residents(data, scene, out, references, settings, kinds, topics, palette, ff
         print(town_field(settings, 'title') + ' resident ready:', identifier, flush=True)
     # Near/far models (tools/npc_lod.py): near files and the pairing manifest.
     lod = npc_lod.publish(scene / 'id1', models, kinds)
+    talk = TalkGreetings(data, kinds, topics, cells)
+    entities = resident_entities(cast, models, settings, talk)
     write_json(out / 'residents.json', {'cast': cast, 'models': models, 'npc_lod': lod,
+                                        'talk_greetings': talk.record(),
                                         **({'left_to_owner': left} if left else {})})
-    return resident_entities(cast, models, settings)
+    return entities
 
 
-def resident_entities(cast, models, settings):
+def resident_entities(cast, models, settings, talk=None):
+    """talk: TalkGreetings, the conversation greeting fields per placement (none when not given)."""
     entities = []
     for ref in cast:
         if abs(ref['scale'] - 1) > 1e-5: raise ValueError('Resident scale requires separate bake')
@@ -528,7 +532,8 @@ def resident_entities(cast, models, settings):
             'netname': record['appearance']['name'], 'aw_voice': record['voice'],
             'aw_line': record['greeting']['text'], 'aw_idle_step': record['step'],
             'aw_hello_distance': greeting['distance'], 'aw_hello_reset': greeting['reset_distance'],
-            'aw_greet_duration': greeting['duration']}))
+            'aw_greet_duration': greeting['duration'],
+            **(talk.fields(ref['id'], talk.exterior_name(ref['position'])) if talk and record['voice'] else {})}))
     return entities
 
 
@@ -631,7 +636,7 @@ def prepare(town, data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', job
     kinds, cells, topics = load_master(child_ci(data, 'Morrowind.esm'))
     arrival, yaw = arrival_point(kinds, settings)
     returning, return_yaw = return_point(kinds, settings)
-    npc_entities = residents(data, scene, out, references, settings, kinds, topics, palette, ffmpeg, jobs)
+    npc_entities = residents(data, scene, out, references, settings, kinds, topics, palette, ffmpeg, jobs, cells)
     write_json(out / 'coverage.json', audit_coverage(index, entries, settings))
     profiles = index['groups'][town_field(settings, 'visual_group')]['visual_profiles']; flatten = load_profiles()
     tasks = []

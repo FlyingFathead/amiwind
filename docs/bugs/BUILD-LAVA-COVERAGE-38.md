@@ -9,7 +9,7 @@
 | Where | Full dev2 exterior world |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev2 (last seen) |
+| Persists in | fixed in v0.0.38 |
 | Severity | high: Full world omits visible lava and its gameplay in reported cells. |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | Playtest version | v0.0.38-dev2 |

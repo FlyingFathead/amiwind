@@ -5,8 +5,8 @@
 #include <strings.h>
 server_t sv;server_static_t svs;client_static_t cls;
 aw_character_t aw_character;aw_race_t aw_races[16];int aw_race_count;
-int hunk_size=8*1024*1024,hunk_low_used,hunk_high_used,com_filesize;
-static model_t world,portrait,gear;
+int hunk_size=8*1024*1024,hunk_low_used,hunk_high_used,com_filesize;double realtime;
+static model_t world,portrait,gear,held_torch;static int held_loads;
 static int right_type=-1,shield=1,loads,frees,tag_frame=-1,wrong_frames,missing,torch;
 int AW_TorchEquipped(void){return torch;}
 int Hunk_LowMark(void){return 0;}
@@ -26,6 +26,7 @@ model_t *Mod_ForName(char *path,qboolean crash){
     if(strstr(path,"_i.mdl")){
         loads++;if(missing)return NULL;m=&portrait;m->numframes=wrong_frames?9:10;
     }else if(strstr(path,"items/")){m=&gear;m->numframes=1;}
+    else if(strstr(path,"_h.mdl")){m=&held_torch;m->numframes=24;held_loads++;}
     else {m=&world;m->numframes=24;}
     strcpy(m->name,path);m->type=mod_alias;m->cache.data=m;return m;
 }
@@ -81,5 +82,20 @@ int main(void){
     strcpy(bodies[0].path,"progs/body/dark_elf_f.mdl");
     assert(AW_ViewInventoryBody(&m,&frame) && strstr(m->name,"_f_i.mdl"));
     assert(world.cache.data && body.frame==19);
+    /* PLAYER-TORCH-THIRDPERSON-38: the held torch evicted from the cache under a torch
+     * body is loaded again (same slot, same frame count), at most once a second and only
+     * with its first admission's free memory; before, it was never drawn again. */
+    {int before;
+     body_model=&world;world.numframes=24;body_torch=1;held_model=Mod_ForName("progs/body/dark_elf_m_h.mdl",false);
+     strcpy(held_path,"progs/body/dark_elf_m_h.mdl");held_next=0;realtime=10;before=held_loads;
+     assert(held_ready() && held_loads==before);
+     held_torch.cache.data=NULL;assert(held_ready() && held_loads==before+1 && held_torch.cache.data);
+     held_torch.cache.data=NULL;realtime=10.5;assert(!held_ready() && held_loads==before+1);
+     realtime=11;assert(held_ready() && held_loads==before+2);
+     held_torch.cache.data=NULL;hunk_size=1024*1024;realtime=13;assert(!held_ready() && held_loads==before+2);
+     hunk_size=8*1024*1024;realtime=14;assert(held_ready() && held_loads==before+3);
+     held_torch.cache.data=NULL;world.numframes=23;realtime=16;assert(!held_ready());   /* wrong alias refused */
+     world.numframes=24;body_torch=0;assert(!held_ready());
+     held_model=NULL;held_path[0]=0;body_model=NULL;}
     AW_ViewInventoryClear();AW_ViewInventoryClear();assert(frees>0);return 0;
 }

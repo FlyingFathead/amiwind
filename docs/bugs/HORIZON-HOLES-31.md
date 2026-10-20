@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -158,6 +158,14 @@ from it and grouped, overlapping switches so no transition leaves a hole ([dista
 notes](../DISTANT_TERRAIN.md#horizon-ponderings-the-island-cut-out-19-october-2026),
 [roadmap](../ROADMAP.md#distant-views-without-pop-in-and-the-screen-the-amiga-need-not-redraw-19-october-2026)).
 This bug is fixed on its own as well; the shell does not merely hide it.
+
+20 October 2026, in source (not built yet): the inventory of every distance cut against the fog's opaque distance
+is on [CHIM-BRIDGE-POP-PIECES-44](CHIM-BRIDGE-POP-PIECES-44.md#every-distance-cut-and-the-fogs-opaque-distance-20-october-2026).
+The far detail presets Light and Strong (`aw_cull` 3, 4, 6; Strong the default since v0.0.42) leave out pieces at
+40 to 85 % of the fog distance, where the fog is not yet opaque, and every building piece is cut on its own. Two
+settings answer the "cull objects whole" proposal above: the fog rule (`dbg fog rule on`, no cut before the fog is
+opaque) and whole-structure cuts (`dbg cut groups on`, structures found by the CHIM builder cut on one box); both
+off until the maintainer's in-game A/B, including the across-the-river Balmora view at sunset of this report.
 
 ## Verification
 

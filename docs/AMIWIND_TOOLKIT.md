@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -513,13 +513,18 @@ the build-side ingest and the live tracker's prompt, files and server lifecycle,
 
 The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs, in any browser, phones included:
 
-- **Progress:** status, percent done, stages passed, running, pending and failed, elapsed time, the ETA with its basis
-  (critical path or history) and the cores in use now, from the run's `build-progress.json`;
+- **Progress:** status, percent done, stages passed, running, pending and failed, elapsed time, the time left and the
+  finish time in rows of their own (the finish time in local time with its offset and in UTC, both dated), the ETA's
+  basis (critical path or history) and the cores in use now, from the run's `build-progress.json`. Under "Cores now" a
+  square of one box per core of the budget shows the busy cores filled: green at half the budget or more, amber under
+  it, red once the build has stayed under the low-cores line (see the stage timeline) for its set time;
 - **Activity:** what the running stage is doing even when its log is silent, from its read/write trace
   (`profile/reads/NN-stage.txt`: files written, files read, code entered): the files written and read and the code
   entries of the last 10 seconds, the code it is in now, the last entries, how long ago the trace and the log last
   grew (more than a minute is marked) and the cores in use;
-- **Stages:** each stage's elapsed time against its expected time;
+- **Stages:** each stage's elapsed time against its expected time, after a status mark that differs by shape as well as
+  colour: ✓ passed (built in this run), ↺ reused from an earlier run, ● running, ○ pending, ✗ failed,
+  ⊘ cancelled or skipped (hover for the reason);
 - **Log:** the live log, read in byte ranges as it grows: the running stage's log by default (it follows the stage
   that is running), any other stage log (for example the CHIM stage's per-frame stair gate lines) or a master
   builder's console log; **Pause** stops reading, scrolling up keeps your place;

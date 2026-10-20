@@ -41,6 +41,51 @@ class WorldUIAssetsTests(unittest.TestCase):
             region_names(cell(0,0,b'unknown'))
         with self.assertRaisesRegex(ValueError,'Duplicate exterior'):
             region_names(cell(0,0,b'')+cell(0,0,b''))
+    def test_region_weather_rows_follow_the_region_names_index_and_chances(self):
+        # SKY-REDMOUNTAIN-BLUE-44: before it no file carried a region's weather, so every region drew the clear sky.
+        from prepare_world_ui import region_weather, read_region_weather, WEATHERS
+        def region(identifier, name, weat):
+            return record('REGN', sub('NAME', identifier)+sub('FNAM', name)+sub('WEAT', bytes(weat)))
+        def cell(x, y, region):
+            return record('CELL', sub('NAME',b'\0')+sub('DATA',struct.pack('<Iii',0,x,y))+sub('RGNN',region))
+        raw=(region(b'West Gash Region\0',b'West Gash Region\0',[15,30,15,20,10,10,0,0])
+             +region(b'Red Mountain Region\0',b'Red Mountain Region\0',[0,0,0,0,0,0,0,100])
+             +region(b'Felsaad Coast Region\0',b'Felsaad\0',[30,10,15,15,0,0,0,0,20,10])
+             +cell(2,5,b'Red Mountain Region\0')+cell(-3,2,b'West Gash Region\0'))
+        names=region_names(raw)
+        catalogue=[names[16+64*i:80+64*i].rstrip(b'\0') for i in range(struct.unpack_from('<I',names,4)[0])]
+        looks,chances,hours=read_region_weather(region_weather(raw))
+        self.assertEqual(hours,20);self.assertEqual(len(looks),len(WEATHERS))
+        self.assertEqual(catalogue,[b'Felsaad',b'Red Mountain Region',b'West Gash Region'])
+        self.assertEqual(chances,[(30,10,15,15,0,0,0,0,20,10),(0,0,0,0,0,0,0,100,0,0),(15,30,15,20,10,10,0,0,0,0)])
+        rows={(x,y):r for x,y,r,p in struct.iter_unpack('<iiII',names[16+64*3:])}
+        self.assertEqual(chances[rows[2,5]][WEATHERS.index('Blight')],100)     # Red Mountain: blight, never clear
+        self.assertEqual(looks[WEATHERS.index('Blight')]['fog'][0],(128,19,19))
+        self.assertEqual(looks[0]['sky'][0],(95,135,203));self.assertEqual(looks[0]['glare'],1.0)
+        with self.assertRaisesRegex(ValueError,'WEAT of 3 bytes'):
+            region_weather(region(b'odd\0',b'Odd\0',[1,2,3]))
+
+    def test_weather_settings_read_the_ini_and_fall_back_per_value(self):
+        from prepare_world_ui import weather_settings, WEATHER_FALLBACK
+        text='[Weather]\r\nHours Between Weather Changes=12\r\n[Weather Blight]\r\nSky Day Color=001,002,003\r\nFog Night Color=999,0,0\r\nTransition Delta=.05\r\n'
+        looks,hours,info=weather_settings(ini_text=text)
+        self.assertEqual(hours,12)
+        self.assertEqual(looks['Blight']['sky'][0],(1,2,3));self.assertEqual(looks['Blight']['delta'],.05)
+        self.assertEqual(looks['Blight']['fog'][3],WEATHER_FALLBACK['Blight'][1][3])   # out of range: shipped value
+        self.assertEqual(looks['Clear']['fog'][0],(206,227,255))
+        self.assertGreater(info['fallback_values'],0)
+
+    def test_fallback_clear_weather_is_the_engines_clear_sky(self):
+        # Clear weather must leave today's clear sky unchanged: the builder's clear stops equal the engine's.
+        from prepare_world_ui import WEATHER_FALLBACK
+        source=(Path(__file__).resolve().parents[1]/'engine/aga/src/r_sky.c').read_text(encoding='utf-8')
+        import re
+        def stops(name):
+            m=re.search(r'static const byte '+name+r'\[4\]\[3\]=\{(.*?)\};',source)
+            return tuple(tuple(int(v) for v in g.split(',')) for g in re.findall(r'\{(\d+,\d+,\d+)\}',m.group(1)))
+        self.assertEqual(stops('sky_clear_rgb_stops'),WEATHER_FALLBACK['Clear'][0])
+        self.assertEqual(stops('fog_clear_rgb_stops'),WEATHER_FALLBACK['Clear'][1])
+
     def test_prepare_and_validate_with_terrain_directory_present(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);data=root/'data';survey=root/'survey';scene=root/'scene'
@@ -56,7 +101,7 @@ class WorldUIAssetsTests(unittest.TestCase):
             (world/'regions.awr').write_bytes(region)
             (world/'other-tool-output').mkdir()
             receipt=prepare(data,survey,scene)
-            self.assertEqual(set(receipt['files']),{'map.awm','journal.awj','entries.dat','quests.awq','region-names.awn'})
+            self.assertEqual(set(receipt['files']),{'map.awm','journal.awj','entries.dat','quests.awq','region-names.awn','region-weather.aww'})
             self.assertEqual(validate(scene/'id1'),receipt)
             self.assertEqual((world/'regions.awr').read_bytes(),region)
             # Re-running on the same private staging tree remains valid.

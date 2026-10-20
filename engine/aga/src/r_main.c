@@ -883,6 +883,9 @@ void R_DrawBEntitiesOnList (void)
 		{
 		case mod_brush:
 
+			/* aw_fog.c: a placement of a long structure is cut on the
+			 * structure's box (aw_cull + 16; chim_cuts.c sets the box). */
+			AW_FarGroup(currententity->aw_cut_box);
 			for(range_pass=-1;;range_pass++){
                 if(range_pass<0)clmodel=currententity->model;
                 else {
@@ -890,7 +893,7 @@ void R_DrawBEntitiesOnList (void)
                     clmodel=&range_view;
                 }
             AW_RC(RC_BM_PASSES);
-            if(!AW_ModelVisible(currententity->origin,clmodel->radius))break;
+            if(!AW_PassVisible(currententity->origin,clmodel->radius))break;
             AW_RC(RC_BM_VISIBLE);
 
 		// see if the bounding box lets us trivially reject, also sets
@@ -1180,7 +1183,7 @@ SetVisibilityByPassages ();
 	if (r_dspeeds.value)
 		dp_time2 = Sys_FloatTime ();
 
-	AW_FogDraw();
+	{ double fog_t0; AW_RT_BEGIN(fog_t0); AW_FogDraw(); AW_RT_END(RT_FOG, fog_t0); }
     AW_GuardTorchDraw(); /* Same world camera/depth, before hands and water warp. */
     AW_StaticFlamesDraw();
     AW_LavaEmbersDraw();

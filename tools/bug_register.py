@@ -50,8 +50,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / 'docs' / 'bugs' / 'bugs.json'
-ARCHIVE = ROOT / 'docs' / 'bugs' / 'archive' / 'bugs-v0.0.29-v0.0.33.json'
-ARCHIVE_UP_TO = 33   # fixed or closed bugs first found in v0.0.33 or earlier rotate into the frozen archive
+ARCHIVE_DIR = ROOT / 'docs' / 'bugs' / 'archive'
+# Frozen archives of bugs.json, read in this order after it: (file, last version series it holds). A fixed or
+# closed, non-persisting bug rotates into the first archive whose last series is at or above the series it was
+# first found in (bugs found before v0.0.29 go into the first). One archive per range keeps every file well under
+# the 256 KiB release text limit (TRACKER-REGISTER-SIZE-33, TRACKER-REGISTER-SIZE-36); a range that nears its
+# warning line is split the same way: add a row, run render.
+ARCHIVES = ((ARCHIVE_DIR / 'bugs-to-v0.0.31.json', 31),
+            (ARCHIVE_DIR / 'bugs-v0.0.32.json', 32),
+            (ARCHIVE_DIR / 'bugs-v0.0.33.json', 33),
+            (ARCHIVE_DIR / 'bugs-v0.0.34-v0.0.35.json', 35))
+ARCHIVE_UP_TO = ARCHIVES[-1][1]   # fixed or closed bugs first found in v0.0.35 or earlier rotate into an archive
+# Archive files of earlier layouts: still read when present, emptied into ARCHIVES and removed by render.
+RETIRED_ARCHIVES = (ARCHIVE_DIR / 'bugs-v0.0.29-v0.0.33.json',)
 FAMILIES = ROOT / 'docs' / 'bugs' / 'families.json'
 REGISTER = ROOT / 'docs' / 'BUGS.md'
 README = ROOT / 'docs' / 'bugs' / 'README.md'
@@ -142,23 +153,61 @@ def found_series(b):
 
 
 def archivable(b):
-    """Rotation rule: fixed or closed, first found in v0.0.33 or earlier, and not persisting."""
+    """Rotation rule: fixed or closed, first found in v0.0.35 (ARCHIVE_UP_TO) or earlier, and not persisting."""
     n = found_series(b)
     return b.get('state') in ('fixed', 'closed') and n is not None and n <= ARCHIVE_UP_TO \
         and len(b.get('reports') or []) < PERSISTING_MIN
 
 
-def load(path=DATA, archive=ARCHIVE):
-    """The register: bugs.json plus, for the default path, the frozen archive (same schema)."""
+def archive_for(b, archives=ARCHIVES):
+    """The archive file a rotated bug belongs in: the first range whose last series covers its found series."""
+    n = found_series(b)
+    for path, last in archives:
+        if n <= last:
+            return path
+    raise ValueError('%s: found in series %s, past the last archive range' % (b['id'], n))
+
+
+def archive_paths(archives=ARCHIVES, retired=RETIRED_ARCHIVES):
+    """Every archive file load() reads, in order: the current ranges, then retired files still present."""
+    return [p for p, _ in archives] + [p for p in retired if p.is_file()]
+
+
+def load(path=DATA, archives=ARCHIVES, retired=RETIRED_ARCHIVES, rotate=None):
+    """The register: bugs.json plus, for the default path (or rotate=True), every frozen archive in ARCHIVES
+    order, then any retired archive file still present (same schema)."""
     bugs = json.loads(path.read_text(encoding='utf-8'))
-    if path == DATA and archive.is_file():
-        bugs = bugs + json.loads(archive.read_text(encoding='utf-8'))
+    if path == DATA if rotate is None else rotate:
+        for p in archive_paths(archives, retired):
+            if p.is_file():
+                bugs = bugs + json.loads(p.read_text(encoding='utf-8'))
     return bugs
 
 
 def split(bugs):
     """(live, archived) in the order given."""
     return [b for b in bugs if not archivable(b)], [b for b in bugs if archivable(b)]
+
+
+def split_archives(old, archives=ARCHIVES):
+    """{archive file: its bugs in the order given} for every archive range, empty ranges included."""
+    groups = {p: [] for p, _ in archives}
+    for b in old:
+        groups[archive_for(b, archives)].append(b)
+    return groups
+
+
+def rotation(bugs, archives=ARCHIVES, retired=RETIRED_ARCHIVES, path=DATA):
+    """{file: text} for bugs.json and every archive that holds bugs or exists; None = a retired file to remove."""
+    live, old = split(bugs)
+    files = {path: live_text(live)}
+    for p, group in split_archives(old, archives).items():
+        if group or p.is_file():
+            files[p] = archive_text(group)
+    for p in retired:
+        if p.is_file():
+            files[p] = None
+    return files
 
 
 def archive_text(old):
@@ -182,14 +231,18 @@ def load_families(path=FAMILIES):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
-def save(bugs, path=DATA, archive=ARCHIVE):
-    """Write bugs.json and, for the default path, the archive of rotated bugs."""
-    if path == DATA:
-        bugs, old = split(bugs)
-        if old or archive.is_file():
-            archive.parent.mkdir(parents=True, exist_ok=True)
-            archive.write_text(archive_text(old), encoding='utf-8', newline='\n')
-    path.write_text(live_text(bugs), encoding='utf-8', newline='\n')
+def save(bugs, path=DATA, archives=ARCHIVES, retired=RETIRED_ARCHIVES, rotate=None):
+    """Write bugs.json and, for the default path (or rotate=True), every archive of rotated bugs; retired
+    archive files are removed once their bugs are written to the current ranges."""
+    if not (path == DATA if rotate is None else rotate):
+        path.write_text(live_text(bugs), encoding='utf-8', newline='\n')
+        return
+    for p, text in rotation(bugs, archives, retired, path).items():
+        if text is None:
+            p.unlink()
+        else:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text, encoding='utf-8', newline='\n')
 
 
 def series(bug_id):
@@ -770,7 +823,7 @@ def chim_tracker(bugs, journal_text, version, pages=None):
     import doc_toc
     chim = [b for b in bugs if is_chim(b)]
     counts = {s: sum(1 for b in chim if b['state'] == s) for s in STATES}
-    out = ['# CHIM Engine tracker', '',
+    out = ['# CHIM Engine tracker', '', doc_toc.generated_line('docs/bugs/bugs.json'), '',
            '<!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json and docs/BUG_JOURNAL.md; '
            'do not edit by hand. -->', '',
            'Every bug of the CHIM engine: its streaming and memory, world format, builder, stairs and collision '
@@ -909,10 +962,29 @@ def family_groups(bugs, families):
     return '\n'.join(out) + '\n'
 
 
+def with_generated_line(text, line):
+    """TEXT with LINE (doc_toc.generated_line) as the only generated line, right under its title (first line)."""
+    import doc_toc
+    lines = text.split('\n')
+    kept = []
+    for i, row in enumerate(lines):
+        if doc_toc.GENERATED_LINE.fullmatch(row):
+            continue
+        if row == '' and i and doc_toc.GENERATED_LINE.fullmatch(lines[i - 1]):
+            continue
+        kept.append(row)
+    body = kept[1:]
+    while body and body[0] == '':
+        body = body[1:]
+    return '\n'.join(kept[:1] + ['', line, ''] + body)
+
+
 def rendered(text, bugs, families=None):
     families = load_families() if families is None else families
     if text.count(BEGIN) != 1 or text.count(END) != 1:
         raise SystemExit('docs/BUGS.md needs exactly one generated-register block')
+    import doc_toc
+    text = with_generated_line(text, doc_toc.generated_line('docs/bugs/bugs.json'))
     a = text.index(BEGIN) + len(BEGIN)
     b = text.index(END)
     counts = {s: sum(1 for x in bugs if x['state'] == s) for s in STATES}
@@ -1323,12 +1395,12 @@ def main(argv=None):
         return 1
     new = outputs(bugs, families)
     live, old = split(bugs)
-    rotation = {DATA: live_text(live), ARCHIVE: archive_text(old)}
+    rotated = rotation(bugs)
     if args.cmd == 'check':
         stale = [p.relative_to(ROOT).as_posix() for p, t in new.items()
                  if not p.is_file() or p.read_text(encoding='utf-8') != t]
-        stale += [p.relative_to(ROOT).as_posix() for p, t in rotation.items()
-                  if not p.is_file() or p.read_text(encoding='utf-8') != t]
+        stale += [p.relative_to(ROOT).as_posix() for p, t in rotated.items()
+                  if t is None or not p.is_file() or p.read_text(encoding='utf-8') != t]
         if stale:
             print('stale generated files (run tools/bug_register.py render): ' + ', '.join(stale), file=sys.stderr)
             return 1

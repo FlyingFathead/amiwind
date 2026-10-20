@@ -63,6 +63,19 @@ GENERATED = {
     'docs/chim/FEATURES.md': 'generated whole by tools/chim_features.py from docs/chim/features.json',
     'docs/chim/CELL_TRACKER.md': 'generated whole by tools/cell_progress.py render-md from the tracker data',
 }
+# The line every GENERATED page carries under its title, written by its generator (documentation policy of record,
+# 19 October 2026): what it was generated from and the AmiWind version of the source that generated it, no date; a
+# hand-written page carries "_Last updated with AmiWind vX (D Month YYYY)._" instead.
+GENERATED_LINE = re.compile(r'^_Generated from `[^`\n]+` with AmiWind v\d+\.\d+\.\d+(?:-[a-z]+\d+)?\._$', re.M)
+
+
+def generated_line(source, version=None):
+    """_Generated from `SOURCE` with AmiWind vX._ (VERSION: default the repository's VERSION file)."""
+    if version is None:
+        version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+    return '_Generated from `%s` with AmiWind v%s._' % (source, str(version).lstrip('v'))
+
+
 FROZEN = {'docs/BUGS-v0.0.29-RC1.md', 'docs/RC2_ISSUE_CHECKPOINT.md'}
 FROZEN_PREFIXES = ('docs/journals/', 'docs/RELEASE-v', 'docs/PATCH-')
 LICENCE = re.compile(r'^(LICEN[CS]E|COPYING|NOTICE)', re.I)

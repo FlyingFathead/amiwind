@@ -9,7 +9,7 @@
 | Where | tools/build.py seyda_scene_source (bsp stage, --seyda-source) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.42-dev1 (last seen) |
+| Persists in | fixed in v0.0.42 |
 | Severity | high: every CHIM MiniWind of a town other than Seyda Neen stops 10 minutes in |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

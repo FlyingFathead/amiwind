@@ -1,5 +1,14 @@
 # BUILD-REUSE-PLAN-ENV-36: The standalone reuse plan reports environment changes the real build does not have
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.36-dev1 at 2026-10-10 (time not recorded): standalone plan marked scene, bsp, world-survey and others rebuilt for environment; the build's own preflight reused 18 of 26
+- Reported with v0.0.45 at 2026-10-20 05:45 +0300: plan of a6a9c6e9 against the v0.0.45 release run: 8 of 39 reused, 31 rebuilt, most for environment alone
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,7 +18,7 @@
 | Where | tools/reuse_report.py plan_main via build.py --reuse-plan |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev1 (last seen) |
+| Persists in | v0.0.36-dev1, v0.0.45 (last seen) |
 | Severity | medium: Under the reuse rule an unexplained rebuild stops a build: a false alarm can stop a valid build or teach people to ignore the plan |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -18,17 +27,45 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
-## Status: 10 October 2026
+<!-- contents start -->
+## Contents
 
-Open. Workaround: read the reuse preflight the build itself prints before its first stage (developer mode, line "(f)").
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Status: 20 October 2026](#status-20-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Status: 20 October 2026
+
+PERSISTING: first reported with v0.0.36-dev1 (10 October 2026), reported again with v0.0.45 (20 October 2026). The
+planned repair (below, 10 October) was never made, so the plan kept giving false numbers for ten days. Cause found
+and repaired on branch `v0.0.46-reuse-plan-env` on 20 October 2026 (not merged yet): the build and the standalone plan
+set the stage environment through the same functions. Until it is merged, the workaround stands: read the reuse
+preflight the build itself prints before its first stage (developer mode, line "(f)"), or the `--check` run of the
+build service.
 
 ## Symptom
 
 `build.py --reuse-plan OLD_RUN` marked several stages (scene, bsp, world-survey and others) as rebuilt with the cause
 "input change: environment", with no changed file behind it. The build started right after with the same options
 printed its own preflight: 18 of 26 stages reused, every rebuild explained by a changed file.
+
+Again on 20 October 2026: the plan of the v0.0.45 dev line head (a6a9c6e9) against the v0.0.45 release run
+`2026_10_19_v0.0.45_release-try2_c9099fb8` said "8 of 39 stages planned for reuse, 31 rebuilt (2 by policy),
+0 UNEXPECTED". world-survey, scene, harvest, door-audio, reading, world-ui, actor-contact and cell-progress were among
+the stages planned as rebuilt for the environment alone. The "0 UNEXPECTED" made it look plausible, because the
+preflight counts an environment change as EXPECTED.
 
 ## Where
 
@@ -41,10 +78,27 @@ A stage's fingerprint includes the AMIWIND_* variables its code reads. A build s
 before the stages run. The standalone plan runs without those options, so it sees the variables unset and compares
 them with the values the old run recorded.
 
+In detail (measured 20 October 2026): `build.py --reuse-plan` returns at the top of `main()`, before the two places
+where `main()` exports its options. One is the option block: the NPC root rule, actor search, interior creatures,
+the NPC animation kit, the stair walk scope and the CHIM native towns. The other is the converter block: the stair
+rules, model hulls, lava, the world map, streamed statics, the CHIM frame extension and region rows, NPC head detail
+and the head reducer. Each stage's computed environment was compared with the values the reuse source recorded in
+`profile/fingerprints.json`. 15 variables differed, and in every case the run had a value that the plan left unset:
+`AMIWIND_ACTOR_SEARCH`, `AMIWIND_CHIM_FRAME_EXT`, `AMIWIND_CHIM_NATIVE_TOWNS`, `AMIWIND_CHIM_REGION_ROWS`,
+`AMIWIND_CHIM_STREAM_STATICS`, `AMIWIND_INTERIOR_CREATURES`, `AMIWIND_LAVA`, `AMIWIND_MODEL_HULL`, `AMIWIND_NPC_ANIM`,
+`AMIWIND_NPC_HEAD_DETAIL`, `AMIWIND_NPC_HEAD_REDUCER`, `AMIWIND_NPC_ROOT_RULE`, `AMIWIND_STAIR_MITIGATION`,
+`AMIWIND_STAIR_WALK` and `AMIWIND_WORLD_MAP`. For world-survey, the only difference was `AMIWIND_NPC_ROOT_RULE`
+(the run recorded `legacy`, the plan left it unset). No bookkeeping variable (`AMIWIND_RUN_*`) was part of any key;
+they are all in `IGNORED_ENV`.
+
+The preflight inside a build was not affected. The developer-mode entry check, `--resource-plan` and the `--check`
+preflight that the build service runs all come after both export blocks.
+
 ## Why it was not caught
 
 The tests compare plans made with the same environment; no test runs the plan without the build's options against a
-run that had them.
+run that had them. When it was found on 10 October, the planned repair went no further than this page. Nothing
+tracked the page while its status said "Open", and a workaround existed.
 
 ## Reproduction
 
@@ -52,16 +106,38 @@ Always: run `build.py --reuse-plan RUN` on a run built with options that set AMI
 
 ## Repair
 
-Planned: the plan takes the build options (or the old run's recorded options) and derives the stage environment from
-them, the way the build does; a variable the plan cannot derive is reported as "unknown", never as a change.
+Branch `v0.0.46-reuse-plan-env`, 20 October 2026:
+
+- `tools/build.py` has two export functions, `export_option_environment(args)` and
+  `export_converter_environment(args)`. They hold the two export blocks, and `main()` calls them where those blocks
+  were. `plan_stage_environment(argv)` parses, resolves and exports with the same two functions.
+- `build.py --reuse-plan OLD_RUN [-- BUILD OPTIONS]` sets that environment before planning and prints where the
+  options came from (`Stage environment: ...`). It takes the options after `--` if given. Otherwise it takes the build
+  command that the run recorded, and otherwise the build defaults. Options that the builder would refuse stop the
+  plan. It does not guess.
+- Every build now records its own options in `build-state.json` (`build_argv`). A later plan against that run then
+  uses them.
 
 ## Verification
 
-To do: the standalone plan and the build's own preflight agree on the same run and options.
+- `ReuseTests.test_the_standalone_reuse_plan_keys_stages_in_the_build_environment` (`tests/test_build_cache.py`):
+  a stage that reads `AMIWIND_NPC_ROOT_RULE` is built with the default value, then planned from a clean environment
+  through `build.main(['--reuse-plan', ...])`. Every stage must be reused. The test fails against the previous code
+  (`beta` rebuilt for `environment`).
+- `ReusePlanEnvironmentTests`: for eleven option sets, the environment the plan sets must equal the one
+  `build.main()` has set when it reaches the prerequisites. The plan must also take the options after `--` first,
+  then the recorded command, then the defaults.
+- The plan of a6a9c6e9 plus this repair (04ed6047) against the same v0.0.45 release run gives 16 of 39 stages
+  planned for reuse, 23 rebuilt (2 by policy), 0 UNEXPECTED. Every remaining rebuild is either a policy stage
+  (engine, image) or names a source file that changed between the run's commit c9099fb8 and a6a9c6e9:
+  `tools/mesh_geometry.py`, `tools/mesh_geometry_env.py`, `src/mwad/dialogue.py`, `tools/chim/collision.py`,
+  `tools/gallery_cache.py`, the CHIM tools or the engine. Some of those reasons still list `environment`. That is
+  the new variable `AMIWIND_COLLISION_HULL_POINTS`, read by the changed `tools/mesh_geometry_env.py`.
 
 ## Prevention
 
-A test that compares the standalone plan with the build's preflight for the same options.
+`ReusePlanEnvironmentTests` fails if `main()` exports a stage variable that the plan does not. A new export
+therefore has to go into one of the two shared functions.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -110,5 +186,9 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [CHIMPORT-POOL-CROSS-MOUNT-36](CHIMPORT-POOL-CROSS-MOUNT-36.md): CHIMport run folder and the storage pool on two mounts of one volume: hard links fail across the mounts, so pooled units were copied, not linked
 - [CHIMPORT-RETRY-AUDIT-FAILED-36](CHIMPORT-RETRY-AUDIT-FAILED-36.md): CHIMport --retry-failed never reran cells that converted but failed an audit (memory fit, doors, hull chains): the runner marks them done
 - [MWAD-WALK-ORDER-35](MWAD-WALK-ORDER-35.md): Input check results depend on directory listing order
+
+Related bugs in other categories:
+
+- [BUILD-ENV-FINGERPRINT-GLOBAL-33](BUILD-ENV-FINGERPRINT-GLOBAL-33.md): The stair rule setting invalidates the reuse cache of every build stage, including stages that never read it
 
 <!-- END GENERATED CATEGORY -->

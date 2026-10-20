@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -625,8 +625,14 @@ What the file holds and how it is worked out:
   minutes (`AMIWIND_ETA_LINE_SECONDS`, 0 = off):
 
   ```text
-  [eta] 67.6 %, ETA 27m46s (at 12:40:00) | chim: ~27m46s left, 539/723 frames done, 6.45 s each here (log counter 'CHIM region frames'), weight 1.00 against history (5 run(s), 364 frames there, 726 here); later phases 7m59s from history
+  [eta] 67.6 %, ETA 27m46s (at 12:40:00 UTC / 15:40:00 local (+0300)) | chim: ~27m46s left, 539/723 frames done, 6.45 s each here (log counter 'CHIM region frames'), weight 1.00 against history (5 run(s), 364 frames there, 726 here); later phases 7m59s from history
   ```
+
+  The builder's container runs on UTC, so the finish time is printed in UTC and, when
+  `AMIWIND_LOCAL_UTC_OFFSET` gives the host's offset (`date +%z`, for example `+0300`), also in local
+  time (without it, the builder's own clock offset is used, so a build run directly on the host shows local
+  time too). A launcher that runs the builder in a container passes `-e AMIWIND_LOCAL_UTC_OFFSET=$(date +%z)`.
+  The status lines do the same (BUILD-ETA-CLOCK-UTC-ONLY-46).
 
   Origin: v0.0.41-dev5's chim stage was expected at 43 minutes from history
   (364-frame runs scaled to 726 frames, many of their frames reused from the
@@ -1006,7 +1012,8 @@ the image step, a stage that follows an expected rebuild, a stage the reuse
 source had itself reused without a file a later stage replaced there and that
 runs again because that later stage runs again) or UNEXPECTED (a key
 that changed only with files no output depends on, such as the release file
-list; a refused old record; outputs of a rebuilt stage that differ although its
+list; a key that changed only with the pool scheduling modules or `VERSION`, for a
+stage that does not write the version into its outputs; a refused old record; outputs of a rebuilt stage that differ although its
 inputs did not, with the files that differ). Exit status 1 when anything is
 UNEXPECTED, 2 for a run made without `--reuse-from`.
 

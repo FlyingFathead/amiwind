@@ -116,7 +116,7 @@
       "default_error_share": 0.01
     },
     "everywhere-v1": {
-      "status": "Project decision 2026-10-16: replacements applied in every CHIM cell and town frame (the original mesh stays the collision). AMIWIND_VISUAL_EVERYWHERE=off keeps the original meshes.",
+      "status": "Project decision 2026-10-16: replacements applied in every CHIM cell and town frame (the original mesh stays the collision). AMIWIND_VISUAL_EVERYWHERE=off keeps the original meshes. 20 October 2026 (CHIM-HULL-SURFACE-HEAP-46): ex_dae_ruin_02_skew collides with coarser convex pieces (tolerance 4 units: 172 to 100 pieces, its walkable surface still within 0.05 of them), drawn unchanged, so the frames by the Bitter Coast Daedric ruins (x-07 y-04, x-08 y-04) fit with its walkable-surface collision.",
       "models": {
         "meshes/l/light_de_streetlight_01.nif": {
           "sha256": "263615adcaf6805ca408a9572c96c96aef8646b0798ae090d9b4e69057772d8a",
@@ -132,6 +132,10 @@
             "paper_material": 2,
             "frame_material": 0
           }
+        },
+        "meshes/x/ex_dae_ruin_02_skew.nif": {
+          "sha256": "547777bcd16032700c68f3e67723c89e895e2131feff2c831c0542149add0134",
+          "collision_tolerance": 4
         }
       }
     },

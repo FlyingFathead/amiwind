@@ -9,7 +9,7 @@
 | Where | tools/payload_preflight.py disk-layout check and tools/world_volumes.py partition_batches |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.43-dev3 (last seen) |
+| Persists in | fixed in v0.0.44 |
 | Severity | high: blocks every all-CHIM image; the milestone build cannot be packaged until fixed |
 | Family | Disk images, partitions and launchers (`disk-image-layout`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

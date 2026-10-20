@@ -145,6 +145,10 @@ int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int h
         part[count].model=gear[i];part[count].frame=0;VectorCopy(origins[i],part[count].origin);
         AngleVectors(angles[i],part[count].forward,part[count].right,part[count].up);count++;
     }
+    /* The carried torch shares the torch body's frame and placement (PLAYER-TORCH-THIRDPERSON-38). */
+    if(count<3 && AW_ViewInventoryHeld(&part[count].model,&part[count].frame)){
+        AngleVectors(zero,part[count].forward,part[count].right,part[count].up);count++;
+    }
     if(!inventory_depth)inventory_depth=(short *)malloc(122*168*sizeof(short));
     if(!inventory_depth)return 0;
     for(k=0;k<3;k++){low[k]=32768;high[k]=-32768;}

@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -34,27 +34,39 @@ The [gallery](docs/GALLERY.md) has in-game screenshots of every version, and
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (19 October 2026)
+## Where AmiWind stands (20 October 2026)
 
-The newest release is **v0.0.45: CHIM Streaming Improved, Guard Torches Are Back**, running on CHIM Engine v0.2.1
-([release notes](docs/RELEASE-v0.0.45.md)). Since v0.0.43 every exterior cell of Vvardenfell is on CHIM: 1,409
+The newest release is **v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes**, running on CHIM Engine v0.2.1
+([release notes](docs/RELEASE-v0.0.46.md)). Since v0.0.43 every exterior cell of Vvardenfell is on CHIM: 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
 [the counting table](docs/chim/CELL_TRACKER.md#what-we-count); every cell: the
 [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md). Interiors are still ordinary Quake maps, and many of the
 base game's interiors are not converted yet; Solstheim is not converted.
 
-What comes next is in the [plan](docs/PLAN-v0.0.45.md): smoother crossings from one CHIM cell to the next first
-(the frame switched in place instead of a level restart), then the open bugs from the playtests, then every
-interior of the base game. The sections below are
+What comes next is in the [roadmap](docs/ROADMAP.md): smoother crossings from one CHIM cell to the next first
+(the outdoors streamed as one world instead of a level restart per frame), collision built from the game's own
+movement rules, then the open bugs from the playtests, then every interior of the base game. The sections below are
 dated records of earlier releases and are kept as written; where one disagrees with this section, this section is
 newer.
+
+## v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes
+
+Red Mountain is red again: every region chooses its weather the way the original game does, and the mountain
+draws its blight sky. The Ebonheart dragon statue is back on its pedestal, the torch shows in third person, the
+Vivec dock walkways hold the player up and the Dreamers greet you. The collision of the whole island now keeps only
+the surface you walk on exactly, so every frame fits its memory again.
+
+Running on CHIM Engine v0.2.1. See the [release notes](docs/RELEASE-v0.0.46.md) for what changed and what is
+known in this build.
 
 ## v0.0.45: CHIM Streaming Improved, Guard Torches Are Back
 
 Crossing from one CHIM cell to the next uses spare Fast RAM now: the frames around the player are read ahead into
 memory while you walk, and the engine's heap grows with the RAM the machine has. On a 128 MiB setup a crossing
-measured about half as long as before (about 450 ms down to about 230 ms); the 16 MiB baseline keeps today's sizes.
+measured about half as long as before (about 450 ms down to about 230 ms; corrected 20 October 2026: about a third
+of the v0.0.44 time over a fixed route, [CROSSING_BASELINE](docs/performance/CROSSING_BASELINE.md)); the 16 MiB
+baseline keeps today's sizes.
 The guards in the streets carry their torches at night again, and the builder keeps its finished stages when only
 its scheduling changes.
 
@@ -1286,4 +1298,4 @@ complete package inclusion remain pending; dev2 has not shipped.
 
 Update (v0.0.44, 19 October 2026): the notes above are from 14 and 15 October 2026 and describe states that have
 since passed. The current state is in
-[Where AmiWind stands](#where-amiwind-stands-19-october-2026) near the top.
+[Where AmiWind stands](#where-amiwind-stands-20-october-2026) near the top.

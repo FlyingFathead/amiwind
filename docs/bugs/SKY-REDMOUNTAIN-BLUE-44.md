@@ -1,5 +1,14 @@
 # SKY-REDMOUNTAIN-BLUE-44: inside the Ghostfence at Red Mountain the sky is clear blue instead of red ash weather
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.44-dev1 at 2026-10-19 15:28 +0300: maintainer: inside and near the Ghostfence the horizon should turn mostly red, grey and brown, and the sky more red as the player approaches
+- Reported with v0.0.45 at 2026-10-20 02:30 +0300: still blue in v0.0.45 (no weather table); cause: clear-weather colours only, no region weather written; fixed on branch v0.0.46-sky-pedestal, needs a world build
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,7 +18,7 @@
 | Where | Red Mountain region inside the Ghostfence, cell 2,5 (global 20605 47338 4890, game time 15:47) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.44-dev1 (last seen) |
+| Persists in | v0.0.44-dev1, v0.0.45 (last seen) |
 | Severity | medium: the most important region of the game loses its look |
 | Family | Lighting, lamps and night (`lighting-night`) |
 | Playtest version | 2026_10_19_v0.0.44-dev1_full-batch5-try6_793d7c14 |
@@ -19,11 +28,29 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
-## Status: 19 October 2026
+<!-- contents start -->
+## Contents
 
-Reported by the maintainer; not fixed yet.
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Status: 20 October 2026](#status-20-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Status: 20 October 2026
+
+Cause found; repaired in the source on branch v0.0.46-sky-pedestal (region weather, every region), not yet in a
+build. Still present in v0.0.45 (its world has no weather table). Needs a world rebuild and an in-game look.
 
 ## Symptom
 
@@ -37,11 +64,32 @@ Red Mountain region, cell 2,5 (global 20605 47338 4890), game time 15:47.
 
 ## How it happened
 
-The sky, fog and horizon colours do not yet follow the region's weather: every region gets the same clear sky.
+Nothing in the game chose a weather. The sky code (`engine/aga/src/r_sky.c`) built its sky, horizon and fog tables
+from one fixed set of colour stops, the clear weather's (`sky_rgb_stops` / `fog_rgb_stops`, "Clear-weather RGB
+stops ... No weather simulation"), and no build step wrote the regions' weather records anywhere the engine could
+read them: the builder's region table (`region-names.awn`, `tools/prepare_world_ui.py`) carried only the region
+names for the HUD. So every exterior cell drew the clear sky, whatever its region. Red Mountain's region record
+gives blight a 100 % chance and clear 0 % (Morrowind.ini: blight sky 90,35,35, fog 128,19,19 by day).
+
+Island-wide (v0.0.45 world, its `region-names.awn` against the region records of Morrowind.esm): every one of the
+nine regions draws the clear sky all the time, while its record gives clear only part of the time:
+
+| Region | Exterior cells | Clear in the records | Its weathers by chance |
+| --- | --- | --- | --- |
+| Red Mountain | 37 | 0 % | blight 100 |
+| Molag Amur | 123 | 5 % | foggy 35, overcast 25, ash storm 20, cloudy 15 |
+| Ashlands | 162 | 10 % | ash storm 30, overcast 25, cloudy 25, foggy 10 |
+| Bitter Coast | 166 | 10 % | cloudy 60, rain 10, thunderstorm 10, foggy 10 |
+| West Gash | 193 | 15 % | cloudy 30, overcast 20, foggy 15, rain 10, thunderstorm 10 |
+| Sheogorad | 170 | 15 % | cloudy 40, overcast 15, rain 10, thunderstorm 10, foggy 10 |
+| Azura's Coast | 379 | 25 % | cloudy 45, overcast 10, foggy 10, rain 5, thunderstorm 5 |
+| Grazelands | 57 | 30 % | cloudy 40, rain 10, thunderstorm 10, overcast 5, foggy 5 |
+| Ascadian Isles | 116 | 45 % | cloudy 45, rain 5, thunderstorm 5 |
 
 ## Why it was not caught
 
-No check compares the sky and fog colour per region with the original game.
+No check compares the sky and fog colour per region with the original game, and the sky work so far
+([DAY_NIGHT_AND_SKY](../DAY_NIGHT_AND_SKY.md)) was the clear day and night only.
 
 ## Reproduction
 
@@ -49,19 +97,39 @@ Always: go inside the Ghostfence at any time of day.
 
 ## Repair
 
-To do: read the Red Mountain region's weather from the game data, compare with OpenMW at the same place and time,
-then give the sky, fog and horizon their colours per region. The [roadmap's colour plan](../ROADMAP.md) adds an ash
-and red palette ramp that grows in rings around the mountain, so the sky shades toward red as the player gets close. The Ghostfence's own shimmering curtain, still not animated,
-is planned with it as a Quake turbulent texture with a flickering glow
-([IDEAS](../chim/IDEAS.md#the-ghostfence-as-a-quake-turbulent-surface)).
+Region weather, for every region at once ([DAY_NIGHT_AND_SKY: Region weather](../DAY_NIGHT_AND_SKY.md#region-weather-20-october-2026)):
+
+- Builder: the world UI stage writes `id1/world/region-weather.aww` (430 bytes): each region's weather chances
+  from its record, in the order of `region-names.awn`, and the ten weathers' sky and fog colours, transition speed
+  and glare from Morrowind.ini (or the values it ships with).
+- Engine: `aw_weather.c` / `aw_weather_rules.c` pick the region's weather at the player (rules from OpenMW file
+  `apps/openmw/mwworld/weather.cpp`: the roll against the summed chances, a new choice every 20 game hours, a
+  transition at the weather's speed when walking into another region, at once after travel or a load); `r_sky.c`
+  draws that weather's sky, horizon and fog colours at every time of day, and no sun disc or sunrise glow in a
+  storm. Clear weather builds exactly the tables of before. `dbg weather` shows the weather and the region's
+  chances, `dbg weather blight` forces one, `dbg weather off` (`aw_weather 0`) brings back the old clear sky.
+
+Not in this repair: the weathers' own cloud textures (Tx_Sky_Blight and the others), ash and blight particles,
+storm sounds, storm ambient light, and the [roadmap's](../ROADMAP.md) ash and red palette ramp in rings around the
+mountain. The Ghostfence's own shimmering curtain, still not animated, is planned as a Quake turbulent texture with
+a flickering glow ([IDEAS](../chim/IDEAS.md#the-ghostfence-as-a-quake-turbulent-surface)).
 
 ## Verification
 
-To do: stills and a short clip at the same pose in OpenMW and AmiWind.
+Done (source, 20 October 2026): `tests/test_world_ui_assets.py` (the weather table follows the region order and
+chances; Red Mountain's row is blight 100; the shipped clear colours equal the engine's clear stops),
+`tests/test_region_weather.py` with `tests/aga_weather_rules_test.c` (roll, 20-hour period, table shape, Red
+Mountain blight in every period, the West Gash spread over 4,000 periods, the blend), the Amiga engine compiles
+without warnings. On the real Morrowind.esm the builder's `region-names.awn` is byte-identical to the v0.0.45
+release's and the weather table has the nine rows above.
+
+To do: a world build with the region weather table, then stills and a short clip at the reported pose (cell 2,5,
+15:47) in OpenMW and AmiWind (`dbg weather` must say blight), and a walk across the Ghostfence for the transition.
 
 ## Prevention
 
-To do: a per-region sky and fog colour check against the original weather records.
+The builder now writes every region's weather from its record, tested against the region order; the sweep table
+above is the per-region check against the original records.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

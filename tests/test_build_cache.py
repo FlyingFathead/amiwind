@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -804,6 +805,33 @@ class ReuseTests(unittest.TestCase):
         with patch.dict(os.environ, {build_cache.NARROWING_ENV: 'off'}):
             self._reuse_preflight_stops_an_unexplained_rebuild()
 
+    @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
+    def test_the_standalone_reuse_plan_keys_stages_in_the_build_environment(self):
+        """BUILD-REUSE-PLAN-ENV-36: `build.py --reuse-plan OLD_RUN` of an unchanged tree against a run built with
+        the default options reuses every stage. The build sets AMIWIND_* from its options before any stage; the
+        standalone plan returned before that and keyed the stages with an empty environment (31 of 39 stages of
+        the v0.0.45 release run planned as rebuilt for 'environment' alone)."""
+        (self.repository / 'tools' / 'stage_b.py').write_text(
+            STAGE_B + "import os\nRULE = os.environ.get('AMIWIND_NPC_ROOT_RULE')\n")
+        default_rule = build.parser().parse_args([]).npc_root_rule
+        with patch.dict(os.environ, {'AMIWIND_NPC_ROOT_RULE': default_rule}):
+            first, _, _ = self.build('first')   # the stage environment a default build sets
+        details = json.loads((first / 'profile' / 'fingerprints.json').read_text())
+        self.assertEqual(details['beta']['environment'], {'AMIWIND_NPC_ROOT_RULE': default_rule})
+        saved = self.root / 'plan.json'
+        predict = build_cache.predict_preflight
+        with patch.dict(os.environ), \
+                patch.object(build_cache, 'predict_preflight',
+                             lambda old_run, scope='units': predict(old_run, scope, root=self.repository)), \
+                contextlib.redirect_stdout(io.StringIO()) as printed:
+            os.environ.pop('AMIWIND_NPC_ROOT_RULE', None)   # a fresh shell, as the plan is run from one
+            code = build.main(['--reuse-plan', str(first), '--json', str(saved)])
+        self.assertEqual(code, 0, printed.getvalue())
+        result = json.loads(saved.read_text())
+        self.assertEqual([row['stage'] for row in result['rows']], [], printed.getvalue())
+        self.assertEqual(result['reused'], 4)
+        self.assertIn('Stage environment: the build defaults', printed.getvalue())
+
     def _reuse_preflight_stops_an_unexplained_rebuild(self):
         first, _, _ = self.build('first')
         index = build_cache.SourceIndex(self.repository)
@@ -1149,6 +1177,7 @@ class DiagnosticOutputTests(unittest.TestCase):
             'tools/build_docker.py': 'host-side image build log', 'tools/run_docker.py': 'host-side logs',
             'tools/fsuae_headless_probe.py': 'emulator probe logs', 'tools/engine_smoke.py': 'the engine smoke (not a builder stage) reads the game console of its own emulator run', 'tools/package_opening.py': 'opening package',
             'tools/profile_demo.py': 'demo profiler', 'tools/capture_opening.py': 'opening capture',
+            'tools/crossing_route.py': 'the crossing route (not a builder stage) reads the game console of its own emulator run',
             'tools/run_tests.py': 'test runner log', 'tools/world_estimate_sample.py': 'estimate sample tool logs',
             'tools/chimport.py': 'the island conversion tool (not a builder stage) quotes a failed cell process log',
             'tools/aw.py': 'the master builder command line (not a builder stage) names its own gate console log',
@@ -1429,6 +1458,84 @@ class SchedulingKeysTest(unittest.TestCase):
         self.assertNotEqual(self.key(reached, 1), base, 'a reached function must still rekey')
 
 
+class SchedulingConstantsTest(unittest.TestCase):
+    """BUILD-REUSE-SCHEDULER-TOP-45 part 2: the legacy-map stair walk key changed between v0.0.44 (c84f8506) and v0.0.45
+    (c9099fb8) only through the import-time code of tools/stair_parallel.py, where v0.0.45 added two pool sizing
+    constants (UNIT_MIN_HEAVY, COST_POOL). A sizing constant (SCHEDULING_CONSTANTS) keys no walk; any other
+    import-time edit there still does."""
+    WALKER = 'from stair_parallel import walk_unit\nwalk_unit(None)\n'
+    PATH = 'tools/stair_parallel.py'
+    READERS = {'unit_size', 'plan_units', 'check'}
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        (self.root / 'tools').mkdir()
+        self.source = (ROOT / self.PATH).read_text(encoding='utf-8')
+        (self.root / 'tools' / 'walker.py').write_text(self.WALKER, encoding='utf-8')
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def key(self, source, top_format=2):
+        (self.root / self.PATH).write_text(source, encoding='utf-8', newline='\n')
+        index = build_cache.SourceIndex(self.root, scope='units', top_format=top_format)
+        selected, uncertain = index.selection(self.root / 'tools' / 'walker.py')
+        self.assertFalse(uncertain)
+        return selected[self.PATH]
+
+    def test_v044_stair_pool_matches_v045(self):
+        source = self.source
+        older = '\n'.join(line for line in source.split('\n')
+                          if not line.startswith(('UNIT_MIN_HEAVY', 'COST_POOL'))
+                          and not line.lstrip().startswith('# room walking about a second a step'))
+        self.assertNotEqual(older, source)
+        for top_format in build_cache.TOP_FORMATS:
+            self.assertEqual(self.key(older, top_format), self.key(source, top_format), 'top format %d' % top_format)
+
+    def test_sizing_constants_keep_the_key_other_top_level_edits_change_it(self):
+        source = self.source
+        base = self.key(source)
+        for old, new in (('\nUNIT_MAX = 128 ', '\nUNIT_MAX = 64 '), ('\nUNIT_MIN = 16 ', '\nUNIT_MIN = 8 '),
+                         ("\nCOST_POOL = 'image-stair-walk'", "\nCOST_POOL = 'stair-walk-2'")):
+            self.assertIn(old, source)
+            self.assertEqual(self.key(source.replace(old, new, 1)), base, old)
+        self.assertIn('\n_SCENES_KEPT = 2\n', source)
+        self.assertNotEqual(self.key(source.replace('\n_SCENES_KEPT = 2\n', '\n_SCENES_KEPT = 3\n', 1)), base)
+        start = source.index('def walk_unit(')
+        body = source.index('\n', start)
+        self.assertNotEqual(self.key(source[:body] + '\n    _changed = 1' + source[body:]), base)
+
+    def test_every_sizing_constant_is_a_one_line_literal_read_only_by_the_pool_sizing(self):
+        import ast
+        tree = ast.parse(self.source)
+        listed = {name for path, name in build_cache.SCHEDULING_CONSTANTS if path == self.PATH}
+        self.assertEqual({path for path, _ in build_cache.SCHEDULING_CONSTANTS}, {self.PATH})
+        found = {}
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                found[node.targets[0].id] = node
+        for name in sorted(listed):
+            node = found.get(name)
+            self.assertIsNotNone(node, name)
+            self.assertEqual(node.lineno, node.end_lineno, name)
+            ast.literal_eval(node.value)
+        readers = set()
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                if any(isinstance(n, ast.Name) and n.id in listed for n in ast.walk(node)):
+                    readers.add(node.name)
+        self.assertLessEqual(readers, self.READERS)
+        # no other module names them
+        pattern = re.compile(r'\b(%s)\b' % '|'.join(sorted(listed)))
+        for folder in ('tools', 'src'):
+            for path in (ROOT / folder).rglob('*.py'):
+                relative = path.relative_to(ROOT).as_posix()
+                if relative in (self.PATH, 'tools/build_cache.py'):
+                    continue
+                self.assertIsNone(pattern.search(path.read_text(encoding='utf-8', errors='replace')), relative)
+
+
 if __name__ == '__main__':
     unittest.main()
 
@@ -1616,3 +1723,76 @@ class ParallelApplyTests(unittest.TestCase):
         self.assertTrue(staged)
         self.assertTrue(all(t.is_file() for t, _ in staged))
         self.assertIn('SHA-256', str(caught.exception))
+
+
+class _StageEnvironmentSeen(Exception):
+    """Stops build.main() where its stage environment is complete (at the prerequisites, before any stage)."""
+
+
+class ReusePlanEnvironmentTests(unittest.TestCase):
+    """BUILD-REUSE-PLAN-ENV-36: the reuse plan's stage environment is the build's, option for option, so the
+    plan cannot drift from the build again (an AMIWIND_* export added to main() alone fails here)."""
+
+    ARGVS = ([], ['--developer-mode'], ['--builder', 'legacy'], ['--anim-kit', 'off'], ['--npc-root-rule', 'morrowind'],
+             ['--actor-search', 'near'], ['--coord-range', 'narrow', '--builder', 'legacy'], ['--stair-walk', 'all'], ['--lava', 'static'],
+             ['--model-hull', 'compiled'], ['--chim-frame-ext', 'bsp'])
+
+    @staticmethod
+    def keyed():
+        return {key: value for key, value in os.environ.items()
+                if key.startswith(build_cache.ENV_PREFIX) and key not in build_cache.IGNORED_ENV}
+
+    def build_environment(self, argv):
+        import build_preflight
+        import previous_release
+        seen = {}
+
+        def stop(*_args, **_kwargs):
+            seen.update(self.keyed())
+            raise _StageEnvironmentSeen()
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(build, 'prerequisites', side_effect=stop), \
+                patch.object(build_preflight, 'run', return_value=[]), \
+                patch.object(build_preflight, 'grounding_problems', return_value=[]), \
+                patch.object(build_preflight, 'free_space_problems', return_value=[]), \
+                patch.object(previous_release, 'require_previous_release', return_value=None), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(_StageEnvironmentSeen):
+                build.main([*argv, '--workspace', tmp, '--check'])
+        return seen
+
+    def plan_environment(self, argv):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(io.StringIO()):
+            build.plan_stage_environment([*argv, '--workspace', tmp, '--check'])
+        return self.keyed()
+
+    def test_the_plan_sets_the_stage_environment_the_build_sets(self):
+        for argv in self.ARGVS:
+            with self.subTest(argv=argv):
+                with patch.dict(os.environ, {}, clear=False):
+                    for key in [key for key in os.environ if key.startswith(build_cache.ENV_PREFIX)]:
+                        del os.environ[key]
+                    built = self.build_environment(argv)
+                with patch.dict(os.environ, {}, clear=False):
+                    for key in [key for key in os.environ if key.startswith(build_cache.ENV_PREFIX)]:
+                        del os.environ[key]
+                    planned = self.plan_environment(argv)
+                self.assertTrue(built)
+                self.assertEqual(planned, built)
+
+    def test_the_plan_takes_the_recorded_command_then_the_flags_after_the_separator(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp)
+            (run / 'build-state.json').write_text(json.dumps({'build_argv': ['--npc-root-rule', 'morrowind']}))
+            with patch.dict(os.environ):
+                source = build.reuse_plan_environment(run)
+                self.assertEqual(os.environ['AMIWIND_NPC_ROOT_RULE'], 'morrowind')
+                self.assertIn('recorded', source)
+                source = build.reuse_plan_environment(run, ['--npc-root-rule', 'legacy'])
+                self.assertEqual(os.environ['AMIWIND_NPC_ROOT_RULE'], 'legacy')
+                self.assertIn('after --', source)
+            (run / 'build-state.json').write_text('{}')
+            with patch.dict(os.environ):
+                self.assertIn('defaults', build.reuse_plan_environment(run))
+            with self.assertRaises(ValueError):
+                build.reuse_plan_environment(run, ['--no-such-option'])

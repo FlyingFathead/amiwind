@@ -18,6 +18,7 @@ from pathlib import Path
 import struct
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import patch
@@ -276,6 +277,14 @@ def started_at(item):
     return name, began
 
 
+def called_in_order(item):
+    name, seconds, log = item
+    with open(log, 'a', encoding='utf-8') as handle:
+        handle.write(name + '\n')
+    time.sleep(seconds)
+    return name
+
+
 class LargestFirst(unittest.TestCase):
     def test_ordered_map_takes_its_cost_history_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -292,11 +301,17 @@ class LargestFirst(unittest.TestCase):
                 self.assertLess(recorded['light'], 1.0)                                # this run's times recorded
 
     def test_completed_map_submits_by_cost(self):
-        items = [('a', .2), ('b', .2), ('c', .2), ('d', .2)]
+        # The order of the calls, not their clock readings: with two workers 'c' cannot be called before
+        # 'b' or 'd' has returned, while a worker delayed on a loaded host can read its clock late
+        # (TESTS-SUPERVISOR-START-CLOCK-46). The workers are processes, so each call appends to a file.
         weight = {'a': 1, 'b': 4, 'c': 2, 'd': 3}
-        rows = list(build_parallel.completed_map(started_at, items, 2, cost=lambda item: weight[item[0]]))
-        began = sorted(rows, key=lambda r: r[1])
-        self.assertEqual({began[0][0], began[1][0]}, {'b', 'd'})
+        with tempfile.TemporaryDirectory() as tmp:
+            log = str(Path(tmp, 'calls'))
+            items = [(name, .2, log) for name in 'abcd']
+            rows = list(build_parallel.completed_map(called_in_order, items, 2, cost=lambda item: weight[item[0]]))
+            calls = Path(log).read_text().split()
+        self.assertEqual(sorted(rows), ['a', 'b', 'c', 'd'])
+        self.assertEqual(set(calls[:2]), {'b', 'd'})
 
     def test_region_frames_weigh_their_source_cells(self):
         from chim import build as chim_build

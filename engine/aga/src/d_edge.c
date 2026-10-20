@@ -46,7 +46,8 @@ vec3_t		transformed_modelorg;
 void D_DrawSolidSurface(surf_t *surface,int color);
 void D_DrawBackground(surf_t *surface)
 {
-    extern int r_backgroundsky;espan_t *span;short *z;int i;
+    extern int r_backgroundsky;espan_t *span;short *z;int i;double sky_t0;
+    AW_RT_BEGIN(sky_t0);
     d_zistepu=0;d_zistepv=0;d_ziorigin=-0.9f;
     if(r_backgroundsky && r_skysource){
         if(!r_skymade)R_MakeSky();
@@ -55,9 +56,11 @@ void D_DrawBackground(surf_t *surface)
             z=d_pzbuffer+span->v*d_zwidth+span->u;
             for(i=0;i<span->count;i++)z[i]=AW_SKY_BACKGROUND_DEPTH;
         }
+        AW_RT_END(RT_SKY, sky_t0);
         return;
     }else D_DrawSolidSurface(surface,(int)r_clearcolor.value & 0xFF);
     D_DrawZSpans(surface->spans);
+    AW_RT_END(RT_SKY, sky_t0);
 }
 
 /*

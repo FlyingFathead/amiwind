@@ -19,7 +19,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -122,8 +122,15 @@ FS-UAE frames with clouds.
 ## Prevention
 
 - The image step refuses the fallback (above).
-- Proposed: check the palette fingerprint right after the `census` stage, minutes into a build instead of in the
-  image step.
+- Every stand-in asset, not only the sky, goes through one rule (`tools/placeholder_policy.py`): a stand-in
+  shared sky, night sky, night-windows table, interface font, startup-screen font or intro video stops the image
+  step, naming the unit, each input with its SHA-256 and the reason, instead of a warning line. A test build can
+  let a named one through with `--allow-placeholder NAME` (refused for release candidates and finals, recorded in
+  the image receipt as `placeholders_allowed`). A stand-in that every build ships today because of an open bug
+  (the empty night-windows table, [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md)) is printed and
+  recorded with that bug instead of stopping the build; once the bug is fixed it stops the build again.
+- The earlier proposal (check the palette right after the `census` stage) is no longer needed: since the
+  palette-matched method every palette gets the cloud sky, so there is nothing left to catch early.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

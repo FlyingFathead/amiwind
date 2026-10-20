@@ -9,7 +9,7 @@
 | Where | CHIM collision of ex_redoran_steps_02, ex_hlaalu_steps_07, ex_ropebridge_2048_01 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.43 (last seen) |
+| Persists in | fixed in v0.0.44 |
 | Severity | high: 39 cells wait: the towns Ald-ruhn, Buckmoth Legion Fort, Maar Gan and Suran stay classic until their stairs walk |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Stairs and collision on CHIM worlds ([CHIM Engine tracker](CHIM_TRACKER.md)) |

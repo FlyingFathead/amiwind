@@ -181,11 +181,35 @@ def connected_components(v,f):
 
 HOLE_AREA=32.  # uncovered square units that make a flat collision piece authored plates (STAIRS-EBONHEART-CHIM-36)
 
+STEP_LOSS_TOLERANCE=.05  # surface_loss_depth: a point this close to a piece is on it (stored hulls are rounded)
+STEP_LOSS_REACH=64.  # surface_loss_depth looks this far around a piece (units); a point no piece reaches counts as this deep
+SURFACE_LOSS=.5  # a convex piece's reduced hull may leave its walkable surface at most this deep (CHIM-VIVEC-DOCK-WALKWAY-43)
 UNDERSIDE_DEPTH=1.  # a convex piece reaching more than this below an authored downward surface of its own closes space
 UNDERSIDE_NZ=-.69    # downward-facing: a surface a player can stand under (the walkable normal, mirrored)
 UNDERSIDE_ABOVE=.25  # and solid just above it: the surface is the underside of something (not a top wound downward)
 
-def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False,underside=None,underside_split=False):
+def surface_hull(candidate,held,surface_loss):
+ """The hull of a convex piece that holds its walkable surface (held: the piece's walkable_samples) within
+ surface_loss as surface_loss_depth measures it, from as few points as that needs (CHIM-HULL-SURFACE-HEAP-46): start
+ from the extreme points (candidate); while a held point lies deeper than surface_loss over the piece (or beside it),
+ add for every hull facet the farthest such point beyond it (the quickhull step with a tolerance). The rule as first
+ shipped (CHIM-VIVEC-DOCK-WALKWAY-43) took the hull of ALL the points of such a piece, walls, undersides and cliff
+ faces included, every corner of a rock, a root or a ruin a hull corner: on the 484 meshes of
+ config/collision-hull-surface.json the placed models' planes, nodes and clipnodes grew the active ring of 1,196 of
+ 1,351 v0.0.46-dev1 frames, six past the CHIM zone. Only the walkable surface sinks the player (the dock's planks); the
+ sides keep the reduced hull every other mesh has. Returns (points, hull)."""
+ q=np.asarray(candidate,float)
+ while True:
+  hull=ConvexHull(q)
+  if not len(held):return q,hull
+  bad=held[piece_depth(held,hull.equations)>surface_loss]
+  if not len(bad):return q,hull
+  d=bad@hull.equations[:,:3].T+hull.equations[:,3]
+  far=np.argmax(d,axis=0);far=far[d[far,np.arange(d.shape[1])]>0]
+  q=np.unique(np.vstack((q,bad[far])),axis=0)
+
+def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False,underside=None,underside_split=False,
+                    surface_loss=None,surface_points='walkable'):
  """Convex proxies of a collision mesh: each connected component, split at its median while the convex hull
  closes source surface deeper than tolerance. plates: a list to collect the positions of authored plates that
  replace a piece (they need exact standing bevels); with it, a flat component whose hull covers more than
@@ -197,7 +221,15 @@ def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False,underside=None
  more than that depth below it (the underside of a slab a walkway runs under, whichever piece the slab is in)
  becomes the authored plates of its triangles: the convex proxy closed the space under it (CHIM-VOS-TEMPLE-WALKWAY-41; the general rule that replaces the name list
  of town_regions.UNDERPASS_NAMES); with underside_split such a piece is split further first and only a piece that
- cannot be split becomes plates. Without plates: the convex proxies only."""
+ cannot be split becomes plates. Without plates: the convex proxies only.
+
+ Each piece's hull is first built from its extreme points along 14 fixed directions (fewer hull planes). That hull
+ can lie inside the source surface: a walkway that runs level and then slopes down (ex_v_dock_01) keeps only the
+ corners of its deck, and the hull's top cuts the bend as a chord up to 19 units under the planks the player walks
+ on (CHIM-VIVEC-DOCK-WALKWAY-43). With surface_loss (units; the CHIM model builder: SURFACE_LOSS) a piece whose
+ extreme-point hull leaves a point of its walkable surface more than that outside gets points of that surface added
+ until none is (surface_hull; CHIM-HULL-SURFACE-HEAP-46); with surface_points 'all' (the rule as first shipped) a
+ piece whose extreme-point hull leaves any of its points more than that outside keeps the hull of all its points."""
  results=[];tris=v[f[:,:3],:3]*.25
  ceilings=_ceiling_samples(tris) if underside and plates is not None else None
  def as_plates(ids):
@@ -212,8 +244,15 @@ def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False,underside=None
    normal=axes[-1];p=np.vstack((p-normal*.2,p+normal*.2))
   dirs=np.array([(x,y,z) for x in (-1,1) for y in (-1,1) for z in (-1,1)]+[(1,0,0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)])
   choice=np.unique(np.argmax(p@dirs.T,axis=0));candidate=p[choice]
-  if len(candidate)>=4 and np.linalg.matrix_rank(candidate-candidate[0])==3:p=candidate
-  hull=ConvexHull(p)
+  if len(candidate)>=4 and np.linalg.matrix_rank(candidate-candidate[0])==3:
+   hull=ConvexHull(candidate)
+   if surface_loss is None:p=candidate
+   elif surface_points=='all':
+    # the rule as first shipped: every point of the piece within surface_loss, else the hull of all its points
+    if float((p@hull.equations[:,:3].T+hull.equations[:,3]).max())<=surface_loss:p=candidate
+    else:hull=ConvexHull(p)
+   else:p,hull=surface_hull(candidate,walkable_samples(tris[ids]),surface_loss)
+  else:hull=ConvexHull(p)
   if plates is not None and flat:
    t=tris[ids];area=float(np.linalg.norm(np.cross(t[:,1]-t[:,0],t[:,2]-t[:,0]),axis=1).sum())/2
    if hull.volume/.4-area>HOLE_AREA:
@@ -238,6 +277,52 @@ def collision_parts(v,f,tolerance=2,plates=None,fill_plates=False,underside=None
   results.append((p,hull,ids,error))
  for ids in connected_components(v,f):split(ids,0)
  return results
+
+def surface_loss_depth(v,f,pieces):
+ """How deep the walkable source surface of a collision mesh lies above its convex pieces (CHIM-VIVEC-DOCK-WALKWAY-43):
+ over the corners and centres of its walkable faces (normal z at least WALKABLE_Z, at least 2 square units), the
+ largest vertical distance from such a point down to the top of the pieces under it (0 for a point inside or on a
+ piece; STEP_LOSS_REACH when no piece is under it within that reach). The player stands that much lower than the
+ surface (a walkway deck the pieces cut as a chord: the Vivec docks, 18.7 units), and the next edge is that much
+ higher: the builder gate fails a mesh over STEP_HEIGHT. Plates (authored surfaces) hold their own points; a mesh
+ without walkable faces or pieces: 0."""
+ if not pieces:return 0.
+ pts=walkable_samples(v[f[:,:3],:3]*.25)
+ if not len(pts):return 0.
+ depth=np.full(len(pts),STEP_LOSS_REACH);e=STEP_LOSS_TOLERANCE
+ for points,hull,_,_ in pieces:
+  points=np.asarray(points,float)
+  eq=hull.equations if hull is not None else ConvexHull(points).equations
+  lo=points.min(axis=0);hi=points.max(axis=0)
+  sel=np.flatnonzero((pts[:,0]>=lo[0]-e)&(pts[:,0]<=hi[0]+e)&(pts[:,1]>=lo[1]-e)&(pts[:,1]<=hi[1]+e)
+                     &(pts[:,2]>=lo[2]-e)&(pts[:,2]-STEP_LOSS_REACH<=hi[2]))
+  if not len(sel):continue
+  depth[sel]=np.minimum(depth[sel],piece_depth(pts[sel],eq))
+ return float(depth.max())
+
+def walkable_samples(tris):
+ """The points surface_loss_depth measures on a mesh's triangles (converter units): the corners and centres of its
+ walkable faces (normal z at least WALKABLE_Z, at least 2 square units)."""
+ from player_hull import WALKABLE_Z
+ n=np.cross(tris[:,1]-tris[:,0],tris[:,2]-tris[:,0]);a=np.linalg.norm(n,axis=1)
+ nz=np.zeros(len(tris));ok=a>1e-6;nz[ok]=n[ok,2]/a[ok]
+ walk=tris[ok&(nz>=WALKABLE_Z)&(a/2>=2.)]
+ if not len(walk):return np.zeros((0,3))
+ return np.unique(np.concatenate([walk.reshape(-1,3),walk.mean(axis=1)]),axis=0)
+
+def piece_depth(p,eq):
+ """surface_loss_depth of points p over one convex piece (hull equations eq): 0 on or in it (within
+ STEP_LOSS_TOLERANCE of every plane), the vertical distance down to its top when the point is over it (its column's
+ side planes within the tolerance), else STEP_LOSS_REACH."""
+ e=STEP_LOSS_TOLERANCE
+ held=(p@eq[:,:3].T+eq[:,3]).max(axis=1)<=e
+ r=-(p[:,:2]@eq[:,:2].T+eq[:,3]);c=eq[:,2];side=np.abs(c)<=.05
+ with np.errstate(divide='ignore',invalid='ignore'):
+  up=np.where((c>.05)[None,:],r/c[None,:],np.inf).min(axis=1)
+  dn=np.where((c<-.05)[None,:],r/c[None,:],-np.inf).max(axis=1)
+ inside=(np.where(side[None,:],(p@eq[:,:3].T+eq[:,3]),-np.inf).max(axis=1)<=e)
+ column=inside&(up>=dn-1e-6)&(dn<=p[:,2]+e)
+ return np.where(held,0.,np.where(column,np.maximum(p[:,2]-np.minimum(up,p[:,2]),0.),STEP_LOSS_REACH))
 
 def _ceiling_samples(t):
  """Sample points of every downward-facing triangle of a mesh (normal z at most UNDERSIDE_NZ): its centre and the
@@ -317,6 +402,49 @@ def collision_pieces(v,f,profile,stairs=None,visible=None):
   # whose walkers need them: CHIM models (chim.build) and rooms (prepare_interior); legacy open-world maps keep
   # the classic proxies and their clip-node budget (BUILD-FLORA-STAIR-PLATES-BUDGET-36)
   return collision_pieces_classic(v,f,profile,stairs)
+ if profile.get('hull_surface_loss') is not None and profile.get('hull_surface_points','walkable')=='walkable':
+  # CHIM-HULL-SURFACE-HEAP-46: the pieces hold their walkable surface (surface_hull). Where the stair rules then
+  # change a piece and leave walkable faces more than a step over what remains (ex_dae_ruin_entry: one point 49.7
+  # units, after the slanted-riser cut), those faces become authored plates (exact standing bevels), as Morrowind
+  # collides with them; the rule as first shipped (the hull of all a piece's points) only if plates do not hold them
+  from player_hull import STEP_HEIGHT
+  pieces,exact,note=_collision_pieces_visible(v,f,profile,stairs,visible)
+  # (ramps the visible-tread rule replaces on purpose are not walked: chim.build.hull_surface_gate does not measure them)
+  if 'visible plates' in str(note) and ' 0 ramp plates' not in str(note):return pieces,exact,note
+  deep=deep_walkable_triangles(v,f,pieces,STEP_HEIGHT)
+  if not deep:return pieces,exact,note
+  plates=shell_collision_parts(v,f[np.array(sorted(deep),int)])
+  held=pieces+plates
+  if not deep_walkable_triangles(v,f,held,STEP_HEIGHT):
+   if exact is not True:
+    exact=frozenset(exact or ())|frozenset(range(len(pieces),len(held)))
+   extra='%d walkable faces the stair rules left more than a step over the pieces made authored plates'%len(deep)
+   return held,exact,(extra if not note else note+'; '+extra)
+  pieces,exact,note=_collision_pieces_visible(v,f,dict(profile,hull_surface_points='all'),stairs,visible)
+  extra='hull of all points (the walkable-surface hulls left walkable collision more than a step under the pieces)'
+  return pieces,exact,(extra if not note else note+'; '+extra)
+ return _collision_pieces_visible(v,f,profile,stairs,visible)
+
+def deep_walkable_triangles(v,f,pieces,limit):
+ """The walkable faces (walkable_samples' faces, by index into f) with a corner or centre more than limit over the
+ pieces as surface_loss_depth measures it."""
+ from player_hull import WALKABLE_Z
+ if not pieces:return set()
+ tris=v[f[:,:3],:3]*.25
+ n=np.cross(tris[:,1]-tris[:,0],tris[:,2]-tris[:,0]);a=np.linalg.norm(n,axis=1)
+ nz=np.zeros(len(f));ok=a>1e-6;nz[ok]=n[ok,2]/a[ok]
+ walk=np.flatnonzero(ok&(nz>=WALKABLE_Z)&(a/2>=2.))
+ if not len(walk):return set()
+ pts=np.concatenate([tris[walk].reshape(-1,3),tris[walk].mean(axis=1)])
+ owner=np.concatenate([np.repeat(walk,3),walk])
+ depth=np.full(len(pts),STEP_LOSS_REACH)
+ for points,hull,_,_ in pieces:
+  eq=hull.equations if hull is not None else ConvexHull(np.asarray(points,float)).equations
+  depth=np.minimum(depth,piece_depth(pts,eq))
+ return set(int(t) for t in owner[depth>limit])
+
+def _collision_pieces_visible(v,f,profile,stairs=None,visible=None):
+ """collision_pieces with the stair-plate rules and the visible-tread rule."""
  pieces,exact,note=_collision_pieces_stairs(v,f,profile,stairs)
  mode=stair_mitigation_mode() if stairs is None else stairs
  if visible is None or not profile.get('visible_treads') or mode=='off' or not pieces or profile.get('collision_none'):
@@ -341,6 +469,9 @@ def _collision_pieces_stairs(v,f,profile,stairs=None):
  if profile.get('collision_none'):
   return [],False,'explicit nonsolid source/category policy'
  exact=bool(profile.get('exact_collision_bevels'))
+ # the reduced hull of a piece may not lie under its source surface (CHIM-VIVEC-DOCK-WALKWAY-43; profile hull_surface_loss)
+ loss={} if profile.get('hull_surface_loss') is None else {'surface_loss':profile['hull_surface_loss'],
+                                                            'surface_points':profile.get('hull_surface_points','walkable')}
  mode=stair_mitigation_mode() if stairs is None else stairs
  if profile.get('hollow_collision'):
   # Authored surface plates of a mesh with stairs need exact standing bevels:
@@ -362,7 +493,7 @@ def _collision_pieces_stairs(v,f,profile,stairs=None):
   # authored collision surfaces with exact bevels, as the name list did for the Velothi temples
   samples=_ceiling_samples(v[f[:,:3],:3]*.25)
   if len(samples) and any(_closes_under_ceiling(hull,samples,whole) for _,hull,_,_ in
-                          collision_parts(v,f,profile.get('collision_tolerance',2))):
+                          collision_parts(v,f,profile.get('collision_tolerance',2),**loss)):
    shell,toes=plate_toes(v,f,shell_collision_parts(v,f),mode)
    return shell,True,('authored collision surfaces: a convex piece fills more than %g units under an authored '
                       'ceiling' % whole)+(f'; {toes} steep toes cut to vertical steps' if toes else '')
@@ -370,7 +501,7 @@ def _collision_pieces_stairs(v,f,profile,stairs=None):
  if limit is not None:
   # measured on the plain convex proxies: the plates below would hide the deep fill this test is for (the Vivec
   # palace stairs, ex_vivec_ps_01, close 9.05 units and keep all their authored surfaces)
-  fill=max((error for _,_,_,error in collision_parts(v,f,profile.get('collision_tolerance',2))),default=0.)
+  fill=max((error for _,_,_,error in collision_parts(v,f,profile.get('collision_tolerance',2),**loss)),default=0.)
   if fill>limit:
    shell,toes=plate_toes(v,f,shell_collision_parts(v,f),mode)
    return shell,True,('authored collision surfaces: convex approximation closes '
@@ -379,7 +510,8 @@ def _collision_pieces_stairs(v,f,profile,stairs=None):
  # the fill test of the stair rule only on meshes with stairs (mode on): every other mesh keeps its convex proxies
  treads=mode!='off' and bool(len(stair_treads(v,f)))
  pieces=collision_parts(v,f,profile.get('collision_tolerance',2),plates=plates,fill_plates=treads,
-                        underside=profile.get('underside_plates'),underside_split=bool(profile.get('underside_split')))
+                        underside=profile.get('underside_plates'),underside_split=bool(profile.get('underside_split')),
+                        **loss)
  own=[pieces[k] for k in plates]
  notes=[f'authored plates where the convex proxy filled open space ({len(own)} plates)'] if own else []
  stair_plates=frozenset()

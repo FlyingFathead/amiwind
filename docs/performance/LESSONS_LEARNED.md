@@ -1,9 +1,44 @@
 # Performance lessons learned
 
-_Last updated with AmiWind v0.0.41-dev4 (16 October 2026)._
+_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [A walkway fix that weighed on every rock (20 October 2026)](#a-walkway-fix-that-weighed-on-every-rock-20-october-2026)
+- [The ruin that was mostly collision (16 October 2026)](#the-ruin-that-was-mostly-collision-16-october-2026)
+- [What a town frame is spent on (8 October 2026)](#what-a-town-frame-is-spent-on-8-october-2026)
+- [The walls Quake never saw (7 October 2026)](#the-walls-quake-never-saw-7-october-2026)
+- [The file reader we never measured (7 October 2026)](#the-file-reader-we-never-measured-7-october-2026)
+
+<!-- contents end -->
 
 Lessons from measuring AmiWind's loading on the emulated reference machine.
 Newest first.
+
+## A walkway fix that weighed on every rock (20 October 2026)
+
+The player sank to the knees on the Vivec dock walkways, because the convex collision pieces lost the surface they
+were cut from. The repair (CHIM-VIVEC-DOCK-WALKWAY-43) went into the shared converter, as it should, and covered
+the 484 mesh types with the same loss. But it gave every piece the hull of all its points: walls, undersides and
+every rock corner, not only the surface the player stands on. Island-wide that added about 55 MB of stored planes
+and nodes and 11 MB of collision; 1,196 of 1,351 frames grew, and six went over the memory zone. The first full
+build to carry it failed at its heap gate after 2 h 38 min (CHIM-HULL-SURFACE-HEAP-46).
+
+What we learned:
+
+- A fix in the shared converter must be measured where it costs, not only where it helps. The walkway fix was
+  checked at the walkway; its memory estimate counted one kind of collision node and promised +110 KB.
+- A heap check on the tightest frames takes minutes. `tools/chim_heaviest_frames.py` now lists them for a quick
+  `chim_build` check before a converter change merges; run on the previous world, it names exactly the six frames
+  that failed.
+- Only what the player stands on needs to be exact. Pieces now keep their walkable surface and give the sides the
+  cheaper hull: the added planes fall by about two thirds, and the walkway still holds the player.
+- One visible trade was made to fit the last frame, by the maintainer's decision: collision-free kelp and grass
+  copies are rounded to 0.1 of scale (at most 5 % of their drawn size) so copies share one model (`--scale-snap`,
+  on by default, can be switched off). It is checked in the v0.0.46-dev1 playtest.
+- The deeper answer is not to guess at collision and then measure it, but to build it from what the game already
+  says (see the roadmap, "Collision from what the game already knows").
 
 ## The ruin that was mostly collision (16 October 2026)
 

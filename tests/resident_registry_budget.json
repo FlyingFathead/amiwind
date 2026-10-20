@@ -3,13 +3,13 @@
  "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.",
  "totals": {
   "commands": {
-   "count": 271,
-   "hunk_bytes": 8672
+   "count": 272,
+   "hunk_bytes": 8704
   },
   "cvars": {
-   "count": 332,
-   "static_bytes": 7968,
-   "zone_bytes": 10848
+   "count": 333,
+   "static_bytes": 7992,
+   "zone_bytes": 10880
   },
   "tables": {
    "count": 0,
@@ -31,7 +31,8 @@
   "2026-10-17: UI-INVENTORY-PREVIEW-STILL-42, maintainer-ordered still inventory picture (rendered once per equipment change): aw_inventory_preview_live, one saved cvar keeping the old live, turnable preview selectable, default off (DON'T DELETE ANY METHOD).",
   "2026-10-17: SKY-STAR-TWINKLE-LATE-42, maintainer-requested star twinkle switch (TG 2026-10-17 12:51: config flag on/off, default on, minimal strength): aw_star_twinkle, one saved cvar (24 structure bytes, 32 zone bytes); dbg startwinkle reuses the on-disk catalogue. 0 keeps the stars steady, 1 is the unchanged default pulse.",
   "2026-10-17: the maintainer-requested debug torch (test only) while AmiWind is a preview (TG 12:42): aw_debug_torch, one cvar set by the builder's game config (1 until the final game, not saved), decides whether the player leaves the census office with the never-burning torch; the grant, the catalogue row and the lit torch need no command or static table.",
-  "2026-10-17: maintainer-ordered automatic use of extra Fast RAM (v0.0.42-rc1, docs/ROADMAP.md cache plan: \"the benefits come automatically\", with an Options setting to turn it off for good): aw_autoram, one saved cvar (24 structure bytes, 32 zone bytes) behind Options > Extra RAM; no command (the startup notice's key and the chim command's memory line need none)."
+  "2026-10-17: maintainer-ordered automatic use of extra Fast RAM (v0.0.42-rc1, docs/ROADMAP.md cache plan: \"the benefits come automatically\", with an Options setting to turn it off for good): aw_autoram, one saved cvar (24 structure bytes, 32 zone bytes) behind Options > Extra RAM; no command (the startup notice's key and the chim command's memory line need none).",
+  "2026-10-20: SKY-REDMOUNTAIN-BLUE-44 (v0.0.45 known list, fix job on branch v0.0.46-sky-pedestal): region weather needs aw_weather, one saved cvar (default 1 = the region weather; 0 = the old clear sky everywhere, the earlier method kept selectable) and aw_weather_set, one command record (dbg weather: force a weather for in-game checks, status with the region chances). Raised on the worker branch; the maintainer approves it at merge."
  ],
  "entries": {
   "commands": [
@@ -208,6 +209,7 @@
    "aw_view_zoom",
    "aw_viewdistance_cycle",
    "aw_wait",
+   "aw_weather_set",
    "aw_worldbounds",
    "aw_worldmap",
    "ban",
@@ -480,6 +482,7 @@
    "aw_view_vanity",
    "aw_voice_dialogue_display_style",
    "aw_warm_light",
+   "aw_weather",
    "aw_world_bounds",
    "bgmbuffer",
    "bgmvolume",

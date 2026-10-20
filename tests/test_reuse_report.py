@@ -103,6 +103,68 @@ class ReuseReportTests(unittest.TestCase):
         self.assertEqual((rows['hands']['class'], rows['hands']['cause']),
                          ('UNEXPECTED', 'refused with identical outputs'))
 
+    def test_a_rebuild_explained_only_by_scheduling_code_or_version_stops_the_build(self):
+        """BUILD-REUSE-SCHEDULER-TOP-45 (JOB_PREAMBLE rule 75c): the v0.0.45 release build planned 16 rebuilds as
+        EXPECTED for 'sources (tools/build_parallel.py)' alone. A rebuild whose own changed inputs are only the pool
+        scheduling modules, VERSION (for a stage that does not write it into its outputs) or docs is refused before
+        any stage runs, like an over-broad key; a real file beside them, a real upstream change, and VERSION for a
+        stage that stamps it still explain a rebuild."""
+        changed = ['tools/build_parallel.py', 'tools/stair_parallel.py', 'VERSION', 'tools/prepare_scenery.py',
+                   'tools/census.py']
+        old_sources = {path: 'a' for path in changed + ['docs/BUGS.md']}
+        files = {path: 'b' for path in changed}
+        files['docs/BUGS.md'] = 'b'
+
+        def keyed(paths, value):
+            return {'sources': {'by_file': {path: value for path in paths}}}
+        stages = {
+            'world-survey': ['tools/build_parallel.py'],
+            'image-walk': ['tools/stair_parallel.py', 'docs/BUGS.md'],
+            'npc-gallery': ['VERSION'],
+            'chim': ['VERSION'],
+            'scenery': ['tools/build_parallel.py', 'tools/prepare_scenery.py'],
+            'census': ['tools/census.py'],
+        }
+        old = {name: keyed(paths, 'u1') for name, paths in stages.items()}
+        new = {name: keyed(paths, 'u2') for name, paths in stages.items()}
+        reasons = {name: 'changed: sources (%s)' % ', '.join(paths) for name, paths in stages.items()}
+        # a dependant of a stage rebuilt for scheduling alone, and one of a real change
+        for name, dep in (('scene', 'world-survey'), ('harvest', 'census')):
+            old[name] = dict(keyed(['tools/build_parallel.py'], 'u1'), dependencies={dep: 'f1'})
+            new[name] = dict(keyed(['tools/build_parallel.py'], 'u2'), dependencies={dep: 'f2'})
+            reasons[name] = 'changed: dependency %s, sources (tools/build_parallel.py)' % dep
+        order = ['world-survey', 'image-walk', 'npc-gallery', 'chim', 'scenery', 'census', 'scene', 'harvest']
+        result = reuse_report.preflight(order, reasons, new, old, old_sources, files)
+        rows = {row['stage']: (row['class'], row['cause']) for row in result['rows']}
+        refused = ('UNEXPECTED', reuse_report.SCHEDULING_OR_VERSION)
+        self.assertEqual(rows['world-survey'], refused)
+        self.assertEqual(rows['image-walk'], refused)
+        self.assertEqual(rows['npc-gallery'], refused)
+        self.assertEqual(rows['scene'], refused)
+        self.assertEqual(rows['chim'], ('EXPECTED', 'input change'))       # writes the version into its outputs
+        self.assertEqual(rows['scenery'], ('EXPECTED', 'input change'))    # a real file beside the scheduler
+        self.assertEqual(rows['census'], ('EXPECTED', 'input change'))
+        self.assertEqual(rows['harvest'], ('EXPECTED', 'input change'))    # follows a real change upstream
+        self.assertEqual(sorted(result['too_broad']), ['image-walk', 'npc-gallery', 'scene', 'world-survey'])
+        with contextlib.redirect_stdout(io.StringIO()) as text:
+            reuse_report.print_preflight(result)
+        self.assertIn('stopping before any stage runs', text.getvalue())
+        self.assertIn('only pool scheduling code, VERSION or docs changed: tools/build_parallel.py', text.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as text:
+            reuse_report.print_preflight(result, accepted=True)
+        self.assertIn('accepted with --accept-rebuild', text.getvalue())
+        # the post-build reuse audit classes it the same way
+        with tempfile.TemporaryDirectory() as temp:
+            run, old_run = Path(temp) / 'new', Path(temp) / 'old'
+            state(run, old_run, ['world-survey'], {}, {'world-survey': 'changed: sources (tools/build_parallel.py)'})
+            code, text = self.audit(run)
+        self.assertEqual(code, 1)
+        self.assertIn(reuse_report.SCHEDULING_OR_VERSION, text)
+
+    def test_the_scheduling_files_are_the_modules_of_the_scheduling_units(self):
+        self.assertEqual(reuse_report.SCHEDULING_FILES,
+                         {path for path, _ in build_cache.SCHEDULING_UNITS | build_cache.SCHEDULING_CONSTANTS})
+
     def test_preflight_names_the_changed_files_and_flags_keys_the_diff_does_not_explain(self):
         """BUILD-REUSE-KEYS-TOO-BROAD-35: the reuse preflight explains every rebuild by the source diff against the
         reuse source's recorded tree, or by a real input change; a source key that changed with no file changed is

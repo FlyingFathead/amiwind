@@ -43,7 +43,9 @@ enum {
     RC_FAR_DETAIL,      /* front faces the far detail step left out (aw_cull 5, 6) */
     RC_COUNTERS
 };
-enum { RT_WORLD, RT_BMODELS, RT_SCAN, RT_DRAW, RT_ALIAS, RT_VIEW, RT_TIMERS };
+/* RT_SKY: the background sky spans (D_DrawBackground, inside RT_DRAW); RT_FOG: the fog
+ * and day/night sky pixel pass (AW_FogDraw, inside RT_VIEW). */
+enum { RT_WORLD, RT_BMODELS, RT_SCAN, RT_DRAW, RT_ALIAS, RT_VIEW, RT_SKY, RT_FOG, RT_TIMERS };
 
 #ifdef AMIGA
 extern long aw_rcount[RC_COUNTERS];

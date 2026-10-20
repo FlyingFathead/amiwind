@@ -476,6 +476,12 @@ def _worker_main(argv):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else list(argv)
+    # Every worker computes with the builder's one BLAS kernel family (TESTS-HEAD-REDUCER-BYTES-CI-45);
+    # the workers inherit it, and none of them has imported NumPy yet.
+    sys.path.insert(0, HERE)
+    import blas_kernel
+    blas_kernel.pin()
+    del sys.path[0]
     if argv[:1] == ['--worker']:
         # Nothing beyond the standard library is imported before the tests.
         return _worker_main(argv)

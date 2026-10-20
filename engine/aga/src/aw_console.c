@@ -80,6 +80,20 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
             if(n<1 || n>10)return 0;
         }
     }
+    /* dbg fog rule / dbg cut groups: switches in aw_cull's upper bits
+     * (quakedef.h AW_CULL_*), so they need no registry entry of their own;
+     * the far test in the low bits is kept. No argument prints aw_cull. */
+    if(!strcmp(r->command,"aw_cull") && (!strcmp(r->words,"fog rule") || !strcmp(r->words,"cut groups"))){
+        int bit=r->words[0]=='f'?AW_CULL_FOG_RULE:AW_CULL_GROUPS,value=(int)Cvar_VariableValue("aw_cull"),on;
+        if(argc-j>1 || capacity<16)return 0;
+        if(argc==j){strcpy(out,"aw_cull\n");return 1;}
+        token=argv[j];
+        on=!Q_strcasecmp(token,"on") || !Q_strcasecmp(token,"true") || !strcmp(token,"1")?1:
+            !Q_strcasecmp(token,"off") || !Q_strcasecmp(token,"false") || !strcmp(token,"0")?0:-1;
+        if(on<0)return 0;
+        value=on?value|bit:value&~bit;
+        sprintf(out,"aw_cull %d\n",value&AW_CULL_MAX);return 1;
+    }
     used=(int)strlen(r->command);if(used+2>capacity)return 0;
     strcpy(out,r->command);
     /* The appearance-only alias reuses quickchar; no second resident command. */

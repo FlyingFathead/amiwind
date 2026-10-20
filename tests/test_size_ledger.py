@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -99,12 +100,94 @@ class FormatTests(unittest.TestCase):
 
     def test_the_committed_release_baseline_is_a_complete_record(self):
         record = size_ledger.load_record(size_ledger.RELEASE_BASELINE)
-        self.assertEqual(record['version'], '0.0.41')
+        # the record of the previous release, never an older one (BUILD-SIZE-GUARD-OLD-BASELINE-45)
+        self.assertEqual(record['version'], size_ledger.previous_release_version())
         self.assertEqual(record['status'], 'complete')
         self.assertEqual(record['labels'], [])
         self.assertEqual(sum(row['bytes'] for row in record['groups'].values()), record['payload_bytes'])
-        self.assertEqual(size_ledger.gib(record['payload_bytes']), '3.81')
-        self.assertEqual(size_ledger.gib(record['groups']['npc-gallery']['bytes']), '0.21')
+        self.assertEqual(size_ledger.gib(record['payload_bytes']), '2.57')
+        self.assertEqual(size_ledger.gib(record['groups']['npc-gallery']['bytes']), '0.22')
+
+
+class ReleaseRecordTests(unittest.TestCase):
+    """BUILD-SIZE-GUARD-OLD-BASELINE-45: the v0.0.45 release build was compared with the v0.0.41 record (every folder
+    equal to v0.0.44, still 0.44 GiB of CHIM world "growth") and failed its size guard. A build is compared with the
+    previous release's own record: its release build's ledger in the workspace, else the committed record when it
+    is of that release; an older release's record is never compared."""
+
+    def release_run(self, workspace, name, groups_from=BOOT, status='passed', ledger=True):
+        folder = Path(workspace) / name
+        run = make_run(folder, groups_from, version=name.split('_v')[1].split('_')[0])
+        target = Path(workspace) / name
+        built = size_ledger.collect(run)
+        # a run folder as the builder leaves it: build-state.json and size-ledger.json at its top
+        (target / 'build-state.json').write_text(json.dumps({'status': status}))
+        if ledger:
+            (target / size_ledger.FILE_NAME).write_text(json.dumps(built))
+        return target
+
+    def committed(self, folder, version):
+        with tempfile.TemporaryDirectory() as other:
+            record = size_ledger.collect(make_run(other, BOOT, version=version))
+        path = Path(folder) / ('committed-%s.json' % version)
+        path.write_text(json.dumps(dict(record, version=version)))
+        return path
+
+    def test_the_previous_release_build_in_the_workspace_is_the_record(self):
+        with tempfile.TemporaryDirectory() as folder:
+            workspace = Path(folder) / 'build'
+            self.release_run(workspace, '2026_10_19_v0.0.45_release_c9099fb8', status='failed')
+            chosen = self.release_run(workspace, '2026_10_19_v0.0.45_release-try2_c9099fb8')
+            self.release_run(workspace, '2026_10_19_v0.0.45_release-try3_c9099fb8', ledger=False)
+            self.release_run(workspace, '2026_10_19_v0.0.44_release-try2_c84f8506',
+                             groups_from=dict(BOOT, **{'id1/maps/old.bsp': 7}))
+            old = self.committed(folder, '0.0.41')
+            now = make_run(workspace, BOOT, version='0.0.46')
+            path, note = size_ledger.resolve_release_baseline(now, '0.0.45', committed=old)
+            self.assertEqual(path, chosen / size_ledger.FILE_NAME)
+            self.assertIn('v0.0.45 release build 2026_10_19_v0.0.45_release-try2_c9099fb8', note)
+            with patch.object(size_ledger, 'previous_release_version', return_value='0.0.45'):
+                ledger = size_ledger.build_ledger(now, '0.0.46', [], 'fail')
+        self.assertEqual(ledger['comparisons'][0]['version'], '0.0.45')
+        self.assertEqual(ledger['guard']['verdict'], 'passed')
+
+    def test_an_older_release_record_is_never_compared(self):
+        with tempfile.TemporaryDirectory() as folder:
+            workspace = Path(folder) / 'build'
+            old = self.committed(folder, '0.0.41')
+            now = make_run(workspace,
+                           dict(BOOT, **{'id1/maps/f2.chim': GIB // 10}), version='0.0.45')
+            path, note = size_ledger.resolve_release_baseline(now, '0.0.44', committed=old)
+            self.assertIsNone(path)
+            self.assertIn('is of v0.0.41 (a record of another release is not compared)', note)
+            with patch.object(size_ledger, 'previous_release_version', return_value='0.0.44'):
+                ledger = size_ledger.build_ledger(now, '0.0.45', [], 'fail', release_baseline='auto')
+                # the old default: the committed record whatever release it is of
+                old_way = size_ledger.build_ledger(now, '0.0.45', [], 'fail', release_baseline=old)
+        self.assertEqual(ledger['comparisons'], [])
+        self.assertEqual(ledger['guard']['verdict'], 'not-comparable')
+        self.assertIn('release record: no record of v0.0.44', '\n'.join(size_ledger.table_lines(ledger)))
+        self.assertEqual(old_way['guard']['verdict'], 'failed')
+
+    def test_the_committed_record_of_the_previous_release_is_the_fallback(self):
+        with tempfile.TemporaryDirectory() as folder:
+            same = self.committed(folder, '0.0.45')
+            now = make_run(Path(folder) / 'build', BOOT,
+                           version='0.0.46-dev1')
+            path, note = size_ledger.resolve_release_baseline(now, '0.0.45', committed=same)
+        self.assertEqual(path, same)
+        self.assertIn('v0.0.45 committed record', note)
+
+    def test_the_build_is_never_its_own_record(self):
+        with tempfile.TemporaryDirectory() as folder:
+            workspace = Path(folder) / 'build'
+            itself = self.release_run(workspace, '2026_10_19_v0.0.45_release_c9099fb8')
+            self.assertIsNone(size_ledger.release_run_ledger(workspace, '0.0.45', exclude=itself.name))
+            self.assertIsNotNone(size_ledger.release_run_ledger(workspace, '0.0.45'))
+
+    def test_the_previous_release_comes_from_the_pin(self):
+        pin = json.loads((ROOT / 'tools' / 'previous-release.json').read_text(encoding='utf-8'))
+        self.assertEqual(size_ledger.previous_release_version(), pin['version'].lstrip('v'))
 
 
 class ComparabilityTests(unittest.TestCase):

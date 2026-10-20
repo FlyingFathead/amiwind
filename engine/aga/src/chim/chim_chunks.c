@@ -645,6 +645,8 @@ static int LoadCatalogue (int index, long *budget)
 		VectorCopy (r.origin, p->ent.origin);
 		p->ent.angles[YAW] = r.yaw;
 		p->ent.colormap = vid.colormap;
+		/* A piece of a long structure: its structure's cut box (chim_cuts.c). */
+		p->ent.aw_cut_box = ChimCuts_Box (r.pid);
 		Q_SinCosDeg (r.yaw, &p->s, &p->c);
 		/* The record's drawn box (the AW_SceneryCapture box, rounded
 		 * outward) serves efrags and the collision broadphase. */

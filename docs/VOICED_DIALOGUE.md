@@ -2,6 +2,18 @@
 
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Event types](#event-types)
+- [Conversation GREETING is a separate path](#conversation-greeting-is-a-separate-path)
+- [Current AmiWind implementation](#current-amiwind-implementation)
+- [Implementation and verification plan](#implementation-and-verification-plan)
+- [Sources and limits](#sources-and-limits)
+- [Automatic cell-handoff voice continuity candidate](#automatic-cell-handoff-voice-continuity-candidate)
+
+<!-- contents end -->
+
 AmiWind currently auditions one generic voiced HELLO for a small NPC set. The
 source records contain a wider event vocabulary, ordered response records,
 conditions, response scripts and voice-file references. A static match cannot
@@ -91,8 +103,29 @@ first-eligible evaluator and not a claim about the original engine's selector.
 `tools/prepare_npcs.py` currently uses it for three nonblocking town actors,
 converts the chosen owned voice file to mono 11025 Hz unsigned 8-bit PCM, and
 sets one `aw_voice` and one `aw_line` per actor. Current nearby greetings use
-that one line and the authored distance/reset/duration values. Idle, combat,
-crime and conversation dialogue are not wired into this NPC runtime.
+that one line and the authored distance/reset/duration values. Idle, combat
+and crime dialogue are not wired into this NPC runtime.
+
+### Conversation greeting (a talk)
+
+A talk (E) opens with the NPC's conversation greeting, not with its HELLO bark
+([NPC-DREAMER-GREETING-DEFAULT-42](bugs/NPC-DREAMER-GREETING-DEFAULT-42.md)).
+`src/mwad/dialogue.py` picks it at build time with the rule above: the Greeting
+topics in ID order, the first INFO in each that passes the actor, player,
+condition and disposition tests (OpenMW `startDialogue`, `filter.cpp`). The
+conditions are evaluated for a new character meeting the speaker for the first
+time (journals 0, nobody dead, globals at their record values, script locals 0,
+no faction, level 1, no bounty, detected, the original player record's starting
+clothes; disposition fixture 50). Conditions on the player character itself
+(race, sex, attributes, skills) and `Random100` are not known at build time: such
+a line is passed over and the residents report (`talk_greetings`) says so. A
+second pick with `TalkedToPc` 1 gives the line of a later talk. The resident
+writers store them as `aw_greeting` and `aw_greeting_again`; the speaker's text
+defines are filled in at build time, the player's (`%PCName`, `%PCRace`,
+`%PCClass`) by the engine. The talk shows the text in the dialogue box and plays
+no sound, as OpenMW's conversation start; an NPC without such a greeting keeps
+the HELLO line and its voice. Topics, choices and result scripts are not
+implemented.
 
 ## Implementation and verification plan
 

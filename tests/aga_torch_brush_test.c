@@ -25,6 +25,8 @@ extern int r_dlightframecount;
 static mnode_t leaf;
 int AW_ModelVisible(vec3_t point, float radius){return 1;}
 int AW_BrushPassFar(vec3_t origin,float radius,const float *minmaxs){return AW_FAR_DRAW;}
+void AW_FarGroup(const float *box){(void)box;}
+int AW_PassVisible(vec3_t point,float radius){return 1;}
 void AW_FarPassBegin(int result){}
 int aw_far_faces;
 void R_RotateBmodel(void){}

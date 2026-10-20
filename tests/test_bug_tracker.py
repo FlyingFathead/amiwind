@@ -354,45 +354,103 @@ class BugTrackerTest(unittest.TestCase):
         files = [REGISTER, JOURNAL, *sorted(p for p in (DOCS / 'bugs').iterdir() if p.is_file()),
                  *sorted((DOCS / 'bugs' / 'archive').glob('*.json'))]
         files += sorted(DOCS.glob('PATCH-v*.json'))  # whitespace baselines (RELEASE-PATCH-SIZE-33)
-        # 2026-10-11 coordinator: temporary until the second archive rotation (TRACKER-REGISTER-SIZE-36);
-        # bugs.json warns at 85 %, every other file at 75 %; the hard 1 MiB limit is unchanged.
-        # 2026-10-16 register audit: 178 fixed entries rotated into the one archive (79 % of its 256 KiB
-        # limit, one issue per line); it warns at 85 % too until the second archive (TRACKER-REGISTER-SIZE-33).
+        # 2026-10-11 coordinator: bugs.json warned at 85 % until the second archive rotation
+        # (TRACKER-REGISTER-SIZE-36); 2026-10-16 the one archive warned at 85 % too (TRACKER-REGISTER-SIZE-33).
+        # 2026-10-20: the 2026-10-20 register audit took the one archive to 89 % of its 256 KiB limit; the
+        # archive is now one file per found-in range (ARCHIVES in tools/bug_register.py) and the rotation
+        # reaches v0.0.35, so bugs.json is back under 75 % (66 %) and every archive under 35 %. Every tracker
+        # file warns at 75 % again; the hard limits (256 KiB, 1 MiB for the two named files) are unchanged.
+        # A file over the line: split its archive range or move the rotation on, never raise the share.
         def share(p):
-            return 0.85 if p.name == 'bugs.json' or p.parent.name == 'archive' else 0.75
+            return 0.75
         big = ['%s %d of %d' % (p.name, p.stat().st_size, release.text_limit(p.relative_to(ROOT).as_posix()))
                for p in files if p.stat().st_size > share(p) * release.text_limit(p.relative_to(ROOT).as_posix())]
         self.assertEqual(big, [], 'tracker files near the release text limit (tools/release.py)')
 
     def test_old_fixed_bugs_rotate_into_the_frozen_archive(self):
         live = json.loads(bug_register.DATA.read_text(encoding='utf-8'))
-        old = json.loads(bug_register.ARCHIVE.read_text(encoding='utf-8'))
-        self.assertTrue(old, 'the archive is empty')
-        live_ids, old_ids = {b['id'] for b in live}, {b['id'] for b in old}
-        self.assertEqual(live_ids & old_ids, set(), 'an ID is in both bugs.json and the archive')
-        self.assertEqual([b['id'] for b in bug_register.load()], [b['id'] for b in live] + [b['id'] for b in old])
-        self.assertEqual([b['id'] for b in old if not bug_register.archivable(b)], [],
-                         'the archive holds a bug that is open, persisting or newer than v0.0.33')
+        listed = json.loads((ROOT / 'tools' / 'release-files.json').read_text(encoding='utf-8'))
+        for p in bug_register.RETIRED_ARCHIVES:
+            self.assertFalse(p.is_file(), '%s is retired: run bug_register.py render' % p.name)
+            self.assertNotIn(p.relative_to(ROOT).as_posix(), listed)
+        self.assertEqual(sorted(p.name for p in (DOCS / 'bugs' / 'archive').iterdir()),
+                         sorted(p.name for p, _ in bug_register.ARCHIVES), 'an archive file outside ARCHIVES')
+        lasts = [last for _, last in bug_register.ARCHIVES]
+        self.assertEqual(lasts, sorted(set(lasts)), 'archive ranges must rise')
+        self.assertEqual(bug_register.ARCHIVE_UP_TO, lasts[-1])
+        order, previous = [b['id'] for b in live], -1
+        for path, last in bug_register.ARCHIVES:
+            old = json.loads(path.read_text(encoding='utf-8'))
+            self.assertTrue(old, '%s is empty' % path.name)
+            self.assertIn(path.relative_to(ROOT).as_posix(), listed)
+            for b in old:
+                self.assertIn(b['state'], ('fixed', 'closed'))
+                self.assertTrue(bug_register.archivable(b), '%s in %s is open, persisting or too new' % (b['id'], path.name))
+                self.assertEqual(bug_register.archive_for(b), path, b['id'])
+                n = bug_register.found_series(b)
+                self.assertLessEqual(n, last)
+                if previous >= 0:
+                    self.assertGreater(n, previous, b['id'])
+                self.assertTrue(b['report'] is None or (DOCS / b['report']).is_file(), b['id'])
+            order += [b['id'] for b in old]
+            previous = last
+        # load(): bugs.json, then every archive in ARCHIVES order; no ID lost, none twice.
+        self.assertEqual([b['id'] for b in bug_register.load()], order)
+        self.assertEqual(len(order), len(set(order)), 'an ID is in more than one register file')
         self.assertEqual([b['id'] for b in live if bug_register.archivable(b)], [],
-                         'bugs.json holds a fixed bug first found in v0.0.33 or earlier: run bug_register.py render')
-        for b in old:
-            self.assertIn(b['state'], ('fixed', 'closed'))
-            self.assertLessEqual(bug_register.found_series(b), 33)
-            self.assertTrue(b['report'] is None or (DOCS / b['report']).is_file(), b['id'])
-        self.assertIn('docs/bugs/archive/bugs-v0.0.29-v0.0.33.json',
-                      json.loads((ROOT / 'tools' / 'release-files.json').read_text(encoding='utf-8')))
+                         'bugs.json holds a fixed bug first found in v0.0.%d or earlier: run bug_register.py render'
+                         % bug_register.ARCHIVE_UP_TO)
+
+    def test_rotation_into_several_archives_keeps_every_bug_once(self):
+        # TRACKER-REGISTER-SIZE-33: the one archive passed its warning line; the rotation now spreads the
+        # archived bugs over one file per found-in range and retires the old single file.
+        def rec(bug_id, found, state='fixed', **kw):
+            return dict(id=bug_id, state=state, found_in=found, title=bug_id, **kw)
+        two = [{'version': 'v0.0.33', 'at': '2026-10-09'}, {'version': 'v0.0.36-dev3', 'at': '2026-10-11'}]
+        bugs = [rec('OPEN-ROT-32', 'v0.0.32', state='open'), rec('OLD-ROT-27', 'v0.0.27-rc1'),
+                rec('A-ROT-32', 'v0.0.32-dev'), rec('B-ROT-33', 'v0.0.33', state='closed'),
+                rec('C-ROT-35', 'v0.0.35'), rec('NEW-ROT-36', 'v0.0.36'), rec('PERS-ROT-33', 'v0.0.33', reports=two),
+                rec('D-ROT-31', 'v0.0.31'), rec('E-ROT-34', 'v0.0.34-rc1')]
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            data, retired = tmp / 'bugs.json', tmp / 'archive' / 'bugs-old.json'
+            archives = ((tmp / 'archive' / 'a-31.json', 31), (tmp / 'archive' / 'a-33.json', 33),
+                        (tmp / 'archive' / 'a-35.json', 35))
+            retired.parent.mkdir()
+            retired.write_text(bug_register.archive_text([bugs[1]]), encoding='utf-8')
+            data.write_text(bug_register.live_text([b for b in bugs if b['id'] != 'OLD-ROT-27']), encoding='utf-8')
+            before = bug_register.load(data, archives, (retired,), rotate=True)
+            self.assertEqual(sorted(b['id'] for b in before), sorted(b['id'] for b in bugs))
+            bug_register.save(before, data, archives, (retired,), rotate=True)
+            self.assertFalse(retired.is_file(), 'the retired archive is still there')
+            files = {p.name: [b['id'] for b in json.loads(p.read_text(encoding='utf-8'))]
+                     for p in [data] + [p for p, _ in archives]}
+            self.assertEqual(files, {'bugs.json': ['OPEN-ROT-32', 'NEW-ROT-36', 'PERS-ROT-33'],
+                                     'a-31.json': ['D-ROT-31', 'OLD-ROT-27'],
+                                     'a-33.json': ['A-ROT-32', 'B-ROT-33'],
+                                     'a-35.json': ['C-ROT-35', 'E-ROT-34']})
+            after = bug_register.load(data, archives, (retired,), rotate=True)
+            self.assertEqual([b['id'] for b in after], sum(files.values(), []))
+            self.assertEqual(sorted(json.dumps(b, sort_keys=True) for b in after),
+                             sorted(json.dumps(b, sort_keys=True) for b in bugs), 'a record changed in the rotation')
+            # A second save changes nothing (the split is stable).
+            texts = {p: p.read_text(encoding='utf-8') for p in [data] + [p for p, _ in archives]}
+            bug_register.save(after, data, archives, (retired,), rotate=True)
+            self.assertEqual({p: p.read_text(encoding='utf-8') for p in texts}, texts)
+        with self.assertRaises(ValueError):
+            bug_register.archive_for(rec('X-ROT-40', 'v0.0.40'), archives)
 
     def test_rotation_rule(self):
         base = dict(id='BUILD-ROT-33', state='fixed', found_in='v0.0.33-rc1')
         self.assertTrue(bug_register.archivable(base))
         self.assertTrue(bug_register.archivable(dict(base, state='closed')))
         self.assertFalse(bug_register.archivable(dict(base, state='open')))
-        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.34')))
+        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.36')))
         self.assertFalse(bug_register.archivable(dict(base, found_in='unknown', id='AW-20261010-01')))
         two = [{'version': 'v0.0.33', 'at': '2026-10-09'}, {'version': 'v0.0.36-dev3', 'at': '2026-10-11'}]
         self.assertFalse(bug_register.archivable(dict(base, reports=two)), 'a persisting bug stays in bugs.json')
-        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-34', found_in='v0.0.34')])
-        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-34'])
+        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-36', found_in='v0.0.36')])
+        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-36'])
         self.assertEqual([b['id'] for b in old], ['BUILD-ROT-33'])
 
     def test_whitespace_baselines_get_the_named_limit(self):

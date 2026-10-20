@@ -9,7 +9,7 @@
 | Where | image step, tools/chim/frame_map.py actor_contact, Seyda Neen frame |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-rc1, v0.0.40-dev2 (last seen) |
+| Persists in | fixed in v0.0.41 |
 | Severity | critical: The release candidate build stops |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

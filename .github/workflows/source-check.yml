@@ -66,6 +66,8 @@ jobs:
           echo "AMIWIND_TEST_QBSP=$RUNNER_TEMP/amiwind-clean-tools/ericw/bin/qbsp" >> "$GITHUB_ENV"
       - name: Source allowlist and synthetic regression checks
         run: |
+          grep -m1 'model name' /proc/cpuinfo
+          python -c 'import numpy; print("numpy", numpy.__version__, numpy.__config__.CONFIG["Build Dependencies"]["blas"].get("openblas configuration"))'
           python tools/release.py --check
           python -c 'from prepare_scenery import check_nif_reader; check_nif_reader()'
           python tools/run_tests.py -v --module-timeout 900

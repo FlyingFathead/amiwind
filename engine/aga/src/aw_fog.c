@@ -163,7 +163,7 @@ void AW_FogDraw(void) {
         }
     }
     /* aw_cull 7 (debug): mark where the sky ray crosses the horizon. */
-    if((int)aw_cull.value==7)for(x=0;x<w;x++)for(y=r_refdef.vrect.y+1;y<r_refdef.vrect.y+h;y++){
+    if(((int)aw_cull.value&AW_CULL_TEST)==7)for(x=0;x<w;x++)for(y=r_refdef.vrect.y+1;y<r_refdef.vrect.y+h;y++){
         u=(r_refdef.vrect.x+x-((int)vid.width>>1))*step;v=(((int)vid.height>>1)-y)*step;
         if(vpn[2]+u*vright[2]+v*vup[2]<0 && vpn[2]+u*vright[2]+(v+step)*vup[2]>=0)
             vid.buffer[y*vid.rowbytes+r_refdef.vrect.x+x]^=0x80;
@@ -188,7 +188,33 @@ void AW_FogDraw(void) {
  * debug view: the fog-exact test without its colour checks (works with fog
  * off, to see what it leaves out) and the sky ray's horizon marked. */
 static cvar_t aw_cull={"aw_cull","4",true};
+/* aw_cull carries two switches above its far test (bits, so they cost no
+ * registry entry of their own: tests/resident_registry_budget.json):
+ * value = test 0..7 + AW_CULL_FOG_RULE + AW_CULL_GROUPS; dbg fog rule and dbg
+ * cut groups set the bits (aw_console.c), Options > Far detail keeps them.
+ *
+ * The fog rule (AW_CULL_FOG_RULE, dbg fog rule; saved; CHIM-BRIDGE-POP-PIECES-44): no distance cut
+ * nearer than the fog's full-opacity depth. The fog table (AW_FogDepths) ramps
+ * from level 1 at 44 % of the distance to level 15 (every colour one) at the
+ * distance itself, so the size-scaled cut-off (aw_cull 3, 4, 6: 40-85 % of
+ * the distance by size) and the far detail step (aw_cull 5, 6: from 50 %)
+ * left out pieces the fog had not yet hidden: walkway pieces, wall sections
+ * and hillside rocks popping in, a bridge losing its middle. 1: every share
+ * is at least the whole distance (the cut then lies where the fog is opaque;
+ * the picture of aw_cull 1/2 for those presets). 0: the cuts as before
+ * (the method up to v0.0.45), the default until the maintainer's in-game A/B.
+ *
+ * Whole-structure cuts (AW_CULL_GROUPS, dbg cut groups; saved): placements the CHIM builder
+ * found to form one long structure (tools/chim/cuts.py: same mesh family,
+ * touching boxes; Vivec's walkways and cantons, town walls, bridges, the
+ * Ghostfence, hillside rocks) share one cut made on the structure's box
+ * (chim_cuts.c, the frame map's .cut sidecar): drawn, fogged and left out as
+ * one piece. 0: each placement on its own sphere (the method up to v0.0.45),
+ * the default until the maintainer's in-game A/B. */
+#define CULL_MODE ((int)aw_cull.value&AW_CULL_TEST)
 static float far_normal[3],far_distance;
+static int fog_rule;                /* the fog rule this frame (exteriors) */
+static const float *pass_group;     /* the structure box of the current brush pass, NULL: its own */
 /* Brush polygons revisit the same world nodes many times in a frame.
  * Cache only the far-plane decision; PVS and brush sort keys remain untouched. */
 typedef struct {short *bounds;unsigned frame;int visible;} aw_far_cache_t;
@@ -240,7 +266,7 @@ int AW_FogFullDepthValue(int distance) {
 static int fog_exact_begin(int distance) {
     const byte *environment=R_DayNightFogColours();
     int i,w=r_refdef.vrect.width,h=r_refdef.vrect.height,extent=w>h?w:h,limit,flames;byte full;float step;
-    if((int)aw_cull.value==7 && extent>0)goto geometry; /* debug view: the colour checks skipped */
+    if(CULL_MODE==7 && extent>0)goto geometry; /* debug view: the colour checks skipped */
     if(!colours || !aw_fog.value || !environment || extent<=0){AW_RC_ADD(RC_FAR_FOG_WHY,1);return 0;}
     if(aw_skyline_fill.value>0 && w<=SKYLINE_MAX){AW_RC_ADD(RC_FAR_FOG_WHY,2);return 0;}
     full=environment[15<<8];
@@ -266,7 +292,7 @@ geometry:
     return 1;
 }
 void AW_CullBegin(void) {
-    float distance=AW_Interior()?4096:AW_DrawDistance();int mode=(int)aw_cull.value;
+    float distance=AW_Interior()?4096:AW_DrawDistance();int mode=CULL_MODE;
     if(!++far_frame){memset(far_cache,0,sizeof(far_cache));far_frame=1;}
     VectorCopy(vpn,far_normal);
     far_distance=DotProduct(r_origin,far_normal)+distance+16;
@@ -274,6 +300,39 @@ void AW_CullBegin(void) {
     size_cut=AW_Interior()?0:mode==3?1:mode==4 || mode==6?2:0;
     detail_step=!AW_Interior() && (mode==5 || mode==6);
     cut_distance=distance;
+    fog_rule=!AW_Interior() && ((int)aw_cull.value&AW_CULL_FOG_RULE);
+    pass_group=NULL;
+}
+/* The share of the distance past which aw_cull's size cut-off leaves out a
+ * placement of this radius this frame: the preset's, at least 1 under the
+ * fog rule. */
+float AW_SizeCutDepthShare(float radius) {
+    float share=AW_SizeCutShare(size_cut,radius);
+    return fog_rule && share<1?1:share;
+}
+/* r_main.c, before each brush model's passes: the structure box its
+ * placement shares (entity_t aw_cut_box, chim_cuts.c), or NULL. Used only
+ * with whole-structure cuts on (AW_CULL_GROUPS) on an exterior. */
+void AW_FarGroup(const float *box) {
+    pass_group=box && ((int)aw_cull.value&AW_CULL_GROUPS) && !AW_Interior()?box:NULL;
+}
+/* The structure box's view depth range along the far plane's normal. */
+static float group_nearest(const float *box) {
+    float nearest=0;int i;
+    for(i=0;i<3;i++)nearest+=far_normal[i]*box[i+(far_normal[i]<0?3:0)];
+    return nearest;
+}
+static float group_radius(const float *box) {
+    float d[3];int i;
+    for(i=0;i<3;i++)d[i]=box[i+3]-box[i];
+    return .5f*(float)sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+}
+/* A brush pass's far plane test: its structure's box with a structure
+ * (AW_FarGroup), else the placement's own sphere (AW_ModelVisible). */
+int AW_PassVisible(vec3_t origin,float radius) {
+    if(!CULL_MODE)return 1;
+    if(pass_group)return group_nearest(pass_group)<=far_distance;
+    return AW_ModelVisible(origin,radius);
 }
 /* R_Init, before AW_FogInit: a config.cfg saved before aw_cull was saved (up to
  * v0.0.41) holds the picture that player had: Full (1). A fresh install has no
@@ -328,10 +387,14 @@ float AW_SizeCutShare(int preset,float radius) {
  * face tests (<<4) to give AW_FarPassBegin after R_RotateBmodel. */
 int AW_BrushPassFar(vec3_t origin,float radius,const float *minmaxs) {
     float eye,depth,nearest=0,farthest=0,down=0,top=0;int i,faces=0;
-    if(!aw_cull.value)return AW_FAR_DRAW;
+    if(!CULL_MODE)return AW_FAR_DRAW;
     eye=DotProduct(r_origin,far_normal);
     depth=DotProduct(origin,far_normal)-eye;
-    if(size_cut && depth-radius>cut_distance*AW_SizeCutShare(size_cut,radius))return AW_FAR_SIZE;
+    /* A structure's pieces are cut together: the size test on the
+     * structure's box (its nearest depth, its size class). */
+    if(size_cut && pass_group){
+        if(group_nearest(pass_group)-eye>cut_distance*AW_SizeCutDepthShare(group_radius(pass_group)))return AW_FAR_SIZE;
+    }else if(size_cut && depth-radius>cut_distance*AW_SizeCutDepthShare(radius))return AW_FAR_SIZE;
     if(fog_exact){
         for(i=0;i<3;i++){
             nearest+=far_normal[i]*minmaxs[i+(far_normal[i]<0?3:0)];
@@ -344,7 +407,9 @@ int AW_BrushPassFar(vec3_t origin,float radius,const float *minmaxs) {
         if(nearest>=fog_exact_depth && top<0)return AW_FAR_SKIP;
         if(farthest>=fog_exact_depth && down<0)faces|=1;
     }
-    if(detail_step && radius>=32 && depth>cut_distance*.5f)faces|=2;
+    /* Under the fog rule the face drop starts once the whole model lies past
+     * the fog end (its near side), not from half the distance. */
+    if(detail_step && radius>=32 && (fog_rule?depth-radius>cut_distance:depth>cut_distance*.5f))faces|=2;
     return faces?AW_FAR_FACES|faces<<4:AW_FAR_DRAW;
 }
 /* After R_RotateBmodel (vpn, vright, vup and modelorg in model space): the
@@ -366,7 +431,7 @@ void AW_FarPassBegin(int result) {
 float aw_far_detail_pixels=2;
 int AW_NodeVisible(short *bounds) {
     float nearest=0;int i;aw_far_cache_t *cached;
-    if(!aw_cull.value)return 1;
+    if(!CULL_MODE)return 1;
     cached=&far_cache[((size_t)bounds>>4)&2047];
     if(cached->bounds==bounds && cached->frame==far_frame)return cached->visible;
     for(i=0;i<3;i++)nearest+=far_normal[i]*bounds[i+(far_normal[i]<0?3:0)];
@@ -374,5 +439,5 @@ int AW_NodeVisible(short *bounds) {
     return cached->visible=nearest<=far_distance;
 }
 int AW_ModelVisible(vec3_t origin,float radius) {
-    return !aw_cull.value || DotProduct(origin,far_normal)-radius<=far_distance;
+    return !CULL_MODE || DotProduct(origin,far_normal)-radius<=far_distance;
 }

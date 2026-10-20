@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_sky.h"
 #include "aw_state.h"
 #include "aw_clock.h"
+#include "aw_weather.h"
 
 
 int		iskyspeed = 8;
@@ -341,8 +342,47 @@ static byte sky_shade[256];
 /* Clear-weather RGB stops from the reference configuration. Timing below is a
  * compact approximation; clouds retain their existing texture luminance and
  * ordinary daytime preserves the original indexed sky. No weather simulation. */
-static const byte sky_rgb_stops[4][3]={{95,135,203},{117,141,164},{56,89,129},{9,10,11}};
-static const byte fog_rgb_stops[4][3]={{206,227,255},{255,189,157},{255,189,157},{9,10,11}};
+static const byte sky_clear_rgb_stops[4][3]={{95,135,203},{117,141,164},{56,89,129},{9,10,11}};
+static const byte fog_clear_rgb_stops[4][3]={{206,227,255},{255,189,157},{255,189,157},{9,10,11}};
+/* Region weather (aw_weather.h, SKY-REDMOUNTAIN-BLUE-44): the stops in use are
+ * the clear ones above unless the player's region has another weather; then
+ * they are that weather's (Morrowind.ini colours from world/region-weather.aww)
+ * and sky_weather_strength (0..AW_WEATHER_STEPS) pulls the sky, its gradient and
+ * the geometry fog to them. Strength 0 builds exactly the tables of before. */
+static byte sky_rgb_stops[4][3]={{95,135,203},{117,141,164},{56,89,129},{9,10,11}};
+static byte fog_rgb_stops[4][3]={{206,227,255},{255,189,157},{255,189,157},{9,10,11}};
+static int sky_weather_strength,sky_weather_glare=100,sky_weather_key,sky_table_weather=-1,sky_made_weather=-1;
+#define SKY_WEATHER_MIX(value,target) (((value)*(AW_WEATHER_STEPS-sky_weather_strength)+(target)*sky_weather_strength)/AW_WEATHER_STEPS)
+static void R_SkyWeather(int days,int milliseconds)
+{
+    aw_weather_blend_t blend;
+    sky_weather_key=AW_WeatherFrame(days,milliseconds,&blend);
+    if(sky_weather_key){
+        memcpy(sky_rgb_stops,blend.sky,sizeof sky_rgb_stops);memcpy(fog_rgb_stops,blend.fog,sizeof fog_rgb_stops);
+        sky_weather_strength=blend.strength;sky_weather_glare=blend.glare;
+    }else{
+        memcpy(sky_rgb_stops,sky_clear_rgb_stops,sizeof sky_rgb_stops);memcpy(fog_rgb_stops,fog_clear_rgb_stops,sizeof fog_rgb_stops);
+        sky_weather_strength=0;sky_weather_glare=100;
+    }
+}
+/* The weather's own sky colour for palette entry i between stops a and b
+ * (0..3): clear-sky texels take the flat sky colour, cloud texels the fog
+ * colour at their own brightness, as the clear V1 cloud-role path does; a sky
+ * without cloud roles keeps its texture brightness. */
+static void R_SkyWeatherTarget(int i,int a,int b,int mix,int *rgb)
+{
+    int k,sky,fog,luma=(host_basepal[3*i]+2*host_basepal[3*i+1]+host_basepal[3*i+2])/4;
+    for(k=0;k<3;k++){
+        sky=(sky_rgb_stops[a][k]*(32-mix)+sky_rgb_stops[b][k]*mix)/32;
+        fog=(fog_rgb_stops[a][k]*(32-mix)+fog_rgb_stops[b][k]*mix)/32;
+        rgb[k]=sky_cloud_roles?(sky_cloud_role[i]?fog*(128+luma)/256:sky):sky*(128+luma)/256;
+    }
+}
+static void R_SkyWeatherFog(int a,int b,int mix,int *fog)
+{
+    int k;
+    for(k=0;k<3;k++)fog[k]=SKY_WEATHER_MIX(fog[k],(fog_rgb_stops[a][k]*(32-mix)+fog_rgb_stops[b][k]*mix)/32);
+}
 static int R_SkySpread(int r,int g,int b)
 {
     int high=r>g?r:g,low=r<g?r:g;
@@ -576,6 +616,7 @@ void R_InitDayNight(void)
     Cmd_AddCommand("aw_cloud_control_set",R_SkyCloudControlCommand);
     Cmd_AddCommand("aw_day_clouds_set",R_SkyDayCloudCommand);
     Cmd_AddCommand("aw_nightsky_mode_set",R_SkyNightModeCommand);
+    AW_WeatherInit();
     sky_bank_ready=R_SkyPaletteBank();
     if(!host_basepal)return;
     for(i=0;i<4096;i++){
@@ -589,6 +630,7 @@ void R_InitDayNight(void)
         sky_rgb[i]=(byte)best;
     }
     sky_tints_ready=1;sky_phase_last=sky_table_phase=-2;sky_table_type=sky_made_type=-1;sky_sun_colour=-1;
+    sky_table_weather=sky_made_weather=-1;
 }
 /* Cache 32 colour steps per transition. No pixel chooses between endpoints:
  * interpolate RGB first, then map each source colour once for the entire tile. */
@@ -668,22 +710,34 @@ static void R_SkyEndpoint(int stop,int band,int index,int *rgb)
 static void R_SkyType2Tables(int phase)
 {
     int a=phase>>10,b=(phase>>6)&15,mix=phase&63,i,k,band,level,left[3],right[3],rgb[3],glow[3];
+    int aa=a==4?3:a,bb=b==4?3:b,haze[3],weather[3];
     sky_glow_strength=(type2_strength[a]*(32-mix)+type2_strength[b]*mix)/32;
     if(sky_frame_type==3 && sky_glow_strength>2){sky_glow_strength+=2;if(sky_glow_strength>7)sky_glow_strength=7;}
+    sky_glow_strength=sky_glow_strength*sky_weather_glare/100; /* no sunrise glow through a storm */
     for(k=0;k<3;k++)glow[k]=(type2_glow[a][k]*(32-mix)+type2_glow[b][k]*mix)/32;
+    /* The horizon haze of a stable phase, pulled to the weather's fog. */
+    for(k=0;k<3;k++)haze[k]=type2_fog[a][k];
+    R_SkyWeatherFog(aa,aa,0,haze);
     for(i=0;i<256;i++){
         for(band=0;band<16;band++){
             /* Exact stable daytime/nighttime compatibility with Type1 haze. */
             if(phase==0 || phase==(3<<10)){
                 if(band==15)sky_gradient[band*256+i]=sky_tint[i];
                 else{
-                    for(k=0;k<3;k++)rgb[k]=(host_basepal[3*sky_tint[i]+k]*band+type2_fog[a][k]*(15-band))/15;
+                    for(k=0;k<3;k++)rgb[k]=(host_basepal[3*sky_tint[i]+k]*band+haze[k]*(15-band))/15;
                     sky_gradient[band*256+i]=R_SkyNearest(rgb[0],rgb[1],rgb[2]);
                 }
             }
             else{
                 R_SkyEndpoint(a,band,i,left);R_SkyEndpoint(b,band,i,right);
                 for(k=0;k<3;k++)rgb[k]=(left[k]*(32-mix)+right[k]*mix)/32;
+                if(sky_weather_strength){
+                    /* Twilight under a weather: its sky above, its fog at the horizon. */
+                    R_SkyWeatherTarget(i,aa,bb,mix,weather);
+                    for(k=0;k<3;k++)weather[k]=(weather[k]*band+
+                        ((fog_rgb_stops[aa][k]*(32-mix)+fog_rgb_stops[bb][k]*mix)/32)*(15-band))/15;
+                    for(k=0;k<3;k++)rgb[k]=SKY_WEATHER_MIX(rgb[k],weather[k]);
+                }
                 sky_gradient[band*256+i]=R_SkyNearest(rgb[0],rgb[1],rgb[2]);
             }
         }
@@ -762,7 +816,7 @@ unsigned char R_DayNightSkyPixel(unsigned char colour,float x,float y,float z,in
         if(sky_night_strength)colour=sky_tint[colour];
         if(fog)colour=sky_fog[(15-band)*256+colour];
     }
-    if(sky_sun_visible && z>=0){
+    if(sky_sun_visible && z>=0 && sky_weather_glare>=50){ /* Glare View: no sun disc through a storm */
         dot=x*sky_sun[0]+y*sky_sun[1]+z*sky_sun[2];
         length=x*x+y*y+z*z;
         if(dot>0 && dot*dot>length*threshold[0]){
@@ -848,6 +902,8 @@ static void R_SkyColourTables(int phase)
         (type2_ambient[a][k]*(32-mix)+type2_ambient[b][k]*mix)/32:255;
     R_SkyNightLight(ambient);
     aa=a==4?3:a;bb=b==4?3:b;
+    /* V2/V3 geometry fog follows the weather's fog; V1 already uses its stops. */
+    if(sky_frame_type>=2)R_SkyWeatherFog(aa,bb,mix,fog);
     for(i=0;i<256;i++){
         luma=(host_basepal[3*i]+2*host_basepal[3*i+1]+host_basepal[3*i+2])/4;
         for(k=0;k<3;k++){
@@ -859,7 +915,12 @@ static void R_SkyColourTables(int phase)
             }
             rgb[k]=(left*(32-mix)+right*mix)/32;
         }
-        sky_tint[i]=(phase || (sky_cloud_roles && (sky_frame_type>=2 || sky_bank_ready)))?R_SkyNearest(rgb[0],rgb[1],rgb[2]):i;
+        if(sky_weather_strength){
+            int weather[3];
+            R_SkyWeatherTarget(i,aa,bb,mix,weather);
+            for(k=0;k<3;k++)rgb[k]=SKY_WEATHER_MIX(rgb[k],weather[k]);
+        }
+        sky_tint[i]=(phase || sky_weather_strength || (sky_cloud_roles && (sky_frame_type>=2 || sky_bank_ready)))?R_SkyNearest(rgb[0],rgb[1],rgb[2]):i;
         for(k=0;k<3;k++)source[k]=host_basepal[3*i+k]*ambient[k]/255;
         /* Scene tone is built into the existing geometry LUT. Daytime and V1
          * retain exact near indices; sky/UI do not consume the ambient tone. */
@@ -871,7 +932,7 @@ static void R_SkyColourTables(int phase)
     }
     if(sky_frame_type>=2)R_SkyType2Tables(phase);
     R_NightTables();
-    sky_table_phase=phase;sky_table_type=sky_frame_type;
+    sky_table_phase=phase;sky_table_type=sky_frame_type;sky_table_weather=sky_weather_key;
     sky_table_night=R_SkyNightLightOn();sky_table_tint=R_SkyNightTint();
 }
 const unsigned char *R_DayNightFogColours(void)
@@ -1018,7 +1079,8 @@ void R_MakeSky (void)
 	xshift = skytime*skyspeed;
 	yshift = skytime*skyspeed;
 
-	if ((xshift == sky_xlast) && (yshift == sky_ylast) && sky_phase==sky_phase_last && sky_made_type==sky_frame_type && sky_made_clouds==clouds && sky_made_cloud_type==R_SkyCloudType() && sky_made_cloud_density==sky_night_cloud_density && sky_made_night==(sky_night_strength>0) && sky_made_coverage_roles==sky_coverage_roles_active){r_skymade=1;return;}
+	if ((xshift == sky_xlast) && (yshift == sky_ylast) && sky_phase==sky_phase_last && sky_made_type==sky_frame_type && sky_made_clouds==clouds && sky_made_cloud_type==R_SkyCloudType() && sky_made_cloud_density==sky_night_cloud_density && sky_made_night==(sky_night_strength>0) && sky_made_coverage_roles==sky_coverage_roles_active && sky_made_weather==sky_table_weather){r_skymade=1;return;}
+    sky_made_weather=sky_table_weather;
     sky_phase_last=sky_phase;sky_made_type=sky_frame_type;sky_made_clouds=clouds;sky_made_cloud_type=R_SkyCloudType();sky_made_cloud_density=sky_night_cloud_density;sky_made_night=sky_night_strength>0;sky_made_coverage_roles=sky_coverage_roles_active;
 
 	sky_xlast = xshift;
@@ -1031,7 +1093,7 @@ void R_MakeSky (void)
     }
 
     if(R_SkyCloudType()==2 || sky_night_cloud_density<16){
-        int tint=sky_phase>=0 && (sky_phase>0 || (sky_cloud_roles && sky_bank_ready)) && sky_frame_type==1 && !sky_night_strength;
+        int tint=sky_phase>=0 && (sky_phase>0 || sky_weather_strength || (sky_cloud_roles && sky_bank_ready)) && sky_frame_type==1 && !sky_night_strength;
         for(y=0;y<SKYSIZE;y++){
             baseofs=((y+yshift)&SKYMASK)*131;
             for(x=0;x<SKYSIZE;x++){
@@ -1043,7 +1105,7 @@ void R_MakeSky (void)
         r_skymade=1;return;
     }
 
-    if(sky_phase>=0 && (sky_phase>0 || (sky_cloud_roles && sky_bank_ready)) && sky_frame_type==1 && !sky_night_strength){
+    if(sky_phase>=0 && (sky_phase>0 || sky_weather_strength || (sky_cloud_roles && sky_bank_ready)) && sky_frame_type==1 && !sky_night_strength){
         for(y=0;y<SKYSIZE;y++){
             baseofs=((y+yshift)&SKYMASK)*131;
             for(x=0;x<SKYSIZE;x++){
@@ -1147,7 +1209,8 @@ void R_SetSkyFrame (void)
     sky_phase=sky_exterior && sky_daynight.value>0 && sky_tints_ready && clock_ready?
         (sky_frame_type>=2?R_SkyType2Phase(clock_ms):R_SkyDayPhase(clock_ms)):-1;
     if(sky_phase>=0){
-        if(sky_phase!=sky_table_phase || sky_frame_type!=sky_table_type ||
+        R_SkyWeather(clock_days,clock_ms);
+        if(sky_phase!=sky_table_phase || sky_frame_type!=sky_table_type || sky_weather_key!=sky_table_weather ||
            R_SkyNightLightOn()!=sky_table_night || R_SkyNightTint()!=sky_table_tint)R_SkyColourTables(sky_phase);
         R_SkySunFrame(clock_ms);
         R_NightFrame(clock_ms,clock_days);

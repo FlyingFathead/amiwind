@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.42-dev1 at 2026-10-17 12:02 +0300: maintainer: statue floating in the air, no pedestal drawn
 - Reported with v0.0.43-dev1 at 2026-10-18 07:50 +0300: maintainer: the after image (test engine with the popping fix) still has the statue floating in the air
+- Reported with v0.0.45 at 2026-10-20 02:50 +0300: same converter rule in v0.0.45; cause: the root NiNode translation (z 327.1) kept, the game drops it; fixed on branch v0.0.46-sky-pedestal, needs a world build
 
 <!-- END GENERATED PERSISTING -->
 
@@ -18,7 +19,7 @@
 | Where | Ebonheart plaza, ex_imp_dragonstatue (vivec_city frame, cell 2,-13) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.41, v0.0.42-dev1 (last seen) |
+| Persists in | v0.0.41, v0.0.42-dev1, v0.0.45 (last seen) |
 | Severity | medium: A landmark statue hangs in the air over the plaza in every build since at least v0.0.41 |
 | Family | Mesh converter geometry (`converter-geometry`) |
 | Playtest version | v0.0.42-dev1 (full-dev1-proof) |
@@ -28,7 +29,31 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Status: 20 October 2026](#status-20-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Island-wide sweep](#island-wide-sweep)
+- [Repair](#repair)
+- [Reproduction](#reproduction)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Status: 20 October 2026
+
+Cause found: the converter applied the translation of the model's root node, which the game drops. Repaired in
+the source on branch v0.0.46-sky-pedestal for every model at once (25 models, 723 placements island-wide), not
+yet in a build. Still present in v0.0.45 (same converter rule). Needs a world rebuild and an in-game look.
 
 ## Symptom
 
@@ -42,7 +67,22 @@ The converted model `x/ex_imp_dragonstatue@s1` (CHIM model 4447 of the dev1 worl
 
 ## How it happened
 
-Not yet known. Measured on 17 October 2026:
+Found 20 October 2026: nothing is missing; the whole model is drawn 327 units too high. In
+`ex_imp_dragonstatue.nif` the root is a NiNode (`Ex_imp_statue_base`, the file's first record) with a
+translation of z 327.1; the base (`Tri Ex_imp_statue_base 0-2`), the column and the dragon are its children. The
+game drops the whole transform of such a root (rule from OpenMW file components/nif/node.cpp, NiNode::read: a
+Morrowind NIF's root NiNode, record 0, any name but Bip01, gets the identity transform). The converter
+(`tools/prepare_scenery.py` `model_geometry`, rule `nif_common.root_local` 'morrowind', since
+BALMORA-TEMPLE-GEOMETRY-29) dropped only the root's rotation and kept its translation and scale. With the game's
+rule the model spans z -92 to 1,060 around its origin: placed at z 416, its base starts at z 324, 20 units into
+the plaza's top (z 344), as a statue on its plinth; with the converter's it started at z 652, 308 units above the
+plaza, which reads as a statue without its pedestal.
+
+The Temple repair kept the root translation because `contain_crate_01` (root offset z -32) rests on the floor only
+with it: that crate's root is the NiTriShape itself, not a NiNode, and the game keeps the whole transform of such a
+root, so the crate is unchanged by this repair.
+
+Measured on 17 October 2026:
 
 - The original data place one `ex_imp_dragonstatue` at 18577, -101915, z 416 and the plaza
   (`ex_imp_plaza`) at z 48; no other object stands under the statue (every reference of cell 2,-13 within
@@ -57,26 +97,72 @@ Not yet known. Measured on 17 October 2026:
 ## Why it was not caught
 
 No check compares a converted model's vertical extent with its original mesh, and the plaza was not looked at
-in game before.
+in game before. The Temple repair took the crate as proof that root translations are kept, without telling a
+NiTriShape root from a NiNode root.
+
+## Island-wide sweep
+
+`tools/nif_root_audit.py --data-files DIR` (20 October 2026, Morrowind.esm, 3,679 placed models): 25 models whose
+root the game's rule and the converter's earlier rule treat differently, with 54 exterior and 669 interior
+placements. The shift is how far every earlier build moved them (the earlier rule's origin minus the game's, in
+original units):
+
+| Model | Shift (x, y, z) | Exterior | Interior |
+| --- | --- | --- | --- |
+| x/ex_dae_ruin_01 | 0, 0, -1,018 (sunk) | 41 | 2 |
+| x/ex_dae_mehrunesdagon | -3, 30, +421 | 0 | 10 |
+| x/ex_imp_dragonstatue | 0, 0, +327 | 1 | 0 |
+| x/ex_dae_malacath_attack | 0, 3, +316 | 2 | 9 |
+| i/in_dagoth_bridge00 | 7, -138, +29 | 0 | 1 |
+| i/in_de_shipwreckul_lg | 5, 37, +92 | 0 | 5 |
+| f/furn_bone_stake00 | 0, 0, +61 | 0 | 514 |
+| f/furn_anvil00 | 0, 0, +32 | 6 | 21 |
+| m/misc_bellows10 | 0, 0, +8 | 0 | 15 |
+| f/furn_6th_ashaltar | 0, 0, -4 | 0 | 24 |
+| x/ex_common_house_addon | 0, 3, 0 | 4 | 0 |
+| d/door_dwrv_loadup00 | 0, -3, +2 (and its root rotation) | 0 | 11 |
+| 13 ground robes (c/c_m_robe_*_gnd) | under 1 unit | 0 | 57 |
+
+Checked against the land: with the game's rule the six exterior anvils rest on the terrain (bottom at land height
+within 0 to 8 units; with the earlier rule all 32 above it) and the Malacath statue at 45508, 178361 touches the
+land within 0.1 unit (earlier rule: 316 above). The 41 exterior Daedric ruins (`ex_dae_ruin_01`) were drawn 1,018
+units too low by every build so far. No model with a non-NiNode root has a rotation (the one case where the earlier
+rule dropped a transform the game keeps); no creature model changes; NPC body parts do not use this converter path.
+
+## Repair
+
+`nif_common.scenery_root_local` (default rule 'node'): a root NiNode that is the file's first record and not named
+Bip01 loses its whole transform; any other root keeps its whole transform. `prepare_scenery.model_geometry` (every
+scenery, CHIM, door, interior and creature model, visual and collision) and `model_flames` use it. The earlier rules
+stay selectable (`model_geometry(..., root_rule='morrowind')` and `'legacy'`). `tools/nif_root_audit.py` lists every
+placed model the rule moves. The CHIM model, tile and cut unit keys now include `tools/nif_common.py` (they read
+geometry through it but were not keyed on it).
+
+Rebuild cost: every CHIM variant, tile and cut unit and every scenery stage that reaches `prepare_scenery.py` is
+recomputed once (the converter changed); the NPC gallery and NPC level bakes are rekeyed by the same file
+although no creature or body model changes.
 
 ## Reproduction
 
 `dbg tp 19705 -101510`, `aw_aim 211 -13`: the statue hangs above the tower roofs to the right of the crosshair.
 
-## Repair
-
-Open. Next: the original mesh (ex_imp_dragonstatue.nif, and the plaza's) against the converted model, in the
-mesh inspector and a headless OpenMW view of the same pose (three references: what the original holds, how
-OpenMW composes it, the converter's node handling).
-
 ## Verification
 
-Open.
+Done (source, 20 October 2026): `tests/test_scenery_root_transform.py`: a root NiNode's translation (the statue's
+z 327.1) and scale are dropped (both fail on the earlier converter), a NiTriShape root keeps its offset (the
+crate), Bip01 and later-record roots keep theirs, the earlier rules stay selectable, the audit lists the moved
+models, the CHIM unit keys include the rule's file. The real `ex_imp_dragonstatue.nif` converts to z -92 to 1,060
+(was 236 to 1,388).
+
+To do: a world build, then at the reproduction pose (and in a headless OpenMW view of it) the statue on its
+plinth on the plaza, headlamp off and on; the same for one Daedric ruin (`ex_dae_ruin_01`, e.g. the pair at
+-119173, 115206), an exterior anvil and an interior with bone stakes.
 
 ## Prevention
 
-Open: a converter check that a model's converted bounds match the original mesh's bounds (per mesh, island
-wide), so a lost or shifted part fails the build.
+`tools/nif_root_audit.py` names every placed model whose root the rule changes; the test pins the rule on
+fictional meshes. Still open: a converter check that a model's converted bounds match the original mesh's bounds
+as the game composes it (per mesh, island wide).
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

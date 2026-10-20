@@ -16,8 +16,40 @@ from mwad.audit import records, subrecords, string
 from mwad.paths import ensure_external, child_ci
 from build_scratch import scratch_dir
 
-WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq', 'region-names.awn')
+WORLD_UI_FILES = ('map.awm', 'journal.awj', 'entries.dat', 'quests.awq', 'region-names.awn', 'region-weather.aww')
 NO_NAME = 0xFFFFFFFF  # region-names.awn row without a region or place
+# Region weather (SKY-REDMOUNTAIN-BLUE-44, docs/DAY_NIGHT_AND_SKY.md "Region weather"): the ten weathers in the order of a REGN
+# record's WEAT chances, named as their Morrowind.ini [Weather NAME] sections.
+WEATHERS = ('Clear', 'Cloudy', 'Foggy', 'Overcast', 'Rain', 'Thunderstorm', 'Ashstorm', 'Blight', 'Snow', 'Blizzard')
+# Colour stops in the engine's order (r_sky.c sky_rgb_stops / fog_rgb_stops: day, sunrise, sunset, night).
+WEATHER_STOPS = ('Day', 'Sunrise', 'Sunset', 'Night')
+WEATHER_REGIONS_MAX = 256     # region rows the engine holds (aw_weather.h AW_WEATHER_REGIONS)
+WEATHER_HOURS = 20            # [Weather] Hours Between Weather Changes as Morrowind.ini ships it
+# The values Morrowind.ini ships with, used when the data folder holds no Morrowind.ini (the staged inputs carry only
+# the masters and archives): per weather the sky stops, the fog stops (both day, sunrise, sunset, night), the
+# Transition Delta (per real second) and the Glare View. Clear equals the engine's own clear-weather stops.
+WEATHER_FALLBACK = {
+    'Clear': (((95, 135, 203), (117, 141, 164), (56, 89, 129), (9, 10, 11)),
+              ((206, 227, 255), (255, 189, 157), (255, 189, 157), (9, 10, 11)), .015, 1.0),
+    'Cloudy': (((117, 160, 215), (126, 158, 173), (111, 114, 159), (9, 10, 11)),
+               ((245, 235, 224), (255, 207, 149), (255, 155, 106), (9, 10, 11)), .015, 1.0),
+    'Foggy': (((184, 211, 228), (197, 190, 180), (142, 159, 176), (18, 23, 28)),
+              ((150, 187, 209), (173, 164, 148), (113, 135, 157), (19, 24, 29)), .015, .25),
+    'Overcast': (((143, 146, 149), (91, 99, 106), (108, 115, 121), (19, 22, 25)),
+                 ((143, 146, 149), (91, 99, 106), (108, 115, 121), (19, 22, 25)), .015, 0.0),
+    'Rain': (((116, 120, 122), (71, 74, 75), (73, 73, 73), (24, 25, 26)),
+             ((116, 120, 122), (71, 74, 75), (73, 73, 73), (24, 25, 26)), .015, 0.0),
+    'Thunderstorm': (((97, 104, 115), (35, 36, 39), (35, 36, 39), (19, 20, 22)),
+                     ((97, 104, 115), (70, 74, 85), (70, 74, 85), (19, 20, 22)), .030, 0.0),
+    'Ashstorm': (((124, 73, 58), (91, 56, 51), (106, 55, 40), (20, 21, 22)),
+                 ((124, 73, 58), (91, 56, 51), (106, 55, 40), (20, 21, 22)), .035, 0.0),
+    'Blight': (((90, 35, 35), (90, 35, 35), (92, 33, 33), (44, 14, 14)),
+               ((128, 19, 19), (90, 35, 35), (92, 33, 33), (44, 14, 14)), .040, 0.0),
+    'Snow': (((153, 158, 166), (106, 91, 91), (96, 115, 134), (31, 35, 39)),
+             ((153, 158, 166), (106, 91, 91), (96, 115, 134), (31, 35, 39)), .015, 0.0),
+    'Blizzard': (((121, 133, 145), (91, 99, 106), (108, 115, 121), (27, 29, 31)),
+                 ((121, 133, 145), (91, 99, 106), (108, 115, 121), (21, 24, 28)), .030, 0.0),
+}
 # World map file format (docs/WORLD_MAP_AND_JOURNAL.md "Map file formats"): v1 = AWM1 (terrain pixels and
 # settlements), v2 = AWM2 (AWM1 plus the LAVA section: the molten lava pools of the exterior cells). Builder option
 # --world-map (config key world_map), exported to this stage as AMIWIND_WORLD_MAP; v1 stays selectable.
@@ -97,6 +129,119 @@ def region_names(raw):
     return (b'ARN2' + struct.pack('<III', len(names), len(places), len(rows))
             + b''.join(regions[name].ljust(64, b'\0') for name in names)
             + b''.join(place.ljust(64, b'\0') for place in places) + b''.join(rows))
+
+
+def _ini_file(data_files):
+    if data_files is None:
+        return None
+    for parent in (Path(data_files), Path(data_files).parent):
+        for p in parent.iterdir() if parent.is_dir() else ():
+            if p.name.casefold() == 'morrowind.ini':
+                return p
+    return None
+
+
+def weather_settings(data_files=None, ini_text=None):
+    """The ten weathers' sky and fog stops, transition speed and glare, and the hours between weather changes:
+    from Morrowind.ini ([Weather NAME] Sky/Fog Day/Sunrise/Sunset/Night Color, Transition Delta, Glare View;
+    [Weather] Hours Between Weather Changes) where the data folder or its parent holds one, else the shipped values
+    (WEATHER_FALLBACK). Returns (settings, hours, info); info names the source and every value taken from the
+    fallback."""
+    ini = None if ini_text is not None else _ini_file(data_files)
+    if ini is not None:
+        ini_text = ini.read_bytes().decode('cp1252', 'replace')
+    sections = {}
+    section = ''
+    for line in (ini_text or '').splitlines():
+        line = line.strip()
+        if line.startswith('['):
+            section = line.strip('[]').casefold(); continue
+        if '=' in line:
+            name, value = line.split('=', 1)
+            sections.setdefault(section, {})[name.strip().casefold()] = value.strip()
+    notes = []
+
+    def colour(fields, key, fallback):
+        try:
+            parts = [int(v) for v in fields[key].split(',')]
+        except (KeyError, ValueError):
+            notes.append(key); return tuple(fallback)
+        if len(parts) != 3 or not all(0 <= v <= 255 for v in parts):
+            notes.append(key); return tuple(fallback)
+        return tuple(parts)
+
+    def number(fields, key, fallback, low, high):
+        try:
+            value = float(fields[key])
+        except (KeyError, ValueError):
+            notes.append(key); return fallback
+        if not low <= value <= high:
+            notes.append(key); return fallback
+        return value
+
+    settings = {}
+    for weather in WEATHERS:
+        sky, fog, delta, glare = WEATHER_FALLBACK[weather]
+        fields = sections.get('weather ' + weather.casefold(), {})
+        settings[weather] = {
+            'sky': [colour(fields, 'sky %s color' % stop.casefold(), sky[i]) for i, stop in enumerate(WEATHER_STOPS)],
+            'fog': [colour(fields, 'fog %s color' % stop.casefold(), fog[i]) for i, stop in enumerate(WEATHER_STOPS)],
+            'delta': number(fields, 'transition delta', delta, 0.001, 1.0),
+            'glare': number(fields, 'glare view', glare, 0.0, 1.0)}
+    hours = number(sections.get('weather', {}), 'hours between weather changes', WEATHER_HOURS, 1, 240)
+    info = {'ini': ini.name if ini is not None else ('text' if ini_text else None),
+            'fallback_values': len(notes)}
+    return settings, int(round(hours)), info
+
+
+def region_weather(raw, settings=None, hours=WEATHER_HOURS):
+    """region-weather.aww (AWW1): the weather chances of every region in region-names.awn's region order (sorted
+    region IDs, the ARN2 index) and the ten weathers' looks. Header 'AWW1' <IIII> weathers, regions, hours between
+    weather changes, 0; per weather 32 bytes: sky stops 4 x RGB, fog stops 4 x RGB (day, sunrise, sunset, night),
+    <H> Transition Delta x 1000, <B> Glare View x 100, 5 zero bytes; per region 10 chance bytes (REGN WEAT:
+    clear, cloudy, foggy, overcast, rain, thunderstorm, ash, blight, snow, blizzard; the base game's 8-byte WEAT
+    leaves snow and blizzard 0)."""
+    if settings is None:
+        settings = weather_settings(ini_text='')[0]
+    chances = {}
+    for tag, flags, payload in records(raw):
+        if tag != 'REGN': continue
+        fields = dict(subrecords(payload))
+        if 'DELE' in fields: continue
+        identifier = string(fields['NAME']).casefold()
+        weat = bytes(fields.get('WEAT', b''))
+        if len(weat) not in (8, 10):
+            raise ValueError('Region %s has a WEAT of %d bytes (8 or 10 expected)' % (identifier, len(weat)))
+        chances[identifier] = weat.ljust(len(WEATHERS), b'\0')
+    names = sorted(chances)
+    if len(names) > WEATHER_REGIONS_MAX:
+        raise ValueError('Region weather table exceeds runtime bounds: %d regions' % len(names))
+    out = bytearray(b'AWW1' + struct.pack('<IIII', len(WEATHERS), len(names), hours, 0))
+    for weather in WEATHERS:
+        look = settings[weather]
+        out += bytes(v for stop in look['sky'] for v in stop) + bytes(v for stop in look['fog'] for v in stop)
+        out += struct.pack('<HB5x', int(round(look['delta'] * 1000)), int(round(look['glare'] * 100)))
+    for name in names:
+        out += chances[name]
+    return bytes(out)
+
+
+def read_region_weather(raw):
+    """Parse an AWW1 file: (looks, regions, hours) with looks per weather {'sky','fog','delta','glare'} and regions
+    a list of chance tuples in region index order."""
+    if raw[:4] != b'AWW1':
+        raise ValueError('Not a region weather file')
+    weathers, count, hours, _ = struct.unpack_from('<IIII', raw, 4)
+    if weathers != len(WEATHERS) or count > WEATHER_REGIONS_MAX or len(raw) != 20 + 32*weathers + 10*count:
+        raise ValueError('Region weather file has the wrong shape')
+    looks = []
+    for w in range(weathers):
+        row = raw[20+32*w:52+32*w]
+        delta, glare = struct.unpack_from('<HB', row, 24)
+        looks.append({'sky': [tuple(row[3*i:3*i+3]) for i in range(4)],
+                      'fog': [tuple(row[12+3*i:15+3*i]) for i in range(4)], 'delta': delta/1000, 'glare': glare/100})
+    base = 20 + 32*weathers
+    return looks, [tuple(raw[base+10*i:base+10*i+10]) for i in range(count)], hours
 
 
 def fixed(value,size):
@@ -333,12 +478,14 @@ def prepare(data_files,survey,scene,world_map=None,lava_pools=None):
         land=lava_map.land_heights(master)      # the visible lava only: land above a pool buries it (WORLDMAP-LAVA-MISMATCH-36)
         rows=lava_layer(lava_pools,land);lava_report=check_lava_layer(rows,lava_pools,land)
     worldmap=map_asset(report,Image.open(survey/'terrain.png'),palette,version,rows)
+    looks,hours,weather_info=weather_settings(data_files)
     for name,raw in [('map.awm',worldmap),('journal.awj',index),('entries.dat',blob),('quests.awq',labels),
-                     ('region-names.awn',region_names(master))]:
+                     ('region-names.awn',region_names(master)),('region-weather.aww',region_weather(master,looks,hours))]:
         (dest/name).write_bytes(raw)
     receipt={'format':'AmiWind world UI 1','master_sha256':report['master_sha256'],
              'palette_sha256':hashlib.sha256(palette).hexdigest(),'journal_quests':quests,
              'journal_entries':(len(index)-8)//76,'journal_text_bytes':len(blob),'map_bytes':len(worldmap),
+             'region_weather':dict(weather_info,hours=hours),
              'files':{name:hashlib.sha256((dest/name).read_bytes()).hexdigest() for name in WORLD_UI_FILES}}
     if version=='v2':
         # v1 keeps its receipt byte for byte; v2 records the format and the lava coverage check.

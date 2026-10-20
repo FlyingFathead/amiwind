@@ -1887,6 +1887,26 @@ static void PF_aw_bark(void)
     G_FLOAT(OFS_RETURN)=AW_VoiceSay(G_EDICT(OFS_PARM0),(int)G_FLOAT(OFS_PARM1),(int)(G_FLOAT(OFS_PARM2)*100+.5f));
 }
 
+/* A manual talk's conversation greeting (NPC-DREAMER-GREETING-DEFAULT-42): the entity's
+ * aw_greeting (first meeting) or aw_greeting_again (later talks), chosen at build time by the
+ * rule of OpenMW's DialogueManager::startDialogue (tools: mwad/dialogue.py), with the player's
+ * defines filled in, in the dialogue box under the speaker's name. The box stays about one
+ * second per 12 characters, 8 to 40 seconds (reading time; the original keeps its window open).
+ * Returns that time, 0 when the entity has no such text: QC then says the hello line and its
+ * voice, the previous method, which every NPC without a conversation greeting still uses. */
+static void PF_aw_converse(void)
+{
+    edict_t *e=G_EDICT(OFS_PARM0);eval_t *v=NULL;char text[1024];double seconds;
+    G_FLOAT(OFS_RETURN)=0;
+    if(G_FLOAT(OFS_PARM1))v=GetEdictFieldValue(e,"aw_greeting_again");
+    if(!v || !v->string || !pr_strings[v->string])v=GetEdictFieldValue(e,"aw_greeting");
+    if(!v || !v->string || !pr_strings[v->string])return;
+    AW_ExpandDialogue(text,sizeof(text),pr_strings+v->string);
+    seconds=strlen(text)/12.0;if(seconds<8)seconds=8;if(seconds>40)seconds=40;
+    AW_UISubtitle(pr_strings+e->v.netname,text,seconds);
+    G_FLOAT(OFS_RETURN)=(float)seconds;
+}
+
 builtin_t pr_builtin[] =
 {
 PF_Fixme,
@@ -1989,7 +2009,8 @@ PF_setspawnparms,
 PF_aw_npctarget, /* #79: entity(entity player) aw_npctarget */
 PF_aw_npcfloor,  /* #80: float(entity actor) aw_npcfloor */
 PF_aw_animprep,  /* #81: void(entity actor) aw_animprep */
-PF_aw_bark       /* #82: float(entity actor, float topic, float odds) aw_bark */
+PF_aw_bark,      /* #82: float(entity actor, float topic, float odds) aw_bark */
+PF_aw_converse   /* #83: float(entity npc, float again) aw_converse */
 };
 
 builtin_t *pr_builtins = pr_builtin;

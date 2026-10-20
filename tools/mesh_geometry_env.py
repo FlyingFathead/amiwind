@@ -160,3 +160,26 @@ def underside_mode():
     if mode not in UNDERSIDE_MODES:
         raise ValueError(UNDERSIDE_VARIABLE + ' must be rule, split, whole or names, not %r' % mode)
     return mode
+
+
+# How the CHIM model builder picks the points of a convex collision piece (mesh_geometry.collision_parts;
+# CHIM-VIVEC-DOCK-WALKWAY-43). Every piece's hull is built from its extreme points along 14 directions; on a deck that
+# runs level and then slopes (the Vivec docks) that hull lies up to 19 units under the planks. table (default from
+# v0.0.43-dev3): the meshes of config/collision-hull-surface.json (measured island-wide: walkable collision more than a
+# step under the pieces) keep all the points of a piece whose reduced hull leaves its source surface more than
+# mesh_geometry.SURFACE_LOSS outside; every other mesh is built as before (the same unit keys). all: that rule for
+# every mesh (measured cost in the bug page). extremes: the method before for every mesh, for A/B tests (the collision
+# surface gate then reports without failing). Resolved into each mesh's profile (hull_surface_loss), so it is in
+# every model's unit key. From v0.0.46 (CHIM-HULL-SURFACE-HEAP-46) the table meshes hold their WALKABLE surface
+# (mesh_geometry.surface_hull: points of that surface added to the reduced hull until it is within SURFACE_LOSS);
+# table-whole: the rule as first shipped (the hull of all a piece's points; six v0.0.46-dev1 frames over the CHIM
+# zone), kept for A/B tests (profile hull_surface_points 'all').
+HULL_POINTS_MODES = ('table', 'all', 'extremes', 'table-whole')
+HULL_POINTS_VARIABLE = 'AMIWIND_COLLISION_HULL_POINTS'
+
+
+def hull_points_mode():
+    mode = os.environ.get(HULL_POINTS_VARIABLE, '').strip() or 'table'
+    if mode not in HULL_POINTS_MODES:
+        raise ValueError(HULL_POINTS_VARIABLE + ' must be table, all, extremes or table-whole, not %r' % mode)
+    return mode

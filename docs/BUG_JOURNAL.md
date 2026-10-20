@@ -1,10 +1,20 @@
 # Bug journal
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [CHIM-HULL-SURFACE-HEAP-46: the walkway collision fix put six frames over the CHIM zone, 20 October 2026](#chim-hull-surface-heap-46-the-walkway-collision-fix-put-six-frames-over-the-chim-zone-20-october-2026)
+- [BUILD-STAIR-WALK-BRUTE-FORCE-46: collision from what the game already knows, 20 October 2026](#build-stair-walk-brute-force-46-collision-from-what-the-game-already-knows-20-october-2026)
+- [BUILD-HEAP-GATE-AFTER-STAIRS-46 and BUILD-CHIM-MAIN-MEMORY-46 registered, 20 October 2026](#build-heap-gate-after-stairs-46-and-build-chim-main-memory-46-registered-20-october-2026)
+- [TESTS-HEAD-REDUCER-BYTES-CI-45 persisting: the NPC bake follows the processor's linear algebra kernel, 20 October 2026](#tests-head-reducer-bytes-ci-45-persisting-the-npc-bake-follows-the-processors-linear-algebra-kernel-20-october-2026)
+- [BUILD-REUSE-PLAN-ENV-36 persisting: the standalone reuse plan keyed stages with an empty environment, 20 October 2026](#build-reuse-plan-env-36-persisting-the-standalone-reuse-plan-keyed-stages-with-an-empty-environment-20-october-2026)
+- [TRACKER-REGISTER-SIZE-33 and TRACKER-REGISTER-SIZE-36: the archive split by version range, 20 October 2026](#tracker-register-size-33-and-tracker-register-size-36-the-archive-split-by-version-range-20-october-2026)
+- [BUILD-SIZE-GUARD-OLD-BASELINE-45: the size guard compared v0.0.45 with v0.0.41, 20 October 2026](#build-size-guard-old-baseline-45-the-size-guard-compared-v0045-with-v0041-20-october-2026)
+- [BUILD-REUSE-SCHEDULER-TOP-45 part 2: walks keyed by the data they walk, preflight stops scheduling-only rebuilds, 20 October 2026](#build-reuse-scheduler-top-45-part-2-walks-keyed-by-the-data-they-walk-preflight-stops-scheduling-only-rebuilds-20-october-2026)
+- [MESH-EBONHEART-DRAGON-PEDESTAL-42: the game drops a root node's translation, 20 October 2026](#mesh-ebonheart-dragon-pedestal-42-the-game-drops-a-root-nodes-translation-20-october-2026)
+- [SKY-REDMOUNTAIN-BLUE-44: region weather, 20 October 2026](#sky-redmountain-blue-44-region-weather-20-october-2026)
 - [BUILD-REUSE-SCHEDULER-TOP-45: a scheduler-only edit rekeyed the gallery and the stair walks, 19 October 2026](#build-reuse-scheduler-top-45-a-scheduler-only-edit-rekeyed-the-gallery-and-the-stair-walks-19-october-2026)
 - [CHIM-ROCKS-OPEN-SHELLS-43: island-wide rock sweep finds no converter cause, 19 October 2026](#chim-rocks-open-shells-43-island-wide-rock-sweep-finds-no-converter-cause-19-october-2026)
 - [TRACKER-CHIM-COUNT-STALE-44: the tracker counted audits, not the build, 19 October 2026](#tracker-chim-count-stale-44-the-tracker-counted-audits-not-the-build-19-october-2026)
@@ -45,6 +55,8 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 - [BUILD-CHIM-STAIR-JOBS-AT-LAUNCH-42 and BUILD-CHIM-STAIR-NO-REUSE-42, 17 October 2026](#build-chim-stair-jobs-at-launch-42-and-build-chim-stair-no-reuse-42-17-october-2026)
 - [BUILD-SCHEDULER-MEMORY-STARVED-42, 17 October 2026](#build-scheduler-memory-starved-42-17-october-2026)
 - [SKY-STAR-TWINKLE-LATE-42, 17 October 2026](#sky-star-twinkle-late-42-17-october-2026)
+- [NPC-DREAMER-GREETING-DEFAULT-42, 17 October 2026](#npc-dreamer-greeting-default-42-17-october-2026)
+- [NPC-STORY-DISABLED-AT-START-42, 17 October 2026](#npc-story-disabled-at-start-42-17-october-2026)
 - [NOCLIP-BOB-DEFAULT-42, 17 October 2026](#noclip-bob-default-42-17-october-2026)
 - [CHIM-ZONE-RELEASE-FLICKER-42, 17 October 2026](#chim-zone-release-flicker-42-17-october-2026)
 - [MESH-EBONHEART-DRAGON-PEDESTAL-42, 17 October 2026](#mesh-ebonheart-dragon-pedestal-42-17-october-2026)
@@ -69,6 +81,97 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 - [INTERIOR-SPAWN-UNDERWATER-41, 17 October 2026](#interior-spawn-underwater-41-17-october-2026)
 
 <!-- contents end -->
+
+## CHIM-HULL-SURFACE-HEAP-46: the walkway collision fix put six frames over the CHIM zone, 20 October 2026
+
+The v0.0.46-dev1 build stopped at its CHIM heap gate: six frames over the zone by 31 to 175 KB. Measured with the
+problem cells and their neighbours built alone: the walkway fix (CHIM-VIVEC-DOCK-WALKWAY-43) gave every piece of its
+484 meshes the hull of all its points, so every rock corner became a plane, a node and clipnodes in every scaled
+copy; with that rule off the frames match v0.0.45. Repaired in the shared converter: the pieces hold only their
+walkable surface, faces the stair rules leave deep become plates, scaled copies of collision-free flora are merged,
+and one Daedric ruin collides with coarser pieces. All six frames fit (19 to 177 KB headroom); the full build is next.
+
+## BUILD-STAIR-WALK-BRUTE-FORCE-46: collision from what the game already knows, 20 October 2026
+
+[BUILD-STAIR-WALK-BRUTE-FORCE-46](bugs/BUILD-STAIR-WALK-BRUTE-FORCE-46.md): a full build walks about 1.5 million
+steps to rediscover what the game data and movement rules already say; nine earlier entries since v0.0.36 made the
+walks cheaper without asking why they were needed. Decided: a second collision method from the game data, A/B
+against today on the same frames, today kept selectable ([roadmap](ROADMAP.md)).
+
+## BUILD-HEAP-GATE-AFTER-STAIRS-46 and BUILD-CHIM-MAIN-MEMORY-46 registered, 20 October 2026
+
+[BUILD-HEAP-GATE-AFTER-STAIRS-46](bugs/BUILD-HEAP-GATE-AFTER-STAIRS-46.md): the v0.0.46-dev1 build failed 2 h 38 min in
+at the CHIM heap gate (six frames 0.6 to 2.8 % over the zone); the gate took 12.6 s and runs after the stair walk.
+[BUILD-CHIM-MAIN-MEMORY-46](bugs/BUILD-CHIM-MAIN-MEMORY-46.md): in the same build the container reached 42.1 of
+44 GiB in the world frames step and the memory guard cut the CHIM workers from 21 to 14.
+
+## TESTS-HEAD-REDUCER-BYTES-CI-45 persisting: the NPC bake follows the processor's linear algebra kernel, 20 October 2026
+
+TESTS-HEAD-REDUCER-BYTES-CI-45 (PERSISTING since v0.0.44, 19 October 2026; reported 4 times): the byte-exact head
+reducer test failed in CI on some runners and passed on others with the same commit. Cause proven: OpenBLAS in the
+NumPy and SciPy packages picks its kernels by the processor (SkylakeX with AVX-512, Haswell on AVX2 processors,
+older families below), and the families round the bake's matrix products and pseudo-inverses differently in the last
+bit; a skin texel meant to be 220 is then truncated to 219 on one of them (358 texels of the fixture; faces and UVs
+identical). Forcing the Haswell family on this machine gives exactly the CI digest `1da14f60…`, also with the CI's
+package versions, while SkylakeX (this machine's own) gives the pinned one. So NPC skins were not reproducible across
+processors either. Repaired on branch v0.0.46-ci-reducer: builder and test runner pin one kernel family before NumPy
+loads (`tools/blas_kernel.py`, Haswell), the NPC bake caches key on the kernel, the test checks exact bytes under the
+pinned family in a child process, and CI prints the processor model. The whole suite run under the Haswell and the
+native family differs in this one test only. The next build rebakes the NPC gallery and resident NPC models once.
+[Report](bugs/TESTS-HEAD-REDUCER-BYTES-CI-45.md).
+
+## BUILD-REUSE-PLAN-ENV-36 persisting: the standalone reuse plan keyed stages with an empty environment, 20 October 2026
+
+BUILD-REUSE-PLAN-ENV-36 (PERSISTING since v0.0.36-dev1, 10 October 2026; reported again with v0.0.45):
+`build.py --reuse-plan` returned before the build exported its options to the environment, so every stage key
+that names an `AMIWIND_*` variable differed from the run's (15 variables, each recorded against "unset").
+Against the v0.0.45 release run the plan showed 8 of 39 stages reused. Repaired on
+branch v0.0.46-reuse-plan-env: the build and the plan share two export functions, the plan takes the options
+after `--`, the run's recorded command (recorded from now on) or the build defaults, and says which; now 16 of 39
+reused, every rebuild named by a changed file. Two tests, the first failing against the old code.
+[Report](bugs/BUILD-REUSE-PLAN-ENV-36.md).
+
+## TRACKER-REGISTER-SIZE-33 and TRACKER-REGISTER-SIZE-36: the archive split by version range, 20 October 2026
+
+TRACKER-REGISTER-SIZE-33 (PERSISTING, reported a fifth time): the register audit of 20 October 2026 took the single
+bug archive to 232,832 bytes, 89 % of its 256 KiB limit. The archive is now one file per range of the version a bug
+was first found in (to v0.0.31, v0.0.32, v0.0.33, v0.0.34-v0.0.35; `ARCHIVES` in `tools/bug_register.py`), and the
+rotation reaches v0.0.35, which is the second archive of TRACKER-REGISTER-SIZE-36. Archives 22-33 % of their limit,
+`bugs.json` 66 % of 1 MiB; every tracker file warns at 75 % again. Not shipped.
+[Report](bugs/TRACKER-REGISTER-SIZE-33.md). SKY-FLAT-PALETTE-DRIFT-41: both parts are merged on the dev line
+(a6a9c6e9); status corrected.
+
+## BUILD-SIZE-GUARD-OLD-BASELINE-45: the size guard compared v0.0.45 with v0.0.41, 20 October 2026
+
+BUILD-SIZE-GUARD-OLD-BASELINE-45: the v0.0.45 release build failed its size guard on 0.44 GiB of CHIM world growth
+although every folder had the size of the v0.0.44 release build's: the guard always compared with the committed
+record, which was still of v0.0.41. Repaired on branch v0.0.45-reuse-keys: the release record is the previous
+release's own ledger (tools/previous-release.json; its release build in the workspace, else the committed record of
+that release); tools/size-baseline.json is now the v0.0.45 record. [Report](bugs/BUILD-SIZE-GUARD-OLD-BASELINE-45.md).
+
+## BUILD-REUSE-SCHEDULER-TOP-45 part 2: walks keyed by the data they walk, preflight stops scheduling-only rebuilds, 20 October 2026
+
+BUILD-REUSE-SCHEDULER-TOP-45: measured per reached unit, the CHIM stair key changed between v0.0.44 and v0.0.45 only
+through the import-time code of tools/chim/validate.py (the frame loader's module) and the legacy-map walk key only
+through two pool sizing constants in tools/stair_parallel.py. Repaired on branch v0.0.45-reuse-keys: NPC gallery face
+keys in key form 2; a CHIM walk keyed by the SHA-256 of the frame data it walks plus the walk's own code, every walk
+worker checking the frame it reads against that key; pool sizing constants key no walk; the reuse preflight stops a
+build whose rebuilds only scheduling code, VERSION or prose explain. Each with a test that fails against the old
+code. [Report](bugs/BUILD-REUSE-SCHEDULER-TOP-45.md).
+## MESH-EBONHEART-DRAGON-PEDESTAL-42: the game drops a root node's translation, 20 October 2026
+
+[MESH-EBONHEART-DRAGON-PEDESTAL-42](bugs/MESH-EBONHEART-DRAGON-PEDESTAL-42.md): the dragon statue's model has a
+root NiNode with a translation of z 327.1; the game drops a root NiNode's whole transform (rule from OpenMW file
+components/nif/node.cpp), the converter dropped only its rotation, so the statue and its plinth floated 327 units
+over the plaza. Repaired for every model in `nif_common.scenery_root_local`; the new `tools/nif_root_audit.py` finds
+25 models with 723 placements that move, among them 41 Daedric ruins drawn 1,018 units too low. Needs a world build.
+
+## SKY-REDMOUNTAIN-BLUE-44: region weather, 20 October 2026
+
+[SKY-REDMOUNTAIN-BLUE-44](bugs/SKY-REDMOUNTAIN-BLUE-44.md): the sky had only the clear weather's colours and no
+build step wrote the regions' weather, so all nine regions drew the clear sky; Red Mountain's record is blight
+100 %. Repaired: the builder writes `region-weather.aww`, the engine picks each region's weather and draws its sky,
+horizon and fog colours. Needs a world build and an in-game look.
 
 ## BUILD-REUSE-SCHEDULER-TOP-45: a scheduler-only edit rekeyed the gallery and the stair walks, 19 October 2026
 
@@ -264,6 +367,11 @@ preflight passes: one drive, boot, frame-map and CHIM world partitions, all with
 The maintainer's v0.0.43-dev2 playtest: the walkway at the Vivec Hlaalu canton dock cannot be climbed; the player
 gets stuck at its foot. Registered open; to be checked in v0.0.43-dev3 with the shared stair fix.
 
+Cause measured the same day: the converter built each convex collision piece from its extreme points along 14
+directions only, and on the dock's level-then-sloped deck that hull lies up to 19.4 units under the planks (the
+authored collision follows them). A second spot by the Arena canton is the same mesh. Fixed in the shared converter
+for 484 measured meshes, with a collision surface gate for every CHIM mesh; verification waits for a build.
+
 ## ENGINE-HEAP-FIXED-SIZE-43, 18 October 2026
 
 The maintainer's v0.0.43-dev2 playtest with 128 MB of RAM: the game heap stays at the build's 11 MiB, so Vivec
@@ -423,6 +531,19 @@ memory beside a stage.
 v0.0.42-dev1 night and some later on. Not a code change: the twinkle (three stars of the dome, unchanged since
 v0.0.28) shows only once the midnight clearing opens the sky; the moving cloud veil can also read as twinkling.
 Minor visual item; new saved switch `aw_star_twinkle` (default on, look unchanged; 0 = steady stars) with a test.
+
+## NPC-DREAMER-GREETING-DEFAULT-42, 17 October 2026
+
+[NPC-DREAMER-GREETING-DEFAULT-42](bugs/NPC-DREAMER-GREETING-DEFAULT-42.md): cause found: a talk said the NPC's Hello
+bark; the conversation greeting topics (Greeting 0-9) were never read, and the Hello topic has no Dreamer line.
+Repaired in source: a talk opens with the greeting picked by OpenMW's startDialogue rule (first meeting and later
+talk), for every NPC; Dreamers now open with their Sixth House lines.
+
+## NPC-STORY-DISABLED-AT-START-42, 17 October 2026
+
+[NPC-STORY-DISABLED-AT-START-42](bugs/NPC-STORY-DISABLED-AT-START-42.md): registered: the original's Startup script
+disables 58 NPCs (the twelve town Dreamers and the Dreamer Prophet among them) and 20 creatures at a new game, and
+the Dreamers enable themselves at journal A2_2_6thHouse 50; AmiWind places them all from the start. Open.
 
 ## NOCLIP-BOB-DEFAULT-42, 17 October 2026
 

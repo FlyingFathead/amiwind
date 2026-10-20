@@ -1,6 +1,6 @@
 # CHIM ideas and held-back work
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +21,7 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 - [Texture effects: a bug turned into an effect](#texture-effects-a-bug-turned-into-an-effect)
 - [The slow-accelerator reality](#the-slow-accelerator-reality)
 - [Island-wide audits (mechanism classes)](#island-wide-audits-mechanism-classes)
+- [Collision from what the game already knows](#collision-from-what-the-game-already-knows)
 - [Also held back](#also-held-back)
 - [Measured and dropped](#measured-and-dropped)
 
@@ -193,6 +194,16 @@ seen from the world. The legacy region maps drew these views much better.
   a few hundred bytes), one fill per screen column. A height grid cannot show an arch, so a bridge seen from far
   becomes a band down to the water; for those few objects the low-poly shells (mold shells, collision hulls)
   sit on top. A/B against today at the same poses (the Vivec bridges, Balmora across the river at sunset).
+- **Solid at every distance: the order. Proposed 19 October 2026.** The maintainer's examples: Vivec's walkways
+  cut in the middle at a distance, Balmora's walls, hillsides and the Ghostfence, which should all stay solid.
+  Cheapest first: (1) the fog rule, no cut before the fog is opaque (settings and a builder check, no new drawing
+  code); (2) long structures (walkways, town walls, the Ghostfence) cut as one piece at one distance, so they fade
+  together instead of losing their middle; (3) the far shell in flat fog colour, measured in the sandbox, designed
+  with the streaming as [one system](CELL_CROSSINGS.md#near-and-far-as-one-system-upcoming-direction); (4) if the
+  68040 cannot afford (3), the horizon profile above (one fill per screen column, a few hundred bytes per cell)
+  for what lies far behind the fog, with the shells only for the few arches. 20 October 2026: (1) and (2) in
+  source, off until the in-game A/B (`dbg fog rule`, `dbg cut groups`: switches in `aw_cull`;
+  [CHIM-BRIDGE-POP-PIECES-44](../bugs/CHIM-BRIDGE-POP-PIECES-44.md)).
 - **No artificial clamps.** The CHIM view distance follows the ring and the
   memory budget, with any remaining limit measured and stated.
 
@@ -375,7 +386,19 @@ Detail: [CHIM engine, "Memory"](ENGINE.md#memory) and the heap gate in the
   chunk room, at 661 of 9,216 positions. The heap gate reports the active
   ring, the load ring and the largest single block, and follows the engine's
   stated policy (`tools/engine_limits.py`) instead of keeping its own copy.
-- **Full rotation in the placement record. Status: measured, proposed (16 October 2026).** A placement
+- **Full rotation in the placement record. Status: decided for the project, next after the cell crossings (19
+  October 2026); first measured 16 October 2026.** Island-wide on the v0.0.45 world: 33,426 stored models made
+  from only 1,400 distinct meshes, 26,477 of them tilted variants (550 MB), and 91 % of the 713 MB of model data
+  copies beyond one per mesh (barnacles alone in 2,022 variants;
+  [CHIM-TILT-VARIANTS-SPLIT-33](../bugs/CHIM-TILT-VARIANTS-SPLIT-33.md)); up to about 650 MB of the 1.32 GB CHIM
+  world, less what collision copies keep. Engine side: drawing a turned model is Quake's own path
+  (`R_RotateBmodel`) and costs one change of view per model, not per vertex; uniform scale is added to the same
+  transform; collision is the open part (below). Selectable storage: mode 0 a baked copy per tilt and scale
+  (today, kept), mode 1 one shared model with rotation and scale in the placement record; a separate setting for
+  collision; mode 1 the default once smaller and no slower on the 68040 and 68060 profiles. The interiors need the
+  same mechanism, so it comes before them ([roadmap](../ROADMAP.md)). It starts with a study of the engine's turned
+  models (drawing and collision as they are, CHIM's yaw-only placements) and of what scale needs, which Quake lacks,
+  before any code. From 16 October: a placement
   record holds a position and a yaw, so every tilted or scaled placement of a mesh is baked into a model of
   its own. Morrowind tilts and scales a lot (Telvanni roots, kelp, shells, barnacles): in the 13 cells left
   out of v0.0.41-dev4, 854 of 1,586 stored models are tilted copies, 20.6 of 41.5 MB. With the rotation in
@@ -387,6 +410,17 @@ Detail: [CHIM engine, "Memory"](ENGINE.md#memory) and the heap gate in the
   adopting on the cells over the memory budget. A builder-only table that merges near-identical tilts
   saves little: 0.6 % exact (two placements share a model only when they differ by a world yaw, because
   Morrowind applies its Z rotation first), 2 % with tilts snapped to 2 degrees.
+- **The same building blocks everywhere. Status: direction (19 October 2026).** One stored model per mesh, placed
+  by reference at any angle and size, is the rule for every kind of content, not only outdoor scenery: people
+  from a shared library of body parts with a recipe per person (3,500 baked people use only 942 part meshes, about
+  72 uses each; [Modular NPCs](#modular-npcs)), and interiors from Morrowind's own kit pieces (halls, walls,
+  stairs per house style), so a room becomes mostly a list of placements instead of about 2 MB of copies.
+- **Rewriting the upper half of the world streaming. Status: direction (19 October 2026).** What works today is
+  the chunk streaming inside a frame (reading chunks, the cache, grafting them into one world). What has to go is
+  the layer above it: frames as separate maps with a level change between them
+  ([Cell crossings](CELL_CROSSINGS.md)). The continuous world replaces that layer, near detail and the far shell
+  are designed together, and shared models change what a chunk holds. Whether the chunk layer itself is rewritten
+  too is decided by the 2x2 sandbox: if it cannot hold a window of several frames cleanly, it is.
 - **Fragmentation. Status: in source on a branch.** The zone never moves a
   block, so a ring that fits by the sum can still find no piece large enough
   for a house model once locked blocks split the room (at a dense Balmora
@@ -576,6 +610,22 @@ the build counts, ordered by the polycount heatmap and the estimator.
 | Sky-bank texels | The validator refuses texels on the sky's palette entries ([CHIM-TEXTURE-SPECKS-33](../bugs/CHIM-TEXTURE-SPECKS-33.md)) | in source |
 | Hidden faces | Placed-model faces buried under the terrain, which the legacy maps culled ([CHIM-HIDDEN-FACES-33](../bugs/CHIM-HIDDEN-FACES-33.md)) | open |
 | Memory fit | The strict heap gate (active ring, load ring, largest block) and the zone walk gate on every frame | in source (zone walk gate on a branch) |
+
+## Collision from what the game already knows
+
+**Status: decided as a direction, 20 October 2026; not started.** The stair walk above was the right safety net
+while the converter guessed at collision, but it walks every step of the island to rediscover what the game data
+already says: a mesh's own collision node (or its drawn mesh), and the original movement rules for the highest
+step, the steepest walkable slope and the player's size (the original game, OpenMW's movement code and the GMSTs).
+The second method builds collision from those, walkable by construction: a plate per tread or an invisible ramp
+under a flight, steps still drawn as steps, and only the surfaces the player stands on kept exact. Its check is
+arithmetic (standing surface against the drawn one, step heights against the limit); the walk becomes a sample. The
+first method stays selectable and unchanged, with its stair gate, and the walk results it has already recorded are
+kept as the reference for the comparison. Both are compared on the same frames (memory, build time, the walk
+sample, clips at stairs, docks and ladders), and the new one must first give the same result at every place where
+a stair or collision bug was fixed. A collision simplifier (plates, merged coplanar pieces) replaces the visual
+mesh optimizer for this; the visual optimizer moves vertices of steps and made merged meshes larger before.
+See the [roadmap](../ROADMAP.md) and [BUILD-STAIR-WALK-BRUTE-FORCE-46](../bugs/BUILD-STAIR-WALK-BRUTE-FORCE-46.md).
 
 ## Also held back
 

@@ -620,6 +620,8 @@ static int KeepPersistent (void *data, unsigned id)
 
 static void MapEnd (void)
 {
+	/* The cut groups live in the map's Hunk: never kept past it. */
+	ChimCuts_End ();
 	if (far_only && !keep_far)
 		ChimFar_End ();
 	far_only = 0;
@@ -850,6 +852,10 @@ static void MapBeginWork (const char *entities, double spike_t0)
 	 * map) before the frame world: if a later step fails, the map keeps it
 	 * as its floor (H15; CHIM-GRAFT-FAIL-NO-FLOOR-35). */
 	ChimFar_Begin (MapModel () ? MapModel ()->name : "", (long)host_parms.memsize - Hunk_LowMark () - Hunk_HighMark ()
+		- (long)chim_reserve_kib.value*1024);
+	/* The frame's whole-structure cut groups (chim_cuts.c, low Hunk, given
+	 * back with the map) before any chunk is activated. */
+	ChimCuts_Begin (MapModel () ? MapModel ()->name : "", (long)host_parms.memsize - Hunk_LowMark () - Hunk_HighMark ()
 		- (long)chim_reserve_kib.value*1024);
 	{
 		/* Statics the frame map streams with their chunks (chim_statics.c). */
@@ -1300,6 +1306,7 @@ static void Status (void)
 			(long)(chim_read_kib.value * 1024), (long)(chim_graft_kib.value * 1024));
 		Con_Printf ("frame edge: %s\n", edge_closed ? "closed (\"" CHIM_EDGE_MESSAGE "\" at the bounds)" : "open");
 		ChimFar_Report ();
+		ChimCuts_Report ();
 	}
 }
 

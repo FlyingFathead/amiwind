@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 7 times; something has to be done
+## PERSISTING: reported 8 times; something has to be done
 
 - Reported with v0.0.33 at 2026-10-09 (time not recorded): found by the island-wide seam audit: 49 reduced meshes tear their seams
 - Reported with v0.0.36-dev3 at 2026-10-11 03:36 +0300: measured as visible holes: 39 of 150 open-world rocks at 64 triangles show the sky through on more than 5 of 100 pixels, worst 48 (terrain_ashland_rock_01)
@@ -11,6 +11,7 @@
 - Reported with v0.0.43-dev2 at 2026-10-18 19:06 +0300: open rocks at -4,12/-4,13 are on classic region maps in dev2 (not CHIM); one step into CHIM cell -5,13 the same rocks are closed; dev3 has all three on CHIM
 - Reported with v0.0.43-dev2 at 2026-10-18 19:20 +0300: maintainer: two long spikes hang from a rock/terrain face in Balmora (cell -3,-3, global -20051 -19320 80, local 107 -1758 20); Balmora is a CHIM town frame
 - Reported with v0.0.43-dev2 at 2026-10-18 19:21 +0300: maintainer: the Balmora spikes may be the overpass poking through the rocks; wants its ends hidden inside the rocks
+- Reported with v0.0.45 at 2026-10-20 02:30 +0300: v0.0.45 seam audit: 42 reduced meshes above 2 percent seam tear (worst flora_bc_tree_01 80.8 percent)
 
 <!-- END GENERATED PERSISTING -->
 
@@ -37,7 +38,7 @@ _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
+- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

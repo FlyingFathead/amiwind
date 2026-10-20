@@ -43,6 +43,13 @@ int AW_ViewTorchParse(aw_view_torch_t *out,const unsigned char *p,int size,int f
     }
     out->count=count;return 1;
 }
+int AW_ViewHeldRetry(int cached,int free_bytes,double now,double *next) {
+    if(!next)return 0;
+    if(cached){*next=0;return 0;}
+    if(now<*next)return 0;
+    *next=now+AW_VIEW_HELD_RETRY;
+    return free_bytes>=AW_VIEW_HELD_FREE;
+}
 
 static int layer_number(const char **text,int *out) {
     const char *p=*text;int v=0,n=0;

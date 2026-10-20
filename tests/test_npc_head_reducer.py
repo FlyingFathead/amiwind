@@ -15,8 +15,44 @@ sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools'), str(ROOT / 'tests')]
 from test_npc_head_detail import grid, needs_numpy  # noqa: E402
 
 # bake(budget=192, head_detail='budget') of the four-shape fixture below with the code before the locked reducer
-# (v0.0.43-moragtong 46a05aa): SHA-256 of frames, faces, uv and skin bytes; 190 faces.
-PREVIOUS_BYTES = '2e30b36563cd6a2638423fe1a08d4f767f84c83226e84e4d1a482242f54a5f09'
+# (v0.0.43-moragtong 46a05aa): SHA-256 of frames, faces, uv and skin bytes; 190 faces. Baked with the builder's
+# pinned BLAS kernel family (tools/blas_kernel.py, Haswell): other kernel families round the bake's matrix
+# products and pseudo-inverses differently in the last bit, and the skin's float-to-byte step turns that into
+# other texels (TESTS-HEAD-REDUCER-BYTES-CI-45: 2e30b365... was this fixture under the SkylakeX kernel of an
+# AVX-512 processor, 74719be5... under Nehalem/Sandybridge; 46a05aa gives the same three values per kernel).
+PREVIOUS_BYTES = '1da14f60d4673a713aca3cae0f08c814399644f5d70977a69768354371923d34'
+# The same fixture with the locked reducer (the shipped default), same kernel.
+LOCKED_BYTES = '4357e33d0df5f045f1c700d80d69a84ff988ed523724bc79ce45a1913e067851'
+
+
+def pinned_bake_digests(*modes):
+    """{reducer mode: (digest, faces)} of the budget bake, baked in a child process that computes with the
+    builder's pinned BLAS kernel family, whatever kernel this process loaded."""
+    import json
+    import subprocess
+    import blas_kernel
+    try:
+        environ = blas_kernel.pinned_environment()
+    except ValueError as exc:
+        raise unittest.SkipTest(str(exc))
+    environ['PYTHONPATH'] = os.pathsep.join(str(ROOT / name) for name in ('src', 'tools', 'tests'))
+    code = ('import json, os, sys\n'
+            'from unittest.mock import patch\n'
+            'import test_npc_head_reducer as T\n'
+            'from npc_geometry import bake\n'
+            'case = T.HeadReducer()\n'
+            'out = {}\n'
+            'for mode in sys.argv[1:]:\n'
+            '    with patch.dict(os.environ, {"AMIWIND_NPC_HEAD_REDUCER": mode}):\n'
+            '        r = bake(case.shapes(), case.materials, {}, case.palette, budget=192, head_detail="budget")\n'
+            '    out[mode] = [T.digest(r), len(r[1])]\n'
+            'print("DIGESTS " + json.dumps(out))\n')
+    done = subprocess.run([sys.executable, '-c', code, *modes], env=environ, capture_output=True, text=True,
+                          timeout=600)
+    lines = [line for line in done.stdout.splitlines() if line.startswith('DIGESTS ')]
+    if done.returncode or not lines:
+        raise AssertionError('pinned bake failed (exit %d):\n%s%s' % (done.returncode, done.stdout, done.stderr))
+    return {mode: tuple(value) for mode, value in json.loads(lines[-1][8:]).items()}
 
 
 def open_edges(faces):
@@ -85,15 +121,12 @@ class HeadReducer(unittest.TestCase):
 
     @needs_numpy
     def test_previous_reducer_reproduces_the_previous_bytes(self):
-        from npc_geometry import bake
-        with patch.dict(os.environ, {'AMIWIND_NPC_HEAD_REDUCER': 'default'}):
-            previous = bake(self.shapes(), self.materials, {}, self.palette, budget=192, head_detail='budget')
-        self.assertEqual(digest(previous), PREVIOUS_BYTES)
-        self.assertEqual(len(previous[1]), 190)
-        with patch.dict(os.environ, {'AMIWIND_NPC_HEAD_REDUCER': 'locked'}):
-            locked = bake(self.shapes(), self.materials, {}, self.palette, budget=192, head_detail='budget')
-        self.assertNotEqual(digest(locked), PREVIOUS_BYTES)
-        self.assertLessEqual(abs(len(locked[1]) - len(previous[1])), 8)
+        # Exact bytes, under the one kernel family every build computes with (not this process's kernel).
+        out = pinned_bake_digests('default', 'locked')
+        self.assertEqual(out['default'], (PREVIOUS_BYTES, 190))
+        self.assertEqual(out['locked'], (LOCKED_BYTES, 189))
+        self.assertNotEqual(out['locked'][0], PREVIOUS_BYTES)
+        self.assertLessEqual(abs(out['locked'][1] - out['default'][1]), 8)
 
     @needs_numpy
     def test_original_heads_are_unchanged(self):

@@ -399,11 +399,16 @@ class CollisionTreeTests(unittest.TestCase):
         class Data:
             roots=[root]
             def read(self,f):pass
-        N=NS(Data=Data,NiAVObject=Node,RootCollisionNode=Collision,NiTriShape=Shape)
+        N=NS(Data=Data,NiAVObject=Node,NiNode=Node,RootCollisionNode=Collision,NiTriShape=Shape)
         raw=b'NetImmerse File Format, Version 4.0.0.2\n'
         visual,_,bounds,_=model_geometry(raw,N)
         physical,_,cbounds,_=model_geometry(raw,N,collision=True)
-        self.assertEqual(bounds,[[5.,0.,0.],[6.,1.,0.]])
-        self.assertEqual(cbounds,[[17.,0.,0.],[18.,1.,0.]])
+        # The root node's own x 5 is dropped (a root NiNode loses its whole transform, rule from OpenMW
+        # components/nif/node.cpp; MESH-EBONHEART-DRAGON-PEDESTAL-42); the collision child keeps its x 10 + 2.
+        self.assertEqual(bounds,[[0.,0.,0.],[1.,1.,0.]])
+        self.assertEqual(cbounds,[[12.,0.,0.],[13.,1.,0.]])
+        # The earlier rule (root translation kept) stays selectable.
+        self.assertEqual(model_geometry(raw,N,root_rule='morrowind')[2],[[5.,0.,0.],[6.,1.,0.]])
+        self.assertEqual(model_geometry(raw,N,collision=True,root_rule='morrowind')[2],[[17.,0.,0.],[18.,1.,0.]])
         self.assertEqual(len(unpack_geometry(visual)[1]),1)
         self.assertEqual(len(unpack_geometry(physical)[1]),1)

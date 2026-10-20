@@ -1,6 +1,6 @@
 # CHIMport: the whole island on CHIM, cell by cell
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -384,12 +384,21 @@ brought into CHIM, not routed around. Work through it in this order:
    of its mesh, stored whole. Many of them in one ring (Telvanni roots: 19 copies of one root in Sadrith
    Mora, 455 KB for a 24 KB mesh) are the case for full rotation in the placement record
    ([IDEAS, Memory](IDEAS.md#memory)); until then, a recipe can reduce that mesh once for every copy.
+   Scaled copies of a mesh without collision (kelp, grass) are already merged: their scale is rounded to the
+   nearest 0.1 (`--scale-snap`, on by default since v0.0.46; [CHIM-HULL-SURFACE-HEAP-46](../bugs/CHIM-HULL-SURFACE-HEAP-46.md)).
 6. **Measure blanket methods before using them.** The mesh optimizer on every mesh made
    Hla Oad's frames larger (merged flora polygons become triangles); cutting large models
    into tiles raised Molag Amur's peak. Both stay selectable for a measured A/B.
 
 After the fix, the cell and the neighbours left out for it rejoin the cell list, and the
 CHIMport run reports the cell again.
+
+**Before merging a converter change that touches many meshes** (a collision rule, a mesh method, a recipe for every
+cell), check the frames closest to the zone with it: `tools/chim_heaviest_frames.py <last build>/chim-world` lists
+them (less than 256 KiB headroom, at least the 12 tightest) and prints their cells with their neighbours for
+`tools/chim_build.py --chim-regions-cells ... --validate --stats`, a build of minutes whose heap gate answers before
+the merge. The walkway collision fix was estimated from its standing-hull bytes alone and put six frames over the
+zone at the end of a 2 h 38 min CHIM stage ([CHIM-HULL-SURFACE-HEAP-46](../bugs/CHIM-HULL-SURFACE-HEAP-46.md)).
 
 Interiors have their own limits and their own order of repairs (sprites, per-mesh reduction, sections cut
 at hallways and doorways, recentring): [Interior sections](../INTERIOR_SECTIONS.md#interiors-over-a-limit-the-order).
@@ -421,6 +430,11 @@ Two things to check at step 3 (18 October 2026, [CHIM-STAIR-STEPS-SOLID-43](../b
   failure row names the walked placement; trace the hull at the stop to see whose collision it is. A walkway family
   that needs it is listed with `visible_walkways` in `town_regions.visual_profile`, with the measured count of
   meshes and frames it changes; the test for every mesh would change 858 of 1,298 frames.
+- Collision can also lie under what you see: the player stands in the planks and the next edge is a step too high
+  (18 October 2026, [CHIM-VIVEC-DOCK-WALKWAY-43](../bugs/CHIM-VIVEC-DOCK-WALKWAY-43.md)). Compare the top of the
+  convex pieces with the collision mesh, not only with the visible faces; a convex piece built from too few points
+  cuts a bent deck as a chord. The collision surface gate names such a mesh; it goes into
+  `config/collision-hull-surface.json`.
 
 After a converter change, find the frames that place a changed mesh and walk them again: the census of every mesh
 before and after the change, then the frames of the last full build that place one of the changed meshes, built

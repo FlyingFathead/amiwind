@@ -57,6 +57,8 @@ void Cmd_AddCommand(char *name,void (*fn)(void)){
  if(!strcmp(name,"aw_console_font"))font_command=fn;
 }
 cvar_t *Cvar_FindVar(char *n){static cvar_t c;return !strcmp(n,"aw_fog") || !strcmp(n,"aw_skyline_fill")?&c:NULL;}
+static float cull_value=4;
+float Cvar_VariableValue(char *n){assert(!strcmp(n,"aw_cull"));return cull_value;}
 /* Every catalogue entry, typed with no arguments, must reach exactly its
  * handler through the engine's translator: a broken or shadowed entry fails. */
 static void every_entry_translates(void){
@@ -71,6 +73,7 @@ static void every_entry_translates(void){
   *bar2=0;*bar3=0;snprintf(words,sizeof words,"%s",bar1+1);snprintf(handler,sizeof handler,"%s",bar2+1);
   argv[0]="dbg";argc=1;
   for(w=strtok(words," ");w && argc<16;w=strtok(NULL," "))argv[argc++]=w;
+  /* dbg fog rule / dbg cut groups print aw_cull with no argument (switch bits) */
   snprintf(expect,sizeof expect,"%s%s\n",handler,
        !strcmp(bar1+1,"characterchange")?" appearance":!strcmp(bar1+1,"inventory grant")?" grant":
        (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
@@ -106,6 +109,16 @@ int main(int count,char **values){
     fog[2]="0.5";assert(AW_DebugTranslate(3,fog,output,sizeof(output))==1 && !strcmp(output,"aw_fog 0.5\n"));
     assert(AW_DebugTranslate(4,fill,output,sizeof(output))==1 && !strcmp(output,"aw_skyline_fill 0\n"));
     assert(AW_DebugTranslate(3,guard,output,sizeof(output))==1 && !strcmp(output,"aw_guardtorch on\n"));
+  }
+  { /* CHIM-BRIDGE-POP-PIECES-44: the fog rule and whole-structure cuts are bits
+     * of aw_cull (8, 16); the far test in the low bits is kept. */
+    char *rule[4]={"dbg","fog","rule","on"},*groups[4]={"dbg","cut","groups","1"};
+    cull_value=4;assert(AW_DebugTranslate(4,rule,output,sizeof(output))==1 && !strcmp(output,"aw_cull 12\n"));
+    cull_value=12;assert(AW_DebugTranslate(4,groups,output,sizeof(output))==1 && !strcmp(output,"aw_cull 28\n"));
+    cull_value=28;rule[3]="off";assert(AW_DebugTranslate(4,rule,output,sizeof(output))==1 && !strcmp(output,"aw_cull 20\n"));
+    cull_value=1;groups[3]="false";assert(AW_DebugTranslate(4,groups,output,sizeof(output))==1 && !strcmp(output,"aw_cull 1\n"));
+    rule[3]="maybe";assert(AW_DebugTranslate(4,rule,output,sizeof(output))==0);
+    cull_value=4;
   }
   { /* dbg god / dbg godmode: one handler, the usual toggle words reach it unchanged. */
     char *god[3]={"dbg","god","true"},*mode[3]={"dbg","godmode","off"};

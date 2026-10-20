@@ -211,6 +211,7 @@ def planned_region_frame_maps(id1, chim_world):
     maps/<name>.far, build_aga.chim_far_sidecar) and the recipe sprite assets (region_task). A frame map already on
     disk keeps its real size (the caller keeps its file)."""
     from chim.far import file_name, sidecar_name
+    from chim import cuts
     from chim.frame_map import region_map_names, region_source_sections
     from map_files import frame_ext
     from world_volumes import PlannedMap
@@ -226,6 +227,9 @@ def planned_region_frame_maps(id1, chim_world):
         far = Path(chim_world)/'far'/file_name(list(cell))
         if far.is_file():
             sidecars['id1/' + sidecar_name('maps/' + map_name)] = far.stat().st_size
+        cut = Path(chim_world)/'cuts'/cuts.file_name(list(cell))
+        if cut.is_file() and cuts.decode(cut.read_bytes())[0]['structures']:     # as build_aga.chim_cut_sidecar
+            sidecars['id1/' + cuts.sidecar_name('maps/' + map_name)] = cut.stat().st_size
         for asset in section.get('sprite_assets', []):
             sidecars['id1/' + asset['path']] = int(asset['bytes'])
     return planned, sidecars

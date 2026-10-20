@@ -22,7 +22,7 @@ h2{font-size:15px;margin:0 0 8px;color:#ffe28a}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px}
 .kv b{color:#9fb3c8;font-weight:400}
 #status.running{color:#8bd5ff}#status.passed{color:#7dffa6}#status.failed{color:#ff7070}
-.stage{display:grid;grid-template-columns:minmax(90px,150px) 1fr auto;gap:6px;align-items:center;font-size:12px;margin:2px 0}
+.stage{display:grid;grid-template-columns:16px minmax(90px,150px) 1fr auto;gap:6px;align-items:center;font-size:12px;margin:2px 0}
 .stage .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .track{position:relative;height:10px;background:#0d1620;border-radius:3px;overflow:hidden}
 .track i{position:absolute;top:0;bottom:0;left:0;border-radius:3px}
@@ -108,6 +108,20 @@ const POLL_MS = 2000, LIST_MS = 10000, LOG_KEEP = 400000, FIRST_TAIL = 65536;
 const S = {run: null, log: null, next: -1, size: 0, paused: false, progress: null, lastList: 0, files: [], console: false,
   timelineFor: null, timer: null, reading: false, token: 0, traces: [], trace: null, tnext: -1, tsize: 0, tgrew: 0, tlines: [], tool: '',
   tbuf: '', logGrewAt: 0};
+// Every time shown is a full stamp: local date, time and offset (the browser's clock) and the UTC date and time
+// (BUILD-ETA-CLOCK-UTC-ONLY-46). A stamp without a zone is shown as is, marked "zone unknown".
+const fullStamp = iso => {
+  if (!iso) return '';
+  const text = String(iso);
+  if (!/(?:[zZ]|[+-]\d\d:?\d\d)$/.test(text)) return text.replace('T', ' ') + ' (zone unknown)';
+  const d = new Date(text);
+  if (isNaN(d)) return text;
+  const p = n => String(n).padStart(2, '0'), off = -d.getTimezoneOffset();
+  const zone = (off >= 0 ? '+' : '-') + p(Math.floor(Math.abs(off) / 60)) + p(Math.abs(off) % 60);
+  const local = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  const utc = d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+  return local + ' ' + zone + ' / ' + utc + ' UTC';
+};
 const fmtS = s => { if (!Number.isFinite(s)) return '-'; s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
   return ((h ? h + ' h ' : '') + (h || m ? m + ' min ' : '') + (h ? '' : (s % 60) + ' s')).trim(); };
 const fmtB = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? (n / 1024).toFixed(0) + ' KB' : n + ' B';
@@ -137,15 +151,33 @@ function renderProgress(p) {
   if (!p) { kv([['Run', S.run || '-']]); $('stages').replaceChildren(); return; }
   const c = p.counts || {}, running = (p.stages || []).filter(s => s.status === 'running').map(s => s.name);
   const ageS = p.updated_epoch ? Date.now() / 1000 - p.updated_epoch : NaN;
-  $('updated').textContent = p.updated_at ? 'updated ' + p.updated_at.replace('T', ' ').replace('+00:00', ' UTC') + (Number.isFinite(ageS) ? ' (' + fmtS(ageS) + ' ago)' : '') : '';
+  $('updated').textContent = p.updated_at ? 'updated ' + fullStamp(p.updated_at) + (Number.isFinite(ageS) ? ' (' + fmtS(ageS) + ' ago)' : '') : '';
   kv([['Run', p.run || S.run], ['Done', (p.percent != null ? p.percent + ' %' : '-') + ' · ' + (c.passed || 0) + ' passed, ' + (c.running || 0) + ' running, ' +
       (c.pending || 0) + ' pending, ' + (c.failed || 0) + ' failed of ' + (c.total || 0)],
     ['Running', running.join(', ') || '-'], ['Elapsed', fmtS(p.elapsed_seconds)],
-    ['ETA', p.status === 'running' ? fmtS(p.eta_seconds) + (p.eta_at ? ' (at ' + p.eta_at.replace('T', ' ').replace('+00:00', ' UTC') + ')' : '') : '-'],
+    ['Time left', p.status === 'running' ? fmtS(p.eta_seconds) : '-'],
+    ['Finishes at', p.status === 'running' && p.eta_at ? fullStamp(p.eta_at) : '-'],
     ['ETA basis', (p.eta_basis || '-') + (p.critical_path ? ' · ' + p.critical_path.join(' > ') : '')],
     ['Cores now', (p.cores_now != null ? p.cores_now : '-') + (p.budget ? ' of ' + p.budget : '') + lowNow()]]);
   const cn = $('facts').children[$('facts').children.length - 1];
   if (cn && lowNow()) cn.className = 'red';
+  // One square per core of the budget, the busy ones filled: green at half the budget or more, amber under it, red
+  // once the low stretch has lasted (the same low-cores rule as the timeline and the "UNDER" note above)
+  let grid = $('coregrid');
+  if (!grid) { grid = el('div'); grid.id = 'coregrid'; $('facts').after(grid); }
+  grid.replaceChildren();
+  const total = Math.max(0, Math.round(p.budget || 0)), used = Math.min(total, Math.round(p.cores_now || 0));
+  if (p.status === 'running' && total) {
+    const low = lowNow(), under = (p.cores_now || 0) < total / 2;
+    const fill = low ? '#e04848' : under ? '#e0a23a' : '#3fbf7a';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(' + Math.ceil(Math.sqrt(total)) + ',14px);gap:3px;margin:6px 0';
+    grid.title = (p.cores_now != null ? p.cores_now : '-') + ' of ' + total + ' cores in use' + (low || (under ? ' · under half' : ''));
+    for (let i = 0; i < total; i++) {
+      const sq = el('i'); sq.style.cssText = 'width:14px;height:14px;border-radius:2px;border:1px solid #4a5f75;' +
+        'background:' + (i < Math.max(used, p.cores_now > 0 ? 1 : 0) ? fill : '#1a2430');
+      grid.append(sq);
+    }
+  }
   const box = $('stages'); box.replaceChildren();
   const stages = p.stages || [], top = Math.max(1, ...stages.map(s => Math.max(s.elapsed_seconds || 0, s.expected_seconds || 0)));
   for (const s of stages) {
@@ -154,7 +186,15 @@ function renderProgress(p) {
     done.style.width = (100 * Math.min(top, s.elapsed_seconds || 0) / top) + '%';
     track.append(exp, done);
     const name = el('span', 'name', s.name); name.title = s.name + ' · ' + (s.status || '') + ' · expected ' + fmtS(s.expected_seconds) + ' (' + (s.expected_basis || '') + ')';
-    row.append(name, track, el('span', 'muted', fmtS(s.elapsed_seconds)));
+    // Status first, by shape as well as colour: passed (built), reused, running, pending, failed, cancelled/skipped
+    const reused = s.status === 'passed' && (s.expected_source === 'reused' || s.expected_basis === 'reused');
+    const [mark, colour, says] = reused ? ['↺', '#8fae7a', 'reused from an earlier run']
+      : ({passed: ['✓', '#3fbf7a', 'passed, built in this run'], running: ['●', '#38a9e8', 'running'],
+          failed: ['✗', '#e04848', 'failed'], cancelled: ['⊘', '#8a98a8', 'cancelled'],
+          skipped: ['⊘', '#8a98a8', 'skipped']}[s.status] || ['○', '#8a98a8', 'pending']);
+    const icon = el('span', 'mark', mark); icon.style.color = colour; icon.style.textAlign = 'center';
+    icon.title = s.name + ': ' + says + (s.expected_basis && !reused ? ' (expected from ' + s.expected_basis + ')' : '');
+    row.append(icon, name, track, el('span', 'muted', fmtS(s.elapsed_seconds)));
     box.append(row);
   }
   if ($('follow').checked && running.length) {

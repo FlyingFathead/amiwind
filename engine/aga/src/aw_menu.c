@@ -202,8 +202,10 @@ static void memory_toggle(void){Cvar_SetValue("aw_autoram",Cvar_VariableValue("a
  * (docs/performance/FAR-TEST.md). Other aw_cull values (console) read Custom. */
 static const int far_values[4]={1,3,4,6};
 static const char *const far_names[4]={"Full","Light","Strong","Strong + small faces"};
-static int far_index(void){int i,v=(int)Cvar_VariableValue("aw_cull");for(i=0;i<4;i++)if(far_values[i]==v)return i;return -1;}
-static void far_step(int direction){int i=far_index();i=i<0?0:(i+direction+4)%4;Cvar_SetValue("aw_cull",far_values[i]);}
+/* The far test is aw_cull's low bits; the fog rule and whole-structure switches
+ * above them (quakedef.h AW_CULL_*) stay as they are. */
+static int far_index(void){int i,v=(int)Cvar_VariableValue("aw_cull")&AW_CULL_TEST;for(i=0;i<4;i++)if(far_values[i]==v)return i;return -1;}
+static void far_step(int direction){int i=far_index();i=i<0?0:(i+direction+4)%4;Cvar_SetValue("aw_cull",far_values[i]|((int)Cvar_VariableValue("aw_cull")&~AW_CULL_TEST));}
 static int front_height(void){int size=AW_UIFontSize();return size>=16?18:16;}
 static int front_top(void){return 192-4*front_height();}
 static int front_width(void){int i,w=96,n;for(i=0;i<4;i++){n=AW_UIWidth(front_items[i])+16;if(n>w)w=n;}return w;}

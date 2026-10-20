@@ -587,6 +587,9 @@ def code_identity():
             versions.append(f'{name}={importlib.metadata.version(name)}')
         except importlib.metadata.PackageNotFoundError:
             versions.append(f'{name}=absent')
+    # The BLAS kernel family changes baked bytes (TESTS-HEAD-REDUCER-BYTES-CI-45): part of the identity.
+    import blas_kernel
+    versions.append(blas_kernel.key())
     texts.append(sys.version + '\n' + '\n'.join(versions))
     _CODE_IDENTITY.append(hashlib.sha256('\0'.join(texts).encode('utf-8', 'surrogateescape')).hexdigest())
     return _CODE_IDENTITY[0]

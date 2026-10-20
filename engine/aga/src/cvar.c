@@ -229,11 +229,15 @@ qboolean	Cvar_Command (void)
         if(*end || cap<666 || cap>1024){Con_Printf("aw_poly_budget_over_cap requires auto or an integer from 666 to 1024 triangles.\n");return true;}
     }
     /* aw_cull selects a far test 0..7 (aw_fog.c); on/off keep their meaning:
-     * on = the far plane alone (1, "Full"), off = none; the default is 4 (Strong). */
+     * on = the far plane alone (1, "Full"), off = none; the default is 4 (Strong).
+     * Plus 8 the fog rule, plus 16 whole-structure cuts (0..31; quakedef.h AW_CULL_*). */
     if(!strcmp(v->name,"aw_cull")) {
         char *s=Cmd_Argv(1);int value=AW_ParseBoolean(s);
-        if(value<0 && s[0]>='0' && s[0]<='7' && !s[1])value=s[0]-'0';
-        if(Cmd_Argc()!=2 || value<0){Con_Printf("aw_cull: 0..7 or on/off (on = 1, the default; 7 = debug view)\n");return true;}
+        if(value<0 && s[0]>='0' && s[0]<='9' && (!s[1] || (s[1]>='0' && s[1]<='9' && !s[2]))){
+            value=s[1]?(s[0]-'0')*10+s[1]-'0':s[0]-'0';
+            if(value>AW_CULL_MAX)value=-1;
+        }
+        if(Cmd_Argc()!=2 || value<0){Con_Printf("aw_cull: 0..7 or on/off (on = 1, the default; 7 = debug view), +8 fog rule, +16 whole-structure cuts\n");return true;}
         Cvar_SetValue(v->name,value);
         return true;
     }

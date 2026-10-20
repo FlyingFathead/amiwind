@@ -65,29 +65,34 @@ def esc(text):
     return text.replace('|', '\\|')
 
 
-STAMP_RE = re.compile(r'^_Last updated with AmiWind v[0-9][^\n]*\._$', re.M)
-
-
 def page_stamp(page):
-    """The page's own "_Last updated with AmiWind vX (date)._" line, or None."""
-    match = STAMP_RE.search(page or '')
+    """The page's generator-written line ("_Generated from `...` with AmiWind vX._"), or None."""
+    from doc_toc import GENERATED_LINE
+    match = GENERATED_LINE.search(page or '')
     return match.group(0) if match else None
 
 
-def new_stamp(today=None):
-    """A stamp for a page regenerated now: the source's VERSION and the host date (every public page carries one,
-    a changed page gets a new one; maintainer 2026-10-18 / 2026-10-19)."""
-    import datetime
-    today = today or datetime.date.today()
-    version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
-    return '_Last updated with AmiWind v%s (%d %s %d)._' % (version, today.day, today.strftime('%B'), today.year)
+def new_stamp(version=None):
+    """The line a generated page carries under its title (documentation policy, 19 October 2026): its source and the
+    AmiWind version of the source tree that generated it, no date (doc_toc.generated_line). It replaces the
+    "Last updated" stamp this page carried until v0.0.45."""
+    from doc_toc import generated_line
+    return generated_line('config/debug-commands.txt', version)
+
+
+# Routes that share a handler but are commands of their own: the translator (aw_console.c route_format) turns
+# them into a different value of that handler (switch bits of aw_cull), so they are no aliases of it.
+OWN_ROUTES = {('aw_cull', 'fog rule'), ('aw_cull', 'cut groups')}
 
 
 def render(text, stamp=None):
+    """The page; STAMP: its generated line (default new_stamp(): this tree's VERSION)."""
+    stamp = new_stamp() if stamp is None else stamp
     groups = {}
     for group, words, handler, help_text in entries(text):
         cmds = groups.setdefault(group, {})
-        cmd = cmds.setdefault(handler, {'words': [], 'help': help_text})
+        key = (handler, words) if (handler, words) in OWN_ROUTES else handler
+        cmd = cmds.setdefault(key, {'words': [], 'help': help_text})
         cmd['words'].append(words)
     out = ['# AmiWind console commands', ''] + ([stamp, ''] if stamp else []) + [
            'Open the console with F10 or the backquote key and type',
@@ -121,13 +126,10 @@ def main(argv=None):
         return 0
     catalogue = CATALOGUE.read_text(encoding='utf-8')
     current = PAGE.read_text(encoding='utf-8') if PAGE.is_file() else ''
-    stamp = page_stamp(current)
-    page = render(catalogue, stamp)
-    if argv == ['render'] and current != page:
-        page = render(catalogue, new_stamp())   # the commands changed (or no stamp yet): a new stamp
+    page = render(catalogue)
     if argv == ['check']:
-        if stamp is None or current != page:
-            print('docs/AMIWIND_CONSOLE_COMMANDS.md is stale or has no "Last updated" line: run '
+        if current != page:
+            print('docs/AMIWIND_CONSOLE_COMMANDS.md is stale (commands or its "Generated from" line): run '
                   'tools/console_commands_doc.py render', file=sys.stderr)
             return 1
         print('console command page ok')

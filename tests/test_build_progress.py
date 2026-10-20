@@ -227,7 +227,7 @@ class StatusTests(unittest.TestCase):
             code, text = self.status(run)
             self.assertEqual(code, 0)
             lines = text.splitlines()
-            self.assertTrue(lines[0].startswith('Build dev-7: running, 47.3 %, elapsed 23m10s, ETA 25m40s (at 20:48:50'))
+            self.assertTrue(lines[0].startswith('Build dev-7: running, 47.3 %, elapsed 23m10s, ETA 25m40s (at 17:48:50 UTC'))
             self.assertIn('Stages: 20 done, 2 running, 12 pending, 0 failed/cancelled (of 34)', text)
             self.assertRegex(text, r'world-terrain\s+12m03s\s+~13m00s\s+14\.2\s+20')
             self.assertRegex(text, r'town-new\s+2m10s\s+no history\s+1\.0\s+4\s+no history, idle 2m05s')

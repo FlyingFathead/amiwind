@@ -37,9 +37,16 @@ anyway. A debugging exception cannot redefine a complete build. Loadable does no
 mean all assets must be resident in memory simultaneously. The static-asset
 gallery remains planned; this contract does not claim it is implemented.
 """
+if __name__ == '__main__':
+    # Before the first NumPy import of the build and of every stage it starts: one BLAS kernel family,
+    # so the same game data bakes the same bytes on every processor (TESTS-HEAD-REDUCER-BYTES-CI-45).
+    import blas_kernel
+    blas_kernel.pin()
 import argparse
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -62,6 +69,7 @@ import build_versions
 from build_jobs import add_jobs, jobs_warning, resolve_jobs
 from build_host import executable_path, find_executable, fallback_font, host_name, setup_plan
 from build_summary import BuildSummary
+import placeholder_policy
 import retired_flags
 from build_font_options import (add_builder_options, add_font_options, add_heap_options, resolve_builder,
                                 resolve_font_options, resolve_heap)
@@ -132,6 +140,10 @@ def parser():
     p.add_argument("--no-entity-baseline", action="store_true",
                    help="DEBUGGING ONLY: do not compare the image's entity tracker with the release baseline "
                         "(config/entity-baseline.json); by default a placement lost against it stops the build")
+    p.add_argument("--allow-placeholder", action="append", default=[], metavar="NAME",
+                   help="TEST BUILDS ONLY: let the named stand-in asset ship instead of stopping the image step "
+                        "(tools/placeholder_policy.py: shared-sky, night-sky, night-windows, ui-font, logo-font, "
+                        "intro-video); a private-test waiver, refused for release candidates and finals")
     p.add_argument("--accept-entity-loss", metavar="REASON",
                    help="Recorded reason that lets an intended loss against the entity baseline pass; name the "
                         "loss's tracker ID in it (release readiness)")
@@ -499,6 +511,11 @@ def parser():
                         'piece filling more than a unit under an authored downward-facing surface becomes authored '
                         'plates), split (such a piece is split first) or whole (such a mesh keeps all its authored '
                         'surfaces; much more collision memory)')
+    p.add_argument('--scale-snap', choices=('on', 'off'), default=None,
+                   help='CHIM placements of a mesh without collision (kelp, grass) scaled to the nearest 0.1 so its '
+                        'scaled copies share one model (chim.build.SCALE_SNAP; at most 5 %% of the size at scale 1; '
+                        'CHIM-HULL-SURFACE-HEAP-46): on (default) or off (every scale as placed); sets '
+                        'AMIWIND_SCALE_SNAP')
     p.add_argument('--stair-walk-sample', type=int, default=None, metavar='N',
                    help='Reused maps or frames the stair walk walks again and compares on every build (default 2; '
                         '0 = none, development builds only): a difference stops the build (the cache key missed an '
@@ -1463,6 +1480,8 @@ def commands(args, tools, run):
             image_options += ['--entity-baseline', str(ENTITY_BASELINE)]
         if getattr(args, 'accept_entity_loss', None):
             image_options += ['--accept-entity-loss', args.accept_entity_loss]
+        for name in sorted(placeholder_policy.parse(getattr(args, 'allow_placeholder', None))):
+            image_options += ['--allow-placeholder', name]
         if getattr(args, 'live_logs', False):
             image_options += ['--live-logs']
         retired = retired_flags.image_option(getattr(args, 'retired_flags_record', None))
@@ -2492,6 +2511,166 @@ def release_readiness_step(args):
     return record
 
 
+def export_option_environment(args, announce=True):
+    """Export the build options the stage code reads from the environment (AMIWIND_*), from parsed ARGS.
+
+    With export_converter_environment, the one place a build's stage environment is set: the build (main) and the
+    standalone reuse plan (plan_stage_environment, build.py --reuse-plan) both call it, so the plan keys every stage
+    as the build does (BUILD-REUSE-PLAN-ENV-36). ANNOUNCE: print the option lines (not in a host plan, which prints
+    JSON only, nor in the reuse plan)."""
+    log_level = getattr(args, 'log_level_record', None) or resolve_log_level(args)
+    os.environ['AMIWIND_LOG_LEVEL'] = log_level['level']
+    # NPC root-node rule: stage code names AMIWIND_NPC_ROOT_RULE, so it is part of every NPC stage's key.
+    os.environ['AMIWIND_NPC_ROOT_RULE'] = args.npc_root_rule
+    # Actor support search (tools/actor_grounding.py reads AMIWIND_ACTOR_SEARCH; part of the actor stages' keys).
+    os.environ['AMIWIND_ACTOR_SEARCH'] = getattr(args, 'actor_search', 'wide')
+    # Interior creatures in the resident stage (tools/creature_residents.py reads AMIWIND_INTERIOR_CREATURES;
+    # part of the resident stages' keys; INTERIOR-CREATURES-MISSING-41).
+    os.environ['AMIWIND_INTERIOR_CREATURES'] = getattr(args, 'interior_creatures', 'listed')
+    if os.environ['AMIWIND_INTERIOR_CREATURES'] == 'all' and announce:
+        print('Interior creatures: all (experimental: every classified creature; docs/BUILDER.md)', flush=True)
+    # Resident animation kit profile (tools/npc_anim.py reads AMIWIND_NPC_ANIM; part of the stage cache identity).
+    if getattr(args, 'npc_anim', 'idle') != 'idle':
+        os.environ['AMIWIND_NPC_ANIM'] = args.npc_anim
+        if announce:
+            print(f'NPC animation kit: {args.npc_anim} (docs/ANIMATION.md)', flush=True)
+    else:
+        os.environ.pop('AMIWIND_NPC_ANIM', None)
+    # Converter workers read these from the environment (off unless given).
+    from scenery_reduce import apply_options as apply_scenery_reduce_options
+    apply_scenery_reduce_options(args)
+    # Item cost history for longest-first pools (tools/build_costs.py): scheduling only.
+    from build_costs import ENV as COST_HISTORY_ENV
+    os.environ.setdefault(COST_HISTORY_ENV, str(Path(args.workspace).resolve() / 'cache' / 'item-costs'))
+    # Image-step per-map pass results by content (tools/pass_cache.py): development builds, and release
+    # candidates and finals with --allow-release-reuse (the from-scratch gate runs separately), so a late
+    # image-step failure resumes from the finished maps (BUILD-IMAGE-NO-RESUME-33); otherwise every pass
+    # runs on every map.
+    from pass_cache import ENV as PASS_CACHE_ENV, setting as pass_cache_setting
+    pass_cache_value = pass_cache_setting(VERSION, args.workspace, getattr(args, 'allow_release_reuse', False))
+    if getattr(args, 'rebuild_unit', ''):
+        from pass_cache import REBUILD_ENV
+        os.environ[REBUILD_ENV] = args.rebuild_unit  # stage workers read it (pass_cache.forced)
+    if pass_cache_value == 'off':
+        os.environ[PASS_CACHE_ENV] = 'off'
+    else:
+        os.environ.setdefault(PASS_CACHE_ENV, pass_cache_value)
+    # What the image step's stair walk covers (project decision 9 October 2026): every step and
+    # ramp in development builds and nightly full reports, only the steps of flights (the rows
+    # that can fail the gate) in release candidates and finals.
+    STAIR_WALK_ENV = 'AMIWIND_STAIR_WALK'  # tools/stair_walk.py SCOPE_ENV
+    stair_scope = stair_walk_scope(VERSION, getattr(args, 'stair_walk', 'auto'))
+    os.environ[STAIR_WALK_ENV] = stair_scope
+    # The stair walk's reuse (BUILD-CHIM-STAIR-WALK-UNCACHED-36): bookkeeping only, the rows are the same either way.
+    # tools/stair_walk.py WALK_CACHE_ENV / WALK_SAMPLE_ENV / WALK_SAMPLE_DEFAULT (not imported: it needs numpy,
+    # which the builder must not load before the tools exist; tests/test_chim_stair_cache.py checks they agree)
+    WALK_CACHE_ENV, WALK_SAMPLE_ENV, WALK_SAMPLE_DEFAULT = 'AMIWIND_STAIR_WALK_CACHE', 'AMIWIND_STAIR_WALK_SAMPLE', 2
+    # end users (no --developer-mode) take the known-good stair records shipped with the source; development builds
+    # walk what changed (B14, v0.0.42 plan 1.0b)
+    walk_cache = getattr(args, 'stair_walk_cache', None) or (
+        'cached' if getattr(args, 'developer_mode', False) else 'records')
+    walk_sample = getattr(args, 'stair_walk_sample', None)
+    walk_sample = WALK_SAMPLE_DEFAULT if walk_sample is None else walk_sample
+    if walk_sample < 0:
+        raise SystemExit('Error: --stair-walk-sample must be 0 or more')
+    if walk_sample == 0 and walk_cache in ('cached', 'records'):
+        from project_version import require_private_test_version
+        try:
+            require_private_test_version(VERSION, ['--stair-walk-sample 0'])
+        except ValueError as exc:
+            raise SystemExit('Error: %s' % exc)
+    os.environ[WALK_CACHE_ENV] = walk_cache
+    os.environ[WALK_SAMPLE_ENV] = str(walk_sample)
+    if getattr(args, 'stair_walk_area', None):
+        os.environ['AMIWIND_STAIR_WALK_AREA'] = args.stair_walk_area   # chim.collision.walk_area_mode
+    if getattr(args, 'collision_underside', None):
+        os.environ['AMIWIND_COLLISION_UNDERSIDE'] = args.collision_underside   # mesh_geometry_env.underside_mode
+    if getattr(args, 'scale_snap', None):
+        os.environ['AMIWIND_SCALE_SNAP'] = '' if args.scale_snap == 'on' else 'off'   # chim.build.scale_snap_step
+    if announce and walk_cache == 'full':
+        print('NOTE: --stair-walk-cache full: every map and frame is stair-walked again (a regression or beta-test '
+              'run)', flush=True)
+    if announce:
+        print('Stair walk: ' + ('every step and ramp' if stair_scope == 'all' else 'flight steps only (release build)')
+              + ' (--stair-walk ' + getattr(args, 'stair_walk', 'auto') + ')', flush=True)
+    try:
+        from chim_town import NATIVE_ENV
+        native = chim_native_towns(args) if getattr(args, 'stage', 'aga') == 'aga' and not args.dry_run else []
+        os.environ[NATIVE_ENV] = ','.join(native)
+    except ValueError:
+        pass  # contradictory builder options are reported by the plan itself
+
+
+def export_converter_environment(args):
+    """Export the converter options (args.font_options, resolve_font_options) the stage code reads from the
+    environment; shared by the build and the reuse plan like export_option_environment (BUILD-REUSE-PLAN-ENV-36)."""
+    # Converter and image workers read the stair rule from the environment
+    # (mesh_geometry.stair_mitigation_mode, stair_walk gate).
+    from mesh_geometry_env import (export_chim_stream_statics, export_model_hull, export_npc_head_detail,
+                                   export_npc_head_reducer, export_stair_rules)
+    export_stair_rules(args.font_options["follow_original_stair_rules"])
+    export_model_hull(args.font_options["model_hull"])
+    from lava import export_lava
+    export_lava(args.font_options["lava"])
+    from build_font_options import export_world_map
+    export_world_map(args.font_options["world_map"])
+    export_chim_stream_statics(args.font_options["chim_stream_statics"])
+    # CHIM frame map extension (tools/map_files.py): read by the image step from the environment.
+    from map_files import DEFAULT_FRAME_EXT, export_frame_ext
+    export_frame_ext(getattr(args, 'chim_frame_ext', None) or DEFAULT_FRAME_EXT)
+    # CHIM region frame map rows (chim.frame_map region_rows_mode): read by the image step from the environment.
+    from chim.frame_map import DEFAULT_REGION_ROWS, export_region_rows
+    export_region_rows(getattr(args, 'chim_region_rows', None) or DEFAULT_REGION_ROWS)
+    export_npc_head_detail(args.font_options["npc_head_detail"])
+    export_npc_head_reducer(args.font_options["npc_head_reducer"])
+
+
+def plan_stage_environment(argv):
+    """Set the stage environment a build with the options ARGV would set, without building: parsed, folded with its
+    recipe and resolved as main() does, then exported by the same two functions (BUILD-REUSE-PLAN-ENV-36: the
+    standalone reuse plan keyed every stage with an empty environment and planned 31 of 39 stages as rebuilt).
+    ValueError for options the builder would refuse. Returns the parsed options."""
+    import build_recipe
+    argv = [str(part) for part in argv]
+    try:
+        with contextlib.redirect_stderr(io.StringIO()) as errors:
+            args = parser().parse_args(argv)
+    except SystemExit:
+        raise ValueError('the build options do not parse (%s): %s' % (shlex.join(argv),
+                                                                       errors.getvalue().strip().splitlines()[-1:]))
+    args._argv = argv
+    build_recipe.configure(parser, args, argv, VERSION, out=sys.stderr)
+    resolve_coord_range(args)
+    if getattr(args, "npc_anim", None) is None:
+        args.npc_anim = ANIM_KIT_PROFILES[getattr(args, "anim_kit", "on")]
+    args.log_level_record = resolve_log_level(args)
+    export_option_environment(args, announce=False)
+    args.font_options = resolve_font_options(args)
+    export_converter_environment(args)
+    return args
+
+
+def reuse_plan_environment(old_run, flags=None):
+    """Set the stage environment for `build.py --reuse-plan OLD_RUN [-- FLAGS]` and say where its options came
+    from: FLAGS when given, else the build command OLD_RUN recorded (build-state.json build_argv), else the
+    build's defaults (runs from before 20 October 2026 record no command)."""
+    if flags is not None:
+        argv, source = list(flags), 'the build options after --: ' + (shlex.join(flags) or '(none)')
+    else:
+        try:
+            state = json.loads((Path(old_run) / 'build-state.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            state = {}
+        recorded = state.get('build_argv')
+        if recorded is not None:
+            argv, source = list(recorded), f'the build command {Path(old_run).name} recorded: ' + shlex.join(recorded)
+        else:
+            argv, source = [], (f'the build defaults ({Path(old_run).name} records no build command; '
+                                'give its options after --)')
+    plan_stage_environment(argv)
+    return source
+
+
 def main(argv=None):
     # Also cover direct Python invocations and subsequent environment re-exec.
     os.environ['PYTHONUNBUFFERED'] = '1'
@@ -2512,9 +2691,15 @@ def main(argv=None):
         import reuse_report
         return reuse_report.main(argv[1:])
     if argv[:1] == ['--reuse-plan']:
-        # Read only, seconds: the reuse preflight of a run against this checkout (tools/reuse_report.py).
+        # Read only, seconds: the reuse preflight of a run against this checkout (tools/reuse_report.py), in the
+        # stage environment the build would set (BUILD-REUSE-PLAN-ENV-36): `--reuse-plan OLD_RUN [...] [-- FLAGS]`.
         import reuse_report
-        return reuse_report.plan_main(argv[1:])
+        rest = argv[1:]
+        flags = None
+        if '--' in rest:
+            at = rest.index('--')
+            rest, flags = rest[:at], rest[at + 1:]
+        return reuse_report.plan_main(rest, environment=lambda old_run: reuse_plan_environment(old_run, flags))
     if argv[:1] == ['profile']:
         import build_profile
         return build_profile.main(argv[1:], prog='build.py profile')
@@ -2579,84 +2764,9 @@ def main(argv=None):
         args.jobs = resolve_jobs(None)
     # Output level of the stages (build_profile.log_level; not part of any stage key: build_cache.IGNORED_ENV).
     args.log_level_record = resolve_log_level(args)
-    os.environ['AMIWIND_LOG_LEVEL'] = args.log_level_record['level']
-    # NPC root-node rule: stage code names AMIWIND_NPC_ROOT_RULE, so it is part of every NPC stage's key.
-    os.environ['AMIWIND_NPC_ROOT_RULE'] = args.npc_root_rule
-    # Actor support search (tools/actor_grounding.py reads AMIWIND_ACTOR_SEARCH; part of the actor stages' keys).
-    os.environ['AMIWIND_ACTOR_SEARCH'] = getattr(args, 'actor_search', 'wide')
-    # Interior creatures in the resident stage (tools/creature_residents.py reads AMIWIND_INTERIOR_CREATURES;
-    # part of the resident stages' keys; INTERIOR-CREATURES-MISSING-41).
-    os.environ['AMIWIND_INTERIOR_CREATURES'] = getattr(args, 'interior_creatures', 'listed')
-    if os.environ['AMIWIND_INTERIOR_CREATURES'] == 'all' and not getattr(args, 'host_plan', False):
-        print('Interior creatures: all (experimental: every classified creature; docs/BUILDER.md)', flush=True)
-    # Resident animation kit profile (tools/npc_anim.py reads AMIWIND_NPC_ANIM; part of the stage cache identity).
-    if getattr(args, 'npc_anim', 'idle') != 'idle':
-        os.environ['AMIWIND_NPC_ANIM'] = args.npc_anim
-        if not getattr(args, 'host_plan', False):  # a host plan prints JSON only
-            print(f'NPC animation kit: {args.npc_anim} (docs/ANIMATION.md)', flush=True)
-    else:
-        os.environ.pop('AMIWIND_NPC_ANIM', None)
-    # Converter workers read these from the environment (off unless given).
-    from scenery_reduce import apply_options as apply_scenery_reduce_options
-    apply_scenery_reduce_options(args)
-    # Item cost history for longest-first pools (tools/build_costs.py): scheduling only.
-    from build_costs import ENV as COST_HISTORY_ENV
-    os.environ.setdefault(COST_HISTORY_ENV, str(Path(args.workspace).resolve() / 'cache' / 'item-costs'))
-    # Image-step per-map pass results by content (tools/pass_cache.py): development builds, and release
-    # candidates and finals with --allow-release-reuse (the from-scratch gate runs separately), so a late
-    # image-step failure resumes from the finished maps (BUILD-IMAGE-NO-RESUME-33); otherwise every pass
-    # runs on every map.
-    from pass_cache import ENV as PASS_CACHE_ENV, setting as pass_cache_setting
-    pass_cache_value = pass_cache_setting(VERSION, args.workspace, getattr(args, 'allow_release_reuse', False))
-    if getattr(args, 'rebuild_unit', ''):
-        from pass_cache import REBUILD_ENV
-        os.environ[REBUILD_ENV] = args.rebuild_unit  # stage workers read it (pass_cache.forced)
-    if pass_cache_value == 'off':
-        os.environ[PASS_CACHE_ENV] = 'off'
-    else:
-        os.environ.setdefault(PASS_CACHE_ENV, pass_cache_value)
-    # What the image step's stair walk covers (project decision 9 October 2026): every step and
-    # ramp in development builds and nightly full reports, only the steps of flights (the rows
-    # that can fail the gate) in release candidates and finals.
-    STAIR_WALK_ENV = 'AMIWIND_STAIR_WALK'  # tools/stair_walk.py SCOPE_ENV
-    stair_scope = stair_walk_scope(VERSION, getattr(args, 'stair_walk', 'auto'))
-    os.environ[STAIR_WALK_ENV] = stair_scope
-    # The stair walk's reuse (BUILD-CHIM-STAIR-WALK-UNCACHED-36): bookkeeping only, the rows are the same either way.
-    # tools/stair_walk.py WALK_CACHE_ENV / WALK_SAMPLE_ENV / WALK_SAMPLE_DEFAULT (not imported: it needs numpy,
-    # which the builder must not load before the tools exist; tests/test_chim_stair_cache.py checks they agree)
-    WALK_CACHE_ENV, WALK_SAMPLE_ENV, WALK_SAMPLE_DEFAULT = 'AMIWIND_STAIR_WALK_CACHE', 'AMIWIND_STAIR_WALK_SAMPLE', 2
-    # end users (no --developer-mode) take the known-good stair records shipped with the source; development builds
-    # walk what changed (B14, v0.0.42 plan 1.0b)
-    walk_cache = getattr(args, 'stair_walk_cache', None) or (
-        'cached' if getattr(args, 'developer_mode', False) else 'records')
-    walk_sample = getattr(args, 'stair_walk_sample', None)
-    walk_sample = WALK_SAMPLE_DEFAULT if walk_sample is None else walk_sample
-    if walk_sample < 0:
-        raise SystemExit('Error: --stair-walk-sample must be 0 or more')
-    if walk_sample == 0 and walk_cache in ('cached', 'records'):
-        from project_version import require_private_test_version
-        try:
-            require_private_test_version(VERSION, ['--stair-walk-sample 0'])
-        except ValueError as exc:
-            raise SystemExit('Error: %s' % exc)
-    os.environ[WALK_CACHE_ENV] = walk_cache
-    os.environ[WALK_SAMPLE_ENV] = str(walk_sample)
-    if getattr(args, 'stair_walk_area', None):
-        os.environ['AMIWIND_STAIR_WALK_AREA'] = args.stair_walk_area   # chim.collision.walk_area_mode
-    if getattr(args, 'collision_underside', None):
-        os.environ['AMIWIND_COLLISION_UNDERSIDE'] = args.collision_underside   # mesh_geometry_env.underside_mode
-    if not getattr(args, 'host_plan', False) and walk_cache == 'full':
-        print('NOTE: --stair-walk-cache full: every map and frame is stair-walked again (a regression or beta-test '
-              'run)', flush=True)
-    if not getattr(args, 'host_plan', False):  # a host plan prints JSON only
-        print('Stair walk: ' + ('every step and ramp' if stair_scope == 'all' else 'flight steps only (release build)')
-              + ' (--stair-walk ' + getattr(args, 'stair_walk', 'auto') + ')', flush=True)
-    try:
-        from chim_town import NATIVE_ENV
-        native = chim_native_towns(args) if getattr(args, 'stage', 'aga') == 'aga' and not args.dry_run else []
-        os.environ[NATIVE_ENV] = ','.join(native)
-    except ValueError:
-        pass  # contradictory builder options are reported by the plan itself
+    # Every option the stage code reads from the environment, by the function the reuse plan also uses
+    # (BUILD-REUSE-PLAN-ENV-36); a host plan prints JSON only.
+    export_option_environment(args, announce=not getattr(args, 'host_plan', False))
     # Per-file caches of the --reuse-from run's workspace, read-only, when it is another workspace
     # (a new volume starts with an empty pool: BUILD-CACHE-PER-WORKSPACE-33).
     from file_cache import FALLBACK_ENV
@@ -2709,6 +2819,12 @@ def main(argv=None):
         configure_area_closure(args)
         configure_direct_start(args)
         configure_skip_census(args)
+        allowed = placeholder_policy.parse(getattr(args, 'allow_placeholder', None))
+        if allowed:  # a private-test waiver: rc/final refuse it, release readiness lists it
+            from project_version import require_private_test_version
+            require_private_test_version(VERSION, [placeholder_policy.OPTION + ' ' + ','.join(sorted(allowed))])
+            print('WARNING: ' + placeholder_policy.OPTION + ' ' + ', '.join(sorted(allowed)) + ': this image may ship '
+                  'stand-in assets (test build only; refused for release candidates and finals)', flush=True)
         args.world_bounds_record = __import__('world_bounds').configure(args)
         args.player_view_record = __import__('prepare_player_view').configure(args)
         if groups:
@@ -2795,25 +2911,8 @@ def main(argv=None):
             # The rc3 image recovery restores a legacy-builder run; it predates CHIM (the default from v0.0.33).
             raise ValueError('--recover-image-from restores a legacy-builder run: add --builder legacy')
         chim_seyda_input(args)
-        # Converter and image workers read the stair rule from the environment
-        # (mesh_geometry.stair_mitigation_mode, stair_walk gate).
-        from mesh_geometry_env import (export_chim_stream_statics, export_model_hull, export_npc_head_detail,
-                                       export_npc_head_reducer, export_stair_rules)
-        export_stair_rules(args.font_options["follow_original_stair_rules"])
-        export_model_hull(args.font_options["model_hull"])
-        from lava import export_lava
-        export_lava(args.font_options["lava"])
-        from build_font_options import export_world_map
-        export_world_map(args.font_options["world_map"])
-        export_chim_stream_statics(args.font_options["chim_stream_statics"])
-        # CHIM frame map extension (tools/map_files.py): read by the image step from the environment.
-        from map_files import DEFAULT_FRAME_EXT, export_frame_ext
-        export_frame_ext(getattr(args, 'chim_frame_ext', None) or DEFAULT_FRAME_EXT)
-        # CHIM region frame map rows (chim.frame_map region_rows_mode): read by the image step from the environment.
-        from chim.frame_map import DEFAULT_REGION_ROWS, export_region_rows
-        export_region_rows(getattr(args, 'chim_region_rows', None) or DEFAULT_REGION_ROWS)
-        export_npc_head_detail(args.font_options["npc_head_detail"])
-        export_npc_head_reducer(args.font_options["npc_head_reducer"])
+        # The converter options the stage code reads from the environment (shared with the reuse plan).
+        export_converter_environment(args)
         if args.recover_image_from and (args.stage != 'aga' or args.dry_run or args.host_plan or args.check_inputs or args.versions or args.install_dependencies or args.install_sdk):
             raise ValueError('--recover-image-from requires an AGA build/check/plan, with a new run name')
         if args.reuse_from is not None:
@@ -3056,6 +3155,9 @@ def main(argv=None):
         if getattr(args, 'developer_mode_record', None) is not None:
             metadata['developer_mode'] = args.developer_mode_record  # tools/entry_check.py
         metadata['run_name'] = args.run_name_record  # date, version, suffix, purpose, commit (tools/run_name.py)
+        # The build's own options, so `build.py --reuse-plan THIS_RUN` sets the same stage environment
+        # (BUILD-REUSE-PLAN-ENV-36; reuse_plan_environment).
+        metadata['build_argv'] = [str(part) for part in getattr(args, '_argv', None) or []]
         if getattr(args, 'release_readiness_record', None) is not None:
             metadata['release_readiness'] = args.release_readiness_record  # tools/release_readiness.py
         # The recipe record (tools/build_recipe.py): build-state.json, build-summary.json and, through the

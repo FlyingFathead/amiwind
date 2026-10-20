@@ -274,5 +274,34 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(doc_toc.dead_anchors(doc_toc.public_docs()), [])
 
 
+class GeneratedLineTests(unittest.TestCase):
+    """Documentation policy of record (19 October 2026): a generated page carries the generator-written line
+    "_Generated from <source> with AmiWind vX._" under its title (the version only, no date), never a hand-written
+    "Last updated" line."""
+    SOURCES = {'docs/BUGS.md': 'docs/bugs/bugs.json', 'docs/bugs/CHIM_TRACKER.md': 'docs/bugs/bugs.json',
+               'docs/chim/FEATURES.md': 'docs/chim/features.json',
+               'docs/AMIWIND_CONSOLE_COMMANDS.md': 'config/debug-commands.txt',
+               'docs/chim/CELL_TRACKER.md': 'cell-progress.json'}
+
+    def test_the_line(self):
+        self.assertEqual(doc_toc.generated_line('docs/bugs/bugs.json', 'v0.0.46-dev1'),
+                         '_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.46-dev1._')
+        version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+        self.assertTrue(doc_toc.generated_line('x').endswith('with AmiWind v%s._' % version))
+        self.assertTrue(doc_toc.GENERATED_LINE.fullmatch(doc_toc.generated_line('x', '0.0.45')))
+        self.assertIsNone(doc_toc.GENERATED_LINE.fullmatch('_Last updated with AmiWind v0.0.45 (20 October 2026)._'))
+
+    def test_every_generated_page_carries_it_under_its_title(self):
+        self.assertEqual(set(self.SOURCES), set(doc_toc.GENERATED))
+        for path, source in self.SOURCES.items():
+            text = (ROOT / path).read_text(encoding='utf-8')
+            found = doc_toc.GENERATED_LINE.findall(text)
+            self.assertEqual(len(found), 1, path)
+            self.assertTrue(found[0].startswith('_Generated from `%s` with AmiWind v' % source), path)
+            title = next(i for i, line in enumerate(text.split('\n')) if line.startswith('# '))
+            self.assertEqual(text.split('\n')[title + 2], found[0], path)
+            self.assertNotIn('_Last updated with AmiWind', text, path)
+
+
 if __name__ == '__main__':
     unittest.main()

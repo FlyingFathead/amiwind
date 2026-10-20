@@ -1,6 +1,6 @@
 # Renderer counters (`dbg rcount`)
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 Counts are the main currency for comparing builds: they do not depend on the emulator
 profile or the host PC, while frame times do
@@ -50,6 +50,7 @@ All figures are averages per frame over the last second, except `frames`, `fps10
 | `at` | alias model triangles sent to the alias renderer (`R_AliasDrawModel`, the hands included) |
 | `ln` near/coarse/resident | NPCs drawn with their near level (level 0) / with a coarse level (2 or 3) / NPC level models resident ([NPC model levels of detail](../NPC_MODEL_CACHE.md#npc-model-levels-of-detail)) |
 | `ft` on/depth/why models/faces/size/detail | the far test ([FAR-TEST.md](FAR-TEST.md)): the share of frames (percent) the fog-exact test applied (`aw_cull 2`), its depth and why it was off; the brush model passes and front faces it proved invisible, passes the size-scaled cut-off dropped (`aw_cull 3`, `4`, `6`), front faces the far detail step dropped (`aw_cull 5`, `6`) |
+| `sk` sky/fog | microseconds: the background sky spans (`D_DrawBackground`, part of the `D_DrawSurfaces` figure) / the fog and day/night sky pixel pass (`AW_FogDraw`, part of the `R_RenderView` figure) |
 
 The counters are plain integer increments, like Quake's `c_faceclip` and
 `r_polycount`; the timers run only while `dbg rcount` is on. The output uses integer

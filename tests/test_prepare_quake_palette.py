@@ -29,7 +29,7 @@ class PaletteTests(unittest.TestCase):
         start=source.index('sky_asset_preparation = prepare_staged_sky(boot')
         check=source.index("sky_asset_preparation.get('status')=='fallback_warning'",start)
         self.assertLess(check,source.index('validate_world_ui(boot',start))
-        self.assertIn('raise ValueError',source[check:check+400])
+        self.assertIn("placeholder(args, 'shared-sky'",source[check:check+400])
 
     def test_explicit_palette_preserves_every_index(self):
         raw=bytes(range(256))*3

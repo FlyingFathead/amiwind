@@ -2,7 +2,7 @@
 
 # CHIM Cell Tracker
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Generated from `cell-progress.json` with AmiWind v0.0.46._
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export. What each number counts: [what we count](#what-we-count).
 

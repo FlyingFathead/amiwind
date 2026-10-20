@@ -658,6 +658,23 @@
       "to": "locked",
       "source": "config/build-defaults.json (NPC-HEAD-DECIMATION-33)",
       "note": "locked = boundary-locked reducer for budget heads (no new holes); default = the previous reducer"
+    },
+    {
+      "version": "0.0.46-dev1",
+      "option": "allow_placeholder",
+      "flag": "--allow-placeholder",
+      "change": "added",
+      "to": [],
+      "source": "tools/build.py: stand-in assets stop the image step (tools/placeholder_policy.py, SKY-FLAT-PALETTE-DRIFT-41); TEST BUILDS ONLY: --allow-placeholder NAME lets one ship (private-test waiver, refused for rc/final)"
+    },
+    {
+      "version": "0.0.46-dev1",
+      "option": "scale_snap",
+      "flag": "--scale-snap",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py: CHIM placements of a mesh without collision scaled to the nearest 0.1 so its scaled copies share one model (chim.build.SCALE_SNAP, CHIM-HULL-SURFACE-HEAP-46)",
+      "note": "null = on (the code default): x-11 y+15 does not fit the CHIM zone without it (over by 40,080 bytes); off = every scale as placed (the method before); a visible change of at most 5 % of the size at scale 1, pending the maintainer's decision"
     }
   ],
   "current": {
@@ -689,6 +706,7 @@
       "actor_search": "wide",
       "allow_data_differences": false,
       "allow_known_actor_ground_findings": null,
+      "allow_placeholder": [],
       "amiga_libs": null,
       "amiga_libs_policy": "warn",
       "anim_kit": "on",
@@ -782,6 +800,7 @@
       "resource_plan": false,
       "resource_plan_json": null,
       "resource_threads": null,
+      "scale_snap": null,
       "scenery_reduce": null,
       "scenery_reduce_texels": null,
       "seyda_recorded": null,

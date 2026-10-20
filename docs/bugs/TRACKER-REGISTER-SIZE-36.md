@@ -19,7 +19,27 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Status: 11 October 2026](#status-11-october-2026)
+- [Symptom](#symptom)
+- [Evidence](#evidence)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [RC2 size recurrence and lossless representation, 13 October 2026](#rc2-size-recurrence-and-lossless-representation-13-october-2026)
+- [Focused validation, 13 October 2026](#focused-validation-13-october-2026)
+- [Second archive made, 20 October 2026](#second-archive-made-20-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 11 October 2026
 
@@ -92,6 +112,17 @@ Instead, the canonical live writer emits one complete issue object per line in t
 ## Focused validation, 13 October 2026
 
 The isolated corrected snapshot passes 56 tracker/export tests with zero failures, errors or skips, including the actual size guard and save/load history regression. Its independently read-back source ZIP contains all 2,871 allowlisted files and the exact compact register bytes. Existing archive bytes remain unchanged. The earlier full-suite failure is retained; this focused result is not a full-suite, game build, native or maintainer acceptance claim. Final integrated source pin and its gates remain required.
+
+## Second archive made, 20 October 2026
+
+Repaired in source on v0.0.46-register-audit, not shipped. The rotation now
+reaches v0.0.35: fixed and closed, non-persisting bugs first found in v0.0.34
+or v0.0.35 (60 bugs) moved into `archive/bugs-v0.0.34-v0.0.35.json`, and the
+old single archive was split by version range at the same time
+(`ARCHIVES` in `tools/bug_register.py`; figures on
+[TRACKER-REGISTER-SIZE-33](TRACKER-REGISTER-SIZE-33.md#archive-split-by-version-range-20-october-2026)).
+`bugs.json` is 689,209 bytes, 66 % of 1 MiB, and its warning is back at
+75 %. No record changed.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

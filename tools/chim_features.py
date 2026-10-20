@@ -291,7 +291,8 @@ def doc_path(path):
 def render(data):
     feats = data['features']
     version = data['chim_version']
-    lines = ['# CHIM feature tracker', '', GENERATED, '']
+    from doc_toc import generated_line
+    lines = ['# CHIM feature tracker', '', generated_line('docs/chim/features.json'), '', GENERATED, '']
     lines += [
         'What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, '
         'where it stands, the gain that was measured (what was compared, how and when) and how Quake\'s '

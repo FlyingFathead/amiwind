@@ -163,10 +163,108 @@ def canonical_model(model, texture_records):
     return m
 
 
+HULL_SURFACE_TABLE = Path(__file__).resolve().parents[2] / 'config/collision-hull-surface.json'
+
+
+def hull_surface_table(path=HULL_SURFACE_TABLE):
+    """The meshes whose convex pieces keep their source surface (hull_surface_loss; CHIM-VIVEC-DOCK-WALKWAY-43): the
+    measured table, source paths in lower case."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    return {m.replace(chr(92), '/').casefold() for m in data['meshes']}
+
+
+def hull_surface_known(path=HULL_SURFACE_TABLE):
+    """The measured meshes the collision surface gate does not fail: still over a step with the rule (another converter
+    path), each with its depth and reason (config known_over_step)."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    return {m.replace(chr(92), '/').casefold() for m in data.get('known_over_step', {})}
+
+
+def hull_surface_unit(task):
+    """How far a mesh's walkable collision surface lies outside its prepared convex pieces
+    (mesh_geometry.surface_loss_depth; a pool worker): task (archive path, scenery index record, pieces)."""
+    from mesh_geometry import surface_loss_depth
+    from mwad.scene import read_asset, unpack_geometry
+    archive, model, pieces = task
+    if not pieces:
+        return 0.
+    with Path(archive).open('rb') as stream:
+        v, f, _ = unpack_geometry(read_asset(stream, model.get('collision') or model))
+    return surface_loss_depth(np.array(v, float), np.array(f), [(np.asarray(p, float), None, i, e)
+                                                                 for p, _, i, e in pieces])
+
+
+def hull_surface_gate(area, models, prepared, mesh_fps, archive, mode, jobs, cache):
+    """The collision surface gate (CHIM-VIVEC-DOCK-WALKWAY-43): every prepared CHIM mesh's walkable collision surface
+    lies within a step (STEP_HEIGHT) of its convex pieces, else the player sinks into it and the next edge is a step
+    too high (the Vivec canton docks: 18.7 units). A unit per mesh, keyed by its mesh unit. A mesh over the step fails
+    the build, named with its depth; the fix is its row in config/collision-hull-surface.json. Mode 'extremes' (the
+    method before, A/B tests) reports the meshes without failing."""
+    from player_hull import STEP_HEIGHT
+    order = sorted(prepared)
+    items = [(fingerprint('hull-surface', mesh_fps[mi], 'surface-loss-v1'),
+              (str(models[mi].get('_archive') or archive), models[mi], prepared[mi][3])) for mi in order]
+    depths = run_units('hull-surface', items, hull_surface_unit, jobs, cache)
+    # the visible-tread rule replaces an authored ramp over a visible flight by the flight on purpose
+    # (mesh_geometry.clear_visible_treads): the ramp's surface is not walked, so it is not measured
+    replaced = {mi for mi in order if 'visible plates' in str((prepared[mi][4] or {}).get('collision', ''))
+                and ' 0 ramp plates' not in str(prepared[mi][4].get('collision', ''))}
+    # the measured meshes still over a step with the rule (another converter path; config known_over_step)
+    known = hull_surface_known()
+    over = sorted(((round(d, 2), models[mi]['source']) for mi, d in zip(order, depths)
+                   if d > STEP_HEIGHT and mi not in replaced
+                   and models[mi]['source'].replace(chr(92), '/').casefold() not in known), reverse=True)
+    print('[chim] %s: collision surface gate: %d meshes (%d with ramps the visible-tread rule replaced, not measured; '
+          '%d known), %d with walkable collision more than a step (%.1f) over the pieces%s' % (
+              area, len(order), len(replaced), len(known), len(over), STEP_HEIGHT,
+              ''.join('; %s %.2f' % (m, d) for d, m in over)), flush=True)
+    if over and mode != 'extremes':
+        raise ValueError('%s: collision surface gate: walkable collision more than %.1f units under the convex pieces '
+                         '(CHIM-VIVEC-DOCK-WALKWAY-43; add the mesh to config/collision-hull-surface.json): %s'
+                         % (area, STEP_HEIGHT, ', '.join('%s %.2f' % (m, d) for d, m in over)))
+    return over
+
+
 def mesh_fingerprint(model, profile, texture_records):
     """A mesh unit by content: its record without layout (mesh and collision hashes, materials with their
     textures' hashes), and its profile."""
     return fingerprint('mesh', canonical_model(model, texture_records), profile)
+
+
+# Placements of a mesh without collision (kelp, grass, ferns) are scaled to the nearest SCALE_SNAP: every distinct
+# scale is a model of its own in CHIM (the placement record holds a position and a yaw), and the game scatters such
+# flora at scales two decimals apart (kelp at 1.20, 1.22 and 1.24 by the Khuul coast: three models of 10-20 KB in one
+# ring). At most 0.05 of the scale (5 % at scale 1), nothing to collide with (CHIM-HULL-SURFACE-HEAP-46: x-11 y+15
+# from 6,284,592 to 6,217,088 bytes). AMIWIND_SCALE_SNAP: off keeps every scale (A/B), or another step.
+SCALE_SNAP = 0.1
+SCALE_SNAP_VARIABLE = 'AMIWIND_SCALE_SNAP'
+
+
+def scale_snap_step():
+    value = os.environ.get(SCALE_SNAP_VARIABLE, '').strip()
+    if not value:
+        return SCALE_SNAP
+    if value == 'off':
+        return 0.
+    step = float(value)
+    if not 0 < step <= 0.25:
+        raise ValueError(SCALE_SNAP_VARIABLE + ' must be off or a step in (0, 0.25], not %r' % value)
+    return step
+
+
+def snap_scales(references, prepared, step=None):
+    """The placements of meshes without collision pieces (prepared[model][3] empty) with their scale rounded to the
+    nearest step (scale_snap_step; SCALE_SNAP); other placements as they are. step 0: unchanged."""
+    step = scale_snap_step() if step is None else step
+    if not step:
+        return references
+    out = []
+    for ref in references:
+        data = prepared.get(ref['model_index'])
+        if data is not None and not data[3]:
+            ref = dict(ref, scale=round(max(step, round(float(ref['scale']) / step) * step), 6))
+        out.append(ref)
+    return out
 
 
 def build_frame(out, **kw):
@@ -203,6 +301,7 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     from chim.models import texture_unit, variant_ref, variant_unit, yaw_degrees, depth_compile_candidate
     timer = timer or Timer()
     cache = cache or UnitCache()
+    references = snap_scales(references, prepared)
     firsts = {}
     for ref in references:
         firsts.setdefault(variant_key(ref), ref)
@@ -952,6 +1051,15 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
         from chim.far import write_layers
         receipt['far_terrain'] = (write_layers(out, [s['frame'] for s in specs], data, jobs=jobs)
                                     if far_terrain else [])
+    # The frames' whole-structure cut groups and the fog check (chim.cuts, CHIM-BRIDGE-POP-PIECES-44): a sidecar
+    # of each frame map; a world with a distance cut nearer than its fog end is refused here.
+    with timer.section('cut groups'), build_profile.phase('CHIM world: cut groups and fog check',
+                                                          '%d frames' % len(specs)):
+        from chim.cuts import write_groups
+        rows = write_groups(out, jobs=jobs)
+        receipt['cut_groups'] = {'frames': len(rows), 'structures': sum(r['structures'] for r in rows),
+                                 'members': sum(r['members'] for r in rows),
+                                 'fog_check': 'passed (no cut nearer than the fog end)'}
     written = build_profile.phase('CHIM world: source and receipt', '%d frames' % len(specs)).__enter__()
     source = {'builder': BUILDER, 'chim_version': CHIM_VERSION, 'world_format': receipt['world_format'],
               'areas': areas, 'frames': sections}
@@ -1332,6 +1440,10 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     from mesh_geometry import UNDERSIDE_DEPTH
     from mesh_geometry_env import underside_mode
     underside = underside_mode()
+    from mesh_geometry import SURFACE_LOSS
+    from mesh_geometry_env import hull_points_mode
+    hull_points = hull_points_mode()
+    hull_surface_meshes = hull_surface_table() if hull_points in ('table', 'table-whole') else set()
     for mi, model in enumerate(index['models']):
         profile = town_model_profile(group[model['source']], model['source'], model['triangles'],
                                      underpass_names=underside == 'names')
@@ -1341,6 +1453,14 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         # collision over the visible stair treads (and architecture's walkways) checked against the mesh as drawn
         # (mesh_geometry.clear_visible_treads, CHIM-STAIR-STEPS-SOLID-43)
         profile['visible_treads'] = True
+        if hull_points == 'all' or model['source'].replace(chr(92), '/').casefold() in hull_surface_meshes:
+            # a convex piece keeps all its points when the reduced hull lies under its source surface (a dock walkway
+            # sank the player 19 units into its planks, mesh_geometry.collision_parts, CHIM-VIVEC-DOCK-WALKWAY-43);
+            # the measured table by default (config/collision-hull-surface.json: only these meshes change)
+            profile['hull_surface_loss'] = SURFACE_LOSS
+            if hull_points == 'table-whole':
+                # the rule as first shipped, for A/B tests: the hull of all a piece's points (CHIM-HULL-SURFACE-HEAP-46)
+                profile['hull_surface_points'] = 'all'
         if underside == 'whole':
             profile['underside_whole'] = UNDERSIDE_DEPTH
         elif underside in ('rule', 'split'):
@@ -1376,6 +1496,8 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     with timer.section('meshes'):
         prepared = dict(enumerate(run_units('mesh', items, mesh_unit, jobs, cache)))
     mesh_fps = {mi: fp for mi, (fp, _) in enumerate(items)}
+    with timer.section('collision surface gate'):
+        hull_surface_gate(town, index['models'], prepared, mesh_fps, archive, hull_points, jobs, cache)
     # The town's placements, as its legacy region maps hold them (town_regions.town_references): a
     # frame centred off the cell grid (Vivec's Arena) audits whole cells around it (CHIM-PAYLOAD-PARITY-33).
     from town_regions import town_references

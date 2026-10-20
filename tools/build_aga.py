@@ -1027,7 +1027,22 @@ def image_waivers(args):
         ('--exclude ' + ','.join(excluded_groups(args)), bool(excluded_groups(args))),
         ('--direct-start', getattr(args, 'direct_start', None)),
         ('--skip-census', getattr(args, 'skip_census', None)),
-        ('--quick-character', getattr(args, 'quick_character', None))) if used]
+        ('--quick-character', getattr(args, 'quick_character', None)),
+        ('--allow-placeholder ' + ','.join(sorted(allowed_placeholders(args))), bool(allowed_placeholders(args)))) if used]
+
+
+def allowed_placeholders(args):
+    """The stand-ins this test build may ship (--allow-placeholder; tools/placeholder_policy.py)."""
+    from placeholder_policy import parse
+    return parse(getattr(args, 'allow_placeholder', None))
+
+
+def placeholder(args, name, reason, unit=None, inputs=()):
+    """Refuse a stand-in asset unless --allow-placeholder NAME (SKY-FLAT-PALETTE-DRIFT-41)."""
+    from placeholder_policy import check as check_placeholder
+    if not hasattr(args, 'placeholder_records'):
+        args.placeholder_records = []
+    return check_placeholder(name, reason, allowed_placeholders(args), unit=unit, inputs=inputs, records=args.placeholder_records)
 
 
 def excluded_groups(args):
@@ -1375,6 +1390,12 @@ def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, s
             record['far_terrain'] = chim_far_sidecar(chim_world, id1, record)
             timer.step()
         timer.done('Image: CHIM far terrain: %d sidecars' % sum(1 for r in frame_maps if r['far_terrain']))
+    # Each frame map's whole-structure cut groups (chim.cuts): maps/<frame map>.cut beside it.
+    with build_profile.phase('Image: CHIM cut groups', total=len(frame_maps), unit='maps') as timer:
+        for record in frame_maps:
+            record['cut_groups'] = chim_cut_sidecar(chim_world, id1, record)
+            timer.step()
+        timer.done('Image: CHIM cut groups: %d sidecars' % sum(1 for r in frame_maps if r['cut_groups']))
     return {'areas': areas, 'receipt': receipt, 'frame_maps': frame_maps, 'region_maps': region_maps,
             'region_cache': region_cache}
 
@@ -1432,6 +1453,30 @@ def chim_far_sidecar(chim_world, id1, record):
     target.write_bytes(data)
     return {'file': sidecar_name(record['map']), 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
             'size': list(head['size']), 'step': head['step']}
+
+
+def chim_cut_sidecar(chim_world, id1, record):
+    """Copy the whole-structure cut groups of a frame map's frame (CHIM output cuts/<cx>_<cy>.cut) to
+    id1/maps/<frame map>.cut after checking it; None when the world has none (built before them, or a frame
+    without structures: every placement then keeps its own cut)."""
+    from chim.cuts import decode, file_name, sidecar_name
+    if not record.get('frame') or not record.get('map'):
+        return None
+    source = Path(chim_world)/'cuts'/file_name(record['frame'])
+    if not source.is_file():
+        return None
+    data = source.read_bytes()
+    head = decode(data)[0]
+    if list(head['cell']) != list(record['frame']):
+        raise ValueError('Cut groups %s name frame %s, not %s' % (source.name, head['cell'], record['frame']))
+    if not head['structures']:
+        return None
+    target = Path(id1)/sidecar_name(record['map'])
+    if target.exists():
+        raise ValueError('Cut groups already present: '+target.name)
+    target.write_bytes(data)
+    return {'file': sidecar_name(record['map']), 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+            'structures': head['structures'], 'members': head['members']}
 
 
 def add_chim_volume(chim_world, id1, out, index, xdftool, mib=None, frames=None):
@@ -1818,8 +1863,9 @@ def image(args):
         try:
             reserve_ui_palette(args.data_files,boot/'id1')
             convert_ui(args.data_files,boot/'id1/gfx/palette.lmp',boot/'id1/gfx')
-        except FileNotFoundError:
-            print('[warning] Original font inputs missing; readable UI fallback retained.',flush=True)
+        except FileNotFoundError as exc:
+            placeholder(args,'ui-font','original font inputs missing: '+str(exc),unit='gfx fonts',
+                        inputs=[boot/'id1/gfx/palette.lmp'])
     from prepare_logo import prepare_logo,prepare_menu_logo
     # NPC skins can use the palette bank first introduced for status bars.
     # A copied old lighting table maps those colours back to grey sky pixels.
@@ -1873,6 +1919,9 @@ def image(args):
     if logo_stream.exists():logo_stream.unlink()
     # MiniWind: the stream ends on the full screen, which the engine holds with its
     # "Press ENTER to start" line until Enter (aw_movie.c); normal builds fade out.
+    if not (boot/'id1/gfx/magic16.awf').is_file():
+        placeholder(args,'logo-font','the converted game font is not staged',unit='intro/amiwind.awv',
+                    inputs=[boot/'id1/gfx/magic16.awf'])
     prepare_logo(logo,logo_stream,boot/'id1/gfx/magic16.awf',lines=startup_lines(mini,boot/'id1/gfx/magic16.awf',chim=bool(getattr(args,'chim_world',None))),
                  **({'prompt_top':miniwind.PROMPT_Y} if mini or direct_start_option() else {}))
     movie=boot/'id1/intro/mw_intro.awv'
@@ -1883,8 +1932,10 @@ def image(args):
             from prepare_logo import prepare_opening_card
             prepare_opening_card(args.intro_captions,boot/'id1/gfx/magic16.awf',
                                  boot/'id1/intro/opening.awt',movie_info['frames'])
+    elif 'video' in excluded_groups(args):
+        print('Quick test build: intro video left out (--exclude video).',flush=True)
     else:
-        print('[warning] Video not found; will not be included: intro/mw_intro.awv',flush=True)
+        placeholder(args,'intro-video','the converted intro video is not staged',unit='intro/mw_intro.awv',inputs=[movie])
     (boot/'id1/quake.rc').write_text('exec default.cfg\nexec default-game.cfg\nexec config.cfg\nexec keymap.cfg\nexec keymaps.cfg\nexec autoexec.cfg\naw_controls_migrate\naw_gallery_migrate\naw_horizon_migrate\naw_startup\n', newline='\n')
     if mini and mini.get('map_inspection'):
         mini['inspection_setup'] = miniwind.install_map_inspection(boot/'id1')
@@ -2252,12 +2303,14 @@ def finalize_image(args):
         local_skybox=getattr(args, 'local_skybox', 'false'))
     # A fallback here leaves the converted maps' one-colour placeholder as the shared sky: every
     # exterior ships a flat sky with no clouds (SKY-FLAT-PALETTE-DRIFT-41, v0.0.40 to v0.0.41, only a
-    # warning line then). With the maintainer's data files it is never acceptable: stop, naming why.
+    # warning line then). With the game's own data files it stops the build (tools/placeholder_policy.py).
     if sky_asset_preparation.get('status')=='fallback_warning' and getattr(args, 'data_files', None):
-        raise ValueError('Shared sky not prepared ({}): the image would ship a flat sky with no clouds '
-                         '(SKY-FLAT-PALETTE-DRIFT-41); staged palette {} sha256 {}'.format(
-                             sky_asset_preparation.get('warning'), boot / 'id1/gfx/palette.lmp',
-                             hashlib.sha256((boot / 'id1/gfx/palette.lmp').read_bytes()).hexdigest()))
+        placeholder(args, 'shared-sky', 'shared sky not prepared: ' + str(sky_asset_preparation.get('warning')),
+                    unit='gfx/aw_shared_sky.lmp', inputs=[boot / 'id1/gfx/palette.lmp', boot / 'id1/gfx/aw_shared_sky.lmp'])
+    night_sky = sky_asset_preparation.get('night_sky') or {}
+    if night_sky.get('status') in ('fallback_warning', 'legacy_fallback_warning') and getattr(args, 'data_files', None):
+        placeholder(args, 'night-sky', 'night sky not prepared: ' + str(night_sky.get('warning')),
+                    unit='gfx/aw_night_sky.lmp', inputs=[boot / 'id1/gfx/palette.lmp', boot / 'id1/gfx/aw_night_sky.lmp'])
     # The sky reservation remaps AWM1 pixels and rebinds their receipt. Check the
     # final palette contract, including reuse/custom-sky paths, before packaging.
     from prepare_world_ui import validate as validate_world_ui
@@ -2371,6 +2424,14 @@ def finalize_image(args):
         maps=staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)), sources=image_sources(args),
         palette=boot/'id1/gfx/palette.lmp', data_files=args.data_files, work_dir=out/'night-lighting',
         lighting_type=getattr(args, 'chim_lighting_type', None))
+    # NIGHT-WINDOWS-LOST-CHIM-36: an empty table means no glowing glass anywhere at night.
+    window_maps=night_lighting['tables']['world/night-windows.txt'].get('maps',0)
+    ships_exterior=bool(staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None))
+                        or getattr(args, 'chim_world', None))
+    if ships_exterior and (not window_maps or night_lighting['night_windows'].get('sources_skipped')):
+        placeholder(args,'night-windows','{} maps with glowing glass; scenery sources skipped: {}'.format(window_maps,
+                    ', '.join(e['name']+' ('+e['reason']+')' for e in night_lighting['night_windows'].get('sources_skipped',[])) or 'none'),
+                    unit='world/night-windows.txt',inputs=[boot/'id1/world/night-windows.txt'])
     # Pure CHIM (--builder chim): each CHIM town's frame maps are written and checked against its
     # final legacy maps (statics both ways, origin, harvest representation), then those legacy maps
     # leave the image (chim.frame_map.remove_legacy_areas, recorded): the stair and heap gates below
@@ -2606,6 +2667,7 @@ def finalize_image(args):
         'npc_gallery':gallery_report,'torch_test':torchtest_report,'world_scenery':world_scenery_acceptance,
         'world_flora':json.loads((out/'world-flora-staging.json').read_text(encoding='utf-8')) if (out/'world-flora-staging.json').is_file() else {'status':'not_requested'},
         'sky_asset_preparation':sky_asset_preparation,
+        'placeholders_allowed':getattr(args,'placeholder_records',[]),
         'guard_torches':guard_torches,
         'night_lighting':night_lighting,
         'hand_metadata':hand_metadata,
@@ -2790,6 +2852,7 @@ def main():
                    help='warn (default): unknown builds used with a warning, invalid files not used; '
                    'fail: an invalid file stops the build; require-known: only known builds (docs/KNOWN_INPUTS.md)')
     i.add_argument('--entity-baseline',type=Path,help="Previous build's entity-tracker.json; placements lost against it stop the build")
+    i.add_argument('--allow-placeholder',action='append',default=[],metavar='NAME',help='TEST BUILDS ONLY: let this named stand-in asset ship (tools/placeholder_policy.py NAMES); refused for release candidates and finals')
     i.add_argument('--accept-entity-loss',help='Recorded reason that makes an intended entity loss pass the --entity-baseline gate')
     for name in ['scene','media','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)
     i.add_argument('--music',type=Path,help='Converted soundtrack (prepare_music.py); required unless --exclude music')

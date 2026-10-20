@@ -18,7 +18,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 ## Status: 8 October 2026
 
@@ -66,6 +66,16 @@ from it and grouped, overlapping switches so no transition leaves a hole ([dista
 notes](../DISTANT_TERRAIN.md#horizon-ponderings-the-island-cut-out-19-october-2026),
 [roadmap](../ROADMAP.md#distant-views-without-pop-in-and-the-screen-the-amiga-need-not-redraw-19-october-2026)).
 This bug is fixed on its own as well; the shell does not merely hide it.
+
+20 October 2026, in source (not built yet): on the CHIM Vivec frame of v0.0.45 the bridges between the cantons
+are separate placements (`ex_vivec_b_*` spans 51 units apart with short gap pieces between them, `ex_vivec_bt_*`),
+and the canton bodies are cut into tiles by the large-model cut; under the default far detail, Strong, a small gap
+piece goes at 40 % of the fog distance (fog still clear) and a span at 85 %. The candidate fixes, the fog rule
+(`dbg fog rule on`) and whole-structure cuts (`dbg cut groups on`: all 34 `ex_vivec_b` spans and all 315 canton tiles
+fall into structures), and their cost on paper are on
+[CHIM-BRIDGE-POP-PIECES-44](CHIM-BRIDGE-POP-PIECES-44.md#in-source-20-october-2026-v0046-fog-cuts-not-built-yet).
+The legacy Arena preview of this report is no longer built; the check is the look-across from a canton top on the
+CHIM Vivec frame.
 
 ## Verification
 

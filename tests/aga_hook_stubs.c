@@ -10,6 +10,7 @@
 #include "aw_miniwind.h"
 #include "aw_quickchar.h"
 #include "aw_testbox.h"
+#include "aw_weather.h"
 #define WEAK __attribute__((weak))
 WEAK int AW_QuickCharActive(void){return 0;}
 /* The inventory picture: still by default (aw_view.c); fixtures time it with a frozen clock. */
@@ -35,6 +36,10 @@ WEAK int AW_MenuHeaderLines(const char *text,int width,char lines[2][AW_MINIWIND
 }
 /* Demo playback's CHIM hook (aw_scenery.c): fixtures linking cl_parse.c without aw_scenery.c. */
 WEAK void (*aw_demo_map_begin)(void);
+/* Region weather (aw_weather.c): fixtures linking r_sky.c without it see no weather table, so the
+ * clear sky every earlier sky contract was written against (SKY-REDMOUNTAIN-BLUE-44). */
+WEAK void AW_WeatherInit(void) {}
+WEAK int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out){(void)days;(void)milliseconds;(void)out;return 0;}
 /* The animation kit console (aw_animkit.c): nothing to drive in fixtures without it. */
 WEAK void AW_AnimKitTick(void) {}
 WEAK void AW_AnimKitInit(void) {}
@@ -58,6 +63,7 @@ WEAK void AW_InventorySpawn(void){}
 WEAK void AW_InventoryPreviewClear(void){}
 WEAK void AW_ViewInventoryClear(void){}
 WEAK int AW_ViewInventoryBody(model_t **model,int *frame){(void)model;(void)frame;return 0;}
+WEAK int AW_ViewInventoryHeld(model_t **model,int *frame){(void)model;(void)frame;return 0;}
 WEAK int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angles[2][3]){(void)models;(void)origins;(void)angles;return 0;}
 WEAK int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int w,int h,float angle){(void)model;(void)frame;(void)x;(void)y;(void)w;(void)h;(void)angle;return 0;}
 WEAK void AW_CombatEquipmentStore(void){}

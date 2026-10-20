@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.46._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -32,10 +32,12 @@ Type: "dbg help" for help.
 | `dbg cam` | - | [mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel distance, right click or Esc ends |
 | `dbg camera` | `dbg pov`, `dbg thirdperson` | [first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md) |
 | `dbg crosshair` | `dbg crosshairs` | [on/off, true/false or 1/0; no argument toggles] show the crosshair (saved; default on; also Options > Show crosshairs) |
-| `dbg cull` | - | far detail (saved; also Options > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0 |
+| `dbg cull` | - | far detail (saved; also Options > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those) |
+| `dbg cut groups` | - | [on/off, 1/0; no argument shows aw_cull] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own |
 | `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 540] |
 | `dbg fog` | - | on/off or 1/0 (default on) |
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off) |
+| `dbg fog rule` | - | [on/off, 1/0; no argument shows aw_cull] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster) |
 | `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode) |
 | `dbg land fill` | `dbg landfill` | 1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B |
 | `dbg land method` | - | 1/0 legacy resident LAND rasterizer (default 0, experimental); separate from the CHIM far layer |
@@ -127,6 +129,7 @@ Type: "dbg help" for help.
 | `dbg torch radius` | - | [32..288] (player + admitted guard lights; default 192, classic 144) |
 | `dbg torch strength` | - | [0..1] (player + admitted guards; default 0.7; local light only) |
 | `dbg warm light` | - | 1/0 torch, lamp and window light takes the light hue (default 1) |
+| `dbg weather` | - | [on/off / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard] region weather: sky and fog colours from the region's weather chances (default on, saved; off = clear sky everywhere); a weather name forces it until auto; no argument: the weather and the region's chances |
 
 ## Ui / Console
 

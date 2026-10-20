@@ -201,6 +201,30 @@ class WalkerKeyIsTheWalk(unittest.TestCase):
             self.assertEqual(walker_key(edited_copy(Path(tmp) / 'compilers', same)), base)
             self.assertNotEqual(walker_key(edited_copy(Path(tmp) / 'walk', walk)), base)
 
+    def test_loader_edits_keep_the_key_face_edits_change_it(self):
+        """BUILD-REUSE-SCHEDULER-TOP-45 part 2: the frame loader is not walk code. The v0.0.45 rewrite of
+        chim/validate.py (frames loaded on the worker pool) changed that module's import-time code and every frame was
+        walked again; an edit to the loader, its module or the file readers only it uses keeps every key (the worker
+        checks the frame it reads against the walk's data key instead), an edit to how the walk reads a brush
+        image's faces changes it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            loader = {
+                # import-time code of the loader's module (what v0.0.45 changed)
+                'tools/chim/validate.py': ("ROOT = Path(__file__).resolve().parents[2]\n",
+                                           "ROOT = Path(__file__).resolve().parents[2]\n_LOADER_POOL = 4\n"),
+                # the format's file readers that only the loader runs
+                'tools/chim/format.py': ('def read_sector(data):\n', 'def read_sector(data):\n    _edited = 1\n'),
+            }
+            body = {'tools/chim/validate.py': ("    root = Path(out) / 'chim'\n    _, files, mdir, _ = F.read_index(",
+                                               "    root = Path(out) / 'chim'\n    _edited = 1\n"
+                                               "    _, files, mdir, _ = F.read_index(")}
+            faces = {'tools/chim/faces.py': ('def face_polygons(lumps):\n',
+                                             'def face_polygons(lumps):\n    _edited = 1\n')}
+            base = walker_key(edited_copy(Path(tmp) / 'base', {}))
+            self.assertEqual(walker_key(edited_copy(Path(tmp) / 'loader', loader)), base)
+            self.assertEqual(walker_key(edited_copy(Path(tmp) / 'body', body)), base)
+            self.assertNotEqual(walker_key(edited_copy(Path(tmp) / 'faces', faces)), base)
+
     def test_the_key_holds_the_walk_files_and_no_compiler(self):
         selected, uncertain = collision.stair_code_selection()
         self.assertFalse(uncertain)
@@ -263,6 +287,8 @@ class WalkerKeyIsTheWalk(unittest.TestCase):
                     continue
                 for inner in ast.walk(node):
                     for name, found in imported(inner, relative):
+                        if (found, name) == collision.STAIR_FRAME_LOADER:
+                            continue        # the frame loader: its output is checked by content (_stair_frame)
                         if found is not None and found not in collision.STAIR_WALK_CODE:
                             problems.append('%s %s imports %s' % (relative, unit, found))
                     if isinstance(inner, ast.Name) and inner.id in top and top[inner.id] is not None \
@@ -278,12 +304,15 @@ class WalkerKeyIsTheWalk(unittest.TestCase):
         import stair_walk  # noqa: F401
         root = str(ROOT.resolve())
         called = set()
+        functions = set()
 
         def seen(code):
             path = code.co_filename
             if (os.path.isabs(path) and path.startswith(root) and code.co_name != '<module>'
                     and os.path.isfile(path)):
-                called.add(Path(path).resolve().relative_to(ROOT.resolve()).as_posix())
+                relative = Path(path).resolve().relative_to(ROOT.resolve()).as_posix()
+                called.add(relative)
+                functions.add((relative, code.co_name))
 
         monitoring = getattr(sys, 'monitoring', None)
         if monitoring is None:
@@ -314,8 +343,104 @@ class WalkerKeyIsTheWalk(unittest.TestCase):
                 monitoring.free_tool_id(tool)
         self.assertTrue(any(r['kind'] == 'step' and r.get('flight') for r in rows))
         self.assertLessEqual({'tools/chim/collision.py', 'tools/stair_walk.py', 'tools/audit_walkability.py',
-                             'tools/chim/validate.py', 'tools/chim/format.py'}, called)
-        self.assertEqual(sorted(called - set(collision.STAIR_WALK_CODE)), [])
+                             'tools/chim/faces.py', 'tools/chim/format.py'}, called)
+        # outside the walk's code only the frame loader runs (its output is checked against the walk's data key)
+        loader_file, loader = collision.STAIR_FRAME_LOADER
+        self.assertEqual(sorted(called - set(collision.STAIR_WALK_CODE) - {loader_file}), [])
+        from build_cache import SourceIndex
+        loader_units = SourceIndex(ROOT).entry_units(ROOT / loader_file, loader)[3].get(loader_file, set())
+        self.assertIn(loader, loader_units)
+        import ast
+        top_level = {n.name for n in ast.parse((ROOT / loader_file).read_text(encoding='utf-8')).body
+                     if isinstance(n, (ast.FunctionDef, ast.ClassDef))}
+        self.assertEqual(sorted(name for path, name in functions if path == loader_file
+                                and name in top_level and name not in loader_units), [])
+
+
+class WalkedDataIsKeyedData(unittest.TestCase):
+    """BUILD-REUSE-SCHEDULER-TOP-45 part 2, the dangerous direction: with the loader out of the code key, a walk must
+    never be stored or reused for data other than what it walked. The data part of the key is the frame as the gate
+    read it (frame_stair_key); every walk worker checks the frame it reads against it and walks nothing on a
+    mismatch; a frame whose walked data changed gets another key and is walked again."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.env = dict(os.environ)
+        for name in ('AMIWIND_STAIR_WALK_REUSE', 'AMIWIND_RUN_CHIM_VERSION', 'AMIWIND_AW_REQUEST'):
+            os.environ.pop(name, None)
+        os.environ.update(AMIWIND_PASS_CACHE=str(Path(self.tmp.name) / 'cache'), AMIWIND_STAIR_WALK_CACHE='cached',
+                          AMIWIND_STAIR_WALK_SAMPLE='0', AMIWIND_RUN_NAME=RUN, AMIWIND_RUN_COMMIT='abc1234',
+                          AMIWIND_RUN_VERSION='0.0.42-dev1')
+        from test_chim_stairs import world_of
+        from chim.validate import Failures, load_world
+        self.out = Path(self.tmp.name) / 'world'
+        self.out.mkdir()
+        world_of(self.out, False)
+        world = load_world(self.out, Failures())
+        self.frames, self.models = world[5], world[4]
+        self.clear()
+
+    def tearDown(self):
+        self.clear()
+        os.environ.clear()
+        os.environ.update(self.env)
+        self.tmp.cleanup()
+
+    def clear(self):
+        collision._STAIR_CACHE.clear()
+        collision._STAIR_DIGESTS.clear()
+
+    def unit(self, expect):
+        cores = [t[2] for t in collision.stair_tasks(self.out, self.frames) if t[1] == 0]
+        return collision.stair_unit((str(self.out), 0, cores, 0, None, expect))
+
+    def changed_load_frame(self):
+        """chim.validate.load_frame returning the frame with one placement moved: other data than the world holds."""
+        from chim import validate
+        real = validate.load_frame
+
+        def moved(out, frame_index):
+            row, models = real(out, frame_index)
+            path, frame, chunks = row
+            chunks = [dict(c, owned=[dict(r, origin=[r['origin'][0] + 64.0] + list(r['origin'][1:]))
+                                     for r in c['owned']]) for c in chunks]
+            return (path, frame, chunks), models
+        return patch.object(validate, 'load_frame', side_effect=moved)
+
+    def test_the_worker_walks_only_the_keyed_frame(self):
+        key = collision.frame_stair_key(self.frames[0], self.models)
+        _, rows = self.unit(key)
+        self.assertTrue(rows)
+        self.clear()
+        with self.assertRaisesRegex(ValueError, 'other data than the world holds'):
+            self.unit('0' * 64)
+        self.clear()
+        with self.changed_load_frame(), self.assertRaisesRegex(ValueError, 'other data than the world holds'):
+            self.unit(key)
+
+    def test_a_gate_whose_loader_reads_other_data_stores_nothing(self):
+        with self.changed_load_frame(), self.assertRaisesRegex(ValueError, 'other data than the world holds'):
+            collision.stair_gate(self.out, self.frames, 1, models=self.models)
+        self.assertEqual(list((Path(os.environ['AMIWIND_PASS_CACHE']) / 'stair-walk').rglob('*.json')), [])
+
+    def test_changed_walked_data_is_walked_again(self):
+        first = collision.stair_gate(self.out, self.frames, 1, models=self.models)
+        self.assertEqual(first['pass_cache']['walked'], len(self.frames))
+        self.clear()
+        again = collision.stair_gate(self.out, self.frames, 1, models=self.models)
+        self.assertEqual((again['pass_cache']['reused'], again['pass_cache']['walked']), (len(self.frames), 0))
+        # the same world with one placement of frame 0 moved: its data key changes, so it is walked, not reused
+        path, frame, chunks = self.frames[0]
+        moved = [dict(c, owned=[dict(r, origin=[r['origin'][0] + 64.0] + list(r['origin'][1:])) for r in c['owned']])
+                 for c in chunks]
+        self.assertTrue(any(c['owned'] for c in chunks))
+        frames = [(path, frame, moved)] + list(self.frames[1:])
+        self.assertNotEqual(collision.frame_stair_key(frames[0], self.models),
+                            collision.frame_stair_key(self.frames[0], self.models))
+        self.clear()
+        # the walk worker reads the files (unchanged): its frame is not the keyed one, so nothing is walked or kept
+        with self.assertRaisesRegex(ValueError, 'other data than the world holds'):
+            collision.stair_gate(self.out, frames, 1, models=self.models)
 
 
 if __name__ == '__main__':

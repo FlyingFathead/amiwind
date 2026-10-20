@@ -9,17 +9,27 @@
 | Where | tests/test_build_profile.py test_cpu_and_wall_of_a_stage_and_all_its_children |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.33 |
+| Persists in | v0.0.33-dev, v0.0.46-dev1 (last seen) |
 | Severity | low: No effect on the game or builds; a gate failure without a defect (1.99606 s summed samples against a 1.996 s bound). |
 | Family | Gates, CI and tests (`tests-ci`) |
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 
 ## Status: 9 October 2026
 
 Fixed in source on the v0.0.33 stage-parallel branch, not shipped.
+
+## Persisting (20 October 2026)
+
+The same check failed again on a busy host: gate 3336 (2026-10-20 16:59 +0300, v0.0.46-dev1, host
+running a 24-core build) summed the timeline to 2.179 s against the stage's exact CPU of 2.163 s plus
+the 0.2 s allowance (over by 0.016 s). The fixed allowance of v0.0.33 did not hold: the rounding and
+interval jitter of the samples grow with the stage's CPU and with the host load, not by a constant.
+
+Repair: the allowance is now the larger of 0.2 s and 10 % of the exact CPU, in the test only; the other
+assertions are unchanged. Reported again with the register (see the report lines in the facts).
 
 ## Symptom
 
@@ -102,6 +112,9 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
 - [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
 - [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
+- [RELEASE-KIT-NO-REPAIR-MODE-35](RELEASE-KIT-NO-REPAIR-MODE-35.md): The release kit has no repair mode for a commit already pushed
+- [RELEASE-KIT-PUSH-BEFORE-CI-45](RELEASE-KIT-PUSH-BEFORE-CI-45.md): The release kit pushes to main before CI has passed
+- [RELEASE-KIT-RETRY-REUSES-CI-45](RELEASE-KIT-RETRY-REUSES-CI-45.md): A kit retry after a CI failure reads the same failed run again
 - [RELEASE-LAVA-IMAGE-ALLOWLIST-38](RELEASE-LAVA-IMAGE-ALLOWLIST-38.md): Lava documentation images were listed without image-type approval
 - [RELEASE-PATCH-SIZE-33](RELEASE-PATCH-SIZE-33.md): The release preflight refuses the whitespace baseline of v0.0.33-dev1 as oversized text
 - [RELEASE-PATCH-TARGET-VERSION-39](RELEASE-PATCH-TARGET-VERSION-39.md): RC1 publication baseline lacks its target version
@@ -125,6 +138,8 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-RC1-INTEGRATION-CONTRACTS-39](TEST-RC1-INTEGRATION-CONTRACTS-39.md): RC1 regression tests assume the old fingerprint location and a separate class cache unit
 - [TEST-TOWN-BOUNDS-40](TEST-TOWN-BOUNDS-40.md): Town expansion left recovery fixtures and coordinate audit stale
 - [TEST-WORKER-SYSPATH-32](TEST-WORKER-SYSPATH-32.md): Pool workers started from tests import tools/mwad.py instead of the mwad package
+- [TESTS-HEAD-REDUCER-BYTES-CI-45](TESTS-HEAD-REDUCER-BYTES-CI-45.md): A byte-exact head reducer test fails on some GitHub runners
+- [TESTS-SUPERVISOR-START-CLOCK-46](TESTS-SUPERVISOR-START-CLOCK-46.md): A scheduler test sorted units by the clock each worker read, and failed when the host delayed a thread
 - [TOOLKIT-TEST-POINTERLOCK-31](TOOLKIT-TEST-POINTERLOCK-31.md): Inspector test left pointer lock set, breaking later drag checks
 
 Related bugs in other categories:

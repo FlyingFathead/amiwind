@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 8 times; something has to be done
+## PERSISTING: reported 9 times; something has to be done
 
 - Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Maintainer repeat: F unsheathes fists successfully; V after F produces world light but no third-person carried torch pose or animation.
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Original human/beast and common first-person torch groups confirmed. Player companion/pose remains unwired; guard overlay has layout limits. No torch/native acceptance.
@@ -12,6 +12,7 @@
 - Reported with v0.0.43-dev2 at 2026-10-18 16:41 +0300: maintainer: the inventory character display does not show the equipped torch either; it should hold it
 - Reported with v0.0.44-dev1 at 2026-10-19 15:56 +0300: maintainer, vanity camera: the player shows the raised-arm torch pose but no torch in the hand
 - Reported with v0.0.44-dev1 at 2026-10-19 15:57 +0300: maintainer: every third-person camera, not only the vanity camera; the raised-arm pose shows, the torch model is missing
+- Reported with v0.0.45 at 2026-10-20 02:22 +0300: source diagnosis: held torch alias never reloaded after a cache eviction (aw_view.c view_held) and never drawn in the inventory picture; fix in code with regression tests, needs gate and in-game check
 
 <!-- END GENERATED PERSISTING -->
 
@@ -24,7 +25,7 @@
 | Where | Third-person player body and equipment |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev2, v0.0.39-rc1 (last seen) |
+| Persists in | v0.0.38-dev2, v0.0.39-rc1, v0.0.43-dev2, v0.0.44-dev1 (last seen) |
 | Severity | medium: Visible player equipment and ready-state feedback are missing. |
 | Family | First-person hands and torch (`torch-hands`) |
 | Playtest version | v0.0.38-dev2 |
@@ -35,12 +36,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.44 (19 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
+- [PERSISTING: reported 9 times; something has to be done](#persisting-reported-9-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -57,6 +58,7 @@ _Last updated with AmiWind v0.0.44 (19 October 2026)._
 - [Implemented RC2 torch candidate, 13 October 2026](#implemented-rc2-torch-candidate-13-october-2026)
 - [Native candidate findings, 14 October 2026](#native-candidate-findings-14-october-2026)
 - [Post-pin RC2 package observation, 14 October 2026](#post-pin-rc2-package-observation-14-october-2026)
+- [Cause of the missing torch, 20 October 2026](#cause-of-the-missing-torch-20-october-2026)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
@@ -98,7 +100,10 @@ an earlier exact package before identifying a first-bad build.
 
 ## Verification
 
-Open, needs fixing. Maintainer report recorded; no fix or repaired-package acceptance.
+Fix in code (20 October 2026, see "Cause of the missing torch" below); it needs
+the engine gate and an in-game check: third person at night on a Balmora street,
+torch equipped (F then V and V alone), idle, walk and run, the vanity camera, the
+inventory picture, headlamp off and on, with a clip. No maintainer acceptance yet.
 
 ## Prevention
 
@@ -184,6 +189,51 @@ Target compilation and scoped Nord native F-then-V, hold/walk/run, torch-off and
 The independently extracted RC2 package shows a raised left arm and carried torch on Nord, then torch-off and water/land model selection. Full disk readback verifies all 20 body/held-torch companions. Scoped native evidence is not all-appearance or matched-original visual acceptance; maintainer acceptance remains pending.
 
 These observations were recorded after source pin b6d759052f908f134ad2eaee1abb85c3aba7ca2d. This documentation continuation does not rewrite the sealed source archive, Linux update kit or inspection package. Maintainer acceptance and final v0.0.39 clearance remain pending.
+
+## Cause of the missing torch, 20 October 2026
+
+The v0.0.44-dev1 reports narrow the symptom: in every third-person camera the
+raised-arm torch pose shows but the torch itself does not, and the inventory
+picture shows no torch either. The raised arm only exists in the torch body, so
+the torch body and its held torch were both admitted; the held torch was then
+not drawn. Two causes in the engine:
+
+1. The held torch never came back after a cache eviction (engine/aga/src/aw_view.c,
+   view_held). The torch body and the held torch are two optional alias models in
+   Quake's model cache. Any later load (an NPC, a guard torch pair, a map chunk, the
+   inventory pose model) can evict either one. The body survives that: the alias
+   renderer reloads its own entity through Mod_Extradata. The held torch was drawn
+   only while Cache_Check still found it, and nothing ever loaded it again, so after
+   one eviction the arm stayed raised and the torch was gone for the rest of the
+   area (the light stayed: it is the player's own light, separate from the model).
+   The RC2 check of 14 October was a short scoped run in a small scene where nothing
+   evicted it; v0.0.43 and v0.0.44 load far more into the cache (whole-island CHIM,
+   guard torches at night, inventory pictures), which is why the report came back.
+2. The inventory picture never drew the held torch (aw_view.c
+   AW_ViewInventoryEquipment draws only a right-hand weapon and a shield): the torch
+   pose was shown without its torch.
+
+Rule from OpenMW npcanimation.cpp (showCarriedLeft) and characterpreview.cpp
+(InventoryPreview::update): the carried-left light is a part of the character that
+is always attached while it is shown, in the world and in the inventory doll, where
+the torch group plays on the left arm. Our own implementation, nothing copied:
+
+- held_ready() in aw_view.c: an evicted held torch is loaded again in the same slot,
+  under its first admission's rule (2 MiB free hunk), at most once a second
+  (AW_ViewHeldRetry in aw_view_rules.c), and only with the torch body's frame count.
+  The held draw no longer requires the body to be in the cache that frame (the
+  renderer reloads the body; the torch only copies its frame and placement).
+- AW_ViewInventoryHeld in aw_view.c, drawn by AW_InventoryPreviewDraw in aw_head.c:
+  the held torch at the torch body's frame and placement in the inventory picture.
+
+Why the earlier attempts did not hold: they built and checked the assets (20 of 20
+torch body and held torch pairs baked and read back) and one short native run;
+nothing tested the held torch after the cache had to make room, and the inventory
+picture was out of their scope. Regression checks: tests/aga_view_test.c (retry
+rule), tests/aga_inventory_pose_test.c (eviction and reload through the real
+aw_view.c), tests/aga_inventory_preview_test.c (the torch drawn in the inventory
+picture) and tests/test_third_person.py (the draw path uses the re-admission). All
+four fail on the code before the fix.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

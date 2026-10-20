@@ -18,7 +18,7 @@
 | Where | Image layout of v0.0.36-dev3: two files, disk 1 DH0 + DW0, disk 2 DW1 + DW2 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | fixed in v0.0.45 |
 | Severity | medium: all four Amiga limits hold, but the target of one image is not met; the player handles two disks and three world partitions |
 | Family | Disk images, partitions and launchers (`disk-image-layout`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

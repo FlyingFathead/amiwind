@@ -65,6 +65,49 @@ def entity(fields):
     return '{\n' + '\n'.join(quote(k)+' '+quote(v) for k,v in fields.items()) + '\n}'
 
 
+class TalkGreetings:
+    """The conversation greeting each placed NPC opens a talk with (mwad.dialogue.talk_greeting,
+    the rule of OpenMW's DialogueManager::startDialogue), one evaluation per (NPC, cell), shared by
+    every resident writer (towns, CHIM towns, rooms, Seyda Neen). fields() gives the entity keys:
+    aw_greeting (first meeting) and aw_greeting_again (later talks) when they exist; record() is
+    what the residents report keeps (topic, INFO, determined or not, and why)."""
+
+    def __init__(self, data, kinds, topics, cells=()):
+        from mwad.dialogue import dialogue_records, exterior_cell_names, greeting_topics
+        # no Greeting topic (a synthetic master): nothing to pick, the master is not read again
+        self.names = {}
+        if greeting_topics(topics):
+            kinds = dialogue_records(child_ci(data, 'Morrowind.esm'), kinds)
+            self.names = exterior_cell_names(kinds, cells)
+        self.kinds, self.topics = kinds, topics
+        self.cache = {}
+
+    def exterior_name(self, position):
+        from town_grid import physical_cell
+        return self.names.get(physical_cell({'position': position}))
+
+    def lookup(self, identifier, cell):
+        from mwad.dialogue import greeting_topics, talk_greeting
+        key = (identifier.casefold(), cell)
+        if key not in self.cache:
+            self.cache[key] = (talk_greeting(self.kinds, self.topics, identifier, cell)
+                               if greeting_topics(self.topics) else {'first': '', 'again': '', 'record': {}})
+        return self.cache[key]
+
+    def fields(self, identifier, cell):
+        talk = self.lookup(identifier, cell)
+        out = {}
+        if talk['first']:
+            out['aw_greeting'] = display_text(talk['first'])
+            if talk['again']:
+                out['aw_greeting_again'] = display_text(talk['again'])
+        return out
+
+    def record(self):
+        return {f'{i}@{c or ""}': talk['record']
+                for (i, c), talk in sorted(self.cache.items(), key=lambda kv: (kv[0][0], kv[0][1] or ''))}
+
+
 def interior_visual_profile(model, area=None):
     """Visual/collision profile of one interior mesh ('meshes/...' path), or
     None when the mesh keeps the assembly default. Shared with the world
@@ -495,7 +538,7 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         models[identifier]=record;baked.add(identifier)
         print('Creature resident ready:',identifier,f"({record['frames']} frames, {record['triangles']} triangles, idle {record['idle']['group']})",flush=True)
     cast.extend((slug,r) for slug,r in creatures if r['id'].casefold() in baked)
-    placed=[]
+    placed=[];talk=TalkGreetings(data,kinds,topics,cells)
     for slug in (['seyda'] if include_exterior else []) + list(rooms):
         path=scene/'id1/maps'/f'{slug}.bsp';b=lumps(path.read_bytes())
         # Replace the three prototype residents, retaining scripted intro actors.
@@ -516,6 +559,9 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
                     'aw_line':display_text(record['greeting']['text']),'aw_idle_step':record['step'],
                     'aw_hello_distance':settings['distance'],'aw_hello_reset':settings['reset_distance'],
                     'aw_greet_duration':settings['duration']}
+            if fields['classname']=='aw_npc' and record['voice']:
+                fields.update(talk.fields(ref['id'],talk.exterior_name(ref['position']) if slug=='seyda'
+                                          else rooms[slug].get('name')))
             entities.append(entity(fields));placed.append({'map':slug,'reference':ref['number'],'id':ref['id'],'position':pos})
         # replaced whole: an earlier stage made this map (BUILD-POOL-READONLY-SCENE-WRITE-35)
         b[0]=('\n'.join(entities)+'\n\0').encode('cp1252');replace_bytes(path,pack_lumps(b))
@@ -527,7 +573,7 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         print(f'Resident stage: {len(left_out)} room references left out (reasons in {report_name} left_out)',flush=True)
     report={'rooms':reports,'cast':placed,'models':models,'doors':doors,'npc_lod':lod_report,
             'creatures':{'mode':creature_residents.mode(),'placed':sum(1 for _,r in creatures if r['id'].casefold() in baked)},
-            'left_out':left_out,
+            'left_out':left_out,'talk_greetings':talk.record(),
             'scope':'original placed humanoid residents, blocking idle actors and bounded greetings; combat, services, schedules and small-item interactions remain separate systems'}
     (scene/report_name).write_text(json.dumps(report,indent=2)+'\n')
     return report

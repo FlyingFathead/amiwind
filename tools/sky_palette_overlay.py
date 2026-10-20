@@ -9,8 +9,9 @@ BANK={222:(223,(100,69,138)),133:(113,(52,73,110)),95:(94,(210,50,34)),
       156:(158,(250,104,45)),140:(138,(255,174,66)),83:(82,(255,232,160)),221:(223,(153,38,79))}
 # .anm: animation kit layouts beside actor models (tools/npc_anim.py); .tag: carried-item tags beside them
 # (tools/npc_items.py): plain ASCII text, no pixels (ANIMKIT-IMAGE-FORMATS-35).
+# .aww: region weather (tools/prepare_world_ui.region_weather): chances and RGB colours, no palette indices.
 OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awn','.awq','.awr','.awt','.awg','.awl',
-        '.anm','.tag'}
+        '.anm','.tag','.aww'}
 # Every extension spans() parses as indexed pixels or metadata (besides OPAQUE and the named files below).
 PARSED={'.mdl','.spr','.bsp','.wad','.lmp','.awb','.awv','.awf','.mws','.awh','.awi','.awu','.awm','.aws','.awp'}
 NAMED={'save-content.bin'}

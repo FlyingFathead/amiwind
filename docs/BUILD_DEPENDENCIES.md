@@ -1,6 +1,6 @@
 # Dependency checks and reference versions
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -137,6 +137,12 @@ Neither version comparison nor CI replaces a full game conversion and playtest.
 The installer uses the project's supported Python dependency constraints rather
 than forcing all these environment versions onto another machine. Its results
 can therefore differ and must be reported and tested. This is not a lockfile.
+
+One linear algebra kernel: the OpenBLAS library inside the NumPy and SciPy packages picks its kernels by the
+processor, and kernel families round matrix products differently in the last bit, enough to change baked NPC skin
+bytes. `tools/build.py` and `tools/run_tests.py` therefore set `OPENBLAS_CORETYPE=Haswell` before NumPy loads
+(`tools/blas_kernel.py`; any x86-64 processor with AVX2 and FMA). An `OPENBLAS_CORETYPE` already set wins; a processor
+without AVX2 and FMA stays unpinned and may bake other bytes. The NPC bake caches include the kernel in their keys.
 
 ## Game inputs and editions
 

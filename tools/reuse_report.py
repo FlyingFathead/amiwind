@@ -35,6 +35,20 @@ if str(Path(__file__).resolve().parent) not in sys.path:  # run as a script; nev
 NEVER_AN_INPUT = (re.compile(r'^tools/release-files\.json$'), re.compile(r'^docs/'), re.compile(r'\.md$'),
                   re.compile(r'^tests/'))
 POLICY = ('engine', 'image', 'dry-run-image')
+# Files whose change alone never explains a rebuild without a look at the diff (JOB_PREAMBLE rule 75c,
+# BUILD-REUSE-SCHEDULER-TOP-45): the pool scheduling modules, whose scheduling functions and sizing constants key no
+# stage (build_cache.SCHEDULING_UNITS, SCHEDULING_CONSTANTS; a key that still changes through them is a real edit
+# there, or a key bug), and VERSION, which only the stages in VERSION_STAMPED write into their outputs. A rebuild
+# whose own changed inputs are only these (and files no output depends on, NEVER_AN_INPUT) stops the build before
+# any stage runs, like an over-broad key; --accept-rebuild (aw: override unexplained-rebuilds) with the reason when
+# the diff shows a real change. The v0.0.45 release build redid about 30 minutes for tools/build_parallel.py alone.
+SCHEDULING_FILES = frozenset({'tools/build_parallel.py', 'tools/stair_parallel.py'})
+VERSION_FILE = 'VERSION'
+# Stages whose outputs carry the AmiWind version: a VERSION change is a real input of theirs.
+# chim: tools/chim/stitch.py writes source_version into the world's records, tools/chim_build.py checks the version
+# class (public or private test build) before it builds.
+VERSION_STAMPED = frozenset({'chim'})
+SCHEDULING_OR_VERSION = 'scheduling or version only'
 # build_cache.plan_reuse: '<old run> reused it without <path> (replaced there by <stages>), which this build runs
 # again' - the old run's record of this stage is short a file a later stage replaced; the stage runs again so that
 # it is never reused with that file missing (BUILD-REUSE-REDUCED-RECORD-36). It follows the stages named.
@@ -96,6 +110,15 @@ def upstream_difference(run, old_run, stage):
     return f'{stage}: {len(found)} units differ ({describe(found, 3)})' if found else f'{stage}: same outputs'
 
 
+def scheduling_or_version(stage, files):
+    """True when the changed FILES of STAGE's key are only pool scheduling modules, VERSION (for a stage that does not
+    write it into its outputs, VERSION_STAMPED) and files no output depends on, at least one of the first two."""
+    suspect = [path for path in files if path in SCHEDULING_FILES
+               or (path == VERSION_FILE and stage not in VERSION_STAMPED)]
+    rest = [path for path in files if path not in suspect]
+    return bool(suspect) and all(any(rule.search(path) for rule in NEVER_AN_INPUT) for path in rest)
+
+
 def classify(name, reason, ctx):
     """(class, cause, detail) for one stage that was not reused."""
     if name in POLICY or reason.startswith(('compiles with the Amiga SDK', 'final image')):
@@ -127,6 +150,12 @@ def classify(name, reason, ctx):
         if own and all(part.startswith('sources') for part in own) and files \
                 and all(any(rule.search(path) for rule in NEVER_AN_INPUT) for path in files):
             return 'UNEXPECTED', 'over-broad key', 'only files no output depends on changed: ' + ', '.join(files)
+        if own and all(part.startswith('sources') for part in own) and files and scheduling_or_version(name, files) \
+                and not any(ctx['classes'].get(d) == 'EXPECTED' for d in deps):
+            return ('UNEXPECTED', SCHEDULING_OR_VERSION,
+                    'only pool scheduling code, VERSION or docs changed: ' + ', '.join(files) + '; a scheduling-only '
+                    'edit keys no stage (BUILD-REUSE-SCHEDULER-TOP-45): read the diff, fix the key, or pass '
+                    '--accept-rebuild with the reason')
         if not own and deps and any(ctx['classes'].get(d) == 'UNEXPECTED' for d in deps):
             return 'UNEXPECTED', 'follows', 'follows an unexpected rebuild: ' + ', '.join(deps)
         return 'EXPECTED', 'input change', ', '.join(parts)
@@ -197,7 +226,7 @@ def report(run):
             'reused': really_reused, 'rebuilt': len(rows), 'unexpected': len(unexpected), 'rows': rows}
 
 
-TOO_BROAD = ('over-broad key', 'not in the source diff')
+TOO_BROAD = ('over-broad key', 'not in the source diff', SCHEDULING_OR_VERSION)
 
 
 def source_diff(old_sources, files):
@@ -292,16 +321,30 @@ def print_preflight(result, stream=None, accepted=False):
               "check the reuse source.", file=stream)
 
 
-def plan_main(argv=None):
-    """`build.py --reuse-plan OLD_RUN`: the preflight alone, read only, in seconds (no game data read)."""
+def plan_main(argv=None, environment=None):
+    """`build.py --reuse-plan OLD_RUN [-- BUILD OPTIONS]`: the preflight alone, read only, in seconds (no game data
+    read). ENVIRONMENT(old_run) sets the stage environment the build would set and returns where its options came
+    from (default: build.reuse_plan_environment with the run's recorded command or the build defaults); without it
+    every stage was keyed with an empty environment and planned as rebuilt (BUILD-REUSE-PLAN-ENV-36)."""
     parser = argparse.ArgumentParser(prog='build.py --reuse-plan',
-                                     description='Reuse preflight: which stages of OLD_RUN this checkout would reuse')
+                                     description='Reuse preflight: which stages of OLD_RUN this checkout would reuse',
+                                     epilog='Build options after -- set the stage environment as that build would; '
+                                            "without them, OLD_RUN's recorded build command, else the build defaults.")
     parser.add_argument('old_run', type=Path)
     parser.add_argument('--fingerprint-scope', choices=('units', 'symbols', 'modules'), default='units')
     parser.add_argument('--accept-rebuild', action='store_true', help='exit 0 even with unexpected rebuilds')
     parser.add_argument('--json', type=Path, help='also write the preflight as JSON')
     args = parser.parse_args(argv)
+    if environment is None:
+        def environment(old_run):
+            import build
+            return build.reuse_plan_environment(old_run)
     import build_cache
+    try:
+        print('Stage environment: ' + environment(args.old_run), flush=True)
+    except (OSError, ValueError) as exc:
+        print('Error: the stage environment of the build: ' + str(exc), file=sys.stderr)
+        return 2
     try:
         result = build_cache.predict_preflight(args.old_run, args.fingerprint_scope)
     except (OSError, ValueError) as exc:

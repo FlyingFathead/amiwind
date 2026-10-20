@@ -132,6 +132,9 @@ def main(argv=None):
                     help='How a model keeps collision a convex piece closes under an authored ceiling: names '
                          '(default: a list of mesh names) or the EXPERIMENTAL general rules rule, split, whole '
                          '(mesh_geometry_env.underside_mode); sets AMIWIND_COLLISION_UNDERSIDE')
+    ap.add_argument('--scale-snap', choices=('on', 'off'), default=None,
+                    help='Placements of a mesh without collision scaled to the nearest 0.1 (on, the default) or as '
+                         'placed (off); sets AMIWIND_SCALE_SNAP (chim.build.scale_snap_step)')
     ap.add_argument('--stair-walk-cache', choices=('records', 'cached', 'full'), default=None,
                     help='How the stair walk reuses its walks (default: AMIWIND_STAIR_WALK_CACHE, else cached): '
                          'records (also the known-good stair records shipped with the source; a frame in neither is '
@@ -204,6 +207,8 @@ def _main(ap, a):
         os.environ['AMIWIND_STAIR_WALK_AREA'] = a.stair_walk_area
     if a.collision_underside:
         os.environ['AMIWIND_COLLISION_UNDERSIDE'] = a.collision_underside
+    if a.scale_snap:
+        os.environ['AMIWIND_SCALE_SNAP'] = '' if a.scale_snap == 'on' else 'off'
     if a.stair_walk_cache:
         os.environ['AMIWIND_STAIR_WALK_CACHE'] = a.stair_walk_cache
     from chim.build import build_areas

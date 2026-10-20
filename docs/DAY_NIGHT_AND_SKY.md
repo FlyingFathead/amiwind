@@ -1,10 +1,11 @@
 # Trees and Grass, Day and Night
 
-_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Region weather (20 October 2026)](#region-weather-20-october-2026)
 - [Clouds missing in v0.0.40 and v0.0.41 (17 October 2026)](#clouds-missing-in-v0040-and-v0041-17-october-2026)
 - [RC1 Seyda Neen brightness discontinuity: cause isolated](#rc1-seyda-neen-brightness-discontinuity-cause-isolated)
 - [v0.0.29 sky follow-up](#v0029-sky-follow-up)
@@ -38,6 +39,36 @@ _Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
 - [Dev3 midnight clearing mode — source candidate, 5 October 2026](#dev3-midnight-clearing-mode--source-candidate-5-october-2026)
 
 <!-- contents end -->
+
+## Region weather (20 October 2026)
+
+Until v0.0.45 every exterior drew the clear-weather sky: the sky and fog colours were the clear stops of the
+reference configuration, and nothing read a region's weather. Red Mountain, whose region record gives blight a
+100 % chance and clear 0 %, therefore showed a blue sky
+([SKY-REDMOUNTAIN-BLUE-44](bugs/SKY-REDMOUNTAIN-BLUE-44.md)).
+
+Now each region draws its own weather:
+
+- The builder writes `id1/world/region-weather.aww` (world UI stage, `tools/prepare_world_ui.py`): the weather
+  chances of every region from its record, in the order of `region-names.awn`, and the sky and fog colours of the
+  ten weathers (day, sunrise, sunset, night), their transition speed and glare from `Morrowind.ini`, or the values
+  it ships with when the data folder holds none.
+- The engine (`aw_weather.c`) finds the player's region with the same per-cell lookup as the HUD's region name and
+  picks that region's weather. Rules from OpenMW file `apps/openmw/mwworld/weather.cpp`: a roll of 1 to 100 against
+  the running sum of the chances, Clear when the chances never reach it; a new choice every
+  `Hours Between Weather Changes` (20 game hours); walking into another region changes the weather at the new
+  weather's `Transition Delta` per real second; arriving by travel, a load or a map change switches at once.
+  AmiWind's own choices: the roll is a hash of the region and the 20-hour period, so the same day has the same
+  weather without a save field, and a change is drawn in 16 steps.
+- The sky (`r_sky.c`) uses that weather's sky and fog colours: the clear sky texels take the weather's sky colour,
+  cloud texels its fog colour at their own brightness, the horizon band and the distance fog its fog colour, at
+  every time of day; the sunrise glow and the sun disc follow the weather's glare (none in a storm). Clear weather
+  builds exactly the tables of before.
+- `dbg weather` shows the weather and the region's chances; `dbg weather blight` (or any weather name) forces one
+  until `dbg weather auto`; `dbg weather off` (saved as `aw_weather 0`) brings back the clear sky everywhere.
+
+Not yet: the weathers' own cloud textures, rain, snow and ash particles, the storm sounds, the darker ambient light
+of a storm and the shorter fog of Foggy weather.
 
 ## Clouds missing in v0.0.40 and v0.0.41 (17 October 2026)
 

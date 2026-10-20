@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -202,6 +202,14 @@ With `--reuse-from`, the builder checks the reuse plan before any stage runs:
   files no output can depend on (the release file list, prose, tests), is a key that is
   too broad: the build stops before the first stage. `--accept-rebuild` builds anyway and
   says so.
+- a stage rebuilt only because the pool scheduling modules (`tools/build_parallel.py`,
+  `tools/stair_parallel.py`), `VERSION` or prose changed stops the build the same way
+  (cause "scheduling or version only"). Their scheduling functions and pool sizing constants
+  key no stage, so a key that still changes through them is either a real edit there (read
+  the diff, then `--accept-rebuild` with the reason) or a key bug. A stage that writes the
+  version into its outputs (the chim stage) is rebuilt for a `VERSION` change as before.
+  Origin: the v0.0.45 release build redid about 30 minutes of work for a scheduling edit
+  in `tools/build_parallel.py` (BUILD-REUSE-SCHEDULER-TOP-45).
 
 `tools/build.py --reuse-plan OLD_RUN [--json FILE]` runs the same preflight alone, read
 only, against OLD_RUN's own commands and game inputs: no game data read, about 10
@@ -209,6 +217,13 @@ seconds. The build itself also checks outputs, so it can only reuse fewer stages
 plan says. Example: the first v0.0.35 development build against the v0.0.34 build printed
 0 of 35 stages reused, 2 by policy, every other one explained by changed sources, game
 inputs or settings.
+
+The plan keys the stages in the environment the build would set (BUILD-REUSE-PLAN-ENV-36):
+`tools/build.py --reuse-plan OLD_RUN [--json FILE] [-- BUILD OPTIONS]` takes the build
+options after `--` when given, else the options OLD_RUN recorded (`build_argv` in its
+`build-state.json`, recorded by every build from 20 October 2026), else the build defaults,
+and prints which (`Stage environment: ...`). The build and the plan set that environment
+through the same functions (`export_option_environment`, `export_converter_environment`).
 
 ## Run names
 

@@ -168,9 +168,13 @@ class StairRuleTests(unittest.TestCase):
 class StairRulePlumbingTests(unittest.TestCase):
     def test_builder_exports_follow_original_stair_rules(self):
         source = (ROOT / 'tools/build.py').read_text(encoding='utf-8')
-        self.assertIn('export_stair_rules(args.font_options["follow_original_stair_rules"])', source)
-        self.assertLess(source.index('args.font_options = resolve_font_options(args)'),
-                        source.index('export_stair_rules('))
+        # The export lives in export_converter_environment, shared by the build and the reuse plan
+        # (BUILD-REUSE-PLAN-ENV-36); both resolve the font options before they call it.
+        shared = source[source.index('def export_converter_environment('):source.index('def plan_stage_environment(')]
+        self.assertIn('export_stair_rules(args.font_options["follow_original_stair_rules"])', shared)
+        for caller in (source[source.index('def main('):], source[source.index('def plan_stage_environment('):]):
+            self.assertLess(caller.index('args.font_options = resolve_font_options(args)'),
+                            caller.index('export_converter_environment(args)'))
 
     def test_image_step_runs_the_stair_gate_when_the_rules_are_on(self):
         source = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')

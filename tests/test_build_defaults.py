@@ -145,6 +145,7 @@ OPTIONS = {
     'live_logs': 'opt-in, not shipped', 'live_tracker': 'opt-in, not shipped', 'tracker_declined': 'opt-in, not shipped',
     'keep_tracker': 'opt-in, not shipped',
     'allow_known_actor_ground_findings': 'private test waiver', 'accept_known_stair_findings': 'private test waiver',
+    'allow_placeholder': 'private test waiver',
     # The AmiWind "MiniWind" Playtester Build: a private -devN partial-area build type (tools/miniwind.py).
     'miniwind': 'opt-in, not shipped', 'miniwind_description': 'opt-in, not shipped',
     'miniwind_scope': 'opt-in, not shipped',
@@ -172,6 +173,8 @@ OPTIONS = {
     'stair_walk_cache': 'check', 'stair_walk_sample': 'check', 'stair_walk_area': 'check',
     # the general underside collision rules of CHIM models: EXPERIMENTAL (names, the list, by default)
     'collision_underside': 'opt-in, not shipped',
+    # collision-free scaled copies merged to the nearest 0.1 of scale (on by default: CHIM-HULL-SURFACE-HEAP-46)
+    'scale_snap': 'shipped default',
     # Entity tracker against the release baseline (BUILD-DRESSING-EXCLUDED-32).
     'no_entity_baseline': 'debug opt-out', 'accept_entity_loss': 'check', 'readiness_id': 'check',
     'skip_dressing': 'debug opt-out',
