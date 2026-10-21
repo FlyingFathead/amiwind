@@ -32,7 +32,7 @@ class StairWalkArea(unittest.TestCase):
         self.env = dict(os.environ)
         for name in ('AMIWIND_STAIR_WALK_REUSE', 'AMIWIND_STAIR_WALK_AREA', 'AMIWIND_PASS_CACHE'):
             os.environ.pop(name, None)
-        os.environ.update(AMIWIND_STAIR_WALK_CACHE='cached', AMIWIND_STAIR_WALK_SAMPLE='0',
+        os.environ.update(AMIWIND_STAIR_WALK_CACHE='cached', AMIWIND_STAIR_WALK_SAMPLE='0', AMIWIND_STAIR_WALK_KEY='frame', AMIWIND_STAIR_WALK='all', AMIWIND_STAIR_WATCH='off',
                           AMIWIND_RUN_VERSION='0.0.42-dev1', AMIWIND_RUN_NAME='2026_10_16_v0.0.42-dev1_full_abc1234')
 
     def tearDown(self):

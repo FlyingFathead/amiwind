@@ -12,7 +12,7 @@ disk is mounted read-only from the image, and the scratch folder is removed afte
 
 Usage (paths inside VOLUME are relative to its root):
   engine_smoke.py --engine FILE --volume VOLUME --image-dir DIR --scratch DIR --roms HOST_DIR --out HOST_DIR
-                  [--prof jit|interp] [--map seyda] [--tp "-21800 -12300"] [--play 10] [--repeat 3]
+                  [--prof jit|interp] [--fast-mb 16] [--map seyda] [--tp "-21800 -12300"] [--play 10] [--repeat 3]
                   [--builder-image IMAGE] [--fsuae-image IMAGE] [--cpus 2] [--cpu-shares N] [--name NAME]
 The builder image needs xdftool (amitools) at /opt/amiwind-tools/venv/bin/xdftool; the FS-UAE image (emulator side: PROBE below) needs fs-uae,
 Xvfb, xdotool and ffmpeg. Images are used as present (--pull never); containers run with --network none.
@@ -37,6 +37,7 @@ PROBE = r'''#!/bin/sh
 # Mounts: /w = the run's fresh boot-disk copy (play-boot.hdf), /img = the image folder (world disk, read-only),
 # /roms = the maintainer's Kickstart folder (read-only), /out = this run's output folder.
 # Env: WORLD (world disk file name in /img, may be empty), PROF jit|interp, KICK (Kickstart file name in /roms),
+# FASTMB (Zorro III Fast RAM in MiB, default 16 = the smallest machine the game runs on, the case the gate must keep proving; 128 = a playtest's default),
 # MAP1 (first map, default seyda), REPEAT (how many times the TP map change runs, default 3), AFTER (after it loads: a console command, or key:NAME, e.g. key:Return for a MiniWind), TP (second load as "dbg tp X Y", default Balmora), PLAY (seconds of play, 10).
 # TP "same X Y": a one-area image; teleport inside MAP1 and stay in it (no second map). TP "view X Y Z": noclip and
 # aw_view to a local point of MAP1; the client's view origin must arrive there (wide network coordinates).
@@ -45,7 +46,7 @@ PROBE = r'''#!/bin/sh
 # reads (aw_music_status reads=); dbg music off (no more reads, the game goes on); a second load (TP) with the music
 # off; dbg music on (reads again). Any emulator exit, stall or missing step fails. Last line: "smoke RESULT ...".
 R=/out; mkdir -p $R/logs $R/shots $R/home $R/awctl
-PROF=${PROF:-jit}; MAP1=${MAP1:-seyda}; TP=${TP:--21800 -12300}; PLAY=${PLAY:-10}; REPEAT=${REPEAT:-3}; KICK=${KICK:-kickstart-3.1-a1200.rom}
+PROF=${PROF:-jit}; MAP1=${MAP1:-seyda}; TP=${TP:--21800 -12300}; PLAY=${PLAY:-10}; REPEAT=${REPEAT:-3}; KICK=${KICK:-kickstart-3.1-a1200.rom}; FASTMB=${FASTMB:-16}
 N=$((60 + $(od -An -N1 -tu1 /dev/urandom)))
 cat > $R/smoke.fs-uae <<CFG
 [config]
@@ -56,7 +57,7 @@ uae_cpu_24bit_addressing = false
 chip_memory = 2048
 slow_memory = 0
 fast_memory = 0
-zorro_iii_memory = 16384
+zorro_iii_memory = $((FASTMB * 1024))
 kickstart_file = /roms/$KICK
 hard_drive_0 = /w/play-boot.hdf
 hard_drive_0_type = hdf
@@ -367,6 +368,9 @@ def main(argv=None):
     ap.add_argument('--kickstart', default='kickstart-3.1-a1200.rom')
     ap.add_argument('--out', required=True, type=Path)
     ap.add_argument('--prof', choices=('jit', 'interp'), default='jit')
+    ap.add_argument('--fast-mb', type=int, default=16, choices=(16, 32, 64, 128, 256, 512, 1024),
+                    help='Zorro III Fast RAM in MiB (default 16, the smallest machine the game runs on: the gate keeps '
+                    'proving the baseline; 128 = what a playtest starts with)')
     ap.add_argument('--map', default='seyda')
     ap.add_argument('--tp', default='-21800 -12300',
                     help='second load as dbg tp X Y (default Balmora); "same X Y" for a one-area image: teleport inside --map; '
@@ -412,7 +416,8 @@ def main(argv=None):
     (out / 'stall.py').write_text(STALL_PY, encoding='utf-8', newline='\n')
     if args.script:
         shutil.copyfile(args.script, out / 'script.txt')
-    (out / 'engine.txt').write_text('engine sha256 %s\nimage %s\nprofile %s\n' % (want, args.image_dir, args.prof),
+    (out / 'engine.txt').write_text('engine sha256 %s\nimage %s\nprofile %s\nfast ram %d MiB\n'
+                                    % (want, args.image_dir, args.prof, args.fast_mb),
                                     encoding='utf-8', newline='\n')
     shares = ['--cpu-shares', args.cpu_shares] if args.cpu_shares else []
     base = ['run', '--pull', 'never', '--rm', '--network', 'none', *shares]
@@ -445,7 +450,7 @@ echo "readback=$(sha256sum /tmp/back | cut -d' ' -f1)"'''
             return 2
         docker(*base, '--cpus', args.cpus, '--memory', '3g', '--name', args.name + '-run', '--entrypoint', 'sh',
                '-e', f'PROF={args.prof}', '-e', f'WORLD={world.group(1) if world else ""}', '-e', f'MAP1={args.map}',
-               '-e', f'TP={args.tp}', '-e', f'PLAY={args.play}', '-e', f'REPEAT={max(1, args.repeat)}', '-e', f'START={args.start}', '-e', f'AFTER={args.after_load}', '-e', f'ILLEGAL={int(args.log_illegal)}', '-e', f'KICK={args.kickstart}',
+               '-e', f'TP={args.tp}', '-e', f'PLAY={args.play}', '-e', f'REPEAT={max(1, args.repeat)}', '-e', f'START={args.start}', '-e', f'AFTER={args.after_load}', '-e', f'ILLEGAL={int(args.log_illegal)}', '-e', f'KICK={args.kickstart}', '-e', f'FASTMB={args.fast_mb}',
                '--mount', f'type=volume,src={args.volume},dst=/w,volume-subpath={scratch}',
                '--mount', f'type=volume,src={args.volume},dst=/img,volume-subpath={args.image_dir},readonly',
                '-v', f'{args.roms.resolve()}:/roms:ro', '-v', f'{out}:/out', args.fsuae_image, '/out/probe.sh',

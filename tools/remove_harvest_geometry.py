@@ -113,9 +113,12 @@ def remove_geometry(raw,refs,origin):
     require(len(origin)==3 and all(math.isfinite(v) for v in origin),'Invalid map origin')
     for ref in refs:
         require(ref.get('type')=='CONT' and ref.get('kind')=='small_mushroom','Target is not an original mushroom container')
-        key=ref.get('source_key');require(isinstance(key,(list,tuple)) and len(key)==4 and key[1]=='exterior' and key[3]==ref['number'],
+        # an exterior key names its cell [x, y]; an interior one its cell name (HARVEST-INTERIOR-PICK-47)
+        key=ref.get('source_key');require(isinstance(key,(list,tuple)) and len(key)==4 and key[3]==ref['number'] and
+                                      ((key[1]=='exterior' and isinstance(key[2],(list,tuple))) or
+                                       (key[1]=='interior' and isinstance(key[2],str) and key[2])),
                                       'Full original placement key required')
-        frozen=(key[0],key[1],tuple(key[2]),key[3]);require(frozen not in keys,'Duplicate original placement key');keys.add(frozen)
+        frozen=(key[0],key[1],key[2] if isinstance(key[2],str) else tuple(key[2]),key[3]);require(frozen not in keys,'Duplicate original placement key');keys.add(frozen)
         number=str(ref['number']);require(number not in wanted,'Ambiguous numeric original reference');wanted[number]=ref
     require(wanted,'No target placements')
     removed=[];bound=[];matched=set()

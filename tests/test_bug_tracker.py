@@ -165,6 +165,11 @@ class BugTrackerTest(unittest.TestCase):
                                                      persists_in='fixed in v0.0.31-dev2')]), [])
         self.assertEqual(bug_register.validate([dict(base, fixed_in='v0.0.31', persists_in='fixed in v0.0.31')]), [])
 
+    def test_owner_acceptance_can_be_cleared_when_a_bug_is_reported_again(self):
+        # a fixed and accepted bug reported again is opened again: set ID --state open --owner-accepted none
+        source = (Path(__file__).resolve().parents[1] / 'tools' / 'bug_register.py').read_text(encoding='utf-8')
+        self.assertIn("b['owner_accepted'] = None if args.owner_accepted == 'none' else args.owner_accepted", source)
+
     def test_tags_are_checked_and_listed(self):
         base = bug(id='TEST-TAG-31')
         self.assertEqual(bug_register.validate([dict(base, tags=['performance'])]), [])

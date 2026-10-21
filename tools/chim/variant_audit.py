@@ -200,6 +200,7 @@ def audit_models(models, references=None, jobs=1):
 
 def audit_world(out, references=None):
     """The report of the CHIM world in OUT (OUT/chim/world.cwi and its sector files)."""
+    from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
     root = Path(out) / 'chim'
     _, files, mdir, _ = F.read_index((root / 'world.cwi').read_bytes())
     models = []

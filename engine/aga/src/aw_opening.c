@@ -2,6 +2,7 @@
  * Bounded adapters for audited opening scripts. Each actor retains its own
  * state/timers; speech completion, menus and movement are separate gates. */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_activated.h"

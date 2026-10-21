@@ -4,6 +4,7 @@
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import struct
 from amiga_fs import check_image
@@ -331,12 +332,13 @@ def digest(path):
 
 def _pack_batch(task):
     """Worker: write, check and read back one world partition (independent)."""
-    index, batch, out, xdftool = task
+    index, batch, out, xdftool = task[:4]
     batch = [Path(p) for p in batch]
     volume=f'AW_WORLD{index}';part=Path(out)/f'world{index}-partition.hdf'
     if part.exists():raise ValueError('World partitions are immutable')
     payload=sum(p.stat().st_size for p in batch)
-    mib=partition_mib(payload)
+    # the compact layout passes its planned size (tools/layout_plan.py); the legacy layout sizes it here
+    mib=task[4] if len(task)>4 else partition_mib(payload)
     if mib>=2048:raise ValueError('World partition must remain below 2 GiB')
     command=[str(xdftool),str(part),'create',f'size={mib}Mi','+','format',volume,'ffs',
              '+','makedir','id1','+','makedir','id1/maps']
@@ -380,17 +382,13 @@ def write_partitions(batches, out, xdftool, jobs=1):
     return list(ordered_map(_pack_batch,tasks,max(1,min(jobs,len(tasks) or 1))))
 
 
-def pack(id1, out, version, xdftool, rdbtool=None, jobs=1, omitted=()):
-    """Verify each temporary partition before removing redundant staging maps.
-
-    Partitions are independent FFS volumes: up to `jobs` are written and read
-    back at once (shared pool); the receipt keeps partition order. Staging maps
-    are removed only after every partition verified. OMITTED is the explicit
-    id1-relative removal/checklist list already validated by the fingerprint;
-    stable routing rows do not imply that their superseded BSPs exist.
-    """
+def region_map_paths(id1, omitted=()):
+    """The open-world maps the region directory names (id1/maps/vfNNNN.bsp, or .chim for a CHIM region frame),
+    without the alias rows of divided cells and the OMITTED ones (id1-relative); None without a region
+    directory. Shared by both layouts (pack, the legacy one, and write_layout, the compact one)."""
+    id1=Path(id1)
     directory=id1/'world/regions.awr'
-    if not directory.exists():return []
+    if not directory.exists():return None
     raw=directory.read_bytes()
     if raw[:4]!=b'AWR2' or len(raw)<64:raise ValueError('Invalid region directory')
     count=struct.unpack_from('<I',raw,4)[0]
@@ -406,7 +404,30 @@ def pack(id1, out, version, xdftool, rdbtool=None, jobs=1, omitted=()):
     for path in paths:
         if path.relative_to(id1).as_posix() in omitted and path.exists():
             raise ValueError('Omitted exterior map remains at packing: '+path.name)
-    paths=[p for p in paths if p.relative_to(id1).as_posix() not in omitted]
+    return [p for p in paths if p.relative_to(id1).as_posix() not in omitted]
+
+
+def write_volumes_file(id1, count):
+    """world/volumes.awv naming COUNT world volumes (the engine adds AW_WORLD0..COUNT-1:id1 to its search path,
+    common.c); removed when there is none. Replaced, never written through (a staged file may be a pool link)."""
+    target=Path(id1)/'world/volumes.awv'
+    if target.exists() or target.is_symlink():target.unlink()
+    if count:
+        target.parent.mkdir(parents=True,exist_ok=True)
+        target.write_bytes(b'AWV1'+bytes([count]))
+
+
+def pack(id1, out, version, xdftool, rdbtool=None, jobs=1, omitted=()):
+    """Verify each temporary partition before removing redundant staging maps.
+
+    Partitions are independent FFS volumes: up to `jobs` are written and read
+    back at once (shared pool); the receipt keeps partition order. Staging maps
+    are removed only after every partition verified. OMITTED is the explicit
+    id1-relative removal/checklist list already validated by the fingerprint;
+    stable routing rows do not imply that their superseded BSPs exist.
+    """
+    paths=region_map_paths(id1,omitted)
+    if paths is None:return []
     # Preserve the original two-partition layout when it fits. Larger worlds
     # use additional bounded partitions discovered through volumes.awv.
     terrain_bytes=sum(p.stat().st_size for p in paths)
@@ -421,10 +442,103 @@ def pack(id1, out, version, xdftool, rdbtool=None, jobs=1, omitted=()):
     images=write_partitions(batches,out,xdftool,jobs)
     for batch in batches:
         for path in batch:path.unlink()
-    (id1/'world/volumes.awv').write_bytes(b'AWV1'+bytes([len(images)]))
+    write_volumes_file(id1,len(images))
     (out/'world-partitions.json').write_text(json.dumps(
         dict(format='AmiWind terrain partitions 1',version=version,partitions=images),indent=2)+'\n')
     return images
+
+
+def _write_layout_task(task):
+    """Worker: write one partition of a compact layout plan (independent of the others): the boot partition,
+    the CHIM world volume (with the frame maps the plan puts there) or a volume of open-world maps. Returns
+    (kind, seconds, result)."""
+    import time
+    started=time.monotonic()
+    kind=task[0]
+    if kind=='boot':
+        _,xdftool,part,boot,mib=task
+        result=write_boot_partition(xdftool,part,boot,mib)
+    elif kind=='chim':
+        _,xdftool,part,chim_root,volume,mib,extra=task
+        from chim.disk import IMAGE_BASE,pack_partition
+        result=pack_partition(chim_root,part,volume,mib,xdftool,IMAGE_BASE,extra)
+    else:
+        _,xdftool,index,batch,out,mib=task
+        result=_pack_batch((index,batch,out,xdftool,mib))
+    return kind,round(time.monotonic()-started,3),result
+
+
+def write_layout(plan, boot, out, xdftool, boot_part, chim_root=None, omitted=(), jobs=1, log=print):
+    """Write every partition of a compact layout plan (tools/layout_plan.py) at the same time, each on its own
+    worker (one xdftool volume is written serially; the partitions are independent files): DH0 from BOOT into
+    BOOT_PART, the CHIM world volume (CHIM_ROOT, files under id1/chim/, then the maps the plan puts there) and
+    any volume of open-world maps. The maps a world volume takes are moved out of BOOT first (to
+    OUT/world-maps-staging, removed once every partition is written and read back), so DH0 is written without
+    them; world/volumes.awv names the world volumes. Returns (boot check, the world volume entries for the drives
+    in plan order, {partition: seconds})."""
+    from build_parallel import ordered_map
+    import layout_plan
+    boot,out=Path(boot),Path(out)
+    id1=boot/'id1'
+    placed=layout_plan.assign(plan,region_map_paths(id1,omitted) or [])
+    rows={row['partition']:row for row in plan['partitions']}
+    staging=out/'world-maps-staging'
+    moved={}
+    for name,paths in placed.items():
+        if name=='DH0' or not paths:continue
+        target=staging/name
+        target.mkdir(parents=True,exist_ok=False)
+        moved[name]=[]
+        for path in paths:
+            path.rename(target/path.name)
+            moved[name].append(target/path.name)
+    write_volumes_file(id1,plan['world_volumes'])
+    tasks=[('boot',str(xdftool),str(boot_part),str(boot),rows['DH0']['mib'])]
+    for row in plan['partitions'][1:]:
+        index=int(row['partition'][2:])
+        if row['role']=='chim':
+            if chim_root is None:raise ValueError('The layout plan has a CHIM world volume; no CHIM world given')
+            extra=[(str(p),'id1/maps/'+p.name) for p in moved.get(row['partition'],[])]
+            tasks.append(('chim',str(xdftool),str(out/('world%d-partition.hdf'%index)),str(chim_root),row['volume'],
+                          row['mib'],extra))
+        else:
+            tasks.append(('maps',str(xdftool),index,[str(p) for p in moved.get(row['partition'],[])],str(out),
+                          row['mib']))
+    workers=max(1,min(int(jobs or 1),len(tasks)))
+    log('Image: partitions: %d written at once on %d workers (one per partition; a single FFS volume is written '
+        'serially by xdftool)'%(len(tasks),workers))
+    results={}
+    try:
+        # largest partition first (its planned MiB)
+        for kind,seconds,result in ordered_map(_write_layout_task,tasks,workers,
+                                               cost=lambda t:t[4] if t[0]=='boot' else t[5]):
+            results.setdefault(kind,[]).append((seconds,result))
+    except BaseException:
+        # the staged maps go back where they were: a failed write leaves the payload as it found it
+        for paths in moved.values():
+            for path in paths:
+                if path.is_file():path.rename(id1/'maps'/path.name)
+        if staging.exists():shutil.rmtree(staging)
+        raise
+    boot_seconds,boot_check=results['boot'][0]
+    log('Image: partition DH0 (boot): %d MiB - took %.1fs, 1 worker'%(rows['DH0']['mib'],boot_seconds))
+    worlds,timings=[],{'DH0':boot_seconds}
+    chim=iter(results.get('chim',[]));plain=iter(results.get('maps',[]))
+    for row in plan['partitions'][1:]:
+        seconds,result=next(chim) if row['role']=='chim' else next(plain)
+        if row['role']=='chim':
+            result=dict(file=result['file'],volume=result['volume'],partition=row['partition'],bytes=result['bytes'],
+                        sha256=result['sha256'],files=result['files'],readback=result['readback'],
+                        layout=result['layout'],mib=result['mib'],role='chim')
+        if result['bytes']!=row['bytes']:
+            raise ValueError('Partition %s is %d bytes, planned %d'%(row['partition'],result['bytes'],row['bytes']))
+        timings[row['partition']]=seconds
+        log('Image: partition %s (%s): %d files, %d MiB - took %.1fs, 1 worker'
+            %(row['partition'],row['role'],len(result['files']),row['mib'],seconds))
+        worlds.append(result)
+    if staging.exists():
+        shutil.rmtree(staging)
+    return boot_check,worlds,timings
 
 
 READBACK_CHUNK = 1024  # files per readback task

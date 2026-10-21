@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_log.h"
+#include "aw_world.h"
 #include <proto/exec.h>
 #include <exec/memory.h>
 /* walk-profile.csv, frame-stalls.csv and frame-profile.txt are diagnostic logs held in
@@ -48,7 +50,9 @@ void AW_ProfileFrame(void) {
     }
     if(!logfile) {logfile=1;AW_LogHeader(AW_LOG_WALK,"frame,elapsed_ms,frame_us,x100,y100,z100,yaw100,hunk_bytes,distance,world_us,map,server_us,surface_order\n");}
     p=&cl_entities[cl.viewentity].origin;
-    if(logfile && frames%10==0)AW_LogPrintf(AW_LOG_WALK,"%d,%ld,%ld,%ld,%ld,%ld,%ld,%d,%d,%ld,%s,%ld,%d\n",frames,(long)((now-start)*1000),(long)(dt*1000000),(long)((*p)[0]*100),(long)((*p)[1]*100),(long)((*p)[2]*100),(long)(cl.viewangles[YAW]*100),Hunk_LowMark()+Hunk_HighMark(),AW_DrawDistance(),(long)(last_stage[0]*1000000),cl.worldmodel->name,(long)(last_stage[5]*1000000),(int)aw_surface_order.value);
+    /* The map column: after a streamed (type 1) crossing the frame the player stands in (aw_scene.c). */
+    {const char *scene=AW_SceneWalkModel();
+    if(logfile && frames%10==0)AW_LogPrintf(AW_LOG_WALK,"%d,%ld,%ld,%ld,%ld,%ld,%ld,%d,%d,%ld,%s,%ld,%d\n",frames,(long)((now-start)*1000),(long)(dt*1000000),(long)((*p)[0]*100),(long)((*p)[1]*100),(long)((*p)[2]*100),(long)(cl.viewangles[YAW]*100),Hunk_LowMark()+Hunk_HighMark(),AW_DrawDistance(),(long)(last_stage[0]*1000000),scene?scene:cl.worldmodel->name,(long)(last_stage[5]*1000000),(int)aw_surface_order.value);}
 }
 void AW_ProfileClose(void) {
     if(logfile){AW_LogStreamClose(AW_LOG_WALK);logfile=0;}if(stalls){AW_LogStreamClose(AW_LOG_STALLS);stalls=0;}

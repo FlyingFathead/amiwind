@@ -1,6 +1,6 @@
 # Disk space: Amiga limits and what CHIM saves
 
-_Last updated with AmiWind v0.0.33 (9 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -31,7 +31,7 @@ producing a disk that fails on an Amiga.
 
 | Limit | What it means |
 | --- | --- |
-| Every partition below 2 GiB | A classic Amiga FFS partition on Kickstart 3.1 cannot reach 2 GiB. The builder sizes each partition from its payload plus about 20 percent and 16 MiB of headroom, rounded up to 128 MiB, and stops if the result would reach 2 GiB (`partition_mib` in `tools/chim/disk.py`; the boot partition in `tools/build_aga.py` uses the same rule). With that headroom one partition holds about 1.66 GB of files. |
+| Every partition below 2 GiB | A classic Amiga FFS partition on Kickstart 3.1 cannot reach 2 GiB. The builder's layout planner (`tools/layout_plan.py`) sizes each partition from the FFS blocks of its files plus a fixed headroom of free space (100 MiB by default, builder setting `partition_headroom_mib`), rounded up to whole MiB, and opens another partition rather than reach 2 GiB; the headroom is never shrunk. With that headroom one partition holds about 2.0 GB of files (1,920 MiB). (The legacy layout, `--disk-layout legacy`, sizes each from its payload plus about 20 percent and 16 MiB, rounded up to 128 MiB: about 1.66 GB per partition.) |
 | Every partition must also *start* below 2 GiB on its drive | Kickstart 3.1 does not mount a partition that starts past the 2 GiB mark. A v0.0.33 development build hit this: the Amiga asked "Please insert volume AW_WORLD3", because the AW_WORLD3 partition started beyond the limit. The builder now orders the partitions so that every one starts below 2 GiB, and its disk-layout gate refuses a layout where one does not. Tracker entry: AMIGA-DISK-2GIB-LIMIT-33. |
 | Files well under 2 GiB | World packs stay below about 1 GiB and are sharded (the validator enforces 1 GiB per file; [world format](WORLD_FORMAT.md#disk-layout)). A drive image file should also stay clear of 2 GiB for host tools; see WORLD-HDF-OVER-2GIB-32 in the [bug register](../BUGS.md). |
 | Drive images below 4 GiB | One drive image (a hard file with a partition table) stays below 4 GiB, partition table and alignment included. Two partitions of exactly 2 GiB would already break it ([storage notes](../STORAGE.md)). |
@@ -39,7 +39,8 @@ producing a disk that fails on an Amiga.
 
 The disk-layout gate lives in `tools/chim/disk.py` (`layout_gate`, with
 `name_rules` for the name and directory rules) and is tested in
-`tests/test_chim_disk.py`; the partition size rule is in `tools/build_aga.py`.
+`tests/test_chim_disk.py`; the partition sizes and the number of partitions come from the layout planner
+(`tools/layout_plan.py`, `tests/test_layout_plan.py`; [build output](../BUILD_OUTPUT.md#disk-layout-the-fewest-partitions-each-with-headroom)).
 Its report goes into the image's `build.json`
 ([world format](WORLD_FORMAT.md#disk-layout), [build output](../BUILD_OUTPUT.md)).
 

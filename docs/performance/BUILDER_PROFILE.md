@@ -1,6 +1,6 @@
 # Builder profile: where a full build spends its time
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -222,7 +222,8 @@ tested by `tests/test_release_pass_rules.py`.
    most of the optimizer, cull and stair walk (about 20,000 CPU-s before the stair-walk repair,
    about 9,500 after).
 2. **What the stair walk walks in a release build.** Only flight steps (438 rows of the v0.0.33
-   payload) gate a build; the other 614,000 rows are advisory findings. Release candidates and
-   finals walk only flight steps (`--stair-walk auto`, or `flights`); development builds and the
-   nightly full report (`--stair-walk all`) walk everything. A flight row is identical in both
-   walks (tested), and the release receipt says that ramps and single steps were not walked.
+   payload) gate a build; the other 614,000 rows are advisory findings. Every build walks only
+   flight steps since v0.0.46 (`--stair-walk auto`, or `flights`; before, development builds
+   walked everything); the nightly or beta full report (`--stair-walk all`) walks everything. A
+   flight row is identical in both walks (tested), and the receipt says that ramps and single
+   steps were not walked (BUILD-STAIR-WALK-SCOPE-KEY-46).

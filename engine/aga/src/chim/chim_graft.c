@@ -165,9 +165,12 @@ typedef struct
 	int		n[CA_ARRAYS], grafts;
 } chim_build_t;
 
+/* A window's chunk (type 1 crossings) whose place another frame's chunk holds
+ * brings no ground of its own: the same ground is never grafted twice. */
 static int Desired (int e)
 {
-	return chim_frame.entries[e].state == CHIM_STATE_ACTIVE && ChimModels_Terrain (e) != NULL;
+	return chim_frame.entries[e].state == CHIM_STATE_ACTIVE && ChimModels_Terrain (e) != NULL &&
+		!(chim_frame.window && chim_frame.entries[e].shadow >= 0);
 }
 
 /* The chunk at a cell the grid hangs in: full rebuild, every active chunk
@@ -368,12 +371,12 @@ static void CopyGraft (chim_pool_t *p, chim_graft_t *g)
 	}
 	for (i=0 ; i<m->numclipnodes ; i++)
 	{
-		dclipnode_t *d = &p->clips[b[CA_CLIP]+i];
-		d->planenum = m->clipnodes[i].planenum + b[CA_PLANE];
+		dclipnode_t *dc = &p->clips[b[CA_CLIP]+i];
+		dc->planenum = m->clipnodes[i].planenum + b[CA_PLANE];
 		for (j=0 ; j<2 ; j++)
 		{
 			c = ClipIndex (m->clipnodes[i].children[j]);
-			d->children[j] = c >= 0 ? ClipChild (c + b[CA_CLIP]) : m->clipnodes[i].children[j];
+			dc->children[j] = c >= 0 ? ClipChild (c + b[CA_CLIP]) : m->clipnodes[i].children[j];
 		}
 	}
 	c = m->hulls[1].firstclipnode;
@@ -527,7 +530,8 @@ static void Build (chim_build_t *b)
  * Mod_DecompressVis reads them. Returns bytes written. */
 static int ChunkRow (const chim_chunk_t *c, byte *bits)
 {
-	int nbytes = (chim_frame.count + 7) >> 3, out = 0, in = 0, n;
+	/* The row covers the chunk's own frame (a window: its slot's chunks). */
+	int nbytes = (ChimChunks_RowEntries (c->entry) + 7) >> 3, out = 0, in = 0, n;
 	while (out < nbytes)
 	{
 		if (in >= c->pvs_bytes)
@@ -545,6 +549,11 @@ static int ChunkRow (const chim_chunk_t *c, byte *bits)
 	}
 	return in == c->pvs_bytes;
 }
+
+/* Chunk from's row sees chunk to: the bit itself, as before, without a
+ * window; a window's row is looked up across frames (chim_chunks.c). */
+#define SEES(row, from, to) (chim_frame.window ? ChimChunks_RowSees ((row), (from), (to)) : \
+	(((row)[(to) >> 3] >> ((to) & 7)) & 1))
 
 static int Compress (const byte *row, int bytes, byte *out)
 {
@@ -589,7 +598,7 @@ static void Visibility (chim_pool_t *p)
 		for (j=0 ; j<p->grafts ; j++)
 		{
 			g = &p->graft[j];
-			if (chunks[g->entry >> 3] & (1 << (g->entry & 7)))
+			if (SEES (chunks, p->graft[i].entry, g->entry))
 				continue;
 			for (k=0 ; k<g->count[CA_LEAF] ; k++)
 			{
@@ -635,7 +644,7 @@ static void VisRows (chim_pool_t *p)
 			for (j=0 ; j<p->grafts ; j++)
 			{
 				g = &p->graft[j];
-				if (chunks[g->entry >> 3] & (1 << (g->entry & 7)))
+				if (SEES (chunks, p->graft[i].entry, g->entry))
 					SetBits (row, g->base[CA_LEAF] - 1, g->count[CA_LEAF]);
 			}
 			if (used + RowBound (row_bytes) > p->vis_cap)
@@ -1918,6 +1927,27 @@ int ChimGraft_Update (int phase)
 	return Update (phase);
 }
 
+/* Type 1 crossings, a recentre (chim_chunks.c): every chunk's place (its
+ * shift) moved; the active ring is copied again at the new places (the full
+ * rebuild, or the incremental pool's repack), entities linked again, surface
+ * caches let go (their texture minimums moved). */
+int ChimGraft_Recentre (void)
+{
+	chim_pool_t *p = pool_current >= 0 ? pool_users[pool_current].data : NULL;
+	int i;
+	if (!world)
+		return 0;
+	if (!incremental)
+	{
+		/* The full rebuild moves caches with unchanged surfaces: these changed. */
+		for (i=0 ; p && i<p->num[CA_SURF] ; i++)
+			if (p->surfs[i].cachehead)
+				DetachCache (&p->surfs[i]);
+		return ChimGraft_Rebuild ();
+	}
+	return Repack ("recentre");
+}
+
 int ChimGraft_Incremental (void)
 {
 	return world && incremental;
@@ -1943,7 +1973,7 @@ int ChimGraft_Begin (model_t *w)
 	requested = reserve;
 	/* At most a twelfth of the zone per slot (a sixth for the one pool): a
 	 * small zone keeps its room for models. Said when it applies. */
-	if (reserve > (zs.used_bytes + zs.free_bytes) / (incremental ? 6 : 12))
+	if ((unsigned long)reserve > (zs.used_bytes + zs.free_bytes) / (incremental ? 6 : 12))
 		reserve = (zs.used_bytes + zs.free_bytes) / (incremental ? 6 : 12);
 	if (reserve < requested)
 	{

@@ -3,6 +3,7 @@
  * 4 KiB colour table baked on the host; 32 KiB depth table rebuilt on setting changes.
  */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_maps.h"
 #include "aw_town.h"
 #include "aw_sky.h"

@@ -183,7 +183,7 @@ class FsUaeTests(unittest.TestCase):
             self.assertIn(f'hard_drive_0 = {image}\n', text)
             self.assertIn(f'kickstart_file = {rom}\n', text)
             self.assertIn('cpu = 68040-NOMMU\n', text)
-            self.assertIn('zorro_iii_memory = 16384\n', text)
+            self.assertIn('zorro_iii_memory = 131072\n', text)  # 128 MiB, the playtest default
             # Reuse identical generated config; preserve a user's later edits.
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(runner.launch(image, str(stub), rom), 0)

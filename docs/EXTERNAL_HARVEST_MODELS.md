@@ -1,6 +1,6 @@
 # Shared models for harvestable mushrooms
 
-_Last updated with AmiWind v0.0.33 (9 October 2026)._
+_Last updated with AmiWind v0.0.47 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -40,14 +40,20 @@ map, the runtime bound; interned root spans; per-map model registries):
 2. Image step, before the final map passes (`clear_baked`): on every shipped
    exterior map, brush entities bound to a harvestable placement in that map's
    coverage are removed with `tools/remove_harvest_geometry.py` (exact reference
-   and pose; every surviving surface and hull verified). Only Balmora's
-   converter bakes mushrooms today. Receipt `image/harvest/harvest-baked-removal.json`.
+   and pose; every surviving surface and hull verified). Balmora's converter
+   and the interior converters bake mushrooms. Interior maps are found by the
+   exact original reference numbers on their entities (`interior_rows`; every
+   plant of a map must imply the same map origin, or the build stops naming the
+   map). Receipt `image/harvest/harvest-baked-removal.json` (it also records the
+   interior maps it found, for `install`).
 3. Image step, after the last map change and before the entity tracker, heap
    audit and content fingerprint (`install`): the plan comes from the region
    directories the image ships (world maps from `world/regions.awr`, Seyda Neen
    and Balmora sub-cells from `seyda-regions.txt` and `balmora-regions.txt`, the
    intro docks from its fixed route bounds); a map's placements are those whose
-   transformed bounds touch its coverage. The geometry gate
+   transformed bounds touch its coverage, and an interior map's are the interior
+   placements bound to it (an exterior map never takes an interior placement).
+   The geometry gate
    (`reject_existing_geometry`) runs on every candidate's final map and stops the
    build on failure. Every candidate catalogue is staged, the repository heap
    check (`check_world_map_heap.inspect_maps`, target ABI sizes) runs on those
@@ -61,6 +67,23 @@ The models must have been converted with the stage's final palette, and the
 master must be the one the step read; otherwise the image stops. Output is
 byte-identical for every `--jobs` value. `--no-harvest` (debugging only) skips
 all of it.
+
+### Interiors (v0.0.47)
+
+The harvest step also takes the original small mushrooms inside interiors
+(HARVEST-INTERIOR-PICK-47), by default; `--harvest-interiors off` keeps the
+earlier exterior-only harvest (interior mushrooms stay baked scenery). The
+global placement index already held their slots, so an interior catalogue has
+the same index digest and slot count as every world catalogue: a pick in a room
+and a pick outdoors are facts of the same saved table, and the save format does
+not change. Each interior placement passes the same graph checks as a catalogue
+entry, one at a time; one the runtime cannot represent (an owner, so taking it
+would be theft; a script; restocking) stays baked and is listed with its reason
+in `harvest-source.json` (`interior_refused`). Original rule for the record
+(OpenMW 0.51 `CellStore::respawn`): a touched container with the Respawn flag
+gets its contents back when its cell loads at least `iMonthsToRespawn` game
+months (4 in the master) after that cell last respawned; AmiWind has no respawn
+yet.
 
 ## Inputs and identity
 

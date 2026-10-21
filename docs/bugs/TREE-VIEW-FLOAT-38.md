@@ -88,4 +88,8 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - TREE-PILLAR-28 (no report page): Sprite-tree roots extend into unintended striped pillars
 - [WATER-UNDERWATER-SKY-44](WATER-UNDERWATER-SKY-44.md): Under water the distance shows the sky's clouds instead of blue water
 
+Related bugs in other categories:
+
+- [CHIM-BC-TREE-PYRAMID-BOX-47](CHIM-BC-TREE-PYRAMID-BOX-47.md): Bitter Coast trees (flora_bc_tree family) look like a pyramid trunk with a flat box floating above it
+
 <!-- END GENERATED CATEGORY -->

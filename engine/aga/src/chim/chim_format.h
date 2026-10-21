@@ -5,7 +5,19 @@
  * frame into one folder per sector row, which the index's file table names,
  * so the records are unchanged; 0.7 adds terrain references: a CHK1 chunk
  * record ends in a reference block naming a TERR record (chunk terrain stored
- * once, in chunk-local units) and the shift it is placed at:
+ * once, in chunk-local units) and the shift it is placed at; 0.8
+ * (EXPERIMENTAL, written only with the builder's placement format 0.8) adds
+ * the pitch and the roll to the placement record (56 bytes, the chunk head
+ * names the record size) and the piece table in a placed model's lump 4
+ * (chim_placed_clip.c); 0.9 (EXPERIMENTAL, written only with the builder's
+ * reach index refs) keeps each placement record once per frame: a chunk that
+ * a record's drawn box reaches but does not own holds a 4-byte reference
+ * (CHK2: inline terrain, CHK3: terrain reference block) to the record in its
+ * owner chunk of the same frame; 0.10 (EXPERIMENTAL, the builder's terrain pack
+ * compact) may store a TERR record compact (chim_terc.c expands it to the same
+ * BSP29 bytes), and every chunk head names its record size (0: 48 bytes); 0.11
+ * (EXPERIMENTAL, terrain pack generate) may store a TERR record as heights and
+ * facts from which chim_thgt.c generates the same bytes:
  * decoders for the big-endian CHIM structures (index, frame file, sector
  * files, chunk records and placement records). Brush images inside the
  * sector files stay little-endian BSP29 and go through model.c's section
@@ -16,7 +28,7 @@
 #define CHIM_FORMAT_H
 
 #define CHIM_FORMAT_MAJOR	0
-#define CHIM_FORMAT_MINOR	7
+#define CHIM_FORMAT_MINOR	11
 #define CHIM_FORMAT_MINOR_OLDEST	4	/* the oldest minor of this major the engine reads */
 
 #define CHIM_HEADER_BYTES		32
@@ -32,6 +44,12 @@
 #define CHIM_CHUNK_HEAD_BYTES	24
 #define CHIM_TERRAIN_REF_BYTES	32	/* 0.7: the reference block of a CHK1 chunk */
 #define CHIM_RECORD_BYTES		48
+#define CHIM_RECORD_BYTES_PLACED	56	/* 0.8: the 48 bytes, then pitch and roll */
+#define CHIM_PLACED_MINOR		8	/* the first minor with placed records and piece tables */
+#define CHIM_REACH_MINOR		9	/* the first minor with reach references (CHK2, CHK3) */
+#define CHIM_REACH_REF_BYTES	4	/* 0.9: u16 owner chunk (frame, pack order), u16 its owned record */
+#define CHIM_THGT_MINOR		11	/* the first minor with generated terrain records (chim_thgt.c) */
+#define CHIM_TERC_MINOR		10	/* the first minor with compact terrain records (chim_terc.c); its chunk heads name the record size */
 #define CHIM_RECORD_OVER_16_LEAVES	1	/* record flag: reaches more than MAX_ENT_LEAFS */
 #define CHIM_RECORD_STORY_HIDDEN	2	/* record flag (0.5): hidden by the opening story */
 #define CHIM_INDEX_NAME			"chim/world.cwi"
@@ -95,6 +113,8 @@ typedef struct
 	int			pvs_bytes, terrain_leaves;
 	int			pvl_bytes;			/* the placements a view from the chunk may see */
 	int			ref;				/* 0.7 CHK1: the image is a terrain reference block */
+	int			record_bytes;		/* 0.8: 56; 0 in 0.4-0.7 (48-byte records) */
+	int			reach_refs;			/* 0.9 CHK2/CHK3: the reach entries are 4-byte references */
 } chim_chunk_head_t;
 
 /* 0.7: where a referenced chunk's terrain is stored and where it is placed. */
@@ -108,6 +128,7 @@ typedef struct
 {
 	unsigned	pid, ref, model;
 	float		origin[3], yaw;
+	float		pitch, roll;		/* 0.8 records; 0 for 0.4-0.7 */
 	int			owner, cell_dx, cell_dy;
 	short		mins[3], maxs[3];	/* drawn box, local units, rounded outward */
 	int			leaves, flags;
@@ -129,5 +150,20 @@ void ChimFormat_ChunkEntry (const unsigned char *p, chim_chunk_entry_t *out);
 int ChimFormat_ChunkHead (const unsigned char *p, chim_chunk_head_t *out);
 int ChimFormat_TerrainRef (const unsigned char *p, chim_terrain_ref_t *out);
 int ChimFormat_Record (const unsigned char *p, chim_record_t *out);
+/* 0.8: a 56-byte record (ChimFormat_Record's 48 bytes, then pitch and roll). */
+int ChimFormat_RecordPlaced (const unsigned char *p, chim_record_t *out);
+/* The placement record size of a world of this minor (48 or 56). */
+int ChimFormat_RecordBytes (int minor);
+/* 0.9: a reach reference: the owner chunk's index in its frame and the
+ * record's position among that chunk's owned records. */
+void ChimFormat_ReachRef (const unsigned char *p, int *owner, int *record);
+
+/* A turbulent texture ('*' name: SURF_DRAWTURB) smaller than 64 x 64 (GHOSTFENCE-NO-ANIMATION-46): Quake's
+ * Turbulent8 (d_scan.c) reads a 64 x 64 texture, so the loader tiles it to 64 x 64. A texture repeated 2 x 2
+ * shows the same texels at every texture coordinate as the small one repeating, so the faces' mapping holds. */
+#define CHIM_TURB_SIZE	64
+#define CHIM_TURB_PIXELS	(CHIM_TURB_SIZE*CHIM_TURB_SIZE/64*85)
+int ChimFormat_TurbulentTile (const char *name, int width, int height);
+void ChimFormat_TileTurbulent (const unsigned char *src, int width, int height, unsigned char *dst);
 
 #endif

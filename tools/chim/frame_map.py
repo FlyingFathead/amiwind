@@ -273,6 +273,7 @@ def empty_world(lo, hi):
 def frame_record(world_dir, cell=None):
     """(cell, low corner, high corner, chunks, centre) of a frame of the CHIM world: the one with
     `cell`, or the only one."""
+    from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
     root = Path(world_dir) / 'chim'
     _, files, _, _ = F.read_index((root / 'world.cwi').read_bytes())
     frames = [f for f in files if f['kind'] == b'FRAM' and (cell is None or tuple(f['cell']) == tuple(cell))]
@@ -315,6 +316,29 @@ def load(world_dir):
             'frames': frames}
 
 
+_FRAME_INDEX = {}
+
+
+def frames_at(frames, cell):
+    """[(position, (key, record, chunks))] of the frames of FRAMES (a CHIM world's 'frames') whose cell is CELL, in
+    world order. The positions by cell of the list last asked about are made once and kept (as numbers only: the
+    world itself is not held here, and a position is checked against its frame before it is used): every region
+    frame's task preparation looked its cell up by scanning all 1,351 frames three times
+    (BUILD-IMAGE-REGION-MAPS-SERIAL-43)."""
+    cell = tuple(cell)
+    for attempt in (0, 1):
+        if attempt or _FRAME_INDEX.get('id') != id(frames) or _FRAME_INDEX.get('count') != len(frames):
+            by_cell = {}
+            for position, entry in enumerate(frames):
+                by_cell.setdefault(tuple(entry[1]['cell']), []).append(position)
+            _FRAME_INDEX.clear()
+            _FRAME_INDEX.update(id=id(frames), count=len(frames), by_cell=by_cell)
+        found = [(position, frames[position]) for position in _FRAME_INDEX['by_cell'].get(cell, [])]
+        if all(tuple(entry[1]['cell']) == cell for _, entry in found):
+            return found
+    raise ValueError('The frame list changed while it was being looked up')
+
+
 def chim_placements(world_dir, cell=None, world=None):
     """{ref: frame-local origin} of the CHIM world's placements (of the frame at `cell` only, if given).
     A cut placement (chim.cut) is listed under its source reference with origin None: its pieces sit at
@@ -322,9 +346,7 @@ def chim_placements(world_dir, cell=None, world=None):
     from chim.cut import source_ref
     frames = (world or load(world_dir))['frames']
     out = {}
-    for _, frame, chunks in frames:
-        if cell is not None and tuple(frame['cell']) != tuple(cell):
-            continue
+    for _, frame, chunks in (frames if cell is None else [entry for _, entry in frames_at(frames, cell)]):
         for c in chunks:
             for r in c['owned']:
                 src = source_ref(r['ref'])
@@ -362,6 +384,7 @@ def model_radius(raw):
 
 def frame_grid(world_dir, cell):
     """(chunks, low (x, y), grain, nx, ny) of the frame at cell."""
+    from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
     root = Path(world_dir) / 'chim'
     _, files, _, _ = F.read_index((root / 'world.cwi').read_bytes())
     path = next(f['path'] for f in files if f['kind'] == b'FRAM' and tuple(f['cell']) == tuple(cell))
@@ -983,7 +1006,8 @@ def region_task(id1, frame, world_dir, world=None, directory=None, rows=None, ha
     stream = stream_enabled()
     if world is not None:
         # the frame's bounds and chunk grid from the world already read (as frame_record / frame_grid read them)
-        _, record, chunks = next(f for f in world['frames'] if tuple(f[1]['cell']) == cell)
+        _, record, chunks = (frames_at(world['frames'], cell) or [(0, next(
+            f for f in world['frames'] if tuple(f[1]['cell']) == cell))])[0][1]
         g, (lx, ly) = record['grain'], record['low']
         lo = (lx, ly, min(c['zmin'] for c in chunks) - FLOOR_MARGIN)
         hi = (lx + record['nx'] * g, ly + record['ny'] * g, frame_top(chunks))
@@ -1087,11 +1111,12 @@ def frame_ground(world, cell, point=(0.0, 0.0), top=None, bottom=None):
     placed models, chim.collision.FrameScene), traced from TOP down to BOTTOM (default: the frame's own height
     range, from the frame's top (frame_top: the terrain ceiling, raised over high ground) to its lowest chunk less
     FLOOR_MARGIN), or None."""
-    _, record, chunks = next(f for f in world['frames'] if tuple(f[1]['cell']) == tuple(cell))
+    found = frames_at(world['frames'], cell) or [next(        # StopIteration for a cell the world does not have
+        (i, f) for i, f in enumerate(world['frames']) if tuple(f[1]['cell']) == tuple(cell))]
+    index, (_, record, chunks) = found[0]
     top = frame_top(chunks) if top is None else top
     bottom = min(c['zmin'] for c in chunks) - FLOOR_MARGIN if bottom is None else bottom
     from chim.collision import FrameScene
-    index = next(i for i, (_, frame, _) in enumerate(world['frames']) if tuple(frame['cell']) == tuple(cell))
     # only the chunks and placements on the traced line: the same result as the whole frame's scene, in a
     # fraction of the time (it was ~45 s of 1,295 frames on one core, BUILD-IMAGE-REGION-MAPS-SERIAL-43)
     return ground_trace(FrameScene(world, index, hull=0, column=tuple(point)), point, top, bottom)
@@ -1389,14 +1414,35 @@ def build_region(id1, frame, world_dir, world=None, rows=None, hand_fields=None,
     return record
 
 
+# The recipe sprite provenance of the CHIM world's frames, read once per process (region_source_sections)
+SPRITE_SECTION_KEYS = ('cell', 'sprite_entities', 'sprite_assets')
+_SOURCE_SECTIONS = {}
+
+
 def region_source_sections(world_dir):
-    """Read sprite provenance once per batch, preserving the first section for each cell."""
+    """Sprite provenance of the CHIM world's frames ({cell: {'cell', 'sprite_entities', 'sprite_assets'}}, the first
+    section of each cell), read once per process.
+
+    chim-source.json is 694 MB in a full build (1,351 frames) and takes 12 to 17 s to parse on one core. The image
+    step read it three times in one process (the payload preflight's disk layout twice, the region frame maps' task
+    preparation once): 16.0 s, 18.5 s and 17.1 s of the v0.0.47-dev1 build, all on one core
+    (BUILD-IMAGE-REGION-MAPS-SERIAL-43). The result is kept for the next call while the file is the same one (path,
+    size, modification time), and only the keys its readers use are kept, so the parsed manifest is freed at once."""
     source_path = Path(world_dir) / 'chim-source.json'
+    if not source_path.is_file():
+        return {}
+    status = source_path.stat()
+    key = (str(source_path.resolve()), status.st_size, status.st_mtime_ns)
+    if key in _SOURCE_SECTIONS:
+        return _SOURCE_SECTIONS[key]
     sections = {}
-    if source_path.is_file():
-        source = json.loads(source_path.read_text(encoding='utf-8'))
-        for section in source['frames']:
-            sections.setdefault(tuple(section['cell']), section)
+    source = json.loads(source_path.read_text(encoding='utf-8'))
+    for section in source['frames']:
+        sections.setdefault(tuple(section['cell']),
+                            {k: section[k] for k in SPRITE_SECTION_KEYS if k in section})
+    del source
+    _SOURCE_SECTIONS.clear()            # one manifest at a time
+    _SOURCE_SECTIONS[key] = sections
     return sections
 
 

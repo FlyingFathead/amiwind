@@ -11,6 +11,7 @@ void Cbuf_AddText(char *t){strcat(buffer,t);}
 void Cvar_RegisterVariable(cvar_t *v){vars[nvars++]=v;v->value=(float)atof(v->string);}
 void Cvar_Set(char *n,char *v){int i;for(i=0;i<nvars;i++)if(!strcmp(vars[i]->name,n)){vars[i]->string=v;vars[i]->value=(float)atof(v);}}
 int AW_WorldToSource(const char *n,const float *l,float *g){(void)n;g[0]=l[0]*4;g[1]=l[1]*4;g[2]=l[2]*4;return 1;}
+const char *AW_SceneName(void){return "vf0573";}   /* aw_scene.c: the scene the player stands in (type 1 crossings) */
 int AW_ClockEnsure(void){return 1;}
 void AW_ClockDate(int *y,int *mo,int *d,int *h,int *mi){*y=427;*mo=8;*d=16;*h=1;*mi=19;}
 int AW_LampLitCount(void){return 2;}
@@ -33,6 +34,7 @@ int main(void){
     f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;
     assert(strstr(text,"commands 1\n") && strstr(text,"time 01:19\n") && strstr(text,"lamps_lit 2\n") && strstr(text,"daylight 200\n") && strstr(text,"guard_night 1\n") && strstr(text,"efrags_bad 3\n") && strstr(text,"screen game\n") && strstr(text,"world_leafs 0\n") && strstr(text,"end\n"));
     assert(strstr(text,"daynight on\n") && !strstr(text,"daynight off\n"));
+    assert(strstr(text,"scene vf0573\n"));   /* the scene the player stands in (type 1 crossings) */
     f=fopen(cmd,"w");fputs("aw_aim 113 -3\n",f);fclose(f);
     realtime=1.2;AW_RemotePoll();assert(exists(cmd)); /* within the period: not yet */
     realtime=1.6;AW_RemotePoll();assert(!exists(cmd) && strstr(buffer,"aw_aim 113 -3\n"));

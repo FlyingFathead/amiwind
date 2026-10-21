@@ -146,7 +146,8 @@ def tile_unit(task):
     surfaces, parts, _, _ = _prepare_placement((ref, task['data'], size, centre, None, False))
     keys = {}
     for srf in surfaces:
-        keys[srf[4]] = ('model',) + material_texture_key(model, srf[4], size, NO_EMISSIVE, task.get('texture_shas'))
+        keys[srf[4]] = ('model',) + material_texture_key(model, srf[4], size, NO_EMISSIVE, task.get('texture_shas'),
+                                                          task.get('uv_scroll', 'off'))
     tiles = model_tiles(surfaces, parts, task['grain'])
     out = []
     order = sorted(tiles)
@@ -264,7 +265,8 @@ def cut_unit(task):
     surfaces, parts, _, _ = _prepare_placement((ref, task['data'], size, centre, None, False))
     keys = {}
     for s in surfaces:
-        keys[s[4]] = ('model',) + material_texture_key(model, s[4], size, NO_EMISSIVE, task.get('texture_shas'))
+        keys[s[4]] = ('model',) + material_texture_key(model, s[4], size, NO_EMISSIVE, task.get('texture_shas'),
+                                                       task.get('uv_scroll', 'off'))
     out = []
     pieces = cut_pieces(surfaces, parts, task['origin'], task['yaw'], task['low'], task['grain'],
                         task['nx'], task['ny'], task.get('cut_mode', 'partition'))

@@ -271,6 +271,9 @@ def bake_work(world, lights_of_frame):
                     model_pts[mi] = face_sample_points(F.read_brush_image(models[mi]['image']))
                 yaw = np.radians(r['yaw'])
                 R = np.array([[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]])
+                if 'angles' in r:           # a format 0.8 record (chim.placed): its three angles
+                    from chim.placed import model_matrix
+                    R = model_matrix(r['angles'])
                 o = np.asarray(r['origin'])
                 for _, n, pts in model_pts[mi]:
                     s, m = illumination(pts @ R.T + o, R @ n, lights)

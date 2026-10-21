@@ -61,7 +61,19 @@ def environment():
             'platform': sys.platform, 'packages': {n: importlib.metadata.version(n) for n in PACKAGES}}
 
 
-# The model converter: its main() reaches convert_model and everything a model's conversion runs.
+# The code key of every model (tools/code_key.py; BUILD-NPC-GALLERY-REBUILT-46): the code convert_cached can reach
+# (the cache wrapper, convert_model and what a model's conversion runs), each unit hashed without comments, and the
+# quality settings. Before it, the key held everything the converter's main() can reach (previous_sources) and this
+# whole file (cache_implementation): a collision-hull fix in tools/mesh_geometry.py, which no model runs, and a
+# four-line change here each converted all 3,551 models again. convert_cached records what really ran and publishes
+# no model of a process that ran code outside the key.
+CODE_ENTRIES = (('tools/gallery_cache.py', 'convert_cached'),)
+CODE_DATA = ('config/gallery_model_quality.json',)
+CODE_KEY_FORMAT = 'code key 1'
+# The previous key form (key_format 'reached code 2' and the whole-file hash of this module as it was then): entries
+# stored under it are still found (find), so the change of form converts no model again. Never edited.
+PREVIOUS_IMPLEMENTATION = '78c62f4385b11bbe45ee3c31e9b3aa42d54ca6c4f0ba1e01f24ef090935e87bb'
+# The model converter: its main() reaches convert_model and everything a model's conversion runs (previous form).
 CONVERTER_ENTRY = 'tools/prepare_gallery.py'
 # 'reached code 2': the converter's reached code with each module's import-time code in key form 2
 # (build_cache.STAGE_TOP_FORMAT, as the stage and pass keys): a function added to a shared module, or a literal
@@ -73,6 +85,7 @@ CONVERTER_ENTRY = 'tools/prepare_gallery.py'
 KEY_FORMAT = 'reached code 2'
 KEY_TOP_FORMAT = 2
 _SOURCES = {}
+_PREVIOUS = {}
 
 
 def converter_files(root=ROOT):
@@ -80,19 +93,44 @@ def converter_files(root=ROOT):
     return {name: file_sha(root/name) for name in CONVERTER_FILES}
 
 
+def converter_code_key(root=ROOT):
+    """tools/code_key.py code_key of CODE_ENTRIES and CODE_DATA (with the reached units, for the coverage check)."""
+    import code_key
+    return code_key.code_key(CODE_ENTRIES, CODE_DATA, Path(root).resolve())
+
+
 def converter_sources(root=ROOT):
-    """The code part of every model's key: {file: digest} of what the converter can reach (build_cache.SourceIndex,
-    scope 'units': each reached module's import-time code in form KEY_TOP_FORMAT plus each reached function, the data
-    files it names). An edit the converter never reaches keeps every model; any reached edit changes every key.
-    Dynamic code makes the selection uncertain: then every repository file counts."""
+    """The code part of every model's key: the code key of what convert_cached can reach (converter_code_key:
+    {file: digest} of each reached module's import-time code and reached functions, comments left out, and the data
+    files). An edit the conversion never reaches keeps every model; any reached edit changes every key. Dynamic code
+    makes the reach uncertain: then every repository file counts."""
     root = Path(root).resolve()
     if root not in _SOURCES:
+        key = converter_code_key(root)
+        _SOURCES[root] = {'key_format': CODE_KEY_FORMAT, 'entries': [list(e) for e in CODE_ENTRIES],
+                          'uncertain': key['uncertain'], 'files': dict(sorted(key['files'].items()))}
+    return _SOURCES[root]
+
+
+def previous_sources(root=ROOT):
+    """The code part of the previous key form: {file: digest} of what the converter's main() can reach
+    (build_cache.SourceIndex, scope 'units', import-time code in form KEY_TOP_FORMAT)."""
+    root = Path(root).resolve()
+    if root not in _PREVIOUS:
         from build_cache import SourceIndex
         selected, uncertain = SourceIndex(root, scope='units', top_format=KEY_TOP_FORMAT).selection(
             root/CONVERTER_ENTRY)
-        _SOURCES[root] = {'key_format': KEY_FORMAT, 'entry': CONVERTER_ENTRY, 'uncertain': uncertain,
-                          'files': dict(sorted(selected.items()))}
-    return _SOURCES[root]
+        _PREVIOUS[root] = {'key_format': KEY_FORMAT, 'entry': CONVERTER_ENTRY, 'uncertain': uncertain,
+                           'files': dict(sorted(selected.items()))}
+    return _PREVIOUS[root]
+
+
+def previous_identity(ident, root=ROOT):
+    """IDENT in the previous key form (previous_sources and this module's hash as it was then), or None when IDENT
+    is not of the current form."""
+    if (ident.get('sources') or {}).get('key_format') != CODE_KEY_FORMAT:
+        return None
+    return dict(ident, sources=previous_sources(root), cache_implementation=PREVIOUS_IMPLEMENTATION)
 
 
 class Dependencies:
@@ -167,9 +205,10 @@ def identity(spec, palette, dependencies, sources, env):
 
     # head_detail: --npc-head-detail original|budget (npc_geometry.head_plan); the
     # two bakes of one appearance never share a cache entry.
+    # This module's code is in SOURCES (the code key reaches convert_cached and what it calls): no whole-file
+    # 'cache_implementation' any more (previous_identity adds it for the previous form).
     return {'format': FORMAT, 'spec': spec, 'palette_sha256': digest(palette),
             'dependencies': dependencies, 'sources': sources, 'environment': env,
-            'cache_implementation': file_sha(Path(__file__)),
             'quality': model_quality(spec), 'retry_policy': 'unchanged bounded 666 then 1024',
             'npc_head_detail': head_detail(spec),
             # the head/hair reducer of a budget-head bake (NPC-HEAD-DECIMATION-33); None for creatures
@@ -216,6 +255,17 @@ def load(cache, ident, key):
         return None
 
 
+def find(cache, ident, key):
+    """(raw, result) of IDENT's entry, or of the same model's entry in the previous key form (previous_identity),
+    or None."""
+    found = load(cache, ident, key)
+    if found is None:
+        previous = previous_identity(ident)
+        if previous is not None:
+            found = load(cache, previous, key)
+    return found
+
+
 def publish(cache, ident, key, raw, result):
     checked_result(raw, result, key, ident['palette_sha256'])
     directory = Path(cache) / token(ident)[:2] / token(ident)
@@ -242,7 +292,7 @@ _worker_data = None
 
 
 def verify_dependencies(data, ident):
-    if converter_sources() != ident['sources'] or file_sha(Path(__file__)) != ident['cache_implementation']:
+    if converter_sources() != ident['sources']:
         raise ValueError('Gallery converter changed before cache publication')
     global _worker_assets, _worker_data
     if _worker_data != str(data):
@@ -255,19 +305,42 @@ def verify_dependencies(data, ident):
             raise ValueError('Gallery input changed before cache publication: ' + name)
 
 
+# The functions outside the code key this process ran (convert_cached): from then on it publishes no model.
+_KEY_GAP = []
+
+
 def convert_cached(task):
+    """One model: from the cache (find), or converted and published. The conversion is traced (code_key.Tracer): a
+    model is published only while this process has run nothing outside the code key (a function reports once per
+    process, in the model where it first ran there, so once a gap is seen the process publishes nothing more)."""
+    import code_key
     from prepare_gallery import convert_model, GALLERY_FACE_LIMIT
     data, output, key, spec, palette, cache, ident = task
     started = time.monotonic()
-    found = load(cache, ident, key)
+    found = find(cache, ident, key)
     if found is not None:
         raw, result = found; materialize(output, key, raw, result)
         return result, 'hit', round(time.monotonic()-started, 6)
     verify_dependencies(data, ident)
-    result = convert_model((data, output, key, spec, palette))
-    if result['status'] != 'ready' and 'Alias' in result.get('error', ''):
-        result = convert_model((data, output, key, dict(spec, face_limit=GALLERY_FACE_LIMIT), palette))
-    if result['status'] == 'ready':
+    tracer = code_key.tracer()
+    tracer.begin()
+    try:
+        result = convert_model((data, output, key, spec, palette))
+        if result['status'] != 'ready' and 'Alias' in result.get('error', ''):
+            result = convert_model((data, output, key, dict(spec, face_limit=GALLERY_FACE_LIMIT), palette))
+    finally:
+        tracer.end()
+    ran = tracer.take()
+    if not _KEY_GAP:
+        if ran is None:
+            _KEY_GAP.append(('no trace', 'Python %d.%d has no sys.monitoring' % sys.version_info[:2]))
+        else:
+            _KEY_GAP.extend(code_key.uncovered(ran, converter_code_key()))
+        if _KEY_GAP:
+            print('[warning] NPC gallery: the conversion ran code outside the model key (%s); this worker publishes no '
+                  'model to the gallery cache from here on (fix: gallery_cache.CODE_ENTRIES)'
+                  % ', '.join('%s %s' % g for g in _KEY_GAP[:5]), flush=True)
+    if result['status'] == 'ready' and not _KEY_GAP:
         verify_dependencies(data, ident)
         publish(cache, ident, key, (Path(output)/(key+'.mdl')).read_bytes(), result)
     return result, 'converted', round(time.monotonic()-started, 6)
@@ -362,7 +435,7 @@ def preflight(cache, output, identities):
     cache_bytes = 0
     hits = 0
     for key, ident in identities.items():
-        found = load(cache, ident, key)
+        found = find(cache, ident, key)
         if found:
             output_bytes += len(found[0]) + len(json.dumps(found[1]))
             hits += 1

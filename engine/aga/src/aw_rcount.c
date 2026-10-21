@@ -33,6 +33,7 @@
  *   chim ... the CHIM world streamer's fields, on a CHIM map only
  */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_rcount.h"
 #include <devices/timer.h>
 #include <proto/timer.h>

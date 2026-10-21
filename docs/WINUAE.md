@@ -1,6 +1,6 @@
 # WinUAE setup
 
-_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+_Last updated with AmiWind v0.0.46 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -173,7 +173,7 @@ RAM expanded** preset is too small for this build. A profile name containing
 | CPU and FPU | 68040; CPU internal FPU; MMU none; 24-bit addressing off |
 | CPU speed | Fastest possible |
 | JIT | On; 8 MB cache; FPU support on |
-| RAM | 2 MB Chip; Z2 Fast none; **Z3 Fast 16 MB** |
+| RAM | 2 MB Chip; Z2 Fast none; **Z3 Fast 128 MB** (16 MB, the smallest the game runs on, before 21 October 2026) |
 | Other RAM | Slow, Processor slot and 32-bit Chip: none |
 | ROM | Complete extracted A1200 KS3.1 or KS3.1.4 ROM; see hashes below |
 | CD & Hard drives | New HDF, UAE controller, RDB autodetection; eject floppy images |
@@ -182,8 +182,10 @@ RAM expanded** preset is too small for this build. A profile name containing
 The JIT cache is host-side translation storage. Increasing it does **not** add
 Amiga Fast RAM. `chipmem_size=4` in a UAE text config means 2 MiB Chip; the unit
 is 512 KiB. `z3mem_size=16` means 16 MiB Z3 RAM. Z3 RAM is the emulator reference
-arrangement, not an expansion available inside a stock A1200.
-More Fast RAM (128 MiB, 256 MiB, 512 MiB, 1 GiB, 1.5 GiB or a custom size) is a
+arrangement, not an expansion available inside a stock A1200. The profiles written
+with a build (`AmiWind-vVERSION-WinUAE.uae`) have `z3mem_size=128` (128 MiB, like a 68060
+accelerator card) since 21 October 2026; `z3mem_size=16` is the 16 MiB baseline.
+Another size (16 MiB, 256 MiB, 512 MiB, 1 GiB, 1.5 GiB or a custom size) is a
 launcher choice: see [Fast RAM](FS-UAE-LAUNCHER.md#fast-ram) for the sizes WinUAE and
 FS-UAE can make and the keys written (`z3mem_size`, `z3mem2_size`, `z3mem_start`).
 

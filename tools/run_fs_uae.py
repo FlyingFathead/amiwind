@@ -108,7 +108,7 @@ def prepare_launch(kickstart=None, *, interactive=False):
     return executable, rom
 
 
-def configuration(image, rom):
+def configuration(image, rom, fast_ram=None):
     preset = ROOT / 'resources/emulators' / f'AmiWind-v{VERSION}-FS-UAE.fs-uae'
     text = preset.read_text(encoding='utf-8')
     for key, value in (('kickstart_file', rom), ('hard_drive_0', image)):
@@ -120,18 +120,19 @@ def configuration(image, rom):
         text = '\n'.join(lines) + '\n'
     spec=importlib.util.spec_from_file_location('amiwind_portable_launcher',ROOT/'tools/AmiWind-FS-UAE-launcher.py')
     launcher=importlib.util.module_from_spec(spec);spec.loader.exec_module(launcher)
-    text=launcher.configured_text(text,image,rom)
+    mib=launcher.FAST_RAM_DEFAULT_MIB if fast_ram is None else launcher.parse_fast_ram(fast_ram)
+    text=launcher.configured_text(text,image,rom,mib)
     return text.replace('# Replace ROM and HDF placeholders with your owned local files.',
                         '# Local paths filled by the launcher; ROM and HDF are not bundled.')
 
 
-def launch(image, executable, rom):
+def launch(image, executable, rom, fast_ram=None):
     image = local_path(image, 'HDF')
     rom = local_path(rom, 'Kickstart ROM')
     if not image.is_file() or image.stat().st_size == 0:
         raise ValueError(f'HDF missing or empty: {image}')
     config = image.with_suffix('.fs-uae')
-    content = configuration(image, rom)
+    content = configuration(image, rom, fast_ram)
     if config.is_symlink():
         raise ValueError(f'Will not write through a configuration symlink: {config}')
     if config.exists():
@@ -165,10 +166,13 @@ def main(argv=None):
     parser.add_argument('--image', type=Path, required=True, help='Existing HDF; no rebuild')
     parser.add_argument('--kickstart-file', '--kickstart', dest='kickstart_file', type=Path,
                         help='Owned ROM file or directory to scan for the reference checksum (default: ~/.roms/; asks if missing interactively)')
+    parser.add_argument('--fast-ram', metavar='MIB',
+                        help='Fast RAM of the emulated Amiga: default 128 MiB (like a 68060 card); 16 = the smallest '
+                        'machine the game runs on; the same sizes as the launcher, up to 1536')
     args = parser.parse_args(argv)
     try:
         executable, rom = prepare_launch(args.kickstart_file, interactive=sys.stdin.isatty())
-        return launch(args.image, executable, rom)
+        return launch(args.image, executable, rom, args.fast_ram)
     except (KeyboardInterrupt, EOFError):
         parser.exit(130, '\nFS-UAE launch interrupted; HDF retained.\n')
     except (OSError, ValueError) as exc:

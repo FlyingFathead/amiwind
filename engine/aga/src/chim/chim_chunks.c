@@ -26,6 +26,8 @@
 #include "quakedef.h"
 #include "r_local.h"
 #include "chim_local.h"
+#include "../aw_actors.h"
+#include "aw_spike.h"
 
 extern efrag_t	**lastlink;
 extern vec3_t	r_emins, r_emaxs;
@@ -40,6 +42,17 @@ void AW_MergeCollisionTrace (trace_t *best, trace_t *candidate, edict_t *touch);
 
 chim_frame_state_t	chim_frame;
 static short		*grid;				/* chunk (cx, cy) -> entry */
+/* A cell's region map name (aw_world.c sets it): a window's frame reads its
+ * streamed statics from that frame map (type 1 crossings). */
+int (*chim_cell_map)(int cx, int cy, char *name, int size);
+/* PROTOTYPE (branch v0.0.46-type1-stateful): the window's actors (aw_actors.c):
+ * a joining frame's actors are spawned from its frame map (offset: its place in
+ * the session), a leaving frame's actors are kept or written to the change list,
+ * and every tick the actors outside the window are looked at again. */
+void (*chim_actors_join)(int cx, int cy, const char *map, const float *offset);
+void (*chim_actors_leave)(int cx, int cy);
+void (*chim_actors_tick)(void);
+void (*chim_actors_cmd)(void);
 static chim_user_t	index_user;
 static model_t		*link_world;		/* cl.worldmodel the efrags belong to */
 static unsigned long	ticks;
@@ -95,71 +108,81 @@ void ChimChunks_Pressure (unsigned long *released_band, unsigned long *released_
 
 /* ---------------------------------------------------------------- directory */
 
-/* The frame file (chunk directory, sector table) of frame (cx, cy); each
- * chunk record lives in one of the frame's sector files. */
-int ChimChunks_Begin (int cx, int cy)
+/* The FRAM row of frame (cx, cy), -1: none. */
+static int FrameRow (int cx, int cy)
+{
+	int i;
+	for (i=0 ; i<chim_world.files ; i++)
+		if (!strcmp (chim_world.file[i].kind, "FRAM") && chim_world.file[i].cx == cx && chim_world.file[i].cy == cy)
+			return i;
+	return -1;
+}
+
+static int FrameHeader (int row, chim_header_t *h, chim_frame_t *f)
 {
 	byte head[CHIM_HEADER_BYTES + CHIM_FRAME_BYTES];
-	chim_header_t h;
 	chim_pack_t *pack;
-	int i, n, cells, bits, size, row = -1, sectors;
-	byte *raw = chim_world.buffer;
-	int per = chim_world.buffer_bytes / CHIM_CHUNK_ENTRY_BYTES;
-	/* With the prefetch on (spare Fast RAM): the frame's sector rows from one
-	 * pass over the file table, and the earlier frames' placement counts kept
-	 * from their first reading, instead of opening every earlier frame's file
-	 * on each map start (CHIM-CROSSING-SYNC-LOAD-43). Same values either way. */
-	int fast = ChimPrefetch_Active ();
-	int sector_row[256];
+	return row >= 0 && (pack = Chim_File (row)) != NULL && Chim_PackRead (pack, 0, head, sizeof(head)) &&
+		ChimFormat_Header (head, pack->bytes, "FRAM", h) && ChimFormat_Frame (head + CHIM_HEADER_BYTES, f);
+}
 
-	memset (&chim_frame, 0, sizeof(chim_frame));
-	memset (&counts, 0, sizeof(counts));
-	link_world = NULL;
-	for (i=0 ; i<chim_world.files && row < 0 ; i++)
-		if (!strcmp (chim_world.file[i].kind, "FRAM") && chim_world.file[i].cx == cx && chim_world.file[i].cy == cy)
-			row = i;
-	if (row < 0 || !(pack = Chim_File (row)) || !Chim_PackRead (pack, 0, head, sizeof(head)) ||
-		!ChimFormat_Header (head, pack->bytes, "FRAM", &h) ||
-		!ChimFormat_Frame (head + CHIM_HEADER_BYTES, &chim_frame.frame))
-		return 0;
-	chim_frame.settings = chim_world.settings;
-	/* Placement ids run on across the frames of a world, in pack order (the
-	 * index's file table): this frame's ids start after the earlier frames'. */
-	if (fast)
-		ChimPrefetch_SetOwned (row, chim_frame.frame.owned_total);
+/* Placement ids run on across the frames of a world, in pack order (the
+ * index's file table): a frame's ids start after the earlier frames'. With the
+ * prefetch on (spare Fast RAM) the earlier frames' placement counts are kept
+ * from their first reading, instead of opening every earlier frame's file on
+ * each map start (CHIM-CROSSING-SYNC-LOAD-43). Same values either way. */
+static int FirstPid (int row, unsigned *first)
+{
+	int i, fast = ChimPrefetch_Active ();
+	*first = 0;
 	for (i=0 ; i<row ; i++)
 	{
-		byte other[CHIM_HEADER_BYTES + CHIM_FRAME_BYTES];
 		chim_header_t oh;
 		chim_frame_t of;
-		chim_pack_t *op;
 		unsigned kept;
 		if (strcmp (chim_world.file[i].kind, "FRAM"))
 			continue;
 		if (fast && ChimPrefetch_Owned (i, &kept))
 		{
-			chim_frame.first_pid += kept;
+			*first += kept;
 			continue;
 		}
-		if (!(op = Chim_File (i)) || !Chim_PackRead (op, 0, other, sizeof(other)) ||
-			!ChimFormat_Header (other, op->bytes, "FRAM", &oh) || !ChimFormat_Frame (other + CHIM_HEADER_BYTES, &of))
+		if (!FrameHeader (i, &oh, &of))
 			return 0;
-		chim_frame.first_pid += of.owned_total;
+		*first += of.owned_total;
 		if (fast)
 			ChimPrefetch_SetOwned (i, of.owned_total);
 	}
-	if (!(pack = Chim_File (row)))
-		return 0;
-	n = (int)h.count;
-	cells = chim_frame.frame.nx * chim_frame.frame.ny;
-	sectors = cells / (chim_frame.frame.sector_chunks * chim_frame.frame.sector_chunks);
-	if (n < 1 || n > CHIM_MAX_CHUNKS || n != cells || chim_frame.frame.grain != chim_world.settings.grain ||
-		chim_frame.frame.cx != cx || chim_frame.frame.cy != cy ||
-		chim_frame.frame.sector_chunks != chim_world.settings.sector_chunks ||
-		h.directory != CHIM_HEADER_BYTES + CHIM_FRAME_BYTES || h.directory + (unsigned)n*CHIM_CHUNK_ENTRY_BYTES != h.data ||
-		h.data + (unsigned)sectors*CHIM_SECTOR_ENTRY_BYTES != h.bytes ||
-		chim_frame.frame.owned_total > 0x7fffffffu - 7)
-		return 0;
+	return 1;
+}
+
+/* The frame file's directory checked against the world (count, grain,
+ * sectors, layout); the sector count in *sectors. */
+static int FrameValid (const chim_header_t *h, const chim_frame_t *f, int cx, int cy, int *sectors)
+{
+	int n = (int)h->count, cells = f->nx * f->ny;
+	*sectors = f->sector_chunks > 0 ? cells / (f->sector_chunks * f->sector_chunks) : 0;
+	return !(n < 1 || n > CHIM_MAX_CHUNKS || n != cells || f->grain != chim_world.settings.grain ||
+		f->cx != cx || f->cy != cy || f->sector_chunks != chim_world.settings.sector_chunks ||
+		h->directory != CHIM_HEADER_BYTES + CHIM_FRAME_BYTES || h->directory + (unsigned)n*CHIM_CHUNK_ENTRY_BYTES != h->data ||
+		h->data + (unsigned)*sectors*CHIM_SECTOR_ENTRY_BYTES != h->bytes || f->owned_total > 0x7fffffffu - 7);
+}
+
+/* The chunk directory of the frame at row into entries[base, base + n) and
+ * its grid (frame-local chunk -> local entry), placed at offset (session
+ * coordinates; 0 without a window). With the prefetch on (spare Fast RAM):
+ * the frame's sector rows from one pass over the file table (the same values). */
+static int ReadDirectory (int row, const chim_header_t *h, const chim_frame_t *f, int base, short *local_grid,
+	const float *offset, int slot)
+{
+	chim_pack_t *pack;
+	int i, n = (int)h->count, cells = f->nx * f->ny, sectors;
+	byte *raw = chim_world.buffer;
+	int per = chim_world.buffer_bytes / CHIM_CHUNK_ENTRY_BYTES;
+	int fast = ChimPrefetch_Active ();
+	int sector_row[256];
+
+	sectors = cells / (f->sector_chunks * f->sector_chunks);
 	if (fast && sectors <= 256)
 	{
 		/* The first row of each sector, as Chim_FileRow finds it. */
@@ -167,13 +190,80 @@ int ChimChunks_Begin (int cx, int cy)
 			sector_row[i] = -1;
 		for (i=0 ; i<chim_world.files ; i++)
 		{
-			const chim_file_row_t *f = &chim_world.file[i];
-			if (f->cx == cx && f->cy == cy && f->sector < sectors && sector_row[f->sector] < 0 && !strcmp (f->kind, "SECT"))
-				sector_row[f->sector] = i;
+			const chim_file_row_t *fr = &chim_world.file[i];
+			if (fr->cx == f->cx && fr->cy == f->cy && fr->sector < sectors && sector_row[fr->sector] < 0 &&
+				!strcmp (fr->kind, "SECT"))
+				sector_row[fr->sector] = i;
 		}
 	}
 	else
 		fast = 0;
+	for (i=0 ; i<cells ; i++)
+		local_grid[i] = -1;
+	for (i=0 ; i<n ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[base + i];
+		unsigned bytes;
+		if (!(i % per) && (!(pack = Chim_File (row)) || !Chim_PackRead (pack, h->directory + i*CHIM_CHUNK_ENTRY_BYTES,
+			raw, (long)((n - i < per ? n - i : per) * CHIM_CHUNK_ENTRY_BYTES))))
+			return 0;
+		ChimFormat_ChunkEntry (raw + (i % per)*CHIM_CHUNK_ENTRY_BYTES, &e->disk);
+		e->file = e->disk.sector >= sectors ? -1 : fast ? sector_row[e->disk.sector] :
+			Chim_FileRow ("SECT", f->cx, f->cy, e->disk.sector);
+		if (e->file < 0 || e->disk.cx >= f->nx || e->disk.cy >= f->ny)
+			return 0;
+		bytes = chim_world.file[e->file].bytes;
+		if (local_grid[e->disk.cy*f->nx + e->disk.cx] >= 0 || e->disk.offset < CHIM_HEADER_BYTES ||
+			(e->disk.offset & 3) || e->disk.offset > bytes ||
+			e->disk.render < CHIM_CHUNK_HEAD_BYTES || e->disk.render > bytes - e->disk.offset ||
+			e->disk.collision > bytes - e->disk.offset - e->disk.render ||
+			e->disk.owned + e->disk.reach > CHIM_MAX_RECORDS)
+			return 0;
+		local_grid[e->disk.cy*f->nx + e->disk.cx] = (short)i;
+		e->low[0] = f->low[0] + e->disk.cx*f->grain + offset[0];
+		e->low[1] = f->low[1] + e->disk.cy*f->grain + offset[1];
+		e->high[0] = e->low[0] + f->grain;
+		e->high[1] = e->low[1] + f->grain;
+		e->distance = e->priority = 1e30f;
+		e->graft = -1;
+		e->shift[0] = e->shift[1] = e->shift[2] = 0;
+		e->terrain_bytes = 0;
+		e->slot = (short)slot;
+		e->shadow = -1;
+		e->terrain_locked = 0;
+	}
+	return 1;
+}
+
+static int WindowBegin (int row, const chim_header_t *h);
+static void WindowUpdate (const vec3_t origin);
+static void SlotRelease (int s);
+
+/* The frame file (chunk directory, sector table) of frame (cx, cy); each
+ * chunk record lives in one of the frame's sector files. */
+int ChimChunks_Begin (int cx, int cy)
+{
+	chim_header_t h;
+	int n, cells, bits, size, row, sectors;
+	static const float zero[2] = {0, 0};
+
+	memset (&chim_frame, 0, sizeof(chim_frame));
+	memset (&counts, 0, sizeof(counts));
+	link_world = NULL;
+	row = FrameRow (cx, cy);
+	if (!FrameHeader (row, &h, &chim_frame.frame))
+		return 0;
+	chim_frame.settings = chim_world.settings;
+	if (ChimPrefetch_Active ())
+		ChimPrefetch_SetOwned (row, chim_frame.frame.owned_total);
+	if (!FirstPid (row, &chim_frame.first_pid) || !Chim_File (row))
+		return 0;
+	if (!FrameValid (&h, &chim_frame.frame, cx, cy, &sectors))
+		return 0;
+	if ((n = WindowBegin (row, &h)) != 0)
+		return n > 0;
+	n = (int)h.count;
+	cells = chim_frame.frame.nx * chim_frame.frame.ny;
 	bits = (int)((chim_frame.frame.owned_total + 7) / 8);
 	size = n*sizeof(chim_entry_t) + cells*sizeof(short) + 2*bits;
 	if (!ChimZone_Alloc (&index_user, size, CHIM_KIND_INDEX, 1))
@@ -184,37 +274,8 @@ int ChimChunks_Begin (int cx, int cy)
 	chim_frame.drawn = (unsigned char *)(grid + cells);
 	chim_frame.visible = chim_frame.drawn + bits;
 	chim_frame.view_entry = -2;
-	for (i=0 ; i<cells ; i++)
-		grid[i] = -1;
-	for (i=0 ; i<n ; i++)
-	{
-		chim_entry_t *e = &chim_frame.entries[i];
-		unsigned bytes;
-		if (!(i % per) && (!(pack = Chim_File (row)) || !Chim_PackRead (pack, h.directory + i*CHIM_CHUNK_ENTRY_BYTES,
-			raw, (long)((n - i < per ? n - i : per) * CHIM_CHUNK_ENTRY_BYTES))))
-			return 0;
-		ChimFormat_ChunkEntry (raw + (i % per)*CHIM_CHUNK_ENTRY_BYTES, &e->disk);
-		e->file = e->disk.sector >= sectors ? -1 : fast ? sector_row[e->disk.sector] :
-			Chim_FileRow ("SECT", cx, cy, e->disk.sector);
-		if (e->file < 0 || e->disk.cx >= chim_frame.frame.nx || e->disk.cy >= chim_frame.frame.ny)
-			return 0;
-		bytes = chim_world.file[e->file].bytes;
-		if (grid[e->disk.cy*chim_frame.frame.nx + e->disk.cx] >= 0 || e->disk.offset < CHIM_HEADER_BYTES ||
-			(e->disk.offset & 3) || e->disk.offset > bytes ||
-			e->disk.render < CHIM_CHUNK_HEAD_BYTES || e->disk.render > bytes - e->disk.offset ||
-			e->disk.collision > bytes - e->disk.offset - e->disk.render ||
-			e->disk.owned + e->disk.reach > CHIM_MAX_RECORDS)
-			return 0;
-		grid[e->disk.cy*chim_frame.frame.nx + e->disk.cx] = (short)i;
-		e->low[0] = chim_frame.frame.low[0] + e->disk.cx*chim_frame.frame.grain;
-		e->low[1] = chim_frame.frame.low[1] + e->disk.cy*chim_frame.frame.grain;
-		e->high[0] = e->low[0] + chim_frame.frame.grain;
-		e->high[1] = e->low[1] + chim_frame.frame.grain;
-		e->distance = e->priority = 1e30f;
-		e->graft = -1;
-		e->shift[0] = e->shift[1] = e->shift[2] = 0;
-		e->terrain_bytes = 0;
-	}
+	if (!ReadDirectory (row, &h, &chim_frame.frame, 0, grid, zero, 0))
+		return 0;
 	chim_frame.count = n;
 	ticks = 0;
 	memset (&ring, 0, sizeof(ring));
@@ -280,12 +341,24 @@ static int AddEfrags (entity_t *ent, const vec3_t mins, const vec3_t maxs)
 	return CountLeaves (ent);
 }
 
+/* Its ground is in the frame world: grafted, or (a window's chunk whose
+ * place another frame's chunk holds) that chunk is. */
+static int Grounded (const chim_entry_t *e)
+{
+	return e->grafted || (chim_frame.window && e->shadow >= 0 && chim_frame.entries[e->shadow].grafted);
+}
+
+int ChimChunks_Grounded (int entry)
+{
+	return entry >= 0 && entry < chim_frame.count && Grounded (&chim_frame.entries[entry]);
+}
+
 /* A chunk whose placements may be linked: active and, with the incremental
  * frame world, grafted (its leaves exist). */
 static int Linkable (int index)
 {
 	chim_entry_t *e = &chim_frame.entries[index];
-	return e->state == CHIM_STATE_ACTIVE && (e->grafted || !ChimGraft_Incremental ()) && e->distance <= efrag_horizon;
+	return e->state == CHIM_STATE_ACTIVE && (Grounded (e) || !ChimGraft_Incremental ()) && e->distance <= efrag_horizon;
 }
 
 static void DropEfrags (entity_t *ent)
@@ -310,19 +383,64 @@ static int Hidden (const chim_place_t *p)
 	return (p->flags & CHIM_RECORD_STORY_HIDDEN) && chim_story_hidden && chim_story_hidden ();
 }
 
+/* A window's slot holding placement id pid (ids of frames do not overlap). */
+static chim_slot_t *PidSlot (unsigned pid)
+{
+	int s;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+		if (chim_frame.slot[s].used && pid - chim_frame.slot[s].first_pid < chim_frame.slot[s].frame.owned_total)
+			return &chim_frame.slot[s];
+	return NULL;
+}
+
+/* The drawn bits holding pid and its bit (a window: its frame's). */
+static unsigned char *DrawnBits (unsigned pid, unsigned *bit)
+{
+	chim_slot_t *s;
+	if (!chim_frame.window)
+	{
+		*bit = Local (pid);
+		return chim_frame.drawn;
+	}
+	if (!(s = PidSlot (pid)))
+		return NULL;
+	*bit = pid - s->first_pid;
+	return s->drawn;
+}
+
 static void SetDrawn (unsigned pid, int on)
 {
-	pid = Local (pid);
+	unsigned char *bits = DrawnBits (pid, &pid);
+	if (!bits)
+		return;
 	if (on)
-		chim_frame.drawn[pid>>3] |= (unsigned char)(1u << (pid & 7));
+		bits[pid>>3] |= (unsigned char)(1u << (pid & 7));
 	else
-		chim_frame.drawn[pid>>3] &= (unsigned char)~(1u << (pid & 7));
+		bits[pid>>3] &= (unsigned char)~(1u << (pid & 7));
 }
 
 static int Drawn (unsigned pid)
 {
-	pid = Local (pid);
-	return (chim_frame.drawn[pid>>3] >> (pid & 7)) & 1;
+	unsigned char *bits = DrawnBits (pid, &pid);
+	return bits ? (bits[pid>>3] >> (pid & 7)) & 1 : 0;
+}
+
+/* A window: each placement is drawn by the frame whose cell holds it (two
+ * frames may both carry an object near their shared border); one in no
+ * window frame's cell by any frame that has it. Always 1 without a window. */
+static int CoreKeeps (const chim_entry_t *e, const float *origin)
+{
+	int s;
+	if (!chim_frame.window)
+		return 1;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+	{
+		const chim_slot_t *w = &chim_frame.slot[s];
+		if (w->used && !w->leaving && origin[0] >= w->core[0] && origin[0] < w->core[2] &&
+			origin[1] >= w->core[1] && origin[1] < w->core[3])
+			return s == e->slot;
+	}
+	return 1;
 }
 
 static void Unlink (chim_place_t *p)
@@ -377,6 +495,11 @@ static void Reconcile (void)
 		for (j=c->owned ; j<c->records ; j++)
 			if (c->places[j].linked && OwnerDraws (&c->places[j]))
 				Unlink (&c->places[j]);
+		/* A window that changed: placements another frame now draws. */
+		if (chim_frame.window)
+			for (j=0 ; j<c->records ; j++)
+				if (c->places[j].linked && !CoreKeeps (&chim_frame.entries[i], c->places[j].ent.origin))
+					Unlink (&c->places[j]);
 	}
 	for (i=0 ; i<chim_frame.count ; i++)
 	{
@@ -386,7 +509,8 @@ static void Reconcile (void)
 		for (j=0 ; j<c->records ; j++)
 		{
 			chim_place_t *p = &c->places[j];
-			if (p->linked || Drawn (p->pid) || Hidden (p) || !p->ent.model)
+			if (p->linked || Drawn (p->pid) || Hidden (p) || !p->ent.model ||
+				!CoreKeeps (&chim_frame.entries[i], p->ent.origin))
 				continue;
 			if (j >= c->owned && OwnerDraws (p))
 				continue;
@@ -406,6 +530,14 @@ static int ViewRow (int entry)
 	int nbytes = (int)((chim_frame.frame.owned_total + 7) >> 3), out = 0, in = 0, k;
 	if (entry < 0 || chim_frame.entries[entry].state != CHIM_STATE_ACTIVE)
 		return 0;
+	if (chim_frame.window)
+	{
+		/* The row covers the view chunk's own frame (its slot's bits). */
+		chim_slot_t *s = &chim_frame.slot[chim_frame.entries[entry].slot];
+		nbytes = (int)((s->frame.owned_total + 7) >> 3);
+		chim_frame.visible = s->visible;
+		chim_frame.view_slot = chim_frame.entries[entry].slot;
+	}
 	c = chim_frame.entries[entry].chunk.data;
 	if (!c->pvl_bytes)
 		return 0;
@@ -432,6 +564,15 @@ static int ViewSees (const chim_place_t *p)
 	unsigned bit = Local (p->pid);	/* bit k of the row = the frame's first id + k */
 	if (chim_frame.view_entry < 0)
 		return 1;
+	if (chim_frame.window)
+	{
+		/* Another frame's placement: the view chunk's row does not cover it. */
+		const chim_slot_t *s = &chim_frame.slot[chim_frame.view_slot];
+		bit = p->pid - s->first_pid;
+		if (bit >= s->frame.owned_total)
+			return 1;
+		return (s->visible[bit >> 3] >> (bit & 7)) & 1;
+	}
 	return bit < chim_frame.frame.owned_total && ((chim_frame.visible[bit >> 3] >> (bit & 7)) & 1);
 }
 
@@ -517,7 +658,7 @@ void ChimChunks_Link (void)
 			 * drawn once grafted (it is at the ring's edge), so its
 			 * placements are not linked into the grid's empty leaves
 			 * only to be linked again a frame later. */
-			if (!e->grafted && ChimGraft_Incremental ())
+			if (!Grounded (e) && ChimGraft_Incremental ())
 				continue;
 			/* Past the efrag horizon: the farthest chunks give their links
 			 * to the nearer ones while the limit is near. */
@@ -593,6 +734,104 @@ static void ChunkEvicted (void *data, unsigned id)
 	chim_frame.entries[id].ready = 0;
 }
 
+/* 0.9: where the reach references being read and the owner records they
+ * name sit in the read buffer (references at the start, a span of one owner
+ * chunk's owned records in the second half). */
+typedef struct
+{
+	int		half;					/* bytes of each half */
+	int		ref_first, ref_count;	/* the references in the buffer */
+	int		owner, span_first, span_count;	/* owner entry and its records in the buffer */
+	int		last_owner;				/* the owner (frame index) of the last record returned */
+} chim_reach_read_t;
+
+/* 0.9: how the reach references were served (dbg and tests): from the owner
+ * chunk's catalogue already in the zone, or read from its record list. */
+chim_reach_stats_t chim_reach_stats;
+/* 1: a reference whose owner catalogue is in the zone is copied from it (no
+ * read); 0: every reference reads its record (tests compare both ways). */
+int chim_reach_resident = 1;
+
+/* 0.9: the owner record that reach reference K (of REFS) of chunk INDEX
+ * names. When the owner chunk's catalogue is in the zone, its run-time
+ * placement (FROM, and its matrix FROM_ROT) is copied with no read;
+ * otherwise the record (REC) is read from the owner chunk's own record list
+ * in the same frame: one read per owner chunk, from the first to the last
+ * record its references in the buffer name (the references come in owner
+ * and record order). 0 on bad data: an owner outside the frame, the chunk
+ * itself, or a record its owner does not hold. */
+static int ReachRecord (int index, int base, int frame_count, int owned, int k, int refs,
+	chim_reach_read_t *s, long *budget, const byte **rec, const chim_place_t **from, const float **from_rot)
+{
+	const chim_entry_t *e = &chim_frame.entries[index], *o;
+	byte *raw = chim_world.buffer;
+	const int rb = CHIM_RECORD_BYTES_PLACED;
+	chim_pack_t *pack;
+	int owner, record, take;
+
+	if (k < s->ref_first || k >= s->ref_first + s->ref_count)
+	{
+		take = refs - k;
+		if (take > s->half / CHIM_REACH_REF_BYTES)
+			take = s->half / CHIM_REACH_REF_BYTES;
+		if (!(pack = Chim_File (e->file)) ||
+			!Chim_PackRead (pack, e->disk.offset + CHIM_CHUNK_HEAD_BYTES + (long)owned*rb + (long)k*CHIM_REACH_REF_BYTES,
+			raw, (long)take*CHIM_REACH_REF_BYTES))
+			return 0;
+		*budget -= (long)take*CHIM_REACH_REF_BYTES;
+		s->ref_first = k;
+		s->ref_count = take;
+	}
+	ChimFormat_ReachRef (raw + (k - s->ref_first)*CHIM_REACH_REF_BYTES, &owner, &record);
+	if (owner >= frame_count || owner + base == index)
+		return 0;
+	o = &chim_frame.entries[owner + base];
+	if (record >= o->disk.owned)
+		return 0;
+	*rec = NULL;
+	*from = NULL;
+	*from_rot = NULL;
+	s->last_owner = owner;
+	if (chim_reach_resident && (o->state == CHIM_STATE_LOADED || o->state == CHIM_STATE_ACTIVE) && o->chunk.data)
+	{
+		const chim_chunk_t *oc = o->chunk.data;
+		if (record >= oc->owned || (oc->rot == NULL) != (chim_world.minor < CHIM_PLACED_MINOR))
+			return 0;
+		*from = &oc->places[record];
+		*from_rot = oc->rot ? oc->rot + 9*record : NULL;
+		chim_reach_stats.resident++;
+		return 1;
+	}
+	chim_reach_stats.read++;
+	if (owner + base != s->owner || record < s->span_first || record >= s->span_first + s->span_count)
+	{
+		/* from this record to the last one the following references in the
+		 * buffer take from the same owner (they come in record order) */
+		int j, last = record, o2, r2;
+		for (j=k+1 ; j<s->ref_first + s->ref_count ; j++)
+		{
+			ChimFormat_ReachRef (raw + (j - s->ref_first)*CHIM_REACH_REF_BYTES, &o2, &r2);
+			if (o2 != owner)
+				break;
+			if (r2 > last && r2 < o->disk.owned)
+				last = r2;
+		}
+		take = last - record + 1;
+		if (take > s->half / rb)
+			take = s->half / rb;
+		if (!(pack = Chim_File (o->file)) ||
+			!Chim_PackRead (pack, o->disk.offset + CHIM_CHUNK_HEAD_BYTES + (long)record*rb, raw + s->half, (long)take*rb))
+			return 0;
+		*budget -= (long)take*rb;
+		chim_reach_stats.span_reads++;
+		s->owner = owner + base;
+		s->span_first = record;
+		s->span_count = take;
+	}
+	*rec = raw + s->half + (record - s->span_first)*rb;
+	return 1;
+}
+
 /* Read the chunk head and its placement records; one catalogue block holds
  * the chunk, a run-time placement per record and its distinct models. */
 static int LoadCatalogue (int index, long *budget)
@@ -603,16 +842,60 @@ static int LoadCatalogue (int index, long *budget)
 	chim_chunk_t *c;
 	chim_pack_t *pack = Chim_File (e->file);
 	byte *raw = chim_world.buffer;
-	int i, j, n, per = chim_world.buffer_bytes / CHIM_RECORD_BYTES;
+	/* 0.8: 56-byte records with pitch and roll, and a matrix per record */
+	int placed = chim_world.minor >= CHIM_PLACED_MINOR, rb = ChimFormat_RecordBytes (chim_world.minor);
+	int i, j, n, per = chim_world.buffer_bytes / rb;
+	long rot_bytes, rows;
+	/* 0.9: reach entries are references to records owned in the frame */
+	int refs, lim;
+	chim_reach_read_t span;
+	/* Its frame's placement ids, entries and offset (a window: its slot's). */
+	unsigned first = chim_frame.first_pid, total = chim_frame.frame.owned_total;
+	int base = 0, frame_count = chim_frame.count;
+	float dx = 0, dy = 0;
 
+	if (chim_frame.window)
+	{
+		const chim_slot_t *s = &chim_frame.slot[e->slot];
+		first = s->first_pid;
+		total = s->frame.owned_total;
+		base = s->base;
+		frame_count = s->count;
+		dx = s->offset[0];
+		dy = s->offset[1];
+	}
 	if (!pack || !Chim_PackRead (pack, e->disk.offset, raw, CHIM_CHUNK_HEAD_BYTES) ||
-		!ChimFormat_ChunkHead (raw, &head) || head.owned != e->disk.owned || head.reach != e->disk.reach)
+		!ChimFormat_ChunkHead (raw, &head) || head.owned != e->disk.owned || head.reach != e->disk.reach ||
+		(placed && head.record_bytes != CHIM_RECORD_BYTES_PLACED && chim_world.minor < CHIM_TERC_MINOR) ||
+		(head.reach_refs && chim_world.minor < CHIM_REACH_MINOR))
 		return -1;
+	if (chim_world.minor >= CHIM_TERC_MINOR)
+	{
+		/* 0.10: the chunk head says its record size (0: the 48-byte record, 56: placed), so a world of compact
+		 * terrain records keeps whichever placement format it was built with */
+		if (head.record_bytes != 0 && head.record_bytes != CHIM_RECORD_BYTES_PLACED)
+			return -1;
+		placed = head.record_bytes == CHIM_RECORD_BYTES_PLACED;
+		rb = placed ? CHIM_RECORD_BYTES_PLACED : CHIM_RECORD_BYTES;
+		per = chim_world.buffer_bytes / rb;
+		if (head.reach_refs && !placed)
+			return -1;
+	}
 	n = head.owned + head.reach;
-	if (head.image_at < (unsigned)(CHIM_CHUNK_HEAD_BYTES + n*CHIM_RECORD_BYTES + head.pvs_bytes + head.pvl_bytes) ||
+	refs = head.reach_refs;
+	lim = refs ? head.owned : n;
+	rows = refs ? (long)head.owned*rb + (long)head.reach*CHIM_REACH_REF_BYTES : (long)n*rb;
+	if (head.image_at < (unsigned)(CHIM_CHUNK_HEAD_BYTES + rows + head.pvs_bytes + head.pvl_bytes) ||
 		head.image_at + head.image_render != e->disk.render)
 		return -1;
-	c = ChimZone_Alloc (&e->chunk, sizeof(*c) + n*(sizeof(chim_place_t) + sizeof(chim_chunk_model_t)) +
+	span.half = (chim_world.buffer_bytes / 2) & ~3;
+	span.ref_first = span.ref_count = span.span_first = span.span_count = 0;
+	span.owner = span.last_owner = -1;
+	if (refs && span.half < rb)
+		return -1;
+	/* an even number of floats keeps the model list behind them aligned */
+	rot_bytes = placed ? (long)((9*n + 1) & ~1)*(long)sizeof(float) : 0;
+	c = ChimZone_Alloc (&e->chunk, sizeof(*c) + n*(sizeof(chim_place_t) + sizeof(chim_chunk_model_t)) + rot_bytes +
 		head.pvs_bytes + head.pvl_bytes, CHIM_KIND_CHUNK, (unsigned)index);
 	if (!c)
 		return -1;
@@ -620,30 +903,75 @@ static int LoadCatalogue (int index, long *budget)
 	c->records = n;
 	c->owned = head.owned;
 	c->places = (chim_place_t *)(c+1);
-	c->model_list = (chim_chunk_model_t *)(c->places + n);
+	c->rot = placed ? (float *)(c->places + n) : NULL;
+	c->model_list = (chim_chunk_model_t *)((byte *)(c->places + n) + rot_bytes);
 	*budget -= CHIM_CHUNK_HEAD_BYTES;
 	for (i=0 ; i<n ; i++)
 	{
 		chim_place_t *p = &c->places[i];
-		if (!(i % per))
+		const byte *rec;
+		if (i >= lim)
 		{
-			int take = n - i < per ? n - i : per;
-			if (!(pack = Chim_File (e->file)) ||
-				!Chim_PackRead (pack, e->disk.offset + CHIM_CHUNK_HEAD_BYTES + i*CHIM_RECORD_BYTES,
-				raw, (long)take*CHIM_RECORD_BYTES))
+			/* 0.9: the owner record a reach reference names */
+			const chim_place_t *from;
+			const float *from_rot;
+			if (!ReachRecord (index, base, frame_count, head.owned, i - head.owned, head.reach, &span, budget,
+				&rec, &from, &from_rot))
 				goto bad;
-			*budget -= (long)take*CHIM_RECORD_BYTES;
+			if (from)
+			{
+				/* the owner's catalogue is in the zone: its run-time placement
+				 * as this loop made it from the same record (same frame, same
+				 * slot offset), the per-chunk fields left as allocated */
+				if (from->pid < first || from->pid - first >= total || from->owner != span.last_owner + base)
+					goto bad;
+				p->pid = from->pid;
+				p->flags = from->flags;
+				p->model = from->model;
+				p->owner = from->owner;
+				VectorCopy (from->ent.origin, p->ent.origin);
+				VectorCopy (from->ent.angles, p->ent.angles);
+				if (placed)
+					memcpy (c->rot + 9*i, from_rot, 9*sizeof(float));
+				p->ent.colormap = vid.colormap;
+				p->ent.aw_cut_box = from->ent.aw_cut_box;
+				p->s = from->s;
+				p->c = from->c;
+				VectorCopy (from->mins, p->mins);
+				VectorCopy (from->maxs, p->maxs);
+				goto counted;
+			}
 		}
-		if (!ChimFormat_Record (raw + (i % per)*CHIM_RECORD_BYTES, &r) || r.pid < chim_frame.first_pid ||
-			r.pid - chim_frame.first_pid >= chim_frame.frame.owned_total ||
-			r.owner >= chim_frame.count || (i < head.owned) != (r.owner == index))
+		else
+		{
+			if (!(i % per))
+			{
+				int take = lim - i < per ? lim - i : per;
+				if (!(pack = Chim_File (e->file)) ||
+					!Chim_PackRead (pack, e->disk.offset + CHIM_CHUNK_HEAD_BYTES + (long)i*rb,
+					raw, (long)take*rb))
+					goto bad;
+				*budget -= (long)take*rb;
+			}
+			rec = raw + (i % per)*rb;
+		}
+		if (!(placed ? ChimFormat_RecordPlaced (rec, &r) : ChimFormat_Record (rec, &r)) ||
+			r.pid < first ||
+			r.pid - first >= total || r.owner >= frame_count || (i < head.owned) != (r.owner + base == index) ||
+			(i >= lim && (int)r.owner != span.last_owner))
 			goto bad;
 		p->pid = r.pid;
 		p->flags = r.flags;
 		p->model = r.model;
-		p->owner = r.owner;
+		p->owner = r.owner + base;
 		VectorCopy (r.origin, p->ent.origin);
+		p->ent.origin[0] += dx;
+		p->ent.origin[1] += dy;
 		p->ent.angles[YAW] = r.yaw;
+		p->ent.angles[PITCH] = r.pitch;		/* 0 before 0.8 */
+		p->ent.angles[ROLL] = r.roll;
+		if (placed)
+			ChimPlaced_AnglesMatrix (p->ent.angles, (float (*)[3])(c->rot + 9*i));
 		p->ent.colormap = vid.colormap;
 		/* A piece of a long structure: its structure's cut box (chim_cuts.c). */
 		p->ent.aw_cut_box = ChimCuts_Box (r.pid);
@@ -652,15 +980,16 @@ static int LoadCatalogue (int index, long *budget)
 		 * outward) serves efrags and the collision broadphase. */
 		for (j=0 ; j<3 ; j++)
 		{
-			p->mins[j] = r.mins[j];
-			p->maxs[j] = r.maxs[j];
+			p->mins[j] = r.mins[j] + (j == 0 ? dx : j == 1 ? dy : 0);
+			p->maxs[j] = r.maxs[j] + (j == 0 ? dx : j == 1 ? dy : 0);
 		}
-		if (r.flags & CHIM_RECORD_OVER_16_LEAVES)
+	counted:
+		if (p->flags & CHIM_RECORD_OVER_16_LEAVES)
 			c->over_16_leaves++;
-		for (j=0 ; j<c->models && c->model_list[j].id != r.model ; j++)
+		for (j=0 ; j<c->models && c->model_list[j].id != p->model ; j++)
 			;
 		if (j == c->models)
-			c->model_list[c->models++].id = r.model;
+			c->model_list[c->models++].id = p->model;
 	}
 	/* The PVS row follows the records; it moves up behind the model list. */
 	c->pvs = (byte *)(c->model_list + c->models);
@@ -671,7 +1000,7 @@ static int LoadCatalogue (int index, long *budget)
 	if (head.pvs_bytes + head.pvl_bytes)
 	{
 		if (!(pack = Chim_File (e->file)) ||
-			!Chim_PackRead (pack, e->disk.offset + CHIM_CHUNK_HEAD_BYTES + n*CHIM_RECORD_BYTES,
+			!Chim_PackRead (pack, e->disk.offset + CHIM_CHUNK_HEAD_BYTES + rows,
 			c->pvs, head.pvs_bytes + head.pvl_bytes))
 			goto bad;
 		*budget -= head.pvs_bytes + head.pvl_bytes;
@@ -680,7 +1009,7 @@ static int LoadCatalogue (int index, long *budget)
 	 * directory sizes hold only the reference block). */
 	if (ChimModels_TerrainPlace (index, NULL, NULL, &e->terrain_bytes) < 0)
 		goto bad;
-	ChimZone_Trim (c, sizeof(*c) + n*sizeof(chim_place_t) + c->models*sizeof(chim_chunk_model_t) +
+	ChimZone_Trim (c, sizeof(*c) + n*sizeof(chim_place_t) + rot_bytes + c->models*sizeof(chim_chunk_model_t) +
 		head.pvs_bytes + head.pvl_bytes);
 	e->state = CHIM_STATE_LOADED;
 	chim_frame.loaded++;
@@ -701,9 +1030,12 @@ static int Activate (int index, int partial)
 	chim_chunk_t *c = e->chunk.data;
 	chim_model_t *terrain = ChimModels_Terrain (index);
 	int i, j, k, missing = 0;
+	/* A window's chunk whose ground another frame's chunk holds: its
+	 * placements only, its own terrain neither needed nor locked. */
+	int own_ground = !(chim_frame.window && e->shadow >= 0);
 
 	e->ready = 0;
-	if (!terrain)
+	if (!terrain && own_ground)
 		return 0;
 	for (i=0 ; i<c->models ; i++)
 		if (!(c->model_list[i].model = ChimModels_Find (c->model_list[i].id)))
@@ -715,13 +1047,23 @@ static int Activate (int index, int partial)
 	e->ready = !missing;
 	e->partial = missing != 0;
 	ChimZone_Lock (c);
-	ChimZone_Lock (terrain);
-	/* A referenced terrain (0.7) is chunk-local: its box moves by the shift,
-	 * as the graft moves the terrain itself (chim_graft.c CopyGraft). */
-	VectorAdd (terrain->model.mins, e->shift, c->mins);
-	VectorAdd (terrain->model.maxs, e->shift, c->maxs);
-	if (terrain->leafs - 1 != c->terrain_leaves)
-		Con_DPrintf ("CHIM: chunk %ld terrain leaves differ from its head\n", (long)index);
+	if (own_ground)
+	{
+		ChimZone_Lock (terrain);
+		e->terrain_locked = 1;
+		/* A referenced terrain (0.7) is chunk-local: its box moves by the shift,
+		 * as the graft moves the terrain itself (chim_graft.c CopyGraft). */
+		VectorAdd (terrain->model.mins, e->shift, c->mins);
+		VectorAdd (terrain->model.maxs, e->shift, c->maxs);
+		if (terrain->leafs - 1 != c->terrain_leaves)
+			Con_DPrintf ("CHIM: chunk %ld terrain leaves differ from its head\n", (long)index);
+	}
+	else
+	{
+		e->terrain_locked = 0;
+		c->mins[0] = c->mins[1] = c->mins[2] = 1e30f;
+		c->maxs[0] = c->maxs[1] = c->maxs[2] = -1e30f;
+	}
 	for (i=0 ; i<c->models ; i++)
 		if (c->model_list[i].model)
 			ChimZone_Lock (c->model_list[i].model);
@@ -778,7 +1120,9 @@ static void Deactivate (int index)
 			ChimZone_Unlock (c->model_list[i].model);
 		c->model_list[i].model = NULL;
 	}
-	ChimZone_Unlock (e->terrain.data);
+	if (e->terrain_locked)
+		ChimZone_Unlock (e->terrain.data);
+	e->terrain_locked = 0;
 	ChimZone_Unlock (c);
 	e->partial = 0;
 	e->ready = 0;
@@ -865,7 +1209,7 @@ static int Need (int index, float active2, unsigned *model)
 	}
 	if (e->state == CHIM_STATE_ABSENT || !e->chunk.data)
 		return 1;
-	if (!ChimModels_Terrain (index))
+	if (!ChimModels_Terrain (index) && !(chim_frame.window && e->shadow >= 0))
 		return 2;
 	c = e->chunk.data;
 	/* A prefetched chunk outside the active ring that was complete stays
@@ -920,7 +1264,7 @@ static int PrefetchRoom (int index, int need, unsigned model, float active2)
 	if (need == 1)
 		bytes = 16384;
 	else if (need == 2)
-		bytes = e->terrain_bytes ? e->terrain_bytes : (long)e->disk.render + e->disk.collision;
+		bytes = e->terrain_bytes ? e->terrain_bytes : (long)e->disk.render + (long)e->disk.collision;
 	else if (need == 3 && ChimStatics_IsStatic (model))
 		bytes = ChimStatics_Bytes (model);
 	else if (need == 3)
@@ -1036,7 +1380,8 @@ static int ReleaseLocks (int index, int n)
 	release_locks[n++] = c;
 	if (e->terrain.data)
 	{
-		release_locks[n++] = e->terrain.data;
+		if (e->terrain_locked)	/* a window's chunk on another frame's ground locks none */
+			release_locks[n++] = e->terrain.data;
 		if (e->grafted)			/* the frame world's lock, dropped by ChimGraft_Update (0) */
 			release_locks[n++] = e->terrain.data;
 	}
@@ -1181,7 +1526,7 @@ static void Margin (void)
 	float nearest = 1e30f;
 	int i;
 	for (i=0 ; i<chim_frame.count ; i++)
-		if (!chim_frame.entries[i].grafted && chim_frame.entries[i].distance < nearest)
+		if (!Grounded (&chim_frame.entries[i]) && chim_frame.entries[i].distance < nearest)
 			nearest = chim_frame.entries[i].distance;
 	ring.margin = nearest >= 1e30f ? -1 : (float)sqrt (nearest);
 	if (ring.margin >= 0 && (ring.margin_min < 0 || ring.margin < ring.margin_min))
@@ -1248,6 +1593,8 @@ void ChimChunks_Tick (const vec3_t origin, long budget, int prime)
 
 	if (!chim_frame.count)
 		return;
+	/* Type 1: the window's frames follow the player first (chim_window). */
+	WindowUpdate (origin);
 	r = ChimChunks_ActiveRadius ();
 	active2 = r*r;
 	r = ChimChunks_LoadRadius ();
@@ -1282,7 +1629,8 @@ void ChimChunks_Tick (const vec3_t origin, long budget, int prime)
 	for (i=0 ; i<chim_frame.count ; i++)
 	{
 		chim_entry_t *e = &chim_frame.entries[i];
-		if (e->priority > load2 || (e->state == CHIM_STATE_ACTIVE && !e->partial))
+		if (e->priority > load2 || (e->state == CHIM_STATE_ACTIVE && !e->partial) ||
+			(chim_frame.window && chim_frame.slot[e->slot].leaving))
 			continue;
 		for (k=candidates ; k>0 && chim_frame.entries[candidate[k-1]].priority > e->priority ; k--)
 			candidate[k] = candidate[k-1];
@@ -1471,6 +1819,107 @@ static void ClipModel (model_t *m, const vec3_t origin, float s, float c, vec3_t
 	AW_MergeCollisionTrace (best, &trace, sv.edicts);
 }
 
+/* ClipModel with the model turned by a matrix (model -> world): the 0.8
+ * fallback for a tilted placement whose model has no usable piece table. The
+ * stored hull was expanded in the model's frame, so the box turns with it
+ * (the yaw path's approximation, on three axes). */
+static void ClipModelTurned (model_t *m, const vec3_t origin, float rot[3][3], vec3_t start, vec3_t mins,
+	vec3_t maxs, vec3_t end, trace_t *best)
+{
+	trace_t trace;
+	vec3_t offset, start_l, end_l, delta, temp;
+	hull_t *hull;
+	float speed;
+	int i;
+
+	memset (&trace, 0, sizeof(trace));
+	trace.fraction = 1;
+	trace.allsolid = true;
+	VectorCopy (end, trace.endpos);
+	if (maxs[0] - mins[0] < 3)
+		hull = &m->hulls[0];
+	else if (maxs[0] - mins[0] <= 32)
+		hull = &m->hulls[1];
+	else
+		hull = &m->hulls[2];
+	if (!hull->clipnodes)
+		return;
+	VectorSubtract (hull->clip_mins, mins, offset);
+	VectorAdd (offset, origin, offset);
+	VectorSubtract (start, offset, temp);
+	for (i=0 ; i<3 ; i++)
+		start_l[i] = rot[0][i]*temp[0] + rot[1][i]*temp[1] + rot[2][i]*temp[2];
+	VectorSubtract (end, offset, temp);
+	for (i=0 ; i<3 ; i++)
+		end_l[i] = rot[0][i]*temp[0] + rot[1][i]*temp[1] + rot[2][i]*temp[2];
+	SV_RecursiveHullCheck (hull, hull->firstclipnode, 0, 1, start_l, end_l, &trace);
+	if (!trace.allsolid && trace.fraction < 1)
+	{
+		VectorSubtract (end_l, start_l, delta);
+		speed = DotProduct (delta, trace.plane.normal);
+		if (speed < 0)
+			speed = -speed;
+		if (speed > 0)
+		{
+			trace.fraction -= CHIM_DIST_EPSILON/speed;
+			if (trace.fraction < 0)
+				trace.fraction = 0;
+			VectorMA (start_l, trace.fraction, delta, trace.endpos);
+		}
+	}
+	if (trace.fraction != 1)
+	{
+		VectorCopy (trace.endpos, temp);
+		for (i=0 ; i<3 ; i++)
+			trace.endpos[i] = DotProduct (rot[i], temp);
+		VectorCopy (trace.plane.normal, temp);
+		for (i=0 ; i<3 ; i++)
+			trace.plane.normal[i] = DotProduct (rot[i], temp);
+		VectorAdd (trace.endpos, offset, trace.endpos);
+	}
+	if (trace.allsolid)
+	{
+		trace.fraction = 0;
+		VectorCopy (start, trace.endpos);
+	}
+	AW_MergeCollisionTrace (best, &trace, sv.edicts);
+}
+
+/* One placement's collision. 0.4-0.7: ClipModel (the yaw path, unchanged).
+ * 0.8: the model's piece table placed by the record's matrix and expanded by
+ * the world-aligned box (chim_placed_clip.c); without a usable table (or
+ * when a trace meets more than the scratch holds) the stored hull: by the
+ * yaw path for a yaw-only record, turned by the matrix otherwise. */
+static void ClipPlacement (const chim_chunk_t *c, int j, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end,
+	trace_t *best)
+{
+	chim_place_t *p = &c->places[j];
+	if (c->rot)
+	{
+		chim_model_t *cm = (chim_model_t *)p->ent.model;	/* the model is the block's first member */
+		float (*rot)[3] = (float (*)[3])(c->rot + 9*j);
+		if (cm->pieces)
+		{
+			trace_t trace;
+			memset (&trace, 0, sizeof(trace));
+			trace.fraction = 1;
+			VectorCopy (end, trace.endpos);
+			if (ChimPlaced_TraceTable (cm->model.visdata, (const float (*)[3])rot, p->ent.origin, start, mins, maxs,
+				end, &trace))
+			{
+				AW_MergeCollisionTrace (best, &trace, sv.edicts);
+				return;
+			}
+		}
+		if (p->ent.angles[PITCH] || p->ent.angles[ROLL])
+		{
+			ClipModelTurned (p->ent.model, p->ent.origin, rot, start, mins, maxs, end, best);
+			return;
+		}
+	}
+	ClipModel (p->ent.model, p->ent.origin, p->s, p->c, start, mins, maxs, end, best);
+}
+
 void ChimChunks_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *best)
 {
 	vec3_t low, high;
@@ -1503,7 +1952,7 @@ void ChimChunks_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_
 					break;
 			if (k != 3)
 				continue;
-			ClipModel (p->ent.model, p->ent.origin, p->s, p->c, start, mins, maxs, end, best);
+			ClipPlacement (c, j, start, mins, maxs, end, best);
 			if (best->allsolid)
 				return;
 		}
@@ -1558,7 +2007,7 @@ int ChimChunks_Pick (const vec3_t start, const vec3_t end, aw_chim_pick_t *out)
 			memset (&best, 0, sizeof(best));
 			best.fraction = 1;
 			VectorCopy (e2, best.endpos);
-			ClipModel (p->ent.model, p->ent.origin, p->s, p->c, s, zero, zero, e2, &best);
+			ClipPlacement (c, j, s, zero, zero, e2, &best);
 			if (best.fraction < nearest && !best.allsolid)
 			{
 				nearest = best.fraction;
@@ -1577,15 +2026,41 @@ int ChimChunks_Pick (const vec3_t start, const vec3_t end, aw_chim_pick_t *out)
 		out->model = p->model;
 		VectorCopy (p->ent.origin, out->origin);
 		out->yaw = p->ent.angles[YAW];
-		out->cell_x = chim_frame.frame.cx;
-		out->cell_y = chim_frame.frame.cy;
-		if ((pack = Chim_File (e->file)) &&
-			Chim_PackRead (pack, e->disk.offset + CHIM_CHUNK_HEAD_BYTES + (long)hit_record*CHIM_RECORD_BYTES,
-			raw, CHIM_RECORD_BYTES) && ChimFormat_Record (raw, &r) && r.pid == p->pid)
+		out->cell_x = chim_frame.window ? chim_frame.slot[e->slot].cx : chim_frame.frame.cx;
+		out->cell_y = chim_frame.window ? chim_frame.slot[e->slot].cy : chim_frame.frame.cy;
 		{
-			out->ref = r.ref;
-			out->cell_x += r.cell_dx;
-			out->cell_y += r.cell_dy;
+			/* the record's place: its own chunk's list, or (0.9) the owner's
+			 * list that the chunk's reach reference names */
+			const chim_entry_t *home = e;
+			long at = (long)hit_record*(((chim_chunk_t *)e->chunk.data)->rot ? CHIM_RECORD_BYTES_PLACED :
+				ChimFormat_RecordBytes (chim_world.minor));
+			chim_chunk_head_t head;
+			int owner, record;
+			if (chim_world.minor >= CHIM_REACH_MINOR && hit_record >= ((chim_chunk_t *)e->chunk.data)->owned &&
+				(pack = Chim_File (e->file)) && Chim_PackRead (pack, e->disk.offset, raw, CHIM_CHUNK_HEAD_BYTES) &&
+				ChimFormat_ChunkHead (raw, &head) && head.reach_refs)
+			{
+				home = NULL;
+				if (Chim_PackRead (pack, e->disk.offset + CHIM_CHUNK_HEAD_BYTES + (long)head.owned*CHIM_RECORD_BYTES_PLACED +
+					(long)(hit_record - head.owned)*CHIM_REACH_REF_BYTES, raw, CHIM_REACH_REF_BYTES))
+				{
+					int slot_base = chim_frame.window ? chim_frame.slot[e->slot].base : 0;
+					ChimFormat_ReachRef (raw, &owner, &record);
+					if (owner + slot_base < chim_frame.count)
+					{
+						home = &chim_frame.entries[owner + slot_base];
+						at = (long)record*CHIM_RECORD_BYTES_PLACED;
+					}
+				}
+			}
+			if (home && (pack = Chim_File (home->file)) &&
+				Chim_PackRead (pack, home->disk.offset + CHIM_CHUNK_HEAD_BYTES + at,
+				raw, CHIM_RECORD_BYTES) && ChimFormat_Record (raw, &r) && r.pid == p->pid)
+			{
+				out->ref = r.ref;
+				out->cell_x += r.cell_dx;
+				out->cell_y += r.cell_dy;
+			}
 		}
 	}
 	/* Model row: u32 name offset at +16, relative to the names table. */
@@ -1629,6 +2104,9 @@ void ChimChunks_End (void)
 	ChimZone_EvictKind (CHIM_KIND_TERRAIN, NULL);
 	world_dirty = 0;
 	world_retry = 0;
+	if (chim_frame.window)
+		for (i=0 ; i<CHIM_WINDOW_SLOTS ; i++)
+			SlotRelease (i);
 	ChimZone_Unlock (index_user.data);
 	ChimZone_Free (&index_user);
 	memset (&chim_frame, 0, sizeof(chim_frame));
@@ -1808,4 +2286,704 @@ int ChimChunks_Frozen (edict_t *ent)
 int ChimChunks_FrozenLast (void)
 {
 	return (int)(frozen_now > frozen_last ? frozen_now : frozen_last);
+}
+
+/* ---------------------------------------------------------------- the window (type 1 crossings) */
+
+/* Type 1 crossings (docs/chim/CELL_CROSSINGS.md, "Type 1: one continuous
+ * world"; the design note of 19 October 2026, sections 3 and 5): the region
+ * frames around the player are one window in one frame world, so walking
+ * from one frame into the next is ordinary streaming, not a level change.
+ *
+ * - The window is the 2 x 2 block of cells (= region frames) meeting at the
+ *   corner nearest the player: the quadrant of the cell the player stands in
+ *   names it, as the prefetch picks its block (chim_prefetch.c); it moves to
+ *   another corner only WINDOW_MARGIN past the cell's midline (hysteresis),
+ *   well outside the active ring (draw distance + hysteresis, about 640 of
+ *   the 1,024 units from the midline to the border).
+ * - Fixed origin: every frame is placed at its offset from the frame the map
+ *   started on (cell steps of 2,048 units); the session's coordinates are that
+ *   frame's. Nothing is moved (no rebase).
+ * - One frame world: the window's chunk grid (frame.low/nx/ny) covers the
+ *   block; each place of it takes the chunk of the frame whose cell holds the
+ *   chunk's centre (or, outside every cell, of the frame whose cell is
+ *   nearest), so ground two frames share is grafted once. The other frames'
+ *   chunks there keep only their placements (shadow: their ground is the
+ *   owner's).
+ * - Placements: each is drawn and collided by the frame whose cell holds its
+ *   origin (CoreKeeps), never twice at a border.
+ * - Joining reads the frame's chunk directory (a few KiB) and its streamed
+ *   statics; leaving deactivates its chunks, waits until the frame world has
+ *   let their ground go (Graft phase 0), then frees their zone blocks.
+ *
+ * Quake/CHIM machinery reused: the incremental frame world (chim_graft.c,
+ * one world model, Mod_LeafPVS rows, SV_LinkEdict), efrags (R_SplitEntityOnNode),
+ * the chunk scheduler and its budgets (ChimChunks_Tick), terrain references
+ * placed by their shift (chim_graft.c Shift), the zone (Cache_*'s LRU).
+ * Selected with "chim crossing 1" before the map starts; 0 (the default) is
+ * type 0, the level change, unchanged. */
+
+static int			window_wanted;		/* "chim crossing 1": the next map start runs a window */
+#define WINDOW_MARGIN	256				/* units past a cell's midline before the block moves */
+#define WINDOW_FAR		1e9f			/* an unused slot's entries: never within any ring */
+static chim_frame_t	home;				/* the frame the map started on (the session's origin) */
+static int			home_row;
+static unsigned		home_first;
+static int			missing[4][2], missing_count;	/* cells of the block without a frame the window can hold */
+
+int ChimChunks_WindowOn (int on)
+{
+	if (on >= 0)
+		window_wanted = on != 0;
+	return window_wanted;
+}
+
+/* A frame a window can hold: one cell, centred on it, its chunks on the cell
+ * lattice (region frames are; town frames are not). */
+static int WindowFits (const chim_frame_t *f)
+{
+	return f->grain > 0 && !(CHIM_CELL_UNITS % f->grain) && f->nx == f->ny && f->nx * f->grain > CHIM_CELL_UNITS &&
+		f->centre[0] == f->cx * 4.0f * CHIM_CELL_UNITS + 2.0f * CHIM_CELL_UNITS &&
+		f->centre[1] == f->cy * 4.0f * CHIM_CELL_UNITS + 2.0f * CHIM_CELL_UNITS;
+}
+
+/* A neighbour the window can hold beside the home frame: the same layout. */
+static int SameLayout (const chim_frame_t *f)
+{
+	return WindowFits (f) && f->nx == home.nx && f->ny == home.ny && f->grain == home.grain &&
+		f->low[0] == home.low[0] && f->low[1] == home.low[1] && f->sector_chunks == home.sector_chunks;
+}
+
+/* First placement id of the frame at row, counted from the home frame's
+ * (only the frames between are read, or their counts the prefetch kept). */
+static int FirstPidNear (int row, unsigned *first)
+{
+	int i, from = row < home_row ? row : home_row, to = row < home_row ? home_row : row;
+	int fast = ChimPrefetch_Active ();
+	unsigned sum = 0, kept;
+	for (i=from ; i<to ; i++)
+	{
+		chim_header_t oh;
+		chim_frame_t of;
+		if (strcmp (chim_world.file[i].kind, "FRAM"))
+			continue;
+		if (fast && ChimPrefetch_Owned (i, &kept))
+		{
+			sum += kept;
+			continue;
+		}
+		if (!FrameHeader (i, &oh, &of))
+			return 0;
+		sum += of.owned_total;
+		if (fast)
+			ChimPrefetch_SetOwned (i, of.owned_total);
+	}
+	*first = row < home_row ? home_first - sum : home_first + sum;
+	return 1;
+}
+
+/* An unused slot's entries: absent, out of every ring. */
+static void SlotEntriesClear (int s)
+{
+	int i, base = s * chim_frame.slot_entries;
+	for (i=base ; i<base + chim_frame.slot_entries ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		memset (e, 0, sizeof(*e));
+		e->file = -1;
+		e->graft = -1;
+		e->shadow = -1;
+		e->slot = (short)s;
+		e->low[0] = e->low[1] = e->high[0] = e->high[1] = WINDOW_FAR;
+		e->distance = e->priority = 1e30f;
+	}
+}
+
+/* The entries of the slot being released: every other block is kept. */
+static int release_first, release_end;
+static int KeepOtherSlots (void *data, unsigned id)
+{
+	(void)data;
+	return (int)id < release_first || (int)id >= release_end;
+}
+
+/* Frees what a slot holds in the zone (nothing of it may be locked by a
+ * chunk or grafted any more). Catalogues and terrain go as an eviction does
+ * (their callbacks: a chunk's state, a terrain model's texture locks). */
+static void SlotRelease (int s)
+{
+	chim_slot_t *w = &chim_frame.slot[s];
+	if (!w->used)
+		return;
+	ChimStatics_SlotEnd (s);
+	release_first = w->base;
+	release_end = w->base + w->count;
+	ChimZone_EvictKind (CHIM_KIND_CHUNK, KeepOtherSlots);
+	ChimZone_EvictKind (CHIM_KIND_TERRAIN, KeepOtherSlots);
+	release_first = release_end = 0;
+	if (w->user.data)
+	{
+		ChimZone_Unlock (w->user.data);
+		ChimZone_Free (&w->user);
+	}
+	memset (w, 0, sizeof(*w));
+	SlotEntriesClear (s);
+}
+
+/* Frame (cx, cy) into slot s: its directory, grid, placement bits and
+ * streamed statics, at its offset from the home frame. */
+static int SlotJoin (int s, int row, const chim_header_t *h, const chim_frame_t *f, unsigned first)
+{
+	chim_slot_t *w = &chim_frame.slot[s];
+	int cells = f->nx * f->ny, bits = (int)((f->owned_total + 7) / 8), size;
+	char map[MAX_QPATH];
+	size = cells * (int)sizeof(short) + 2*bits + 16;
+	memset (w, 0, sizeof(*w));
+	if (!ChimZone_Alloc (&w->user, size, CHIM_KIND_INDEX, 2 + (unsigned)s))
+		return 0;
+	ChimZone_Lock (w->user.data);
+	memset (w->user.data, 0, size);
+	w->grid = w->user.data;
+	w->drawn = (unsigned char *)(w->grid + cells);
+	w->visible = w->drawn + bits;
+	w->frame = *f;
+	w->cx = f->cx;
+	w->cy = f->cy;
+	w->row = row;
+	w->first_pid = first;
+	w->base = s * chim_frame.slot_entries;
+	w->count = (int)h->count;
+	w->offset[0] = (float)((f->cx - home.cx) * CHIM_CELL_UNITS);
+	w->offset[1] = (float)((f->cy - home.cy) * CHIM_CELL_UNITS);
+	w->core[0] = w->offset[0] - CHIM_CELL_UNITS/2;
+	w->core[1] = w->offset[1] - CHIM_CELL_UNITS/2;
+	w->core[2] = w->offset[0] + CHIM_CELL_UNITS/2;
+	w->core[3] = w->offset[1] + CHIM_CELL_UNITS/2;
+	w->used = 1;
+	if (w->count > chim_frame.slot_entries || !ReadDirectory (row, h, f, w->base, w->grid, w->offset, s))
+	{
+		SlotRelease (s);
+		return 0;
+	}
+	/* Its streamed statics: the frame map's tagged entities (the home frame's
+	 * came with the map's own entity text, ED_LoadFromFile). */
+	if (s != 0 || chim_frame.joins)
+	{
+		map[0] = 0;
+		if (chim_cell_map && chim_cell_map (f->cx, f->cy, map, sizeof(map)))
+			ChimStatics_SlotJoin (s, w->base, w->count, map, w->offset);
+		if (map[0] && chim_actors_join)
+			chim_actors_join (f->cx, f->cy, map, w->offset);
+	}
+	chim_frame.joins++;
+	return 1;
+}
+
+static int InWindow (int cx, int cy)
+{
+	int s;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+		if (chim_frame.slot[s].used && !chim_frame.slot[s].leaving && chim_frame.slot[s].cx == cx &&
+			chim_frame.slot[s].cy == cy)
+			return 1;
+	return 0;
+}
+
+/* Frame (cx, cy) joins the window in a free slot: 1, 0 none free (it tries
+ * again next tick), -1 no frame there the window can hold. */
+static int Join (int cx, int cy)
+{
+	chim_header_t h;
+	chim_frame_t f;
+	int s, row, sectors;
+	unsigned first;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS && chim_frame.slot[s].used ; s++)
+		;
+	if (s == CHIM_WINDOW_SLOTS)
+		return 0;
+	row = FrameRow (cx, cy);
+	if (row < 0 || !FrameHeader (row, &h, &f) || !FrameValid (&h, &f, cx, cy, &sectors) || !SameLayout (&f) ||
+		!FirstPidNear (row, &first) || !SlotJoin (s, row, &h, &f, first))
+		return -1;
+	if (chim_debug.value)
+		Con_Printf ("CHIM: window: frame %ld %ld joins (slot %ld, %ld chunks)\n", (long)cx, (long)cy, (long)s,
+			(long)chim_frame.slot[s].count);
+	return 1;
+}
+
+/* A slot leaves: its chunks are deactivated now; the zone blocks go once the
+ * frame world has let their ground go (SlotFinish). */
+static void SlotLeave (int s)
+{
+	chim_slot_t *w = &chim_frame.slot[s];
+	int i;
+	if (chim_actors_leave)
+		chim_actors_leave (w->cx, w->cy);
+	for (i=w->base ; i<w->base + w->count ; i++)
+		if (chim_frame.entries[i].state == CHIM_STATE_ACTIVE)
+			Deactivate (i);
+	w->leaving = 1;
+	if (chim_debug.value)
+		Con_Printf ("CHIM: window: frame %ld %ld leaves (slot %ld)\n", (long)w->cx, (long)w->cy, (long)s);
+}
+
+static int SlotFinish (int s)
+{
+	chim_slot_t *w = &chim_frame.slot[s];
+	int i, job = ChimModels_JobTerrain ();
+	for (i=w->base ; i<w->base + w->count ; i++)
+		if (chim_frame.entries[i].grafted || chim_frame.entries[i].state == CHIM_STATE_ACTIVE)
+			return 0;
+	if (job >= w->base && job < w->base + w->count)
+		ChimModels_Abort ();
+	SlotRelease (s);
+	chim_frame.leaves++;
+	return 1;
+}
+
+/* The block's first cell along one axis (absolute cell numbers): from the
+ * session coordinate v, the home frame's cell, and the current block start
+ * (hysteresis). */
+static int BlockAxis (float v, int home_cell, int current, int set)
+{
+	int cell = (int)floor ((v + CHIM_CELL_UNITS/2) / (float)CHIM_CELL_UNITS);
+	float in = v + CHIM_CELL_UNITS/2 - (float)cell * CHIM_CELL_UNITS;		/* 0 .. 2,048 inside the cell */
+	int natural = in >= CHIM_CELL_UNITS/2 ? cell : cell - 1;
+	cell += home_cell;
+	natural += home_cell;
+	if (set && (cell == current || cell == current + 1))
+	{
+		if (cell == current && in < CHIM_CELL_UNITS/2 - WINDOW_MARGIN)
+			return current - 1;
+		if (cell == current + 1 && in >= CHIM_CELL_UNITS/2 + WINDOW_MARGIN)
+			return current + 1;
+		return current;
+	}
+	return natural;
+}
+
+/* The window's grid over the block and which chunk holds each place (the
+ * frame whose cell holds the chunk's centre, else the nearest cell's frame);
+ * chunks whose place another frame's chunk holds become shadows (an active
+ * one whose role changed starts again, with or without its ground). */
+static void Layout (void)
+{
+	int g = home.grain, nx = chim_frame.frame.nx, ny = chim_frame.frame.ny, vx, vy, s, i, best, lx, ly;
+	float low0 = (float)((chim_frame.block[0] - home.cx) * CHIM_CELL_UNITS) + home.low[0];
+	float low1 = (float)((chim_frame.block[1] - home.cy) * CHIM_CELL_UNITS) + home.low[1];
+	float px, py, d, dx, dy, nearest;
+
+	chim_frame.frame.low[0] = low0;
+	chim_frame.frame.low[1] = low1;
+	for (vy=0 ; vy<ny ; vy++)
+		for (vx=0 ; vx<nx ; vx++)
+		{
+			px = low0 + (vx + 0.5f) * g;
+			py = low1 + (vy + 0.5f) * g;
+			best = -1;
+			nearest = 1e30f;
+			for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+			{
+				const chim_slot_t *w = &chim_frame.slot[s];
+				int e;
+				if (!w->used || w->leaving)
+					continue;
+				lx = (int)floor ((px - w->offset[0] - w->frame.low[0]) / g);
+				ly = (int)floor ((py - w->offset[1] - w->frame.low[1]) / g);
+				if (lx < 0 || ly < 0 || lx >= w->frame.nx || ly >= w->frame.ny || (e = w->grid[ly*w->frame.nx + lx]) < 0)
+					continue;
+				/* Inside its cell (half-open, as CoreKeeps): this frame's; else the nearest cell's. */
+				if (px >= w->core[0] && px < w->core[2] && py >= w->core[1] && py < w->core[3])
+				{
+					best = w->base + e;
+					break;
+				}
+				dx = px < w->core[0] ? w->core[0] - px : px - w->core[2] + 1;
+				dy = py < w->core[1] ? w->core[1] - py : py >= w->core[3] ? py - w->core[3] + 1 : 0;
+				if (px >= w->core[0] && px < w->core[2])
+					dx = 0;
+				d = dx*dx + dy*dy;
+				if (d < nearest)
+				{
+					nearest = d;
+					best = w->base + e;
+				}
+			}
+			grid[vy*nx + vx] = (short)best;
+		}
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		int shadow = -1, owner;
+		if (chim_frame.slot[e->slot].used && !chim_frame.slot[e->slot].leaving)
+		{
+			vx = (int)floor ((e->low[0] - low0) / g + 0.5f);
+			vy = (int)floor ((e->low[1] - low1) / g + 0.5f);
+			owner = vx >= 0 && vy >= 0 && vx < nx && vy < ny ? grid[vy*nx + vx] : -1;
+			if (owner >= 0 && owner != i)
+				shadow = owner;
+		}
+		if (shadow != e->shadow)
+		{
+			if (e->state == CHIM_STATE_ACTIVE)
+				Deactivate (i);
+			e->shadow = (short)shadow;
+			e->ready = 0;
+		}
+	}
+	chim_frame.view_entry = -2;
+	Reconcile ();
+	Released ();
+	world_dirty = 1;
+}
+
+/* Server side, at the start of each ring tick: the block follows the player;
+ * frames that left it go, frames of it join. */
+static void WindowUpdate (const vec3_t origin)
+{
+	int s, bx, by, x, y, k, r, changed = 0, leaving = 0, joined = 0, left = 0;
+	double started = 0;
+	unsigned long joins = chim_frame.joins, leaves = chim_frame.leaves;
+	/* The actors' tick (aw_actors.c) also runs in a type 0 map while type 1 is asked: a town frame never starts a
+	 * window, and entering it must still apply the change list to its residents (a killed one stays dead) */
+	if (chim_actors_tick && (chim_frame.window || window_wanted))
+		chim_actors_tick ();
+	if (!chim_frame.window)
+		return;
+	bx = BlockAxis (origin[0], home.cx, chim_frame.block[0], chim_frame.block_set);
+	by = BlockAxis (origin[1], home.cy, chim_frame.block[1], chim_frame.block_set);
+	if (!chim_frame.block_set || bx != chim_frame.block[0] || by != chim_frame.block[1])
+	{
+		started = Sys_FloatTime ();
+		chim_frame.block[0] = bx;
+		chim_frame.block[1] = by;
+		chim_frame.block_set = 1;
+		missing_count = 0;
+		for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+		{
+			chim_slot_t *w = &chim_frame.slot[s];
+			if (w->used && !w->leaving && (w->cx < bx || w->cx > bx + 1 || w->cy < by || w->cy > by + 1))
+				SlotLeave (s);
+		}
+		changed = 1;
+	}
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+		leaving += chim_frame.slot[s].used && chim_frame.slot[s].leaving;
+	if (leaving)
+	{
+		/* Their ground leaves the frame world first, then their blocks go. */
+		if (changed)
+			Layout ();
+		changed = 0;
+		Graft (0);
+		for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+			if (chim_frame.slot[s].used && chim_frame.slot[s].leaving && SlotFinish (s))
+				changed = 1;
+	}
+	for (y=by ; y<=by+1 ; y++)
+		for (x=bx ; x<=bx+1 ; x++)
+		{
+			if (InWindow (x, y))
+				continue;
+			for (k=0 ; k<missing_count && (missing[k][0] != x || missing[k][1] != y) ; k++)
+				;
+			if (k < missing_count)
+				continue;
+			for (s=0 ; s<CHIM_WINDOW_SLOTS && chim_frame.slot[s].used ; s++)
+				;
+			if (s == CHIM_WINDOW_SLOTS)
+				continue;		/* no free slot yet: a leaving frame still holds one */
+			if (!started)
+				started = Sys_FloatTime ();
+			if ((r = Join (x, y)) > 0)
+				changed = 1;
+			else if (r < 0 && missing_count < 4)
+			{
+				missing[missing_count][0] = x;
+				missing[missing_count][1] = y;
+				missing_count++;
+			}
+		}
+	if (changed)
+		Layout ();
+	if (started > 0)
+	{
+		/* What the window's changes cost this tick (one console line with chim_debug 1; "chim spikes"). */
+		double took = Sys_FloatTime () - started;
+		joined = (int)(chim_frame.joins - joins);
+		left = (int)(chim_frame.leaves - leaves);
+		AW_SpikeAdd (AW_SP_WINDOW, took, 0);
+		if (chim_debug.value && (joined || left))
+			Con_Printf ("CHIM: window block %ld %ld: %ld joined, %ld left, %ld us\n", (long)bx, (long)by, (long)joined,
+				(long)left, (long)(took * 1e6));
+	}
+}
+
+/* The map starts a window (type 1) when asked ("chim crossing 1") and its
+ * frame is a region frame: 1, 0 not a window (type 0), -1 failed. */
+static int WindowBegin (int row, const chim_header_t *h)
+{
+	int n = (int)h->count, total, size, s;
+	char map[MAX_QPATH];
+	if (!window_wanted || !WindowFits (&chim_frame.frame))
+		return 0;
+	/* A town frame (its cell has no region map: AW_CellMap) never becomes the window's home, even when its layout
+	 * fits: it could never join the window again once it left, so its ground and residents would stay gone until
+	 * a level change (CHIM-ACTORS-TOWN-RETURN-EMPTY-47). Crossings into and out of towns stay level changes (type
+	 * 0), as Seyda Neen's do; the open world between towns keeps the window. */
+	if (chim_cell_map && !chim_cell_map (chim_frame.frame.cx, chim_frame.frame.cy, map, sizeof(map)))
+		return 0;
+	total = n * CHIM_WINDOW_SLOTS;
+	if (total > CHIM_MAX_CHUNKS)
+		return 0;
+	home = chim_frame.frame;
+	home_row = row;
+	home_first = chim_frame.first_pid;
+	chim_frame.window = 1;
+	chim_frame.slot_entries = n;
+	chim_frame.count = total;
+	/* The window's grid: a 2 x 2 block of frames, a cell apart. */
+	chim_frame.frame.nx = chim_frame.frame.ny = home.nx + CHIM_CELL_UNITS / home.grain;
+	size = total * (int)sizeof(chim_entry_t) + chim_frame.frame.nx * chim_frame.frame.ny * (int)sizeof(short);
+	if (!ChimZone_Alloc (&index_user, size, CHIM_KIND_INDEX, 1))
+	{
+		memset (&chim_frame, 0, sizeof(chim_frame));
+		return -1;
+	}
+	ChimZone_Lock (index_user.data);
+	chim_frame.entries = index_user.data;
+	grid = (short *)(chim_frame.entries + total);
+	chim_frame.view_entry = -2;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+		SlotEntriesClear (s);
+	chim_frame.block[0] = home.cx;
+	chim_frame.block[1] = home.cy;
+	if (!SlotJoin (0, row, h, &home, home_first))
+	{
+		ChimZone_Unlock (index_user.data);
+		ChimZone_Free (&index_user);
+		memset (&chim_frame, 0, sizeof(chim_frame));
+		return -1;
+	}
+	missing_count = 0;
+	Layout ();
+	ticks = 0;
+	memset (&ring, 0, sizeof(ring));
+	ring.margin = ring.margin_min = -1;
+	return 1;
+}
+
+/* PROTOTYPE (aw_actors.c): the cell whose centre is the session's origin:
+ * the home frame of a window, else the running frame; 0 without a CHIM frame. */
+int ChimChunks_OriginCell (int *cx, int *cy)
+{
+	if (chim_frame.window)
+	{
+		*cx = home.cx;
+		*cy = home.cy;
+		return 1;
+	}
+	if (!chim_frame.entries || !WindowFits (&chim_frame.frame))
+		return 0;
+	*cx = chim_frame.frame.cx;
+	*cy = chim_frame.frame.cy;
+	return 1;
+}
+
+/* PROTOTYPE (aw_actors.c): the cell of a session position (absolute cell
+ * numbers) and whether the window holds that cell's frame; 0 without a window. */
+int ChimChunks_WindowCell (const vec3_t origin, int *cx, int *cy, int *held)
+{
+	if (!chim_frame.window)
+		return 0;
+	*cx = home.cx + (int)floor ((origin[0] + CHIM_CELL_UNITS/2) / (float)CHIM_CELL_UNITS);
+	*cy = home.cy + (int)floor ((origin[1] + CHIM_CELL_UNITS/2) / (float)CHIM_CELL_UNITS);
+	*held = InWindow (*cx, *cy);
+	return 1;
+}
+
+/* The player passed into another frame's cell (aw_scene.c's crossing, type 1):
+ * 1 when the window holds that frame (the crossing streams, no level change),
+ * with its cell; 0: the level change as before. */
+int ChimChunks_WindowCross (const vec3_t origin, int *cx, int *cy)
+{
+	int s;
+	if (!chim_frame.window)
+		return 0;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+	{
+		const chim_slot_t *w = &chim_frame.slot[s];
+		if (w->used && !w->leaving && origin[0] >= w->core[0] && origin[0] < w->core[2] &&
+			origin[1] >= w->core[1] && origin[1] < w->core[3])
+		{
+			*cx = w->cx;
+			*cy = w->cy;
+			chim_frame.crossings++;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/* "chim crossing 1 recentre": a test setting (design note section 5, weak point
+ * 5): after every streamed crossing the session's origin moves to the frame
+ * the player entered, so every place that stores a position is moved at every
+ * crossing and a missed one shows at once. Production keeps one origin over
+ * many crossings (a rebase only when the loaded surroundings near the
+ * coordinate range's end). */
+static int recentre_wanted;
+
+int ChimChunks_RecentreOn (int on)
+{
+	if (on >= 0)
+		recentre_wanted = on != 0;
+	return recentre_wanted;
+}
+
+/* The session's origin moves to frame (cx, cy): every session position of the
+ * window moves by d = that frame's offset (written to d), as one step: the
+ * frames' offsets and cells, every chunk's square and terrain place,
+ * placements, streamed statics, the far terrain, the cut boxes, the window's
+ * grid; then the frame world is laid out again at the new places
+ * (ChimGraft_Recentre). Server and client positions are the caller's
+ * (aw_scene.c), moved before this. 0: no window or no move. */
+int ChimChunks_WindowOffset (int cx, int cy, float *d)
+{
+	if (!chim_frame.window)
+		return 0;
+	d[0] = (float)((cx - home.cx) * CHIM_CELL_UNITS);
+	d[1] = (float)((cy - home.cy) * CHIM_CELL_UNITS);
+	d[2] = 0;
+	return d[0] || d[1];
+}
+
+int ChimChunks_WindowRecentre (int cx, int cy, float *d)
+{
+	int s, i, j, k;
+	if (!ChimChunks_WindowOffset (cx, cy, d))
+		return 0;
+	home.cx = cx;
+	home.cy = cy;
+	home.centre[0] += 4 * d[0];
+	home.centre[1] += 4 * d[1];
+	for (k=0 ; k<2 ; k++)
+		chim_frame.frame.centre[k] += 4 * d[k];
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+	{
+		chim_slot_t *w = &chim_frame.slot[s];
+		if (!w->used)
+			continue;
+		for (k=0 ; k<2 ; k++)
+		{
+			w->offset[k] -= d[k];
+			w->core[k] -= d[k];
+			w->core[k+2] -= d[k];
+		}
+	}
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		chim_chunk_t *c = e->chunk.data;
+		if (!chim_frame.slot[e->slot].used)
+			continue;
+		for (k=0 ; k<2 ; k++)
+		{
+			e->low[k] -= d[k];
+			e->high[k] -= d[k];
+			e->shift[k] -= d[k];
+		}
+		if (!c)
+			continue;
+		if (e->state == CHIM_STATE_ACTIVE)
+			for (k=0 ; k<2 ; k++)
+			{
+				c->mins[k] -= d[k];
+				c->maxs[k] -= d[k];
+			}
+		for (j=0 ; j<c->records ; j++)
+			for (k=0 ; k<2 ; k++)
+			{
+				c->places[j].ent.origin[k] -= d[k];
+				c->places[j].mins[k] -= d[k];
+				c->places[j].maxs[k] -= d[k];
+			}
+	}
+	for (k=0 ; k<2 ; k++)
+	{
+		ring.last[k] -= d[k];
+		ring.ahead[k] -= d[k];
+	}
+	ChimStatics_Recentre (d);
+	ChimFar_Recentre (d);
+	ChimCuts_Recentre (d);
+	Layout ();
+	ChimGraft_Recentre ();
+	world_dirty = 1;
+	chim_frame.recentres++;
+	return 1;
+}
+
+/* The chunk count a chunk's PVS row covers: its own frame's. */
+int ChimChunks_RowEntries (int entry)
+{
+	if (!chim_frame.window)
+		return chim_frame.count;
+	return chim_frame.slot[chim_frame.entries[entry].slot].count;
+}
+
+/* Does chunk from's PVS row see chunk to? The row covers from's own frame;
+ * another frame's chunk is looked up at its place in from's frame, and seen
+ * when it lies outside it (no data: distance and the frustum decide). */
+int ChimChunks_RowSees (const byte *row, int from, int to)
+{
+	const chim_entry_t *a, *b;
+	const chim_slot_t *w;
+	int x, y, local;
+	if (!chim_frame.window)
+		return (row[to >> 3] >> (to & 7)) & 1;
+	a = &chim_frame.entries[from];
+	b = &chim_frame.entries[to];
+	w = &chim_frame.slot[a->slot];
+	if (a->slot == b->slot)
+		local = to - w->base;
+	else
+	{
+		x = (int)floor ((b->low[0] - w->offset[0] - w->frame.low[0]) / w->frame.grain + 0.5f);
+		y = (int)floor ((b->low[1] - w->offset[1] - w->frame.low[1]) / w->frame.grain + 0.5f);
+		if (x < 0 || y < 0 || x >= w->frame.nx || y >= w->frame.ny || (local = w->grid[y*w->frame.nx + x]) < 0)
+			return 1;
+	}
+	return (row[local >> 3] >> (local & 7)) & 1;
+}
+
+void ChimChunks_WindowReport (void)
+{
+	int s;
+	if (!chim_frame.window)
+	{
+		Con_Printf ("crossing: type %ld (%s)\n", (long)window_wanted,
+			window_wanted ? "type 1 asked; this map is not a region frame, its crossings change the level" :
+			"type 0: a crossing changes the level");
+		return;
+	}
+	Con_Printf ("crossing: type 1, window block %ld %ld (2 x 2 cells), origin frame %ld %ld; %lu joins, %lu leaves, %lu streamed crossings, %lu recentres\n",
+		(long)chim_frame.block[0], (long)chim_frame.block[1], (long)home.cx, (long)home.cy, chim_frame.joins,
+		chim_frame.leaves, chim_frame.crossings, chim_frame.recentres);
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+	{
+		const chim_slot_t *w = &chim_frame.slot[s];
+		int i, active = 0, loaded = 0, shadows = 0;
+		if (!w->used)
+			continue;
+		for (i=w->base ; i<w->base + w->count ; i++)
+		{
+			active += chim_frame.entries[i].state == CHIM_STATE_ACTIVE;
+			loaded += chim_frame.entries[i].state == CHIM_STATE_LOADED;
+			shadows += chim_frame.entries[i].shadow >= 0;
+		}
+		Con_Printf ("  slot %ld: frame %ld %ld%s, offset %ld %ld, %ld chunks (%ld active, %ld loaded, %ld on another frame's ground), ids %lu+%lu\n",
+			(long)s, (long)w->cx, (long)w->cy, w->leaving ? " (leaving)" : "", (long)w->offset[0], (long)w->offset[1],
+			(long)w->count, (long)active, (long)loaded, (long)shadows, (unsigned long)w->first_pid,
+			(unsigned long)w->frame.owned_total);
+	}
 }

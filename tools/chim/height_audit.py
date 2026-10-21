@@ -132,6 +132,7 @@ def main(argv=None):
     ap.add_argument('--cells', help='only these cells, "x,y;x,y"')
     a = ap.parse_args(argv)
     global _WORLD
+    from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
     t0 = time.time()
     _, files, _, _ = F.read_index((Path(a.world) / 'chim' / 'world.cwi').read_bytes())
     cells = [tuple(f['cell']) for f in files if f['kind'] == b'FRAM']

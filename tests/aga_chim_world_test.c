@@ -211,6 +211,9 @@ void AW_UISubtitle(const char *name,const char *text,double duration){strncpy(su
 int (*aw_chim_view_reach)(void);
 /* aw_hud.c: original coordinates on the active frame (the debug HUD's GLOBAL row and cell). */
 int (*aw_chim_source)(const float *local,float *world);
+/* aw_scene.c: a crossing into another frame's cell streams (type 1 crossings, CHIM's window). */
+int (*aw_chim_cross)(const float *origin,int *cx,int *cy);
+int (*aw_chim_recentre)(int cx,int cy,const float *d,int apply);
 int (*aw_chim_pick)(const float *start,const float *end,aw_chim_pick_t *out);	/* aw_inspect.c (the dbg hud pin) */
 /* aw_fog.c's far terrain hook and aw_horizon.c's grid rasterizer (tested in
  * aga_chim_far_test.c): here only that the frame's layer is handed over. */
@@ -1272,6 +1275,8 @@ static void seam(void){
     for(i=0;i<chim_frame.count;i++)if(chim_frame.entries[i].grafted)assert(chim_frame.entries[i].state==CHIM_STATE_ACTIVE);
     free(v);
     end_map();
+    printf("terc records %lu%c",chim_world.terc_records,10);
+    printf("generated records %lu%c",chim_world.thgt.records,10);
     printf("seam ok\n");
 }
 
@@ -1532,9 +1537,9 @@ static void set_version(int major,int minor){
     assert(f);b[0]=(byte)(major>>8);b[1]=(byte)major;b[2]=(byte)(minor>>8);b[3]=(byte)minor;
     fseek(f,8,SEEK_SET);assert(fwrite(b,1,4,f)==4);fclose(f);
 }
-/* 0.4 to 0.7 are read; 0.8 and 1.5 are refused whole, with a console line. */
+/* 0.4 to 0.11 are read; 0.12 and 1.5 are refused whole, with a console line. */
 static void formats(void){
-    static const int version[6][2]={{0,4},{0,5},{0,6},{0,7},{0,8},{1,5}};static int k;
+    static const int version[6][2]={{0,4},{0,5},{0,6},{0,7},{0,12},{1,5}};static int k;
     for(k=0;k<6;k++){
         set_version(version[k][0],version[k][1]);
         reset_engine();Chim_Init();
@@ -1551,7 +1556,7 @@ static void formats(void){
             expect_host_error=1;host_error_text[0]=0;
             if(!setjmp(host_error_jump)){begin_map(frame_map);assert(!"the frame map was not refused");}
             expect_host_error=0;console_capture=0;
-            sprintf(said,"world format %d.%d; this engine reads 0.4 to 0.7",version[k][0],version[k][1]);
+            sprintf(said,"world format %d.%d; this engine reads 0.4 to 0.11",version[k][0],version[k][1]);
             assert(!Chim_Active() && strstr(console,said));
             assert(strstr(host_error_text,"cannot be read") && strstr(host_error_text,"not a playable map without its CHIM world"));
         }
@@ -1604,6 +1609,93 @@ static void story(void){
     }
     chim_story_hidden=NULL;
     printf("story ok%c",10);
+}
+
+/* World format 0.8 (EXPERIMENTAL, tests/test_chim_engine_native.py writes it
+ * with placed.txt): every record's three angles reach the entity, the
+ * catalogue holds the matrix ChimPlaced_AnglesMatrix makes of them, every
+ * model's piece table is converted and usable, and a box dropped onto the
+ * tilted placements stops where the exact expansion of the turned pieces
+ * says (the expected heights come from the test). */
+static void placed_world(void){
+    vec3_t mins={-7.32f,-7.12f,-16.625f},maxs={7.32f,7.12f,16.625f},a,b;trace_t t;FILE *f;
+    unsigned pid;float ang[3],x,y,top,bottom;int n=0,k,i,j;
+    reset_engine();Chim_Init();
+    begin_map(frame_map);frame_at(64,64,40);check_once();
+    assert(chim_world.minor==8 || chim_world.minor==9);	/* 0.9: the same with reach references */
+    f=fopen("placed.txt","r");assert(f);
+    while(fscanf(f,"angles %u %f %f %f\n",&pid,&ang[0],&ang[1],&ang[2])==4){
+        chim_place_t *p=placement(pid);float m[3][3],*rot=NULL;
+        if(!p){assert(pid!=0 && pid!=3);continue;}		/* outside the active ring */
+        assert(p->ent.angles[PITCH]==ang[0] && p->ent.angles[YAW]==ang[1] && p->ent.angles[ROLL]==ang[2]);
+        for(i=0;i<chim_frame.count;i++){
+            chim_chunk_t *c=chim_frame.entries[i].chunk.data;
+            if(chim_frame.entries[i].state!=CHIM_STATE_ACTIVE)continue;
+            assert(c->rot);
+            if(p>=c->places && p<c->places+c->records)rot=c->rot+9*(p-c->places);
+        }
+        assert(rot);ChimPlaced_AnglesMatrix(ang,m);
+        for(i=0;i<3;i++)for(j=0;j<3;j++)assert(rot[3*i+j]==m[i][j]);
+        assert(((chim_model_t *)p->ent.model)->pieces==1);
+        n++;
+    }
+    assert(n>0);
+    for(k=0;fscanf(f,"drop %f %f %f %f\n",&x,&y,&top,&bottom)==4;k++){
+        VectorSet(a,x,y,top);VectorSet(b,x,y,bottom);t=chim_trace(a,mins,maxs,b);
+        printf("drop %d %.4f %.4f %d %.5f\n",k,t.endpos[2],t.fraction,t.startsolid,t.plane.normal[2]);
+    }
+    fclose(f);
+    assert(chim_placed_stats.table_traces>0 && !chim_placed_stats.table_full);
+    end_map();
+    printf("placed ok%c",10);
+}
+
+/* World format 0.9 (EXPERIMENTAL, tests/test_chim_engine_native.py writes
+ * the same placements as 0.8 with reach references): every loaded chunk's
+ * catalogue, one line per run-time placement, at three player positions; the
+ * test compares the lines of the 0.8 and the 0.9 world. */
+static void catalogue_dump(void){
+    static const float at[3][2]={{64,64},{-200,150},{300,-260}};int k,i,j,m;
+    if(getenv("CHIM_REACH_RESIDENT"))chim_reach_resident=atoi(getenv("CHIM_REACH_RESIDENT"));
+    reset_engine();Chim_Init();
+    begin_map(frame_map);
+    for(k=0;k<3;k++){
+        frame_at(at[k][0],at[k][1],40);check_once();
+        printf("cat pos %d minor %d active %d loaded %d%c",k,chim_world.minor,chim_frame.active,chim_frame.loaded,10);
+        for(i=0;i<chim_frame.count;i++){
+            chim_entry_t *e=&chim_frame.entries[i];chim_chunk_t *c=e->chunk.data;
+            if(e->state!=CHIM_STATE_ACTIVE && e->state!=CHIM_STATE_LOADED)continue;
+            printf("cat chunk %d records %d owned %d models %d%c",i,c->records,c->owned,c->models,10);
+            for(j=0;j<c->records;j++){
+                chim_place_t *p=&c->places[j];
+                printf("cat %d %d pid %u model %u owner %d flags %d o %.6g %.6g %.6g a %.6g %.6g %.6g b %.6g %.6g %.6g %.6g %.6g %.6g",
+                    i,j,p->pid,p->model,p->owner,p->flags,p->ent.origin[0],p->ent.origin[1],p->ent.origin[2],
+                    p->ent.angles[0],p->ent.angles[1],p->ent.angles[2],p->mins[0],p->mins[1],p->mins[2],
+                    p->maxs[0],p->maxs[1],p->maxs[2]);
+                if(c->rot)for(m=0;m<9;m++)printf(" %.8g",c->rot[9*j+m]);
+                printf("%c",10);
+            }
+        }
+        /* dbg hud pin: every linked placement picked by a ray down onto its
+         * origin; the record is re-read from disk (0.9: through the owner chunk
+         * when the linked entry is a reach reference) */
+        for(i=0;i<chim_frame.count;i++){
+            chim_entry_t *e=&chim_frame.entries[i];chim_chunk_t *c=e->chunk.data;
+            if(e->state!=CHIM_STATE_ACTIVE)continue;
+            for(j=0;j<c->records;j++){
+                chim_place_t *p=&c->places[j];aw_chim_pick_t out;vec3_t a,b;
+                if(!p->linked)continue;
+                VectorSet(a,p->ent.origin[0],p->ent.origin[1],p->maxs[2]+50);
+                VectorSet(b,p->ent.origin[0],p->ent.origin[1],p->mins[2]-50);
+                memset(&out,0,sizeof(out));
+                if(ChimChunks_Pick(a,b,&out))
+                    printf("pick %u reach %d hit %u ref %u cell %d %d%c",p->pid,j>=c->owned,out.pid,out.ref,out.cell_x,out.cell_y,10);
+            }
+        }
+    }
+    printf("reach resident %lu read %lu runs %lu%c",chim_reach_stats.resident,chim_reach_stats.read,chim_reach_stats.span_reads,10);
+    end_map();
+    printf("catalogue ok%c",10);
 }
 
 /* "_chim_edge" "closed" (M3): at the frame's bounds the player hears the
@@ -1786,6 +1878,241 @@ static void statics(void){
     (void)at;
 }
 
+
+/* ---------------------------------------------------------------- type 1 crossings (the window) */
+
+/* A world of region frames (tests/chim_fixture.py write_region_world: cells
+ * 0..2 x 0..1, one cell of 2,048 units each, a 896-unit terrain margin, 15 x 15
+ * chunks of 256). "chim crossing 1": the frames around the player are one
+ * window in one frame world at the fixed origin of the frame the map started
+ * on (0 0); walking from frame to frame never changes the map. */
+static int cell_map(int cx,int cy,char *name,int size){snprintf(name,size,"w_%d_%d",cx,cy);return 1;}
+static const char *window_map="{\n\"classname\" \"worldspawn\"\n\"_chim_frame\" \"0 0\"\n\"_chim_streamed_statics\" \"1\"\n}\n";
+/* The fixture's ground: the chunk at global lattice (gx, gy) stands at ((3 gx + 5 gy) mod 4) x 8, the same
+ * in every frame holding it; session coordinates of frame 0 0 give gx = floor((x + 1920) / 256). */
+static float window_ground(float x,float y){
+    int gx=(int)floor((x+1920)/256),gy=(int)floor((y+1920)/256);
+    return (float)((((gx*3+gy*5)%4)+4)%4*8);
+}
+static int window_slot(int cx,int cy){
+    int s;for(s=0;s<CHIM_WINDOW_SLOTS;s++)if(chim_frame.slot[s].used && !chim_frame.slot[s].leaving && chim_frame.slot[s].cx==cx && chim_frame.slot[s].cy==cy)return s;
+    return -1;
+}
+/* Each place of the frame world grafted once; each placement drawn once (by
+ * pid), never a frame's copy of its east neighbour's object ("apron", id
+ * first + 4) while that neighbour is in the window; the efrags in the world's
+ * leaves are exactly the linked placements' and statics'. Returns the linked count. */
+static int window_once(void){
+    static unsigned char seen[1024];static float place[CHIM_MAX_CHUNKS][2];
+    int i,j,k,n=0,linked=0,leaves=0,cn,ce,co,cm,sc,sl,se,sm,sb;
+    memset(seen,0,sizeof seen);
+    for(i=0;i<chim_frame.count;i++){
+        chim_entry_t *e=&chim_frame.entries[i];chim_chunk_t *c=e->chunk.data;
+        if(e->grafted){
+            assert(e->state==CHIM_STATE_ACTIVE && e->shadow<0 && chim_frame.slot[e->slot].used);
+            for(k=0;k<n;k++)assert(place[k][0]!=e->low[0] || place[k][1]!=e->low[1]);
+            place[n][0]=e->low[0];place[n][1]=e->low[1];n++;
+        }
+        if(e->state!=CHIM_STATE_ACTIVE)continue;
+        assert(chim_frame.slot[e->slot].used && !chim_frame.slot[e->slot].leaving);
+        for(j=0;j<c->records;j++){
+            chim_place_t *p=&c->places[j];
+            if(!p->linked){assert(!p->ent.efrag);continue;}
+            assert(p->pid<1024 && !seen[p->pid]);seen[p->pid]=1;linked++;leaves+=p->leaves;
+            assert(p->ent.model);
+        }
+    }
+    for(k=0;k<CHIM_WINDOW_SLOTS;k++){
+        const chim_slot_t *w=&chim_frame.slot[k];
+        if(w->used && !w->leaving && window_slot(w->cx+1,w->cy)>=0)assert(!seen[w->first_pid+4]);
+    }
+    ChimChunks_Counts(&cn,&ce,&co,&cm);
+    assert(cn==linked && ce==leaves);
+    ChimStatics_Counts(&sc,&sl,&se,&sm,&sb);
+    assert(world_efrags()==leaves+se);
+    free_efrags_clean();
+    return linked;
+}
+/* Positions below are in frame 0 0's coordinates (X, Y); with a recentre ("chim crossing recentre 1")
+ * the session's coordinates are those less the session's shift (wsh). */
+static float wsh[2];
+static void gframe(float x,float y){frame_at(x-wsh[0],y-wsh[1],100);}
+/* The ground under a point is the fixture's (a chunk centre: no step under the box). */
+static void window_ground_ok(float x,float y){
+    vec3_t mins={-7.32f,-7.12f,-16.625f},maxs={7.32f,7.12f,16.625f},a,b;trace_t t;
+    x=(float)(floor((x+1920)/256)*256-1920+128.37);y=(float)(floor((y+1920)/256)*256-1920+128.41);
+    VectorSet(a,x-wsh[0],y-wsh[1],300);VectorSet(b,x-wsh[0],y-wsh[1],-200);
+    t=world_trace(a,mins,maxs,b);
+    if(!(t.fraction<1 && fabs(t.endpos[2]-(window_ground(x,y)+16.625f))<0.1)){
+        fprintf(stderr,"ground at %g %g (shift %g %g): fraction %g z %g, want %g\n",x,y,wsh[0],wsh[1],t.fraction,
+            t.endpos[2],window_ground(x,y)+16.625f);
+        abort();
+    }
+}
+/* aw_scene.c's half of a recentre: the server's and the client's positions (here the test's edicts, the view
+ * entity and the static entity), then CHIM's own. */
+static void window_recentre(int cx,int cy){
+    float d[3];int i,k;
+    d[0]=(float)(cx*2048)-wsh[0];d[1]=(float)(cy*2048)-wsh[1];d[2]=0;
+    assert(aw_chim_recentre(cx,cy,d,0));
+    for(i=1;i<sv.num_edicts;i++)for(k=0;k<2;k++){edicts[i].v.origin[k]-=d[k];}
+    for(k=0;k<2;k++)cl_entities[1].origin[k]-=d[k];
+    for(i=0;i<cl.num_statics;i++)for(k=0;k<2;k++)cl_static_entities[i].origin[k]-=d[k];
+    assert(aw_chim_recentre(cx,cy,d,1));
+    wsh[0]+=d[0];wsh[1]+=d[1];
+    for(i=2;i<5;i++)edict_leaf_ok(&edicts[i]);
+}
+static void window_walk(float x0,float y0,float x1,float y1,int steps,int *crossings,int *last_cx,int *last_cy){
+    int k,cx,cy,how;float x,y;vec3_t o;
+    for(k=0;k<=steps;k++){
+        x=x0+(x1-x0)*k/steps;y=y0+(y1-y0)*k/steps;
+        gframe(x,y);
+        window_once();
+        window_ground_ok(x,y);
+        VectorSet(o,x-wsh[0],y-wsh[1],100);
+        /* Past a border (aw_scene.c asks when the player is 64 units into the next cell): the window holds it. */
+        cx=(int)floor((x+1024)/2048);cy=(int)floor((y+1024)/2048);
+        if(cx!=*last_cx || cy!=*last_cy){
+            how=aw_chim_cross(o,&cx,&cy);
+            assert(how && cx==(int)floor((x+1024)/2048) && cy==(int)floor((y+1024)/2048));
+            (*crossings)++;*last_cx=cx;*last_cy=cy;
+            if(how==2){
+                window_recentre(cx,cy);
+                window_once();window_ground_ok(x,y);
+            }
+        }
+    }
+}
+static void window_lock_line(void *data,unsigned id){
+    if(ChimZone_Locks(data))printf("locked block id %u locks %d size %d\n",id,ChimZone_Locks(data),ChimZone_Size(data));
+}
+static void window_slots_are(const int cells[4][2]){
+    int k;for(k=0;k<4;k++)assert(window_slot(cells[k][0],cells[k][1])>=0);
+}
+/* A town frame (its cell has no region map, as AW_CellMap answers for a town's cell) never starts a window, even
+ * with "chim crossing 1" and a layout that fits: its crossings stay level changes (type 0)
+ * (CHIM-ACTORS-TOWN-RETURN-EMPTY-47). */
+static int town_cell_map(int cx,int cy,char *name,int size){
+    if(cx==0 && cy==0)return 0;
+    snprintf(name,size,"w_%d_%d",cx,cy);return 1;
+}
+extern void (*chim_actors_tick)(void);
+static int town_actor_ticks;
+static void town_actors_tick(void){town_actor_ticks++;}
+static void window_town_scenario(void){
+    write_sprite("progs/f.spr",8,16);
+    reset_engine();Chim_Init();chim_cell_map=town_cell_map;
+    /* type 0 as asked by default: the actors' tick does not run without a window */
+    chim_actors_tick=town_actors_tick;
+    begin_map(window_map);gframe(500,500);
+    assert(Chim_Active() && !chim_frame.window && town_actor_ticks==0);
+    end_map();
+    cmd_argc=3;cmd_args[0]="chim";cmd_args[1]="crossing";cmd_args[2]="1";chim_command();cmd_argc=0;
+    begin_map(window_map);gframe(500,500);
+    assert(Chim_Active() && !chim_frame.window && chim_frame.count==225);
+    /* type 1 asked, a town (no window): the actors' tick still runs (the change list reaches the residents) */
+    assert(town_actor_ticks>0);
+    chim_actors_tick=NULL;
+    {vec3_t o={1100,500,100};int cx,cy;assert(!aw_chim_cross(o,&cx,&cy));}
+    end_map();
+    /* the same frame as a region frame (its cell has a region map): the window */
+    chim_cell_map=cell_map;
+    begin_map(window_map);gframe(500,500);
+    assert(Chim_Active() && chim_frame.window && chim_frame.count==4*225);
+    end_map();
+    cmd_argc=3;cmd_args[0]="chim";cmd_args[1]="crossing";cmd_args[2]="0";chim_command();cmd_argc=0;
+    printf("windowtown ok%c",10);
+}
+static void window_scenario(void){
+    int i,k,crossings=0,lx=0,ly=0,round;
+    unsigned long locked[3],used[3];
+    static const int west[4][2]={{0,0},{1,0},{0,1},{1,1}},east[4][2]={{1,0},{2,0},{1,1},{2,1}};
+    write_sprite("progs/f.spr",8,16);
+    reset_engine();Chim_Init();chim_cell_map=cell_map;
+    /* The default is type 0: the frame map runs its own frame alone. */
+    begin_map(window_map);gframe(500,500);
+    assert(Chim_Active() && !chim_frame.window && chim_frame.count==225);
+    {vec3_t o={1100,500,100};int cx,cy;assert(!aw_chim_cross(o,&cx,&cy));}
+    end_map();
+    /* chim crossing 1, then the map starts again: a window. */
+    console_used=0;console[0]=0;console_capture=1;
+    cmd_argc=3;cmd_args[0]="chim";cmd_args[1]="crossing";cmd_args[2]="1";chim_command();cmd_argc=0;
+    console_capture=0;
+    assert(strstr(console,"chim crossing 1: from the next map start"));
+    if(getenv("CHIM_WINDOW_RECENTRE")){
+        /* The test setting: the session's origin moves at every streamed crossing. */
+        cmd_argc=4;cmd_args[0]="chim";cmd_args[1]="crossing";cmd_args[2]="recentre";cmd_args[3]="1";chim_command();cmd_argc=0;
+    }
+    begin_map(window_map);
+    assert(Chim_Active() && chim_frame.window && chim_frame.count==4*225 && chim_frame.frame.nx==23);
+    gframe(500,500);
+    window_slots_are(west);
+    for(i=0;i<20;i++)gframe(500,500);
+    window_once();window_ground_ok(500,500);
+    /* The east neighbour's chunks sit at its offset; the shared ground is its own past its border. */
+    {
+        int s=window_slot(1,0);assert(s>=0 && chim_frame.slot[s].offset[0]==2048 && chim_frame.slot[s].offset[1]==0);
+        i=ChimChunks_CellEntry(15,9);assert(i>=0 && chim_frame.entries[i].slot==s);   /* x 1,920..2,176 */
+        i=ChimChunks_CellEntry(11,9);assert(i>=0 && chim_frame.entries[i].slot==s);   /* x 896..1,152: centre 1,024 in cell 1 */
+        i=ChimChunks_CellEntry(10,9);assert(i>=0 && chim_frame.entries[i].slot==window_slot(0,0));
+    }
+    /* Statics: each joined frame's from its frame map, at its offset. */
+    assert(ChimStatics_Count()==3);
+    /* East across the border, on to where the window moves (2,304: the margin past cell 1's midline). */
+    window_walk(500,500,2600,500,70,&crossings,&lx,&ly);
+    assert(crossings==1 && lx==1 && ly==0);
+    for(i=0;i<5;i++){gframe(2600,500);window_once();}
+    window_slots_are(east);
+    assert(window_slot(0,0)<0 && window_slot(0,1)<0 && chim_frame.leaves==2 && chim_frame.joins==6);
+    assert(ChimStatics_Count()==4);
+    /* Frame 1 0's flora at (2,548, 500): placed, linked in the frame world's leaves. */
+    for(i=0;i<20;i++)gframe(2600,500);
+    {
+        int found=0,sc,sl,se,sm,sb;
+        for(i=0;i<ChimStatics_Count();i++){entity_t *e=ChimStatics_Entity(i);
+            if(fabs(e->origin[0]+wsh[0]-2548)<0.01 && fabs(e->origin[1]+wsh[1]-500)<0.01){found=1;assert(e->model && e->efrag);efrags_in_world(e);}}
+        assert(found);ChimStatics_Counts(&sc,&sl,&se,&sm,&sb);assert(sl>=1);
+    }
+    /* Back and forth: the window moves each way, memory and locks come back to the same. */
+    for(round=0;round<3;round++){
+        chim_zone_stats_t s;
+        window_walk(2600,500,500,500,70,&crossings,&lx,&ly);
+        for(i=0;i<5;i++){gframe(500,500);window_once();}
+        window_slots_are(west);
+        window_walk(500,500,2600,500,70,&crossings,&lx,&ly);
+        for(i=0;i<5;i++){gframe(2600,500);window_once();}
+        window_slots_are(east);
+        ChimZone_Stats(&s);locked[round]=s.locked_bytes;used[round]=s.kind_blocks[CHIM_KIND_INDEX];
+        assert(ChimStatics_Count()==4);
+    }
+    assert(locked[1]==locked[2] && used[0]==used[1] && used[1]==used[2]);
+    assert(crossings==7 && chim_frame.leaves==2+12);
+    /* A corner: the diagonal through the point where four frames meet. */
+    lx=1;ly=0;
+    window_walk(2600,500,1700,1700,40,&crossings,&lx,&ly);
+    window_walk(1700,1700,500,800,40,&crossings,&lx,&ly);
+    assert(lx==0 && ly==0);
+    /* The status line says it. */
+    console_used=0;console[0]=0;console_capture=1;cmd_argc=1;chim_command();console_capture=0;
+    assert(strstr(console,"crossing: type 1, window block 0 0"));
+    assert(strstr(console,"  slot "));
+    printf("window: %lu joins, %lu leaves, %d crossings, %lu recentres, zone locked %lu bytes%c",chim_frame.joins,chim_frame.leaves,
+        crossings,chim_frame.recentres,locked[2],10);
+    /* Every chunk deactivated: nothing in the zone is locked but the frame's own blocks. */
+    if(getenv("CHIM_WINDOW_LOCKS")){
+        for(i=0;i<chim_frame.count;i++){chim_entry_t *e=&chim_frame.entries[i];
+            if(e->state==CHIM_STATE_ACTIVE)printf("active %d slot %d shadow %d tl %d\n",i,e->slot,e->shadow,e->terrain_locked);
+            if(e->terrain.data && ChimZone_Locks(e->terrain.data))printf("terrain %d locks %d grafted %d state %d tl %d\n",i,ChimZone_Locks(e->terrain.data),e->grafted,e->state,e->terrain_locked);
+            if(e->chunk.data && ChimZone_Locks(e->chunk.data))printf("chunk %d locks %d state %d\n",i,ChimZone_Locks(e->chunk.data),e->state);
+        }
+        R_ClearEfrags(true);ChimGraft_End();ChimChunks_End();ChimStatics_End();ChimModels_Abort();
+        for(k=1;k<CHIM_KINDS;k++)ChimZone_ForEach(k,window_lock_line);
+        exit(0);
+    }
+    end_map();
+    {chim_zone_stats_t s;ChimZone_Stats(&s);assert(s.banks==0 && s.blocks==0);}
+    printf("window ok%c",10);
+}
 
 /* ---------------------------------------------------------------- v0.0.35 crash paths */
 
@@ -1993,6 +2320,8 @@ int main(int argc,char **argv){
     else if(!strcmp(argv[1],"edge"))edge();
     else if(!strcmp(argv[1],"rest"))rest();
     else if(!strcmp(argv[1],"story"))story();
+    else if(!strcmp(argv[1],"placed"))placed_world();
+    else if(!strcmp(argv[1],"catalogue"))catalogue_dump();
     else if(!strcmp(argv[1],"statics"))statics();
     else if(!strcmp(argv[1],"far"))far();
     else if(!strcmp(argv[1],"pin"))pin();
@@ -2000,6 +2329,8 @@ int main(int argc,char **argv){
     else if(!strcmp(argv[1],"efragcap"))efragcap();
     else if(!strcmp(argv[1],"farfail"))farfail();
     else if(!strcmp(argv[1],"flight"))flight();
+    else if(!strcmp(argv[1],"window"))window_scenario();
+    else if(!strcmp(argv[1],"windowtown"))window_town_scenario();
     else return 2;
     return 0;
 }

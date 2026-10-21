@@ -61,7 +61,7 @@ NOT_IN_RECIPE = frozenset({
     'prerendered_stages', 'storage_pool', 'storage_pool_dir', 'fingerprint_scope', 'live_tracker',
     'tracker_declined', 'keep_tracker', 'override', 'miniwind_preset', 'recipe', 'save_recipe',
     'recipe_inputs', 'perf_guard', 'perf_guard_baselines', 'size_guard', 'size_baseline', 'size_growth_margin',
-    'size_growth_reason'})
+    'size_growth_reason', 'clean', 'public_defaults'})
 # Repeatable options whose command-line values add to the recipe's instead of replacing them
 # (exclusions add up, as they did with the MiniWind preset table).
 ADDITIVE = frozenset({'exclude'})

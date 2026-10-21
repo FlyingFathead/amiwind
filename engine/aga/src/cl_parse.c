@@ -491,6 +491,18 @@ void CL_ParseUpdate (int bits)
 	if ( bits & U_NOLERP )
 		ent->forcelink = true;
 
+	/* AmiWind: a live alias entity's instance scale (U_AW_SCALE), drawn as statics are; none = 1 */
+	if (bits & U_AW_SCALE)
+	{
+		float s = MSG_ReadFloat ();
+		if (!isfinite (s) || s <= 0.01f || s >= 64.0f)
+			Host_Error ("CL_ParseUpdate: invalid entity scale");
+		ent->aw_sprite_scale = s;
+		ent->effects |= AW_EF_ALIAS_SCALE;
+	}
+	else
+		ent->aw_sprite_scale = 1;
+
 	if ( forcelink )
 	{	// didn't have an update last message
 		VectorCopy (ent->msg_origins[0], ent->msg_origins[1]);
@@ -831,6 +843,7 @@ void CL_ParseServerMessage (void)
 		case svc_disconnect:
 			Host_EndGame ("Server disconnected\n");
 
+			/* fall through - Host_EndGame does not return */
 		case svc_print:
 			Con_Printf ("%s", MSG_ReadString ());
 			break;

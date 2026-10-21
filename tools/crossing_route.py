@@ -119,6 +119,8 @@ RE_LOADING = re.compile(r'Loading AmiWind \S+: (\S+)\.\.\.')
 RE_SEG = re.compile(r'^seg (\S+)\s*$')
 RE_FLIGHT = re.compile(r'^flight (\S+) (start|end)\s*$')
 RE_READY = re.compile(r'Scene ready: (\S+), (\d+) ms, (\d+) hunk bytes')
+# Type 1 (CHIM's window of region frames, "chim crossing 1"): a crossing that streams instead of loading a map.
+RE_STREAMED = re.compile(r'Scene ready: (\S+), 0 ms, streamed crossing \(type 1(, recentred)?\), CHIM frame (-?\d+) (-?\d+), (\d+) us')
 RE_PRIMED = re.compile(r'CHIM: primed: (\d+) active, (\d+) loaded, (\d+) models, (\d+) textures, (\d+) KiB in (\d+) reads, (\d+) ms')
 RE_FRAME = re.compile(r'CHIM: map frame (-?\d+) (-?\d+): (\d+) chunks, (\d+) files, (\d+) models, (\d+) textures, zone (\d+) KiB')
 RE_MEMORY = re.compile(r'^Memory: .*')
@@ -148,6 +150,15 @@ def parse_console(text):
         if m:
             cur = {'seg': seg, 'map': m.group(1), 'crossing': flying, 'ready_ms': None, 'hunk_bytes': None,
                    'prime_ms': None, 'prime_kib_total': None, 'prime_reads_total': None, 'frame': None}
+            loads.append(cur)
+            continue
+        m = RE_STREAMED.search(line)
+        if m:
+            # no level change: the player never stops (ready 0); the frame is the window's
+            cur = {'seg': seg, 'map': m.group(1), 'crossing': flying, 'ready_ms': 0, 'hunk_bytes': None,
+                   'prime_ms': None, 'prime_kib_total': None, 'prime_reads_total': None, 'streamed': True,
+                   'recentred': bool(m.group(2)), 'cross_us': int(m.group(5)),
+                   'frame': {'x': int(m.group(3)), 'y': int(m.group(4))}}
             loads.append(cur)
             continue
         if cur is None:
@@ -218,12 +229,29 @@ def parse_stalls(text):
 
 
 def parse_walk(text):
+    """walk-profile.csv rows (every tenth frame): frame number, elapsed and frame time (ms), map (the scene after a
+    streamed crossing)."""
     rows = []
     for line in text.splitlines():
         p = line.strip().split(',')
         if len(p) >= 11 and p[0].isdigit():
-            rows.append({'frame': int(p[0]), 'map': p[10]})
+            row = {'frame': int(p[0]), 'map': p[10]}
+            try:
+                row['elapsed_ms'], row['frame_ms'] = int(p[1]), int(p[2]) / 1000.0
+            except ValueError:
+                pass
+            rows.append(row)
     return rows
+
+
+def frame_median_around(walk, frame, seconds=2.0):
+    """The median frame time (ms) of the walk log's sampled frames within SECONDS of the crossing frame, both sides
+    (every tenth frame is logged), and how many samples."""
+    at = next((r.get('elapsed_ms') for r in walk if r['frame'] >= frame and r.get('elapsed_ms') is not None), None)
+    if at is None:
+        return None, 0
+    near = [r['frame_ms'] for r in walk if r.get('frame_ms') is not None and abs(r['elapsed_ms'] - at) <= seconds * 1000]
+    return (round(statistics.median(near), 1) if near else None), len(near)
 
 
 RE_RC = {
@@ -327,7 +355,13 @@ def parse_session(d):
                    'region': leg.get('region'), 'from': prev_map, 'to': ld['map'],
                    'ready_ms': ld['ready_ms'], 'prime_ms': ld['prime_ms'],
                    'prime_kib': ld.get('prime_kib'), 'prime_reads': ld.get('prime_reads'),
-                   'frame': ld['frame'], 'load': ld.get('load'), 'visible': ld.get('visible'), 'stall': st}
+                   'frame': ld['frame'], 'load': ld.get('load'), 'visible': ld.get('visible'), 'stall': st,
+                   'streamed': bool(ld.get('streamed'))}
+            if ld.get('streamed'):
+                row['cross_us'] = ld.get('cross_us')
+                row['recentred'] = ld.get('recentred')
+            if st and st.get('frames'):
+                row['frame_median_ms'], row['frame_median_n'] = frame_median_around(walk, st['frames'][1])
             if ld.get('load') and ld['prime_ms'] is not None and ld['ready_ms'] is not None:
                 spawn = ld['load']['spawn_ms']
                 row['split_ms'] = {
@@ -344,8 +378,11 @@ def parse_session(d):
             # (a corner loop crosses several times in one flight: search on from the previous crossing's sample)
             fl = [s for s in samples if s.get('leg') == ld['seg'] and s.get('flight')]
             start = seg_cursor.get(ld['seg'], 0)
-            first = next((i for i, s in enumerate(fl) if i > start and s.get('server') == ld['map']
-                          and fl[i - 1].get('server') != ld['map']), None)
+            # the scene the player stands in: 'scene' (the frame entered, also after a streamed crossing), or the
+            # running map ('server') in logs from before it existed
+            where = lambda s: s.get('scene') or s.get('server')
+            first = next((i for i, s in enumerate(fl) if i > start and where(s) == ld['map']
+                          and where(fl[i - 1]) != ld['map']), None)
             if first is not None:
                 # the approach: the worst rendered frame of the flight's seconds before this crossing (since the
                 # previous crossing on a corner loop)
@@ -434,8 +471,9 @@ def table(runs):
                 groups.setdefault(key, []).append(c)
     lines = ['| Fast RAM | Crossing | Where | Crossings | Stall frame median / max (ms) | Stall 3 s median / max (ms) '
              '| Ready median / max (ms) | Map file KiB / reads (median) | Ring KiB / reads (median) '
-             '| Surface cache texels drawn, 3 s after (thousands, median) | Approach worst frame median / max (ms) |',
-             '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |']
+             '| Surface cache texels drawn, 3 s after (thousands, median) | Approach worst frame median / max (ms) '
+             '| Frame median within 2 s (ms, median / max) |',
+             '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |']
 
     def mem_key(k):
         try:
@@ -453,10 +491,11 @@ def table(runs):
         rr = [c.get('prime_reads') for c in cs]
         sb = [c['after_3s']['surface_texels'] // 1000 if c.get('after_3s') else None for c in cs]
         ap = [c.get('approach_peak_ms') for c in cs]
-        lines.append('| %s MB | %s | %s | %d | %s / %s | %s / %s | %s / %s | %s / %s | %s / %s | %s | %s / %s |' % (
+        fm = [c.get('frame_median_ms') for c in cs]
+        lines.append('| %s MB | %s | %s | %d | %s / %s | %s / %s | %s / %s | %s / %s | %s / %s | %s | %s / %s | %s / %s |' % (
             key[0], key[1], key[2], len(cs), _fmt(_med(sf)), _fmt(_max(sf)), _fmt(_med(sw)), _fmt(_max(sw)),
             _fmt(_med(rd)), _fmt(_max(rd)), _fmt(_med(mk)), _fmt(_med(mr)), _fmt(_med(rk)), _fmt(_med(rr)),
-            _fmt(_med(sb)), _fmt(_med(ap)), _fmt(_max(ap))))
+            _fmt(_med(sb)), _fmt(_med(ap)), _fmt(_max(ap)), _fmt(_med(fm)), _fmt(_max(fm))))
     return '\n'.join(lines) + '\n'
 
 
@@ -587,6 +626,7 @@ class Session:
     def sample(self, leg, flight):
         s = self.state()
         row = {'t': round(time.time() - self.t0, 2), 'leg': leg, 'flight': flight, 'server': s.get('server'),
+               'scene': s.get('scene'),
                'global': self.floats(s.get('global')), 'angles': self.floats(s.get('angles')),
                'rcount': s.get('rcount')}
         self.samples.write(json.dumps(row) + '\n')
@@ -665,9 +705,17 @@ class Session:
             return 0
 
     def noclip_on(self):
+        if self.a.walk:
+            return self.noclip_off()
         text = (self.awctl / 'console.log').read_text(errors='replace')
         last = max(text.rfind('noclip ON'), text.rfind('noclip OFF'))
         if last < 0 or text.startswith('noclip OFF', last):
+            self.rc('noclip', 2)
+
+    def noclip_off(self):
+        """--walk: every leg on foot (the player walks over the ground and across the border)."""
+        text = (self.awctl / 'console.log').read_text(errors='replace')
+        if text.rfind('noclip ON') > text.rfind('noclip OFF'):
             self.rc('noclip', 2)
 
     def leg(self, leg, capture=False, label=None):
@@ -693,7 +741,7 @@ class Session:
         self.rc('echo start %s %d %d' % (name, x, y), 0.3)
         self.noclip_on()
         g = self.floats(self.state().get('global'))
-        if g and g[2] < leg['z'] + self.a.z_offset - 100:
+        if g and g[2] < leg['z'] + self.a.z_offset - 100 and not self.a.walk:
             # straight up (noclip upmove), so the start point stays where it is
             self.aim(leg['yaw'], 0)
             self.rc('+moveup')
@@ -847,6 +895,9 @@ def main(argv=None):
     se.add_argument('--display', type=int, default=77)
     se.add_argument('--xdftool', default='xdftool')
     se.add_argument('--ground', action='store_true', help='calibration: ground heights along each leg, no flights')
+    se.add_argument('--walk', action='store_true', help='every leg on foot from its start on the ground (no noclip, '
+                    'no climb): clips of the player walking across the border; the walking speed is about two thirds '
+                    'of the flight, so a leg crosses later')
     pa = sub.add_parser('parse')
     pa.add_argument('session')
     pa.add_argument('--json')

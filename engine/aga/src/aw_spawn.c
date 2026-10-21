@@ -3,6 +3,7 @@
  * The scene's nominal point can intersect an approximate architectural proxy.
  */
 #include "quakedef.h"
+#include "aw_world.h"
 
 static qboolean floor_at(edict_t *p, vec3_t top, vec3_t bottom, vec3_t result)
 {

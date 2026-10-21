@@ -13,7 +13,7 @@ int AW_SpeechValidate(const byte *p,int n) {
     unsigned count,samples;int i;
     if(n<13 || memcmp(p,"AWL1",4) || get16(p+4)!=25)return 0;
     count=get16(p+6);samples=get32(p+8);
-    if(!count || count>3000 || n!=12+count || !samples || samples>1323000 ||
+    if(!count || count>3000 || n!=12+(int)count || !samples || samples>1323000 ||
        count!=(samples*25+11024)/11025)return 0;
     for(i=12;i<n;i++)if(p[i]>3)return 0;
     return 1;
@@ -32,7 +32,7 @@ void AW_SpeechStart(int entity,int channel,const char *sound,int start,int lengt
     sprintf(path,"sound/%s",sound);strcpy(path+strlen(path)-4,".lip");
     f=NULL;n=COM_FOpenFile(path,&f);
     if(f){
-        if(n>=13 && n<=3012 && fread(data,1,n,f)==n && AW_SpeechValidate(data,n)) {
+        if(n>=13 && n<=3012 && fread(data,1,n,f)==(size_t)n && AW_SpeechValidate(data,n)) {
             v->count=get16(data+6);memcpy(v->levels,data+12,v->count);
         }
         fclose(f);

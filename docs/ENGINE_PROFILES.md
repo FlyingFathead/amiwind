@@ -1,6 +1,6 @@
 # Engine profiles
 
-_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -85,7 +85,9 @@ unit decides which one runs. Without assembly the source compiles exactly as bef
 
 ## Checks
 
-Every engine build, in every profile, must be free of compiler and assembler warnings, pass the
+Every engine build, in every profile, must be free of compiler and assembler warnings (at the warning level in
+[DEVELOPMENT.md](DEVELOPMENT.md#mandatory-build-rule-always-check-compiler-warnings): `-Wall -Wextra` for every
+file, stricter for AmiWind's own), pass the
 68040 unimplemented-FPU-instruction check and link exactly the selected assembly objects (read from
 the link map). The gate's engine step builds both profiles and the `-O2` experiment
 (`upstream` at `o2`) with `build_aga.py engine --check-profiles`, and also builds `c` once more with its `make` variables spelled out (`ENGINE_ASM=` `ENGINE_OPT=o1`):

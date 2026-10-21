@@ -38,7 +38,29 @@ typedef struct {
     int strength,glare;
 } aw_weather_blend_t;
 
+/* The weather in effect at the player (SKY-REDMOUNTAIN-BLUE-44, 46): rules from OpenMW file
+ * apps/openmw/mwworld/weather.cpp (read, not copied). A new weather (another region walked into, a
+ * new period) starts a transition when none runs; while one runs it is queued and starts when the
+ * running one ends (addWeatherTransition), never a jump back. A cell without a region keeps the
+ * weather it had (updateWeatherRegion ignores an empty region). Only an arrival (the first frame, a
+ * jump of over half a cell: travel, a door to elsewhere, a load; or a wait, rest or travel of an hour
+ * or more of game time) puts the weather there at once (playerTeleported / advanceTime); a walked
+ * crossing into another frame map, however long its load, is not an arrival. */
+#define AW_WEATHER_NONE (-1)
+#define AW_WEATHER_ARRIVAL_UNITS 4096.0  /* half a cell (8,192 original units) */
+#define AW_WEATHER_ARRIVAL_HOURS 1
+typedef struct {
+    int current,next,queued;   /* next/queued AW_WEATHER_NONE when no transition runs or waits */
+    double progress;           /* 0..1 of current -> next */
+    int region;                /* the last region with a name, -1 none yet */
+} aw_weather_state_t;
+
 /* Pure rules (aw_weather_rules.c, host-tested). */
+void AW_WeatherForce(aw_weather_state_t *s,int weather);
+void AW_WeatherAddTransition(aw_weather_state_t *s,int weather);
+void AW_WeatherAdvance(aw_weather_state_t *s,const aw_weather_table_t *table,double seconds);
+int AW_WeatherRegionKeep(aw_weather_state_t *s,int region);
+int AW_WeatherIsArrival(int have_last,double dx,double dy,long hours_passed);
 int AW_WeatherChoose(const unsigned char *chances,int count,int roll);
 int AW_WeatherRoll(int region,int period);
 int AW_WeatherPeriod(int days,int milliseconds,int hours);

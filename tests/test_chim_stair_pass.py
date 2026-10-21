@@ -34,7 +34,7 @@ class PassIsAPass(unittest.TestCase):
             os.environ.pop(name, None)
         os.environ.update(AMIWIND_PASS_CACHE=str(Path(self.tmp.name) / 'cache'), AMIWIND_STAIR_WALK_CACHE='cached',
                           AMIWIND_STAIR_WALK_SAMPLE='0', AMIWIND_RUN_NAME=RUN, AMIWIND_RUN_COMMIT='abc1234',
-                          AMIWIND_RUN_VERSION='0.0.42-dev1')
+                          AMIWIND_RUN_VERSION='0.0.42-dev1', AMIWIND_STAIR_WALK_KEY='frame', AMIWIND_STAIR_WALK='all', AMIWIND_STAIR_WATCH='off')
 
     def tearDown(self):
         os.environ.clear()
@@ -370,7 +370,7 @@ class WalkedDataIsKeyedData(unittest.TestCase):
             os.environ.pop(name, None)
         os.environ.update(AMIWIND_PASS_CACHE=str(Path(self.tmp.name) / 'cache'), AMIWIND_STAIR_WALK_CACHE='cached',
                           AMIWIND_STAIR_WALK_SAMPLE='0', AMIWIND_RUN_NAME=RUN, AMIWIND_RUN_COMMIT='abc1234',
-                          AMIWIND_RUN_VERSION='0.0.42-dev1')
+                          AMIWIND_RUN_VERSION='0.0.42-dev1', AMIWIND_STAIR_WALK_KEY='frame', AMIWIND_STAIR_WALK='all', AMIWIND_STAIR_WATCH='off')
         from test_chim_stairs import world_of
         from chim.validate import Failures, load_world
         self.out = Path(self.tmp.name) / 'world'

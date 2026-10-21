@@ -64,8 +64,17 @@ class HarvestPickAuditTests(unittest.TestCase):
         self.assertEqual(H.check(report, known={}), [2])
         self.assertEqual(H.check(report, known={2: {'ref': 2, 'bug': 'X'}}), [])
 
-    def test_known_list_is_empty(self):
-        self.assertEqual(H.load_known(), {})
+    def test_known_list_names_registered_bugs(self):
+        # Each known unpickable plant names a registered bug (HARVEST-INTERIOR-PICK-47: nine interior mushrooms).
+        known = H.load_known()
+        ids = {line.split('"id":"', 1)[1].split('"', 1)[0]
+               for path in [ROOT / 'docs/bugs/bugs.json', *sorted((ROOT / 'docs/bugs/archive').glob('*.json'))]
+               for line in path.read_text(encoding='utf-8').splitlines() if line.lstrip().startswith('{"id":"')}
+        self.assertEqual(len(known), 9)
+        for ref, entry in known.items():
+            self.assertEqual(entry['ref'], ref)
+            self.assertIn(entry['bug'], ids)
+            self.assertTrue(entry['reason'])
 
     def test_replay_matches_the_engine_source(self):
         runtime = (ROOT / 'engine/aga/src/aw_harvest_runtime.c').read_text(encoding='utf-8')

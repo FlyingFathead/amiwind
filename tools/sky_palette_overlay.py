@@ -13,7 +13,9 @@ BANK={222:(223,(100,69,138)),133:(113,(52,73,110)),95:(94,(210,50,34)),
 OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awn','.awq','.awr','.awt','.awg','.awl',
         '.anm','.tag','.aww'}
 # Every extension spans() parses as indexed pixels or metadata (besides OPAQUE and the named files below).
-PARSED={'.mdl','.spr','.bsp','.wad','.lmp','.awb','.awv','.awf','.mws','.awh','.awi','.awu','.awm','.aws','.awp'}
+# .awk: a shared actor skin (tools/payload_share.py): indexed pixels only; a model that points to one carries no
+# pixels of its own (skin type AWSK, IMAGE-ACTOR-SKIN-REPEATS-46).
+PARSED={'.mdl','.spr','.bsp','.wad','.lmp','.awb','.awv','.awf','.mws','.awh','.awi','.awu','.awm','.aws','.awp','.awk'}
 NAMED={'save-content.bin'}
 
 
@@ -94,6 +96,8 @@ def spans(raw,rel):
             count,w,h=get('<3i',48);need(count>0 and w>0 and h>0,'Invalid skins');at=84
         else:
             need(raw[:4]==b'IDSP' and get('<i',4)[0]==1,'Unsupported SPR');count=get('<i',24)[0];need(count>0,'Invalid frames');at=36
+        if ext=='.mdl' and raw[84:88]==b'AWSK':
+            need(count==1,'Invalid shared skin');count=0   # pixels in progs/skins/<hex>.awk
         for _ in range(count):
             kind=get('<i',at)[0];at+=4;need(kind in (0,1),'Unsupported image group');frames=1
             if kind:
@@ -103,6 +107,8 @@ def spans(raw,rel):
                     _,_,w,h=get('<4i',at);at+=16;need(w>0 and h>0,'Invalid sprite frame')
                 add(at,w*h);at+=w*h
         if ext=='.spr':need(at==n,'Trailing sprite bytes')
+    elif ext=='.awk':
+        need(n>0,'Empty shared skin');add(0,n)
     elif ext=='.awm':
         # AWM1 terrain pixels and its ocean fill index share the global palette.
         # Town identities/transforms are metadata, not palette references.

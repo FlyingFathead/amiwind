@@ -54,6 +54,7 @@ typedef struct {
 //===========================================================================
 
 extern cvar_t	r_draworder;
+extern cvar_t	aw_ghostfence;
 extern cvar_t	r_speeds;
 extern cvar_t	r_timegraph;
 extern cvar_t	r_graphheight;

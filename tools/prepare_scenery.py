@@ -163,6 +163,9 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None, ro
                               'source_shape': name, 'source_shape_path': path,
                               'source_face_range': {'start': len(faces), 'count': int(g.num_triangles)},
                               'source_visibility': visibility})
+            scroll = None if collision else uv_scroll(node)
+            if scroll:
+                materials[-1]['uv_scroll'] = scroll
             start = len(vertices)
             hom = np.array([[v.x,v.y,v.z,1.] for v in g.vertices])
             positions = hom @ transform
@@ -211,6 +214,26 @@ def model_geometry(raw, N, collision=False, repair_uv=False, pose_world=None, ro
     unpack_geometry(packet)
     points = np.array(vertices)[:, :3]
     return packet, materials, [points.min(axis=0).tolist(), points.max(axis=0).tolist()], skipped
+
+
+def uv_scroll(shape):
+    """The texture scroll of a shape: its NiUVController's U and V translation keys as [[time, value], ...]
+    (the Ghostfence's curtain moves V by 1 or 2 texture heights in 8 s with a +-0.05 U sway; waterfalls,
+    lava, the ash mire), or None when the shape has no such controller or its translations never move. The
+    original keeps it on the shape (rule from OpenMW file components/nifosg/controller.cpp, UVController:
+    the U/V translation keys move the texture coordinates over time); chim.models turns it into a Quake
+    turbulent texture when the build asks for it (uv_scroll setting, GHOSTFENCE-NO-ANIMATION-46)."""
+    controller = getattr(shape, 'controller', None)
+    while controller is not None and type(controller).__name__ != 'NiUVController':
+        controller = getattr(controller, 'next_controller', None)
+    data = getattr(controller, 'data', None) if controller is not None else None
+    groups = list(getattr(data, 'uv_groups', None) or [])
+    if len(groups) < 2:
+        return None
+    keys = [[[round(float(k.time), 4), round(float(k.value), 4)] for k in g.keys] for g in groups[:2]]
+    if not any(len({v for _, v in axis}) > 1 for axis in keys):
+        return None
+    return {'u': keys[0], 'v': keys[1]}
 
 
 # Particle emitters that are not flames.

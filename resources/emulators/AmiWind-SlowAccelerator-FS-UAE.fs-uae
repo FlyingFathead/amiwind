@@ -2,7 +2,8 @@
 # Replace the ROM and HDF placeholders with your owned local files.
 #
 # What it approximates: an A1200 with a TF1260-class accelerator, here a 68040
-# at about 50 MHz with its internal FPU, 2 MB Chip RAM and 16 MB Fast RAM.
+# at about 50 MHz with its internal FPU, 2 MB Chip RAM and 128 MB Fast RAM (the playtest
+# default since 21 October 2026; zorro_iii_memory = 16384 gives the 16 MB baseline).
 # It gives the FEEL of slow real hardware next to the normal (fast, JIT) preset.
 # It is NOT a measurement: FS-UAE only approximates 68040 instruction and memory
 # timing, its hard disk is backed by the PC's file cache (loading is faster than
@@ -35,7 +36,7 @@ uae_cpu_24bit_addressing = false
 chip_memory = 2048
 slow_memory = 0
 fast_memory = 0
-zorro_iii_memory = 16384
+zorro_iii_memory = 131072
 kickstart_file = /path/to/your/kickstart-3.1-a1200.rom
 hard_drive_0 = /path/to/your/AmiWind-v0.0.32.hdf
 hard_drive_0_type = hdf

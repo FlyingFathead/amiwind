@@ -26,6 +26,12 @@ class GlobalHarvestIndexTests(unittest.TestCase):
         self.assertEqual(receipt['placements'][0]['slot'], 1)
         self.assertEqual(len(receipt['global_catalogue_sha256']), 64)
 
+    def test_interior_and_world_catalogues_share_one_pick_state(self):
+        # HARVEST-INTERIOR-PICK-47: a room's catalogue and the world's, bound to the same global index.
+        native.NativeSourceTests().compile_run('aga_interior_harvest_test.c',
+            [Path(native.SOURCE)/'src'/n for n in ('aw_harvest.c','aw_state.c','aw_save_codec.c')],
+            cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+
     def test_original_engine_global_capacity_and_corrupt_saves(self):
         native.NativeSourceTests().compile_run('aga_global_harvest_test.c',
             [Path(native.SOURCE)/'src'/n for n in ('aw_harvest.c','aw_state.c','aw_save_codec.c')],

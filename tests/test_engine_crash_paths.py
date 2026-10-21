@@ -227,7 +227,7 @@ class CrashPathsSource(unittest.TestCase):
         qc = strip_comments(text('pr_cmds.c'))
         self.assertNotIn('Sys_Error ("SV_StartSound', qc)
         self.assertIn('style >= MAX_LIGHTSTYLES', qc)
-        place = strip_comments(section(text('chim/chim_statics.c'), 'static int Place (chim_static_t *s)', FN_END))
+        place = strip_comments(section(text('chim/chim_statics.c'), 'static int Place (chim_statics_t *L, chim_static_t *s)', FN_END))
         self.assertNotIn('Host_Error', place)
 
 

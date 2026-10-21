@@ -1,6 +1,6 @@
 # CHIM ideas and held-back work
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.46 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -22,6 +22,7 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 - [The slow-accelerator reality](#the-slow-accelerator-reality)
 - [Island-wide audits (mechanism classes)](#island-wide-audits-mechanism-classes)
 - [Collision from what the game already knows](#collision-from-what-the-game-already-knows)
+  - [Terrain collision from heights (measured prototype, 21 October 2026)](#terrain-collision-from-heights-measured-prototype-21-october-2026)
 - [Also held back](#also-held-back)
 - [Measured and dropped](#measured-and-dropped)
 
@@ -125,7 +126,7 @@ pursuers stop at load doors, as in Morrowind
 
 ## The Ghostfence as a Quake turbulent surface
 
-**Status: idea (maintainer, 16 October 2026), with the Red Mountain region.** The Ghostfence and the Ghostgate show an
+**Status: the default of a build from v0.0.47-dev1 (`--chim-uv-scroll off` for the still texture; in game `dbg ghostfence on/off`), 21 October 2026 ([GHOSTFENCE-NO-ANIMATION-46](../bugs/GHOSTFENCE-NO-ANIMATION-46.md)); the flickering light style is not done. Idea: the maintainer, 16 October 2026, with the Red Mountain region.** The Ghostfence and the Ghostgate show an
 upright, shimmering curtain between the pylons, like electricity and water at once. Quake already draws exactly
 this kind of surface: a texture whose name starts with `*` is drawn turbulent (`D_DrawTurbulent`, the warp that
 ripples water, slime, lava and the upright teleporter fields), and our lava already uses it. Plan: the fence's
@@ -626,6 +627,42 @@ sample, clips at stairs, docks and ladders), and the new one must first give the
 a stair or collision bug was fixed. A collision simplifier (plates, merged coplanar pieces) replaces the visual
 mesh optimizer for this; the visual optimizer moves vertices of steps and made merged meshes larger before.
 See the [roadmap](../ROADMAP.md) and [BUILD-STAIR-WALK-BRUTE-FORCE-46](../bugs/BUILD-STAIR-WALK-BRUTE-FORCE-46.md).
+
+### Terrain collision from heights (measured prototype, 21 October 2026)
+
+**Status: design and host measurement only; no engine or builder change, no default change.** Today every terrain
+record stores qbsp's standing hull: the union of the tile prisms already moved out by the player's box, as planes and
+clipnodes. The alternative traces the player's box against the ground itself: each ground polygon of the chunk (the
+render faces that are not water) is a prism down to the chunk floor, and the engine's exact box-against-convex trace
+(the placed-model collision method, a Minkowski sum with every bevel) sweeps the box against the prisms whose box
+meets the move, the way a heightfield shape works in other engines. The walkable rules (step 34, slope 46 degrees)
+are then read from the hit normal, as today.
+
+Measured on the v0.0.46 world, every tenth terrain record (9,736 records, 200 moves each inside the chunk: random
+moves, drops, walks at foot height, step-downs), against the stored hull traced by the engine's own trace code:
+
+| Records | Moves | Same end (0.05), same hit, same start state | Different start state | Hit against miss | End apart 0.05 or more |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| generated (0.11) | 1,667,800 | 99.979 % | 41 | 5 | 303 |
+| other, not lava | 268,200 | 99.979 % | 3 | 1 | 51 |
+| lava beds | 11,200 | 80.2 % | 935 | 113 | 1,174 |
+
+What does not agree, by kind: (1) lava beds: the stored hull keeps the lava volume solid up to the lava surface,
+and the prototype makes no lava prisms yet (it skips the lava surface like water), so lava needs its own flat prisms
+before this can replace the stored hull there; (2) moves that end within a fraction of a unit (median 0.11) of the
+stored end, mostly grazing moves along a slope, where the stored planes are rounded and the prism planes are not;
+(3) a hit exactly on the crease between two ground polygons, where the two methods report the other polygon's normal
+(103 moves, and 10 more where the two normals fall on either side of the walkable slope limit); (4) a start exactly on or inside the surface,
+where the stored hull calls the whole move solid and the prisms let it slide out, or the reverse (44); (5) a few
+moves the stored hull stops on a bevel or underside plane that the prisms do not have (6).
+
+Cost per move: 33.6 clipnode visits with the stored hull against 36.3 prism plane tests (generated chunks; 36.9
+against 53.7 on the converter's triangles; each is two dot products), 2.8 prisms per move with a box lookup; the
+prisms are moved out once when the chunk joins (about 10,800 floating-point operations, 118 planes held per chunk).
+Bytes it would remove from a 0.11 world: the clipnode payload (55.7 MB) and the planes only the hull uses (about
+78 MB of the 98.0 MB plane payload) of the 83,236 generated records, and up to 42.7 MB more in the others before
+packing, about 176 MB of the 298.5 MB of terrain records. It would ship as an option with an A/B against the stored
+hull, never as a silent replacement.
 
 ## Also held back
 

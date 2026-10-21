@@ -20,7 +20,14 @@ OPT_FLAGS = -O1 -fno-strict-aliasing
 MATH_FLAGS = -fno-builtin-sin -fno-builtin-cos -fno-builtin-sinf -fno-builtin-cosf
 # NOTE: Using -O1 globally due to GCC optimizer bugs (culling, FP math)
 # NOTE: cvar.c contains workaround for AmigaOS sprintf lacking %f support
-WARN_FLAGS = -Wall -Wno-unused
+# Warnings (ENGINE-STRICT-WARNINGS-36, docs/DEVELOPMENT.md): every file builds with -Wall -Wextra and
+# -Wformat-security, less three checks that are noise in the inherited Quake code: unused code,
+# partly initialised structs (the cvar_t definitions) and signed/unsigned comparisons. AmiWind's own
+# files (aw_*.c and chim/*.c, OWN_FILES below) get those back (unused parameters excepted), plus
+# shadowed names and missing prototypes. The builder fails on any warning (tools/build_aga.py), so a
+# new warning in either set stops the build. Warning flags do not change the generated code.
+WARN_FLAGS = -Wall -Wextra -Wformat-security -Wno-unused -Wno-missing-field-initializers -Wno-sign-compare
+OWN_WARN_FLAGS = -Wunused -Wno-unused-parameter -Wsign-compare -Wshadow -Wmissing-prototypes
 # EXTRA_DEFINES: experimental engine switches, off by default (docs/EXPERIMENTAL_FLAGS.md), e.g.
 # make EXTRA_DEFINES=-DAW_EXP_WIDECOORD (24-bit coordinates, aw_coord.h)
 EXTRA_DEFINES ?=
@@ -116,7 +123,7 @@ OBJDIR = obj
 SRCS = \
 	amiga_stubs.c \
 	aw_debug.c aw_cam_rules.c aw_cam.c aw_clock.c aw_wait.c \
-	aw_ui.c aw_icons.c aw_excluded.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_inventory.c aw_debug_torch.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_npcpath.c aw_companion.c aw_combat_rules.c aw_combat.c aw_items.c aw_arena.c aw_view_rules.c aw_view.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_scene.c aw_hand_sprites.c aw_anim.c aw_animkit_rules.c aw_animkit.c aw_lava_rules.c aw_lava.c \
+	aw_ui.c aw_icons.c aw_excluded.c aw_movie.c aw_speech.c aw_intro.c aw_story.c aw_state.c aw_harvest.c aw_harvest_runtime.c aw_harvest_proxy.c aw_opening.c aw_barrier.c aw_character.c aw_head.c aw_reader.c aw_worldui.c aw_inventory.c aw_debug_torch.c aw_save_codec.c aw_save.c aw_savemenu.c aw_nav.c aw_npcpath.c aw_companion.c aw_combat_rules.c aw_combat.c aw_items.c aw_arena.c aw_actors.c aw_view_rules.c aw_view.c aw_console.c aw_console_glyphs.c aw_door_audio.c aw_scene.c aw_hand_sprites.c aw_anim.c aw_animkit_rules.c aw_animkit.c aw_lava_rules.c aw_lava.c \
 	aw_spawn.c aw_scenery.c aw_region.c aw_section.c aw_mappath.c aw_gallery.c aw_stream.c aw_spike.c aw_heapsize.c \
 	aw_walk.c aw_world.c aw_bounds_rules.c aw_bounds.c aw_torch.c aw_guard_torch.c aw_lamps.c aw_remote.c aw_fog_location.c aw_weather_rules.c aw_weather.c aw_hand_models.c aw_npc_lod.c \
 	aw_music.c aw_aread.c aw_log.c \
@@ -209,9 +216,17 @@ CHIM_SRCS = \
 	chim/chim_statics.c \
 	chim/chim_far.c \
 	chim/chim_cuts.c \
-	chim/chim_prefetch.c
+	chim/chim_prefetch.c \
+	chim/chim_placed_clip.c \
+	chim/chim_actor_table.c \
+	chim/chim_terc.c \
+	chim/chim_thgt.c
 
 SRCS += $(CHIM_SRCS)
+
+# AmiWind's own files: the stricter warning set (WARN_FLAGS above).
+OWN_FILES = $(filter aw_%.c chim/%.c,$(SRCS))
+$(OWN_FILES:%.c=$(OBJDIR)/%.o): WARN_FLAGS += $(OWN_WARN_FLAGS)
 
 # The c profile links no assembly: GPL C spans and the independent C2P (aw_c2p.c). The upstream
 # profile adds the ENGINE_ASM units above.

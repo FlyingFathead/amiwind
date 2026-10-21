@@ -96,7 +96,7 @@ class PartitionStartLimitTests(unittest.TestCase):
 
     def test_image_step_gates_every_written_drive(self):
         # The image step writes its drives with world_volumes.assemble_drives, which gates each as written.
-        self.assertIn('assemble_drives(args.rdbtool,drive_plans,out,part,boot_files,jobs=jobs,run=run)',
+        self.assertIn('assemble_drives(args.rdbtool,drive_plans,out,part,boot_files,jobs=jobs,run=run,',
                       (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8'))
         self.assertIn('require_mountable(checked)', (ROOT / 'tools/world_volumes.py').read_text(encoding='utf-8'))
 

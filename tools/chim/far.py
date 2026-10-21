@@ -238,7 +238,8 @@ def frame_boxes(frame_path):
         for k in range(count):
             rkind, _rid, o, n = F.RECORD_ENTRY.unpack_from(data, diro + k * F.RECORD_ENTRY.size)
             if rkind == b'CHNK':
-                boxes += [r['box'] for r in F.read_chunk(data[o:o + n])['owned']]
+                from chim.reach import read_chunk_any as read_chunk     # format 0.8 and 0.9 too
+                boxes += [r['box'] for r in read_chunk(data[o:o + n])['owned']]
     return (v[0], v[1]), boxes
 
 

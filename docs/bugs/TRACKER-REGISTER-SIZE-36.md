@@ -8,7 +8,7 @@
 | First noticed | 11 October 2026, in v0.0.36-dev5 |
 | Where | docs/bugs/bugs.json; tools/bug_register.py rotation; tests/test_bug_tracker.py |
 | Reproduction | always |
-| Duplicate of | no |
+| Duplicate of | [TRACKER-REGISTER-SIZE-33](TRACKER-REGISTER-SIZE-33.md) |
 | Persists in | v0.0.36-dev5 (last seen) |
 | Severity | medium: Tooling: the register would hit the release preflight limit if left; no game impact |
 | Family | Development tooling, receipts and packaging (`tracker-tooling`) |

@@ -2,6 +2,8 @@
  * Local development console commands. No gameplay state/save format implied.
  */
 #include "quakedef.h"
+#include "aw_actors.h"
+#include "aw_links.h"
 #include "aw_bounds.h"
 #include "aw_save.h"
 #include "aw_region.h"
@@ -141,7 +143,7 @@ static void npcs(void) {
         if(!p->free && !strcmp(pr_strings+p->v.classname,"aw_npc"))
             Con_Printf("NPC %s: %ld %ld %ld yaw %ld auto %ld E %ld armed %ld\n",pr_strings+p->v.netname,
                 (long)p->v.origin[0],(long)p->v.origin[1],(long)p->v.origin[2],(long)p->v.angles[1],
-                field(p,"aw_hello_count"),field(p,"aw_manual_count"),!field(p,"aw_hello_done"));
+                field(p,"aw_hello_count"),field(p,"aw_manual_count"),(long)!field(p,"aw_hello_done"));
     }
 }
 /* Read-only release audit of live feet against current collision. Run after
@@ -234,13 +236,38 @@ static void godmode_command(void)
     if(on!=now)Cbuf_AddText("god\n");   /* Host_God_f prints "godmode ON/OFF" */
     else Con_Printf("godmode %s\n",on?"ON":"OFF");
 }
+/* A recentre of the session's origin by d (CHIM's window, "chim crossing recentre 1", a test setting; design note
+ * weak point 5), the server's and the client's half (aw_scene.c, before CHIM moves its own): every edict (its
+ * links follow in CHIM's frame world rebuild), the client's entities (both interpolation ends and baselines),
+ * static entities, dynamic lights, particles and sound channels. Engine modules keeping positions of their own
+ * (paths, companions, combat) are not moved yet: the forced recentre is there to find exactly those. */
+extern particle_t *active_particles;
+static void AW_SessionShift(const float *d) {
+    int i,k;edict_t *e;particle_t *pt;
+    for(i=1,e=NEXT_EDICT(sv.edicts);i<sv.num_edicts;i++,e=NEXT_EDICT(e)){
+        if(e->free)continue;
+        for(k=0;k<2;k++){e->v.origin[k]-=d[k];e->v.oldorigin[k]-=d[k];e->baseline.origin[k]-=d[k];}
+    }
+    for(i=0;i<MAX_EDICTS;i++)for(k=0;k<2;k++){
+        cl_entities[i].origin[k]-=d[k];cl_entities[i].msg_origins[0][k]-=d[k];cl_entities[i].msg_origins[1][k]-=d[k];
+        cl_entities[i].baseline.origin[k]-=d[k];
+    }
+    for(i=0;i<cl.num_statics;i++)for(k=0;k<2;k++)cl_static_entities[i].origin[k]-=d[k];
+    for(i=0;i<MAX_DLIGHTS;i++)for(k=0;k<2;k++)cl_dlights[i].origin[k]-=d[k];
+    for(pt=active_particles;pt;pt=pt->next)for(k=0;k<2;k++)pt->org[k]-=d[k];
+    for(i=0;i<total_channels;i++)for(k=0;k<2;k++)channels[i].origin[k]-=d[k];
+    for(k=0;k<2;k++)listener_origin[k]-=d[k];
+}
 void AW_DebugInit(void) {
     AW_InspectInit();
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
     AW_GalleryInit();AW_WorldUIInit();AW_DebugTorchInit();
     AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
+    /* CHIM's window (type 1 crossings) names a cell's region map through the world directory. */
+    {extern int (*chim_cell_map)(int,int,char *,int);chim_cell_map=AW_CellMap;}
+    {extern void (*aw_session_shift)(const float *);aw_session_shift=AW_SessionShift;}
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
-    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_CompanionInit();AW_CombatInit();AW_ViewInit();AW_LavaInit();AW_AnimInit();AW_AnimKitInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();
+    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_CompanionInit();AW_CombatInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_AnimInit();AW_AnimKitInit();AW_WaitInit();AW_ConsoleInit();AW_SceneInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();
     Cmd_AddCommand("amiwind_debug_reset_location",reset_location);
     Cmd_AddCommand("aw_hands",hands);Cmd_AddCommand("aw_eyeheight",eyeheight);
     Cmd_AddCommand("aw_dimensions",dimensions);

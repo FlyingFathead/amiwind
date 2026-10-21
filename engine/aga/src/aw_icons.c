@@ -84,7 +84,7 @@ int AW_IconLoad(aw_icon_t *slot,const char *key){
 }
 void AW_IconDraw(const aw_icon_t *icon,int x,int y){
     int yy;
-    if(!icon || !icon->ok || x<0 || y<0 || x+icon->w>vid.width || y+icon->h>vid.height)return;
+    if(!icon || !icon->ok || x<0 || y<0 || x+icon->w>(int)vid.width || y+icon->h>(int)vid.height)return;
     for(yy=0;yy<icon->h;yy++)memcpy(vid.buffer+(y+yy)*vid.rowbytes+x,icon->pixels+yy*icon->w,icon->w);
     aw_icon_stats.draws++;
 }
@@ -119,24 +119,24 @@ static void hud_track(int slot,const char *key,int x,int y,float fraction) {
     if(!(fraction>0) || !AW_IconLoad(t,key) || t->w!=HUD_BOX-2 || t->h!=HUD_BAR-2)return;
     if(fraction>1)fraction=1;
     fill=(int)(t->w*fraction+.5f);if(fill<1)fill=1;
-    if(x<0 || y<0 || x+fill>vid.width || y+t->h>vid.height)return;
+    if(x<0 || y<0 || x+fill>(int)vid.width || y+t->h>(int)vid.height)return;
     for(yy=0;yy<t->h;yy++)memcpy(vid.buffer+(y+yy)*vid.rowbytes+x,t->pixels+yy*t->w,fill);
 }
 static void hud_icon(int slot,const char *key,int x,int y) {
     aw_icon_t *t=&hud_slot[slot];
     if(AW_IconLoad(t,key) && t->w==HUD_BOX-2 && t->h==HUD_BOX-2)AW_IconDraw(t,x,y);
 }
-static int hud_original_boxes(int y,int channels) {
+static int hud_original_boxes(int y,int boxes) {
     aw_inventory_item_t item;char key[72];int x;
-    if(vid.width<140 || y<0 || y+HUD_BOX+HUD_BAR>vid.height)return 1;
-    if(channels&AW_HUD_WEAPON){
+    if((int)vid.width<140 || y<0 || y+HUD_BOX+HUD_BAR>(int)vid.height)return 1;
+    if(boxes&AW_HUD_WEAPON){
         int armed=AW_InventoryEquippedItem(AW_SLOT_RIGHT,&item) && item.category==AW_INV_WEAPON;
         x=85;if(!hud_frame(x,y))return 0;
         if(armed)sprintf(key,"item:%s",item.id);else strcpy(key,"skill:26");
         hud_icon(SLOT_WEAPON,key,x+1,y+1);
         if(armed)hud_track(SLOT_TRACK_WEAPON,"hud:track:weapon",x+1,y+HUD_BOX+1,item.health>0?AW_InventoryCondition(item.id):1);
     }
-    if(channels&AW_HUD_MAGIC){
+    if(boxes&AW_HUD_MAGIC){
         x=107;if(!hud_frame(x,y))return 0;
         if(AW_MagicSelectedItem(&item)){
             sprintf(key,"item:%s",item.id);hud_icon(SLOT_MAGIC,key,x+1,y+1);
@@ -147,10 +147,10 @@ static int hud_original_boxes(int y,int channels) {
 }
 /* Both methods are timed here, so aw_icons reports a same-session A/B of
  * the per-frame cost (aw_hud_icons 1 vs 0). */
-static int hud_item_boxes(int y,int channels) {
+static int hud_item_boxes(int y,int boxes) {
     double t0=Sys_FloatTime();int method=hud_icons.value!=0;
     /* No imported HUD art in this image: the interim marks, never a blank HUD. */
-    if(!method || !hud_original_boxes(y,channels))AW_UIHudPlaceholders(y,channels);
+    if(!method || !hud_original_boxes(y,boxes))AW_UIHudPlaceholders(y,boxes);
     aw_icon_stats.seconds[method]+=Sys_FloatTime()-t0;aw_icon_stats.frames[method]++;
     return 1;
 }
@@ -209,7 +209,7 @@ static int title_bar(int x,int y,int w,const char *title){
     if(!hud_icons.value || !AW_StripLoad(&title_strip,"ui:head:block") || !AW_IconLoad(&title_edge[0],"ui:head:left") ||
        !AW_IconLoad(&title_edge[1],"ui:head:right") || title_strip.h!=12 || title_edge[0].w!=1 || title_edge[1].w!=1 ||
        title_edge[0].h!=12 || title_edge[1].h!=12)return 0;
-    if(x<0 || y<0 || x+w>vid.width || y+12>vid.height)return 0;
+    if(x<0 || y<0 || x+w>(int)vid.width || y+12>(int)vid.height)return 0;
     plaque=AW_UIWidth(title)+14;if(plaque>w-6)plaque=w-6;
     side=(w-plaque)/2;
     title_block(x,y,side);title_block(x+side+plaque,y,w-side-plaque);

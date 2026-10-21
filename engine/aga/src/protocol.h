@@ -42,6 +42,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define	U_SKIN		(1<<12)
 #define	U_EFFECTS	(1<<13)
 #define	U_LONGENTITY	(1<<14)
+/* AmiWind: a live alias entity's instance scale (its aw_scale field, other than 1) follows the angles as
+ * a float; the client draws it scaled as statics are (R_SpriteEntityScale, AW_EF_ALIAS_SCALE). */
+#define	U_AW_SCALE	(1<<15)
 
 
 #define	SU_VIEWHEIGHT	(1<<0)

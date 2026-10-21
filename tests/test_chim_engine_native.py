@@ -264,12 +264,53 @@ def set_world_version(root, major, minor):
             path.write_bytes(bytes(data))
 
 
-def write_test_world(root, first=0, story=(), rows=False, refs=False):
+# World format 0.8 (EXPERIMENTAL; tests/test_chim_placed_format.py): the placements' three angles (pitch, yaw, roll);
+# placement 0 is tilted, placement 3 tilted and yawed, the others keep their yaw.
+PLACED_ANGLES = {0: (10.0, 0.0, 20.0), 3: (-12.0, 45.0, 8.0)}
+# drops of the standing box over placement 0 (x, y): start and end height
+PLACED_DROPS = [(32.0, 32.0), (40.0, 26.0), (22.0, 41.0), (47.0, 47.0), (16.0, 20.0)]
+
+
+def placed_expected(origin, angles, boxes, x, y):
+    """Where a standing box dropped at (x, y) first touches a placed model of boxes turned by the angles: the highest
+    point of the turned pieces inside the box's footprint, less the box's floor (the exact Minkowski sum), or None."""
+    import numpy as np
+    from itertools import product
+    from scipy.optimize import linprog
+    from scipy.spatial import ConvexHull
+    from chim.placed import model_matrix
+    from player_hull import MINS, MAXS
+    m = model_matrix(angles)
+    best = None
+    for lo, hi in boxes:
+        pts = np.array(list(product(*zip(lo, hi))), float) @ m.T + np.asarray(origin)
+        eq = ConvexHull(pts).equations
+        res = linprog([0, 0, -1], A_ub=eq[:, :3], b_ub=-eq[:, 3],
+                      bounds=[(x + MINS[0], x + MAXS[0]), (y + MINS[1], y + MAXS[1]), (None, None)])
+        if res.status == 0:
+            top = -res.fun - MINS[2]
+            best = top if best is None else max(best, top)
+    return best
+
+
+def write_test_world(root, first=0, story=(), rows=False, refs=False, placed=False, reach_refs=False):
     """first: the world's placement ids before this frame (an earlier frame); story: placement ids flagged
-    story hidden (format 0.5)."""
+    story hidden (format 0.5); placed: world format 0.8 (56-byte records with PLACED_ANGLES, piece tables);
+    reach_refs (with placed): world format 0.9, the reach copies written as references (chim.reach)."""
     from chim_fixture import box_bsp, miptex, pack_order, placement, terrain_bsp, write_world
     models = [box_bsp(MODEL_BOXES[0], texture_ids=[0]), box_bsp(MODEL_BOXES[1], texture_ids=[1]),
               box_bsp(MODEL_BOXES[2], texture_ids=[2], lighting=40000)]
+    if placed:
+        import numpy as np
+        from itertools import product
+        from chim import format as F
+        from chim import placed as P
+        tables = []
+        for m, boxes in enumerate(MODEL_BOXES):
+            lumps = F.read_brush_image(models[m])
+            lumps[4] = P.piece_table([(np.array(list(product(*zip(lo, hi))), float),) for lo, hi in boxes])
+            models[m] = F.brush_image(lumps)[0]
+            tables.append(lumps[4])
     textures = [miptex('surface%d' % i, seed=i) for i in range(4)]
     order = pack_order(NX, NX, SECTOR)
     index = {c: i for i, c in enumerate(order)}
@@ -277,12 +318,21 @@ def write_test_world(root, first=0, story=(), rows=False, refs=False):
     reach = {c: [] for c in order}
     for pid, model, origin, yaw in PLACEMENTS:
         lo, hi = placed_box(origin, yaw, *MODEL_BOXES[model][0])
+        box = (lo + (origin[2] + MODEL_BOXES[model][0][0][2] - 1,), hi + (origin[2] + MODEL_BOXES[model][0][1][2] + 1,))
+        if placed:
+            import math
+            angles = PLACED_ANGLES.get(pid, (0.0, yaw, 0.0))
+            plo, phi = P.placed_box(origin, angles, *MODEL_BOXES[model][0])
+            lo, hi = tuple(v - 1 for v in plo[:2]), tuple(v + 1 for v in phi[:2])
+            box = ([math.floor(v - 1) for v in plo], [math.ceil(v + 1) for v in phi])
         owner = chunk_of(*origin[:2])
         a, b = chunk_of(*lo), chunk_of(*hi)
         touched = {(x, y) for x in range(a[0], b[0] + 1) for y in range(a[1], b[1] + 1)} - {owner}
-        rec = placement(pid + first, 1000 + pid, model, origin, yaw, index[owner],
-                        (lo + (origin[2] + MODEL_BOXES[model][0][0][2] - 1,),
-                         hi + (origin[2] + MODEL_BOXES[model][0][1][2] + 1,)), story_hidden=pid in story)
+        if placed:
+            rec = P.placement(pid + first, 1000 + pid, model, origin, angles, index[owner], 0, 0, box, 1,
+                              story_hidden=pid in story)
+        else:
+            rec = placement(pid + first, 1000 + pid, model, origin, yaw, index[owner], box, story_hidden=pid in story)
         owned[owner].append(rec)
         for c in sorted(touched):
             reach[c].append(rec)
@@ -304,9 +354,14 @@ def write_test_world(root, first=0, story=(), rows=False, refs=False):
     write_world(root, (0, 0), (LOW, LOW), GRAIN, NX, NX, chunks, models, textures, len(PLACEMENTS),
                 dict(draw_distance=200.0, hysteresis=32.0, prefetch_margin=64.0, collision_margin=48.0), sees, SECTOR,
                 {0: (0,), 1: (1,), 2: (2,)}, sees_placement=sees_placement,
-                lead=((5, 5), first) if first else None, rows=rows, refs=refs)
+                lead=((5, 5), first) if first else None, rows=rows, refs=refs, placed=placed, reach=reach_refs)
     if rows:
         set_world_version(root, 0, 6)
+    if placed:
+        lines = ['angles %d %r %r %r' % (pid, *(float(np.float32(v)) for v in PLACED_ANGLES.get(pid, (0.0, yaw, 0.0))))
+                 for pid, _, _, yaw in PLACEMENTS]
+        lines += ['drop %r %r 200.0 -20.0' % xy for xy in PLACED_DROPS]
+        (Path(root) / 'placed.txt').write_text('\n'.join(lines) + '\n', encoding='ascii', newline='\n')
     return sum(len(r) for r in reach.values())
 
 
@@ -336,12 +391,13 @@ def write_big_world(root):
                 {m: (m % 3,) for m in range(40)})
 
 
-def write_seam_world(root, refs=False):
+def write_seam_world(root, refs=False, terc=False):
     """A 4 x 4 chunk frame written by the CHIM builder (tests/test_chim_format.py's fixture) on
     ground that steps up in every other chunk column and row, so near most chunk borders the
     highest ground under the standing box is the neighbour's. Writes seam.txt (x y stand) for
     points near every inner border and visits.txt (x y z) for points over the whole frame.
-    Returns how many seam samples stand on the neighbour's ground."""
+    Returns how many seam samples stand on the neighbour's ground. terc: False, True (the compact terrain pack)
+    or 'generate' (the generate pack)."""
     import random
     import numpy as np
     from test_chim_format import fixture
@@ -357,7 +413,8 @@ def write_seam_world(root, refs=False):
         return float(np.interp(x, vertex, steps) + 0.5 * np.interp(y, vertex, steps))
 
     _, source = fixture(Path(root), heights_of=ground,
-                        settings={'grain': 256, 'sector_chunks': 2, **({'terrain_refs': 'on'} if refs else {})})
+                        settings={'grain': 256, 'sector_chunks': 2, **({'terrain_refs': 'on'} if refs else {}),
+                                  **({'terrain_pack': terc if isinstance(terc, str) else 'compact'} if terc else {})})
     rows, neighbour = [], 0
     for border in (-256, 0, 256):
         for along in (-470.3, -301.7, -130.9, 41.3, 207.7, 388.1):
@@ -386,13 +443,17 @@ class ChimWorldTests(unittest.TestCase):
 
     SOURCES = [SRC / 'chim' / n for n in ('chim_format.c', 'chim_zone.c', 'chim_models.c', 'chim_chunks.c', 'chim_graft.c',
                                           'chim_world.c', 'chim_statics.c', 'chim_far.c', 'chim_cuts.c',
-                                          'chim_prefetch.c')] + \
+                                          'chim_prefetch.c', 'chim_placed_clip.c', 'chim_terc.c', 'chim_thgt.c')] + \
         [SRC / n for n in ('aw_scenery.c', 'world.c', 'r_efrag.c', 'mathlib.c', 'aw_format.c', 'aw_harvest.c',
                            'aw_harvest_runtime.c', 'aw_harvest_proxy.c', 'aw_state.c')]
 
     def run_world(self, modes, with_data=True, env=None, big=False, seam=False, first=0, story=(), rows=False,
-                  far=False, extra=(), refs=False):
+                  far=False, extra=(), refs=False, region=None, placed=False, reach=False, terc=False):
         with tempfile.TemporaryDirectory(prefix='amiwind-chim-world-') as tmp:
+            if region:
+                from chim_fixture import write_region_world
+                write_region_world(tmp, region)
+                with_data = False
             if far:
                 # The frame map's far terrain (tools/chim/far.py), frame 0 0 (centre 0 0): 9 x 7 samples.
                 import numpy as np
@@ -401,11 +462,11 @@ class ChimWorldTests(unittest.TestCase):
                 (Path(tmp) / 'maps').mkdir()
                 (Path(tmp) / 'maps/chimtest.far').write_bytes(encode((0, 0), -4096, -3072, 1024, grid, 4))
             if seam:
-                self.assertGreater(write_seam_world(tmp, refs), 20)
+                self.assertGreater(write_seam_world(tmp, refs, terc), 20)
             elif big:
                 write_big_world(tmp)
             elif with_data:
-                self.assertGreater(write_test_world(tmp, first, story, rows, refs), 0)
+                self.assertGreater(write_test_world(tmp, first, story, rows, refs, placed, reach), 0)
                 if rows:
                     self.assertTrue(list(Path(tmp).glob('chim/frames/*/*/r*/s*.ccs')))
             old = dict(os.environ)
@@ -603,6 +664,32 @@ class ChimWorldTests(unittest.TestCase):
         self.assertIn('seam ok', out)
         self.assertIn(' 0 off the ground', out)
 
+    def test_compact_terrain_records_stand_and_collide_as_their_images(self):
+        """World format 0.10 (EXPERIMENTAL, chim.terc): the same builder world with terrain references, its TERR records
+        written compact; the engine expands them (chim_terc.c) to the same BSP29 bytes, so the seam walk (the standing
+        hull at every chunk border, ground over the whole frame) prints the same lines as the plain world."""
+        plain = self.run_world(['seam'], seam=True, refs=True)[0]
+        packed = self.run_world(['seam'], seam=True, refs=True, terc=True)[0]
+        self.assertIn('seam ok', packed)
+        self.assertIn('terc records 0', plain)
+        self.assertNotIn('terc records 0', packed)
+        strip = lambda out: [l for l in out.splitlines() if not l.startswith('terc records')]    # noqa: E731
+        self.assertEqual(strip(packed), strip(plain))
+
+    def test_generated_terrain_records_stand_and_collide_as_their_images(self):
+        """World format 0.11 (EXPERIMENTAL, chim.thgt): the same builder world with terrain references, its regular-path
+        TERR records written as heights and facts; the engine generates their render part (chim_thgt.c), the same bytes,
+        so the seam walk prints the same lines as on the plain world."""
+        plain = self.run_world(['seam'], seam=True, refs=True)[0]
+        made = self.run_world(['seam'], seam=True, refs=True, terc='generate')[0]
+        self.assertIn('seam ok', made)
+        self.assertIn('generated records 0', plain)
+        self.assertNotIn('generated records 0', made)
+
+        def strip(out):
+            return [line for line in out.splitlines() if not line.startswith(('terc records', 'generated records'))]
+        self.assertEqual(strip(made), strip(plain))
+
     def test_placement_ids_of_a_later_frame_of_a_world(self):
         # Ids run on across frames: this frame's ids start at 1,000 (an earlier frame in the index);
         # the whole ring scenario (placements once, reach copies, lists, collision) holds.
@@ -624,6 +711,82 @@ class ChimWorldTests(unittest.TestCase):
     def test_a_closed_frame_edge_says_the_area_is_unavailable(self):
         out = self.run_world(['edge'])[0]
         self.assertIn('edge ok', out)
+
+    def test_format_09_reach_references_give_the_08_catalogue_and_collision(self):
+        """World format 0.9 (EXPERIMENTAL, chim.reach): the same placements as the 0.8 world, every reach copy written
+        as a 4-byte reference to its owner record. Like for like: the engine's catalogue of every loaded chunk (each
+        run-time placement: id, model, owner, flags, origin, angles, drawn box, matrix) at three player positions, and
+        the drops of the standing box onto the tilted placements, are the same lines for both worlds; the drawn-once
+        and efrag checks (check_once) pass in both. With terrain references too (CHK3)."""
+        def lines(out, prefix):
+            return [l for l in out.splitlines() if l.startswith(prefix)]
+        for refs in (False, True):
+            with self.subTest(terrain_refs=refs):
+                out08 = self.run_world(['catalogue', 'placed'], placed=True, refs=refs)
+                out09 = self.run_world(['catalogue', 'placed'], placed=True, refs=refs, reach=True)
+                # every reference read from the owner chunk's record list (never copied from the zone)
+                read09 = self.run_world(['catalogue'], placed=True, refs=refs, reach=True,
+                                        env={'CHIM_REACH_RESIDENT': '0'})[0]
+                self.assertIn('catalogue ok', out08[0])
+                self.assertIn('catalogue ok', out09[0])
+                self.assertIn('placed ok', out09[1])
+                cat08, cat09 = lines(out08[0], 'cat '), lines(out09[0], 'cat ')
+                self.assertTrue(any(' minor 8 ' in l for l in cat08) and any(' minor 9 ' in l for l in cat09))
+                strip = lambda ls: [l.replace(' minor 9 ', ' minor 8 ') for l in ls]    # noqa: E731
+                self.assertEqual(strip(cat09), cat08)
+                # reach placements were read (records past the owned ones in some chunk)
+                self.assertTrue(any(int(l.split()[4]) > int(l.split()[6]) for l in cat08 if l.startswith('cat chunk')))
+                self.assertEqual(lines(out09[1], 'drop '), lines(out08[1], 'drop '))
+                # the pin re-reads each hit's record (0.9: a linked reach entry's record through its owner): the
+                # same reference number and cell as in 0.8, and a linked reach entry was picked
+                picks08, picks09 = lines(out08[0], 'pick '), lines(out09[0], 'pick ')
+                self.assertEqual(picks09, picks08)
+                self.assertTrue(picks09)
+                for l in picks09:
+                    w = l.split()
+                    if w[5] == w[1]:
+                        self.assertEqual(int(w[7]), 1000 + int(w[5]), l)
+                self.assertTrue(any(l.split()[3] == '1' and l.split()[5] == l.split()[1] for l in picks09))
+                # both ways a reference is served: copied from the owner chunk's catalogue in the zone, read from disk
+                (r08,), (r09,), (rr,) = lines(out08[0], 'reach '), lines(out09[0], 'reach '), lines(read09, 'reach ')
+                self.assertEqual(r08, 'reach resident 0 read 0 runs 0')
+                self.assertGreater(int(r09.split()[2]), 0, r09)
+                w = rr.split()
+                self.assertEqual(int(w[2]), 0, rr)
+                self.assertGreater(int(w[4]), 0, rr)
+                self.assertGreater(int(w[6]), 0, rr)
+                self.assertEqual(strip(lines(read09, 'cat ')), cat08)
+                self.assertEqual(lines(read09, 'pick '), picks08)
+
+    def test_format_08_world_angles_matrices_tables_and_placed_collision(self):
+        """World format 0.8 (EXPERIMENTAL): the engine reads 56-byte records, keeps each record's matrix, converts
+        every model's piece table and collides a standing box with the tilted placements as the exact expansion of
+        the turned pieces (placed_expected, an LP on the turned boxes) says."""
+        out = self.run_world(['placed'], placed=True)[0]
+        self.assertIn('placed ok', out)
+        drops = {}
+        for line in out.splitlines():
+            if line.startswith('drop '):
+                _, k, z, f, solid, nz = line.split()
+                drops[int(k)] = (float(z), float(f), int(solid), float(nz))
+        self.assertEqual(len(drops), len(PLACED_DROPS))
+        origin = PLACEMENTS[0][2]
+        hits = 0
+        for k, (x, y) in enumerate(PLACED_DROPS):
+            want = placed_expected(origin, PLACED_ANGLES[0], MODEL_BOXES[0], x, y)
+            z, f, solid, nz = drops[k]
+            with self.subTest(drop=k):
+                self.assertEqual(solid, 0)
+                if want is None:
+                    self.assertEqual(f, 1.0)
+                else:
+                    hits += 1
+                    # the contact margin: DIST_EPSILON (1/32) along the hit facet's normal, so 1/32 over its z share
+                    # along a vertical drop
+                    self.assertGreater(nz, 0.0)
+                    self.assertGreaterEqual(z, want - 1e-3)
+                    self.assertLess(z, want + 0.03125 / nz + 2e-3)
+        self.assertGreaterEqual(hits, 4)
 
     def test_story_hidden_placements_stay_out_while_the_story_hides_them(self):
         out = self.run_world(['story'], story=(0,))[0]
@@ -650,6 +813,37 @@ class ChimWorldTests(unittest.TestCase):
     def test_prefetch_ahead_and_the_ring_follows_the_view_distance(self):
         out = self.run_world(['ahead'])[0]
         self.assertIn('ahead ok', out)
+
+    # Type 1 crossings (docs/chim/CELL_CROSSINGS.md, CHIM-CROSSING-SLUGGISH-43): "chim crossing 1" runs the
+    # region frames around the player as one window in one frame world, at the origin of the frame the map
+    # started on. The default (type 0) leaves a frame map alone. Each place grafted once, each object drawn
+    # once (a frame's copy of its neighbour's object is not), the ground there at every step across borders
+    # and a corner, the window moving with the player (frames join and leave, their statics read from their
+    # frame maps), and memory and locks the same after every round trip.
+    REGION_CELLS = ((0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1))
+
+    def test_type1_window_of_region_frames(self):
+        out = self.run_world(['window'], region=self.REGION_CELLS)[0]
+        self.assertIn('window ok', out)
+        self.assertIn(' 0 recentres', out)
+        print([l for l in out.splitlines() if l.startswith('window:')])
+
+    def test_type1_window_never_starts_on_a_town_frame(self):
+        # CHIM-ACTORS-TOWN-RETURN-EMPTY-47: a frame whose cell has no region map (a town's) stays type 0 with
+        # "chim crossing 1"; the same frame with a region map starts the window
+        out = self.run_world(['windowtown'], region=self.REGION_CELLS)[0]
+        self.assertIn('windowtown ok', out)
+
+    def test_type1_window_with_a_recentre_at_every_crossing(self):
+        # The test setting "chim crossing recentre 1" (design note weak point 5): at every streamed crossing
+        # the session's origin moves to the entered frame; ground, placements, statics, the window and the
+        # edicts' leaves stay where they were in the world, crossing after crossing.
+        out = self.run_world(['window'], region=self.REGION_CELLS, env={'CHIM_WINDOW_RECENTRE': '1'})[0]
+        self.assertIn('window ok', out)
+        line = [l for l in out.splitlines() if l.startswith('window:')][0]
+        crossings = int(line.split(' crossings')[0].split(', ')[-1])
+        self.assertIn(' %d recentres' % crossings, line)
+        print(line)
 
 
 if __name__ == '__main__':

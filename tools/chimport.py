@@ -2065,6 +2065,18 @@ def add_region_option(q):
 
 
 def main(argv=None):
+    """The command line, with the stair walk off by default (BUILD-STAIR-WALK-OFF-46; an explicit
+    AMIWIND_STAIR_WALK wins); the default is restored when it returns."""
+    import stair_walk
+    before = stair_walk.DEFAULT_OFF
+    stair_walk.DEFAULT_OFF = True
+    try:
+        return _cli(argv)
+    finally:
+        stair_walk.DEFAULT_OFF = before
+
+
+def _cli(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0], formatter_class=argparse.RawDescriptionHelpFormatter,
                                  epilog=__doc__.split('\n', 2)[2])
     sub = ap.add_subparsers(dest='cmd', required=True)

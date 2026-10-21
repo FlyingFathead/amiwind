@@ -2,6 +2,7 @@
  * Supported walking for the scaled town. Camera bob remains in view.c.
  */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "chim/chim.h"
 /* CHIM ring loading and actor freezing (chim/chim_world.c sets them only
  * when its data exists). */
@@ -159,6 +160,18 @@ static int feet_in_lava(edict_t *p,const vec3_t at)
     feet[0]=at[0];feet[1]=at[1];feet[2]=at[2]+p->v.mins[2]+1;
     return SV_PointContents(feet)==CONTENTS_LAVA;
 }
+/* How far a trial step may rise or fall: a stair's height (8.75), plus, on a
+ * slope, what that slope climbs over the step's length. The walk follows the
+ * slope's tangent, so a 22-unit step on a walkable 0.90 slope moves 10.6 units
+ * up or down; the fixed 8.75 stopped every actor there
+ * (COMBAT-PURSUIT-SLOPE-STALL-46). The slope is the floor's under the box after
+ * the step, so a flat floor further down (a ledge) still fails the support test. */
+static qboolean step_height_ok(const vec3_t delta,const trace_t *under)
+{
+    float run=sqrt(delta[0]*delta[0]+delta[1]*delta[1]),nz=under->plane.normal[2];
+    if(nz>1)nz=1;
+    return fabs(delta[2])<=8.75f+run*sqrt(1-nz*nz)/nz;
+}
 qboolean AW_ActorStep(edict_t *p,vec3_t move,double dt)
 {
     vec3_t origin,oldorigin,velocity,delta;float flags,groundentity,movetype;trace_t floor;int i;
@@ -176,7 +189,7 @@ qboolean AW_ActorStep(edict_t *p,vec3_t move,double dt)
     VectorSubtract(p->v.origin,origin,delta);
     /* Actors keep out of lava as Morrowind's AvoidNode on the pools makes them path around it: a step into lava
      * fails, so the navigation ladder (aw_npcpath.c) takes another way; an actor already in lava may step out. */
-    if(delta[0]*delta[0]+delta[1]*delta[1]>.00001f && fabs(delta[2])<=8.75f && support(p,8.75f,&floor) &&
+    if(delta[0]*delta[0]+delta[1]*delta[1]>.00001f && support(p,8.75f,&floor) && step_height_ok(delta,&floor) &&
        !(feet_in_lava(p,p->v.origin) && !feet_in_lava(p,origin))) {
         ground(p,&floor);VectorCopy(vec3_origin,p->v.velocity);SV_LinkEdict(p,true);return true;
     }

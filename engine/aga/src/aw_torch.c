@@ -249,10 +249,10 @@ static void pixel(int x,int y,int scale,byte color)
 {
     int xx,yy;
     for(yy=y;yy<y+scale;yy++){
-        if(yy<0 || yy>=vid.height || yy<r_refdef.vrect.y ||
+        if(yy<0 || yy>=(int)vid.height || yy<r_refdef.vrect.y ||
            yy>=r_refdef.vrect.y+r_refdef.vrect.height)continue;
         for(xx=x;xx<x+scale;xx++){
-            if(xx<0 || xx>=vid.width || xx<r_refdef.vrect.x ||
+            if(xx<0 || xx>=(int)vid.width || xx<r_refdef.vrect.x ||
                xx>=r_refdef.vrect.x+r_refdef.vrect.width)continue;
             vid.buffer[yy*vid.rowbytes+xx]=color;
         }
@@ -290,7 +290,7 @@ void AW_TorchDraw(void)
 {
     static const int threshold[16]={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
     vec3_t anchor,forward,right,up,angles,world,delta;
-    float depth,cx,cy,scale,size,age,drift,rise;double animation_time;
+    float depth,cx,cy,size,age,drift,rise;double animation_time;
     int frame,i,j,k,x,y,xx,yy,n,alpha,core;const byte *tex,*p,*assets;
     if(!AW_TorchEquipped() || !torch_assets || !vid.buffer || !r_drawviewmodel.value ||
        chase_active.value || r_fov_greater_than_90 || (cl.items&IT_INVISIBILITY))return;

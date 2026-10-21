@@ -1,4 +1,77 @@
 {
   "about": "Placed harvestable plants that the harvest pick audit (tools/harvest_pick_audit.py) may find unpickable without failing the build; each entry names its bug ID. Empty: every placed plant must be pickable.",
-  "known": []
+  "known": [
+    {
+      "ref": 423926,
+      "bug": "HARVEST-INTERIOR-PICK-47",
+      "label": "Luminous Russula",
+      "map": "vdi014",
+      "cell": "Vivec, St. Delyn Underworks",
+      "reason": "interior mushroom: from every standing position the audit tries, the view line meets room scenery before the plant (measured on the v0.0.46 maps, 21 October 2026); it was not pickable before either (baked scenery)"
+    },
+    {
+      "ref": 423929,
+      "bug": "HARVEST-INTERIOR-PICK-47",
+      "label": "Violet Coprinus",
+      "map": "vdi014",
+      "cell": "Vivec, St. Delyn Underworks",
+      "reason": "interior mushroom: from every standing position the audit tries, the view line meets room scenery before the plant (measured on the v0.0.46 maps, 21 October 2026); it was not pickable before either (baked scenery)"
+    },
+    {
+      "ref": 423937,
+      "bug": "HARVEST-INTERIOR-PICK-47",
+      "label": "Luminous Russula",
+      "map": "vdi014",
+      "cell": "Vivec, St. Delyn Underworks",
+      "reason": "interior mushroom: from every standing position the audit tries, the view line meets room scenery before the plant (measured on the v0.0.46 maps, 21 October 2026); it was not pickable before either (baked scenery)"
+    },
+    {
+      "ref": 466597,
+      "bug": "HARVEST-INTERIOR-PICK-47",
+      "label": "Violet Coprinus",
+      "map": "vhi008",
+      "cell": "Vivec, Hlaalu Plaza",
+      "reason": "interior mushroom: from every standing position the audit tries, the view line meets room scenery before the plant (measured on the v0.0.46 maps, 21 October 2026); it was not pickable before either (baked scenery)"
+    },
+    {
+      "ref": 466606,
+      "bug": "HARVEST-INTERIOR-PICK-47",
+      "label": "Violet Coprinus",
+      "map": "vhi008",
+      "cell": "Vivec, Hlaalu Plaza",
+      "reason": "interior mushroom: from every standing position the audit tries, the view line meets room scenery before the plant (measured on the v0.0.46 maps, 21 October 2026); it was not pickable before either (baked scenery)"
+    },
+    {
+      "ref": 466628,
+      "bug": "HARVEST-INTERIOR-PICK-47",
+      "label": "Violet Coprinus",
+      "map": "vhi008",
+      "cell": "Vivec, Hlaalu Plaza",
+      "reason": "interior mushroom: from every standing position the audit tries, the view line meets room scenery before the plant (measured on the v0.0.46 maps, 21 October 2026); it was not pickable before either (baked scenery)"
+    },
+    {
+      "ref": 467152,
+      "bug": "HARVEST-INTERIOR-PICK-47",
+      "label": "Violet Coprinus",
+      "map": "voi011",
+      "cell": "Vivec, St. Olms Plaza",
+      "reason": "interior mushroom: from every standing position the audit tries, the view line meets room scenery before the plant (measured on the v0.0.46 maps, 21 October 2026); it was not pickable before either (baked scenery)"
+    },
+    {
+      "ref": 467167,
+      "bug": "HARVEST-INTERIOR-PICK-47",
+      "label": "Violet Coprinus",
+      "map": "voi011",
+      "cell": "Vivec, St. Olms Plaza",
+      "reason": "interior mushroom: from every standing position the audit tries, the view line meets room scenery before the plant (measured on the v0.0.46 maps, 21 October 2026); it was not pickable before either (baked scenery)"
+    },
+    {
+      "ref": 467177,
+      "bug": "HARVEST-INTERIOR-PICK-47",
+      "label": "Violet Coprinus",
+      "map": "voi011",
+      "cell": "Vivec, St. Olms Plaza",
+      "reason": "interior mushroom: from every standing position the audit tries, the view line meets room scenery before the plant (measured on the v0.0.46 maps, 21 October 2026); it was not pickable before either (baked scenery)"
+    }
+  ]
 }

@@ -138,3 +138,21 @@ class OriginalCellRecipes(unittest.TestCase):
         out = scope_reference_recipes(index, {'source_cell': [10, 0]}, self.document)
         self.assertEqual(out['models'][0]['sha256'], 'a' * 64)
         self.assertEqual(out['references'], [])
+
+
+class SpriteKey(unittest.TestCase):
+    """BUILD-SPRITE-KEY-HASHLIB-47: sprite_key used hashlib without importing it; the v0.0.47-dev1 build's CHIM stage
+    failed on the first mesh with a sprite replacement, 45 minutes in. No test called it."""
+
+    def test_sprite_key_runs_and_keeps_the_previous_form(self):
+        import hashlib
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
+        from chim.units import UnitKey
+        from visual_recipes import sprite_key
+        key = UnitKey('k' * 64)
+        key.previous = 'p' * 64
+        new = sprite_key(key, 'd' * 64)
+        self.assertEqual(str(new), hashlib.sha256(('k' * 64 + ':sprite:' + 'd' * 64).encode()).hexdigest())
+        self.assertEqual(new.previous, hashlib.sha256(('p' * 64 + ':sprite:' + 'd' * 64).encode()).hexdigest())
+        self.assertEqual(str(sprite_key('plain', 'd' * 64)),
+                         hashlib.sha256(('plain:sprite:' + 'd' * 64).encode()).hexdigest())

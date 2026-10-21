@@ -4,6 +4,7 @@
  * residency is bounded by the current overlapping exterior sub-cell BSP.
  */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_harvest_runtime.h"
 #include "aw_town.h"
 #include "chim/chim.h"

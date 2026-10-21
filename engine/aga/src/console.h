@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -34,13 +34,12 @@ void Con_CheckResize (void);
 void Con_Init (void);
 void Con_DrawConsole (int lines, qboolean drawinput);
 void Con_Print (char *txt);
-void Con_Printf (char *fmt, ...);
-void Con_DPrintf (char *fmt, ...);
-void Con_SafePrintf (char *fmt, ...);
+void Con_Printf (char *fmt, ...) __attribute__((format(printf, 1, 2)));
+void Con_DPrintf (char *fmt, ...) __attribute__((format(printf, 1, 2)));
+void Con_SafePrintf (char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void Con_Clear_f (void);
 void Con_DrawNotify (void);
 void Con_ClearNotify (void);
 void Con_ToggleConsole_f (void);
 
 void Con_NotifyBox (char *text);	// during startup for sound / cd warnings
-

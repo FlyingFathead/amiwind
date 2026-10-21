@@ -16,7 +16,7 @@ Usage:
                          [--status TEXT] [--tag T...] [--chim PART] [build options]
                                 add an open bug (then write its report page and render)
   bug_register.py set ID [--state open|fixed|closed] [--fixed-in V] [--status TEXT]
-                         [--owner-accepted V] [--tag T...] [any fact option of add]
+                         [--owner-accepted V|none] [--tag T...] [any fact option of add]
                          [--duplicate-of ID] [--persists-in V...] [--chim PART] [build options]
 
 Build options (the build a bug was found in, docs/bugs/README.md "Found in build"):
@@ -1359,7 +1359,8 @@ def main(argv=None):
         if args.status:
             b['status'] = args.status
         if args.owner_accepted:
-            b['owner_accepted'] = args.owner_accepted
+            # 'none' clears it: a bug reported again after its acceptance is open again
+            b['owner_accepted'] = None if args.owner_accepted == 'none' else args.owner_accepted
         if args.tag:
             b['tags'] = sorted(set(b.get('tags', [])) | set(args.tag))
         apply_facts(b)

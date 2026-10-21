@@ -745,11 +745,11 @@ static void think(slot_t *s,edict_t *p,float dt) {
     if(s->state==S_BLOCK){if(s->state_time>=(s->has_block?duration(s,G_BLOCK):block_seconds))set_state(s,S_CHASE,G_IDLE);return;}
     if(s->state==S_DODGE){
         if(s->dodged<DODGE_UNITS){
-            float yaw=(s->e->v.angles[1]+90)*(float)M_PI/180,step=DODGE_UNITS*dt/DODGE_SECONDS;vec3_t move;
-            if(step>DODGE_UNITS-s->dodged)step=DODGE_UNITS-s->dodged;
-            move[0]=Q_SinRad(yaw)*step*s->dodge_dir;move[1]=-Q_CosRad(yaw)*step*s->dodge_dir;move[2]=0;
+            float yaw=(s->e->v.angles[1]+90)*(float)M_PI/180,dstep=DODGE_UNITS*dt/DODGE_SECONDS;vec3_t move;
+            if(dstep>DODGE_UNITS-s->dodged)dstep=DODGE_UNITS-s->dodged;
+            move[0]=Q_SinRad(yaw)*dstep*s->dodge_dir;move[1]=-Q_CosRad(yaw)*dstep*s->dodge_dir;move[2]=0;
             pass_player(1);if(!AW_ActorStep(s->e,move,host_frametime>0?host_frametime:dt))s->dodged=DODGE_UNITS;pass_player(0);
-            s->dodged+=step;
+            s->dodged+=dstep;
         }
         if(s->state_time>=DODGE_SECONDS+.1f)set_state(s,S_CHASE,G_IDLE);
         return;
@@ -764,13 +764,13 @@ static void think(slot_t *s,edict_t *p,float dt) {
      * 3.0 s, so it fights again as soon as the player is reachable. */
     if(s->state==S_FLEE){
         if(s->state_time<1.0f){
-            vec3_t away;float len;int moved;
+            vec3_t away;float len;int fled;
             away[0]=s->e->v.origin[0]-p->v.origin[0];away[1]=s->e->v.origin[1]-p->v.origin[1];away[2]=0;
             len=(float)AW_PathLength((int)away[0],(int)away[1]);if(len<1)len=1;
             VectorScale(away,chase_speed.value*dt/len,away);
-            pass_player(1);moved=AW_ActorStep(s->e,away,host_frametime>0?host_frametime:dt);pass_player(0);
+            pass_player(1);fled=AW_ActorStep(s->e,away,host_frametime>0?host_frametime:dt);pass_player(0);
             s->e->v.angles[1]=AW_PathHeading((int)-away[0],(int)-away[1])*360.0f/AW_PATH_FAN+90;
-            s->f.moving=(unsigned char)moved;s->group=moved?G_RUN:G_IDLE;
+            s->f.moving=(unsigned char)fled;s->group=fled?G_RUN:G_IDLE;
             return;
         }
         s->group=G_IDLE;face_player(s->e,p);
@@ -810,6 +810,17 @@ static void think(slot_t *s,edict_t *p,float dt) {
     }
     pass_player(0);
     s->f.moving=(unsigned char)moved;
+    /* PROTOTYPE diagnostics (branch v0.0.46-type1-stateful, COMBAT-CHASE-CHIM-STUCK-46): "aw_combat_cmd readout 2"
+     * is not a toggle word, so the cvar is set directly: aw_combat_readout 2 prints every chase think. */
+    if(readout.value>=2){
+        trace_t t;vec3_t end;edict_t *se=s->e;
+        VectorCopy(se->v.origin,end);end[2]-=8.75f;
+        t=SV_Move(se->v.origin,se->v.mins,se->v.maxs,end,MOVE_NORMAL,se);
+        Con_Printf("chase %s: mode %d step %d moved %d at %ld %ld %ld goal %ld %ld %ld onground %d hull %ld..%ld below frac %ld/100 solid %d/%d normz %ld/100 hit %d\n",
+            s->f.name,(int)s->path.mode,step,moved,(long)s->e->v.origin[0],(long)s->e->v.origin[1],(long)s->e->v.origin[2],
+            (long)goal[0],(long)goal[1],(long)goal[2],((int)s->e->v.flags&FL_ONGROUND)!=0,(long)s->e->v.mins[2],(long)s->e->v.maxs[2],
+            (long)(t.fraction*100),(int)t.startsolid,(int)t.allsolid,(long)(t.plane.normal[2]*100),t.ent!=NULL);
+    }
     if(s->path.mode==AW_PATH_LOST){
         totals.npc_flees++;
         if(readout.value)Con_Printf("Combat: %s cannot reach you and flees\n",s->f.name);
@@ -993,3 +1004,29 @@ void AW_CombatInit(void) {
     Cmd_AddCommand("+aw_alt",alt_down);Cmd_AddCommand("-aw_alt",alt_up);
     aw_combat_enemy_bar=AW_CombatEnemyBar;aw_combat_scene=AW_CombatSceneSpawn;
 }
+
+#include "aw_actors.h"
+/* PROTOTYPE (branch v0.0.46-type1-stateful, aw_actors.c): the window's
+ * stateful actors ask a resident's combat state, start a fight with the
+ * nearest one for a test, and let a dead one's slot go before it is freed. */
+int AW_CombatSlotState(edict_t *e,float *health) {
+    slot_t *s=slot_of(e);
+    if(!s)return 0;
+    if(health)*health=s->f.health;
+    return s->f.dead?2:1;
+}
+int AW_CombatTestEngage(edict_t *t,int dead) {
+    slot_t *s=slot_of(t);char id[32];aw_fighter_t sheet;eval_t *v;
+    if(!s){
+        v=GetEdictFieldValue(t,"aw_source_id");
+        if(!v || !v->string || !*(pr_strings+v->string))return 0;
+        strncpy(id,pr_strings+v->string,sizeof(id)-1);id[sizeof(id)-1]=0;
+        if(!AW_CombatActorLoad(id,&sheet) || !AW_CombatEngage(t,&sheet,NULL))return 0;
+        s=slot_of(t);if(!s)return 0;
+    }
+    if(dead){s->f.dead=1;s->f.health=0;set_state(s,S_DEAD,G_DEATH);}
+    return 1;
+}
+/* aw_actors.c: a resumed fight keeps the health the save or the change list held. */
+int AW_CombatSetHealth(edict_t *e,float health) {slot_t *s=slot_of(e);if(!s || !(health>0))return 0;s->f.health=health;return 1;}
+void AW_CombatForget(edict_t *e) {slot_t *s=slot_of(e);if(s)release(s);if(enemy==e)enemy=NULL;}

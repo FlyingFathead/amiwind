@@ -766,6 +766,9 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
         rows = 256 if total <= 512 else ((face_limit+31)//32)*16
         if alias_bytes(len(shapes[0]['positions']),total*3,total,512,rows) > full_frame_budget:
             raise AliasOverflow('Alias byte budget exceeded with full samples')
+    # barycentric weights of the 16 x 16 texels of a face tile: the same for every face
+    yy,xx=np.mgrid[0:16,0:16];tile_weights=np.column_stack((np.maximum(0,1-(xx.ravel()+yy.ravel())/15),xx.ravel()/15,yy.ravel()/15))
+    tile_weights/=tile_weights.sum(1)[:,None]
     for shape,(exact,points,ff) in zip(shapes,reduced):
         orig=shape['positions'];faces=shape['faces'];p=orig[0]
         old_tri=p[faces];centres=old_tri.mean(axis=1);tree=cKDTree(centres)
@@ -789,13 +792,12 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                     animated.append(transfer_vertex(point,orig[:,faces[ti]]))
                 allframes.append(np.stack(animated,axis=1))
             tile=np.zeros((16,16,3),np.uint8)
-            yy,xx=np.mgrid[0:16,0:16];w=np.column_stack((np.maximum(0,1-(xx.ravel()+yy.ravel())/15),xx.ravel()/15,yy.ravel()/15));w/=w.sum(1)[:,None]
-            samples=w@triangle
+            samples=tile_weights@triangle
             if exact:
                 # Protected shapes retain authored triangles and UV seams.
                 # Nearby folds must not lend their texture to the original face.
-                sampleuv=w@shape['uv'][faces[source_face]]
-                samplecolour=w@shape['colours'][faces[source_face],:3]
+                sampleuv=tile_weights@shape['uv'][faces[source_face]]
+                samplecolour=tile_weights@shape['colours'][faces[source_face],:3]
             else:
                 # Sample the closest original surface per texel. Projecting an
                 # entire decimated face onto one tiny source triangle crosses UV
@@ -805,8 +807,10 @@ def _bake(shapes,materials,textures,palette,face_limit,minimum_faces,quotas,shel
                 best=np.full(len(samples),np.inf);sampleuv=np.zeros((len(samples),2));samplecolour=np.ones((len(samples),3))
                 for ci in range(choices.shape[1]):
                     triids=choices[:,ci];tri=old_tri[triids]
-                    bases=np.stack((tri[:,1]-tri[:,0],tri[:,2]-tri[:,0]),axis=2)
-                    xy=np.einsum('nij,nj->ni',np.linalg.pinv(bases),samples-tri[:,0])
+                    # the pseudo-inverse of each original triangle's edge matrix, made once per shape above
+                    # (`inverse`; the same matrices, so bitwise the same values): it was made again for every
+                    # sample of every output face, 4.5 of 10 s of a body bake (BUILD-BODY-BAKE-SLOWER-44)
+                    xy=np.einsum('nij,nj->ni',inverse[triids],samples-tri[:,0])
                     bw=np.column_stack((1-xy.sum(1),xy));bw=np.maximum(bw,0);bw/=bw.sum(1)[:,None]
                     projected=np.einsum('nv,nvc->nc',bw,tri);dist=((projected-samples)**2).sum(1);take=dist<best
                     sampleuv[take]=np.einsum('nv,nvc->nc',bw,shape['uv'][faces[triids]])[take]

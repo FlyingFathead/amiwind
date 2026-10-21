@@ -67,7 +67,7 @@ class LinksBeforeModelTests(unittest.TestCase):
         self.assertIn('c->places[j].leaves || c->places[j].ent.efrag', release)
 
     def test_unplace_removes_links_whatever_the_leaf_count(self):
-        unplace = body(text('chim/chim_statics.c'), 'static void Unplace (chim_static_t *s)')
+        unplace = body(text('chim/chim_statics.c'), 'static void Unplace (chim_statics_t *L, chim_static_t *s)')
         remove = unplace.index('ChimGraft_RemoveEfrags (&s->ent)')
         leaves_block = body(unplace[unplace.index('if (s->leaves)'):], 'if (s->leaves)')
         self.assertNotIn('ChimGraft_RemoveEfrags', leaves_block)

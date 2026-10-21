@@ -460,7 +460,7 @@ void ED_Print (edict_t *ed)
 		return;
 	}
 
-	Con_Printf("\nEDICT %ld:\n", NUM_FOR_EDICT(ed));
+	Con_Printf("\nEDICT %d:\n", NUM_FOR_EDICT(ed));
 	for (i=1 ; i<progs->numfielddefs ; i++)
 	{
 		d = &pr_fielddefs[i];
@@ -551,7 +551,7 @@ void ED_PrintEdicts (void)
 {
 	int		i;
 
-	Con_Printf ("%ld entities\n", sv.num_edicts);
+	Con_Printf ("%d entities\n", sv.num_edicts);
 	for (i=0 ; i<sv.num_edicts ; i++)
 		ED_PrintNum (i);
 }
@@ -604,11 +604,11 @@ void ED_Count (void)
 			step++;
 	}
 
-	Con_Printf ("num_edicts:%3ld\n", sv.num_edicts);
-	Con_Printf ("active    :%3ld\n", active);
-	Con_Printf ("view      :%3ld\n", models);
-	Con_Printf ("touch     :%3ld\n", solid);
-	Con_Printf ("step      :%3ld\n", step);
+	Con_Printf ("num_edicts:%3d\n", sv.num_edicts);
+	Con_Printf ("active    :%3d\n", active);
+	Con_Printf ("view      :%3d\n", models);
+	Con_Printf ("touch     :%3d\n", solid);
+	Con_Printf ("step      :%3d\n", step);
 
 }
 
@@ -1033,7 +1033,7 @@ void ED_LoadFromFile (char *data)
 		PR_ExecuteProgram (func - pr_functions);
 	}
 
-	Con_DPrintf ("%ld entities inhibited\n", inhibit);
+	Con_DPrintf ("%d entities inhibited\n", inhibit);
 }
 
 
@@ -1055,7 +1055,7 @@ void PR_LoadProgs (void)
 	progs = (dprograms_t *)COM_LoadHunkFile ("progs.dat");
 	if (!progs)
 		Sys_Error ("PR_LoadProgs: couldn't load progs.dat");
-	Con_DPrintf ("Programs occupy %ldK.\n", com_filesize/1024);
+	Con_DPrintf ("Programs occupy %dK.\n", com_filesize/1024);
 
 	for (i=0 ; i<com_filesize ; i++)
 		CRC_ProcessByte (&pr_crc, ((byte *)progs)[i]);
@@ -1065,7 +1065,7 @@ void PR_LoadProgs (void)
 		((int *)progs)[i] = LittleLong ( ((int *)progs)[i] );
 
 	if (progs->version != PROG_VERSION)
-		Sys_Error ("progs.dat has wrong version number (%ld should be %ld)", progs->version, PROG_VERSION);
+		Sys_Error ("progs.dat has wrong version number (%d should be %d)", progs->version, PROG_VERSION);
 	if (progs->crc != PROGHEADER_CRC)
 		Sys_Error ("progs.dat system vars have been modified, progdefs.h is out of date");
 
@@ -1150,7 +1150,7 @@ void PR_Init (void)
 edict_t *EDICT_NUM(int n)
 {
 	if (n < 0 || n >= sv.max_edicts)
-		Sys_Error ("EDICT_NUM: bad number %ld", n);
+		Sys_Error ("EDICT_NUM: bad number %d", n);
 	return (edict_t *)((byte *)sv.edicts+ (n)*pr_edict_size);
 }
 

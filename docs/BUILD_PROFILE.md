@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -1024,13 +1024,40 @@ on the same commit, and its payload is compared file by file with the release
 payload before the release; the hit counts in the optimizer, cull and stair-walk
 receipts show what was reused. Without the option every pass runs on every map.
 
-The image step's stair walk (`--stair-walk`, default `auto`) walks every step
-and ramp in development builds (`all`: the gate rows and the advisory findings)
-and only the steps of flights in release candidates and finals (`flights`: the
-438 rows of the v0.0.33 payload that can stop a build, out of about 615,000); a
-nightly full report builds with `--stair-walk all`. A flight row is the same in
-both walks; the release receipt says that ramps and single steps were not walked
-(`scope`). Measured costs: [performance/BUILDER_PROFILE.md](performance/BUILDER_PROFILE.md).
+The stair walk (`--stair-walk`) is off by default since v0.0.47-dev1 (decided for the project, 20 October 2026,
+BUILD-STAIR-WALK-OFF-46): `auto` means off, and no build walks stairs unless asked with `flights` or `all`. When asked,
+`flights` walks only the steps of flights (what `auto` meant in every build from v0.0.46)
+(`flights`: the rows that can stop a build; the v0.0.46-dev1 CHIM world had 1,971 flight rows among 261,038 steps
+and ramps). `--stair-walk all` walks every step and ramp (the advisory findings too): a nightly or beta run on
+request. Before v0.0.46, `auto` meant `all` for development builds, and the CHIM gate walked every step and ramp
+whatever the scope (BUILD-STAIR-WALK-SCOPE-KEY-46). A flight row is the same in both walks; a flights receipt says
+so (`scope`). Measured costs: [performance/BUILDER_PROFILE.md](performance/BUILDER_PROFILE.md).
+
+What a CHIM frame's walk is keyed by (`--stair-walk-key`): `reach` (the default with the workspace's own walks)
+keys each core of the frame by its steps and ramps (the items the walk tests, by their SHA-256) and by the collision
+and polygons within the walk's reach of them: every chunk and placement whose polygons or collision box meet the
+placements the items belong to, grown by how far a walk traces and tests ground and headroom (about 72 units,
+made from the walker's own constants). Collision far from every stair (a rock's walls and underside out of reach)
+no longer walks a frame again. A core's items are found once and kept in the pool by the SHA-256 of the
+placements that can make them (`stair-walk-items/`), so an unchanged core does not read its frame to know them.
+`frame` keys a frame by every chunk and placement it holds (the key before v0.0.46, and the default with
+`--stair-walk-cache records`, whose shipped records are keyed by it). The sample check below stops the build when a
+key missed an input, and `tests/test_chim_stair_reach_key.py` traces walks and checks they read nothing outside
+their key.
+
+The stair watch list (`config/stair-watch.json`, `--stair-watch FILE|off`) names the places stair and walkway
+bugs reported (CHIM cells, frames and source references; interior maps): every build walks the frames and maps
+holding them again, even when their walk is reused, and stops when a walk again differs from its record. A bug page
+that reports a stair or walkway problem adds its place to the list, so the walk is the redundancy check for those
+places. `--stair-walk-places FILE|ID,...` (development builds only) walks ONLY the named places: watch list IDs,
+cells `x:y`, frame paths, source references `ref:N` and maps `map:NAME`; nothing else is walked or gated, and the
+rows are reported, never stored.
+
+The image step no longer walks the CHIM frame maps (`vf*.chim`: an empty world with the frame's entities and
+collision boxes; v0.0.46-dev1 walked 1,353 of them and found no row): the CHIM stair gate walks every frame on its
+real collision. `AMIWIND_STAIR_WALK_FRAME_MAPS=on` walks them again (the method before v0.0.46). The interiors and
+other legacy maps keep the map key (the SHA-256 of the map's bytes): a compiled map's collision is one tree, so a
+change anywhere in the map changes what a walk could read.
 
 The stair walk is a check of the collision, not a step every build must repeat. Every legacy map and every
 CHIM frame is walked once; its rows are kept by the SHA-256 of what the walk reads (the map's bytes, or the

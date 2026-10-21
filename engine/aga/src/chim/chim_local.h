@@ -6,6 +6,8 @@
 
 #include "chim.h"
 #include "chim_format.h"
+#include "chim_placed_clip.h"
+#include "chim_thgt.h"
 #include "chim_zone.h"
 #include "aw_inspect.h"
 
@@ -45,6 +47,10 @@ typedef struct chim_model_s
 	unsigned		id;
 	int				kind;
 	int				leafs;		/* decoded leaves, leaf 0 included */
+	/* 0.8: the piece table in lump 4 (model.visdata, chim_placed_clip.c):
+	 * its bytes, and 1 once it is in native order and usable */
+	long			piece_bytes;
+	int				pieces;
 } chim_model_t;
 
 /* Run-time placement: one per placement record of an active chunk. */
@@ -72,6 +78,8 @@ typedef struct
 	int			records, owned, models;
 	int			over_16_leaves;		/* records flagged by the builder */
 	chim_place_t		*places;
+	float		*rot;			/* 0.8: model -> world of each record (9 floats; ChimPlaced_AnglesMatrix),
+								 * NULL in 0.4-0.7 worlds */
 	chim_chunk_model_t	*model_list;
 	vec3_t		mins, maxs;		/* terrain and every placement box */
 	byte		*pvs;			/* compressed row over the frame's chunks */
@@ -102,7 +110,36 @@ typedef struct
 	unsigned long	failed_said;	/* tick + 1 of its last failure line (one line per 50 ticks) */
 	float		distance;		/* squared, to the chunk square */
 	float		priority;		/* squared; the nearer of the player and the point ahead */
+	/* Type 1 crossings (the window, chim_window.c): its frame's slot (0
+	 * without a window), the entry whose terrain stands at the same place
+	 * when that is another frame's (-1: this one's own ground), and whether
+	 * its activation locked its terrain (always, without a window). */
+	short		slot, shadow;
+	int			terrain_locked;
 } chim_entry_t;
+
+/* Type 1 crossings (docs/chim/CELL_CROSSINGS.md, "Type 1: one continuous
+ * world"): the region frames around the player are one window of up to
+ * CHIM_WINDOW_SLOTS frames in one frame world, at a fixed origin (the frame
+ * the map started on). A slot holds one frame: its chunk entries are
+ * chim_frame.entries[base, base + count), placed at offset (frame-local to
+ * the session's coordinates); its own chunk grid, placement ids and
+ * placement bits. */
+#define CHIM_WINDOW_SLOTS	4
+#define CHIM_CELL_UNITS		2048		/* a Morrowind exterior cell in map units (8,192 original) */
+typedef struct
+{
+	int				used, leaving;		/* leaving: its chunks wait to leave the frame world */
+	int				cx, cy, row;		/* its frame (= its cell) and FRAM file row */
+	float			offset[2];			/* frame-local -> session coordinates */
+	float			core[4];			/* the cell it owns, session coordinates: x0 y0 x1 y1 */
+	int				base, count;
+	unsigned		first_pid;
+	chim_frame_t	frame;				/* its own frame header (frame-local) */
+	short			*grid;				/* its chunk (x, y) -> local entry */
+	unsigned char	*drawn, *visible;	/* bits over its placement ids */
+	chim_user_t		user;				/* the zone block of the three above */
+} chim_slot_t;
 
 typedef struct
 {
@@ -115,6 +152,13 @@ typedef struct
 	int				view_entry;		/* chunk of the visible row, -1: none (all visible) */
 	unsigned		first_pid;		/* placement ids run on across frames: this frame's first */
 	int				active, loaded;
+	/* Type 1 (chim_window.c): 1 when this map runs a window of frames; then
+	 * frame.low/nx/ny is the window's chunk grid in the session's coordinates
+	 * (frame.centre, cx, cy stay the map's own frame: the session origin). */
+	int				window, slot_entries, view_slot, block_set;
+	int				block[2];		/* the window's 2 x 2 block of cells: its south-west cell */
+	chim_slot_t		slot[CHIM_WINDOW_SLOTS];
+	unsigned long	joins, leaves, crossings, recentres;
 } chim_frame_state_t;
 
 /* A row of the index's file table as the engine keeps it (CHIM-ZONE-RELEASE-
@@ -154,6 +198,8 @@ typedef struct
 	byte			*buffer;		/* the loading buffer */
 	int				buffer_bytes;
 	unsigned long	bytes_read, reads, model_loads, texture_loads, chunk_loads;
+	unsigned long	terc_records;		/* 0.10: compact terrain records expanded */
+	chim_thgt_stats_t	thgt;			/* 0.11: generated terrain records and the work done */
 	unsigned long	streamed_models, failed_loads, opens;
 	unsigned long	prefetch_hits, prefetch_bytes;	/* the prefetch (chim_prefetch.c): reads served, bytes read ahead */
 	int				minor;			/* the world's format minor */
@@ -207,6 +253,7 @@ int ChimModels_TerrainPlace (int entry, chim_pack_t **pack, long *at, long *byte
 int ChimModels_Busy (void);
 chim_model_t *ChimModels_Terrain (int entry);
 void ChimModels_Abort (void);
+int ChimModels_JobTerrain (void);
 int ChimModels_ResidentTextures (void);
 void ChimModels_IndexSlots (void);
 
@@ -217,6 +264,14 @@ void ChimChunks_Tick (const vec3_t origin, long budget, int prime);
 void ChimChunks_Link (void);
 void ChimChunks_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *best);
 int ChimChunks_Pick (const vec3_t start, const vec3_t end, aw_chim_pick_t *out);
+/* 0.9 reach references: served from a resident owner catalogue, read from
+ * disk, and the owner record runs read (chim_chunks.c ReachRecord). */
+typedef struct
+{
+	unsigned long	resident, read, span_reads;
+} chim_reach_stats_t;
+extern chim_reach_stats_t chim_reach_stats;
+extern int chim_reach_resident;
 void ChimChunks_Report (void);
 void ChimChunks_Init (void);
 void ChimChunks_Counts (int *linked, int *efrags, int *one_leaf, int *max_leaves);
@@ -226,6 +281,20 @@ int ChimChunks_Hidden (void);
 unsigned long ChimChunks_PrefetchHeld (void);
 void ChimChunks_LastFrame (int *sent, int *one_leaf_path, int *placements);
 int ChimChunks_CellEntry (int x, int y);
+int ChimChunks_RowSees (const byte *row, int from, int to);
+int ChimChunks_RowEntries (int entry);
+int ChimChunks_Grounded (int entry);
+int ChimChunks_WindowOn (int on);
+int ChimChunks_WindowCross (const vec3_t origin, int *cx, int *cy);
+int ChimChunks_WindowRecentre (int cx, int cy, float *d);
+int ChimChunks_WindowOffset (int cx, int cy, float *d);
+int ChimChunks_RecentreOn (int on);
+int ChimGraft_Recentre (void);
+void ChimStatics_Recentre (const float *d);
+void ChimFar_Recentre (const float *d);
+void ChimCuts_Recentre (const float *d);
+void ChimChunks_WindowReport (void);
+extern int (*chim_cell_map)(int cx, int cy, char *name, int size);	/* aw_world.c: a cell's region map name */
 void ChimChunks_ReleaseEfrags (void);
 int ChimChunks_Frozen (edict_t *ent);
 int ChimChunks_FrozenLast (void);
@@ -242,6 +311,8 @@ void ChimChunks_Pressure (unsigned long *released_band, unsigned long *released_
 /* chim_statics.c */
 void ChimStatics_Begin (int stated, int chunks);
 void ChimStatics_End (void);
+int ChimStatics_SlotJoin (int slot, int base, int chunks, const char *map, const float *offset);
+void ChimStatics_SlotEnd (int slot);
 int ChimStatics_Capture (char **data);
 int ChimStatics_Count (void);
 entity_t *ChimStatics_Entity (int i);

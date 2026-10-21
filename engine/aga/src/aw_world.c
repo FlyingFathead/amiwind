@@ -207,6 +207,16 @@ int AW_WorldDestination(const char *name,const float *local,char *target,float *
     return target_map(target);
 }
 
+/* A cell's region map name (vfNNNN), for CHIM's window of region frames (type 1
+ * crossings): the map whose core holds the cell's centre. 0: none, or the cell is
+ * a town's (a town frame never joins a window). */
+int AW_CellMap(int cx,int cy,char *name,int size){
+    float world[2],arrival[3];char target[32];
+    world[0]=cx*8192.0f+4096.0f;world[1]=cy*8192.0f+4096.0f;
+    if(size<2 || !AW_WorldMapTarget(world,target,arrival) || AW_TerrainId(target)<0)return 0;
+    strncpy(name,target,size-1);name[size-1]=0;
+    return 1;
+}
 /* Resolve a clicked original-game XY position. Z is deliberately not inferred
  * from map colour or the current player's altitude: the destination scene checks
  * its actual standing collision before placing the player. */

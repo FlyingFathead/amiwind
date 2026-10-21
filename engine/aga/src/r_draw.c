@@ -53,6 +53,9 @@ qboolean		r_nearzionly;
 
 int		sintable[SIN_BUFFER_SIZE];
 int		intsintable[SIN_BUFFER_SIZE];
+/* aw_ghostfence 0 (dbg ghostfence off): a flat table of the sine table's middle value, so a turbulent texture
+ * (the Ghostfence curtain, waterfalls, water) is drawn straight and still; only its first CYCLE entries are read. */
+int		stillturbtable[CYCLE];
 
 // Per-frame cached turbulence table pointers
 int		*r_turb_sintable;

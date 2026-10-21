@@ -7,9 +7,9 @@
    "hunk_bytes": 8704
   },
   "cvars": {
-   "count": 333,
-   "static_bytes": 7992,
-   "zone_bytes": 10880
+   "count": 334,
+   "static_bytes": 8016,
+   "zone_bytes": 10912
   },
   "tables": {
    "count": 0,
@@ -32,7 +32,8 @@
   "2026-10-17: SKY-STAR-TWINKLE-LATE-42, maintainer-requested star twinkle switch (TG 2026-10-17 12:51: config flag on/off, default on, minimal strength): aw_star_twinkle, one saved cvar (24 structure bytes, 32 zone bytes); dbg startwinkle reuses the on-disk catalogue. 0 keeps the stars steady, 1 is the unchanged default pulse.",
   "2026-10-17: the maintainer-requested debug torch (test only) while AmiWind is a preview (TG 12:42): aw_debug_torch, one cvar set by the builder's game config (1 until the final game, not saved), decides whether the player leaves the census office with the never-burning torch; the grant, the catalogue row and the lit torch need no command or static table.",
   "2026-10-17: maintainer-ordered automatic use of extra Fast RAM (v0.0.42-rc1, docs/ROADMAP.md cache plan: \"the benefits come automatically\", with an Options setting to turn it off for good): aw_autoram, one saved cvar (24 structure bytes, 32 zone bytes) behind Options > Extra RAM; no command (the startup notice's key and the chim command's memory line need none).",
-  "2026-10-20: SKY-REDMOUNTAIN-BLUE-44 (v0.0.45 known list, fix job on branch v0.0.46-sky-pedestal): region weather needs aw_weather, one saved cvar (default 1 = the region weather; 0 = the old clear sky everywhere, the earlier method kept selectable) and aw_weather_set, one command record (dbg weather: force a weather for in-game checks, status with the region chances). Raised on the worker branch; the maintainer approves it at merge."
+  "2026-10-20: SKY-REDMOUNTAIN-BLUE-44 (v0.0.45 known list, fix job on branch v0.0.46-sky-pedestal): region weather needs aw_weather, one saved cvar (default 1 = the region weather; 0 = the old clear sky everywhere, the earlier method kept selectable) and aw_weather_set, one command record (dbg weather: force a weather for in-game checks, status with the region chances). Raised on the worker branch; the maintainer approves it at merge.",
+  "2026-10-21: GHOSTFENCE-NO-ANIMATION-46, maintainer request (desktop chat 2026-10-21: the turbulent Ghostfence on by default with a dbg option for on/off): aw_ghostfence, one cvar (24 structure bytes, 32 zone bytes; default 1, not saved); dbg ghostfence reuses the on-disk catalogue, no command. The still table it selects is 512 bytes (CYCLE ints), under the 1 KiB static-table line."
  ],
  "entries": {
   "commands": [
@@ -383,6 +384,7 @@
    "aw_fog_location",
    "aw_fpucount",
    "aw_gallery_defaults",
+   "aw_ghostfence",
    "aw_guard_torch_radius",
    "aw_harvest_mode",
    "aw_headlamp",

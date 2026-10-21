@@ -30,7 +30,7 @@ import numpy as np
 from chim import BUILDER, CHIM_VERSION, FORMAT_VERSION
 from chim.terrain import TERRAIN_LIGHT, WATER_LEVEL, chunk_ceiling, frame_ceiling, terrain_unit
 from chim.texfx import apply_effects, load_effect
-from chim.units import Timer, UnitCache, fingerprint, run_units
+from chim.units import Timer, UnitCache, content_key, fingerprint, result_key, run_units
 from chim.world import build_frames, write_json
 
 
@@ -225,10 +225,25 @@ def hull_surface_gate(area, models, prepared, mesh_fps, archive, mode, jobs, cac
     return over
 
 
-def mesh_fingerprint(model, profile, texture_records):
+def mesh_fingerprint(model, profile, texture_records, kind='mesh'):
     """A mesh unit by content: its record without layout (mesh and collision hashes, materials with their
-    textures' hashes), and its profile."""
-    return fingerprint('mesh', canonical_model(model, texture_records), profile)
+    textures' hashes), and its profile. KIND 'mesh-stair': the stair collision method 1 worker's code key
+    (chim.units.CODE_ENTRIES), so method 1's code never enters a default mesh unit's key."""
+    return fingerprint(kind, canonical_model(model, texture_records), profile)
+
+
+def mesh_result_keys(items, prepared, indices, tag=None):
+    """{model index: the key of its prepared mesh for the units it feeds} (the variants and the collision surface
+    gate): the mesh's input content and the SHA-256 of the prepared mesh (chim.units.result_key), so a mesh unit
+    rebuilt for a code change with a byte-identical result keeps every variant's key (early cutoff in the unit
+    layer, BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46). ITEMS: run_units' [(fp, (mi, model, profile, archive,
+    textures))] in the order of INDICES; TAG: the mesh key's own tag ('town flora', 'opening')."""
+    keys = {}
+    for mi, (fp, task) in zip(indices, items):
+        _, model, profile, _, texture_records = task
+        keys[mi] = result_key('mesh', content_key(tag, canonical_model(model, texture_records), profile),
+                              prepared[mi], fp)
+    return keys
 
 
 # Placements of a mesh without collision (kelp, grass, ferns) are scaled to the nearest SCALE_SNAP: every distinct
@@ -302,9 +317,30 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     timer = timer or Timer()
     cache = cache or UnitCache()
     references = snap_scales(references, prepared)
+    # EXPERIMENTAL world format 0.8 (build setting placement_format, chim.placed): one model per mesh + scale, the
+    # full rotation in the record; off (default), nothing below changes
+    placed = None
+    if (settings or {}).get('placement_format', '0.7') != '0.7':
+        from chim import placed
+        placed.placement_format(settings)               # refused before any unit (fail fast)
+        if float((settings or {}).get('cut_models_over', CUT_MODELS_OVER)) > 0 and \
+                (settings or {}).get('cut_mode', 'tiles') != 'tiles':
+            raise ValueError('World format 0.8 cuts large models only by tiles (cut_mode tiles)')
+        if str((settings or {}).get('model_bevels', 'profile')).startswith('tol:'):
+            raise ValueError('World format 0.8 does not take model_bevels tol:N (its collision is the placed pieces)')
+
+    def clips(ref):
+        return models[ref['model_index']].get('_clip_to_terrain', (settings or {}).get('clip_to_terrain', False))
+
+    def shared(ref):
+        # drawn by the mesh + scale model of format 0.8 (a model clipped to the terrain keeps its tilt baked)
+        return placed is not None and not clips(ref)
+
+    def vkey(ref):
+        return variant_key(placed.untilt(ref)) if shared(ref) else variant_key(ref)
     firsts = {}
     for ref in references:
-        firsts.setdefault(variant_key(ref), ref)
+        firsts.setdefault(vkey(ref), placed.untilt(ref) if shared(ref) else ref)
     order = list(firsts)
     clip_spec = None
     if any(models[r['model_index']].get('_clip_to_terrain', (settings or {}).get('clip_to_terrain', False))
@@ -340,12 +376,20 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             profile = model['_profile'] if '_profile' in model else profiles[model['source']]
             size = profile.get('texture_size', 64)
             exact = bool(prepared[mi][4].get('collision_bevels'))
+            if (settings or {}).get('model_bevels', 'profile') != 'profile':
+                # EXPERIMENTAL edge bevels on every model (chim.bevels; CHIM-COMPILED-HULL-OVERFILL-46)
+                from chim.bevels import model_bevels_mode
+                bevels = model_bevels_mode(settings)
+                exact = exact or bevels == 'exact'
             task = {'ref': ref, 'data': prepared[mi], 'texsize': size, 'centre': list(centre), 'model': model,
                     'texture_shas': texture_shas,
                     'exact': exact, 'hollow': bool(profile.get('hollow_collision')),
                     'qbsp': str(qbsp) if qbsp else None,
                     'collision_cache': str(collision_cache) if collision_cache else None,
-                    'hull_patch': model_hull_patch_on(settings), 'weld': model_weld_mode(settings)}
+                    'hull_patch': model_hull_patch_on(settings), 'weld': model_weld_mode(settings),
+                    'uv_scroll': uv_scroll_mode(settings)}
+            if (settings or {}).get('model_bevels', 'profile') != 'profile' and not exact:
+                task['bevel_tolerance'] = model_bevels_mode(settings)
             # the hull mode changes the model's collision bytes (routed_hull): part of its identity
             from mesh_geometry_env import model_hull_mode
             from routed_hull import chain_depth_limit, keep_chain_set, mesh_stem
@@ -364,17 +408,39 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                              ref.get('_flatten_shift', 0), ref.get('_visual_offset', [0, 0, 0]))
             if checked:
                 fp = fingerprint('variant', fp, *checked)
+            if 'bevel_tolerance' in task:
+                # other standing hulls, another key; without the setting every key is as before
+                fp = fingerprint('variant', fp, 'bevel-tolerance', task['bevel_tolerance'])
+            if task['uv_scroll'] != 'off' and any(m.get('uv_scroll') for m in model['materials']):
+                # a scrolling texture drawn turbulent (GHOSTFENCE-NO-ANIMATION-46): other texture names, another key;
+                # every other model keeps its key
+                fp = fingerprint('variant', fp, 'uv-scroll-1', task['uv_scroll'])
             if task['weld'] == 'base':
                 # vertices shared as in the base (chim.models.base_frame, CHIM-STRIDER-SCALED-SEAMS-36): other bytes
                 # than the placed-position sharing for most scaled and tilted variants, so another key
                 fp = fingerprint('variant', fp, 'weld-base-1')
             if clip_spec is not None and model.get('_clip_to_terrain', (settings or {}).get('clip_to_terrain', False)):
                 poses = [(tuple(float(v) for v in (np.array(r['position'])-np.array([*centre,0]))*.25), yaw_degrees(r))
-                         for r in references if variant_key(r)==k]
+                         for r in references if vkey(r)==k]
                 task['terrain_clip'] = dict(clip_spec, placements=poses)
                 fp = fingerprint('variant', fp, 'terrain-render-clip-v1', task['terrain_clip'])
+            if shared(ref):
+                # format 0.8: the untilted model with its piece table (chim.placed; own unit kind and key)
+                task['placed'] = True
+                fp = fingerprint('variant-placed', fp, 'piece-table-1')
             items.append((fp, task))
-        results = run_units('variant', items, variant_unit, jobs, cache)
+        if any('bevel_tolerance' in t for _, t in items):
+            from chim.bevels import variant_unit_bevels
+            results = run_units('variant-bevels', items, variant_unit_bevels, jobs, cache)
+        elif placed is not None:
+            results = [None] * len(items)
+            for kind, run in (('variant', variant_unit), ('variant-placed', placed.variant_unit_placed)):
+                at = [i for i, (_, t) in enumerate(items) if bool(t.get('placed')) == (kind == 'variant-placed')]
+                if at:
+                    for i, res in zip(at, run_units(kind, [items[i] for i in at], run, jobs, cache)):
+                        results[i] = res
+        else:
+            results = run_units('variant', items, variant_unit, jobs, cache)
         variant_fps = {k: fp for k, (fp, _) in zip(order, items)}
         variant_tasks = {k: task for k, (_, task) in zip(order, items)}
     variants, names, fallbacks, routed, checks, reasons = {}, set(), [], [], [], {}
@@ -407,7 +473,8 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                 if tkey in tasks:
                     continue
                 flat = tkey[1] == 'flatten'
-                kind, glow = ('flatten', 0) if flat else ('surface', tkey[4])
+                kind, glow = ('flatten', 0) if flat else (
+                    ('turbulent', 0) if len(tkey) > 5 and tkey[5] == 'turbulent' else ('surface', tkey[4]))
                 ti = None if flat else (index_of_sha[tkey[1]] if isinstance(tkey[1], str) else tkey[1])
                 flat_rgb = prepared[mi][4].get('_flat_rgb') if flat else None
                 source_archive = model.get('_archive', archive)
@@ -438,8 +505,19 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     g = (settings or {}).get('grain', 256)
     # ground or placements near or over the terrain ceiling raise the frame's ceiling (every chunk of it) to the
     # highest plus a flight band (chim.terrain.frame_ceiling, CHIM-RED-MOUNTAIN-SOLID-SKY-43); other frames keep theirs
-    ceiling = frame_ceiling(frame_ground_zmax(heights, ground, liquids, WATER_LEVEL),
-                            frame_placement_top(references, variants, centre), ceiling)
+    if placed is None:
+        top = frame_placement_top(references, variants, centre)
+    else:
+        # format 0.8: a shared model's top as placed (turned by its angles)
+        tops = []
+        for ref in references:
+            v = variants.get(vkey(ref))
+            if v and 'hi' in v:
+                o = [float(x) * 0.25 for x in (np.array(ref['position']) - np.array([*centre, 0]))]
+                turn = placed.quake_angles(ref) if shared(ref) else (0.0, yaw_degrees(ref), 0.0)
+                tops.append(placed.placed_box(o, turn, v['lo'], v['hi'])[1][2])
+        top = max(tops) if tops else None
+    ceiling = frame_ceiling(frame_ground_zmax(heights, ground, liquids, WATER_LEVEL), top, ceiling)
     with timer.section('chunk terrain'):
         nx, ny = int(frame['span'][0] // g), int(frame['span'][1] // g)
         per = int(g // step)
@@ -533,9 +611,21 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                 task = dict(variant_tasks[k], grain=g)
                 task.pop('qbsp', None)
                 task.pop('collision_cache', None)
-                items.append((fingerprint('tiles', variant_fps[k], g), task))
+                items.append((fingerprint('tiles-placed' if task.get('placed') else 'tiles', variant_fps[k], g), task))
             keys = [k for k in order if cut_candidate(variants[k], cut_over, keep_whole)]
-            for k, tiles in zip(keys, run_units('tiles', items, tile_unit, jobs, cache)):
+            if any('bevel_tolerance' in t for _, t in items):
+                from chim.bevels import tile_unit_bevels
+                tile_results = run_units('tiles-bevels', items, tile_unit_bevels, jobs, cache)
+            elif placed is not None:
+                tile_results = [None] * len(items)
+                for kind, run in (('tiles', tile_unit), ('tiles-placed', placed.tile_unit_placed)):
+                    at = [i for i, (_, t) in enumerate(items) if bool(t.get('placed')) == (kind == 'tiles-placed')]
+                    if at:
+                        for i, res in zip(at, run_units(kind, [items[i] for i in at], run, jobs, cache)):
+                            tile_results[i] = res
+            else:
+                tile_results = run_units('tiles', items, tile_unit, jobs, cache)
+            for k, tiles in zip(keys, tile_results):
                 tiled[k] = tiles
                 for t in tiles:
                     variants[('tile', k, *t['tile'])] = dict(t, name='%s@tile%d,%d' % (variants[k]['name'], *t['tile']),
@@ -561,15 +651,19 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     placements = []
     for ref in references:
         cell = tuple(ref.get('cell') or (math.floor(ref['position'][0] / 8192), math.floor(ref['position'][1] / 8192)))
-        if variant_key(ref) in tiled:
+        # format 0.8: every record carries Quake angles (a model clipped to the terrain: its yaw only)
+        turn = None if placed is None else (placed.quake_angles(ref) if shared(ref) else (0.0, yaw_degrees(ref), 0.0))
+        if vkey(ref) in tiled:
             from chim.cut import piece_ref, rotation
-            k = variant_key(ref)
+            k = vkey(ref)
             o = (np.array(ref['position']) - np.array([*centre, 0])) * 0.25
-            R = rotation(yaw_degrees(ref))
+            R = rotation(yaw_degrees(ref)) if turn is None or not (turn[0] or turn[2]) else placed.model_matrix(turn)
             for index, t in enumerate(tiled[k], 1):
                 row = {'ref': piece_ref(ref['number'], index), 'cell': cell,
                        'origin': tuple(float(v) for v in o + R @ np.array(t['centre'])), 'yaw': yaw_degrees(ref),
                        'variant': ('tile', k, *t['tile'])}
+                if turn is not None:
+                    row.update(yaw=turn[1], angles=turn)
                 if ref.get('_story_hidden'):
                     row['story_hidden'] = True
                 placements.append(row)
@@ -589,7 +683,9 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             continue
         origin = tuple(float(v) for v in (np.array(ref['position']) - np.array([*centre, 0])) * 0.25)
         row = {'ref': ref['number'], 'cell': cell, 'origin': origin, 'yaw': yaw_degrees(ref),
-               'variant': variant_key(ref)}
+               'variant': vkey(ref)}
+        if turn is not None:
+            row.update(yaw=turn[1], angles=turn)
         if ref.get('_story_hidden'):
             row['story_hidden'] = True       # format 0.5 (FLAG_STORY_HIDDEN); absent: the 0.4 record, unchanged
         placements.append(row)
@@ -628,6 +724,17 @@ def model_hull_patch_on(settings):
     if mode not in MODEL_HULL_PATCH:
         raise ValueError('Unknown model hull patch mode: %s' % mode)
     return mode == 'on'
+
+
+def uv_scroll_mode(settings):
+    """How a shape whose texture scrolls in the original is drawn (build setting 'uv_scroll'; chim.models.UV_SCROLL):
+    'off' (default, a still texture as before v0.0.46) or 'turbulent' (a Quake turbulent texture,
+    GHOSTFENCE-NO-ANIMATION-46)."""
+    from chim.models import UV_SCROLL
+    mode = (settings or {}).get('uv_scroll', 'off')
+    if mode not in UV_SCROLL:
+        raise ValueError('Unknown uv_scroll mode: %s' % mode)
+    return mode
 
 
 def model_weld_mode(settings):
@@ -814,7 +921,7 @@ def add_town_flora(found, flora, models, textures, prepared, mesh_fps, selected,
     keys = sorted(fmodels)
     for key, (fp, _), result in zip(keys, items, run_units('mesh', items, mesh_unit, jobs, cache)):
         prepared[fmodels[key]] = result
-        mesh_fps[fmodels[key]] = fp
+    mesh_fps.update(mesh_result_keys(items, prepared, [fmodels[key] for key in keys], 'town flora'))
     for ref in frefs:
         from chim.ownership import capture
         selected.append(dict(capture(ref), model_index=fmodels[(ref['model_index'], modes[ref['number']])]))
@@ -1444,6 +1551,15 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     from mesh_geometry_env import hull_points_mode
     hull_points = hull_points_mode()
     hull_surface_meshes = hull_surface_table() if hull_points in ('table', 'table-whole') else set()
+    from stair_collision_env import stair_collision_method
+    stair_collision = stair_collision_method()
+    # stair collision method 1: its own unit kind and worker (stair_mesh.mesh_unit_stair); default builds keep the
+    # mesh units, worker and code keys they had (CHIM-STAIR-COLLISION-MESH-47)
+    mesh_kind = 'mesh-stair' if stair_collision == '1' else 'mesh'
+    if mesh_kind == 'mesh-stair':
+        from stair_mesh import mesh_unit_stair as mesh_worker
+    else:
+        mesh_worker = mesh_unit
     for mi, model in enumerate(index['models']):
         profile = town_model_profile(group[model['source']], model['source'], model['triangles'],
                                      underpass_names=underside == 'names')
@@ -1453,6 +1569,10 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         # collision over the visible stair treads (and architecture's walkways) checked against the mesh as drawn
         # (mesh_geometry.clear_visible_treads, CHIM-STAIR-STEPS-SOLID-43)
         profile['visible_treads'] = True
+        if stair_collision == '1':
+            # stair collision method 1 (default off): a stairway collision mesh per flight that fails the geometric
+            # stair check (tools/stair_mesh.py, CHIM-STAIR-COLLISION-MESH-47); method 0 leaves the profile as it was
+            profile['stair_collision'] = 'mesh'
         if hull_points == 'all' or model['source'].replace(chr(92), '/').casefold() in hull_surface_meshes:
             # a convex piece keeps all its points when the reduced hull lies under its source surface (a dock walkway
             # sank the player 19 units into its planks, mesh_geometry.collision_parts, CHIM-VIVEC-DOCK-WALKWAY-43);
@@ -1489,15 +1609,22 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
             profile = apply_recipe(profile, model, everywhere, recipes)
         model['_profile'] = profile
         profiles[model['source']] = profile
-        fp = mesh_fingerprint(model, profile, index['textures'])
+        fp = mesh_fingerprint(model, profile, index['textures'], mesh_kind)
         if model['source'] in rebuild_meshes:
             fp = fingerprint('mesh', fp, 'rebuild', time.time_ns())
         items.append((fp, (mi, model, profile, archive, index['textures'])))
     with timer.section('meshes'):
-        prepared = dict(enumerate(run_units('mesh', items, mesh_unit, jobs, cache)))
-    mesh_fps = {mi: fp for mi, (fp, _) in enumerate(items)}
+        prepared = dict(enumerate(run_units(mesh_kind, items, mesh_worker, jobs, cache)))
+    mesh_fps = mesh_result_keys(items, prepared, range(len(items)))
     with timer.section('collision surface gate'):
         hull_surface_gate(town, index['models'], prepared, mesh_fps, archive, hull_points, jobs, cache)
+    if stair_collision == '1':
+        # stair collision method 1: each mesh's stair check (prepare_mesh_bsp: lod stair_check) for the stage's
+        # collected report and gate (chim_build: stair_mesh.require); method 0 writes nothing
+        from stair_mesh import REPORT_NAME
+        rows = [dict(prepared[mi][4]['stair_check'], mesh=model['source'])
+                for mi, model in enumerate(index['models']) if prepared[mi][4].get('stair_check')]
+        write_json(work / REPORT_NAME, {'format': 1, 'meshes': rows})
     # The town's placements, as its legacy region maps hold them (town_regions.town_references): a
     # frame centred off the cell grid (Vivec's Arena) audits whole cells around it (CHIM-PAYLOAD-PARITY-33).
     from town_regions import town_references

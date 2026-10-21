@@ -89,10 +89,13 @@ class TranslateTests(unittest.TestCase):
     def test_build_options_reach_the_chim_stage_only_when_given(self):
         import argparse
         from build import chim_stage_options
-        self.assertEqual(chim_stage_options(argparse.Namespace()), [])
-        self.assertEqual(chim_stage_options(argparse.Namespace(chim_terrain_hull='auto', chim_terrain_refs='off')), [])
+        # a build's own default since v0.0.47 (GHOSTFENCE-NO-ANIMATION-46): turbulent scrolling textures
+        default = ['--uv-scroll', 'turbulent']
+        self.assertEqual(chim_stage_options(argparse.Namespace()), default)
+        self.assertEqual(chim_stage_options(argparse.Namespace(chim_terrain_hull='auto', chim_terrain_refs='off')),
+                         default)
         self.assertEqual(chim_stage_options(argparse.Namespace(chim_terrain_hull='compiled', chim_terrain_refs='on')),
-                         ['--terrain-hull', 'compiled', '--terrain-refs', 'on'])
+                         ['--terrain-hull', 'compiled', '--terrain-refs', 'on'] + default)
 
     def test_the_setting_is_off_by_default(self):
         self.assertFalse(terrain_refs_on({}))

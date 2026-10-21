@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -9,6 +9,7 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 - [Units](#units)
 - [Why reuse is safe](#why-reuse-is-safe)
 - [Early cutoff](#early-cutoff)
+- [Code keys and early cutoff in the unit caches](#code-keys-and-early-cutoff-in-the-unit-caches)
 - [Narrowed reuse: what a stage really used](#narrowed-reuse-what-a-stage-really-used)
 - [Reuse preflight](#reuse-preflight)
 - [Run names](#run-names)
@@ -17,6 +18,8 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 - [Fail fast](#fail-fast)
 - [Hierarchical output hashes](#hierarchical-output-hashes)
 - [Selective rebuilds](#selective-rebuilds)
+- [Clean builds and public defaults](#clean-builds-and-public-defaults)
+  - [Before a release](#before-a-release)
 - [Stage hashes and reference checksums](#stage-hashes-and-reference-checksums)
 - [End summary](#end-summary)
 - [Largest unit](#largest-unit)
@@ -127,6 +130,14 @@ that run code on import (anything but a literal). Adding or changing a function 
 stage reaches changes no stage key. A reuse source recorded in form 1 is compared in
 form 1, so the change of form costs no rebuild (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
 
+The data files a stage's key counts are those its reached code names. A function default that only builds a path
+(`config_dir=ROOT / 'config'`) names its files for that function alone: a stage that imports the module but never
+calls the function is not keyed on them. A loop over a written-out list names only the listed files, also when the
+list is held in a local name and the loop name is bound by another loop too. Until 21 October 2026 both counted the
+whole `config/` folder, so every new entry in `config/option-changes.json` rebuilt the CHIM, town, flora, engine and
+image stages (BUILD-OPTION-RECORD-KEYS-STAGES-47). A default that runs code, or a list that is changed or passed on,
+still counts as before.
+
 The image-pass and unit caches (`tools/pass_cache.py`) use form 2 as well. Their keys
 also leave out `tools/pass_cache.py` itself: that is the cache's own key and storage
 code, and a change in what a stored result means changes its `FORMAT`. On a miss, a
@@ -134,6 +145,38 @@ pass looks the input up once under the form-1 key, verifies the entry by SHA-256
 records it under the new key, so the change of form recomputes nothing
 (BUILD-PASS-KEY-OVERBROAD-36: Vivec stage A try3 recomputed all 275 head previews after
 a new function was added to `tools/build_parallel.py`).
+
+## Code keys and early cutoff in the unit caches
+
+The CHIM units and the NPC gallery models are keyed on the code their worker can reach,
+not on whole source files (`tools/code_key.py`):
+
+- **What counts.** A unit kind names its worker function (`chim.units.CODE_ENTRIES`,
+  `gallery_cache.CODE_ENTRIES`), and, for a module whose classes run on objects the worker
+  is handed, that module's import-time code. The key holds every function and module the
+  entries can reach, plus the data files the kind names. Each piece is hashed as its
+  tokens: a comment, a blank line or spacing changes no key; any other edit does.
+  Measured on the v0.0.46-dev1 rebuild (the walkable-surface hull fix in
+  `tools/mesh_geometry.py`, commits f5a1404a to e86b1704): with whole files, the mesh,
+  collision surface gate, variant, terrain, tile, cut and ocean keys all changed (3,551
+  gallery models too); with code keys only the mesh and collision surface gate keys
+  change, the units that run the changed code.
+- **Never narrower than what runs.** Every unit that is built is traced
+  (`sys.monitoring`): if a worker runs a repository function outside its key, the units of
+  that call are not stored, nor any later unit of that kind in the process, and the build
+  prints the function. A missing entry costs reuse, never a stale unit.
+- **Early cutoff between units.** The variants and the collision surface gate are keyed
+  on the prepared mesh's content (its record and profile) and the SHA-256 of the prepared
+  mesh itself, not on the mesh unit's key. A mesh unit that runs again for a code change
+  and comes out byte-identical keeps the keys of every variant after it.
+- **No rebuild for the change of form.** Each key also carries its whole-file form; a unit
+  not found under its key is looked up under that form, and a gallery model under its
+  previous identity, so the first build with code keys reuses everything stored before.
+  `AMIWIND_UNIT_CODE_KEYS=off` keeps the whole-file keys (A/B).
+
+A setting the builder passes only for its logs (the host's UTC offset of the progress
+lines, `AMIWIND_LOCAL_UTC_OFFSET`) is no stage input. When a name joins that list, runs
+that recorded it are still reused: the comparison leaves the listed names out.
 
 ## Narrowed reuse: what a stage really used
 
@@ -346,6 +389,52 @@ units with their names, keys, file counts and sizes. Units that read game data a
 cached only when the build has an input lock (the game data identity); a unit whose
 receipt does not survive a JSON round trip unchanged is never cached, so a cached unit
 returns exactly what a built one would.
+
+## Clean builds and public defaults
+
+Reuse makes our own rebuilds fast, but it can also hide a problem that a first-time
+user meets: a stage that passes only because an earlier build stored its result, or a
+build that passes only with an input that is not in the source tree. Two switches,
+both off by default, build the way a public user does. Neither changes a stage command
+or a stage key; when given, the build receipt (`build-state.json`) records them.
+
+`--clean` builds with nothing from an earlier build:
+
+- `--reuse-from`, `--rebuild-stage`, `--rebuild-unit`, `--prerendered`,
+  `--allow-release-reuse`, and caches or pools outside the workspace
+  (`--storage-pool-dir`, the build config's `storage_pool_dir`, `--gallery-cache`,
+  `--parts-cache`, `--gallery-seed-run`) are refused;
+- the workspace cache (`WORKSPACE/cache`: the world terrain, CHIM unit, media,
+  image-pass, stair-walk, NPC gallery and parts caches and the storage pool) must be
+  empty or absent. A filled one is refused and never emptied: give a new
+  `--workspace`. The caches fill during the build, as they do for a first-time user,
+  so a clean build that stops is started again in a new workspace;
+- environment variables that point the builder at another cache, pool or record
+  folder (`AMIWIND_PASS_CACHE`, `AMIWIND_CACHE_FALLBACK`, `AMIWIND_STORAGE_POOL`,
+  `AMIWIND_COST_HISTORY`, `AMIWIND_STAIR_RECORDS`) are ignored and listed;
+- the start line says `CLEAN BUILD (--clean)`, and the receipt carries `"clean": true`
+  with what the build started without (`clean_build`).
+
+`--public-defaults` refuses, before any stage, what a public user would not have, and
+lists every refused option with its reason:
+
+- `--override` and the retired flags ([experimental flags](EXPERIMENTAL_FLAGS.md#retired-flags));
+- every `--allow-*` and `--accept-*` waiver;
+- `--chim-regions @FILE` and `--chim-regions-status FILE` outside the source tree (the
+  shipped sets, region names and files in the source tree, such as
+  `docs/chim/cell-progress-reference.json`, are fine);
+- every switch of [experimental flags](EXPERIMENTAL_FLAGS.md) at a value other than
+  the builder's default.
+
+The receipt carries `"public_defaults": true` with what was checked
+(`public_defaults_check`).
+
+### Before a release
+
+Build once with `--clean --public-defaults` in a new workspace, on the release
+commit: this is the from-scratch check. It shows that the release builds from the
+source tree and the user's own game data alone. A stage that fails there and passes in
+our cached builds is a release blocker, registered like any other bug.
 
 ## Stage hashes and reference checksums
 

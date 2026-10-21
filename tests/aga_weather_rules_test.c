@@ -69,6 +69,38 @@ int main(void)
     assert(blend.strength==AW_WEATHER_STEPS/2 && blend.glare==50);
     assert(blend.sky[0][2]==(203+35+1)/2);
     assert(AW_WeatherIndex("blight")==AW_WEATHER_BLIGHT && AW_WeatherIndex("clear")==0 && AW_WeatherIndex("x")<0);
+    {
+        /* Transitions (SKY-REDMOUNTAIN-BLUE-44, 46; rules from OpenMW mwworld/weather.cpp). Blight's delta is
+         * 0.040 per real second (25 s), cloudy's 0.015 (about 67 s). */
+        aw_weather_state_t s={AW_WEATHER_CLEAR,AW_WEATHER_NONE,AW_WEATHER_NONE,0.0,-1};
+        table.look[1].delta_milli=15;
+        AW_WeatherForce(&s,AW_WEATHER_BLIGHT);
+        assert(s.current==AW_WEATHER_BLIGHT && s.next==AW_WEATHER_NONE);
+        /* Same weather: nothing starts. */
+        AW_WeatherAddTransition(&s,AW_WEATHER_BLIGHT);assert(s.next==AW_WEATHER_NONE);
+        /* Walking out of Red Mountain into a cloudy region: a transition at cloudy's delta, not a jump. */
+        AW_WeatherAddTransition(&s,1);assert(s.current==AW_WEATHER_BLIGHT && s.next==1 && s.progress==0.0);
+        AW_WeatherAdvance(&s,&table,10.0);
+        assert(s.current==AW_WEATHER_BLIGHT && s.next==1 && s.progress>0.149 && s.progress<0.151);
+        /* Back into Red Mountain mid-transition: queued, the running transition goes on (no snap back). */
+        AW_WeatherAddTransition(&s,AW_WEATHER_BLIGHT);
+        assert(s.next==1 && s.queued==AW_WEATHER_BLIGHT && s.progress>0.149);
+        /* The cloudy transition ends after about 67 s; the time left goes to blight at blight's delta. */
+        AW_WeatherAdvance(&s,&table,56.0+2.0/3.0+5.0);
+        assert(s.current==1 && s.next==AW_WEATHER_BLIGHT && s.queued==AW_WEATHER_NONE);
+        assert(s.progress>0.199 && s.progress<0.201);
+        AW_WeatherAdvance(&s,&table,20.5);
+        assert(s.current==AW_WEATHER_BLIGHT && s.next==AW_WEATHER_NONE && s.progress==0.0);
+        /* A cell without a region keeps the last named region. */
+        assert(AW_WeatherRegionKeep(&s,-1)==-1);
+        assert(AW_WeatherRegionKeep(&s,1)==1 && AW_WeatherRegionKeep(&s,-1)==1 && AW_WeatherRegionKeep(&s,0)==0);
+        /* Arrivals: the first frame, a jump of over half a cell, an hour of game time or time running back.
+         * A walked crossing (a few units between frames, however long its load) is not one. */
+        assert(AW_WeatherIsArrival(0,0,0,0));
+        assert(!AW_WeatherIsArrival(1,300.0,-200.0,0));
+        assert(!AW_WeatherIsArrival(1,4096.0,0.0,0) && AW_WeatherIsArrival(1,4097.0,0.0,0));
+        assert(AW_WeatherIsArrival(1,0,0,1) && AW_WeatherIsArrival(1,0,0,-1) && AW_WeatherIsArrival(1,0,0,8));
+    }
     puts("weather rules ok");
     return 0;
 }

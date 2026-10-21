@@ -183,6 +183,22 @@ class MediaAssetsTests(unittest.TestCase):
             self.assertEqual(result['lookups']['sounds'][0]['output'],'sound/pool/a1.wav')
             self.assertEqual((payload/'sound/pool/a1.wav').read_bytes(),b'validated converted sound')
 
+    def test_catalogue_stays_off_the_payload_unless_asked(self):
+        # IMAGE-MEDIA-CATALOGUE-ON-DISK-46: nothing in the game reads id1/media/catalogue.json (64 MB in v0.0.46);
+        # the coverage report is returned (the image step writes it beside the image) and on_disk=True (build.py
+        # --media-catalogue on, debugging) still writes the same report into the payload.
+        with tempfile.TemporaryDirectory() as d:
+            media,payload,music=self.staged_fixture(Path(d))
+            result=stage_catalogue(media,payload,music)
+            self.assertFalse((payload/'media').exists())
+            self.assertIs(result['catalogue_on_disk'],False)
+            self.assertTrue((payload/'intro/videos.awl').is_file())
+        with tempfile.TemporaryDirectory() as d:
+            media,payload,music=self.staged_fixture(Path(d))
+            result=stage_catalogue(media,payload,music,on_disk=True)
+            self.assertIs(result['catalogue_on_disk'],True)
+            self.assertEqual(json.loads((payload/'media/catalogue.json').read_text()),result)
+
     def test_staging_on_the_pool_is_the_same_with_any_worker_count(self):
         # BUILD-IMAGE-AUDIO-SERIAL-36: many files staged by the shared worker pool, rows in catalogue order, the
         # payload the same bytes with one worker or several; staged files are hard links of the checked outputs.

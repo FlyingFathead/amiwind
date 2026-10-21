@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-_Last updated with AmiWind v0.0.45 (19 October 2026). FAQ revision 20._
+_Last updated with AmiWind v0.0.46 (21 October 2026). FAQ revision 22._
 
 <!-- contents start -->
 ## Contents
@@ -220,7 +220,7 @@ configuration**:
 | Machine and chipset | A1200 / AGA / PAL |
 | CPU and FPU | Emulated 68040 with FPU |
 | Chip RAM | 2 MiB |
-| Additional RAM | 16 MiB, configured as Zorro III memory in the emulator |
+| Additional RAM | 128 MiB Zorro III memory in the playtest emulator setup (since 21 October 2026); 16 MiB is the smallest the game runs on |
 | CPU execution | JIT enabled, maximum emulated CPU speed |
 | Default game display | 320 × 200, 8-bit indexed colour |
 
@@ -237,7 +237,7 @@ is therefore not a supported configuration for this build. The earlier A500
 experiment remains in the repository, alongside the current accelerated AGA
 track. See the [engine build settings](../engine/aga/Makefile),
 [startup checker](../engine/aga/boot/bootcheck.asm) and
-[project overview](../README.md#about-amiwind).
+[project overview](ABOUT.md).
 
 Bringing the experience down to lower specifications is planned work. A
 particular physical accelerator, memory configuration or minimum frame rate
@@ -535,7 +535,7 @@ The shared-sky work gives a concrete example of a completed reduction:
 documented comparison, counting the shared sky resource once, saved
 **131.324 MiB of disk storage**. That is a result for that conversion pass;
 resident memory, loading time and frame time have their own measurements.
-See the [build comparison](../README.md#v0028--trees-and-grass-day-and-night)
+See the [build comparison](README_ARCHIVE.md#v0028--trees-and-grass-day-and-night)
 and [sky implementation notes](DAY_NIGHT_AND_SKY.md).
 
 Making data smaller only counts as a useful optimization when the necessary
@@ -663,7 +663,7 @@ demonstration screenshots and clips. It does not include the original or
 converted game assets needed for play, a compiled AmiWind executable,
 Kickstart ROMs or Workbench files. A playable image contains converted game
 assets, so it is a private build output that stays with whoever built it. The
-[build and setup instructions](../README.md#building-and-playing) are the place
+[build and setup instructions](BUILDING_AND_PLAYING.md) are the place
 to start.
 
 ### Is AmiWind official? Do I need the game?

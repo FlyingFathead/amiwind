@@ -134,6 +134,17 @@ int main(void) {
   assert(!AW_ActorStep(&p,move,frame_time));assert(p.v.origin[0]==0 && p.v.origin[2]==floor_z && p.v.oldorigin[0]==7 && p.v.velocity[0]==9 && p.v.flags==FL_ONGROUND);
   step=-4;assert(AW_ActorStep(&p,move,frame_time));assert(fabs(p.v.origin[0]-2)<.001f && fabs(p.v.origin[2]-(floor_z-4))<.04f);
   assert(walk_movetype==MOVETYPE_WALK && p.v.movetype==MOVETYPE_NONE);
+  /* COMBAT-PURSUIT-SLOPE-STALL-46: a full 22-unit actor step down a walkable 0.90 slope falls 10.6 units: it
+   * holds; the same step over a flat ledge 20 units down still fails. */
+  {vec3_t run={22,0,0};
+   step=0;slope=-.4843f;memset(&p,0,sizeof(p));p.v.origin[2]=floor_z;p.v.flags=FL_ONGROUND;
+   assert(AW_ActorStep(&p,run,frame_time));
+   assert(fabs(p.v.origin[0]-22)<.001f && fabs(p.v.origin[2]-(floor_z+slope*22))<.1f && ((int)p.v.flags&FL_ONGROUND));
+   slope=.4843f;memset(&p,0,sizeof(p));p.v.origin[2]=floor_z;p.v.flags=FL_ONGROUND;   /* and up it */
+   assert(AW_ActorStep(&p,run,frame_time) && fabs(p.v.origin[2]-(floor_z+slope*22))<.1f);
+   slope=0;step=-20;memset(&p,0,sizeof(p));p.v.origin[2]=floor_z;p.v.flags=FL_ONGROUND;
+   assert(!AW_ActorStep(&p,run,frame_time) && p.v.origin[0]==0 && p.v.origin[2]==floor_z);
+   step=0;}
  }
  /* Hlaalu's authored stair ramp is just steeper than Quake's old .7 cutoff.
   * It must hold an idle walker and preserve uphill speed in both directions. */

@@ -9,6 +9,7 @@
  * table is read once per area.
  */
 #include "quakedef.h"
+#include "aw_remote.h"
 #include "aw_sky.h"
 #define FOG_NIGHT_DAYLIGHT 128
 extern int (*aw_fog_location_hook)(int);

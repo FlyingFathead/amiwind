@@ -62,8 +62,8 @@ static void close_music(void) {
     if(music)AW_AReadClose(music);
     music=NULL;at=0;memset(valid,0,sizeof(valid));loaded=0;loading=-1;header_wait=0;stall_logged=0;
 }
-static void send_read(long length) {
-    if(!AW_AReadStart(music,length))return;
+static void send_read(long bytes) {
+    if(!AW_AReadStart(music,bytes))return;
     read_started=Sys_FloatTime();read_polls=0;
 }
 /* Check the header of the opened stream; 0 = not a valid MWA1 stream. */
@@ -438,7 +438,7 @@ int CDAudio_Init(void) {
     title_track=-1;title_playing=0;
     if(Q_fscanf(f,"%d",&id)==1 && id>=0 && id<=98)title_track=id;
     fclose(f);available=1;paused=0;mode=0;loading=-1;
-    {int g;death_id=manual_lookup("mw_death",&g);}
+    {int group;death_id=manual_lookup("mw_death",&group);}
     rng^=(unsigned int)(Sys_FloatTime()*1000000.0);
     AW_LogHeader(AW_LOG_MUSIC_EVENTS,"time_ms,event,mode,track,file,played_frames,total_frames\n");events=1;
     Cmd_AddCommand("aw_music_play",music_play);

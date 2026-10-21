@@ -19,6 +19,21 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- contents start -->
+## Contents
+
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Symptom
 
 The maintainer, 17 October 2026: there are several Dreamers, and they start to appear only after the main
@@ -64,21 +79,55 @@ Start a new game and go to Hla Oad: the Dreamer stands there.
 
 ## Repair
 
-Not yet. The parts it needs, from the original: the references disabled at the start (the Startup script's
-`->Disable` lines, read from the data, not a hand list), and for each the condition that enables it (for the
-Dreamers `GetJournalIndex A2_2_6thHouse == 50` in the reference's own script; for the others their own quest
-scripts). Until AmiWind has the main quest's journal,
-the faithful state of a new game is "not placed"; once it has, the engine places them when the journal reaches
-that index.
+21 October 2026, branch v0.0.47-story-npc (not yet in a build), off by default:
+
+- `tools/start_disabled.py` reads the list from the game data, never a hand list: the scripts the global script
+  Main starts (its `StartScript` lines: Startup, VampireCheck, CharGen), their `->Disable` lines outside any `if`
+  block (a line inside one is reported as conditional, not applied), and for every disabled reference its type, its
+  placements and how it is enabled again: its own script when that script is the simple journal template (a
+  journal index read, a guard that returns, one `Enable` under one journal comparison), every other script or
+  dialogue result that names `ID->Enable`, otherwise "unknown, needs the script compiler".
+- With `--start-disabled original`, the resident stages (`tools/import_town.py` residents for towns and CHIM
+  towns, `tools/prepare_area.py` populate for rooms and Seyda Neen) leave the disabled actors (NPC and creature
+  records) out of a new game and list each with its map, reference, the start script line and its enable rule
+  (`residents.json` `start_disabled`, the area report's `left_out` and `start_disabled`).
+- Builder option `--start-disabled placed|original` (environment `AMIWIND_START_DISABLED`, part of the resident
+  stages' keys): `placed` is the default (every actor placed, as before; the variable is not set, the reports
+  are as before); `original` is the faithful mode, off by default because nothing enables a left-out actor
+  during play yet: it would remove the Dreamer Prophet and the quest characters for good. It becomes the default
+  once the runtime enable exists (the world state's "disabled at start" records).
+
+What the table holds (Morrowind.esm): 102 disabled references, 78 actors (58 NPCs, 20 creatures), every one with a
+single placement. Enable rules: 12 journal (the twelve Dreamers: their script `dreamer_talkerEnable`, journal
+`A2_2_6thHouse` == 50), 22 with no script of their own (enabled by a quest script or a dialogue result, e.g. the
+Dreamer Prophet by a dialogue result), 9 whose own script never enables them (enabled elsewhere), 35 unknown until
+the script compiler exists.
+
+Not done: nothing enables a held actor during play. AmiWind's journal state exists, but no quest stage advances
+`A2_2_6thHouse` yet; the table is the input for the world state's "disabled at start" records and the actor
+layer. Objects the start script disables (scaffolding, notes, keys, a bucket) are listed but still placed. The
+terrain detail tiles of a CHIM town (`tools/chim/build.py`) still count a held resident's spot (only keeps the
+original ground samples there).
 
 ## Verification
 
-Pending the repair.
+- Unit tests `tests/test_start_disabled.py` (synthetic script text and a synthetic master, no game data): the
+  `->Disable` reader (quoted, bare, comments, conditional lines), the scripts Main starts, the journal template in
+  both forms and its refusals, the enable callers, the table, the filter in both modes, the builder option and the
+  town resident stage's record.
+- Read-only counts against the v0.0.46 release run (2026_10_20_v0.0.46_release_a3fb9b74) and the game data:
+  `original` would leave out 11 placed references: around Seyda Neen Dreamer_Talker04, Dreamer_Talker05 and agronian
+  guy; Balmora Dreamer_Talker01; Vivec Dreamer_Talker11 and tarvyn faren; Vivec rooms the Dreamer Prophet (Foreign
+  Quarter Underworks), drarel andus and frelene acques; Balmora rooms balyn omavel-DEAD and itermerel. None of the
+  20 creatures is placed in that build.
+- Not yet seen in game: needs a build with the branch and `--start-disabled original` (Hla Oad, Gnaar Mok and the roads are outside the built town
+  frames; Seyda Neen, Balmora and Vivec are where the change shows).
 
 ## Prevention
 
-Pending the repair: a check that every reference the start scripts disable is either left out or placed
-disabled, with the reason.
+The disabled-at-start list comes from the data, and every held actor is written into the stage's report with its
+reason and enable rule, so the actor layer (world state "disabled at start") reads the same table. A test fails if
+the builder stops exporting the mode to the resident stages.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -99,6 +148,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [CHIM-ACTOR-GROUNDING-POLICY-36](CHIM-ACTOR-GROUNDING-POLICY-36.md): A CHIM area outside the shipped towns stops at its chim-town stage: the NPC grounding policy lists only the shipped towns' NPCs, and the check runs 40 minutes into the build
 - [COMBAT-RUN-ROOT-DRIFT-33](COMBAT-RUN-ROOT-DRIFT-33.md): Arena fighters' run frames carry the root's forward motion: the body slides ahead and snaps back each cycle
 - [COMPANION-NO-RUN-ANIM-33](COMPANION-NO-RUN-ANIM-33.md): The companion slides instead of walking or running, and mimic mode does not mirror the gait
+- [CREATURE-BAKE-NIF-UNSUPPORTED-47](CREATURE-BAKE-NIF-UNSUPPORTED-47.md): The creature bake refuses 14 of the 39 creature meshes the outdoor world can show, the cliff racer, the rat, the guar and the nix-hound among them
 - [INTERIOR-CREATURES-MISSING-41](INTERIOR-CREATURES-MISSING-41.md): No creature is placed in any interior: the resident stage takes NPC records only, so the demigod Vivec is missing from his palace
 - [NPC-ANIM-IDLE-ONLY-33](NPC-ANIM-IDLE-ONLY-33.md): NPCs have only an 8-frame idle: walking, running, swimming, hit and death are not animated
 - [NPC-ANIMATION-OFFSET-40](NPC-ANIMATION-OFFSET-40.md): Simplified actor vertices keep a fixed offset while limbs rotate

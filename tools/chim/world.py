@@ -58,9 +58,15 @@ def yaw_points(points, origin, yaw):
 
 
 def placed_box(origin, yaw, lo, hi):
-    """Drawn box of a placement, as the engine computes it (aw_scenery.c AW_SceneryCapture)."""
+    """Drawn box of a placement, as the engine computes it (aw_scenery.c AW_SceneryCapture). yaw: degrees, or the
+    three Quake angles (pitch, yaw, roll) of a format 0.8 record (chim.placed)."""
     from world_chunk_estimate import placed_box as box
-    return box(origin, (0.0, yaw, 0.0), lo, hi)
+    return box(origin, tuple(yaw) if isinstance(yaw, (tuple, list)) else (0.0, yaw, 0.0), lo, hi)
+
+
+def turn_of(p):
+    """What turns a placement row: its format 0.8 angles (single precision), else its yaw (single precision)."""
+    return tuple(f32(a) for a in p['angles']) if 'angles' in p else f32(p['yaw'])
 
 
 class World:
@@ -135,13 +141,21 @@ def chunk_visibility(world, terrain, by_chunk, variants, visibility, jobs=1, cac
     for c in world.order:
         for p in sorted(by_chunk[c]['owned'], key=lambda q: q['_pid']):
             v = variants[p['variant']]
+            # format 0.8 (chim.placed): a record turned by pitch or roll too places its pieces with its three angles
+            tilted = 'angles' in p and (p['angles'][0] or p['angles'][2])
             for pts in v['occluders']:
-                q = yaw_points(pts, p['origin'], p['yaw'])
+                if tilted:
+                    from chim.placed import place_points
+                    q = place_points(pts, p['origin'], p['angles'])
+                else:
+                    q = yaw_points(pts, p['origin'], p['yaw'])
                 try:
                     occ.add(ConvexHull(q).equations, q)
                 except Exception:  # noqa: BLE001 - a flat or degenerate piece occludes nothing
                     continue
-            if v.get('occluder_grid') and visibility.get('mesh_occluders', True):
+            # the solid columns of a hollow shell are placed by yaw only: a tilted 0.8 record adds none (it then
+            # occludes less, never more)
+            if v.get('occluder_grid') and visibility.get('mesh_occluders', True) and not tilted:
                 mesh_pieces += 1
                 for i, j, z0, z1 in place_columns(v['occluder_grid'], p['origin'], p['yaw'], CELL,
                                                   world.frame['low'], occ.nx, occ.ny):
@@ -348,8 +362,8 @@ FRAME_VIS_CHUNKS = 256
 def _visibility_inputs(spec, layout, settings):
     """What chunk_visibility reads of one frame, without the terrain images and model lumps."""
     world, by_chunk, _, _, _ = layout
-    keep = ('_pid', '_box', 'variant', 'origin', 'yaw')
-    rows = {c: {kind: [{k: p[k] for k in keep} for p in by_chunk[c][kind]] for kind in ('owned', 'reach')}
+    keep = ('_pid', '_box', 'variant', 'origin', 'yaw', 'angles')      # angles: format 0.8 records only
+    rows = {c: {kind: [{k: p[k] for k in keep if k in p} for p in by_chunk[c][kind]] for kind in ('owned', 'reach')}
             for c in world.order}
     # variant keys mix model numbers and ('tile', ...) tuples (chim/build.py terrain tiles): order them by repr
     used = {p['variant'] for c in world.order for p in by_chunk[c]['owned']}
@@ -625,7 +639,9 @@ def frame_layout(spec, settings, pid):
         # origin, yaw and model bounds as stored (single precision), so the engine and
         # the validator derive the same box from the files
         p = dict(p, origin=tuple(f32(x) for x in p['origin']), yaw=f32(p['yaw']))
-        box = stored_box(*placed_box(p['origin'], p['yaw'], [f32(x) for x in v['lo']], [f32(x) for x in v['hi']]))
+        if 'angles' in p:
+            p['angles'] = turn_of(p)        # format 0.8 (chim.placed): the stored angles turn the box
+        box = stored_box(*placed_box(p['origin'], turn_of(p), [f32(x) for x in v['lo']], [f32(x) for x in v['hi']]))
         owner = world.chunk_of(p['origin'][0], p['origin'][1])
         p = dict(p, _owner=owner, _box=box, _touched=world.touched(*box) | {owner})
         by_chunk[owner]['owned'].append(p)
@@ -670,6 +686,42 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     # Format0.7 readers already accept both CHK0 inline and CHK1 referenced terrain.
     # Keep earlier frames inline when new ocean frames use shared TERR records.
     version = REFS_FORMAT_VERSION if refs else FORMAT_VERSION
+    # EXPERIMENTAL world format 0.8 (chim.placed): placement rows with three angles; 56-byte records in every chunk
+    placed = any('angles' in p for spec in frames for p in spec['placements'])
+    if placed:
+        from chim import placed as P
+        version = P.FORMAT_VERSION
+        write_record = lambda *a, **k: P.placement(*a, **k)                    # noqa: E731
+        write_chunk, write_chunk_ref = P.chunk_record, P.chunk_record_ref
+    else:
+        write_record, write_chunk, write_chunk_ref = F.placement, F.chunk_record, F.chunk_record_ref
+    # EXPERIMENTAL world format 0.9 (chim.reach, build setting reach_index refs): a reach copy becomes a 4-byte
+    # reference to the owner record; off (default), nothing below changes
+    reach_refs = (settings or {}).get('reach_index', 'copies') != 'copies'
+    if reach_refs:
+        from chim import reach as RI
+        RI.reach_mode(settings)                         # refused before any file is written (fail fast)
+        if not placed:
+            raise ValueError('The reach index (world format 0.9) needs placement format 0.8 records')
+        version = RI.FORMAT_VERSION
+        write_chunk, write_chunk_ref = RI.chunk_record, RI.chunk_record_ref
+    # EXPERIMENTAL world format 0.10 (chim.terc, build setting terrain_pack compact): a TERR record stored compact when
+    # that is smaller and fits the engine's loading buffer (the engine expands it to the same bytes); off (default),
+    # nothing below changes
+    terc_on = (settings or {}).get('terrain_pack', 'bsp29') != 'bsp29'
+    if terc_on:
+        from chim import terc as TC
+        generate_on = TC.terrain_pack(settings) == 'generate'     # refused before any file is written (fail fast)
+        if not refs:
+            raise ValueError('The compact terrain pack (world format 0.10) needs terrain references')
+        version = TC.FORMAT_VERSION
+        if generate_on:
+            # EXPERIMENTAL world format 0.11 (chim.thgt): a regular-path record as heights and facts the engine
+            # generates the same bytes from; every other record compact as above
+            from chim import thgt as TG
+            version = TG.FORMAT_VERSION
+    terc_count, terc_saved, thgt_count, thgt_saved = 0, 0, 0, 0
+    generate_on = False if not terc_on else generate_on
     terrain_content, terrain_records, terrain_at = {}, [], {}
 
     def texture_id_of(fi, key):
@@ -758,6 +810,8 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
             fdir = 'frames/%s/%s' % (frame_dir(cell), frame_subdir(cell))
             chunk_rows, sector_rows, sector_blobs = [], [], []
             first_row = len(files) + 1                     # the frame file's row; its sectors follow
+            # format 0.9 (chim.reach): every chunk's references to its frame's owner records
+            refs_of = RI.frame_refs(by_chunk, world.chunk_index) if reach_refs else None
             for si, sector in enumerate(world.sectors):
                 homed['textures'], homed['models'], homed['terrain'] = [], [], []
                 records, chunk_meta, ref_at = [], [], {}
@@ -774,16 +828,35 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                         digest = hashlib.sha256(image).hexdigest()
                         if digest not in terrain_content:
                             terrain_content[digest] = len(terrain_records)
-                            terrain_records.append((image, image_render))
+                            # format 0.11 record version 2: the converter's own triangles of this chunk,
+                            # when the frame's ground is irregular (the regular path needs none)
+                            made = TG.encode(image, TG.chunk_triangles(spec.get('visibility'), shift)) \
+                                if terc_on and generate_on else None
+                            compact = TC.encode(image) if terc_on and made is None else None
+                            if made is not None:
+                                # format 0.11: the generated record, read whole
+                                thgt_count += 1
+                                thgt_saved += len(image) - len(made)
+                                terrain_records.append((made, len(made)))
+                            elif compact is not None:
+                                # format 0.10: the compact record, read whole (its block names it as render bytes)
+                                terc_count += 1
+                                terc_saved += len(image) - len(compact)
+                                terrain_records.append((compact, len(compact)))
+                            else:
+                                terrain_records.append((image, image_render))
                             homed['terrain'].append(terrain_content[digest])
                         ref_at[c] = (terrain_content[digest], shift)
                     rows = {}
                     for kind in ('owned', 'reach'):
-                        rows[kind] = [F.placement(p['_pid'], p['ref'], model_id_of(fi, p['variant']), p['origin'],
-                                                  p['yaw'], world.chunk_index[p['_owner']], p['cell'][0] - cell[0],
+                        rows[kind] = [write_record(p['_pid'], p['ref'], model_id_of(fi, p['variant']), p['origin'],
+                                                   (p.get('angles') or (0.0, p['yaw'], 0.0)) if placed else p['yaw'],
+                                                   world.chunk_index[p['_owner']], p['cell'][0] - cell[0],
                                                   p['cell'][1] - cell[1], p['_box'], p['_leaves'],
                                                   p.get('story_hidden', False))
                                       for p in sorted(by_chunk[c][kind], key=lambda q: q['_pid'])]
+                    if reach_refs:
+                        rows['reach'] = refs_of[c]      # format 0.9: references in place of the reach copies
                     if packed is not None:
                         pvs_row, pvl_row = packed[c]
                     else:
@@ -797,11 +870,11 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                     if referenced:
                         # the reference block is written with its record's place once the sector is laid out
                         tid, shift = ref_at[c]
-                        data, render, collision = F.chunk_record_ref(
+                        data, render, collision = write_chunk_ref(
                             rows['owned'], rows['reach'], pvs_row,
                             F.terrain_ref(tid, 0, 0, 0, 0, shift), info.get('leaves', 0), pvl_row)
                     else:
-                        data, render, collision = F.chunk_record(rows['owned'], rows['reach'], pvs_row, image,
+                        data, render, collision = write_chunk(rows['owned'], rows['reach'], pvs_row, image,
                                                                  image_render, info.get('leaves', 0), pvl_row)
                     records.append((b'CHNK', world.chunk_index[c], data))
                     chunk_meta.append((c, render, collision, len(rows['owned']), len(rows['reach']),
@@ -893,9 +966,14 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                'files_removed': ['chim/' + rel for rel in removed],
                'sectors': sum(r['sectors'] for r in frame_recs), 'largest_sector_bytes': largest,
                'placements': pid, 'reach_copies': reach_total,
+               **({'reach_index': {'references': reach_total, 'reference_bytes': RI.reach_bytes(reach_total)[1],
+                                   'copy_bytes': RI.reach_bytes(reach_total)[0]}} if reach_refs else {}),
                'models': len(model_records), 'model_variants': len(model_ids), 'model_aliases': aliases,
                'textures': len(texture_records), 'texture_keys': len(texture_ids),
                'chunks': sum(r['chunks'] for r in frame_recs),
+               **({'terrain_pack': {'compact_records': terc_count, 'bytes_saved': terc_saved,
+                                    **({'generated_records': thgt_count, 'generated_bytes_saved': thgt_saved}
+                                       if generate_on else {})}} if terc_on else {}),
                **({'terrain_refs': {'records': len(terrain_records),
                                     'record_bytes': sum(len(i) for i, _ in terrain_records)}} if refs else {}),
                'visibility': vis_totals,

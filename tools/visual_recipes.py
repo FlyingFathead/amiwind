@@ -4,6 +4,7 @@
 Recipes alter converter profiles only. The mesh preparer retains the original
 geometry for collision. A different source packet keeps its ordinary profile.
 """
+import hashlib
 import json
 from pathlib import Path
 
@@ -80,6 +81,17 @@ def everywhere_recipe(document):
     return name
 
 
+def sprite_key(key, digest):
+    """A mesh key with its sprite replacement (DIGEST: the sprite's SHA-256); a chim.units.UnitKey keeps its
+    previous form the same way, so units stored under it are still found."""
+    from chim.units import UnitKey
+    new = UnitKey(hashlib.sha256((str(key) + ':sprite:' + digest).encode()).hexdigest())
+    previous = getattr(key, 'previous', None)
+    if previous is not None:
+        new.previous = hashlib.sha256((previous + ':sprite:' + digest).encode()).hexdigest()
+    return new
+
+
 def prepare_sprite_replacements(recipe, index, archive, palette, references,
                                 prepared, mesh_fps, centre, out):
     """Bake recipe-selected flora using the existing sprite renderer and static protocol.
@@ -136,7 +148,7 @@ def prepare_sprite_replacements(recipe, index, archive, palette, references,
             data[2] = []
             data[4] = dict(data[4], representation='collision_only')
             prepared[mi] = tuple(data)
-            mesh_fps[mi] = hashlib.sha256((str(mesh_fps[mi]) + ':sprite:' + digest).encode()).hexdigest()
+            mesh_fps[mi] = sprite_key(mesh_fps[mi], digest)
     return prepared, mesh_fps, rows, assets
 
 

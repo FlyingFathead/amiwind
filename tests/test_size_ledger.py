@@ -105,7 +105,7 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(record['status'], 'complete')
         self.assertEqual(record['labels'], [])
         self.assertEqual(sum(row['bytes'] for row in record['groups'].values()), record['payload_bytes'])
-        self.assertEqual(size_ledger.gib(record['payload_bytes']), '2.57')
+        self.assertEqual(size_ledger.gib(record['payload_bytes']), '2.60')  # v0.0.46 release record
         self.assertEqual(size_ledger.gib(record['groups']['npc-gallery']['bytes']), '0.22')
 
 

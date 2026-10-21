@@ -18,5 +18,8 @@
   "npc_face_lod": "all",
   "npc_lod_disk_mib": 96,
   "npc_head_detail": "auto",
-  "npc_head_reducer": "locked"
+  "npc_head_reducer": "locked",
+  "disk_layout": "compact",
+  "partition_headroom_mib": 100,
+  "boot_partition_headroom_mib": null
 }

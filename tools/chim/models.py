@@ -34,7 +34,7 @@ from routed_hull import HULL_LEAF_PIECES, CHIM_ROUTE_PIECES as MODEL_ROUTE_PIECE
 
 # ---------------------------------------------------------------- textures
 
-def material_texture_key(model, material, size, no_emissive, texture_shas=None):
+def material_texture_key(model, material, size, no_emissive, texture_shas=None, uv_scroll='off'):
     """prepare_mesh_bsp texture() identity: (texture, size, tint, glow) or the flattened panel. texture is
     the texture's content hash when texture_shas (the stage's texture hashes, by index) is given: a unit's
     result then holds no position in a stage's texture list and can be reused by another stage
@@ -46,7 +46,31 @@ def material_texture_key(model, material, size, no_emissive, texture_shas=None):
     texture = mat['texture_index']
     if texture_shas is not None and texture is not None:
         texture = texture_shas[texture]
+    if scrolls_turbulent(mat, size, uv_scroll):
+        # a Quake turbulent texture: drawn without light or glow, so no glow in its identity
+        return (texture, size, tuple(round(x, 2) for x in mat['diffuse']), 0, 'turbulent')
     return (texture, size, tuple(round(x, 2) for x in mat['diffuse']), glow)
+
+
+# How a shape whose texture scrolls in the original (a NiUVController; prepare_scenery.uv_scroll) is drawn
+# (build setting 'uv_scroll', GHOSTFENCE-NO-ANIMATION-46): 'off' (default, the method before v0.0.46): a still
+# texture; 'turbulent': a Quake turbulent texture (name '*...': model.c gives it SURF_DRAWTURB, D_DrawTurbulent8
+# ripples it over time, as Quake's water and teleporter fields, unlit). Lava keeps its own path (tools/lava.py);
+# a texture larger than 64 x 64 stays still.
+UV_SCROLL = ('off', 'turbulent')
+TURBULENT_SIZE = 64     # d_scan.c Turbulent8 reads a 64 x 64 texel texture
+# sizes a turbulent texture may have: 64, or a divisor the engine tiles to 64 x 64 when it loads it
+# (chim_format.h ChimFormat_TileTurbulent; the Ghostfence curtain's textures are 32 x 32)
+TURBULENT_SIZES = (16, 32, 64)
+
+
+def scrolls_turbulent(mat, size, mode):
+    if mode not in UV_SCROLL:
+        raise ValueError('Unknown uv_scroll mode: %s' % mode)
+    if mode != 'turbulent' or not mat.get('uv_scroll') or size not in TURBULENT_SIZES:
+        return False
+    from lava import is_lava_texture
+    return not is_lava_texture(mat.get('texture_source'))
 
 
 def material_texture_image(archive, index, model, material, size, palette_image, flat_rgb=None):
@@ -56,9 +80,11 @@ def material_texture_image(archive, index, model, material, size, palette_image,
 
 
 def engine_texture_name(kind, glow, texture_id):
-    """Miptex name the engine sees: emitN_ (self-lit, r_surf.c R_EmissiveLevel), flatN, surfaceN."""
+    """Miptex name the engine sees: emitN_ (self-lit, r_surf.c R_EmissiveLevel), flatN, surfaceN, *scrollN (turbulent)."""
     if kind == 'flatten':
         return 'flat%d' % texture_id
+    if kind == 'turbulent':
+        return '*scroll%d' % texture_id
     return ('emit%d_%d' % (glow, texture_id)) if glow else 'surface%d' % texture_id
 
 
@@ -391,7 +417,8 @@ def variant_unit(task):
     surfaces, parts, lo, hi = _prepare_placement((ref, task['data'], size, centre, None, False))
     keys = {}
     for s in surfaces:
-        keys[s[4]] = ('model',) + material_texture_key(model, s[4], size, NO_EMISSIVE, task.get('texture_shas'))
+        keys[s[4]] = ('model',) + material_texture_key(model, s[4], size, NO_EMISSIVE, task.get('texture_shas'),
+                                                       task.get('uv_scroll', 'off'))
     compiled = None
     fallback = None
     hull_check = None

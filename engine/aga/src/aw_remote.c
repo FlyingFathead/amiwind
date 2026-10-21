@@ -70,6 +70,8 @@ static void write_state(void)
     have_global=sv.active && AW_WorldToSource(sv.name,r_refdef.vieworg,global);
     fprintf(f,"commands %ld\nrealtime %s\nframe_ms %s\n",command_files,fixed(a,realtime,2),fixed(b,host_frametime*1000.0,1));
     fprintf(f,"map %s\nserver %s\n",cl.worldmodel?cl.worldmodel->name:"none",sv.active?sv.name:"none");
+    /* The scene the player stands in: after a streamed (type 1) crossing the frame entered, else the running map. */
+    fprintf(f,"scene %s\n",AW_SceneName());
     fprintf(f,"local %s %s %s\n",fixed(a,r_refdef.vieworg[0],0),fixed(b,r_refdef.vieworg[1],0),fixed(c,r_refdef.vieworg[2],0));
     fprintf(f,"angles %s %s\n",fixed(a,cl.viewangles[PITCH],1),fixed(b,cl.viewangles[YAW],1));
     if(have_global)fprintf(f,"global %s %s %s\n",fixed(a,global[0],0),fixed(b,global[1],0),fixed(c,global[2],0));

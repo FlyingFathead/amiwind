@@ -38,6 +38,7 @@ IMAGE_BASE = 'id1/chim'             # where the image keeps the world (engine: c
 
 def pack_order(chim_root):
     """Paths below chim/ in the order they go on the disk: the index, then the index's file table order."""
+    from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
     _, files, _, _ = F.read_index((Path(chim_root) / 'world.cwi').read_bytes())
     return ['world.cwi'] + [f['path'] for f in files]
 
@@ -62,14 +63,27 @@ def directories(order, base='chim'):
     return dirs
 
 
-def partition_command(xdftool, part, chim_root, volume, mib, base='chim'):
-    """The xdftool command: create, format, directories, then every file in pack order."""
+def partition_command(xdftool, part, chim_root, volume, mib, base='chim', extra=()):
+    """The xdftool command: create, format, directories, then every file in pack order. EXTRA: further
+    (source file, volume path) pairs written after the CHIM world (the compact layout puts the open-world
+    frame maps on the CHIM volume, tools/layout_plan.py), so the world stays packed in order."""
     order = pack_order(chim_root)
     command = [str(xdftool), str(part), 'create', 'size=%dMi' % mib, '+', 'format', volume, 'ffs']
-    for d in directories(order, base):
+    made = directories(order, base)
+    for d in made:
         command += ['+', 'makedir', d]
     for rel in order:
         command += ['+', 'write', str(Path(chim_root) / rel), base + '/' + rel]
+    extra = list(extra)
+    for path in extra:
+        parts = path[1].split('/')[:-1]
+        for k in range(1, len(parts) + 1):
+            d = '/'.join(parts[:k])
+            if d not in made:
+                made.append(d)
+                command += ['+', 'makedir', d]
+    for source, path in extra:
+        command += ['+', 'write', str(source), path]
     return command
 
 
@@ -161,9 +175,12 @@ def layout_gate(part, paths, partition=None):
                       'file_bytes_below': F.FFS_MAX_PACK}}
 
 
-def pack_partition(chim_root, part, volume='AW_CHIM', mib=None, xdftool='xdftool', base='chim'):
+def pack_partition(chim_root, part, volume='AW_CHIM', mib=None, xdftool='xdftool', base='chim', extra=()):
     """Write, read back and gate; returns {file, volume, mib, bytes, sha256, files: [{path, bytes, sha256}],
-    readback, layout}. Raises ValueError when the readback or the layout gate fails."""
+    readback, layout}. Raises ValueError when the readback or the layout gate fails. EXTRA: (source file,
+    volume path) pairs written after the world and read back too (partition_command); the layout gate's
+    pack-order and name rules cover the CHIM world, the extra files keep their own folder (the image's
+    disk-layout gate measures every directory)."""
     from amiga_fs import check_image
     from build_windows_xdftool import run_any
     chim_root, part = Path(chim_root), Path(part)
@@ -174,9 +191,10 @@ def pack_partition(chim_root, part, volume='AW_CHIM', mib=None, xdftool='xdftool
     fails = name_rules(paths)
     if fails:
         raise ValueError('CHIM disk layout: ' + '; '.join(fails[:5]))
-    payload = sum((chim_root / rel).stat().st_size for rel in order)
+    extra = [(Path(source), str(path)) for source, path in extra]
+    payload = sum((chim_root / rel).stat().st_size for rel in order) + sum(s.stat().st_size for s, _ in extra)
     mib = mib or partition_mib(payload)
-    run_any(partition_command(xdftool, part, chim_root, volume, mib, base))
+    run_any(partition_command(xdftool, part, chim_root, volume, mib, base, extra))
     check_image(part, normalize=True)
     from amitools.fs.ADFSVolume import ADFSVolume
     from amitools.fs.FSString import FSString
@@ -186,10 +204,10 @@ def pack_partition(chim_root, part, volume='AW_CHIM', mib=None, xdftool='xdftool
     try:
         mounted = ADFSVolume(device)
         mounted.open()
-        for rel, path in zip(order, paths):
-            data = (chim_root / rel).read_bytes()
+        for source, path in [(chim_root / rel, path) for rel, path in zip(order, paths)] + extra:
+            data = source.read_bytes()
             if mounted.read_file(FSString(path)) != data:
-                raise ValueError('CHIM partition readback mismatch: ' + rel)
+                raise ValueError('CHIM partition readback mismatch: ' + path)
             files.append({'path': path, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
     finally:
         device.close()

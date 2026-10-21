@@ -11,13 +11,14 @@
 /* Registered in Host_InitLocal; 0 restores the separate validation pass. */
 cvar_t aw_alias_single_pass = {"aw_alias_single_pass","1",true};
 typedef struct {
-    FILE *file;
+    FILE *file,*held;   /* held: the member while file is a shared skin's file (AW_AliasStreamSharedSkin) */
     long left;
     model_t *mod;
     int allocated, total, used;
 } aw_alias_stream_t;
 
 static void AW_AliasStreamError(aw_alias_stream_t *s, const char *why) {
+    if(s->held){fclose(s->held);s->held=NULL;}
     if(s->file){fclose(s->file);s->file=NULL;}
     if(s->allocated && s->mod->cache.data)Cache_Free(&s->mod->cache);
     s->allocated=0;s->mod->needload=NL_NEEDS_LOADED;
@@ -68,9 +69,22 @@ static void AW_AliasStreamTriangles(aw_alias_stream_t *s,int count,int vertices,
         count-=take;
     }
 }
+/* A shared skin (model.c AW_SKIN_SHARED): its pixels from progs/skins/<REF>.awk into OFFSET (< 0: only
+ * checked). The member's own read position and remaining bytes are kept. */
+static void AW_AliasStreamSharedSkin(aw_alias_stream_t *s,const byte *ref,int offset,size_t n) {
+    char path[48];FILE *skin=NULL;long left=s->left;int size;
+    if(!AW_SharedSkinPath(ref,path,sizeof(path)))AW_AliasStreamError(s,"shared skin name");
+    size=COM_FOpenFile(path,&skin);
+    if(!skin)AW_AliasStreamError(s,"shared skin file missing");
+    s->held=s->file;s->file=skin;s->left=size;
+    if(size<0 || (size_t)size!=n)AW_AliasStreamError(s,"shared skin size");
+    AW_AliasStreamCopy(s,offset,n);
+    fclose(skin);s->file=s->held;s->held=NULL;s->left=left;
+}
 int Mod_TryStreamAlias(model_t *mod) {
     aw_alias_stream_t s;mdl_t disk,check,*m;daliasskintype_t kind;
-    daliasframetype_t framekind;daliasframe_t frame;
+    daliasframetype_t framekind;daliasframe_t frame;byte ref[AW_SKIN_SHARED_REF],again[AW_SKIN_SHARED_REF];
+    int shared=0;
     aliashdr_t *h;maliasskindesc_t *skin;stvert_t *uv;
     long base;int bytes,nv,nt,nf,width,height,i,j,headeroff,modeloff,uvoff,trioff,skinoff,pixeloff,frameoff;
     size_t total=0,head=0,skinbytes=0;
@@ -101,9 +115,13 @@ int Mod_TryStreamAlias(model_t *mod) {
     s.total=(int)total;
     AW_AliasStreamRead(&s,&kind,sizeof(kind));
     if(LittleLong(kind.type)==ALIAS_SKIN_GROUP){fclose(s.file);return 0;}
-    if(LittleLong(kind.type)!=ALIAS_SKIN_SINGLE)AW_AliasStreamError(&s,"skin type");
+    if(LittleLong(kind.type)==AW_SKIN_SHARED){
+        shared=1;AW_AliasStreamRead(&s,ref,sizeof(ref));
+        if((size_t)(ref[16]|(ref[17]<<8)|(ref[18]<<16)|((unsigned long)ref[19]<<24))!=skinbytes)
+            AW_AliasStreamError(&s,"shared skin size");
+    }else if(LittleLong(kind.type)!=ALIAS_SKIN_SINGLE)AW_AliasStreamError(&s,"skin type");
     if(!aw_alias_single_pass.value){
-    AW_AliasStreamCopy(&s,-1,skinbytes);
+    if(shared)AW_AliasStreamSharedSkin(&s,ref,-1,skinbytes);else AW_AliasStreamCopy(&s,-1,skinbytes);
     AW_AliasStreamCopy(&s,-1,(size_t)nv*sizeof(stvert_t));
     AW_AliasStreamTriangles(&s,nt,nv,-1);
     for(i=0;i<nf;i++){
@@ -133,8 +151,12 @@ int Mod_TryStreamAlias(model_t *mod) {
     skinoff=AW_AliasStreamAlloc(&s,sizeof(maliasskindesc_t));pixeloff=AW_AliasStreamAlloc(&s,skinbytes);
     h->skindesc=skinoff;skin=(maliasskindesc_t *)((byte *)h+skinoff);skin->type=ALIAS_SKIN_SINGLE;skin->skin=pixeloff;
     AW_AliasStreamRead(&s,&kind,sizeof(kind));
-    if(LittleLong(kind.type)!=ALIAS_SKIN_SINGLE)AW_AliasStreamError(&s,"skin changed");
-    AW_AliasStreamCopy(&s,pixeloff,skinbytes);
+    if(LittleLong(kind.type)!=(shared?AW_SKIN_SHARED:ALIAS_SKIN_SINGLE))AW_AliasStreamError(&s,"skin changed");
+    if(shared){
+        AW_AliasStreamRead(&s,again,sizeof(again));
+        if(memcmp(ref,again,sizeof(ref)))AW_AliasStreamError(&s,"skin changed");
+        AW_AliasStreamSharedSkin(&s,ref,pixeloff,skinbytes);
+    }else AW_AliasStreamCopy(&s,pixeloff,skinbytes);
     AW_AliasStreamCopy(&s,uvoff,(size_t)nv*sizeof(stvert_t));
     uv=(stvert_t *)(AW_AliasStreamData(&s)+uvoff);
     for(i=0;i<nv;i++){

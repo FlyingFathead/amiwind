@@ -1,10 +1,43 @@
 # Bug journal
 
-_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
+_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [BUILD-CHIM-CELLS-PRIVATE-LIST-47 and CHIM-ACTOR-TABLE-OFF-IN-GAME-47 registered, 21 October 2026](#build-chim-cells-private-list-47-and-chim-actor-table-off-in-game-47-registered-21-october-2026)
+- [BUILD-LAVA-TERRAIN-BUDGET-38 persisting: public default builds stop at world-scenery, 21 October 2026](#build-lava-terrain-budget-38-persisting-public-default-builds-stop-at-world-scenery-21-october-2026)
+- [v0.0.47-dev1 build: the CHIM and image sections under half their cores, 21 October 2026](#v0047-dev1-build-the-chim-and-image-sections-under-half-their-cores-21-october-2026)
+- [CHIM-DOCK-TERRAIN-SEAM-47: a pale sliver gap at a dock end, 21 October 2026](#chim-dock-terrain-seam-47-a-pale-sliver-gap-at-a-dock-end-21-october-2026)
+- [CHIM-BC-TREE-PYRAMID-BOX-47: Bitter Coast trees drawn as a pyramid trunk with a floating box, 21 October 2026](#chim-bc-tree-pyramid-box-47-bitter-coast-trees-drawn-as-a-pyramid-trunk-with-a-floating-box-21-october-2026)
+- [HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47: a tree sprite blocks the pick of some mushrooms, 21 October 2026](#harvest-seyda-tree-sprite-blocks-pick-47-a-tree-sprite-blocks-the-pick-of-some-mushrooms-21-october-2026)
+- [BUILD-ACTOR-LIBRARY-MWAD-PATH-47: the v0.0.47-dev2 build stopped in the actor-library stage, 21 October 2026](#build-actor-library-mwad-path-47-the-v0047-dev2-build-stopped-in-the-actor-library-stage-21-october-2026)
+- [BUILD-SPRITE-KEY-HASHLIB-47: the v0.0.47-dev1 build failed in its CHIM stage, 21 October 2026](#build-sprite-key-hashlib-47-the-v0047-dev1-build-failed-in-its-chim-stage-21-october-2026)
+- [CHIM-ACTORS-TOWN-RETURN-EMPTY-47: a town frame never starts the type 1 window, 21 October 2026](#chim-actors-town-return-empty-47-a-town-frame-never-starts-the-type-1-window-21-october-2026)
+- [CHIM-ACTORS-TOWN-RETURN-EMPTY-47: a town frame's own residents stay with it; the second cause found, 21 October 2026](#chim-actors-town-return-empty-47-a-town-frames-own-residents-stay-with-it-the-second-cause-found-21-october-2026)
+- [BUILD-OPTION-RECORD-KEYS-STAGES-47: a new option entry no longer rebuilds stages that never read it, 21 October 2026](#build-option-record-keys-stages-47-a-new-option-entry-no-longer-rebuilds-stages-that-never-read-it-21-october-2026)
+- [HARVEST-INTERIOR-PICK-47 found and fixed on a branch; INTERIOR-PLACED-ITEMS-47 and HARVEST-ORGANIC-PLANTS-47 registered, 21 October 2026](#harvest-interior-pick-47-found-and-fixed-on-a-branch-interior-placed-items-47-and-harvest-organic-plants-47-registered-21-october-2026)
+- [GHOSTFENCE-NO-ANIMATION-46: the turbulent curtain is the default; dbg ghostfence on/off, 21 October 2026](#ghostfence-no-animation-46-the-turbulent-curtain-is-the-default-dbg-ghostfence-onoff-21-october-2026)
+- [World format 0.11: the converter's own triangles generated too, 21 October 2026](#world-format-011-the-converters-own-triangles-generated-too-21-october-2026)
+- [COMBAT-PURSUIT-SLOPE-STALL-46 fixed on a branch: actor steps follow walkable slopes, 21 October 2026](#combat-pursuit-slope-stall-46-fixed-on-a-branch-actor-steps-follow-walkable-slopes-21-october-2026)
+- [World format 0.11: texture splits and water crossings generated too, 21 October 2026](#world-format-011-texture-splits-and-water-crossings-generated-too-21-october-2026)
+- [World format 0.11: generated terrain records, off by default, 21 October 2026](#world-format-011-generated-terrain-records-off-by-default-21-october-2026)
+- [World format 0.10: compact terrain records, off by default; CHIM-PLANE-TYPE-ALL-SLANTED-46 converter side measured, 21 October 2026](#world-format-010-compact-terrain-records-off-by-default-chim-plane-type-all-slanted-46-converter-side-measured-21-october-2026)
+- [CHIM-PLACEMENT-MARGIN-COPIES-46: the reach index's reads, three variants priced, 21 October 2026](#chim-placement-margin-copies-46-the-reach-indexs-reads-three-variants-priced-21-october-2026)
+- [CHIM-EXTERIOR-ACTORS-MISSING-46: the actor table, off by default, 21 October 2026](#chim-exterior-actors-missing-46-the-actor-table-off-by-default-21-october-2026)
+- [CHIM-PLACEMENT-MARGIN-COPIES-46: world format 0.9 (reach references) written, off by default, 21 October 2026](#chim-placement-margin-copies-46-world-format-09-reach-references-written-off-by-default-21-october-2026)
+- [CHIM-TILT-VARIANTS-SPLIT-33: world format 0.8 written, off by default, 21 October 2026](#chim-tilt-variants-split-33-world-format-08-written-off-by-default-21-october-2026)
+- [COMBAT-CHASE-CHIM-STUCK-46 fixed on a branch: the spawn snap waits for the streamed ground, 21 October 2026](#combat-chase-chim-stuck-46-fixed-on-a-branch-the-spawn-snap-waits-for-the-streamed-ground-21-october-2026)
+- [COMBAT-CHASE-CHIM-STUCK-46: the chase works; spawned actors without a baked ground float, 21 October 2026](#combat-chase-chim-stuck-46-the-chase-works-spawned-actors-without-a-baked-ground-float-21-october-2026)
+- [CHIM-STAIR-COLLISION-MESH-47: default builds keep their keys, an exact box in the check, 21 October 2026](#chim-stair-collision-mesh-47-default-builds-keep-their-keys-an-exact-box-in-the-check-21-october-2026)
+- [CHIM-STAIR-COLLISION-MESH-47: walkways and seams, 21 October 2026](#chim-stair-collision-mesh-47-walkways-and-seams-21-october-2026)
+- [NPC-STORY-DISABLED-AT-START-42: the start script's disabled actors, off by default, 21 October 2026](#npc-story-disabled-at-start-42-the-start-scripts-disabled-actors-off-by-default-21-october-2026)
+- [CHIM-COMPILED-HULL-OVERFILL-46: cause found, edge bevels measured, 21 October 2026](#chim-compiled-hull-overfill-46-cause-found-edge-bevels-measured-21-october-2026)
+- [CHIM-STAIR-COLLISION-MESH-47: the stair check calibrated against the recorded walks, 21 October 2026](#chim-stair-collision-mesh-47-the-stair-check-calibrated-against-the-recorded-walks-21-october-2026)
+- [CHIM-STAIR-COLLISION-MESH-47: stair collision method 1, a stairway collision mesh, 20 October 2026](#chim-stair-collision-mesh-47-stair-collision-method-1-a-stairway-collision-mesh-20-october-2026)
+- [CHIM-COMPILED-HULL-OVERFILL-46: compiled model hulls solid outside their pieces, 21 October 2026](#chim-compiled-hull-overfill-46-compiled-model-hulls-solid-outside-their-pieces-21-october-2026)
+- [ENGINE-STRICT-WARNINGS-36 persisting: the engine's warning level raised, 20 October 2026](#engine-strict-warnings-36-persisting-the-engines-warning-level-raised-20-october-2026)
+- [CHIM-PLACEMENT-MARGIN-COPIES-46 and CHIM-TILT-VARIANTS-SPLIT-33: what the frame segments hold, 20 October 2026](#chim-placement-margin-copies-46-and-chim-tilt-variants-split-33-what-the-frame-segments-hold-20-october-2026)
 - [CHIM-HULL-SURFACE-HEAP-46: the walkway collision fix put six frames over the CHIM zone, 20 October 2026](#chim-hull-surface-heap-46-the-walkway-collision-fix-put-six-frames-over-the-chim-zone-20-october-2026)
 - [BUILD-STAIR-WALK-BRUTE-FORCE-46: collision from what the game already knows, 20 October 2026](#build-stair-walk-brute-force-46-collision-from-what-the-game-already-knows-20-october-2026)
 - [BUILD-HEAP-GATE-AFTER-STAIRS-46 and BUILD-CHIM-MAIN-MEMORY-46 registered, 20 October 2026](#build-heap-gate-after-stairs-46-and-build-chim-main-memory-46-registered-20-october-2026)
@@ -81,6 +114,296 @@ _Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 - [INTERIOR-SPAWN-UNDERWATER-41, 17 October 2026](#interior-spawn-underwater-41-17-october-2026)
 
 <!-- contents end -->
+
+## BUILD-CHIM-CELLS-PRIVATE-LIST-47 and CHIM-ACTOR-TABLE-OFF-IN-GAME-47 registered, 21 October 2026
+
+[BUILD-CHIM-CELLS-PRIVATE-LIST-47](bugs/BUILD-CHIM-CELLS-PRIVATE-LIST-47.md), persisting since v0.0.36: every release
+image was built with a CHIM cell list kept outside the source tree, and `--chim-regions` was off by default, so a
+public build put no exterior cell on CHIM (the path of [BUILD-LAVA-TERRAIN-BUDGET-38](bugs/BUILD-LAVA-TERRAIN-BUDGET-38.md)).
+Fixed on branch v0.0.47-chim-cells: `config/chim-cells.json` (every exterior cell, 1,409) is the default of a full
+CHIM build; the plan resolves the same 1,348 region cells as v0.0.47-dev2; `--chim-regions none` keeps the earlier
+default. [CHIM-ACTOR-TABLE-OFF-IN-GAME-47](bugs/CHIM-ACTOR-TABLE-OFF-IN-GAME-47.md): v0.0.47-dev2 ships the actor
+table, but the engine reads it only with `chim actors table 1`, which no shipped config sets; being fixed on branch
+v0.0.47-defaults.
+
+## BUILD-LAVA-TERRAIN-BUDGET-38 persisting: public default builds stop at world-scenery, 21 October 2026
+
+[BUILD-LAVA-TERRAIN-BUDGET-38](bugs/BUILD-LAVA-TERRAIN-BUDGET-38.md): a tester's default build from the public
+repository (19 October, v0.0.43) stopped at the end of the world-scenery stage with 7 regions over the 4 MiB storage
+cap. Reproduced on 21 October with the v0.0.46 tree: same seven regions, the same bytes. The project's builds put
+these cells on CHIM, so nothing measured them as BSP29 regions. Repaired with eleven refinement splits (the seven
+plus four regions within 5 % of the cap); both open-world stages pass from scratch with the default options, and the
+scan is recorded in config/world-region-budget-scan.json with a test that ties it to the refinement table.
+
+## v0.0.47-dev1 build: the CHIM and image sections under half their cores, 21 October 2026
+
+The build summary of the v0.0.47-dev1 build (try 2, 41 minutes) listed `underused:chim` six times, `underused:image`
+four times and the perf guard failure of the body bake. Read against the register:
+
+- [BUILD-BODY-BAKE-SLOWER-44](bugs/BUILD-BODY-BAKE-SLOWER-44.md) (reported again, 137 s against 92 s, the host not
+  busy): cause measured. A player body bake spent 4.5 of 10 s inverting the same small matrices again for every texel
+  sample; fixed in source on branch v0.0.47-build-cores with identical output bytes (SHA-256 of three bakes of two
+  real bodies) and 2 to 2.8 times faster bakes. The bodies that fall back to the previous head reducer (six in this
+  build) bake up to twice as often: plan on the page.
+- [BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47](bugs/BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47.md) (new): the image step
+  parses the 694 MB `chim-source.json` three times on one core (payload preflight 16.0 s and 18.5 s, region frame map
+  task preparation 17.1 s); parsed once per process on the branch, outputs identical.
+- [BUILD-CHIM-SERIAL-SECTIONS-44](bugs/BUILD-CHIM-SERIAL-SECTIONS-44.md) (reported again): the pack (1 m 28 s on one
+  core, serial because ids are handed out in walk order), source and receipt (40 s at 2.05 cores), stats (41 s at 1.34)
+  and an early stall (6.6 cores with 1,270 units queued); plan on the page.
+- [BUILD-IMAGE-UNDERUSED-32](bugs/BUILD-IMAGE-UNDERUSED-32.md), [BUILD-IMAGE-REGION-MAPS-SERIAL-43](bugs/BUILD-IMAGE-REGION-MAPS-SERIAL-43.md)
+  and [BUILD-STATS-SERIAL-36](bugs/BUILD-STATS-SERIAL-36.md) (reported again with this build's numbers).
+## CHIM-DOCK-TERRAIN-SEAM-47: a pale sliver gap at a dock end, 21 October 2026
+
+[CHIM-DOCK-TERRAIN-SEAM-47](bugs/CHIM-DOCK-TERRAIN-SEAM-47.md): the maintainer, playing v0.0.47-dev1, saw a pale
+sliver where the dock end `x/ex_de_docks_end@s1` (cell -5,-6, Bitter Coast) meets the ground. He guessed the lowered
+polycount; the cause is not established. Registered open; the island-wide extent of dock-to-terrain gaps is not
+measured.
+
+## CHIM-BC-TREE-PYRAMID-BOX-47: Bitter Coast trees drawn as a pyramid trunk with a floating box, 21 October 2026
+
+[CHIM-BC-TREE-PYRAMID-BOX-47](bugs/CHIM-BC-TREE-PYRAMID-BOX-47.md): the maintainer reported the `flora_bc_tree` family
+at three spots in v0.0.47-dev1 (`_01` once, `_04` twice, including Hla Oad). The reduced meshes keep 16 % (`_04`) to
+31 % (`_01`) of the original triangles; the cause of the flat crown is not established. Direction decided for the
+project: crossed vertical planes with the tree's outline (angle impostors as the alternative), A/B against the
+current look and the original game first.
+
+## HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47: a tree sprite blocks the pick of some mushrooms, 21 October 2026
+
+[HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47](bugs/HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47.md): in the Seyda Neen region
+some mushrooms cannot be picked because a tree sprite stands in the pick. Cause unknown; the first check is whether
+the pick trace counts the sprite's box or its collision as a blocker. Registered open; no position pinned yet.
+## BUILD-ACTOR-LIBRARY-MWAD-PATH-47: the v0.0.47-dev2 build stopped in the actor-library stage, 21 October 2026
+
+[BUILD-ACTOR-LIBRARY-MWAD-PATH-47](bugs/BUILD-ACTOR-LIBRARY-MWAD-PATH-47.md): run as a script, `tools/actor_library.py`
+found `tools/mwad.py` instead of the `src/mwad` package; the first real build with the actor table stopped there.
+`src/` now goes ahead of `tools/`, as in `chim_build.py`, and a test runs the script the way the build does.
+
+## BUILD-SPRITE-KEY-HASHLIB-47: the v0.0.47-dev1 build failed in its CHIM stage, 21 October 2026
+
+[BUILD-SPRITE-KEY-HASHLIB-47](bugs/BUILD-SPRITE-KEY-HASHLIB-47.md): `sprite_key` in `tools/visual_recipes.py` used
+`hashlib` without importing it (added with the CHIM unit code keys on 20 October); the CHIM stage failed after
+45 minutes on the first mesh with a sprite recipe. Fixed with the import and a test that calls the function; a sweep
+of tools/ and src/ found no other standard module used without an import.
+## CHIM-ACTORS-TOWN-RETURN-EMPTY-47: a town frame never starts the type 1 window, 21 October 2026
+
+[CHIM-ACTORS-TOWN-RETURN-EMPTY-47](bugs/CHIM-ACTORS-TOWN-RETURN-EMPTY-47.md): the second cause fixed on branch
+v0.0.47-save-changes, decided for the project, 21 October 2026: a frame whose cell has no region map (a town's)
+never becomes the window's home frame, so crossings into and out of towns stay level changes, as Seyda Neen's do; the
+open world between towns keeps the window. A window that keeps a town as its home frame is a follow-up with an
+in-game route check. Experimental settings only (`chim crossing 1`).
+
+## CHIM-ACTORS-TOWN-RETURN-EMPTY-47: a town frame's own residents stay with it; the second cause found, 21 October 2026
+
+[CHIM-ACTORS-TOWN-RETURN-EMPTY-47](bugs/CHIM-ACTORS-TOWN-RETURN-EMPTY-47.md): two causes, read from the console of the
+save check. A town frame covers several cells, and the type 1 window released its residents in the cells beside its
+own at once; fixed on branch v0.0.47-save-changes (the home map's own actors stay while the home frame or their
+cell's frame is in the window; native test). Not fixed: a town frame that starts the window leaves it when the player
+arrives at the town's edge, and a town frame never joins a window again, so the town stays empty until a level change
+into its core. Experimental settings only (`chim crossing 1`, `chim actors table 1`).
+
+## BUILD-OPTION-RECORD-KEYS-STAGES-47: a new option entry no longer rebuilds stages that never read it, 21 October 2026
+
+[BUILD-OPTION-RECORD-KEYS-STAGES-47](bugs/BUILD-OPTION-RECORD-KEYS-STAGES-47.md): each new entry in
+config/option-changes.json rekeyed the chim, town, world-flora, engine and image stages of a default build: their
+keys counted every file of config/, through a function default (`config_dir=ROOT / 'config'` in
+tools/map_engine_limits.py) and a loop name bound twice (tools/build_aga.py, three named debug catalogues). Fixed in
+source on branch v0.0.47-option-keys, not shipped at the time of writing: a path default names its files only for
+its own function, and loop reads name only the listed files. No default stage is keyed on the file now; a one-time
+rekey of those stages (they drop files they never read); CHIM unit, gallery, image pass and stair record keys
+unchanged.
+## HARVEST-INTERIOR-PICK-47 found and fixed on a branch; INTERIOR-PLACED-ITEMS-47 and HARVEST-ORGANIC-PLANTS-47 registered, 21 October 2026
+
+[HARVEST-INTERIOR-PICK-47](bugs/HARVEST-INTERIOR-PICK-47.md): in the v0.0.46 image a mushroom inside an interior is
+drawn but cannot be picked (checked in game in Addamasartus; an outdoor pick on the Seyda Neen shore stays picked
+across the cave visit, a return and a quicksave and quickload). The harvest step read only the exterior placements,
+so no interior map got a catalogue. Fixed in source on v0.0.47-interior-picks: interior mushrooms get their room's
+catalogue on the same global index as the world's (one pick state, save format unchanged), default on,
+`--harvest-interiors off` keeps the old behaviour; on the v0.0.46 maps 305 mushrooms in 8 shipped interiors, every map
+within the runtime bounds and the heap check. Not built yet.
+[INTERIOR-PLACED-ITEMS-47](bugs/INTERIOR-PLACED-ITEMS-47.md): placed items, ingredients included, are left out of
+every converted interior (2,581 placed ingredients in interiors, 294 in shipped rooms).
+[HARVEST-ORGANIC-PLANTS-47](bugs/HARVEST-ORGANIC-PLANTS-47.md): only the small mushrooms are harvestable; 934 of
+21,238 outdoor organic plants and none of 3,725 interior ones can be picked.
+
+## GHOSTFENCE-NO-ANIMATION-46: the turbulent curtain is the default; dbg ghostfence on/off, 21 October 2026
+
+[GHOSTFENCE-NO-ANIMATION-46](bugs/GHOSTFENCE-NO-ANIMATION-46.md): decided for the project, 21 October 2026: a build draws shapes whose texture scrolls in
+the original (the Ghostfence curtain, the Vivec waterfalls, the ash mire) as Quake turbulent textures by default;
+`--chim-uv-scroll off` keeps the still texture of before. New in-game switch `dbg ghostfence on/off`
+(`aw_ghostfence`, default on, not saved): off draws every turbulent texture straight and still, also the water of
+the interiors. Only models with a scrolling texture get a new unit key. First seen in a full build with
+v0.0.47-dev1.
+## World format 0.11: the converter's own triangles generated too, 21 October 2026
+
+The 0.11 generator (still experimental and off) now also makes the records of the converter's own triangles
+(shoreline and 32-unit detail tiles) from the chunk's 32-unit samples and the triangles, stored as record version 2.
+On the v0.0.46 world 95,818 of 97,369 terrain records are generated (was 83,236), every tenth of each kind checked
+through the engine's generator byte for byte, and the terrain records would go from 489.4 MB to 247.6 MB. Not
+generated yet: 563 lava records, 886 too large for the engine's loading buffer, and 100 whose texture mappings
+differ.
+
+## COMBAT-PURSUIT-SLOPE-STALL-46 fixed on a branch: actor steps follow walkable slopes, 21 October 2026
+
+[COMBAT-PURSUIT-SLOPE-STALL-46](bugs/COMBAT-PURSUIT-SLOPE-STALL-46.md): an actor's trial step was refused when it
+moved more than a stair height (8.75 units); on a walkable 0.90 slope a full step moves 10.6. The allowance now
+grows with the slope of the floor under the step; a ledge is still refused. The pursuer followed the player down
+the slope and kept fighting.
+## World format 0.11: texture splits and water crossings generated too, 21 October 2026
+
+The 0.11 generator (still experimental and off) now also makes the ground polygons the builder cuts where their
+texture span passes 240 texels and where the water line crosses a tile: on the v0.0.46 world 83,236 of 97,369 terrain
+records are generated (was 77,020), every tenth checked through the engine's generator byte for byte, and the
+terrain records would go from 489.4 MB to 298.5 MB. Not generated yet: the 13,284 records holding the converter's own
+triangles, 738 lava-bed and shore records, and 183 others.
+
+## World format 0.11: generated terrain records, off by default, 21 October 2026
+
+World format 0.11 is in the source behind `--chim-terrain-pack generate` (experimental, off; needs terrain
+references): a regular-path terrain record stored as its corner heights and a few decided facts, from which the engine
+generates the render part of the chunk, the same bytes as the stored record. The planes and the standing hull stay
+stored (the hull is qbsp's compiled union). Host tests only; on the v0.0.46 world 77,020 of 97,369 terrain records are
+generated, every tenth of them checked through the engine's generator byte for byte, and the terrain records would
+go from 489.4 MB to 310.4 MB. The shoreline, lava and converter-triangle records are not generated yet.
+
+## World format 0.10: compact terrain records, off by default; CHIM-PLANE-TYPE-ALL-SLANTED-46 converter side measured, 21 October 2026
+
+World format 0.10 is in the source behind `--chim-terrain-pack compact` (experimental, off; needs terrain
+references): a terrain record stored as a lossless repack that the engine expands to the same BSP29 bytes before
+loading it. Host tests only; on the v0.0.46 world every terrain record expands back byte for byte, and the terrain
+records would go from 489.4 MB to 450.8 MB. The earlier estimate of 83.5 MB assumed more axial planes than there are:
+85 % of the terrain planes are slanted. For [CHIM-PLANE-TYPE-ALL-SLANTED-46](bugs/CHIM-PLANE-TYPE-ALL-SLANTED-46.md):
+planes with a negative axis normal are 0.65 % of the terrain planes and 3.3 % of the model planes; flipping them in the
+builder is not done (it changes content and on-plane ties for little), pending an in-game gain of the loader's fix.
+
+## CHIM-PLACEMENT-MARGIN-COPIES-46: the reach index's reads, three variants priced, 21 October 2026
+
+[CHIM-PLACEMENT-MARGIN-COPIES-46](bugs/CHIM-PLACEMENT-MARGIN-COPIES-46.md): world format 0.9's reach references
+read about twice as often as 0.8's copies. Three variants were priced on the same zone walks (one read for records
+and references, owner chunks loaded before the chunks that reference them, whole copies where the owner chunk is usually
+absent): none reads as seldom as 0.8 copies while saving bytes. 0.8 copies stay the recommended form; 0.9 stays
+experimental and off. No code changed.
+
+## CHIM-EXTERIOR-ACTORS-MISSING-46: the actor table, off by default, 21 October 2026
+
+[CHIM-EXTERIOR-ACTORS-MISSING-46](bugs/CHIM-EXTERIOR-ACTORS-MISSING-46.md): the actor table is in the source behind
+`--chim-actor-table on` (experimental, off): every exterior NPC and creature reference of the game data in one
+table outside the frames (5,981 references, about 197 KB on the v0.0.46 data), and the type 1 window takes a
+joining cell's actors from it with `chim actors table 1`. Host tests only. Only the 90 living town residents have a model
+to spawn; the other NPCs, every creature and the levelled creature lists still need models and list resolution:
+the bug stays open. Also measured for
+[CHIM-PLACEMENT-MARGIN-COPIES-46](bugs/CHIM-PLACEMENT-MARGIN-COPIES-46.md): a 0.9 reach reference finds its owner
+chunk's catalogue in the zone 42 % to 45 % of the time; 0.9 reads about 10 % fewer bytes but about twice as often.
+
+## CHIM-PLACEMENT-MARGIN-COPIES-46: world format 0.9 (reach references) written, off by default, 21 October 2026
+
+[CHIM-PLACEMENT-MARGIN-COPIES-46](bugs/CHIM-PLACEMENT-MARGIN-COPIES-46.md): world format 0.9 is in the source
+behind `--chim-reach-index refs` (experimental, off; needs `--chim-placement-format 0.8`): a chunk that a
+placement's drawn box reaches but does not own holds a 4-byte reference to the owner record in the same frame
+instead of a whole copy. Host tests only: every chunk holds the same records as in 0.8 once the references are
+resolved, the engine builds the same catalogue and collides the same, a default build is byte for byte as before.
+Estimated on the v0.0.46 world: placement records 60.9 MB in 0.8 to 28.8 MB in 0.9; when the owner chunk is not in
+the zone, reading a chunk's catalogue takes more reads. A placement is still stored once per frame, not once for
+the island (about 3.5 frames per object): the bug stays open. Not built and not seen in game yet.
+
+## CHIM-TILT-VARIANTS-SPLIT-33: world format 0.8 written, off by default, 21 October 2026
+
+[CHIM-TILT-VARIANTS-SPLIT-33](bugs/CHIM-TILT-VARIANTS-SPLIT-33.md): world format 0.8 is in the source behind
+`--chim-placement-format 0.8` (experimental, off): one model per mesh and scale, the whole rotation in a 56-byte
+placement record, collision from the mesh's own convex pieces expanded by the world-aligned player box when a trace
+meets them (which also removes [CHIM-YAW-PLAYER-BOX-TURNS-46](bugs/CHIM-YAW-PLAYER-BOX-TURNS-46.md) in such a
+world). Host tests only: the same drawn vertices as 0.7, collision equal to the exact shape on every test trace, and
+a default build byte for byte as before. Estimated on the v0.0.46 world: 32,714 models become 8,105, about 455 MB
+less. Not built and not seen in game yet; both bugs stay open.
+
+## COMBAT-CHASE-CHIM-STUCK-46 fixed on a branch: the spawn snap waits for the streamed ground, 21 October 2026
+
+[COMBAT-CHASE-CHIM-STUCK-46](bugs/COMBAT-CHASE-CHIM-STUCK-46.md): the snap ran once at the spawn, before CHIM had
+streamed the collision under the actor. A miss is now retried once a second until the ground is there; test residents
+landed within three seconds and the pursuer chased the player over a frame border.
+
+## COMBAT-CHASE-CHIM-STUCK-46: the chase works; spawned actors without a baked ground float, 21 October 2026
+
+[COMBAT-CHASE-CHIM-STUCK-46](bugs/COMBAT-CHASE-CHIM-STUCK-46.md): narrowed the same day. A resident standing on the
+ground chased the player over a frame border and back. The failures were a ledge in Balmora (the player dropped off
+it; fleeing is the rule) and test residents standing a few units above the ground: the spawn floor snap did not put
+them down on the CHIM ground, so they could not step. Residents with a builder-baked ground point are not affected.
+
+## CHIM-STAIR-COLLISION-MESH-47: default builds keep their keys, an exact box in the check, 21 October 2026
+
+[CHIM-STAIR-COLLISION-MESH-47](bugs/CHIM-STAIR-COLLISION-MESH-47.md): method 1 now runs in its own mesh worker and unit
+kind, so the shared converter modules hold none of its code and a default build's mesh units keep the code keys they
+had before method 1 (its first version had rekeyed four unit kinds). The stair check places the standing box exactly
+(the pieces grown by the box); it agrees with the recorded walks on 97.9 % of the tread points they covered. Method 1
+now changes 14 meshes and cannot fix 11.
+
+## CHIM-STAIR-COLLISION-MESH-47: walkways and seams, 21 October 2026
+
+[CHIM-STAIR-COLLISION-MESH-47](bugs/CHIM-STAIR-COLLISION-MESH-47.md): rope bridges, docks and boards are walkways in
+stair collision method 1 (sloped plates along their boards instead of a block per board); the stair check follows
+the standing box across every seam between treads. On the v0.0.46 release build's meshes method 1 now changes 11
+meshes at +0.6 % collision bytes on them (it was +30 %); 19 meshes it cannot fix keep today's collision.
+
+## NPC-STORY-DISABLED-AT-START-42: the start script's disabled actors, off by default, 21 October 2026
+
+[NPC-STORY-DISABLED-AT-START-42](bugs/NPC-STORY-DISABLED-AT-START-42.md): the builder can now read the actors the
+original's start script disables at a new game from the game data (78: 58 NPCs, 20 creatures), and with
+`--start-disabled original` the resident stages leave them out. On the v0.0.46 release build that would remove 11
+placed references: four Dreamers (two around Seyda Neen, one in Balmora, one in Vivec), the Dreamer Prophet and six
+quest characters. The twelve Dreamers' enable rule (journal `A2_2_6thHouse` == 50) is read from their own script.
+AmiWind does not run that journal stage yet, so a left-out actor would never come back: the default stays `placed`
+(as before) until the runtime enable exists.
+## CHIM-COMPILED-HULL-OVERFILL-46: cause found, edge bevels measured, 21 October 2026
+
+[CHIM-COMPILED-HULL-OVERFILL-46](bugs/CHIM-COMPILED-HULL-OVERFILL-46.md): not the compiler. The models' standing
+hulls are their pieces expanded without edge bevels: on the worst rocks the stored hull and that expansion classify
+7,965 to 8,000 of 8,000 sample points alike, and a fresh qbsp compile of the same pieces has no extra solid. A new
+builder option, `--chim-model-bevels exact` or `tol:N`, adds the bevels, off by default: over the models of every
+frame's heap peak it grows the hull planes from 3.2 to 3.9 million (tol:4) or 5.8 million (exact) and puts 8 to 40
+frames over the CHIM zone budget. The placed collision method of the next world format holds the exact shape
+without storing the planes.
+
+## CHIM-STAIR-COLLISION-MESH-47: the stair check calibrated against the recorded walks, 21 October 2026
+
+[CHIM-STAIR-COLLISION-MESH-47](bugs/CHIM-STAIR-COLLISION-MESH-47.md): the geometric stair check now places the
+standing box over each tread point. Compared, without walking, with the stair walks the v0.0.46 release build
+recorded: on the 2,896 tread points those walks covered it agrees on 2,846 (98.3 %); the walks covered 8.6 % of the
+tread points. Method 1 now climbs flights with one ramp per run of steps between landings, and a build with it gates
+on the check. It changes 15 of 97 flight meshes at +30 % collision bytes on them; 14 it cannot fix yet.
+
+## CHIM-STAIR-COLLISION-MESH-47: stair collision method 1, a stairway collision mesh, 20 October 2026
+
+[CHIM-STAIR-COLLISION-MESH-47](bugs/CHIM-STAIR-COLLISION-MESH-47.md): method 1 beside today's stair collision, off by
+default: a flight whose collision fails a geometric check (stand height against the drawn tread, slope, standing
+room, rise between neighbouring points; plane arithmetic, no walk) gets one ramp or one block per tread. Measured on
+the v0.0.46 release build's meshes: 24 of 97 flight meshes made walkable by it (29 flights), 46 already pass, 27
+still fail and keep today's collision; +7.9 % collision bytes on the 24 changed meshes. Not in game yet.
+## CHIM-COMPILED-HULL-OVERFILL-46: compiled model hulls solid outside their pieces, 21 October 2026
+
+[CHIM-COMPILED-HULL-OVERFILL-46](bugs/CHIM-COMPILED-HULL-OVERFILL-46.md): measured while checking the placed
+collision method on the real collision pieces of the v0.0.46 world's heaviest meshes. The stored compiled standing
+hulls are solid in 0.7 to 0.9 % of the sampled volume where the exact expansion of their own pieces is free (up to
+82 units from the nearest piece, mostly in open air), and 703 of 45,000 traces on tilted variants change between hit
+and miss. Stored hulls that are plain piece chains match exactly. The placed method matches the exact expansion on
+44,950 of the 45,000 traces. Not seen in game yet.
+
+## ENGINE-STRICT-WARNINGS-36 persisting: the engine's warning level raised, 20 October 2026
+
+[ENGINE-STRICT-WARNINGS-36](bugs/ENGINE-STRICT-WARNINGS-36.md) (PERSISTING since v0.0.36-dev3, 11 October 2026;
+raised again by an outside review of v0.0.46): the gate still built with `-Wall -Wno-unused`. Measured on v0.0.46
+over every engine variant: 451 warnings with `-Wall -Wextra`, 4,068 with a strict set, and 35 printf format
+mismatches once the printf-like functions carry the format attribute. Real faults fixed: a `double` printed with
+`%d`, two texts passed as the format, a float compared with the integer `abs()`, and unsigned screen-size
+comparisons that filled the whole row for an off-screen rectangle or dropped text starting left of the screen.
+The gate level is now `-Wall -Wextra` for every file and stricter for AmiWind's own; warning flags alone leave the
+engine byte-identical. Branch v0.0.47-strict-warnings, not yet merged.
+## CHIM-PLACEMENT-MARGIN-COPIES-46 and CHIM-TILT-VARIANTS-SPLIT-33: what the frame segments hold, 20 October 2026
+
+[CHIM-PLACEMENT-MARGIN-COPIES-46](bugs/CHIM-PLACEMENT-MARGIN-COPIES-46.md): the v0.0.46 release world's 1,315 MB of
+frame segments, read record by record: models 736 MB, terrain 489 MB, chunk records 80 MB, textures 2 MB. Every
+object's placement record is stored in 3.55 frames on average (the region frame margins) plus 619,074 reach copies:
+52 MB for 132,369 objects. [CHIM-TILT-VARIANTS-SPLIT-33](bugs/CHIM-TILT-VARIANTS-SPLIT-33.md) persists: 32,714
+stored models come from 1,400 meshes; one copy per mesh would be about 57 MB of drawn geometry.
 
 ## CHIM-HULL-SURFACE-HEAP-46: the walkway collision fix put six frames over the CHIM zone, 20 October 2026
 

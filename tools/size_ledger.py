@@ -144,7 +144,16 @@ def collect(run):
     for row in record.get('partitions') or []:
         name, expected = row.get('partition'), int(row.get('payload_bytes') or 0)
         before = sum(group['bytes'] for group in groups.values())
-        if name in world_lists:
+        if name in world_lists and name == chim_partition:
+            # compact layout (tools/layout_plan.py): the CHIM volume also holds the open-world frame maps
+            source = 'chim volume (id1/chim) + world-partitions.json maps'
+            listed = 0
+            for item in world_lists[name]:
+                add(groups, item['path'], int(item['bytes']))
+                listed += int(item['bytes'])
+            groups['chim-world']['bytes'] += expected - listed
+            groups['chim-world']['files'] += int(row.get('files') or 0) - len(world_lists[name])
+        elif name in world_lists:
             source = 'world-partitions.json'
             for item in world_lists[name]:
                 add(groups, item['path'], int(item['bytes']))

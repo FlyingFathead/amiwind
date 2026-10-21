@@ -71,7 +71,7 @@ from build_host import executable_path, find_executable, fallback_font, host_nam
 from build_summary import BuildSummary
 import placeholder_policy
 import retired_flags
-from build_font_options import (add_builder_options, add_font_options, add_heap_options, resolve_builder,
+from build_font_options import (add_builder_options, add_disk_layout_options, add_font_options, add_heap_options, resolve_builder,
                                 resolve_font_options, resolve_heap)
 from build_aga import UPSTREAM_SHA256, RUNTIME_BUILD_DIR, VERSION, runtime_sources, check_quakec
 
@@ -125,6 +125,10 @@ def parser():
                    help="Optional: a folder from your own Workbench/accelerator installation (or its LIBS: drawer). "
                         "68040.library/68060.library found there are copied to LIBS: on the boot disk and opened at boot; "
                         "without one the build continues and reports no FPU support library. See docs/FPU_SUPPORT_LIBRARY.md")
+    p.add_argument("--workbench-icon", choices=("off", "requester", "launch"), default=None,
+                   help="Icon on the boot volume for someone who opens it from Workbench (docs/WORKBENCH_ICON.md): "
+                        "launch (the default when not given: the icon starts the game from Workbench), requester (a requester "
+                        "says AmiWind starts by booting from its disk) or off (no icon)")
     p.add_argument("--seyda-recorded", type=Path, metavar="DIR",
                    help=retired_flags.help_text(SEYDA_RECORDED_HELP))
     p.add_argument("--seyda-scene-source", choices=("auto", "carrier", "compiled"), default="auto",
@@ -209,6 +213,8 @@ def parser():
     p.add_argument("--npc-root-rule", choices=("morrowind", "legacy"), default="legacy", help="NIF root node rule for NPC body parts and equipment: legacy (default; the full root transform, verified correct for rigid body parts) or morrowind (the root rotation is ignored exactly as for scenery; measured to break 35 rigid NPC part meshes). Part of every NPC stage's cache key (AMIWIND_NPC_ROOT_RULE)")
     import creature_residents
     creature_residents.add_option(p)
+    import start_disabled
+    start_disabled.add_option(p)
     p.add_argument("--actor-search", choices=("wide", "near"), default="wide", help="Actor support search: wide (default; a ground actor that no spot within 32 units fits is also tried up to 48 units away, CHIM-VIVEC-FRAME-WIDE-41; an actor the 32-unit search places never moves) or near (32 units only: the method before v0.0.41). Part of the actor stages' cache keys (AMIWIND_ACTOR_SEARCH)")
     from build_exclusions import add_options as add_exclusion_options
     add_exclusion_options(p)
@@ -241,6 +247,10 @@ def parser():
     p.add_argument('--no-harvest', action='store_true',
                    help='DEBUGGING ONLY: omit harvestable mushrooms (shipped since v0.0.29); the harvest step is built '
                         'by default and such an image does not match a release (mushrooms stay baked, not pickable)')
+    p.add_argument('--harvest-interiors', choices=('on', 'off'), default='on',
+                   help='Harvestable mushrooms inside the shipped interiors (default on since v0.0.47: picked = gone '
+                        'and remembered in the save, one pick state with the outdoors, HARVEST-INTERIOR-PICK-47); '
+                        'off: the earlier exterior-only harvest, interior mushrooms stay baked scenery')
     p.add_argument('--tree-sprites', action='store_true',
                    help='No effect, kept for old command lines: world flora is built by default (BUILD-FLORA-OPTIN-32)')
     p.add_argument('--map-budget-policy', choices=('strict', 'warning'), default='strict',
@@ -270,6 +280,21 @@ def parser():
                    help='DEBUGGING ONLY: build Seyda Neen and Balmora only, without the shipped towns ('
                         + (', '.join(shipped_towns) or 'none') + ') or any --extra-town; such an image does '
                         'not match a release')
+    p.add_argument('--media-catalogue', choices=('on', 'off'), default='off',
+                   help='DEBUGGING ONLY: on also puts the media catalogue (the media coverage report, about 64 MB) on '
+                        'the boot disk as id1/media/catalogue.json; off (the default after v0.0.46) leaves it beside the '
+                        'image as image/media-coverage.json, since nothing in the game reads it '
+                        '(IMAGE-MEDIA-CATALOGUE-ON-DISK-46, docs/MEDIA_IMPORT.md)')
+    p.add_argument('--file-aliases', choices=('on', 'off'), default='on',
+                   help='on (the default since v0.0.47): byte-identical models, sounds, sprites and tags of the boot '
+                        'disk are stored once, their other names listed in id1/file-aliases.txt that the engine reads '
+                        '(tools/payload_share.py, IMAGE-DUPLICATE-FILES-46, docs/PAYLOAD_SHARING.md; about 21 MB less '
+                        'on the v0.0.46 payload); off stores every copy (the method before)')
+    p.add_argument('--shared-skins', choices=('on', 'off'), default='on',
+                   help='on (the default since v0.0.47): an actor skin that several actor models repeat (a model and '
+                        'its mover model) is stored once in progs/skins/ and the models point to it '
+                        '(tools/payload_share.py, IMAGE-ACTOR-SKIN-REPEATS-46, docs/PAYLOAD_SHARING.md; about 65 MB '
+                        'less on the v0.0.46 payload); off keeps a skin in every model (the method before)')
     p.add_argument('--night-lamp-lightmaps', choices=('on', 'off'), default='off',
                    help='EXPERIMENTAL (off by default): legacy Balmora cores get baked night-lamp lightmaps on '
                         'lightstyle 32 (prototype, tools/lamp_lightmaps.py; docs/EXPERIMENTAL_FLAGS.md); off keeps '
@@ -282,13 +307,16 @@ def parser():
                         + retired_flags.RETIRED_SINCE + ', refused in developer mode without --override '
                         'chim-native-towns-off; docs/EXPERIMENTAL_FLAGS.md "Retired flags")')
     p.add_argument('--chim-regions', action='append', default=[], metavar='SET',
-                   help='EXPERIMENTAL (off by default): exterior cells on CHIM inside the legacy open world, one '
-                        'CHIM frame per cell replacing that cell\'s open-world map (docs/chim/CHIM_REGIONS.md): '
-                        'seabed, coast, sea-ring, a region name, or @FILE (CSV with x,y, aw-chim-cells-1 JSON, '
-                        'Toolkit World Map state export); repeatable; needs --builder chim and --chim-regions-status')
+                   help='Exterior cells on CHIM, one CHIM frame per cell replacing that cell\'s open-world map '
+                        '(docs/chim/CHIM_REGIONS.md). Default for a full --builder chim build (since v0.0.47): '
+                        '@config/chim-cells.json, the release cell list in the source tree. Values: seabed, coast, '
+                        'sea-ring, a region name, @FILE (CSV with x,y, aw-chim-cells-1 JSON, Toolkit World Map '
+                        'state export), or none (no CHIM region cells: the earlier default, kept selectable); '
+                        'repeatable; needs --builder chim')
     p.add_argument('--chim-regions-status', type=Path, metavar='FILE',
                    help='The CHIM progress tracker file (cell-progress.json) --chim-regions is checked against: '
-                        'every cell finished in CHIMport (or empty sea), no legacy pocket, no town frame')
+                        'every cell finished in CHIMport (or empty sea), no legacy pocket, no town frame; default '
+                        'the public reference docs/chim/cell-progress-reference.json')
     from map_files import DEFAULT_FRAME_EXT as FRAME_EXT_DEFAULT
     p.add_argument('--chim-region-rows', choices=('game-data', 'legacy'), default=None,
                    help='Where a CHIM region frame map takes its worldspawn and player start from: game-data (default: '
@@ -365,6 +393,30 @@ def parser():
                    help='CHIM builder: add the pieces a compiled model hull lost under a walkable surface (on, '
                         'default), or keep the compiled hull as it is and record the check (off: the previous '
                         'method; CHIM-COMPILED-HULL-SHORT-36)')
+    p.add_argument('--chim-model-bevels', default=None,
+                   help='CHIM builder: edge bevels of the model standing hulls (EXPERIMENTAL; '
+                        'CHIM-COMPILED-HULL-OVERFILL-46): exact, or tol:N; not given or profile = only the meshes whose '
+                        'profile asks for them (the method before)')
+    p.add_argument('--chim-placement-format', choices=('0.7', '0.8'), default=None,
+                   help='CHIM builder: world format of the placements (EXPERIMENTAL; CHIM-TILT-VARIANTS-SPLIT-33): 0.8 = '
+                        'one model per mesh + scale, the full rotation in the record, collision from the placed pieces; '
+                        'not given or 0.7 = scale and tilt baked per variant (the method before)')
+    p.add_argument('--chim-reach-index', choices=('copies', 'refs'), default=None,
+                   help='CHIM builder: placements a chunk reaches but does not own (EXPERIMENTAL; '
+                        'CHIM-PLACEMENT-MARGIN-COPIES-46): refs = world format 0.9, a 4-byte reference to the '
+                        'owner record in the same frame (needs --chim-placement-format 0.8); not given or copies = '
+                        'a whole record in every chunk the drawn box touches (the method before)')
+    p.add_argument('--chim-terrain-pack', choices=('bsp29', 'compact', 'generate'), default='generate',
+                   help='CHIM builder: how terrain records are stored: generate (the default since v0.0.47) = world '
+                        'format 0.11, regular-path terrain generated by the engine from its heights, the rest compact '
+                        '(needs --chim-terrain-refs on; with --chim-terrain-refs off the builder falls back to bsp29); '
+                        'compact = world format 0.10, a lossless repack the engine expands to the same bytes; bsp29 = '
+                        'the BSP29 brush image (the method before)')
+    p.add_argument('--chim-actor-table', choices=('off', 'on'), default='on',
+                   help='CHIM builder: the actor table (CHIM-EXTERIOR-ACTORS-MISSING-46): on (the default since '
+                        'v0.0.47) = every exterior NPC and creature reference of the game data in maps/chim-actors.cca, '
+                        'read by the type 1 window with "chim actors table 1", and the actor library stage; off = none '
+                        '(only the frame maps place actors; the method before)')
     p.add_argument('--chim-mesh-method', choices=('table', 'converter', 'merge', 'meshopt+merge'), default=None,
                    help='CHIM builder: how meshes become faces: table (default: config/mesh-methods.json), or one method '
                         'for every mesh: converter (the method before v0.0.36-dev3), merge, meshopt+merge '
@@ -373,6 +425,11 @@ def parser():
                    help='CHIM builder: how a model variant shares its vertices: base (default: as its base, so every '
                         'scale and tilt has the same vertices and edges; CHIM-STRIDER-SCALED-SEAMS-36) or placed '
                         '(by the placed position, the method before v0.0.36-dev3)')
+    p.add_argument('--chim-uv-scroll', choices=('off', 'turbulent'), default='turbulent',
+                   help='CHIM builder: shapes whose texture scrolls in the original (the Ghostfence curtain, '
+                        'waterfalls, the ash mire; not lava): turbulent (default since v0.0.47) a Quake turbulent '
+                        'texture that ripples over time, unlit (in game: dbg ghostfence on/off); off a still texture, '
+                        'the method before v0.0.47 (GHOSTFENCE-NO-ANIMATION-46)')
     p.add_argument('--chim-draw-distance', type=int, metavar='UNITS',
                    help='DEBUG ONLY (--miniwind --miniwind-debug): a stated closer view; the CHIM world is built '
                         'and heap-gated for this draw distance and the image starts with it (default 540)')
@@ -405,6 +462,8 @@ def parser():
     add_exterior_sky_options(p)
     from world_bounds import add_option as add_world_bounds_option
     add_world_bounds_option(p)
+    from chim_crossing import add_option as add_chim_crossing_option
+    add_chim_crossing_option(p)
     from prepare_player_view import add_options as add_player_view_options
     add_player_view_options(p)
     p.add_argument('--estimate-world', type=Path, metavar='OUT',
@@ -452,6 +511,19 @@ def parser():
                    help='DEBUGGING ONLY: run stages without the build profiler and output manifests '
                         '(build-profile.json); outputs are the same, and a later --reuse-from cannot use such a run. '
                         'See docs/BUILD_PROFILE.md')
+    # A first-time user's build and the release's from-scratch check (tools/clean_build.py, docs/BUILD_CACHE.md
+    # "Before a release"): off by default; neither changes a stage command or key, the receipt records them.
+    p.add_argument('--clean', action='store_true',
+                   help='Build as a first-time user would: no --reuse-from, --rebuild-stage, prerendered store or '
+                        'cache and pool outside the workspace, and the workspace cache (WORKSPACE/cache) must be '
+                        'empty or absent (a filled one is refused, never emptied: give a new --workspace). '
+                        'Recorded in the build receipt (clean). See docs/BUILD_CACHE.md')
+    p.add_argument('--public-defaults', action='store_true',
+                   help='Refuse what a public user would not have: --override and retired flags, every --allow-* '
+                        'and --accept-* waiver, --chim-regions @FILE or --chim-regions-status outside the source '
+                        'tree, and the switches of docs/EXPERIMENTAL_FLAGS.md at a non-default value; every refusal '
+                        'is listed. Recorded in the build receipt (public_defaults). With --clean: the release\'s '
+                        'from-scratch check')
     p.add_argument('--reuse-from', type=Path, metavar='RUN',
                    help='Development builds: copy the verified outputs of stages whose input fingerprint is unchanged '
                         'from this earlier run instead of running them; refused for release candidates and finals. '
@@ -484,12 +556,28 @@ def parser():
                         'this option). Name one folder in several workspaces and in tools/chimport.py to share ONE '
                         'pool. Hard links need it on the same file system and mount as the run: otherwise files are '
                         'copied, with one warning recorded in the build state (docs/BUILD_CACHE.md)')
-    p.add_argument('--stair-walk', choices=('auto', 'all', 'flights'), default='auto',
-                   help='What the stair walk covers: all (every step and ramp; the advisory findings), flights (only '
-                        'the steps of flights, which gate the build) or auto (default: all for development builds, '
-                        'flights for release candidates and finals). This is WHAT is walked; with the walk cache '
-                        '(--stair-walk-cache cached, the default) a map or frame whose collision is unchanged is not '
-                        'walked again')
+    p.add_argument('--stair-walk', choices=('auto', 'off', 'all', 'flights'), default='auto',
+                   help='OFF BY DEFAULT (decided by the maintainer 20 October 2026, BUILD-STAIR-WALK-OFF-46: auto = off, no build walks stairs unless asked). When asked, what the stair walk covers: flights (only the steps of flights, which gate the build), all '
+                        '(every step and ramp, the advisory findings too: a nightly or beta run on request) or auto '
+                        '(default: flights for every build since v0.0.46; before, all for development builds). This '
+                        'is WHAT is walked; with the walk cache (--stair-walk-cache cached, the default with '
+                        '--developer-mode) a map or frame whose walk inputs are unchanged is not walked again')
+    p.add_argument('--stair-walk-key', choices=('reach', 'frame'), default=None,
+                   help='How the walk of a CHIM frame is keyed: reach (default with --stair-walk-cache cached: per core, '
+                        'its steps and ramps and the collision within reach of their walks, so collision far from '
+                        'every stair does not walk a frame again) or frame (the key before v0.0.46: every chunk and '
+                        'placement of the frame; the default with --stair-walk-cache records, whose shipped stair '
+                        'records are keyed by it); sets AMIWIND_STAIR_WALK_KEY')
+    p.add_argument('--stair-walk-places', metavar='FILE|ID,...', default=None,
+                   help='DEVELOPMENT BUILDS ONLY: a targeted stair walk of the named places and nothing else (a '
+                        'redundancy check of individual problem places on request): a watch-list file, or a comma '
+                        'list of IDs of config/stair-watch.json, cells x:y, frame paths frames/..., maps map:NAME and source '
+                        'references ref:N; the rows are reported, never stored; sets AMIWIND_STAIR_WALK_PLACES')
+    p.add_argument('--stair-watch', metavar='FILE|off', default=None,
+                   help='The stair watch list: the frames holding its places are walked again on every build, even '
+                        'when their walk is reused, and a difference from the record stops the build (default '
+                        'config/stair-watch.json; a bug page that reports a stair or walkway problem adds its place '
+                        'there); off: none; sets AMIWIND_STAIR_WATCH')
     p.add_argument('--stair-walk-cache', choices=('records', 'cached', 'full'), default=None,
                    help='records (the default without --developer-mode): a CHIM frame whose collision matches the '
                         'known-good stair records shipped with the source (config/stair-records, by SHA-256) or a '
@@ -504,6 +592,11 @@ def parser():
                    help='Where a CHIM region frame\'s stair walk walks: owned (default: the cell the frame owns plus '
                         'the map-switch margin; its border copies of other cells are walked where they are owned) '
                         'or frame (the method before v0.0.42: the whole frame with its border copies)')
+    p.add_argument('--stair-collision-method', choices=('0', '1'), default=None,
+                    help='How a flight of stairs gets its collision: 0 (default) the convex proxies with the stair '
+                         'rules, proven by the stair walk; 1 (EXPERIMENTAL) a stairway collision mesh (one ramp, or one '
+                         'block per tread) for every flight whose collision fails the geometric stair check '
+                         '(tools/stair_mesh.py); sets AMIWIND_STAIR_COLLISION_METHOD')
     p.add_argument('--collision-underside', choices=('rule', 'split', 'whole', 'names'), default=None,
                    help='How a CHIM model keeps collision that a convex piece closes under an authored ceiling '
                         '(CHIM-VOS-TEMPLE-WALKWAY-41): names (default): a list of mesh names (the Velothi temples) '
@@ -561,6 +654,7 @@ def parser():
                    help='fail (default): a stage whose single unit cannot fit the memory refuses the build before '
                         'any stage; warn: print it and build anyway; off: no resource plan')
     add_font_options(p)
+    add_disk_layout_options(p)
     import npc_lod
     npc_lod.add_options(p)
     add_builder_options(p)
@@ -965,11 +1059,14 @@ def harvest_steps(args, tool, run, jobs):
     """The harvest step and its image option (BUILD-HARVEST-NOT-BUILT-32).
 
     Shared mushroom models against the runtime palette (the scene palette after
-    the census) and every original exterior placement; the image step derives
+    the census) and every original exterior placement plus, by default, every
+    representable interior one (--harvest-interiors, HARVEST-INTERIOR-PICK-47);
+    the image step derives
     the per-map plan from the maps it ships, gates and admits them.
     """
     step = ('harvest', tool('harvest_build.py', 'prepare', '--data-files', args.data_files,
             '--palette', run / 'intro-scene/id1/gfx/palette.lmp', '--out', run / 'harvest',
+            *(['--interiors', 'off'] if getattr(args, 'harvest_interiors', 'on') == 'off' else []),
             '--jobs', jobs))
     return step, ['--harvest', str(run / 'harvest')]
 
@@ -1138,14 +1235,15 @@ def world_terrain_cache(args):
 
 
 def stair_walk_scope(version, choice='auto'):
-    """'all' or 'flights' for the image step's stair walk: --stair-walk all|flights as given;
-    auto = 'all' for development (-devN) versions, 'flights' for release candidates and finals
-    (project decision 9 October 2026; a nightly full report builds with --stair-walk all)."""
-    if choice in ('all', 'flights'):
+    """'all' or 'flights' for the stair walk (image step and CHIM gate): --stair-walk all|flights as given;
+    auto = 'flights' for every version (decided for the project 20 October 2026, BUILD-STAIR-WALK-SCOPE-KEY-46:
+    only flights gate a build; before, auto was 'all' for development versions, project decision 9 October 2026).
+    A nightly or beta full report builds with --stair-walk all."""
+    if choice in ('off', 'all', 'flights'):
         return choice
     if choice != 'auto':
-        raise ValueError('--stair-walk must be auto, all or flights')
-    return 'all' if re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-dev[0-9]+', version) else 'flights'
+        raise ValueError('--stair-walk must be auto, off, all or flights')
+    return 'off'   # BUILD-STAIR-WALK-OFF-46: decided by the maintainer 20 October 2026: no stair walk by default
 
 
 def reuse_cache_fallback(reuse_from, workspace):
@@ -1233,6 +1331,16 @@ def seyda_scene_source(args):
         raise ValueError('--seyda-scene-source carrier needs a CHIM-native Seyda Neen (--builder chim with Seyda '
                          'Neen on CHIM, no --legacy-area seyda or --seyda-recorded)')
     return 'carrier' if native else 'compiled'
+
+
+def chim_actor_table(args):
+    """'on' or 'off': --chim-actor-table (on by default since v0.0.47, decided for the project, 2026-10-21) for a CHIM
+    builder; a legacy-builder build has no CHIM world and no actor table (its plan as before)."""
+    value = getattr(args, 'chim_actor_table', None)
+    if value != 'on':
+        return 'off'
+    builder = getattr(args, 'builder_options', None) or resolve_builder(args)
+    return 'on' if builder['builder'] == 'chim' else 'off'
 
 
 def seyda_absent_miniwind(args):
@@ -1408,7 +1516,7 @@ def commands(args, tools, run):
                             *[part for name in (getattr(args, "engine_experiment", None) or []) for part in ("--engine-experiment", name)],
                             # narrow coordinates only when asked: the default (wide) command line has no option
                             *(["--coord-range", "narrow"] if getattr(args, "coord_range", "wide") == "narrow" else []))),
-            ("image", tool("build_aga.py", "image", "--jobs", jobs, *(["--kickstart-file", args.kickstart_file] if getattr(args,"kickstart_file",None) else []), *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *[part for fid in (getattr(args, "accept_known_stair_findings", None) or []) for part in ("--accept-known-stair-findings", fid)], *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--sdk", args.sdk, "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--world-scenery", run / "world-scenery", "--music", run / "music", "--media", run / "media", "--engine", binary, "--out", run / "image",
+            ("image", tool("build_aga.py", "image", "--jobs", jobs, *(["--chim-actor-table", "on"] if chim_actor_table(args) == "on" else []), *(["--kickstart-file", args.kickstart_file] if getattr(args,"kickstart_file",None) else []), *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *[part for fid in (getattr(args, "accept_known_stair_findings", None) or []) for part in ("--accept-known-stair-findings", fid)], *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--sdk", args.sdk, "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--world-scenery", run / "world-scenery", "--music", run / "music", "--media", run / "media", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
         # Shipped towns (by default) and --extra-town towns convert in the same
@@ -1443,6 +1551,16 @@ def commands(args, tools, run):
                       '--town-flora-source-index', str(run / 'scenery/scenery-index.json'),
                       '--town-flora-scene-report', str(run / 'alias-scene/scene-report.json')] if name == 'image' else command)
                  for name, command in steps]
+    if chim_actor_table(args) == 'on' and any(name == 'image' for name, _ in steps):
+        # --chim-actor-table on (the default since v0.0.47; CHIM-EXTERIOR-ACTORS-MISSING-46): the actor library stage bakes
+        # the models of the exterior creatures and of the NPCs outside the CHIM towns (tools/actor_library.py); the
+        # image step installs them and gives the actor table their base texts. Off: no stage, no option.
+        image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
+        steps.insert(image_index, ('actor-library', tool(
+            'actor_library.py', '--data-files', args.data_files, '--palette', run / 'intro-scene/id1/gfx/palette.lmp',
+            '--run', run, '--out', run / 'actor-library', '--jobs', jobs)))
+        steps = [(name, command + ['--actor-library', str(run / 'actor-library')] if name == 'image' else command)
+                 for name, command in steps]
     if harvest_status(args)[0]:
         step, options = harvest_steps(args, tool, run, jobs)
         image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
@@ -1469,6 +1587,11 @@ def commands(args, tools, run):
             image_options += ['--balmora-cache', str(run / 'balmora-work')]
             if getattr(args, 'night_lamp_lightmaps', 'off') == 'on':
                 image_options += ['--night-lamp-lightmaps']  # EXPERIMENTAL, off by default
+        if getattr(args, 'media_catalogue', 'off') == 'on':
+            image_options += ['--media-catalogue']  # DEBUGGING ONLY, off by default (IMAGE-MEDIA-CATALOGUE-ON-DISK-46)
+        for flag in ('file_aliases', 'shared_skins'):   # on by default since v0.0.47 (docs/PAYLOAD_SHARING.md)
+            if getattr(args, flag, 'off') == 'on':
+                image_options += ['--' + flag.replace('_', '-')]
         if getattr(args, 'shared_sky_source', None) is not None:
             image_options += ['--shared-sky-source', str(args.shared_sky_source.resolve())]
         if getattr(args, 'seyda_recorded', None) is not None:
@@ -1487,9 +1610,21 @@ def commands(args, tools, run):
         retired = retired_flags.image_option(getattr(args, 'retired_flags_record', None))
         if retired:
             image_options += ['--retired-flags-used', retired]  # image/build.json retired_flags_used
+        # The disk layout (tools/layout_plan.py): CLI over --build-config over config/build-defaults.json, resolved
+        # here so the image step gets the exact values and records them in build.json.
+        import layout_plan
+        # Passed only when they differ from the shipped defaults, which the image step resolves itself: a default build's
+        # image command (and its stage key) stays as it was.
+        disk = layout_plan.resolve(getattr(args, 'disk_layout', None), getattr(args, 'partition_headroom_mib', None),
+                                   getattr(args, 'boot_partition_headroom_mib', None), getattr(args, 'build_config', None))
+        if disk != layout_plan.resolve():
+            image_options += ['--disk-layout', disk['mode'], '--partition-headroom-mib', str(disk['headroom_mib']),
+                              '--boot-partition-headroom-mib', str(disk['boot_headroom_mib'])]
         if getattr(args, 'amiga_libs', None) is not None:
             image_options += ['--amiga-libs', str(args.amiga_libs),
                               '--amiga-libs-policy', getattr(args, 'amiga_libs_policy', 'warn')]
+        if getattr(args, 'workbench_icon', None) is not None:  # not given = the image step's default (launch)
+            image_options += ['--workbench-icon', args.workbench_icon]
         steps = [(name, command + image_options if name == 'image' else command)
                  for name, command in steps]
     if getattr(args, 'skip_dressing', False):
@@ -1569,6 +1704,13 @@ def commands(args, tools, run):
     if args.stage == 'aga' and not getattr(args, 'dry_run', False):
         from world_bounds import configure as configure_world_bounds, image_arguments
         extra = image_arguments(getattr(args, 'world_bounds_record', None) or configure_world_bounds(args))
+        if extra:
+            steps = [(name, command + extra if name == 'image' else command) for name, command in steps]
+        # --chim-crossing (tools/chim_crossing.py, default 0): 1 adds the image step's --chim-crossing 1 (the image
+        # writes "chim crossing 1" into the game's defaults); 0 adds nothing (the image step's command as before).
+        from chim_crossing import configure as configure_chim_crossing, image_arguments as crossing_arguments
+        extra = crossing_arguments(getattr(args, 'chim_crossing_record', None) or configure_chim_crossing(
+            args, (getattr(args, 'builder_options', None) or resolve_builder(args))['builder']))
         if extra:
             steps = [(name, command + extra if name == 'image' else command) for name, command in steps]
         # --player-body / --death-retry (tools/prepare_player_view.py, default on): off adds the image step's
@@ -1755,10 +1897,25 @@ def chim_stage_options(args):
         out += ['--terrain-refs', args.chim_terrain_refs]
     if getattr(args, 'chim_model_hull_patch', 'on') not in (None, 'on'):
         out += ['--model-hull-patch', args.chim_model_hull_patch]
+    if getattr(args, 'chim_model_bevels', None) not in (None, 'profile'):
+        out += ['--model-bevels', args.chim_model_bevels]
+    if getattr(args, 'chim_placement_format', None) not in (None, '0.7'):
+        out += ['--placement-format', args.chim_placement_format]
+    if getattr(args, 'chim_reach_index', None) not in (None, 'copies'):
+        out += ['--reach-index', args.chim_reach_index]
+    # generate by default since v0.0.47 (world format 0.11); compact and generate need terrain references, so a
+    # build with --chim-terrain-refs off keeps the BSP29 brush images (the method before)
+    if getattr(args, 'chim_terrain_pack', None) not in (None, 'bsp29') and \
+            getattr(args, 'chim_terrain_refs', None) not in (None, 'off'):
+        out += ['--terrain-pack', args.chim_terrain_pack]
     if getattr(args, 'chim_mesh_method', None) not in (None, 'table'):
         out += ['--mesh-method', args.chim_mesh_method]
     if getattr(args, 'chim_model_weld', None) not in (None, 'base'):
         out += ['--model-weld', args.chim_model_weld]
+    # turbulent by default since v0.0.47 (decided for the project, 2026-10-21); off = the still texture of before
+    uv_scroll = getattr(args, 'chim_uv_scroll', None) or 'turbulent'
+    if uv_scroll != 'off':
+        out += ['--uv-scroll', uv_scroll]
     if getattr(args, 'chim_regions_cells', None):
         # the cells themselves (resolve_chim_regions), so the stage key covers exactly them
         out += ['--chim-regions-cells', args.chim_regions_cells]
@@ -1775,27 +1932,48 @@ def chim_region_skip(args):
     return ['--chim-regions-cells', cells]
 
 
+# The default of a full CHIM build with no --chim-regions (BUILD-CHIM-CELLS-PRIVATE-LIST-47): the cell list and the
+# public tracker reference in the source tree. Kept here, not in tools/chim/regions.py, so no stage's source closure
+# names these files: the chim stage gets the resolved cells on its command line and is keyed on exactly them.
+CHIM_CELLS_DEFAULT_NAME = 'config/chim-cells.json'
+CHIM_CELLS_DEFAULT = ROOT / 'config' / 'chim-cells.json'
+CHIM_CELLS_STATUS_DEFAULT = ROOT / 'docs' / 'chim' / 'cell-progress-reference.json'
+
+
 def resolve_chim_regions(args, builder=None):
-    """--chim-regions (EXPERIMENTAL, off by default): the preflight of the selected cells against the tracker
-    file, in seconds, before any stage (tools/chim/regions.py); sets args.chim_regions_cells (the chim stage's
-    cells) and returns the record for the build log, or None when the option is not given."""
+    """--chim-regions: the preflight of the selected cells against the tracker file, in seconds, before any stage
+    (tools/chim/regions.py); sets args.chim_regions_cells (the chim stage's cells) and returns the record for the
+    build log, or None when the build has no CHIM region cells. A full CHIM build without --chim-regions takes the
+    cell list in the source tree (config/chim-cells.json, the release cells since v0.0.43) checked against the
+    public tracker reference (BUILD-CHIM-CELLS-PRIVATE-LIST-47); --chim-regions none builds none (the earlier
+    default, kept selectable)."""
+    from chim import regions as chim_regions
     args.chim_regions_table = None
-    if not getattr(args, 'chim_regions', None):
+    values = list(getattr(args, 'chim_regions', None) or [])
+    if chim_regions.NONE in values:
+        if values != [chim_regions.NONE]:
+            raise ValueError('--chim-regions none cannot be combined with other --chim-regions values')
         args.chim_regions_cells = None
         return None
+    default = False
+    if not values:
+        builder = builder or resolve_builder(args)
+        if builder['builder'] != 'chim' or getattr(args, 'miniwind', False):
+            args.chim_regions_cells = None
+            return None
+        values, default = ['@' + str(CHIM_CELLS_DEFAULT)], True
     builder = builder or resolve_builder(args)
     if builder['builder'] != 'chim':
         raise ValueError('--chim-regions needs the CHIM builder (--builder chim)')
     if getattr(args, 'miniwind', False):
         raise ValueError('--chim-regions is for full builds; a MiniWind sandbox builds one town')
-    if not getattr(args, 'chim_regions_status', None):
-        raise ValueError('--chim-regions needs --chim-regions-status FILE (the CHIM progress tracker file)')
-    from chim import regions as chim_regions
+    # the tracker file: the public reference in the source tree unless one is given
+    status = getattr(args, 'chim_regions_status', None) or CHIM_CELLS_STATUS_DEFAULT
+    args.chim_regions_status = status
     # the earlier region method (--chim-region-rows legacy) copies one legacy map per cell: only it refuses divided
     # cells (CHIM-REGION-DIVIDED-CELLS-36); the default makes one frame row for the whole cell
     one_map = (getattr(args, 'chim_region_rows', None) or 'game-data') == 'legacy'
-    table, problems = chim_regions.plan(args.chim_regions, args.chim_regions_status, towns=builder['chim_areas'],
-                                        one_map_only=one_map)
+    table, problems = chim_regions.plan(values, status, towns=builder['chim_areas'], one_map_only=one_map)
     problems += chim_regions.ocean_land_problems(chim_regions.table_kinds(table), getattr(args, 'data_files', None))
     problems += chim_regions.owned_land_problems(chim_regions.table_kinds(table), getattr(args, 'data_files', None))
     # the world terrain planner's ocean rule, from the master in seconds (CHIM-OCEAN-CELL-RECORD-ROUTING-43)
@@ -1808,15 +1986,19 @@ def resolve_chim_regions(args, builder=None):
                                  len(routing), (' (%s)' % ' '.join('%d,%d' % c for c in routing)) if routing else ''),
               flush=True)
     if problems:
-        raise ValueError('CHIM regions preflight failed before any stage:\n  ' + '\n  '.join(problems))
+        hint = (' (the default cell list %s; --chim-regions none builds without CHIM region cells)'
+                % CHIM_CELLS_DEFAULT_NAME) if default else ''
+        raise ValueError('CHIM regions preflight failed before any stage%s:%s' % (hint, chr(10) + '  ')
+                         + (chr(10) + '  ').join(problems))
     args.chim_regions_cells = chim_regions.encode_cells(chim_regions.table_kinds(table))
-    args.chim_regions_table = (table, chim_regions.load_status(args.chim_regions_status))  # the world manifest
+    args.chim_regions_table = (table, chim_regions.load_status(status))  # the world manifest
     c = table['counts']
-    print('EXPERIMENTAL --chim-regions %s: %d cells on CHIM (%s) in %d frames, %d groups; %d '
+    shown = ('default (%s)' % CHIM_CELLS_DEFAULT_NAME) if default else ', '.join(values)
+    print('CHIM regions --chim-regions %s, tracker %s: %d cells on CHIM (%s) in %d frames, %d groups; %d '
           'dropped (inside a town frame); their open-world maps are replaced by CHIM frame maps'
-          % (', '.join(args.chim_regions), c['cells'], chim_regions.kind_summary(c), c['frames'], c['components'],
+          % (shown, Path(status).name, c['cells'], chim_regions.kind_summary(c), c['frames'], c['components'],
              len(table['dropped'])), flush=True)
-    return {'selection': table['selection'], 'counts': c, 'dropped': table['dropped']}
+    return {'selection': table['selection'], 'counts': c, 'dropped': table['dropped'], 'default': default}
 
 
 def debug_settings(args):
@@ -2051,6 +2233,10 @@ def provenance(args, tools):
     return {
         "schema": "amiwind-build-receipt-v1", "runtime_version": VERSION,
         **extra,
+        # --clean / --public-defaults (tools/clean_build.py): only when given, so a default receipt is unchanged.
+        **({"clean": True, "clean_build": args.clean_record} if getattr(args, "clean_record", None) else {}),
+        **({"public_defaults": True, "public_defaults_check": args.public_defaults_record}
+           if getattr(args, "public_defaults_record", None) else {}),
         "npc_gallery": "asset-free" if args.dry_run else
             "omitted (--miniwind-scope exterior: quick playtest, no NPC gallery)" if exterior else
             "omitted (--miniwind PARTIAL-AREA test)" if miniwind else
@@ -2064,6 +2250,7 @@ def provenance(args, tools):
         "quick_character": getattr(args, 'quick_character_record', None),
         "skip_census": getattr(args, 'skip_census_record', None),
         "world_bounds": getattr(args, 'world_bounds_record', None),
+        "chim_crossing": getattr(args, 'chim_crossing_record', None),
         "player_view": getattr(args, 'player_view_record', None),
         "miniwind_preset": getattr(args, 'miniwind_preset_record', None),
         # Where the player starts and why (start_record; the image step checks it on the final payload).
@@ -2118,6 +2305,7 @@ def provenance(args, tools):
         "npc_root_rule": getattr(args, "npc_root_rule", "legacy"),
         "actor_search": getattr(args, "actor_search", "wide"),
         "interior_creatures": getattr(args, "interior_creatures", "listed"),
+        "start_disabled": getattr(args, "start_disabled", None) or "placed",
         "tool_sha256": {name: sha256(path) for name, path in tools.items()},
         "input_sha256": {} if args.dry_run else input_hashes(args),
         "known_inputs": known_inputs_record(args),
@@ -2529,6 +2717,13 @@ def export_option_environment(args, announce=True):
     os.environ['AMIWIND_INTERIOR_CREATURES'] = getattr(args, 'interior_creatures', 'listed')
     if os.environ['AMIWIND_INTERIOR_CREATURES'] == 'all' and announce:
         print('Interior creatures: all (experimental: every classified creature; docs/BUILDER.md)', flush=True)
+    # Actors the original's start scripts disable at a new game (tools/start_disabled.py reads
+    # AMIWIND_START_DISABLED; part of the resident stages' keys; NPC-STORY-DISABLED-AT-START-42).
+    # Default placed: the variable is removed, so a default build's environment is as before.
+    from start_disabled import export_mode as export_start_disabled
+    if export_start_disabled(getattr(args, 'start_disabled', None) or 'placed') == 'original' and announce:
+        print('Start-disabled actors: original (off by default, A/B: the actors the start script disables are '
+              'left out; nothing enables them during play yet)', flush=True)
     # Resident animation kit profile (tools/npc_anim.py reads AMIWIND_NPC_ANIM; part of the stage cache identity).
     if getattr(args, 'npc_anim', 'idle') != 'idle':
         os.environ['AMIWIND_NPC_ANIM'] = args.npc_anim
@@ -2583,15 +2778,33 @@ def export_option_environment(args, announce=True):
     os.environ[WALK_SAMPLE_ENV] = str(walk_sample)
     if getattr(args, 'stair_walk_area', None):
         os.environ['AMIWIND_STAIR_WALK_AREA'] = args.stair_walk_area   # chim.collision.walk_area_mode
+    if getattr(args, 'stair_walk_key', None):
+        os.environ['AMIWIND_STAIR_WALK_KEY'] = args.stair_walk_key     # chim.collision.walk_key_method
+    if getattr(args, 'stair_watch', None):
+        os.environ['AMIWIND_STAIR_WATCH'] = args.stair_watch           # chim.collision.load_watch
+    if getattr(args, 'stair_walk_places', None):
+        from project_version import require_private_test_version
+        try:
+            require_private_test_version(VERSION, ['--stair-walk-places'])
+        except ValueError as exc:
+            raise SystemExit('Error: %s' % exc)
+        os.environ['AMIWIND_STAIR_WALK_PLACES'] = args.stair_walk_places   # chim.collision.parse_places
+        if announce:
+            print('NOTE: --stair-walk-places: a TARGETED stair walk of %s only; no other step is walked or gated'
+                  % args.stair_walk_places, flush=True)
     if getattr(args, 'collision_underside', None):
         os.environ['AMIWIND_COLLISION_UNDERSIDE'] = args.collision_underside   # mesh_geometry_env.underside_mode
+    if getattr(args, 'stair_collision_method', None):
+        from stair_collision_env import export_stair_collision_method   # chim.build: profile stair_collision
+        export_stair_collision_method(args.stair_collision_method)
     if getattr(args, 'scale_snap', None):
         os.environ['AMIWIND_SCALE_SNAP'] = '' if args.scale_snap == 'on' else 'off'   # chim.build.scale_snap_step
     if announce and walk_cache == 'full':
         print('NOTE: --stair-walk-cache full: every map and frame is stair-walked again (a regression or beta-test '
               'run)', flush=True)
     if announce:
-        print('Stair walk: ' + ('every step and ramp' if stair_scope == 'all' else 'flight steps only (release build)')
+        print('Stair walk: ' + {'all': 'every step and ramp', 'flights': 'flight steps only'}.get(
+              stair_scope, 'off, nothing is walked (BUILD-STAIR-WALK-OFF-46)')
               + ' (--stair-walk ' + getattr(args, 'stair_walk', 'auto') + ')', flush=True)
     try:
         from chim_town import NATIVE_ENV
@@ -2742,6 +2955,19 @@ def main(argv=None):
     if args.retired_flags_record:
         print('=' * 72 + '\n' + retired_flags.summary_line(args.retired_flags_record) + '\n' + '=' * 72,
               file=retired_out, flush=True)
+    # --clean and --public-defaults (tools/clean_build.py): refused before anything reads a cache or the environment.
+    import clean_build
+    try:
+        from build_font_options import configured_storage_pool_dir
+        args.clean_record = clean_build.configure_clean(
+            args, config_pool=configured_storage_pool_dir(args)[0] if getattr(args, 'clean', False) else None)
+        args.public_defaults_record = clean_build.check_public_defaults(args, p)
+    except ValueError as exc:
+        p.exit(2, f'Error: {exc}\n')
+    for record, line in ((args.clean_record, clean_build.clean_line),
+                         (args.public_defaults_record, clean_build.public_line)):
+        if record:
+            print(line(record), file=retired_out, flush=True)
     # The coordinate range (tools/coord_range.py): the engine compile switch and every builder check that
     # follows the engine's coordinate bound, before any stage.
     try:
@@ -2826,6 +3052,7 @@ def main(argv=None):
             print('WARNING: ' + placeholder_policy.OPTION + ' ' + ', '.join(sorted(allowed)) + ': this image may ship '
                   'stand-in assets (test build only; refused for release candidates and finals)', flush=True)
         args.world_bounds_record = __import__('world_bounds').configure(args)
+        args.chim_crossing_record = __import__('chim_crossing').configure(args, resolve_builder(args)['builder'])
         args.player_view_record = __import__('prepare_player_view').configure(args)
         if groups:
             if args.stage != 'aga' or args.dry_run:
@@ -2837,7 +3064,7 @@ def main(argv=None):
                 raise ValueError('--host-plan cannot be combined with installation or launch modes')
             print(json.dumps(setup_plan(args), indent=2))
             return 0
-        # CHIM regions (EXPERIMENTAL, off by default): the cell preflight in seconds, before any stage
+        # CHIM regions (default: the in-repo cell list, config/chim-cells.json): the cell preflight in seconds, before any stage
         args.chim_regions_record = resolve_chim_regions(args)
         if args.stage == 'aga' and not args.dry_run:
             # rc/final images contain the previous release (RELEASE-PREVIOUS-FIXES-MISSING-33)
@@ -3063,6 +3290,9 @@ def main(argv=None):
             if getattr(args, "world_bounds_record", None):
                 print("World bounds: " + ("on" if args.world_bounds_record["on"] else "off") +
                       " (" + args.world_bounds_record["source"] + ")", flush=True)
+            if getattr(args, "chim_crossing_record", None):
+                print("Crossing: type " + str(args.chim_crossing_record["type"]) +
+                      " (" + args.chim_crossing_record["source"] + ")", flush=True)
             print("NPC heads: " + args.font_options["npc_head_detail"] +
                   " (" + args.font_options["npc_head_detail_selected_by"] + "); head reducer " +
                   args.font_options["npc_head_reducer"] + " (" + args.font_options["npc_head_reducer_selected_by"] + ")",

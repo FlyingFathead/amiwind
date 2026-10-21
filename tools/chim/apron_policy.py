@@ -121,7 +121,7 @@ def supplement_seyda(specs, sections):
     """
     import copy
     from chim.ownership import capture, intersects, manifest, model_digest, source_failures
-    from chim.world import f32, placed_box
+    from chim.world import f32, placed_box, turn_of
     errors = source_failures(sections)
     if errors:
         raise ValueError('Cannot supplement invalid ownership: ' + '; '.join(errors[:3]))
@@ -152,7 +152,7 @@ def supplement_seyda(specs, sections):
             boxes = []
             for row in rows:
                 v = donor['variants'][row['variant']]
-                lo, hi = placed_box([f32(x) for x in row['origin']], f32(row['yaw']),
+                lo, hi = placed_box([f32(x) for x in row['origin']], turn_of(row),
                                     [f32(x) for x in v['lo']], [f32(x) for x in v['hi']])
                 boxes.append([dc[k]+4*lo[k] for k in range(2)]+[dc[k]+4*hi[k] for k in range(2)])
             if not any(intersects(coverage, box) for box in boxes):

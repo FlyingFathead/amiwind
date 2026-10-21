@@ -21,6 +21,9 @@ class StairCacheTests(unittest.TestCase):
         os.environ['AMIWIND_PASS_CACHE'] = str(Path(self.tmp.name) / 'cache')
         os.environ['AMIWIND_STAIR_WALK_CACHE'] = 'cached'
         os.environ['AMIWIND_STAIR_WALK_SAMPLE'] = '0'
+        # the frame key and the all scope (the methods before v0.0.46, kept selectable; the reach key and the
+        # flights scope: tests/test_chim_stair_reach_key.py)
+        os.environ.update(AMIWIND_STAIR_WALK_KEY='frame', AMIWIND_STAIR_WALK='all', AMIWIND_STAIR_WATCH='off')
 
     def tearDown(self):
         os.environ.clear()

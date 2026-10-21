@@ -105,7 +105,7 @@
   },
   {
    "id": "media",
-   "description": "Converted videos and sound effects with their catalogue",
+   "description": "Converted videos and sound effects (id1/media/catalogue.json only with --media-catalogue on, debugging)",
    "steps": ["media"],
    "patterns": ["id1/media/catalogue.json", "id1/sound/pool/*.wav", "id1/intro/video/*.awv", "id1/intro/videos.awl",
                 "id1/intro/mw_intro.awv"]

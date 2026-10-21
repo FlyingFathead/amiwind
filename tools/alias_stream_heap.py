@@ -5,8 +5,10 @@ from pathlib import Path
 import re
 import struct
 
-# Updated for aw_alias_single_pass (one read while decoding; same cache block, no staging).
-STREAM_SHA256='17b39288303d1d762944dc278d193817fc7396b323735c7b08907379f9d0e36d'
+# Updated for aw_alias_single_pass (one read while decoding; same cache block, no staging), then for shared
+# actor skins (IMAGE-ACTOR-SKIN-REPEATS-46: the pixels read from progs/skins/ through the same 4 KiB scratch
+# into the same cache block; no allocation added).
+STREAM_SHA256='7529bdd787b4d7d5e47cf61dac9d106e4bb97d95c27d0cda620f2d9799592d4f'
 
 def runtime_policy(source):
     source=Path(source)

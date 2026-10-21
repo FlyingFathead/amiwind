@@ -13,10 +13,14 @@
 static cvar_t aw_weather={"aw_weather","1",true};
 static aw_weather_table_t table;
 static int loaded,attempted,forced=-1;
-static int from=AW_WEATHER_CLEAR,to=AW_WEATHER_CLEAR,instant=1;
-static double progress=1.0,last_time=-1;
+/* The weather in effect (aw_weather_state_t: current, a running transition, a queued one) and where
+ * and when it was last drawn; kept across frame-map crossings, loads and interiors, so only an arrival
+ * (AW_WeatherIsArrival) changes it at once. instant: the console changed it. */
+static aw_weather_state_t state={AW_WEATHER_CLEAR,AW_WEATHER_NONE,AW_WEATHER_NONE,0.0,-1};
+static int instant=1,have_last,last_target=AW_WEATHER_NONE;
+static double last_time=-1;
 static float last_source[3];
-static char last_map[MAX_QPATH];
+static long last_hour;
 
 static void load(void)
 {
@@ -39,39 +43,43 @@ static int player_source(float *source)
 }
 static int target_weather(int days,int milliseconds,const float *source,int *region)
 {
-    *region=AW_RegionIndexAt(source);
+    /* A cell without a region keeps the last region's weather (OpenMW updateWeatherRegion). */
+    *region=AW_WeatherRegionKeep(&state,AW_RegionIndexAt(source));
     if(forced>=0)return forced;
     return AW_WeatherOfRegion(&table,*region,days,milliseconds);
 }
 int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out)
 {
-    float source[3];int target,region,step,teleport;double now=realtime,dx,dy;
+    float source[3];int target,region,step;double now=realtime,seconds;long hour;
     load();
-    if(!loaded || (aw_weather.value<=0 && forced<0) || !player_source(source)){
-        instant=1;last_time=-1;return 0;
+    if(!loaded || (aw_weather.value<=0 && forced<0)){
+        instant=1;have_last=0;last_time=-1;return 0;
     }
+    /* Off the exterior (an interior, a load, a crossing's map change) nothing is drawn and nothing is
+     * forgotten: the next exterior frame decides from where the player is then. */
+    if(!player_source(source)){last_time=-1;return 0;}
     target=target_weather(days,milliseconds,source,&region);
-    /* A load, a map change, a long pause or a jump of over half a cell is an
-     * arrival: the new weather is there at once (OpenMW playerTeleported). */
-    dx=source[0]-last_source[0];dy=source[1]-last_source[1];
-    teleport=instant || last_time<0 || now-last_time>2.0 || strcmp(last_map,sv.name) || dx*dx+dy*dy>4096.0*4096.0;
-    if(teleport){from=to=target;progress=1.0;}
-    else if(target!=to){
-        /* A new weather mid-transition starts from the nearer end. */
-        if(progress<.5)to=from;
-        from=to;to=target;progress=0.0;
-    }else if(progress<1.0){
-        progress+=(now-last_time)*table.look[to].delta_milli/1000.0;
-        if(progress>1.0)progress=1.0;
+    hour=(long)(days<0?0:days)*24+milliseconds/3600000;
+    if(instant || AW_WeatherIsArrival(have_last,source[0]-last_source[0],source[1]-last_source[1],hour-last_hour)){
+        AW_WeatherForce(&state,target);
+    }else{
+        if(target!=last_target)AW_WeatherAddTransition(&state,target);
+        /* real seconds since the last exterior frame; a stall (a frame-map load) counts at most 2 s */
+        seconds=last_time<0?0.0:now-last_time;
+        if(seconds>2.0)seconds=2.0;
+        if(seconds>0.0)AW_WeatherAdvance(&state,&table,seconds);
     }
-    instant=0;last_time=now;
+    instant=0;have_last=1;last_time=now;last_target=target;last_hour=hour;
     last_source[0]=source[0];last_source[1]=source[1];last_source[2]=source[2];
-    snprintf(last_map,sizeof last_map,"%s",sv.name);
-    step=(int)(progress*AW_WEATHER_STEPS);
-    if(from==to)step=AW_WEATHER_STEPS;
-    AW_WeatherBlend(&table,from,to,step,out);
-    if(from==AW_WEATHER_CLEAR && to==AW_WEATHER_CLEAR)return 0;
-    return 1+from*AW_WEATHERS*(AW_WEATHER_STEPS+1)+to*(AW_WEATHER_STEPS+1)+step;
+    if(state.next==AW_WEATHER_NONE){
+        AW_WeatherBlend(&table,state.current,state.current,AW_WEATHER_STEPS,out);
+        if(state.current==AW_WEATHER_CLEAR)return 0;
+        return 1+state.current*AW_WEATHERS*(AW_WEATHER_STEPS+1)+state.current*(AW_WEATHER_STEPS+1)+AW_WEATHER_STEPS;
+    }
+    step=(int)(state.progress*AW_WEATHER_STEPS);
+    if(step>AW_WEATHER_STEPS)step=AW_WEATHER_STEPS;
+    AW_WeatherBlend(&table,state.current,state.next,step,out);
+    return 1+state.current*AW_WEATHERS*(AW_WEATHER_STEPS+1)+state.next*(AW_WEATHER_STEPS+1)+step;
 }
 static void weather_command(void)
 {
@@ -85,9 +93,11 @@ static void weather_command(void)
         instant=1;
     }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg weather [on/off / auto / NAME]\n");return;}
     load();
-    now=aw_weather_names[to<0 || to>=AW_WEATHERS?0:to];
-    Con_Printf("Region weather %s%s: %s%s (table %s",aw_weather.value>0?"on":"off",forced>=0?", forced":"",now,
-        from!=to?" (changing)":"",loaded?"loaded":"missing: clear sky");
+    now=aw_weather_names[state.current<0 || state.current>=AW_WEATHERS?0:state.current];
+    Con_Printf("Region weather %s%s: %s",aw_weather.value>0?"on":"off",forced>=0?", forced":"",now);
+    if(state.next!=AW_WEATHER_NONE)Con_Printf(" changing to %s %ld%%",aw_weather_names[state.next],(long)(state.progress*100));
+    if(state.queued!=AW_WEATHER_NONE)Con_Printf(", then %s",aw_weather_names[state.queued]);
+    Con_Printf(" (table %s",loaded?"loaded":"missing: clear sky");
     if(loaded && player_source(source)){
         int region=AW_RegionIndexAt(source);
         if(region>=0 && region<table.regions)

@@ -8,7 +8,7 @@
 | First noticed | 8 October 2026, in v0.0.32-dev |
 | Where | Scenery converters (one model per mesh, scale and tilt) |
 | Reproduction | always |
-| Duplicate of | no |
+| Duplicate of | [CHIM-TILT-VARIANTS-SPLIT-33](CHIM-TILT-VARIANTS-SPLIT-33.md) |
 | Persists in | v0.0.32-dev (last seen) |
 | Severity | medium: 4 to 7 times more models than meshes; storage and load cost. |
 | Family | World storage and duplication (`world-storage`) |

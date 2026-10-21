@@ -37,6 +37,47 @@ for p in (ROOT / 'tools', ROOT / 'src'):
         sys.path.insert(0, str(p))
 
 from chim import format as F  # noqa: E402
+
+
+def _read_chunk(raw):
+    """A chunk record of any world: chim.placed's reader only for 56-byte records (format 0.8: the chunk head's last
+    u16 is the record size), imported only then, so reading an older world runs and reaches chim.format alone (the
+    stair walk's code key, chim.collision.STAIR_WALK_CODE, stays as it was)."""
+    if raw[22:24] == bytes(2):
+        return F.read_chunk(raw)
+    if raw[:4] in (b'CHK2', b'CHK3'):
+        # format 0.9 (chim.reach): reach references, resolved per frame (_resolve_reach)
+        from chim import reach
+        return reach.read_chunk(raw)
+    from chim import placed
+    return placed.read_chunk(raw)
+
+
+def _terrain_image(data, render):
+    """(brush image, render bytes) of a TERR record: a compact one (format 0.10, chim.terc: magic TRC1, imported only
+    then) expanded to its image, a plain one as it is (with the reference block's render bytes)."""
+    if bytes(data[:4]) == b'THG1':
+        from chim import thgt             # format 0.11: a generated record
+        image = thgt.decode(data)
+        return image, F.render_extent(image)
+    if bytes(data[:4]) != b'TRC1':
+        return data, render
+    from chim import terc
+    image = terc.decode(data)
+    return image, F.render_extent(image)
+
+
+def _resolve_reach(chunks):
+    """Format 0.9: every chunk's reach references replaced by the owner records they name (chim.reach.resolve_frame),
+    so the checks below see the records a 0.8 frame stores as copies. Returns an error text or None."""
+    if not any('reach_refs' in c for c in chunks):
+        return None
+    from chim import reach
+    try:
+        reach.resolve_frame(chunks)
+    except ValueError as e:
+        return str(e)
+    return None
 # face_polygons lives in its own module (the stair walk reads it, and its key holds only the code it runs)
 from chim.faces import face_polygons  # noqa: E402,F401
 from chim.terrain import box_leaves, tree_depth  # noqa: E402
@@ -457,7 +498,7 @@ def _frame_read(f, blob, sector_of, record_of, fails):
                            f['path'] + ': chunk %d entry does not point at its record' % c['index']):
             continue
         try:
-            parts = F.read_chunk(r['data'])
+            parts = _read_chunk(r['data'])
         except ValueError as e:
             fails.append('chunk %d: %s' % (c['index'], e))
             continue
@@ -473,13 +514,21 @@ def _frame_read(f, blob, sector_of, record_of, fails):
                                f['path'] + ': chunk %d terrain reference does not point at its record'
                                % c['index']):
                 continue
-            why = F.refuse_shift(t['data'], ref['shift'])
+            try:
+                image, render = _terrain_image(t['data'], ref['render'])
+            except ValueError as e:
+                fails.append(f['path'] + ': chunk %d terrain record: %s' % (c['index'], e))
+                continue
+            why = F.refuse_shift(image, ref['shift'])
             if not fails.check(why is None, f['path'] + ': chunk %d: %s' % (c['index'], why)):
                 continue
             terrain_used.add(ref['id'])
-            parts = dict(parts, image=F.translate_image(t['data'], ref['shift']), image_render=ref['render'],
-                         terrain_record=t['data'])
+            parts = dict(parts, image=F.translate_image(image, ref['shift']), image_render=render,
+                         terrain_record=image)
         out_chunks.append(dict(c, **parts, file=sec['path']))
+    why = _resolve_reach(out_chunks)
+    if why:
+        fails.append('%s: %s' % (f['path'], why))
     return (f['path'], frame, out_chunks), terrain_used
 
 
@@ -491,6 +540,7 @@ def _read_frames_task(task):
     as _frame_read does in the parent, from the world's own files on disk. Returns [(failures, frame row or None,
     terrain ids, {chunk index: (terrain record file row, offset)})]: a referenced chunk's 'terrain_record' bytes are
     left out (the parent puts its own copy of that record back, so one copy of each record is kept)."""
+    from chim import reach  # noqa: F401 (format 0.8 and 0.9 headers in a worker process)
     root, rows, files = task
     root = Path(root)
 
@@ -547,12 +597,15 @@ def _read_frames_task(task):
 
 
 def load_world(out, fails, jobs=1):
-    """Read every file of a CHIM world and check the file structure: the index lists exactly the
+    """World format 0.8 (EXPERIMENTAL) is read too (chim.placed widens chim.format's versions when imported).
+    Read every file of a CHIM world and check the file structure: the index lists exactly the
     files on disk, sizes and CRCs match, every sector file is tiled exactly by its records, the
     frame and index directories point at those records, and every chunk, model and texture is
     stored in exactly one record. JOBS > 1: the frame files are read on the worker pool, frames in groups
     (BUILD-CHIM-SERIAL-SECTIONS-44: about 1.5 minutes on one core for 1,351 frames, mostly placing the referenced
     terrain); the same frames, failures and order."""
+    from chim import placed  # noqa: F401 (format 0.8 headers)
+    from chim import reach  # noqa: F401 (format 0.9 headers)
     root = Path(out) / 'chim'
     sizes = ffs_rules(root, fails)
     settings, files, mdir, tdir = F.read_index((root / 'world.cwi').read_bytes())
@@ -621,7 +674,7 @@ def load_world(out, fails, jobs=1):
                     continue
                 for c in frame_row[2]:
                     if c['index'] in refs:
-                        c['terrain_record'] = records[refs[c['index']]]['data']
+                        c['terrain_record'] = _terrain_image(records[refs[c['index']]]['data'], 0)[0]
                 frames.append(frame_row)
     else:
         def sector_of(cell, si):
@@ -683,6 +736,7 @@ def load_frame(out, frame_index):
     its sector files, the records its terrain references point at and the records of its models; no
     checks (the caller has validated the world: load_world / validate). The stair gate's workers used to
     read and check the whole world (8.9 s for 273 frames) for every frame they walked."""
+    from chim import reach  # noqa: F401 (format 0.8 and 0.9 headers)
     root = Path(out) / 'chim'
     _, files, mdir, _ = F.read_index(_world_file(root, 'world.cwi'))
     fram = [f for f in files if f['kind'] == b'FRAM']
@@ -704,13 +758,16 @@ def load_frame(out, frame_index):
     out_chunks = []
     for c in chunks:
         _, path, recs = sector(c['sector'])
-        parts = F.read_chunk(recs[c['offset']]['data'])
+        parts = _read_chunk(recs[c['offset']]['data'])
         if 'ref' in parts:
             ref = parts['ref']
-            t = record(ref['file'], ref['offset'], ref['bytes'])
-            parts = dict(parts, image=F.translate_image(t, ref['shift']), image_render=ref['render'],
+            t, render = _terrain_image(record(ref['file'], ref['offset'], ref['bytes']), ref['render'])
+            parts = dict(parts, image=F.translate_image(t, ref['shift']), image_render=render,
                          terrain_record=t)
         out_chunks.append(dict(c, **parts, file=path))
+    why = _resolve_reach(out_chunks)
+    if why:
+        raise ValueError('%s: %s' % (f['path'], why))
     models = {}
     for c in out_chunks:
         for r in c['owned'] + c['reach']:
@@ -1030,7 +1087,7 @@ def _frame_cross_checks(task):
         fails.check(order[ci] == own, 'placement %d: owner chunk does not hold its origin' % ref)
         if r['model'] >= nmodels:
             continue
-        lo, hi = placed_box(r['origin'], (0.0, r['yaw'], 0.0), *bounds[r['model']])
+        lo, hi = placed_box(r['origin'], r.get('angles', (0.0, r['yaw'], 0.0)), *bounds[r['model']])
         box = (tuple(int(math.floor(v - 1)) for v in lo), tuple(int(math.ceil(v + 1)) for v in hi))
         fails.check(tuple(r['box']) == box, 'placement %d: stored drawn box %s, model bounds give %s'
                     % (ref, r['box'], box))

@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.41-dev1 at 2026-10-14 12:31 +0300: maintainer TG: inventory UI font in our game's default configs
 - Reported with v0.0.42-dev1 at 2026-10-17 13:25 +0300: maintainer: keep the Morrowind font in those categories and as buttons like in the original game
+- Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 
 <!-- END GENERATED PERSISTING -->
 

@@ -170,7 +170,8 @@ class UnitsGiveThePerCoreRows(Fixture):
     def setUp(self):
         self.env = dict(os.environ)
         self.cache = tempfile.TemporaryDirectory()
-        os.environ.update(AMIWIND_PASS_CACHE=str(Path(self.cache.name) / 'cache'), AMIWIND_STAIR_WALK_CACHE='cached',
+        os.environ.update(AMIWIND_STAIR_WALK_KEY='frame', AMIWIND_STAIR_WALK='all', AMIWIND_STAIR_WATCH='off',
+                          AMIWIND_PASS_CACHE=str(Path(self.cache.name) / 'cache'), AMIWIND_STAIR_WALK_CACHE='cached',
                           AMIWIND_STAIR_WALK_SAMPLE='0')
 
     def tearDown(self):

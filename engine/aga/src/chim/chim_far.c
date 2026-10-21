@@ -313,6 +313,15 @@ void ChimFar_Begin (const char *map_name, long hunk_spare)
 			(long)head.nx, (long)head.ny, (long)layer.step, (long)bytes);
 }
 
+/* Type 1 crossings, a recentre: the session's origin moved by d (local units). */
+void ChimFar_Recentre (const float *d)
+{
+	if (!loaded)
+		return;
+	layer.x0 -= d[0];
+	layer.y0 -= d[1];
+}
+
 void ChimFar_End (void)
 {
 	/* The heights live in the map's Hunk, which the map change frees. */

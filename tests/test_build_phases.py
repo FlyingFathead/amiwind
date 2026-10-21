@@ -104,6 +104,21 @@ class PhaseTests(unittest.TestCase):
         self.assertIn('tools/build_profile.py', build_cache.INSTRUMENTATION_MODULES)
         for name in (build_profile.LOG_LEVEL_ENV, build_profile.HEARTBEAT_ENV):
             self.assertIn(name, build_cache.IGNORED_ENV)
+        # the local clock of the progress lines: a summer-time change must not rebuild a stage
+        self.assertIn('AMIWIND_LOCAL_UTC_OFFSET', build_cache.IGNORED_ENV)
+
+    def test_local_utc_offset_is_no_stage_input(self):
+        script = Path(build_cache.ROOT) / 'tools' / 'chim_build.py'
+        index = build_cache.SourceIndex(build_cache.ROOT)
+        keys = []
+        for value in ('+0300', '+0200', None):
+            env = {k: v for k, v in os.environ.items() if k != 'AMIWIND_LOCAL_UTC_OFFSET'}
+            if value is not None:
+                env['AMIWIND_LOCAL_UTC_OFFSET'] = value
+            with patch.dict(os.environ, env, clear=True):
+                keys.append(build_cache.stage_environment(script, index))
+        self.assertEqual(keys[0], keys[1])
+        self.assertEqual(keys[0], keys[2])
 
     def test_build_log_level_option(self):
         class Args:

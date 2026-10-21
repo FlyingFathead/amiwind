@@ -84,8 +84,8 @@ class GalleryCacheTests(unittest.TestCase):
             self.assertNotEqual(c.token(original),c.token(self.ident(**kwargs)))
 
     def test_model_key_covers_the_reached_converter_code_exactly(self):
-        """BUILD-REUSE-KEYS-TOO-BROAD-35: every model's key covers the code the converter reaches (also modules
-        the old fixed file list left out) and nothing it does not reach."""
+        """BUILD-REUSE-KEYS-TOO-BROAD-35 (the previous key form, still looked up): the code the converter's main()
+        reaches (also modules the old fixed file list left out) and nothing it does not reach."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root/'tools').mkdir()
@@ -94,15 +94,15 @@ class GalleryCacheTests(unittest.TestCase):
             shared = 'def used():\n    return 1\ndef unused():\n    return 2\n'
             (root/'tools/shared.py').write_text(shared)
             def key():
-                c._SOURCES.clear()
-                return c.token(c.converter_sources(root))
+                c._PREVIOUS.clear()
+                return c.token(c.previous_sources(root))
             original = key()
-            self.assertIn('tools/shared.py', c.converter_sources(root)['files'])
+            self.assertIn('tools/shared.py', c.previous_sources(root)['files'])
             (root/'tools/shared.py').write_text(shared.replace('return 2', 'return 3'))
             self.assertEqual(key(), original)          # an unreached edit keeps every model
             (root/'tools/shared.py').write_text(shared.replace('return 1', 'return 4'))
             self.assertNotEqual(key(), original)       # a reached edit, in a module the old list never named
-        c._SOURCES.clear()
+        c._PREVIOUS.clear()
         real = c.converter_sources()
         self.assertFalse(real['uncertain'])
         for path in ('tools/prepare_gallery.py', 'tools/npc_geometry.py', 'tools/nif_common.py', 'src/mwad/npc.py',
@@ -127,8 +127,8 @@ class GalleryCacheTests(unittest.TestCase):
             (root/'tools/shared.py').write_text(shared)
 
             def key():
-                c._SOURCES.clear()
-                return c.token(c.converter_sources(root))
+                c._PREVIOUS.clear()
+                return c.token(c.previous_sources(root))
             original = key()
             for name, edited in (('new function', shared + 'def helper(x, size=4, name="a"):\n    return x\n'),
                                  ('literal default added', shared.replace('flag=False)', 'flag=False, n=3)'))):
@@ -138,7 +138,125 @@ class GalleryCacheTests(unittest.TestCase):
             self.assertNotEqual(key(), original)       # a default that runs code on import
             (root/'tools/shared.py').write_text(shared.replace('return 1', 'return 4'))
             self.assertNotEqual(key(), original)       # a reached edit
+        c._PREVIOUS.clear()
+
+    def test_model_key_is_the_code_the_conversion_reaches(self):
+        """BUILD-NPC-GALLERY-REBUILT-46: the key holds what convert_cached reaches, each unit without comments; an
+        edit to a function the conversion does not reach (in a module it does reach), or to a comment, keeps every
+        model; an edit to a reached function changes them."""
+        import code_key
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root/'tools').mkdir()
+            (root/'tools/gallery_cache.py').write_text('from shared import used\ndef convert_cached(task):\n'
+                                                       '    return used()\ndef other():\n    return 0\n')
+            shared = 'LIMIT = 4  # a limit\ndef used():\n    return LIMIT\ndef unused():\n    return 2\n'
+            (root/'tools/shared.py').write_text(shared)
+
+            def key():
+                c._SOURCES.clear()
+                code_key._KEYS.clear()
+                code_key._INDEX.clear()
+                return c.token(c.converter_sources(root))
+            original = key()
+            self.assertEqual(c.converter_sources(root)['key_format'], c.CODE_KEY_FORMAT)
+            for name, edited in (('unreached function', shared.replace('return 2', 'return 3')),
+                                 ('comment', shared.replace('# a limit', '# the most it takes')),
+                                 ('blank lines', shared.replace('def unused', '\n\ndef unused'))):
+                (root/'tools/shared.py').write_text(edited)
+                self.assertEqual(key(), original, name)
+            (root/'tools/gallery_cache.py').write_text('from shared import used\ndef convert_cached(task):\n'
+                                                       '    return used()\ndef other():\n    return 1\n')
+            self.assertEqual(key(), original, 'unreached function of the entry module')
+            (root/'tools/shared.py').write_text(shared.replace('LIMIT = 4', 'LIMIT = 5'))
+            self.assertNotEqual(key(), original)       # import-time code it reaches
+            (root/'tools/shared.py').write_text(shared.replace('return LIMIT', 'return LIMIT + 1'))
+            self.assertNotEqual(key(), original)       # a reached function
         c._SOURCES.clear()
+        code_key._KEYS.clear()
+        code_key._INDEX.clear()
+
+    def test_model_key_on_this_repository(self):
+        """The case of the v0.0.46-dev1 rebuild: a collision-hull change in tools/mesh_geometry.py (a comment on a
+        constant, new statements in collision_parts and surface_loss_depth) keeps every model's key; a change to
+        the head reducer (npc_geometry.simplify_head_locked) changes it."""
+        import shutil
+        import code_key
+        real = Path(c.ROOT)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for folder in ('tools', 'src', 'config'):
+                shutil.copytree(real/folder, root/folder, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+            for name in ('pyproject.toml', 'VERSION'):
+                if (real/name).is_file():
+                    shutil.copy2(real/name, root/name)
+
+            def key():
+                c._SOURCES.clear()
+                code_key._KEYS.clear()
+                code_key._INDEX.clear()
+                return c.token(c.converter_sources(root))
+            original = key()
+            self.assertIn('tools/npc_geometry.py', c.converter_sources(root)['files'])
+            mesh = (root/'tools/mesh_geometry.py').read_text(encoding='utf-8')
+            edited = mesh.replace('SURFACE_LOSS=.5  # a', 'SURFACE_LOSS=.5  # another comment, a', 1)
+            for function in ('def collision_parts(', 'def surface_loss_depth('):
+                head = edited.index(function)
+                body = edited.index('"""', edited.index('"""', head) + 3) + 3
+                edited = edited[:body] + '\n unused_probe=1' + edited[body:]
+            self.assertNotEqual(edited, mesh)
+            (root/'tools/mesh_geometry.py').write_text(edited, encoding='utf-8')
+            self.assertEqual(key(), original)
+            npc = (root/'tools/npc_geometry.py').read_text(encoding='utf-8')
+            head = npc.index('def simplify_head_locked(')
+            body = npc.index('"""', npc.index('"""', head) + 3) + 3
+            (root/'tools/npc_geometry.py').write_text(npc[:body] + '\n    unused_probe = 1' + npc[body:],
+                                                      encoding='utf-8')
+            self.assertNotEqual(key(), original)
+        c._SOURCES.clear()
+        code_key._KEYS.clear()
+        code_key._INDEX.clear()
+
+    def test_previous_key_form_entries_are_still_found(self):
+        with tempfile.TemporaryDirectory() as temp:
+            raw, result = self.pair()
+            ident = self.ident(sources=c.converter_sources())
+            previous = c.previous_identity(ident)
+            self.assertEqual(previous['cache_implementation'], c.PREVIOUS_IMPLEMENTATION)
+            self.assertNotEqual(c.token(previous), c.token(ident))
+            c.publish(temp, previous, self.key, raw, result)
+            self.assertIsNone(c.load(temp, ident, self.key))
+            self.assertEqual(c.find(temp, ident, self.key), (raw, result))
+            # another model's previous entry is no hit
+            self.assertIsNone(c.find(temp, self.ident(sources=c.converter_sources(), palette=bytes([3])*768),
+                                     self.key))
+
+    def test_a_conversion_outside_the_key_is_not_published(self):
+        import code_key
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); out = root/'out'; out.mkdir(); cache = root/'cache'
+            ident = self.ident(sources=c.converter_sources()); raw, result = self.pair()
+            task = ('data', str(out), self.key, self.spec, bytes(768), str(cache), ident)
+
+            def convert(task):
+                c.materialize(task[1], task[2], raw, result); return result
+            gap = [('tools/unreached.py', 'helper')]
+            with patch('gallery_cache.verify_dependencies'), \
+                    patch('prepare_gallery.convert_model', side_effect=convert), \
+                    patch.object(code_key, 'uncovered', return_value=gap), patch.object(c, '_KEY_GAP', []), \
+                    contextlib.redirect_stdout(io.StringIO()) as printed:
+                actual, action, _ = c.convert_cached(task)
+                self.assertEqual(action, 'converted')
+                self.assertIn('outside the model key', printed.getvalue())
+                self.assertIsNone(c.find(cache, ident, self.key))
+                # the process stays gapped: the next model is not published either, even without a new gap
+                code_key.uncovered.return_value = []
+                c.convert_cached(task)
+                self.assertIsNone(c.find(cache, ident, self.key))
+            with patch('gallery_cache.verify_dependencies'), \
+                    patch('prepare_gallery.convert_model', side_effect=convert), patch.object(c, '_KEY_GAP', []):
+                c.convert_cached(task)
+            self.assertEqual(c.find(cache, ident, self.key), (raw, result))
 
     def test_complete_pair_roundtrip_and_corrupt_or_missing_files_miss(self):
         with tempfile.TemporaryDirectory() as temp:

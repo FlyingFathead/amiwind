@@ -80,6 +80,8 @@ class StairWalkScope(unittest.TestCase):
     def test_scope_from_the_builder_variable(self):
         import stair_walk
         with patch.dict(os.environ, {stair_walk.SCOPE_ENV: ''}):
+            self.assertEqual(stair_walk.scope_setting(), 'flights')   # the default since v0.0.46
+        with patch.dict(os.environ, {stair_walk.SCOPE_ENV: 'all'}):
             self.assertEqual(stair_walk.scope_setting(), 'all')
         with patch.dict(os.environ, {stair_walk.SCOPE_ENV: 'flights'}):
             self.assertEqual(stair_walk.scope_setting(), 'flights')
@@ -98,9 +100,12 @@ class StairWalkScope(unittest.TestCase):
 
     def test_builder_scope_by_version(self):
         import build
-        self.assertEqual(build.stair_walk_scope('0.0.34-dev3'), 'all')
-        self.assertEqual(build.stair_walk_scope('0.0.34-rc1'), 'flights')
-        self.assertEqual(build.stair_walk_scope('0.0.34'), 'flights')
+        # off by default for every build (BUILD-STAIR-WALK-OFF-46); flights and all only on request
+        self.assertEqual(build.stair_walk_scope('0.0.34-dev3'), 'off')
+        self.assertEqual(build.stair_walk_scope('0.0.34-dev3', 'all'), 'all')
+        self.assertEqual(build.stair_walk_scope('0.0.34-rc1'), 'off')
+        self.assertEqual(build.stair_walk_scope('0.0.34'), 'off')
+        self.assertEqual(build.stair_walk_scope('0.0.34', 'off'), 'off')
         self.assertEqual(build.stair_walk_scope('0.0.34', 'all'), 'all')          # nightly full report
         self.assertEqual(build.stair_walk_scope('0.0.34-dev3', 'flights'), 'flights')
         with self.assertRaises(ValueError):
@@ -109,6 +114,12 @@ class StairWalkScope(unittest.TestCase):
         self.assertIn("STAIR_WALK_ENV = 'AMIWIND_STAIR_WALK'", text)
         import stair_walk
         self.assertEqual(stair_walk.SCOPE_ENV, 'AMIWIND_STAIR_WALK')
+
+    def test_the_build_log_says_off_when_nothing_is_walked(self):
+        # BUILD-STAIR-WALK-OFF-46: the log line said 'flight steps only' for the default, which walks nothing
+        text = (ROOT / 'tools' / 'build.py').read_text(encoding='utf-8')
+        self.assertIn("{'all': 'every step and ramp', 'flights': 'flight steps only'}.get(", text)
+        self.assertIn("'off, nothing is walked (BUILD-STAIR-WALK-OFF-46)'", text)
 
 
 if __name__ == '__main__':

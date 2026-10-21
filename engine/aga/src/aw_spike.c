@@ -12,7 +12,7 @@ void			(*aw_chim_spike_counts)(unsigned long *out, int count);
 
 static const char	*slot_name[AW_SP_SLOTS] =
 	{"spawn", "mapfile", "index", "chimbegin", "clinfo", "prime", "tick", "link", "read", "sound", "prefetch",
-	 "cbuf", "server", "client", "screen", "snd", "scene", "save"};
+	 "cbuf", "server", "client", "screen", "snd", "scene", "save", "window"};
 static double	frame_time[AW_SP_SLOTS];
 static long		frame_bytes[AW_SP_SLOTS], frame_calls[AW_SP_SLOTS];
 static unsigned long	chim_last[AW_SPIKE_CHIM_COUNTS];

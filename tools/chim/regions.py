@@ -24,6 +24,8 @@ from pathlib import Path
 
 FORMAT = 'aw-chim-ownership-1'
 CELLS_FORMAT = 'aw-chim-cells-1'
+# --chim-regions none: no CHIM region cells (tools/build.py; its default cell list is CHIM_CELLS_DEFAULT there)
+NONE = 'none'
 CELL_UNITS = 8192                 # Morrowind units per exterior cell
 SCALE = 0.25                      # map units per Morrowind unit
 CELL_MAP = int(CELL_UNITS * SCALE)   # 2048 map units per cell

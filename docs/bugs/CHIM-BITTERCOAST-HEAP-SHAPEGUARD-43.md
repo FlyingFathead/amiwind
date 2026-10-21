@@ -22,6 +22,22 @@
 
 _Last updated with AmiWind v0.0.43-dev4 (19 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Status: 19 October 2026](#status-19-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 19 October 2026
 
 Cause found; fixed in source on the v0.0.43 line, not yet in a build. The next dev4 build checks it at the CHIM
@@ -145,5 +161,6 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 Related bugs in other categories:
 
 - [CHIM-AZURA-FLOATING-FLORA-43](CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7)
+- [CHIM-BC-TREE-PYRAMID-BOX-47](CHIM-BC-TREE-PYRAMID-BOX-47.md): Bitter Coast trees (flora_bc_tree family) look like a pyramid trunk with a flat box floating above it
 
 <!-- END GENERATED CATEGORY -->

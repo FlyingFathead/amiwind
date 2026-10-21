@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.47 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -132,6 +132,12 @@ keeps the earlier rule (rooms leave the pools out, exterior frames place them as
 The world map file is written as v2 by default (`--world-map v2`, config key `world_map`): the terrain map plus
 the molten lava pools of the exterior cells, shown on the in-game map (M). `--world-map v1` writes the earlier
 map byte for byte. See [World map](WORLD_MAP_AND_JOURNAL.md#map-file-formats-v1-and-v2-lava-pools).
+
+The disk image is laid out compact by default (`--disk-layout compact`, config key `disk_layout`): the fewest
+partitions the payload needs, each sized from its payload plus a fixed free space of 100 MiB
+(`--partition-headroom-mib`, config key `partition_headroom_mib`; the boot partition can keep its own,
+`--boot-partition-headroom-mib` / `boot_partition_headroom_mib`). `--disk-layout legacy` keeps the earlier layout.
+See [Build output](BUILD_OUTPUT.md#disk-layout-the-fewest-partitions-each-with-headroom).
 
 World bounds are on by default (`--world-bounds on`): the sea near the edge of the open world carries the
 player along it and back in, instead of an invisible wall (an AmiWind extension). `--world-bounds off` writes
@@ -511,7 +517,10 @@ map (Balmora) where a harvestable one goes, writes one catalogue per map that
 covers plants (world maps from `world/regions.awr`, the Seyda Neen and Balmora
 sub-cells from their region tables, the intro docks), runs the geometry gate on
 the final maps and admits a map only when the repository heap check passes
-with its catalogue. Details: [EXTERNAL_HARVEST_MODELS.md](EXTERNAL_HARVEST_MODELS.md#builder-step).
+with its catalogue. The mushrooms inside the shipped interiors get a catalogue
+of their room too, on the same pick state as the outdoors (since v0.0.47;
+`--harvest-interiors off` keeps them baked). Details:
+[EXTERNAL_HARVEST_MODELS.md](EXTERNAL_HARVEST_MODELS.md#builder-step).
 `--no-harvest` leaves them out for debugging only (a warning; `build-state.json`
 records `harvest` as `disabled by --no-harvest`; mushrooms stay baked and
 cannot be picked), and the image does not match a release.
@@ -658,10 +667,12 @@ or one option per group.
 | `harvest` | `--exclude-harvest` (or `--no-harvest`) | the harvest stage | mushrooms stay, but cannot be picked |
 | `unreferenced` | `--exclude-unreferenced [GROUPS]` | area builds only: what the area does not reference | only the area's NPCs, voices and sounds |
 
-Release builds: the image step's stair walk walks only the steps of flights
-(the rows that can stop the build) in release candidates and finals, and every
-step and ramp otherwise; `--stair-walk all` forces the full walk (nightly full
-reports), `--stair-walk flights` the short one. A build from your own copy of the game takes the known-good
+Every build's stair walk walks only the steps of flights (the rows that can stop
+the build; since v0.0.46, before only in release candidates and finals);
+`--stair-walk all` walks every step and ramp too (nightly or beta reports). The
+places of the stair watch list (`config/stair-watch.json`) are walked again on
+every build, and `--stair-walk-places ID,...` walks only the named places
+(development builds; see docs/BUILD_PROFILE.md). A build from your own copy of the game takes the known-good
 stair records shipped with the source (`config/stair-records/`, `--stair-walk-cache records`, the default
 without `--developer-mode`): a CHIM frame whose collision has the SHA-256 recorded there is not walked; a frame
 whose collision differs (another converter, other game data) is named in the log and walked only on request

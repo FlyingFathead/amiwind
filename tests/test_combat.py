@@ -159,7 +159,7 @@ class CombatSourceContractTests(unittest.TestCase):
         # the death track is looked up once at start, never read during play (HANG-IDLE-DUSK-35)
         self.assertIn('open_track(death_id,"death")', death[:600])
         self.assertNotIn('manual_lookup', death[:600])
-        self.assertIn('death_id=manual_lookup("mw_death",&g)', music[music.index('int CDAudio_Init(void)'):])
+        self.assertIn('death_id=manual_lookup("mw_death",&group)', music[music.index('int CDAudio_Init(void)'):])
         combat = code('aw_combat.c')
         self.assertIn('AW_MusicCombat(want)', combat)
         self.assertIn('AW_MusicDeath()', combat)

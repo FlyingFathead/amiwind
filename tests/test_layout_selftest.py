@@ -171,7 +171,9 @@ class ImageStepUsesThePlanGate(unittest.TestCase):
         self.assertEqual(wv.partition_mib(1500 * MIB), 1920)
         self.assertEqual(wv.partition_mib(1600 * MIB), 2048)
         source = (ROOT / 'tools/world_volumes.py').read_text(encoding='utf-8')
-        self.assertIn('mib=partition_mib(payload)', source)
+        # the legacy layout's writer sizes from the payload; the compact layout passes its planned size
+        # (tools/layout_plan.py, tests/test_layout_plan.py)
+        self.assertIn('else partition_mib(payload)', source)
 
 
 

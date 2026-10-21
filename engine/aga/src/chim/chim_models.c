@@ -13,6 +13,8 @@
 #include "r_local.h"
 #include "d_local.h"
 #include "chim_local.h"
+#include "chim_terc.h"
+#include "chim_thgt.h"
 
 void R_InitSky (texture_t *mt);
 
@@ -76,6 +78,28 @@ static texture_t *LoadTexture (unsigned id)
 			return NULL;
 	if (chim_debug.value >= 2)
 		Con_Printf ("CHIM: texture %lu %ldx%ld\n", (unsigned long)id, (long)mt->width, (long)mt->height);
+	mt->name[sizeof(mt->name)-1] = 0;
+	if (ChimFormat_TurbulentTile (mt->name, mt->width, mt->height) &&
+		mt->offsets[1] == mt->offsets[0] + mt->width*mt->height && mt->offsets[0] == (int)sizeof(miptex_t) &&
+		mt->offsets[2] == mt->offsets[1] + mt->width*mt->height/4 && mt->offsets[3] == mt->offsets[2] + mt->width*mt->height/16)
+	{
+		/* A small turbulent texture is tiled to the 64 x 64 that Turbulent8 reads (chim_format.h). */
+		static byte small[CHIM_TURB_PIXELS];
+		if (pixels > (int)sizeof(small) || !(pack = Chim_File (e->file)) ||
+			!Chim_PackRead (pack, e->offset + sizeof(miptex_t), small, pixels))
+			return NULL;
+		tx = ChimZone_Alloc (NULL, sizeof(texture_t) + CHIM_TURB_PIXELS, CHIM_KIND_TEXTURE, id);
+		if (!tx)
+			return NULL;
+		ChimFormat_TileTurbulent (small, mt->width, mt->height, (byte *)(tx+1));
+		memcpy (tx->name, mt->name, sizeof(tx->name));
+		tx->width = tx->height = CHIM_TURB_SIZE;
+		tx->offsets[0] = sizeof(texture_t);
+		for (j=1 ; j<MIPLEVELS ; j++)
+			tx->offsets[j] = tx->offsets[j-1] + (CHIM_TURB_SIZE>>(j-1))*(CHIM_TURB_SIZE>>(j-1));
+		chim_world.texture_loads++;
+		return tx;
+	}
 	tx = ChimZone_Alloc (NULL, sizeof(texture_t) + pixels, CHIM_KIND_TEXTURE, id);
 	if (!tx)
 		return NULL;
@@ -222,6 +246,13 @@ chim_model_t *ChimModels_Terrain (int entry)
 	return cm && !(job.active && job.block == cm) ? cm : NULL;
 }
 
+/* The chunk whose terrain is being streamed in, -1: none (a window's frame
+ * that leaves stops it first, chim_chunks.c SlotFinish). */
+int ChimModels_JobTerrain (void)
+{
+	return job.active && job.kind == CHIM_KIND_TERRAIN ? (int)job.id : -1;
+}
+
 void ChimModels_Abort (void)
 {
 	if (!job.active)
@@ -242,6 +273,10 @@ static void Finish (void)
 	cm->arena.slice = NULL;
 	cm->arena.slice_bytes = 0;
 	ChimZone_Unlock (cm);
+	/* 0.8: the piece table into native order once; a table the placed
+	 * collision cannot use leaves the model on its stored hull */
+	if (cm->piece_bytes && cm->model.visdata)
+		cm->pieces = ChimPlaced_TableLoad (cm->model.visdata, cm->piece_bytes);
 	if (job.kind == CHIM_KIND_MODEL)
 	{
 		chim_world.model_loads++;
@@ -262,11 +297,37 @@ static int Begin (int kind, unsigned id, chim_user_t *user, chim_pack_t *pack, l
 	byte head[sizeof(dheader_t)];
 	chim_model_t *cm;
 	int bound, image = bytes <= chim_world.buffer_bytes;
+	long disk = bytes;		/* read from the disk (a compact terrain record expands after) */
 
 	if (chim_debug.value >= 2)
 		Con_Printf ("CHIM: begin %s %lu: %ld bytes at %ld in %s\n", kind == CHIM_KIND_MODEL ? "model" : "terrain",
 			(unsigned long)id, bytes, offset, pack->path);
-	if (image ? !Chim_PackRead (pack, offset, chim_world.buffer, bytes) :
+	if (image && kind == CHIM_KIND_TERRAIN && chim_world.minor >= CHIM_TERC_MINOR)
+	{
+		/* 0.10: a terrain record may be compact (chim_terc.c): read it to the buffer's end and expand it to the
+		 * start, the same BSP29 bytes as the record it was packed from; a plain image moves to the start */
+		long tail = chim_world.buffer_bytes - bytes, expanded;
+		if (!Chim_PackRead (pack, offset, chim_world.buffer + tail, bytes))
+			return -1;
+		if (ChimTerc_Is (chim_world.buffer + tail, bytes))
+		{
+			if (!ChimTerc_Expand (chim_world.buffer + tail, bytes, chim_world.buffer, tail, &expanded))
+				return -1;
+			chim_world.terc_records++;
+			bytes = expanded;
+		}
+		else if (chim_world.minor >= CHIM_THGT_MINOR && ChimThgt_Is (chim_world.buffer + tail, bytes))
+		{
+			/* 0.11: a generated record: the render part generated from its heights (chim_thgt.c) */
+			if (!ChimThgt_Generate (chim_world.buffer + tail, bytes, chim_world.buffer, tail, &expanded,
+				&chim_world.thgt))
+				return -1;
+			bytes = expanded;
+		}
+		else
+			memmove (chim_world.buffer, chim_world.buffer + tail, (size_t)bytes);
+	}
+	else if (image ? !Chim_PackRead (pack, offset, chim_world.buffer, bytes) :
 		!Chim_PackRead (pack, offset, head, sizeof(head)))
 		return -1;
 	if (!AW_BrushHeader (&header, image ? chim_world.buffer : head, bytes) ||
@@ -279,6 +340,10 @@ static int Begin (int kind, unsigned id, chim_user_t *user, chim_pack_t *pack, l
 	cm->id = id;
 	cm->kind = kind;
 	cm->leafs = header.lumps[LUMP_LEAFS].filelen / (int)sizeof(dleaf_t);
+	/* 0.8: a placed model's lump 4 is its piece table (read as visdata) */
+	cm->piece_bytes = kind == CHIM_KIND_MODEL && chim_world.minor >= CHIM_PLACED_MINOR ?
+		header.lumps[LUMP_VISIBILITY].filelen : 0;
+	cm->pieces = 0;
 	sprintf (cm->model.name, kind == CHIM_KIND_MODEL ? "chim:m%lu" : "chim:t%lu", (unsigned long)id);
 	cm->arena.base = (byte *)(cm+1);
 	cm->arena.size = bound;
@@ -293,7 +358,7 @@ static int Begin (int kind, unsigned id, chim_user_t *user, chim_pack_t *pack, l
 		Con_Printf ("CHIM: bound %ld bytes, %s\n", (long)bound, image ? "image" : "stream");
 	if (image)
 	{
-		*budget -= bytes;
+		*budget -= disk;
 		if (!AW_BrushImage (&cm->model, chim_world.buffer, bytes, &cm->arena))
 		{
 			ChimModels_Abort ();
@@ -417,6 +482,11 @@ int ChimModels_TerrainPlace (int entry, chim_pack_t **pack_out, long *at_out, lo
 		for (k=0 ; k<3 ; k++)
 			e->shift[k] = ref.shift[k];
 	}
+	/* A window's frame (type 1 crossings): placed at its offset from the
+	 * frame the map started on, as the graft places a referenced terrain. */
+	if (chim_frame.window)
+		for (k=0 ; k<2 ; k++)
+			e->shift[k] += chim_frame.slot[e->slot].offset[k];
 	if (bytes < (long)sizeof(dheader_t))
 		return -1;
 	if (pack_out)

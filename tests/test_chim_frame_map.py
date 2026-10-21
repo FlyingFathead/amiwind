@@ -48,6 +48,46 @@ class RegionSourceBatchTests(unittest.TestCase):
             self.assertIs(sections, task.call_args_list[1].kwargs['source_sections'])
             self.assertEqual(sections[(10, 1)], first)
 
+    def test_provenance_is_parsed_once_per_file_and_keeps_only_the_sprite_keys(self):
+        """The 694 MB manifest was parsed by the payload preflight twice and by the region frame maps once in one
+        image step (16.0 s, 18.5 s, 17.1 s on one core, BUILD-IMAGE-REGION-MAPS-SERIAL-43): one parse per file."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            path = root / 'chim-source.json'
+            path.write_text(json.dumps({'frames': [
+                {'cell': [1, 2], 'sprite_entities': [{'model': 'a'}], 'sprite_assets': [{'path': 'p'}],
+                 'references': list(range(50)), 'town': 'x'},
+                {'cell': [1, 2], 'sprite_entities': [{'model': 'later'}]}, {'cell': [3, 4]}]}), encoding='utf-8')
+            real = json.loads
+            with patch.object(M.json, 'loads', side_effect=real) as parse:
+                one = M.region_source_sections(root)
+                two = M.region_source_sections(root)
+                self.assertEqual(parse.call_count, 1)
+                self.assertIs(one, two)
+                self.assertEqual(one[(1, 2)], {'cell': [1, 2], 'sprite_entities': [{'model': 'a'}],
+                                               'sprite_assets': [{'path': 'p'}]})
+                self.assertEqual(one[(3, 4)], {'cell': [3, 4]})
+                # another file (here: the same name, a different size) is read again
+                path.write_text(json.dumps({'frames': [{'cell': [5, 6], 'sprite_entities': []}]}), encoding='utf-8')
+                three = M.region_source_sections(root)
+                self.assertEqual(parse.call_count, 2)
+                self.assertEqual(sorted(three), [(5, 6)])
+            self.assertEqual(M.region_source_sections(root / 'missing'), {})
+
+
+    def test_frame_lookup_by_cell_is_the_scan_it_replaced(self):
+        frames = [(k, {'cell': [k % 3, k // 3]}, []) for k in range(9)]
+        frames.append((9, {'cell': [1, 1]}, ['again']))      # a second frame of one cell stays in world order
+        for cell in ((1, 1), [2, 0], (0, 2), (7, 7)):
+            scan = [(i, f) for i, f in enumerate(frames) if tuple(f[1]['cell']) == tuple(cell)]
+            self.assertEqual(M.frames_at(frames, cell), scan)
+        # a list that grew or was rebuilt is indexed again, and a moved frame is never taken for the old one
+        frames.append((10, {'cell': [7, 7]}, []))
+        self.assertEqual(M.frames_at(frames, (7, 7)), [(10, frames[10])])
+        frames[0] = (0, {'cell': [5, 5]}, [])
+        self.assertEqual(M.frames_at(frames, (0, 0)), [])
+        self.assertEqual(M.frames_at(frames, (5, 5)), [(0, frames[0])])
+
 WORLDSPAWN = {'classname': 'worldspawn', 'message': 'Balmora', 'aw_hull': 'tes3-humanoid-v1'}
 # the fixture's ground (its tile corner heights), for actors and the arrival standing on it
 GROUND = {'terrain_step': STEP, 'terrain_low': list(LOW),

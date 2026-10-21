@@ -58,8 +58,10 @@ def value(command, flag):
 
 EXPECTED_STAGES = ['setup', 'terrain', 'scenery', 'scene', 'bsp', 'npcs', 'hands', 'interior', 'dialogue-lookup',
                    'intro', 'census', 'balmora-interiors', 'door-audio', 'character', 'reading',
-                   'opening-references', 'seam-audit', 'media', 'music', 'engine', 'harvest', 'hand-catalog', 'chim',
-                   'chim-town-balmora', 'cell-progress', 'image']  # seam-audit: the seam gate runs in every plan (MESH-LOD-OPEN-SEAMS-33)
+                   'opening-references', 'seam-audit', 'media', 'music', 'engine', 'actor-library', 'harvest',
+                   'hand-catalog', 'chim', 'chim-town-balmora', 'cell-progress', 'image']
+# seam-audit: the seam gate runs in every plan (MESH-LOD-OPEN-SEAMS-33); actor-library: the actor table is on by
+# default since v0.0.47 (decided for the project, 2026-10-21)
 # CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): Balmora's residents come from chim-town-balmora,
 # not the legacy chain stage 'balmora' (--legacy-area balmora, RETIRED).
 

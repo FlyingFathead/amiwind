@@ -1454,13 +1454,157 @@ void COM_CopyFile (char *netpath, char *cachepath)
 
 /*
 ===========
+AmiWind file aliases (IMAGE-DUPLICATE-FILES-46; written by tools/payload_share.py, builder option
+--file-aliases on): byte-identical payload files are stored once and their other names listed in
+id1/file-aliases.txt (Amiga FFS has no links). A name that no search path has is looked up here and the
+stored copy is opened instead, so a payload without the table behaves exactly as before. Format (ASCII,
+LF): "AWALIAS1 <stored> <aliases>", one stored name per line, then one "<alias>TAB<stored index>" line per
+alias, sorted by COM_AliasCompare. Memory: the table text plus 8 bytes per alias and 4 per stored name.
+===========
+*/
+#define COM_ALIAS_FILE "file-aliases.txt"
+#define COM_ALIAS_NAME 63
+typedef struct {char *name,*target;} com_alias_t;
+static com_alias_t *com_aliases;
+static int com_alias_count;
+/* Case-insensitive ASCII order (a-z read as A-Z, as Quake's Q_strncasecmp folds case). */
+static int COM_AliasCompare (const char *a, const char *b)
+{
+	int c1, c2;
+	do {
+		c1 = (unsigned char)*a++;
+		c2 = (unsigned char)*b++;
+		if (c1 >= 'a' && c1 <= 'z')
+			c1 -= 'a' - 'A';
+		if (c2 >= 'a' && c2 <= 'z')
+			c2 -= 'a' - 'A';
+	} while (c1 == c2 && c1);
+	return c1 - c2;
+}
+/* One line of the table at *at, its newline replaced by a NUL; NULL for a malformed line. */
+static char *COM_AliasLine (char **at, char *end)
+{
+	char *line = *at, *p;
+	for (p = line ; p < end && *p != '\n' ; p++)
+		if ((unsigned char)*p < 32 && *p != '\t')
+			return NULL;
+	if (p >= end || p == line || p - line > COM_ALIAS_NAME + 6)
+		return NULL;
+	*p = 0;
+	*at = p + 1;
+	return line;
+}
+static int COM_AliasNumber (const char *text, int limit)
+{
+	int value = 0;
+	if (!*text)
+		return -1;
+	for ( ; *text ; text++) {
+		if (*text < '0' || *text > '9' || value > limit / 10)
+			return -1;
+		value = value * 10 + (*text - '0');
+	}
+	return value <= limit ? value : -1;
+}
+/* Read the table TEXT (BYTES long, NUL after it) in place; returns the alias count, 0 for a bad table. */
+int COM_ParseFileAliases (char *text, int bytes)
+{
+	char *at, *end, *line, *tab, *previous = NULL, **stored;
+	int targets, aliases, i, index;
+	com_aliases = NULL;
+	com_alias_count = 0;
+	end = text + bytes;
+	at = text;
+	/* The whole table is checked before any of it is used: a bad table gives no aliases. */
+	if (!(line = COM_AliasLine (&at, end)) || strncmp (line, "AWALIAS1 ", 9))
+		goto bad;
+	if (!(tab = strchr (line + 9, ' ')))
+		goto bad;
+	*tab = 0;
+	targets = COM_AliasNumber (line + 9, 8192);
+	aliases = COM_AliasNumber (tab + 1, 16384);
+	if (targets < 1 || aliases < 1)
+		goto bad;
+	stored = Hunk_AllocName (targets * (int)sizeof(char *), "aliases");
+	for (i = 0 ; i < targets ; i++)
+		if (!(stored[i] = COM_AliasLine (&at, end)) || strchr (stored[i], '\t') || strlen (stored[i]) > COM_ALIAS_NAME)
+			goto bad;
+	com_aliases = Hunk_AllocName (aliases * (int)sizeof(com_alias_t), "aliases");
+	for (i = 0 ; i < aliases ; i++) {
+		if (!(line = COM_AliasLine (&at, end)) || !(tab = strchr (line, '\t')) || tab == line)
+			goto bad;
+		*tab = 0;
+		if (strlen (line) > COM_ALIAS_NAME || (index = COM_AliasNumber (tab + 1, targets - 1)) < 0)
+			goto bad;
+		if (previous && COM_AliasCompare (previous, line) >= 0)
+			goto bad;
+		com_aliases[i].name = previous = line;
+		com_aliases[i].target = stored[index];
+	}
+	if (at != end)
+		goto bad;
+	com_alias_count = aliases;
+	Con_Printf ("File aliases: %d names for %d stored files\n", aliases, targets);
+	return aliases;
+bad:
+	com_aliases = NULL;
+	com_alias_count = 0;
+	Con_Printf ("Ignoring an invalid %s: no file aliases\n", COM_ALIAS_FILE);
+	return 0;
+}
+static int com_find_quiet;   /* set while probing an optional file: a miss is not reported */
+static void COM_InitFileAliases (void)
+{
+	char *text;
+	com_aliases = NULL;
+	com_alias_count = 0;
+	com_find_quiet = 1;          /* default builds have no table: no "can't find" line at startup */
+	text = (char *)COM_LoadHunkFile (COM_ALIAS_FILE);
+	com_find_quiet = 0;
+	if (text)
+		COM_ParseFileAliases (text, com_filesize);
+}
+/* The stored name of FILENAME, or NULL when it is no alias. */
+char *COM_FileAliasTarget (char *filename)
+{
+	int low = 0, high = com_alias_count - 1, middle, order;
+	while (low <= high) {
+		middle = (low + high) / 2;
+		order = COM_AliasCompare (filename, com_aliases[middle].name);
+		if (!order)
+			return com_aliases[middle].target;
+		if (order < 0)
+			high = middle - 1;
+		else
+			low = middle + 1;
+	}
+	return NULL;
+}
+
+static int COM_FindFileIn (char *filename, int *handle, FILE **file);
+/*
+===========
 COM_FindFile
 
 Finds the file in the search path.
 Sets com_filesize and one of handle or file
+AmiWind: a name no search path has is tried once more as its stored copy (file aliases above).
 ===========
 */
 int COM_FindFile (char *filename, int *handle, FILE **file)
+{
+	char *stored;
+	int found = COM_FindFileIn (filename, handle, file);
+	if (found < 0 && (stored = COM_FileAliasTarget (filename)) != NULL)
+		found = COM_FindFileIn (stored, handle, file);
+	if (found < 0 && !com_find_quiet) {
+		Sys_Printf ("FindFile: can't find %s\n", filename);
+		fflush(stdout);
+	}
+	return found;
+}
+
+static int COM_FindFileIn (char *filename, int *handle, FILE **file)
 {
 	searchpath_t    *search;
 	char            netpath[MAX_OSPATH];
@@ -1577,9 +1721,6 @@ int COM_FindFile (char *filename, int *handle, FILE **file)
 		}
 
 	}
-
-	Sys_Printf ("FindFile: can't find %s\n", filename);
-	fflush(stdout);
 
 	if (handle)
 		*handle = -1;
@@ -2043,4 +2184,5 @@ void COM_InitFilesystem (void)
         }
     }
 #endif
+	COM_InitFileAliases ();
 }

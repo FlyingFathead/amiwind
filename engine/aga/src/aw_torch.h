@@ -14,7 +14,7 @@ extern cvar_t aw_torch_strength,aw_guard_torch_radius;
 /* Renderer-relative intensity, separate from the bounded radius. At 0.7,
  * aliases retain their accepted lighting while surfaces gain a peak of
  * 358.4 light units before the existing palette saturation. */
-static float AW_TorchLightGain(int key,float radius,int surface)
+static float __attribute__((unused)) AW_TorchLightGain(int key,float radius,int surface)
 {
     float strength;
     /* Player torch, guard torches and night lamps (a torch's worth of light). */

@@ -558,6 +558,7 @@ PHASES = {
     ('build_aga image', 'add_chim_volume'): 'Image: CHIM world volume',
     ('build_aga image', 'world_volumes:write_boot_partition'): 'Image: boot partition',
     ('build_aga image', 'world_volumes:assemble_drives'): 'Image: drives',
+    ('build_aga image', 'world_volumes:write_layout'): 'Image: partitions (all at once)',
     ('build_aga image', 'arrival_spot:require'): 'Image: arrival check',
     ('build_aga image', 'chim_frame_maps'): 'Image: CHIM frame maps',
     ('build_aga image', 'chim.frame_map:remove_legacy_areas'): 'Image: remove legacy areas',
@@ -623,7 +624,7 @@ INSTRUMENT = {
         'world_progress:build_step', 'stage_direct_start', 'chim.heap:require_frame_map_heap',
         'optimize_world_maps:rebind_chim_maps', 'map_engine_limits:check_maps', 'stair_walk:require',
         'prepare_media_assets:stage_catalogue', 'add_chim_volume', 'world_volumes:write_boot_partition',
-        'world_volumes:assemble_drives',
+        'world_volumes:assemble_drives', 'world_volumes:write_layout',
         # from the build-timeline line: finalize_image between the optimizer and the final checks
         'arrival_spot:require', 'chim_frame_maps', 'chim.frame_map:remove_legacy_areas',
         'build_parallel:ordered_map', 'build_parallel:completed_map'),

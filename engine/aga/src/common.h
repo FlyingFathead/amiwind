@@ -183,7 +183,7 @@ void COM_StripExtension (char *in, char *out);
 void COM_FileBase (char *in, char *out);
 void COM_DefaultExtension (char *path, char *extension);
 
-char	*va(char *format, ...);
+char	*va(char *format, ...) __attribute__((format(printf, 1, 2)));
 // does a varargs printf into a temp buffer
 
 
@@ -195,9 +195,12 @@ struct cache_user_s;
 extern	char	com_gamedir[MAX_OSPATH];
 
 void COM_WriteFile (char *filename, void *data, int len);
-qboolean COM_FormatPath (char *out, int size, const char *format, ...);
+qboolean COM_FormatPath (char *out, int size, const char *format, ...) __attribute__((format(printf, 3, 4)));
 int COM_OpenFile (char *filename, int *hndl);
 int COM_FOpenFile (char *filename, FILE **file);
+/* The stored name of a file alias (id1/file-aliases.txt, IMAGE-DUPLICATE-FILES-46), or NULL. */
+char *COM_FileAliasTarget (char *filename);
+int COM_ParseFileAliases (char *text, int bytes);
 void COM_CloseFile (int h);
 
 byte *COM_LoadStackFile (char *path, void *buffer, int bufsize);

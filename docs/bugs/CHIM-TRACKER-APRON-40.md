@@ -23,6 +23,21 @@
 
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Symptom and reproduction](#symptom-and-reproduction)
+- [Cause and why it was not caught](#cause-and-why-it-was-not-caught)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Direct Seyda source receipt gap, 15 October 2026](#direct-seyda-source-receipt-gap-15-october-2026)
+- [Direct Seyda source accounting, 15 October 2026](#direct-seyda-source-accounting-15-october-2026)
+- [Seyda full conversion follow-up - 15 October 2026](#seyda-full-conversion-follow-up---15-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Symptom and reproduction
 
 Digest the expanded Vivec conversion with its source ownership receipts. The
@@ -138,6 +153,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-COAST-OBJECTS-MISSING-36](CHIM-COAST-OBJECTS-MISSING-36.md): Objects including Dwemer ruins are reported missing from the CHIM coast
 - [CHIM-LAVA-TERRAIN-SPIKES-38](CHIM-LAVA-TERRAIN-SPIKES-38.md): Angular terrain wedges cross a lava pool in the final-image inspection
 - [CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36](CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36.md): CHIM-native images with no legacy exterior (MiniWinds of one town) ship without the shared sky their frame maps name
+- [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Placed items, ingredients included, are left out of converted interiors
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
 - [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM

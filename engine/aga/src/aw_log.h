@@ -42,7 +42,7 @@ const char *AW_LogPath(int log);
 /* Stream logs. The header (a string that must stay valid) starts the file. */
 void AW_LogHeader(int log, const char *header);
 void AW_LogWrite(int log, const char *text);
-void AW_LogPrintf(int log, const char *format, ...);
+void AW_LogPrintf(int log, const char *format, ...) __attribute__((format(printf, 2, 3)));
 /* Live mode: close a stream log's open file now (its owner shut down). */
 void AW_LogStreamClose(int log);
 /* Snapshot logs. */

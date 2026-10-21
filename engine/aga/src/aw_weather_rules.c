@@ -58,7 +58,7 @@ int AW_WeatherParse(const unsigned char *raw,long size,aw_weather_table_t *out)
     if(!raw || !out || size<20 || memcmp(raw,"AWW1",4))return 0;
     weathers=word(raw+4);regions=word(raw+8);hours=word(raw+12);
     if(weathers!=AW_WEATHERS || regions>AW_WEATHER_REGIONS || hours<1 || hours>240)return 0;
-    if(size!=20+32L*weathers+10L*regions)return 0;
+    if(size!=20+32L*(long)weathers+10L*(long)regions)return 0;
     memset(out,0,sizeof *out);
     out->regions=(int)regions;out->hours=(int)hours;
     for(w=0;w<AW_WEATHERS;w++){
@@ -79,6 +79,45 @@ int AW_WeatherOfRegion(const aw_weather_table_t *table,int region,int days,int m
     if(!table || region<0 || region>=table->regions)return AW_WEATHER_CLEAR;
     return AW_WeatherChoose(table->chances[region],AW_WEATHERS,
         AW_WeatherRoll(region,AW_WeatherPeriod(days,milliseconds,table->hours)));
+}
+/* Transitions (aw_weather.h; rules from OpenMW mwworld/weather.cpp forceWeather,
+ * addWeatherTransition, updateWeatherTransitions, updateWeatherRegion, playerTeleported). */
+void AW_WeatherForce(aw_weather_state_t *s,int weather)
+{
+    s->current=weather;s->next=s->queued=AW_WEATHER_NONE;s->progress=0.0;
+}
+void AW_WeatherAddTransition(aw_weather_state_t *s,int weather)
+{
+    if(s->next==AW_WEATHER_NONE){
+        if(weather!=s->current){s->next=weather;s->progress=0.0;}
+    }else if(weather!=s->next)s->queued=weather;
+}
+/* seconds of real time at the delta (Transition Delta, per real second) of the weather being moved to;
+ * time left over when one ends goes to the queued one at its own delta. */
+void AW_WeatherAdvance(aw_weather_state_t *s,const aw_weather_table_t *table,double seconds)
+{
+    double delta,left;
+    while(s->next!=AW_WEATHER_NONE && seconds>0.0){
+        delta=table->look[s->next].delta_milli/1000.0;
+        if(delta<=0.0)delta=0.001;
+        s->progress+=seconds*delta;
+        if(s->progress<1.0)return;
+        left=(s->progress-1.0)/delta;
+        s->current=s->next;s->next=s->queued;s->queued=AW_WEATHER_NONE;s->progress=0.0;
+        seconds=left;
+    }
+}
+/* The region to use: a named region is remembered; none (-1) keeps the last named one. */
+int AW_WeatherRegionKeep(aw_weather_state_t *s,int region)
+{
+    if(region>=0)s->region=region;
+    return s->region;
+}
+int AW_WeatherIsArrival(int have_last,double dx,double dy,long hours_passed)
+{
+    if(!have_last)return 1;
+    if(dx*dx+dy*dy>AW_WEATHER_ARRIVAL_UNITS*AW_WEATHER_ARRIVAL_UNITS)return 1;
+    return hours_passed>=AW_WEATHER_ARRIVAL_HOURS || hours_passed<0;
 }
 /* step 0 = all from, AW_WEATHER_STEPS = all to. */
 void AW_WeatherBlend(const aw_weather_table_t *table,int from,int to,int step,aw_weather_blend_t *out)

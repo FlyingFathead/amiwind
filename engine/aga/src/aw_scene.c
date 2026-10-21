@@ -3,6 +3,7 @@
  * time. This is not inventory, quest persistence or original opening logic.
  */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_inventory.h"
 #include "aw_hand_state.h"
 #include <errno.h>
@@ -94,6 +95,39 @@ static void target_names_command(void) {
 }
 static const char *npc_hint(void);
 static edict_t *travel_target(void);
+/* CHIM streams its collision with the player (the ring): an actor spawned
+ * where the ground is not collidable yet finds nothing under it and stayed in
+ * the air for good (COMBAT-CHASE-CHIM-STUCK-46). Such a miss is kept and the
+ * same bounded snap tried again (AW_NPCFloorRetry, from AW_SceneTick) until the
+ * ground arrives (once a second), or the actor moves or goes. At most 64
+ * kept. Legacy maps (no CHIM world): unchanged. */
+#define FLOOR_RETRY_MAX 64
+static struct {edict_t *e;vec3_t origin;double since;} floor_retry[FLOOR_RETRY_MAX];
+static int floor_retries,floor_retrying;static double floor_retry_next;
+static void floor_retry_add(edict_t *e) {
+    int i;
+    if(floor_retrying || !Chim_Active())return;
+    for(i=0;i<floor_retries;i++)if(floor_retry[i].e==e){VectorCopy(e->v.origin,floor_retry[i].origin);return;}
+    if(floor_retries>=FLOOR_RETRY_MAX)return;
+    floor_retry[floor_retries].e=e;VectorCopy(e->v.origin,floor_retry[floor_retries].origin);
+    floor_retry[floor_retries].since=sv.time;floor_retries++;
+}
+/* Once a second of server time: returns how many actors it put on the ground. */
+int AW_NPCFloorRetry(void) {
+    int i,landed=0,drop;edict_t *e;
+    if(!floor_retries)return 0;
+    if(!sv.active || !Chim_Active() || sv.time<floor_retry_next-2 || sv.time<floor_retry[0].since){floor_retries=0;floor_retry_next=0;return 0;} /* gone, or a new server */
+    if(sv.time<floor_retry_next)return 0;
+    floor_retry_next=sv.time+1;floor_retrying=1;
+    for(i=0;i<floor_retries;){
+        e=floor_retry[i].e;
+        drop=e->free || !VectorCompare(e->v.origin,floor_retry[i].origin);
+        if(!drop && AW_NPCFloor(e)){landed++;drop=1;}
+        if(drop)floor_retry[i]=floor_retry[--floor_retries];else i++;
+    }
+    floor_retrying=0;
+    return landed;
+}
 /* Resolve the authored feet point against linked world/architectural brushes.
  * Balmora's ground conversion leaves source feet up to 18 units above paving.
  * Bound correction to 32 units so a missing floor cannot move actors a storey. */
@@ -112,6 +146,7 @@ int AW_NPCFloor(edict_t *e) {
     }
     VectorCopy(e->v.origin,start);VectorCopy(start,end);start[2]+=8;end[2]-=32;
     tr=SV_Move(start,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,e);
+    if(!tr.startsolid && !tr.allsolid && tr.fraction>=1)floor_retry_add(e);
     if(tr.startsolid || tr.allsolid || tr.fraction>=1 || tr.plane.normal[2]<AW_WALKABLE_Z)return 0;
     VectorCopy(tr.endpos,e->v.origin);e->v.origin[2]+=0.25f;
     e->v.flags=(int)e->v.flags|FL_ONGROUND;
@@ -505,7 +540,7 @@ void AW_SceneDraw(void) {
     }
     if(!name)return;
     y=r_refdef.vrect.y+r_refdef.vrect.height;
-    if(vid.height-y<20+AW_ConsoleCharHeight())return;
+    if((int)vid.height-y<20+AW_ConsoleCharHeight())return;
     if(!npc && (!AW_UISpeakerAtRight() || label_style.value!=2))AW_UIObjectName(name,(int)label_style.value);
     if(!action)return;
     sprintf(line,"(%s)",action);cw=AW_ConsoleCharWidth();w=strlen(line)*cw;
@@ -645,9 +680,61 @@ void AW_SceneSignon(void) {
 /* CHIM: the chunk ring around the arrival point is loaded before the
  * clearance search (chim/chim_world.c sets it only when its data exists). */
 void (*aw_chim_spawn)(vec3_t);
+/* Type 1 cell crossings (CHIM's window of region frames, "chim crossing 1";
+ * docs/chim/CELL_CROSSINGS.md): a crossing between two region frames the
+ * window holds streams instead of loading the next map. The running map keeps
+ * its name and its coordinates (the session's); the frame the player stands
+ * in is the logical scene: its region map name and the offset from its own
+ * coordinates to the session's. Every other crossing (towns, doors, dbg tp,
+ * a frame the window does not hold) changes the level as before. */
+int (*aw_chim_cross)(const float *origin,int *cx,int *cy);
+int (*aw_chim_recentre)(int cx,int cy,const float *d,int apply);
+static char logical_map[16];
+static vec3_t logical_offset;
+static int logical_used;		/* a streamed crossing since the map started */
+/* The scene the player stands in: the logical frame after a streamed
+ * crossing, else the running map (aw_remote.c's state file). */
+const char *AW_SceneName(void){return logical_map[0]?logical_map:sv.active?sv.name:"none";}
+/* The walk log's map column (aw_profile.c) after a streamed crossing:
+ * maps/<scene>; NULL: the client's world model as before. */
+const char *AW_SceneWalkModel(void){
+    static char path[MAX_QPATH+8];
+    if(!logical_used || !sv.active)return NULL;
+    sprintf(path,"maps/%s",AW_SceneName());return path;
+}
+/* A recentre ("chim crossing recentre 1", a test setting; design note weak
+ * point 5): the server's and the client's positions move by d first
+ * (aw_debug.c AW_SessionShift, set by the engine at start-up), then CHIM's own
+ * (aw_chim_recentre). NULL: no recentre. */
+void (*aw_session_shift)(const float *d);
+static int world_destination(const float *origin,char *target,float *arrival){
+    float local[3];int k;
+    for(k=0;k<3;k++)local[k]=origin[k]-logical_offset[k];
+    return AW_WorldDestination(logical_map[0]?logical_map:sv.name,local,target,arrival);
+}
+static int stream_cross(edict_t *p,aw_scene_link_t *r){
+    int cx,cy,k,how,moved=0;double t0=Sys_FloatTime();float d[3];
+    if(!aw_chim_cross || AW_TerrainId(r->target)<0 || !(how=aw_chim_cross(p->v.origin,&cx,&cy)))return 0;
+    copy_name(logical_map,sizeof(logical_map),r->target);logical_used=1;
+    for(k=0;k<3;k++)logical_offset[k]=p->v.origin[k]-r->arrival[k];
+    VectorCopy(logical_offset,d);d[2]=0;
+    if(how==2 && aw_session_shift && aw_chim_recentre && aw_chim_recentre(cx,cy,d,0)){
+        /* The entered frame's coordinates become the session's (CHIM agreed on the offset): the
+         * map's name follows (saves, doors and the crossing checks read its coordinates from here on). */
+        aw_session_shift(d);
+        if((moved=aw_chim_recentre(cx,cy,d,1))!=0){
+            copy_name(sv.name,sizeof(sv.name),r->target);
+            logical_map[0]=0;VectorCopy(vec3_origin,logical_offset);
+        }
+    }
+    Con_Printf("Scene ready: %s, 0 ms, streamed crossing (type 1%s), CHIM frame %ld %ld, %ld us\n",r->target,
+        moved?", recentred":"",(long)cx,(long)cy,(long)((Sys_FloatTime()-t0)*1e6));
+    return 1;
+}
 void AW_SceneSpawn(edict_t *p) {
     int placed=0;float eye;
     area_last_ok=0;
+    logical_map[0]=0;VectorCopy(vec3_origin,logical_offset);logical_used=0;
     /* Quake's stuck recovery returns to oldorigin, which a fresh client edict
      * leaves at the frame origin; anchor it at the scene spawn instead. */
     VectorCopy(p->v.origin,p->v.oldorigin);
@@ -731,6 +818,7 @@ void AW_SceneSpawn(edict_t *p) {
 }
 void AW_SceneTick(void) {
     aw_scene_link_t r;edict_t *p;
+    AW_NPCFloorRetry();
     if(!pending && sv.active && cls.state==ca_connected && cls.signon==SIGNONS &&
        key_dest==key_game && svs.maxclients==1 && svs.clients && (p=svs.clients[0].edict))
         AW_StreamTick(AW_CellChangeMethod()==2?AW_RegionAhead(p->v.origin,p->v.velocity,
@@ -751,10 +839,10 @@ void AW_SceneTick(void) {
     memset(&r,0,sizeof(r));
     if(AW_SectionDestination(sv.name,p->v.origin,r.target)){
         VectorCopy(p->v.origin,r.arrival);
-    }else if(AW_StoryRestricted() || !AW_WorldDestination(sv.name,p->v.origin,r.target,r.arrival)){
+    }else if(AW_StoryRestricted() || !world_destination(p->v.origin,r.target,r.arrival)){
         if(!AW_RegionCrossing(p->v.origin,intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
         copy_name(r.target,sizeof(r.target),sv.name);VectorCopy(p->v.origin,r.arrival);
-    }
+    }else if(stream_cross(p,&r))return;
     r.yaw=p->v.angles[1];
     /* The displayed local view can differ from the last rounded movement
      * packet. Preserve it and its drift policy across the client-state reset. */

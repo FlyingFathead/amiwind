@@ -106,12 +106,12 @@ int AW_ConsoleCharWidth(void) {return small?4:8;}
 int AW_ConsoleCharHeight(void) {return small?6:8;}
 void AW_SmallString(int x,int y,const char *text) {
     int r,col,c,bits;byte *p;
-    for(;*text && x<vid.width;text++,x+=4){
+    for(;*text && x<(int)vid.width;text++,x+=4){
         c=*text&127;if(c<32 || c>126)continue;
         for(r=0;r<5;r++){
-            if(y+r<0 || y+r>=vid.height)continue;
+            if(y+r<0 || y+r>=(int)vid.height)continue;
             bits=glyphs[c-32][r];p=vid.buffer+(y+r)*vid.rowbytes;
-            for(col=0;col<3;col++)if(x+col>=0 && x+col<vid.width && (bits&(4>>col)))p[x+col]=254;
+            for(col=0;col<3;col++)if(x+col>=0 && x+col<(int)vid.width && (bits&(4>>col)))p[x+col]=254;
         }
     }
 }
@@ -123,10 +123,10 @@ void AW_SmallStringColor(int x,int y,int width,const char *text,int color) {
     for(;*text && x+4<=right;text++,x+=4){
         c=(unsigned char)*text;if(c<32 || c>126)c='?';
         for(r=0;r<5;r++){
-            if(y+r<0 || y+r>=vid.height)continue;
+            if(y+r<0 || y+r>=(int)vid.height)continue;
             bits=glyphs[c-32][r];p=vid.buffer+(y+r)*vid.rowbytes;
             for(col=0;col<3;col++)
-                if(x+col>=0 && x+col<vid.width && (bits&(4>>col)))p[x+col]=(byte)color;
+                if(x+col>=0 && x+col<(int)vid.width && (bits&(4>>col)))p[x+col]=(byte)color;
         }
     }
 }
@@ -136,8 +136,8 @@ void AW_ConsoleCharacter(int x,int y,int c) {
     if(c==10)c='>';else if(c==11)c='_';
     if(c<32 || c>126)return;
     for(r=0;r<5;r++) {
-        if(y+r<0 || y+r>=vid.conheight)continue;
+        if(y+r<0 || y+r>=(int)vid.conheight)continue;
         bits=glyphs[c-32][r];p=vid.conbuffer+(y+r)*vid.conrowbytes;
-        for(col=0;col<3;col++)if(x+col>=0 && x+col<vid.conwidth && (bits&(4>>col)))p[x+col]=254;
+        for(col=0;col<3;col++)if(x+col>=0 && x+col<(int)vid.conwidth && (bits&(4>>col)))p[x+col]=254;
     }
 }

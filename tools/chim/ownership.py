@@ -75,7 +75,7 @@ def select_compiled_apron(spec, references):
     apron, and record exact excluded originals and boxes for source accounting.
     The unchanged manifest guard still rejects missing pieces and bad ownership.
     """
-    from chim.world import frame_box, f32, placed_box
+    from chim.world import frame_box, f32, placed_box, turn_of
     frame = spec['frame']; centre = frame['centre']
     core = list(frame_box(frame))
     coverage = [centre[k] + 4*frame['low'][k] for k in range(2)]
@@ -85,7 +85,7 @@ def select_compiled_apron(spec, references):
         v = spec['variants'][p['variant']]
         if not all(math.isfinite(x) for x in [*p['origin'], p['yaw'], *v['lo'], *v['hi']]):
             raise ValueError('Nonfinite compiled apron transform or bounds')
-        lo, hi = placed_box([f32(x) for x in p['origin']], f32(p['yaw']),
+        lo, hi = placed_box([f32(x) for x in p['origin']], turn_of(p),
                             [f32(x) for x in v['lo']], [f32(x) for x in v['hi']])
         box = [centre[k] + 4*lo[k] for k in range(2)] + [centre[k] + 4*hi[k] for k in range(2)]
         if not all(math.isfinite(x) for x in box):
@@ -113,7 +113,7 @@ def select_compiled_apron(spec, references):
 
 def manifest(spec, references):
     """Bind each original to its exact converted pieces before packing."""
-    from chim.world import frame_box, f32, placed_box
+    from chim.world import frame_box, f32, placed_box, turn_of
     frame = spec['frame'];centre = frame['centre']
     core = list(frame_box(frame))
     coverage = [centre[k] + 4*frame['low'][k] for k in range(2)]
@@ -123,7 +123,7 @@ def manifest(spec, references):
     for p in spec['placements']:
         v = spec['variants'][p['variant']]
         origin = [f32(x) for x in p['origin']];yaw = f32(p['yaw'])
-        lo, hi = placed_box(origin, yaw, [f32(x) for x in v['lo']], [f32(x) for x in v['hi']])
+        lo, hi = placed_box(origin, turn_of(p), [f32(x) for x in v['lo']], [f32(x) for x in v['hi']])
         box = [centre[k] + 4*lo[k] for k in range(2)] + [centre[k] + 4*hi[k] for k in range(2)]
         footprints.setdefault(source_ref(p['ref']), []).append(box)
         pieces.append({'ref': p['ref'], 'origin': origin, 'yaw': yaw, 'cell': list(p['cell']),

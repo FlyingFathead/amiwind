@@ -18,15 +18,25 @@
  * MB), more than the whole-map Hunk rule leaves (CHIM-SEYDA-HUNK-GAP-33).
  * Each model is decoded once, shared by name and locked while an active
  * chunk places it; unlocked it stays in the zone as cache.
+ *
+ * Type 1 crossings (a window of frames, chim_chunks.c): one list per window
+ * slot. The map's own frame (slot 0 at the start) takes its statics from the
+ * map's entity text (ED_LoadFromFile, ChimStatics_Capture); a frame that joins
+ * the window later has its frame map's entity text read for them
+ * (ChimStatics_SlotJoin), placed at the frame's offset. Without a window there
+ * is only list 0, as before.
  */
 #include "quakedef.h"
 #include "r_local.h"
 #include "chim_local.h"
+#include "aw_mappath.h"
 
 int Mod_LoadSpriteInto (model_t *mod, void *(*alloc)(void *context, int size), void *context);
 
 #define CHIM_MAX_STATICS		2048	/* streamed statics in one frame map */
 #define CHIM_STATIC_MODEL_BIT	0x80000000u	/* in a chunk's model need: a static's model */
+#define CHIM_STATIC_SLOT_SHIFT	24			/* ... its window slot, then its row in that slot's table */
+#define CHIM_STATIC_ROW_MASK	0x00ffffffu
 
 typedef struct
 {
@@ -57,30 +67,56 @@ typedef struct
 	short			*order;			/* statics by chunk */
 	int				*first;			/* per chunk: first row in order, then count in first[count+1] */
 	int				capacity, count, nmodels, sorted, chunks;
+	int				base;			/* the slot's first chunk entry (0 without a window) */
 	chim_user_t		table;			/* the zone block holding all of the above */
 	unsigned long	sprite_loads, alias_loads, refused, linked_peak;
 	int				linked, efrags;
 	model_t			*link_world;
 } chim_statics_t;
 
-static chim_statics_t	st;
+static chim_statics_t	lists[CHIM_WINDOW_SLOTS];
+#define st	lists[0]		/* the map's own frame (type 0: the only list) */
 
-int ChimStatics_Count (void) { return st.count; }
+/* The list and its chunk for a chunk entry (the slot's list in a window). */
+static chim_statics_t *ListOf (int index, int *local)
+{
+	chim_statics_t *L;
+	int s = 0;
+	if (chim_frame.window && index >= 0 && index < chim_frame.count)
+		s = chim_frame.entries[index].slot;
+	L = &lists[s];
+	*local = index - L->base;
+	return L;
+}
 
-/* The i-th streamed static's entity (dbg and the host tests). */
+int ChimStatics_Count (void)
+{
+	int s, n = 0;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+		n += lists[s].count;
+	return n;
+}
+
+/* The i-th streamed static's entity (dbg and the host tests), over the lists in slot order. */
 entity_t *ChimStatics_Entity (int i)
 {
-	return i >= 0 && i < st.count ? &st.list[i].ent : NULL;
+	int s;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+	{
+		if (i >= 0 && i < lists[s].count)
+			return &lists[s].list[i].ent;
+		i -= lists[s].count;
+	}
+	return NULL;
 }
 
 /* ---------------------------------------------------------------- the list */
 
-/* The frame map states how many statics it streams ("_chim_streamed_statics");
- * room for them and their models is taken from the zone, locked for the map. */
-void ChimStatics_Begin (int stated, int chunks)
+static void ListBegin (chim_statics_t *L, int stated, int chunks, int base)
 {
 	int bytes;
-	memset (&st, 0, sizeof(st));
+	memset (L, 0, sizeof(*L));
+	L->base = base;
 	if (stated <= 0 || chunks <= 0)
 		return;
 	if (stated > CHIM_MAX_STATICS)
@@ -91,54 +127,71 @@ void ChimStatics_Begin (int stated, int chunks)
 	}
 	bytes = stated * (int)(sizeof(chim_static_t) + sizeof(chim_smodel_t) + sizeof(short)) +
 		(chunks + 2) * (int)sizeof(int) + 64;
-	if (!ChimZone_Alloc (&st.table, bytes, CHIM_KIND_STATIC, 0xffffffffu))
+	if (!ChimZone_Alloc (&L->table, bytes, CHIM_KIND_STATIC, 0xffffffffu))
 	{
 		Con_Printf ("CHIM: no room for %ld streamed statics (%ld bytes); they spawn as usual\n", (long)stated, (long)bytes);
 		return;
 	}
-	ChimZone_Lock (st.table.data);
-	memset (st.table.data, 0, bytes);
-	st.list = (chim_static_t *)st.table.data;
-	st.models = (chim_smodel_t *)(st.list + stated);
-	st.order = (short *)(st.models + stated);
-	st.first = (int *)(((size_t)(st.order + stated) + 7) & ~(size_t)7);
-	st.capacity = stated;
-	st.chunks = chunks;
+	ChimZone_Lock (L->table.data);
+	memset (L->table.data, 0, bytes);
+	L->list = (chim_static_t *)L->table.data;
+	L->models = (chim_smodel_t *)(L->list + stated);
+	L->order = (short *)(L->models + stated);
+	L->first = (int *)(((size_t)(L->order + stated) + 7) & ~(size_t)7);
+	L->capacity = stated;
+	L->chunks = chunks;
+}
+
+/* The frame map states how many statics it streams ("_chim_streamed_statics");
+ * room for them and their models is taken from the zone, locked for the map. */
+void ChimStatics_Begin (int stated, int chunks)
+{
+	int s;
+	for (s=1 ; s<CHIM_WINDOW_SLOTS ; s++)
+		memset (&lists[s], 0, sizeof(lists[s]));
+	ListBegin (&st, stated, chunks, 0);
+}
+
+static void ListEnd (chim_statics_t *L)
+{
+	int i;
+	for (i=0 ; i<L->nmodels ; i++)
+	{
+		if (L->models[i].user.data)
+		{
+			while (ChimZone_Locks (L->models[i].user.data) > 0)
+				ChimZone_Unlock (L->models[i].user.data);
+			ChimZone_Free (&L->models[i].user);
+		}
+	}
+	if (L->table.data)
+	{
+		ChimZone_Unlock (L->table.data);
+		ChimZone_Free (&L->table);
+	}
+	memset (L, 0, sizeof(*L));
 }
 
 void ChimStatics_End (void)
 {
-	int i;
-	for (i=0 ; i<st.nmodels ; i++)
-	{
-		if (st.models[i].user.data)
-		{
-			while (ChimZone_Locks (st.models[i].user.data) > 0)
-				ChimZone_Unlock (st.models[i].user.data);
-			ChimZone_Free (&st.models[i].user);
-		}
-	}
-	if (st.table.data)
-	{
-		ChimZone_Unlock (st.table.data);
-		ChimZone_Free (&st.table);
-	}
-	memset (&st, 0, sizeof(st));
+	int s;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+		ListEnd (&lists[s]);
 }
 
-static int ModelRow (const char *name)
+static int ModelRow (chim_statics_t *L, const char *name)
 {
 	int i, n;
-	for (i=0 ; i<st.nmodels ; i++)
-		if (!strcmp (st.models[i].name, name))
+	for (i=0 ; i<L->nmodels ; i++)
+		if (!strcmp (L->models[i].name, name))
 			return i;
-	if (st.nmodels >= st.capacity)
+	if (L->nmodels >= L->capacity)
 		return -1;
 	n = (int)strlen (name);
-	memset (&st.models[i], 0, sizeof(st.models[i]));
-	strcpy (st.models[i].name, name);
-	st.models[i].sprite = n > 4 && !Q_strcasecmp ((char *)name + n - 4, ".spr");
-	st.nmodels++;
+	memset (&L->models[i], 0, sizeof(L->models[i]));
+	strcpy (L->models[i].name, name);
+	L->models[i].sprite = n > 4 && !Q_strcasecmp ((char *)name + n - 4, ".spr");
+	L->nmodels++;
 	return i;
 }
 
@@ -148,10 +201,10 @@ static int Vector3 (const char *text, vec3_t out)
 		isfinite (out[0]) && isfinite (out[1]) && isfinite (out[2]);
 }
 
-/* ED_LoadFromFile, for every entity after worldspawn (*data just past its
- * opening brace): a tagged aw_static or aw_flora is taken into the list and
- * *data moves past its closing brace; anything else is left as it was (0). */
-int ChimStatics_Capture (char **data)
+/* One entity of entity text (*data just past its opening brace): a tagged
+ * aw_static or aw_flora is taken into list L and *data moves past its
+ * closing brace; anything else is left as it was (0). */
+static int CaptureInto (chim_statics_t *L, char **data)
 {
 	char *p = *data, key[64], classname[32], model[MAX_QPATH];
 	vec3_t origin, angles, box[2];
@@ -159,7 +212,7 @@ int ChimStatics_Capture (char **data)
 	int frame = 0, skin = 0, chunk = -1, has_box = 0, has_origin = 0, tagged = 0, row;
 	chim_static_t *s;
 
-	if (!st.capacity)
+	if (!L->capacity)
 		return 0;
 	classname[0] = model[0] = 0;
 	VectorCopy (vec3_origin, origin);
@@ -216,11 +269,11 @@ int ChimStatics_Capture (char **data)
 	/* Only the two classes whose spawn is a plain makestatic (world.qc);
 	 * anything else tagged is the builder's error and spawns as usual. */
 	if ((strcmp (classname, "aw_static") && strcmp (classname, "aw_flora")) || !model[0] || !has_origin ||
-		!has_box || chunk < 0 || chunk >= st.chunks || st.count >= st.capacity || frame < 0 || frame > 255 ||
+		!has_box || chunk < 0 || chunk >= L->chunks || L->count >= L->capacity || frame < 0 || frame > 255 ||
 		skin < 0 || skin > 255)
 	{
-		st.refused++;
-		if (st.refused == 1)
+		L->refused++;
+		if (L->refused == 1)
 			Con_Printf ("CHIM: a tagged %s (%s) cannot stream: spawned as usual\n", classname[0] ? classname : "entity", model);
 		return 0;
 	}
@@ -232,11 +285,11 @@ int ChimStatics_Capture (char **data)
 	}
 	else
 		scale = 1;
-	if ((row = ModelRow (model)) < 0)
+	if ((row = ModelRow (L, model)) < 0)
 		return 0;
-	if (!strcmp (classname, "aw_flora") && !st.models[row].sprite)
+	if (!strcmp (classname, "aw_flora") && !L->models[row].sprite)
 		Host_Error ("Invalid aw_flora static sprite scale");
-	s = &st.list[st.count++];
+	s = &L->list[L->count++];
 	memset (s, 0, sizeof(*s));
 	VectorCopy (origin, s->ent.origin);
 	VectorCopy (angles, s->ent.angles);
@@ -248,52 +301,195 @@ int ChimStatics_Capture (char **data)
 	s->frame = (unsigned char)frame;
 	s->skin = (unsigned char)skin;
 	s->flora = !strcmp (classname, "aw_flora");
-	st.sorted = 0;
+	L->sorted = 0;
 	*data = p;
 	return 1;
 }
 
-/* Statics by chunk (counting sort, once after the map's entities). */
-static void Sort (void)
+/* ED_LoadFromFile, for every entity after worldspawn (*data just past its
+ * opening brace): the map's own frame's list. */
+int ChimStatics_Capture (char **data)
 {
-	int i, c;
-	if (st.sorted)
-		return;
-	memset (st.first, 0, (st.chunks + 2) * sizeof(int));
-	for (i=0 ; i<st.count ; i++)
-		st.first[st.list[i].chunk + 1]++;
-	for (c=0 ; c<st.chunks ; c++)
-		st.first[c+1] += st.first[c];
-	for (i=0 ; i<st.count ; i++)
-		st.order[st.first[st.list[i].chunk]++] = (short)i;
-	for (c=st.chunks ; c>0 ; c--)
-		st.first[c] = st.first[c-1];
-	st.first[0] = 0;
-	st.sorted = 1;
+	return CaptureInto (&st, data);
 }
 
-#define FOR_CHUNK(index, k, s) \
-	for (Sort (), k = st.first[index]; k < st.first[(index)+1] && ((s) = &st.list[st.order[k]]) != NULL; k++)
+/* Statics by chunk (counting sort, once after the map's entities). */
+static void Sort (chim_statics_t *L)
+{
+	int i, c;
+	if (L->sorted)
+		return;
+	memset (L->first, 0, (L->chunks + 2) * sizeof(int));
+	for (i=0 ; i<L->count ; i++)
+		L->first[L->list[i].chunk + 1]++;
+	for (c=0 ; c<L->chunks ; c++)
+		L->first[c+1] += L->first[c];
+	for (i=0 ; i<L->count ; i++)
+		L->order[L->first[L->list[i].chunk]++] = (short)i;
+	for (c=L->chunks ; c>0 ; c--)
+		L->first[c] = L->first[c-1];
+	L->first[0] = 0;
+	L->sorted = 1;
+}
+
+#define FOR_CHUNK(L, index, k, s) \
+	for (Sort (L), k = (L)->first[index]; k < (L)->first[(index)+1] && ((s) = &(L)->list[(L)->order[k]]) != NULL; k++)
+
+/* ---------------------------------------------------------------- a window's frame */
+
+/* Frame map name's entity text read for its tagged statics into slot s's
+ * list (type 1: a frame joins the window), placed at offset. Returns how
+ * many it took. */
+int ChimStatics_SlotJoin (int slot, int base, int chunks, const char *map, const float *offset)
+{
+	chim_statics_t *L = &lists[slot];
+	char path[MAX_QPATH+16], *text, *p, *q;
+	FILE *f = NULL;
+	int bytes, i, stated = 0, n = 0;
+	unsigned char head[12];
+	long at, length;
+	chim_user_t buffer = {NULL};
+
+	ListEnd (L);
+	L->base = base;
+	if (slot < 0 || slot >= CHIM_WINDOW_SLOTS || !map || !*map)
+		return 0;
+	AW_MapPath (map, path, sizeof(path));
+	bytes = COM_FOpenFile (path, &f);
+	if (!f)
+		return 0;
+	at = ftell (f);
+	/* BSP29 header: version, then the entity lump's offset and length. */
+	if (fread (head, 1, sizeof(head), f) != sizeof(head))
+	{
+		fclose (f);
+		return 0;
+	}
+	length = (long)(head[8] | (head[9] << 8) | (head[10] << 16) | ((unsigned long)head[11] << 24));
+	i = head[4] | (head[5] << 8) | (head[6] << 16) | (head[7] << 24);
+	if (i < 0 || length <= 0 || length > 4*1024*1024 || (long)i + length > bytes ||
+		!ChimZone_Alloc (&buffer, (int)length + 1, CHIM_KIND_BUFFER, 0))
+	{
+		fclose (f);
+		return 0;
+	}
+	ChimZone_Lock (buffer.data);
+	text = buffer.data;
+	if (fseek (f, at + i, SEEK_SET) || fread (text, 1, (size_t)length, f) != (size_t)length)
+		length = 0;
+	fclose (f);
+	text[length] = 0;
+	/* The worldspawn states the count (as the map's own start reads it). */
+	if ((p = strstr (text, "\"_chim_streamed_statics\"")) != NULL && (q = strchr (text, '}')) != NULL && p < q)
+	{
+		for (p += 24 ; *p == ' ' || *p == '\t' ; p++)
+			;
+		if (*p == '"')
+			stated = atoi (p + 1);
+	}
+	ListBegin (L, stated, chunks, base);
+	p = text;
+	if (L->capacity && (p = COM_Parse (p)) != NULL && com_token[0] == '{')
+	{
+		/* Past the worldspawn, then each entity: taken, or skipped whole. */
+		while ((p = COM_Parse (p)) != NULL && com_token[0] != '}')
+			if (!(p = COM_Parse (p)))
+				break;
+		while (p && (p = COM_Parse (p)) != NULL && com_token[0] == '{')
+		{
+			q = p;
+			if (CaptureInto (L, &q))
+			{
+				chim_static_t *s = &L->list[L->count-1];
+				int k;
+				for (k=0 ; k<2 ; k++)
+				{
+					s->ent.origin[k] += offset[k];
+					s->mins[k] += offset[k];
+					s->maxs[k] += offset[k];
+				}
+				p = q;
+				n++;
+				continue;
+			}
+			while ((p = COM_Parse (p)) != NULL && com_token[0] != '}')
+				if (!(p = COM_Parse (p)))
+					break;
+		}
+	}
+	ChimZone_Unlock (buffer.data);
+	ChimZone_Free (&buffer);
+	return n;
+}
+
+/* A slot's frame left the window: its list and models go. */
+void ChimStatics_SlotEnd (int slot)
+{
+	chim_statics_t *L;
+	int i;
+	if (slot < 0 || slot >= CHIM_WINDOW_SLOTS)
+		return;
+	L = &lists[slot];
+	for (i=0 ; i<L->count ; i++)
+		if (L->list[i].placed || L->list[i].leaves || L->list[i].ent.efrag)
+		{
+			/* its chunks were deactivated first: nothing may be placed */
+			if (L->list[i].ent.efrag && L->link_world && cl.worldmodel == L->link_world && cls.signon == SIGNONS)
+				ChimGraft_RemoveEfrags (&L->list[i].ent);
+			L->list[i].ent.efrag = NULL;
+		}
+	ListEnd (L);
+}
+
+/* Type 1 crossings, a recentre: the session's origin moved by d (local units). */
+void ChimStatics_Recentre (const float *d)
+{
+	int s, i, k;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+		for (i=0 ; i<lists[s].count ; i++)
+			for (k=0 ; k<2 ; k++)
+			{
+				lists[s].list[i].ent.origin[k] -= d[k];
+				lists[s].list[i].mins[k] -= d[k];
+				lists[s].list[i].maxs[k] -= d[k];
+			}
+}
 
 /* ---------------------------------------------------------------- models */
 
-static model_t *Resident (int m)
+static model_t *Resident (chim_statics_t *L, int m)
 {
-	chim_smodel_t *sm = &st.models[m];
+	chim_smodel_t *sm = &L->models[m];
 	return sm->sprite ? (sm->user.data ? (model_t *)sm->user.data : NULL) : sm->alias;
 }
 
-/* The first model a chunk's statics still need: CHIM_STATIC_MODEL_BIT | row,
- * or 0 when all are resident (or cannot be loaded). */
+static unsigned ModelId (const chim_statics_t *L, int row)
+{
+	return CHIM_STATIC_MODEL_BIT | ((unsigned)(L - lists) << CHIM_STATIC_SLOT_SHIFT) | (unsigned)row;
+}
+
+/* The list and row a static model id names, NULL when there is none. */
+static chim_statics_t *ModelList (unsigned model, int *row)
+{
+	unsigned s = (model & ~CHIM_STATIC_MODEL_BIT) >> CHIM_STATIC_SLOT_SHIFT;
+	*row = (int)(model & CHIM_STATIC_ROW_MASK);
+	if (s >= CHIM_WINDOW_SLOTS || *row >= lists[s].nmodels)
+		return NULL;
+	return &lists[s];
+}
+
+/* The first model a chunk's statics still need: CHIM_STATIC_MODEL_BIT | slot |
+ * row, or 0 when all are resident (or cannot be loaded). */
 unsigned ChimStatics_Missing (int index)
 {
-	int k;
+	int k, local;
 	chim_static_t *s;
-	if (!st.count || index < 0 || index >= st.chunks)
+	chim_statics_t *L = ListOf (index, &local);
+	if (!L->count || local < 0 || local >= L->chunks)
 		return 0;
-	FOR_CHUNK (index, k, s)
-		if (!st.models[s->model].bad && !Resident (s->model))
-			return CHIM_STATIC_MODEL_BIT | (unsigned)s->model;
+	FOR_CHUNK (L, local, k, s)
+		if (!L->models[s->model].bad && !Resident (L, s->model))
+			return ModelId (L, s->model);
 	return 0;
 }
 
@@ -304,8 +500,9 @@ int ChimStatics_IsStatic (unsigned model)
 
 const char *ChimStatics_Name (unsigned model)
 {
-	model &= ~CHIM_STATIC_MODEL_BIT;
-	return (int)model < st.nmodels ? st.models[model].name : "?";
+	int row;
+	chim_statics_t *L = ModelList (model, &row);
+	return L ? L->models[row].name : "?";
 }
 
 static int FileBytes (chim_smodel_t *sm)
@@ -324,11 +521,12 @@ static int FileBytes (chim_smodel_t *sm)
 /* What a model's load takes from the zone at most (prefetch room). */
 long ChimStatics_Bytes (unsigned model)
 {
+	int row;
+	chim_statics_t *L = ModelList (model, &row);
 	chim_smodel_t *sm;
-	model &= ~CHIM_STATIC_MODEL_BIT;
-	if ((int)model >= st.nmodels)
+	if (!L)
 		return 0;
-	sm = &st.models[model];
+	sm = &L->models[row];
 	return sm->sprite ? (long)FileBytes (sm) * (r_pixbytes + 2) + 1024 : 0;
 }
 
@@ -359,13 +557,13 @@ int ChimStatics_Step (unsigned model, long *budget)
 	chim_smodel_t *sm;
 	chim_bump_t bump;
 	model_t *m;
-	int bound, bytes;
+	int bound, bytes, row;
+	chim_statics_t *L = ModelList (model, &row);
 
-	model &= ~CHIM_STATIC_MODEL_BIT;
-	if ((int)model >= st.nmodels)
+	if (!L)
 		return -1;
-	sm = &st.models[model];
-	if (Resident (model))
+	sm = &L->models[row];
+	if (Resident (L, row))
 		return 1;
 	bytes = FileBytes (sm);
 	if (!bytes)
@@ -396,11 +594,11 @@ int ChimStatics_Step (unsigned model, long *budget)
 			Con_Printf ("CHIM: streamed static model %s is not an alias model\n", sm->name);
 			return -1;
 		}
-		st.alias_loads++;
+		L->alias_loads++;
 		return 1;
 	}
 	bound = (int)ChimStatics_Bytes (model) + (int)sizeof(model_t);
-	if (!(m = ChimZone_Alloc (&sm->user, bound, CHIM_KIND_STATIC, model)))
+	if (!(m = ChimZone_Alloc (&sm->user, bound, CHIM_KIND_STATIC, (unsigned)row)))
 		return -1;
 	ChimZone_Lock (m);
 	memset (m, 0, sizeof(*m));
@@ -418,7 +616,7 @@ int ChimStatics_Step (unsigned model, long *budget)
 	}
 	ChimZone_Trim (m, (int)sizeof(model_t) + bump.used);
 	ChimZone_Unlock (m);
-	st.sprite_loads++;
+	L->sprite_loads++;
 	return 1;
 }
 
@@ -427,18 +625,19 @@ int ChimStatics_Step (unsigned model, long *budget)
 long ChimStatics_AliasBytes (void)
 {
 	long n = 0;
-	int i;
-	for (i=0 ; i<st.nmodels ; i++)
-		if (!st.models[i].sprite && !st.models[i].bad)
-			n += FileBytes (&st.models[i]);
+	int i, s;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+		for (i=0 ; i<lists[s].nmodels ; i++)
+			if (!lists[s].models[i].sprite && !lists[s].models[i].bad)
+				n += FileBytes (&lists[s].models[i]);
 	return n;
 }
 
 /* ---------------------------------------------------------------- chunks */
 
-static void Use (int m, int on)
+static void Use (chim_statics_t *L, int m, int on)
 {
-	chim_smodel_t *sm = &st.models[m];
+	chim_smodel_t *sm = &L->models[m];
 	if (!sm->sprite)
 	{
 		sm->refs += on ? 1 : -1;
@@ -454,30 +653,30 @@ static void Use (int m, int on)
 		ChimZone_Unlock (sm->user.data);
 }
 
-static void Unplace (chim_static_t *s)
+static void Unplace (chim_statics_t *L, chim_static_t *s)
 {
 	if (s->leaves)
 	{
-		st.efrags -= s->leaves;
-		st.linked--;
+		L->efrags -= s->leaves;
+		L->linked--;
 	}
 	/* Whatever the leaf count says: no link may outlive the model (CHIM-FRAME-EDGE-EFRAG-CRASH-36). */
-	if (s->ent.efrag && st.link_world && cl.worldmodel == st.link_world && cls.signon == SIGNONS)
+	if (s->ent.efrag && L->link_world && cl.worldmodel == L->link_world && cls.signon == SIGNONS)
 		ChimGraft_RemoveEfrags (&s->ent);
 	s->ent.efrag = NULL;
 	s->leaves = 0;
 	if (s->placed)
 	{
-		Use (s->model, 0);
+		Use (L, s->model, 0);
 		s->placed = 0;
 		s->ent.model = NULL;
 	}
 }
 
 /* CL_ParseStatic's entity, once its model is resident. */
-static int Place (chim_static_t *s)
+static int Place (chim_statics_t *L, chim_static_t *s)
 {
-	model_t *m = Resident (s->model);
+	model_t *m = Resident (L, s->model);
 	if (!m)
 		return 0;
 	/* Bad flora data leaves the static out, never a Host_Error here: chunk
@@ -485,9 +684,9 @@ static int Place (chim_static_t *s)
 	 * map's zone drop then stopped the program (CHIM-STATIC-PLACE-HOST-ERROR-35). */
 	if (s->flora && (m->type != mod_sprite || !isfinite (s->scale * m->radius)))
 	{
-		if (!st.models[s->model].bad)
+		if (!L->models[s->model].bad)
 			Con_Printf ("CHIM: invalid aw_flora static sprite scale (%s): left out\n", m->name);
-		st.models[s->model].bad = 1;
+		L->models[s->model].bad = 1;
 		return 0;
 	}
 	s->ent.model = m;
@@ -499,7 +698,7 @@ static int Place (chim_static_t *s)
 	s->ent.efrag = NULL;
 	s->leaves = 0;
 	s->placed = 1;
-	Use (s->model, 1);
+	Use (L, s->model, 1);
 	return 1;
 }
 
@@ -507,68 +706,96 @@ static int Place (chim_static_t *s)
  * Returns how many still wait for their model (a partial chunk). */
 int ChimStatics_Activate (int index)
 {
-	int k, missing = 0;
+	int k, missing = 0, local;
 	chim_static_t *s;
-	if (!st.count || index < 0 || index >= st.chunks)
+	chim_statics_t *L = ListOf (index, &local);
+	if (!L->count || local < 0 || local >= L->chunks)
 		return 0;
-	FOR_CHUNK (index, k, s)
-		if (!s->placed && !Place (s) && !st.models[s->model].bad)
+	FOR_CHUNK (L, local, k, s)
+		if (!s->placed && !Place (L, s) && !L->models[s->model].bad)
 			missing++;
 	return missing;
 }
 
 void ChimStatics_Deactivate (int index)
 {
-	int k;
+	int k, local;
 	chim_static_t *s;
-	if (!st.count || index < 0 || index >= st.chunks)
+	chim_statics_t *L = ListOf (index, &local);
+	if (!L->count || local < 0 || local >= L->chunks)
 		return;
-	FOR_CHUNK (index, k, s)
-		Unplace (s);
+	FOR_CHUNK (L, local, k, s)
+		Unplace (L, s);
 }
 
 /* ChimChunks_Link: every placed static of an active, grafted chunk is in the
  * leaves its drawn box touches (the frame world's own leaves). */
-int ChimStatics_Link (int (*add)(entity_t *ent, const vec3_t mins, const vec3_t maxs), int (*linkable)(int index))
+static int ListLink (chim_statics_t *L, int (*add)(entity_t *ent, const vec3_t mins, const vec3_t maxs),
+	int (*linkable)(int index))
 {
 	int i;
 	chim_static_t *s;
-	if (!st.count || !cl.worldmodel)
+	if (!L->count || !cl.worldmodel)
 		return 0;
-	if (cl.worldmodel != st.link_world)
+	if (cl.worldmodel != L->link_world)
 	{
 		/* A new client map reset the efrag pool. */
-		for (i=0 ; i<st.count ; i++)
-			st.list[i].ent.efrag = NULL, st.list[i].leaves = 0;
-		st.linked = st.efrags = 0;
-		st.link_world = cl.worldmodel;
+		for (i=0 ; i<L->count ; i++)
+			L->list[i].ent.efrag = NULL, L->list[i].leaves = 0;
+		L->linked = L->efrags = 0;
+		L->link_world = cl.worldmodel;
 	}
-	for (i=0 ; i<st.count ; i++)
+	for (i=0 ; i<L->count ; i++)
 	{
-		s = &st.list[i];
-		if (!s->placed || s->leaves || !linkable (s->chunk))
+		s = &L->list[i];
+		if (!s->placed || s->leaves || !linkable (s->chunk + L->base))
 			continue;
 		s->leaves = (short)add (&s->ent, s->mins, s->maxs);
 		if (s->leaves)
 		{
-			st.linked++;
-			st.efrags += s->leaves;
+			L->linked++;
+			L->efrags += s->leaves;
 		}
 	}
-	if ((unsigned long)st.linked > st.linked_peak)
-		st.linked_peak = st.linked;
-	return st.linked;
+	if ((unsigned long)L->linked > L->linked_peak)
+		L->linked_peak = L->linked;
+	return L->linked;
+}
+
+int ChimStatics_Link (int (*add)(entity_t *ent, const vec3_t mins, const vec3_t maxs), int (*linkable)(int index))
+{
+	int s, n = 0;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+		n += ListLink (&lists[s], add, linkable);
+	return n;
 }
 
 /* The client's efrag pool was reset (a map change): links are forgotten,
  * never unlinked from leaves that no longer exist. */
 void ChimStatics_PoolReset (void)
 {
-	int i;
-	for (i=0 ; i<st.count ; i++)
-		st.list[i].ent.efrag = NULL, st.list[i].leaves = 0;
-	st.linked = st.efrags = 0;
-	st.link_world = NULL;
+	int i, s;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+	{
+		chim_statics_t *L = &lists[s];
+		for (i=0 ; i<L->count ; i++)
+			L->list[i].ent.efrag = NULL, L->list[i].leaves = 0;
+		L->linked = L->efrags = 0;
+		L->link_world = NULL;
+	}
+}
+
+/* The list holding an entity, or NULL. */
+static chim_statics_t *EntityList (const entity_t *ent)
+{
+	int s;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+	{
+		const chim_static_t *x = (const chim_static_t *)ent;
+		if (lists[s].count && x >= lists[s].list && x < lists[s].list + lists[s].count)
+			return &lists[s];
+	}
+	return NULL;
 }
 
 /* The frame world took an entity out of its leaves: when it is a static,
@@ -576,22 +803,24 @@ void ChimStatics_PoolReset (void)
 const char *ChimStatics_Describe (const entity_t *ent, char *out, int size)
 {
 	const chim_static_t *s = (const chim_static_t *)ent;
+	chim_statics_t *L = EntityList (ent);
 	(void)size;
-	if (!st.count || s < st.list || s >= st.list + st.count)
+	if (!L)
 		return NULL;
-	sprintf (out, "CHIM static %ld (chunk %d, placed %d, leaves %d)", (long)(s - st.list), s->chunk, s->placed, s->leaves);
+	sprintf (out, "CHIM static %ld (chunk %d, placed %d, leaves %d)", (long)(s - L->list), s->chunk, s->placed, s->leaves);
 	return out;
 }
 
 int ChimStatics_Forget (entity_t *ent)
 {
 	chim_static_t *s = (chim_static_t *)ent;
-	if (!st.count || s < st.list || s >= st.list + st.count)
+	chim_statics_t *L = EntityList (ent);
+	if (!L)
 		return 0;
 	if (s->leaves)
 	{
-		st.efrags -= s->leaves;
-		st.linked--;
+		L->efrags -= s->leaves;
+		L->linked--;
 		s->leaves = 0;
 	}
 	return 1;
@@ -600,47 +829,69 @@ int ChimStatics_Forget (entity_t *ent)
 /* Before the world's leaves are replaced (ChimChunks_ReleaseEfrags). */
 void ChimStatics_ReleaseEfrags (void)
 {
-	int i;
-	for (i=0 ; i<st.count ; i++)
-		if (st.list[i].leaves)
-		{
-			ChimGraft_ReleaseEfrags (&st.list[i].ent);
-			st.list[i].leaves = 0;
-		}
-	st.linked = st.efrags = 0;
+	int i, s;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+	{
+		chim_statics_t *L = &lists[s];
+		for (i=0 ; i<L->count ; i++)
+			if (L->list[i].leaves)
+			{
+				ChimGraft_ReleaseEfrags (&L->list[i].ent);
+				L->list[i].leaves = 0;
+			}
+		L->linked = L->efrags = 0;
+	}
 }
 
 void ChimStatics_Report (void)
 {
-	int i, resident = 0, bytes = 0, bad = 0;
-	if (!st.capacity)
-		return;
-	for (i=0 ; i<st.nmodels ; i++)
+	int i, s, resident = 0, bytes = 0, bad = 0, count = 0, capacity = 0, linked = 0, efrags = 0, nmodels = 0;
+	unsigned long peak = 0, sprites = 0, alias = 0, refused = 0;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
 	{
-		if (st.models[i].bad)
-			bad++;
-		if (st.models[i].user.data)
+		chim_statics_t *L = &lists[s];
+		for (i=0 ; i<L->nmodels ; i++)
 		{
-			resident++;
-			bytes += ChimZone_Size (st.models[i].user.data);
+			if (L->models[i].bad)
+				bad++;
+			if (L->models[i].user.data)
+			{
+				resident++;
+				bytes += ChimZone_Size (L->models[i].user.data);
+			}
+			else if (L->models[i].alias)
+				resident++;
 		}
-		else if (st.models[i].alias)
-			resident++;
+		count += L->count;
+		capacity += L->capacity;
+		linked += L->linked;
+		efrags += L->efrags;
+		nmodels += L->nmodels;
+		peak += L->linked_peak;
+		sprites += L->sprite_loads;
+		alias += L->alias_loads;
+		refused += L->refused;
 	}
+	if (!capacity)
+		return;
 	Con_Printf ("streamed statics: %ld of %ld stated, %ld linked (most %lu), %ld efrags; models %ld (%ld resident, %ld KiB of sprites in the zone, %ld bad); loads %lu sprites, %lu alias; refused %lu\n",
-		(long)st.count, (long)st.capacity, (long)st.linked, st.linked_peak, (long)st.efrags,
-		(long)st.nmodels, (long)resident, (long)(bytes/1024), (long)bad, st.sprite_loads, st.alias_loads, st.refused);
+		(long)count, (long)capacity, (long)linked, peak, (long)efrags,
+		(long)nmodels, (long)resident, (long)(bytes/1024), (long)bad, sprites, alias, refused);
 }
 
 void ChimStatics_Counts (int *count, int *linked, int *efrags, int *models, int *sprite_bytes)
 {
-	int i;
-	*count = st.count;
-	*linked = st.linked;
-	*efrags = st.efrags;
-	*models = st.nmodels;
-	*sprite_bytes = 0;
-	for (i=0 ; i<st.nmodels ; i++)
-		if (st.models[i].user.data)
-			*sprite_bytes += ChimZone_Size (st.models[i].user.data);
+	int i, s;
+	*count = *linked = *efrags = *models = *sprite_bytes = 0;
+	for (s=0 ; s<CHIM_WINDOW_SLOTS ; s++)
+	{
+		chim_statics_t *L = &lists[s];
+		*count += L->count;
+		*linked += L->linked;
+		*efrags += L->efrags;
+		*models += L->nmodels;
+		for (i=0 ; i<L->nmodels ; i++)
+			if (L->models[i].user.data)
+				*sprite_bytes += ChimZone_Size (L->models[i].user.data);
+	}
 }

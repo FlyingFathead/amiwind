@@ -191,8 +191,10 @@ class ChimStageTests(unittest.TestCase):
         names = [name for name, _ in steps]
         legacy = [name for name, _ in plan(['--jobs', '4', '--builder', 'legacy'])]
         # CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): Balmora's legacy chain stage is replaced.
+        # actor-library: the actor table's stage, CHIM builder only (on by default since v0.0.47)
         self.assertEqual([n for n in names if n not in ('chim', 'cell-progress', 'chim-town-balmora', 'chim-town-seyda',
-                                                        'chim-town-vivec_city', 'chim-rooms-vivec_city')],
+                                                        'chim-town-vivec_city', 'chim-rooms-vivec_city',
+                                                        'actor-library')],
                          [n for n in legacy if n != 'balmora'])
         self.assertLess(names.index('census'), names.index('chim'))
         self.assertLess(names.index('chim'), names.index('image'))

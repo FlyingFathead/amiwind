@@ -1,12 +1,13 @@
 # Initial NPC placement and ground-contact workflow
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.46 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Classify the intended initial state first](#classify-the-intended-initial-state-first)
 - [Interior creatures and the levitating class](#interior-creatures-and-the-levitating-class)
+- [Actors the original disables at the start](#actors-the-original-disables-at-the-start)
 - [Main gate: host build, before packaging](#main-gate-host-build-before-packaging)
 - [Runtime correction](#runtime-correction)
 - [Native integration checks](#native-integration-checks)
@@ -89,6 +90,37 @@ Island-wide, the base master places 530 creature references in interiors (178 re
 `all`, Vivec is the only one classified today: 494 references have no grounding classification and 35 are
 authored dead. Classifying them is source work (Flies flag, the Levitate effect, water level, measured
 support), as for the NPCs; by their records 330 walk, 108 swim only, 1 flies and 91 have none of the three.
+
+## Actors the original disables at the start
+
+A new game in the original does not show every actor its cells list. The global script the game always
+runs starts a run-once start script, and that script's `->Disable` lines take 78 references out of the
+world before the player arrives (58 NPCs, 20 creatures; the twelve town Dreamers, the Dreamer Prophet and
+characters of later quests). A disabled reference only leaves the scene: its own script keeps running, and a
+Dreamer's script enables it when the main quest's journal `A2_2_6thHouse` reaches 50; others come back
+through a quest script or a dialogue result ([NPC-STORY-DISABLED-AT-START-42](bugs/NPC-STORY-DISABLED-AT-START-42.md)).
+
+From v0.0.47 the resident stages (`tools/import_town.py` residents for towns and CHIM towns,
+`tools/prepare_area.py` populate for rooms and Seyda Neen) can read that list from the game data with
+`tools/start_disabled.py`: the scripts the global script starts, their unconditional `->Disable` lines
+(a line inside an `if` block is reported, not applied), and for each reference how it is enabled again.
+`--start-disabled` selects what a build does with them:
+
+| Mode | What is placed |
+| --- | --- |
+| `placed` (default) | every actor placed, as before |
+| `original` (off by default, A/B) | the faithful start: the actors the start script disables are left out of a new game; each is listed with its enable rule (`residents.json` `start_disabled`, the area report's `left_out`) |
+
+`original` stays off by default until the runtime enable exists: without it, an actor left out never comes
+back (the Dreamer Prophet and the quest characters would be gone for good).
+
+The enable rule is read, never guessed: a reference's own script counts as a journal condition only when it
+is the simple template (a journal index read, a guard that returns, one `Enable` under one journal
+comparison); every other script and dialogue result that names `ID->Enable` is listed by name; anything else
+is recorded as unknown until the script compiler exists (docs/ROADMAP.md, game logic). AmiWind does not run
+the main quest's journal stages yet, so nothing enables a held actor during play; the listed rules are the
+input for the world state's "disabled at start" records, which are what lets `original` become the default. Objects the start script disables (scaffolding, notes,
+keys) are listed in the table but not filtered.
 
 ## Main gate: host build, before packaging
 

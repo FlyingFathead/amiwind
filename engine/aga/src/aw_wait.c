@@ -45,7 +45,7 @@ static int help_bound(int key) {
 }
 static void help_text(int x,int y,int right,const char *s) {
     int i,w=AW_ConsoleCharWidth(),chars=(right-x)/w,n=(int)strlen(s);
-    if(y<0 || y+AW_ConsoleCharHeight()>vid.height-4 || chars<=0)return;
+    if(y<0 || y+AW_ConsoleCharHeight()>(int)vid.height-4 || chars<=0)return;
     for(i=0;i<n && i<chars;i++,x+=w)
         AW_ConsoleCharacter(x,y,n>chars && chars>=3 && i>=chars-3?'.':(unsigned char)s[i]);
 }

@@ -1,12 +1,12 @@
 # CHIM feature tracker
 
-_Generated from `docs/chim/features.json` with AmiWind v0.0.46._
+_Generated from `docs/chim/features.json` with AmiWind v0.0.47-dev3._
 
 <!-- Generated whole by tools/chim_features.py render from docs/chim/features.json; do not edit by hand. -->
 
 What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, where it stands, the gain that was measured (what was compared, how and when) and how Quake's visibility culling still works with it. Generated from [`features.json`](features.json); a test fails when this page is stale. Bugs are on the [CHIM bug tracker](../bugs/CHIM_TRACKER.md); ideas and held-back work are collected in [CHIM ideas](IDEAS.md). How far the open world has been converted, cell by cell, is on the [CHIM cell tracker](CELL_TRACKER.md).
 
-CHIM version: 0.2.1. 40 features: 21 shipped, 1 in this release, 12 in progress, 3 planned, 3 ideas. Updated 19 October 2026.
+CHIM version: 0.2.1. 42 features: 21 shipped, 1 in this release, 15 in progress, 3 planned, 2 ideas. Updated 21 October 2026.
 
 ## What CHIM has done so far
 
@@ -15,6 +15,7 @@ The headline measured gains. Each links to its feature, which says what was comp
 - **Every asset stored once:** Balmora exterior: 162.1 MB of legacy region maps to 21.3 MB of CHIM world (7.62 times smaller). *builder output, 9 October 2026.* [Details](#every-asset-stored-once)
 - **Every asset stored once:** Seyda Neen with the intro docks and the courtyard: 190.4 MB to 7.83 MB (24.3 times smaller). *builder output, 9 October 2026.* [Details](#every-asset-stored-once)
 - **Streaming with no region stop:** Bytes read on the Balmora door walk: 73.5 MB to 40.7 MB. *builder output, 8 October 2026.* [Details](#streaming-with-no-region-stop)
+- **Crossings without a level change (type 1):** Not like for like: the type 1 prototype creates no entities in joined frames, so its worst frame after a light-area crossing (42 ms at 128 MB, 66 ms at 16 MB, against type 0's 83 and 373 ms) does not show how much faster a complete crossing would be. *emulator, relative, quiet host, 20 October 2026.* [Details](#crossings-without-a-level-change-type-1)
 - **Incremental frame world:** At most 16 KB copied per update instead of 405 KB; 85 chunk copies instead of 4,504. *emulator, relative, busy host, 9 October 2026.* [Details](#incremental-frame-world)
 - **Chunk pinning: no holes in the town:** Steps with a chunk missing its ground inside the collision margin on the maintainer's Balmora route: 860 to 0. *host simulation, 9 October 2026.* [Details](#chunk-pinning-no-holes-in-the-town)
 - **No disk writes during play:** Time spent "not validated" during play: 3.7 % to 0 %; write bursts during play: 6 in 410 s to 0 in 1,355 s. *emulator, relative, busy host, 9 October 2026.* [Details](#no-disk-writes-during-play)
@@ -36,9 +37,9 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | --- | --- | --- |
 | Shipped | in a published release | 21 |
 | In this release (CHIM 0.2.1) | in the line that becomes the next release; not yet published | 1 |
-| In progress | being built or measured; not finished | 12 |
+| In progress | being built or measured; not finished | 15 |
 | Planned | decided; no finished design or code | 3 |
-| Idea | written down, not decided | 3 |
+| Idea | written down, not decided | 2 |
 
 ### Shipped
 
@@ -76,16 +77,19 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 
 | Feature | Area | What it does | Measured gain |
 | --- | --- | --- | --- |
+| [Crossings without a level change (type 1)](#crossings-without-a-level-change-type-1) | Streaming and memory | The region frames around the player run as one window in one frame world, so walking from one cell into the next streams instead of restarting the level. The builder's default since v0.0.47 (decided for the project, 2026-10-21): chim crossing 1 in the game's start-up settings; chim crossing 0 gives type 0 back. Towns, doors and saves keep the level change. | not like for like: type 1 creates no entities yet |
 | [Modular NPCs](#modular-npcs) | Characters | Humanoid NPCs are assembled from shared body parts converted once, with one small recipe per actor, instead of one complete baked model per actor. Equipment changes and looting can then change how an actor looks. The baked whole-actor method stays selectable. | about 0.4 million triangles in parts against 12.3 million baked |
 | [NPC pathfinding and companions](#npc-pathfinding-and-companions) | Characters | A ladder that starts with plain Quake chase movement and stair climbing, and escalates only when stuck: a local ping, then A* on a small walkable graph stored with the chunks. dbg companion is a prototype follower that tests the first steps. | not measured |
 | [Routed standing hulls for many-piece models](#routed-standing-hulls-for-many-piece-models) | Builder and tools | Models with more than 16 collision pieces get one routed standing hull (same solid set, nested routing) instead of a long chain of pieces, in CHIM and in the legacy converter alike; tools/hull_chain_audit.py sweeps every map for deep hull chains. --model-hull (auto, chain, routed or balanced) keeps every method selectable. | not measured |
+| [Stairway collision mesh (stair collision method 1)](#stairway-collision-mesh-stair-collision-method-1) | Builder and tools | A flight of stairs whose collision fails a geometric check gets one ramp per run of steps, or one solid block per tread, as its collision; the drawn steps are unchanged. The check is plane arithmetic on the collision (stand height against the drawn tread within a step, walkable slope, standing room, rise between neighbouring points within a step), no walk. --stair-collision-method 0 or 1; 0 (today's convex pieces with the stair rules) stays the default. | not measured |
 | [CHIMport: the whole island, cell by cell](#chimport-the-whole-island-cell-by-cell) | Builder and tools | An autobuilder that converts every exterior cell with everything placed in it to CHIM, from the sea at the edge of the map inwards ring by ring, runs every builder audit on each cell, records its figures and feeds the CHIM Progress Tracker. | not measured |
 | [Memory estimator](#memory-estimator) | Builder and tools | A predictor of how many bytes the chunk zone must hold at any position on the island, before anything is built, from the distinct models in the ring, terrain, catalogue entries and textures. | about 20 % to 40 % accuracy |
 | [Vivec on CHIM (milestone M3)](#vivec-on-chim-milestone-m3) | Roadmap | Stage A moves the Vivec Arena canton onto CHIM with the v0.0.32 parity gates; stage B puts all of Vivec on CHIM (one city frame does not fit the engine's coordinate range: the frame layout is an open decision). | not measured |
 | [CHIM cells inside the legacy open world](#chim-cells-inside-the-legacy-open-world) | World format and disk | Finished CHIMport cells (the seabed, the coast, a region or a cell list) replace their legacy open-world maps one cell at a time, in place and under the same map names, so the island moves to CHIM area by area. | not measured |
+| [Run-time scale and tilt of shared models](#run-time-scale-and-tilt-of-shared-models) | World format and disk | One stored model per mesh instead of one per scale and tilt: the placement carries the full rotation (and later a uniform scale); the mesh's convex pieces are stored once and expanded by the world-aligned player box when a trace meets them. Decided for the project, 20 October 2026. Tilt: world format 0.8 (--chim-placement-format 0.8, experimental, off). | models 735.8 MB to about 272 MB in format 0.8 (tilt), estimated, not built yet |
 | [Lighting audit in the cell tracker](#lighting-audit-in-the-cell-tracker) | Builder and tools | Every exterior cell is checked for light like the original: its original lights by class, with and without a mesh, how each reaches the frame (baked, night lamps only, not at all) and the share of lit surfaces. Lit is required for both completion levels; cells that wait only for light are shown as awaiting lighting. | not measured |
 | [Lit like the original](#lit-like-the-original) | Rendering and visibility | The hybrid lighting type (builder default, --chim-lighting-type): Morrowind lights as Quake light entities baked into CHIM terrain lightmaps with lightstyles for flicker and pulse, one light level per placed model, the nearest sources of every class as dynamic lights, and per-plant glow generated at build time. | not measured |
-| [Ground stored once](#ground-stored-once) | World format and disk | Terrain references (world format 0.7, --chim-terrain-refs, off by default): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record. | 9.0 MB to 1.9 MB for seven region cells |
+| [Ground stored once](#ground-stored-once) | World format and disk | Terrain references (world format 0.7, --chim-terrain-refs, on by default since v0.0.36): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record. | 9.0 MB to 1.9 MB for seven region cells |
 | [Fewer faces per mesh (planar merge, meshoptimizer for large shells)](#fewer-faces-per-mesh-planar-merge-meshoptimizer-for-large-shells) | Builder and tools | Every CHIM mesh's coplanar triangles with one texture mapping become one convex Quake face (planar merge, lossless, never more faces); large hard-surface shells that a profile reduces use meshoptimizer's simplifier with locked borders instead of the profile's reducer (the arrival ship). A method table chooses per mesh by a measured rule; the earlier method stays selectable. | -2.1 % faces island-wide; the ship -9 %, shape error /7 |
 | [Cells ahead read into spare Fast RAM](#cells-ahead-read-into-spare-fast-ram) | Streaming and memory | Outdoors a cell border is a map change. With extra Fast RAM the files of the cells ahead are read in 32 KiB slices, in frames where nothing else is read, into the CHIM banks; later reads of them are copied from RAM. The 2x2 block at the nearest corner first (the cell walked towards leading), then the 3x3 ring; the block moves only past a margin. The world index stays in RAM across maps. 16 MiB: unchanged. | crossings 452 ms to about 220 ms (median) at 128 MiB |
 
@@ -101,7 +105,6 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 
 | Feature | Area | What it does | Measured gain |
 | --- | --- | --- | --- |
-| [Run-time scale and tilt of shared models](#run-time-scale-and-tilt-of-shared-models) | World format and disk | One model per mesh instead of one variant per scale and tilt: the largest model-byte saving left island-wide, though hulls stay per variant. | not measured |
 | [Terrain generated from a heightfield at load](#terrain-generated-from-a-heightfield-at-load) | World format and disk | Generate the ground from height samples when a chunk loads instead of storing its faces, once the 68040 cost of doing so is measured. | not measured |
 | [Shared interior props with per-placement lighting](#shared-interior-props-with-per-placement-lighting) | World format and disk | Store interior props once and light each placement separately, which would remove the per-map model limit indoors. | not measured |
 
@@ -120,16 +123,18 @@ Every mesh, collision hull and texture of an exterior is stored once and placed 
 - Balmora exterior: 162.1 MB of legacy region maps to 21.3 MB of CHIM world (7.62 times smaller). Compared: the 64 legacy region maps of a v0.0.32 development image against the CHIM world (index, frame and chunk sections) plus its frame map, world format 0.5; interiors are the same in both and left out. *builder output, 9 October 2026.*
 - Seyda Neen with the intro docks and the courtyard: 190.4 MB to 7.83 MB (24.3 times smaller). Compared: the 66 recorded legacy maps v0.0.32 ships against the CHIM world (51 files and 3 frame maps), world format 0.5. *builder output, 9 October 2026.*
 - Legacy layout: each exterior object is stored about 9.8 times (about 1.4 million copies of 143,147 placements over the island, about 20 GB of maps); CHIM stores each placement once. Compared: the whole-world estimate behind WORLD-REGION-DUPLICATION-31; the island-wide CHIM figure is not measured yet, although every exterior cell of Vvardenfell has been on CHIM since v0.0.43. *estimate, 8 October 2026.*
+- World format 0.9 (experimental, off): a reach copy becomes a 4-byte reference to its owner record in the same frame; estimated on the v0.0.46 world, placement records 60.9 MB to 28.8 MB against format 0.8 (619,074 reach copies), 52.2 MB in today's format 0.7. Compared: the v0.0.46 release run's 308,754 chunk records read in place (owned records and reach copies counted per chunk, each copy's owner record located); host tests (tests/test_chim_reach_index.py, tests/test_chim_engine_native.py): the same placements built as a 0.8 and a 0.9 world give the same records, the same engine catalogue and the same placed collision. *estimate, 21 October 2026.*
 
 **Visibility:** Each placement is linked to the visibility leaves its box touches (Quake's efrags) and is drawn once, from its owner chunk, so the PVS still culls it. Sharing a model never turns it into a brush entity; placements over 16 leaves are counted by the validator.
 
 **Caveats:**
 
 - The island-wide CHIM size is not measured yet; the measured figures are for Balmora and Seyda Neen, although every exterior cell of Vvardenfell is built as a CHIM world since v0.0.43.
+- Format 0.9 stores a placement once per frame, not once for the island: an object in the overlapping margins of neighbouring region frames is still stored in each (about 3.5 frames per object, CHIM-PLACEMENT-MARGIN-COPIES-46). When the owner chunk is not in the zone, reading a chunk's catalogue takes more reads than with copies (estimated 985,500 against 517,059 for every chunk once); not built yet.
 
-**Read more:** [World streamer design](../WORLD_STREAMER.md); [CHIM world format](WORLD_FORMAT.md); [Draft v0.0.33 release notes, disk](../RELEASE-v0.0.33.md#disk-each-asset-once); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json).
+**Read more:** [World streamer design](../WORLD_STREAMER.md); [CHIM world format](WORLD_FORMAT.md); [Draft v0.0.33 release notes, disk](../RELEASE-v0.0.33.md#disk-each-asset-once); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json); [World format: reach index (0.9, experimental)](WORLD_FORMAT.md#reach-index-09-experimental).
 
-**Bugs:** [WORLD-REGION-DUPLICATION-31](../bugs/WORLD-REGION-DUPLICATION-31.md).
+**Bugs:** [WORLD-REGION-DUPLICATION-31](../bugs/WORLD-REGION-DUPLICATION-31.md), [CHIM-PLACEMENT-MARGIN-COPIES-46](../bugs/CHIM-PLACEMENT-MARGIN-COPIES-46.md).
 
 #### Pure CHIM towns: no legacy maps shipped
 
@@ -188,15 +193,31 @@ Finished CHIMport cells (the seabed, the coast, a region or a cell list) replace
 
 #### Run-time scale and tilt of shared models
 
-**Status:** Idea. **ID:** `runtime-scale-tilt`.
+**Status:** In progress. **ID:** `runtime-scale-tilt`.
 
-One model per mesh instead of one variant per scale and tilt: the largest model-byte saving left island-wide, though hulls stay per variant.
+One stored model per mesh instead of one per scale and tilt: the placement carries the full rotation (and later a uniform scale); the mesh's convex pieces are stored once and expanded by the world-aligned player box when a trace meets them. Decided for the project, 20 October 2026. Tilt: world format 0.8 (--chim-placement-format 0.8, experimental, off).
 
-**Measured gain:** Not measured; to be measured with the engine first.
+**Measured gain:**
 
-**Visibility:** Not designed in detail yet; any implementation is checked with the renderer counters like every CHIM change.
+- Shared exterior models: 735.8 MB in 32,714 stored models from 1,400 meshes; one model per mesh and scale would be 216.8 MB, one per mesh 63.2 MB (tilted copies alone 571.8 MB). Compared: the v0.0.46 release image's CHIM model records, by model name (mesh, scale, tilt), the largest copy of each mesh kept. *exact counts, 20 October 2026.*
+- Placed collision of one stored shape (rotation and scale at run time) ends every trace where the hull baked by the builder at that rotation and scale ends: 14,400 of 14,400 traces within 0.02 units, the same surface on all 3,932 hits; plane tests per trace 17.4 against 22.7 node visits. Compared: host unit test on synthetic shapes (slab, ramp, rock, two-piece post) at 12 rotations and scales: the experiment against the engine's own trace on the builder's exact box-expanded piece chain. *host simulation, 20 October 2026.*
+- World format 0.8 on synthetic placements through the real builder units: every placement draws the same vertices as in 0.7 (within 0.02 units); the placed collision equals the exact expansion of the turned pieces on 2,700 of 2,700 traces (largest difference 0.004 units); a default build writes the same bytes as before. Compared: host unit test (tests/test_chim_placed_format.py): the same nine box placements (yawed, tilted, scaled) built as a 0.7 and a 0.8 world, traced by world.c on the 0.7 hulls and by the engine's placed collision on the 0.8 piece tables. *host simulation, 21 October 2026.*
+- Estimated for the v0.0.46 world in format 0.8: 32,714 stored models to 8,105 (one per mesh and scale), model records 735.8 MB to about 229.3 MB plus about 42.9 MB of piece tables, placement records 52.2 MB to 60.9 MB: about 455 MB less. Compared: the v0.0.46 release run's model directory and point hulls read in place (one model per mesh and scale kept, its untilted copy where it has one); piece tables from the hulls' planes with the corner and edge counts measured on the heaviest meshes. *estimate, 21 October 2026.*
 
-**Read more:** [CHIM ideas: also held back](IDEAS.md#also-held-back).
+Model bytes are exact counts of today's records; the 0.8 figures are estimates until a build writes such a world. Collision is checked on synthetic shapes on the host, not in game; no 68040/68060 timing.
+
+**Visibility:** Unchanged: placements keep their drawn box in the record, linked to the leaves it touches; counters to be compared with dbg rcount when the format step lands.
+
+**Caveats:**
+
+- Scale is not drawn by the renderer yet (it already turns models fully): until it is, scale stays baked and the saving is the tilt part.
+- Variants that are not one rigid transform of their mesh keep their own models; models clipped to the terrain keep their tilt baked.
+- Every trace that meets a placement expands the pieces its swept box meets (about 1,200 to 9,000 float operations per piece on the test shapes); nothing is kept between traces yet (a prepared-piece cache is the next step).
+- The Python collision mirror (the stair walk's code, unchanged so stored walks keep their keys) reads only the yaw of a 0.8 record.
+
+**Read more:** [CHIM ideas: also held back](IDEAS.md#also-held-back); [World format: placed models (0.8, experimental)](WORLD_FORMAT.md#placed-models-08-experimental).
+
+**Bugs:** [CHIM-TILT-VARIANTS-SPLIT-33](../bugs/CHIM-TILT-VARIANTS-SPLIT-33.md), [CHIM-YAW-PLAYER-BOX-TURNS-46](../bugs/CHIM-YAW-PLAYER-BOX-TURNS-46.md).
 
 #### Terrain generated from a heightfield at load
 
@@ -230,11 +251,13 @@ Store interior props once and light each placement separately, which would remov
 
 **Status:** In progress. **ID:** `terrain-stored-once`.
 
-Terrain references (world format 0.7, --chim-terrain-refs, off by default): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record.
+Terrain references (world format 0.7, --chim-terrain-refs, on by default since v0.0.36): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record.
 
 **Measured gain:**
 
 - Seven CHIM region cells (coast and sea floor): 9.0 MB of frames to 1.9 MB with references and the compiled terrain hull, 0.91 times the 2.1 MB of open-world maps they replace. Compared: scratch CHIM worlds of the same cells (chim_build --chim-regions-cells, one frame per cell, 896-unit margin) with copies and the routed hull, against the same cells with --terrain-hull compiled --terrain-refs on; the open-world maps of the same build. *builder output, 10 October 2026.*
+- World format 0.10 (selectable; with generated terrain the default stores every record it does not generate this way): compact terrain records, a lossless repack the engine expands to the same bytes; measured on the v0.0.46 world, terrain records 489.4 MB to 450.8 MB, every record expanding back byte for byte. Compared: all 97,369 terrain records of the v0.0.46 release run packed by tools/chim/terc.py and expanded again (9,359 of them through the engine's expander); host tests on the builder's own world written plain and compact (same records, same validator chunks, same seam walk in the engine). *host simulation, 21 October 2026.*
+- World format 0.11 (the default since v0.0.47, decided for the project, 2026-10-21): terrain generated by the engine from its heights, regular-path records from their corner heights and the converter's own triangles from their 32-unit samples (planes and the standing hull stored); measured on the v0.0.46 world, 95,818 of 97,369 terrain records generated byte for byte, terrain records 489.4 MB to 247.6 MB with the rest compact. Compared: all 97,369 terrain records of the v0.0.46 release run tried with tools/chim/thgt.py (each generated record equal to the stored one by construction), every tenth generated one of each record version (8,333 and 1,270) through the engine's generator natively; host tests on the builder's own world written plain and generated (same records, same validator chunks, same seam walk in the engine). *host simulation, 21 October 2026.*
 
 Six coastal land cells: 10.0 MB to 2.6 MB (0.93 times their open-world maps). Memory unchanged (each chunk keeps its own decoded copy); every CHIM gate passed on both worlds.
 
@@ -242,10 +265,12 @@ Six coastal land cells: 10.0 MB to 2.6 MB (0.93 times their open-world maps). Me
 
 **Caveats:**
 
-- Experimental and off by default until a sea-ring build has been played.
+- Generated terrain records (format 0.11) are the builder's default since v0.0.47; --chim-terrain-pack bsp29 keeps the BSP29 brush images of before.
 - A record homed in another frame's sector file costs one more file seek when it loads.
+- v0.0.47-dev2 is the first image with generated (0.11) and compact (0.10) terrain records; 3,860 large records stay BSP29 images.
+- Generated terrain (format 0.11) covers the tile rule and the converter's own triangles: lava records, records too large for the engine's loading buffer and 100 with differing texture mappings are stored; the standing hull is stored too (qbsp's compiled union); no 68040/68060 timing of the generation yet.
 
-**Read more:** [Terrain references](WORLD_FORMAT.md); [CHIM regions](CHIM_REGIONS.md).
+**Read more:** [Terrain references](WORLD_FORMAT.md); [CHIM regions](CHIM_REGIONS.md); [World format: compact terrain records (0.10, experimental)](WORLD_FORMAT.md#compact-terrain-records-010-experimental); [World format: generated terrain records (0.11, experimental)](WORLD_FORMAT.md#generated-terrain-records-011-experimental).
 
 **Bugs:** [CHIM-REGION-MARGIN-STORAGE-36](../bugs/CHIM-REGION-MARGIN-STORAGE-36.md).
 
@@ -272,6 +297,29 @@ The land is cut into chunks of 256 units. A ring of chunks around the player is 
 **Read more:** [CHIM engine: loading](ENGINE.md#loading); [Draft v0.0.33 release notes, loading](../RELEASE-v0.0.33.md#loading-smaller-steps-no-region-stop); [Measurements behind the release charts](../performance/CHIM-v0.0.33-MEASUREMENTS.json).
 
 **Bugs:** [CHIM-READ-RUNS-33](../bugs/CHIM-READ-RUNS-33.md), [CHIM-READ-BUDGET-33](../bugs/CHIM-READ-BUDGET-33.md), [BENCH-JIT-PROFILE-32](../bugs/BENCH-JIT-PROFILE-32.md).
+
+#### Crossings without a level change (type 1)
+
+**Status:** In progress. **ID:** `type1-crossings`.
+
+The region frames around the player run as one window in one frame world, so walking from one cell into the next streams instead of restarting the level. The builder's default since v0.0.47 (decided for the project, 2026-10-21): chim crossing 1 in the game's start-up settings; chim crossing 0 gives type 0 back. Towns, doors and saves keep the level change.
+
+**Measured gain:**
+
+- Not like for like: the type 1 prototype creates no entities in joined frames, so its worst frame after a light-area crossing (42 ms at 128 MB, 66 ms at 16 MB, against type 0's 83 and 373 ms) does not show how much faster a complete crossing would be. Compared: the crossing route's legs ai-c1, ai-l1 and ai-e1 (18 crossings per session) on the v0.0.45 release image with the same engine, chim crossing 0 against 1, FS-UAE JIT 68040, a type 0 session repeated as drift control; type 1 skips the entity work type 0 does, so the two do not do equal work. *emulator, relative, quiet host, 20 October 2026.*
+
+**Visibility:** Each chunk keeps its own frame's visibility row; a chunk of another frame outside that row's area is treated as visible, so distance and the view frustum decide there.
+
+**Caveats:**
+
+- With 16 MB the work moved before the border: the approach's worst frame rose from 66 to 80 ms median.
+- The zone's locked peak is 7 % higher at 16 MB; the memory gate does not model the window yet.
+- The default since v0.0.47 (decided for the project, 2026-10-21; v0.0.47-dev2 was the first image built with it, with the actor table). Limits recorded before that image: towns never join a window; people and creatures of a joined frame are not created (the actor table, on by default since v0.0.47, gives a joining frame its actors); doors and plants work only in the starting frame; followers and escorts do not cross with it.
+- Next, in order: one world-state change list keyed by reference ID, entity windowing, followers and escorts crossing frame borders, NPC traversal, then comparisons that are like for like.
+
+**Read more:** [Cell crossings: the type 1 prototype](CELL_CROSSINGS.md#the-type-1-prototype-measured-20-october-2026).
+
+**Bugs:** [CHIM-CROSSING-SLUGGISH-43](../bugs/CHIM-CROSSING-SLUGGISH-43.md).
 
 #### Incremental frame world
 
@@ -659,6 +707,24 @@ Models with more than 16 collision pieces get one routed standing hull (same sol
 **Read more:** [Collision hull chains](../bugs/COLLISION-HULL-CHAINS-33.md); [CHIMport: hull policy pending](CHIMPORT.md#hull-policy-pending).
 
 **Bugs:** [BUILD-ROUTED-FLORA-RESERVE-33](../bugs/BUILD-ROUTED-FLORA-RESERVE-33.md), [CHIM-HULL-CHAIN-COST-33](../bugs/CHIM-HULL-CHAIN-COST-33.md), [COLLISION-HULL-CHAINS-33](../bugs/COLLISION-HULL-CHAINS-33.md), [ROUTED-HULL-NODE-ORDER-33](../bugs/ROUTED-HULL-NODE-ORDER-33.md).
+
+#### Stairway collision mesh (stair collision method 1)
+
+**Status:** In progress. **ID:** `stair-collision-mesh`.
+
+A flight of stairs whose collision fails a geometric check gets one ramp per run of steps, or one solid block per tread, as its collision; the drawn steps are unchanged. The check is plane arithmetic on the collision (stand height against the drawn tread within a step, walkable slope, standing room, rise between neighbouring points within a step), no walk. --stair-collision-method 0 or 1; 0 (today's convex pieces with the stair rules) stays the default.
+
+**Measured gain:** Not measured in game. On the v0.0.46 release build's meshes (read only): the check agrees with the recorded stair walks on 97.9 % of the 3,098 tread points they covered; method 1 changes 14 of 97 meshes with flights (all their flights then pass) at +11 % collision bytes on them; 11 meshes it cannot make pass keep today's collision. Default builds keep their mesh units and code keys.
+
+**Visibility:** Not a drawing change: collision only.
+
+**Caveats:**
+
+- Experimental and off by default; no image built with it yet.
+
+**Read more:** [Stair collision method 1](../bugs/CHIM-STAIR-COLLISION-MESH-47.md).
+
+**Bugs:** [BUILD-STAIR-WALK-BRUTE-FORCE-46](../bugs/BUILD-STAIR-WALK-BRUTE-FORCE-46.md), [CHIM-STAIR-COLLISION-MESH-47](../bugs/CHIM-STAIR-COLLISION-MESH-47.md).
 
 #### The CHIM builder
 

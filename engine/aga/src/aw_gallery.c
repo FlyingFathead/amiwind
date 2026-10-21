@@ -3,6 +3,7 @@
  * Catalogue rows are scanned, not kept resident in the Amiga runtime heap.
  */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_save.h"
 #include "aw_character.h"
 #include "aw_region.h"
@@ -205,7 +206,7 @@ static void open_browser(void) {
 static int page_rows(void){int n=(vid.height-76)/(2*AW_ConsoleCharHeight()+2);if(n<1)n=1;if(n>GALLERY_PAGE)n=GALLERY_PAGE;return n;}
 static int mouse_row(void) {
     int h=AW_ConsoleCharHeight(),top=22+3*h,row;
-    if(mouse_x<6 || mouse_x>=vid.width-22 || mouse_y<top)return -1;
+    if(mouse_x<6 || mouse_x>=(int)vid.width-22 || mouse_y<top)return -1;
     row=(mouse_y-top)/(2*h+2);
     return row<page_count && row<page_rows()?row:-1;
 }
@@ -221,9 +222,9 @@ void AW_GalleryMouse(int dx,int dy) {
     if(!AW_GalleryModal() || !page || (!dx && !dy))return;
     mouse_visible=1;mouse_x+=dx;mouse_y+=dy;
     if(mouse_x<0)mouse_x=0;
-    if(mouse_x>=vid.width)mouse_x=vid.width-1;
+    if(mouse_x>=(int)vid.width)mouse_x=(int)vid.width-1;
     if(mouse_y<0)mouse_y=0;
-    if(mouse_y>=vid.height)mouse_y=vid.height-1;
+    if(mouse_y>=(int)vid.height)mouse_y=(int)vid.height-1;
     if(scroll_drag){scroll_mouse();return;}
     row=mouse_row();if(row>=0){page_selected=row;filtering=0;}
 }
@@ -610,8 +611,8 @@ int AW_GalleryKey(int key,int down,int shift,int control) {
 }
 static void text_at(int x,int y,const char *s,int limit) {
     int w=AW_ConsoleCharWidth();
-    if(y<0 || y+AW_ConsoleCharHeight()>vid.height)return;
-    for(;*s && limit-- && x+w<=vid.width;s++,x+=w)AW_ConsoleCharacter(x,y,(unsigned char)*s);
+    if(y<0 || y+AW_ConsoleCharHeight()>(int)vid.height)return;
+    for(;*s && limit-- && x+w<=(int)vid.width;s++,x+=w)if(x>=0)AW_ConsoleCharacter(x,y,(unsigned char)*s);
 }
 static void line(int row,const char *s){text_at(4,4+row*AW_ConsoleCharHeight(),s,160);}
 static void right_line(int y,const char *s){

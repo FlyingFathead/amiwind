@@ -43,10 +43,18 @@ import struct
 # allocation is unchanged.
 # Re-pinned 2026-10-15 for CHIM-MODEL-ARENA-RESERVE-41: only placed-model
 # arena bounds change; all edge-cache code and legacy loaders are byte-identical.
+# Re-pinned 2026-10-20 for shared actor skins (IMAGE-ACTOR-SKIN-REPEATS-46): the alias file loader rebuilds a
+# shared-skin model in its own malloc block before decoding; edge-cache code and brush loaders are byte-identical.
+# Re-pinned 2026-10-20 for CHIM-PLANE-TYPE-ALL-SLANTED-46: Mod_LoadPlanes sets the type of exact +X/+Y/+Z planes;
+# no allocation changes.
+# Re-pinned 2026-10-20 for ENGINE-STRICT-WARNINGS-36 (model.c): only Sys_Error format conversions (%ld -> %d for
+# int values) and a format attribute on AW_BrushError's declaration; no allocation or loader code changed.
+# Re-pinned 2026-10-21 for GHOSTFENCE-NO-ANIMATION-46 (r_draw.c): one static table of CYCLE ints (stillturbtable,
+# dbg ghostfence off); no edge-cache allocation changes.
 SOURCE_HASHES={
-    'model.c':'cc088069ea0b78537a4cdeb3177705933247a1bf26f3bb66c78ba22d70eea137',
+    'model.c':'7865e39df3b8ea89ef5ad38a1cab239cd35eb5b7df19f222ac35a3e4fdaeb517',
     'model.h':'6ca2bae523261a81ad9613620e84af3dfb355551ee4fc64fb9644fe435e28f3c',
-    'r_draw.c':'1e26849d022fa219adfd399f8863118b72e34daab4b6e2b588e22ed8c53c8232',
+    'r_draw.c':'08464e4c3bbb98ed197f7c42c5b013818d2ef4fffd1a5727ed9a6a4c3385cce4',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',
 }
 

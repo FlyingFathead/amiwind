@@ -1,6 +1,6 @@
 # Development and source packaging
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -87,6 +87,17 @@ The v0.0.20 maintenance comparison is 95 -> 93 with no new warnings under the
 same GCC 16.2-rc11 configuration. Two array-row bounds violations were reproduced
 and fixed. The other 93 warnings remain work, not a clean-bill-of-health claim.
 This rule applies to later builds too, including character creation and save/load.
+
+The engine's warning level (`engine/aga/Makefile`, since 20 October 2026,
+[ENGINE-STRICT-WARNINGS-36](bugs/ENGINE-STRICT-WARNINGS-36.md)): every file builds
+with `-Wall -Wextra -Wformat-security`, less three checks that are noise in the
+inherited Quake code (unused code, partly initialised structs, signed/unsigned
+comparisons). AmiWind's own files (`aw_*.c`, `chim/*.c`) get those three back
+(unused parameters excepted) plus `-Wshadow` and `-Wmissing-prototypes`. The
+builder fails on any warning, so both sets stay at zero in every engine variant
+the gate builds. Printf-like engine functions carry the format attribute so
+their callers are checked; a function called from another file gets one
+prototype in a header that both sides include (`aw_links.h` for AmiWind's own).
 
 ## Efficiency rule #1: parallelize
 

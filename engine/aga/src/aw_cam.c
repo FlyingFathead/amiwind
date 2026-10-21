@@ -18,6 +18,7 @@
  * The names mark and recall live under "cam" so they never read as the game's
  * Mark and Recall spells. */
 #include "quakedef.h"
+#include "aw_links.h"
 #include <errno.h>
 #ifdef AMIGA
 #include <proto/dos.h>

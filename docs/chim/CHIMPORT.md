@@ -405,8 +405,11 @@ at hallways and doorways, recentring): [Interior sections](../INTERIOR_SECTIONS.
 
 ## When a cell fails the stair gate
 
-The stair gate walks every step and ramp of a CHIM frame with the player's standing box (33.25 units tall) and fails
-a flight step the box cannot climb. In order (16 October 2026, [CHIM-VOS-TEMPLE-WALKWAY-41](../bugs/CHIM-VOS-TEMPLE-WALKWAY-41.md)):
+The stair gate walks the flight steps of a CHIM frame (every step and ramp with `--stair-walk all`) with the player's
+standing box (33.25 units tall) and fails a flight step the box cannot climb. A frame is walked again only when its
+steps or the collision within the walk's reach of them changed (`--stair-walk-key reach`), and the places of the
+stair watch list (`config/stair-watch.json`) on every build; see [Build profile](../BUILD_PROFILE.md). In order
+(16 October 2026, [CHIM-VOS-TEMPLE-WALKWAY-41](../bugs/CHIM-VOS-TEMPLE-WALKWAY-41.md)):
 
 1. Read the failure in `chim-stairs.json`: frame, reference number, point, rise, and the detail (`start in solid`
    names the placement whose collision the box starts in).
@@ -418,6 +421,9 @@ a flight step the box cannot climb. In order (16 October 2026, [CHIM-VOS-TEMPLE-
 4. Fix it in the shared converter, for every mesh it applies to (the collision profile of that mesh family, or a
    general rule in `mesh_geometry.collision_parts`), with a regression test; never a per-cell exception.
 5. Rebuild the failing frames: the stair gate passes and the heap gate still fits; then the full build.
+   `--stair-walk-places ID` (or `ref:N`, `x:y`) walks only the place itself on a built world, in minutes.
+6. Add the place to `config/stair-watch.json` with the bug's ID (cells, source references or interior maps), so
+   every later build walks it again.
 
 Two things to check at step 3 (18 October 2026, [CHIM-STAIR-STEPS-SOLID-43](../bugs/CHIM-STAIR-STEPS-SOLID-43.md)):
 

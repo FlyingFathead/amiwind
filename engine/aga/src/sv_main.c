@@ -129,13 +129,13 @@ void SV_StartSound (edict_t *entity, int channel, char *sample, int volume,
     int			ent;
 
     if (volume < 0 || volume > 255)
-        Sys_Error ("SV_StartSound: volume = %ld", volume);
+        Sys_Error ("SV_StartSound: volume = %d", volume);
 
     if (attenuation < 0 || attenuation > 4)
         Sys_Error ("SV_StartSound: attenuation = %f", attenuation);
 
     if (channel < 0 || channel > 7)
-        Sys_Error ("SV_StartSound: channel = %ld", channel);
+        Sys_Error ("SV_StartSound: channel = %d", channel);
 
     if (sv.datagram.cursize > MAX_DATAGRAM-16)
         return;
@@ -432,10 +432,36 @@ SV_WriteEntitiesToClient
 
 =============
 */
+ddef_t *ED_FindField (char *name);
+
+/* The instance scale of a live alias entity (its aw_scale field; 1 when the progs have no such field, the entity
+ * is no alias model or the value is not a usable scale). The field's offset is looked up once per progs. */
+static float SV_AliasScale (edict_t *ent)
+{
+    static dprograms_t *seen;
+    static int ofs = -1;
+    float s;
+    model_t *m;
+    if (progs != seen)
+    {
+        ddef_t *def = ED_FindField ("aw_scale");
+        seen = progs;
+        ofs = def && (def->type & ~DEF_SAVEGLOBAL) == ev_float ? def->ofs : -1;
+    }
+    if (ofs < 0)
+        return 1;
+    s = ((float *)&ent->v)[ofs];
+    if (!(s > 0.01f && s < 64.0f) || s == 1.0f)
+        return 1;
+    m = (ent->v.modelindex > 0 && ent->v.modelindex < MAX_MODELS) ? sv.models[(int)ent->v.modelindex] : NULL;
+    return m && m->type == mod_alias ? s : 1;
+}
+
 void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 {
     int		e, i;
     int		bits;
+    float	scale;
     byte	*pvs;
     vec3_t	org;
     float	miss;
@@ -470,7 +496,8 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
                 continue;		// not visible
         }
 
-        if (msg->maxsize - msg->cursize < 16)
+        scale = SV_AliasScale (ent);
+        if (msg->maxsize - msg->cursize < (scale != 1 ? 20 : 16))
         {
             Con_Printf ("packet overflow\n");
             return;
@@ -497,6 +524,9 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 
         if (ent->v.movetype == MOVETYPE_STEP)
             bits |= U_NOLERP;	// don't mess up the step animation
+
+        if (scale != 1)
+            bits |= U_AW_SCALE;
 
         if (ent->baseline.colormap != ent->v.colormap)
             bits |= U_COLORMAP;
@@ -553,6 +583,8 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
             MSG_WriteCoord (msg, ent->v.origin[2]);
         if (bits & U_ANGLE3)
             MSG_WriteAngle(msg, ent->v.angles[2]);
+        if (bits & U_AW_SCALE)
+            MSG_WriteFloat (msg, scale);
     }
 }
 

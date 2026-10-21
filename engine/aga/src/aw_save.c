@@ -16,6 +16,9 @@
 #include <time.h>
 #include <errno.h>
 static aw_save_t world,pending;
+/* The world-state change list of a save (feature 8): written from aw_actors.c's export, read back at a load and
+ * handed to its import before the window spawns (static: off the Amiga task stack). */
+static aw_changes_t save_changes,pending_changes;
 static int loading,scheduled,content_ready;
 static double last_auto,settle;
 static byte content_id[32];
@@ -48,7 +51,12 @@ static int path(char *out,int capacity,uint32_t profile,int slot,int generation)
                slot<5?'m':'a',(long)(slot<5?slot:slot-4),generation?'b':'a');
     return n>0 && n<capacity;
 }
+static int read_file_changes(uint32_t profile,int slot,int generation,aw_save_t *state,aw_changes_t *changes);
 static int read_file(uint32_t profile,int slot,int generation,aw_save_t *state)
+{
+    return read_file_changes(profile,slot,generation,state,NULL);
+}
+static int read_file_changes(uint32_t profile,int slot,int generation,aw_save_t *state,aw_changes_t *changes)
 {
     char filename[384];byte *raw;FILE *f;int n,extra,ok;
     if(!path(filename,sizeof(filename),profile,slot,generation))return 0;
@@ -56,7 +64,7 @@ static int read_file(uint32_t profile,int slot,int generation,aw_save_t *state)
     raw=(byte *)malloc(AW_SAVE_BYTES);if(!raw){fclose(f);return 0;}
     n=fread(raw,1,AW_SAVE_BYTES,f);extra=fgetc(f);ok=!ferror(f) && extra==EOF;
     fclose(f);
-    ok=ok && AW_SaveDecode(raw,n,state) && state->profile==profile &&
+    ok=ok && AW_SaveDecodeChanges(raw,n,state,changes) && state->profile==profile &&
         content() && !memcmp(state->content,content_id,32);
     free(raw);return ok;
 }
@@ -123,6 +131,10 @@ void AW_SaveSpawn(void)
     if(loading){
         if(strcmp(sv.name,pending.scene)){loading=0;Con_Printf("Saved scene could not be loaded.\n");return;}
         world=pending;aw_story=world.story;aw_character=world.character;aw_state=world.state;
+        /* the change list: an old save's actor rows read as "moved + health" entries; aw_actors.c takes the
+         * entries it can place (cells) before the window spawns its actors */
+        if(!pending_changes.count)AW_SaveFoldActors(&world,&pending_changes);
+        if(aw_save_changes_import)aw_save_changes_import(&pending_changes);
         AW_BarrierLoad();AW_OpeningSpawn();
     }
     for(i=1;i<sv.num_edicts;i++){
@@ -220,7 +232,11 @@ int AW_SaveWrite(int slot)
     memset(world.label,0,sizeof(world.label));strcpy(world.label,label);
     /* Keep larger serialized storage off the fixed Amiga task stack. */
     raw=(byte *)malloc(AW_SAVE_BYTES);if(!raw)return 0;
-    n=AW_SaveEncode(raw,AW_SAVE_BYTES,&world);if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
+    save_changes.count=0;
+    if(aw_save_changes_export && aw_save_changes_export(&save_changes)<0){
+        free(raw);Con_Printf("Save change list incomplete; previous saves retained.\n");return 0;
+    }
+    n=AW_SaveEncodeChanges(raw,AW_SAVE_BYTES,&world,&save_changes);if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
     side=newest(world.profile,slot,&check);side=side==0?1:0;
     if(!path(filename,sizeof(filename),world.profile,slot,side)){free(raw);return 0;}
     f=fopen(filename,"wb");if(!f){free(raw);return 0;}
@@ -241,8 +257,9 @@ int AW_SaveWrite(int slot)
 }
 int AW_SaveRead(uint32_t profile,int slot)
 {
-    aw_save_t candidate,other;char map[40];int n,i;
-    if(!AW_CharacterLoad() || !content() || newest(profile,slot,&candidate)<0){
+    aw_save_t candidate,other;char map[40];int n,i,generation;
+    if(!AW_CharacterLoad() || !content() || (generation=newest(profile,slot,&candidate))<0 ||
+       !read_file_changes(profile,slot,generation,&candidate,&pending_changes)){
         Con_Printf("No valid compatible save generation; current game retained.\n");return 0;
     }
     /* The scene's own map, or its CHIM frame map in a pure-CHIM image. */

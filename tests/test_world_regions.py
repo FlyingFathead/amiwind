@@ -208,9 +208,14 @@ class ContentPreservingRefinementTests(unittest.TestCase):
         layout=layout_refinements()
         self.assertEqual(layout['survey_source_triangle_limit'],140801)
         self.assertEqual([r['parent'] for r in layout['regions']],
-                         ['vf0698','vf0791','vf1174','vf1176','vf1255','vf1454','vf1692','vf1693','vf1816','vf1694','vf2541'])
+                         ['vf0698','vf0791','vf1174','vf1176','vf1255','vf1454','vf1692','vf1693','vf1816','vf1694','vf2541',
+                          # BUILD-LAVA-TERRAIN-BUDGET-38: world-scenery regions over 4 MiB in a public default build
+                          'vf1178','vf1179','vf1394','vf1395','vf1600','vf1818','vf2543',
+                          # and the four within 5 % of the cap that can still be split (headroom)
+                          'vf1513','vf1904','vf1689','vf1587'])
         self.assertEqual([(r.get('parent_divisions',1),r['divisions']) for r in layout['regions'][2:]],
-                         [(1,2),(2,4),(1,2),(1,2),(2,4),(2,4),(2,4),(2,4),(4,8)])
+                         [(1,2),(2,4),(1,2),(1,2),(2,4),(2,4),(2,4),(2,4),(4,8),
+                          (2,4),(1,2),(1,2),(1,2),(2,4),(2,4),(4,8),(1,2),(1,2),(4,8),(2,4)])
 
 if __name__=='__main__':unittest.main()
 

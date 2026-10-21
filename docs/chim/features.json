@@ -1,7 +1,7 @@
 {
   "schema": "chim-features 1",
   "chim_version": "0.2.1",
-  "updated": "2026-10-19",
+  "updated": "2026-10-21",
   "features": [
     {
       "id": "stored-once",
@@ -30,11 +30,18 @@
           "compared": "the whole-world estimate behind WORLD-REGION-DUPLICATION-31; the island-wide CHIM figure is not measured yet, although every exterior cell of Vvardenfell has been on CHIM since v0.0.43",
           "basis": "estimate",
           "date": "2026-10-08"
+        },
+        {
+          "text": "World format 0.9 (experimental, off): a reach copy becomes a 4-byte reference to its owner record in the same frame; estimated on the v0.0.46 world, placement records 60.9 MB to 28.8 MB against format 0.8 (619,074 reach copies), 52.2 MB in today's format 0.7",
+          "compared": "the v0.0.46 release run's 308,754 chunk records read in place (owned records and reach copies counted per chunk, each copy's owner record located); host tests (tests/test_chim_reach_index.py, tests/test_chim_engine_native.py): the same placements built as a 0.8 and a 0.9 world give the same records, the same engine catalogue and the same placed collision",
+          "basis": "estimate",
+          "date": "2026-10-21"
         }
       ],
       "gain_short": "7.62 times smaller for Balmora, 24.3 times for Seyda Neen",
       "caveats": [
-        "The island-wide CHIM size is not measured yet; the measured figures are for Balmora and Seyda Neen, although every exterior cell of Vvardenfell is built as a CHIM world since v0.0.43."
+        "The island-wide CHIM size is not measured yet; the measured figures are for Balmora and Seyda Neen, although every exterior cell of Vvardenfell is built as a CHIM world since v0.0.43.",
+        "Format 0.9 stores a placement once per frame, not once for the island: an object in the overlapping margins of neighbouring region frames is still stored in each (about 3.5 frames per object, CHIM-PLACEMENT-MARGIN-COPIES-46). When the owner chunk is not in the zone, reading a chunk's catalogue takes more reads than with copies (estimated 985,500 against 517,059 for every chunk once); not built yet."
       ],
       "vis": "Each placement is linked to the visibility leaves its box touches (Quake's efrags) and is drawn once, from its owner chunk, so the PVS still culls it. Sharing a model never turns it into a brush entity; placements over 16 leaves are counted by the validator.",
       "links": [
@@ -53,10 +60,15 @@
         {
           "title": "Measurements behind the release charts",
           "path": "docs/performance/CHIM-v0.0.33-MEASUREMENTS.json"
+        },
+        {
+          "title": "World format: reach index (0.9, experimental)",
+          "path": "docs/chim/WORLD_FORMAT.md#reach-index-09-experimental"
         }
       ],
       "bugs": [
-        "WORLD-REGION-DUPLICATION-31"
+        "WORLD-REGION-DUPLICATION-31",
+        "CHIM-PLACEMENT-MARGIN-COPIES-46"
       ],
       "commits": []
     },
@@ -142,6 +154,42 @@
         "CHIM-READ-RUNS-33",
         "CHIM-READ-BUDGET-33",
         "BENCH-JIT-PROFILE-32"
+      ],
+      "commits": []
+    },
+    {
+      "id": "type1-crossings",
+      "name": "Crossings without a level change (type 1)",
+      "area": "streaming",
+      "summary": "The region frames around the player run as one window in one frame world, so walking from one cell into the next streams instead of restarting the level. The builder's default since v0.0.47 (decided for the project, 2026-10-21): chim crossing 1 in the game's start-up settings; chim crossing 0 gives type 0 back. Towns, doors and saves keep the level change.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [
+        {
+          "headline": true,
+          "text": "Not like for like: the type 1 prototype creates no entities in joined frames, so its worst frame after a light-area crossing (42 ms at 128 MB, 66 ms at 16 MB, against type 0's 83 and 373 ms) does not show how much faster a complete crossing would be",
+          "compared": "the crossing route's legs ai-c1, ai-l1 and ai-e1 (18 crossings per session) on the v0.0.45 release image with the same engine, chim crossing 0 against 1, FS-UAE JIT 68040, a type 0 session repeated as drift control; type 1 skips the entity work type 0 does, so the two do not do equal work",
+          "basis": "emulator",
+          "date": "2026-10-20",
+          "host": "quiet"
+        }
+      ],
+      "gain_short": "not like for like: type 1 creates no entities yet",
+      "caveats": [
+        "With 16 MB the work moved before the border: the approach's worst frame rose from 66 to 80 ms median.",
+        "The zone's locked peak is 7 % higher at 16 MB; the memory gate does not model the window yet.",
+        "The default since v0.0.47 (decided for the project, 2026-10-21; v0.0.47-dev2 was the first image built with it, with the actor table). Limits recorded before that image: towns never join a window; people and creatures of a joined frame are not created (the actor table, on by default since v0.0.47, gives a joining frame its actors); doors and plants work only in the starting frame; followers and escorts do not cross with it.",
+        "Next, in order: one world-state change list keyed by reference ID, entity windowing, followers and escorts crossing frame borders, NPC traversal, then comparisons that are like for like."
+      ],
+      "vis": "Each chunk keeps its own frame's visibility row; a chunk of another frame outside that row's area is treated as visible, so distance and the view frustum decide there.",
+      "links": [
+        {
+          "title": "Cell crossings: the type 1 prototype",
+          "path": "docs/chim/CELL_CROSSINGS.md#the-type-1-prototype-measured-20-october-2026"
+        }
+      ],
+      "bugs": [
+        "CHIM-CROSSING-SLUGGISH-43"
       ],
       "commits": []
     },
@@ -700,6 +748,31 @@
       "commits": []
     },
     {
+      "id": "stair-collision-mesh",
+      "name": "Stairway collision mesh (stair collision method 1)",
+      "area": "builder",
+      "summary": "A flight of stairs whose collision fails a geometric check gets one ramp per run of steps, or one solid block per tread, as its collision; the drawn steps are unchanged. The check is plane arithmetic on the collision (stand height against the drawn tread within a step, walkable slope, standing room, rise between neighbouring points within a step), no walk. --stair-collision-method 0 or 1; 0 (today's convex pieces with the stair rules) stays the default.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [],
+      "gain_note": "Not measured in game. On the v0.0.46 release build's meshes (read only): the check agrees with the recorded stair walks on 97.9 % of the 3,098 tread points they covered; method 1 changes 14 of 97 meshes with flights (all their flights then pass) at +11 % collision bytes on them; 11 meshes it cannot make pass keep today's collision. Default builds keep their mesh units and code keys.",
+      "caveats": [
+        "Experimental and off by default; no image built with it yet."
+      ],
+      "vis": "Not a drawing change: collision only.",
+      "links": [
+        {
+          "title": "Stair collision method 1",
+          "path": "docs/bugs/CHIM-STAIR-COLLISION-MESH-47.md"
+        }
+      ],
+      "bugs": [
+        "BUILD-STAIR-WALK-BRUTE-FORCE-46",
+        "CHIM-STAIR-COLLISION-MESH-47"
+      ],
+      "commits": []
+    },
+    {
       "id": "chim-builder",
       "name": "The CHIM builder",
       "area": "builder",
@@ -1112,21 +1185,63 @@
       "id": "runtime-scale-tilt",
       "name": "Run-time scale and tilt of shared models",
       "area": "world",
-      "summary": "One model per mesh instead of one variant per scale and tilt: the largest model-byte saving left island-wide, though hulls stay per variant.",
-      "status": "idea",
+      "summary": "One stored model per mesh instead of one per scale and tilt: the placement carries the full rotation (and later a uniform scale); the mesh's convex pieces are stored once and expanded by the world-aligned player box when a trace meets them. Decided for the project, 20 October 2026. Tilt: world format 0.8 (--chim-placement-format 0.8, experimental, off).",
+      "status": "in-progress",
       "version": null,
-      "gains": [],
-      "gain_note": "Not measured; to be measured with the engine first.",
-      "caveats": [],
-      "vis": "Not designed in detail yet; any implementation is checked with the renderer counters like every CHIM change.",
+      "gains": [
+        {
+          "headline": false,
+          "text": "Shared exterior models: 735.8 MB in 32,714 stored models from 1,400 meshes; one model per mesh and scale would be 216.8 MB, one per mesh 63.2 MB (tilted copies alone 571.8 MB)",
+          "compared": "the v0.0.46 release image's CHIM model records, by model name (mesh, scale, tilt), the largest copy of each mesh kept",
+          "basis": "count",
+          "date": "2026-10-20"
+        },
+        {
+          "headline": false,
+          "text": "Placed collision of one stored shape (rotation and scale at run time) ends every trace where the hull baked by the builder at that rotation and scale ends: 14,400 of 14,400 traces within 0.02 units, the same surface on all 3,932 hits; plane tests per trace 17.4 against 22.7 node visits",
+          "compared": "host unit test on synthetic shapes (slab, ramp, rock, two-piece post) at 12 rotations and scales: the experiment against the engine's own trace on the builder's exact box-expanded piece chain",
+          "basis": "simulation",
+          "date": "2026-10-20"
+        },
+        {
+          "headline": false,
+          "text": "World format 0.8 on synthetic placements through the real builder units: every placement draws the same vertices as in 0.7 (within 0.02 units); the placed collision equals the exact expansion of the turned pieces on 2,700 of 2,700 traces (largest difference 0.004 units); a default build writes the same bytes as before",
+          "compared": "host unit test (tests/test_chim_placed_format.py): the same nine box placements (yawed, tilted, scaled) built as a 0.7 and a 0.8 world, traced by world.c on the 0.7 hulls and by the engine's placed collision on the 0.8 piece tables",
+          "basis": "simulation",
+          "date": "2026-10-21"
+        },
+        {
+          "headline": false,
+          "text": "Estimated for the v0.0.46 world in format 0.8: 32,714 stored models to 8,105 (one per mesh and scale), model records 735.8 MB to about 229.3 MB plus about 42.9 MB of piece tables, placement records 52.2 MB to 60.9 MB: about 455 MB less",
+          "compared": "the v0.0.46 release run's model directory and point hulls read in place (one model per mesh and scale kept, its untilted copy where it has one); piece tables from the hulls' planes with the corner and edge counts measured on the heaviest meshes",
+          "basis": "estimate",
+          "date": "2026-10-21"
+        }
+      ],
+      "gain_note": "Model bytes are exact counts of today's records; the 0.8 figures are estimates until a build writes such a world. Collision is checked on synthetic shapes on the host, not in game; no 68040/68060 timing.",
+      "caveats": [
+        "Scale is not drawn by the renderer yet (it already turns models fully): until it is, scale stays baked and the saving is the tilt part.",
+        "Variants that are not one rigid transform of their mesh keep their own models; models clipped to the terrain keep their tilt baked.",
+        "Every trace that meets a placement expands the pieces its swept box meets (about 1,200 to 9,000 float operations per piece on the test shapes); nothing is kept between traces yet (a prepared-piece cache is the next step).",
+        "The Python collision mirror (the stair walk's code, unchanged so stored walks keep their keys) reads only the yaw of a 0.8 record."
+      ],
+      "vis": "Unchanged: placements keep their drawn box in the record, linked to the leaves it touches; counters to be compared with dbg rcount when the format step lands.",
       "links": [
         {
           "title": "CHIM ideas: also held back",
           "path": "docs/chim/IDEAS.md#also-held-back"
+        },
+        {
+          "title": "World format: placed models (0.8, experimental)",
+          "path": "docs/chim/WORLD_FORMAT.md#placed-models-08-experimental"
         }
       ],
-      "bugs": [],
-      "commits": []
+      "bugs": [
+        "CHIM-TILT-VARIANTS-SPLIT-33",
+        "CHIM-YAW-PLAYER-BOX-TURNS-46"
+      ],
+      "commits": [],
+      "gain_short": "models 735.8 MB to about 272 MB in format 0.8 (tilt), estimated, not built yet"
     },
     {
       "id": "heightfield-terrain",
@@ -1235,7 +1350,7 @@
       "id": "terrain-stored-once",
       "name": "Ground stored once",
       "area": "world",
-      "summary": "Terrain references (world format 0.7, --chim-terrain-refs, off by default): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record.",
+      "summary": "Terrain references (world format 0.7, --chim-terrain-refs, on by default since v0.0.36): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record.",
       "status": "in-progress",
       "version": null,
       "gains": [
@@ -1245,13 +1360,27 @@
           "compared": "scratch CHIM worlds of the same cells (chim_build --chim-regions-cells, one frame per cell, 896-unit margin) with copies and the routed hull, against the same cells with --terrain-hull compiled --terrain-refs on; the open-world maps of the same build",
           "basis": "build",
           "date": "2026-10-10"
+        },
+        {
+          "text": "World format 0.10 (selectable; with generated terrain the default stores every record it does not generate this way): compact terrain records, a lossless repack the engine expands to the same bytes; measured on the v0.0.46 world, terrain records 489.4 MB to 450.8 MB, every record expanding back byte for byte",
+          "compared": "all 97,369 terrain records of the v0.0.46 release run packed by tools/chim/terc.py and expanded again (9,359 of them through the engine's expander); host tests on the builder's own world written plain and compact (same records, same validator chunks, same seam walk in the engine)",
+          "basis": "simulation",
+          "date": "2026-10-21"
+        },
+        {
+          "text": "World format 0.11 (the default since v0.0.47, decided for the project, 2026-10-21): terrain generated by the engine from its heights, regular-path records from their corner heights and the converter's own triangles from their 32-unit samples (planes and the standing hull stored); measured on the v0.0.46 world, 95,818 of 97,369 terrain records generated byte for byte, terrain records 489.4 MB to 247.6 MB with the rest compact",
+          "compared": "all 97,369 terrain records of the v0.0.46 release run tried with tools/chim/thgt.py (each generated record equal to the stored one by construction), every tenth generated one of each record version (8,333 and 1,270) through the engine's generator natively; host tests on the builder's own world written plain and generated (same records, same validator chunks, same seam walk in the engine)",
+          "basis": "simulation",
+          "date": "2026-10-21"
         }
       ],
       "gain_short": "9.0 MB to 1.9 MB for seven region cells",
       "gain_note": "Six coastal land cells: 10.0 MB to 2.6 MB (0.93 times their open-world maps). Memory unchanged (each chunk keeps its own decoded copy); every CHIM gate passed on both worlds.",
       "caveats": [
-        "Experimental and off by default until a sea-ring build has been played.",
-        "A record homed in another frame's sector file costs one more file seek when it loads."
+        "Generated terrain records (format 0.11) are the builder's default since v0.0.47; --chim-terrain-pack bsp29 keeps the BSP29 brush images of before.",
+        "A record homed in another frame's sector file costs one more file seek when it loads.",
+        "v0.0.47-dev2 is the first image with generated (0.11) and compact (0.10) terrain records; 3,860 large records stay BSP29 images.",
+        "Generated terrain (format 0.11) covers the tile rule and the converter's own triangles: lava records, records too large for the engine's loading buffer and 100 with differing texture mappings are stored; the standing hull is stored too (qbsp's compiled union); no 68040/68060 timing of the generation yet."
       ],
       "vis": "No change: the grafted world holds the same nodes, leaves and faces at the same place; chunk and placement visibility rows are unchanged.",
       "links": [
@@ -1262,6 +1391,14 @@
         {
           "title": "CHIM regions",
           "path": "docs/chim/CHIM_REGIONS.md"
+        },
+        {
+          "title": "World format: compact terrain records (0.10, experimental)",
+          "path": "docs/chim/WORLD_FORMAT.md#compact-terrain-records-010-experimental"
+        },
+        {
+          "title": "World format: generated terrain records (0.11, experimental)",
+          "path": "docs/chim/WORLD_FORMAT.md#generated-terrain-records-011-experimental"
         }
       ],
       "bugs": [

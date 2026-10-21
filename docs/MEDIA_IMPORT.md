@@ -1,6 +1,6 @@
 # Complete media import and coverage
 
-_Last updated with AmiWind v0.0.29-dev4 (6 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 Normal AGA builds run a complete media stage alongside scene preparation. It
 imports available sound files, including voice recordings not referenced by the
@@ -28,10 +28,17 @@ an actual audio decoding failure remains an error in the coverage report.
 
 Each run saves `media/source-inventory.json` and `media/media-coverage.json`.
 Assembly checks output hashes, original soundtrack identities and copied files,
-then writes `image/media-coverage.json`. The game payload contains the lookup
-catalogue at `id1/media/catalogue.json` and the numeric video list at
-`id1/intro/videos.awl`. Extra installed videos retain path lookups without changing
-the stable numeric IDs of the known videos.
+then writes `image/media-coverage.json`. The game payload contains the numeric
+video list at `id1/intro/videos.awl`. Extra installed videos retain path lookups
+without changing the stable numeric IDs of the known videos.
+
+The lookup catalogue (the same coverage report, about 64 MB for a full build) stays
+beside the image as `image/media-coverage.json` and is not put on the Amiga disk:
+nothing in the game reads it. The media stage keeps its own copy at
+`media/id1/media/catalogue.json`, which the harvest stage reads at build time.
+`build.py --media-catalogue on` (debugging only) also writes it into the payload as
+`id1/media/catalogue.json`, as images up to v0.0.46 had it
+(IMAGE-MEDIA-CATALOGUE-ON-DISK-46).
 
 The final build summary shows included, available, missing-source and
 missing-output counts separately for videos, music, voices and effects. Coverage

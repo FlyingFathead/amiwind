@@ -1,6 +1,6 @@
 # Portable FS-UAE launcher
 
-_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+_Last updated with AmiWind v0.0.46 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -114,7 +114,7 @@ file sizes are 256 KiB, 512 KiB and 1 MiB.
 
 The launcher creates `AmiWind-vVERSION-FS-UAE.fs-uae` beside the selected HDF,
 using a matching `resources/emulators/` template if present. Otherwise it uses
-the embedded accelerated A1200/AGA, 68040/FPU/JIT, 2 MiB Chip and 16 MiB Z3 preset.
+the embedded accelerated A1200/AGA, 68040/FPU/JIT, 2 MiB Chip and 128 MiB Z3 preset.
 This is the accelerated development target. Stock A1200 performance is unproven.
 
 On reruns it updates only the ROM/HDF paths, HDF type and the corrected
@@ -148,7 +148,7 @@ FPU:                  68040 internal          [x] OK
 CPU speed:            Fastest possible        [x] OK
 JIT:                  ON                      [x] OK
 24-bit addressing:    OFF                     [x] OK
-Fast RAM in total:    16 MiB (default)        [x] OK
+Fast RAM in total:    128 MiB (default)       [x] OK
 Cycle-exact speed:    OFF (cpu_speed=max)     [x] OK
 Kickstart:            3.1 A1200 40.68         [x] OK
 ```
@@ -161,13 +161,16 @@ ship-exit/menu freeze.
 
 ## Fast RAM
 
-The emulated Amiga gets 16 MiB of Zorro III Fast RAM by default, the same
-machine as before. Testers can give it more:
+The emulated Amiga gets 128 MiB of Zorro III Fast RAM by default, like a 68060
+accelerator card (decided for the project, 21 October 2026; earlier launchers
+started with 16 MiB). 16 MiB, the smallest machine the game runs on, stays a
+choice (menu entry 2 or `--fast-ram 16`), so that baseline can still be played
+and tested. Testers can also give it more:
 
 | Choice | Fast RAM | Zorro III boards |
 | --- | --- | --- |
-| 1 (default) | 16 MiB | one 16 MiB board |
-| 2 | 128 MiB, like a 68060 accelerator card | one 128 MiB board |
+| 1 (default) | 128 MiB, like a 68060 accelerator card | one 128 MiB board |
+| 2 | 16 MiB, the smallest the game runs on (the earlier default) | one 16 MiB board |
 | 3 | 256 MiB | one board |
 | 4 | 512 MiB | one board |
 | 5 | 1 GiB | one 1 GiB board |
@@ -176,9 +179,9 @@ machine as before. Testers can give it more:
 
 At the launch question (`Run latest AmiWind ...? [Y/n, M = Fast RAM]`) type
 `m` for the menu; Enter keeps the current size. Or pass it on the command line,
-`--fast-ram 128` (also `default`, `1G`, `1.5GiB`). The choice is remembered in
+`--fast-ram 16` (also `default`, `256`, `1G`, `1.5GiB`). The choice is remembered in
 `AmiWind-launcher.json` as `"fast_ram_mib"`; back at the default the entry is
-removed again, so a default run writes the same files as before. The launcher
+removed again, so a later default change reaches folders that never chose a size. The launcher
 prints the size it starts with (`Fast RAM:` and `Starting with ... of Fast RAM`)
 and checks it in the host preflight; the game's own boot check shows what the
 Amiga sees (`Fast RAM: 131072K, free ...` for 128 MiB).
@@ -201,7 +204,8 @@ its source); the launcher writes `z3mem_size` and `z3mem2_size` (MiB) and, above
 1 GiB, `z3mem_start=0x10000000`, where FS-UAE places the boards too. WinUAE was
 not started with these sizes here; please report what its boot check shows.
 `tools/emulator_configs.py --fast-ram MIB` writes both profiles beside a built
-image with the same choice.
+image with the same choice (the build writes them with the 128 MiB default), and
+`tools/run_fs_uae.py --fast-ram MIB` takes it too.
 
 ## Quitting and the "not validated" request
 

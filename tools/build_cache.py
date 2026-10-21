@@ -111,6 +111,10 @@ IGNORED_ENV = {'AMIWIND_BUILD_JOBS', 'AMIWIND_INPUTS_LOCK', 'AMIWIND_PROFILE_SEC
                'AMIWIND_STAIR_WALK_CACHE', 'AMIWIND_STAIR_WALK_SAMPLE', 'AMIWIND_STAIR_WALK_REUSE',
                # what the stages print and when the builder's heartbeat speaks: logs only (build_profile.phase)
                'AMIWIND_LOG_LEVEL', 'AMIWIND_HEARTBEAT_SECONDS', 'AMIWIND_BUILD_EPOCH',
+               # the host's UTC offset for the local clock in progress lines (build_progress.clock_text): logs only.
+               # As a key it rebuilt the chim stage when the launcher did not pass it (the reuse plan) and would at
+               # every summer-time change (+0300 -> +0200)
+               'AMIWIND_LOCAL_UTC_OFFSET',
                # who wrote a stair-walk record (tools/stair_records.py): provenance, not an input
                'AMIWIND_RUN_NAME', 'AMIWIND_RUN_COMMIT', 'AMIWIND_RUN_VERSION', 'AMIWIND_AW_REQUEST',
                # who wrote any cache entry (tools/cache_provenance.py): provenance, not an input (CACHE-NO-PROVENANCE-36)
@@ -138,10 +142,12 @@ PATH_CALLS = {'Path', 'PurePath', 'PurePosixPath', 'joinpath', 'join', 'open', '
 # tools/pool_status.py, tools/stage_watch.py: the scheduler's live supervisor (queued and running units, cores used,
 # worker shares lent to queued work, underuse warnings; BUILD-STAGE-ALLOWANCE-STUCK-43), never what a unit computes.
 # tools/build_digest.py: the build summary's digest and build-summary.md (reads the run's records only).
+# tools/code_key.py: the code keys of the per-unit caches and the trace that checks them (which units are reused,
+# never what a unit computes; BUILD-CACHE-CLOSURE-WIDE-33).
 INSTRUMENTATION_MODULES = frozenset({'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
                                      'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py',
                                      'tools/resource_plan.py', 'tools/pool_status.py', 'tools/stage_watch.py',
-                                     'tools/build_digest.py'})
+                                     'tools/build_digest.py', 'tools/code_key.py'})
 OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
 # Single functions that can never change a stage's outputs although they read files: the closure does not follow them
 # (explicit list with the reason, tested in tests/test_build_cache.py; add one only if no output can depend on it).
@@ -1009,7 +1015,10 @@ def loop_choices(walked):
     files, not the whole folder (BUILD-SURVEY-KEY-CONFIG-35: the world survey's key counted
     every file under config/). A name bound any other way in the unit (assignment, another
     loop, with/except/import/def/match, a parameter, global/nonlocal) has no choices, so a key
-    never under-declares."""
+    never under-declares. Two refinements (BUILD-OPTION-RECORD-KEYS-STAGES-47): the sequence may be a local
+    name bound once to a written-out sequence and read only as loop sequences; and a name a for loop binds
+    that is also bound elsewhere has the loop's values at the reads inside that loop's body (keyed by id() of
+    the read) when the body never binds it again."""
     stores, other = {}, set()
     for node in walked:
         if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
@@ -1028,13 +1037,36 @@ def loop_choices(walked):
             other.add(node.name)
         elif isinstance(node, ast.MatchMapping) and node.rest:
             other.add(node.rest)
-    found = {}
+    # A local name bound once to a written-out sequence and read only as the sequence of for loops
+    # (`files = [('debug-commands.txt', b'AWDC1'), ...]` then `for name, magic in files`) is that sequence
+    # (BUILD-OPTION-RECORD-KEYS-STAGES-47: build_aga.py stage_debug_catalogues read three named files of config/,
+    # and its key counted the whole folder). Any other read of the name (a call, an attribute such as
+    # .append, an index, an argument) keeps it unknown, so a key never under-declares.
+    sequences, loads, iters = {}, {}, set()
+    for node in walked:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+                and isinstance(node.value, (ast.List, ast.Tuple))):
+            sequences[node.targets[0].id] = node.value
+        elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            loads[node.id] = loads.get(node.id, 0) + 1
+        elif isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)) and isinstance(node.iter, ast.Name):
+            iters.add(id(node.iter))
+    loop_reads = {}
+    for node in walked:
+        if isinstance(node, ast.Name) and id(node) in iters:
+            loop_reads[node.id] = loop_reads.get(node.id, 0) + 1
+    sequences = {name: value for name, value in sequences.items()
+                 if stores.get(name) == 1 and name not in other and loads.get(name, 0) == loop_reads.get(name, 0)}
+    found, by_read = {}, {}
     for node in walked:
         if not isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
             continue
-        # The sequence is written out ([...] or (...)); only the target's string positions must be
-        # literal (`for name, file, reader in [('Balmora', 'balmora.json', regions), ...]`).
-        if not isinstance(node.iter, (ast.List, ast.Tuple)) or not node.iter.elts:
+        # The sequence is written out ([...] or (...)), here or in a local name (sequences); only the target's
+        # string positions must be literal (`for name, file, reader in [('Balmora', 'balmora.json', regions), ...]`).
+        sequence = node.iter
+        if isinstance(sequence, ast.Name) and sequence.id in sequences:
+            sequence = sequences[sequence.id]
+        if not isinstance(sequence, (ast.List, ast.Tuple)) or not sequence.elts:
             continue
         target = node.target
         if isinstance(target, ast.Name):
@@ -1045,7 +1077,7 @@ def loop_choices(walked):
             continue
         for index, name in positions:
             options = []
-            for element in node.iter.elts:
+            for element in sequence.elts:
                 if index is not None:
                     if not isinstance(element, (ast.Tuple, ast.List)) or len(element.elts) != len(target.elts)                             or any(isinstance(e, ast.Starred) for e in element.elts):
                         options = None
@@ -1055,23 +1087,53 @@ def loop_choices(walked):
                     options = None
                     break
                 options.append(element.value)
-            if options is not None:
-                found[name] = tuple(dict.fromkeys(options))
-    return {name: options for name, options in found.items() if stores.get(name) == 1 and name not in other}
+            if options is None:
+                continue
+            options = tuple(dict.fromkeys(options))
+            found[name] = options
+            if isinstance(node, ast.comprehension) or stores.get(name) == 1 or name in other:
+                continue
+            # The name is bound elsewhere in the unit too (another loop: `for name, raw in payloads`): its reads
+            # inside THIS loop's body still have this loop's values, provided the body never binds it again and
+            # the read is not inside a nested function, lambda or class (late binding). Keyed by the read's node.
+            body = [item for statement in node.body for item in _walk_same_scope(statement)]
+            if any(isinstance(item, ast.Name) and item.id == name and isinstance(item.ctx, (ast.Store, ast.Del))
+                   for item in body):
+                continue
+            for item in body:
+                if isinstance(item, ast.Name) and item.id == name and isinstance(item.ctx, ast.Load):
+                    by_read[id(item)] = options
+    chosen = {name: options for name, options in found.items() if stores.get(name) == 1 and name not in other}
+    chosen.update(by_read)
+    return chosen
+
+
+def _walk_same_scope(node):
+    """ast.walk without descending into nested functions, lambdas and classes (their names bind late)."""
+    pending = [node]
+    while pending:
+        item = pending.pop()
+        yield item
+        if item is not node and isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+            continue
+        pending.extend(ast.iter_child_nodes(item))
 
 
 def _literal_runs(operands, constants=None, refined=True, choices=None):
     if refined and choices:
         # A loop name with known string values (loop_choices): one reading per combination.
+        # Keys: a name (one loop binds it in the unit) or id() of one read (its loop's body; loop_choices).
+        def known(operand):
+            return choices.get(id(operand)) or choices.get(operand.id)
         chosen = [index for index, operand in enumerate(operands)
-                  if isinstance(operand, ast.Name) and operand.id in choices and operand.id not in (constants or {})]
+                  if isinstance(operand, ast.Name) and known(operand) and operand.id not in (constants or {})]
         combinations = 1
         for index in chosen:
-            combinations *= len(choices[operands[index].id])
+            combinations *= len(known(operands[index]))
         if chosen and combinations <= MAX_PATH_CHOICES:
             from itertools import product
             runs = []
-            for values in product(*(choices[operands[index].id] for index in chosen)):
+            for values in product(*(known(operands[index]) for index in chosen)):
                 expanded = list(operands)
                 for index, value in zip(chosen, values):
                     expanded[index] = ast.Constant(value)
@@ -1357,6 +1419,32 @@ def lazy_tables(tree):
     return tables
 
 
+PATH_BUILDERS = frozenset({'Path', 'PurePath', 'PurePosixPath', 'PureWindowsPath'})
+
+
+def path_value(node):
+    """True for a default value that only builds a path and reads nothing: ROOT / 'config', Path(ROOT, 'x'),
+    PurePath(...) of names, module.attribute and string literals (no keywords, no other call). module_symbols:
+    the files such a default names are read only when its function runs (BUILD-OPTION-RECORD-KEYS-STAGES-47)."""
+    def part(item):
+        if isinstance(item, ast.Constant):
+            return isinstance(item.value, str)
+        if isinstance(item, ast.Name):
+            return True
+        if isinstance(item, ast.Attribute):
+            return part(item.value)
+        return built(item)
+
+    def built(item):
+        if isinstance(item, ast.BinOp) and isinstance(item.op, ast.Div):
+            return part(item.left) and part(item.right)
+        if isinstance(item, ast.Call) and not item.keywords and item.args:
+            function = item.func.attr if isinstance(item.func, ast.Attribute) else getattr(item.func, 'id', '')
+            return function in PATH_BUILDERS and all(part(argument) for argument in item.args)
+        return False
+    return built(node)
+
+
 def module_symbols(tree, text=None, refined=False):
     """{'units': {name: facts}, 'bindings', 'fallback', 'broken', 'texts'} for one parsed module.
 
@@ -1375,12 +1463,15 @@ def module_symbols(tree, text=None, refined=False):
         return {'units': {}, 'bindings': {}, 'fallback': {}, 'broken': True, 'texts': {}}
     docstrings = _docstring_ids(tree)
     constants = module_constants(tree) if refined else {}
-    top, main, lazy = [], [], {}
+    top, main, lazy, path_defaults = [], [], {}, []
     tables = lazy_tables(tree)
     for statement in tree.body:
         if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and not statement.decorator_list:
             lazy.setdefault(statement.name, []).append(statement)
-            top.extend([*statement.args.defaults, *(d for d in statement.args.kw_defaults if d is not None)])
+            defaults = [*statement.args.defaults, *(d for d in statement.args.kw_defaults if d is not None)]
+            top.extend(defaults)
+            if refined:
+                path_defaults.extend(d for d in defaults if path_value(d))
             # A name defined twice (a def and an assignment) runs with the top level too.
         elif id(statement) in tables:
             lazy.setdefault(tables[id(statement)], []).append(statement)
@@ -1391,6 +1482,17 @@ def module_symbols(tree, text=None, refined=False):
             top.append(statement)
     units = {'<top>': _unit_facts(top, docstrings, constants, refined),
              '<main>': _unit_facts(main, docstrings, constants, refined)}
+    if path_defaults:
+        # REFINED: a default value that only builds a path (path_value: ROOT / 'config') reads nothing on import;
+        # the files it names are read when its function runs, so they count for that function's unit (its facts
+        # walk its own defaults), never for every importer of the module. Origin BUILD-OPTION-RECORD-KEYS-STAGES-47:
+        # check_config_budgets(config_dir=ROOT / 'config') in tools/map_engine_limits.py keyed all of config/
+        # (config/option-changes.json too) into every stage importing that module, so each new builder option
+        # entry rekeyed the CHIM, town and flora stages. Only the data facts move: the default's names, its text
+        # in '<top>' and what '<top>' reaches stay as they were.
+        moved = {id(node) for node in path_defaults}
+        data = _unit_facts([d for d in top if id(d) not in moved], docstrings, constants, refined)
+        units['<top>']['paths'], units['<top>']['constants'] = data['paths'], data['constants']
     assigned = {target.id for statement in top for node in ast.walk(statement)
                 if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign))
                 for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
@@ -1755,11 +1857,20 @@ def comparable_all(components, old_details, run):
     return {name: comparable(old_details.get(name), parts, run, name) for name, parts in components.items()}
 
 
+def _keyed_environment(environment):
+    """A recorded stage environment without the names IGNORED_ENV leaves out of every key."""
+    return {k: v for k, v in (environment or {}).items() if k not in IGNORED_ENV}
+
+
 def explain(old_components, new_components):
     """Which components of a stage fingerprint changed (for reports and refusals)."""
     changed = []
     for key in sorted(set(old_components) | set(new_components)):
         if old_components.get(key) != new_components.get(key):
+            if key == 'environment' and _keyed_environment(old_components.get(key)) ==                     _keyed_environment(new_components.get(key)):
+                # differs only in names that key no stage (IGNORED_ENV), e.g. a record written before a name
+                # joined that list (AMIWIND_LOCAL_UTC_OFFSET): the stage's own inputs are unchanged
+                continue
             if key == 'dependencies':
                 deps = [d for d in set(old_components.get(key, {})) | set(new_components.get(key, {}))
                         if old_components.get(key, {}).get(d) != new_components.get(key, {}).get(d)]

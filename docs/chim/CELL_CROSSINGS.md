@@ -1,19 +1,22 @@
 # Cell crossings: how the engine moves from one CHIM frame to the next
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [The two methods](#the-two-methods)
 - [What a crossing costs today](#what-a-crossing-costs-today)
+  - [The level change, part by part](#the-level-change-part-by-part)
 - [What has to get better](#what-has-to-get-better)
 - [What the level change throws away](#what-the-level-change-throws-away)
 - [Quick wins that keep type 0](#quick-wins-that-keep-type-0)
 - [Type 1: one continuous world](#type-1-one-continuous-world)
+  - [The type 1 prototype, measured (20 October 2026)](#the-type-1-prototype-measured-20-october-2026)
 - [Near and far as one system (upcoming direction)](#near-and-far-as-one-system-upcoming-direction)
 - [Weak points](#weak-points)
 - [How it is built](#how-it-is-built)
+  - [The plan after the correction (the maintainer's decisions, 20 October 2026)](#the-plan-after-the-correction-the-maintainers-decisions-20-october-2026)
 
 <!-- contents end -->
 
@@ -21,12 +24,23 @@ The outdoors of Vvardenfell are built as CHIM frames: each region frame holds on
 This page describes how the engine crosses from one frame to the next today, what that costs, and the method that
 replaces it. Today's method stays selectable; Quake's networking code stays in the engine.
 
+**Status of type 1 (20 October 2026).** Type 1 is a prototype and cannot yet do what a real crossing has to do:
+
+- The people and creatures of a frame it joins are not created.
+- Doors and harvestable plants work only in the frame the map started in, not in frames joined by streaming.
+- Towns refuse it and keep the level change.
+- Followers and escorts do not cross with it.
+
+It is not the default and will not be until it carries entities. The level change (type 0) stays the default.
+The type 1 figures below are not a like-for-like comparison with type 0: see
+[the box above the measurements](#the-type-1-prototype-measured-20-october-2026).
+
 ## The two methods
 
 | Method | What a crossing does | Status |
 | --- | --- | --- |
 | Type 0, "AmiQuake" | A full level change: the game-logic half of the engine shuts down and starts the next frame as a new map, the display half reconnects and reloads its lists | Today's method; stays as an option |
-| Type 1, "CHIM" | One continuous world: the frames around the player are a sliding window, nothing restarts | Designed; prototype next |
+| Type 1, "CHIM" | One continuous world: the frames around the player are a sliding window, nothing restarts | Prototype without entities in joined frames (see the status above); selected with `chim crossing 1`, off by default; its first figures are [not like for like](#the-type-1-prototype-measured-20-october-2026) |
 
 Real doors, travel and interiors stay level changes in both methods. The Vivec Arena duel idea (multiplayer over a
 network or a null-modem cable) concerns the indoor Arena, an ordinary level, and is not affected.
@@ -194,6 +208,117 @@ Measured one at a time against today's method before any is kept. The timeline a
 - **Work spread over many frames.** Joining and leaving frames runs in small pieces while the player walks, so no
   single frame pays for a crossing.
 
+### The type 1 prototype, measured (20 October 2026)
+
+> **Not a like-for-like comparison (corrected 20 October 2026).** Type 0's crossing creates the new frame's
+> entities: its people and creatures, doors, harvestable plants, their spawn functions and the models they load.
+> The type 1 prototype creates none of them in the frames it joins. The ready-time figures (146 to 0 ms at 128 MB,
+> 712 to 0 ms at 16 MB) and the worst-frame figures below therefore do not show how much faster a complete
+> crossing would be; part of the difference may be exactly the work type 1 skips. How much is not measured yet.
+> The table is kept as history. Every A/B in the project now lists the work each variant does before any number is
+> reported.
+
+The first version of type 1 runs in the engine behind a console setting, `chim crossing 1` (a `chim` subcommand,
+not saved, so a stored setting never switches the method; `chim crossing 0`, the default, is type 0 unchanged).
+It takes effect at the next map start. A build can start every game with it: the builder option
+`--chim-crossing 1` (the default since v0.0.47, decided for the project, 2026-10-21) ends the image's
+`id1/default-game.cfg` with `chim crossing 1`, which runs at start-up before any map; `chim crossing 0` in the
+console before a map starts gives the old crossing back. `--chim-crossing 0` writes nothing, the image as before
+(`tools/chim_crossing.py`, [experimental flags](../EXPERIMENTAL_FLAGS.md)). A map
+that starts on a region frame then runs a window instead of one frame:
+
+- **The window** is the 2 x 2 block of cells (each a region frame) meeting at the corner nearest the player, as
+  the read-ahead picks its block. It moves to another corner only 256 units past a cell's midline, well outside the
+  ring of active chunks, so walking along a border never swaps it back and forth. Frames join with their chunk
+  directory and their streamed statics (read from their frame map), and leave once the frame world has let their
+  ground go (`engine/aga/src/chim/chim_chunks.c`).
+- **Fixed origin**: every frame is placed at its offset from the frame the map started on (cell steps of 2,048
+  units). Nothing moves; the coordinate range holds about 15 cells on each side.
+- **One composite world**: the window's chunk grid gives each place one owner, the frame whose cell holds the
+  chunk's centre, so ground two frames share is grafted once (`chim_graft.c`). The other frames' chunks at that
+  place keep only their placements. Each placement is drawn and collided by the frame whose cell holds it, so an
+  object two frames both carry near their border appears once. A chunk's visibility row covers its own frame; a
+  chunk of another frame outside that row's area is treated as visible (distance and the view decide).
+- **The crossing**: when the player passes 64 units into a cell the window holds, `aw_scene.c` records the frame
+  entered as the player's logical frame (the running map keeps its name and coordinates) and nothing is loaded.
+  Towns, doors, `dbg tp`, loading a save, and any frame the window cannot hold keep the level change.
+- **A test setting**, `chim crossing recentre 1`, moves the origin to the frame entered at every streamed crossing
+  (server and client positions, sounds, lights, particles, CHIM's chunks, placements, statics, distant terrain and
+  structure boxes, the frame world laid out again), so that any stored position the move misses shows at once.
+
+Measured on the crossing route ([Crossing baseline](../performance/CROSSING_BASELINE.md)) on the v0.0.45 release
+image, with the same engine (branch commit ce322285) for both methods and only the setting changed. FS-UAE JIT,
+68040, quiet host. Legs ai-c1, ai-l1 and ai-e1, which lie in the four cells 2,-7 / 3,-7 / 2,-6 / 3,-6, each flown
+three times: 18 crossings per session. A type 0 session at 128 MB was run again at the end as the drift control
+(ready 151 against 146 ms, worst frame 83 against 83 ms). Median (worst), milliseconds. Type 1 creates no entities
+in joined frames: not comparable.
+
+| Fast RAM | Method | Ready | Worst frame, 3 s after the crossing | Frame median within 2 s | Worst frame of the approach |
+| --- | --- | --- | --- | --- | --- |
+| 128 MB | type 0 | 146 (183) | 83 (792) | 14 | 54 (153) |
+| 128 MB | type 1 | 0 | 42 (48) | 14 | 46 (55) |
+| 16 MB | type 0 | 712 (868) | 373 (460) | 14 | 66 (82) |
+| 16 MB | type 1 | 0 | 66 (193) | 14 | 80 (159) |
+
+- **No pause at the border, with no entities created.** The player never stops ("ready" 0), but type 1 skips the
+  entity work type 0 does (see the box above), so these numbers do not say a complete crossing would halve the
+  worst frame at 128 MB or cut it to about a sixth at 16 MB. The worst single frame at 16 MB was 193 ms, on a
+  corner loop. Whether a complete crossing meets the 100 ms goal is not measured yet.
+- **The cost moved before the border at 16 MB.** The approach's worst frame rises from 66 to 80 ms median (159 at
+  most): the neighbouring frames' chunks, now loaded whole instead of the current frame's terrain-only margin,
+  stream in ahead. That is the next thing to spread (1.4, 1.6b).
+- **Memory at 16 MB**: the zone's locked peak rose from 4,573 to 4,889 KiB (+7 %), with up to 6,783 of the 6,864
+  KiB zone used. Retried loads for a full zone happen with both methods (85 type 0, 97 type 1 messages per session).
+  Starting a map with three frames to join costs 160 to 230 ms at 16 MB, inside the teleport's load.
+- **The same picture**: screenshots at fixed poses on both sides of the ai-e1 border, type 0 against type 1, differ
+  in 0.00 % of the 3D view's pixels before the border and in 0.16 % after it (a sky edge).
+- **Saving after a streamed crossing** and loading the save puts the player back at the same place, in the same
+  frame (cell 3,-6). The load first primes the ring at the map's spawn, then the window follows the player.
+- **Frame by frame**: clips of the same steady move across the ai-e1 border (noclip, constant heading and speed, no
+  console command during the move) were checked frame by frame for held pictures, and every engine frame of 40 ms
+  or more was named by `chim spikes 40`.
+  - At eye height over the ground (128 MB): the flight follows the measured ground profile within -6 to +44 map
+    units of a standing player's eye height, steered by the move keys only. Type 0 holds the picture for 120 to
+    160 ms around the border (the level change reports 133 ms; engine frames up to 146 ms). Type 1 repeats one
+    picture once (two video frames, 80 ms) 27 units before the border; its only engine frame over 40 ms took 47 ms,
+    and the crossing itself took 90 microseconds.
+  - The first flights were meant to fly level just over eye height but flew about 710 map units (some 10 m) higher:
+    the climb before the move was stopped through the console, which acts about half a second late. There, type 0
+    held the picture once, right after the border, for 160 ms with 128 MB and 600 ms with 16 MB (the server start,
+    the CHIM start of the frame and the ring prime). Type 1 held nothing at the border; with 16 MB its frames that
+    read the neighbour's chunks near the border took 50 to 53 ms.
+  - The eye-height flights with 16 MB ran while other builds loaded the machine (the emulator at about 60 % of its
+    speed), so they show the path only; their timing is to be repeated on a quiet machine.
+  - Clips of a walk on foot over the same line also stop where the player runs into a tree, with both methods;
+    those stops are collisions, not streaming.
+- How the measurement harness affects the game: each console command it sends costs the game one frame of about
+  55 ms (the console buffer). The timed flights send none during a crossing; the corner loops send one at each turn,
+  between crossings, with both methods alike. For about half a second at a type 0 level change, the harness's state
+  line pairs the new map's name with the old view position, so the reported position jumps by one cell; the
+  harness skips those lines.
+
+Risks and open items, plainly:
+
+- **Memory at 16 MB**: the window locks 7 % more of the zone at its peak, and loads that wait for room in a full
+  zone happen with both methods. The memory gate does not model the window yet.
+- **The approach at 16 MB**: the work moved before the border (50 to 53 ms frames, the approach's worst frame 80 ms
+  median against 66). It has to be spread thinner, not only moved.
+- **Towns** never join a window; their crossings stay type 0.
+- **People and other entities** of a joined frame are not spawned yet (no entity windowing).
+- **The sandbox**: measured on the release image's four cells, not on a MiniWind build; a MiniWind sandbox of region
+  frames needs its own MiniWind scope in the builder first.
+
+What the prototype does not do yet (each its own next step):
+
+- Doors and harvestable plants of a frame entered by streaming: the running map's own catalogues stay loaded, so
+  only the starting frame's doors and plants work (the logical frame is known; the catalogues do not follow it yet).
+- People, sounds and other entities of a joined frame that are not streamed statics are not spawned.
+- Whole-structure cut boxes and the distant terrain are the starting frame's.
+- The memory gate still models one frame; the window's peak is measured here, not gated.
+- Town frames never join a window (they are not cell-aligned); crossings into and out of towns stay type 0.
+- The recentre moves the engine's main stores; modules keeping positions of their own (paths, companions,
+  combat) are not moved yet.
+
 ## Near and far as one system (upcoming direction)
 
 Proposed 19 October 2026, to be proven in the sandbox before anything else: streaming the world and drawing what is
@@ -239,8 +364,23 @@ edge count is the risk) and no worse than today's horizon at the same viewpoints
     whole approach is measured, not only the crossing, so a pause is not just moved before the border.
 12. Today's setting `aw_cell_change_method` already has meanings (1 the current method, 2 the read-ahead
     experiment); type 1 gets its own setting or an explicit migration, so a saved value never switches methods.
+    The prototype has its own, `chim crossing`, which is not saved.
 
 ## How it is built
+
+### The plan after the correction (the maintainer's decisions, 20 October 2026)
+
+In order:
+
+1. **One world-state change list keyed by reference ID.** It holds what differs from the base data: moved, dead and
+   following NPCs, picked plants, opened doors, container contents. A joining frame is its base data plus its
+   changes; a leaving frame writes its changes back; saves write the same list.
+2. **Entity windowing.** The people, creatures, doors and plants of the frames in the window are created and
+   released as the window moves.
+3. **Followers and escorts crossing frame borders.** Some quests, the main quest among them, need it. The companion
+   test must pass with type 1 as it does with type 0.
+4. **NPC traversal** across frame borders.
+5. **Every comparison like for like**: both methods doing the same work, on frames with people.
 
 Each step is measured against type 0 on the same route, with the same image, memory size and cache state, at 16
 and 128 MiB, with a repeated type 0 run as drift control:
@@ -249,9 +389,14 @@ and 128 MiB, with a repeated type 0 run as drift control:
 2. A sandbox of four light frames around one corner: crossings at a fixed origin, the four frames in one composite
    world, server, client, player and clock kept running, with a model and sound set that fits today's lists.
    After a seamless crossing the terrain, the doors and harvesting all keep working, checked in each frame.
+   Status 20 October 2026: the crossings, the composite world and the running session are in (measured
+   [above](#the-type-1-prototype-measured-20-october-2026), on the release image's four cells); the doors and
+   harvesting of a frame entered by streaming are not yet.
 3. Repeated loading and unloading in that sandbox with a person, an object across a seam and changed object state:
    memory and list use stay bounded.
-4. A rebase forced in the same sandbox: collision, camera, effects, saving and loading.
+4. A rebase forced in the same sandbox: collision, camera, effects, saving and loading. Status 20 October 2026:
+   the test setting `chim crossing recentre 1` exists and holds ground, objects and links in the engine's own tests
+   at every crossing of a six-frame test world; not yet measured in the game.
 5. Edges and the corner measured for the longest single frame and the memory peak, beside the median crossing.
 6. Then the whole island, with type 0 kept as an option.
 

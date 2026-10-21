@@ -21,6 +21,7 @@
  * small record below (model, kind) and the arrival spot.
  */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_npcpath.h"
 #include "aw_anim.h"
 

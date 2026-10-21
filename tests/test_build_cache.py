@@ -297,7 +297,7 @@ class FingerprintTests(unittest.TestCase):
                          {'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
                           'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py',
                           'tools/resource_plan.py', 'tools/pool_status.py', 'tools/stage_watch.py',
-                          'tools/build_digest.py'})
+                          'tools/build_digest.py', 'tools/code_key.py'})
         tools = self.repository / 'tools'
         (tools / 'build_progress.py').write_text('def show(text):\n    print(text)\n')
         (tools / 'build_profile.py').write_text('from build_progress import show\ndef instrument(stage):\n    show(stage)\n')
@@ -448,6 +448,11 @@ class FingerprintTests(unittest.TestCase):
         old = {'command': ['x'], 'sources': {'digest': '1'}, 'dependencies': {'a': '1', 'b': '2'}}
         new = {'command': ['x'], 'sources': {'digest': '2'}, 'dependencies': {'a': '1', 'b': '3'}}
         self.assertEqual(build_cache.explain(old, new), ['dependency b', 'sources'])
+        # a name that joined IGNORED_ENV after the old run recorded it: no change of the stage's own inputs
+        old = {'command': ['x'], 'environment': {'AMIWIND_LOCAL_UTC_OFFSET': '+0300', 'AMIWIND_LAVA': 'on'}}
+        self.assertEqual(build_cache.explain(old, {'command': ['x'], 'environment': {'AMIWIND_LAVA': 'on'}}), [])
+        self.assertEqual(build_cache.explain(old, {'command': ['x'], 'environment': {'AMIWIND_LAVA': 'off'}}),
+                         ['environment'])
 
     def test_real_stage_closures_leave_engine_sources_to_the_engine_and_image(self):
         """An engine C edit must not invalidate the conversion stages (measured on this repository)."""

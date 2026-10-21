@@ -189,8 +189,12 @@ class StairRulePlumbingTests(unittest.TestCase):
         whole-town Seyda Neen preview proxies (COLLISION-SEYDA-PREVIEW-BYPASS-32;
         shipped images use the recorded Seyda stage instead). routed_hull.py only
         expands the pieces collision_pieces made by the standing box (the
-        collider's own step, INTERIOR-HULL-CHAIN / COLLISION-HULL-CHAINS-33)."""
-        allowed = {'mesh_geometry.py', 'prepare_bsp.py', 'routed_hull.py'}
+        collider's own step, INTERIOR-HULL-CHAIN / COLLISION-HULL-CHAINS-33). stair_mesh.py is stair collision
+        method 1, run only by its own mesh worker (stair_mesh.mesh_unit_stair, unit kind 'mesh-stair') for a profile
+        with stair_collision 'mesh'; its own calls of collision_pieces are method 0's, for the rest of the mesh
+        (CHIM-STAIR-COLLISION-MESH-47).
+        stair_mesh_survey.py and stair_mesh_calibrate.py measure both methods on a finished build, read only."""
+        allowed = {'mesh_geometry.py', 'prepare_bsp.py', 'routed_hull.py', 'stair_mesh.py'}
         offenders = []
         for path in sorted((ROOT / 'tools').glob('*.py')):
             text = path.read_text(encoding='utf-8')
@@ -201,7 +205,9 @@ class StairRulePlumbingTests(unittest.TestCase):
         self.assertEqual(offenders, [])
         users = sorted(p.name for p in (ROOT / 'tools').glob('*.py')
                        if 'collision_pieces(' in p.read_text(encoding='utf-8') and p.name != 'mesh_geometry.py')
-        self.assertEqual(users, ['asset_census.py', 'prepare_mesh_bsp.py', 'world_estimate_data.py'])
+        self.assertEqual(users, ['asset_census.py', 'prepare_mesh_bsp.py', 'stair_mesh.py', 'stair_mesh_calibrate.py',
+                                 'stair_mesh_survey.py',
+                                 'world_estimate_data.py'])
         # Every map converter (towns, world, interiors, census, prison) assembles through prepare_mesh_bsp.
         for name in ('import_town.py', 'prepare_world_scenery.py', 'prepare_area.py', 'prepare_census.py',
                      'prepare_interior.py'):

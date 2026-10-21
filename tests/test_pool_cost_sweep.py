@@ -57,6 +57,9 @@ REASONS = {
     'tools/chim/world.py:frame_rows': ('a generator in largest-first order of the frames\' own size (placements and '
                                        'chunks); each task makes its frame\'s layout and rows on the worker (STREAM)'),
     'tools/chim/zone_sim.py:walk': SORTED,
+    'tools/creature_library.py:bake': ('39 creature meshes of about the same cost (measured 3 to 10 s each on the '
+                                       'game data); not run by any build stage'),
+    'tools/npc_library.py:build': LATER,
     'tools/entity_tracker.py:refs_by_map': UNIFORM,
     'tools/exterior_sky_build.py:configure_staged_maps': SORTED,
     'tools/hand_metadata.py:stamp_staged_hands': UNIFORM,

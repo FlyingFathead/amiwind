@@ -73,6 +73,7 @@ extern void ppc_c2p_line (int line, int src, struct BitMap *dst, int cnt);
 extern void *aw_c2p_reloc(struct BitMap *bitmap );
 extern void aw_c2p_deinit(void *c2p );
 extern void aw_c2p(void *c2p , struct BitMap *bmp , UBYTE *chunky , ULONG width , ULONG rows );
+#include "aw_c2p.h"	/* checks the three declarations above against the definition's prototypes */
 #else
 #include "c2p8_040_amlaukka.h"
 #endif

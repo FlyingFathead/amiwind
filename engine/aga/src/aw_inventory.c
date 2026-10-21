@@ -3,6 +3,7 @@
  * UI selection never fabricates inventory and never directly deletes an item. */
 #ifndef AW_INVENTORY_RULES_ONLY
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_combat.h"
 #include "aw_character.h"
 #include "aw_story.h"

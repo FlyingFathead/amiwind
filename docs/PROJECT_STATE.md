@@ -1,10 +1,11 @@
 # Current project state
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [21 October 2026: v0.0.47-dev1 - development snapshot](#21-october-2026-v0047-dev1---development-snapshot)
 - [19 October 2026: v0.0.45 - CHIM Streaming Improved, Guard Torches Are Back](#19-october-2026-v0045---chim-streaming-improved-guard-torches-are-back)
 - [19 October 2026: v0.0.44 - By Azura's Trees!](#19-october-2026-v0044---by-azuras-trees)
 - [7 October 2026: v0.0.30 - The Temple](#7-october-2026-v0030---the-temple)
@@ -27,6 +28,14 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
   - [28 September 15:50 maintainer follow-up](#28-september-1550-maintainer-follow-up)
 
 <!-- contents end -->
+
+## 21 October 2026: v0.0.47-dev1 - development snapshot
+
+The newest development snapshot is [v0.0.47-dev1](RELEASE-v0.0.47-dev1.md) (not a release; the newest release is
+still v0.0.46). It adds the shimmering Ghostfence, a lighter image, a Workbench icon, pursuit on slopes and a builder
+that walks no stairs by default. The emulator presets start with 128 MiB of Fast RAM. The type 1 crossing, the
+outdoor actor table and the smaller world formats are in the source behind switches that are off
+([experimental flags](EXPERIMENTAL_FLAGS.md)).
 
 ## 19 October 2026: v0.0.45 - CHIM Streaming Improved, Guard Torches Are Back
 

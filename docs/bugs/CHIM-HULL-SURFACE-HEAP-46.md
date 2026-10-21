@@ -9,7 +9,7 @@
 | Where | CHIM heap gate, v0.0.46-dev1: x+17 y+04, x-07 y-04, x-08 y-04, x-11 y+15, x+09 y+02, x+18 y+04 |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.46-dev1 (last seen) |
+| Persists in | fixed in v0.0.46 |
 | Severity | high: the full build stops at its CHIM heap gate; no dev1 image |
 | Family | Map heap and memory budget (`heap-memory`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -39,6 +39,9 @@ _Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 <!-- contents end -->
 
 ## Status: 20 October 2026
+
+Fixed in v0.0.46. The maintainer checked the v0.0.46-dev1 playtest on the evening of 20 October 2026: "the heap fix btw IS GOOD".
+The text below is the state before the full build.
 
 Cause measured and fixed in the shared converter (not yet in a full build): all six frames fit again in a build of
 the problem cells and their neighbours, with the walkway fix kept. Verification waits for the next full build.

@@ -78,6 +78,34 @@ def exterior_references(context):
     return refs
 
 
+def interior_references(context):
+    """Interior original small-mushroom placements (HARVEST-INTERIOR-PICK-47), in master order.
+
+    The same placements the global index already reserves slots for (prepare_harvest.placement_index: exterior and
+    interior identities, one digest), so interior catalogues share the world's pick state: a pick in a room and a
+    pick outdoors are facts of the same saved table. Each placement passes the same graph checks as a catalogue
+    entry (one at a time): one the runtime cannot represent (ownership/theft, scripts, restocking, a non-container
+    model) is left baked and listed with its reason, never turned into free loot. Returns (admitted, refused).
+    """
+    from prepare_harvest import placement_source_key, prepare_graph
+    from prepare_harvest_alias import alias_angles
+    master_sha256 = context['full']['master_sha256']
+    admitted, refused = [], []
+    for r in context['full']['interior_references']:
+        if r['kind'] != 'small_mushroom':
+            continue
+        ref = dict(r, source_key=placement_source_key(r, master_sha256))
+        try:
+            prepare_graph(dict(context, max_plants=1), [ref],
+                          lambda q: ({'model': '@0', 'representation': 'external_alias', 'scale': q['scale']},
+                                     [v * .25 for v in q['position']], alias_angles(q)))
+        except ValueError as error:
+            refused.append(dict(cell=r['cell'], number=r['number'], id=r['id'], reason=str(error)))
+            continue
+        admitted.append(ref)
+    return admitted, refused
+
+
 def _convert_model(task):
     """Worker: one shared MDL from the source packet (opens its own handle)."""
     from harvest_alias_mesh import convert
@@ -94,8 +122,11 @@ def registry_line(name, raw):
     return name + ' ' + digest(raw) + ' ' + ' '.join(format(v, '.9g') for v in (*lo, *hi))
 
 
-def prepare(data_files, scene_palette, out, *, jobs=None):
-    """Builder step: shared models and placement source from the player's data."""
+def prepare(data_files, scene_palette, out, *, jobs=None, interiors=True):
+    """Builder step: shared models and placement source from the player's data.
+
+    interiors: also every representable interior placement (interior_references; the default since v0.0.47,
+    HARVEST-INTERIOR-PICK-47); False keeps the earlier exterior-only source (those plants stay baked scenery)."""
     from build_parallel import ordered_map
     from mwad.paths import child_ci, ensure_external, resolve_data_files
     from prepare_hand_catalog import runtime_palette
@@ -109,6 +140,12 @@ def prepare(data_files, scene_palette, out, *, jobs=None):
     master = child_ci(data, 'Morrowind.esm').read_bytes()
     context = source_context(master, max_plants=MAX_PLANTS, intern_root_spans=True)
     refs = exterior_references(context)
+    inside, refused = interior_references(context) if interiors else ([], [])
+    refs += inside
+    print('Harvest source: %d exterior and %d interior placements%s.' % (
+        len(refs) - len(inside), len(inside),
+        ('; %d interior placements left baked (not representable: ownership, scripts, contents)' % len(refused))
+        if interiors else ' (interiors off)'), flush=True)
     # Every placement must be representable before anything is written: the
     # same graph checks as a catalogue (no scripts, ownership, restocking...).
     prepare_graph(dict(context, max_plants=len(refs)), refs,
@@ -144,13 +181,16 @@ def prepare(data_files, scene_palette, out, *, jobs=None):
     (out / 'palette.lmp').write_bytes(palette)
     receipt = dict(format=SOURCE_FORMAT,
                    settings=dict(max_plants=MAX_PLANTS, intern_root_spans=True, compact_models=True,
-                                 texture_size=TEXTURE_SIZE),
+                                 texture_size=TEXTURE_SIZE, interiors=bool(interiors)),
                    master=pin(master), scene_palette_sha256=digest(Path(scene_palette).read_bytes()),
                    palette=pin(palette), index=pin(index_raw), packet=pin(packet.read_bytes()),
                    global_slots=len(context['indices']), global_catalogue_sha256=context['catalogue'],
-                   placements=len(checked), models=models,
-                   scope='Every exterior original small-mushroom placement; maps, catalogues, geometry '
-                         'gate and heap admission are decided by the image step on its final maps')
+                   placements=len(checked), interior_placements=len(inside), interior_refused=refused,
+                   models=models,
+                   scope='Every exterior original small-mushroom placement' +
+                         (' and every representable interior one' if interiors else '') +
+                         '; maps, catalogues, geometry gate and heap admission are decided by the image step on '
+                         'its final maps')
     (out / SOURCE_RECEIPT).write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8', newline='\n')
     return receipt
 
@@ -251,8 +291,17 @@ def plan_rows(id1, native=(), regions=None):
                    if r['name'] in chim or (id1 / 'maps' / (r['name'] + '.bsp')).is_file()), key=lambda r: r['name'])
 
 
+def interior(ref):
+    """An interior placement: its cell is the interior's name (exterior cells are [x, y])."""
+    return isinstance(ref['cell'], str)
+
+
 def select(row, refs):
-    """Placements whose transformed bounds touch the map's coverage."""
+    """Placements whose transformed bounds touch the map's coverage; an interior map's row (interior_rows): the
+    interior placements bound to it by reference number. Exterior coverage never takes an interior placement."""
+    if row.get('interior'):
+        return [r for r in refs if interior(r) and r['number'] in row['numbers']]
+    refs = [r for r in refs if not interior(r)]
     ox, oy = row['origin'][0], row['origin'][1]
     (lx, ly), (hx, hy) = row['coverage']
     selected = []
@@ -350,9 +399,66 @@ def source_placements(source, data_files):
     return receipt, context, refs
 
 
-def map_selections(id1, refs, native=(), regions=None):
-    """(plan rows, {map: placements}) for every shipped exterior map with plants."""
+def _interior_bound(task):
+    """Worker: the placements of `wanted` one map binds (entity aw_ref on a func_wall), each with its entity
+    origin."""
+    from compact_bsp import entities
+    from player_hull import lumps
+    path, wanted = task
+    raw = Path(path).read_bytes()
+    if raw[:4] != struct.pack('<i', 29):
+        return Path(path).stem, []
+    found = []
+    for e in entities(lumps(raw)[0]):
+        ref = e.get('aw_ref', '')
+        if ref.isdigit() and int(ref) in wanted and e.get('classname') == 'func_wall':
+            found.append((int(ref), [float(v) for v in e.get('origin', '0 0 0').split()]))
+    return Path(path).stem, found
+
+
+def interior_rows(id1, refs, taken=(), jobs=None, known=()):
+    """Plan rows of the shipped interior maps that bind interior placements (HARVEST-INTERIOR-PICK-47).
+
+    An interior map's placements are found by their exact original reference number on the map's entities (the
+    interior converters write aw_ref on every converted CONT); the map origin follows from those entities (whole
+    rooms: 0 0 0, the room's quarter-scale original coordinates; as for the exterior rows, map position = quarter-scale
+    original position - origin) and must agree for every plant of the map. A map
+    whose plants disagree is refused (named), never guessed. Rows: name, origin, interior=True, numbers. Maps in
+    `taken` (the exterior plan rows) and the open-world maps are not read. `known`: rows clear_baked recorded
+    (harvest-baked-removal.json interior_rows) for maps whose bound entities it has removed since: taken as
+    recorded, those maps are not read again."""
+    from build_parallel import ordered_map
+    id1 = Path(id1)
+    inside = {r['number']: r for r in refs if interior(r)}
+    if not inside:
+        return []
+    rows = [dict(name=row['name'], origin=[float(v) for v in row['origin']], coverage=None, interior=True,
+                 numbers=sorted(int(n) for n in row['numbers'] if int(n) in inside))
+            for row in known if (id1 / 'maps' / (row['name'] + '.bsp')).is_file()]
+    taken = set(taken) | {row['name'] for row in known}
+    paths = [p for p in sorted((id1 / 'maps').glob('*.bsp'))
+             if p.stem not in taken and not p.stem.startswith('vf') and NAME.fullmatch(p.stem)]
+    # largest maps first (each unit reads one map's entity lump)
+    for name, found in ordered_map(_interior_bound, [(str(p), set(inside)) for p in paths], jobs,
+                                   cost=lambda task: Path(task[0]).stat().st_size):
+        if not found:
+            continue
+        origins = [[inside[n]['position'][k] * .25 - e[k] for k in range(3)] for n, e in found]
+        origin = [round(v, 3) + 0. for v in origins[0]]
+        if any(abs(o[k] - origins[0][k]) > .01 for o in origins for k in range(3)) or \
+                not all(math.isfinite(v) for v in origin):
+            raise ValueError('Harvest: interior map %s binds plants at disagreeing origins; refusing to place '
+                             'them (HARVEST-INTERIOR-PICK-47)' % name)
+        rows.append(dict(name=name, origin=origin, coverage=None, interior=True,
+                         numbers=sorted({n for n, _ in found})))
+    return sorted((row for row in rows if row['numbers']), key=lambda row: row['name'])
+
+
+def map_selections(id1, refs, native=(), regions=None, jobs=None, interiors=()):
+    """(plan rows, {map: placements}) for every shipped exterior map with plants and every shipped interior map
+    that binds interior placements (interior_rows; `interiors`: its rows clear_baked recorded)."""
     rows = plan_rows(id1, native, regions)
+    rows += interior_rows(id1, refs, {row['name'] for row in rows}, jobs, interiors)
     return rows, {row['name']: selected for row in rows for selected in [select(row, refs)] if selected}
 
 
@@ -389,7 +495,7 @@ def clear_baked(source, id1, work, *, data_files, jobs=None, native=(), chim_wor
     id1, work = Path(id1), Path(work)
     _, _, refs = source_placements(source, data_files)
     regions = chim_regions(id1, chim_world)
-    rows, selections = map_selections(id1, refs, native, **({'regions': regions} if regions else {}))
+    rows, selections = map_selections(id1, refs, native, jobs=jobs, **({'regions': regions} if regions else {}))
     origins = {row['name']: row['origin'] for row in rows}
     chim = {row['name'] for row in rows if row.get('chim')}  # no map: the CHIM world leaves them out
     tasks = [(str(id1 / 'maps' / (name + '.bsp')), selections[name], origins[name]) for name in sorted(selections)
@@ -401,7 +507,10 @@ def clear_baked(source, id1, work, *, data_files, jobs=None, native=(), chim_wor
     work.mkdir(parents=True, exist_ok=True)
     receipt = dict(format='AmiWind harvest baked geometry removal 1', maps_checked=len(tasks),
                    maps_changed=len(cleared), placements_removed=sum(len(r['removed']) for r in cleared.values()),
-                   maps=cleared, tool='tools/remove_harvest_geometry.py remove_geometry')
+                   maps=cleared, tool='tools/remove_harvest_geometry.py remove_geometry',
+                   # the interior maps found by their bound entities (removed above): install reads them here
+                   interior_rows=[dict(name=row['name'], origin=row['origin'], numbers=row['numbers'])
+                                  for row in rows if row.get('interior')])
     (work / 'harvest-baked-removal.json').write_text(json.dumps(receipt, indent=2) + '\n',
                                                      encoding='utf-8', newline='\n')
     return receipt
@@ -438,7 +547,8 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_
     order = {row['packet_model']: i for i, row in enumerate(receipt['models'])}
     limits = runtime_limits()
     regions = chim_regions(id1, chim_world)
-    rows, found = map_selections(id1, refs, native, **({'regions': regions} if regions else {}))
+    rows, found = map_selections(id1, refs, native, jobs=jobs, interiors=removal.get('interior_rows', ()),
+                                 **({'regions': regions} if regions else {}))
     chim = {row['name'] for row in rows if row.get('chim')}
     candidates, selections, capacity = {}, {}, {}
     for row in rows:
@@ -514,7 +624,8 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_
     (work / 'harvest-plan.json').write_text(json.dumps(plan, indent=2) + '\n', encoding='utf-8', newline='\n')
     families = {}
     for row in rows:
-        family = 'world' if row['name'].startswith('vf') else row['name'] if row['name'] == 'intro_docks' else row['name'][:2]
+        family = 'world' if row['name'].startswith('vf') else row['name'] if row['name'] == 'intro_docks' else \
+            'interior' if row.get('interior') else row['name'][:2]
         stats = families.setdefault(family, dict(maps=0, with_plants=0, admitted=0, plants=0))
         stats['maps'] += 1
         stats['with_plants'] += row['name'] in candidates or row['name'] in capacity
@@ -703,10 +814,15 @@ def main(argv=None):
     p.add_argument('--data-files', type=Path, required=True)
     p.add_argument('--palette', type=Path, required=True, help='Scene palette (intro-scene/id1/gfx/palette.lmp)')
     p.add_argument('--out', type=Path, required=True)
+    p.add_argument('--interiors', choices=('on', 'off'), default='on',
+                   help='Also the interior mushrooms (default on: picked in a room = gone and remembered, '
+                        'HARVEST-INTERIOR-PICK-47); off: the earlier exterior-only source, interior plants baked')
     add_jobs(p)
     args = parser.parse_args(argv)
-    receipt = prepare(args.data_files, args.palette, args.out, jobs=resolve_jobs(args.jobs))
-    print(f"Harvest source: {receipt['placements']} exterior placements, {len(receipt['models'])} shared models.",
+    receipt = prepare(args.data_files, args.palette, args.out, jobs=resolve_jobs(args.jobs),
+                      interiors=args.interiors == 'on')
+    print(f"Harvest source: {receipt['placements']} placements ({receipt['interior_placements']} interior, "
+          f"{len(receipt['interior_refused'])} interior left baked), {len(receipt['models'])} shared models.",
           flush=True)
     return 0
 

@@ -20,7 +20,9 @@ from project_version import public_version, check_native_versions
 PROJECT = "amiwind"
 EXECUTABLES = {"build.sh", "tools/AmiWind-FS-UAE-launcher.py", "tools/run_fs_uae.py"}
 PROJECT_MEDIA = {"resources/media/AmiWind_logo.png", "resources/media/AmiWind_wordmark.png",
-                 "resources/media/AmiWind_logo_name_only.png"}
+                 "resources/media/AmiWind_logo_name_only.png",
+                 # the Workbench icon's pictures (tools/workbench_launcher.py, docs/WORKBENCH_ICON.md)
+                 "resources/workbench/AmiWind-icon.png", "resources/workbench/AmiWind-icon-selected.png"}
 IGNORED_PARTS = {".git", "__pycache__", ".venv", ".pytest_cache"}
 DOCUMENTATION_IMAGES = {f"docs/images/amiwind-v0.0.15-dev2-{name}.png" for name in ("dock", "npc", "guard", "town", "waterfront")}
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.38-lava-{name}.png" for name in ("east-clean", "pool-clean"))

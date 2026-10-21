@@ -1,5 +1,14 @@
 # BUILD-BODY-BAKE-SLOWER-44: the image step's player body bake ran 42 % slower than its baseline with the same 40 bodies
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.46-dev1 at 2026-10-20 14:48 +0300: dev1 rebuild (try 2): image bake_body perf guard FAIL again: 153 s against 92 s with the same 40 units (+67 percent)
+- Reported with v0.0.47-dev1 at 2026-10-21 14:44 +0300: dev1 try 2: 137 s vs 92 s, same 40 units (+49 percent), host not busy; 6 of 20 bodies fell back; cause found and fixed in source on v0.0.47-build-cores
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -19,12 +28,13 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [Status: 19 October 2026](#status-19-october-2026)
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Status: 21 October 2026](#status-21-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -36,42 +46,83 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents end -->
 
-## Status: 19 October 2026
+## Status: 21 October 2026
 
-Found by the perf guard of the v0.0.44 release build; cause not measured yet.
+Cause measured and repaired in source on branch v0.0.47-build-cores, not shipped at the time of writing: a player
+body bake took 10 s of which 4.5 s were the same small matrix inversions made again for every texel sample of every
+face. Output bytes identical (SHA-256), about 2.4 times faster per bake. Verification: the perf guard of the next full
+build. The bodies that fall back to the previous head reducer bake up to twice as often (up to 32 bakes instead of
+16): that is the remaining cost and stays open as a plan (below).
 
 ## Symptom
 
-The image step bakes the 40 player bodies (every race and sex) on the worker pool. In the v0.0.44 release build that
-took 130 s on 14 of 24 cores; the recorded baseline for the same 40 bodies is 92 s on 17.4 of 20 cores.
+The image step bakes the 20 player bodies (ten races, two sexes) and then the 20 inventory poses on the worker
+pool; both calls are the `bake_body` section (40 units in two calls). The perf guard's `bake_body` section failed in three builds against the same baseline of 92 s with 40
+units (17.4 of 20 cores, v0.0.44-dev1 batch 2):
+
+| Build | Time | Cores |
+| --- | --- | --- |
+| v0.0.44 release | 130 s | 14 of 24 |
+| v0.0.46-dev1 try 2 | 153 s | |
+| v0.0.47-dev1 try 2 (2026_10_21_v0.0.47-dev1_dev1-try2_4a2d42b9) | 137 s (the longest single call 116 s) | 13.9 of 24 |
+
+The v0.0.47-dev1 build marks no stage as host-busy (the perf guard says "0 busy-host"), so the slowdown is not the
+host.
 
 ## Where
 
-Image step, the player body bake (`tools/prepare_player_view.py`, parallel map `bake_body`).
+Image step, the player body bake (`tools/prepare_player_view.py`, parallel map `bake_body`), which calls the NPC
+bake (`tools/npc_geometry.py`, `_bake`).
 
 ## How it happened
 
-Not measured yet. The likely cause: since v0.0.44-dev1 a body that does not fit the vertex budget with the new head
-reducer is baked again with the previous one ([NPC-HEAD-DECIMATION-33](NPC-HEAD-DECIMATION-33.md)), so some bodies
-are baked twice.
+Measured on 21 October 2026 in a throwaway container (2 cores, the source read-only, the game data read-only) with
+cProfile on one bake of a player body (budget 480):
+
+- 10.1 s for the bake; `numpy.linalg.pinv` 4.5 s in 5,277 calls (6,327 SVDs), `transfer_vertex` 1.9 s, the bake's
+  own loop 1.9 s, the head and body reduction only 0.2 s.
+- The texel sampling in `_bake` asked `pinv` for the edge matrices of the 12 nearest original triangles of every
+  sample of every output face (a pseudo-inverse per sample, thousands of calls), although the same matrices were
+  already inverted once per shape in the line before it (`inverse`, kept for exactly this and never used; the test
+  `test_shared_pseudo_inverses_are_bitwise_the_per_triangle_ones` has asserted since the sharing was written that
+  a batched call gives the same values as the per-triangle ones).
+- The v0.0.44-dev1 head-reducer fallback ([NPC-HEAD-DECIMATION-33](NPC-HEAD-DECIMATION-33.md)) makes it worse: the
+  v0.0.47-dev1 log lists six bodies (imperial female, khajiit male and female, dark elf female, high elf male,
+  argonian female) that found no fit with the locked reducer. Each body searches 4 skin settings x 4 budgets = 16
+  bakes; a body with no fit searches all 16 with the locked reducer and then up to 16 again with the previous one.
+  Every bake of the search takes about 10 s (about 4 s now), so those six bodies are the longest calls of the pool:
+  with 20 bodies on 24 cores the step lasts as long as the slowest body.
 
 ## Why it was not caught
 
-The fallback was checked for correctness (every body built), not for time.
+The fallback was checked for correctness (every body built), not for time; the per-sample inversion was never
+profiled, because the bake's cost was only visible as a total.
 
 ## Reproduction
 
-Always: any full build's image step.
+Always: any full build's image step. To see the cost: `bake` of any player body with cProfile.
 
 ## Repair
 
-To do: time each body with and without the fallback; if the second bake is the cost, decide the reducer per body
-from the first bake's vertex count before baking, or keep each body's reducer choice in the pass cache by its
-input hash.
+Done (source, branch v0.0.47-build-cores): the sampling takes `inverse[triids]` instead of a new `pinv` per sample,
+and the texel weights (the same for every face) are made once per bake instead of once per face. Byte-identical:
+SHA-256 of frames, faces, UV and skin of the first three bakes of two real bodies (breton male, imperial female) are
+the same before and after; time per bake 8.7 s to 4.6 s, 5.7 s to 3.1 s, 4.6 s to 2.4 s (breton male) and 14.5 s to
+5.2 s and 12.7 s to 5.6 s (imperial female) at 2 cores on a busy host. Rekeyed: every stage that reaches
+`tools/npc_geometry.py` (npcs, hands, hand-catalog, character, the image step's bodies and the NPC gallery); their
+outputs are unchanged, so the dependants stop at the identical outputs.
+
+Plan, not done (needs a measured design): the fallback bodies. (1) The 16 combinations of a search are independent
+until the first fit: the six bodies could run their combinations as separate pool units so the longest body no
+longer sets the step's time (20 bodies on 24 cores leave 4 idle). (2) The combinations of one budget differ only in
+the skin rows and the leg contour, not in the reduction or the per-face transfer: share the reduced shapes and the
+per-face results between them. (3) Keep each body's reducer choice, keyed by SHA-256 of its inputs, in the pass cache
+so a rebuild does not search the locked reducer again.
 
 ## Verification
 
-To do: the perf guard's `bake_body` section back at or under its baseline.
+To do: the perf guard's `bake_body` section back at or under its baseline (92 s with 40 units) in the next full
+build.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -89,6 +140,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-OVERBROAD-33](BUILD-CACHE-OVERBROAD-33.md): CHIM builds rerun the scene chain after merges that cannot change its outputs
 - [BUILD-CACHE-PER-WORKSPACE-33](BUILD-CACHE-PER-WORKSPACE-33.md): Per-file caches live in each build workspace, so a build on a new volume with --reuse-from converts everything again (MiniWind media 1,195 s instead of seconds)
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
+- [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
 - [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers
 - [BUILD-CHIM-REGION-FRAMES-TAIL-43](BUILD-CHIM-REGION-FRAMES-TAIL-43.md): The CHIM region-frame step runs its last frames on one worker while the other cores sit idle
@@ -100,6 +152,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CHIM-STAIR-NO-REUSE-42](BUILD-CHIM-STAIR-NO-REUSE-42.md): The v0.0.42 final walked all 1,118 frames again: the walks of the passed dev1 build carry no check mark, because its launcher never promotes them
 - [BUILD-CHIM-STATS-SERIAL-TAIL-36](BUILD-CHIM-STATS-SERIAL-TAIL-36.md): The chim stage ended with its statistics validating the whole CHIM world a second time, on one core with no output (7 min 44 s on 273 frames)
 - [BUILD-CHIM-UNIT-HULL-KEY-33](BUILD-CHIM-UNIT-HULL-KEY-33.md): CHIM unit cache ignores the standing-hull form: a --model-hull chain build reused routed-hull model units
+- [BUILD-CHIM-VIS-ROWS-KEY-BROAD-46](BUILD-CHIM-VIS-ROWS-KEY-BROAD-46.md): The CHIM visibility rows are keyed on the frames' whole collision, so every collision change redoes 75,904 units, and each frame took 4 times longer
 - [BUILD-CHIM-VIS-ROWS-SERIAL-42](BUILD-CHIM-VIS-ROWS-SERIAL-42.md): The CHIM visibility rows of a build with many new frames run on one worker at a time and print nothing for half an hour or more
 - [BUILD-CHIM-WORLD-SERIAL-TAIL-41](BUILD-CHIM-WORLD-SERIAL-TAIL-41.md): After the region frames the CHIM world conversion prepared the towns one after another and worked out 723 frames' visibility rows in turn: about 7 minutes on 1 to 5 of 24 cores
 - [BUILD-DOOR-REFERENCE-SERIAL-33](BUILD-DOOR-REFERENCE-SERIAL-33.md): The door step reads the whole master once per destination cell
@@ -120,6 +173,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
 - [BUILD-IMAGE-SERIAL-32](BUILD-IMAGE-SERIAL-32.md): The image step runs on one core for about 23 minutes per pass
+- [BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47](BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47.md): The image step parses the 694 MB CHIM source manifest three times, on one core each (16.0 s, 18.5 s, 17.1 s)
 - [BUILD-IMAGE-STAIR-WALK-CORES-43](BUILD-IMAGE-STAIR-WALK-CORES-43.md): The image step's stair walk used 45 % of its cores in the v0.0.43-dev3 build (95 % before): the perf guard failed its walk_unit section
 - [BUILD-IMAGE-STAIR-WALK-SERIAL-36](BUILD-IMAGE-STAIR-WALK-SERIAL-36.md): The image step's stair walk runs one map per worker: a single heavy room keeps one core busy for 13-19 minutes while the others sit idle
 - [BUILD-IMAGE-UNDERUSED-32](BUILD-IMAGE-UNDERUSED-32.md): Parts of the image step still run serially or leave most CPUs idle
@@ -128,8 +182,10 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module
 - [BUILD-MINIWIND-STAGE-CLOSURE-33](BUILD-MINIWIND-STAGE-CLOSURE-33.md): The MiniWind plan puts the CHIM builder modules into every conversion stage's fingerprint
 - [BUILD-NESTED-POOL-ALLOWANCE-33](BUILD-NESTED-POOL-ALLOWANCE-33.md): Pool workers open their own pools sized to the whole stage's allowance
+- [BUILD-NPC-GALLERY-REBUILT-46](BUILD-NPC-GALLERY-REBUILT-46.md): The NPC gallery (3,551 models, 36 minutes) is rebuilt after a change in collision code that its models do not use
 - [BUILD-NPCLOD-PATH-ARG-34](BUILD-NPCLOD-PATH-ARG-34.md): The first --npc-lod on build stopped at its area stage: a Path in the command broke build-state.json
 - [BUILD-OPTIMIZER-CACHE-KEY-BROAD-36](BUILD-OPTIMIZER-CACHE-KEY-BROAD-36.md): Regression: the image step's BSP optimizer pass cache reused 13 of 2,658 maps; its key covers the whole image tool, so any image-code change redoes every map
+- [BUILD-OPTION-RECORD-KEYS-STAGES-47](BUILD-OPTION-RECORD-KEYS-STAGES-47.md): A new builder option entry rebuilds the CHIM, town, flora, engine and image stages: their keys counted all of config/
 - [BUILD-ORDERED-WINDOW-33](BUILD-ORDERED-WINDOW-33.md): The ordered worker pool idles behind one slow item, and hands long items out last
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
@@ -140,6 +196,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-PROFILE-SECTIONS-MISSING-36](BUILD-PROFILE-SECTIONS-MISSING-36.md): Long builder phases printed no elapsed time and recorded no sections: the chim stage's 44-minute stair gate was visible only from cache file times
 - [BUILD-PROFILER-NO-WASTE-ALARM-36](BUILD-PROFILER-NO-WASTE-ALARM-36.md): No profiler, perf ledger or gate flagged idle cores, work done for maps that are removed, or growth of the image
 - [BUILD-PROGRESS-ETA-BASIS-36](BUILD-PROGRESS-ETA-BASIS-36.md): The live build progress took a stage's expected time from earlier runs of any size: dev3's chim stage was expected at 154 s and ran 1 h 48 min
+- [BUILD-RESIDENT-MAP-SLOWER-46](BUILD-RESIDENT-MAP-SLOWER-46.md): The resident-map step of the area and balmora-interiors stages ran 55 to 60 percent slower than its baseline with the same units
 - [BUILD-RESOURCE-PLAN-CHIM-ESTIMATE-44](BUILD-RESOURCE-PLAN-CHIM-ESTIMATE-44.md): The resource plan estimated the CHIM stage at 2 workers and 6 h 13 min; it ran on 24 workers in about 75 min
 - [BUILD-REUSE-APPLY-SERIAL-41](BUILD-REUSE-APPLY-SERIAL-41.md): A reused stage staged its files one at a time: world terrain, scenery and flora took 8 to 12 seconds each, one after another, at the start of every reuse build
 - [BUILD-REUSE-KEYS-TOO-BROAD-35](BUILD-REUSE-KEYS-TOO-BROAD-35.md): A whole build reused no stage, and the cost was not visible before the build started
@@ -155,6 +212,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-STAGE-START-SHARE-33](BUILD-STAGE-START-SHARE-33.md): A pooled stage that starts while others run gets one worker as its start value
 - [BUILD-STAIR-GATE-OOM-42](BUILD-STAIR-GATE-OOM-42.md): The CHIM stair gate runs a whole-Vivec MiniWind out of memory: its worker pool breaks
 - [BUILD-STAIR-WALK-BORDER-COPIES-41](BUILD-STAIR-WALK-BORDER-COPIES-41.md): The CHIM stair gate walks every frame's whole border, so each cell's flights are walked many times and unreachable copies can fail a build
+- [BUILD-STAIR-WALK-OFF-46](BUILD-STAIR-WALK-OFF-46.md): Every build walked the island stairs (about 1.5 million steps per release cycle); the stair walk is now off by default
+- [BUILD-STAIR-WALK-SCOPE-KEY-46](BUILD-STAIR-WALK-SCOPE-KEY-46.md): Development builds walk every step of the island again after any collision change: the CHIM gate ignored the walk scope and keyed each frame by all of its collision
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them

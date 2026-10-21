@@ -714,15 +714,31 @@ def check_polys(polys, scene, core=None, contents=None, proxy=None):
     return _check_items(candidates(polys, core), polys, scene, contents, proxy)
 
 
-# What the walk covers (project decision 9 October 2026): 'all' walks every step and ramp (development
-# builds, the nightly full report); 'flights' walks only the steps of flights, the rows that can stop a
-# build (release candidates and finals). The builder sets the variable (tools/build.py --stair-walk).
+# What the walk covers: 'flights' (the default for every build since v0.0.46, decided for the project 20 October
+# 2026, BUILD-STAIR-WALK-SCOPE-KEY-46) walks only the steps of flights, the rows that can stop a build; 'all'
+# walks every step and ramp (the advisory findings: a nightly or beta run on request). Before, development builds
+# walked 'all' (project decision 9 October 2026) and the CHIM gate ignored the scope. The builder sets the
+# variable (tools/build.py --stair-walk).
 SCOPE_ENV = 'AMIWIND_STAIR_WALK'
 SCOPES = ('all', 'flights')
 
 
+# 2026-10-20 [v0.0.46] the maintainer: "YOU FUCKING FIGURE OUT A WAY TO DO OUR BUILDS WITHOUT THOSE. YOU FUCKING
+# DISABLE IT BY DEFAULT." AMIWIND_STAIR_WALK=off (the builder's default) skips every stair walk; the walks stay
+# selectable (--stair-walk flights|all) and are never deleted (BUILD-STAIR-WALK-OFF-46).
+DEFAULT_OFF = False   # the command-line tools set it while they run (chim_build, chimport); the builder sets AMIWIND_STAIR_WALK=off
+
+
+def walk_off():
+    """True when the stair walk is switched off: AMIWIND_STAIR_WALK=off, or unset in a tool whose default is off."""
+    value = os.environ.get(SCOPE_ENV, '')
+    return value == 'off' or (value == '' and DEFAULT_OFF)
+
+
 def scope_setting():
-    value = os.environ.get(SCOPE_ENV, '') or 'all'
+    value = os.environ.get(SCOPE_ENV, '') or 'flights'
+    if value == 'off':
+        return 'flights'   # walking code is not reached when off; keys stay as for flights
     if value not in SCOPES:
         raise ValueError('%s must be one of %s, not %r' % (SCOPE_ENV, ', '.join(SCOPES), value))
     return value
@@ -873,6 +889,8 @@ def check_map_cached(task):
     raw = Path(path).read_bytes()
     key = hashlib.sha256(raw).hexdigest() + ':' + json.dumps(core)
     record, mark = stair_records.lookup(cache, key)
+    if record is None or mark is None:
+        record, mark = flight_rows_of_all_walk(cache, key, record, mark)
     name = Path(path).stem
     if record is not None and mark is not None:
         # Same keys in the same order; only the map name is this map's (aliases share bytes).
@@ -891,7 +909,26 @@ def check_map_cached(task):
     return name, rows, 'walked', stair_records.store(cache, key, rows)
 
 
+def flight_rows_of_all_walk(cache, key, record=None, mark=None):
+    """(record, mark) for a 'flights' walk from the checked record of an 'all' walk of the same map (options
+    without the scope): its flight rows, which are exactly the rows a flights walk gives (each step is walked on its
+    own; tests/test_release_pass_rules.py), so the walks of earlier development builds and adopted earlier-form
+    records keep being reused when the scope changes (BUILD-STAIR-WALK-SCOPE-KEY-46). (RECORD, MARK) unchanged when
+    the cache is not a flights cache or there is no such checked record."""
+    options = getattr(cache, 'options', None) or {}
+    if options.get('scope') != 'flights':
+        return record, mark
+    import stair_records
+    from pass_cache import PassCache
+    every = PassCache('stair-walk', {k: v for k, v in options.items() if k != 'scope'}, cache.sources, cache.root)
+    found, checked = stair_records.lookup(every, key)
+    if found is None or checked is None:
+        return record, mark
+    return dict(found, rows=[r for r in found['rows'] if r.get('flight')]), checked
+
+
 # Maps of the payload that are not converted game maps: no standing hull, nothing to walk (named, logged, never silent).
+FRAME_MAPS_ENV = 'AMIWIND_STAIR_WALK_FRAME_MAPS'   # 'on': the image step walks the CHIM frame maps too
 NOT_WALKED = {'charplane': 'NPC gallery room (plain compile, no converted standing hull)'}
 
 
@@ -922,11 +959,16 @@ def hull_preflight(tasks):
 def map_tasks(id1, models=None, only=None):
     """(map, core, ref->model) for every map of the payload: town regions with
     their cores, every other map (interiors, open-world regions) whole. Town
-    alias maps (copies of a region under the town's name) are skipped."""
+    alias maps (copies of a region under the town's name) are skipped. CHIM frame maps (map_files.is_chim_frame:
+    an empty world, the frame's entities and collision-only boxes; their geometry is in the CHIM world) are skipped
+    too: the CHIM stair gate walks every frame on its real collision (chim.collision.stair_gate), and the walk of a
+    frame map found no step to walk (v0.0.46-dev1: 1,353 frame maps walked, 0 rows; BUILD-STAIR-WALK-SCOPE-KEY-46).
+    AMIWIND_STAIR_WALK_FRAME_MAPS=on walks them again (the method before v0.0.46)."""
     from town_config import runtime_towns
     from arrival_spot import read_directory
-    from map_files import map_file, map_files
-    id1 = Path(id1); tasks = []; seen = set()
+    from map_files import is_chim_frame, map_file, map_files
+    frame_maps = os.environ.get(FRAME_MAPS_ENV, '') == 'on'
+    id1 = Path(id1); tasks = []; seen = set(); frames_skipped = 0
     aliases = {t['name'] for t in runtime_towns()}
     for town in runtime_towns():
         directory = id1 / town['regions']
@@ -943,7 +985,13 @@ def map_tasks(id1, models=None, only=None):
         if path.stem in NOT_WALKED:
             print('Stair walk: skipped %s: %s' % (path.name, NOT_WALKED[path.stem]), flush=True)
             continue
+        if not frame_maps and is_chim_frame(path):
+            frames_skipped += 1
+            continue
         tasks.append((str(path), None, models or {}))
+    if frames_skipped:
+        print('Stair walk: %d CHIM frame maps not walked here: the CHIM stair gate walks their frames on the CHIM '
+              'world (%s=on walks them here too)' % (frames_skipped, FRAME_MAPS_ENV), flush=True)
     return tasks
 
 
@@ -974,7 +1022,7 @@ def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
     """The gate over a payload; exempt: maps whose blocking failures are
     reported but do not fail it (a recorded, maintainer-approved stage); scope: 'all'
     (every step and ramp) or 'flights' (only the steps of flights, the rows that can
-    fail the gate); default from AMIWIND_STAIR_WALK, else 'all'."""
+    fail the gate); default from AMIWIND_STAIR_WALK, else 'flights'."""
     from build_parallel import ordered_map
     from mesh_geometry_env import stair_mode
     from pass_cache import PassCache
@@ -1100,7 +1148,7 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--maps', nargs='*')
     parser.add_argument('--jobs', type=int, default=1)
-    parser.add_argument('--scope', choices=SCOPES, help="'all' (default, or AMIWIND_STAIR_WALK) or 'flights'")
+    parser.add_argument('--scope', choices=SCOPES, help="'flights' (default, or AMIWIND_STAIR_WALK) or 'all'")
     a = parser.parse_args()
     report = check(a.id1, a.jobs, a.maps, scope=a.scope)
     a.out.write_text(json.dumps(report, indent=1) + '\n', newline='\n')

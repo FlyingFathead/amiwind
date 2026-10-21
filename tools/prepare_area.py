@@ -473,16 +473,29 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
              include_exterior=True,report_name='area-report.json',doors=True,exclude_residents=()):
     palette=(scene/'id1/gfx/palette.lmp').read_bytes()
     kinds,cells,topics=load_master(child_ci(data,'Morrowind.esm'))
-    cast=[]
-    for cell in cells if include_exterior else []:
-        for ref in cell['refs']:
-            key=ref['id'].casefold()
-            if not ref.get('deleted') and key in kinds['NPC_'] and not key.startswith('chargen ') and inside(ref['position']):
-                cast.append(('seyda',ref))
+    # Actors the original's start scripts disable at a new game stay out with --start-disabled original
+    # (tools/start_disabled.py; off by default), listed in left_out with their enable rule.
+    import start_disabled
+    def hold(refs,where):
+        live=[r for r in refs if not r.get('deleted')]
+        if not live or start_disabled.mode()!='original':return list(refs),[]
+        _,held=start_disabled.held(live,start_disabled.table_for(data),where,active=True)
+        out={id(r) for r in live if any(h['reference']==r.get('number') and h['id']==r['id'] for h in held)}
+        kept=[r for r in refs if id(r) not in out]
+        for row in held:print('Resident left out at a new game:',where,row['id'],'(reference %s):'%row['reference'],row['reason'],flush=True)
+        return kept,held
+    cast=[];left_out=[]
+    exterior=[ref for cell in (cells if include_exterior else []) for ref in cell['refs']
+              if not ref.get('deleted') and ref['id'].casefold() in kinds['NPC_']
+              and not ref['id'].casefold().startswith('chargen ') and inside(ref['position'])]
+    exterior,held=hold(exterior,'seyda');left_out.extend(held)
+    cast.extend(('seyda',ref) for ref in exterior)
     # Every room reference the resident stage does not place is listed with its reason (left_out).
     import creature_residents
-    left_out=[];creatures=[]
-    for slug,cell in rooms.items():
+    creatures=[]
+    for slug,cell in list(rooms.items()):
+        refs,held=hold(cell['refs'],slug);left_out.extend(held)
+        cell=dict(cell,refs=refs)
         cast.extend((slug,r) for r in cell['refs'] if not r.get('deleted') and r['type']=='NPC_'
                     and r['id'].casefold() not in exclude_residents)
         left_out.extend({'map':slug,'reference':r['number'],'id':r['id'],'type':r['type'],
@@ -574,6 +587,8 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
     report={'rooms':reports,'cast':placed,'models':models,'doors':doors,'npc_lod':lod_report,
             'creatures':{'mode':creature_residents.mode(),'placed':sum(1 for _,r in creatures if r['id'].casefold() in baked)},
             'left_out':left_out,'talk_greetings':talk.record(),
+            **({'start_disabled':{'mode':'original','held':sum(1 for r in left_out if 'disabled_by' in r)}}
+               if start_disabled.mode()=='original' else {}),
             'scope':'original placed humanoid residents, blocking idle actors and bounded greetings; combat, services, schedules and small-item interactions remain separate systems'}
     (scene/report_name).write_text(json.dumps(report,indent=2)+'\n')
     return report

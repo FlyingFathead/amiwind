@@ -15,6 +15,7 @@
  * model; stats always from combat/actors.txt (the record's own sheet).
  */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_combat.h"
 #include "aw_character.h"
 #include "aw_mappath.h"
@@ -395,8 +396,8 @@ int AW_ArenaKey(int key,int down) {
 }
 static void text_at(int x,int y,const char *s) {
     int w=AW_ConsoleCharWidth();
-    if(y<0 || y+AW_ConsoleCharHeight()>vid.height)return;
-    for(;*s && x+w<=vid.width;s++,x+=w)if(x>=0)AW_ConsoleCharacter(x,y,(unsigned char)*s);
+    if(y<0 || y+AW_ConsoleCharHeight()>(int)vid.height)return;
+    for(;*s && x+w<=(int)vid.width;s++,x+=w)if(x>=0)AW_ConsoleCharacter(x,y,(unsigned char)*s);
 }
 static void centred(int y,const char *s) {text_at((vid.width-(int)strlen(s)*AW_ConsoleCharWidth())/2,y,s);}
 void AW_ArenaDraw(void) {

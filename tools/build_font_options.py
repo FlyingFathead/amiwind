@@ -56,7 +56,22 @@ KNOWN_KEYS = {"bitmap_paper_ink", "follow_original_stair_rules", "builder", "chi
               "heap_mb", "model_hull", "chim_stream_statics", "lava", "world_map", "chim_lighting_type",
               "storage_pool_dir", "npc_head_detail", "npc_head_reducer",
               # NPC model levels of detail: validated and resolved by tools/npc_lod.py.
-              "npc_lod", "npc_lod_levels", "npc_face_lod", "npc_lod_disk_mib"}
+              "npc_lod", "npc_lod_levels", "npc_face_lod", "npc_lod_disk_mib",
+              # The image's disk layout: validated and resolved by tools/layout_plan.py.
+              "disk_layout", "partition_headroom_mib", "boot_partition_headroom_mib"}
+
+
+def add_disk_layout_options(parser):
+    """The image's disk layout options (tools/layout_plan.py; tools/build.py passes them to the image step)."""
+    parser.add_argument("--disk-layout", choices=("compact", "legacy"), default=None,
+                        help="Disk image layout: compact (default, config disk_layout: the fewest partitions the payload "
+                             "needs, each sized from its payload + headroom; tools/layout_plan.py) or legacy (the earlier "
+                             "layout: open-world maps on volumes of their own, partitions payload + 20 %% + 16 MiB)")
+    parser.add_argument("--partition-headroom-mib", type=int, default=None, metavar="MIB",
+                        help="Free space every partition keeps (default 100, config partition_headroom_mib)")
+    parser.add_argument("--boot-partition-headroom-mib", type=int, default=None, metavar="MIB",
+                        help="Free space the boot partition keeps for saves and settings (default: the partition "
+                             "headroom, config boot_partition_headroom_mib)")
 
 
 def add_font_options(parser):
@@ -136,6 +151,13 @@ def _read(path):
         raise ValueError(f"Invalid npc_head_reducer in {path}: expected locked or default")
     if "follow_original_stair_rules" in values and not isinstance(values["follow_original_stair_rules"], bool):
         raise ValueError(f"Invalid follow_original_stair_rules in {path}: expected true or false")
+    if "disk_layout" in values and values["disk_layout"] not in ("compact", "legacy"):
+        raise ValueError(f"Invalid disk_layout in {path}: expected compact or legacy")
+    for name in ("partition_headroom_mib", "boot_partition_headroom_mib"):
+        value = values.get(name)
+        if name in values and not (value is None and name == "boot_partition_headroom_mib") and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 0):
+            raise ValueError(f"Invalid {name} in {path}: expected a whole number of MiB (0 or more)")
     if "storage_pool_dir" in values and not (isinstance(values["storage_pool_dir"], str) and values["storage_pool_dir"]):
         raise ValueError(f"Invalid storage_pool_dir in {path}: expected a folder path")
     return values, {"path": str(path.resolve()), "sha256": hashlib.sha256(raw).hexdigest()}

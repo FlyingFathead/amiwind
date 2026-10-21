@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.44-dev1 at 2026-10-19 15:28 +0300: maintainer: inside and near the Ghostfence the horizon should turn mostly red, grey and brown, and the sky more red as the player approaches
 - Reported with v0.0.45 at 2026-10-20 02:30 +0300: still blue in v0.0.45 (no weather table); cause: clear-weather colours only, no region weather written; fixed on branch v0.0.46-sky-pedestal, needs a world build
+- Reported with v0.0.46 at 2026-10-20 21:33 +0300: maintainer, v0.0.46 playtest: inside the Ghostfence the blight sky turns blue at once (time = when the report reached the fix; the report's own time was not passed on)
 
 <!-- END GENERATED PERSISTING -->
 
@@ -18,7 +19,7 @@
 | Where | Red Mountain region inside the Ghostfence, cell 2,5 (global 20605 47338 4890, game time 15:47) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.44-dev1, v0.0.45 (last seen) |
+| Persists in | v0.0.46 (last seen) |
 | Severity | medium: the most important region of the game loses its look |
 | Family | Lighting, lamps and night (`lighting-night`) |
 | Playtest version | 2026_10_19_v0.0.44-dev1_full-batch5-try6_793d7c14 |
@@ -28,13 +29,14 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 20 October 2026](#status-20-october-2026)
+- [Reported again with v0.0.46](#reported-again-with-v0046)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -49,8 +51,52 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 ## Status: 20 October 2026
 
+**Reported again with v0.0.46 (open, persisting).** The maintainer, in the v0.0.46 playtest: inside the Ghostfence
+the blight sky turns blue while he is still inside the fence. See
+[Reported again with v0.0.46](#reported-again-with-v0046) below. A fix is on branch v0.0.46-ghostfence. It is
+checked in game in a fresh play copy of the v0.0.46 image with the fixed engine, but it is not gated or in a
+build yet.
+
+Earlier the same day: fixed in v0.0.46. The maintainer checked the v0.0.46-dev1 playtest on the evening of 20 October 2026: "at least the red mountain is now red". The weather itself (clouds, rain, ash) is still missing and is not part of this bug.
+The text below is the state before that build.
+
 Cause found; repaired in the source on branch v0.0.46-sky-pedestal (region weather, every region), not yet in a
 build. Still present in v0.0.45 (its world has no weather table). Needs a world rebuild and an in-game look.
+
+## Reported again with v0.0.46
+
+Two causes, found in the game data, OpenMW and the engine:
+
+- **The sky switched at once at every cell border.** Every exterior cell is its own CHIM frame. The default
+  crossing loads the next frame as a new map: a map change, and a load that can take over 2 seconds on the
+  Amiga. The weather code took both for an arrival, as after travel or a load, and put the new cell's weather
+  there at once instead of changing to it over time. In game, at Ghostgate, walking south from Red Mountain
+  (cell 2,5) into cell 2,4 while still inside the fence:
+  - with the v0.0.46 engine, `dbg weather` said `ash` at the first look after the crossing;
+  - with the fixed engine it said `blight changing to ash` 9 %, 41 %, 70 % and 98 % over the next 32 seconds,
+    then `ash`.
+- **Part of the fenced-in area is not Red Mountain in the game data.** The Ghostfence is not the border of the
+  Red Mountain region. 22 of the 36 cells the fence runs through belong to the Ashlands region in Morrowind.esm
+  (the other 14 to Red Mountain). Measured over the fence line, 9.8 % of the area inside the fence lies in Ashlands cells:
+  a strip along the inside of the fence, including the north side of Ghostgate. Every one of the 37 Red Mountain
+  cells is inside the fence. The original and OpenMW take the weather from the cell's own region. OpenMW 0.51
+  (`apps/openmw/mwworld/weather.cpp`: `update` passes the player cell's region to `updateWeatherRegion`) does the
+  same at the same place. Walking from Red Mountain into cell 2,4 at Ghostgate, its weather went from Blight to
+  the Ashlands' Foggy of that day; the change was half done about 35 seconds later. So the sky inside that strip
+  does change, in the original too, but slowly, not at once.
+
+Today's Ashlands weather decides the colour it changes to: ash storm, overcast, cloudy, foggy or clear. Clear and
+cloudy are blue-grey skies, together 35 % of its days.
+
+The fix follows OpenMW's rules (read, not copied):
+
+- A new weather starts a transition at its Transition Delta when none runs.
+- While a transition runs, the next weather is queued until it ends, instead of the sky jumping back.
+- A cell without a region keeps the weather it had.
+- Only an arrival puts the new weather there at once: the first frame, a jump of over half a cell, or an hour or
+  more of game time.
+
+The region stays the cell's own, as in the data.
 
 ## Symptom
 
@@ -116,6 +162,12 @@ a flickering glow ([IDEAS](../chim/IDEAS.md#the-ghostfence-as-a-quake-turbulent-
 
 ## Verification
 
+Reported again with v0.0.46: `tests/aga_weather_rules_test.c` covers the transition, the queue, the time carried
+over, a cell without a region and the arrival thresholds; `tests/test_region_weather.py` covers the wiring. In game:
+the walk south across the cell border at Ghostgate, recorded with the v0.0.46 engine and with the fixed engine
+(same image, same scripted route), and the same walk in OpenMW.
+
+
 Done (source, 20 October 2026): `tests/test_world_ui_assets.py` (the weather table follows the region order and
 chances; Red Mountain's row is blight 100; the shipped clear colours equal the engine's clear stops),
 `tests/test_region_weather.py` with `tests/aga_weather_rules_test.c` (roll, 20-hour period, table shape, Red
@@ -172,5 +224,9 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - TORCH-LIGHT-29 (no report page): Torch flames look weak and provide little immediate light
 - TORCH-NPC-LIGHT-29 (no report page): Nearby NPCs do not visibly respond to torchlight
 - TORCHTEST-DARKNESS-29 (no report page): Torch test room floor stays dim gray at zero light
+
+Related bugs in other categories:
+
+- [GHOSTFENCE-NO-ANIMATION-46](GHOSTFENCE-NO-ANIMATION-46.md): The Ghostfence's shimmering curtain does not move: its texture scroll is dropped by the converter
 
 <!-- END GENERATED CATEGORY -->

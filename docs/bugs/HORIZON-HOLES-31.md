@@ -1,5 +1,14 @@
 # HORIZON-HOLES-31: distant buildings break up against the sky
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.44 at 2026-10-19 18:28 +0300: maintainer: distant topology still breaks up (counted as a bug); idea: a very low-poly depth/silhouette model of the world for the distance, with the far-terrain and mold-shell layers; later to-do
+- Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -24,6 +33,7 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Status: 7 October 2026](#status-7-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

@@ -36,7 +36,7 @@ int AW_NavLoad(const char *map) {
     if(strlen(map)>16 || strstr(map,"..") || strchr(map,'/'))return 0;
     sprintf(path,"intro/%s.awn",map);n=COM_FOpenFile(path,&f);
     if(!f)return 0;
-    if(n<6 || n>sizeof(raw) || fread(raw,1,n,f)!=n){fclose(f);return 0;}
+    if(n<6 || n>(int)sizeof(raw) || fread(raw,1,n,f)!=(size_t)n){fclose(f);return 0;}
     fclose(f);return AW_NavDecode(raw,n);
 }
 static int nearest(vec3_t point) {

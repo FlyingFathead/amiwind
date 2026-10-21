@@ -315,7 +315,7 @@ class ChimUnitProvenance(Base):
         fp = fingerprint('pvs', {'cells': [1, 2]})
         cache.put('pvs', fp, {'rows': [7]})
         path = cache._path('pvs', fp)
-        self.assertEqual(path.read_bytes(), pickle.dumps((fp, {'rows': [7]}), protocol=4))
+        self.assertEqual(path.read_bytes(), pickle.dumps((str(fp), {'rows': [7]}), protocol=4))
         record = cp.read_sidecar(path)
         self.assertComplete(record)
         self.assertEqual(record['output_sha256'], sha(path.read_bytes()))

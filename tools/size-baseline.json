@@ -8,32 +8,32 @@
  "drives": [
   {
    "bytes": 3623911424,
-   "file": "AmiWind-v0.0.45.hdf"
+   "file": "AmiWind-v0.0.46.hdf"
   }
  ],
  "groups": {
   "chim-world": {
-   "bytes": 1321960842,
+   "bytes": 1344485254,
    "files": 38364
   },
   "classic-maps": {
-   "bytes": 305804364,
-   "files": 201
+   "bytes": 308234492,
+   "files": 1385
   },
   "music": {
    "bytes": 56272804,
    "files": 21
   },
   "npc-gallery": {
-   "bytes": 234011352,
+   "bytes": 234005720,
    "files": 7106
   },
   "other": {
-   "bytes": 90886696,
-   "files": 1223
+   "bytes": 90908949,
+   "files": 1224
   },
   "progs": {
-   "bytes": 407779363,
+   "bytes": 407772586,
    "files": 2766
   },
   "sound": {
@@ -46,10 +46,10 @@
   }
  },
  "labels": [],
- "note": "AmiWind v0.0.45 release image (the previous release); payload totals of earlier builds, GiB: v0.0.41 3.81 (NPC gallery 0.21), v0.0.44 2.57, v0.0.45 2.57 (NPC gallery 0.22)",
- "payload_bytes": 2762877803,
- "run": "2026_10_19_v0.0.45_release-try2_c9099fb8",
+ "note": "AmiWind v0.0.46 release image (the previous release); payload totals of earlier builds, GiB: v0.0.41 3.81 (NPC gallery 0.21), v0.0.44 2.57, v0.0.45 2.57 (NPC gallery 0.22), v0.0.46 2.60",
+ "payload_bytes": 2787842187,
+ "run": "2026_10_20_v0.0.46_release_a3fb9b74",
  "schema": "amiwind-size-ledger-v1",
  "status": "complete",
- "version": "0.0.45"
+ "version": "0.0.46"
 }

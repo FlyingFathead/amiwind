@@ -19,7 +19,7 @@
 | Where | Ebonheart plaza, ex_imp_dragonstatue (vivec_city frame, cell 2,-13) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.41, v0.0.42-dev1, v0.0.45 (last seen) |
+| Persists in | fixed in v0.0.46 |
 | Severity | medium: A landmark statue hangs in the air over the plaza in every build since at least v0.0.41 |
 | Family | Mesh converter geometry (`converter-geometry`) |
 | Playtest version | v0.0.42-dev1 (full-dev1-proof) |
@@ -29,7 +29,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -50,6 +50,9 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 <!-- contents end -->
 
 ## Status: 20 October 2026
+
+Fixed in v0.0.46. The maintainer checked the v0.0.46-dev1 playtest on the evening of 20 October 2026: "ebonheart's statue pedestal is at least confirmed fixed, just checked it out".
+The text below is the state before that build.
 
 Cause found: the converter applied the translation of the model's root node, which the game drops. Repaired in
 the source on branch v0.0.46-sky-pedestal for every model at once (25 models, 723 placements island-wide), not
@@ -176,6 +179,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - BSP-LIGHT-01 (no report page): Vodunius face lightmap range exceeded its lighting lump
 - [BUILD-INTERIOR-INDEX-ROUTED-33](BUILD-INTERIOR-INDEX-ROUTED-33.md): Full build stops in the interior stage: the prison ship collision index expects a convex-piece chain, but the converter now routes large standing hulls
 - [BUILD-SEYDA-OCEAN-FLOOR-40](BUILD-SEYDA-OCEAN-FLOOR-40.md): Expanded Seyda ocean terrain collapses onto the fixed BSP seal
+- [CHIM-DOCK-TERRAIN-SEAM-47](CHIM-DOCK-TERRAIN-SEAM-47.md): A pale sliver gap shows where a dock end meets the ground (Bitter Coast, cell -5,-6)
 - [CHIM-ROCKS-OPEN-SHELLS-43](CHIM-ROCKS-OPEN-SHELLS-43.md): Several rock meshes on CHIM do not close up: open faces where the rock should be solid
 - [CHIM-STRIDER-SCALED-SEAMS-36](CHIM-STRIDER-SCALED-SEAMS-36.md): Seyda Neen's silt strider (scale 0.89 variant) still shows open seams; Balmora's (scale 1.0) is closed
 - [CHIM-TERRAIN-DIAGONAL-40](CHIM-TERRAIN-DIAGONAL-40.md): Terrain triangle diagonals differ from the OpenMW 0.48 reference
@@ -189,6 +193,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [EXTENTS-RULE-OLD-INTERIORS-32](EXTENTS-RULE-OLD-INTERIORS-32.md): The v0.0.32 extent rule breaks the lightmaps of interiors converted before the grid fix
 - GEO-01 (no report page): Giant mushroom cap gaps after material-wise mesh reduction
 - GEO-03 (no report page): Canonical clipping stored reversed-winding fragments
+- [GHOSTFENCE-NO-ANIMATION-46](GHOSTFENCE-NO-ANIMATION-46.md): The Ghostfence's shimmering curtain does not move: its texture scroll is dropped by the converter
 - INLAND-SHORE-29 (no report page): v0.0.29-dev1: Angular/jagged inland shoreline
 - [INTERIOR-HULL-CHAIN-33](INTERIOR-HULL-CHAIN-33.md): The Arena Pit's main structure collides through one chain of 36,545 clipnodes; every trace in the room walks it
 - [LIGHTMAP-GRID-31](LIGHTMAP-GRID-31.md): Some baked lightmaps sit one sample row or column off

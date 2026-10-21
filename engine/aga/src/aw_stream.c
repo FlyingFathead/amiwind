@@ -58,7 +58,7 @@ void AW_StreamTick(const char *next) {
         capacity=wanted;
         /* Reserve room for decoding and active aliases. Allocation may evict
          * cache data but cannot consume the protected low/high hunk arena. */
-        if(host_parms.memsize-Hunk_LowMark()-Hunk_HighMark()<capacity+256*1024){failed=1;return;}
+        if((long)(host_parms.memsize-Hunk_LowMark()-Hunk_HighMark())<(long)capacity+256*1024L){failed=1;return;}
         if(COM_FOpenFile((char *)next,&f)<0 || !f){failed=1;return;}
         input=f;Cache_Alloc(&cache,capacity,"next-cell");
     }

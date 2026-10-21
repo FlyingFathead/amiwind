@@ -9,7 +9,7 @@
 | Where | engine heap size (sys_amiga.c Sys_Init); Vivec city warns 'hunk-gap safety below 2 MiB' |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.43-dev2 (last seen) |
+| Persists in | fixed in v0.0.45 |
 | Severity | medium: players with more RAM get no benefit: memory warnings and load pauses that spare RAM could avoid |
 | Family | Map heap and memory budget (`heap-memory`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |

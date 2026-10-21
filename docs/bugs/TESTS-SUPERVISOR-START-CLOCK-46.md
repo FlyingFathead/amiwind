@@ -9,7 +9,7 @@
 | Where | tests/test_build_stage_supervisor.py LargestFirst.test_completed_map_submits_by_cost |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.46-dev1 (last seen) |
+| Persists in | fixed in v0.0.46 |
 | Severity | low: A gate failed on a correct change; no build was affected |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | v0.0.46-dev1 |

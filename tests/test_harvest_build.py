@@ -111,7 +111,9 @@ def gates(failing=()):
     return admission
 
 
-class HarvestBuild(unittest.TestCase):
+class HarvestCase(unittest.TestCase):
+    """The synthetic source and stage helpers (no tests of its own)."""
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -136,6 +138,8 @@ class HarvestBuild(unittest.TestCase):
                 harvest_build.clear_baked(self.root / source, id1, work, data_files=self.data, jobs=jobs)
             return harvest_build.install(self.root / source, id1, work, data_files=self.data, sizes={}, jobs=jobs)
 
+
+class HarvestBuild(HarvestCase):
     def test_plan_generated_from_the_players_data(self):
         receipt = self.prepare()
         self.assertEqual(receipt['placements'], 3)
@@ -379,6 +383,124 @@ class HarvestBuild(unittest.TestCase):
         limits = harvest_build.runtime_limits()
         self.assertEqual(limits['plants'], harvest_build.MAX_PLANTS)
         self.assertEqual(limits['models'], 8)
+
+
+# HARVEST-INTERIOR-PICK-47: one interior with a representable mushroom (201) and an owned one (202, left baked).
+CAVE = 'Test Cave'
+CAVE_PLANTS = ((201, (400., 800., -40.), b''), (202, (440., 800., -40.), b'someone\0'))
+
+
+def interior_master():
+    body = sub('NAME', CAVE.encode() + b'\0') + sub('DATA', struct.pack('<Iii', 1, 0, 0))
+    for number, position, owner in CAVE_PLANTS:
+        body += sub('FRMR', struct.pack('<I', number)) + sub('NAME', b'plant\0') + \
+            sub('DATA', struct.pack('<6f', *position, 0, 0, 0)) + (sub('ANAM', owner) if owner else b'')
+    return master() + record('CELL', body)
+
+
+def stage_interior(root, origin=(0., 0., 0.)):
+    """stage() plus one interior room map (mitestcave) that bakes plant 201 as a brush entity (aw_ref) at its
+    quarter-scale original position shifted by `origin` (a recentred room)."""
+    id1 = stage(root)
+    position = [v * .25 + o for v, o in zip(CAVE_PLANTS[0][1], origin)]
+    (id1 / 'maps/mitestcave.bsp').write_bytes(bsp((201, position)))
+    return id1
+
+
+class InteriorHarvest(HarvestCase):
+    """HARVEST-INTERIOR-PICK-47: interior mushrooms share the world's pick state (one global index, one digest)."""
+
+    def setUp(self):
+        super().setUp()
+        (self.data / 'Morrowind.esm').write_bytes(interior_master())
+
+    def prepare(self, name='harvest', jobs=1, interiors=True):
+        with patch('prepare_scenery.export_refs', fake_export_refs), \
+                patch('prepare_hand_catalog.runtime_palette', lambda data, palette: PALETTE):
+            return harvest_build.prepare(self.data, self.root / 'palette.lmp', self.root / name, jobs=jobs,
+                                         interiors=interiors)
+
+    def test_interior_placements_join_the_source_owned_ones_stay_baked(self):
+        receipt = self.prepare()
+        self.assertEqual((receipt['placements'], receipt['interior_placements']), (4, 1))
+        self.assertEqual([(r['number'], r['cell']) for r in receipt['interior_refused']], [(202, CAVE)])
+        self.assertIn('ownership', receipt['interior_refused'][0]['reason'])
+        self.assertTrue(receipt['settings']['interiors'])
+        off = self.prepare('harvest-off', interiors=False)
+        self.assertEqual((off['placements'], off['interior_placements'], off['interior_refused']), (3, 0, []))
+        # Both sources share the one global index: the same digest and slot count (saves stay compatible).
+        self.assertEqual((receipt['global_catalogue_sha256'], receipt['global_slots']),
+                         (off['global_catalogue_sha256'], off['global_slots']))
+
+    def test_interior_room_gets_its_catalogue_and_loses_the_baked_plant(self):
+        receipt = self.prepare()
+        id1 = stage_interior(self.root / 's')
+        staging = self.install(id1)
+        self.assertEqual(staging['baked_removal'], dict(maps=1, placements=1))
+        self.assertNotIn('201', [e.get('aw_ref') for e in
+                                 entities(lumps((id1 / 'maps/mitestcave.bsp').read_bytes())[0])])
+        catalogue = (id1 / 'harvest-mitestcave.txt').read_text().splitlines()
+        header = catalogue[0].split()
+        self.assertEqual((header[0], header[3], header[5]), ('AWH4', '1', receipt['global_catalogue_sha256']))
+        plant = catalogue[-1].split()
+        self.assertEqual(plant[2], '201')
+        # The plant's slot is its slot in the global index (the one the outdoor catalogues use).
+        from prepare_harvest import identity_key, placement_index
+        from world_flora import inventory
+        indices, digest_ = placement_index(inventory(interior_master(), ('small_mushroom',)))
+        self.assertEqual(digest_, receipt['global_catalogue_sha256'])
+        self.assertEqual(int(plant[1]), indices[identity_key((hashlib.sha256(interior_master()).hexdigest(),
+                                                              'interior', CAVE, 201))])
+        # Room coordinates: the quarter-scale original position, origin 0 0 0.
+        self.assertEqual([float(v) for v in plant[7:10]], [100., 200., -10.])
+        self.assertEqual(staging['families']['interior'], dict(maps=1, with_plants=1, admitted=1, plants=1))
+        plan = json.loads((id1.parent / 'work/harvest-plan.json').read_text())
+        row = [m for m in plan['maps'] if m['name'] == 'mitestcave'][0]
+        self.assertEqual((row['origin'], row['coverage'], len(row['keys'])), ([0., 0., 0.], None, 1))
+        # Exterior coverage never takes the interior plant (vf0001 covers its position): still three outdoors.
+        self.assertEqual(len([m for m in plan['maps'] if m['name'] == 'vf0001'][0]['keys']), 3)
+
+    def test_a_recentred_room_keeps_its_origin(self):
+        self.prepare()
+        id1 = stage_interior(self.root / 's', origin=(-64., 32., 0.))
+        self.install(id1)
+        plant = (id1 / 'harvest-mitestcave.txt').read_text().splitlines()[-1].split()
+        self.assertEqual([float(v) for v in plant[7:10]], [36., 232., -10.])
+        plan = json.loads((id1.parent / 'work/harvest-plan.json').read_text())
+        self.assertEqual([m for m in plan['maps'] if m['name'] == 'mitestcave'][0]['origin'], [64., -32., 0.])
+
+    def test_disagreeing_room_origins_are_refused(self):
+        refs = [dict(number=201, cell=CAVE, position=[400., 800., -40.]),
+                dict(number=203, cell=CAVE, position=[0., 0., 0.])]
+        id1 = Path(self.root / 'r/id1')
+        (id1 / 'maps').mkdir(parents=True)
+        (id1 / 'maps/mitestcave.bsp').write_bytes(b'')
+
+        def bound(task):
+            return 'mitestcave', [(201, [100., 200., -10.]), (203, [5., 0., 0.])]
+        with patch('harvest_build._interior_bound', bound), \
+                self.assertRaisesRegex(ValueError, 'mitestcave binds plants at disagreeing origins'):
+            harvest_build.interior_rows(id1, refs, jobs=1)
+
+    def test_interior_harvest_off_keeps_the_room_baked(self):
+        self.prepare(interiors=False)
+        id1 = stage_interior(self.root / 's')
+        before = (id1 / 'maps/mitestcave.bsp').read_bytes()
+        staging = self.install(id1)
+        self.assertEqual((id1 / 'maps/mitestcave.bsp').read_bytes(), before)
+        self.assertFalse((id1 / 'harvest-mitestcave.txt').exists())
+        self.assertNotIn('interior', staging['families'])
+
+    def test_builder_option_reaches_the_step(self):
+        import argparse
+        import build
+
+        def tool(*a):
+            return [str(v) for v in a]
+        on = build.harvest_steps(argparse.Namespace(data_files='D', harvest_interiors='on'), tool, Path('r'), 4)[0]
+        off = build.harvest_steps(argparse.Namespace(data_files='D', harvest_interiors='off'), tool, Path('r'), 4)[0]
+        self.assertNotIn('--interiors', on[1])
+        self.assertEqual(off[1][off[1].index('--interiors') + 1], 'off')
 
 
 class ImageHooks(unittest.TestCase):

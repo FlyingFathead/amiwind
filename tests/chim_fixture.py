@@ -300,7 +300,7 @@ def pack_order(nx, ny, sector):
 
 def write_world(root, cell, low, grain, nx, ny, chunks, models, textures, owned_total, settings=None,
                 sees=None, sector=3, model_textures=None, terrain_textures=(3,), sees_placement=None,
-                lead=None, rows=False, refs=False):
+                lead=None, rows=False, refs=False, placed=False, reach=False):
     """chunks: {(cx, cy): (owned records, reach records, terrain image)};
     models: brush images by id; textures: miptex bytes by id;
     sees(a, b): chunk index a sees chunk index b (PVS rows), default all;
@@ -311,7 +311,11 @@ def write_world(root, cell, low, grain, nx, ny, chunks, models, textures, owned_
     the file table): this frame's placement ids then start at that count (worlds of several frames);
     rows: sector files in one folder per sector row (format 0.6, frames of more than 64 sectors);
     refs: terrain references (format 0.7): each chunk's terrain moved to chunk-local units, stored once per
-    content as a TERR record (homed where first met) and named by a CHK1 reference block."""
+    content as a TERR record (homed where first met) and named by a CHK1 reference block.
+    placed: world format 0.8 (chim.placed): the records are 56 bytes (chim.placed.placement) and every chunk head says
+    so.
+    reach (with placed): world format 0.9 (chim.reach): every reach copy is written as a reference to its owner
+    record (the owner chunk's index and the record's position among that chunk's owned records)."""
     first = lead[1] if lead else 0
     from chim import format as F
     order, sectors = F.sector_order(nx, ny, sector)
@@ -320,10 +324,10 @@ def write_world(root, cell, low, grain, nx, ny, chunks, models, textures, owned_
     home_model, home_texture = {}, {}
     for i, c in enumerate(order):
         s = i // (sector * sector)
-        owned, reach, image = chunks[c]
+        owned, reached, image = chunks[c]
         for tex in terrain_textures:
             home_texture.setdefault(tex, s)
-        for rec in owned + reach:
+        for rec in owned + reached:
             m = F.read_placement(rec)['model']
             if m not in home_model:
                 home_model[m] = s
@@ -335,6 +339,19 @@ def write_world(root, cell, low, grain, nx, ny, chunks, models, textures, owned_
         home_texture.setdefault(k, 0)
     folder = 'frames/x%+03d/y%+03d' % cell
     version = F.REFS_FORMAT_VERSION if refs else F.FORMAT_VERSION
+    chunk_record, chunk_record_ref = F.chunk_record, F.chunk_record_ref
+    if placed:
+        from chim import placed as P
+        version = P.FORMAT_VERSION
+        chunk_record, chunk_record_ref = P.chunk_record, P.chunk_record_ref
+    position = {}
+    if reach:
+        from chim import reach as RI
+        version = RI.FORMAT_VERSION
+        chunk_record, chunk_record_ref = RI.chunk_record, RI.chunk_record_ref
+        for i, c in enumerate(order):
+            for k, rec in enumerate(chunks[c][0]):
+                position[F.read_placement(rec)['pid']] = (i, k)
     terrain_id, terrain_images, ref_of = {}, [], {}
     if refs:
         for i, c in enumerate(order):
@@ -349,7 +366,9 @@ def write_world(root, cell, low, grain, nx, ny, chunks, models, textures, owned_
         records = []
         for i in range(s * sector * sector, (s + 1) * sector * sector):
             c = order[i]
-            owned, reach, image = chunks[c]
+            owned, reached, image = chunks[c]
+            if reach:
+                reached = [RI.reach_ref(*position[F.read_placement(rec)['pid']]) for rec in reached]
             bits = bytearray((len(order) + 7) // 8)
             for other in range(len(order)):
                 if sees is None or sees(i, other):
@@ -359,15 +378,15 @@ def write_world(root, cell, low, grain, nx, ny, chunks, models, textures, owned_
                 if sees_placement is None or sees_placement(i, pid + first):
                     pbits[pid >> 3] |= 1 << (pid & 7)
             if refs:
-                data, render, coll = F.chunk_record_ref(owned, reach, compress_row(bytes(bits)),
+                data, render, coll = chunk_record_ref(owned, reached, compress_row(bytes(bits)),
                                                         F.terrain_ref(ref_of[i][0], 0, 0, 0, 0, ref_of[i][1]),
                                                         image_leaves(image), compress_row(bytes(pbits)))
             else:
-                data, render, coll = F.chunk_record(owned, reach, compress_row(bytes(bits)), image,
+                data, render, coll = chunk_record(owned, reached, compress_row(bytes(bits)), image,
                                                     F.render_extent(image), image_leaves(image),
                                                     compress_row(bytes(pbits)))
             records.append((b'CHNK', i, data))
-            chunk_rows.append([c[0], c[1], s, None, render, coll, len(owned), len(reach), -64, 64])
+            chunk_rows.append([c[0], c[1], s, None, render, coll, len(owned), len(reached), -64, 64])
         records += [(b'TERR', t, img) for t, (img, home) in enumerate(terrain_images) if home == s]
         records += [(b'MODL', m, models[m]) for m in sorted(home_model) if home_model[m] == s]
         records += [(b'TEXR', k, textures[k]) for k in sorted(home_texture) if home_texture[k] == s]
@@ -437,6 +456,168 @@ def write_world(root, cell, low, grain, nx, ny, chunks, models, textures, owned_
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(blob)
     return out
+
+
+def map_bytes(entity_text):
+    """A minimal BSP29 file whose entity lump is entity_text (bytes, without the closing NUL)."""
+    text = entity_text + b'\0'
+    header = struct.pack('<i', 29) + struct.pack('<2i', 124, len(text)) + bytes(124 - 12)
+    return header + text
+
+
+# ---------------------------------------------------------------- a world of region frames (type 1 crossings)
+
+# Region frames as the CHIM builder makes them (docs/chim/CHIM_REGIONS.md): one cell of 2,048 units each,
+# centred on the cell, with a 896-unit terrain margin: 15 x 15 chunks of 256 units from -1,920.
+REGION_CELL, REGION_GRAIN, REGION_NX, REGION_LOW, REGION_SECTOR = 2048, 256, 15, -1920.0, 3
+# The placements of every frame, frame-local: (name, x, y). 'border' sits in the chunk that straddles the
+# east border (x 896..1152); 'apron' is outside the frame's cell, on its east neighbour's ground (a copy of
+# the neighbour's 'twin', at the same place); every frame has a 'twin' at its own west side.
+REGION_PLACEMENTS = (('centre', 0.0, 0.0), ('border', 1000.0, 0.0), ('west', -1000.0, 0.0),
+                     ('twin', -948.0, 100.0), ('apron', 1100.0, 100.0))
+
+
+def region_ground(gx, gy):
+    """The ground height of the chunk at global chunk lattice (gx, gy): the same in every frame that holds it."""
+    return float(((gx * 3 + gy * 5) % 4) * 8)
+
+
+def region_chunk_lattice(cell, cx, cy):
+    """Global chunk lattice coordinates of frame cell's chunk (cx, cy)."""
+    step = REGION_CELL // REGION_GRAIN
+    return cell[0] * step + cx, cell[1] * step + cy
+
+
+def write_region_world(root, cells, settings=None, statics=True):
+    """chim/ with one region frame per cell (pack order as given) and maps/w_<x>_<y>.bsp frame maps:
+    terrain references (format 0.7), the REGION_PLACEMENTS of each frame (model 0), one streamed aw_flora
+    static per frame (progs/f.spr, written by the C test) at frame-local (500, 500). Placement ids run on
+    across frames in pack order. Returns {cell: first placement id}."""
+    from chim import format as F
+    models = [box_bsp([((-16, -16, 0), (16, 16, 64))], texture_ids=[0])]
+    textures = [miptex('surface%d' % i, seed=i) for i in range(4)]
+    version = F.REFS_FORMAT_VERSION
+    order, sectors = F.sector_order(REGION_NX, REGION_NX, REGION_SECTOR)
+    index_of = {c: i for i, c in enumerate(order)}
+    out = Path(root) / 'chim'
+    files, blobs, firsts, model_rows, texture_rows = [], [], {}, [], []
+    first = 0
+    renders = {}
+    for frame_index, cell in enumerate(cells):
+        firsts[tuple(cell)] = first
+        folder = 'frames/x%+03d/y%+03d' % tuple(cell)
+        frame_row = len(files)
+        owned = {c: [] for c in order}
+        for k, (name, x, y) in enumerate(REGION_PLACEMENTS):
+            c = (int((x - REGION_LOW) // REGION_GRAIN), int((y - REGION_LOW) // REGION_GRAIN))
+            gx, gy = region_chunk_lattice(cell, *c)
+            z = region_ground(gx, gy)
+            owned[c].append(placement(first + k, 1000 * (len(firsts)) + k, 0, (x, y, z), 0.0, index_of[c],
+                                      ((x - 17, y - 17, z - 1), (x + 17, y + 17, z + 65))))
+        owned_total = len(REGION_PLACEMENTS)
+        terrain_id, terrain_images, ref_of = {}, [], {}
+        for i, c in enumerate(order):
+            x0, y0 = REGION_LOW + c[0] * REGION_GRAIN, REGION_LOW + c[1] * REGION_GRAIN
+            image = terrain_bsp((x0, y0, x0 + REGION_GRAIN, y0 + REGION_GRAIN),
+                                region_ground(*region_chunk_lattice(cell, *c)))
+            local = F.translate_image(image, (-x0, -y0, 0.0))
+            if local not in terrain_id:
+                terrain_id[local] = len(terrain_images)
+                terrain_images.append((local, i // (REGION_SECTOR * REGION_SECTOR), image_leaves(image)))
+            ref_of[i] = (terrain_id[local], (x0, y0, 0.0), image_leaves(image))
+        everything = bytes((len(order) + 7) // 8 * [255])
+        pbits = bytes((owned_total + 7) // 8 * [255])
+        first_sector = {}
+        records_of = []
+        for s in range(len(sectors)):
+            records = []
+            for i in range(s * REGION_SECTOR * REGION_SECTOR, (s + 1) * REGION_SECTOR * REGION_SECTOR):
+                records.append([b'CHNK', i, None])
+            records += [[b'TERR', t, img] for t, (img, home, _) in enumerate(terrain_images) if home == s]
+            if frame_index == 0 and s == 0:
+                records += [[b'MODL', m, models[m]] for m in range(len(models))]
+                records += [[b'TEXR', k, textures[k]] for k in range(len(textures))]
+            records_of.append(records)
+        # TERR rows: where each terrain record lands (offsets do not depend on the CHNK records' contents
+        # beyond their sizes, which a reference block fixes: write twice).
+        def sector_blobs(terr_at):
+            blobs_now = []
+            for s, records in enumerate(records_of):
+                recs = []
+                for kind, i, data in records:
+                    if kind == b'CHNK':
+                        c = order[i]
+                        tid, shift, leaves = ref_of[i]
+                        row, offset = terr_at.get(tid, (0, 0))
+                        img = terrain_images[tid][0]
+                        data, renders[i], _ = F.chunk_record_ref(owned[c], [], compress_row(everything),
+                                                  F.terrain_ref(tid, row, offset, len(img), F.render_extent(img),
+                                                                shift),
+                                                  leaves, compress_row(pbits))
+                    recs.append((kind, i, data))
+                blobs_now.append(F.sector_file(recs, version))
+            return blobs_now
+        sector_data = sector_blobs({})
+        terr_at = {}
+        for s, d in enumerate(sector_data):
+            for r in F.read_sector(d):
+                if r['kind'] == b'TERR':
+                    terr_at[r['id']] = (frame_row + 1 + s, r['offset'])
+        sector_data = sector_blobs(terr_at)
+        located = {}
+        chunk_rows = []
+        for s, d in enumerate(sector_data):
+            for r in F.read_sector(d):
+                located[(r['kind'], r['id'])] = (s, r['offset'], r['bytes'])
+        for i, c in enumerate(order):
+            s, o, n = located[(b'CHNK', i)]
+            chunk_rows.append((c[0], c[1], s, o, renders[i], 0, len(owned[c]), 0, -64, 64))
+        if frame_index == 0:
+            for m, image in enumerate(models):
+                s, o, n = located[(b'MODL', m)]
+                model_rows.append(('m%d' % m, frame_row + 1 + s, o, n, F.render_extent(image)))
+            for k, mip in enumerate(textures):
+                s, o, n = located[(b'TEXR', k)]
+                w, h = struct.unpack_from('<2I', mip, 16)
+                texture_rows.append(('t%d' % k, frame_row + 1 + s, o, n, w, h))
+        centre = (cell[0] * 4.0 * REGION_CELL + 2.0 * REGION_CELL, cell[1] * 4.0 * REGION_CELL + 2.0 * REGION_CELL)
+        frame = dict(cell=tuple(cell), centre=centre, low=(REGION_LOW, REGION_LOW), grain=REGION_GRAIN,
+                     nx=REGION_NX, ny=REGION_NX, sector_chunks=REGION_SECTOR, owned_total=owned_total)
+        frame_bytes = F.frame_file(frame, chunk_rows,
+                                   [(sx, sy, len(d), F.crc32(d)) for (sx, sy), d in zip(sectors, sector_data)],
+                                   version)
+        files.append(dict(kind=b'FRAM', sector=0, cell=tuple(cell), bytes=len(frame_bytes),
+                          crc=F.crc32(frame_bytes), entries=len(order), path=folder + '/frame.ccf'))
+        blobs.append((folder + '/frame.ccf', frame_bytes))
+        for s, d in enumerate(sector_data):
+            path = folder + '/' + F.sector_name(s)
+            files.append(dict(kind=b'SECT', sector=s, cell=tuple(cell), bytes=len(d), crc=F.crc32(d),
+                              entries=len(F.read_sector(d)), path=path))
+            blobs.append((path, d))
+        # The frame map: worldspawn naming the frame, one streamed flora static.
+        sx, sy = 500.0, 500.0
+        c = (int((sx - REGION_LOW) // REGION_GRAIN), int((sy - REGION_LOW) // REGION_GRAIN))
+        z = region_ground(*region_chunk_lattice(cell, *c))
+        text = b'{\n"classname" "worldspawn"\n"_chim_frame" "%d %d"\n"_chim_streamed_statics" "%d"\n}\n' % (
+            cell[0], cell[1], 1 if statics else 0)
+        if statics:
+            text += (b'{\n"classname" "aw_flora"\n"model" "progs/f.spr"\n"origin" "%g %g %g"\n"aw_scale" "1"\n'
+                     b'"_chim_chunk" "%d"\n"_chim_box" "%g %g %g %g %g %g"\n}\n' % (
+                         sx, sy, z, index_of[c], sx - 8, sy - 8, z, sx + 8, sy + 8, z + 16))
+        text += b'{\n"classname" "info_player_start"\n"origin" "0 0 64"\n}\n'
+        maps = Path(root) / 'maps'
+        maps.mkdir(parents=True, exist_ok=True)
+        (maps / ('w_%d_%d.bsp' % tuple(cell))).write_bytes(map_bytes(text))
+        first += owned_total
+    s = dict(draw_distance=540.0, hysteresis=96.0, collision_margin=224.0, prefetch_margin=256.0, terrain_light=12)
+    s.update(settings or {})
+    s.update(grain=REGION_GRAIN, placements=first, models=len(models), textures=len(textures), frames=len(cells),
+             sector_chunks=REGION_SECTOR)
+    for rel, blob in [('world.cwi', F.index_file(s, files, model_rows, texture_rows, version))] + blobs:
+        target = out / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(blob)
+    return firsts
 
 
 def frame_header_bytes(cell=(0, 0), pad=0, key=True):

@@ -358,7 +358,7 @@ static void flame_particle(const vec3_t origin,int k,float scale,int core,int ma
     n=size>=max_pixels?max_pixels:(int)size;if(n<2)n=2;x=(int)cx-n/2;y=(int)cy-n/2;z=(int)(32768/depth);
     for(yy=0;yy<n;yy++)for(xx=0;xx<n;xx++){
         px=x+xx;py=y+yy;
-        if(px<0 || py<0 || px>=vid.width || py>=vid.height || px<r_refdef.vrect.x ||
+        if(px<0 || py<0 || px>=(int)vid.width || py>=(int)vid.height || px<r_refdef.vrect.x ||
             py<r_refdef.vrect.y || px>=r_refdef.vrect.x+r_refdef.vrect.width ||
             py>=r_refdef.vrect.y+r_refdef.vrect.height)continue;
         j=((yy*16/n)*16+xx*16/n)*2;alpha=(int)(flame_pixels[j+1]*(1-age*.6f)*opacity);

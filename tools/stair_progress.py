@@ -35,7 +35,7 @@ def chim_core_counts_task(task):
     area]): the count per core, in core order, with the same polygon filter as chim.collision.stair_task (with a
     walk area only the steps and ramps chim.collision.stair_task_in walks: riser point in the area). The CHIM stair
     gate's scheduler sizes its units by these counts and skips the cores without any (they walk nothing)."""
-    from chim.collision import _poly_box, frame_polys, in_walk_area, stair_polys
+    from chim.collision import _poly_box, frame_polys, in_walk_area, scoped_items, stair_polys
     from stair_walk import candidates
     out, frame_index, cores = task[:3]
     area = task[3] if len(task) > 3 else None
@@ -45,7 +45,7 @@ def chim_core_counts_task(task):
     polys = [(pts, ref, _poly_box(pts)) for pts, ref in frame_polys(world, frame_index)]
     found = []
     for core in cores:
-        items = candidates(stair_polys(polys, core)[1], core)
+        items = scoped_items(candidates(stair_polys(polys, core)[1], core))   # the walk scope, as stair_task
         found.append(len(items) if area is None else sum(1 for i in items if in_walk_area(area, i['point'])))
     return frame_index, found
 

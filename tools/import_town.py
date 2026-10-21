@@ -489,6 +489,15 @@ def resident_cast(references, settings, foreign=None):
 
 
 def residents(data, scene, out, references, settings, kinds, topics, palette, ffmpeg, jobs, cells=()):
+    # Actors the original's start scripts disable at a new game stay out with --start-disabled original
+    # (tools/start_disabled.py; off by default), listed in residents.json with their enable rule.
+    import start_disabled
+    held = []
+    if start_disabled.mode() == 'original' and any(r.get('type') in start_disabled.ACTOR_TYPES for r in references):
+        references, held = start_disabled.held(references, start_disabled.table_for(data), town_field(settings, 'id'))
+    for row in held:
+        print('%s resident left out at a new game: %s (reference %s): %s'
+              % (town_field(settings, 'title'), row['id'], row['reference'], row['reason']), flush=True)
     cast, left = resident_cast(references, settings)
     for row in left:
         print('%s resident left to %s (its cell %d,%d is owned there): %s (reference %s)'
@@ -515,7 +524,9 @@ def residents(data, scene, out, references, settings, kinds, topics, palette, ff
     entities = resident_entities(cast, models, settings, talk)
     write_json(out / 'residents.json', {'cast': cast, 'models': models, 'npc_lod': lod,
                                         'talk_greetings': talk.record(),
-                                        **({'left_to_owner': left} if left else {})})
+                                        **({'left_to_owner': left} if left else {}),
+                                        **({'start_disabled': {'mode': 'original', 'held': held}}
+                                           if start_disabled.mode() == 'original' else {})})
     return entities
 
 

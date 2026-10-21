@@ -1,9 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Explicit little-endian schema; no raw structs, pointers or model caches. */
 #include <string.h>
+#include <stdlib.h>
 #include <math.h>
 #include "aw_save.h"
 #include "aw_maps.h"
+int (*aw_save_changes_export)(aw_changes_t *changes);
+void (*aw_save_changes_import)(const aw_changes_t *changes);
 static unsigned char *writing;
 static const unsigned char *reading;
 static int at,end,error;
@@ -215,14 +218,72 @@ static void magic_fields(aw_state_t *s){
         }else if(writing && m->charge[i]!=0){error=1;return;}
     }
 }
+/* AWS4 feature bit 8: the world-state change list (aw_save.h). Entries strictly ascending by key, each checked
+ * field by field; 36 bytes each on disk. The sorted copy and the decoder's scratch live here, off the stack. */
+static aw_changes_t change_scratch;
+static int change_order(const void *a,const void *b)
+{
+    uint32_t x=((const aw_change_t *)a)->key,y=((const aw_change_t *)b)->key;
+    return x<y?-1:x>y;
+}
+uint32_t AW_SaveChangeKey(uint32_t reference)
+{
+    return reference>=0x800000U && reference<=0xffffffU?AW_CHANGE_BUILDER|(reference-0x800000U):reference;
+}
+static void changes_fields(aw_changes_t *c)
+{
+    int i;uint32_t packed,previous=0,where;
+    integer(&c->count,1,AW_SAVE_CHANGES);if(error)return;
+    for(i=0;i<c->count;i++){
+        aw_change_t *e=&c->entry[i];
+        word(&e->key);
+        packed=writing?(e->flags&0xffffU)|((e->pick&0xffffU)<<16):0;word(&packed);
+        if(!writing){e->flags=packed&0xffffU;e->pick=packed>>16;}
+        where=writing?(uint32_t)e->where:0;word(&where);if(!writing)e->where=(int32_t)where;
+        floating(&e->position[0],-1000000,1000000);floating(&e->position[1],-1000000,1000000);
+        floating(&e->position[2],-1000000,1000000);floating(&e->yaw,-720,720);
+        floating(&e->health,-10000,100000);floating(&e->hours,0,10000000);
+        if(error)return;
+        if(!e->key || (e->key&0x7f000000U) || !(e->key&0xffffffU) || (i && e->key<=previous) ||
+           !e->flags || (e->flags&~AW_CHANGE_FLAGS) || e->flags>0xffffU ||
+           ((e->flags&AW_CHANGE_PICK)?(e->pick<1 || e->pick>0x8001U):e->pick!=0)){error=1;return;}
+        if(e->flags&AW_CHANGE_SCENE){if(e->where<0 || e->where>=AW_SCENE_COUNT || !AW_MapName(e->where)[0]){error=1;return;}}
+        else{
+            int cx=(int16_t)((uint32_t)e->where>>16),cy=(int16_t)((uint32_t)e->where&0xffffU);
+            if(cx<-1024 || cx>1024 || cy<-1024 || cy>1024){error=1;return;}
+        }
+        previous=e->key;
+    }
+}
+int AW_SaveFoldActors(const aw_save_t *state,aw_changes_t *changes)
+{
+    int i,j,added=0;uint32_t key;
+    for(i=0;i<state->actor_count;i++){
+        const aw_saved_actor_t *a=&state->actors[i];
+        key=AW_SaveChangeKey(a->reference);
+        for(j=0;j<changes->count;j++)if(changes->entry[j].key==key)break;
+        if(j<changes->count || changes->count>=AW_SAVE_CHANGES)continue;
+        {
+            aw_change_t *e=&changes->entry[changes->count++];
+            memset(e,0,sizeof(*e));e->key=key;e->flags=AW_CHANGE_MOVED|AW_CHANGE_SCENE;e->where=a->scene;
+            memcpy(e->position,a->position,sizeof(e->position));e->yaw=a->angles[1];e->health=a->health;
+            added++;
+        }
+    }
+    return added;
+}
 int AW_SaveEncode(unsigned char *out,int capacity,const aw_save_t *state)
 {
-    aw_save_t copy=*state;uint32_t size=0,crc;
+    return AW_SaveEncodeChanges(out,capacity,state,NULL);
+}
+int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,const aw_changes_t *changes)
+{
+    aw_save_t copy=*state;uint32_t size=0,crc;int listed=changes && changes->count>0;
     if(capacity<12 || capacity>AW_SAVE_BYTES)return 0;
     writing=out;reading=NULL;at=12;end=capacity;error=0;
     memset(out,0,capacity);fields(&copy);if(!error)journal_fields(&copy.state);
     {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state.inventory)?2U:0U)|
-        (magic_used(&copy.state.magic)?4U:0U);word(&features);}
+        (magic_used(&copy.state.magic)?4U:0U)|(listed?8U:0U);word(&features);}
     if(!error && copy.state.harvest.slots)harvest_fields(&copy.state.harvest);
     if(!copy.state.harvest.slots){
         int i;for(i=0;i<32;i++)if(copy.state.harvest.catalogue[i])error=1;
@@ -233,11 +294,22 @@ int AW_SaveEncode(unsigned char *out,int capacity,const aw_save_t *state)
        ((copy.equipment&AW_EQUIPMENT_TORCH) && !(copy.equipment&AW_EQUIPMENT_DRAWN)))error=1;
     if(!error && inventory_used(&copy.state.inventory))inventory_fields(&copy.state);
     if(!error && magic_used(&copy.state.magic))magic_fields(&copy.state);
+    if(!error && listed){
+        if(changes->count>AW_SAVE_CHANGES)return 0;
+        change_scratch.count=changes->count;
+        memcpy(change_scratch.entry,changes->entry,sizeof(aw_change_t)*changes->count);
+        qsort(change_scratch.entry,change_scratch.count,sizeof(aw_change_t),change_order);
+        changes_fields(&change_scratch);
+    }
     if(error)return 0;
     size=at;memcpy(out,"AWS4",4);at=4;word(&size);
     crc=crc32(out+12,size-12);word(&crc);return size;
 }
 int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
+{
+    return AW_SaveDecodeChanges(data,size,out,NULL);
+}
+int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_changes_t *changes)
 {
     aw_save_t candidate;uint32_t length=0,crc=0,features=0;
     if(size<12 || size>AW_SAVE_BYTES || (memcmp(data,"AWS1",4) && memcmp(data,"AWS2",4) && memcmp(data,"AWS3",4) && memcmp(data,"AWS4",4)))return 0;
@@ -247,7 +319,7 @@ int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
     /* Older saves have quest indices but no chronological evidence. Do not
      * fabricate earlier entries or dates when decoding them. */
     if(!error && data[3]!='1')journal_fields(&candidate.state);
-    if(!error && data[3]=='4'){word(&features);if(features>7)error=1;}
+    if(!error && data[3]=='4'){word(&features);if(features>15)error=1;}
     if(!error && (data[3]=='3' || (data[3]=='4' && (features&1))))harvest_fields(&candidate.state.harvest);
     if(!error && data[3]=='4'){
         word(&candidate.equipment);
@@ -256,6 +328,11 @@ int AW_SaveDecode(const unsigned char *data,int size,aw_save_t *out)
     }
     if(!error && data[3]=='4' && (features&2))inventory_fields(&candidate.state);
     if(!error && data[3]=='4' && (features&4))magic_fields(&candidate.state);
+    change_scratch.count=0;
+    if(!error && data[3]=='4' && (features&8))changes_fields(&change_scratch);
     if(error || at!=size)return 0;
-    *out=candidate;return 1;
+    *out=candidate;
+    if(changes){changes->count=change_scratch.count;
+        memcpy(changes->entry,change_scratch.entry,sizeof(aw_change_t)*change_scratch.count);}
+    return 1;
 }

@@ -1,12 +1,15 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Test on Amiberry, 21 October 2026](#test-on-amiberry-21-october-2026)
+- [30-minute rebuilds, 20 October 2026](#30-minute-rebuilds-20-october-2026)
 - [Collision from what the game already knows, 20 October 2026](#collision-from-what-the-game-already-knows-20-october-2026)
 - [Cell crossings: one continuous world, 19 October 2026](#cell-crossings-one-continuous-world-19-october-2026)
+  - [Decisions of 20 October 2026](#decisions-of-20-october-2026)
 - [The road after v0.0.44, 19 October 2026](#the-road-after-v0044-19-october-2026)
 - [Distant views without pop-in, and the screen the Amiga need not redraw, 19 October 2026](#distant-views-without-pop-in-and-the-screen-the-amiga-need-not-redraw-19-october-2026)
 - [Colour: AGA ramps for the ash, the blight and Red Mountain, 19 October 2026](#colour-aga-ramps-for-the-ash-the-blight-and-red-mountain-19-october-2026)
@@ -85,6 +88,68 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
+## Test on Amiberry, 21 October 2026
+
+Amiberry is an open-source Amiga emulator, and it is the emulator inside the upcoming THEA1200, an A1200 replica
+with CPU JIT and FPU JIT options and adjustable RAM (one visitor's report saw 32 MB of Fast RAM). A reviewer reports that
+it loads WHDLoad installs and floppy, hard drive and CD images from a USB stick, offers RTG and switchable chipsets
+(OCS, ECS, AGA), and launches on 4 December 2026 (an earlier report said June; the launch was delayed). Games that
+run well in it will be what many people try first, so AmiWind should be checked there.
+
+- [ ] Build Amiberry from its source in a Docker image (a new image, so the maintainer's go comes first).
+- [ ] Boot the AmiWind hard disk image directly, with no Workbench needed.
+- [ ] Measure with 2 MB Chip, 32 MB Fast, the CPU JIT and the FPU JIT on, with the same scripted routes as the
+  other emulators ([relative numbers](REAL_HARDWARE.md#first-measure-then-play) until a real figure exists).
+
+Open questions: the most RAM the replica can have; whether the reported hard drive images from USB take the AmiWind image (to confirm); whether its JIT runs
+the 68040 code the game uses correctly; and its real speed (a claimed 68060 at 70 MHz is not a measurement).
+
+## 30-minute rebuilds, 20 October 2026
+
+The goal, set by the maintainer on 20 October 2026: a build that can load what it already made from the cache takes
+30 minutes at most, wherever the change was. A build is the tool every fix, test and release passes through, so
+every hour it takes is an hour taken from the game.
+
+Two reference times show how far off that is:
+
+- The v0.0.46-dev1 rebuild (try 2) took 3 h 02 min after one function of the shared collision converter changed: the
+  CHIM stage alone took 2 h 33 min, the NPC gallery 36 min and the image step 15 min 38 s.
+- The v0.0.46 release build reused the dev1 build and took about 45 minutes (an estimate from its log while it was
+  still running; the real total replaces this figure when the build has finished).
+
+The work, in order:
+
+1. **Stop needless rebuilds.** A rebuilt unit whose output is byte-identical (by SHA-256) must not rebuild what comes
+   after it, and every key must cover exactly the inputs its unit reads.
+   [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](bugs/BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md),
+   [BUILD-CHIM-VIS-ROWS-KEY-BROAD-46](bugs/BUILD-CHIM-VIS-ROWS-KEY-BROAD-46.md),
+   [BUILD-NPC-GALLERY-REBUILT-46](bugs/BUILD-NPC-GALLERY-REBUILT-46.md),
+   [BUILD-CACHE-NO-CUTOFF-33](bugs/BUILD-CACHE-NO-CUTOFF-33.md),
+   [BUILD-REUSE-SCHEDULER-TOP-45](bugs/BUILD-REUSE-SCHEDULER-TOP-45.md).
+2. **Stair walks only where something changed.** Walk the flights, the reach around a changed piece and a watch
+   list, not the island (BUILD-STAIR-WALK-SCOPE-KEY-46), and in the long run replace the walk by a check from the
+   game's own collision data (the next section,
+   [BUILD-STAIR-WALK-BRUTE-FORCE-46](bugs/BUILD-STAIR-WALK-BRUTE-FORCE-46.md)).
+3. **Use the whole machine, in every stage.** The 20 October build left cores idle in these places, each tracked:
+   - the CHIM areas side by side: 50 min at 14.1 of 24 cores, big frames last
+     ([BUILD-CHIM-REGION-FRAMES-TAIL-43](bugs/BUILD-CHIM-REGION-FRAMES-TAIL-43.md));
+   - queues that sit with units waiting and none running between CHIM phases, and the serial pack
+     ([BUILD-CHIM-SERIAL-SECTIONS-44](bugs/BUILD-CHIM-SERIAL-SECTIONS-44.md));
+   - validation, heap gate and zone walk made of many tiny units, to be batched per worker
+     ([BUILD-CHIM-STAGE-SERIAL-TAIL-36](bugs/BUILD-CHIM-STAGE-SERIAL-TAIL-36.md));
+   - the NPC gallery on 11 cores while CHIM ran beside it
+     ([BUILD-NPC-GALLERY-REBUILT-46](bugs/BUILD-NPC-GALLERY-REBUILT-46.md));
+   - the image step: 15 min 38 s at 8.9 of 24 cores, partitions written one after another, a 281 s stall
+     ([BUILD-IMAGE-UNDERUSED-32](bugs/BUILD-IMAGE-UNDERUSED-32.md)), the stair-walk tail of two single rooms
+     ([BUILD-IMAGE-STAIR-WALK-CORES-43](bugs/BUILD-IMAGE-STAIR-WALK-CORES-43.md)), the body bake
+     ([BUILD-BODY-BAKE-SLOWER-44](bugs/BUILD-BODY-BAKE-SLOWER-44.md));
+   - small stages under half their cores: chim-town-seyda, hand-catalog, interior, intro, census
+     ([BUILD-IDLE-STAGES-33](bugs/BUILD-IDLE-STAGES-33.md));
+   - the resident-map step 55 to 60 percent slower than its baseline
+     ([BUILD-RESIDENT-MAP-SLOWER-46](bugs/BUILD-RESIDENT-MAP-SLOWER-46.md)).
+4. **The build says it.** The build summary's "Needs attention" list gets an entry when a build that used its cache
+   still takes more than 30 minutes, naming the stages that used the time.
+
 ## Collision from what the game already knows, 20 October 2026
 
 Decided for the project, 20 October 2026. Today the converter cuts each drawn mesh into convex collision pieces as
@@ -127,6 +192,10 @@ reconnects and reloads its model and sound lists).
 
 The next method ("type 1") makes the outdoors one continuous world, with the frames as a sliding window:
 
+(Status 20 October 2026: a prototype exists but creates no people, creatures, doors or plants in the frames it
+joins, so it is not the default and its first timings are not comparable with the level change; see
+[Cell crossings](chim/CELL_CROSSINGS.md).)
+
 - **Nothing restarts.** The game-logic and display halves stay connected the whole time; a frame is only which part
   of the island is loaded, not a map.
 - **The origin moves, rarely.** Since v0.0.36 the engine uses wide coordinates by default: ±32,768 units
@@ -159,6 +228,33 @@ split by its parts to find what is thrown away and rebuilt although it is the sa
 note reviewed for its weak points (the origin shift, the model-list limit, saved games); a prototype in a small
 sandbox of 2×2 frames; an A/B against type 0 on the same crossing route; then the whole island
 ([plan section 1](PLAN-v0.0.45.md#1-cell-crossings); the full design: [Cell crossings](chim/CELL_CROSSINGS.md)).
+
+### Decisions of 20 October 2026
+
+Decided for the project on the evening of 20 October 2026, in plain words:
+
+1. **One streamed world outdoors; Quake levels only behind doors.** The outdoors is one continuous world and a
+   level change happens when the player goes through a door into an interior. This stands as decided at noon.
+2. **The streamed crossing is not the default yet.** The prototype of type 1 (`chim crossing 1`, on the branch
+   v0.0.46-stream-type1; its notes join [Cell crossings](chim/CELL_CROSSINGS.md) when it is merged) becomes the
+   default only when it carries the world's entities. Until then the level change (type 0) stays the default.
+3. **What it needs, in order:**
+   1. One world-state change list, keyed by reference ID: moved, dead and following NPCs, picked plants, opened
+      doors and the contents of containers. A frame that joins the window is its base data plus its changes; a frame
+      that leaves writes its state back; saves write the same list. This is the object and container state item of
+      [the road after v0.0.44](#the-road-after-v0044-19-october-2026), with machines that have little RAM keeping
+      part of the list on disk.
+   2. Entity windowing: the NPCs, creatures, doors and plants of every frame in the window exist, each with its
+      state.
+   3. Followers and escorts cross frame borders with the player. Some quests, the main quest included, cannot be
+      finished otherwise, so the companion test must pass with the streamed crossing as it does with the level
+      change, with behaviour following the original game and OpenMW's rules.
+   4. NPC traversal across frame borders.
+4. **Every comparison like for like.** Both methods must do the same work before a figure is reported. The first
+   prototype figures compared a crossing that creates the new frame's people with one that creates none; they are
+   marked as not comparable and are not used as a speed-up.
+5. **The menu.** The old read-ahead experiment (the Load method and Read-ahead buffer lines, built for the region
+   maps from before CHIM) leaves the menu; its code stays. One Options line shows the active crossing method.
 
 ## The road after v0.0.44, 19 October 2026
 
@@ -469,8 +565,9 @@ The step-by-step checklist, with what counts as done for each step, is the
 Maintainer request, 16 October 2026: future effects start from what AmiQuake already draws, mapped onto the Morrowind
 data, before any new engine feature ([IDEAS](chim/IDEAS.md#the-ghostfence-as-a-quake-turbulent-surface)).
 
-- [ ] The Ghostfence and the Ghostgate: the upright shimmering curtain between the pylons (electricity and water
-  at once) as a Quake turbulent surface. Textures named with a leading `*` are drawn by the warp that ripples
+- [x] The Ghostfence and the Ghostgate: the upright shimmering curtain between the pylons (electricity and water
+  at once) as a Quake turbulent surface (the default of a build from v0.0.47-dev1, commit 43abedc7; `dbg ghostfence
+  off` draws it still). Textures named with a leading `*` are drawn by the warp that ripples
   water, slime, lava and Quake's upright teleporter fields; our lava already uses it. The fence's energy texture
   becomes such a texture on the fence walls, with no new engine feature.
 - [ ] The electric pulse: a flickering light style (Quake's animated light patterns) on the fence's glow, so the

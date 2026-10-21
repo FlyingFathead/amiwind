@@ -33,10 +33,12 @@ LEGACY_PLAN = (
     ('harvest', 'harvest_build.py'), ('hand-catalog', 'prepare_hand_catalog.py'), ('image', 'build_aga.py'))
 LEGACY_IMAGE_OPTIONS = (
     '--balmora-cache', '--balmora-scenery', '--canonical-land-source', '--data-files', '--engine', '--entity-baseline',
-    '--gallery', '--hand-catalog', '--hands', '--harvest', '--hidden-surface-cull', '--jobs', '--light',
+    '--file-aliases', '--gallery', '--hand-catalog', '--hands', '--harvest', '--hidden-surface-cull', '--jobs', '--light',
     '--local-skybox', '--map-budget-policy', '--media', '--music', '--out', '--qbsp', '--qcc', '--rdbtool', '--scene',
-    '--sdk', '--town-flora-scene-report', '--town-flora-source-index', '--town-scenery', '--vis', '--world-bounds',
-    '--world-flora', '--world-scenery', '--xdftool')   # --world-bounds: a game setting for every builder (default on)
+    '--sdk', '--shared-skins', '--town-flora-scene-report', '--town-flora-source-index', '--town-scenery', '--vis',
+    '--world-bounds', '--world-flora', '--world-scenery', '--xdftool')
+# --world-bounds: a game setting for every builder (default on); --file-aliases / --shared-skins: the payload pass of
+# every image, on by default since v0.0.47. No --chim-crossing and no actor table: a legacy image has no CHIM world.
 BOTH = ['--jobs', '4', '--builder', 'chim', '--chim-area', 'balmora', '--chim-area', 'seyda']
 
 

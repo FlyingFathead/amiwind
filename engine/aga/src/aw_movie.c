@@ -111,7 +111,7 @@ static void hold(const char *why){
 /* One centred line in the console font at row top (at most 40 characters). */
 static void draw_line(const char *s,int top,byte colour){
     int n=(int)strlen(s),left,c,x,y;byte *glyph,*row;
-    if(!draw_chars || top<0 || top+8>vid.height)return;
+    if(!draw_chars || top<0 || top+8>(int)vid.height)return;
     if(n>40)n=40;
     left=(320-n*8)/2;
     for(c=0;c<n;c++){
@@ -155,7 +155,7 @@ static int start_movie(char *path,int brand){
     expected=DATA_START+frames*pixels+samples;
     if(size!=expected || !shm || shm->speed!=RATE)goto invalid;
     buffers=malloc(sizeof(*buffers));if(!buffers)goto invalid;
-    if(fread(buffers->palette,1,768,video)!=768 || fread(buffers->frame,1,pixels,video)!=pixels)goto invalid;
+    if(fread(buffers->palette,1,768,video)!=768 || fread(buffers->frame,1,pixels,video)!=(size_t)pixels)goto invalid;
     audio_size=COM_FOpenFile(path,&audio);
     audio_start=DATA_START+frames*pixels;
     if(!audio || audio_size!=expected || fseek(audio,audio_start,SEEK_SET))goto invalid;
@@ -205,7 +205,7 @@ static int catalogue_path(char *request,char *out,int capacity){
         else {strcpy(expected,"intro/video/00.awv");expected[12]='0'+id/10;expected[13]='0'+id%10;}
         if(strcmp(file,expected))goto bad;
         if((numeric && id==wanted) || (!numeric && !Q_strcasecmp(request,name))){
-            if(strlen(file)+1>capacity)goto bad;
+            if(strlen(file)+1>(size_t)capacity)goto bad;
             strcpy(out,file);
         }
         previous=id;
@@ -246,7 +246,7 @@ void AW_MovieUpdate(void){
     if(frame>=frames)frame=frames-1;
     /* Drop late pictures without delaying the narration. Seek only on skips. */
     if((frame!=shown+1 && fseek(video,DATA_START+frame*pixels,SEEK_SET)) ||
-       fread(buffers->frame,1,pixels,video)!=pixels){finish("video read error");return;}
+       fread(buffers->frame,1,pixels,video)!=(size_t)pixels){finish("video read error");return;}
     if(frame>shown+1)dropped+=frame-shown-1;
     pictures++;shown=frame;
 }

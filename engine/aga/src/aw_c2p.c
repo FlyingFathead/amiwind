@@ -4,6 +4,7 @@
  */
 #include <exec/types.h>
 #include <graphics/gfx.h>
+#include "aw_c2p.h"
 #if AW_ASM_C2P
 /* Engine profile (docs/ENGINE_PROFILES.md): upstream AmiQuake's c2p8.s, NovaCoder's chunky-to-planar
  * routine. c2p8_reloc copies the routine to Fast RAM with this bitmap's plane offsets patched in;

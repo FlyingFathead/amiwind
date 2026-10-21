@@ -1,0 +1,419 @@
+{
+  "format": "AmiWind world region budget scan 1",
+  "about": "Largest open-world regions of a public default build (every region a BSP29 map, no CHIM region selection), measured after the world-scenery stage. Re-measure after any change to config/world-region-refinements.json (tools/world_budget_scan.py, BUILD-LAVA-TERRAIN-BUDGET-38).",
+  "refinements_sha256": "cf1628ec05459a110b73dde6bc9040f1d9e8c4cb466d4071bd9f266d8e0efd79",
+  "survey_sha256": "0bb02d46476c7da304cbd37f3075d5b42e84c8bcc0378ea662ca3c7a5a9de503",
+  "measured_with": {
+    "version": "0.0.47-dev1",
+    "commit": "2cfd1a90"
+  },
+  "limits": {
+    "bytes": 4194304,
+    "faces": 30000,
+    "clipnodes": 32767
+  },
+  "regions_measured": 2417,
+  "regions_over": [],
+  "largest": [
+    {
+      "name": "vf2555",
+      "cell": [
+        9,
+        0
+      ],
+      "divisions": 8,
+      "subcell": [
+        3,
+        1
+      ],
+      "terrain_bytes": 3388896,
+      "bytes": 4147976,
+      "faces": 14339,
+      "clipnodes": 15600
+    },
+    {
+      "name": "vf2574",
+      "cell": [
+        9,
+        0
+      ],
+      "divisions": 8,
+      "subcell": [
+        3,
+        2
+      ],
+      "terrain_bytes": 3170612,
+      "bytes": 3993032,
+      "faces": 14230,
+      "clipnodes": 15552
+    },
+    {
+      "name": "vf1693",
+      "cell": [
+        9,
+        0
+      ],
+      "divisions": 4,
+      "subcell": [
+        2,
+        0
+      ],
+      "terrain_bytes": 3196344,
+      "bytes": 3949768,
+      "faces": 14192,
+      "clipnodes": 15655
+    },
+    {
+      "name": "vf2248",
+      "cell": [
+        15,
+        2
+      ],
+      "divisions": 1,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 3249072,
+      "bytes": 3926212,
+      "faces": 13718,
+      "clipnodes": 30241
+    },
+    {
+      "name": "vf2542",
+      "cell": [
+        9,
+        0
+      ],
+      "divisions": 4,
+      "subcell": [
+        0,
+        1
+      ],
+      "terrain_bytes": 3035416,
+      "bytes": 3923848,
+      "faces": 16345,
+      "clipnodes": 13352
+    },
+    {
+      "name": "vf1589",
+      "cell": [
+        8,
+        -3
+      ],
+      "divisions": 2,
+      "subcell": [
+        0,
+        1
+      ],
+      "terrain_bytes": 3082528,
+      "bytes": 3855912,
+      "faces": 15113,
+      "clipnodes": 15093
+    },
+    {
+      "name": "vf1598",
+      "cell": [
+        8,
+        -1
+      ],
+      "divisions": 2,
+      "subcell": [
+        1,
+        1
+      ],
+      "terrain_bytes": 2998072,
+      "bytes": 3841964,
+      "faces": 15873,
+      "clipnodes": 13674
+    },
+    {
+      "name": "vf1694",
+      "cell": [
+        9,
+        0
+      ],
+      "divisions": 4,
+      "subcell": [
+        0,
+        2
+      ],
+      "terrain_bytes": 3011480,
+      "bytes": 3823072,
+      "faces": 15667,
+      "clipnodes": 14234
+    },
+    {
+      "name": "vf1692",
+      "cell": [
+        9,
+        0
+      ],
+      "divisions": 4,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 3021992,
+      "bytes": 3801524,
+      "faces": 15449,
+      "clipnodes": 13117
+    },
+    {
+      "name": "vf1254",
+      "cell": [
+        3,
+        -3
+      ],
+      "divisions": 1,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 2712144,
+      "bytes": 3779292,
+      "faces": 15444,
+      "clipnodes": 22599
+    },
+    {
+      "name": "vf1255",
+      "cell": [
+        3,
+        -2
+      ],
+      "divisions": 2,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 2791668,
+      "bytes": 3759128,
+      "faces": 15250,
+      "clipnodes": 18755
+    },
+    {
+      "name": "vf1256",
+      "cell": [
+        3,
+        -1
+      ],
+      "divisions": 1,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 2699200,
+      "bytes": 3742168,
+      "faces": 15405,
+      "clipnodes": 16024
+    },
+    {
+      "name": "vf1098",
+      "cell": [
+        1,
+        -4
+      ],
+      "divisions": 1,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 1327056,
+      "bytes": 3715228,
+      "faces": 17663,
+      "clipnodes": 28548
+    },
+    {
+      "name": "vf0779",
+      "cell": [
+        -3,
+        -4
+      ],
+      "divisions": 1,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 1263292,
+      "bytes": 3701200,
+      "faces": 18493,
+      "clipnodes": 26820
+    },
+    {
+      "name": "vf1099",
+      "cell": [
+        1,
+        -3
+      ],
+      "divisions": 1,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 1887840,
+      "bytes": 3643736,
+      "faces": 15899,
+      "clipnodes": 22424
+    },
+    {
+      "name": "vf2570",
+      "cell": [
+        8,
+        0
+      ],
+      "divisions": 4,
+      "subcell": [
+        3,
+        1
+      ],
+      "terrain_bytes": 2860704,
+      "bytes": 3640264,
+      "faces": 15364,
+      "clipnodes": 14313
+    },
+    {
+      "name": "vf1512",
+      "cell": [
+        7,
+        -5
+      ],
+      "divisions": 1,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 2544852,
+      "bytes": 3633432,
+      "faces": 15297,
+      "clipnodes": 20500
+    },
+    {
+      "name": "vf1455",
+      "cell": [
+        6,
+        -1
+      ],
+      "divisions": 1,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 2876228,
+      "bytes": 3632972,
+      "faces": 13953,
+      "clipnodes": 18080
+    },
+    {
+      "name": "vf2544",
+      "cell": [
+        9,
+        0
+      ],
+      "divisions": 4,
+      "subcell": [
+        3,
+        0
+      ],
+      "terrain_bytes": 2919216,
+      "bytes": 3629304,
+      "faces": 13365,
+      "clipnodes": 14061
+    },
+    {
+      "name": "vf2536",
+      "cell": [
+        3,
+        -2
+      ],
+      "divisions": 2,
+      "subcell": [
+        0,
+        1
+      ],
+      "terrain_bytes": 2850120,
+      "bytes": 3627248,
+      "faces": 14317,
+      "clipnodes": 15924
+    },
+    {
+      "name": "vf1602",
+      "cell": [
+        8,
+        0
+      ],
+      "divisions": 2,
+      "subcell": [
+        1,
+        1
+      ],
+      "terrain_bytes": 2729916,
+      "bytes": 3583940,
+      "faces": 15929,
+      "clipnodes": 14220
+    },
+    {
+      "name": "vf1818",
+      "cell": [
+        10,
+        0
+      ],
+      "divisions": 4,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 2864700,
+      "bytes": 3578832,
+      "faces": 13191,
+      "clipnodes": 13472
+    },
+    {
+      "name": "vf2554",
+      "cell": [
+        9,
+        0
+      ],
+      "divisions": 8,
+      "subcell": [
+        2,
+        1
+      ],
+      "terrain_bytes": 2876240,
+      "bytes": 3575828,
+      "faces": 13154,
+      "clipnodes": 13985
+    },
+    {
+      "name": "vf2141",
+      "cell": [
+        13,
+        14
+      ],
+      "divisions": 1,
+      "subcell": [
+        0,
+        0
+      ],
+      "terrain_bytes": 3026216,
+      "bytes": 3555632,
+      "faces": 12777,
+      "clipnodes": 24542
+    },
+    {
+      "name": "vf1691",
+      "cell": [
+        9,
+        -1
+      ],
+      "divisions": 4,
+      "subcell": [
+        3,
+        3
+      ],
+      "terrain_bytes": 2866548,
+      "bytes": 3550796,
+      "faces": 13710,
+      "clipnodes": 13152
+    }
+  ]
+}

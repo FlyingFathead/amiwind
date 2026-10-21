@@ -9,6 +9,12 @@
    "note": "the narrow bound itself (AW_COORD_NARROW, --coord-range narrow); wide (32000) is the default since v0.0.36"
   },
   {
+   "file": "engine/aga/src/aw_world.c",
+   "contains": "world[0]=cx*8192.0f+4096.0f;world[1]=cy*8192.0f+4096.0f;",
+   "class": "unrelated",
+   "note": "the centre of an original Morrowind cell in original coordinates (half the cell's 8,192), for AW_CellMap (type 1 crossings), not a map-space position against the coordinate range"
+  },
+  {
    "file": "engine/aga/src/aw_excluded.c",
    "contains": "if(n<5 || n>4096 || !fget",
    "class": "unrelated",
@@ -157,12 +163,6 @@
    "contains": "world_below(e,4096)",
    "class": "kept",
    "note": "downward trace depth"
-  },
-  {
-   "file": "engine/aga/src/aw_weather.c",
-   "contains": "dx*dx+dy*dy>4096.0*4096.0",
-   "class": "kept",
-   "note": "region weather teleport test: a jump of over half an original cell (8,192 units) in one frame switches the weather at once; a distance between two original-world (source) positions in double precision, not an engine position, so the engine coordinate bound does not apply"
   },
   {
    "file": "engine/aga/src/bspfile.h",
@@ -397,6 +397,12 @@
    "contains": "Was 4096 in the engine while this writer had no limit",
    "class": "unrelated",
    "note": "the CHIM world index file-row limit (CHIM-WORLD-INDEX-FILE-LIMIT-36), a count, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_weather.h",
+   "contains": "AW_WEATHER_ARRIVAL_UNITS 4096.0",
+   "class": "unrelated",
+   "note": "a jump distance in map units (half a cell) that counts as an arrival for the region weather (SKY-REDMOUNTAIN-BLUE-44), not a position against the coordinate range"
   }
  ]
 }

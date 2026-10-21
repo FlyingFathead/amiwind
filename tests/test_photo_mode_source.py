@@ -113,7 +113,7 @@ class PhotoModeSourceTests(unittest.TestCase):
                       'sb_lines = AW_INSPECT_SB_LINES;', source('screen.c'))
         self.assertIn('#define AW_INSPECT_SB_LINES (48+AW_INSPECT_LIFT)', source('aw_inspect.h'))
         ui = source('aw_ui.c')
-        self.assertIn('int i,channels,y=vid.height-26-hud_lift();', ui)
+        self.assertIn('int i,boxes,y=vid.height-26-hud_lift();', ui)
         self.assertIn('aw_ui_hud_lift=AW_InspectHudLift;', source('aw_hud.c'))
 
     def test_light_gallery_strip_hidden_unless_debug_hud(self):

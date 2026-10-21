@@ -1,4 +1,5 @@
-"""Fast RAM choice of the playtest launcher: presets, custom sizes, emulator keys, default unchanged."""
+"""Fast RAM choice of the playtest launcher: presets, custom sizes, emulator keys, the 128 MiB default and the
+16 MiB baseline still selectable."""
 import contextlib
 import importlib.util
 import io
@@ -32,9 +33,12 @@ EXPECTED_FS = {
 
 class FastRamRuleTests(unittest.TestCase):
     def test_presets_are_the_promised_sizes_and_default_first(self):
-        self.assertEqual([mib for mib, _ in launcher.FAST_RAM_PRESETS], [16, 128, 256, 512, 1024, 1536])
-        self.assertEqual(launcher.FAST_RAM_DEFAULT_MIB, 16)
-        self.assertEqual(launcher.PROFILE_VALUES['zorro_iii_memory'], '16384')
+        self.assertEqual([mib for mib, _ in launcher.FAST_RAM_PRESETS], [128, 16, 256, 512, 1024, 1536])
+        self.assertEqual(launcher.FAST_RAM_DEFAULT_MIB, 128)
+        self.assertEqual(launcher.FAST_RAM_BASELINE_MIB, 16)
+        self.assertEqual(launcher.FAST_RAM_MIN_MIB, 16)
+        self.assertEqual(launcher.PROFILE_VALUES['zorro_iii_memory'], '131072')
+        self.assertIn('zorro_iii_memory = 131072', launcher.PRESET)
 
     def test_each_preset_writes_the_right_fs_uae_keys(self):
         for mib, expected in EXPECTED_FS.items():
@@ -49,7 +53,7 @@ class FastRamRuleTests(unittest.TestCase):
             self.assertEqual(first + second, mib)
 
     def test_custom_sizes_are_validated(self):
-        for text, mib in (('default', 16), ('128', 128), ('384', 384), ('768 MiB', 768), ('1G', 1024),
+        for text, mib in (('default', 128), ('16', 16), ('128', 128), ('384', 384), ('768 MiB', 768), ('1G', 1024),
                           ('1.5GiB', 1536), ('1280', 1280), (' 24 ', 24)):
             self.assertEqual(launcher.parse_fast_ram(text), mib, text)
         for bad in ('8', '0', '-1', '100', '1000', '1537', '2G', '2048', '4096', 'lots', '1.3G', '128.5'):
@@ -63,7 +67,7 @@ class FastRamRuleTests(unittest.TestCase):
                          ['16 MiB', '128 MiB', '1 GiB', '1.5 GiB', '1280 MiB'])
 
     def test_menu_enter_keeps_presets_and_custom(self):
-        cases = ((('',), 16), (('2',), 128), (('6',), 1536), (('c', '384'), 384),
+        cases = ((('',), 16), (('1',), 128), (('2',), 16), (('6',), 1536), (('c', '384'), 384),
                  (('x', '100', '3'), 256), (('512',), 512))
         for answers, expected in cases:
             replies = iter(answers)
@@ -88,15 +92,29 @@ class FastRamConfigTests(unittest.TestCase):
         self.fs_template = (ROOT / ('resources/emulators/AmiWind-v%s-FS-UAE.fs-uae' % VERSION)).read_text(encoding='utf-8')
         self.win_template = (ROOT / ('resources/emulators/AmiWind-v%s-WinUAE.uae' % VERSION)).read_text(encoding='utf-8')
 
-    def test_default_fs_uae_config_is_the_template_unchanged_except_paths(self):
+    def test_default_fs_uae_config_is_the_template_with_128_mib(self):
         out = launcher.configured_text(self.fs_template, self.image, '/rom')
-        self.assertEqual(out, launcher.configured_text(self.fs_template, self.image, '/rom', 16))
-        keep = [line for line in self.fs_template.splitlines() if not PATH_KEYS.match(line)]
-        self.assertEqual([line for line in out.splitlines() if not PATH_KEYS.match(line)], keep)
+        self.assertEqual(out, launcher.configured_text(self.fs_template, self.image, '/rom', 128))
+        self.assertEqual(re.findall(r'(?m)^zorro_iii_memory = (.*)$', out), ['131072'])
+        other = re.compile(r'^(kickstart_file|hard_drive_[0-9]+(?:_type)?|zorro_iii_memory) *=')
+        keep = [line for line in self.fs_template.splitlines() if not other.match(line)]
+        self.assertEqual([line for line in out.splitlines() if not other.match(line)], keep)
         self.assertNotIn('uae_z3mem2_size', out)
 
-    def test_default_winuae_profile_is_byte_identical(self):
-        self.assertEqual(launcher.fast_ram_winuae_text(self.win_template, 16), self.win_template)
+    def test_baseline_16_mib_still_written(self):
+        out = launcher.configured_text(self.fs_template, self.image, '/rom', 16)
+        self.assertEqual(re.findall(r'(?m)^zorro_iii_memory = (.*)$', out), ['16384'])
+        win = launcher.fast_ram_winuae_text(self.win_template, 16)
+        self.assertEqual(re.findall(r'(?m)^z3mem_size=(.*)$', win), ['16'])
+
+    def test_winuae_profile_already_at_the_size_is_byte_identical(self):
+        size = int(re.findall(r'(?m)^z3mem_size=(.*)$', self.win_template)[0])
+        self.assertEqual(launcher.fast_ram_winuae_text(self.win_template, size), self.win_template)
+        default = launcher.fast_ram_winuae_text(self.win_template, launcher.FAST_RAM_DEFAULT_MIB)
+        self.assertEqual(re.findall(r'(?m)^z3mem_size=(.*)$', default), ['128'])
+        if size != 128:
+            self.assertIn('128MiB Z3 Fast RAM', default)
+        self.assertEqual(launcher.fast_ram_winuae_text(default, 128), default)
 
     def test_fs_uae_presets_and_switching_back_removes_second_board(self):
         for mib, expected in EXPECTED_FS.items():
@@ -106,11 +124,12 @@ class FastRamConfigTests(unittest.TestCase):
             if 'uae_z3mem2_size' not in expected:
                 self.assertNotIn('uae_z3mem2_size', out)
         big = launcher.configured_text(self.fs_template, self.image, '/rom', 1536)
-        self.assertEqual(launcher.configured_text(big, self.image, '/rom', 16),
-                         launcher.configured_text(self.fs_template, self.image, '/rom', 16))
+        self.assertEqual(launcher.configured_text(big, self.image, '/rom', 128),
+                         launcher.configured_text(self.fs_template, self.image, '/rom', 128))
 
     def test_winuae_presets(self):
-        for mib, z3, z3b, start in ((128, '128', None, '0x40000000'), (1024, '1024', None, '0x40000000'),
+        for mib, z3, z3b, start in ((256, '256', None, '0x40000000'),
+                                    (1024, '1024', None, '0x40000000'),
                                     (1536, '1024', '512', '0x10000000')):
             out = launcher.fast_ram_winuae_text(self.win_template, mib)
             self.assertEqual(re.findall(r'(?m)^z3mem_size=(.*)$', out), [z3])
@@ -124,10 +143,13 @@ class FastRamConfigTests(unittest.TestCase):
         before = {n: (self.root / n).read_bytes() for n in default}
         self.assertEqual(write_configs(self.image, fast_ram_mib='default'), default)
         self.assertEqual({n: (self.root / n).read_bytes() for n in default}, before)
-        write_configs(self.image, fast_ram_mib=128)
         fs, win = [(self.root / n).read_text(encoding='utf-8') for n in default]
         self.assertIn('zorro_iii_memory = 131072', fs)
         self.assertIn('z3mem_size=128', win)
+        write_configs(self.image, fast_ram_mib=16)
+        fs, win = [(self.root / n).read_text(encoding='utf-8') for n in default]
+        self.assertIn('zorro_iii_memory = 16384', fs)
+        self.assertIn('z3mem_size=16', win)
         with self.assertRaises(ValueError):
             write_configs(self.image, fast_ram_mib=100)
 
@@ -154,8 +176,20 @@ class FastRamLauncherRunTests(unittest.TestCase):
         status, output = self.run_main(['--configure-only'])
         self.assertEqual(status, 0, output)
         self.assertNotIn('fast_ram_mib', json.loads(self.settings.read_text()))
-        self.assertIn('Fast RAM: 16 MiB (default)', output)
+        self.assertIn('Fast RAM: 128 MiB (default)', output)
+        self.assertIn('zorro_iii_memory = 131072', self.config.read_text())
+        self.assertIn('Fast RAM in total:    128 MiB (default)', output)
+
+    def test_baseline_16_mib_is_written_and_remembered(self):
+        status, output = self.run_main(['--configure-only', '--fast-ram', '16'])
+        self.assertEqual(status, 0, output)
         self.assertIn('zorro_iii_memory = 16384', self.config.read_text())
+        self.assertIn('Starting with 16 MiB of Fast RAM', output)
+        self.assertEqual(json.loads(self.settings.read_text())['fast_ram_mib'], 16)
+        status, output = self.run_main(['--configure-only'])
+        self.assertEqual(status, 0, output)
+        self.assertIn('Fast RAM: 16 MiB', output)
+        self.assertNotIn('(default)', output.split('Fast RAM: 16 MiB', 1)[1].split(chr(10), 1)[0])
 
     def test_choice_is_written_printed_and_remembered(self):
         status, output = self.run_main(['--configure-only', '--fast-ram', '1536'])
@@ -179,7 +213,7 @@ class FastRamLauncherRunTests(unittest.TestCase):
             status, output = self.run_main([], answers=('m', '2', 'n'))
         self.assertEqual(status, 0, output)
         self.assertIn('Fast RAM for the emulated Amiga', output)
-        self.assertIn('Fast RAM: 128 MiB', output)
+        self.assertIn('Fast RAM: 16 MiB', output)
         prompts = []
         with patch.object(launcher.shutil, 'which', return_value=None), \
              contextlib.redirect_stdout(io.StringIO()), \

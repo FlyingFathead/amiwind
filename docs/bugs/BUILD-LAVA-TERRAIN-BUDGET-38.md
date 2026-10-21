@@ -1,16 +1,26 @@
 # BUILD-LAVA-TERRAIN-BUDGET-38: Detailed lava terrain exceeds region storage budget
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.41-dev2 at 2026-10-16 00:57 +0300: vf1697 4.74 MB, vf2544 4.35 MB over 4 MiB; two more splits
+- Reported with v0.0.43 at 2026-10-19 (time not recorded): A tester's default build from the public repository (native and Docker) stopped at world-scenery: 7 regions over 4 MiB (vf1178 4,468,264 bytes ...)
+- Reported with v0.0.46 at 2026-10-21 (time not recorded): Reproduced on the v0.0.46 tree, default options from scratch: same 7 regions, vf1178 byte for byte; v0.0.47 fix: 11 refinement splits, both stages pass
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
 | --- | --- |
 | Reported by | build |
 | First noticed | 12 October 2026, in v0.0.38-dev3 |
-| Where | Legacy exterior world-terrain stage |
-| Reproduction | unknown |
+| Where | Legacy exterior world-terrain and world-scenery stages of a default build (no CHIM region selection) |
+| Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev3 (last seen) |
-| Severity | high: Blocks full development playtest packaging. |
+| Persists in | v0.0.38-dev3, v0.0.43, v0.0.46 (last seen) |
+| Severity | high: Stops a default build from the public repository at the world-scenery stage (no image). |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
 | Playtest version | v0.0.38-dev3 full candidate |
 | From commit | source 5d509f1, engine 5d509f1, CHIM world 5d509f1 |
@@ -20,11 +30,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -118,6 +129,53 @@ split, and every exceeded limit with the measured value and SHA-256. Earlier it 
 Still open: the remaining near-cap regions (vf1603 at 3,968,800 bytes, vf1821 at 3,951,208 bytes) have no headroom for
 further lava growth. A pre-build budget scan of every dense lava region would catch the next one before a full build.
 
+### PERSISTING: public default builds, 19 and 21 October 2026
+
+A tester built the game from the public repository with the default builder options on 19 October 2026, both natively
+and in Docker (from the map names, v0.0.43: its region layout is the one from BUILD-WORLD-LAYOUT-DRIFT-32). Both runs
+stopped at the end of the world-scenery stage, after converting all 2,384 regions: 7 regions were over the
+4,194,304-byte region storage cap. The register had closed this bug in the 20 October audit as superseded, because the
+project's own builds put these cells on CHIM.
+
+Checked on 21 October 2026 with the v0.0.46 release tree: the world-terrain and world-scenery stages run from scratch
+with the default options (no CHIM region selection; the survey and the scenery export are the same in both kinds of
+build) stop the same way, with the same seven regions. vf1178 is byte for byte the size the tester reported:
+
+| Region | Cell | Split | Bytes | Faces | Clipnodes |
+| --- | --- | --- | ---: | ---: | ---: |
+| vf1818 | 10,0 | quarter 0,0 | 4,923,988 | 17,330 | 17,014 |
+| vf1394 | 5,-2 | whole cell | 4,872,748 | 18,726 | 19,454 |
+| vf1600 | 8,0 | quarter 1,0 | 4,765,484 | 18,058 | 14,131 |
+| vf1179 | 2,-1 | whole cell | 4,669,588 | 18,072 | 21,683 |
+| vf2543 | 9,0 | sixteenth 1,1 | 4,604,696 | 15,522 | 17,131 |
+| vf1178 | 2,-2 | quarter 1,1 | 4,468,264 | 17,210 | 20,037 |
+| vf1395 | 5,-1 | whole cell | 4,325,612 | 17,373 | 20,723 |
+
+Face and clipnode counts are within their limits; only storage is over.
+
+Why it came back: the 12 October scenery failures (vf1397, vf1516 and vf1907 at the time; cells 5,-2, 5,-1, 7,-4
+and 11,-1) and the later lava growth were repaired by putting the cells on CHIM, through the CHIM cell list the project
+passes to its own builds. That list is not a public default. A default build still converts these cells as BSP29
+regions, and nothing measured them: the project's builds skip them and reuse the open-world stages from earlier runs,
+and no from-scratch default build had run since the cells moved to CHIM. The terrain stage's own 4 MiB check passes,
+because the scenery overlay adds the size.
+
+Repair (v0.0.47): eleven more rules in the refinement table, config/world-region-refinements.json. The seven regions
+above are split into four children each. Four more regions within 5 % of the cap that could still be split are split
+too, for headroom: vf1513 (cell 7,-4, 4,116,252 bytes), vf1904 (11,-1, 4,079,536), vf1689 (9,-1, 4,050,484) and vf1587
+(8,-3, 4,026,920). Original core triangles, scenery references and the 896-unit apron are kept. Earlier region names
+do not change; the new children are added at the end of the world directory (2,589 rows, 2,417 BSP29 maps in a default
+build). In the project's own builds these cells are CHIM, so they only gain directory rows.
+
+Verification: the same two stages from scratch with the repaired table pass: 2,417 regions converted, the overlay
+covers all 37,081 source references, none over a limit. The largest is vf2555 (cell 9,0, an eighth-split child) at
+4,147,976 bytes. It is already at the finest split, so it is the region to watch.
+
+Prevention: the scan is recorded in config/world-region-budget-scan.json by tools/world_budget_scan.py (the largest
+regions, the limits and the refinement table it was measured with). tests/test_world_region_budget.py fails when the
+refinement table changes without a new scan, or when a recorded region is over a limit. A from-scratch default build
+of the open-world stages belongs to every release check (it takes about 30 minutes on 6 cores).
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -129,6 +187,7 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - AW25-09 (no report page): Image stage rejected the world/journal receipt after terrain
 - [BUILD-ACTOR-CONTACT-CALL-32](BUILD-ACTOR-CONTACT-CALL-32.md): Builder actor-contact stage calls convert() with the wrong arguments since v0.0.27
 - [BUILD-ACTOR-CONTACT-REGRESSION-38](BUILD-ACTOR-CONTACT-REGRESSION-38.md): Full dev3 rebuild rejects116 previously grounded actors
+- [BUILD-CHIM-CELLS-PRIVATE-LIST-47](BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells
 - [BUILD-CHIM-VIS-VARIANT-SORT-42](BUILD-CHIM-VIS-VARIANT-SORT-42.md): CHIM world visibility step stops on mixed variant keys (model numbers beside terrain tile variants)
 - [BUILD-DIAGNOSTIC-PALETTE-38](BUILD-DIAGNOSTIC-PALETTE-38.md): Lava diagnostic mixes conversion and runtime palettes
 - [BUILD-FINALIZE-SCENE-31](BUILD-FINALIZE-SCENE-31.md): Image finalisation stops on an undefined name before media staging

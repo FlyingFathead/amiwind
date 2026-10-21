@@ -46,6 +46,9 @@ SHIPPED_STAGES = {
     # The Arena's listed rooms (the Pit, vai000; shipped in v0.0.35 through the legacy chain): their own CHIM-native stage
     # (tools/chim_rooms.py, BUILD-MINIWIND-ARENA-PIT-REFUSED-36).
     'chim-rooms-vivec_city': 'the 130 Vivec rooms (the Arena Pit vai000 among them), their residents and linked door banks',
+    # v0.0.47 (--chim-actor-table on by default, CHIM-EXTERIOR-ACTORS-MISSING-46): exterior creature and NPC models
+    # for the actor table
+    'actor-library': 'exterior creature and NPC models named by maps/chim-actors.cca',
     'door-audio': 'door-sounds.txt', 'character': 'character/*.awh', 'reading': 'reading/*',
     'opening-references': 'opening references', 'world-survey': 'world/regions.awr, map.awm',
     'world-ui': 'world/journal.awj, quests.awq', 'actor-contact': 'actor ground gate',
@@ -53,7 +56,7 @@ SHIPPED_STAGES = {
     'seam-audit': 'seam-tear gate over reduced meshes (seam-audit.json)',
     'world-scenery': 'rock and mushroom overlay',
     'world-flora-assets': 'progs/aw_flora/*.spr (76 files)', 'world-flora': 'trees and grass overlay',
-    'media': 'media/catalogue.json, sound/*', 'music': 'music/*.mws', 'engine': 'AmiWind, AmiWindCheck',
+    'media': 'sound/*, intro videos (the catalogue stays beside the image)', 'music': 'music/*.mws', 'engine': 'AmiWind, AmiWindCheck',
     'image': 'the HDF images',
     # v0.0.33, the first CHIM release: Balmora and Seyda Neen as a CHIM world (config/build-defaults.json).
     'chim': 'CHIM world (chim/world.cwi, frame maps of Balmora and Seyda Neen)',
@@ -114,9 +117,16 @@ OPTIONS = {
     'lava': 'shipped default',
     # In-game world map v2 with the lava pools (config/build-defaults.json, v2); --world-map v1 keeps the earlier map
     'world_map': 'shipped default',
+    # Disk layout (config/build-defaults.json: compact, 100 MiB headroom; tools/layout_plan.py); --disk-layout legacy
+    # keeps the earlier layout
+    'disk_layout': 'shipped default', 'partition_headroom_mib': 'shipped default',
+    'boot_partition_headroom_mib': 'shipped default',
     # World bounds (tools/world_bounds.py, docs/WORLD_BOUNDS.md): on by default, the image step gets --world-bounds;
     # --world-bounds off writes nothing (the game as before; tests/test_world_bounds.py)
     'world_bounds': 'shipped default',
+    # Cell crossings (tools/chim_crossing.py, docs/chim/CELL_CROSSINGS.md): type 1 by default since v0.0.47 (the image
+    # step's --chim-crossing 1); --chim-crossing 0 adds nothing, the image as before (tests/test_chim_crossing.py)
+    'chim_crossing': 'shipped default',
     # The player's view (tools/prepare_player_view.py, docs/THIRD_PERSON.md): the bodies and the quick retry are on
     # by default (nothing added to the image step); off adds --no-player-body / --no-death-retry
     'player_body': 'shipped default',
@@ -141,6 +151,8 @@ OPTIONS = {
     # --extra-town adds towns not shipped yet; shipped towns are built by default.
     'extra_town': 'opt-in, not shipped', 'intro_captions': 'opt-in, not shipped',
     'amiga_libs': 'opt-in, not shipped', 'shared_sky_source': 'opt-in, not shipped',
+    # Workbench icon on the boot volume (docs/WORKBENCH_ICON.md): not given = the image step's default, launch.
+    'workbench_icon': 'shipped default',
     # Benchmark/diagnostic images: live diagnostic logs (BOOT-VOLUME-NOT-VALIDATED-33).
     'live_logs': 'opt-in, not shipped', 'live_tracker': 'opt-in, not shipped', 'tracker_declined': 'opt-in, not shipped',
     'keep_tracker': 'opt-in, not shipped',
@@ -165,14 +177,35 @@ OPTIONS = {
     'actor_search': 'shipped default',
     # creatures in converted interiors: the listed ones (Vivec) by default; all = experimental, off = before v0.0.42
     'interior_creatures': 'shipped default',
+    # actors the original's start script disables at a new game: original = off by default until the runtime
+    # enable exists (NPC-STORY-DISABLED-AT-START-42); placed = as before
+    'start_disabled': 'opt-in, not shipped',
     'chim_model_hull_patch': 'shipped default',
+    # edge bevels on every CHIM model's standing hull (CHIM-COMPILED-HULL-OVERFILL-46): EXPERIMENTAL, profile by default
+    'chim_model_bevels': 'opt-in, not shipped',
+    # world format 0.8: one model per mesh + scale, the full rotation in the record (CHIM-TILT-VARIANTS-SPLIT-33):
+    # EXPERIMENTAL, 0.7 by default
+    'chim_placement_format': 'opt-in, not shipped',
+    # world format 0.9: a reach copy becomes a reference to the owner record (CHIM-PLACEMENT-MARGIN-COPIES-46):
+    # EXPERIMENTAL, copies by default
+    'chim_reach_index': 'opt-in, not shipped',
+    # the actor table: every exterior NPC and creature reference for the type 1 window (CHIM-EXTERIOR-ACTORS-MISSING-46):
+    # on by default since v0.0.47; off = only the frame maps place actors
+    'chim_actor_table': 'shipped default',
+    # generated terrain records (world format 0.11) by default since v0.0.47; compact (0.10) and bsp29 selectable
+    'chim_terrain_pack': 'shipped default',
     # how a CHIM model variant shares its vertices (base by default; placed = the earlier per-placement weld)
     'chim_model_weld': 'shipped default',
     # how CHIM meshes become faces (table by default: config/mesh-methods.json)
     'chim_mesh_method': 'shipped default',
+    # shapes whose texture scrolls in the original drawn as Quake turbulent textures (GHOSTFENCE-NO-ANIMATION-46):
+    # turbulent by default since v0.0.47; off = the still texture of before
+    'chim_uv_scroll': 'shipped default',
     'stair_walk_cache': 'check', 'stair_walk_sample': 'check', 'stair_walk_area': 'check',
+    'stair_walk_key': 'check', 'stair_walk_places': 'check', 'stair_watch': 'check',
     # the general underside collision rules of CHIM models: EXPERIMENTAL (names, the list, by default)
     'collision_underside': 'opt-in, not shipped',
+    'stair_collision_method': 'opt-in, not shipped',
     # collision-free scaled copies merged to the nearest 0.1 of scale (on by default: CHIM-HULL-SURFACE-HEAP-46)
     'scale_snap': 'shipped default',
     # Entity tracker against the release baseline (BUILD-DRESSING-EXCLUDED-32).
@@ -200,7 +233,9 @@ OPTIONS = {
     # Build profile and development stage reuse (docs/BUILD_PROFILE.md): outputs unchanged.
     'no_profile': 'tooling', 'perf_guard': 'tooling', 'perf_guard_baselines': 'tooling', 'size_guard': 'tooling', 'size_baseline': 'tooling',
     'size_growth_margin': 'tooling', 'size_growth_reason': 'tooling', 'log_level': 'tooling', 'quiet': 'tooling', 'reuse_from': 'tooling', 'reuse_mode': 'tooling', 'rebuild_stage': 'tooling',
-    'accept_rebuild': 'tooling', 'any_run_name': 'tooling', 'source_commit': 'tooling',
+    'accept_rebuild': 'tooling', 'any_run_name': 'tooling',
+    # A first-time user's build and the release's from-scratch check (tools/clean_build.py): outputs unchanged.
+    'clean': 'check', 'public_defaults': 'check', 'source_commit': 'tooling',
     'developer_mode': 'tooling', 'working_version': 'tooling', 'accept_version_mismatch': 'tooling',
     # Build recipes (tools/build_recipe.py, docs/BUILD_RECIPES.md): where the options come from and where they go.
     'recipe': 'tooling', 'save_recipe': 'tooling', 'recipe_inputs': 'tooling',
@@ -210,10 +245,16 @@ OPTIONS = {
     'prerendered': 'tooling', 'prerendered_stages': 'tooling', 'storage_pool': 'tooling', 'anim_kit': 'shipped default', 'miniwind_boot': 'mode',
     # CHIM-native towns (CHIM-LEGACY-CHAIN-33): on by default since v0.0.36 (CHIM-native areas); 'off' and --legacy-area
     # are RETIRED since CHIM v0.1.0 (tools/retired_flags.py, BUILD-LEGACY-CHAIN-DEFAULT-36); --override lets one through.
-    'chim_native_towns': 'shipped default', 'chim_regions': 'opt-in, not shipped', 'chim_regions_status': 'opt-in, not shipped',
+    'chim_native_towns': 'shipped default', 'chim_regions': 'shipped default', 'chim_regions_status': 'shipped default',
     'legacy_areas': 'retired', 'override': 'tooling',
+    # Interior mushrooms on the world's pick state (HARVEST-INTERIOR-PICK-47): on by default since v0.0.47
+    'harvest_interiors': 'shipped default',
     # Night-lamp lightmaps (bm019 prototype, tools/lamp_lightmaps.py): EXPERIMENTAL, off by default
     'night_lamp_lightmaps': 'mode',
+    # The media catalogue on the boot disk (IMAGE-MEDIA-CATALOGUE-ON-DISK-46): DEBUGGING ONLY, off by default
+    'media_catalogue': 'mode',
+    # Repeated content stored once (tools/payload_share.py): on by default since v0.0.47; off stores every copy
+    'file_aliases': 'shipped default', 'shared_skins': 'shipped default',
     # Modular NPCs (docs/MODULAR_NPCS.md): EXPERIMENTAL, whole by default
     'npc_models': 'mode', 'npc_parts_face_cap': 'tooling', 'npc_parts_policy': 'tooling', 'parts_cache': 'tooling', 'storage_pool_dir': 'tooling', 'stair_walk': 'check',
 }
@@ -257,6 +298,50 @@ class DefaultBuildShipsTheRelease(unittest.TestCase):
         self.assertEqual(option(image, '--map-budget-policy'), 'strict')
         for flag in ('--no-npc-gallery', '--vis-mode', '--allow-known-actor-ground-findings', '--intro-captions'):
             self.assertNotIn(flag, image)
+
+    def test_media_catalogue_stays_off_the_image_by_default(self):
+        # IMAGE-MEDIA-CATALOGUE-ON-DISK-46: nothing in the game reads id1/media/catalogue.json (64 MB in v0.0.46).
+        self.assertNotIn('--media-catalogue', dict(steps())['image'])
+        self.assertIn('--media-catalogue', dict(steps('--media-catalogue', 'on'))['image'])
+
+    def test_payload_sharing_is_on_by_default(self):
+        # IMAGE-DUPLICATE-FILES-46, IMAGE-ACTOR-SKIN-REPEATS-46: on by default since v0.0.47 (v0.0.47-dev2's content);
+        # off keeps every copy (the method before).
+        image = dict(steps())['image']
+        self.assertIn('--file-aliases', image)
+        self.assertIn('--shared-skins', image)
+        off = dict(steps('--file-aliases', 'off', '--shared-skins', 'off'))['image']
+        self.assertNotIn('--file-aliases', off)
+        self.assertNotIn('--shared-skins', off)
+
+    def test_default_build_has_the_v047_dev2_switches(self):
+        # Decided for the project, 2026-10-21: v0.0.47 ships v0.0.47-dev2's content. That build was made with
+        # --chim-crossing 1 --chim-actor-table on --chim-terrain-pack generate --file-aliases on --shared-skins on
+        # (its build_argv); a default build must give the same plan as one with those switches given by hand, and
+        # world format 0.8 / 0.9 (left out of dev2) stay off.
+        dev2 = ('--chim-crossing', '1', '--chim-actor-table', 'on', '--chim-terrain-pack', 'generate',
+                '--file-aliases', 'on', '--shared-skins', 'on')
+        self.assertEqual(steps(), steps(*dev2))
+        args = build.parser().parse_args([])
+        self.assertEqual((args.chim_crossing, args.chim_actor_table, args.chim_terrain_pack, args.file_aliases,
+                          args.shared_skins), ('1', 'on', 'generate', 'on', 'on'))
+        self.assertIsNone(args.chim_placement_format)
+        self.assertIsNone(args.chim_reach_index)
+        plan = dict(steps())
+        image = [str(part) for part in plan['image']]
+        self.assertEqual(option(image, '--chim-crossing'), '1')
+        self.assertEqual(option(image, '--chim-actor-table'), 'on')
+        self.assertIn('--actor-library', image)
+        chim = [str(part) for part in plan['chim']]
+        self.assertEqual(option(chim, '--terrain-pack'), 'generate')
+        self.assertEqual(option(chim, '--terrain-refs'), 'on')
+        for flag in ('--placement-format', '--reach-index'):
+            self.assertNotIn(flag, chim)
+        # every old value is still selectable and changes the plan
+        for old in (('--chim-crossing', '0'), ('--chim-actor-table', 'off'), ('--chim-terrain-pack', 'bsp29'),
+                    ('--file-aliases', 'off'), ('--shared-skins', 'off')):
+            with self.subTest(old=old):
+                self.assertNotEqual(steps(*old), steps())
 
     def test_night_lamp_lightmaps_are_off_by_default(self):
         # EXPERIMENTAL bm019 prototype (docs/EXPERIMENTAL_FLAGS.md): the default image is unchanged.

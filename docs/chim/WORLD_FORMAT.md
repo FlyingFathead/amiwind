@@ -1,6 +1,6 @@
 # CHIM world format
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -21,6 +21,11 @@ _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
   - [Placement record (48 bytes, big-endian)](#placement-record-48-bytes-big-endian)
   - [Terrain image (a world subtree)](#terrain-image-a-world-subtree)
 - [Terrain references (0.7, experimental)](#terrain-references-07-experimental)
+- [Compact terrain records (0.10, experimental)](#compact-terrain-records-010-experimental)
+- [Generated terrain records (0.11, experimental)](#generated-terrain-records-011-experimental)
+- [Placed models (0.8, experimental)](#placed-models-08-experimental)
+- [Reach index (0.9, experimental)](#reach-index-09-experimental)
+- [Actor table (experimental)](#actor-table-experimental)
 - [Collision reference and the stair rule](#collision-reference-and-the-stair-rule)
 - [Visibility and culling](#visibility-and-culling)
 - [Ids and order](#ids-and-order)
@@ -54,8 +59,8 @@ legacy builder). This page specifies the files the CHIM builder writes and the
 engine will read: every shared model, texture and terrain face stored once,
 every placement stored once and pointing at a shared model, in small sector
 files that a classic Amiga FFS disk reads whole, front to back. The builder
-writes world format 0.5, or 0.7 when terrain references are on; the engine
-reads 0.4 to 0.7 ("Version rules" below). A short overview for newcomers, with
+writes world format 0.5, or 0.7 when terrain references are on (0.8 and 0.9 only
+to 0.11 only behind experimental options); the engine reads 0.4 to 0.11 ("Version rules" below). A short overview for newcomers, with
 the roadmap of the format: [CHIM file format](../CHIM_FILE_FORMAT.md).
 
 ## File types
@@ -91,7 +96,7 @@ markers, with the frame it names) and a CHIM world folder, with the heap gate's 
 
 | | |
 | --- | --- |
-| World format | Written: 0.5, or 0.7 with terrain references (`--chim-terrain-refs on`, opt-in). The engine reads 0.4 to 0.7 (`chim/chim_format.h`). History: 0.7 terrain references; 0.6 one folder per sector row for frames of more than 64 sectors (read by the engine, not yet written by the builder); 0.5 story-hidden placements and irregular ground; 0.4 regular terrain grids only and no story-hidden placements; 0.3 chunk standing hulls without the neighbouring ground; 0.2 no placement lists; 0.1 one model pack, one texture pack and one chunk pack per frame. Major 0 = still in development. |
+| World format | Written by default since v0.0.47: 0.11 generated terrain records (`--chim-terrain-pack generate` with terrain references, `--chim-terrain-refs on`); selectable: 0.10 compact terrain records (`--chim-terrain-pack compact`), 0.7 terrain references with BSP29 terrain records (`--chim-terrain-pack bsp29`), 0.5 (`--chim-terrain-refs off`); experimental and off by default: 0.8 placed models (`--chim-placement-format 0.8`), 0.9 placed models with reach references (`--chim-reach-index refs`). The engine reads 0.4 to 0.11 (`chim/chim_format.h`). History: 0.11 generated terrain records; 0.10 compact terrain records; 0.9 reach references; 0.8 placed models; 0.7 terrain references; 0.6 one folder per sector row for frames of more than 64 sectors (read by the engine, not yet written by the builder); 0.5 story-hidden placements and irregular ground; 0.4 regular terrain grids only and no story-hidden placements; 0.3 chunk standing hulls without the neighbouring ground; 0.2 no placement lists; 0.1 one model pack, one texture pack and one chunk pack per frame. Major 0 = still in development. |
 | CHIM version | 0.2.1 with AmiWind v0.0.41 (0.2.0 with v0.0.36; 0.1.0 first shipped with AmiWind v0.0.33); its own number, kept in the `CHIM_VERSION` file at the repository root, the one source: `tools/project_version.py` (`chim_version()`) and the builder receipts read it, and `generate_native` writes `chim_version.h` (`#define CHIM_VERSION`; the engine's `chim/chim.h` includes it) and the boot check's "AmiWind vX / CHIM vY" |
 | Builder | `tools/chim_build.py` (package `tools/chim/`), receipts say `builder: "chim"` |
 | Validator | `tools/chim/validate.py` |
@@ -169,10 +174,14 @@ Classic FFS rules, hard requirements checked by the validator:
   `chim/` in the same order, after every other file, so each file occupies
   one contiguous run of blocks.
 
-On the image (`tools/build.py --builder chim`), the world is one more world
-volume: the image step (`tools/build_aga.py image --chim-world`) writes it
-onto its own partition `DW<n>` (volume `AW_WORLD<n>`, the next free world
-volume) under `id1/chim/`, and `world/volumes.awv` counts it. The engine adds
+On the image (`tools/build.py --builder chim`), the world is a world volume
+of its own: the image step (`tools/build_aga.py image --chim-world`) writes it
+onto its own partition under `id1/chim/`, and `world/volumes.awv` counts it.
+With the compact layout (the default, `tools/layout_plan.py`) it is `DW0`
+(volume `AW_WORLD0`) and also holds the open-world frame maps (`id1/maps/`,
+written after the world, so the world stays in pack order); with
+`--disk-layout legacy` it is the next free world volume `DW<n>` after the
+volumes of the open-world maps. The engine adds
 `AW_WORLD0:id1` ... `AW_WORLD<n>:id1` to its search path, so `chim/world.cwi`
 opens like any other game file. `tools/chim/disk.py` writes the partition in
 pack order and reads every file back. It then runs the disk-layout gate on
@@ -525,6 +534,302 @@ CHIM-REGION-MARGIN-STORAGE-36), against the open-world maps they replace:
 The compiled standing hull (`--terrain-hull compiled`: qbsp's exact union of the same pieces, the hull
 Seyda Neen's irregular ground already uses) takes about half the bytes; references take the margins
 shared between neighbours and every repeated chunk. File counts do not change.
+
+## Compact terrain records (0.10, experimental)
+
+A world built with `tools/chim_build.py --terrain-refs on --terrain-pack compact` (`tools/build.py
+--chim-terrain-pack compact`; `generate` by default since v0.0.47, `bsp29` before) may store a `TERR` record in a compact form that the engine expands
+back into the very same BSP29 bytes before its usual loaders read them (`chim/chim_terc.c`; builder
+`tools/chim/terc.py`). Such a world is written as format 0.10; a default build writes the same bytes as before. The
+engine reads 0.4 to 0.10; an engine older than 0.10 refuses a 0.10 world by its minor version. In a 0.10 world every
+chunk head names its placement record size (0: 48 bytes, 56: placed), so the option combines with either placement
+format.
+
+- **Record.** Still a sector record of kind `TERR`, told apart by its first four bytes: `TRC1` instead of the BSP29
+  version. Head (16 bytes, big-endian): `TRC1`, u32 image bytes, u32 render bytes, u16 15, u16 0; then 15 entries of
+  8 bytes in the image's file order (u8 method, u8 0, u16 0, u32 payload bytes); then the payloads, each on a 4-byte
+  boundary. The payloads keep the image's little-endian bytes: expanding is byte shuffling, no arithmetic.
+- **Methods** (each exact; a lump none of them holds is stored as it is): planes with an axial normal (bit for bit
+  the unit vector on an axis, either sign, zeros of either sign) as a one-byte code and the 4-byte distance instead
+  of 20 bytes; a light lump of one value (the terrain's uniform light) as its length and that value; clipnodes and
+  nodes whose plane numbers fit 16 bits with a 16-bit plane number (6 and 22 bytes instead of 8 and 24).
+- **Which records.** Only a record that comes out smaller and whose compact form plus its image fit the engine's
+  smallest loading buffer (18,448 bytes): the engine reads it to the end of that buffer and expands it to the start,
+  then loads it as any image. Larger records stay BSP29 images in the same world.
+- **Tools** expand a compact record when they read it (`chim.validate`), so every reader and gate sees the same image
+  as in a plain world.
+
+Measured (host tests, `tests/test_chim_terc.py`: the builder's own world with terrain references written plain and
+compact): every compact record expands to the plain world's record byte for byte, in Python and in the engine's
+expander (natively); the validator reads both worlds into the same chunks; the engine's seam walk on the compact
+world prints the same lines as on the plain one. On the v0.0.46 world (read only, all 97,369 terrain records): every
+record packs and expands back exactly (and 9,359 of them, every tenth, through the engine's C expander); 93,509
+records come out compact, 3,860 (65.6 MB) are too large for the buffer and stay; the terrain records go from 489.4 MB
+to 450.8 MB (-38.6 MB, 7.9 %; -42.4 MB if every record were compact). The planes save 8.7 MB (85 % of the terrain's
+6.8 million planes are slanted and keep their 20 bytes), clipnodes 23.1 MB, nodes 4.0 MB, light 7.8 MB.
+The texinfo rows (9.5 MB, 19 distinct island-wide) would need a world-level table and are not packed.
+
+## Generated terrain records (0.11, experimental)
+
+A world built with `tools/chim_build.py --terrain-refs on --terrain-pack generate` (`tools/build.py
+--chim-terrain-pack generate`; the default since v0.0.47, decided for the project, 2026-10-21) stores a regular-path terrain record (the builder's tile rule) as its corner heights and the facts the builder
+decided (record version 1), and a record of the converter's own triangles (shoreline insertion, 32-unit detail
+tiles) as its 32-unit samples and the triangles (record version 2); the engine generates the render part when the
+chunk joins (`chim/chim_thgt.c`; builder `tools/chim/thgt.py`): the same BSP29 bytes as the
+record it replaces, then loaded as before. Every other record is written as in a 0.10 world (compact, or as it is).
+Such a world is written as format 0.11; the engine reads 0.4 to 0.11; a default build writes the same bytes as before.
+
+- **Generated:** the vertexes, edges, surfedges, faces, texture mappings, leaves, marksurfaces, nodes (tree, bounds,
+  faces), the uniform light lump and the model, by the builder's own regular-path rule (axial splits on the tile grid,
+  the tile diagonal where a tile is two triangles, the ground plane node, the cut of a ground polygon whose texture
+  span passes 240 texels 224 texels from its low line, the water plane node and the water face where a tile lies under
+  water, the ground polygon cut where the water line crosses it). Version 2: each tile split on its triangles'
+  edges as the builder splits it (the cut through a triangle edge that cuts the fewest triangles, then the most
+  even one, until one ground plane is left), the corners of each region from the triangle corners or from their
+  plane, then the ground plane, water and texture splits as above.
+- **Stored:** the corner heights (f32), per tile its texture slot and four facts (one quad or two triangles; under
+  water; the texture axis of each ground polygon), the plane of every node, the plane lump and the standing hull as
+  the compact record packs them, the texture references, the light value and size. The planes are stored so the
+  generation needs no floating-point arithmetic beyond copies, sums of whole units, comparisons (floor and ceil are
+  taken from the bits) and one formula, the point where an edge crosses a cut (`p + (q - p) * d / (d - e)`, in double
+  precision as the builder computes it; on the Amiga the generator sets the FPU to double rounding precision and
+  restores it after): an Amiga's FPU gives the same bytes as the builder's computer (not yet measured on a 68040 or
+  68060). The standing hull is qbsp's
+  compiled union of the tile prisms and stays stored.
+- **Record:** a sector record of kind `TERR` starting with `THG1`: head (72 bytes, big-endian: image and render
+  bytes, version 1, tiles across and along, nodes, the box, floor, ceiling, water level, tile step, light size and
+  value, water texture slot, the sizes of the plane, clipnode and texture-reference payloads, the standing hull's
+  root), the heights, the tile facts, the node planes (u16), the texture references, then the plane and clipnode
+  payloads. Version 2 (version field 2): the 32-unit samples of the chunk (f32), per tile its texture slot and
+  triangle count, every triangle as three sample indices in the builder's order, then as version 1. The triangles
+  come from the frame's ground when the world is packed; lava records are not generated (their prisms are not in
+  the record). The engine's generator has fixed buffers (16 corners per polygon, 64 pieces per region, 6,144 piece
+  corners alive at once); the builder refuses a record that would need more. Only a record whose generation equals the stored record byte for byte, that comes out smaller, and that
+  fits the engine's smallest loading buffer with its image is written so.
+
+Measured (host tests, `tests/test_chim_thgt.py`: the builder's own world with terrain references written plain and
+generated, with regular and with irregular ground): every generated record gives back the plain record byte for byte, in Python and in the engine's generator
+(natively); the validator reads both worlds into the same chunks; the engine's seam walk prints the same lines. On the
+v0.0.46 world (read only, all 97,369 terrain records): 83,236 records are generated as version 1 (353.2 MB of records
+stored in 167.4 MB) and 12,582 as version 2 (91.5 MB as compact records today, 40.6 MB generated: 11,820 of the
+13,284 records holding the converter's own triangles, 736 of the 738 shore records the version-1 rule refused, 26
+others); the engine's generator gives back every tenth of each (8,333 and 1,270) byte for byte; the terrain records
+go from 489.4 MB to 247.6 MB with the rest compact (-241.8 MB, 49.4 %; 450.8 MB with the compact pack alone). Not
+generated: 563 lava records, 886 whose record and image together do not fit the engine's loading buffer (18,448
+bytes; 292 would fit 20,480, 586 would fit 24,576), and 100 whose generation differs from the stored record in its
+texture mappings (a face given the texture axes of another base direction than its plane; the cause is not found).
+The work per generated version-1 chunk (mean of the
+8,333): 8 tiles, 15.5 ground polygons, 6 grid and water splits, 0.3 texture splits, 32 vertexes, 13 faces, 17 nodes,
+11 leaves, about 3.4 KB of image written, in two passes (count, then write); no 68040 or 68060 timing yet. The zone holds the same decoded chunk as before (the same image); the loading buffer holds the record and
+the image, as for a compact record.
+
+## Placed models (0.8, experimental)
+
+A world built with `tools/chim_build.py --placement-format 0.8` (`tools/build.py --chim-placement-format 0.8`;
+0.7 by default) stores one model per mesh and scale, and puts the whole rotation into the placement record
+([CHIM-TILT-VARIANTS-SPLIT-33](../bugs/CHIM-TILT-VARIANTS-SPLIT-33.md)). Until then a tilted placement got a model
+of its own with the tilt baked in, and only the yaw was left to the record. Such a world is written as format 0.8;
+a default build writes the same bytes as before (0.5, or 0.7 with terrain references). The engine reads 0.4 to
+0.8; an engine older than 0.8 refuses a 0.8 world by its minor version, with its usual message.
+
+- **Placement record: 56 bytes.** The 48 bytes of the record above, then the pitch and the roll (f32, degrees).
+  The three angles are Quake's entity angles (pitch, yaw, roll): the renderer turns the model with them as it
+  turns any brush entity (`r_bsp.c` R_BuildBmodelRotation), so drawing a tilted placement needs no new engine
+  code. The builder converts the game's rotation (Z, then Y, then X of the negated angles) once and checks the
+  turn of the stored angles against it (within 1e-5); a placement that turns about Z only keeps the 0.7 record's
+  yaw exactly and pitch and roll 0. The drawn box is the model's bounds turned by all three angles.
+- **Chunk head.** The last u16 of the chunk head (0 until 0.7) is the size of the chunk's placement records: 56.
+- **Models.** A placed model is built untilted (scale, the visual offset and the flattening shift baked as
+  before), so one model serves every tilt of a mesh at one scale. Lump 4 of its brush image (visibility, which a
+  placed model never uses) holds its **piece table**: the convex collision pieces of the mesh, unexpanded, in
+  the model's frame (big-endian: `PCS1`, pieces, table bytes, 0; per piece a 36-byte entry with its plane,
+  corner and edge counts, its box and the offset of its data; then per piece its planes as 4 x f32 with
+  n.x < d inside, its corners as 3 x f32 and its edges as 3 x u16: the two planes that meet there and one
+  corner). The stored point and standing hulls stay in the image.
+- **Collision.** The engine turns each record's angles into a matrix once, when the chunk's catalogue is read
+  (the renderer's own arithmetic, so a placement collides where it is drawn). A trace expands only the pieces
+  its swept box meets: the piece turned into the world and moved out by the world-aligned player box, with
+  every facet of the Minkowski sum (own planes, axial and edge bevels), then traced as a point
+  (`chim_placed_clip.c`). That is the exact expansion the builder bakes for a tilted variant, and the box no
+  longer turns with a yawed model ([CHIM-YAW-PLAYER-BOX-TURNS-46](../bugs/CHIM-YAW-PLAYER-BOX-TURNS-46.md)). A
+  model whose table cannot be used (a piece of more than 128 planes, or a trace that meets more than the
+  2,048-plane scratch) keeps its stored hull: by the yaw path for a yaw-only record, turned by the matrix
+  otherwise (the box then turns with the model).
+- **What keeps its tilt.** A model that clips its faces to the terrain (a visual recipe's `clip_to_terrain`)
+  keeps the 0.7 variant with its tilt baked, its records carry its yaw only. The large-model cut works by tiles
+  only (`cut_mode tiles`): the tiles of the untilted model turn with the placement's angles.
+- **Python tools** read either record size (`chim.placed.read_chunk`); the validator checks the turned boxes.
+  The Python collision mirror (`chim/collision.py`, the stair walk's code) still reads only a record's yaw: it is
+  left unchanged so the stored walks keep their keys, and it does not collide a tilted 0.8 placement as the engine
+  does. A 0.8 world is not walked or ground-checked by it yet.
+
+Measured (host tests, synthetic boxes through the real units; `tests/test_chim_placed_format.py`): the drawn
+vertices of every placement agree with 0.7 within 0.02 units; the placed collision equals the exact expansion of
+the turned pieces on every trace (2,700 of 2,700, largest difference 0.004 units); against 0.7's stored hulls,
+point traces agree on every placement, box traces on every placement whose record has no yaw, and differ on
+yawed ones by the turning box. Estimated on the v0.0.46 world (read-only, its model directory and point hulls):
+32,714 models become 8,105, model records 735.8 MB become about 229.3 MB plus about 42.9 MB of piece tables,
+placement records grow from 52.2 MB to 60.9 MB. Nothing of it is seen in game yet: that needs a build.
+
+## Reach index (0.9, experimental)
+
+A world built with `tools/chim_build.py --placement-format 0.8 --reach-index refs` (`tools/build.py
+--chim-placement-format 0.8 --chim-reach-index refs`; `copies` by default) keeps each placement record once per
+frame ([CHIM-PLACEMENT-MARGIN-COPIES-46](../bugs/CHIM-PLACEMENT-MARGIN-COPIES-46.md)). Until then every chunk
+that a placement's drawn box touches, besides its owner chunk, held a whole copy of the owner record (a reach copy,
+48 or 56 bytes). Such a world is written as format 0.9: format 0.8 (placed models, 56-byte records) with reach
+references. It needs the placement format 0.8 (the builder refuses it otherwise). A default build writes the same
+bytes as before. The engine reads 0.4 to 0.9; an engine older than 0.9 refuses a 0.9 world by its minor version.
+
+- **Chunk record.** Magic `CHK2` (terrain image inline, as `CHK0`) or `CHK3` (terrain reference block, as `CHK1`).
+  The head's reach count is the number of references and its last u16 the record size (56), as in 0.8. The owned
+  records (by id) are followed by the **reach references**, 4 bytes each, big-endian: u16 owner chunk (its index
+  in the frame, pack order), u16 the record's position among that chunk's owned records. They come in placement id
+  order, which is owner chunk and record order. Then the PVS row, the placement row and the terrain, as before.
+- **Same frame only.** A reference names a record of the same frame, so it never opens another frame's files.
+  Everything else (index, frame file, sector files, models, textures, terrain records, ids and their order) is the
+  0.8 layout: model and texture ids are handed out as before, reach placements included.
+- **Engine.** When a chunk's catalogue is read, a reference whose owner chunk's catalogue is already in the zone
+  is copied from it (no read); otherwise the record is read from the owner chunk's own record list: one read per
+  owner chunk, from the first to the last record the chunk's references name there (`chim_chunks.c`
+  ReachRecord). Either way the chunk's run-time placements are the ones a 0.8 world gives: same ids, models,
+  owners, origins, angles, drawn boxes and matrices. The dbg pin re-reads a reach placement's record through
+  its owner.
+- **Python tools** read the references with `chim.reach` and resolve them per frame (`resolve_frame`), so the
+  validator and every tool that reads a world through it see the records a 0.8 frame stores as copies. The
+  validator refuses a reference that names no owned record, or a record its named chunk does not own.
+
+What it does not do: a placement is still stored once per **frame** that owns it, so an object in the
+overlapping margins of neighbouring region frames is stored in each of them (about 3.5 frames per object on
+the v0.0.46 world). Storing it once for the whole island needs chunks cut on one island grid with pages and a
+table of placements that cross chunks, which this format does not have yet.
+
+Measured (host tests on synthetic boxes through the real units, `tests/test_chim_reach_index.py`;
+`tests/test_chim_engine_native.py` for the engine): every chunk of a 0.9 world holds, once resolved, the
+records of the same chunk of the 0.8 world; model, texture and terrain records are byte-identical; each chunk
+record is 52 bytes shorter per reach entry; the engine's catalogue of every loaded chunk (ids, models, owners,
+origins, angles, drawn boxes, matrices), the dbg pin and the placed collision give the same results in both
+worlds, with the references copied from the zone and with every one read from disk.
+
+Estimated on the v0.0.46 world (read only, its 308,754 chunk records): 469,266 owned records and 619,074 reach
+copies. Placement bytes in 0.8 60.9 MB (34.7 MB of reach copies), in 0.9 28.8 MB (2.5 MB of references); the
+0.7 records of today take 52.2 MB. The cost is on reading: when no owner catalogue is in the zone, reading
+every chunk's catalogue once takes 78.7 MB in 985,500 reads against 68.4 MB in 517,059 reads with copies
+(468,441 owner record runs, 193,142 of them in another sector file of the frame).
+
+How often the owner chunk's catalogue is already in the zone, measured with the zone walk simulator
+(`tools/chim/zone_sim.py`: the engine's zone allocator and ring rules, block sizes of the target) on the v0.0.46
+world, the same walks for both forms: the 12 legs of the crossing route (each across its border, a fresh zone at
+the frame change) and four straight walks of eight cells across region frames, 4,328 steps. Each frame on its
+own zone (the type 1 window, several frames in one zone, is not simulated). 128 MB: the zone plus the 97 MiB of
+cache banks the engine takes with 128 MiB, look-ahead x3.
+
+| Memory | Catalogue loads | Reach entries | Owner in the zone | Bytes read, 0.9 / 0.8 | Reads, 0.9 / 0.8 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 16 MB | 4,363 | 15,039 | 42.2 % | 1.45 MB / 1.60 MB | 17,318 / 8,341 |
+| 128 MB | 7,342 | 25,341 | 44.5 % | 2.38 MB / 2.67 MB | 28,640 / 14,029 |
+
+So 0.9 reads about 10 % fewer bytes per catalogue but about twice as many times: the references are a read
+of their own, and more than half of them need a run of their owner's records, a third of those in another
+sector file. On a classic FFS disk a read costs more than its bytes; nothing of it is seen in game yet.
+
+Three ways to make it cheaper on reads, priced on the same walks (file reads and bytes of every catalogue
+load; 0.8 copies on the same schedule as the reference):
+
+| Variant | Reads 16 MB | Bytes 16 MB | Reads 128 MB | Bytes 128 MB |
+| --- | ---: | ---: | ---: | ---: |
+| 0.8 copies | 8,341 | 1,596,608 | 14,029 | 2,670,224 |
+| 0.9 as written | 17,318 | 1,450,012 | 28,640 | 2,384,964 |
+| (a) owned records and references in one read | 14,781 | 1,450,012 | 24,425 | 2,384,964 |
+| (b) owner chunks loaded before the chunks that reference them, with (a) | 13,914 | 1,387,260 | 22,253 | 2,228,080 |
+| 0.8 copies on the schedule of (b) | 8,837 | 1,724,696 | 14,801 | 2,864,288 |
+| (c) a whole copy where the owner chunk was resident less than 75 % of the time on the other walks, with (a) | 8,408 | 1,589,364 | 14,175 | 2,642,896 |
+| (b) and (c) at 75 % | 8,909 | 1,711,256 | 14,961 | 2,821,704 |
+
+(c)'s threshold is taken from the other walk group (the long walks judge the crossing legs and the legs judge the
+walks), never from the walk it is judged on; 25 %, 50 % and 90 % give the same picture. None of them reads as
+seldom as 0.8 copies while saving bytes: (a) and (b) still pay a read for every absent owner, and (c) can only
+avoid those reads by turning nearly every reference back into a copy (97 % to 98 % of them at 75 %), which leaves 0.5 %
+to 1 % of the bytes saved for 1 % more reads. Whether an owner is resident depends on the direction the player
+comes from (the ring loads nearest first), so no rule fixed in the data separates the references that will find
+their owner. Format 0.8 copies stay the recommended form; 0.9 stays experimental and off.
+
+## Actor table (experimental)
+
+An image built with `tools/build.py --chim-actor-table on` (`build_aga.py image --chim-actor-table on`; the
+builder's default since v0.0.47, decided for the project, 2026-10-21; `off` writes none) carries `maps/chim-actors.cca`: every exterior NPC and creature reference of the game data in one
+island-wide table outside the frames ([CHIM-EXTERIOR-ACTORS-MISSING-46](../bugs/CHIM-EXTERIOR-ACTORS-MISSING-46.md)).
+The type 1 window takes a joining frame's actors from it with `chim actors table 1`: the engine's own setting is
+off and not saved (the actors of the frame maps, as before), so an image built with the table ends
+`id1/default-game.cfg` with that line (`build_aga.py` `stage_chim_actor_table_config`; `chim actors table 0` in the
+console gives the actors of the frame maps back). Written by `tools/chim/actors.py`, read by `chim/chim_actor_table.c` and `aw_actors.c`.
+
+- **Records** (24 bytes, big-endian): u32 key (the reference number & 0xFFFFFF), u16 base, u16 flags, f32 origin
+  x, y, z in the local units of the reference's own cell (the cell centre at 0, 0: the frame-local units of that
+  cell's region frame), f32 yaw (degrees). Flag 1: the origin is the builder's baked ground point; flag 2: the
+  record is a built actor row of a frame map (its position as placed there), else the game data's position.
+- **Bases** (12 bytes): u32 text offset, u16 text bytes (0: no actor model in this build), u16 kind (NPC,
+  creature, levelled creature list, dead resident), u32 FNV-1a of the base record's id.
+- **Cells** (16 bytes per exterior cell with actors, in 4 x 4-cell page order): i16 x, i16 y, u32 first record,
+  u32 records; a cell's records are contiguous.
+- **Base text**: the key/value pairs of the built actor row without its per-placement fields; the engine parses
+  it as the entity (`ED_ParseEdict`) and sets the origin, angles, reference and baked ground from the record.
+- Header (48 bytes): `ACT1`, u16 0, u16 version (1 or 2), u32 48, then counts and offsets of the cells, records
+  and bases, the text offset, the file size, and (version 2) the offset of the list section (0 in version 1).
+- **Levelled creature lists** (version 2, what the image step writes since v0.0.47): a levelled reference's base
+  (kind 2) has no text and its offset field is the index of its list; every creature a used list can give has a
+  creature base of its own. List section: u32 lists, then per list 8 bytes (u32 first entry, u16 entries, u8
+  chance none 0-100, u8 flags: bit 0 "calculate from all levels at or below the player's"), then the entries, 4
+  bytes each in the record's order (u16 level, u16 target: a base index, `0x8000 | list` for a list inside a list,
+  `0xFFFF` for an entry that names no record).
+
+How the engine resolves a levelled reference (`ChimActors_LevelledPick`, the rule read from OpenMW 0.51's levelled
+list code, our own implementation; the builder's `levelled_pick` is the same and the tests compare them roll by
+roll): when the reference's cell joins, one roll at the player's level: chance none first (a roll 0-99 below it
+gives nothing); the candidates are every entry at or below the level when the list calculates from all levels,
+else only the entries at the highest level at or below it; no candidate gives nothing; one candidate is picked
+uniformly; a list picked is rolled again at the same level. The pick is kept in the change list under the
+reference, so a later join spawns the same creature (or nothing), and the creature keeps the list reference's id
+for its death and moves. The random numbers come from the reference's key and a session seed (`chim actors seed
+N`); OpenMW draws them from the game's generator and saves the pick. Not done: the respawn (OpenMW rolls a list
+again at a cell load once its creature has been dead for the corpse delay, 72 game hours in the game data).
+
+What it does not do: only an actor whose model a build made has base text (today the town residents); every
+other NPC and every creature is in the table without a model, and the engine counts it as not spawnable (a
+levelled reference that gives such a creature too). A creature model library (`tools/creature_library.py`, one
+model per creature mesh, not part of any build yet) can give the creature bases their text
+(`tools/chim/actors.py --library`). The frame maps keep their actors in every case.
+
+**Instance scales** (version 3, what the image step writes when an exterior reference has a scale other than 1:
+the game data has 5): after the list section, u32 count, then per scaled record u32 record index and f32 scale
+(by record index). The engine sets the spawned entity's `aw_scale` and draws it at that scale: the server sends
+a live alias entity's scale other than 1 in its update (bit `U_AW_SCALE`, a float after the angles) and the client
+scales it as it scales statics (the alias transform's entity scale). The original also scales the creature a
+levelled list gives by the list reference's scale. The previous method stays selectable: when the creature
+library has models baked at a scale (`tools/actor_library.py --scaled-variants`, keys `id@S`), a scaled creature
+reference takes a base naming that model, a scaled levelled reference a copy of its list whose creatures do, and
+the record carries flag 4 (the base's model is already at the record's scale: the engine does not scale it
+again).
+
+**In saves** (v0.0.47, experimental): the change list goes into the save as AWS4 feature bit 8, so a levelled
+list's pick, a death, where an actor was left with its health, and a fight survive a save and a load. Per entry 36
+bytes, sorted by key: u32 key (the game's reference; bit 31 marks a builder-made object, the intro roles; bits 24-30
+are always 0, the pieces of a cut object share their source's state), u16 flags (dead, moved, fight, follow, pick,
+scene), u16 pick, i32 cell (x in the high half, y in the low) or a scene id, f32 island position x, y, z, f32 yaw,
+f32 health, f32 game hours when captured. A save holds at most 2,048 entries (a full list makes a save of about
+75 KB, so the size limit of a save is now 256 KiB). An older reader refuses a save with the list; a save without it
+is the same bytes as before, and old saves load as before (their actor rows read as "moved + health" entries of
+their scene). Following actors are saved but not re-attached at a load; no respawn yet.
+
+Measured on the game data (read only, 21 October 2026): the exterior uses 61 of the game's 116 levelled creature
+lists (676 entries; every one calculates from all levels, 25 have a chance none, none holds another list, none
+names a missing record); they can give 49 creature records at player levels 1 to 30 (17 at level 1). The list
+section is 3,196 bytes; the version 2 table 205,180 bytes, 633 bases.
+
+Measured on the v0.0.46 release image's frame maps and the game data (read only): 5,981 references (566 NPC,
+333 creature, 5,082 levelled creature lists) in 1,058 cells, 601 bases, 201,600 bytes (records 143,544, cell
+directory 16,928, bases 7,212, base text 33,866). 91 records are built rows: 90 living town residents, which can spawn, and one dead resident. Per 2 x 2-cell
+window: at most 50 actors (p99 38), with doors, containers, items and activators at most 312 (p99 186).
 
 ## Collision reference and the stair rule
 

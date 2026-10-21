@@ -15,7 +15,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.46 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -375,7 +375,7 @@ target, pitched/FOV sky appearance, actor/particle/water/torch occlusion, and
 measured resident memory/frame cost. Serialized sky-enclosure removal and global
 terrain clipping have separate geometry/collision/visibility gates. Native sky
 fixtures do not establish completion of those converter gates. See
-[day/night and sky](DAY_NIGHT_AND_SKY.md) for the runtime resource contract.
+[day/night and sky](../DAY_NIGHT_AND_SKY.md) for the runtime resource contract.
 
 ### EXTERIOR-SURFACES v0.0.28: no checked interior-cell leak; storage exclusion remains open
 
@@ -453,16 +453,16 @@ runs `qbsp`, `vis` and `light`, rebuilds the world hull, and then calls
 `append_meshes()`. The static mesh surfaces appended at that stage bypass brush
 CSG on the earlier map brushes. This scope is specific to this route; the
 separate canonical terrain-visual-cull pass has incomplete production
-acceptance. See [pipeline source](../tools/prepare_mesh_bsp.py#L414) and
-[append call](../tools/prepare_mesh_bsp.py#L432).
+acceptance. See [pipeline source](../../tools/prepare_mesh_bsp.py) and
+[append call](../../tools/prepare_mesh_bsp.py).
 
 `Mod_LoadFaces()` allocates `count * sizeof(msurface_t)` for every stored BSP
 face and records the full face count. Vertex, edge and texinfo loaders likewise
 allocate arrays according to their serialized lump counts. Runtime backface
 rejection tests whether a surface is drawn from a particular viewpoint; it does
-not remove loaded face records or free their Hunk storage. See [face loading](../engine/aga/src/model.c#L913),
-[vertex loading](../engine/aga/src/model.c#L693), [edge loading](../engine/aga/src/model.c#L759),
-[texinfo loading](../engine/aga/src/model.c#L787), and [backface tests](../engine/aga/src/r_bsp.c#L355).
+not remove loaded face records or free their Hunk storage. See [face loading](../../engine/aga/src/model.c),
+[vertex loading](../../engine/aga/src/model.c), [edge loading](../../engine/aga/src/model.c),
+[texinfo loading](../../engine/aga/src/model.c), and [backface tests](../../engine/aga/src/r_bsp.c).
 This does not mean every loaded face is drawn in a frame. A two-sided inspector
 view is not proof of duplicate storage. Independently stored inner walls remain
 in the BSP and resident arrays until an accepted compile-time exclusion removes

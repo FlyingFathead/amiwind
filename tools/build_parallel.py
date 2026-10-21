@@ -786,6 +786,11 @@ def stage_dependencies(steps, skipped=()):
             deps = (*deps, 'hand-catalog')
         if name == 'image' and 'harvest' in names:
             deps = (*deps, 'harvest')
+        # the actor library (--chim-actor-table on only) reads the census palette and the CHIM towns' residents
+        if name == 'actor-library':
+            deps = ('census', *(n for n in names if n.startswith('chim-town-')))
+        if name == 'image' and 'actor-library' in names:
+            deps = (*deps, 'actor-library')
         if name == 'image' and 'chim' in names:
             # the image installs every CHIM town's stage output and its rooms (BUILD-CHIM-ROOMS-IMAGE-RACE-36: the
             # image ran beside chim-rooms-vivec_city and read its record before it existed)

@@ -210,8 +210,11 @@ def _stair_frame(out, frame_index, expect=None):
         while len(_STAIR_CACHE) >= _STAIR_CACHE_FRAMES:
             _STAIR_CACHE.pop(next(iter(_STAIR_CACHE)))
         _STAIR_DIGESTS[key] = frame_stair_key(row, models)
-        _STAIR_CACHE[key] = (row[0], FrameScene(world, frame_index),
-                             FrameScene(world, frame_index, hull=0), frame_polys(world, frame_index))
+        standing, points = FrameScene(world, frame_index), FrameScene(world, frame_index, hull=0)
+        # the trace's visit guard of a walk: a fixed count, never the whole frame's node count (which far collision
+        # changes), so a walk reads only the collision within its reach (WALK_GUARD_NODES, walk_reach)
+        standing.full_nodes = points.full_nodes = WALK_GUARD_NODES
+        _STAIR_CACHE[key] = (row[0], standing, points, frame_polys(world, frame_index))
     if expect is not None and _STAIR_DIGESTS.get(key) != expect:
         raise ValueError('Stair gate: frame %s (index %d of %s) as the walk worker reads it (chim.validate.load_frame) '
                          'has the frame data key %s, but its walk is keyed by %s (the world the gate read): the '
@@ -249,10 +252,19 @@ def stair_task(task):
     out, frame_index, core = task
     path, scene, points, polys = _stair_frame(out, frame_index)
     near, wide = stair_polys(polys, core)
-    rows = _check_items(candidates(wide, core), near, scene, points.contents, points)
+    rows = _check_items(scoped_items(candidates(wide, core)), near, scene, points.contents, points)
     for row in rows:
         row['map'] = path
     return rows
+
+
+def scoped_items(items):
+    """The candidates the walk scope walks (stair_walk.scope_setting, tools/build.py --stair-walk): 'flights' (the
+    default) only the steps of flights, which gate the build; 'all' every step and ramp (the advisory findings).
+    Each item is walked on its own, so a flights walk gives exactly the flight rows of an all walk
+    (BUILD-STAIR-WALK-SCOPE-KEY-46: before, the CHIM gate walked every step and ramp whatever the scope)."""
+    from stair_walk import flight_items, scope_setting
+    return flight_items(items) if scope_setting() == 'flights' else items
 
 
 def in_walk_area(area, point):
@@ -273,7 +285,23 @@ def stair_task_in(task):
     out, frame_index, core, area = task
     path, scene, points, polys = _stair_frame(out, frame_index)
     near, wide = stair_polys(polys, core)
-    items = [item for item in candidates(wide, core) if in_walk_area(area, item['point'])]
+    items = [item for item in scoped_items(candidates(wide, core)) if in_walk_area(area, item['point'])]
+    rows = _check_items(items, near, scene, points.contents, points)
+    for row in rows:
+        row['map'] = path
+    return rows
+
+
+def stair_task_places(task):
+    """Worker: a targeted walk (--stair-walk-places), (out, frame index, core, walk area or None, refs or None) ->
+    rows: stair_task (stair_task_in with a walk area) on the steps and ramps of the named source references only
+    (all of the core's with refs None). Rows of a targeted walk are reported, never stored as the frame's walk."""
+    from stair_walk import _check_items, candidates
+    out, frame_index, core, area, refs = task
+    path, scene, points, polys = _stair_frame(out, frame_index)
+    near, wide = stair_polys(polys, core)
+    items = [item for item in scoped_items(candidates(wide, core))
+             if (area is None or in_walk_area(area, item['point'])) and (refs is None or item['ref'] in refs)]
     rows = _check_items(items, near, scene, points.contents, points)
     for row in rows:
         row['map'] = path
@@ -546,11 +574,15 @@ def stair_unit(task):
     out, frame_index, cores, uid = task[:4]
     area = task[4] if len(task) > 4 else None
     expect = task[5] if len(task) > 5 else None
+    refs = task[6] if len(task) > 6 else False      # a targeted walk (--stair-walk-places): its references or None
     _stair_frame(out, frame_index, expect)
     rows = []
     for core in cores:
-        rows.extend(stair_task((out, frame_index, core)) if area is None
-                    else stair_task_in((out, frame_index, core, area)))
+        if refs is not False:
+            rows.extend(stair_task_places((out, frame_index, core, area, refs)))
+        else:
+            rows.extend(stair_task((out, frame_index, core)) if area is None
+                        else stair_task_in((out, frame_index, core, area)))
     return uid, rows
 
 
@@ -656,15 +688,21 @@ def derive_area_rows(cache, whole_key, area, rule):
                        'run': record.get('run'), 'checked': mark is not None}
 
 
-def walk_caches(root, areas):
+def walk_caches(root, areas, scope=None, method='frame'):
     """(whole-frame cache, area cache or None) of the frame walks' records (pass_cache.PassCache 'stair-walk' under
     ROOT; ROOT None: keys only, nothing stored or read). A walk restricted to its area is its own record, keyed by
     its own walker (stair_task_in) and its area; the whole-frame records (towns, --stair-walk-area frame) keep their
     keys, and an area walk is derived from an unchanged whole-frame walk without walking (its rows filtered by the
-    area: the same rows, derive_area_rows)."""
+    area: the same rows, derive_area_rows). SCOPE 'flights' and METHOD 'reach' are in the options (a flights walk
+    has other rows than an all walk; a reach key is another key form); scope 'all' with the frame key keeps the
+    options, so the records and the shipped stair records written before them keep their keys."""
     from mesh_geometry_env import stair_mode
     from pass_cache import PassCache
     options = {'stair_mode': stair_mode(), 'world': 'chim-frame', 'tile': STAIR_TILE}
+    if scope == 'flights':
+        options['scope'] = 'flights'
+    if method == 'reach':
+        options['key'] = STAIR_REACH_KEY_FORM
     return (PassCache('stair-walk', options, stair_key_sources(), root),
             PassCache('stair-walk', options, stair_area_key_sources(), root) if areas else None)
 
@@ -677,26 +715,455 @@ def walk_input_keys(frames, models, areas):
     return whole_parts, parts, [_parts_key(p) for p in parts]
 
 
+# ---------------------------------------------------------------- the walk's reach key (BUILD-STAIR-WALK-SCOPE-KEY-46)
+# The frame key (frame_stair_parts) holds every chunk and placement of a frame: a converter change to collision the
+# walk never reaches (a rock's walls and underside far from any stair, CHIM-HULL-SURFACE-HEAP-46) rekeyed 1,196 of
+# 1,351 frames and the v0.0.46-dev1 rebuild walked the island again. The reach key holds what the walk reads, per
+# core of the frame:
+#   1. the core's ITEMS, the steps and ramps the walk tests (stair_walk.candidates on the core's polygons, the walk
+#      scope and the walk area applied), by the SHA-256 of the items themselves. They are found from the polygons of
+#      the placements that reach the core plus STAIR_MARGIN + FLIGHT_MARGIN (stair_polys 'wide'), once, and kept in
+#      the pool by the SHA-256 of those placements' reference, origin, yaw and placed polygons and of the code that
+#      finds them (the items record, ITEMS_FOLDER), so an unchanged core never reads its frame to know its items;
+#   2. the collision and polygons within the walk's reach of the items: every chunk and placement whose polygons or
+#      collision box (FrameScene's, the box margin included) meet the polygons of the placements the items belong
+#      to, grown by walk_reach() (how far a walk's traces, ground and headroom tests go beyond the step's own
+#      placement), and every chunk whose point-contents cell the reach meets (FrameScene.contents clamps to the
+#      frame's edge chunks), each by the SHA-256 of what the walk reads of it (brush_walk_digest, placement fields),
+#      in scene order (a trace takes the first brush of equal fraction);
+#   3. the frame's path, grid fields, tile, the reach, the walk scope and the walk area.
+# A core without items is not in the key (it walks nothing). The trace's visit guard is a fixed count in a walk's
+# scene (WALK_GUARD_NODES), never the whole frame's node count. A key that missed an input would be a correctness
+# bug: every build walks a sample of the reused frames again and stops on any difference (--stair-walk-sample),
+# and tests/test_chim_stair_reach_key.py traces walks and checks they read nothing outside their key.
+WALK_KEY_ENV = 'AMIWIND_STAIR_WALK_KEY'
+WALK_KEY_METHODS = ('reach', 'frame')
+STAIR_REACH_KEY_FORM = 'chim-stair-reach-key-1'
+STAIR_ITEMS_FORM = 'chim-stair-items-1'
+ITEMS_FOLDER = 'stair-walk-items'
+WALK_GUARD_NODES = 131072   # 32 x this many trace visits: never reached by one image's tree (< 65,520 clipnodes)
+REACH_SLACK = 8.0           # rounding and the riser point's edge tolerance off its own polygons
+
+
+def walk_key_method(cache_mode=None):
+    """AMIWIND_STAIR_WALK_KEY (tools/build.py --stair-walk-key): 'reach' (the default with the workspace's own walks:
+    the frame's cores with steps or ramps and the collision within the walk's reach) or 'frame' (the key before
+    v0.0.46: every chunk and placement of the frame; the default with --stair-walk-cache records, whose shipped
+    stair records are keyed by it)."""
+    import os
+    value = os.environ.get(WALK_KEY_ENV, '')
+    if not value:
+        if cache_mode is None:
+            from stair_walk import walk_cache_mode
+            cache_mode = walk_cache_mode()
+        value = 'frame' if cache_mode == 'records' else 'reach'
+    if value not in WALK_KEY_METHODS:
+        raise ValueError('%s must be one of %s, not %r' % (WALK_KEY_ENV, ', '.join(WALK_KEY_METHODS), value))
+    return value
+
+
+def walk_reach():
+    """Plan units beyond the polygons of a step's own placement within which the walk of that step traces and tests
+    ground and headroom (stair_walk.test, walk, other_lines, _check_items): the start up to 3 x CLEARANCE behind the
+    riser plus a sideways shift, the walk past the riser by CLEARANCE plus a move or the tread test's box length,
+    the standing box, a move, the nosing offset and a slack. Made from the walker's own constants, so a change to
+    them changes it (and the walker's code key)."""
+    from stair_walk import CLEARANCE, EDGE_TOLERANCE, INCREMENT, SIDE_SHIFTS
+    return (3 * CLEARANCE + max(abs(v) for v in SIDE_SHIFTS) + max(CLEARANCE + INCREMENT, 2 * MAXS[0] + 1)
+            + max(MAXS[0], MAXS[1]) + INCREMENT + EDGE_TOLERANCE + 1 + REACH_SLACK)
+
+
+def brush_poly_digest(image):
+    """(SHA-256 of the polygons frame_polys takes from a brush image: each face's points in order; plan bounds
+    (x0, y0, x1, y1) of its vertexes or None; plan radius of its vertexes around the image's origin)."""
+    import hashlib
+    import numpy as np
+    lumps = F.read_brush_image(image)
+    verts = np.frombuffer(lumps[3], '<f4').reshape(-1, 3)
+    edges = np.frombuffer(lumps[12], '<u2').reshape(-1, 2)
+    surf = np.frombuffer(lumps[13], '<i4')
+    h = hashlib.sha256(STAIR_ITEMS_FORM.encode())
+    for f in struct.iter_unpack('<HhihH4Bi', lumps[7]):
+        se = surf[f[2]:f[2] + f[3]]
+        ids = np.where(se >= 0, edges[np.abs(se), 0], edges[np.abs(se), 1]) if len(se) else se
+        h.update(struct.pack('<i', len(ids)))
+        h.update(np.ascontiguousarray(verts[ids]).tobytes())
+    if not len(verts):
+        return h.hexdigest(), None, 0.0
+    v = verts.astype(float)
+    bounds = (float(v[:, 0].min()), float(v[:, 1].min()), float(v[:, 0].max()), float(v[:, 1].max()))
+    return h.hexdigest(), bounds, float(np.sqrt((v[:, 0] ** 2 + v[:, 1] ** 2).max()))
+
+
+def _sha(value):
+    import hashlib
+    import json
+    return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def reach_sources(frame_row, models, memo):
+    """The chunks and placements of a frame in scene order (FrameScene, frame_polys) as arrays for the reach key:
+    'placement' (bool), 'sref' (source reference, -1 for a chunk), 'poly' (plan bounds of its placed polygons),
+    'trace' (FrameScene's collision box), 'cell' (a chunk's contents cell, NaN for a placement), 'items' (SHA-256
+    of what the items read of it), 'walk' (SHA-256 of what a walk reads of it), 'extent' (the frame's plan box).
+    MEMO: model number -> digests (one world)."""
+    import numpy as np
+    path, frame, chunks = frame_row
+    g, (lx, ly) = frame['grain'], frame['low']
+    mx, my = abs(MINS[0]) + 2, abs(MINS[1]) + 2
+    nan = float('nan')
+    placement, sref, poly, trace, cell, items, walk = [], [], [], [], [], [], []
+    for c in chunks:
+        x0, y0 = lx + c['cx'] * g, ly + c['cy'] * g
+        _, bounds, _ = brush_poly_digest(c['image'])
+        box = (x0, y0, x0 + g, y0 + g)
+        placement.append(False)
+        sref.append(-1)
+        poly.append(bounds or box)
+        trace.append((x0 - mx, y0 - my, x0 + g + mx, y0 + g + my))
+        cell.append(box)
+        items.append('')
+        walk.append(_sha(['chunk', c['cx'], c['cy'], brush_walk_digest(c['image'])]))
+
+    def model(m):
+        if m not in memo:
+            known = (0 <= m < len(models)) if isinstance(models, (list, tuple)) else (m in models)
+            if known:
+                image = models[m]['image']
+                memo[m] = (brush_walk_digest(image),) + brush_poly_digest(image)
+            else:
+                memo[m] = ('missing', 'missing', None, 0.0)
+        return memo[m]
+    for c in chunks:
+        for r in c['owned']:
+            wd, pd, _, radius = model(r['model'])
+            ox, oy = float(r['origin'][0]), float(r['origin'][1])
+            (bx0, by0, _), (bx1, by1, _) = r['box']
+            placement.append(True)
+            sref.append(source_ref(r['ref']))
+            poly.append((ox - radius, oy - radius, ox + radius, oy + radius))
+            trace.append((bx0 - mx, by0 - my, bx1 + mx, by1 + my))
+            cell.append((nan, nan, nan, nan))
+            items.append(_sha(['placement', r['ref'], r['origin'], r['yaw'], pd]))
+            walk.append(_sha(['placement', [r.get(k) for k in STAIR_PLACEMENT_FIELDS], wd]))
+    return {'placement': np.array(placement, bool), 'sref': np.array(sref, np.int64),
+            'poly': np.array(poly, float).reshape(-1, 4), 'trace': np.array(trace, float).reshape(-1, 4),
+            'cell': np.array(cell, float).reshape(-1, 4), 'items': items, 'walk': walk,
+            'extent': (lx, ly, lx + frame['nx'] * g, ly + frame['ny'] * g)}
+
+
+def _meets(boxes, q):
+    """Which of BOXES ((n, 4) plan boxes x0, y0, x1, y1, closed) meet the plan box Q."""
+    return (boxes[:, 2] >= q[0]) & (boxes[:, 0] <= q[2]) & (boxes[:, 3] >= q[1]) & (boxes[:, 1] <= q[3])
+
+
+def reach_boxes(src, owners, reach):
+    """The plan boxes a core's walks stay in: the placed polygons of the placements its items belong to (OWNERS,
+    indices into SRC), each grown by REACH."""
+    return [(b[0] - reach, b[1] - reach, b[2] + reach, b[3] + reach) for b in src['poly'][owners]]
+
+
+def reach_used(src, owners, reach):
+    """Which sources of SRC (reach_sources) a core's walks can read: polygons or collision box meeting a reach box,
+    or a chunk whose contents cell meets a reach box clamped into the frame (FrameScene.contents clamps)."""
+    import numpy as np
+    x0, y0, x1, y1 = src['extent']
+    used = np.zeros(len(src['walk']), bool)
+    for q in reach_boxes(src, owners, reach):
+        clamped = (min(max(q[0], x0), x1), min(max(q[1], y0), y1), min(max(q[2], x0), x1), min(max(q[3], y0), y1))
+        used |= _meets(src['poly'], q) | _meets(src['trace'], q)
+        used |= ~src['placement'] & _meets(src['cell'], clamped)
+    return used
+
+
+def stair_items_key_sources():
+    """The code digest in the items records' keys: stair_items_task and what it reaches of the walker's code."""
+    if 'items' not in _WALKER_SOURCES:
+        import hashlib
+        import json
+        selected, uncertain = stair_code_selection('stair_items_task')
+        _WALKER_SOURCES['items'] = hashlib.sha256(json.dumps(
+            [STAIR_ITEMS_FORM, sorted(selected.items()), uncertain], sort_keys=True).encode()).hexdigest()
+    return _WALKER_SOURCES['items']
+
+
+def core_items_key(sources, core, area, scope, code):
+    """(SHA-256 of what a core's items read, the placements read): the code, the scope, the core, the walk area and
+    the placements whose polygons meet the core plus STAIR_MARGIN + FLIGHT_MARGIN, in scene order."""
+    import hashlib
+    import numpy as np
+    from stair_walk import FLIGHT_MARGIN
+    w = STAIR_MARGIN + FLIGHT_MARGIN
+    wide = (core[0] - w, core[1] - w, core[2] + w, core[3] + w)
+    picked = np.flatnonzero(sources['placement'] & _meets(sources['poly'], wide))
+    h = hashlib.sha256(_sha([STAIR_ITEMS_FORM, code, scope, list(core),
+                             None if area is None else list(area)]).encode())
+    for i in picked:
+        h.update(sources['items'][i].encode())
+    return h.hexdigest(), picked
+
+
+def stair_items_task(task):
+    """Worker: (frame index, [(count, items SHA-256, source references)...]) for TASK (world folder, frame index,
+    [core...], walk area or None, scope, frame data key): the items each core's walk tests (scoped_items of
+    stair_walk.candidates on stair_polys 'wide', the walk area applied), as stair_task and stair_task_in find them.
+    The frame as this worker reads it must have the frame data key the gate computed, else nothing is returned."""
+    import hashlib
+    import json
+    import os
+    from stair_walk import SCOPE_ENV, candidates
+    out, frame_index, cores, area, scope, expect = task
+    os.environ[SCOPE_ENV] = scope
+    from chim.validate import load_frame
+    row, models = load_frame(out, frame_index)
+    if expect is not None and frame_stair_key(row, models) != expect:
+        raise ValueError('Stair gate items: frame %s (index %d of %s) as the worker reads it has another frame data '
+                         'key than the world the gate read; nothing found or stored for it'
+                         % (row[0], frame_index, out))
+    world = {'frames': {frame_index: row}, 'models': models}
+    polys = [(pts, ref, _poly_box(pts)) for pts, ref in frame_polys(world, frame_index)]
+    found = []
+    for core in cores:
+        items = scoped_items(candidates(stair_polys(polys, core)[1], core))
+        if area is not None:
+            items = [i for i in items if in_walk_area(area, i['point'])]
+        digest = hashlib.sha256(json.dumps(items, sort_keys=True, default=str).encode()).hexdigest()
+        found.append((len(items), digest, sorted({int(i['ref']) for i in items})))
+    return frame_index, found
+
+
+def _items_path(root, key):
+    return Path(root) / ITEMS_FOLDER / key[:2] / (key + '.json')
+
+
+def _items_lookup(root, key):
+    import json
+    if root is None:
+        return None
+    try:
+        rec = json.loads(_items_path(root, key).read_text(encoding='utf-8'))
+        if rec.get('format') == STAIR_ITEMS_FORM and rec.get('key') == key:
+            return int(rec['count']), str(rec['items_sha256']), [int(v) for v in rec['refs']]
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+def _items_store(root, key, info):
+    """Keep a core's items record in the pool; bookkeeping, never fails the gate."""
+    import json
+    import os
+    if root is None:
+        return
+    try:
+        target = _items_path(root, key)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_name(target.name + '.%d.tmp' % os.getpid())
+        tmp.write_text(json.dumps({'format': STAIR_ITEMS_FORM, 'key': key, 'count': info[0],
+                                   'items_sha256': info[1], 'refs': list(info[2])}, sort_keys=True) + '\n',
+                       encoding='utf-8', newline='\n')
+        os.replace(tmp, target)
+    except (OSError, TypeError, ValueError):
+        pass
+
+
+def reach_keys(out, frames, models, areas, scope, root, jobs=1, frame_mib=None):
+    """(parts, keys, items) of every frame's walk under the reach key (see above): parts [(name, SHA-256)], keys
+    their SHA-256 (_parts_key), items {frame index: [(core, count)...]} in core order (the scheduler's counts).
+    Items records are read from and stored in ROOT (None: found here, nothing stored); the frames with cores whose
+    items are not recorded are read on the worker pool, each admitted at its frame's size (FRAME_MIB)."""
+    import time
+    import numpy as np
+    from build_parallel import governed_map
+    from chim.stair_pool import WORKER_BASE_MIB
+    started = time.monotonic()
+    code = stair_items_key_sources()
+    reach = walk_reach()
+    memo, sources, plan, missing = {}, {}, {}, {}
+    for fi, frame_row in enumerate(frames):
+        src = reach_sources(frame_row, models, memo)
+        sources[fi] = src
+        area = areas.get(fi)
+        cores = [t[2] for t in stair_tasks(out, [frame_row], {0: area} if area is not None else None)]
+        plan[fi] = []
+        for core in cores:
+            key, picked = core_items_key(src, core, area, scope, code)
+            info = _items_lookup(root, key)
+            plan[fi].append([core, key, picked, info])
+            if info is None:
+                missing.setdefault(fi, []).append(len(plan[fi]) - 1)
+    keyed = time.monotonic() - started
+    found_at = time.monotonic()
+    if missing:
+        mib = frame_mib or {}
+        tasks = [(str(out), fi, [plan[fi][k][0] for k in ks], areas.get(fi), scope,
+                  frame_stair_key(frames[fi], models)) for fi, ks in missing.items()]
+        # largest first: a frame's read and polygons grow with its size, its candidate search with its cores
+        for fi, found in governed_map(stair_items_task, tasks, max(1, min(jobs, len(tasks))),
+                                      unit_mib=max(mib.get(t[1], WORKER_BASE_MIB) for t in tasks),
+                                      label='CHIM stair gate items',
+                                      cost=lambda t: len(t[2]) * mib.get(t[1], WORKER_BASE_MIB),
+                                      item_mib=lambda t: mib.get(t[1], WORKER_BASE_MIB)):
+            for k, info in zip(missing[fi], found):
+                plan[fi][k][3] = info
+                _items_store(root, plan[fi][k][1], info)
+    parts, keys, items = [], [], {}
+    for fi, (path, frame, _) in enumerate(frames):
+        src = sources[fi]
+        frame_parts =[('frame', _sha([STAIR_REACH_KEY_FORM, path, STAIR_TILE, reach, scope,
+                                       [frame.get(k) for k in STAIR_FRAME_FIELDS]]))]
+        if fi in areas:
+            frame_parts.append(area_part(areas[fi]))
+        items[fi] = []
+        for n, (core, _, picked, info) in enumerate(plan[fi]):
+            count, digest, refs = info
+            items[fi].append((core, count))
+            if not count:
+                continue
+            owners = picked[np.isin(src['sref'][picked], np.array(refs, np.int64))]
+            used = reach_used(src, owners, reach)
+            frame_parts.append(('core %d' % n, _sha([list(core), digest, int(len(owners)),
+                                                    [src['walk'][i] for i in np.flatnonzero(used)]])))
+        parts.append(frame_parts)
+        keys.append(_parts_key(frame_parts))
+    print('CHIM stair gate: reach keys: %d frames, %d cores (%d with steps or ramps to walk); items of %d cores '
+          'found again in %d frames (%.1f s), the others from the pool; keys %.1f s'
+          % (len(frames), sum(len(v) for v in plan.values()), sum(1 for v in items.values() for _, c in v if c),
+             sum(len(v) for v in missing.values()), len(missing), time.monotonic() - found_at, keyed), flush=True)
+    return parts, keys, items
+
+
+# ---------------------------------------------------------------- the watch list and targeted walks
+# The stair walk as a redundancy check for named problem places (BUILD-STAIR-WALK-SCOPE-KEY-46; decided for the
+# project 20 October 2026): config/stair-watch.json lists the places stair and walkway bugs reported (cells, frames,
+# source references); every build walks the frames holding them again, even when their walk is reused, and stops
+# when a walk again differs from its record. A bug page that reports a stair or walkway problem adds its place.
+# --stair-walk-places FILE|ID,... walks ONLY the named places (a targeted check on request, rows not stored).
+WATCH_ENV = 'AMIWIND_STAIR_WATCH'          # a watch list file, or 'off'
+PLACES_ENV = 'AMIWIND_STAIR_WALK_PLACES'   # a targeted walk: a watch-format file, or IDs, cells, frames, refs
+WATCH_FORMAT = 'aw-stair-watch-1'
+
+
+def watch_file():
+    return Path(__file__).resolve().parents[2] / 'config' / 'stair-watch.json'
+
+
+def load_watch(path=None):
+    """The places of a watch list ([{'id', 'cells', 'frames', 'refs', ...}]); PATH None: AMIWIND_STAIR_WATCH, else
+    the shipped config/stair-watch.json; 'off': []. A list that does not read is an error (never silently empty)."""
+    import json
+    import os
+    value = path if path is not None else (os.environ.get(WATCH_ENV, '') or str(watch_file()))
+    if str(value).lower() == 'off':
+        return []
+    try:
+        data = json.loads(Path(value).read_text(encoding='utf-8'))
+        if data.get('format') != WATCH_FORMAT:
+            raise ValueError('format %r, expected %s' % (data.get('format'), WATCH_FORMAT))
+        places = data['places']
+        for p in places:
+            if not (p.get('cells') or p.get('frames') or p.get('refs') or p.get('maps')):
+                raise ValueError('place %r names no cell, frame, reference or map' % p.get('id'))
+        return places
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise ValueError('Stair watch list %s does not read: %s' % (value, exc))
+
+
+def parse_places(value, watch=None):
+    """Places of a targeted walk (--stair-walk-places): a watch-format FILE, or a comma list of IDs of the watch list,
+    cells 'x:y', frame paths 'frames/...', source references 'ref:N' (or a bare number) and maps 'map:NAME' (an
+    interior or other map the image step walks)."""
+    import re
+    if not value:
+        return None
+    if Path(value).is_file():
+        return load_watch(value)
+    watch = load_watch() if watch is None else watch
+    by_id = {p['id']: p for p in watch}
+    places = []
+    for token in [t.strip() for t in str(value).split(',') if t.strip()]:
+        if token in by_id:
+            places.append(by_id[token])
+        elif re.fullmatch(r'-?\d+:-?\d+', token):
+            places.append({'id': token, 'cells': [[int(v) for v in token.split(':')]]})
+        elif token.startswith('frames/') or token.endswith('.ccf'):
+            places.append({'id': token, 'frames': [token]})
+        elif token.startswith('map:') and len(token) > 4:
+            places.append({'id': token, 'maps': [token[4:]]})
+        elif re.fullmatch(r'(ref:)?\d+', token):
+            places.append({'id': token, 'refs': [int(token.split(':')[-1])]})
+        else:
+            raise ValueError('Stair walk places: %r is no watch list ID, cell x:y, frame path, ref:N or map:NAME'
+                             % token)
+    return places
+
+
+def match_places(frames, places):
+    """{frame index: (place IDs, source references or None)} of the frames holding a place. A place with references
+    is held by every frame that places one of them (its other fields only describe it), and its walk there takes
+    those references' steps; a place without references is held by the frames of its paths and cells, whole
+    (references None)."""
+    found = {}
+    for fi, (path, frame, chunks) in enumerate(frames):
+        cell = [int(v) for v in frame['cell']] if frame.get('cell') is not None else None
+        owned = None
+        for p in places:
+            refs = {int(v) for v in p.get('refs') or ()}
+            if p.get('maps') and not (refs or p.get('cells') or p.get('frames')):
+                continue                         # a map place: the image step's walk (watched_maps)
+            if refs:
+                if owned is None:
+                    owned = {source_ref(r['ref']) for c in chunks for r in c['owned']}
+                held = refs & owned
+                if not held:
+                    continue
+            elif not (path in (p.get('frames') or ()) or
+                      (cell is not None and cell in [[int(v) for v in c] for c in p.get('cells') or ()])):
+                continue
+            else:
+                held = None
+            ids, have = found.get(fi, ((), set()))
+            found[fi] = (ids + (p['id'],), None if (have is None or held is None) else have | held)
+    return found
+
+
+def watched_maps(places):
+    """{map name: place IDs} of the maps (interiors and other maps of the image step's walk) PLACES name."""
+    found = {}
+    for p in places or ():
+        for name in p.get('maps') or ():
+            found.setdefault(str(name), []).append(p['id'])
+    return found
+
+
 def shipped_entries(out, frames, models, root):
     """(entries, missing) of the known-good stair records (stair_records.shipped_entry) of a CHIM world whose every
     frame was walked into the pass cache at ROOT (a stair gate in 'cached' mode): one entry per frame, under the
-    frame walk's full key; missing names the frames without a stored walk (nothing is walked here)."""
+    frame walk's full key; missing names the frames without a stored walk (nothing is walked here). The walks are
+    looked up as the gate stored them (walk scope, key method: walk_key_method, stair_walk.scope_setting); the
+    entries are keyed by the frame key without scope, as the known-good records are read
+    (--stair-walk-cache records)."""
     from mesh_geometry_env import stair_mode
+    from stair_walk import scope_setting
     import stair_records
     areas, _ = frame_walk_areas(out, frames)
-    cache, area_cache = walk_caches(root, areas)
-    _, _, keys = walk_input_keys(frames, models, areas)
+    scope, method = scope_setting(), walk_key_method('cached')
+    cache, area_cache = walk_caches(root, areas, scope, method)
+    ship, ship_area = walk_caches(None, areas)
+    _, _, frame_keys = walk_input_keys(frames, models, areas)
+    keys = reach_keys(out, frames, models, areas, scope, root)[1] if method == 'reach' else frame_keys
     entries, missing = [], []
     for fi, (path, frame, _) in enumerate(frames):
         c = area_cache if fi in areas else cache
+        s = ship_area if fi in areas else ship
         record, _ = stair_records.lookup(c, keys[fi])
         if record is None:
             missing.append(path)
             continue
         rows = record['rows']
         outcome = record.get('outcome') or ('passed' if walk_passed(rows) else 'failed')
-        entries.append(stair_records.shipped_entry(path, [int(v) for v in frame['cell']], c.key(keys[fi]),
-                                                   c.sources, stair_mode(), rows, fi in areas, outcome))
+        entries.append(stair_records.shipped_entry(path, [int(v) for v in frame['cell']], s.key(frame_keys[fi]),
+                                                   s.sources, stair_mode(), rows, fi in areas, outcome))
     return entries, missing
 
 
@@ -754,21 +1221,53 @@ def stair_gate(out, frames, jobs=1, models=None):
     # keyed by the frame worker and what it reaches (BUILD-STAIR-KEY-BOOKKEEPING-36): the progress counter, the
     # records' bookkeeping and the known-findings table never rekey a stored frame walk, nor do the collision
     # compilers (their output is the frame's collision, in the parts): stair_key_sources, STAIR_WALK_CODE
+    import os
     from pass_cache import folder
+    from stair_walk import scope_setting
+    from chim.stair_pool import frame_walk_mib as _frame_mib
+    scope = scope_setting()
+    print('CHIM stair gate: walk scope: %s (--stair-walk %s)' % (
+        'flight steps only (the steps that gate the build)' if scope == 'flights'
+        else 'every step and ramp (the advisory findings too)', scope), flush=True)
+    # a targeted walk (--stair-walk-places): only the named places, nothing reused or stored
+    places = parse_places(os.environ.get(PLACES_ENV, ''))
+    targeted = match_places(frames, places) if places is not None else None
+    if targeted is not None:
+        tasks = [t for t in tasks if t[1] in targeted]
+        print('CHIM stair gate: TARGETED walk of %d places (%s) in %d frames (%s): nothing else is walked; rows are '
+              'reported, never stored as a frame\'s walk' % (
+                  len(places), ', '.join(p['id'] for p in places), len(targeted),
+                  ', '.join(frames[fi][0] for fi in sorted(targeted)) or 'none'), flush=True)
     mode = walk_cache_mode()
-    root = folder() if models is not None and mode in ('cached', 'records') else None
+    root = folder() if models is not None and mode in ('cached', 'records') and targeted is None else None
     # records (the default without --developer-mode): a frame neither the workspace's own walks nor the known-good
     # stair records shipped with the source hold is reported, not walked (stair_records.load_shipped, B14)
     shipped, shipped_notes = (stair_records.load_shipped() if models is not None and mode == 'records'
-                              else (None, None))
+                              and targeted is None else (None, None))
     keyed = root is not None or shipped is not None
-    cache, area_cache = walk_caches(root, areas) if keyed else (None, None)
+    method = walk_key_method(mode) if keyed else None
+    cache, area_cache = walk_caches(root, areas, scope, method) if keyed else (None, None)
+    # the shipped stair records are keyed by the frame key without scope (stair_records.shipped_entry)
+    ship, ship_area = walk_caches(None, areas) if shipped is not None else (None, None)
 
     def cache_of(fi):
         return area_cache if fi in areas else cache
     rule = walk_reuse_rule() if cache is not None else None
-    whole_parts, parts, keys = walk_input_keys(frames, models, areas) if cache is not None else (None, None, None)
+    whole_parts, parts, keys, ship_keys, reach_items = None, None, None, None, None
+    if cache is not None and method == 'reach':
+        from build_parallel import stage_ceiling as _ceiling
+        parts, keys, reach_items = reach_keys(out, frames, models, areas, scope, root, max(1, _ceiling(jobs)),
+                                              {fi: _frame_mib(frames[fi], models) for fi in range(len(frames))})
+        ship_keys = walk_input_keys(frames, models, areas)[2] if shipped is not None else None
+    elif cache is not None:
+        whole_parts, parts, keys = walk_input_keys(frames, models, areas)
+        ship_keys = keys
+    if cache is not None:
+        print('CHIM stair gate: walk key: %s' % (
+            'reach (per core: its steps and ramps and the collision within the walk\'s reach)' if method == 'reach'
+            else 'frame (every chunk and placement of the frame)'), flush=True)
     cached, todo, sample, origin, candidates, stored, passes = {}, tasks, [], {}, 0, [], 0
+    watched = {}                                 # frame index -> watch list place IDs
     reused_records = []     # unmarked passes this run reuses: a passed build marks them too (BUILD-CHIM-STAIR-NO-REUSE-42)
     derived = {}                                 # frame index -> the whole-frame record its rows came from
     from_records, unmatched = {}, []             # frames taken from the shipped records; frames in neither
@@ -788,13 +1287,13 @@ def stair_gate(out, frames, jobs=1, models=None):
                 candidates += 1                  # a failed walk, or (release rule) one no passed master build checked
                 why_not = (True if rule == 'checked' else
                            'its stored walk did not pass and has no check mark of a passed master build')
-            if fi not in cached and fi in areas and root is not None:
+            if fi not in cached and fi in areas and root is not None and whole_parts is not None:
                 found = derive_area_rows(cache, _parts_key(whole_parts[fi]), areas[fi], rule)
                 if found is not None:
                     cached[fi], derived[fi] = found[0], found[2]
                     origin[fi] = 'derived from its whole-frame walk, ' + found[1]
             if fi not in cached and shipped is not None:
-                entry = shipped.get(cache_of(fi).key(key))
+                entry = shipped.get((ship_area if fi in areas else ship).key(ship_keys[fi]))
                 if entry is not None:
                     cached[fi] = stair_records.shipped_rows(entry, frames[fi][0])
                     from_records[fi] = entry
@@ -815,6 +1314,20 @@ def stair_gate(out, frames, jobs=1, models=None):
             for fi in unmatched:
                 print('CHIM stair gate: %s: %s' % (frames[fi][0], origin[fi]), flush=True)
         sample = pick_sample(sorted(cached), walk_sample(), keys[0])
+        # the watch list: the frames of the named problem places are walked again every build (a reused walk is
+        # compared with its record, as the sample), also in records mode
+        for fi, (ids, _) in sorted(match_places(frames, load_watch()).items()):
+            watched[fi] = ids
+            if fi in unmatched:
+                unmatched.remove(fi)
+                origin[fi] = 'walked: watch list (%s)' % ', '.join(ids)
+            elif fi in cached and fi not in sample:
+                sample.append(fi)
+        sample = sorted(sample)
+        if watched:
+            print('CHIM stair gate: watch list: %d frames hold its places, walked again: %s' % (
+                len(watched), ', '.join('%s (%s)' % (frames[fi][0], ', '.join(ids))
+                                        for fi, ids in sorted(watched.items()))), flush=True)
         if derived:
             print('CHIM stair gate: %d frames take their walk from an unchanged whole-frame walk, its rows outside '
                   'the walk area left out (nothing walked)' % len(derived), flush=True)
@@ -822,7 +1335,8 @@ def stair_gate(out, frames, jobs=1, models=None):
             print('CHIM stair gate: %d of %d frames reused by content; walked again to check the cache: %s'
                   % (len(cached), len(frames), ', '.join(frames[fi][0] for fi in sample) or 'none'), flush=True)
         for fi in sample:
-            origin[fi] = 'walked again: ' + origin[fi]
+            origin[fi] = ('walked again: %s' % ('watch list (%s), ' % ', '.join(watched[fi]) if fi in watched else '')
+                          + origin[fi])
         if passes:
             print('CHIM stair gate: %d of the reused frames are passed walks of earlier runs (reuse rule %s)'
                   % (passes, rule), flush=True)
@@ -862,9 +1376,15 @@ def stair_gate(out, frames, jobs=1, models=None):
     # count reads its frame (polygons only): admitted at the frame's own size like the walks
     count_tasks = sorted([(str(out), fi, cores[fi]) + ((areas[fi],) if fi in areas else ()) for fi in walk_frames],
                          key=lambda t: -len(t[2]))
-    counts = dict(governed_map(stair_progress.chim_core_counts_task, count_tasks,
-                               max(1, min(by_cores, len(walk_frames) or 1)), unit_mib=per_worker,
-                               label='CHIM stair gate counts', item_mib=lambda t: frame_mib.get(t[1], WORKER_BASE_MIB)))
+    if reach_items is not None:
+        # the reach keys know every core's steps and ramps already (the items records): nothing read to count
+        by_core = {fi: dict((tuple(c), n) for c, n in reach_items[fi]) for fi in walk_frames}
+        counts = {fi: [by_core[fi].get(tuple(c), 0) for c in cores[fi]] for fi in walk_frames}
+    else:
+        counts = dict(governed_map(stair_progress.chim_core_counts_task, count_tasks,
+                                   max(1, min(by_cores, len(walk_frames) or 1)), unit_mib=per_worker,
+                                   label='CHIM stair gate counts',
+                                   item_mib=lambda t: frame_mib.get(t[1], WORKER_BASE_MIB)))
     to_check = {fi: sum(counts[fi]) for fi in walk_frames}
     reused_only = [fi for fi in sorted(cached) if fi not in sample]
     stairs_total = sum(to_check.values()) + sum(len(cached[fi]) for fi in reused_only)
@@ -939,7 +1459,7 @@ def stair_gate(out, frames, jobs=1, models=None):
     unit_of = {u[3]: u for u in units}
     # the data part of each walked frame's key: every worker checks the frame it reads against it (_stair_frame),
     # so a walk is stored only under the data it walked (the loader is not in the code key, STAIR_FRAME_LOADER)
-    frame_keys = {fi: _parts_key(whole_parts[fi]) for fi in walk_frames} if whole_parts else {}
+    frame_keys = {fi: frame_stair_key(frames[fi], models) for fi in walk_frames} if keys else {}
     done_units, peaks = set(), []
     from concurrent.futures.process import BrokenProcessPool
     try:
@@ -948,7 +1468,8 @@ def stair_gate(out, frames, jobs=1, models=None):
         # each unit at its frame's size: a worker keeps built only the frames that fit in that unit's share
         # (stair_unit_sized), so a worker holds about the frame it walks
         for uid, found, peak in governed_map(
-                stair_unit_sized, [((str(out), u[1], u[2], u[3], areas.get(u[1]), frame_keys.get(u[1])),
+                stair_unit_sized, [((str(out), u[1], u[2], u[3], areas.get(u[1]), frame_keys.get(u[1]))
+                                    + ((targeted[u[1]][1],) if targeted is not None else ()),
                                     frame_mib.get(u[1], WORKER_BASE_MIB), frame_mib.get(u[1], WORKER_BASE_MIB))
                                    for u in units],
                 max(1, min(by_cores, len(units) or 1)), unit_mib=per_worker, label='CHIM stair gate',
@@ -1001,11 +1522,16 @@ def stair_gate(out, frames, jobs=1, models=None):
                 walkable_normal_z=WALKABLE_Z, walkable_degrees=round(math.degrees(math.acos(WALKABLE_Z)), 2),
                 gate='flights of stairs (3+ steps, 2+ vertical risers) the standing box cannot walk up and down',
                 summary=summary, untestable_reasons=reasons, failures=failures, advisory_failures=advisory,
-                tested=len(rows), walk_counts=counted,
+                tested=len(rows), walk_counts=counted, scope=scope,
+                targeted=None if targeted is None else {
+                    'places': [p['id'] for p in places],
+                    'frames': {frames[fi][0]: {'places': list(ids), 'refs': None if refs is None else sorted(refs)}
+                               for fi, (ids, refs) in sorted(targeted.items())}},
                 walk_area={'mode': walk_area_mode(), 'note': area_note, 'frames': len(areas),
                            'cores_skipped': cores_skipped, 'derived': len(derived)}, pass_cache={
                     'mode': walk_cache_mode(), 'reused': len(cached) - len(sample), 'walked': len(walk_frames) - len(sample),
-                    'units': len(units), 'reuse_rule': rule, 'reused_passes': passes,
+                    'units': len(units), 'reuse_rule': rule, 'reused_passes': passes, 'key_method': method,
+                    'watched': {frames[fi][0]: list(ids) for fi, ids in sorted(watched.items())},
                     'sampled': [frames[fi][0] for fi in sample], 'unchecked_candidates': candidates,
                     'stored': stored, 'reused_records': reused_records,
                     'frames': {frames[fi][0]: origin.get(fi, 'walked') for fi in range(len(frames))}},
@@ -1034,7 +1560,10 @@ def require_stairs(out, jobs=1, report_path=None, accepted=(), world=None):
     from mesh_geometry_env import stair_mode
     from chim.validate import loaded_world
     report_path = Path(report_path or Path(out) / 'chim-stairs.json')
-    if stair_mode() == 'off':
+    import stair_walk
+    if stair_walk.walk_off():   # BUILD-STAIR-WALK-OFF-46: the builder's default, nothing is walked
+        report = dict(format=1, status='skipped', stair_walk='off')
+    elif stair_mode() == 'off':
         report = dict(format=1, status='skipped', stair_rule='off')
     else:
         try:

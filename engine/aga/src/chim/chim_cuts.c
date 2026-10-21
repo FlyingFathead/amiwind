@@ -113,6 +113,19 @@ const float *ChimCuts_Box (unsigned pid)
 	return members ? ChimCuts_Find (boxes, pids, which, members, pid) : NULL;
 }
 
+/* Type 1 crossings, a recentre: the session's origin moved by d (local units). */
+void ChimCuts_Recentre (const float *d)
+{
+	long i;
+	for (i=0 ; boxes && i<structures ; i++)
+	{
+		boxes[6*i] -= d[0];
+		boxes[6*i+1] -= d[1];
+		boxes[6*i+3] -= d[0];
+		boxes[6*i+4] -= d[1];
+	}
+}
+
 void ChimCuts_End (void)
 {
 	/* The tables live in the map's Hunk, which the map change frees. */

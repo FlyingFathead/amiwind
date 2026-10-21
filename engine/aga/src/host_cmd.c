@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_anim.h"
 #include "amiwind_version.h"
 #include "aw_spike.h"

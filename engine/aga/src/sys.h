@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -44,12 +44,12 @@ void Sys_MakeCodeWriteable (unsigned long startaddr, unsigned long length);
 //
 // system IO
 //
-void Sys_DebugLog(char *file, char *fmt, ...);
+void Sys_DebugLog(char *file, char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
-void Sys_Error (char *error, ...);
+void Sys_Error (char *error, ...) __attribute__((format(printf, 1, 2)));
 // an error will cause the entire program to exit
 
-void Sys_Printf (char *fmt, ...);
+void Sys_Printf (char *fmt, ...) __attribute__((format(printf, 1, 2)));
 // send text to the console
 
 void Sys_Quit (void);
@@ -68,4 +68,3 @@ void Sys_SendKeyEvents (void);
 void Sys_LowFPPrecision (void);
 void Sys_HighFPPrecision (void);
 void Sys_SetFPCW (void);
-

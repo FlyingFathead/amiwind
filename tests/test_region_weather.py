@@ -51,6 +51,20 @@ class WeatherWiringTests(unittest.TestCase):
         self.assertIn('AW_RegionIndexAt(source)', weather)
         self.assertIn('AW_WeatherOfRegion(&table,*region,days,milliseconds)', weather)
 
+    def test_crossings_are_no_arrivals_and_transitions_queue(self):
+        # SKY-REDMOUNTAIN-BLUE-44 reported again with v0.0.46: a walked crossing into another frame map (a map
+        # change, a load of over 2 s) was taken for an arrival and switched the weather at once.
+        weather = code('aw_weather.c')
+        frame = weather[weather.index('int AW_WeatherFrame'):weather.index('static void weather_command')]
+        self.assertNotIn('sv.name', frame)
+        self.assertNotIn('now-last_time>2.0', frame)
+        self.assertIn('AW_WeatherIsArrival(have_last,source[0]-last_source[0],source[1]-last_source[1],hour-last_hour)', frame)
+        self.assertIn('if(target!=last_target)AW_WeatherAddTransition(&state,target);', frame)
+        self.assertIn('AW_WeatherAdvance(&state,&table,seconds);', frame)
+        # Off the exterior nothing is forgotten (no reset of the last position or the weather).
+        self.assertIn('if(!player_source(source)){last_time=-1;return 0;}', frame)
+        self.assertIn('AW_WeatherRegionKeep(&state,AW_RegionIndexAt(source))', weather)
+
     def test_build_payload_and_console(self):
         makefile = (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8')
         self.assertIn('aw_weather_rules.c aw_weather.c', makefile)

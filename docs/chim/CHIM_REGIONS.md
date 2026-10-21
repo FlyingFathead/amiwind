@@ -1,8 +1,13 @@
 # CHIM regions: exterior cells on CHIM inside the legacy open world
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 
-Status: EXPERIMENTAL builder option, off by default (`--chim-regions`), v0.0.36 development.
+Status: the default of a full CHIM build since v0.0.47 (`--chim-regions`, BUILD-CHIM-CELLS-PRIVATE-LIST-47): with no
+`--chim-regions`, `tools/build.py --builder chim` takes the cell list in the source tree, `config/chim-cells.json`
+(every exterior cell of Vvardenfell, 1,409 cells: the release cells since v0.0.43), checked against
+`docs/chim/cell-progress-reference.json` (the default of `--chim-regions-status`). `--chim-regions none` builds
+with no CHIM region cells (the earlier default, kept selectable). Until v0.0.47-dev2 this was an experimental
+option, off by default, and the releases named a cell list kept outside the source tree.
 
 Update, 19 October 2026: this page describes how a cell joins a build, as designed in v0.0.36. Since v0.0.43 every
 exterior cell of Vvardenfell is a CHIM frame (one cell per region frame, 1,348 of them, besides the three town
@@ -85,10 +90,11 @@ bytes of the open-world maps they replace (copies with the routed hull: 4.3 and 
 
 ## Selecting cells
 
-    tools/build.py ... --builder chim --chim-regions SET [--chim-regions SET ...] --chim-regions-status FILE
+    tools/build.py ... --builder chim [--chim-regions SET ...] [--chim-regions-status FILE]
 
-`SET` is one of:
+`SET` is one of (none given: `@config/chim-cells.json`):
 
+- `none`: no CHIM region cells (the earlier default);
 - `seabed`: the empty sea cells (a LAND record, nothing placed);
 - `coast`: the finished land cells of ring 1 (the cells that touch the sea);
 - `sea-ring`: both;

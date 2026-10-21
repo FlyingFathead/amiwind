@@ -110,6 +110,111 @@
       "parent_divisions": 4,
       "divisions": 8,
       "reason": "v0.0.41-dev2 lava terrain 4,352,800 bytes exceeds 4 MiB in this vf1692 child; four-child split, original core triangles and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf1178",
+      "cell": [
+        2,
+        -2
+      ],
+      "parent_divisions": 2,
+      "divisions": 4,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,468,264 bytes exceeds 4 MiB; four-child split of this quarter, like its vf1176 sibling, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf1179",
+      "cell": [
+        2,
+        -1
+      ],
+      "divisions": 2,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,669,588 bytes exceeds 4 MiB; four-child split, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf1394",
+      "cell": [
+        5,
+        -2
+      ],
+      "divisions": 2,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,872,748 bytes exceeds 4 MiB; four-child split, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf1395",
+      "cell": [
+        5,
+        -1
+      ],
+      "divisions": 2,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,325,612 bytes exceeds 4 MiB; four-child split, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf1600",
+      "cell": [
+        8,
+        0
+      ],
+      "parent_divisions": 2,
+      "divisions": 4,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,765,484 bytes exceeds 4 MiB; four-child split of this quarter, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf1818",
+      "cell": [
+        10,
+        0
+      ],
+      "parent_divisions": 2,
+      "divisions": 4,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,923,988 bytes exceeds 4 MiB; four-child split of this quarter, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf2543",
+      "cell": [
+        9,
+        0
+      ],
+      "parent_divisions": 4,
+      "divisions": 8,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,604,696 bytes exceeds 4 MiB; four-child split of this vf1692 child, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf1513",
+      "cell": [
+        7,
+        -4
+      ],
+      "divisions": 2,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,116,252 bytes, within 5 % of the 4 MiB cap; four-child split for headroom, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf1904",
+      "cell": [
+        11,
+        -1
+      ],
+      "divisions": 2,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,079,536 bytes, within 5 % of the 4 MiB cap; four-child split for headroom, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf1689",
+      "cell": [
+        9,
+        -1
+      ],
+      "parent_divisions": 4,
+      "divisions": 8,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,050,484 bytes, within 5 % of the 4 MiB cap; four-child split for headroom, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
+    },
+    {
+      "parent": "vf1587",
+      "cell": [
+        8,
+        -3
+      ],
+      "parent_divisions": 2,
+      "divisions": 4,
+      "reason": "v0.0.47 public default build (no CHIM region selection): world-scenery region 4,026,920 bytes, within 5 % of the 4 MiB cap; four-child split for headroom, original core triangles, scenery references and 896-unit apron kept (BUILD-LAVA-TERRAIN-BUDGET-38, persisting)"
     }
   ]
 }

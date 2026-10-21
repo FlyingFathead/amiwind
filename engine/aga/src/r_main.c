@@ -122,6 +122,8 @@ void R_MarkLeaves (void);
 
 cvar_t aw_drawdistance = {"aw_drawdistance","540",true};
 cvar_t	r_draworder = {"r_draworder","0"};
+/* dbg ghostfence on/off: turbulent textures ripple (1, default) or are drawn straight and still (0); not saved. */
+cvar_t	aw_ghostfence = {"aw_ghostfence","1"};
 cvar_t	r_speeds = {"r_speeds","0"};
 cvar_t	r_timegraph = {"r_timegraph","0"};
 cvar_t	r_graphheight = {"r_graphheight","10"};
@@ -206,6 +208,7 @@ void R_Init (void)
     R_InitDayNight();
 	Cvar_RegisterVariable (&aw_drawdistance);
 	Cvar_RegisterVariable (&r_draworder);
+	Cvar_RegisterVariable (&aw_ghostfence);
     Cvar_RegisterVariable (&aw_depthslop);
     Cvar_RegisterVariable (&aw_surface_order);
 	Cvar_RegisterVariable (&r_speeds);
@@ -1258,4 +1261,6 @@ void R_InitTurb (void)
 		sintable[i] = AMP + Q_SinRad(i*3.14159*2/CYCLE)*AMP;
 		intsintable[i] = AMP2 + Q_SinRad(i*3.14159*2/CYCLE)*AMP2;	// AMP2, not 20
 	}
+	for (i=0 ; i<CYCLE ; i++)
+		stillturbtable[i] = AMP;
 }

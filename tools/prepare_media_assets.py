@@ -462,13 +462,18 @@ def _stage_media_file(task):
         return {'error': str(error)[:400]}
 
 
-def stage_catalogue(media, id1, music_manifest, intro_receipt=None, excluded=(), jobs=None):
+def stage_catalogue(media, id1, music_manifest, intro_receipt=None, excluded=(), jobs=None, on_disk=False):
     """Copy only validated outputs; bind coverage to the final prepared payload.
 
     Preserve the higher-resolution story intro when its original source digest
     matches. All other collisions must be byte-identical, never overwritten.
     excluded: categories a quick test build leaves out ('music' when the image
     takes no soundtrack); the media stage records its own ('videos', 'voices').
+    on_disk: also write the catalogue (this coverage report, about 64 MB for a full
+    build) into the payload as id1/media/catalogue.json. Off by default: nothing in
+    the game reads it (IMAGE-MEDIA-CATALOGUE-ON-DISK-46); the image step keeps it
+    beside the image as media-coverage.json, and the media stage's own copy
+    (OUT/id1/media/catalogue.json) stays the build-time input of tools/prepare_harvest.py.
     """
     media = ensure_external(media, 'converted media'); id1 = ensure_external(id1, 'image payload')
     report = copy.deepcopy(json.loads((media/'media-coverage.json').read_text()))
@@ -537,8 +542,10 @@ def stage_catalogue(media, id1, music_manifest, intro_receipt=None, excluded=(),
                          if r['category']=='videos' and r['status']=='included' and 'id' in r]
     (id1/'intro').mkdir(parents=True,exist_ok=True)
     (id1/'intro/videos.awl').write_text('\n'.join(catalogue)+'\n', encoding='ascii', newline='\n')
-    (id1/'media').mkdir(parents=True, exist_ok=True)
-    (id1/'media/catalogue.json').write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8', newline='\n')
+    report['catalogue_on_disk'] = bool(on_disk)
+    if on_disk:   # DEBUGGING only (build.py --media-catalogue on)
+        (id1/'media').mkdir(parents=True, exist_ok=True)
+        (id1/'media/catalogue.json').write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8', newline='\n')
     for line in summary_lines(report['categories']):print(line, flush=True)
     for category, counts in report['categories'].items():
         for field, label in (('missing_source', 'missing source'), ('missing_output', 'missing output')):

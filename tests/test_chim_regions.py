@@ -799,7 +799,8 @@ class DividedCells(unittest.TestCase):
         import build_aga
         self.assertIn('alias_rows(raw)', inspect.getsource(build_aga.write_content_fingerprint))
         import world_volumes          # second build: the volume packer stopped on the same alias row
-        self.assertIn('alias_rows(raw)', inspect.getsource(world_volumes.pack))
+        self.assertIn('alias_rows(raw)', inspect.getsource(world_volumes.region_map_paths))
+        self.assertIn('region_map_paths(id1,omitted)', inspect.getsource(world_volumes.pack))
 
     def test_unwidened_rows_and_the_earlier_method_are_refused(self):
         with self.assertRaisesRegex(ValueError, 'do not each cover the cell'):
@@ -850,20 +851,51 @@ class Rebind(unittest.TestCase):
 
 
 class Builder(unittest.TestCase):
-    def test_off_by_default(self):
+    def test_none_builds_no_region_cells(self):
         import build
-        args = build.parser().parse_args(['--dry-run'])
-        self.assertEqual(args.chim_regions, [])
+        args = build.parser().parse_args(['--dry-run', '--chim-regions', 'none'])
         self.assertIsNone(build.resolve_chim_regions(args))
         self.assertNotIn('--chim-regions-cells', build.chim_stage_options(args))
+        args = build.parser().parse_args(['--dry-run', '--chim-regions', 'none', '--chim-regions', 'coast'])
+        with self.assertRaisesRegex(ValueError, 'none'):
+            build.resolve_chim_regions(args)
 
-    def test_needs_chim_builder_and_status(self):
+    def test_default_is_the_cell_list_in_the_source_tree(self):
+        # BUILD-CHIM-CELLS-PRIVATE-LIST-47: a full CHIM build without --chim-regions puts the release cells on
+        # CHIM from config/chim-cells.json, checked against the public tracker reference
+        import build
+        data = json.loads(build.CHIM_CELLS_DEFAULT.read_text(encoding='utf-8'))
+        listed = {tuple(c) for c in data['cells']}
+        self.assertEqual(data['format'], R.CELLS_FORMAT)
+        self.assertEqual(len(listed), len(data['cells']))
+        args = build.parser().parse_args(['--dry-run', '--builder', 'chim'])
+        self.assertEqual(args.chim_regions, [])
+        record = build.resolve_chim_regions(args)
+        self.assertTrue(record['default'])
+        self.assertEqual(Path(args.chim_regions_status), build.CHIM_CELLS_STATUS_DEFAULT)
+        resolved = set(R.decode_cells(args.chim_regions_cells))
+        dropped = {R.parse_cell(d['cell']) if isinstance(d, dict) else R.parse_cell(d) for d in record['dropped']}
+        self.assertEqual(resolved | dropped, listed)
+        self.assertEqual(record['counts']['cells'], len(listed) - len(dropped))
+        self.assertIn('--chim-regions-cells', build.chim_stage_options(args))
+        # the same cells as naming the file explicitly
+        explicit = build.parser().parse_args(['--dry-run', '--builder', 'chim', '--chim-regions',
+                                              '@' + str(build.CHIM_CELLS_DEFAULT)])
+        build.resolve_chim_regions(explicit)
+        self.assertEqual(explicit.chim_regions_cells, args.chim_regions_cells)
+
+    def test_no_default_for_legacy_or_miniwind(self):
+        import build
+        args = SimpleNamespace(chim_regions=[], chim_regions_status=None, miniwind=False)
+        self.assertIsNone(build.resolve_chim_regions(args, {'builder': 'legacy', 'chim_areas': []}))
+        args = SimpleNamespace(chim_regions=[], chim_regions_status=None, miniwind=True)
+        self.assertIsNone(build.resolve_chim_regions(args, {'builder': 'chim', 'chim_areas': []}))
+
+    def test_needs_chim_builder(self):
         import build
         args = SimpleNamespace(chim_regions=['seabed'], chim_regions_status=None, miniwind=False)
         with self.assertRaisesRegex(ValueError, 'CHIM builder'):
             build.resolve_chim_regions(args, {'builder': 'legacy', 'chim_areas': []})
-        with self.assertRaisesRegex(ValueError, 'chim-regions-status'):
-            build.resolve_chim_regions(args, {'builder': 'chim', 'chim_areas': []})
 
     def test_cells_reach_the_chim_stage(self):
         import build

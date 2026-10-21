@@ -1,10 +1,12 @@
-# AmiWind 68060 play preset (FS-UAE): an A1200 with a 68060 card, 16 MB Fast RAM, JIT for speed.
+# AmiWind 68060 play preset (FS-UAE): an A1200 with a 68060 card, 128 MB Fast RAM, JIT for speed.
 # Replace the ROM and HDF placeholders with your owned local files. Not a timing model of a real card.
 # A 68060 needs its support library on the game disk: build with --amiga-libs (your own 68060.library,
 # mmu.library and, for MMULib's libraries, your Workbench's C/SetPatch) or copy them to LIBS: and C: of the
 # boot partition. The game picks its 68060 engine (AmiWind060) at boot; without the library it shows a notice
 # and the boot check stops (docs/68060.md, docs/FPU_SUPPORT_LIBRARY.md).
-# Checked 17 October 2026 with FS-UAE 3.1.66: boots to the main menu with AmiWind060 picked at boot.
+# Checked 17 October 2026 with FS-UAE 3.1.66 (then with 16 MB Fast RAM): boots to the main menu with AmiWind060
+# picked at boot. 128 MB since 21 October 2026, as every playtest; 16 MB (zorro_iii_memory = 16384) is the
+# smallest machine the game runs on.
 [config]
 amiga_model = A1200
 cpu = 68060-NOMMU
@@ -15,7 +17,7 @@ uae_cpu_24bit_addressing = false
 chip_memory = 2048
 slow_memory = 0
 fast_memory = 0
-zorro_iii_memory = 16384
+zorro_iii_memory = 131072
 kickstart_file = /path/to/your/kickstart-3.1-a1200.rom
 hard_drive_0 = /path/to/your/AmiWind.hdf
 hard_drive_0_type = hdf

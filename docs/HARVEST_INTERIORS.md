@@ -1,6 +1,11 @@
 # Source-bound mushroom interiors
 
-_Last updated with AmiWind v0.0.29 (6 October 2026)._
+_Last updated with AmiWind v0.0.47 (21 October 2026)._
+
+Since v0.0.47 the builder makes the mushrooms of every shipped interior pickable on its own (the harvest step and
+the image step, on the same pick state as the outdoors): see
+[EXTERNAL_HARVEST_MODELS.md](EXTERNAL_HARVEST_MODELS.md#interiors-v0047). This page describes the earlier one-room
+prototype, kept as it was.
 
 The opt-in `tools/prepare_harvest_room.py` prototype builds one original interior,
 its external mushroom catalogue/models and original directed door-bank deltas.

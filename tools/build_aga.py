@@ -1479,11 +1479,13 @@ def chim_cut_sidecar(chim_world, id1, record):
             'structures': head['structures'], 'members': head['members']}
 
 
-def add_chim_volume(chim_world, id1, out, index, xdftool, mib=None, frames=None):
+def add_chim_volume(chim_world, id1, out, index, xdftool, mib=None, frames=None, packed=None):
     """The CHIM world as world volume AW_WORLD<index> (partition DW<index>, files under id1/chim/),
     written in pack order, read back and gated (tools/chim/disk.py); world/volumes.awv then counts it.
     frames: chim_frame_maps' result when the image wrote the frame maps earlier (pure CHIM); else
-    they are written here. Returns (the volume entry for the hardfile, the build.json record)."""
+    they are written here. packed: the pack_partition result when the compact layout wrote the volume
+    already (world_volumes.write_layout, which also wrote world/volumes.awv): only the record is made.
+    Returns (the volume entry for the hardfile, the build.json record)."""
     from chim.disk import IMAGE_BASE, pack_partition
     from map_files import frame_ext
     chim_world = Path(chim_world)
@@ -1495,9 +1497,11 @@ def add_chim_volume(chim_world, id1, out, index, xdftool, mib=None, frames=None)
     if not 0 <= index < 8:
         raise ValueError('World payload exceeds the eight-volume runtime limit')
     volume = 'AW_WORLD%d' % index
-    packed = pack_partition(chim_world/'chim', out/('world%d-partition.hdf' % index), volume, mib, xdftool, IMAGE_BASE)
-    (id1/'world').mkdir(parents=True, exist_ok=True)
-    (id1/'world/volumes.awv').write_bytes(b'AWV1'+bytes([index+1]))
+    if packed is None:
+        packed = pack_partition(chim_world/'chim', out/('world%d-partition.hdf' % index), volume, mib, xdftool,
+                                IMAGE_BASE)
+        from world_volumes import write_volumes_file
+        write_volumes_file(id1, index+1)
     for path in (receipt_path, validate_path, stats_path):
         shutil.copyfile(path, out/path.name)
     entry = dict(file=packed['file'], volume=volume, partition='DW%d' % index, bytes=packed['bytes'],
@@ -1637,6 +1641,54 @@ def stage_world_bounds(args, id1):
 WORLD_BOUNDS_LINES = (b'// World bounds (builder default, --world-bounds on|off): the sea near the edge of the open\n'
                       b'// world carries you along it and back in (an AmiWind extension; dbg worldbounds).\n'
                       b'aw_world_bounds 1\n')
+
+
+def stage_chim_crossing(args, id1):
+    """--chim-crossing 1 (tools/chim_crossing.py; build.py --chim-crossing, default 1 since v0.0.47): "chim crossing 1"
+    at the end of the game's default settings (default-game.cfg), which run before any map, so the first map starts
+    with type 1 cell crossings (docs/chim/CELL_CROSSINGS.md). Type 0 (this step's own default; build.py passes 1 by
+    default): nothing is written (the game as before). Returns the record, or None for type 0."""
+    if str(getattr(args, 'chim_crossing', None) or '0') != '1':
+        return None
+    path = Path(id1) / 'default-game.cfg'
+    raw = path.read_bytes()
+    if not raw.endswith(b'\n'):
+        raw += b'\n'
+    raw += CHIM_CROSSING_LINES
+    path.write_bytes(raw)
+    print('Crossing: type 1 (chim crossing 1 in default-game.cfg; chim crossing 0 in the console for the old '
+          'crossing)', flush=True)
+    return {'type': 1, 'config': 'id1/default-game.cfg', 'line': 'chim crossing 1'}
+
+
+def stage_chim_actor_table_config(args, id1):
+    """--chim-actor-table on (build.py's default since v0.0.47; tools/chim/actors.py, CHIM-EXTERIOR-ACTORS-MISSING-46):
+    the image ships maps/chim-actors.cca, and the engine reads it only with "chim actors table 1" (aw_actors.c, off
+    by default, not saved), so the game's default settings (default-game.cfg, run before any map, as "chim crossing
+    1") turn it on. Off: nothing is written. Returns the record, or None."""
+    if getattr(args, 'chim_actor_table', 'off') != 'on':
+        return None
+    path = Path(id1) / 'default-game.cfg'
+    raw = path.read_bytes()
+    if not raw.endswith(b'\n'):
+        raw += b'\n'
+    raw += CHIM_ACTOR_TABLE_LINES
+    path.write_bytes(raw)
+    print('Actor table: on (chim actors table 1 in default-game.cfg; chim actors table 0 in the console for the '
+          'actors of the frame maps)', flush=True)
+    return {'on': True, 'config': 'id1/default-game.cfg', 'line': 'chim actors table 1'}
+
+
+CHIM_ACTOR_TABLE_LINES = (b'// Actor table (builder option --chim-actor-table on|off, default on): a joining frame takes its\n'
+                          b'// actors from maps/chim-actors.cca. Not saved; "chim actors table 0" in the console gives\n'
+                          b'// the actors of the frame maps back.\n'
+                          b'chim actors table 1\n')
+
+
+CHIM_CROSSING_LINES = (b'// Cell crossings (builder option --chim-crossing 0|1, default 1 since v0.0.47): type 1, the\n'
+                       b'// region frames around the player as one window. Read when a map starts; not saved.\n'
+                       b'// "chim crossing 0" in the console before a map starts gives the old crossing back.\n'
+                       b'chim crossing 1\n')
 
 
 SKIP_CENSUS_LINES = (b'// --skip-census (quick test build): New Game makes the character on the quick character\n'
@@ -1847,6 +1899,8 @@ def image(args):
     skip_census_record=stage_skip_census(args, boot/'id1')
     args.image_skip_census_record=skip_census_record  # finalize_image writes it into build.json
     args.image_world_bounds_record=stage_world_bounds(args, boot/'id1')  # build.json, only when on
+    args.image_chim_crossing_record=stage_chim_crossing(args, boot/'id1')  # build.json, only for type 1
+    args.image_chim_actor_table_config=stage_chim_actor_table_config(args, boot/'id1')  # build.json, only when on
     # --death-retry off (tools/prepare_player_view.py): aw_death_retry 0 in the game defaults.
     from prepare_player_view import stage_death_retry
     args.image_death_retry_record=stage_death_retry(getattr(args,'no_death_retry',False), boot/'id1')
@@ -1962,6 +2016,13 @@ def image(args):
     fpu_receipt=stage_fpu_support(args,engine_record,boot)
     (out/'fpu-support.json').write_text(json.dumps(fpu_receipt,indent=2)+'\n',encoding='utf-8',newline='\n')
     (boot/'S/startup-sequence').write_text(fpu_support.startup_sequence(fpu_receipt,**fpu_support.engine_start(bool(pair))), newline='\n')
+    # --workbench-icon (default launch): an icon for someone who opens the boot volume from Workbench (tools/workbench_launcher.py).
+    import workbench_launcher
+    workbench=workbench_launcher.install(boot,getattr(args,'workbench_icon',None) or workbench_launcher.DEFAULT,VERSION,
+                                         pair=bool(pair),fpu=fpu_receipt.get('status')=='installed')
+    if workbench:
+        (out/'workbench-icon.json').write_text(json.dumps(workbench,indent=2)+'\n',encoding='utf-8',newline='\n')
+        print('Workbench icon: "%s" (%s) on %s:'%(workbench['name'],workbench['mode'],workbench['volume']),flush=True)
     if not mini:
         for name in ['seyda.map','town.wad']:shutil.copyfile(scene/name,out/name)
     if (scene/'scene-ready.json').is_file():
@@ -2248,7 +2309,110 @@ def payload_preflight(args, out, excluded, jobs, pending=None):
                          harvest=getattr(args, 'harvest', None), data_files=getattr(args, 'data_files', None),
                          report_path=None if getattr(args, 'payload_preflight_only', False) else out/'payload-preflight.json',
                          chim_towns=chim_native_towns(args), chim_town_dirs=getattr(args, 'chim_town', None) or (),
-                         exterior_terrain=getattr(args, 'exterior_terrain', None) or getattr(args, 'world_terrain', None))
+                         exterior_terrain=getattr(args, 'exterior_terrain', None) or getattr(args, 'world_terrain', None),
+                         layout=disk_layout_settings(args), media=getattr(args, 'media', None),
+                         media_catalogue=getattr(args, 'media_catalogue', False),
+                         # the layout plan the image step follows (tools/layout_plan.py): written by every run of the
+                         # preflight on a real image run, so finalize_image follows the latest one
+                         layout_plan_path=None if getattr(args, 'payload_preflight_only', False) else out/'layout-plan.json')
+
+def disk_layout_settings(args):
+    """The disk layout settings of the image (tools/layout_plan.py): --disk-layout, --partition-headroom-mib and
+    --boot-partition-headroom-mib over the build config over config/build-defaults.json."""
+    import layout_plan
+    return layout_plan.resolve(getattr(args, 'disk_layout', None), getattr(args, 'partition_headroom_mib', None),
+                               getattr(args, 'boot_partition_headroom_mib', None),
+                               getattr(args, 'build_config', None))
+
+
+def legacy_layout_findings(receipts, settings):
+    """The legacy layout's partitions the compact layout's headroom gate would refuse, as findings (printed, recorded;
+    the legacy layout is kept for A/B and is not gated by them)."""
+    import layout_plan
+    found = []
+    for r in receipts:
+        want = settings['headroom_mib'] * layout_plan.MIB
+        if r['bytes'] > layout_plan.SMALL_PARTITION and r['free_bytes'] > want + r['bytes'] // 2:
+            found.append('%s mostly empty: %d of %d bytes free (payload %d bytes)'
+                         % (r['partition'], r['free_bytes'], r['bytes'], r['payload_bytes']))
+    for line in found:
+        print('Disk layout (legacy) finding: ' + line, flush=True)
+    return found
+
+
+def compact_layout(args, boot, out, part, omitted_maps, chim_frames, settings, jobs, drive_name, shrink=None):
+    """The compact disk layout (tools/layout_plan.py): plan the staged payload, require that it follows the plan the
+    payload preflight wrote (OUT/layout-plan.json: same partitions and maps, every payload within its headroom),
+    gate the planned drives, then write every partition at once (world_volumes.write_layout). Returns (world
+    volume entries, the CHIM world record, drive plans, the boot check, the boot files as written, the layout
+    record for build.json). SHRINK: {partition: bytes} the image step removed after the payload preflight planned
+    (tools/payload_share.py); the plan is followed with those bytes added back."""
+    import layout_plan
+    from world_volumes import plan_drives, region_map_paths, write_layout
+    id1 = boot/'id1'
+    maps = region_map_paths(id1, omitted_maps) or []
+    map_set = set(maps)
+    boot_rows = {p.relative_to(boot).as_posix(): p.stat().st_size for p in boot.rglob('*')
+                 if p.is_file() and p not in map_set}
+    chim_root = Path(args.chim_world)/'chim' if getattr(args, 'chim_world', None) else None
+    plan = layout_plan.plan_compact(boot_rows, [(p.relative_to(boot).as_posix(), p.stat().st_size) for p in maps],
+                                    layout_plan.walk(chim_root) if chim_root else None,
+                                    settings['headroom_mib'], settings['boot_headroom_mib'])
+    planned_path = out/'layout-plan.json'
+    if planned_path.is_file():
+        planned = json.loads(planned_path.read_text(encoding='utf-8'))
+        layout_plan.require_follows(planned, plan, shrink=shrink)
+        print('Layout plan followed: the staged payload matches %s (%d partitions, every payload within its '
+              'headroom)' % (planned_path.name, len(plan['partitions'])), flush=True)
+        source = planned_path.name
+    else:
+        print('Layout plan: no plan from the payload preflight in this run; planned now from the staged payload',
+              flush=True)
+        source = 'image step'
+    layout_plan.require_minimal(plan)
+    for line in layout_plan.lines(plan):
+        print(line, flush=True)
+    (out/'layout-plan-image.json').write_text(json.dumps(plan, indent=1)+'\n', encoding='utf-8', newline='\n')
+    check_payload_names(boot)
+    # The disk-layout gate on the PLAN, before any partition or drive is written (BUILD-WORLD-PARTITION-MOUNT-33):
+    # partitions below 2 GiB and starting below 2 GiB, files well under 2 GiB, drives below 4 GiB.
+    placed = layout_plan.assign(plan, maps)
+    rows = {row['partition']: row for row in plan['partitions']}
+    dh0_files = [dict(path=k, bytes=v) for k, v in sorted(boot_rows.items()) if k != layout_plan.VOLUMES_FILE]
+    dh0_files += [dict(path=p.relative_to(boot).as_posix(), bytes=p.stat().st_size) for p in placed['DH0']]
+    if plan['world_volumes']:
+        dh0_files.append(dict(path=layout_plan.VOLUMES_FILE, bytes=layout_plan.VOLUMES_BYTES))
+    worlds_planned = []
+    for row in plan['partitions'][1:]:
+        files = [dict(path='id1/maps/'+p.name, bytes=p.stat().st_size) for p in placed[row['partition']]]
+        if row['role'] == 'chim':
+            files = [dict(path='id1/chim/'+k, bytes=v) for k, v in layout_plan.walk(chim_root)] + files
+        worlds_planned.append(dict(partition=row['partition'], volume=row['volume'], bytes=row['bytes'], files=files))
+    drive_plans = plan_drives(dict(partition='DH0', volume='AMIWIND', bytes=rows['DH0']['bytes'], files=dh0_files),
+                              worlds_planned, name=drive_name)
+    root_check, worlds, timings = write_layout(plan, boot, out, args.xdftool, part, chim_root, omitted_maps, jobs,
+                                               log=lambda line: print(line, flush=True))
+    chim_world = {'status': 'not_requested'}
+    for index, row in enumerate(plan['partitions'][1:]):
+        if row['role'] == 'chim':
+            entry, chim_world = add_chim_volume(args.chim_world, id1, out, index, args.xdftool, frames=chim_frames,
+                                                packed=worlds[index])
+            chim_world['frame_maps_on_volume'] = len(row['maps'])
+            worlds[index] = entry
+    # the open-world maps of each world volume, as the legacy layout recorded them (size ledger, reference build)
+    (out/'world-partitions.json').write_text(json.dumps(dict(
+        format='AmiWind terrain partitions 1', version=VERSION, layout='compact',
+        partitions=[dict(file=w['file'], volume=w['volume'], partition=w['partition'], role=row['role'],
+                         files=[f for f in w['files'] if f['path'].startswith('id1/maps/')])
+                    for w, row in zip(worlds, plan['partitions'][1:]) if row['maps']]), indent=2)+'\n',
+        encoding='utf-8', newline='\n')
+    boot_paths = [p for p in sorted(boot.rglob('*')) if p.is_file()]
+    summary = dict(plan, partitions=[dict(r, maps=len(r['maps'])) for r in plan['partitions']])
+    record = {'mode': 'compact', 'headroom_mib': settings['headroom_mib'],
+              'boot_headroom_mib': settings['boot_headroom_mib'], 'plan_source': source, 'plan': summary,
+              'write_seconds': timings}
+    return worlds, chim_world, drive_plans, root_check, boot_paths, record
+
 
 def finalize_image(args):
     """Finalize an already prepared private image stage through every normal gate.
@@ -2397,6 +2561,22 @@ def finalize_image(args):
         getattr(args,'entity_baseline',None), getattr(args,'accept_entity_loss',None), jobs=jobs,
         dressing_terms=DRESSING_EXCLUDED, extra_maps={**chim_town_placements(args, boot/'id1', world=chim_world_data),
                                                      **chim_region_placements(args, boot/'id1', world=chim_world_data)})
+    # EXPERIMENTAL actor table (--chim-actor-table on, tools/chim/actors.py, CHIM-EXTERIOR-ACTORS-MISSING-46): every
+    # exterior NPC and creature reference in one table beside the frame maps, for the type 1 window; off by default
+    if getattr(args, 'chim_actor_table', 'off') == 'on':
+        from chim.actors import FILE_NAME, write_table
+        library = None
+        if getattr(args, 'actor_library', None):
+            # the actor library stage's models (tools/actor_library.py): installed here, named by the table's bases
+            from actor_library import install as install_actor_library
+            library, installed = install_actor_library(args.actor_library, boot/'id1')
+            print('Image: actor library: %d files installed, %d base texts' % (installed, len(library)), flush=True)
+        actor_table = write_table(boot/'id1/maps'/FILE_NAME, child_ci(args.data_files,'Morrowind.esm'), boot/'id1/maps',
+                                  Path(args.chim_world)/'chim' if getattr(args, 'chim_world', None) else None, library)
+        (out/'chim-actor-table.json').write_text(json.dumps(actor_table, indent=1, sort_keys=True)+'\n', encoding='utf-8', newline='\n')
+        print('Image: actor table: %d records (%d with a model), %d bases, %d bytes' % (
+            actor_table['records'], actor_table['spawnable_records'], actor_table['bases'], actor_table['bytes']),
+            flush=True)
     # World progress map data: topomap coverage plus entity and POI layers.
     from world_progress import build_step as world_progress_step
     if getattr(args, 'miniwind', False):
@@ -2525,7 +2705,10 @@ def finalize_image(args):
     # standing box (COLLISION-STAIR-SLOPE-32); on with follow_original_stair_rules.
     # The recorded Seyda Neen stage (BUILD-SEYDA-REGEN-30) is reported, not gated.
     from mesh_geometry_env import stair_rules_enabled
-    if stair_rules_enabled():
+    import stair_walk
+    if stair_walk.walk_off():   # BUILD-STAIR-WALK-OFF-46: the builder's default
+        print('Image stair walk: off (the default; --stair-walk flights|all walks)', flush=True)
+    elif stair_rules_enabled():
         from stair_parallel import require as require_stairs   # every core (BUILD-IMAGE-STAIR-WALK-SERIAL-36)
         from recorded_stage import frozen_maps
         from chim.known import known_stair_findings
@@ -2594,7 +2777,8 @@ def finalize_image(args):
     intro_receipt_path = Path(args.scene)/'intro-conversion.json'
     intro_receipt = json.loads(intro_receipt_path.read_text()).get('movie') if intro_receipt_path.is_file() else None
     media_coverage = stage_catalogue(args.media, boot/'id1', manifest, intro_receipt,
-                                     excluded=['music'] if 'music' in excluded else [], jobs=jobs)
+                                     excluded=['music'] if 'music' in excluded else [], jobs=jobs,
+                                     on_disk=getattr(args, 'media_catalogue', False))
     media_coverage_path = out/'media-coverage.json'
     media_coverage_path.write_text(json.dumps(media_coverage,indent=2)+'\n',encoding='utf-8',newline='\n')
     # Missing original inputs remain warnings, but every available source must
@@ -2620,22 +2804,13 @@ def finalize_image(args):
                                                for kind, row in legacy_summary['payload_by_kind'].items()), flush=True)
     if legacy_summary['shipped']:
         raise ValueError('Legacy maps of CHIM cells in the payload: ' + ', '.join(legacy_summary['shipped'][:8]))
-    from world_volumes import pack as pack_world_volumes
-    world_images=pack_world_volumes(boot/'id1',out,VERSION,args.xdftool,args.rdbtool,jobs=jobs,
-                                   omitted=omitted_maps)
-    chim_world={'status':'not_requested'}
-    if getattr(args,'chim_world',None):
-        volume,chim_world=add_chim_volume(args.chim_world,boot/'id1',out,len(world_images),args.xdftool,
-                                          frames=chim_frames)
-        chim_world['removed_legacy']=removed_legacy
-        chim_world['legacy_check']=legacy_check
-        chim_world['not_on_chim']=not_on_chim
-        world_images.append(volume)
-    check_payload_names(boot)
-    from world_volumes import (assemble_drives, partition_mib as planned_mib, plan_drives, planned_partition,
-                               write_boot_partition)
-    payload_bytes=sum(p.stat().st_size for p in boot.rglob('*') if p.is_file())
-    partition_mib=planned_mib(payload_bytes)
+    # Repeated content stored once (tools/payload_share.py; both EXPERIMENTAL, off by default): the last payload pass,
+    # after every check above that reads the payload by name or size (heap, budgets, legacy maps). The layout plan of
+    # the payload preflight allows for the bytes it removes from DH0 (layout_plan.require_follows shrink).
+    from payload_share import share_payload
+    payload_sharing = share_payload(boot/'id1', file_aliases=getattr(args, 'file_aliases', False),
+                                    shared_skins=getattr(args, 'shared_skins', False), jobs=jobs,
+                                    log=lambda line: print(line, flush=True))
     suffix = '' if actor_acceptance['production_gate_passed'] and budget_decision['production_memory_gate_passed'] else '-private-test'
     if suffix:
         require_private_test_version(VERSION, ['a failed production gate'])
@@ -2644,21 +2819,65 @@ def finalize_image(args):
     from build_exclusions import HDF_TAG
     tag = miniwind_hdf_tag(args) + (HDF_TAG if excluded else '')
     part=out/'partition.hdf';hdf=out/f'AmiWind-v{VERSION}{tag}{suffix}.hdf'
-    boot_paths=[p for p in sorted(boot.rglob('*')) if p.is_file()]
-    # The disk-layout gate on the PLAN, before the boot partition or any drive is written: every
-    # partition starts below 2 GiB and is below 2 GiB, files well under 2 GiB, drives below 4 GiB
-    # (BUILD-WORLD-PARTITION-MOUNT-33). hardfile_groups groups the partitions into drives.
-    drive_plans=plan_drives(planned_partition('DH0',[dict(path=p.relative_to(boot).as_posix(),bytes=p.stat().st_size)
-                                                     for p in boot_paths],'AMIWIND'),world_images,
-                            name=lambda index:hdf.name if index==0 else f'AmiWind-v{VERSION}{tag}{suffix}-world-{index:02d}.hdf')
-    root_check=write_boot_partition(args.xdftool,part,boot,partition_mib)
+    drive_name=lambda index:hdf.name if index==0 else f'AmiWind-v{VERSION}{tag}{suffix}-world-{index:02d}.hdf'
+    layout_settings=disk_layout_settings(args)
+    layout_record={'mode':layout_settings['mode'],'headroom_mib':layout_settings['headroom_mib'],
+                   'boot_headroom_mib':layout_settings['boot_headroom_mib']}
+    from world_volumes import assemble_drives, plan_drives
     from build_parallel import hash_files
+    if layout_settings['mode']=='legacy':
+        # LEGACY layout (--disk-layout legacy): the open-world maps balanced against the boot payload into their own
+        # volumes, the CHIM world one more volume, every partition payload + 20 % + 16 MiB in 128 MiB steps.
+        print('Disk layout: LEGACY (--disk-layout legacy): partitions sized payload + 20 % + 16 MiB in 128 MiB '
+              'steps, open-world maps on volumes of their own',flush=True)
+        from world_volumes import pack as pack_world_volumes
+        world_images=pack_world_volumes(boot/'id1',out,VERSION,args.xdftool,args.rdbtool,jobs=jobs,
+                                       omitted=omitted_maps)
+        chim_world={'status':'not_requested'}
+        if getattr(args,'chim_world',None):
+            volume,chim_world=add_chim_volume(args.chim_world,boot/'id1',out,len(world_images),args.xdftool,
+                                              frames=chim_frames)
+            world_images.append(volume)
+        check_payload_names(boot)
+        from world_volumes import partition_mib as planned_mib, planned_partition, write_boot_partition
+        payload_bytes=sum(p.stat().st_size for p in boot.rglob('*') if p.is_file())
+        partition_mib=planned_mib(payload_bytes)
+        boot_paths=[p for p in sorted(boot.rglob('*')) if p.is_file()]
+        # The disk-layout gate on the PLAN, before the boot partition or any drive is written: every
+        # partition starts below 2 GiB and is below 2 GiB, files well under 2 GiB, drives below 4 GiB
+        # (BUILD-WORLD-PARTITION-MOUNT-33). hardfile_groups groups the partitions into drives.
+        drive_plans=plan_drives(planned_partition('DH0',[dict(path=p.relative_to(boot).as_posix(),bytes=p.stat().st_size)
+                                                         for p in boot_paths],'AMIWIND'),world_images,name=drive_name)
+        root_check=write_boot_partition(args.xdftool,part,boot,partition_mib)
+        images=None
+    else:
+        # COMPACT layout (default; tools/layout_plan.py, BUILD-PARTITION-GROWTH-UNGATED-36): the plan the payload
+        # preflight made, checked against the staged payload, then every partition written at the same time.
+        world_images,chim_world,drive_plans,root_check,boot_paths,layout_record=compact_layout(
+            args,boot,out,part,omitted_maps,chim_frames,layout_settings,jobs,drive_name,
+            shrink={'DH0':payload_sharing['bytes_removed']})
+        images={volume['partition']:volume for volume in world_images}
+    if getattr(args,'chim_world',None):
+        chim_world['removed_legacy']=removed_legacy
+        chim_world['legacy_check']=legacy_check
+        chim_world['not_on_chim']=not_on_chim
     boot_files=[dict(path=p.relative_to(boot).as_posix(),bytes=p.stat().st_size,sha256=value)
                 for p,value in zip(boot_paths,hash_files(boot_paths,jobs))]
     # Every planned drive written (rdbtool), read back and gated again as written: require_mountable and
     # require_disk_layout(drive.name, drive.stat().st_size, checked, partitions); the measured layout goes
     # into build.json.
-    layout,drive_receipts,disk_layout=assemble_drives(args.rdbtool,drive_plans,out,part,boot_files,jobs=jobs,run=run)
+    layout,drive_receipts,disk_layout=assemble_drives(args.rdbtool,drive_plans,out,part,boot_files,jobs=jobs,run=run,
+                                                      images=images)
+    layout_record['partitions']=[dict(partition=r['partition'],volume=r.get('volume'),bytes=r['bytes'],
+                                      payload_bytes=r['payload_bytes'],free_bytes=r['free_bytes'],
+                                      free_share=round(r['free_bytes']/r['bytes'],4),files=r['files'])
+                                 for r in layout]
+    import layout_plan
+    if layout_settings['mode']=='compact':
+        # The headroom gate as written: every partition keeps its headroom free and none is mostly empty.
+        layout_record['headroom_gate']=layout_plan.require_headroom(layout,layout_record['plan'])
+    else:
+        layout_record['legacy_findings']=legacy_layout_findings(layout,layout_settings)
     for volume in world_images:(out/volume['file']).unlink()
     part.unlink()
     verify_heap_loader_source_receipt(engine_record)
@@ -2705,7 +2924,7 @@ def finalize_image(args):
             'safety_headroom_bytes':world_heap['safety_headroom_bytes'],
             'loader_source_sha256':heap_loader_source_sha256,
             'acceptance':world_heap['acceptance']},
-        'torch':torch_report,'combat_data':combat_summary(combat_data),'hdf_file':hdf.name,'hdf_files':drive_receipts,'disk_layout':disk_layout,'chim_world':chim_world,
+        'torch':torch_report,'combat_data':combat_summary(combat_data),'hdf_file':hdf.name,'hdf_files':drive_receipts,'disk_layout':disk_layout,'disk_layout_plan':layout_record,'chim_world':chim_world,
         'default_start':{'profile':'logo-fade-then-main-menu','movie':'intro/amiwind.awv',
             'music_track':groups['title'],'new_game_map':'prison',
             'new_game_movie':'intro/mw_intro.awv' if movie.exists() else None,
@@ -2719,6 +2938,8 @@ def finalize_image(args):
         'payload_bytes':sum(p['payload_bytes'] for p in layout),'partitions':layout,
         'media_coverage':{'report':media_coverage_path.name,'sha256':digest(media_coverage_path),
             'categories':media_coverage['categories'],'excluded':media_coverage.get('excluded',[]),
+            'catalogue_on_disk':media_coverage.get('catalogue_on_disk',False),
+            'payload_sharing':payload_sharing,
             'payload_readback':'passed'},
         'direct_start':direct_start_record,
         'start':start_check,
@@ -2735,6 +2956,10 @@ def finalize_image(args):
         print('RETIRED FLAGS USED: ' + args.retired_flags_used, flush=True)
     if getattr(args, 'image_world_bounds_record', None):
         build_json['world_bounds'] = args.image_world_bounds_record
+    if getattr(args, 'image_chim_crossing_record', None):
+        build_json['chim_crossing'] = args.image_chim_crossing_record
+    if getattr(args, 'image_chim_actor_table_config', None):
+        build_json['chim_actor_table_config'] = args.image_chim_actor_table_config
     recipe_record = os.environ.get('AMIWIND_BUILD_RECIPE')
     if recipe_record:
         # The build's recipe (tools/build_recipe.py ENV, set by tools/build.py; never part of a stage key): a reused
@@ -2822,6 +3047,13 @@ def main():
     i.add_argument('--world-flora',type=Path,help='Complete validated private world vegetation overlay; preserves rock/mushroom inputs')
     i.add_argument('--harvest',type=Path,help='Harvest source from harvest_build.py prepare (builder step harvest); the builder default')
     i.add_argument('--hand-catalog',type=Path,help='Per-race first-person hand catalogue from prepare_hand_catalog.py --runtime-palette; the builder default')
+    i.add_argument('--chim-actor-table', choices=('off', 'on'), default='off',
+                   help='write the CHIM actor table (maps/chim-actors.cca: every exterior NPC and creature reference, '
+                        'for the type 1 window; CHIM-EXTERIOR-ACTORS-MISSING-46); off (the default of this step): none; '
+                        'build.py passes on by default since v0.0.47')
+    i.add_argument('--actor-library', type=Path,
+                   help='With --chim-actor-table on: the actor library stage (tools/actor_library.py): its '
+                        'models are installed and named by the actor table')
     i.add_argument('--chim-world',type=Path,help='CHIM world (tools/chim_build.py output: chim/, chim-receipt.json, '
                    'chim-validate.json, chim-stats.json), added as one more world volume; tools/build.py --builder chim')
     i.add_argument('--chim-lighting-type',default=None,help='With --chim-world: the CHIM lighting type (tools/chim/light_types.py); it selects the night lamp table classes (none: empty, lamps: the warm lamp classes, hybrid: every class that adds light); default: the legacy lamp table')
@@ -2848,6 +3080,9 @@ def main():
     i.add_argument('--amiga-libs',type=Path,help='Optional folder from your own Workbench/accelerator installation; '
                    'its 68040.library/68060.library (in DIR or DIR/LIBS) go into LIBS: and are opened at boot. '
                    'See docs/FPU_SUPPORT_LIBRARY.md')
+    i.add_argument('--workbench-icon',choices=('off','requester','launch'),default='launch',
+                   help='Icon on the boot volume for Workbench users (docs/WORKBENCH_ICON.md): launch (default: starts '
+                   'the game from Workbench), requester (says to boot from the disk) or off')
     i.add_argument('--amiga-libs-policy',choices=known_inputs.POLICIES,default='warn',
                    help='warn (default): unknown builds used with a warning, invalid files not used; '
                    'fail: an invalid file stops the build; require-known: only known builds (docs/KNOWN_INPUTS.md)')
@@ -2856,6 +3091,25 @@ def main():
     i.add_argument('--accept-entity-loss',help='Recorded reason that makes an intended entity loss pass the --entity-baseline gate')
     for name in ['scene','media','engine','out','qcc','qbsp','vis','light','xdftool','rdbtool']:i.add_argument('--'+name,type=Path,required=True)
     i.add_argument('--music',type=Path,help='Converted soundtrack (prepare_music.py); required unless --exclude music')
+    i.add_argument('--file-aliases',action='store_true',
+                   help='build.py --file-aliases on (its default since v0.0.47): store byte-identical models, sounds, sprites and tags '
+                        'once, the other names in id1/file-aliases.txt (tools/payload_share.py, IMAGE-DUPLICATE-FILES-46)')
+    i.add_argument('--shared-skins',action='store_true',
+                   help='build.py --shared-skins on (its default since v0.0.47): store a skin several actor models repeat once in '
+                        'progs/skins/ (tools/payload_share.py, IMAGE-ACTOR-SKIN-REPEATS-46)')
+    i.add_argument('--media-catalogue',action='store_true',
+                   help='DEBUGGING ONLY (build.py --media-catalogue on): also put the media catalogue (the media coverage '
+                        'report, about 64 MB) on the boot disk as id1/media/catalogue.json. Nothing in the game reads it; '
+                        'by default it stays beside the image as media-coverage.json (IMAGE-MEDIA-CATALOGUE-ON-DISK-46)')
+    i.add_argument('--disk-layout',choices=('compact','legacy'),default=None,
+                   help='compact (default, config/build-defaults.json disk_layout): the fewest partitions the payload '
+                        'needs, each sized from its payload + headroom (tools/layout_plan.py); legacy: the earlier '
+                        'layout (open-world maps on volumes of their own, payload + 20 %% + 16 MiB in 128 MiB steps)')
+    i.add_argument('--partition-headroom-mib',type=int,default=None,metavar='MIB',
+                   help='Free space each partition keeps (default 100, config partition_headroom_mib)')
+    i.add_argument('--boot-partition-headroom-mib',type=int,default=None,metavar='MIB',
+                   help='Free space the boot partition DH0 keeps for saves and settings (default: the partition '
+                        'headroom, config boot_partition_headroom_mib)')
     i.add_argument('--payload-preflight-only',action='store_true',help='Read only: run the payload preflight of the image step (tools/payload_preflight.py) on the already staged payload in --out and stop')
     i.add_argument('--direct-start',metavar='START',
                    help='Quick test build (-devN only): boot straight into START (tools/direct_start.py forms); '
@@ -2868,6 +3122,10 @@ def main():
     i.add_argument('--world-bounds',action='store_true',
                    help='The sea near the edge of the open world carries the player along it and back in '
                         '(aw_world_bounds 1 in default-game.cfg; tools/world_bounds.py, docs/WORLD_BOUNDS.md)')
+    i.add_argument('--chim-crossing',choices=('0','1'),default='0',
+                   help='1: the image starts with type 1 cell crossings ("chim crossing 1" in default-game.cfg; '
+                        'tools/chim_crossing.py, docs/chim/CELL_CROSSINGS.md; build.py passes 1 by default since '
+                        'v0.0.47); 0: nothing written')
     i.add_argument('--no-player-body',action='store_true',
                    help="No player body for the third-person view (tools/prepare_player_view.py; build.py --player-body off)")
     i.add_argument('--no-death-retry',action='store_true',

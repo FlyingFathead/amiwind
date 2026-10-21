@@ -148,5 +148,43 @@ class CrossingRouteTest(unittest.TestCase):
             self.assertIn('| 480 / 480 | - / - |', cr.table([r2]))
 
 
+    def test_streamed_crossing_type1(self):
+        """Type 1 ("chim crossing 1"): no map load at the border; the engine's streamed-crossing line is the crossing,
+        ready 0, the walk log and the state file name the scene entered, the stall and the frame median come from the
+        frames around it."""
+        console = ("seg ai-e1\nLoading AmiWind v0.0.46: rcp2_m6...\n"
+                   "CHIM: primed: 9 active, 9 loaded, 120 models, 60 textures, 1000 KiB in 50 reads, 300 ms\n"
+                   "Scene ready: rcp2_m6, 500 ms, 9000000 hunk bytes, arrival checked\nflight ai-e1 start\n"
+                   "Scene ready: rcp3_m6, 0 ms, streamed crossing (type 1), CHIM frame 3 -6, 41 us\nflight ai-e1 end\n")
+        walk = ("frame,elapsed_ms,frame_us,x100,y100,z100,yaw100,hunk_bytes,distance,world_us,map,server_us,surface_order\n"
+                + ''.join('%d,%d,%d,0,0,0,0,0,0,0,%s,0,0\n' % (f, f * 30, 30000 + (5000 if f == 110 else 0),
+                                                              'maps/rcp2_m6.chim' if f < 110 else 'maps/rcp3_m6')
+                          for f in range(10, 210, 10)))
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp) / 'run1'
+            (d / 'awctl').mkdir(parents=True)
+            (d / 'hdflogs').mkdir()
+            (d / 'awctl' / 'console.log').write_text(console)
+            (d / 'hdflogs' / 'walk-profile.csv').write_text(walk)
+            (d / 'hdflogs' / 'frame-stalls.csv').write_text('time_ms,frame,frame_us\n')
+            (d / 'session.json').write_text(json.dumps({'fast_mb': 16}))
+            samples = [
+                {'t': 1.0, 'leg': 'ai-e1', 'flight': True, 'server': 'rcp2_m6', 'scene': 'rcp2_m6',
+                 'global': [24400, -45056, 2600], 'rcount': None},
+                {'t': 1.5, 'leg': 'ai-e1', 'flight': True, 'server': 'rcp2_m6', 'scene': 'rcp3_m6',
+                 'global': [24700, -45056, 2600], 'rcount': RC},
+            ]
+            (d / 'samples.jsonl').write_text(''.join(json.dumps(s) + '\n' for s in samples))
+            r = cr.parse_session(d)
+            self.assertEqual(len(r['crossings']), 1)
+            c = r['crossings'][0]
+            self.assertTrue(c['streamed'])
+            self.assertEqual((c['from'], c['to'], c['ready_ms'], c['cross_us']), ('rcp2_m6', 'rcp3_m6', 0, 41))
+            self.assertEqual(c['stall']['frame_ms'], 0)            # no frame over 100 ms between the two walk rows
+            self.assertEqual(c['frame_median_ms'], 30.0)
+            self.assertEqual(c['at'], [24550, -45056])
+            self.assertIn('| 16 MB | edge | all | 1 | 0 / 0 |', cr.table([r]))
+
+
 if __name__ == '__main__':
     unittest.main()

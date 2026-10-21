@@ -275,6 +275,7 @@ def sidecar_name(frame_map):
 # ---------------------------------------------------------------- reading a world
 
 def model_names(chim_root):
+    from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
     from chim import format as F
     _, _, models, _ = F.read_index((Path(chim_root) / 'world.cwi').read_bytes())
     return [m['name'] for m in models]
@@ -283,6 +284,7 @@ def model_names(chim_root):
 def frame_placements(frame_path):
     """(frame dict, [placement record]) of every placement one frame owns (reach copies left out), from its
     frame file and the sector files beside it."""
+    from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
     from chim import format as F
     frame_path = Path(frame_path)
     frame, _, _ = F.read_frame(frame_path.read_bytes())
@@ -290,7 +292,8 @@ def frame_placements(frame_path):
     for sector in sorted(frame_path.parent.rglob('s*.ccs')):
         for rec in F.read_sector(sector.read_bytes()):
             if rec['kind'] == b'CHNK':
-                rows += F.read_chunk(rec['data'])['owned']
+                from chim.reach import read_chunk_any as read_chunk     # format 0.8 and 0.9 too
+                rows += read_chunk(rec['data'])['owned']
     rows.sort(key=lambda r: r['pid'])
     return frame, rows
 
@@ -307,6 +310,7 @@ def _world_names(chim_root):
     """Model names of a world, read once per worker process."""
     key = str(chim_root)
     if key not in _NAMES:
+        from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
         from chim import format as F
         settings, _, models, _ = F.read_index((Path(chim_root) / 'world.cwi').read_bytes())
         _NAMES.clear()
@@ -355,6 +359,7 @@ def _write_groups(out, jobs=1):
     folder.mkdir(parents=True, exist_ok=True)
     tasks = []
     for path in frames:
+        from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
         from chim import format as F
         frame, _, _ = F.read_frame(path.read_bytes())
         tasks.append((str(path), str(root), str(folder / file_name(frame['cell']))))

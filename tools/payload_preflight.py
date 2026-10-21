@@ -19,9 +19,11 @@ placeholder files in a scratch folder (tools/build_scratch.py) that is always re
   payload, and none of the maps it binds is one the image removes (BUILD-IMAGE-NO-RESUME-33);
 - payload-names: amiga_fs.check_payload_names (FFS names of at most 30 bytes, no case collisions);
 - host-paths: amiga_fs.check_payload_host_paths (no build path in a shipped text file);
-- disk-layout: the world partition batches (world_volumes.partition_batches, as pack makes them) and the
-  planned drives (plan_drives: partitions below 2 GiB and starting below 2 GiB, files below the file
-  limit, drives below 4 GiB) for the planned payload, music and CHIM volume included;
+- disk-layout: the layout plan (tools/layout_plan.py, the compact layout: the fewest partitions, each sized
+  from its payload + headroom; written to the run as layout-plan.json, the image step follows it; the
+  legacy layout: the world partition batches as world_volumes.pack makes them) and the planned drives
+  (plan_drives: partitions below 2 GiB and starting below 2 GiB, files below the file limit, drives below
+  4 GiB) for the planned payload, music, the media the image step adds and the CHIM volume included;
 - music: every soundtrack file is there, decodes and matches its manifest hash;
 - actor-frames: every placed actor model has a declared frame layout (an animation kit layout <model>.anm,
   or the previous 8 idle / 21 town actor layouts), every layout fits its model (and its mover), and every
@@ -235,8 +237,36 @@ def planned_region_frame_maps(id1, chim_world):
     return planned, sidecars
 
 
-def check_disk_layout(boot, removed, music_files, chim_world):
-    """The planned partitions and drives through the disk-layout gate, before anything is written."""
+def media_additions(media, files, catalogue=False):
+    """{boot-relative path: bytes} the image step's media catalogue adds to the payload after the preflight
+    (prepare_media_assets.stage_catalogue): every included converted sound and video not staged yet, and, only
+    with CATALOGUE (build.py --media-catalogue on, debugging), the catalogue itself (written from the media
+    coverage report, counted at that report's size + 1 %; off by default: IMAGE-MEDIA-CATALOGUE-ON-DISK-46)."""
+    from prepare_media_assets import key
+    media = Path(media)
+    report_path = media/'media-coverage.json'
+    if not report_path.is_file():
+        return {}
+    report = json.loads(report_path.read_text(encoding='utf-8'))
+    out = {}
+    for row in report.get('entries') or []:
+        if row.get('status') == 'included' and row.get('path'):
+            rel = 'id1/' + key(row['path'])    # the catalogue's own path rule
+            if rel not in files:
+                out[rel] = int(row.get('bytes') or 0)
+    if catalogue:
+        size = report_path.stat().st_size
+        out['id1/media/catalogue.json'] = size + size // 100
+    return out
+
+
+def check_disk_layout(boot, removed, music_files, chim_world, layout=None, media=None, media_catalogue=False):
+    """The planned partitions and drives through the disk-layout gate, before anything is written. LAYOUT: the
+    disk layout settings (tools/layout_plan.resolve); the compact layout (default) is planned by
+    tools/layout_plan.py and returned as layout_plan (the image step follows it), counting the media the image
+    step adds later (MEDIA, the converted media folder); the legacy layout is planned as before."""
+    import layout_plan
+    layout = layout or layout_plan.resolve()
     from world_volumes import (RDB_BYTES, PlannedMap, map_bytes, partition_batches, plan_drives, plan_partitions,
                                partition_starts, planned_partition, require_partition_plans)
     id1 = boot/'id1'
@@ -280,6 +310,8 @@ def check_disk_layout(boot, removed, music_files, chim_world):
                 files.setdefault(rel, size)
             paths += [m for name, m in sorted(planned.items()) if name not in written
                       and 'maps/' + m.name not in removed]
+        if layout['mode'] == 'compact':
+            return compact_disk_layout(boot, files, paths, chim_world, layout, media, media_catalogue)
         # the boot payload: every staged file but the world maps on disk (a planned map is not in FILES yet)
         terrain = sum(map_bytes(p) for p in paths if not isinstance(p, PlannedMap))
         kept, batches = partition_batches(paths, sum(files.values()) - terrain)
@@ -293,6 +325,8 @@ def check_disk_layout(boot, removed, music_files, chim_world):
                 if not isinstance(path, PlannedMap):
                     files.pop(path.relative_to(boot).as_posix(), None)
         frame_maps = [m for m in kept + [m for batch in batches for m in batch] if isinstance(m, PlannedMap)]
+    elif layout['mode'] == 'compact':
+        return compact_disk_layout(boot, files, [], chim_world, layout, media, media_catalogue)
     if chim_world and (Path(chim_world)/'chim').is_dir():
         base = Path(chim_world)/'chim'
         chim = planned_partition('DW%d' % len(worlds), [dict(path=p.relative_to(base).as_posix(), bytes=p.stat().st_size)
@@ -313,6 +347,49 @@ def check_disk_layout(boot, removed, music_files, chim_world):
                                             largest_file=max((f['bytes'] for f in m.get('files', ())), default=0))
                                        for m, start in zip(d['members'], partition_starts(RDB_BYTES, d['members']))])
                       for d in plans])
+
+
+def compact_disk_layout(boot, files, paths, chim_world, layout, media=None, media_catalogue=False):
+    """The compact layout plan (tools/layout_plan.py) of the payload: FILES {boot-relative path: bytes} with the
+    world maps PATHS (files on disk or PlannedMap) among them or planned; the media the image step adds later
+    counted. The plan passes the minimal-partitions check and the drive gate (plan_drives); returned with the
+    drive summary as the layout_plan the image step follows."""
+    import layout_plan
+    from world_volumes import PlannedMap, map_bytes, partition_starts, plan_drives, RDB_BYTES
+    files = dict(files)
+    if media:
+        for rel, size in media_additions(media, files, media_catalogue).items():
+            files.setdefault(rel, size)
+    maps = []
+    for p in paths:
+        rel = 'id1/maps/' + p.name
+        files.pop(rel, None)
+        maps.append((rel, map_bytes(p)))
+    base = Path(chim_world)/'chim' if chim_world else None
+    chim = layout_plan.walk(base) if base is not None and base.is_dir() else None
+    plan = layout_plan.plan_compact(files, maps, chim, layout['headroom_mib'], layout['boot_headroom_mib'])
+    layout_plan.require_minimal(plan)
+    rows = plan['partitions']
+    drives = plan_drives(dict(partition='DH0', volume='AMIWIND', bytes=rows[0]['bytes'], files=[]),
+                         [dict(partition=r['partition'], volume=r['volume'], bytes=r['bytes'], files=[]) for r in rows[1:]])
+    plan['drives'] = [dict(file=d['file'], bytes=d['bytes'], partitions=[m['partition'] for m in d['members']])
+                      for d in drives]
+    planned = [m for m in paths if isinstance(m, PlannedMap)]
+    return dict(drives=len(drives), partitions=len(rows), bytes=sum(d['bytes'] for d in drives), rdb_bytes=RDB_BYTES,
+                layout='compact', headroom_mib=plan['headroom_mib'], boot_headroom_mib=plan['boot_headroom_mib'],
+                planned_frame_maps=dict(count=len(planned), bytes=sum(m.bytes for m in planned),
+                                        bound=sum(1 for m in planned if m.bound)),
+                lines=layout_plan.lines(plan),
+                plan=[dict(drive=d['file'], bytes=d['bytes'],
+                           partitions=[dict(partition=r['partition'], volume=r['volume'], role=r['role'],
+                                            bytes=r['bytes'], start=start, files=r['files'], payload=r['payload'],
+                                            free_bytes=r['free_bytes'], largest_file=r['largest_file'],
+                                            maps=len(r['maps']))
+                                       for r, start in zip([next(x for x in rows if x['partition'] == m['partition'])
+                                                            for m in d['members']],
+                                                           partition_starts(RDB_BYTES, d['members']))])
+                      for d in drives],
+                layout_plan=plan)
 
 
 def check_file_formats(id1):
@@ -353,10 +430,12 @@ def check_music(music):
 
 
 def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=None, report_path=None,
-        pending=None, chim_towns=(), chim_town_dirs=(), exterior_terrain=None):
+        pending=None, chim_towns=(), chim_town_dirs=(), exterior_terrain=None, layout=None, media=None,
+        layout_plan_path=None, media_catalogue=False):
     """Run every check over the staged payload OUT (OUT/boot). Prints one summary line; raises
     ValueError listing every error together. Returns the report. pending: files the image step still
-    writes before its frame maps (check_chim_inputs)."""
+    writes before its frame maps (check_chim_inputs). layout: the disk layout settings (tools/layout_plan.py);
+    the compact layout's plan is printed and written to LAYOUT_PLAN_PATH (the image step follows it)."""
     from amiga_fs import check_payload_host_paths, check_payload_names
     started = time.monotonic()
     out = Path(out)
@@ -403,9 +482,19 @@ def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=No
     # The layout needs the music sizes; it runs last (seconds: stat only).
     if not music or 'files' in music_result:
         try:
-            results['disk-layout'] = check_disk_layout(boot, removed, music_result.get('files', []), chim_world)
+            results['disk-layout'] = check_disk_layout(boot, removed, music_result.get('files', []), chim_world,
+                                                       layout, media, media_catalogue)
         except (OSError, ValueError) as exc:
             errors.append(('disk-layout', exc))
+    planned = (results.get('disk-layout') or {}).pop('layout_plan', None)
+    if planned is not None:
+        lines = results['disk-layout'].pop('lines', [])
+        if layout_plan_path is not None:           # an image run: the plan it will follow, printed and written
+            for line in lines:
+                print(line, flush=True)
+        if layout_plan_path is not None and not errors:
+            Path(layout_plan_path).write_text(json.dumps(planned, indent=1) + chr(10), encoding='utf-8',
+                                              newline=chr(10))
     count = len(checks) + 1 + (1 if chim_world else 0)
     seconds = time.monotonic() - started
     report = dict(checks=count, errors=[dict(check=name, error=str(exc)) for name, exc in errors],

@@ -30,6 +30,7 @@ enum
 	AW_SP_SNDUPD,		/* S_Update */
 	AW_SP_SCENE,		/* AW_SceneTick: crossings and doors */
 	AW_SP_SAVE,			/* AW_SaveTick: autosaves */
+	AW_SP_WINDOW,		/* CHIM type 1: frames joining or leaving the window (nested in the tick) */
 	AW_SP_SLOTS
 };
 

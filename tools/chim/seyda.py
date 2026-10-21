@@ -429,7 +429,8 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
         items.append((fp, (mi, model, profile, archive, index['textures'])))
     with timer.section('meshes'):
         prepared = dict(zip(used, run_units('mesh', items, mesh_unit, jobs, cache)))
-    mesh_fps = {mi: fp for mi, (fp, _) in zip(used, items)}
+    from chim.build import mesh_result_keys
+    mesh_fps = mesh_result_keys(items, prepared, used)
     mount_references(index, selected, prepared, CENTRE, SCALE)
     apply_visual_offsets(index, selected)
     parity = {'harvest_removed': [], 'town_flora_added': [], 'omitted': omitted['omitted'],
@@ -464,7 +465,7 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
                                                        else m['texture_index'] + base) for m in model['materials']]))
             for (fp, task), result in zip(items, run_units('mesh', items, mesh_unit, jobs, cache)):
                 prepared[added[task[0]]] = result
-                mesh_fps[added[task[0]]] = fp
+            mesh_fps.update(mesh_result_keys(items, prepared, [added[task[0]] for _, task in items], 'opening'))
             audit = json.loads((legacy / 'work/generated/seyda-neen/placements.json').read_text())
             originals = {r['number']: r for r in audit}
             for ref in bindex['references']:

@@ -70,7 +70,7 @@ static int say(int role,const char *stem) {
     if(!actor || AW_SpeechRemaining()>0)return 0;
     sprintf(path,"intro/%s.txt",stem);n=COM_FOpenFile(path,&f);
     if(!f)return -1;
-    if(n<1 || n>sizeof(text) || fread(text,1,n,f)!=n || text[n-1]){fclose(f);return -1;}fclose(f);
+    if(n<1 || n>(int)sizeof(text) || fread(text,1,n,f)!=(size_t)n || text[n-1]){fclose(f);return -1;}fclose(f);
     sprintf(path,"intro/%s.wav",stem);sound=S_PrecacheSound(path);if(!sound)return -1;
     face(actor);S_StartSound(NUM_FOR_EDICT(actor),2,sound,actor->v.origin,.9,1);
     duration=AW_SpeechRemaining();if(duration<=0)return -1;

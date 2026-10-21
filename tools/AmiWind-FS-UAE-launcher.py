@@ -34,7 +34,7 @@ PROFILE_VALUES = {
     'chip_memory': '2048',
     'slow_memory': '0',
     'fast_memory': '0',
-    'zorro_iii_memory': '16384',
+    'zorro_iii_memory': '131072',
     'joystick_port_1': 'none',
     'middle_click_ungrab': '0',
     'keyboard_key_pageup': 'action_key_68',
@@ -51,21 +51,24 @@ PROFILE_LABELS = (
     ('JIT', 'jit_compiler', 'ON'),
     ('24-bit addressing', 'uae_cpu_24bit_addressing', 'OFF'),
     ('Chip RAM', 'chip_memory', '2048 KiB'),
-    ('Z3 Fast RAM', 'zorro_iii_memory', '16384 KiB'),
+    ('Z3 Fast RAM', 'zorro_iii_memory', '131072 KiB'),
 )
-# Fast RAM choice (Zorro III). The default is the profile's 16 MiB, unchanged.
+# Fast RAM choice (Zorro III). The default is 128 MiB (decided for the project, 21 October 2026: like a 68060
+# accelerator card; earlier playtests started with 16 MiB). 16 MiB, the smallest machine the game runs on, stays a
+# choice (menu entry 2, --fast-ram 16) so that baseline can still be played and tested.
 # Limits measured in FS-UAE 3.1.66 (JIT on): every Zorro III board must be a power of two from 1 MiB to
 # 1 GiB (any other size gives NO Zorro III RAM at all), a second board may not be larger than the first,
 # and both boards together reach at most 1.5 GiB (a 2 GiB request ends up as 1 GiB + 512 MiB).
 # WinUAE uses the same per-board rule (power of two, 1 MiB to 1 GiB per board); the same limits apply to
 # both emulators so a choice means the same machine in either.
-FAST_RAM_DEFAULT_MIB = 16
+FAST_RAM_DEFAULT_MIB = 128
+FAST_RAM_BASELINE_MIB = 16
 FAST_RAM_MIN_MIB = 16
 FAST_RAM_MAX_MIB = 1536
 FAST_RAM_BOARD_MAX_MIB = 1024
 FAST_RAM_PRESETS = (
-    (FAST_RAM_DEFAULT_MIB, 'default: the AmiWind profile, as before'),
-    (128, 'like a 68060 accelerator card'),
+    (FAST_RAM_DEFAULT_MIB, 'default: like a 68060 accelerator card'),
+    (FAST_RAM_BASELINE_MIB, 'the smallest the game runs on (earlier default)'),
     (256, ''),
     (512, ''),
     (1024, ''),
@@ -142,12 +145,13 @@ def fast_ram_fs_uae_values(mib):
 
 
 def fast_ram_winuae_text(text, mib):
-    """Set the WinUAE profile's Zorro III RAM (z3mem_size / z3mem2_size, MiB). The default leaves it as is."""
+    """Set the WinUAE profile's Zorro III RAM (z3mem_size / z3mem2_size, MiB). A profile that already has the
+    asked size (one board) is returned unchanged."""
     first, second = fast_ram_boards(mib)
     lines = [line for line in text.splitlines() if not re.match(r'z3mem2_size=', line)]
     if not any(re.match(r'z3mem_size=', line) for line in lines):
         raise ValueError('WinUAE profile has no z3mem_size line.')
-    if mib == FAST_RAM_DEFAULT_MIB:
+    if not second and ('z3mem_size=%d' % first) in lines and len(lines) == len(text.splitlines()):
         return text
     out = []
     for line in lines:
@@ -162,7 +166,7 @@ def fast_ram_winuae_text(text, mib):
             out.append('z3mem_start=0x10000000')
             continue
         if line.startswith('config_description='):
-            line = line.replace('16M Z3', '%s Z3 Fast RAM' % fast_ram_label(mib).replace(' ', ''))
+            line = re.sub(r'\b\d+M Z3( Fast RAM)?', '%s Z3 Fast RAM' % fast_ram_label(mib).replace(' ', ''), line)
         out.append(line)
     return '\n'.join(out) + ('\n' if text.endswith('\n') else '')
 
@@ -208,7 +212,7 @@ uae_cpu_24bit_addressing = false
 chip_memory = 2048
 slow_memory = 0
 fast_memory = 0
-zorro_iii_memory = 16384
+zorro_iii_memory = 131072
 kickstart_file = {rom}
 hard_drive_0 = {image}
 hard_drive_0_type = hdf
@@ -505,7 +509,7 @@ def print_host_preflight(version, image, rom, config, fast_ram_mib=FAST_RAM_DEFA
         expected = expected_values[key]
         ok = actual.strip().casefold() == expected.casefold()
         failed = failed or not ok
-        if key == 'zorro_iii_memory' and fast_ram_mib != FAST_RAM_DEFAULT_MIB:
+        if key == 'zorro_iii_memory':
             display = expected + ' KiB'
         shown = display if ok else (actual or '<missing>')
         print(('%-21s %-23s %s' % (label + ':', shown, '[x] OK' if ok else '[!] FAIL')), flush=True)
@@ -626,7 +630,8 @@ def main(argv=None):
     parser.add_argument('--rom', help='Select and remember a ROM file (or search a ROM directory)')
     parser.add_argument('--fs-uae', metavar='EXECUTABLE', help='Select and remember FS-UAE executable (default: fs-uae on PATH)')
     parser.add_argument('--fast-ram', metavar='MIB', help='Fast RAM for the emulated Amiga, remembered: "default" (%d MiB, '
-                        'the AmiWind profile) or a size in MiB, e.g. 128, 256, 512, 1024, 1536 (the most); '
+                        'like a 68060 card) or a size in MiB, e.g. 16 (the smallest the game runs on), 256, 512, '
+                        '1024, 1536 (the most); '
                         'other sizes are checked against what the emulator can make' % FAST_RAM_DEFAULT_MIB)
     parser.add_argument('-y', '--yes', action='store_true', help='Run the newest image without the selection prompt')
     parser.add_argument('--configure-only', action='store_true', help='Validate files and create/reuse the preset without launching')

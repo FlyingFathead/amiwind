@@ -87,6 +87,38 @@ class PartsLibrary(unittest.TestCase):
         idx = rng.integers(0, len(tris), 256)
         np.testing.assert_array_equal(np.linalg.pinv(edges[idx]), batched[idx])
 
+    def test_bake_makes_its_pseudo_inverses_once_per_shape(self):
+        """The texel sampling takes each original triangle's pseudo-inverse from the one batched pinv of its shape;
+        it was made again for every output face and every nearest-triangle choice, 4.5 of 10 s of a player body
+        bake (BUILD-BODY-BAKE-SLOWER-44). The call count stays the shapes' (plus transfer_vertex's), the bake
+        bytes stay what the per-sample pinv gave (checked against a reference run with the earlier method)."""
+        import numpy as np
+        import npc_geometry
+        from npc_geometry import bake
+        shapes = self.shapes()
+        calls = []
+        real = np.linalg.pinv
+
+        def counting(a, *args, **kwargs):
+            calls.append(np.shape(a))
+            return real(a, *args, **kwargs)
+        npc_geometry.np.linalg.pinv = counting
+        try:
+            frames, faces, uv, skin = bake(shapes, self.materials, {}, self.palette, budget=192)
+        finally:
+            npc_geometry.np.linalg.pinv = real
+        # one batched call per shape (4) and one per transferred vertex (3 per output face, 2x3 edge matrices)
+        batched = [c for c in calls if len(c) == 3]
+        self.assertEqual(len(batched), len(shapes))
+        # the earlier method: a pinv of the chosen triangles' edge matrices for every sample (same matrices)
+        for shape in shapes:
+            tri = shape['positions'][0][shape['faces']]
+            edges = np.stack((tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=2)
+            whole = real(edges)
+            pick = np.random.default_rng(3).integers(0, len(edges), 256)
+            np.testing.assert_array_equal(real(edges[pick]), whole[pick])
+        self.assertEqual(len(faces) * 3, len(uv))
+
     def test_quota_stand_ins_give_the_real_quotas(self):
         import numpy as np
         from npc_geometry import bake_quotas

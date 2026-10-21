@@ -1,5 +1,14 @@
 # UI-INVENTORY-ORIGINAL-LAYOUT-42: The inventory lacks the original encumbrance bar, armour rating and item icon grid
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.43-dev2 at 2026-10-18 16:40 +0300: maintainer: the inventory window's title shows the weapon skill (Hand-to-hand); it should just say Inventory
+- Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |

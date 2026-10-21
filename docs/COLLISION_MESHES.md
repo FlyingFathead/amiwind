@@ -1,6 +1,6 @@
 # Morrowind collision meshes: where they are and how AmiWind uses them
 
-_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
+_Last updated with AmiWind v0.0.46 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -12,6 +12,7 @@ _Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
   - [The models AmiWind converts](#the-models-amiwind-converts)
 - [Stairs and ramps](#stairs-and-ramps)
 - [How the AmiWind converter uses collision today](#how-the-amiwind-converter-uses-collision-today)
+- [Stair collision method 1 (experimental)](#stair-collision-method-1-experimental)
 - [Cost of using the authored collision](#cost-of-using-the-authored-collision)
 - [Recommendations](#recommendations)
 - [How the numbers were measured](#how-the-numbers-were-measured)
@@ -255,6 +256,45 @@ pass. Measured consequences (two bug reports):
 - [COLLISION-NC-FLAGS-32](bugs/COLLISION-NC-FLAGS-32.md): every NC/NCC model placed by the mesh
   converters is solid: banners, tapestries, rugs, hooks, candles, ground flora in rooms, and the
   Vivec banners and waterfalls. In Morrowind they do not block the player.
+
+## Stair collision method 1 (experimental)
+
+`--stair-collision-method 1` (default 0, today's method; CHIM-STAIR-COLLISION-MESH-47) builds a flight's collision
+from the movement rules instead of repairing convex pieces after the fact, and proves it by arithmetic instead of a
+walk (`tools/stair_mesh.py`):
+
+- flights are found from the drawn level faces: treads that meet in plan within 2.5 units (a bevelled nosing between
+  them) at a rise of 1 unit to a step (8.5 units: Morrowind's 34), three or more levels in a chain;
+- a flight whose collision (its RootCollisionNode, else the drawn mesh, as the convex pieces make it) already passes
+  the check keeps it;
+- otherwise it gets one ramp (the hull of its tread corners, the top through the nosings), or one solid block per
+  tread where that ramp would stand more than a step over a tread, be steeper than walkable, or cut through other
+  drawn geometry; the drawn steps are unchanged; the rest of the mesh is converted as before;
+- the check: over every drawn tread with standing room, the surface the standing box rests on lies within a step
+  of the tread, is walkable (normal z at least 0.69), leaves the box's height free, and neighbouring points whose
+  drawn treads are within a step stand within a step. A mesh whose flights do not all pass keeps today's collision.
+
+The check places the standing box's footprint over each tread point: the box rests on the highest support in
+reach; a place where it does not fit or rests on a surface too steep to stand on is not a fault there, a tread with
+no place to stand is. It was calibrated against the stair walks the v0.0.46 release build recorded, without walking
+(`tools/stair_mesh_calibrate.py`): on the 2,896 tread points those walks covered (8.6 % of all), it agrees on 2,846
+(98.3 %). Flights are climbed by one ramp per run of steps between landings where a ramp holds, by one block per
+tread elsewhere (`stair_ramps` 'flight' keeps one ramp per whole flight selectable).
+
+Walkways (rope bridges, docks, boards: rises of at most 2.5 units) are not stairs: they take in the level boards
+they continue into and get sloped plates along their boards. The check also follows the standing box across every
+seam between treads (from a ramp onto a landing or block, or the other way) and fails a lip over a step, a gap or a
+blocked way.
+
+Measured on the v0.0.46 release build's 1,380 exterior meshes (no build, no walk): 97 have flights (132); today's
+collision fails the check on 34 of them; the check agrees with the recorded walks on 97.9 % of the 3,098 tread
+points they covered. Method 1 changes 14 meshes (all their flights then pass; 13 failed before) at +11 % collision
+bytes on those meshes (+3 % without one rope bridge and one curved stair), keeps 72 as they are, and cannot yet fix
+11 (the ships, the shipwreck, the silt strider, an ashlander tent, Daedric ruins among them). Not tried in game yet.
+`tools/stair_mesh_survey.py RUN --out DIR` repeats the measurement. A build with method 1 converts those meshes with
+its own worker and unit kind (default builds keep their mesh units and keys), collects the check of every mesh into
+`chim-world/chim-stair-check.json` and its build summary, and fails on a mesh that fails it under the collision it
+ships with.
 
 ## Cost of using the authored collision
 

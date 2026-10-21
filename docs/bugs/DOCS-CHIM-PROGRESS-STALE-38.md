@@ -9,7 +9,7 @@
 | Where | Main README: CHIM progress map image, caption, counts and release-plan legend |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38 (last seen) |
+| Persists in | fixed in v0.0.46 |
 | Severity | medium: The main project page presents old coverage and release plans beside the current release. |
 | Family | Development tooling, receipts and packaging (`tracker-tooling`) |
 | Playtest version | v0.0.38 |

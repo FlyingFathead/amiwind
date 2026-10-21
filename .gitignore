@@ -126,6 +126,8 @@ unins*
 !/resources/media/AmiWind_logo.png
 !/resources/media/AmiWind_wordmark.png
 !/resources/media/AmiWind_logo_name_only.png
+!/resources/workbench/AmiWind-icon.png
+!/resources/workbench/AmiWind-icon-selected.png
 
 # logs
 *.log

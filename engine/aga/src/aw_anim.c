@@ -344,8 +344,8 @@ static void prep_layout(model_t *m,const char *path,int numframes) {
     if(!text){AW_AnimDefault(a,numframes);Hunk_FreeToLowMark(mark);return;}
     if(!AW_AnimParse(a,(const char *)text,numframes))Con_Printf("Animation layout %s: invalid, idle only\n",anm);
     Hunk_FreeToLowMark(mark);
-    {int g,n,k=used-1;table[k].needed=0;
-     for(g=0;g<AW_ANIM_GROUPS;g++)if(a->g[g].present){n=(int)a->g[g].base+(int)a->g[g].count;if(n>table[k].needed)table[k].needed=n;}}
+    {int g,need,last=used-1;table[last].needed=0;
+     for(g=0;g<AW_ANIM_GROUPS;g++)if(a->g[g].present){need=(int)a->g[g].base+(int)a->g[g].count;if(need>table[last].needed)table[last].needed=need;}}
     for(k=0;k<AW_ANIM_EVENT_KINDS;k++)for(i=0;i<AW_ANIM_MEDIA;i++)
         if(a->sound[k][i][0] && !precached(a->sound[k][i]))a->sound[k][i][0]=0;
 }

@@ -2,6 +2,7 @@
  * Local menu layout. Original fonts/artwork are private converted inputs.
  */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_save.h"
 #include "aw_maps.h"
 #include "aw_region.h"
@@ -497,7 +498,7 @@ void M_Draw(void){
         AW_UITextBox(vid.width-w-6,180,w,20,line,colours[1]);cursor();return;
     }
     if(frontend)AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
-    else for(yy=0;yy<vid.height;yy++)for(xx=0;xx<vid.width;xx++)
+    else for(yy=0;yy<(int)vid.height;yy++)for(xx=0;xx<(int)vid.width;xx++)
         if((xx&3)!=((yy&1)<<1))vid.buffer[yy*vid.rowbytes+xx]=colours[0];
     if(audio_options){
         static const char *names[]={"Master","Music","Effects","Dialogue"};
@@ -558,13 +559,13 @@ void M_Draw(void){
         AW_UITextBox(36,170,236,17,controls_capture?"Press a key   Esc: cancel":"Enter: set   Del: clear",colours[1]);
         AW_UISmallEnd();
     }else if(graphics && fog_slider){
-        int knob=FOG_X+(fog_value()-FOG_MIN)*FOG_W/(FOG_MAX-FOG_MIN);
+        int fog_knob=FOG_X+(fog_value()-FOG_MIN)*FOG_W/(FOG_MAX-FOG_MIN);
         AW_UITextBox(40,56,240,20,"Fog distance",colours[1]);
         if(fog_typing)sprintf(line,"%s_",fog_typed);else sprintf(line,"%ld",(long)fog_value());
         AW_UIFill(130,76,60,20,colours[3]);AW_UITextBox(130,76,60,20,line,colours[1]);
         AW_UIFill(FOG_X,FOG_Y,FOG_W+1,3,colours[2]);
-        AW_UIFill(FOG_X,FOG_Y,knob-FOG_X,3,colours[1]);
-        AW_UIFill(knob-3,FOG_Y-5,7,13,colours[1]);AW_UIFill(knob-1,FOG_Y-3,3,9,colours[0]);
+        AW_UIFill(FOG_X,FOG_Y,fog_knob-FOG_X,3,colours[1]);
+        AW_UIFill(fog_knob-3,FOG_Y-5,7,13,colours[1]);AW_UIFill(fog_knob-1,FOG_Y-3,3,9,colours[0]);
         AW_UISmallBegin();
         sprintf(line,"%ld",(long)FOG_MIN);AW_UITextBox(FOG_X-30,FOG_Y-8,28,17,line,colours[1]);
         sprintf(line,"%ld",(long)FOG_MAX);AW_UITextBox(FOG_X+FOG_W+4,FOG_Y-8,30,17,line,colours[1]);

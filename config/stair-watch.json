@@ -1,0 +1,30 @@
+{
+ "format": "aw-stair-watch-1",
+ "about": "Stair watch list (BUILD-STAIR-WALK-SCOPE-KEY-46): places that stair and walkway bugs reported. Every build walks the CHIM frames and the maps (interiors) holding them again, even when their walk is reused, and stops when a walk again differs from its record; tools/build.py --stair-walk-places ID walks one of them on its own. A place with refs is held by every frame that places one of those source references; a place without refs by the frames of its cells; maps names interior maps the image step walks (tools/stair_parallel.py). A bug page that reports a stair or walkway problem adds its place here. Read by chim.collision.load_watch.",
+ "places": [
+  {"id": "CHIM-VIVEC-DOCK-WALKWAY-43", "where": "Vivec, Hlaalu canton dock walkway (ex_v_dock_01)",
+   "cells": [[2, -11], [4, -11]], "refs": [278930, 278913]},
+  {"id": "CHIM-VOS-TEMPLE-WALKWAY-41", "where": "Vos walkway stair against the Velothi temple",
+   "cells": [[11, 14]], "refs": [177306, 177289]},
+  {"id": "STAIRS-MOLAG-ACCESS-38", "where": "Tel Uvirith walkway step and door stairs",
+   "cells": [[10, 1]]},
+  {"id": "STAIRS-EBONHEART-CHIM-36", "where": "Ebonheart flights at the edge of the Vivec frame",
+   "cells": [[1, -13], [2, -13]], "refs": [113805, 124537, 124459]},
+  {"id": "CHIM-STAIR-STEPS-SOLID-43", "where": "Redoran steps (Ald-ruhn, Maar Gan), Hlaalu steps (Suran), rope bridge",
+   "cells": [[-2, 6], [-3, 12], [5, -7], [0, 8]]},
+  {"id": "CHIM-SEYDA-EXPANDED-STAIRS-40", "where": "Seyda Neen, two Imperial stairs",
+   "cells": [[0, -8]], "refs": [3322, 3324]},
+  {"id": "STAIR-DETECT-POSITION-41", "where": "Telvanni spiral ramp and a Daedric wall step found per frame",
+   "refs": [162877, 227262]},
+  {"id": "VIVEC-TEMPLE-STAIRS-33", "where": "Vivec palace steps and High Fane quarter flights",
+   "refs": [428484, 428530, 484457, 484458]},
+  {"id": "CHIM-HULL-STAIR-EDGE-33", "where": "Balmora flight at a chunk edge",
+   "cells": [[-3, -2]], "refs": [32841]},
+  {"id": "STAIRS-VIVEC-ROOMS-JOINT-36", "where": "Vivec rooms: stair piece joints",
+   "maps": ["vdi012", "voi025", "vri000"]},
+  {"id": "STAIRS-BALMORA-WESTSOUTH-32", "where": "Balmora interior, Hlaalu hall staircase",
+   "maps": ["bmwestsouth"]},
+  {"id": "STAIRS-ADDAMASARTUS-32", "where": "Addamasartus cave, a low step",
+   "maps": ["addamasartus"]}
+ ]
+}

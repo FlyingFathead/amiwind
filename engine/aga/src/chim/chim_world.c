@@ -17,6 +17,7 @@
  * 16 MiB baseline never reaches the first bank and plays exactly as before.
  */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "aw_rcount.h"
 #include "chim_local.h"
 #include "aw_town.h"
@@ -100,6 +101,10 @@ cvar_t	chim_partial = {"chim_partial", "1"};
 /* aw_fog.c: a CHIM map's view distance is limited by its world's data, not
  * by the region table. */
 extern int (*aw_chim_view_reach)(void);
+/* aw_scene.c: the player passed into another frame's cell; 1 when the
+ * crossing streams (type 1, the window holds that frame), with its cell. */
+extern int (*aw_chim_cross)(const float *origin, int *cx, int *cy);
+extern int (*aw_chim_recentre)(int cx, int cy, const float *d, int apply);
 extern cvar_t aw_drawdistance;
 int AW_DrawDistance (void);
 int AW_OpeningStoryHidden (void);
@@ -861,7 +866,7 @@ static void MapBeginWork (const char *entities, double spike_t0)
 		/* Statics the frame map streams with their chunks (chim_statics.c). */
 		char text[16];
 		ChimStatics_Begin (WorldspawnKey (entities, "_chim_streamed_statics", text, sizeof(text)) ? atoi (text) : 0,
-			chim_frame.count);
+			chim_frame.window ? chim_frame.slot_entries : chim_frame.count);
 	}
 	/* The frame's terrain becomes the map's world (chim_graft.c). */
 	if (!MapModel () || !ChimGraft_Begin (MapModel ()))
@@ -927,7 +932,8 @@ int Chim_EdgeReached (const vec3_t origin)
 {
 	float x0 = chim_frame.frame.low[0], y0 = chim_frame.frame.low[1], g = (float)chim_frame.frame.grain;
 	float x1 = x0 + g*chim_frame.frame.nx, y1 = y0 + g*chim_frame.frame.ny;
-	if (!active || !edge_closed || !chim_frame.count)
+	/* A window (type 1 crossings) has no edge of its own frame. */
+	if (!active || !edge_closed || !chim_frame.count || chim_frame.window)
 		return 0;
 	return origin[0] < x0 + CHIM_EDGE_REACH || origin[0] > x1 - CHIM_EDGE_REACH ||
 		origin[1] < y0 + CHIM_EDGE_REACH || origin[1] > y1 - CHIM_EDGE_REACH;
@@ -1226,7 +1232,61 @@ static int Subcommand (void)
 #endif
 		return 1;
 	}
+	/* "chim crossing [0|1]": the cell crossing method of the next map start
+	 * (docs/chim/CELL_CROSSINGS.md): 0 (the default) type 0, a level change
+	 * at every frame border; 1 type 1, the region frames around the player
+	 * as one window (chim_chunks.c). Not saved: a stored setting never
+	 * switches the method (weak point 12). */
+	/* PROTOTYPE (branch v0.0.46-type1-stateful): "chim actors ...", the window's stateful actors (aw_actors.c). */
+	if (!strcmp (argv[0], "actors"))
+	{
+		extern void (*chim_actors_cmd)(void);
+		if (chim_actors_cmd)
+			chim_actors_cmd ();
+		return 1;
+	}
+	if (!strcmp (argv[0], "crossing"))
+	{
+		/* "chim crossing recentre [0|1]": the test setting that moves the
+		 * session's origin at every streamed crossing (weak point 5). */
+		if (argc == 3 && !strcmp (argv[1], "recentre") && (!strcmp (argv[2], "0") || !strcmp (argv[2], "1")))
+		{
+			ChimChunks_RecentreOn (atoi (argv[2]));
+			Con_Printf ("chim crossing recentre %s\n", argv[2]);
+		}
+		else if (argc == 2 && (!strcmp (argv[1], "0") || !strcmp (argv[1], "1")))
+		{
+			ChimChunks_WindowOn (atoi (argv[1]));
+			Con_Printf ("chim crossing %s: from the next map start\n", argv[1]);
+		}
+		else if (argc != 1)
+			Con_Printf ("chim crossing [0|1] (0: a level change at every frame border; 1: one window of region frames); chim crossing recentre [0|1] (test: move the origin at every crossing)\n");
+		ChimChunks_WindowReport ();
+		return 1;
+	}
 	return 0;
+}
+
+/* aw_scene.c, on a CHIM map: the player passed into another frame's cell. 1:
+ * the window holds that frame (type 1), the crossing streams; 2: the same,
+ * and the test setting asks for a recentre (aw_scene.c moves the server's and
+ * the client's positions, then calls Recentre). */
+static int Cross (const float *origin, int *cx, int *cy)
+{
+	if (!active || !chim_frame.window || !ChimChunks_WindowCross (origin, cx, cy))
+		return 0;
+	return ChimChunks_RecentreOn (-1) ? 2 : 1;
+}
+
+/* A recentre to frame (cx, cy) by d (aw_scene.c): apply 0 checks that CHIM
+ * moves by the same d (nothing is moved); apply 1 moves CHIM's own positions,
+ * after the server's and the client's. */
+static int Recentre (int cx, int cy, const float *d, int apply)
+{
+	float own[3];
+	if (!active || !chim_frame.window || !ChimChunks_WindowOffset (cx, cy, own) || own[0] != d[0] || own[1] != d[1])
+		return 0;
+	return !apply || ChimChunks_WindowRecentre (cx, cy, own);
 }
 
 static void Status (void)
@@ -1280,6 +1340,7 @@ static void Status (void)
 	Con_Printf ("limits: sign-on %ld of %ld bytes (MAX_MSGLEN), efrag links %ld in use, peak %ld, %ld allocated of %ld (AW_EFRAG_LIMIT)\n",
 		(long)(sv.active ? sv.signon.cursize : 0), (long)MAX_MSGLEN, (long)aw_efrags_used, (long)aw_efrags_peak,
 		(long)aw_efrags_capacity, (long)AW_EFRAG_LIMIT);
+	ChimChunks_WindowReport ();
 	Con_Printf ("towns (chim_towns %ld):\n", (long)chim_towns.value);
 	TownReport (1);
 	if (active)
@@ -1569,10 +1630,10 @@ static void Chim_MemoryStart (void)
 		}
 		if (auto_count)
 		{
-			static int registered;
-			if (!registered)
+			static int atexit_done;
+			if (!atexit_done)
 				atexit (AtExitAuto);
-			registered = 1;
+			atexit_done = 1;
 			memory_notice = 1;
 		}
 	}
@@ -1682,6 +1743,8 @@ void Chim_Init (void)
 	aw_chim_town_map = TownMap;
 	aw_chim_entity = ChimStatics_Capture;
 	aw_chim_source = Source;
+	aw_chim_cross = Cross;
+	aw_chim_recentre = Recentre;
 #ifdef AMIGA
 	chim_story_hidden = AW_OpeningStoryHidden;		/* aw_opening.c */
 #endif

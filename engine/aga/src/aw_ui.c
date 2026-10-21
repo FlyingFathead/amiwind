@@ -140,15 +140,15 @@ void AW_UIFill(int x,int y,int w,int h,int color) {
     int bottom=y+h,right=x+w;
     if(x<0)x=0;
     if(y<0)y=0;
-    if(right>vid.width)right=vid.width;
-    if(bottom>vid.height)bottom=vid.height;
+    if(right>(int)vid.width)right=(int)vid.width;
+    if(bottom>(int)vid.height)bottom=(int)vid.height;
     if(right<=x || bottom<=y)return;
     for(;y<bottom;y++)memset(vid.buffer+y*vid.rowbytes+x,color,right-x);
 }
 static int read_asset(char *path,byte *out,int capacity) {
     FILE *f=NULL;int n=COM_FOpenFile(path,&f);
     if(!f)return 0;
-    if(n<=0 || n>capacity || fread(out,1,n,f)!=n){fclose(f);return 0;}
+    if(n<=0 || n>capacity || fread(out,1,n,f)!=(size_t)n){fclose(f);return 0;}
     fclose(f);return n;
 }
 static int select_font(int size) {
@@ -168,9 +168,9 @@ int AW_UIBackground(void) {
             !memcmp(background,"AWB2",4) && u16(background+4)==320 && u16(background+6)==200?1:-1;
     }
     if(background_state<0)return 0;
-    for(y=0;y<vid.height;y++){
+    for(y=0;y<(int)vid.height;y++){
         row=background+776+(y*200/vid.height)*320;
-        for(x=0;x<vid.width;x++)vid.buffer[y*vid.rowbytes+x]=row[x*320/vid.width];
+        for(x=0;x<(int)vid.width;x++)vid.buffer[y*vid.rowbytes+x]=row[x*320/(int)vid.width];
     }
     return 1;
 }
@@ -196,7 +196,7 @@ int AW_LoadingDelayExpired(void) {
 int AW_RegionLoadingFrozen(void){return region_loading.value!=0;}
 void AW_RegionLoadingToggle(void){Cvar_SetValue(region_loading.name,!AW_RegionLoadingFrozen());}
 int AW_LoadingFrozen(void){
-    return loading_active && loading_frozen && vid.width==loading_width && vid.height==loading_height;
+    return loading_active && loading_frozen && (int)vid.width==loading_width && (int)vid.height==loading_height;
 }
 void AW_BeginLoadingStyle(void) {
     int row;
@@ -211,7 +211,7 @@ void AW_BeginLoadingStyle(void) {
         if(vid.buffer && vid.width>0 && vid.height>0 && vid.rowbytes>=vid.width &&
            vid.width<=64000/vid.height){
             loading_width=vid.width;loading_height=vid.height;
-            for(row=0;row<vid.height;row++)memcpy(loading_background+776+row*vid.width,
+            for(row=0;row<(int)vid.height;row++)memcpy(loading_background+776+row*(int)vid.width,
                 vid.buffer+row*vid.rowbytes,vid.width);
         }else {loading_frozen=0;loading_blank=1;}
     }
@@ -230,7 +230,7 @@ void AW_UILoading(void) {
     if(AW_LoadingDelayed())return;
     if(loading_frozen && !AW_LoadingFrozen()){loading_frozen=0;loading_blank=1;}
     if(loading_frozen){
-        for(row=0;row<vid.height;row++)memcpy(vid.buffer+row*vid.rowbytes,
+        for(row=0;row<(int)vid.height;row++)memcpy(vid.buffer+row*vid.rowbytes,
             loading_background+776+row*vid.width,vid.width);
         w=AW_UIWidth("Loading...")+20;h=AW_UIHeight()+8;x=(vid.width-w)/2;
         AW_UIBox(x,6,w,h);AW_UITextBox(x+4,10,w-8,h-8,"Loading...",-1);
@@ -340,9 +340,9 @@ void AW_UIText(int x,int y,const char *text,int color) {
         if(c=='\n'){x=start;y+=line_height;continue;}
         if(font_bytes){m=font+8+c*8;w=m[2];h=m[3];ox=x+(signed char)m[4];oy=y+(signed char)m[5];pixels=font+2056+u16(m);}
         else {w=h=8;ox=x;oy=y;pixels=draw_chars+(c>>4)*1024+(c&15)*8;}
-        for(yy=0;yy<h;yy++)if(oy+yy>=0 && oy+yy<vid.height) {
+        for(yy=0;yy<h;yy++)if(oy+yy>=0 && oy+yy<(int)vid.height) {
             dst=vid.buffer+(oy+yy)*vid.rowbytes;
-            for(xx=0;xx<w;xx++)if(ox+xx>=0 && ox+xx<vid.width) {
+            for(xx=0;xx<w;xx++)if(ox+xx>=0 && ox+xx<(int)vid.width) {
                 k=yy*w+xx;shade=font_bytes?((pixels[k>>2]>>(6-2*(k&3)))&3):(pixels[yy*128+xx]?3:0);
                 if(shade)dst[ox+xx]=color<0?ink[shade-1]:(shade==3?color:(shade==2?ink[1]:ink[0]));
             }
@@ -369,7 +369,7 @@ int AW_UILogo(int x,int y) {
     int row;
     if(!logo_state)logo_state=read_asset("gfx/amiwind.awi",logo,sizeof(logo))==sizeof(logo) &&
         !memcmp(logo,"AWI1",4) && u16(logo+4)==200 && u16(logo+6)==40?1:-1;
-    if(logo_state<0 || x<0 || y<0 || x+200>vid.width || y+40>vid.height)return 0;
+    if(logo_state<0 || x<0 || y<0 || x+200>(int)vid.width || y+40>(int)vid.height)return 0;
     for(row=0;row<40;row++)memcpy(vid.buffer+(y+row)*vid.rowbytes+x,logo+8+row*200,200);
     return 1;
 }
@@ -444,9 +444,9 @@ const char *AW_UILine(const char *text,int width,char *out,int capacity) {
 }
 static void tile(int x,int y,int w,int h,int sx,int sy,int tw,int th) {
     int xx,yy;byte *dst;
-    for(yy=0;yy<h;yy++)if(y+yy>=0 && y+yy<vid.height) {
+    for(yy=0;yy<h;yy++)if(y+yy>=0 && y+yy<(int)vid.height) {
         dst=vid.buffer+(y+yy)*vid.rowbytes;
-        for(xx=0;xx<w;xx++)if(x+xx>=0 && x+xx<vid.width)
+        for(xx=0;xx<w;xx++)if(x+xx>=0 && x+xx<(int)vid.width)
             dst[x+xx]=skin[8+(sy+yy%th)*64+sx+xx%tw];
     }
 }
@@ -526,21 +526,21 @@ void AW_UIEnemyBar(float fraction,float alpha) {
 }
 /* The interim authored marks (v0.0.40-dev1, HUD-STATS-29): a fist or a generic
  * weapon mark and an empty-magic dash. Kept selectable: aw_hud_icons 0. */
-void AW_UIHudPlaceholders(int y,int channels) {
+void AW_UIHudPlaceholders(int y,int boxes) {
     static const byte fist[8]={0x38,0x7c,0x7c,0x3e,0x3e,0x1c,0x18,0x18};
     static const byte weapon[8]={0x03,0x06,0x0c,0x58,0x30,0x78,0x84,0x00};
     aw_inventory_item_t item;
     const byte *shape=fist;int xx,yy,color;
-    if(vid.width<140 || y<0 || y+24>vid.height)return;
+    if((int)vid.width<140 || y<0 || y+24>(int)vid.height)return;
     color=AW_UIColor(210,184,121);
-    if(channels&AW_HUD_WEAPON){
+    if(boxes&AW_HUD_WEAPON){
         if(AW_InventoryEquippedItem(AW_SLOT_RIGHT,&item) && item.category==AW_INV_WEAPON)
             shape=weapon;
         AW_UIBox(88,y,24,24);AW_UIFill(91,y+3,18,18,black);
         for(yy=0;yy<8;yy++)for(xx=0;xx<8;xx++)
             if(shape[yy]&(128>>xx))AW_UIFill(92+xx*2,y+4+yy*2,2,2,color);
     }
-    if(channels&AW_HUD_MAGIC){
+    if(boxes&AW_HUD_MAGIC){
         AW_UIBox(116,y,24,24);AW_UIFill(119,y+3,18,18,black);
         AW_UIFill(124,y+11,8,2,color);
     }
@@ -548,17 +548,17 @@ void AW_UIHudPlaceholders(int y,int channels) {
 /* The original weapon/magic boxes live with the icon table (aw_icons.c, which
  * sets this hook); it returns 0 when they are switched off (aw_hud_icons 0). */
 int (*aw_hud_item_boxes)(int y,int channels);
-static void hud_equipment_boxes(int y,int channels) {
-    if(aw_hud_item_boxes && aw_hud_item_boxes(y,channels))return;
-    AW_UIHudPlaceholders(y,channels);
+static void hud_equipment_boxes(int y,int boxes) {
+    if(aw_hud_item_boxes && aw_hud_item_boxes(y,boxes))return;
+    AW_UIHudPlaceholders(y,boxes);
 }
 int (*aw_combat_enemy_bar)(float *fraction,float *alpha);   /* aw_combat.c */
 int (*aw_combat_guard_marker)(void);   /* aw_combat.c: the player guards (hold to block) */
 void AW_UIHud(void) {
     float current[3]={100,100,100},maximum[3]={100,100,100};
-    int i,channels,y=vid.height-26-hud_lift();
+    int i,boxes,y=vid.height-26-hud_lift();
     initialize();if(cls.state!=ca_connected)return;
-    if(r_refdef.vrect.y+r_refdef.vrect.height<vid.height)
+    if(r_refdef.vrect.y+r_refdef.vrect.height<(int)vid.height)
         AW_UIFill(0,r_refdef.vrect.y+r_refdef.vrect.height,vid.width,vid.height,black);
     if(!ui_hud.value)return;
     /* Each stat owns its current/max values. In particular, 55/55 is full.
@@ -568,17 +568,17 @@ void AW_UIHud(void) {
     }
     if(sv.active && svs.maxclients==1 && svs.clients && svs.clients[0].edict)
         current[0]=svs.clients[0].edict->v.health;
-    channels=AW_DebugTestInputActive()?AW_HUD_ALL:AW_StoryHudChannels();
-    if(channels&AW_HUD_STATS)
+    boxes=AW_DebugTestInputActive()?AW_HUD_ALL:AW_StoryHudChannels();
+    if(boxes&AW_HUD_STATS)
         for(i=0;i<3;i++)AW_UIBar(8,y+i*8,75,7,i,maximum[i]>0?current[i]/maximum[i]:0);
-    hud_equipment_boxes(y,channels);
+    hud_equipment_boxes(y,boxes);
     {float fraction,alpha;if(aw_combat_enemy_bar && aw_combat_enemy_bar(&fraction,&alpha))AW_UIEnemyBar(fraction,alpha);}
     /* The guard marker (COMBAT-BLOCKING-36; dropped in v0.0.41-dev1, restored): first person shows no shield yet,
      * so the word "Guard" at the lower right, on the bottom line of the strip under the viewport (object names use
      * its top line), or inside the viewport's lower right corner when there is no strip. */
     if(aw_combat_guard_marker && aw_combat_guard_marker()){
         int bottom=r_refdef.vrect.y+r_refdef.vrect.height,gy;
-        gy=vid.height-bottom>=24?vid.height-hud_lift()-AW_UIHeight()-2:bottom-AW_UIHeight()-4;
+        gy=(int)vid.height-bottom>=24?(int)vid.height-hud_lift()-AW_UIHeight()-2:bottom-AW_UIHeight()-4;
         AW_UIText(vid.width-6-AW_UIWidth("Guard"),gy,"Guard",-1);
     }
     scr_copyeverything=1;
@@ -587,7 +587,7 @@ void AW_UIHud(void) {
 static void name_label(const char *name,int x,int y,int right) {
     char label[80];int n,w;
     strncpy(label,name,sizeof(label)-1);label[sizeof(label)-1]=0;
-    for(n=strlen(label);n && AW_UIWidth(label)>vid.width-24;n--)label[n-1]=0;
+    for(n=strlen(label);n && AW_UIWidth(label)>(int)vid.width-24;n--)label[n-1]=0;
     w=AW_UIWidth(label);
     AW_UITextBox(right?x-w:x,y,w,line_height,label,-1);
 }
@@ -759,7 +759,7 @@ void AW_UIDraw(void) {
     if(panel_position<=0)return;
     /* Weights include a small per-page reading pause; long pages get longer.
      * The sum remains exactly the supplied speech duration. */
-    if(cached_revision!=subtitle_revision || cached_width!=vid.width ||
+    if(cached_revision!=subtitle_revision || cached_width!=(int)vid.width ||
        cached_rows!=maxlines || cached_size!=font_height){
         cached_revision=subtitle_revision;cached_width=vid.width;
         cached_rows=maxlines;cached_size=font_height;
@@ -792,7 +792,7 @@ void AW_UIDraw(void) {
          * retains full width and a shorter single-line strip. */
         if(dialogue_layout.value!=2 && n){
             boxwidth=wide+16;
-            if(boxwidth>vid.width)boxwidth=vid.width;
+            if(boxwidth>(int)vid.width)boxwidth=(int)vid.width;
             boxx=(vid.width-boxwidth)/2;h=bottom-top+16;
         }else if(n==1 && h>font_height+16)h=font_height+16;
     }

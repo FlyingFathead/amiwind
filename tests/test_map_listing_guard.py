@@ -27,6 +27,8 @@ ALLOWED = {
     'tools/chim_town.py': (1, "a town's legacy region maps (<prefix>NNN), the frame map's sources"),
     'tools/exterior_sky_build.py': (1, 'frame maps get their sky keys when written (frame_exterior, '
                                        'chim_town_rows); rewriting them here would break the optimizer receipt'),
+    'tools/harvest_build.py': (1, 'interior_rows: interior rooms are BSP maps; a CHIM frame map (.chim) is an exterior '
+                                  'frame and holds no interior placement (HARVEST-INTERIOR-PICK-47)'),
     'tools/hand_metadata.py': (1, "frame maps get the hand fields when written (hand_metadata's worldspawn_fields)"),
     'tools/hidden_surface_build.py': (1, 'frame maps hold no render faces (their geometry is the CHIM world)'),
     'tools/miniwind.py': (2, "prunes the scene's legacy maps; the frame maps are written after it"),

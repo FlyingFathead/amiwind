@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "aw_log.h"
+#include "aw_planetype.h"
 #include "r_local.h"
 #include <limits.h>
 #include <stddef.h>
@@ -118,6 +119,44 @@ int Mod_TryStreamAlias (model_t *mod);
  * Holding the file in the high hunk while decoding into the low hunk evicts
  * other visible actors from the cache between them. No resident RAM increase. */
 static int aw_alias_file_bytes;
+/* Shared actor skins (IMAGE-ACTOR-SKIN-REPEATS-46; tools/payload_share.py, builder option --shared-skins on):
+ * a single-skin alias may keep its skin pixels in progs/skins/<16 hex>.awk, stored once for every model that
+ * has them. Its skin type is then AW_SKIN_SHARED ("AWSK"), followed by the 16 hex digits and the pixel count
+ * (little-endian) in place of the pixels. Both alias loaders read the pixels from that file into the place
+ * they had, so the decoded model is byte-identical and nothing more stays in memory. */
+#define AW_SKIN_SHARED 0x4B535741
+#define AW_SKIN_SHARED_REF 20
+int AW_SharedSkinPath(const byte *ref,char *path,int size) {
+    int i;
+    for(i=0;i<16;i++)if(!((ref[i]>='0' && ref[i]<='9') || (ref[i]>='a' && ref[i]<='f')))return 0;
+    if(size<(int)sizeof("progs/skins/0123456789abcdef.awk"))return 0;
+    memcpy(path,"progs/skins/",12);memcpy(path+12,ref,16);strcpy(path+28,".awk");return 1;
+}
+/* The stored model's pixel count, or -1 when RAW (BYTES long) is no single-skin shared-skin alias. */
+int AW_SharedSkinPixels(const byte *raw,int bytes) {
+    const mdl_t *m=(const mdl_t *)raw;int count;
+    if(bytes<(int)sizeof(mdl_t)+4+AW_SKIN_SHARED_REF || memcmp(raw,"IDPO",4) ||
+       LittleLong(*(const int *)(raw+sizeof(mdl_t)))!=AW_SKIN_SHARED || LittleLong(m->numskins)!=1)return -1;
+    count=raw[sizeof(mdl_t)+20]|(raw[sizeof(mdl_t)+21]<<8)|(raw[sizeof(mdl_t)+22]<<16)|(raw[sizeof(mdl_t)+23]<<24);
+    if(LittleLong(m->skinwidth)<1 || LittleLong(m->skinheight)<1 || LittleLong(m->skinheight)>MAX_LBM_HEIGHT ||
+       count!=LittleLong(m->skinwidth)*LittleLong(m->skinheight))return -1;
+    return count;
+}
+/* The whole model a stored shared-skin alias stands for, in a new malloc block (the old one is freed), or
+ * NULL when its skin file is missing or of another size. *BYTES becomes the model's size. */
+byte *AW_SharedSkinExpand(byte *stored,int *bytes) {
+    char path[48];FILE *f=NULL;byte *full;int pixels=AW_SharedSkinPixels(stored,*bytes),head=sizeof(mdl_t),size,rest;
+    if(pixels<0 || !AW_SharedSkinPath(stored+head+4,path,sizeof(path))){free(stored);return NULL;}
+    rest=*bytes-head-4-AW_SKIN_SHARED_REF;
+    size=COM_FOpenFile(path,&f);
+    if(!f || size!=pixels || pixels>INT_MAX-head-4-rest){if(f)fclose(f);free(stored);return NULL;}
+    full=malloc(head+4+pixels+rest);
+    if(!full){fclose(f);free(stored);return NULL;}
+    memcpy(full,stored,head);*(int *)(full+head)=LittleLong(ALIAS_SKIN_SINGLE);
+    if(AW_LoadRead(full+head+4,pixels,f)!=(size_t)pixels){fclose(f);free(full);free(stored);return NULL;}
+    fclose(f);memcpy(full+head+4+pixels,stored+head+4+AW_SKIN_SHARED_REF,rest);free(stored);
+    *bytes=head+4+pixels+rest;return full;
+}
 static void *AW_AliasFile(char *name) {
     FILE *f=NULL;byte *data;int size;
     if(strlen(name)<4 || strcmp(name+strlen(name)-4,".mdl"))return NULL;
@@ -126,7 +165,9 @@ static void *AW_AliasFile(char *name) {
     data=malloc(size);if(!data){fclose(f);return NULL;}
     Draw_BeginDisc();
     if(AW_LoadRead(data,size,f)!=(size_t)size || memcmp(data,"IDPO",4)){free(data);data=NULL;}
-    fclose(f);Draw_EndDisc();if(data)aw_alias_file_bytes=size;return data;
+    fclose(f);
+    if(data && AW_SharedSkinPixels(data,size)>=0)data=AW_SharedSkinExpand(data,&size);
+    Draw_EndDisc();if(data)aw_alias_file_bytes=size;return data;
 }
 
 model_t *Mod_LoadModel (model_t *mod, qboolean crash);
@@ -496,6 +537,12 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
     switch (LittleLong(*(unsigned *)buf))
     {
     case IDPOLYHEADER:
+        if(AW_SharedSkinPixels((byte *)buf,alias_bytes)>=0){
+            /* Only AW_AliasFile rebuilds a shared-skin model; reaching here its skin file was missing. */
+            mod->needload=NL_NEEDS_LOADED;if(alias_file)free(alias_file);
+            if(crash)Host_Error("Model %s: its shared skin file is missing or damaged",mod->name);
+            return NULL;
+        }
         if(!AW_AliasExceptionAllows(mod->name,LittleLong(((mdl_t *)buf)->numverts),LittleLong(((mdl_t *)buf)->numtris),(byte *)buf,alias_file?aw_alias_file_bytes:com_filesize)){
             Con_Printf("Model %s needs a matching model-budgets.txt exception and an adequate active polygon cap.\n",mod->name);
             mod->needload=NL_NEEDS_LOADED;if(alias_file)free(alias_file);
@@ -585,6 +632,7 @@ static aw_brush_arena_t *aw_brush_arena;
  * (CHIM-BRUSH-BAD-DATA-35). */
 static jmp_buf *aw_brush_catch;
 static char aw_brush_why[128];
+static void AW_BrushError(char *fmt,...) __attribute__((format(printf, 1, 2)));
 static void AW_BrushError(char *fmt,...)
 {
     va_list args;
@@ -884,7 +932,7 @@ void Mod_LoadTextures (lump_t *l)
         {
             tx2 = anims[j];
             if (!tx2)
-                Sys_Error ("Missing frame %ld of %s",j, tx->name);
+                Sys_Error ("Missing frame %d of %s",j, tx->name);
             tx2->anim_total = max * ANIM_CYCLE;
             tx2->anim_min = j * ANIM_CYCLE;
             tx2->anim_max = (j+1) * ANIM_CYCLE;
@@ -896,7 +944,7 @@ void Mod_LoadTextures (lump_t *l)
         {
             tx2 = altanims[j];
             if (!tx2)
-                Sys_Error ("Missing frame %ld of %s",j, tx->name);
+                Sys_Error ("Missing frame %d of %s",j, tx->name);
             tx2->anim_total = altmax * ANIM_CYCLE;
             tx2->anim_min = j * ANIM_CYCLE;
             tx2->anim_max = (j+1) * ANIM_CYCLE;
@@ -1741,7 +1789,7 @@ void Mod_LoadPlanes (lump_t *l)
         }
 
         out->dist = LittleFloat (in->dist);
-        out->type = LittleLong (in->type);
+        out->type = AW_PlaneType (out->normal, LittleLong (in->type));
         out->signbits = bits;
     }
 }
@@ -1973,7 +2021,7 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 
     i = LittleLong (header->version);
     if (i != BSPVERSION)
-        Sys_Error ("Mod_LoadBrushModel: %s has wrong version number (%ld should be %ld)", mod->name, i, BSPVERSION);
+        Sys_Error ("Mod_LoadBrushModel: %s has wrong version number (%d should be %d)", mod->name, i, BSPVERSION);
 
 // swap all the lumps
     mod_base = (byte *)header;
@@ -2377,7 +2425,7 @@ void * Mod_LoadAliasSkin (void * pin, int *pskinindex, int skinsize,
     }
     else
     {
-        Sys_Error ("Mod_LoadAliasSkin: driver set invalid r_pixbytes: %ld\n",
+        Sys_Error ("Mod_LoadAliasSkin: driver set invalid r_pixbytes: %d\n",
                  r_pixbytes);
     }
 
@@ -2474,7 +2522,7 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer, int bytes)
 
     version = LittleLong (pinmodel->version);
     if (version != ALIAS_VERSION)
-        Sys_Error ("%s has wrong version number (%ld should be %ld)",
+        Sys_Error ("%s has wrong version number (%d should be %d)",
                  mod->name, version, ALIAS_VERSION);
 
 //
@@ -2504,7 +2552,7 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer, int bytes)
     pmodel->skinheight = LittleLong (pinmodel->skinheight);
 
     if (pmodel->skinheight > MAX_LBM_HEIGHT)
-        Sys_Error ("model %s has a skin taller than %ld", mod->name,
+        Sys_Error ("model %s has a skin taller than %d", mod->name,
                    MAX_LBM_HEIGHT);
 
     pmodel->numverts = LittleLong (pinmodel->numverts);
@@ -2546,7 +2594,7 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer, int bytes)
     skinsize = pmodel->skinheight * pmodel->skinwidth;
 
     if (numskins < 1)
-        Sys_Error ("Mod_LoadAliasModel: Invalid # of skins: %ld\n", numskins);
+        Sys_Error ("Mod_LoadAliasModel: Invalid # of skins: %d\n", numskins);
 
     pskintype = (daliasskintype_t *)&pinmodel[1];
 
@@ -2619,7 +2667,7 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer, int bytes)
 // load the frames
 //
     if (numframes < 1)
-        Sys_Error ("Mod_LoadAliasModel: Invalid # of frames: %ld\n", numframes);
+        Sys_Error ("Mod_LoadAliasModel: Invalid # of frames: %d\n", numframes);
 
     pframetype = (daliasframetype_t *)&pintriangles[pmodel->numtris];
 
@@ -2734,7 +2782,7 @@ void * Mod_LoadSpriteFrame (void * pin, mspriteframe_t **ppframe)
     }
     else
     {
-        Sys_Error ("Mod_LoadSpriteFrame: driver set invalid r_pixbytes: %ld\n",
+        Sys_Error ("Mod_LoadSpriteFrame: driver set invalid r_pixbytes: %d\n",
                  r_pixbytes);
     }
 
@@ -2910,7 +2958,7 @@ int Mod_TryStreamSprite(model_t *mod)
         return AW_SpriteError(file,mod,"truncated sprite header");
     if(LittleLong(header.version)!=SPRITE_VERSION){
         int version=LittleLong(header.version);fclose(file);file=NULL;
-        Sys_Error("%s has wrong version number (%ld should be %ld)",mod->name,version,SPRITE_VERSION);
+        Sys_Error("%s has wrong version number (%d should be %d)",mod->name,version,SPRITE_VERSION);
         return 0;
     }
     numframes=LittleLong(header.numframes);
@@ -3022,7 +3070,7 @@ void Mod_LoadSpriteModel (model_t *mod, void *buffer)
     version = LittleLong (pin->version);
     if (version != SPRITE_VERSION)
         Sys_Error ("%s has wrong version number "
-                 "(%ld should be %ld)", mod->name, version, SPRITE_VERSION);
+                 "(%d should be %d)", mod->name, version, SPRITE_VERSION);
 
     numframes = LittleLong (pin->numframes);
 
@@ -3048,7 +3096,7 @@ void Mod_LoadSpriteModel (model_t *mod, void *buffer)
 // load the frames
 //
     if (numframes < 1)
-        Sys_Error ("Mod_LoadSpriteModel: Invalid # of frames: %ld\n", numframes);
+        Sys_Error ("Mod_LoadSpriteModel: Invalid # of frames: %d\n", numframes);
 
     mod->numframes = numframes;
     mod->flags = 0;

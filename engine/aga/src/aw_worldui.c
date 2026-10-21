@@ -361,7 +361,7 @@ static void window_title(int x,int y,int w,const char *title,int color){
     if(!aw_title_bar || !aw_title_bar(x,y,w,title))AW_UITextCentred(x,y,w,12,title,color);
 }
 static void inventory_draw(void){
-    int i,j,x,row,index,frame,right=inventory_list_right();model_t *model=NULL;aw_inventory_item_t *item;char line[160];
+    int i,j,x,row,index,right=inventory_list_right();aw_inventory_item_t *item;char line[160];
     int gold=AW_UIColor(223,199,144),muted=AW_UIColor(150,135,104);
     AW_UIFill(0,0,320,200,AW_UIColor(0,0,0));AW_UIBox(2,2,316,196);
     AW_UIBox(4,18,122,178);AW_UIBox(128,18,188,178);
@@ -631,8 +631,8 @@ static int expand_entry(void){
         if(!strncmp(p,"%PCName",7)){value=aw_story.name;skip=7;}
         else if(aw_character.valid && !strncmp(p,"%PCRace",7)){value=aw_races[aw_character.race].name;skip=7;}
         else if(aw_character.valid && !strncmp(p,"%PCClass",8)){value=aw_classes[aw_character.clas].name;skip=8;}
-        if(value){while(*value){if(n>=sizeof(book->text)-1)return 0;book->text[n++]=*value++;}p+=skip;}
-        else {if(n>=sizeof(book->text)-1)return 0;book->text[n++]=*p++;}
+        if(value){while(*value){if(n>=(int)sizeof(book->text)-1)return 0;book->text[n++]=*value++;}p+=skip;}
+        else {if(n>=(int)sizeof(book->text)-1)return 0;book->text[n++]=*p++;}
     }
     book->text[n]=0;return 1;
 }

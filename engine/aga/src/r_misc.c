@@ -376,7 +376,8 @@ void R_SetupFrame (void)
 	float			w, h;
 
 // calculate turbulence table pointers once per frame
-	r_turb_sintable = sintable + ((int)(cl.time*SPEED)&(CYCLE-1));
+	// aw_ghostfence 0 (dbg ghostfence off): turbulent textures drawn straight and still (stillturbtable)
+	r_turb_sintable = aw_ghostfence.value ? sintable + ((int)(cl.time*SPEED)&(CYCLE-1)) : stillturbtable;
 	r_turb_intsintable = intsintable + ((int)(cl.time*SPEED)&(CYCLE-1));
 
 // don't allow cheats in multiplayer
@@ -395,7 +396,7 @@ void R_SetupFrame (void)
 		if ((surface_p - surfaces) > r_maxsurfsseen)
 			r_maxsurfsseen = surface_p - surfaces;
 
-		Con_Printf ("Used %d of %d surfs; %d max\n", surface_p - surfaces,
+		Con_Printf ("Used %ld of %ld surfs; %d max\n", surface_p - surfaces,
 				surf_max - surfaces, r_maxsurfsseen);
 	}
 

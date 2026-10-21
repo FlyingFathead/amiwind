@@ -1,6 +1,6 @@
 # Storage profiles and disk-backed preprocessing
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -61,6 +61,16 @@ certify target gameplay. See [release evidence](RELEASE-v0.0.27.md) and
 Keep each HDF below 4 GiB and each partition below 2 GiB. Measure the current
 payload and allocated/free space separately; the earlier single-HDF sizes below
 are historical measurements, not the size of a current v0.0.27 build.
+
+### The boot volume seen from Workbench
+
+The game starts by booting from the image's first partition (volume
+`AMIWIND`), whose `S:startup-sequence` runs the boot check and the engine.
+When someone boots their own Workbench with the AmiWind disk attached instead,
+the volume carries a project icon named `AmiWind v<VERSION>` that starts the
+game from Workbench (or, built with `--workbench-icon requester`, says to boot
+from the disk). The engine binary itself has no icon. See
+[Workbench icon](WORKBENCH_ICON.md).
 
 ## Historical v0.0.25 single-HDF layout
 

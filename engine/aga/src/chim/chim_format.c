@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * CHIM world format 0.4 to 0.7 decoders (chim_format.h). Byte access only, so the
+ * CHIM world format 0.4 to 0.8 decoders (chim_format.h). Byte access only, so the
  * same code reads the big-endian structures on the 68k and on a host test.
  * Every decoder checks what it can see on its own; the caller checks offsets
  * against the file it read them from.
@@ -182,9 +182,12 @@ void ChimFormat_ChunkEntry (const unsigned char *p, chim_chunk_entry_t *c)
 
 int ChimFormat_ChunkHead (const unsigned char *p, chim_chunk_head_t *h)
 {
-	if (memcmp (p, "CHK0", 4) && memcmp (p, "CHK1", 4))
+	/* CHK0 inline terrain, CHK1 terrain reference (0.7); CHK2 and CHK3 the
+	 * same with reach references (0.9) */
+	if (memcmp (p, "CHK", 3) || p[3] < '0' || p[3] > '3')
 		return 0;
-	h->ref = p[3] == '1';
+	h->ref = p[3] == '1' || p[3] == '3';
+	h->reach_refs = p[3] >= '2';
 	h->owned = ChimFormat_U16 (p+4);
 	h->reach = ChimFormat_U16 (p+6);
 	h->image_at = ChimFormat_U32 (p+8);
@@ -192,6 +195,7 @@ int ChimFormat_ChunkHead (const unsigned char *p, chim_chunk_head_t *h)
 	h->pvs_bytes = ChimFormat_U16 (p+16);
 	h->terrain_leaves = ChimFormat_U16 (p+18);
 	h->pvl_bytes = ChimFormat_U16 (p+20);
+	h->record_bytes = ChimFormat_U16 (p+22);
 	return 1;
 }
 
@@ -237,7 +241,55 @@ int ChimFormat_Record (const unsigned char *p, chim_record_t *r)
 	}
 	r->leaves = ChimFormat_U16 (p+44);
 	r->flags = ChimFormat_U16 (p+46);
+	r->pitch = r->roll = 0;
 	return Finite (r->origin[0]) && Finite (r->origin[1]) && Finite (r->origin[2]) && Finite (r->yaw) &&
 		r->origin[0] > -8192 && r->origin[0] < 8192 && r->origin[1] > -8192 && r->origin[1] < 8192 &&
 		r->origin[2] > -8192 && r->origin[2] < 8192 && r->yaw >= -720 && r->yaw <= 720;
+}
+
+int ChimFormat_RecordPlaced (const unsigned char *p, chim_record_t *r)
+{
+	if (!ChimFormat_Record (p, r))
+		return 0;
+	r->pitch = ChimFormat_F32 (p+48);
+	r->roll = ChimFormat_F32 (p+52);
+	return Finite (r->pitch) && Finite (r->roll) && r->pitch >= -720 && r->pitch <= 720 &&
+		r->roll >= -720 && r->roll <= 720;
+}
+
+void ChimFormat_ReachRef (const unsigned char *p, int *owner, int *record)
+{
+	*owner = ChimFormat_U16 (p);
+	*record = ChimFormat_U16 (p+2);
+}
+
+int ChimFormat_RecordBytes (int minor)
+{
+	return minor >= CHIM_PLACED_MINOR ? CHIM_RECORD_BYTES_PLACED : CHIM_RECORD_BYTES;
+}
+
+/* 1 when a texture of this name and size is drawn turbulent and must be tiled to 64 x 64 first. */
+int ChimFormat_TurbulentTile (const char *name, int width, int height)
+{
+	if (!name || name[0] != '*' || width <= 0 || height <= 0)
+		return 0;
+	if (width > CHIM_TURB_SIZE || height > CHIM_TURB_SIZE || (width == CHIM_TURB_SIZE && height == CHIM_TURB_SIZE))
+		return 0;
+	return width >= 8 && height >= 8 && CHIM_TURB_SIZE % width == 0 && CHIM_TURB_SIZE % height == 0;
+}
+
+/* src: the four mip levels of a width x height miptex, one after the other; dst: the four levels of the
+ * 64 x 64 texture (CHIM_TURB_PIXELS bytes), each level the source level repeated. */
+void ChimFormat_TileTurbulent (const unsigned char *src, int width, int height, unsigned char *dst)
+{
+	int j, x, y, sw, sh, dw;
+	for (j = 0; j < 4; j++)
+	{
+		sw = width >> j; sh = height >> j; dw = CHIM_TURB_SIZE >> j;
+		for (y = 0; y < dw; y++)
+			for (x = 0; x < dw; x++)
+				dst[y*dw + x] = src[(y % sh)*sw + x % sw];
+		src += sw*sh;
+		dst += dw*dw;
+	}
 }

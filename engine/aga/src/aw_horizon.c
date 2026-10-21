@@ -125,8 +125,8 @@ static int view_valid(int distance) {
     return distance>=128 && distance<=4096 &&
        vid.buffer && d_pzbuffer && r_refdef.vrect.x>=0 && r_refdef.vrect.y>=0 &&
        r_refdef.vrect.width>0 && r_refdef.vrect.height>0 &&
-       r_refdef.vrect.width<=vid.width-r_refdef.vrect.x &&
-       r_refdef.vrect.height<=vid.height-r_refdef.vrect.y &&
+       r_refdef.vrect.width<=(int)vid.width-r_refdef.vrect.x &&
+       r_refdef.vrect.height<=(int)vid.height-r_refdef.vrect.y &&
        vid.rowbytes>=vid.width && d_zwidth>=vid.width &&
        xscale>0 && xscale<=16384 && yscale>0 && yscale<=16384 &&
        isfinite(xcenter) && isfinite(ycenter);

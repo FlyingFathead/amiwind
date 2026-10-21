@@ -89,8 +89,10 @@ class GuidedBuildTests(unittest.TestCase):
             data = base / "Data Files"
             synthetic_install(data)
             output = base / "private output"
+            # synthetic game data has no LAND records: no CHIM region cells (the default list is the real island's)
             run = subprocess.run(["sh", str(ROOT / "build.sh"), "--stage", "terrain", "--check", "--allow-data-differences",
-                "--data-files", str(data), "--workspace", str(output)], cwd=base, text=True, capture_output=True)
+                "--chim-regions", "none", "--data-files", str(data), "--workspace", str(output)], cwd=base, text=True,
+                capture_output=True)
             self.assertEqual(run.returncode, 0, run.stderr)
             self.assertIn("Prerequisites passed", run.stdout)
             self.assertFalse(output.exists())

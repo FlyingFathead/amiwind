@@ -1,6 +1,6 @@
 # Trees and Grass, Day and Night
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -57,9 +57,24 @@ Now each region draws its own weather:
   picks that region's weather. Rules from OpenMW file `apps/openmw/mwworld/weather.cpp`: a roll of 1 to 100 against
   the running sum of the chances, Clear when the chances never reach it; a new choice every
   `Hours Between Weather Changes` (20 game hours); walking into another region changes the weather at the new
-  weather's `Transition Delta` per real second; arriving by travel, a load or a map change switches at once.
+  weather's `Transition Delta` per real second; arriving by travel or a load switches at once.
   AmiWind's own choices: the roll is a hash of the region and the 20-hour period, so the same day has the same
   weather without a save field, and a change is drawn in 16 steps.
+- When the weather changes (fixed in v0.0.46 after the maintainer saw the blight sky turn blue at once inside the
+  Ghostfence; [SKY-REDMOUNTAIN-BLUE-44](bugs/SKY-REDMOUNTAIN-BLUE-44.md)), rules from the same OpenMW file: a new
+  weather starts a transition when none runs; while one runs, the next one waits until it ends instead of the sky
+  jumping back; a cell without a region keeps the weather it had. Only an arrival puts the new weather there at
+  once: the first frame, a jump of more than half a cell (travel, a door to another place, a load), or an hour or
+  more of game time passing (waiting, resting, travel). Walking from one cell into the next is not an arrival,
+  although every exterior cell is its own CHIM frame and the default crossing loads the next one as a new map;
+  before the fix each such crossing, and any crossing whose load took over two seconds, switched the weather at
+  once.
+- The region is the cell's own, from its record, as in the original and in OpenMW. The Ghostfence is not the
+  border of the Red Mountain region: 22 of the 36 cells the fence runs through belong to the Ashlands region, and
+  about a tenth of the fenced-in area lies in them (a strip along the inside of the fence, including the north side
+  of Ghostgate). In OpenMW, walking from Red Mountain into that strip starts the change from Blight to the
+  Ashlands' weather of the day (measured at Ghostgate: Blight to Foggy, half done after about 35 seconds); AmiWind
+  now does the same.
 - The sky (`r_sky.c`) uses that weather's sky and fog colours: the clear sky texels take the weather's sky colour,
   cloud texels its fog colour at their own brightness, the horizon band and the distance fog its fog colour, at
   every time of day; the sunrise glow and the sun disc follow the weather's glare (none in a storm). Clear weather

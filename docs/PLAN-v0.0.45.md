@@ -100,9 +100,11 @@ only A, and only if the measurement shows a large share, at most one evening; th
 
 ### 1c. Type 1 "CHIM": one continuous world
 
-- [ ] 1.8 The method switch: type 0 and type 1 selectable; type 0 stays the default until type 1 wins on the route.
+- [x] 1.8 The method switch: type 0 and type 1 selectable; type 0 stays the default until type 1 wins on the route.
   A setting of its own (or an explicit migration): today's saved `aw_cell_change_method` 1 means the current method
   and 2 the read-ahead experiment, so a saved 1 must never turn into type 1.
+  Done 20 October 2026 (branch `v0.0.46-stream-type1`, 951c1e83): `chim crossing 0|1`, a `chim` subcommand that
+  is never saved; 0, the default, is type 0 unchanged.
 - [ ] 1.9 Near and far together in the sandbox ([one system](chim/CELL_CROSSINGS.md#near-and-far-as-one-system-upcoming-direction)):
   streamed detail near, the far shell beyond, one handover distance tied to the fog, the shell split along the
   streamed chunks, one priority queue and one memory budget; a chunk held back on purpose shows its silhouette.
@@ -114,6 +116,12 @@ only A, and only if the measurement shows a large share, at most one evening; th
   nearby objects keep the area they belong to; the remembered harvest region carries its area too (two catalogues
   can use the same index). The check: cross the seam, pick a plant, use a door in the incoming area, come back
   outside and read the world-map position.
+  20 October 2026, first part: the window of four region frames at a fixed origin, one owner per physical chunk,
+  each object drawn once, the session, player and clock running through the crossing (branch
+  `v0.0.46-stream-type1`; engine tests on a six-frame test world). Measured on the release image's four cells
+  2,-7 / 3,-7 / 2,-6 / 3,-6 instead of a MiniWind build: the builder refuses `--chim-regions` in a MiniWind and a
+  MiniWind leaves out the terrain-region stage the region directory comes from, so a region sandbox needs its own
+  MiniWind scope first. Not yet: the doors and plants of a frame entered by streaming, and the far shell.
 - [ ] 1.10 Repeated loading and unloading in the sandbox with a person, an object across a seam and changed object
   state: memory and list use stay within a bounded range (entity data reclaimed without a level reset).
 - [ ] 1.11 Late data: bytes read, data decoded, and collision and objects installed and safe are three different
@@ -125,6 +133,12 @@ only A, and only if the measurement shows a large share, at most one evening; th
 - [ ] 1.13 Edges and the corner measured for the longest single rendered frame and the memory peak, beside the median
   crossing, at 16 and 128 MB; the same standing views and walking route in both methods with frame time, active
   actors and drawn geometry, so a smooth crossing is not bought with neighbours that keep thinking and drawing.
+  20 October 2026, the light legs (ai-c1, ai-l1, ai-e1; [table](chim/CELL_CROSSINGS.md#the-type-1-prototype-measured-20-october-2026)):
+  worst frame after a crossing 83 to 42 ms at 128 MB, 373 to 66 ms at 16 MB; the approach's worst frame the same at
+  128 MB and 66 to 80 ms at 16 MB; zone locked peak +7 % at 16 MB; standing views 0.00 and 0.16 % of pixels apart.
+  Corrected 20 October 2026: not a like-for-like comparison, because type 1 creates no entities in the frames it joins
+  and type 0 does; these figures do not show the speed of a complete crossing. To be repeated with both methods doing
+  the same work on frames with people. Towns, actors and drawn geometry still to measure.
 - [ ] 1.14 The whole island on type 1, type 0 kept as an option; crossings between towns and the open world may stay
   type 0 at first (town frames are not cell-aligned).
 

@@ -267,7 +267,7 @@ static void set_font(void) {
 void AW_ConsoleBackground(int lines) {
     int y,ink=(int)colour.value;
     if(lines<0)return;
-    if(lines>vid.conheight)lines=vid.conheight;
+    if(lines>(int)vid.conheight)lines=(int)vid.conheight;
     if(ink<0||ink>255)ink=255;
     for(y=0;y<lines;y++)
         memset(vid.conbuffer+y*vid.conrowbytes,ink,vid.conwidth);

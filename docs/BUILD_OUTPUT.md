@@ -1,11 +1,12 @@
 # Build completion output
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [HDF capacity versus installed content](#hdf-capacity-versus-installed-content)
+  - [Disk layout: the fewest partitions, each with headroom](#disk-layout-the-fewest-partitions-each-with-headroom)
 - [Size ledger](#size-ledger)
 - [Completion footer](#completion-footer)
 - [HDFs and emulator runners](#hdfs-and-emulator-runners)
@@ -13,6 +14,7 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 - [Compiler and toolkit inventory](#compiler-and-toolkit-inventory)
 - [Warnings](#warnings)
 - [Failures, modes and saved results](#failures-modes-and-saved-results)
+  - [Release readiness](#release-readiness)
 
 <!-- contents end -->
 
@@ -22,10 +24,11 @@ coverage and protected model quality remain mandatory.
 ## HDF capacity versus installed content
 
 The final HDF's byte size is its virtual disk capacity, including filesystem
-metadata and free space. It is not a count of converted game assets. The current
-full-world layout creates as many world partitions as needed, each sized from its
-payload plus approximately 20 percent and 16 MiB of headroom, then rounded up
-to a 128 MiB boundary. Each partition stays below 2 GiB and also starts below 2 GiB on its drive,
+metadata and free space. It is not a count of converted game assets. The image
+uses the fewest partitions its payload needs, each sized from its payload plus a
+fixed headroom ([disk layout](#disk-layout-the-fewest-partitions-each-with-headroom) below;
+the legacy layout sized each from its payload plus about 20 percent and 16 MiB,
+rounded up to 128 MiB). Each partition stays below 2 GiB and also starts below 2 GiB on its drive,
 because Kickstart 3.1 does not mount a later one (see
 [AMIGA-DISK-2GIB-LIMIT-33](bugs/AMIGA-DISK-2GIB-LIMIT-33.md)); the combined legacy
 hardfile stays below 4 GiB. When the complete partition set will not fit,
@@ -40,6 +43,65 @@ file counts after readback of the completed HDF. Capacity minus payload also
 includes filesystem overhead; use the recorded bitmap free bytes for available
 space. Allocated host-disk blocks, compressed download size and runtime RAM are
 different measurements again.
+
+### Disk layout: the fewest partitions, each with headroom
+
+The layout planner (`tools/layout_plan.py`) decides the partitions before the
+image step writes anything. It runs in the payload preflight (seconds: it reads
+file sizes only), prints one line per partition, and writes the plan to the run
+as `image/layout-plan.json`:
+
+- the units are the boot payload (`DH0`, volume `AMIWIND`), the CHIM world (one
+  volume, files under `id1/chim/`, written in the order the engine reads them)
+  and the open-world maps the region directory names (`id1/maps/vfNNNN.*`);
+- the open-world maps go onto the CHIM world volume first (they are world data),
+  then onto `DH0`, and only when neither has room is another world partition
+  opened. The engine finds a map on any world volume: it adds `AW_WORLD0:id1` ...
+  to its search path from `world/volumes.awv`, so both layouts load the same way;
+- every partition is sized from its payload: the blocks its files take on
+  classic FFS (header, data and extension blocks, one block per directory, root
+  and bitmap blocks; the estimate equals what `xdftool` writes) plus a fixed
+  free space, the headroom, rounded up to whole MiB;
+- the headroom is 100 MiB per partition by default (builder setting
+  `partition_headroom_mib` in `config/build-defaults.json` or a `--build-config`
+  file, `--partition-headroom-mib` on the command line). The boot partition,
+  where the game writes saves and settings, can keep its own
+  (`boot_partition_headroom_mib`, `--boot-partition-headroom-mib`; by default the
+  same);
+- the Amiga limits win: if a partition's payload plus its headroom would reach
+  2 GiB, another partition is opened; the headroom is never shrunk. Partition
+  starts below 2 GiB and drives below 4 GiB are kept as before.
+
+The image step follows the plan: the same partitions with the same maps in
+each. It refuses when a partition's payload moved by more than its headroom
+since the plan, and it writes every partition at the same time (one worker per
+partition; one FFS volume is written by one `xdftool` process). After writing,
+the disk-layout gate refuses:
+
+- a partition with less free space than its headroom;
+- a partition over 16 MiB that is mostly empty (more free space than its
+  headroom plus half its size);
+- a plan with more partitions than the payload needs (a partition of maps that
+  would fit into another one below 2 GiB with that one's headroom).
+
+Each refusal names the partition, its payload and its free bytes.
+`image/build.json` records the settings and the plan in `disk_layout_plan`
+(layout, headroom, per partition payload, size, free bytes and share).
+
+The v0.0.46 release payload, planned and written this way (the partitions and
+the drive written again from that build's staged files, 20 October 2026): 2
+partitions on one drive of 3,076,554,752 bytes, `DH0` 1,524 MiB (payload
+1,457,977,095 bytes, 105,678,336 bytes free) and `DW0` with the CHIM world and
+the 1,348 frame maps, 1,410 MiB (payload 1,329,865,092 bytes, 105,166,336 bytes
+free); the planned free space matched the written one to the byte. The release itself was built with
+the earlier layout: 3 partitions on 3,623,911,424 bytes, one of them (`DW0`,
+128 MiB) holding only the frame maps, 98 percent empty
+(BUILD-PARTITION-GROWTH-UNGATED-36 in the [bug register](BUGS.md)).
+
+`--disk-layout legacy` (config `disk_layout: legacy`) builds the earlier layout
+for comparison: the open-world maps balanced against the boot payload onto
+volumes of their own, every partition payload + 20 % + 16 MiB in 128 MiB steps.
+Its mostly-empty partitions are printed and recorded as findings, not refused.
 
 ## Size ledger
 

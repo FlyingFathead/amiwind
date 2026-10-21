@@ -136,9 +136,10 @@ class ShorelineSwitchTests(unittest.TestCase):
         from build import chim_stage_options
         from chim.build import SHORELINE_MODES
         self.assertEqual(SHORELINE_MODES, ('on', 'off'))
-        self.assertEqual(chim_stage_options(argparse.Namespace(chim_terrain_shoreline='on')), [])
+        default = ['--uv-scroll', 'turbulent']  # a build's own default since v0.0.47 (GHOSTFENCE-NO-ANIMATION-46)
+        self.assertEqual(chim_stage_options(argparse.Namespace(chim_terrain_shoreline='on')), default)
         self.assertEqual(chim_stage_options(argparse.Namespace(chim_terrain_shoreline='off')),
-                         ['--terrain-shoreline', 'off'])
+                         ['--terrain-shoreline', 'off'] + default)
         text = (ROOT / 'tools/chim_build.py').read_text(encoding='utf-8')
         self.assertIn("'--terrain-shoreline', choices=('on', 'off'), default='on'", text)
 

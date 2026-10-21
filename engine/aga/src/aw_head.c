@@ -50,7 +50,7 @@ int AW_HeadLoad(int head,int hair)
 void AW_HeadDraw(int x,int y,int width,int height,float angle)
 {
     int slot,i,j,k,xx,yy,x0,y0,x1,y1,ix,iy,z;
-    byte *p;float points[3][3],low[3],high[3],centre[3],scale,cs,sn,a,b,c,area,dx,dy,dz;
+    byte *p;float points[3][3],low[3],high[3],centre[3],scale,cs,snv,a,b,c,area,dx,dy,dz;
     if(width<1 || width>108 || height<1 || height>122 || x<0 || y<0 || x+width>(int)vid.width || y+height>(int)vid.height)return;
     if(!faces[0] || !faces[1]){AW_UITextBox(x,y,width,height,"Preview unavailable",-1);return;}
     for(i=0;i<3;i++){low[i]=32768;high[i]=-32768;}
@@ -68,16 +68,16 @@ void AW_HeadDraw(int x,int y,int width,int height,float angle)
     if(a<.01 || c<.01)return;
     scale=(width-8)/a;
     if(scale>(height-8)/c)scale=(height-8)/c;
-    cs=Q_CosRad(angle);sn=Q_SinRad(angle);
+    cs=Q_CosRad(angle);snv=Q_SinRad(angle);
     for(i=0;i<width*height;i++)depth[i]=32767;
     AW_UIFill(x,y,width,height,AW_UIColor(16,17,18));
     for(slot=0;slot<2;slot++)for(i=0;i<faces[slot];i++){
         p=mesh[slot]+6+i*82;
         for(j=0;j<3;j++){
             dx=(short)u16(p+j*6)/512.f-centre[0];dy=(short)u16(p+j*6+2)/512.f-centre[1];dz=(short)u16(p+j*6+4)/512.f-centre[2];
-            points[j][0]=width*.5f+(dx*cs-dy*sn)*scale;
+            points[j][0]=width*.5f+(dx*cs-dy*snv)*scale;
             points[j][1]=height*.5f-dz*scale;
-            points[j][2]=(dx*sn+dy*cs)*128;
+            points[j][2]=(dx*snv+dy*cs)*128;
         }
         area=(points[1][0]-points[0][0])*(points[2][1]-points[0][1])-(points[1][1]-points[0][1])*(points[2][0]-points[0][0]);
         if(fabs(area)<.01f)continue;
@@ -134,7 +134,7 @@ int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int h
     inventory_part_t part[3];model_t *gear[2];float origins[2][3],angles[2][3],point[3],zero[3]={0,0,0};
     aliashdr_t *h;mdl_t *m;trivertx_t *v;mtriangle_t *tri;stvert_t *st;
     maliasskindesc_t *sd;byte *skin;int i,j,k,which,count=1,n,xx,yy,x0,y0,x1,y1,ix,iy,z;
-    float low[3],high[3],centre[3],points[3][3],uv[3][2],scale,cs,sn;
+    float low[3],high[3],centre[3],points[3][3],uv[3][2],scale,cs,snv;
     float a,b,c,area,dx,dy,dz,span;
     if(!model || model->type!=mod_alias || width<1 || width>122 || height<1 || height>168 ||
        x<0 || y<0 || x+width>(int)vid.width || y+height>(int)vid.height)return 0;
@@ -163,7 +163,7 @@ int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int h
     a=high[0]-low[0];b=high[1]-low[1];span=(float)sqrt(a*a+b*b);
     c=high[2]-low[2];if(span<.01f || c<.01f)return 0;
     scale=(width-8)/span;if(scale>(height-8)/c)scale=(height-8)/c;
-    cs=Q_CosRad(angle);sn=Q_SinRad(angle);
+    cs=Q_CosRad(angle);snv=Q_SinRad(angle);
     for(i=0;i<width*height;i++)inventory_depth[i]=32767;
     for(which=0;which<count;which++){
         if(!inventory_alias(&part[which],&h,&m,&v))return 0;
@@ -177,8 +177,8 @@ int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int h
                 int vertex=tri[i].vertindex[j];if(vertex<0 || vertex>=m->numverts)return 0;
                 inventory_point(&part[which],m,&v[vertex],point);
                 dx=point[0]-centre[0];dy=point[1]-centre[1];dz=point[2]-centre[2];
-                points[j][0]=width*.5f+(dx*cs-dy*sn)*scale;points[j][1]=height*.5f-dz*scale;
-                points[j][2]=(dx*sn+dy*cs)*128;
+                points[j][0]=width*.5f+(dx*cs-dy*snv)*scale;points[j][1]=height*.5f-dz*scale;
+                points[j][2]=(dx*snv+dy*cs)*128;
                 uv[j][0]=(float)st[vertex].s/65536.f;
                 if(!tri[i].facesfront && st[vertex].onseam)uv[j][0]+=m->skinwidth*.5f;
                 uv[j][1]=(float)st[vertex].t/65536.f;

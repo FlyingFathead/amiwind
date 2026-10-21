@@ -19,6 +19,7 @@ progress counter and the records are not part of any walk's key (BUILD-STAIR-KEY
 stair_walk.check (one map per task) stays as the reference method; tests compare the two.
 """
 import json
+import os
 import math
 from pathlib import Path
 import sys
@@ -51,13 +52,17 @@ def plan_map(task):
     stored rows or None, provenance or None): 'reused' (a record checked by a passed master build; its rows),
     'walk' (count candidates to walk; a sampled reused map also carries its stored rows to compare)."""
     import hashlib
+    import stair_walk as sw
     path, core, models, cache, scope, again = task
     name = Path(path).stem
     stored = origin = None
     if cache is not None:
         import stair_records
         raw = Path(path).read_bytes()
-        record, mark = stair_records.lookup(cache, hashlib.sha256(raw).hexdigest() + ':' + json.dumps(core))
+        key = hashlib.sha256(raw).hexdigest() + ':' + json.dumps(core)
+        record, mark = stair_records.lookup(cache, key)
+        if record is None or mark is None:
+            record, mark = sw.flight_rows_of_all_walk(cache, key, record, mark)
         if record is not None and mark is not None:
             # same keys in the same order; only the map name is this map's (aliases share bytes)
             stored = [{k: (name if k == 'map' else v) for k, v in row.items()} for row in record['rows']]
@@ -145,15 +150,31 @@ def check(id1, jobs=1, only=None, models=None, exempt=(), scope=None):
     scope = scope or sw.scope_setting()
     if scope not in sw.SCOPES:
         raise ValueError('Stair walk scope must be one of %s, not %r' % (', '.join(sw.SCOPES), scope))
-    tasks = sw.map_tasks(id1, models, only)
+    # a targeted walk (--stair-walk-places): only the maps its places name, nothing reused or stored; the watch list:
+    # its maps walked again every build (chim.collision watch list, BUILD-STAIR-WALK-SCOPE-KEY-46)
+    from chim.collision import PLACES_ENV, load_watch, parse_places, watched_maps
+    places = parse_places(os.environ.get(PLACES_ENV, ''))
+    if places is not None:
+        named = set(watched_maps(places))
+        only = [name for name in named if not only or name in only]
+        print('Stair walk: TARGETED walk (--stair-walk-places): maps %s only; rows reported, never stored'
+              % (', '.join(sorted(only)) or 'none'), flush=True)
+    tasks = sw.map_tasks(id1, models, only) if places is None or only else []
     sw.hull_preflight(tasks)
     options = {'stair_mode': stair_mode(), 'models': hashlib.sha256(
         json.dumps(models or {}, sort_keys=True).encode()).hexdigest()}
     if scope != 'all':
         options['scope'] = scope
     # the walker's records: the same cache and key as stair_walk.check (sources: the walker module)
-    cache = PassCache.open('stair-walk', options, *sw.walk_key_sources()) if sw.walk_cache_mode() != 'full' else None
+    cache = (PassCache.open('stair-walk', options, *sw.walk_key_sources())
+             if sw.walk_cache_mode() != 'full' and places is None else None)
     sample = set(sw.pick_sample([t[0] for t in tasks], sw.walk_sample(), 'legacy:%d' % len(tasks))) if cache else set()
+    watched = watched_maps(load_watch()) if cache else {}
+    watch_paths = {t[0] for t in tasks if Path(t[0]).stem in watched}
+    if watch_paths:
+        print('Stair walk: watch list: %d maps walked again: %s' % (len(watch_paths), ', '.join(
+            '%s (%s)' % (Path(p).stem, ', '.join(watched[Path(p).stem])) for p in sorted(watch_paths))), flush=True)
+    sample |= watch_paths
     workers = max(1, resolve_jobs(jobs))
     work = [(*task, cache, scope, task[0] in sample) for task in tasks]
     plans = list(ordered_map(plan_map, work, max(1, min(workers, len(tasks) or 1)), cost=sw._map_cost))
@@ -298,7 +319,7 @@ def main():
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--maps', nargs='*')
     parser.add_argument('--jobs', type=int, default=1)
-    parser.add_argument('--scope', choices=sw.SCOPES, help="'all' (default, or AMIWIND_STAIR_WALK) or 'flights'")
+    parser.add_argument('--scope', choices=sw.SCOPES, help="'flights' (default, or AMIWIND_STAIR_WALK) or 'all'")
     a = parser.parse_args()
     report = check(a.id1, a.jobs, a.maps, scope=a.scope)
     a.out.write_text(json.dumps(report, indent=1) + '\n', encoding='utf-8', newline='\n')

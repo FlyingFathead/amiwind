@@ -197,6 +197,33 @@ def harvest_line(record):
             + (f"; not admitted: {', '.join(record['not_admitted'])}" if record.get('not_admitted') else ''))
 
 
+def read_stair_check(run):
+    """The CHIM stage's stair check (stair collision method 1 builds only, CHIM-STAIR-COLLISION-MESH-47):
+    chim-world/chim-stair-check.json, or None (a method 0 build writes none)."""
+    path = Path(run) / 'chim-world' / 'chim-stair-check.json'
+    if not path.is_file():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {'status': 'unreadable'}
+    return {k: record.get(k) for k in ('status', 'meshes', 'flights')} | {
+        'ships_method_1': len(record.get('ships_method_1') or ()),
+        'failing': [{'mesh': x['mesh'], 'ships_method': x['ships_method'], 'flights': [f['flight'] for f in x['failed']]}
+                    for x in record.get('failing') or ()]}
+
+
+def stair_check_line(record):
+    if record.get('status') == 'unreadable':
+        return 'Stair check (method 1): report unreadable'
+    line = ('Stair check (method 1): %s, %s meshes with %s flights, %d ship a stairway collision mesh'
+            % (record['status'], record['meshes'], record['flights'], record['ships_method_1']))
+    if record['failing']:
+        line += '; failing: ' + ', '.join('%s (method %d)' % (x['mesh'], x['ships_method'])
+                                          for x in record['failing'][:8])
+    return line
+
+
 def read_file_cache(run):
     """{stage: {group: {'hit', 'miss', 'enabled'}}} from the per-file cache reports (profile/file-cache).
 
@@ -355,6 +382,7 @@ class BuildSummary:
         harvest = read_harvest(self.run)
         engine = read_engine_profile(self.run)
         file_cache = read_file_cache(self.run)
+        stair_check = read_stair_check(self.run)
         import size_ledger
         sizes = size_ledger.read(self.run) if status == 'passed' else None
         elapsed = max(0, time.monotonic() - self.started)
@@ -379,6 +407,7 @@ class BuildSummary:
                   'engine_profile': engine,
                   'harvest': harvest,
                   'file_cache': file_cache,
+                  **({'stair_check': stair_check} if stair_check else {}),
                   'size_ledger': sizes,
                   'known_inputs': self.known_inputs,
                   **({'build_type': self.build_type} if self.build_type else {}),
@@ -470,6 +499,8 @@ class BuildSummary:
         if harvest is not None:
             lines.append(harvest_line(harvest))
         lines.extend(file_cache_lines(file_cache))
+        if stair_check:
+            lines.append(stair_check_line(stair_check))
         if fpu_receipt is not None:
             from fpu_support import summary_lines as fpu_support_lines
             lines.extend(fpu_support_lines(fpu_receipt))

@@ -316,11 +316,11 @@ void Host_ServerFrame (void);
 void Host_InitCommands (void);
 void Host_Init (quakeparms_t *parms);
 void Host_Shutdown(void);
-void Host_Error (char *error, ...);
-void Host_EndGame (char *message, ...);
+void Host_Error (char *error, ...) __attribute__((format(printf, 1, 2)));
+void Host_EndGame (char *message, ...) __attribute__((format(printf, 1, 2)));
 void Host_Frame (float time);
 void Host_Quit_f (void);
-void Host_ClientCommands (char *fmt, ...);
+void Host_ClientCommands (char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void Host_ShutdownServer (qboolean crash);
 
 extern qboolean		msg_suppress_1;		// suppresses resolution and cache size console output
@@ -557,6 +557,7 @@ const char *AW_SceneTargetName(void);
 edict_t *AW_NPCTarget(edict_t *player,vec3_t angles);
 edict_t *AW_NPCTargetReach(edict_t *player,vec3_t angles,float reach);
 int AW_NPCFloor(edict_t *actor);
+int AW_NPCFloorRetry(void);
 int AW_AliasBudgetAllows(int vertices,int triangles);
 int AW_AliasExceptionAllows(const char *name,int vertices,int triangles,const byte *raw,int bytes);
 int AW_GalleryActive(void);

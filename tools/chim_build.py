@@ -29,6 +29,20 @@ for p in (ROOT / 'tools', ROOT / 'src'):
 
 
 def main(argv=None):
+    """The command line, with the stair walk off by default (BUILD-STAIR-WALK-OFF-46; an explicit
+    AMIWIND_STAIR_WALK wins); the default is restored when it returns."""
+    path = list(sys.path)
+    import stair_walk
+    sys.path[:] = path   # stair_walk puts tools/ first again; src/mwad must stay ahead of tools/mwad.py
+    before = stair_walk.DEFAULT_OFF
+    stair_walk.DEFAULT_OFF = True
+    try:
+        return _cli(argv)
+    finally:
+        stair_walk.DEFAULT_OFF = before
+
+
+def _cli(argv=None):
     from build_jobs import add_jobs
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--area', '--town', dest='areas', action='append', default=None, metavar='TOWN',
@@ -60,10 +74,34 @@ def main(argv=None):
                     help='Compiled model hulls whose compiler lost pieces under a walkable surface get those pieces '
                          'added exactly (on, default), or stay as compiled with the check recorded (off: the '
                          'previous method); CHIM-COMPILED-HULL-SHORT-36')
+    ap.add_argument('--model-bevels', default='profile',
+                    help='Edge bevels of the model standing hulls (EXPERIMENTAL; CHIM-COMPILED-HULL-OVERFILL-46): profile '
+                         '(default: only meshes whose profile asks for them, the method before), exact (every model) or '
+                         'tol:N (every model: the bevels whose omission reaches more than N units past the exact '
+                         'expansion)')
+    ap.add_argument('--placement-format', choices=('0.7', '0.8'), default='0.7',
+                    help='World format of the placements (EXPERIMENTAL; CHIM-TILT-VARIANTS-SPLIT-33): 0.7 (default: '
+                         'scale and tilt baked into one model per variant, the yaw in the record, the method before) '
+                         'or 0.8 (one model per mesh + scale, the full rotation in a 56-byte record, collision from '
+                         "the mesh's own pieces placed at run time)")
+    ap.add_argument('--terrain-pack', choices=('bsp29', 'compact', 'generate'), default='bsp29',
+                    help='How terrain records are stored (EXPERIMENTAL): bsp29 (default: the BSP29 brush image, the '
+                         'method before) or compact (world format 0.10: a lossless repack the engine expands to the '
+                         'same bytes; needs --terrain-refs on) or generate (world format 0.11: regular-path records '
+                         'as heights the engine generates the same bytes from, the rest compact)')
+    ap.add_argument('--reach-index', choices=('copies', 'refs'), default='copies',
+                    help='Placements a chunk reaches but does not own (EXPERIMENTAL; CHIM-PLACEMENT-MARGIN-COPIES-46): '
+                         'copies (default: a whole record in every chunk the drawn box touches, the method before) or '
+                         'refs (world format 0.9: a 4-byte reference to the owner record in the same frame; needs '
+                         '--placement-format 0.8)')
     ap.add_argument('--mesh-method', choices=('table', 'converter', 'merge', 'meshopt+merge'), default='table',
                     help='How meshes become faces (docs/chim/MESH_METHODS.md): table (default: config/mesh-methods.json, '
                          'planar merge for every mesh, meshoptimizer + planar merge for the meshes it names), or one '
                          'method for every mesh: converter (the method before v0.0.36-dev3), merge, meshopt+merge')
+    ap.add_argument('--uv-scroll', choices=('off', 'turbulent'), default='off',
+                    help='Shapes whose texture scrolls in the original (the Ghostfence curtain, waterfalls, the ash mire; '
+                         'not lava): off (default) a still texture; turbulent a Quake turbulent texture that ripples '
+                         'over time, unlit (GHOSTFENCE-NO-ANIMATION-46)')
     ap.add_argument('--model-weld', choices=('base', 'placed'), default='base',
                     help='How a model variant shares its vertices: base (default: as its base, the prepared mesh '
                          'unscaled, so every scale and tilt has the same vertices and edges; '
@@ -128,6 +166,11 @@ def main(argv=None):
                     help='Where a region frame\'s stair walk walks: owned (default: its cell plus the map-switch '
                          'margin) or frame (the whole frame with its border copies, the method before v0.0.42); '
                          'sets AMIWIND_STAIR_WALK_AREA (chim.collision.walk_area_mode)')
+    ap.add_argument('--stair-collision-method', choices=('0', '1'), default=None,
+                    help='How a flight of stairs gets its collision: 0 (default) the convex proxies with the stair '
+                         'rules, proven by the stair walk; 1 (EXPERIMENTAL) a stairway collision mesh (one ramp, or one '
+                         'block per tread) for every flight whose collision fails the geometric stair check '
+                         '(tools/stair_mesh.py); sets AMIWIND_STAIR_COLLISION_METHOD')
     ap.add_argument('--collision-underside', choices=('rule', 'split', 'whole', 'names'), default=None,
                     help='How a model keeps collision a convex piece closes under an authored ceiling: names '
                          '(default: a list of mesh names) or the EXPERIMENTAL general rules rule, split, whole '
@@ -140,6 +183,21 @@ def main(argv=None):
                          'records (also the known-good stair records shipped with the source; a frame in neither is '
                          'reported, not walked), cached (walk what changed) or full (walk every frame); sets '
                          'AMIWIND_STAIR_WALK_CACHE')
+    ap.add_argument('--stair-walk', choices=('all', 'flights'), default=None,
+                    help='What the stair walk covers (default: AMIWIND_STAIR_WALK, else flights): flights (the steps '
+                         'that gate the build) or all (every step and ramp, the advisory findings too); sets '
+                         'AMIWIND_STAIR_WALK')
+    ap.add_argument('--stair-walk-key', choices=('reach', 'frame'), default=None,
+                    help='How the walk of a frame is keyed (default: reach, frame with --stair-walk-cache records): reach '
+                         '(per core: its steps and ramps and the collision within reach of their walks) or frame (every '
+                         'chunk and placement of the frame, the key before v0.0.46); sets AMIWIND_STAIR_WALK_KEY')
+    ap.add_argument('--stair-walk-places', metavar='FILE|ID,...', default=None,
+                    help='A targeted stair walk of the named places only (watch-list file, or IDs of '
+                         'config/stair-watch.json, cells x:y, frames/... paths, ref:N); rows reported, not stored; '
+                         'sets AMIWIND_STAIR_WALK_PLACES')
+    ap.add_argument('--stair-watch', metavar='FILE|off', default=None,
+                    help='The stair watch list whose frames are walked again every build (default '
+                         'config/stair-watch.json; off: none); sets AMIWIND_STAIR_WATCH')
     ap.add_argument('--gate-order', choices=('stairs-first', 'stairs-last'), default='stairs-first',
                     help='When the stair gate runs among the CHIM checks: stairs-first (default since v0.0.42: right '
                          'after the validation, before the statistics, heap gate and zone walk; with the stored '
@@ -148,6 +206,17 @@ def main(argv=None):
                          'stair gate last); same reports either way')
     add_jobs(ap)
     a = ap.parse_args(argv)
+    from chim.bevels import model_bevels_mode
+    try:
+        model_bevels_mode({'model_bevels': a.model_bevels})     # refused before any stage (fail fast)
+    except ValueError as error:
+        ap.error(str(error))
+    if a.placement_format == '0.8' and a.model_bevels.startswith('tol:'):
+        ap.error('--placement-format 0.8 does not take --model-bevels tol:N (its collision is the placed pieces)')
+    if a.terrain_pack != 'bsp29' and a.terrain_refs != 'on':
+        ap.error('--terrain-pack %s needs --terrain-refs on' % a.terrain_pack)
+    if a.reach_index == 'refs' and a.placement_format != '0.8':
+        ap.error('--reach-index refs (world format 0.9) needs --placement-format 0.8')
     import build_parallel
     with build_parallel.stage_pool(a.jobs, 'CHIM', mode=a.pool):
         return _main(ap, a)
@@ -207,10 +276,17 @@ def _main(ap, a):
         os.environ['AMIWIND_STAIR_WALK_AREA'] = a.stair_walk_area
     if a.collision_underside:
         os.environ['AMIWIND_COLLISION_UNDERSIDE'] = a.collision_underside
+    if a.stair_collision_method:
+        from stair_collision_env import export_stair_collision_method
+        export_stair_collision_method(a.stair_collision_method)
     if a.scale_snap:
         os.environ['AMIWIND_SCALE_SNAP'] = '' if a.scale_snap == 'on' else 'off'
     if a.stair_walk_cache:
         os.environ['AMIWIND_STAIR_WALK_CACHE'] = a.stair_walk_cache
+    for value, name in ((a.stair_walk, 'AMIWIND_STAIR_WALK'), (a.stair_walk_key, 'AMIWIND_STAIR_WALK_KEY'),
+                        (a.stair_walk_places, 'AMIWIND_STAIR_WALK_PLACES'), (a.stair_watch, 'AMIWIND_STAIR_WATCH')):
+        if value:
+            os.environ[name] = value
     from chim.build import build_areas
     from chim.texfx import effect_path
     def build_world():
@@ -223,7 +299,12 @@ def _main(ap, a):
                      **({'terrain_hull': a.terrain_hull} if a.terrain_hull != 'auto' else {}),
                      **({'terrain_refs': a.terrain_refs} if a.terrain_refs != 'off' else {}),
                      **({'model_hull_patch': a.model_hull_patch} if a.model_hull_patch != 'on' else {}),
+                     **({'model_bevels': a.model_bevels} if a.model_bevels != 'profile' else {}),
+                     **({'placement_format': a.placement_format} if a.placement_format != '0.7' else {}),
+                     **({'reach_index': a.reach_index} if a.reach_index != 'copies' else {}),
+                     **({'terrain_pack': a.terrain_pack} if a.terrain_pack != 'bsp29' else {}),
                      **({'model_weld': a.model_weld} if a.model_weld != 'base' else {}),
+                     **({'uv_scroll': a.uv_scroll} if a.uv_scroll != 'off' else {}),
                      **({'mesh_method': a.mesh_method} if a.mesh_method != 'table' else {})), not a.no_cache,
                         set(a.rebuild_mesh), not a.no_mesh_occluders, a.unit_cache, a.harvest, a.flora,
                         a.legacy_run, [effect_path(e) for e in a.texture_effect], not a.no_far_terrain,
@@ -276,6 +357,21 @@ def _main(ap, a):
         # the gates below read the world the validation read (--pool stage), instead of reading and decoding
         # every file again each (--pool batch: the method before v0.0.42); the same world, the same reports
         shared = world if a.pool == 'stage' else None
+
+        from stair_collision_env import stair_collision_method
+        if stair_collision_method() == '1':
+            # stair collision method 1: the geometric stair check of every mesh with flights, collected from the
+            # frames' work folders (no walk); a mesh failing it under the method it ships with fails the stage
+            import stair_mesh
+            check_timer = build_profile.phase('CHIM stair check').__enter__()
+            try:
+                found = stair_mesh.require(a.out)
+            except ValueError as exc:
+                check_timer.__exit__(ValueError, exc, None)
+                ap.exit(1, 'Error: %s\n' % exc)
+            check_timer.done('CHIM stair check: %s (%d meshes with %d flights, %d ship a stairway collision mesh)'
+                             % (found['status'], found['meshes'], found['flights'], len(found['ships_method_1'])))
+            check_timer.__exit__(None, None, None)
 
         def stair_gate():
             """The stair gate and its receipt entries (gate order: --gate-order)."""

@@ -1,15 +1,24 @@
 # ENGINE-STRICT-WARNINGS-36: The engine builds warning-free only under -Wall -Wno-unused; stricter flags show 482 warnings
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.36-dev3 at 2026-10-11 02:12 +0300: diagnostic engine build of c8bf614 with -Wextra -Wuninitialized -Wmaybe-uninitialized -Wmissing-field-initializers -Wshadow -Wunused: 482 distinct warnings
+- Reported with v0.0.46 at 2026-10-20 23:29 +0300: outside review of v0.0.46 (registered 2026-10-20 20:29 UTC): gate still -Wall -Wno-unused; 451 warnings at -Wall -Wextra, 35 printf mismatches
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
 | --- | --- |
 | Reported by | test |
 | First noticed | 11 October 2026, in v0.0.36-dev3 |
-| Where | engine/aga/src (view.c 35, chim/chim_world.c 18, ...); engine/aga/Makefile WARN_FLAGS |
+| Where | engine/aga/Makefile WARN_FLAGS; engine/aga/src (printf-like functions, aw_ui.c, sv_move.c, ...) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3 (last seen) |
+| Persists in | v0.0.36-dev3, v0.0.46 (last seen) |
 | Severity | medium: uninitialised, shadowed and unused code can hide real faults that the gate cannot see |
 | Family | Gates, CI and tests (`tests-ci`) |
 | Playtest version | v0.0.36-dev3 |
@@ -18,12 +27,55 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.40 (15 October 2026)._
+_Last updated with AmiWind v0.0.46 (20 October 2026)._
 
-## Status: 11 October 2026
+<!-- contents start -->
+## Contents
 
-Open. Planned repair below. No earlier register entry covers compiler warnings beyond the gate's flags, so this is a
-first report.
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Status: 20 October 2026](#status-20-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Status: 20 October 2026
+
+PERSISTING since v0.0.36-dev3 (11 October 2026): an outside review of v0.0.46 raised it again on 20 October 2026,
+and nothing had changed since the first report (still `-Wall -Wno-unused`). Repair ready on the branch
+v0.0.47-strict-warnings, not yet on the development line: the real faults the stricter warnings show are fixed and
+the gate's warning level is raised (below). What is still left: the warnings the new level does not ask for, all
+classified as noise below; they are counted, not fixed.
+
+### Measured on v0.0.46 (20 October 2026)
+
+Distinct warnings over every engine variant the gate builds (`c` for the 68040 and the 68060, `upstream` at `-O1`
+and `-O2`, `c` with its variables spelled out), split by file: AmiWind's own files (`aw_*.c`, `chim/*.c`, their
+headers), inherited AmiQuake files AmiWind changed, and inherited files unchanged since upstream revision 9c62d90.
+
+| Flags | Before: own / changed / unchanged = total | After |
+| --- | --- | --- |
+| `-Wall -Wno-unused` (the old gate) | 0 / 0 / 0 = 0 | 0 |
+| the same, printf-like functions checked | 1 / 34 / 0 = 35 | 0 |
+| `-Wall -Wextra -Wno-unused` | 227 / 193 / 31 = 451 | 157 / 190 / 31 = 378 |
+| `-Wall -Wunused` | 5 / 15 / 1 = 21 | 0 / 15 / 1 = 16 |
+| `-Wall -Wextra -Wno-unused -Wshadow -Wconversion -Wdouble-promotion -Wformat=2 -Wmissing-prototypes -Wundef -Wpointer-arith` | 1,375 / 2,168 / 525 = 4,068 | 1,231 / 2,164 / 525 = 3,920 |
+| the new gate level (below) | 127 / 3 / 0 = 130 | 0 |
+
+What is left after the repair is noise: `-Wmissing-field-initializers` (343: the `cvar_t` definitions name only
+their first fields), `-Wconversion` / `-Wsign-conversion` / `-Wfloat-conversion` (2,566: integer and float
+narrowing that Quake does on purpose), `-Wdouble-promotion` (488: float values widened for double constants and
+calls; the 68040 FPU computes in extended precision either way, so this is a speed question, not a fault),
+`-Wmissing-prototypes` in inherited files (429: Quake declares many functions only where they are used),
+`-Wundef` (39: `#if id68k` and the engine profile switches, meant to be 0 when undefined), and in inherited files
+signed/unsigned comparisons (35), shadowed names (19) and unused locals (16), each read and found harmless.
 
 ## Symptom
 
@@ -52,16 +104,50 @@ of the diagnostic build is kept with the private evidence of the dev3 crash inve
 
 ## Repair
 
-Planned (checklist T10): fix every warning (uninitialised and shadowed variables first), then raise the gate's
-`WARN_FLAGS` so the stricter set stays at zero; one change per file group, each gated.
+20 October 2026, branch v0.0.47-strict-warnings, in two commits.
+
+Faults fixed (the engine binary changes, only in the objects of these files):
+
+- The printf-like engine functions (`Con_Printf`, `Con_DPrintf`, `Sys_Error`, `Sys_Printf`, `Host_Error`,
+  `Host_EndGame`, `SV_ClientPrintf`, `SV_BroadcastPrintf`, `PR_RunError`, `va`, `AW_LogPrintf`, `COM_FormatPath`)
+  had no format attribute, so no warning level checked their callers. With it, `-Wall` found 35 mismatches.
+  Real: `FloorDivMod` printed a `double` with `%d` (the error text was wrong); `Con_NotifyBox` and the network
+  reject reason passed text as the format (a `%` in it would be read as a conversion). The other 32 printed an
+  `int` with `%ld` or the reverse, harmless on the Amiga (both 32 bits), corrected to the matching conversion.
+- `SV_NewChaseDir` (inherited Quake code) compared float distances with the integer `abs()`, which cuts the
+  fractions: now `fabs()`.
+- The screen size (`vid.width`, `vid.height`) is unsigned, so a negative position compared with it became a huge
+  number. `AW_UIFill` turned a rectangle wholly left of or above the screen into a fill of the whole row span or
+  column; text that started left of the screen was dropped instead of clipped (`AW_SmallString`, the arena labels);
+  the gallery's right-aligned text could hand `Draw_Character`, which does not clip, a position just left of the
+  screen. AmiWind's own files now compare the screen size as `int`, and the gallery skips characters left of it.
+
+Noise fixed in AmiWind's own files without a code change (their objects are byte-identical): names that shadowed a
+global or an outer local were renamed; unused locals removed; two header helpers marked unused; functions called
+from another file now have one shared prototype (`aw_links.h`, `aw_c2p.h`) that both the defining file and the
+callers include, so a mismatched call is a compile error. One inherited fall-through is marked as intended.
+
+The gate's warning level (`engine/aga/Makefile`): every file builds with `-Wall -Wextra -Wformat-security`, less
+three checks that are noise in the inherited Quake code (unused code, partly initialised structs, signed/unsigned
+comparisons); AmiWind's own files get those back (unused parameters excepted) plus `-Wshadow` and
+`-Wmissing-prototypes`. The builder fails on any warning, so a new warning in either set stops the build.
 
 ## Verification
 
-Open.
+- Warning flags do not change the generated code: the fixed source built with the old flags (`-Wall -Wno-unused`)
+  and with the new level gives the same SHA-256 in every engine variant the gate builds (the 68040 `c` engine
+  `2d1fbf11...`, the 68060 engine, `upstream` at `-O1` and `-O2`).
+- The fixes change the 68040 `c` engine from `f2c246bc...` (the v0.0.46 dev head) to `2d1fbf11...`. Objects
+  compared one by one: only the 27 files with the format, `fabs` and signed comparison changes above differ
+  (in `chim_world.o` only a renamed static variable's symbol, which the stripped binary does not carry).
+- `tests/test_engine_warnings.py`: the make command lines of every engine variant carry the two levels; every
+  printf-like declaration carries the format attribute; the fixed faults stay fixed.
+- The gate's engine step builds every variant at the new level with zero warnings.
 
 ## Prevention
 
-The raised gate flags keep it at zero.
+The raised gate level keeps both sets at zero, and the format attribute makes every printf-like call checked. A new
+printf-like function without the attribute fails `tests/test_engine_warnings.py`.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

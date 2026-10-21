@@ -91,11 +91,30 @@ class AllChimDiskLayoutTests(unittest.TestCase):
         names = {'vf%04d' % i: (i, 0) for i in range(count)}
         return boot, chim, names
 
-    def layout(self, boot, chim, names, removed=()):
+    def layout(self, boot, chim, names, removed=(), layout=None):
+        """The preflight's layout of the planned payload: the legacy layout unless LAYOUT says otherwise."""
         def owned(id1, world, primary_only=False):
             return dict(names)
         with patch('chim.frame_map.region_map_names', side_effect=owned):
-            return payload_preflight.check_disk_layout(boot, set(removed), [], chim)
+            return payload_preflight.check_disk_layout(boot, set(removed), [], chim, layout or dict(mode='legacy', headroom_mib=100, boot_headroom_mib=100))
+
+    def test_compact_layout_puts_the_frame_maps_on_the_chim_volume(self):
+        # the default layout (tools/layout_plan.py): two partitions, the planned frame maps with the CHIM world
+        with tempfile.TemporaryDirectory() as directory:
+            boot, chim, names = self.world(Path(directory), 6, sprites={2: 3})
+            result = self.layout(boot, chim, names, layout=dict(mode='compact', headroom_mib=100,
+                                                                 boot_headroom_mib=100))
+        self.assertEqual(result['layout'], 'compact')
+        self.assertEqual(result['planned_frame_maps'], dict(count=6, bytes=6 * 1024 + 3 * 512, bound=6))
+        parts = result['plan'][0]['partitions']
+        self.assertEqual([(p['partition'], p['role']) for p in parts], [('DH0', 'boot'), ('DW0', 'chim')])
+        self.assertEqual(parts[1]['maps'], 6)
+        self.assertEqual(parts[1]['payload'], 8192 + 6 * 1024 + 3 * 512)
+        # boot: engine + six far sidecars + one recipe sprite asset + world/volumes.awv (5 bytes, written later)
+        self.assertEqual(parts[0]['payload'], ENGINE + awr_bytes(6) + 6 * 100 + 64 + 5)
+        self.assertTrue(all(p['free_bytes'] >= 100 * 1024 ** 2 for p in parts))
+        plan = result['layout_plan']
+        self.assertEqual(plan['partitions'][1]['maps'], ['vf%04d.chim' % i for i in range(6)])
 
     def test_every_cell_on_chim_plans_its_frame_maps(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -129,7 +148,7 @@ class AllChimDiskLayoutTests(unittest.TestCase):
             (id1 / 'maps').mkdir(parents=True)
             files(id1 / 'maps', [1000, 2000, 3000])
             (boot / 'AmiWind').write_bytes(b'e' * ENGINE)
-            result = payload_preflight.check_disk_layout(boot, set(), [], None)
+            result = payload_preflight.check_disk_layout(boot, set(), [], None, dict(mode='legacy', headroom_mib=100, boot_headroom_mib=100))
         self.assertEqual(result['planned_frame_maps'], dict(count=0, bytes=0, bound=0))
         self.assertEqual((result['drives'], result['partitions']), (1, 2))
         self.assertEqual([p['files'] for p in result['plan'][0]['partitions']], [2, 3])

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+#include "aw_links.h"
 #include "amiwind_version.h"
 #include "aw_world.h"
 #include "aw_clock.h"
@@ -256,7 +257,7 @@ static void compass(void) {
 static int strip_slots(int lift) {
     int n=0,y;
     if(AW_PhotoModeActive() || sb_lines<48)return 0;
-    for(y=vid.height-HUD_LINE_BOTTOM-lift;y>=vid.height-sb_lines+12;y-=HUD_LINE_STEP)n++;
+    for(y=(int)vid.height-HUD_LINE_BOTTOM-lift;y>=(int)vid.height-sb_lines+12;y-=HUD_LINE_STEP)n++;
     return n;
 }
 /* INSPECT-OVER-VIEWPORT-42: the hint on the first line under the bars, then up to three
