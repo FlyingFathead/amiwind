@@ -1,6 +1,6 @@
 # Cell crossings: how the engine moves from one CHIM frame to the next
 
-_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
+_Last updated with AmiWind v0.0.47 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents

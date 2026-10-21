@@ -1,10 +1,16 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.47 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.47: CHIM: The More, The Merrier, 21 October 2026](#v0047-chim-the-more-the-merrier-21-october-2026)
+- [v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes, 20 October 2026](#v0046-red-mountain-getting-red-a-whole-heap-of-fixes-20-october-2026)
+- [v0.0.45: CHIM Streaming Improved, Guard Torches Are Back, 20 October 2026](#v0045-chim-streaming-improved-guard-torches-are-back-20-october-2026)
+- [v0.0.44: By Azura's Trees!, 19 October 2026](#v0044-by-azuras-trees-19-october-2026)
+- [v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It, 19 October 2026](#v0043-let-there-be-chim-vvardenfells-outdoors-all-of-it-19-october-2026)
+- [v0.0.42: Things Are Starting To Look Pretty Khuul, 17 October 2026](#v0042-things-are-starting-to-look-pretty-khuul-17-october-2026)
 - [v0.0.41 candidate - visibility aprons, 15 October 2026](#v0041-candidate---visibility-aprons-15-october-2026)
 - [v0.0.41 candidate - window support, 15 October 2026](#v0041-candidate---window-support-15-october-2026)
 - [v0.0.41 candidate - lava coverage, 15 October 2026](#v0041-candidate---lava-coverage-15-october-2026)
@@ -149,6 +155,86 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.47: CHIM: The More, The Merrier, 21 October 2026
+
+- The CHIM cell list is now in the repository (`config/chim-cells.json`) and the default: a plain build puts every
+  exterior cell on CHIM. Since v0.0.36 the list the project's own builds used was not in the repository, and builds
+  from the repository made the old region maps ([BUILD-CHIM-CELLS-PRIVATE-LIST-47](bugs/BUILD-CHIM-CELLS-PRIVATE-LIST-47.md)).
+- Crossing a frame border outdoors is no longer a level change; creatures and people appear outside the towns, and
+  the game's setting for the actor table is switched on whenever the image ships it, which was missing before
+  ([CHIM-ACTOR-TABLE-OFF-IN-GAME-47](bugs/CHIM-ACTOR-TABLE-OFF-IN-GAME-47.md)). The switches of the second
+  development snapshot are on by default.
+- Mushrooms in converted interiors can be picked ([HARVEST-INTERIOR-PICK-47](bugs/HARVEST-INTERIOR-PICK-47.md)).
+- The builder keeps `--jobs` at full width while memory is below 96 %: the memory guard no longer cuts workers it
+  cannot free. A from-scratch build's CHIM stage had run on 1 of 24 cores for an hour
+  ([BUILD-SCHEDULER-MEMORY-STARVED-42](bugs/BUILD-SCHEDULER-MEMORY-STARVED-42.md)).
+- New builder options `--clean` (a clean start) and `--public-defaults` (only the repository's own defaults, old
+  methods refused).
+- Terrain generated from the game's heights, shared files and skins stored once, no stair walk by default.
+- Details: [the v0.0.47 release notes](RELEASE-v0.0.47.md).
+
+## v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes, 20 October 2026
+
+- Every region chooses its weather as the original game does; Red Mountain draws its blight sky
+  ([SKY-REDMOUNTAIN-BLUE-44](bugs/SKY-REDMOUNTAIN-BLUE-44.md)).
+- The Ebonheart dragon statue stands on its pedestal again, the torch shows in third person, the Vivec dock
+  walkways hold the player up, and the Dreamers greet you.
+- Collision pieces keep only the surface you walk on exactly, so every frame fits its memory again
+  ([CHIM-HULL-SURFACE-HEAP-46](bugs/CHIM-HULL-SURFACE-HEAP-46.md)).
+- Rebuilds reuse more: stair walks are keyed by the data they walk, and the build's finish time is printed in UTC and
+  local time.
+- Details: [the v0.0.46 release notes](RELEASE-v0.0.46.md).
+
+## v0.0.45: CHIM Streaming Improved, Guard Torches Are Back, 20 October 2026
+
+- Frames around the player are read ahead into spare Fast RAM; on a 128 MiB setup a crossing takes about a third of
+  the v0.0.44 time ([CROSSING_BASELINE](performance/CROSSING_BASELINE.md)).
+- The engine sizes its heap from the free Fast RAM; a 16 MiB machine keeps the built 11 MiB
+  ([ENGINE-HEAP-FIXED-SIZE-43](bugs/ENGINE-HEAP-FIXED-SIZE-43.md)).
+- Guards in the streets carry their torches at night again: 19 guard types instead of 13
+  ([GUARD-TORCH-CHIM-FRAMES-44](bugs/GUARD-TORCH-CHIM-FRAMES-44.md)).
+- The CHIM stage runs its serial sections on the worker pool, and a change to the scheduler no longer rebuilds
+  every stage.
+- Details: [the v0.0.45 release notes](RELEASE-v0.0.45.md).
+
+## v0.0.44: By Azura's Trees!, 19 October 2026
+
+- The Bitter Coast trees are 16 to 42 % lighter again, every trunk keeping at least 90 % of its height, so both
+  Bitter Coast areas fit in memory ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md)).
+- The player body is built again for every race, and guard torch models are built again
+  ([NPC-HEAD-DECIMATION-33](bugs/NPC-HEAD-DECIMATION-33.md)).
+- Interior plant sprites reach every room type ([INTERIOR-MORAG-TONG-FPS-43](bugs/INTERIOR-MORAG-TONG-FPS-43.md)).
+- The CHIM tracker counts what each build puts on CHIM: 1,292 land cells and 117 sea cells
+  ([TRACKER-CHIM-COUNT-STALE-44](bugs/TRACKER-CHIM-COUNT-STALE-44.md)).
+- Details: [the v0.0.44 release notes](RELEASE-v0.0.44.md).
+
+## v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It, 19 October 2026
+
+- Every exterior cell of Vvardenfell is on CHIM; the 227 cells left classic in v0.0.42 joined in three batches,
+  lightest first.
+- The 98 sea floor cells are taken as flat seabed, and fourteen open-sea cells join as ocean cells.
+- Three meshes whose collision did not match their visible steps are fixed
+  ([CHIM-STAIR-STEPS-SOLID-43](bugs/CHIM-STAIR-STEPS-SOLID-43.md)); two tree meshes no longer keep 14 cells off CHIM.
+- Red Mountain's summit no longer meets a solid sky ceiling, editor markers are no longer drawn or solid, and
+  interior plants and trees are sprites by default.
+- The build checks a pooled stage against the memory it needs before it starts, the image step's frame maps run on
+  all cores, and the playtest is smaller.
+- Details: [the v0.0.43 release notes](RELEASE-v0.0.43.md).
+
+## v0.0.42: Things Are Starting To Look Pretty Khuul, 17 October 2026
+
+- 1,168 of the island's 1,395 exterior cells on CHIM (776 in v0.0.42-dev1), the light cells of the CHIMport by
+  weight.
+- The clouds are back: the cloud sky is converted for whatever palette the build has, and a stand-in sky stops the
+  build ([SKY-FLAT-PALETTE-DRIFT-41](bugs/SKY-FLAT-PALETTE-DRIFT-41.md)).
+- No more popping buildings where streaming memory ran full
+  ([CHIM-ZONE-RELEASE-FLICKER-42](bugs/CHIM-ZONE-RELEASE-FLICKER-42.md)).
+- Vivec's giant mushrooms are closed again, doors in CHIM region cells show their entrance, and 141 Vivec rooms are
+  converted.
+- The inventory starts to take its original shape: title bar, item icons from the game's own art, the character as a
+  still picture.
+- Details: [the v0.0.42 release notes](RELEASE-v0.0.42.md).
 
 [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
 

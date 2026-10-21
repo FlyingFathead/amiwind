@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
+_Last updated with AmiWind v0.0.47 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -431,6 +431,18 @@ Every change is printed with its reason (`[pool] ...: workers 8 -> 11 of 11
 (memory or threads freed up; ...)`, `[scheduler] memory tight ...`). The
 resource plan and the governor never change what a unit computes or the order
 of any output, so they are not part of any stage key.
+
+**`--jobs` keeps its level below 96 % of the memory limit** (decided for the
+project, 21 October 2026; BUILD-SCHEDULER-MEMORY-STARVED-42). The memory guard
+cuts a pooled stage's workers only above 96 %, to keep the build clear of the
+out-of-memory killer. Below that line every stage runs at its full share of
+`--jobs`, and a cut made above it is lifted as soon as the memory is back under
+it (`[scheduler] memory ...: below the critical line (96 %), chim back to its
+full share of --jobs`). The reason: a cut does not free memory. A pool's worker
+processes stay alive between units and keep the memory they reached; a cut only
+stops giving them new units. The earlier guard cut workers from 90 % and grew
+them back only when memory came free, so a cut never reversed: a from-scratch
+build's CHIM stage ran on 1 of 24 cores for an hour at 90 % memory.
 
 ## Perf database
 

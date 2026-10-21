@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
+_Last updated with AmiWind v0.0.47 (21 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,28 +27,28 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands (21 October 2026)
 
-The newest release is **v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes**, running on CHIM Engine v0.2.1
-([release notes](docs/RELEASE-v0.0.46.md)). Since v0.0.43 every exterior cell of Vvardenfell is on CHIM: 1,409
+The newest release is **v0.0.47: CHIM: The More, The Merrier**, running on CHIM Engine v0.2.1
+([release notes](docs/RELEASE-v0.0.47.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
 [the counting table](docs/chim/CELL_TRACKER.md#what-we-count); every cell: the
 [CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md). Interiors are still ordinary Quake maps, and many of the
 base game's interiors are not converted yet; Solstheim is not converted.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): smoother crossings from one CHIM cell to the next first
-(the outdoors streamed as one world instead of a level restart per frame), collision built from the game's own
+What comes next is in the [roadmap](docs/ROADMAP.md): streamed crossings into and out of the towns first,
+collision built from the game's own
 movement rules, then the open bugs from the playtests, then every interior of the base game.
 
-### The development snapshot: v0.0.47-dev1
+### What v0.0.47 changed
 
-The newest development snapshot is **v0.0.47-dev1**, 21 October 2026 (not a release;
-[notes](docs/RELEASE-v0.0.47-dev1.md)). The Ghostfence, the Vivec waterfalls and the ash mire shimmer by default,
-the image is lighter (the 64 MB media catalogue is no longer on the boot disk), pursuers keep up on slopes, spawned
-actors stand on the ground, and the boot volume has a Workbench icon labelled with the version. The builder walks no
-stairs by default and reuses more on a rebuild. The emulator presets and the launcher start with 128 MB of Fast RAM;
-16 MB, the smallest machine the game runs on, stays a choice and the boot smoke keeps using it. The smaller world
-formats (0.8 to 0.11), the outdoor actors and the streamed type 1 crossing are in the source behind switches that
-are off ([experimental flags](docs/EXPERIMENTAL_FLAGS.md)).
+The builder in this repository now builds every exterior cell on CHIM by default (since v0.0.36 the cell list the
+project's own builds used was not in the repository). Crossing a frame border outdoors is no longer a level change,
+creatures and people appear outside the towns, mushrooms can be picked indoors, and the Ghostfence, the Vivec
+waterfalls and the ash mire shimmer. The terrain is generated from the game's heights, repeated files and skins are
+stored once, and the builder walks no stairs by default, reuses more on a rebuild and keeps its workers at full width
+while memory allows. The emulator presets and the
+launcher start with 128 MB of Fast RAM; 16 MB, the smallest machine the game runs on, stays a choice.
 
 ### What v0.0.46 changed
 
@@ -56,7 +56,7 @@ Red Mountain is red again: every region chooses its weather the way the original
 draws its blight sky. The Ebonheart dragon statue is back on its pedestal, the torch shows in third person, the
 Vivec dock walkways hold the player up and the Dreamers greet you. The collision of the whole island now keeps only
 the surface you walk on exactly, so every frame fits its memory again. Earlier releases: the
-[release notes](docs/RELEASE-v0.0.46.md) link back through every version, and the sections the front page used to
+[release notes](docs/RELEASE-v0.0.47.md) link back through every version, and the sections the front page used to
 carry are kept in [earlier README sections](docs/README_ARCHIVE.md).
 
 ### What works, and the honest limits
@@ -68,7 +68,7 @@ carry are kept in [earlier README sections](docs/README_ARCHIVE.md).
   every performance figure so far come from emulators and are relative. The one real-hardware figure, from a tester
   in October 2026, is about 0.2 frames per second on an A4000 with a 68060 at 100 MHz with an earlier build: not
   playable yet. See [AmiWind on real hardware](docs/REAL_HARDWARE.md) and [AmiWind on the 68060](docs/68060.md).
-- Crossing from one cell to the next is still a level change; a streamed crossing is work in progress
+- Crossing from one outdoor cell to the next is streamed; walking into or out of a town is still a level change
   ([cell crossings](docs/chim/CELL_CROSSINGS.md)).
 - The known problems are listed in [the bug register](docs/BUGS.md) and under "Known in this build" in each
   release's notes.
@@ -103,8 +103,8 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.47-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.47-dev1-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.47-dev1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.47-dev1-WinUAE.uae).
+[`AmiWind-v0.0.47-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.47-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.47-WinUAE.uae`](resources/emulators/AmiWind-v0.0.47-WinUAE.uae).
 
 ## Where to read more
 

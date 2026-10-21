@@ -1156,6 +1156,8 @@ ALARM_ENV = 'AMIWIND_SCHEDULER_ALARM_SECONDS'
 # Measured worker memory (BUILD-STAGE-ALLOWANCE-STUCK-43). When the scheduler can read a stage's own processes
 # (/proc: its main process and the pool workers under it), the guard decides from what the workers really hold, not
 # from the plan's unit estimate:
+# SUPERSEDED 2026-10-21 (SchedulerGuard docstring, BUILD-SCHEDULER-MEMORY-STARVED-42): below PRESSURE_CRITICAL no cut
+# at all, --jobs kept and earlier cuts lifted; the two lines below describe the rule before that.
 # - a cut is made only when the workers' own memory (above an idle worker's) can free what is over PRESSURE_HIGH; when
 #   the memory is held by the stage's main process, fewer workers free nothing and the workers stay (one line says
 #   so). Above PRESSURE_CRITICAL the guard cuts anyway, by as many workers as the excess needs;
@@ -1241,6 +1243,25 @@ def worker_sizes(measured):
 
 
 class SchedulerGuard:
+    """The build's memory and CPU guard for pooled stages.
+
+    THE RULE (maintainer 2026-10-21: "--jobs max" keeps its level at all points; BUILD-SCHEDULER-MEMORY-STARVED-42):
+    below PRESSURE_CRITICAL (96 % of the container's memory limit) a pooled stage ALWAYS runs at its full --jobs
+    share, and any earlier cut is lifted at once. Only above PRESSURE_CRITICAL does the guard cut workers, to keep the
+    build out of the out-of-memory killer.
+
+    Why, so this is never undone again: a cut does not free memory. A pool's worker processes stay alive between
+    units and keep the memory they reached (Python does not hand freed heap back); a cut only stops handing them new
+    units. Every cut between PRESSURE_HIGH and PRESSURE_CRITICAL therefore froze the memory where it was and, with the
+    grow-back rule waiting for room that never came, ratcheted the stage down for good: the v0.0.42 final's chim stage
+    sat on 1 of 6 workers for over an hour, and on 2026-10-21 the v0.0.47-dev3 clean public build's chim stage sat on
+    1 of 24 for an hour at 39.5 of 44 GiB (main process 14 GB, 26 idle-but-alive workers 19 GiB).
+
+    Do NOT reintroduce a cut below PRESSURE_CRITICAL, a "memory tight" cut on a share of the limit, or a cut that
+    assumes idle workers shrink, unless the same change also ends the cut workers' processes (and a test proves the
+    memory comes back). tests/test_build_stage_supervisor.py and tests/test_scheduler_memory_starved.py pin this.
+    """
+
     def __init__(self, budget, units=None, reader=None, clock=time.monotonic, interval=None, log=None, parents=None,
                  alarm_seconds=None, stage_reader=None):
         self.budget, self.units, self.parents = budget, dict(units or {}), dict(parents or {})
@@ -1321,15 +1342,34 @@ class SchedulerGuard:
         measured = {name: self._measure(name) for name in pooled}
         if pressure <= PRESSURE_HIGH:
             self.holding.clear()
+        if pressure <= PRESSURE_CRITICAL:
+            # THE RULE (class docstring): below the critical line every pooled stage runs at its full --jobs share; a
+            # cut made above it is lifted here at once, whatever the grow-back room says (the dev3 clean public build
+            # sat at 89.8 %, under PRESSURE_HIGH, on 1 of 24 workers for an hour, waiting for room under 88 %).
+            for capped in [n for n in list(self.caps) if n in pooled]:
+                del self.caps[capped]
+                self.log('[scheduler] memory %.1f of %.1f GiB: below the critical line (%d %%), %s back to its full '
+                         'share of --jobs (a cut frees nothing while the worker processes stay alive)' % (
+                             live / gib, limit / gib, round(PRESSURE_CRITICAL * 100), capped))
+                self.changes.append({'what': 'memory-restore', 'stage': capped})
         if pressure > PRESSURE_HIGH:
             name = max(pooled, key=lambda n: (pooled[n], n))
             sizes = worker_sizes(measured.get(name))
             excess = (live - limit * PRESSURE_HIGH) / MIB
-            if pooled[name] <= 1:
+            if pooled[name] <= 1 and name not in self.caps:
                 pass
-            elif sizes is not None and pressure <= PRESSURE_CRITICAL and sizes[0] < excess:
-                # the workers do not hold the memory: fewer of them would free nothing (BUILD-STAGE-ALLOWANCE-STUCK-43)
-                if name not in self.holding:
+            elif pressure <= PRESSURE_CRITICAL:
+                # Below the critical line the stage keeps --jobs (maintainer 2026-10-21: "--jobs max" keeps its level
+                # at all points). A cut never freed memory here: the pool's worker processes stay alive and keep what
+                # they hold whether or not they get new units, so every cut only ratcheted the stage down, to one
+                # worker for an hour on the v0.0.47-dev3 clean public build (BUILD-SCHEDULER-MEMORY-STARVED-42,
+                # persisting since v0.0.42; before: BUILD-STAGE-ALLOWANCE-STUCK-43). An earlier cut is lifted.
+                if self.caps.pop(name, None) is not None:
+                    self.log('[scheduler] memory %.1f of %.1f GiB: below the critical line (%d %%), %s back to its '
+                             'full %d workers (a cut frees nothing while the worker processes stay alive)' % (
+                                 live / gib, limit / gib, round(PRESSURE_CRITICAL * 100), name, pooled[name]))
+                    self.changes.append({'what': 'memory-restore', 'stage': name, 'workers': pooled[name]})
+                if sizes is not None and name not in self.holding:
                     self.holding.add(name)
                     self.log('[scheduler] memory tight (%.1f of %.1f GiB in use), but %s\'s main process holds '
                              '%.1f GiB and its %d worker process(es) only %.0f MiB above an idle worker: fewer '

@@ -1,6 +1,6 @@
 # Bug register
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.47-dev3._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.47._
 
 The single list of every AmiWind bug and its current status. How tracking
 works, the report template and the rules: [bug tracking](bugs/README.md).

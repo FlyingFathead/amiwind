@@ -101,37 +101,27 @@ class GrowBack(unittest.TestCase):
         g = rp.SchedulerGuard(12, units or {'chim': 1200.0}, reader=memory.read, clock=memory.clock, interval=30,
                               log=lines.append)
         used = memory.used
-        memory.used = int(0.95 * memory.limit)
-        for t in range(0, 300, 30):                           # tight: cut to one worker
+        memory.used = int(0.97 * memory.limit)
+        for t in range(0, 300, 30):                           # above the critical line: cut to one worker
             memory.t = t
             g.tick({n: g.cap(n, 6) for n in g.units}, {n: 6 for n in g.units})
         memory.used = used
         return g
 
-    def test_between_70_and_90_percent_a_stage_grows_by_the_units_that_fit_under_80(self):
-        # try2's kind of state: a large parent keeps the container above 70 %, so the guard never gave workers back
-        memory, lines = Memory(32, 23), []
-        g = self.capped(memory, lines)
-        self.assertEqual(g.cap('chim', 6), 1)
-        memory.t = 400
-        g.tick({'chim': 1}, {'chim': 6})
-        # free under 80 %: 25.6 - 23 GiB = 2,662 MiB = 2 units of 1,200 MiB -> 1 + 2 = 3
-        self.assertEqual(g.cap('chim', 6), 3)
-        self.assertIn('chim workers 1 -> 3 of 6', lines[-1])
+    def test_below_the_critical_line_a_cut_stage_gets_its_full_share_back_at_once(self):
+        # try2's kind of state (72 %) and the dev3 clean public build's (84-90 %): the old grow-back waited for room
+        # under 80/88 % for planned units and left the stage on one worker; the rule now is --jobs below 96 %
+        for used in (23, 27, 30.5):
+            memory, lines = Memory(32, used), []
+            g = self.capped(memory, lines)
+            self.assertEqual(g.cap('chim', 6), 1)
+            memory.t = 400
+            g.tick({'chim': 1}, {'chim': 6})
+            self.assertEqual(g.cap('chim', 6), 6, used)
+            self.assertIn('back to its full share', lines[-1])
 
-    def test_growth_never_plans_past_80_percent_so_never_into_the_cut_above_90(self):
-        memory, lines = Memory(32, 24), []
-        g = self.capped(memory, lines, units={'chim': 1200.0, 'npc-gallery': 600.0})
-        memory.t = 400
-        g.tick({'chim': 1, 'npc-gallery': 1}, {'chim': 6, 'npc-gallery': 6})
-        grown = (g.cap('chim', 6) - 1) * 1200.0 + (g.cap('npc-gallery', 6) - 1) * 600.0
-        self.assertGreater(grown, 0)
-        self.assertLessEqual(24 * 1024 + grown, 0.8 * 32 * 1024)    # the two stages share the free memory
-        self.assertLess(24 * 1024 + grown, rp.PRESSURE_HIGH * 32 * 1024)
-
-    def test_nothing_fits_nothing_grows(self):
-        # 27 GiB in use of 32: no unit fits under 80 % (25.6 GiB); the stage stays at one worker and the ALARM speaks
-        memory, lines = Memory(32, 27), []
+    def test_above_the_critical_line_a_cut_stage_stays_cut(self):
+        memory, lines = Memory(32, 31.5), []
         g = self.capped(memory, lines)
         memory.t = 400
         g.tick({'chim': 1}, {'chim': 6})

@@ -65,13 +65,27 @@ class MeasuredMemoryGuard(unittest.TestCase):
         self.assertEqual(len(holds), 1, lines)            # said once per episode
         self.assertIn("chim's main process holds 34.0 GiB", holds[0])
 
-    def test_workers_that_hold_the_excess_are_cut_by_what_it_needs(self):
-        # 37.0 of 40 GiB: 1 GiB over 90 %; 8 workers of 900 MiB above a 100 MiB idle one free it with 2 fewer
+    def test_below_the_critical_line_the_stage_keeps_its_jobs(self):
+        # 37.0 of 40 GiB (92.5 %): the old guard cut 9 -> 7 here, and because the pool's worker processes stay alive and
+        # keep their memory, every cut only ratcheted down (one worker for an hour, BUILD-SCHEDULER-MEMORY-STARVED-42).
+        # --jobs keeps its level until the critical line (maintainer 2026-10-21).
         memory, lines = Memory(40, 37.0), []
         g = guard(memory, lines, lambda: {'main_mib': 28000.0, 'workers_mib': [100.0] + [1000.0] * 8})
         g.tick({'chim': 9}, {'chim': 20})
-        self.assertEqual(g.cap('chim', 20), 7)
-        self.assertIn('chim workers 9 -> 7', lines[-1])
+        self.assertEqual(g.cap('chim', 20), 20)
+
+    def test_a_stage_cut_above_the_critical_line_gets_its_jobs_back_below_it(self):
+        # the dev3 clean public build: cut to 1 of 24, then 39.5 of 44 GiB (90 %) for an hour with no way back
+        memory, lines = Memory(44, 43.0), []
+        g = guard(memory, lines, lambda: {'main_mib': 14000.0, 'workers_mib': [900.0] * 26})
+        for t in range(0, 300, 30):
+            memory.t = t
+            g.tick({'chim': g.cap('chim', 24)}, {'chim': 24})
+        self.assertLess(g.cap('chim', 24), 24)
+        memory.used, memory.t = int(39.5 * GIB), 330
+        g.tick({'chim': g.cap('chim', 24)}, {'chim': 24})
+        self.assertEqual(g.cap('chim', 24), 24)
+        self.assertTrue(any('back to its full share' in line for line in lines))
 
     def test_above_the_critical_share_the_guard_cuts_anyway(self):
         memory, lines = Memory(40, 39.0), []
@@ -91,10 +105,7 @@ class MeasuredMemoryGuard(unittest.TestCase):
         state['tree'] = {'main_mib': 33000.0, 'workers_mib': [150.0] * 20}
         memory.used, memory.t = 33 * GIB, 400
         g.tick({'chim': 1}, {'chim': 20})
-        # room under 88 %: 35.2 - 33 GiB = 2,253 MiB = 15 workers of 150 MiB -> 16; next look the rest
-        self.assertEqual(g.cap('chim', 20), 16)
-        memory.t = 431
-        g.tick({'chim': 16}, {'chim': 20})
+        # 82.5 %: below the critical line the whole share comes back at once (before: 16 now, the rest later)
         self.assertEqual(g.cap('chim', 20), 20)
 
     def test_without_a_measurement_the_planned_unit_rules_stay(self):
@@ -103,7 +114,10 @@ class MeasuredMemoryGuard(unittest.TestCase):
                               log=lines.append, stage_reader=lambda pid: None)
         g.track('chim', 1)
         g.tick({'chim': 6}, {'chim': 6})
-        self.assertEqual(g.cap('chim', 6), 4)                # three quarters, as before
+        self.assertEqual(g.cap('chim', 6), 6)                # 94.6 %: below the critical line, --jobs kept
+        memory.used, memory.t = int(27.5 * GIB), 60          # 98 %: above it, three quarters, as before
+        g.tick({'chim': 6}, {'chim': 6})
+        self.assertEqual(g.cap('chim', 6), 4)
 
     def test_stage_memory_reads_this_process_tree(self):
         if not Path('/proc/self/stat').is_file():

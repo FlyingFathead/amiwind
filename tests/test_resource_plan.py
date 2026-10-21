@@ -238,7 +238,7 @@ class GovernorTests(unittest.TestCase):
         memory.used, memory.t = 5 * GIB, 31
         guard.tick({'chim': 9, 'scene': 4}, {'chim': 12, 'scene': 4})
         self.assertEqual(guard.cap('chim', 12), 12)
-        self.assertIn('freed up', lines[-1])
+        self.assertTrue(any('back to its full share' in line or 'freed up' in line for line in lines))
         self.assertEqual(guard.effective_budget(), 24)     # no quota at the start: --jobs exact
         memory.quota, memory.t = 8, 62
         guard.tick({'chim': 12}, {'chim': 12})

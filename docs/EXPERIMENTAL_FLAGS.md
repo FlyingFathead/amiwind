@@ -1,6 +1,6 @@
 # Experimental flags
 
-_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
+_Last updated with AmiWind v0.0.47 (21 October 2026)._
 
 Work that is in the source but not finished, or not yet the default, ships behind a switch that is
 off by default. A default build is unchanged by everything on this page; each switch has a test that
