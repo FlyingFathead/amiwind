@@ -307,7 +307,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 
 Related bugs in other categories:
 
-- [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Placed items, ingredients included, are left out of converted interiors
+- [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out)
 - [UI-INVENTORY-LAYOUT-40](UI-INVENTORY-LAYOUT-40.md): Inventory text overlaps fields and footer; preview initially faces away
 
 <!-- END GENERATED CATEGORY -->

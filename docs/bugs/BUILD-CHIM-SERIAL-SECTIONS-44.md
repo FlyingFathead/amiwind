@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.44 at 2026-10-19 17:00 +0300: v0.0.44 release build (before this fix merged): CHIM validation 131 s on 2.8 of 23 cores, stair gate 1,066 s on 4.9 of 23; perf guard FIX-NOW
 - Reported with v0.0.46-dev1 at 2026-10-20 14:48 +0300: dev1 try 2: CHIM queues stalled with 1351 or 978 units queued, 0 running, 1.1-1.7 cores for 90-376 s; source and receipt 35 s at 2.3 cores; pack 3m51s on 1 core (serial)
 - Reported with v0.0.47-dev1 at 2026-10-21 14:44 +0300: dev1 try 2: 6 underused:chim windows (longest 3m21s); pack 1m28s on 1 core, source and receipt 40 s at 2.05, stats 41 s at 1.34; first window 6.6 cores, 1,270 queued
+- Reported with v0.0.47-dev2 at 2026-10-21 17:30 +0300: same pattern in the image step world read (23 units running on 2 cores); see BUILD-IMAGE-WORLD-READ-FRAMES-47
 
 <!-- END GENERATED PERSISTING -->
 
@@ -30,12 +31,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
+_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Status: 19 October 2026](#status-19-october-2026)
 - [Symptom](#symptom)
 - [v0.0.47-dev1 (21 October 2026): what is still under half the cores](#v0047-dev1-21-october-2026-what-is-still-under-half-the-cores)
@@ -255,6 +256,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-STAIR-WALK-CORES-43](BUILD-IMAGE-STAIR-WALK-CORES-43.md): The image step's stair walk used 45 % of its cores in the v0.0.43-dev3 build (95 % before): the perf guard failed its walk_unit section
 - [BUILD-IMAGE-STAIR-WALK-SERIAL-36](BUILD-IMAGE-STAIR-WALK-SERIAL-36.md): The image step's stair walk runs one map per worker: a single heavy room keeps one core busy for 13-19 minutes while the others sit idle
 - [BUILD-IMAGE-UNDERUSED-32](BUILD-IMAGE-UNDERUSED-32.md): Parts of the image step still run serially or leave most CPUs idle
+- [BUILD-IMAGE-WORLD-READ-FRAMES-47](BUILD-IMAGE-WORLD-READ-FRAMES-47.md): The image step CHIM world read ran its frame-read pool at 2.96 of 24 cores for 102 s (91 units): perf guard FIX-NOW
 - [BUILD-INPUTCHECK-SLOW-32](BUILD-INPUTCHECK-SLOW-32.md): The game data reference check takes over 12 minutes through Docker
 - [BUILD-JOBS-RESOLVE-PER-STAGE-32](BUILD-JOBS-RESOLVE-PER-STAGE-32.md): With automatic jobs, stages of one build plan can get different worker counts
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module

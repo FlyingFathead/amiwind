@@ -1,4 +1,4 @@
-# INTERIOR-PLACED-ITEMS-47: placed items, ingredients included, are left out of converted interiors
+# INTERIOR-PLACED-ITEMS-47: takeable and movable items and containers in converted interiors are not live objects (placed items are left out)
 
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -21,6 +21,23 @@
 <!-- END GENERATED FACTS -->
 
 _Last updated with AmiWind v0.0.47 (21 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Status: 21 October 2026](#status-21-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Design of record: the shell is baked, everything that can be taken is an object](#design-of-record-the-shell-is-baked-everything-that-can-be-taken-is-an-object)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 21 October 2026
 
@@ -65,6 +82,32 @@ category that loses placements against its baseline, so a category that was neve
 Any shop or house with items in the original, for example Balmora, Morag Tong Guild (7 placed ingredients in the
 original): the shelves are empty in AmiWind. The image's `entity-tracker.json` lists the interior items under
 "skipped": "small item or actor deferred".
+
+## Design of record: the shell is baked, everything that can be taken is an object
+
+Decided for the project, 21 October 2026. The maintainer: interiors cannot be fully pre-baked, because rooms are where
+the things on tables and shelves are, "shit you can take and so forth". An interior is therefore two kinds of content:
+
+1. **The shell:** walls, floors, stairs, fixed furniture and fixtures. Baked into the room's map as today (lightmaps,
+   visibility and collision compiled once).
+2. **Everything that can be taken, moved or opened:** items on tables and shelves, books, bottles, plates, weapons on
+   racks, containers and their contents, ingredients. Never baked. Each one is its own object with an identity and a
+   state.
+
+How it works:
+
+- At build time the builder splits each room's references. The shell is baked; every takeable, movable or openable
+  reference goes into a per-room object table, with one shared model per item type placed by reference (the same
+  pattern as the outdoor actor table).
+- In the engine each object is a Quake entity, drawn with the light sampled from the baked lightmap at its spot.
+- The state per room (taken, moved, emptied) is part of the save. On machines with little RAM it is kept on disk and
+  loaded with the room (roadmap: object and container state).
+- Measure first: a counting pass reports the takeable objects per room (entities, memory, draw cost on a 68040). A
+  busy room may need its untouched clutter grouped into one object until the player touches it.
+- Proven small first: picking mushrooms indoors ([HARVEST-INTERIOR-PICK-47](HARVEST-INTERIOR-PICK-47.md), v0.0.47).
+
+Order: interiors next after v0.0.47, then object and container state, then the game logic (MWScript compiled to
+bytecode). See the [roadmap](../ROADMAP.md#interiors-shell-baked-takeable-things-as-objects).
 
 ## Repair
 

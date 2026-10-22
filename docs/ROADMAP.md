@@ -11,6 +11,7 @@ _Last updated with AmiWind v0.0.47 (21 October 2026)._
 - [Cell crossings: one continuous world, 19 October 2026](#cell-crossings-one-continuous-world-19-october-2026)
   - [Decisions of 20 October 2026](#decisions-of-20-october-2026)
 - [The road after v0.0.44, 19 October 2026](#the-road-after-v0044-19-october-2026)
+- [Interiors: shell baked, takeable things as objects](#interiors-shell-baked-takeable-things-as-objects)
 - [Distant views without pop-in, and the screen the Amiga need not redraw, 19 October 2026](#distant-views-without-pop-in-and-the-screen-the-amiga-need-not-redraw-19-october-2026)
 - [Colour: AGA ramps for the ash, the blight and Red Mountain, 19 October 2026](#colour-aga-ramps-for-the-ash-the-blight-and-red-mountain-19-october-2026)
 - [Next: the outdoors complete, then every entrance and every interior, 18 October 2026](#next-the-outdoors-complete-then-every-entrance-and-every-interior-18-october-2026)
@@ -312,6 +313,26 @@ as with the outdoors: the world first, then what is in it, then what happens in 
    (details [below](#next-the-outdoors-complete-then-every-entrance-and-every-interior-18-october-2026)): the
    globals, journal indexes and each object's script values as small tables, scripts as checks that run only when
    their inputs change, the whole machine measured for its size and its cost per frame on the 68040 and 68060.
+
+## Interiors: shell baked, takeable things as objects
+
+Decided for the project, 21 October 2026. The maintainer: interiors cannot be fully pre-baked, because rooms are where
+the things on tables and shelves are, things you can take. So an interior has two kinds of content:
+
+- **The shell:** walls, floors, stairs, fixed furniture and fixtures. Baked into the map as today (lightmaps,
+  visibility and collision compiled once).
+- **Everything that can be taken, moved or opened:** items on tables and shelves, books, bottles, plates, weapons on
+  racks, containers and their contents, ingredients. Never baked. At build time the builder splits each room's
+  references; every such reference goes into a per-room object table, one shared model per item type placed by
+  reference (the pattern of the outdoor actor table). In the engine each is a Quake entity, drawn with the light
+  sampled from the baked lightmap at its spot. Its state (taken, moved, emptied) is kept per room in the save, on disk
+  on machines with little RAM.
+
+Measured first: a pass counts the takeable objects per room (entities, memory, draw cost on a 68040); a busy room may
+group its untouched clutter into one object until the player touches it. Proven small in v0.0.47 with indoor mushroom
+picking ([HARVEST-INTERIOR-PICK-47](bugs/HARVEST-INTERIOR-PICK-47.md)). Order: interiors next after v0.0.47, then
+object and container state, then the game logic (MWScript compiled to bytecode). Report:
+[INTERIOR-PLACED-ITEMS-47](bugs/INTERIOR-PLACED-ITEMS-47.md).
 
 ## Distant views without pop-in, and the screen the Amiga need not redraw, 19 October 2026
 

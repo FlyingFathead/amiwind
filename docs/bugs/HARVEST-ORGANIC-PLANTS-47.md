@@ -104,6 +104,6 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 
 Related bugs in other categories:
 
-- [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Placed items, ingredients included, are left out of converted interiors
+- [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out)
 
 <!-- END GENERATED CATEGORY -->

@@ -1,18 +1,18 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.47._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.48-dev1._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json and docs/BUG_JOURNAL.md; do not edit by hand. -->
 
 Every bug of the CHIM engine: its streaming and memory, world format, builder, stairs and collision on CHIM worlds, rendering and performance. Generated together with the [bug register](../BUGS.md) from [`bugs.json`](bugs.json); a test fails when this page is stale or a CHIM bug is missing. Which bugs appear here and how to add one: [CHIM bugs](README.md#chim-bugs). Design: [world streamer](../WORLD_STREAMER.md).
 
-CHIM version: 0.2.1. 252 CHIM bugs: 125 open, 114 fixed, 13 closed.
+CHIM version: 0.2.1. 253 CHIM bugs: 126 open, 114 fixed, 13 closed.
 
 | Part | Open | Fixed | Closed |
 | --- | --- | --- | --- |
 | [Engine streaming and memory](#engine-streaming-and-memory) | 18 | 21 | 2 |
 | [World format](#world-format) | 3 | 4 | 0 |
-| [Builder](#builder) | 62 | 69 | 10 |
+| [Builder](#builder) | 63 | 69 | 10 |
 | [Stairs and collision on CHIM worlds](#stairs-and-collision-on-chim-worlds) | 16 | 9 | 0 |
 | [Rendering and visibility](#rendering-and-visibility) | 10 | 3 | 0 |
 | [Performance](#performance) | 16 | 8 | 1 |
@@ -24,6 +24,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](bugs/BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells (reported 10 times, open)
 - [CHIM-AZURA-FLOATING-FLORA-43](bugs/CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](bugs/BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs (reported 5 times, open)
+- [BUILD-CHIM-SERIAL-SECTIONS-44](bugs/BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers (reported 4 times, open)
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](bugs/BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 4 times, open)
 - [BUILD-CHIM-STAIR-WALK-UNCACHED-36](bugs/BUILD-CHIM-STAIR-WALK-UNCACHED-36.md): CHIM frames are stair-walked again on every build: about 69 minutes for 270 frames (reported 4 times, fixed)
 - [BUILD-IMAGE-CHIM-MAPS-SERIAL-36](bugs/BUILD-IMAGE-CHIM-MAPS-SERIAL-36.md): The image step writes the CHIM region cells' .chim maps one by one on half a core, silently (reported 4 times, fixed)
@@ -33,7 +34,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [CHIM-BALMORA-INSET-SLIVERS-43](bugs/CHIM-BALMORA-INSET-SLIVERS-43.md): Balmora's town frame hands over 96 units inside its cells: the 8 cells around the town keep classic strips, built as 15 legacy maps (11.5 MB) with every object of those cells (reported 4 times, fixed)
 - [CHIM-FRAME-EDGE-EFRAG-CRASH-36](bugs/CHIM-FRAME-EDGE-EFRAG-CRASH-36.md): R_StoreEfrags: Bad entity type 270440 ends the game: a leaf link to an entity whose model is NULL (normal play in Seyda Neen; noclip past the Vivec frame edge) (reported 4 times, fixed)
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](bugs/BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing (reported 3 times, fixed)
-- [BUILD-CHIM-SERIAL-SECTIONS-44](bugs/BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers (reported 3 times, open)
 - [BUILD-IMAGE-AUDIO-SERIAL-36](bugs/BUILD-IMAGE-AUDIO-SERIAL-36.md): The image step puts the audio payload in one file at a time while 22 of 24 cores sit idle (reported 3 times, fixed)
 - [BUILD-LEGACY-TOWN-MAPS-SHIPPED-36](bugs/BUILD-LEGACY-TOWN-MAPS-SHIPPED-36.md): CHIM-native Seyda Neen is still built through the legacy chain: 65 sn maps are built and removed before packing (build time, not payload) (reported 3 times, fixed)
 - [BUILD-PARTITION-GROWTH-UNGATED-36](bugs/BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image (reported 3 times, open)
@@ -63,6 +63,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 Newest first: the last 10 [journal](../BUG_JOURNAL.md) entries that name a CHIM bug.
 
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47 and CHIM-ACTOR-TABLE-OFF-IN-GAME-47 registered, 21 October 2026](../BUG_JOURNAL.md#build-chim-cells-private-list-47-and-chim-actor-table-off-in-game-47-registered-21-october-2026): BUILD-CHIM-CELLS-PRIVATE-LIST-47, CHIM-ACTOR-TABLE-OFF-IN-GAME-47
+- [BUILD-IMAGE-WORLD-READ-FRAMES-47: the v0.0.47-dev2 build's frame-read pool on 3 of 24 cores, 21 October 2026](../BUG_JOURNAL.md#build-image-world-read-frames-47-the-v0047-dev2-builds-frame-read-pool-on-3-of-24-cores-21-october-2026): BUILD-IMAGE-WORLD-READ-FRAMES-47, BUILD-CHIM-SERIAL-SECTIONS-44
 - [v0.0.47-dev1 build: the CHIM and image sections under half their cores, 21 October 2026](../BUG_JOURNAL.md#v0047-dev1-build-the-chim-and-image-sections-under-half-their-cores-21-october-2026): BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47, BUILD-CHIM-SERIAL-SECTIONS-44, BUILD-IMAGE-REGION-MAPS-SERIAL-43, BUILD-STATS-SERIAL-36
 - [CHIM-DOCK-TERRAIN-SEAM-47: a pale sliver gap at a dock end, 21 October 2026](../BUG_JOURNAL.md#chim-dock-terrain-seam-47-a-pale-sliver-gap-at-a-dock-end-21-october-2026): CHIM-DOCK-TERRAIN-SEAM-47
 - [CHIM-BC-TREE-PYRAMID-BOX-47: Bitter Coast trees drawn as a pyramid trunk with a floating box, 21 October 2026](../BUG_JOURNAL.md#chim-bc-tree-pyramid-box-47-bitter-coast-trees-drawn-as-a-pyramid-trunk-with-a-floating-box-21-october-2026): CHIM-BC-TREE-PYRAMID-BOX-47
@@ -71,7 +72,6 @@ Newest first: the last 10 [journal](../BUG_JOURNAL.md) entries that name a CHIM 
 - [CHIM-ACTORS-TOWN-RETURN-EMPTY-47: a town frame's own residents stay with it; the second cause found, 21 October 2026](../BUG_JOURNAL.md#chim-actors-town-return-empty-47-a-town-frames-own-residents-stay-with-it-the-second-cause-found-21-october-2026): CHIM-ACTORS-TOWN-RETURN-EMPTY-47
 - [BUILD-OPTION-RECORD-KEYS-STAGES-47: a new option entry no longer rebuilds stages that never read it, 21 October 2026](../BUG_JOURNAL.md#build-option-record-keys-stages-47-a-new-option-entry-no-longer-rebuilds-stages-that-never-read-it-21-october-2026): BUILD-OPTION-RECORD-KEYS-STAGES-47
 - [GHOSTFENCE-NO-ANIMATION-46: the turbulent curtain is the default; dbg ghostfence on/off, 21 October 2026](../BUG_JOURNAL.md#ghostfence-no-animation-46-the-turbulent-curtain-is-the-default-dbg-ghostfence-onoff-21-october-2026): GHOSTFENCE-NO-ANIMATION-46
-- [COMBAT-PURSUIT-SLOPE-STALL-46 fixed on a branch: actor steps follow walkable slopes, 21 October 2026](../BUG_JOURNAL.md#combat-pursuit-slope-stall-46-fixed-on-a-branch-actor-steps-follow-walkable-slopes-21-october-2026): COMBAT-PURSUIT-SLOPE-STALL-46
 
 ## Engine streaming and memory
 
@@ -149,6 +149,7 @@ Newest first: the last 10 [journal](../BUG_JOURNAL.md) entries that name a CHIM 
 | [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md) | The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle | open | medium | 11 October 2026, in v0.0.36-dev5 | - | MiniWind v0.0.36-dev5 (Vivec city with rooms): CHIM 0.1.0, engine f6e08fe, source f6e08fe, world f6e08fe, format not recorded | 16 October 2026: Open: perf-guard waiver expired 2026-10-14; no fix named; the 13 Oct v0.0.38 image passed the perf guard without waivers, so measure this section's core use and close or fix. |
 | [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md) | The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames | open | high | 18 October 2026, in v0.0.43-dev2 | - | 2026_10_18_v0.0.43-dev2_full-batch3_f29d984: CHIM 0.2.1, format 0.5, engine f29d984, source f29d984, world f29d984 | Repaired on the v0.0.43 line (v0.0.43-imgpar): the CHIM world read once for the image step, ground traces on a column scene, town frame maps and door rows on the pool, region cache keyed by both row methods; fixed when a full build passes its perf guard. |
 | [BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47](BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47.md) | The image step parses the 694 MB CHIM source manifest three times, on one core each (16.0 s, 18.5 s, 17.1 s) | open | medium | 21 October 2026, in v0.0.47-dev1 | - | 2026_10_21_v0.0.47-dev1_dev1-try2_4a2d42b9: CHIM 0.2.1, format 0.7, engine 4a2d42b, source 4a2d42b, world 4a2d42b | 21 October 2026: fixed in source on branch v0.0.47-build-cores, not shipped at the time of writing: the sprite sections are parsed once per process and only their three keys are kept; verification: the next full build |
+| [BUILD-IMAGE-WORLD-READ-FRAMES-47](BUILD-IMAGE-WORLD-READ-FRAMES-47.md) | The image step CHIM world read ran its frame-read pool at 2.96 of 24 cores for 102 s (91 units): perf guard FIX-NOW | open | medium | 21 October 2026, in v0.0.47-dev2 | - | 2026_10_21_v0.0.47-dev2_dev2-try3_c20bc0d8: CHIM 0.2.1, format 0.7, engine c20bc0d, source c20bc0d, world c20bc0d | 21 October 2026: open; cause narrowed (workers wait, not compute: file reads or the parent receiving 1.5 GB of results); plan on the report page, no code changed |
 | [BUILD-MINIWIND-ARENA-PIT-REFUSED-36](BUILD-MINIWIND-ARENA-PIT-REFUSED-36.md) | Regression against v0.0.35: the Vivec Arena Pit is in no CHIM build (no CHIM-native stage made the Arena's rooms), and its start was refused as not converted | open | high | 11 October 2026, in v0.0.36-dev3 | - | source: CHIM 0.1.0, format 0.5, engine 714d6de, source 714d6de, world 714d6de | 16 October 2026: Fix shipped in v0.0.36 (300e8dd, 91657e9): stage chim-rooms-TOWN converts the Arena Pit and the resolver finds it; an in-game Arena Pit check in a CHIM build is not recorded. |
 | [BUILD-OPTION-RECORD-KEYS-STAGES-47](BUILD-OPTION-RECORD-KEYS-STAGES-47.md) | A new builder option entry rebuilds the CHIM, town, flora, engine and image stages: their keys counted all of config/ | open | medium | 21 October 2026, in v0.0.47-dev | - | source: CHIM 0.2.1, engine 43a8f1e, source 43a8f1e, world 43a8f1e, format not recorded | Fixed in source on branch v0.0.47-option-keys (21 October 2026), not shipped at the time of writing: path defaults and loop reads name only the files they read. |
 | [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md) | Nothing gates the number of world partitions or the growth of the image | open | medium | 11 October 2026, in v0.0.36-dev3 | - | source: CHIM 0.1.0, format 0.7, engine 3b5e7a9, source 3b5e7a9, world 3b5e7a9 | 20 October 2026: repaired in source on branch v0.0.46-span-what-we-need (layout planner, compact layout default: the fewest partitions, 100 MiB headroom each; gate refuses mostly-empty and unneeded partitions); v0.0.46 payload re-laid as 2 partitions; open until a build with it ships |

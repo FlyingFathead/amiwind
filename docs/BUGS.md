@@ -1,6 +1,6 @@
 # Bug register
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.47._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.48-dev1._
 
 The single list of every AmiWind bug and its current status. How tracking
 works, the report template and the rules: [bug tracking](bugs/README.md).
@@ -20,7 +20,7 @@ a duplicate or superseded (the status says which).
 
 <!-- BEGIN GENERATED BUG REGISTER: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
-968 bugs: 472 open, 412 fixed, 84 closed.
+969 bugs: 473 open, 412 fixed, 84 closed.
 
 ### Persisting, not resolved
 
@@ -30,8 +30,8 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [PLAYER-TORCH-THIRDPERSON-38](bugs/PLAYER-TORCH-THIRDPERSON-38.md): Player torch and holding pose disappear in third person while light remains (reported 9 times, open)
 - [BUILD-REUSE-KEYS-TOO-BROAD-35](bugs/BUILD-REUSE-KEYS-TOO-BROAD-35.md): A whole build reused no stage, and the cost was not visible before the build started (reported 8 times, open)
 - [MESH-LOD-TORN-MESHES-33](bugs/MESH-LOD-TORN-MESHES-33.md): Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship) (reported 8 times, open)
+- [BUILD-IMAGE-UNDERUSED-32](bugs/BUILD-IMAGE-UNDERUSED-32.md): Parts of the image step still run serially or leave most CPUs idle (reported 7 times, open)
 - [CHIM-AZURA-FLOATING-FLORA-43](bugs/CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
-- [BUILD-IMAGE-UNDERUSED-32](bugs/BUILD-IMAGE-UNDERUSED-32.md): Parts of the image step still run serially or leave most CPUs idle (reported 6 times, open)
 - [ENGINE-CRASH-EXIT-KEYBOARD-36](bugs/ENGINE-CRASH-EXIT-KEYBOARD-36.md): After AmiWind crashes, the AmigaDOS shell mangles typing: shift/caps latched, M and N never appear (reported 6 times, open)
 - [TRACKER-REGISTER-SIZE-33](bugs/TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit (reported 6 times, open)
 - [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification (reported 6 times, open)
@@ -41,6 +41,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [COLLISION-NC-FLAGS-32](bugs/COLLISION-NC-FLAGS-32.md): Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters (reported 5 times, open)
 - [HUD-STATS-29](bugs/HUD-STATS-29.md): Health uses fixed 100; other bars hardcoded full (reported 5 times, open)
 - [ANIMKIT-COVERAGE-35](bugs/ANIMKIT-COVERAGE-35.md): NPCs that move or fight have no walk, run or attack animation: Fargoth and other Seyda Neen villagers glitch toward the player (reported 4 times, open)
+- [BUILD-CHIM-SERIAL-SECTIONS-44](bugs/BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers (reported 4 times, open)
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](bugs/BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 4 times, open)
 - [BUILD-CHIM-STAIR-WALK-UNCACHED-36](bugs/BUILD-CHIM-STAIR-WALK-UNCACHED-36.md): CHIM frames are stair-walked again on every build: about 69 minutes for 270 frames (reported 4 times, fixed)
 - [BUILD-IDLE-STAGES-33](bugs/BUILD-IDLE-STAGES-33.md): Scene-chain stages leave most of the workers they hold idle (reported 4 times, open)
@@ -57,7 +58,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [TESTS-HEAD-REDUCER-BYTES-CI-45](bugs/TESTS-HEAD-REDUCER-BYTES-CI-45.md): A byte-exact head reducer test fails on some GitHub runners (reported 4 times, open)
 - [AW-20260928-10](bugs/AW-20260928-10.md): Interior door animation and sound missing (reported 3 times, open)
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](bugs/BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing (reported 3 times, fixed)
-- [BUILD-CHIM-SERIAL-SECTIONS-44](bugs/BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers (reported 3 times, open)
 - [BUILD-IMAGE-AUDIO-SERIAL-36](bugs/BUILD-IMAGE-AUDIO-SERIAL-36.md): The image step puts the audio payload in one file at a time while 22 of 24 cores sit idle (reported 3 times, fixed)
 - [BUILD-IMAGE-SERIAL-32](bugs/BUILD-IMAGE-SERIAL-32.md): The image step runs on one core for about 23 minutes per pass (reported 3 times, open)
 - [BUILD-KEY-FUNCTION-DEFAULTS-TOP-36](bugs/BUILD-KEY-FUNCTION-DEFAULTS-TOP-36.md): Adding a function to a shared module changed the key of every stage that imports it, although no stage runs the new code (reported 3 times, open)
@@ -195,6 +195,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 | [BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47](bugs/BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47.md) | The image step parses the 694 MB CHIM source manifest three times, on one core each (16.0 s, 18.5 s, 17.1 s) | medium | v0.0.47-dev1 (2026_10_21_v0.0.47-dev1_dev1-try2_4a2d42b9) | open | - | - | 21 October 2026: fixed in source on branch v0.0.47-build-cores, not shipped at the time of writing: the sprite sections are parsed once per process and only their three keys are kept; verification: the next full build |
 | [BUILD-IMAGE-STAIR-WALK-CORES-43](bugs/BUILD-IMAGE-STAIR-WALK-CORES-43.md) | The image step's stair walk used 45 % of its cores in the v0.0.43-dev3 build (95 % before): the perf guard failed its walk_unit section | medium | v0.0.43-dev3 (2026_10_18_v0.0.43-dev3_full-batch5_0f8bbae) | open | - | - | Cause measured 19 October 2026: a tail of heavy-room units (16 of 16 cores for 97 s, then 5 to 1 core for 165 s; the parent idle). Repair on branch v0.0.44-serial: walk times per map recorded and heavy maps cut shorter (dev3 maps 215-238 s -> 156 s, same report); verification: the next full build. |
 | [BUILD-IMAGE-UNDERUSED-32](bugs/BUILD-IMAGE-UNDERUSED-32.md) | Parts of the image step still run serially or leave most CPUs idle | medium | v0.0.32-dev | open | - | - | 16 October 2026: Open: cull throttling and parallel readback shipped in v0.0.32 (517d548); guard torch conversion still serial, other phases not re-measured; see BUILD-PIPELINE-UNDERUTILIZATION-36. |
+| [BUILD-IMAGE-WORLD-READ-FRAMES-47](bugs/BUILD-IMAGE-WORLD-READ-FRAMES-47.md) | The image step CHIM world read ran its frame-read pool at 2.96 of 24 cores for 102 s (91 units): perf guard FIX-NOW | medium | v0.0.47-dev2 (2026_10_21_v0.0.47-dev2_dev2-try3_c20bc0d8) | open | - | - | 21 October 2026: open; cause narrowed (workers wait, not compute: file reads or the parent receiving 1.5 GB of results); plan on the report page, no code changed |
 | [BUILD-INPUTCHECK-SLOW-32](bugs/BUILD-INPUTCHECK-SLOW-32.md) | The game data reference check takes over 12 minutes through Docker | medium | v0.0.32-dev | open | - | - | Open: per-file parent walk in ensure_external(); not hashing |
 | [BUILD-INVENTORY-PALETTE-41](bugs/BUILD-INVENTORY-PALETTE-41.md) | Inventory icons and metadata stop the sky palette image pass | high | v0.0.41 | open | - | - | 16 October 2026: Fix shipped in v0.0.41-dev1 (4ca9bbc): the sky palette pass validates AWIC/AWI2/AWST at their exact paths and remaps only icon pixels; later images assemble; in-game icon check pending. |
 | [BUILD-KEY-FUNCTION-DEFAULTS-TOP-36](bugs/BUILD-KEY-FUNCTION-DEFAULTS-TOP-36.md) | Adding a function to a shared module changed the key of every stage that imports it, although no stage runs the new code | high | v0.0.36-dev1 (2026_10_10_v0.0.36-dev1_full-bcoast-chimtest-try3_be5d6d3) | open | - | - | PERSISTING: the v0.0.36 fix covered stage keys only; v0.0.45 re-keyed NPC gallery faces and stair walks (BUILD-REUSE-SCHEDULER-TOP-45). Repair shipped in v0.0.46 for gallery faces and stair walks (branch v0.0.45-reuse-keys, merge 65fd1547, in the v0.0.46 release line); open until the next build reuse report confirms it. |
@@ -428,7 +429,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 | [INTERIOR-LIGHT-29](bugs/INTERIOR-LIGHT-29.md) | Interiors lack convincing local illumination | medium | v0.0.28 | open | - | - | P2 source-light and bounded renderer study requested; cause/coverage not yet audited. |
 | [INTERIOR-MORAG-TONG-FPS-43](bugs/INTERIOR-MORAG-TONG-FPS-43.md) | The Morag Tong Guild interior runs at a very low frame rate | medium | v0.0.43-dev2 (2026_10_18_v0.0.43-dev2_full-batch3_b55a5ce) | open | - | - | 18 October 2026: Decided: plants and trees of every interior as sprites by default (branch v0.0.43-moragtong, gated; not yet built). Measured: Morag Tong 35,125 faces drawn, Redoran Plaza 26,044, both one vis leaf; tramaroot planters 39.7 % of Redoran Plaza; top 20 meshes after the sprite rule ranked on the page; in-game A/B pending. |
 | INTERIOR-NPC-LIGHT-29 | Census Office characters appear too dark under room lighting | medium | v0.0.29-rc1 | open | - | - | RC1 maintainer report; compare static room lighting and torch contribution on NPCs separately. Shared cause with torch lighting is unconfirmed; source and controlled native investigation pending. |
-| [INTERIOR-PLACED-ITEMS-47](bugs/INTERIOR-PLACED-ITEMS-47.md) | Placed items, ingredients included, are left out of converted interiors | medium | v0.0.46 | open | - | - | Open: 2,581 placed ingredients in interiors, 294 in shipped rooms, none drawn or takeable; needs a live placed-item object and theft rules |
+| [INTERIOR-PLACED-ITEMS-47](bugs/INTERIOR-PLACED-ITEMS-47.md) | Takeable and movable items and containers in converted interiors are not live objects (placed items are left out) | medium | v0.0.46 | open | - | - | Open, design of record 21 October 2026: shell baked, takeable things as per-room objects; 2,581 placed ingredients in interiors, 294 in shipped rooms, none drawn or takeable; needs the object table and theft rules |
 | [INTRO-CAMERA-GATING-38](bugs/INTRO-CAMERA-GATING-38.md) | Opening vanity and third-person cameras expose an unselected default race | medium | v0.0.38-dev | open | - | - | 16 October 2026: Open: camera permission gate in the v0.0.38-rc1 source with focused fixtures; native opening-stage, bypass and save/load checks still required. |
 | [INVENTORY-CATALOG-LOOKUP-40](bugs/INVENTORY-CATALOG-LOOKUP-40.md) | Inventory catalogue lookup and name sorting use an equality-only comparison | high | v0.0.40-dev1 | open | - | - | 16 October 2026: Ordered comparator repair in v0.0.40-dev1 source; native target 795 shows real names, icons, sword/shield grants and equip; full suite, package and maintainer check pending. |
 | [LAMPS-CACHE-31](bugs/LAMPS-CACHE-31.md) | Night lamps beyond 96 per 3x3 cells are silently dropped (Vivec) | medium | v0.0.32-dev | open | - | - | 16 October 2026: Fix shipped in v0.0.32 (8b7336a): lamp cache 256 per 3x3 cells, drops counted, builder refuses overflow; tests pass; in-game Vivec check pending. |
@@ -1117,6 +1118,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47](bugs/BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47.md): The image step parses the 694 MB CHIM source manifest three times, on one core each (16.0 s, 18.5 s, 17.1 s) (open)
 - [BUILD-IMAGE-STAIR-WALK-CORES-43](bugs/BUILD-IMAGE-STAIR-WALK-CORES-43.md): The image step's stair walk used 45 % of its cores in the v0.0.43-dev3 build (95 % before): the perf guard failed its walk_unit section (open)
 - [BUILD-IMAGE-UNDERUSED-32](bugs/BUILD-IMAGE-UNDERUSED-32.md): Parts of the image step still run serially or leave most CPUs idle (open)
+- [BUILD-IMAGE-WORLD-READ-FRAMES-47](bugs/BUILD-IMAGE-WORLD-READ-FRAMES-47.md): The image step CHIM world read ran its frame-read pool at 2.96 of 24 cores for 102 s (91 units): perf guard FIX-NOW (open)
 - [BUILD-PARTITION-GROWTH-UNGATED-36](bugs/BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image (open)
 - [BUILD-PASS-KEY-TOP-BROAD-43](bugs/BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps (open)
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](bugs/BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs (open)
@@ -1307,7 +1309,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [CHIM-COAST-OBJECTS-MISSING-36](bugs/CHIM-COAST-OBJECTS-MISSING-36.md): Objects including Dwemer ruins are reported missing from the CHIM coast (open, high)
 - [CHIM-LAVA-TERRAIN-SPIKES-38](bugs/CHIM-LAVA-TERRAIN-SPIKES-38.md): Angular terrain wedges cross a lava pool in the final-image inspection (open, high)
 - [CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36](bugs/CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36.md): CHIM-native images with no legacy exterior (MiniWinds of one town) ship without the shared sky their frame maps name (open, medium)
-- [INTERIOR-PLACED-ITEMS-47](bugs/INTERIOR-PLACED-ITEMS-47.md): Placed items, ingredients included, are left out of converted interiors (open, medium)
+- [INTERIOR-PLACED-ITEMS-47](bugs/INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out) (open, medium)
 - [NIGHT-WINDOWS-LOST-CHIM-36](bugs/NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM (open, medium)
 - [PLAYTEST-PAYLOAD-COVERAGE-32](bugs/PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest (open, high)
 - [SEYDA-LANTERNS-MISSING-31](bugs/SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps (open, medium)
@@ -1407,6 +1409,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47](bugs/BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47.md): The image step parses the 694 MB CHIM source manifest three times, on one core each (16.0 s, 18.5 s, 17.1 s) (open, medium)
 - [BUILD-IMAGE-STAIR-WALK-CORES-43](bugs/BUILD-IMAGE-STAIR-WALK-CORES-43.md): The image step's stair walk used 45 % of its cores in the v0.0.43-dev3 build (95 % before): the perf guard failed its walk_unit section (open, medium)
 - [BUILD-IMAGE-UNDERUSED-32](bugs/BUILD-IMAGE-UNDERUSED-32.md): Parts of the image step still run serially or leave most CPUs idle (open, medium)
+- [BUILD-IMAGE-WORLD-READ-FRAMES-47](bugs/BUILD-IMAGE-WORLD-READ-FRAMES-47.md): The image step CHIM world read ran its frame-read pool at 2.96 of 24 cores for 102 s (91 units): perf guard FIX-NOW (open, medium)
 - [BUILD-INPUTCHECK-SLOW-32](bugs/BUILD-INPUTCHECK-SLOW-32.md): The game data reference check takes over 12 minutes through Docker (open, medium)
 - [BUILD-NPC-GALLERY-REBUILT-46](bugs/BUILD-NPC-GALLERY-REBUILT-46.md): The NPC gallery (3,551 models, 36 minutes) is rebuilt after a change in collision code that its models do not use (open, medium)
 - [BUILD-OPTION-RECORD-KEYS-STAGES-47](bugs/BUILD-OPTION-RECORD-KEYS-STAGES-47.md): A new builder option entry rebuilds the CHIM, town, flora, engine and image stages: their keys counted all of config/ (open, medium)

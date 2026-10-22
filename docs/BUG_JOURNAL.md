@@ -1,11 +1,14 @@
 # Bug journal
 
+_Last updated with AmiWind v0.0.47 (21 October 2026)._
 _Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [INTERIOR-PLACED-ITEMS-47: design of record, the shell baked and everything takeable as objects, 21 October 2026](#interior-placed-items-47-design-of-record-the-shell-baked-and-everything-takeable-as-objects-21-october-2026)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47 and CHIM-ACTOR-TABLE-OFF-IN-GAME-47 registered, 21 October 2026](#build-chim-cells-private-list-47-and-chim-actor-table-off-in-game-47-registered-21-october-2026)
+- [BUILD-IMAGE-WORLD-READ-FRAMES-47: the v0.0.47-dev2 build's frame-read pool on 3 of 24 cores, 21 October 2026](#build-image-world-read-frames-47-the-v0047-dev2-builds-frame-read-pool-on-3-of-24-cores-21-october-2026)
 - [BUILD-LAVA-TERRAIN-BUDGET-38 persisting: public default builds stop at world-scenery, 21 October 2026](#build-lava-terrain-budget-38-persisting-public-default-builds-stop-at-world-scenery-21-october-2026)
 - [v0.0.47-dev1 build: the CHIM and image sections under half their cores, 21 October 2026](#v0047-dev1-build-the-chim-and-image-sections-under-half-their-cores-21-october-2026)
 - [CHIM-DOCK-TERRAIN-SEAM-47: a pale sliver gap at a dock end, 21 October 2026](#chim-dock-terrain-seam-47-a-pale-sliver-gap-at-a-dock-end-21-october-2026)
@@ -115,6 +118,15 @@ _Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 
 <!-- contents end -->
 
+## INTERIOR-PLACED-ITEMS-47: design of record, the shell baked and everything takeable as objects, 21 October 2026
+
+[INTERIOR-PLACED-ITEMS-47](bugs/INTERIOR-PLACED-ITEMS-47.md): decided for the project, 21 October 2026: an interior is
+a baked shell (walls, floors, stairs, fixed furniture and fixtures) plus a per-room table of objects for everything that
+can be taken, moved or opened (items, books, bottles, weapons on racks, containers and their contents, ingredients),
+each its own Quake entity lit from the baked lightmap, its state kept per room in the save. Measured first: takeable
+objects per room. Order: interiors, then object and container state, then the compiled game logic. The report's title
+is widened to match.
+
 ## BUILD-CHIM-CELLS-PRIVATE-LIST-47 and CHIM-ACTOR-TABLE-OFF-IN-GAME-47 registered, 21 October 2026
 
 [BUILD-CHIM-CELLS-PRIVATE-LIST-47](bugs/BUILD-CHIM-CELLS-PRIVATE-LIST-47.md), persisting since v0.0.36: every release
@@ -125,6 +137,16 @@ CHIM build; the plan resolves the same 1,348 region cells as v0.0.47-dev2; `--ch
 default. [CHIM-ACTOR-TABLE-OFF-IN-GAME-47](bugs/CHIM-ACTOR-TABLE-OFF-IN-GAME-47.md): v0.0.47-dev2 ships the actor
 table, but the engine reads it only with `chim actors table 1`, which no shipped config sets; being fixed on branch
 v0.0.47-defaults.
+## BUILD-IMAGE-WORLD-READ-FRAMES-47: the v0.0.47-dev2 build's frame-read pool on 3 of 24 cores, 21 October 2026
+
+[BUILD-IMAGE-WORLD-READ-FRAMES-47](bugs/BUILD-IMAGE-WORLD-READ-FRAMES-47.md) (new): the image step's CHIM world read
+failed the perf guard of the v0.0.47-dev2 build (try 3): `_read_frames_task`, 91 units, 102 s on 2.96 of 24 cores
+(the phase 1 m 55 s at 2.7 cores; the same phase in the dev1 build took 13.0 s). A single group measured read-only
+on the stored world takes at most 3.5 s of CPU, so the 23 "running" units on 2.0 cores were waiting: either on file
+reads that every worker repeats, or on the parent receiving about 1.5 GB of results. Not isolated yet; the plan on the
+page starts with per-unit wall, CPU and byte counts in the phase log. Reported again with these numbers on
+[BUILD-IMAGE-UNDERUSED-32](bugs/BUILD-IMAGE-UNDERUSED-32.md) and
+[BUILD-CHIM-SERIAL-SECTIONS-44](bugs/BUILD-CHIM-SERIAL-SECTIONS-44.md). No code changed.
 
 ## BUILD-LAVA-TERRAIN-BUDGET-38 persisting: public default builds stop at world-scenery, 21 October 2026
 

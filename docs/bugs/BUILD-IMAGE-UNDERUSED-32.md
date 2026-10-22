@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 6 times; something has to be done
+## PERSISTING: reported 7 times; something has to be done
 
 - Reported with v0.0.32-dev at 2026-10-08 (time not recorded): BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: audio payload and CHIM maps serial, stats on one core
@@ -10,6 +10,7 @@
 - Reported with v0.0.46-dev1 at 2026-10-20 14:48 +0300: dev1 try 2: image 15m38s at 8.9 of 24; finalize 10m at 7.1; boot partition 50 s and CHIM volume 45 s at 1 core (xdftool one by one); a 281 s stall, 62 queued, 0 running
 - Reported with v0.0.46 at 2026-10-20 20:02 +0300: v0.0.46 release image: CHIM world volume 43.4 s then boot partition 42.0 s, each on 1 core, one after the other; written at once on branch v0.0.46-span-what-we-need
 - Reported with v0.0.47-dev1 at 2026-10-21 14:44 +0300: dev1 try 2: image 8m00s at 8.4 of 24, 4 windows (3m16s); finalize 3m19s at 2.95; preflight 16.0 s and 18.5 s at 1.1; partitions 36.9 s at 1.67 of 2
+- Reported with v0.0.47-dev2 at 2026-10-21 17:30 +0300: dev2 try 3, FIX-NOW: frame-read pool 102 s on 2.96 of 24 cores, 91 units; see BUILD-IMAGE-WORLD-READ-FRAMES-47
 
 <!-- END GENERATED PERSISTING -->
 
@@ -28,12 +29,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
+_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
+- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Remaining serial work (profile of 8 October 2026, after the image-step parallel work)](#remaining-serial-work-profile-of-8-october-2026-after-the-image-step-parallel-work)
@@ -188,6 +189,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47](BUILD-IMAGE-SOURCE-MANIFEST-REPARSED-47.md): The image step parses the 694 MB CHIM source manifest three times, on one core each (16.0 s, 18.5 s, 17.1 s)
 - [BUILD-IMAGE-STAIR-WALK-CORES-43](BUILD-IMAGE-STAIR-WALK-CORES-43.md): The image step's stair walk used 45 % of its cores in the v0.0.43-dev3 build (95 % before): the perf guard failed its walk_unit section
 - [BUILD-IMAGE-STAIR-WALK-SERIAL-36](BUILD-IMAGE-STAIR-WALK-SERIAL-36.md): The image step's stair walk runs one map per worker: a single heavy room keeps one core busy for 13-19 minutes while the others sit idle
+- [BUILD-IMAGE-WORLD-READ-FRAMES-47](BUILD-IMAGE-WORLD-READ-FRAMES-47.md): The image step CHIM world read ran its frame-read pool at 2.96 of 24 cores for 102 s (91 units): perf guard FIX-NOW
 - [BUILD-INPUTCHECK-SLOW-32](BUILD-INPUTCHECK-SLOW-32.md): The game data reference check takes over 12 minutes through Docker
 - [BUILD-JOBS-RESOLVE-PER-STAGE-32](BUILD-JOBS-RESOLVE-PER-STAGE-32.md): With automatic jobs, stages of one build plan can get different worker counts
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module
