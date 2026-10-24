@@ -1,11 +1,11 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
+_Last updated with AmiWind v0.0.48 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [Current state, 19 October 2026](#current-state-19-october-2026)
+- [Current state, 24 October 2026](#current-state-24-october-2026)
 - [Why it exists](#why-it-exists)
 - [Data flow](#data-flow)
 - [Statuses](#statuses)
@@ -35,7 +35,7 @@ _Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 Where the conversion of the open world to CHIM stands, and how the tracker that measures it works.
 
-## Current state, 19 October 2026
+## Current state, 24 October 2026
 
 The open world is converted to CHIM release by release, lightest cells first. Exterior cells of Vvardenfell on CHIM
 in each packaged build, as counted at the time, out of 1,395: the 1,390 cells with a LAND record (1,292 land cells
@@ -52,16 +52,26 @@ figures differ by a few cells.
 | v0.0.43 (released 19 October) | every exterior cell: 1,409 (1,348 in one-cell region frames + 61 in the three town frames) | The stair-walk cells (Ald-ruhn, Maar Gan, Suran), Balmora's border cells and 14 open-sea cells joined |
 | v0.0.44-dev1 | as v0.0.43 | Bitter Coast trees fit in memory again ([CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](../bugs/CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md)) |
 | v0.0.44 (released 19 October) | as v0.0.43 | The patch release: the Bitter Coast trees fit in memory again; the same cells as v0.0.43 ([release notes](../RELEASE-v0.0.44.md)) |
+| v0.0.45 (released 20 October) | 1,409 (1,348 in one-cell region frames + 61 in the three town frames) | Crossings use spare Fast RAM; guard torches are back. Count from the release build's own CHIM regions line (1,348 region cells; the town frames as in v0.0.47) ([release notes](../RELEASE-v0.0.45.md)) |
+| v0.0.46 (released 20 October) | 1,409 (1,348 in one-cell region frames + 61 in the three town frames) | Red Mountain getting red: a whole heap of fixes. Count from the release build's own CHIM regions line, as v0.0.45 ([release notes](../RELEASE-v0.0.46.md)) |
+| v0.0.47 (released 21 October) | 1,409 (1,348 in one-cell region frames + 61 in the three town frames) | The repository's builder builds every exterior cell on CHIM by default ([release notes](../RELEASE-v0.0.47.md)) |
+| v0.0.48 (released 24 October) | 1,409 (1,348 in one-cell region frames + 61 in the three town frames; no cell partly overlapped by a town frame) | Inner CHIM: the interiors are on CHIM rooms too, 1,132 of the 1,134 base-game interiors (see below and [Interiors](#interiors-every-room-on-the-tracker); [release notes](../RELEASE-v0.0.48.md)) |
+
+From v0.0.43 on the denominator is the whole outdoors, 1,409 cells; the percentages above for earlier builds are out
+of 1,395, the figure then counted.
 
 The [cell tracker](CELL_TRACKER.md) holds the per-cell results: 1,193 of Vvardenfell's 1,292 land cells have passed
 every measured audit; the other 99 land cells and the 98 sea-floor cells are empty sea (nothing placed, done as they
 are). None is waiting for a hull policy and none fails an audit. Solstheim's 144 land cells are not started.
 
-Since v0.0.43 no exterior cell of Vvardenfell is classic: no classic region maps are left outdoors. Interiors
-stay Quake maps, and some interiors of the base game are not in the build yet; bringing them in, with the
-cell-to-cell crossing pauses first among the fixes, is the next work ([roadmap](../ROADMAP.md)). Solstheim is
-not converted yet. The per-cell numbers above and on the [cell tracker](CELL_TRACKER.md) come from the tracker
-ingest after each packaged build.
+Since v0.0.43 no exterior cell of Vvardenfell is classic: no classic region maps are left outdoors. The interiors
+followed in v0.0.48 ("Inner CHIM", 24 October 2026): the builder plans all 1,134 interiors of the base game as CHIM
+rooms and converts 1,132 of them. The prison ship and the census office stay classic room maps on purpose: the
+opening sequence runs in them with scripted objects that need object state, which CHIM rooms do not have yet (the
+census office becomes a CHIM room once they do, [interior store](INTERIOR_STORE.md)). The rooms are
+tracked too, see [Interiors](#interiors-every-room-on-the-tracker) below. Solstheim is not converted yet ([roadmap](../ROADMAP.md)).
+The per-cell numbers above and on the [cell tracker](CELL_TRACKER.md) come from the tracker ingest after each
+packaged build.
 
 History, as written after v0.0.43-dev2 (all three items were fixed in v0.0.43). What still kept exterior cells
 classic then:
@@ -215,7 +225,10 @@ panel (b) compares the spiral order with the risk order. Every Toolkit page carr
 ## Interiors: every room on the tracker
 
 Parity with the original game: every interior cell of the game is a room on the tracker, keyed by its cell ID, and
-none is left out. With the door graph and the batch plan ([DOOR_GRAPH.md](DOOR_GRAPH.md)), the ingest adds
+none is left out. Since v0.0.48 ("Inner CHIM", 24 October 2026) the interiors are on CHIM too: every interior of
+the base game but two is built as a CHIM room (1,134 planned, 1,132 converted; the prison ship and the census office,
+where the opening sequence runs, stay classic room maps on purpose), and the tracker shows them as a room list with counts per island and state
+([TRACKER-INTERIORS-NOT-SHOWN-48](../bugs/TRACKER-INTERIORS-NOT-SHOWN-48.md)). With the door graph and the batch plan ([DOOR_GRAPH.md](DOOR_GRAPH.md)), the ingest adds
 `interior_rooms` to the tracker data (`--door-graph`, `--batch-plan`, and `--chim-rooms` with a CHIM rooms receipt or
 a build's `chim-interiors.json`). Each room gets its master, its island (the island its entrance is on; `none` for a
 room with no entrance area), its entrance cell, its state, its batch and its reasons. The states fall into the three
@@ -319,7 +332,7 @@ All commands take `--out DIR`, the tracker folder, and are run with `python3 too
 ## History: v0.0.41 preparation notes, 15 October 2026
 
 These notes record the state during the v0.0.41 preparation and are kept as written. The current state is at the
-[top of this page](#current-state-19-october-2026).
+[top of this page](#current-state-24-october-2026).
 
 [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](../bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md) — 15 October 2026, v0.0.41-dev1: full-build preparation rejected five explicitly selected ocean routing cells absent from the original CELL/LAND inventory, before legacy compilation. The source checklist now records additional ocean routing cells separately and allows their absence only before routing rows are appended. Final classification/stage verification still requires every row and CHIM routing flags; undeclared or unselected missing cells are rejected. All 98 targeted checks across five modules pass, including three new ocean checklist regressions. Exact production conversion, native ocean behavior, image/package and delivery checks remain pending; coverage states are unchanged.
 

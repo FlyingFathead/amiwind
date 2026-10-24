@@ -566,7 +566,7 @@ History, as written during v0.0.43 (all of it is done; v0.0.43 shipped the whole
 are the ones held by the stair walk (Ald-ruhn, Maar Gan, Suran and one rope bridge cell, with the town cells
 around them), eight Balmora border cells and fourteen open-sea cells; the last two are fixed, the stair fix is
 in the shared converter. v0.0.43-dev3 is meant to be the first build with the whole outdoors on CHIM
-([progress tracker](chim/PROGRESS_TRACKER.md#current-state-19-october-2026)).
+([progress tracker](chim/PROGRESS_TRACKER.md#current-state-24-october-2026)).
 
 **Milestone, 18 October 2026: every exterior cell converted to CHIM.** The v0.0.43-dev3 build converted the
 whole outdoors of Vvardenfell to CHIM in one run (1,351 frames: 1,348 region frames and 3 town frames; the stair gate passed every flight it walks, but it

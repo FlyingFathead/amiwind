@@ -37,9 +37,10 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): build turnaround first (a release rebuilt from its candidate's
-caches in minutes), then streamed crossings into and out of the towns, collision built from the game's own movement
-rules, and the open bugs from the playtests.
+What comes next is in the [roadmap](docs/ROADMAP.md): build turnaround first (a version change rebuilds only the
+engine and the image, so a release is rebuilt from its candidate's caches), then much smaller actor models (body
+parts stored once, [modular NPCs](docs/MODULAR_NPCS.md)), then the game's scripts and object state, and the open
+bugs from the playtests.
 
 ### Memory: 32 MB of Fast RAM is the safe minimum (23 October 2026)
 
@@ -89,9 +90,18 @@ carry are kept in [earlier README sections](docs/README_ARCHIVE.md).
 
 ### What works, and the honest limits
 
-- You can walk the whole outdoors of Vvardenfell, enter Balmora, Seyda Neen and the city of Vivec, and go through
-  the doors of the interiors that are converted; characters are created through the opening sequence, and music streams from disk.
-- Combat, quests, services, schedules and most game logic are unfinished.
+- **The whole main island is in.** All of Vvardenfell's outdoors, 1,409 exterior cells, is converted and streamed
+  as you walk; visit the towns and cities of the main island, such as Seyda Neen, Balmora, Vivec and many others.
+- **Every interior of the base game is in.** 1,132 of the 1,134 are CHIM rooms; the two where the opening sequence
+  runs (the prison ship and the census office) stay classic room maps on purpose until rooms have object state. The
+  people and creatures the game places in a room stand in it with their full set of animations and their own voices.
+- **Play:** create your character through the opening sequence; the inventory, the journal and the map; saving and
+  loading, with what you pick up staying picked after a save and a load; basic hand-to-hand combat (damage, armour,
+  block, knockdown, knockout, fatigue, death); a torch in hand to explore Vvardenfell at night and underground;
+  mushrooms to pick indoors and out; the original movement speeds; weather by region, and music streamed from disk.
+- **Not yet:** quests, dialogue, services, schedules, weapon and magic combat and most other game logic are
+  unfinished; items and containers in rooms are not live objects yet, and the doors of the open-world frames do not
+  lead into rooms yet ([v0.0.48 release notes](docs/RELEASE-v0.0.48.md#known-in-this-build)).
 - The reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (the safe minimum;
   16 MiB starts with a warning); development and
   every performance figure so far come from emulators and are relative. The one real-hardware figure, from a tester
