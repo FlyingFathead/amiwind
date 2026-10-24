@@ -14,7 +14,8 @@ import amiga_icon
 import build
 import layout_plan
 import workbench_launcher
-from project_version import VERSION
+from project_version import public_version
+VERSION = public_version()
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = {name: '/tools/' + name for name in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}

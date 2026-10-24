@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.49 (24 October 2026)._
+_Last updated with AmiWind v0.0.50 (24 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,8 +27,8 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands (24 October 2026)
 
-The newest release is **v0.0.49: Build Turnaround (A Version Is Just A Number)**, a builder release on v0.0.48's
-game, running on CHIM Engine v0.2.2 ([release notes](docs/RELEASE-v0.0.49.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+The newest release is **v0.0.50: The Doors: Riders On The CHIM**: every entrance of the game leads into its
+interior and every way out leads back, running on CHIM Engine v0.2.2 ([release notes](docs/RELEASE-v0.0.50.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
@@ -37,10 +37,9 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): build turnaround first (a version change rebuilds only the
-engine and the image, so a release is rebuilt from its candidate's caches), then much smaller actor models (body
-parts stored once, [modular NPCs](docs/MODULAR_NPCS.md)), then the game's scripts and object state, and the open
-bugs from the playtests.
+What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.51, much smaller actor models (body parts stored once,
+[modular NPCs](docs/MODULAR_NPCS.md)), the game's scripts and object state, and Bloodmoon, along with the open bugs
+from the playtests.
 
 ### Memory: 32 MB of Fast RAM is the safe minimum (23 October 2026)
 
@@ -60,6 +59,15 @@ RAM is used automatically (a larger game heap, CHIM's caches and reading ahead).
 at boot, but loads more often. The emulator presets and the launcher start with 32 MB. Why, with the measured
 numbers: [why 32 MB](docs/REAL_HARDWARE.md#why-32-mb-of-fast-ram).
 
+### What v0.0.50 changed
+
+Every door leads where the game says it does. All of the base game's 3,133 load doors and jail markers go through
+one door table built from the game's own door records, and the image no longer builds when one does not lead
+anywhere. The ways out of the rooms around Vivec and Ebonheart, Pelagiad's houses and the caves, tombs and the
+shipwreck near Seyda Neen open now; the opening's prison ship, pier and census office keep the doors the opening
+scene gives them. A new version number now rebuilds only the
+engine and the image, proven by a build where only the version changed.
+
 ### What v0.0.49 changed
 
 The builder: a new version number no longer rebuilds the CHIM world, only the engine and the image that show it, and
@@ -76,17 +84,7 @@ and the plants in the rooms can be picked. There are a Stats window and a Magic 
 movement speeds, burning campfires and the original's sound markers. CHIM moves to 0.2.2 with a compatibility table,
 and the builder rebuilds less and keeps more cores busy.
 
-### What v0.0.47 changed
-
-The builder in this repository now builds every exterior cell on CHIM by default (since v0.0.36 the cell list the
-project's own builds used was not in the repository). Crossing a frame border outdoors is no longer a level change,
-creatures and people appear outside the towns, mushrooms can be picked indoors, and the Ghostfence, the Vivec
-waterfalls and the ash mire shimmer. The terrain is generated from the game's heights, repeated files and skins are
-stored once, and the builder walks no stairs by default, reuses more on a rebuild and keeps its workers at full width
-while memory allows. The emulator presets and the
-launcher start with 128 MB of Fast RAM; 16 MB, the smallest machine the game runs on, stays a choice.
-
-Earlier releases: the [release notes](docs/RELEASE-v0.0.49.md) link back through every version, and the sections the
+Earlier releases: the [release notes](docs/RELEASE-v0.0.50.md) link back through every version, and the sections the
 front page used to carry are kept in [earlier README sections](docs/README_ARCHIVE.md).
 
 ### What works, and the honest limits
@@ -96,18 +94,22 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
 - **Every interior of the base game is in.** 1,132 of the 1,134 are CHIM rooms; the two where the opening sequence
   runs (the prison ship and the census office) stay classic room maps on purpose until rooms have object state. The
   people and creatures the game places in a room stand in it with their full set of animations and their own voices.
+- **Every door leads in and back out.** All 3,133 load doors and markers of the base game resolve through one door
+  table; the build fails if one does not ([door graph](docs/chim/DOOR_GRAPH.md)).
 - **Play:** create your character through the opening sequence; the inventory, the journal and the map; saving and
   loading, with what you pick up staying picked after a save and a load; basic hand-to-hand combat (damage, armour,
   block, knockdown, knockout, fatigue, death); a torch in hand to explore Vvardenfell at night and underground;
   mushrooms to pick indoors and out; the original movement speeds; weather by region, and music streamed from disk.
 - **Not yet:** quests, dialogue, services, schedules, weapon and magic combat and most other game logic are
-  unfinished; items and containers in rooms are not live objects yet, and the doors of the open-world frames do not
-  lead into rooms yet ([v0.0.48 release notes](docs/RELEASE-v0.0.48.md#known-in-this-build)).
+  unfinished, and items and containers in rooms are not live objects yet; the jail markers are in the door table for
+  the jail system to come. Akulakhan's Chamber, the game's final room, cannot be entered yet: it ends the game (fixed
+  first in v0.0.51; [v0.0.50 release notes](docs/RELEASE-v0.0.50.md#known-in-this-build)).
 - The reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (the safe minimum;
   16 MiB starts with a warning); development and
-  every performance figure so far come from emulators and are relative. The one real-hardware figure, from a tester
-  in October 2026, is about 0.2 frames per second on an A4000 with a 68060 at 100 MHz with an earlier build: not
-  playable yet. See [AmiWind on real hardware](docs/REAL_HARDWARE.md) and [AmiWind on the 68060](docs/68060.md).
+  every performance figure so far come from emulators and are relative. The first real-hardware figures, from testers
+  in October 2026: about 0.2 frames per second on an A4000 with a 68060 at 100 MHz (an earlier build), and about 0.6
+  to 0.7 on an A3000 with a 68060 at 80 MHz through RTG (a tester's own modified build): not playable yet. The game
+  aims at today's accelerated 68k Amigas, with a classic 68060 as the floor. See [AmiWind on real hardware](docs/REAL_HARDWARE.md) and [AmiWind on the 68060](docs/68060.md).
 - Crossing from one outdoor cell to the next is streamed; walking into or out of a town is still a level change
   ([cell crossings](docs/chim/CELL_CROSSINGS.md)).
 - The known problems are listed in [the bug register](docs/BUGS.md) and under "Known in this build" in each
@@ -143,8 +145,8 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.49-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.49-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.49-WinUAE.uae`](resources/emulators/AmiWind-v0.0.49-WinUAE.uae).
+[`AmiWind-v0.0.50-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.50-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.50-WinUAE.uae`](resources/emulators/AmiWind-v0.0.50-WinUAE.uae).
 
 ## Where to read more
 

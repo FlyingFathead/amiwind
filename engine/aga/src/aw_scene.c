@@ -1046,6 +1046,23 @@ static void scene_help(void) {
         Con_Printf("During play: dbg tp %s/<map name>, dbg tp X Y [Z] (original coordinates); dbg tp opens the menu.\n",names);
     else Con_Printf("During play: dbg tp <map name> or dbg tp X Y [Z] (original coordinates); no town on this disk.\n");
 }
+/* dbg tp NAME for a place no town name reaches: teleport-names.txt in the game data (config/teleport-names.txt,
+ * checked by the builder), one "name|map|x y z|yaw|label" per line; the arrival is where the game's own door into the
+ * place puts the player. 1 with R filled when NAME is listed and its map is valid. */
+static int named_place(const char *name,aw_scene_link_t *r) {
+    FILE *f;char line[192],key[24],map[16],label[96];float x,y,z,yaw;int found=0;
+    COM_FOpenFile("teleport-names.txt",&f);
+    if(!f)return 0;
+    if(!fgets(line,sizeof(line),f) || (strcmp(line,"AWTN1\n") && strcmp(line,"AWTN1\r\n"))){fclose(f);return 0;}
+    while(!found && fgets(line,sizeof(line),f)) {
+        if(line[0]=='#')continue;
+        if(Q_sscanf(line,"%23[^|]|%15[^|]|%f %f %f|%f|%95[^\r\n]",key,map,&x,&y,&z,&yaw,label)!=7)continue;
+        if(Q_strcasecmp(key,(char *)name) || !map_valid(map))continue;
+        memset(r,0,sizeof(*r));copy_name(r->target,sizeof(r->target),map);copy_name(r->label,sizeof(r->label),label);
+        r->arrival[0]=x;r->arrival[1]=y;r->arrival[2]=z;r->yaw=yaw;found=1;
+    }
+    fclose(f);return found;
+}
 static void scene_command(void) {
     aw_scene_link_t r;const char *s=Cmd_Argv(1);char path[40];int i,size;
     if(!Q_strcasecmp((char *)s,"seydaneen") || !Q_strcasecmp((char *)s,"seyda") ||
@@ -1067,6 +1084,11 @@ static void scene_command(void) {
     }
     if(!sv.active && Cmd_Argc()==2){
         Con_Printf("dbg tp needs a game running: New Game first%s.\n",AW_MiniwindActive()?", or aw_quick_start":"");return;
+    }
+    /* a named place (teleport-names.txt: dbg tp heartchamber) */
+    if(sv.active && Cmd_Argc()==2 && strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s) && named_place(s,&r)){
+        if(AW_SceneMapSize(r.target,path,sizeof(path))<124){Con_Printf("Destination not on this disk: %s.\n",r.label);return;}
+        door_ready=0;door_close=0;Con_Printf("%s\n",r.label);load_scene(&r,1);return;
     }
     if(!sv.active || Cmd_Argc()!=2 || (strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s))) {
         if(sv.active && Cmd_Argc()==2)Con_Printf("Unknown destination: %s.\n",Cmd_Argv(1));

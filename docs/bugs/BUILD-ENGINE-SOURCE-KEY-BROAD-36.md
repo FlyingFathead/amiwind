@@ -18,7 +18,7 @@
 | Where | Keys of the chim and world-flora stages (engine source folder named by engine_limits, zone_sim) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3, v0.0.45, v0.0.46-dev1 (last seen) |
+| Persists in | v0.0.36-dev3, v0.0.45, v0.0.46-dev1, v0.0.48-dev2, v0.0.50 (last seen) |
 | Severity | medium: An engine-only change (no converter or data change) reruns the CHIM world conversion and the world flora stage on the next build. |
 | Family | Build speed (`build-speed`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |

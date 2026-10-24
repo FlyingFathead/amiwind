@@ -1,10 +1,11 @@
 # Earlier README sections
 
-_Last updated with AmiWind v0.0.49 (24 October 2026)._
+_Last updated with AmiWind v0.0.50 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.47: CHIM: The More, The Merrier](#v0047-chim-the-more-the-merrier)
 - [v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes](#v0046-red-mountain-getting-red-a-whole-heap-of-fixes)
 - [v0.0.45: CHIM Streaming Improved, Guard Torches Are Back](#v0045-chim-streaming-improved-guard-torches-are-back)
 - [v0.0.44: By Azura's Trees!](#v0044-by-azuras-trees)
@@ -44,6 +45,16 @@ _Last updated with AmiWind v0.0.49 (24 October 2026)._
 <!-- contents end -->
 
 The front page ([README](../README.md)) used to carry these sections. They are dated records of earlier releases and of the work around them, kept as written; where one disagrees with the front page, the front page is newer. The release notes of each version are in `docs/RELEASE-v*.md`.
+
+## v0.0.47: CHIM: The More, The Merrier
+
+The builder in this repository now builds every exterior cell on CHIM by default (since v0.0.36 the cell list the
+project's own builds used was not in the repository). Crossing a frame border outdoors is no longer a level change,
+creatures and people appear outside the towns, mushrooms can be picked indoors, and the Ghostfence, the Vivec
+waterfalls and the ash mire shimmer. The terrain is generated from the game's heights, repeated files and skins are
+stored once, and the builder walks no stairs by default, reuses more on a rebuild and keeps its workers at full width
+while memory allows. The emulator presets and the
+launcher start with 128 MB of Fast RAM; 16 MB, the smallest machine the game runs on, stays a choice.
 
 ## v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes
 

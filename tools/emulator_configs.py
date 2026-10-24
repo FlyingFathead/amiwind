@@ -9,7 +9,8 @@ import os
 import re
 import shutil
 import sys
-from project_version import ROOT, VERSION
+from project_version import ROOT, public_version
+VERSION = public_version()
 sys.path.insert(0, str(ROOT / 'src'))
 
 

@@ -22,7 +22,7 @@
 | Where | tools/chim/validate.py validate, chim/heap.py ring_peak, chim/zone_sim.py walk |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3, v0.0.49-dev1 (last seen) |
+| Persists in | v0.0.36-dev3, v0.0.49-dev1, v0.0.50-dev1 (last seen) |
 | Severity | high: About 10 minutes of one-core work in every chim stage of the coast build, on 24 held workers, redone on every build |
 | Family | Build speed (`build-speed`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

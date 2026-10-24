@@ -283,6 +283,13 @@ def _line_ok(text, limit):
 
 def validate_facts(b, ids, families, where):
     errors = []
+    # the register is public: no field of any bug names the private working folder or a tool (the maintainer,
+    # 24 October 2026; tests/test_public_tree_private_words.py checks the whole public tree in the gate); the words
+    # are kept in pieces so this file does not hold them
+    text = json.dumps(b, ensure_ascii=False).lower()
+    for word in ('cla' + 'ude', 'open' + 'ai', 'chatg' + 'pt'):
+        if word in text:
+            errors.append('%s: a field holds a private word (%s...): the register is public' % (where, word[:3]))
     missing = [k for k in FACTS if k not in b]
     if missing:
         if needs_facts(b) or has_facts(b):

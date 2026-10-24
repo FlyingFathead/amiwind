@@ -59,9 +59,18 @@ class FoldTests(unittest.TestCase):
         self.assertLess(html.index('<hr class="foldrule">'), html.index('<main>'))
 
     def test_toolkit_version_line(self):
-        # the tree's own version, not a literal (a literal went stale at the v0.0.49 release)
-        version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
-        self.assertIn('Last updated with AmiWind v' + version, page('header.js'))
+        # The line names the AmiWind release the Toolkit last changed in (tools/toolkit_version.py), so it is never
+        # tied to VERSION: header.js and index.html name the same release, and it is not later than VERSION's.
+        # A literal went stale at the v0.0.49 release; VERSION itself broke the v0.0.50-dev1 bump (gate 3840).
+        header = re.search(r"const VERSION_TEXT = 'Last updated with AmiWind v(\d+\.\d+\.\d+)';", page('header.js'))
+        index = re.search(r'<small id="toolkit-version"[^>]*>Last updated with AmiWind v(\d+\.\d+\.\d+)</small>',
+                          page('index.html'))
+        self.assertIsNotNone(header)
+        self.assertIsNotNone(index)
+        self.assertEqual(header.group(1), index.group(1))
+        release = (ROOT / 'VERSION').read_text(encoding='utf-8').strip().split('-')[0]
+        as_tuple = lambda version: tuple(int(n) for n in version.split('.'))
+        self.assertLessEqual(as_tuple(header.group(1)), as_tuple(release))
 
     @unittest.skipUnless(shutil.which('node'), 'Node.js unavailable')
     def test_helper_runs_with_blocked_storage(self):

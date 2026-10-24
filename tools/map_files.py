@@ -81,6 +81,14 @@ def map_file(maps_dir, name):
     return chim if chim.is_file() else maps_dir / (name + LEGACY_EXT)
 
 
+def town_map_present(maps_dir, name):
+    """True when the image can run town NAME: its own map (map_file), or its CHIM frame map <name>-chim, which the
+    engine runs for a door or teleport that names the town (engine/aga/src/chim/chim_world.c TownMap,
+    aw_region.c AW_RegionSelect). A town on CHIM has only the second (CHIM-REGION-DOORS-NO-ROOMS-48: checking the
+    first alone dropped every town from the door linker)."""
+    return map_file(maps_dir, name).is_file() or map_file(maps_dir, name + '-chim').is_file()
+
+
 def map_rel(id1, name):
     """id1-relative path ('maps/<name>.chim' or 'maps/<name>.bsp') of map NAME, resolved as map_file."""
     return 'maps/' + map_file(Path(id1) / 'maps', name).name

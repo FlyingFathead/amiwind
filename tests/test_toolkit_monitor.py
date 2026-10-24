@@ -333,6 +333,19 @@ class PageTests(unittest.TestCase):
         index = (ROOT / 'amiwind-toolkit' / 'index.html').read_text(encoding='utf-8')
         self.assertIn('<button role="tab" id="tab-monitor" aria-selected="false">Monitor</button>', index)
 
+    def test_the_follow_choices_are_remembered_and_start_on(self):
+        # the maintainer, 24 October 2026: on a load or a reload, "follow latest" and "follow the running stage" follow
+        # the running build ("maybe you could cookie the user prefs"): both on when nothing is saved, the last choice
+        # kept in this browser, and a running build found by follow latest wins over the page's ?run= link
+        html = (ROOT / 'amiwind-toolkit' / 'monitor.html').read_text(encoding='utf-8')
+        self.assertIn('<input type="checkbox" id="followlatest" checked autocomplete="off">', html)
+        self.assertIn('<input type="checkbox" id="follow" checked autocomplete="off">', html)
+        self.assertIn("const FOLLOW_KEY = 'amiwind-monitor-follow-1';", html)
+        self.assertIn('return {latest: true, stage: true};', html)          # nothing saved: both on
+        self.assertIn("$('followlatest').checked = saved.latest; $('follow').checked = saved.stage;", html)
+        self.assertEqual(html.count('saveFollowPrefs();'), 4)                # every way a choice changes is saved
+        self.assertIn('if (S.run) return;', html)
+
     @unittest.skipUnless(shutil.which('node'), 'Node.js unavailable')
     def test_page_renders_a_sample_run(self):
         with tempfile.TemporaryDirectory() as tmp:

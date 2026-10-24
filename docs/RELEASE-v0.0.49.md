@@ -1,4 +1,4 @@
-# AmiWind v0.0.49: Build Turnaround (A Version Is Just A Number)
+# AmiWind v0.0.49: Build Turnaround
 
 Released 24 October 2026. Running on CHIM Engine v0.2.2. Previous release: [v0.0.48](RELEASE-v0.0.48.md);
 development snapshot [v0.0.49-dev1](RELEASE-v0.0.49-dev1.md).

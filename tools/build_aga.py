@@ -57,7 +57,8 @@ from prepare_music import playlists, unpack_stream
 from check_aga_binary import check_binary
 import check_fpu_unimplemented
 from amiga_fs import check_image, check_payload_names, check_payload_host_paths
-from project_version import VERSION, check_native_versions, require_private_test_version
+from project_version import check_native_versions, public_version, require_private_test_version
+VERSION = public_version()   # the image shows it (BUILD-VERSION-GETATTR-TRACE-49: read here, not by project_version)
 from build_jobs import add_jobs, resolve_jobs
 from build_host import executable_path, make_python_assignment
 from vis_options import add_vis_option
@@ -268,7 +269,9 @@ def install_mwscript(stage, id1):
 def stage_debug_catalogues(id1, debug_luma=False):
     """Required on-disk metadata: fail the build instead of shipping broken dbg."""
     # camera-marks.txt: the public camera marks of dbg cam recall (docs/CAMERA_MARKS.md), checked as the engine reads them.
-    files = [('debug-commands.txt', b'AWDC1'), ('shroompicker.txt', b'AWSP1'), ('camera-marks.txt', b'AWCM1')]
+    # teleport-names.txt: the named places of dbg tp NAME (engine aw_scene.c named_place), checked as the engine reads them.
+    files = [('debug-commands.txt', b'AWDC1'), ('shroompicker.txt', b'AWSP1'), ('camera-marks.txt', b'AWCM1'),
+             ('teleport-names.txt', b'AWTN1')]
     limits = {'debug-commands.txt': 65536, 'camera-marks.txt': 16384}
     payloads = []
     for name, magic in files:
@@ -282,6 +285,9 @@ def stage_debug_catalogues(id1, debug_luma=False):
                 camera_marks.parse(raw, name)
             except camera_marks.MarkError as error:
                 raise ValueError(f'Invalid camera marks: {error}') from None
+        if name == 'teleport-names.txt':
+            import world_doors
+            world_doors.teleport_names(raw)
         payloads.append((name, raw))
     for name, raw in payloads:
         (Path(id1)/name).write_bytes(raw)
@@ -2295,11 +2301,58 @@ def staged_town_interiors(id1):
     return [room['map'] for room in town_interiors() if map_file(Path(id1) / 'maps', room['map']).is_file()]
 
 
+def write_world_doors(args, id1, out, chim_frames):
+    """The world door table (tools/world_doors.py, v0.0.50 The Doors): every load door and teleport marker of the
+    master resolved by one holder rule (town frame box, else the CHIM region frame of the cell, else the room), written
+    into id1's door banks (a missing door's row added, a "-" row filled) and to OUT/world-doors.json. Raises when a door
+    or marker does not resolve: every entrance of the game and every way back out must be linked
+    (CHIM-REGION-DOORS-NO-ROOMS-48). Returns the receipt."""
+    import room_batches
+    import world_doors
+    from map_files import map_file
+    from mwad.interior import original_doors
+    from mwad.paths import child_ci
+    from town_config import load_registry
+    from town_interiors import door_mesh_bounds, room_offsets
+    id1 = Path(id1)
+    maps = id1 / 'maps'
+    registered = {row['id'] for row in load_registry()['towns']}
+    towns = world_doors.town_holders([a for a in chim_frames['areas'] if a in registered])
+    regions = room_batches.region_frames(chim_region_table(args.chim_world), (chim_frames or {}).get('region_maps'))
+    rooms = {cell: name for cell, name in room_batches.listed_maps().items() if name and map_file(maps, name).is_file()}
+    if getattr(args, 'chim_room_batches', None):
+        record = json.loads((Path(args.chim_room_batches) / room_batches.RECORD).read_text(encoding='utf-8'))
+        rooms.update({r['room'].casefold(): r['map'] for r in record['rooms'] if map_file(maps, r['map']).is_file()})
+    doors = original_doors(child_ci(args.data_files, 'Morrowind.esm').read_bytes())
+    rows = world_doors.table(doors, rooms, towns, regions, room_offsets())
+    wanted = {row['reference'] for row in rows if row['kind'] == 'door' and 'source' in row and 'target' in row}
+    bounds = door_mesh_bounds(args.data_files, [d for d in doors if d['number'] in wanted])
+    applied = world_doors.apply(id1, rows, bounds)
+    problems = world_doors.unresolved_problems(rows)
+    # the named places of dbg tp (teleport-names.txt) lead into rooms of this image too
+    # the literal file name: a path built from a variable reads as the whole config/ folder to the stage keys
+    # (BUILD-SURVEY-KEY-CONFIG-35), and every stage would key the option history
+    problems += world_doors.teleport_name_problems(
+        world_doors.teleport_names((ROOT/'config'/'teleport-names.txt').read_bytes()), rooms)
+    receipt = {'format': world_doors.FORMAT, 'towns': [t[0] for t in towns], 'region_frames': len(regions),
+               'rooms': len(rooms), 'summary': world_doors.summary(rows), 'added': applied['added'],
+               'filled': applied['filled'], 'banks_changed': applied['banks_changed'], 'unresolved': problems,
+               'rows': rows}
+    (Path(out)/'world-doors.json').write_text(json.dumps(receipt, indent=1, sort_keys=True)+'\n', encoding='utf-8',
+                                              newline='\n')
+    print('World doors: %d doors and markers, %d rows added to the door banks, %d filled, %d unresolved '
+          '(world-doors.json)' % (len(rows), applied['added'], applied['filled'], len(problems)), flush=True)
+    if problems:
+        raise ValueError('World doors: %d door(s) or marker(s) do not resolve (every entrance and every way out must be '
+                         'linked, CHIM-REGION-DOORS-NO-ROOMS-48):\n  ' % len(problems) + '\n  '.join(problems[:40]))
+    return receipt
+
+
 def write_room_batch_links(args, id1, out, chim_frames):
     """The door links of the batch rooms (tools/room_batches.py link_banks) into id1's door banks; the receipt goes to
     OUT/room-batch-links.json. Returns it."""
     import room_batches
-    from map_files import map_file
+    from map_files import map_file, town_map_present
     from mwad.interior import original_doors
     from mwad.paths import child_ci
     from town_interiors import frame_towns, room_offsets
@@ -2310,7 +2363,7 @@ def write_room_batch_links(args, id1, out, chim_frames):
     present = {cell: name for cell, name in room_batches.listed_maps().items()
                if name and map_file(maps, name).is_file()}
     present.update(batch)
-    towns = [t for t in frame_towns(prefer=chim_native_towns(args)) if map_file(maps, t[0]).is_file()]
+    towns = [t for t in frame_towns(prefer=chim_native_towns(args)) if town_map_present(maps, t[0])]
     regions = room_batches.region_frames(chim_region_table(args.chim_world), (chim_frames or {}).get('region_maps'))
     listed = {r['room'].casefold() for r in room_batches.rows(room_batches.load())}
     receipt = room_batches.link_banks(id1, batch, present, original_doors(child_ci(args.data_files, 'Morrowind.esm')
@@ -2898,6 +2951,10 @@ def finalize_image(args):
             # their exits (a town frame, else the CHIM region frame of the exit's cell), room to room; a door to a room
             # or a place this build does not hold stays "-" and is listed.
             write_room_batch_links(args, boot/'id1', out, chim_frames)
+        if chim_frames['region_maps'] and getattr(args, 'data_files', None):
+            # Every door and marker of the game through one table, the towns' included; the image fails when one
+            # does not resolve (v0.0.50 The Doors, CHIM-REGION-DOORS-NO-ROOMS-48).
+            write_world_doors(args, boot/'id1', out, chim_frames)
         if getattr(args, 'harvest', None):
             # The final payload: every harvestable plant the CHIM world leaves out is in a shipped catalogue,
             # each CHIM region cell's in its own frame map's (HARVEST-CHIM-REGION-LOSS-41).

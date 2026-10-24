@@ -14,7 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 from mwad.paths import ensure_external
 from mwad.progress import section
-from project_version import VERSION
+from project_version import public_version
+VERSION = public_version()
 
 FS_UAE_URL = 'https://fs-uae.net/'
 REFERENCE_ROM_SHA256 = '6d43840d4099a74170ea0f0425b6257c3891ebcaa39c4d1840075a9ab22b5707'

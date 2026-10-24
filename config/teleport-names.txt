@@ -1,0 +1,7 @@
+AWTN1
+# Named places of dbg tp NAME (docs/AMIWIND_CONSOLE_COMMANDS.md): a place no town name reaches, travelled to as a
+# door would (the room map, the arrival in its local units, the facing). One place per line:
+# name|map|x y z|yaw|label
+# The arrival is where the game's own door into the place puts the player (tools/world_doors.py, room_target).
+# The Heart Chamber: Akulakhan's Chamber, from the door of Dagoth Ur, Facility Cavern (reference 258101).
+heartchamber|rifa4ef181ed|-24 320 472.875|90|Akulakhan's Chamber (the Heart Chamber)

@@ -1,10 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.48 (24 October 2026)._
+_Last updated with AmiWind v0.0.50-dev (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.50: The Doors: Riders On The CHIM, 24 October 2026](#v0050-the-doors-riders-on-the-chim-24-october-2026)
 - [Build turnaround first, 24 October 2026](#build-turnaround-first-24-october-2026)
   - [Why the image is bigger than the original game](#why-the-image-is-bigger-than-the-original-game)
   - [A disk layout that cannot dead-end](#a-disk-layout-that-cannot-dead-end)
@@ -66,6 +67,7 @@ _Last updated with AmiWind v0.0.48 (24 October 2026)._
   - [Weather: ash storms and blight winds](#weather-ash-storms-and-blight-winds)
   - [Long-term possibility: a reusable Amiga game engine](#long-term-possibility-a-reusable-amiga-game-engine)
   - [Long-term possibility: an RTG display path](#long-term-possibility-an-rtg-display-path)
+  - [Research: hardware 3D through Warp3D (v0.0.50 study, 24 October 2026)](#research-hardware-3d-through-warp3d-v0050-study-24-october-2026)
   - [Long-term possibility: Lua scripting](#long-term-possibility-lua-scripting)
   - [From Quake Arena to Vivec Arena: two-Amiga 1v1 duels](#from-quake-arena-to-vivec-arena-two-amiga-1v1-duels)
 - [Older history](#older-history)
@@ -94,9 +96,42 @@ _Last updated with AmiWind v0.0.48 (24 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
+## v0.0.50: The Doors: Riders On The CHIM, 24 October 2026
+
+Decided by the maintainer on 24 October 2026: v0.0.50 is "The Doors: Riders On The CHIM". Every exterior entrance in the game is linked to
+its interior, and every way back out is linked too. Everything planned before for v0.0.50 (actor sizes, the game's
+scripts and logic, object state in rooms, Bloodmoon and the Morrowind-style UI work) moves to v0.0.51. The builder
+fixes already made on v0.0.50-dev (no hidden version read in the build stages, so a version change rebuilds only the
+engine and the image) stay in v0.0.50.
+
+Door audit of the published v0.0.49 image against every load door of the base game's master file: 3,133 load doors,
+3,027 lead where they should and 106 do not yet.
+
+- 85 ways back out of rooms around Vivec and Ebonheart (among them Hawkmoth Towers, the Grand Council Chambers, the
+  East Empire warehouses, several Vivec waistworks and Telvanni Plaza): the builder did not look up the town frames
+  for cells a town holds.
+- 15 entrances that no door list carries (among them in Pelagiad, Ebonheart, Wolverine Hall, Moonmoth and Buckmoth
+  Legion Forts, and some tombs, grottos and a shipwreck around Seyda Neen).
+- 6 to check by hand (doors of the opening sequence's census office).
+
+The doors of Balmora, Seyda Neen and Vivec and all room-to-room doors (914) are linked. Tracked as
+[CHIM-REGION-DOORS-NO-ROOMS-48](bugs/CHIM-REGION-DOORS-NO-ROOMS-48.md), marked as persisting in v0.0.49.
+
+The plan:
+
+1. One door table for the whole world, built from the game's own door data (no new content: only the links the
+   original data has).
+2. Every door looked up in that table.
+3. A build check that fails the image when a door the game can reach is not linked.
+
+Done in the v0.0.50 release ([release notes](RELEASE-v0.0.50.md), [door graph](chim/DOOR_GRAPH.md)): all three steps,
+the jail markers kept as rows of the table for the jail system and the game's scripts, and the opening's maps (the
+prison ship, the pier, the census office) left with the doors the opening scene gives them. Next on this line: the old
+town frames' geometry as ordinary CHIM region frames (later; the doors already use one table).
+
 ## Build turnaround first, 24 October 2026
 
-Decided by the maintainer on 24 October 2026, during the v0.0.48 release builds: the next version starts with build
+Decided by the maintainer on 24 October 2026, during the v0.0.48 release builds: v0.0.49 starts with build
 turnaround, before game logic and MWScript. Slow builds hold back every fix and feature behind them, and MWScript
 will bring hundreds of small fix-and-rebuild loops.
 
@@ -119,7 +154,7 @@ The original game's Data Files (Morrowind, Tribunal and Bloodmoon, with every vi
 | Interior store | about 320 MB | The same trade for the interiors |
 | Sound, intro video, music | about 390 MB | Converted for the Amiga |
 
-The actors are the part to cut. The world's share has never been measured by kind, so the next version also measures
+The actors are the part to cut. The world's share has never been measured by kind, so v0.0.51 also measures
 what each byte of the CHIM world is (geometry, lighting, collision, visibility, textures, distant terrain), to keep the
 trade that is needed and find anything stored twice.
 
@@ -209,7 +244,7 @@ run again, so the image step (assembled and checked fresh for every release) is 
 
 Two real machines have now reported a frame rate: an A4000 with a 68060 at 100 MHz (AGA, an earlier build, about
 0.2 frames per second) and an A3000 with a 68060 at 80 MHz through RTG (the tester's own RTG changes on a build from the public repository of
-23 October 2026, about 0.6 to 0.7 on a short timedemo). The two cannot be compared: each tester recorded their own walk with their own settings, and the
+22 October 2026, the v0.0.48-dev1 pre-release, about 0.6 to 0.7 on a short timedemo). The two cannot be compared: each tester recorded their own walk with their own settings, and the
 hardware page did not say how to show the frame rate (BENCH-NO-STANDARD-DEMO-48 in the [bug register](BUGS.md)).
 For v0.0.49:
 
@@ -1939,6 +1974,204 @@ engine already carries an inherited, untested CyberGraphX path. The emulators' v
 makes it testable without hardware. Possible scope: choose an RTG screen at startup when one is present (AGA
 otherwise), the palette and double buffering, the HUD, menus and video, and a measured comparison with AGA. A
 future path to look into, not a planned release item ([FAQ](FAQ.md#why-not-use-pistorm32-rtg-and-minigl)).
+
+### Research: hardware 3D through Warp3D (v0.0.50 study, 24 October 2026)
+
+An RTG screen alone does not make the 3D faster: the 68k still textures every pixel, and the finished frame then
+crosses the expansion bus to the card. That is why a 68060 at 80 MHz on RTG stays at a few frames per second. A
+number of graphics cards that reached the Amiga are 3D cards of Morrowind's own era (Permedia 2 on the
+CyberVisionPPC and BlizzardVisionPPC, Voodoo 3/4/5 and Radeon cards through PCI busboards), and
+[Warp3D](https://wiki.amigaos.net/wiki/UserDoc%3AWarp3D) lets a program hand its triangles to them. Warp3D
+draws only: texture mapping, filtering, depth buffering and blending happen on the card, while visibility,
+transforms and lighting stay with the program. That is the same split as Quake's own GL renderer. In Quake-style software renderers the drawing is
+usually about half to two thirds of the frame; AmiWind's own split is not measured yet (study step 1). AmiWind would open `Warp3D.library` at run time when the player has it
+installed and keep the software renderer otherwise; nothing from Warp3D is shipped. Other classic games have
+already reached Amiga graphics cards, so the hardware is there.
+
+The 3D chips that Warp3D's own documentation lists, with what it says about them:
+
+| Chip (Warp3D driver) | Cards named | What the documentation says |
+| --- | --- | --- |
+| Permedia 2 | CyberVisionPPC, BlizzardVisionPPC (8 MB) | The oldest; 8 MB of card memory and a slow interface; no multitexturing, MIP mapping or stencil buffer |
+| Voodoo 3 (Avenger), Voodoo 4/5 (Napalm) | PCI cards | Dithering settings; full-screen anti-aliasing on the Napalm |
+| Radeon R100 | Radeon 7000 | Anisotropic filtering; a 16-bit depth buffer to save card memory |
+| Radeon R200 | Radeon 9250 and others | Anisotropic filtering, per-program settings |
+
+These are the AmigaOS 4 drivers (Warp3D version 5); which of them exist for a 68k Amiga on AmigaOS 3, and on which
+busboards, is part of the study.
+
+What a better RTG path alone would give, estimated (not measured): a 320 by 200 frame at 8 bits is 64 KB, which
+crosses Zorro III in a few milliseconds. At 2 frames per second a frame takes 500 milliseconds, nearly all of it the
+CPU drawing and walking the world, so even a perfect RTG path would gain little, perhaps 5 to 15 per cent. Moving only
+the final drawing to the card would, by the usual split above, make the frame roughly two to three times faster, since
+visibility, transforms, lighting and game logic stay on the CPU; handing whole models to the card could also drop the
+clipping work below, which is why that design is the one to measure. These are estimates until the experiment below
+measures them. Frame rates in the twenties need a hardware path together with a cheaper CPU side of the frame
+([AmiWind on the 68060](68060.md)) and the faster 68k of the machines AmiWind aims at
+([real hardware](REAL_HARDWARE.md#which-machines-amiwind-aims-at)).
+
+**Three different things, three different gains.** "RTG" can mean any of them, and only the third moves the 3D
+work off the CPU:
+
+| Path | The CPU does | The card does |
+| --- | --- | --- |
+| Today's AGA renderer | everything: geometry, texturing, lighting, depth, fog, chunky-to-planar | shows the bitplanes |
+| The software renderer with an RTG screen | the same, without the chunky-to-planar step | shows the chunky frame; may speed the copy |
+| A hardware 3D renderer | game logic, streaming, visibility, transforms, handing triangles over | rasterising, texturing, depth tests, blending |
+
+**Where today's frame goes.** The placed models (houses, rocks, props) were 60 to 79 % of the 3D view in the
+v0.0.42-dev1 measurements, and walking the world's tree for them about half of that
+([where a slow frame goes](performance/SLOW-FRAME-BREAKDOWN.md); emulator figures of an older build, so they show where
+the cost sits, not today's exact share). Each model's polygons are clipped against the world's tree
+(`R_RecursiveClipBPoly`, `engine/aga/src/r_bsp.c`) and then drawn as spans on the CPU. That clipping exists only to
+feed the software renderer. So the choice of what a hardware renderer replaces decides the gain:
+
+- Uploading the finished software frame to a card keeps all of that work.
+- Keeping the clipping and only drawing the final spans on the card saves the pixel work, not the geometry work.
+- Handing each visible model's triangles to a depth-buffered card skips the clipping and the edge lists as well. The
+  visibility and collision structures stay; only the drawing changes. That is the case to investigate.
+
+CHIM is a good starting point: its model store (`engine/aga/src/chim/chim_models.c`) already keeps each shared model
+once, apart from its placements, and manages what is resident. A hardware path could build each loaded model's
+triangles and texture coordinates once, reuse them for every placement, and keep a matching texture cache in the
+card's memory.
+
+**Two catches to design around.**
+
+- **Fog.** The fog pass (`engine/aga/src/aw_fog.c`) reads the depth buffer and reads and rewrites the frame's pixels.
+  Reading the card's frame and depth back every frame would eat much of the gain, so fog, the sky and the related
+  effects move into the hardware path itself.
+- **Palette and lighting.** The renderer lights through palette tables, and the game changes the palette. Indexed
+  textures can be expanded for the card, but the look of the palette lighting, its changes and the fog take explicit
+  work, and a true-colour screen alone cannot bring back colour the texture conversion already dropped.
+
+**For an RTG screen alone** (the software renderer, no 3D card), the first design to measure keeps drawing in Fast RAM
+and uploads the finished frame: drawing straight into the card's memory (`-directcgx`) can be slower on some cards,
+because the fog pass reads and rewrites every pixel. The profiler times the AGA chunky-to-planar step but neither an
+RTG upload nor the display swap; both timings come first, so the comparison is like for like.
+
+**The first experiment, deliberately narrow.**
+
+1. Add the missing timings: RTG upload and display swap beside the chunky-to-planar time.
+2. Pick one card, driver and API that can be verified (classic Warp3D, or a GL layer over it), and the emulator setup
+   that runs it (WinUAE emulates a Voodoo 3).
+3. Textured triangles with hardware depth testing on that setup.
+4. One representative CHIM scene through the new path: the same assets, camera and visibility, triangles and textures
+   cached, the software clipping, edge and span path bypassed for it.
+5. Measure the CPU's preparation, the submission, the texture uploads and the whole frame (waiting for the card
+   included), against the software renderer on the same scene.
+6. Only then fog, lighting, actors, sprites and the HUD.
+
+That answers the useful question: how much of AmiWind's rendering this particular card can take over. No figure is
+promised before it is measured.
+
+**Use what the machine has (24 October 2026).** One game and one disk for every machine, as with the Fast RAM AmiWind
+already puts to use by itself: the world, the assets and the game are shared, and the engine picks its drawing path at
+start-up from what it finds.
+
+1. Warp3D, a 3D card and a working driver: the hardware renderer, the card draws.
+2. An RTG card without a usable 3D driver: the software renderer in Fast RAM, the finished frame uploaded to the card
+   (no chunky-to-planar step).
+3. Neither: today's AGA path, the software renderer and chunky-to-planar; the baseline, always there to fall back on.
+
+The game says which path it took and why (the card, the driver and what it offers, or the reason it fell back), never
+silently; a driver that fails to open or lacks a needed feature (depth buffer, texture format) drops it to the next
+path instead of stopping the game; a setting or start-up option picks a path by hand for tests and for a misbehaving
+driver, and the boot countdown offers it too: a key during the countdown opens a small options screen (renderer:
+automatic, AGA, RTG or Warp3D), and with no key the countdown runs out on "automatic", so the unattended tests never
+stop at a menu; saves and the world do not depend on the path; and each path gets its own boot smoke so none breaks unnoticed.
+The engine already finds an RTG screen (`vid_amiga.c` opens `cybergraphics.library` and checks for an RTG mode); the
+hardware path adds opening `Warp3D.library` and asking it what the card can do.
+
+**Where to start in the engine (24 October 2026).** The first milestone is a small, real CHIM scene drawn by the card
+inside AmiWind, measured before the whole renderer is converted.
+
+1. **Display and renderer chosen separately**, three explicit combinations: AGA with the software renderer (the
+   baseline), RTG with the software renderer (compatibility and comparison), RTG with Warp3D (the acceleration).
+   `vid_amiga.c` gets the hardware path's screen, colour format, depth buffer and presentation; today it assumes an
+   8-bit screen and a software frame. One verified target first (68k, Mediator, Voodoo 3, Warp3D); the game logs the
+   driver and the capabilities it got, and a software fallback says so plainly.
+2. **The branch before the software edge pipeline.** `R_RenderView_` (`engine/aga/src/r_main.c`) calls
+   `R_EdgeDrawing`, then the entities, particles and the frame effects. The camera and visibility setup that both
+   paths need is separated from the software-only buffer and edge bookkeeping, and the scene goes to one renderer or
+   the other. A pointer, not a ready switch: the inherited `r_drawpolys` branch in `r_main.c` notes that depth-buffered
+   drawing needs no clipping against the world tree, only against the view; its `D_DrawPoly` (`d_edge.c`) is empty.
+3. **A cached CHIM-to-triangle adapter.** The models already carry vertices, edges, surface outlines and texture
+   vectors; triangles and texture coordinates are made once when a model becomes resident, freed with it in
+   `chim_models.c`'s eviction, and textures uploaded in a format the card takes. First a ground patch and a few opaque
+   placed models, with their placements and the useful visibility rejection, without `R_RecursiveClipBPoly`, edge
+   emission or span drawing. Classic Warp3D has no vertex buffers or instancing in the modern sense: the CPU still
+   transforms and prepares. The card's texture memory gets its own budget; spare Fast RAM is not spare card memory.
+4. **The card owns the finished 3D frame**: `screen.c` and the video code stop the software `VID_Update` from drawing
+   over it. Simple fixed lighting and a small diagnostic overlay first; then actors, sprites, the HUD, lighting, fog,
+   the sky and water, each measured. Fog is rebuilt inside the hardware path (no full-frame readback), and the culling
+   that counts on fog hiding things is checked until the fog matches.
+5. **Measured before it grows**: the same camera, geometry, resolution and effects on both renderers (what the
+   prototype leaves out, its software comparison leaves out too): the CPU's preparation, submission, texture uploads,
+   the waits for the card and the screen, and the whole frame; and a check that the software clipping and span code no
+   longer touches the scene the card draws.
+
+The first task: an optional Warp3D backend that draws one CHIM ground patch and several shared-model placements with
+correct textures, near-plane clipping, hardware depth, presentation and cleanup. Accepted when the scene draws right,
+its frame costs are measured, and the software drawing path is shown to be bypassed for it.
+
+**Findings so far (24 October 2026).**
+
+- The poor frame rate seen on an RTG screen does not show that the card is too weak: in that setup the CPU still draws
+  the whole scene, and the card only shows the result. It measures the work a hardware path would hand over.
+- The architecture to aim for: the AGA mode keeps the software renderer and its chunky-to-planar step; an accelerated
+  RTG mode gets a separate drawing backend that shares the world, the assets and the gameplay. The CPU keeps the game,
+  collision, CHIM streaming, visibility, animation and whatever transforms the card's interface leaves to it; the card
+  draws the textured triangles, tests and writes depth, blends, and does the fog and lighting it supports, into its own
+  display buffers.
+- Visible CHIM geometry goes to the card before the software polygon splitting, edge and span work, so that work
+  disappears instead of only the final pixel writes.
+- The first target: a Voodoo card through a Mediator busboard with Warp3D on a 68k Amiga, for which the busboard's
+  maker documents 68k as well as PowerPC Warp3D support for the Voodoo 3, 4 and 5 (to verify on the real setup). The
+  Radeon cards come later: the maker lists them through Picasso96, and Radeon Warp3D support is documented for
+  AmigaOS 4.1, which does not establish a 68k AmigaOS 3 driver.
+- Card memory, as the busboard maker lists the boards (the usable amount under the Amiga driver to check): Voodoo 3
+  2000/3000/3500 16 MB, Voodoo 4 4500 32 MB, Voodoo 5 5500 64 MB but split 32 MB per chip with the textures held twice
+  (so at most 32 MB of texture room, less its buffers and the driver's share, not 64), Radeon 9200/9250 64 to 256 MB by board. 16 MB is a workable first budget: two
+  640 by 480 frames and one depth buffer at 16 bits take about 1.76 MiB before alignment and the driver's own share;
+  the rest is textures, so CHIM's texture residency decides how much of a scene fits. AmiWind's textures are small
+  8-bit ones today; expanded to 16 bits for the card they take twice the room.
+- Textures live on the card. Keeping them in the card's memory and letting the card map them is the basic thing these
+  cards do: CHIM loads a shared texture, converts it to a format the card takes and uploads it once; it stays resident
+  and serves every placement that uses it; the card fetches it, maps it, draws and depth-tests the pixels; textures
+  leave the card when CHIM's streaming and the card's memory say so. No texture is uploaded every frame, and CHIM's
+  shared texture numbers and residency already give the bookkeeping. The offload is both the texture storage and the
+  per-pixel drawing; the CPU keeps preparing the visible geometry and running the game.
+- The two budgets stay separate: 2 MB of Chip RAM (the chipset, the sound), 32 MB of Fast RAM (the CHIM world,
+  geometry, collision, actors, game logic, the streaming caches and the CPU's share of the drawing) stays the minimum,
+  and the card's memory is extra (its frames, depth buffer and resident textures). The game's working set is not
+  copied to the card; a hardware path does not make 16 MB of Fast RAM enough again, and it must fit both budgets.
+- Whether 16 MB on the card holds the texture working set is a measurement that needs no card: the build knows every
+  texture each frame and room uses. The audit: the peak resident textures in the card's format (16 bits, mipmaps if
+  used), the frame and depth buffers, the extra Fast RAM for cached triangles and submission data, and the texture
+  uploads and evictions as the player moves.
+- The slow expansion bus is not the limit it looks like: it carries the geometry, the drawing commands and each texture
+  once, while the card's per-pixel work (texture reads, colour and depth writes) stays in the card's own memory. So a
+  Zorro or busboard link can still feed worthwhile acceleration, as long as the design keeps textures resident, sends
+  triangles in batches, tests depth on the card, and never reads the frame or the depth buffer back as a routine (fog
+  and the overlays included). The remaining limits are the CPU's: scene preparation, transforms, visibility, driver
+  calls and the transfers themselves.
+- What it could be worth, as an engineering estimate (not a measurement): a complete hardware renderer could remove
+  roughly half to two thirds of the drawing work in heavy scenes, because some of that work moves to the card and some
+  disappears (the clipping of every visible building against the world's tree, done only to order the drawing).
+  Roughly twice the speed overall is a credible first target, more where the software drawing dominates; keeping the
+  clipping and edge work and accelerating only the final pixels would leave much of today's cost in place. How a cut
+  in frame time reads as speed: 40 % less is 1.67 times, 50 % is 2 times, 67 % is about 3 times, 75 % is 4 times. Less
+  CPU work per frame can still show the CPU fully busy: it is then making more frames.
+- The first proof can be smaller than an outdoor scene: one existing CHIM room's opaque geometry, its textures resident
+  on the card, hardware depth testing, measured against the software renderer on the same room.
+- The limit: classic Warp3D draws but does not transform, so the CPU's share needs its own budget. The original game's
+  500 MHz Pentium III-class requirement is not the yardstick for it: that was for the original's full assets (full
+  detail meshes and skinned characters, a long view distance, lighting on everything), while AmiWind draws reduced
+  assets made for the Amiga (budgeted models, merged statics, a short fogged view, simpler lighting). The CPU's share
+  on AmiWind's own scenes is what the first experiment measures. Still open alongside: which Warp3D versions serve which cards on 68k AmigaOS 3 today,
+on which buses and on what terms they are distributed, and the texture memory of the small cards (the Permedia 2 cards
+have 8 MB). The AGA 68040 path stays the baseline and the primary target.
 
 ### Long-term possibility: Lua scripting
 

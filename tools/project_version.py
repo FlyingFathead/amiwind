@@ -286,13 +286,10 @@ def check_native_versions(root=ROOT):
     return expected
 
 
-def __getattr__(name):
-    """VERSION, read when a module asks for it (from project_version import VERSION), not at import: importing this
-    module for anything else (a CHIM stage's private-test refusal) no longer reads the version file, so it keys no
-    stage that does not show the version (BUILD-CHIM-KEY-VERSION-48)."""
-    if name == 'VERSION':
-        return public_version()
-    raise AttributeError('module %r has no attribute %r' % (__name__, name))
+# No module-level VERSION and no module __getattr__ (BUILD-CHIM-KEY-VERSION-48, BUILD-VERSION-GETATTR-TRACE-49): importing
+# this module reads no version file. A tool that shows the version reads it itself (VERSION = public_version()); a
+# provenance field or a refusal calls run_version. A module __getattr__ runs on every missing attribute lookup, so the
+# v0.0.49-dev1 CHIM stage's read trace recorded it and the v0.0.49 final refused to reuse that world.
 
 
 def main():

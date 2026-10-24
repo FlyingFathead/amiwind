@@ -63,8 +63,10 @@ class RepositoryVersionKeyTests(unittest.TestCase):
     def test_the_tracker_still_keys_the_version_it_shows(self):
         self.assertTrue(self.keys_version('cell_progress_build.py'))
 
-    def test_no_stage_is_listed_as_version_stamped(self):
-        self.assertEqual(reuse_report.VERSION_STAMPED, frozenset())
+    def test_only_the_tracker_is_listed_as_version_stamped(self):
+        # the tracker data shows the version (SHOWS_VERSION), so its rebuild on a version change is expected, never
+        # called unexpected by the reuse preflight (BUILD-PREFLIGHT-CELL-PROGRESS-VERSION-49); nothing else is
+        self.assertEqual(reuse_report.VERSION_STAMPED, frozenset({'cell-progress'}))
 
 
 STAGE_REFUSAL = '''
@@ -141,10 +143,19 @@ class RunVersionTests(unittest.TestCase):
             if old is not None:
                 os.environ['AMIWIND_RUN_VERSION'] = old
 
-    def test_the_module_version_is_read_when_asked(self):
-        self.assertEqual(project_version.VERSION, project_version.public_version())
-        with self.assertRaises(AttributeError):
-            project_version.NO_SUCH_NAME
+    def test_the_module_reads_no_version_and_runs_nothing_on_lookups(self):
+        # BUILD-VERSION-GETATTR-TRACE-49: a module __getattr__ (the first, lazy VERSION) runs on every missing attribute
+        # lookup; the v0.0.49-dev1 CHIM stage's read trace recorded it, the key could not, and the v0.0.49 final refused
+        # to reuse that world. No module VERSION and no __getattr__: the tools that show the version read it themselves.
+        self.assertFalse(hasattr(project_version, '__getattr__'))
+        self.assertFalse(hasattr(project_version, 'VERSION'))
+        for name in ('build_aga.py', 'emulator_configs.py', 'publish_first_release.py', 'run_fs_uae.py'):
+            text = (ROOT / 'tools' / name).read_text(encoding='utf-8')
+            self.assertIn('VERSION = public_version()', text, name)
+        for path in sorted((ROOT / 'tools').rglob('*.py')):
+            text = path.read_text(encoding='utf-8')
+            self.assertNotRegex(text, r'(?m)^def __getattr__\(', path.name)   # module level (a class's own is fine)
+            self.assertNotRegex(text, r'from project_version import [^\n]*\bVERSION\b', path.name)
 
 
 if __name__ == '__main__':

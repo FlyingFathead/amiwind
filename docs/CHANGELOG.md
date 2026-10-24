@@ -1,11 +1,12 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.48 (24 October 2026)._
+_Last updated with AmiWind v0.0.50-dev (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.49: Build Turnaround (A Version Is Just A Number), 24 October 2026](#v0049-build-turnaround-a-version-is-just-a-number-24-october-2026)
+- [v0.0.50: The Doors: Riders On The CHIM, 24 October 2026](#v0050-the-doors-riders-on-the-chim-24-october-2026)
+- [v0.0.49: Build Turnaround, 24 October 2026](#v0049-build-turnaround-24-october-2026)
 - [v0.0.48: Inner CHIM & Actors On Stage, 24 October 2026](#v0048-inner-chim--actors-on-stage-24-october-2026)
 - [v0.0.47: CHIM: The More, The Merrier, 21 October 2026](#v0047-chim-the-more-the-merrier-21-october-2026)
 - [v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes, 20 October 2026](#v0046-red-mountain-getting-red-a-whole-heap-of-fixes-20-october-2026)
@@ -158,7 +159,30 @@ _Last updated with AmiWind v0.0.48 (24 October 2026)._
 
 <!-- contents end -->
 
-## v0.0.49: Build Turnaround (A Version Is Just A Number), 24 October 2026
+## v0.0.50: The Doors: Riders On The CHIM, 24 October 2026
+
+- Every entrance of the game leads into its interior, and every way out leads back. One door table for the whole
+  world, built from the game's own door records, resolves every load door and every marker where an arrest takes the
+  player: a town frame holds what lies inside its box (Seyda Neen, Balmora, Vivec), the CHIM region frame of the cell
+  the rest, a room its own doors. Every door bank of the image is written from it, and the image no longer builds when
+  a door does not resolve ([CHIM-REGION-DOORS-NO-ROOMS-48](bugs/CHIM-REGION-DOORS-NO-ROOMS-48.md),
+  [door graph](chim/DOOR_GRAPH.md#rooms-by-batch-in-the-builder)).
+- The v0.0.49 image had 106 of the base game's 3,133 load doors and markers unlinked: 85 ways out of rooms around
+  Vivec and Ebonheart (the builder had checked each town's map by its own name and so dropped every town on CHIM), 10
+  entrances in cells inside the old town frames (Pelagiad's houses, the Abaesen-Pulu Egg Mine, Assemanu, the Andrano
+  Ancestral Tomb, the Akimaes and Nimawia Grottos, the Remote Shipwreck), 5 jail markers and the opening's census
+  office and prison ship doors, which the opening scene keeps as it wrote them.
+- `dbg tp heartchamber` (Akulakhan's Chamber); named places in `config/teleport-names.txt`.
+- The Toolkit Monitor keeps "follow latest" and "follow the running stage" in the browser, on when nothing is saved
+  (Toolkit 0.1.12).
+- A version change rebuilds only the engine and the image: the v0.0.50-dev2 build (only the version changed) reused
+  40 of 43 stages, the CHIM world from the cache
+  ([BUILD-VERSION-GETATTR-TRACE-49](bugs/BUILD-VERSION-GETATTR-TRACE-49.md)); the build's reuse check no longer calls
+  the tracker data's rebuild unexpected.
+- The hardware page leads with the machines AmiWind aims at; hardware 3D through Warp3D is a research item. The actor
+  sizes, the game's scripts, object state in rooms, Bloodmoon and the Morrowind-style UI work move to v0.0.51.
+
+## v0.0.49: Build Turnaround, 24 October 2026
 
 - A version change rebuilds only what shows the version (the engine, the image, the tracker data); the CHIM world no
   longer keys on it, kept by a gate test over every stage of the builder (BUILD-CHIM-KEY-VERSION-48). This release's

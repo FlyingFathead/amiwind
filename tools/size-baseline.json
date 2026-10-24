@@ -8,7 +8,7 @@
  "drives": [
   {
    "bytes": 4291854336,
-   "file": "AmiWind-v0.0.48-rc1.hdf"
+   "file": "AmiWind-v0.0.49.hdf"
   }
  ],
  "groups": {
@@ -29,7 +29,7 @@
    "files": 7106
   },
   "other": {
-   "bytes": 355998208,
+   "bytes": 355998084,
    "files": 3391
   },
   "progs": {
@@ -46,10 +46,10 @@
   }
  },
  "labels": [],
- "note": "v0.0.48 release (the rc1 image shipped as the final: run 2026_10_24_v0.0.48-rc1_rc1-try8_af1df936; its image says 0.0.48-rc1, the record is of the v0.0.48 release)",
- "payload_bytes": 3976762766,
- "run": "2026_10_24_v0.0.48-rc1_rc1-try8_af1df936",
+ "note": "The v0.0.49 release image's record (the previous release after the v0.0.49 pin)",
+ "payload_bytes": 3976762642,
+ "run": "2026_10_24_v0.0.49_final_eb8be8d3",
  "schema": "amiwind-size-ledger-v1",
  "status": "complete",
- "version": "0.0.48"
+ "version": "0.0.49"
 }

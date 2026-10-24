@@ -55,7 +55,7 @@ td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}
     <label class="muted" for="run">Build run</label>
     <select id="run" aria-label="Build run"></select>
     <button id="runrefresh" title="Read the run list again">&#x21bb; Refresh</button>
-    <label class="chk"><input type="checkbox" id="followlatest"> follow latest</label>
+    <label class="chk"><input type="checkbox" id="followlatest" checked autocomplete="off"> follow latest</label>
   </div>
 </div>
 <main>
@@ -85,7 +85,7 @@ td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}
     <h2>Log</h2>
     <div id="logbar">
       <select id="logpick" aria-label="Log"></select>
-      <label class="chk"><input type="checkbox" id="follow" checked> follow the running stage</label>
+      <label class="chk"><input type="checkbox" id="follow" checked autocomplete="off"> follow the running stage</label>
       <button id="pause" aria-pressed="false">Pause</button>
       <button id="bottom">Jump to end</button>
       <span id="loginfo" class="muted"></span>
@@ -677,13 +677,33 @@ async function refreshRuns() {
   }
   return runs;
 }
+// The two follow choices, kept per browser like the folded blocks (panel-fold.js); every storage access is guarded, so
+// a browser that blocks storage keeps the choice until the page closes.
+const FOLLOW_KEY = 'amiwind-monitor-follow-1';
+function followPrefs() {
+  try {
+    const v = JSON.parse(localStorage.getItem(FOLLOW_KEY) || 'null');
+    if (v && typeof v === 'object') return {latest: v.latest !== false, stage: v.stage !== false};
+  } catch (_) { /* no storage */ }
+  return {latest: true, stage: true};
+}
+function saveFollowPrefs() {
+  try { localStorage.setItem(FOLLOW_KEY, JSON.stringify({latest: $('followlatest').checked, stage: $('follow').checked})); }
+  catch (_) { /* no storage: the choice lasts until the page closes */ }
+}
 async function start() {
   try {
     const cfg = await get('/monitor/config.json');
     if (!cfg.builds) { $('status').textContent = 'no build source'; $('updated').textContent = 'start the Toolkit server with --builds DIR (or --builds-command)'; }
     const r = await get('/monitor/results.json'); renderResults(r.results);
     if (!cfg.builds) return;
+    // "follow latest" and "follow the running stage" are remembered in this browser (FOLLOW_KEY); with nothing saved
+    // both are on, so a load or a reload follows the newest running build and its running stage, and a running build
+    // found that way wins over the page's own ?run= link.
+    const saved = followPrefs();
+    $('followlatest').checked = saved.latest; $('follow').checked = saved.stage;
     const runs = await refreshRuns();
+    if (S.run) return;                                            // follow latest found a running build
     const want = new URLSearchParams(location.search).get('run');
     const sel = $('run');
     const first = runs.find(x => x.run === want) || runs[0];
@@ -691,11 +711,12 @@ async function start() {
     else { $('status').textContent = 'no build runs yet'; setTimeout(start, 5000); }         // the build source may still be starting
   } catch (e) { $('status').textContent = 'not connected'; $('updated').textContent = e.message + ' (trying again)'; $('updated').className = 'error'; setTimeout(start, 5000); }
 }
-$('run').onchange = () => { $('followlatest').checked = false; chooseRun($('run').value); };
+$('run').onchange = () => { $('followlatest').checked = false; saveFollowPrefs(); chooseRun($('run').value); };
 $('runrefresh').onclick = () => { refreshRuns().catch(() => {}); };
-$('followlatest').onchange = () => { refreshRuns().catch(() => {}); };
+$('followlatest').onchange = () => { saveFollowPrefs(); refreshRuns().catch(() => {}); };
+$('follow').onchange = () => { saveFollowPrefs(); };
 if (typeof setInterval === 'function') setInterval(() => { if (S.runList) refreshRuns().catch(() => {}); }, 15000);
-$('logpick').onchange = () => { $('follow').checked = false; switchLog($('logpick').value); };
+$('logpick').onchange = () => { $('follow').checked = false; saveFollowPrefs(); switchLog($('logpick').value); };
 $('pause').onclick = () => { S.paused = !S.paused; $('pause').setAttribute('aria-pressed', String(S.paused)); $('pause').textContent = S.paused ? 'Resume' : 'Pause'; if (!S.paused) readLog(false); };
 // Timeline interaction: hover cursor, click a red stretch, wheel zoom and drag pan on the time axis, arrows step stretches.
 (function () {

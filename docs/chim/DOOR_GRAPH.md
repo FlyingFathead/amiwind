@@ -1,6 +1,6 @@
 # Door graph: every load door and every interior
 
-_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
+_Last updated with AmiWind v0.0.50-dev (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -310,6 +310,32 @@ graph and today's town rooms use.
 Every other row stays as it is. A door into a listed room that this build does not convert, or an exit to a place it
 does not hold, stays inert ("Interior unavailable"). It is listed in the image's `room-batch-links.json`, together with
 the link counts per kind.
+
+**The world door table** (v0.0.50, `tools/world_doors.py`, the image step after the batch links). The rule from
+v0.0.50 on: every entrance of the game leads into its interior, and every way out leads back
+([CHIM-REGION-DOORS-NO-ROOMS-48](../bugs/CHIM-REGION-DOORS-NO-ROOMS-48.md)). The table holds every authored load door
+of the master, and the teleport markers too, each resolved by one holder rule:
+
+- **Its own place.** A point inside a town frame's box (Seyda Neen, Balmora and Vivec, built as towns before the region
+  frames) is that town's; any other exterior point is the CHIM region frame's of its cell; a door inside a room is that
+  room's. This is the rule the build uses to give cells to town frames.
+- **Where it leads.** Into a room the image holds, at the arrival of the door record; or out to the frame that holds
+  the exit point, by the same rule. A town on CHIM runs as its CHIM frame map (`<town>-chim`), which the engine starts
+  for a door that names the town.
+- **Written into the door banks.** A door that its holder's bank does not list yet gets its row (the touch box from its
+  mesh, with the bank's own padding); a row still `-` gets its target and arrival. The table is in the image's
+  `world-doors.json`.
+- **Markers.** A `PrisonMarker` (where an arrest takes the player) is a row of kind `marker`: resolved like a door,
+  never written into a bank (there is no door to touch). The jail system and the game's scripts look it up later.
+- **The build check.** A door or marker that does not resolve stops the image with the list. So do the named places of
+  `dbg tp` (`config/teleport-names.txt`, for example `dbg tp heartchamber`) whose room is not in the image.
+
+**Measured on the v0.0.49 image** (24 October 2026): of the base game's 3,133 load doors and markers, 3,027 led where
+they should. The table gives the same target and arrival for all 3,021 doors the image already linked, and links the
+rest: 85 ways out of rooms into cells a town frame holds (the batch linker had checked each town's map by its own name
+and so dropped every town on CHIM) and 10 entrances in cells inside the old town frames that no bank carried (among
+them Pelagiad's houses, the Abaesen-Pulu Egg Mine, the Akimaes and Nimawia Grottos and the Remote Shipwreck). The
+check is `python3 tools/world_doors.py audit --data-files DIR --id1 ID1` (read only).
 
 **Measured** (23 October 2026). The stage commands were run on the MiniWind Balmora run of 22 October with no image
 built, capped at 8 cores, while another measurement used the host:

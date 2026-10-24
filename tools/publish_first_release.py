@@ -9,7 +9,8 @@ import subprocess
 import time
 import zipfile
 
-from project_version import ROOT, VERSION
+from project_version import ROOT, public_version
+VERSION = public_version()
 from release import inspect_source, validate_candidate
 
 REPOSITORY = 'FlyingFathead/amiwind'

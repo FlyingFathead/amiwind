@@ -316,6 +316,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 
 Related bugs in other categories:
 
+- BUILD-IMAGE-LAYOUT-SERIAL-49 (no report page): The image step plans its disk layout and writes its partitions on about 1.6 of 24 cores for about three minutes
 - [BUILD-LIGHT-THREADS-32](BUILD-LIGHT-THREADS-32.md): ericw light is not byte-reproducible with more than one thread
 
 <!-- END GENERATED CATEGORY -->

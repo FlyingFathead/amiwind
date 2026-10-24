@@ -1,16 +1,19 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
+_Last updated with AmiWind v0.0.50-dev (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Contents](#contents-1)
+- [Which machines AmiWind aims at](#which-machines-amiwind-aims-at)
 - [What the game needs](#what-the-game-needs)
 - [Why 32 MB of Fast RAM](#why-32-mb-of-fast-ram)
 - [Before you start: 68060 and Kickstart 3.1](#before-you-start-68060-and-kickstart-31)
 - [First measure, then play](#first-measure-then-play)
 - [More Fast RAM: the memory settings that exist today](#more-fast-ram-the-memory-settings-that-exist-today)
+  - [Extra RAM is used automatically](#extra-ram-is-used-automatically)
+  - [The settings](#the-settings)
 - [Disk buffers and RAM disks](#disk-buffers-and-ram-disks)
 - [A cache test plan](#a-cache-test-plan)
 - [Compatibility roadmap](#compatibility-roadmap)
@@ -27,7 +30,9 @@ on 23 October 2026, came from another tester who built the game from the public 
 desktop PC and a night) and ran it on an **A3000 with a 68060 at 80 MHz through RTG**, with RTG changes the tester
 made to their own build (the shipped build has not been run on RTG yet): the menus were quick and the music played,
 and a short timedemo with settings the tester also changed gave about 0.6 to 0.7 frames per second; a clean retest is
-planned. Neither is playable yet; making the frame cheaper is the main engine work now ([AmiWind on the 68060](68060.md)). More real
+planned. Neither is playable yet; making the frame cheaper is the main engine work now ([AmiWind on the 68060](68060.md)). An
+RTG screen does not draw the 3D for the CPU: the drawing stays on the 68k either way. Handing it to a 3D graphics card
+through Warp3D is a research item ([roadmap](ROADMAP.md#research-hardware-3d-through-warp3d-v0050-study-24-october-2026)). More real
 measurements, with the details listed under [what to send back](#what-to-send-back), are what turn emulator figures
 into predictions for real machines. If you have one, this page lists what the game needs, what to run first, and
 which settings use more memory. Measurements from real machines are very welcome: see
@@ -35,6 +40,7 @@ which settings use more memory. Measurements from real machines are very welcome
 
 ## Contents
 
+- [Which machines AmiWind aims at](#which-machines-amiwind-aims-at)
 - [What the game needs](#what-the-game-needs)
 - [Why 32 MB of Fast RAM](#why-32-mb-of-fast-ram)
 - [Before you start: 68060 and Kickstart 3.1](#before-you-start-68060-and-kickstart-31)
@@ -44,7 +50,20 @@ which settings use more memory. Measurements from real machines are very welcome
 - [A cache test plan](#a-cache-test-plan)
 - [Compatibility roadmap](#compatibility-roadmap)
 - [Not yet: non-blocking disk reads](#not-yet-non-blocking-disk-reads)
+- [PiStorm](#pistorm)
 - [What to send back](#what-to-send-back)
+
+## Which machines AmiWind aims at
+
+The 68k Amiga lives on in new accelerators and machines: FPGA cores (the Vampire's Apollo 68080), a Raspberry Pi
+in the CPU socket running a 68k JIT ([PiStorm](#pistorm)), and complete new machines built around an emulator,
+such as the THEA1200 (an A1200 replica running Amiberry). These are where AmiWind is meant to be played, and the
+development emulators already run 68k code at that kind of speed. They also run on original Amigas fitted with a
+modern accelerator, and most of them offer an RTG screen as the normal display.
+
+A classic 68060 at 80 to 100 MHz is the floor: the check that the game starts, loads the world and stays within its
+memory. It is not the goal for frame rate. The first figures from real machines are all from classic 68060 boards
+(below), so a first figure from any of the modern machines is the most wanted report.
 
 ## What the game needs
 

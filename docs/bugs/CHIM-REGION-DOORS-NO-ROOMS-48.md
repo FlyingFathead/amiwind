@@ -9,7 +9,7 @@
 | Where | tools/build_aga.py chim_frame_maps, chim.frame_map.build_regions (rooms unused) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.48-dev2 (last seen) |
+| Persists in | fixed in v0.0.50 |
 | Severity | medium: every room behind an open-world door is unreachable even when the image holds it |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

@@ -2,7 +2,8 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
-from project_version import ROOT, VERSION, check_native_versions, public_version, python_version, generate_native
+from project_version import ROOT, check_native_versions, public_version, python_version, generate_native
+VERSION = public_version()
 
 
 class ProjectVersion(unittest.TestCase):

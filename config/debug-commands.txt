@@ -77,7 +77,7 @@ WORLD / TRAVEL|reset location|amiwind_debug_reset_location|0
 WORLD / TRAVEL|scene|aw_scene|ship/town/balmora/<map name>
 WORLD / TRAVEL|scene change|aw_scene_menu|(scene picker)
 WORLD / TRAVEL|superspeed|superspeed|[on/off, true/false or 1/0; no argument = status and current speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey) instead of the original's speed from Speed, Athletics and load; no running fatigue (default off; not saved; also plain superspeed on/off)
-WORLD / TRAVEL|tp|aw_teleport|[X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (also teluvirith) / <map name>; no argument opens menu]
+WORLD / TRAVEL|tp|aw_teleport|[X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (also teluvirith) / heartchamber (teleport-names.txt) / <map name>; no argument opens menu]
 WORLD / TRAVEL|tp map|aw_teleport_map|select a destination on the world map
 WORLD / TRAVEL|tp menu|aw_scene_menu|(teleport picker)
 WORLD / TRAVEL|unstuck|aw_unstuck|(nearest clear standing spot below or beside you; never into a wall or water; leaves noclip)
