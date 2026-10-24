@@ -37,6 +37,11 @@ SHIPPED_STAGES = {
     'interior': 'interiors', 'dialogue-lookup': 'voice lookup', 'intro': 'opening, chargen captions',
     'census': 'census map', 'npc-gallery': 'gallery/*.mdl (7,102 files)',
     'area': 'area interiors', 'balmora-interiors': 'Balmora interiors',
+    # CHIM rooms (docs/chim/INTERIOR_STORE.md; maintainer, 22 October 2026): every converted room on one interior store
+    'chim-interiors': 'CHIM rooms: the interior store (chimi/) and the room records',
+    # every base-game interior by batch (config/room-batches.json, --room-batches all by default: the maintainer's
+    # decision of 23 October 2026)
+    'chim-room-batches': 'the rooms of every batch the other room stages do not convert, residents and door banks',
     # CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): Balmora prepared CHIM-native, no legacy region maps (bm*).
     'chim-town-balmora': 'Balmora residents, frame entities, region table and door bank from the game data',
     # all of Vivec in one CHIM frame, CHIM-native (project decision 2026-10-11 09:55; replaces the Arena-only frame)
@@ -57,6 +62,9 @@ SHIPPED_STAGES = {
     'world-scenery': 'rock and mushroom overlay',
     'world-flora-assets': 'progs/aw_flora/*.spr (76 files)', 'world-flora': 'trees and grass overlay',
     'media': 'sound/*, intro videos (the catalogue stays beside the image)', 'music': 'music/*.mws', 'engine': 'AmiWind, AmiWindCheck',
+    # v0.0.48 (MWSCRIPT-AUDIO-FIRST-48): every script compiled (docs/MWSCRIPT_BYTECODE.md); the engine runs it with
+    # aw_mwscript on (experimental, off by default)
+    'mwscript': 'mwscript.awm (the compiled game scripts)',
     'image': 'the HDF images',
     # v0.0.33, the first CHIM release: Balmora and Seyda Neen as a CHIM world (config/build-defaults.json).
     'chim': 'CHIM world (chim/world.cwi, frame maps of Balmora and Seyda Neen)',
@@ -72,11 +80,13 @@ SHIPPED_IMAGE_OPTIONS = {
     '--gallery': str(RUN / 'npc-gallery'),
     '--hands': '3d',
     '--hand-catalog': str(RUN / 'hand-catalog'),
+    '--mwscript': str(RUN / 'mwscript'),
     '--harvest': str(RUN / 'harvest'),
     '--hidden-surface-cull': 'true',
     '--local-skybox': 'false',
     '--canonical-land-source': str(RUN / 'world-survey/terrain-source.npz'),
     '--town-scenery': str(RUN / 'scenery'),
+    '--chim-room-batches': str(RUN / 'chim-room-batches'),
 }
 
 # Every builder option, classified against what a release ships. A new option
@@ -180,18 +190,28 @@ OPTIONS = {
     # actors the original's start script disables at a new game: original = off by default until the runtime
     # enable exists (NPC-STORY-DISABLED-AT-START-42); placed = as before
     'start_disabled': 'opt-in, not shipped',
+    # where the scene stages read Seyda Neen's entities: the entity list; bsp = the legacy read path, the same
+    # bytes (BUILD-SEYDA-ENTITY-BUS-48)
+    'seyda_entities': 'shipped default',
     'chim_model_hull_patch': 'shipped default',
     # edge bevels on every CHIM model's standing hull (CHIM-COMPILED-HULL-OVERFILL-46): EXPERIMENTAL, profile by default
     'chim_model_bevels': 'opt-in, not shipped',
     # world format 0.8: one model per mesh + scale, the full rotation in the record (CHIM-TILT-VARIANTS-SPLIT-33):
     # EXPERIMENTAL, 0.7 by default
     'chim_placement_format': 'opt-in, not shipped',
+    # CHIM rooms (docs/chim/INTERIOR_STORE.md): on by default by the maintainer's decision of 22 October 2026
+    'interior_format': 'shipped default',
+    # interior rooms by batch (config/room-batches.json): all by default (the maintainer's decision of 23 October
+    # 2026); none for a MiniWind or --interior-format bsp unless given
+    'room_batches': 'shipped default',
     # world format 0.9: a reach copy becomes a reference to the owner record (CHIM-PLACEMENT-MARGIN-COPIES-46):
     # EXPERIMENTAL, copies by default
     'chim_reach_index': 'opt-in, not shipped',
     # the actor table: every exterior NPC and creature reference for the type 1 window (CHIM-EXTERIOR-ACTORS-MISSING-46):
     # on by default since v0.0.47; off = only the frame maps place actors
     'chim_actor_table': 'shipped default',
+    # the region frames' NPCs and creatures in their frame maps (CHIM-EXTERIOR-ACTORS-MISSING-46): EXPERIMENTAL, off
+    'chim_region_actors': 'shipped default',
     # generated terrain records (world format 0.11) by default since v0.0.47; compact (0.10) and bsp29 selectable
     'chim_terrain_pack': 'shipped default',
     # how a CHIM model variant shares its vertices (base by default; placed = the earlier per-placement weld)
@@ -201,11 +221,21 @@ OPTIONS = {
     # shapes whose texture scrolls in the original drawn as Quake turbulent textures (GHOSTFENCE-NO-ANIMATION-46):
     # turbulent by default since v0.0.47; off = the still texture of before
     'chim_uv_scroll': 'shipped default',
+    # a light level per placed model from every exterior light source, the lights without a mesh among them
+    # (CHIM-MESHLESS-LIGHTS-33): EXPERIMENTAL, off until its in-game frame cost is measured
+    'chim_placement_light': 'opt-in, not shipped',
+    # the fires' light on the placed models around them, from the frame maps' flame rows (CHIM-EXTERIOR-FLAMES-
+    # MISSING-48): on by default, the maintainer 2026-10-23 ("set it on by default but add some dbg command like dbg
+    # campfires on|off"); off = flames without light
+    'chim_fire_light': 'shipped default',
     'stair_walk_cache': 'check', 'stair_walk_sample': 'check', 'stair_walk_area': 'check',
     'stair_walk_key': 'check', 'stair_walk_places': 'check', 'stair_watch': 'check',
     # the general underside collision rules of CHIM models: EXPERIMENTAL (names, the list, by default)
     'collision_underside': 'opt-in, not shipped',
-    'stair_collision_method': 'opt-in, not shipped',
+    # stair collision method 1 (CHIM-STAIR-COLLISION-MESH-47) and the one collision-source rule
+    # (COLLISION-RCN-SCOPE-32): the defaults since v0.0.48-dev2 (decided for the project 22 October 2026); 0 and
+    # profile keep the methods before for A/B
+    'stair_collision_method': 'shipped default', 'collision_source': 'shipped default',
     # collision-free scaled copies merged to the nearest 0.1 of scale (on by default: CHIM-HULL-SURFACE-HEAP-46)
     'scale_snap': 'shipped default',
     # Entity tracker against the release baseline (BUILD-DRESSING-EXCLUDED-32).
@@ -342,6 +372,25 @@ class DefaultBuildShipsTheRelease(unittest.TestCase):
                     ('--file-aliases', 'off'), ('--shared-skins', 'off')):
             with self.subTest(old=old):
                 self.assertNotEqual(steps(*old), steps())
+
+    def test_collision_defaults_of_v048_dev2(self):
+        # Decided for the project, 22 October 2026 (the maintainer: "implement this"): the one collision-source rule
+        # (COLLISION-RCN-SCOPE-32) and stair collision method 1 (CHIM-STAIR-COLLISION-MESH-47) are the defaults; the
+        # methods before stay selectable (--collision-source profile, --stair-collision-method 0)
+        import os
+        from collision_source_env import COLLISION_SOURCE_VARIABLE, collision_source_mode
+        from stair_collision_env import STAIR_COLLISION_VARIABLE, stair_collision_method
+        args = build.parser().parse_args([])
+        self.assertIsNone(args.collision_source)
+        self.assertIsNone(args.stair_collision_method)
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(COLLISION_SOURCE_VARIABLE, None)
+            os.environ.pop(STAIR_COLLISION_VARIABLE, None)
+            self.assertEqual((collision_source_mode(), stair_collision_method()), ('authored', '1'))
+        for flags in (('--collision-source', 'profile'), ('--stair-collision-method', '0')):
+            with self.subTest(flags=flags):
+                parsed = build.parser().parse_args(list(flags))
+                self.assertEqual(getattr(parsed, flags[0][2:].replace('-', '_')), flags[1])
 
     def test_night_lamp_lightmaps_are_off_by_default(self):
         # EXPERIMENTAL bm019 prototype (docs/EXPERIMENTAL_FLAGS.md): the default image is unchanged.

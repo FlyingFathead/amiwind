@@ -18,8 +18,8 @@ extern short *d_pzbuffer;
 extern unsigned int d_zwidth;
 extern cvar_t r_drawentities;
 extern int hunk_size,hunk_low_used,hunk_high_used;
-#define GUARD_TYPES 32
-#define GUARD_VISIBLE 32
+#define GUARD_TYPES AW_GUARD_TORCH_TYPES /* registry records (aw_torch.h; GUARD-TORCH-TYPES-LIMIT-48) */
+#define GUARD_VISIBLE 32 /* guards drawn with a torch in one frame, unchanged */
 #define GUARD_LIGHTS AW_GUARD_TORCH_LIGHT_COUNT
 #define GUARD_LIGHT_KEY AW_GUARD_TORCH_LIGHT_KEY
 #define GUARD_LIGHT_RANGE (384.0f*384.0f)
@@ -400,6 +400,7 @@ void AW_GuardTorchDraw(void)
 #define STATIC_FLAME_RANGE (640.0f*640.0f)
 #define STATIC_FLAME_PARTS 6
 cvar_t aw_static_flames={"aw_static_flames","1",true};
+/* dbg campfires off (aw_campfires 0, aw_lamps.c; r_campfires 0): no static flame outdoors. Interiors keep theirs. */
 /* Which STATIC_FLAME_DRAW flames get the budget (FLAME-RANGE-NEAREST-32).
  * 0, the default: flames on screen, largest on screen first (size over
  * distance), so a hearth across the room is not crowded out by candles behind
@@ -521,7 +522,7 @@ static int flame_depth_limit(void)
     if(!flame_pixels)return limit;
     if(aw_view_torch_emitter && aw_view_torch_emitter(player))limit=flame_limit(player,4.2f,limit);
     for(i=0;i<visible_count;i++)if(guards[i].active)limit=flame_limit(guards[i].flame,4.2f,limit);
-    if(aw_static_flames.value && cl.worldmodel){
+    if(aw_static_flames.value && cl.worldmodel && (r_campfires || !R_SkyExterior())){
         /* Not read yet for this map (AW_StaticFlamesDraw reads it): unknown
          * flames, so nothing may be left out this frame. */
         if(cl.worldmodel!=static_flame_world)return 0;
@@ -538,6 +539,7 @@ void AW_StaticFlamesDraw(void)
 {
     int i,k,count,core,chosen[STATIC_FLAME_DRAW];
     if(!aw_static_flames.value || !cl.worldmodel)return;
+    if(!r_campfires && R_SkyExterior())return;      /* dbg campfires off: no fire outdoors */
     if(cl.worldmodel!=static_flame_world)static_flames_load(cl.worldmodel);
     if(!static_flame_count || !flame_pixels || !vid.buffer || !d_pzbuffer || d_zwidth<vid.width)return;
     count=AW_StaticFlamesPick(static_flames,static_flame_count,aw_static_flames_nearest.value!=0,chosen);

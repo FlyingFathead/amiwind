@@ -15,7 +15,7 @@ void Mod_LoadAliasModel(model_t *,void *);
 void Mod_LoadAliasModel(model_t *,void *,int);
 #endif
 static union {long double align;byte bytes[2*1024*1024];} arena;
-static byte raw[700000];
+static byte raw[900000];
 static jmp_buf failure;
 static int expect_error,loads;
 int r_pixbytes=1;
@@ -30,11 +30,12 @@ void Con_Printf(char *fmt,...){(void)fmt;}
 void Cmd_AddCommand(char *name,xcommand_t fn){(void)name;(void)fn;}
 void Sys_Error(char *fmt,...){assert(expect_error);longjmp(failure,1);}
 static int make_alias(int mode){
-    mdl_t *m=(mdl_t *)raw;byte *p;int i,j,grouped=mode==1,skinbytes;dtriangle_t *tri;daliasframe_t *f;
+    /* mode 0: small; 1: grouped; 2: over the 512 KiB staging limit (536 KB); 3: over the stream limit (797 KB) */
+    mdl_t *m=(mdl_t *)raw;byte *p;int i,j,grouped=mode==1,skinbytes,nf=mode==3?80:8;dtriangle_t *tri;daliasframe_t *f;
     memset(raw,0,sizeof raw);m->ident=IDPOLYHEADER;m->version=ALIAS_VERSION;
-    m->numskins=1;m->skinwidth=mode==2?1024:256;m->skinheight=mode==2?480:256;
+    m->numskins=1;m->skinwidth=mode>=2?1024:256;m->skinheight=mode>=2?480:256;
     skinbytes=m->skinwidth*m->skinheight;
-    m->numverts=900;m->numtris=300;m->numframes=8;m->size=1;
+    m->numverts=900;m->numtris=300;m->numframes=nf;m->size=1;
     for(i=0;i<3;i++){m->scale[i]=.25;m->scale_origin[i]=-2;}
     p=raw+sizeof(*m);((daliasskintype_t *)p)->type=grouped?ALIAS_SKIN_GROUP:ALIAS_SKIN_SINGLE;p+=sizeof(daliasskintype_t);
     if(grouped){((daliasskingroup_t *)p)->numskins=2;p+=sizeof(daliasskingroup_t);
@@ -43,7 +44,7 @@ static int make_alias(int mode){
     p+=900*sizeof(stvert_t);tri=(dtriangle_t *)p;
     for(i=0;i<300;i++){tri[i].facesfront=1;tri[i].vertindex[0]=i*3;tri[i].vertindex[1]=i*3+1;tri[i].vertindex[2]=i*3+2;}
     p+=300*sizeof(*tri);
-    for(j=0;j<8;j++){
+    for(j=0;j<nf;j++){
         ((daliasframetype_t *)p)->type=grouped?ALIAS_GROUP:ALIAS_SINGLE;p+=sizeof(daliasframetype_t);
         if(grouped){((daliasgroup_t *)p)->numframes=2;p+=sizeof(daliasgroup_t);
             for(i=0;i<2;i++){((daliasinterval_t *)p)->interval=(i+1)*.2f;p+=sizeof(daliasinterval_t);}}

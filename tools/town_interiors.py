@@ -255,10 +255,12 @@ def only_rooms(listed, only_cells, title):
             dict(room, exclude=ONLY_CELLS_LEFT_OUT) for room in listed]
 
 
-def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dry_run=False, only_cells=None):
+def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dry_run=False, only_cells=None,
+            room_form='compiled'):
     """Convert the town's listed rooms; returns {'rooms', 'cells', 'failed', 'excluded', 'reports'}.
     only_cells: convert only these listed rooms (cell IDs; a MiniWind interior scope); every other room is
-    excluded with that reason, and a name that is no listed room stops the stage."""
+    excluded with that reason, and a name that is no listed room stops the stage. room_form: compiled (qbsp, vis,
+    light) or shell (prepare_area.add_room_form_option: the CHIM room's inputs, no compile)."""
     from build_parallel import ordered_map
     from vis_options import map_threads
     from interior_plants import plant_mode
@@ -280,7 +282,8 @@ def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dr
                             **({} if room['cell'].casefold() in outside else {'original_door_arrivals': True}),
                             **({'recentre': room['recentre']} if room.get('recentre') else {}),
                             **({'plant_sprites': True} if room.get('plants') == 'sprites' and plant_mode() != 'meshes'
-                               else {})},
+                               else {}),
+                            **({'room_form': 'shell'} if room_form == 'shell' else {})},
               qbsp, vis, light, timings, map_threads(jobs, workers), vis_mode) for room in work]
     from build_costs import costed_map, room_sizes
     sizes = room_sizes(data, [(room['map'], room['cell']) for room in work])

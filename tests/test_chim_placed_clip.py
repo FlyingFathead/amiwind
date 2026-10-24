@@ -171,19 +171,30 @@ class PlacedClipContractTests(unittest.TestCase):
         self.assertIn('chim/chim_placed_clip.c', make)
         callers = sorted(p.name for p in SRC.rglob('*.c')
                          if p.name != 'chim_placed_clip.c' and 'ChimPlaced_' in p.read_text(encoding='utf-8', errors='replace'))
-        self.assertEqual(callers, ['chim_chunks.c', 'chim_models.c'])
+        self.assertEqual(callers, ['chim_chunks.c', 'chim_models.c', 'chim_room.c'])
+        # a room record holds placed records only (0.8 and later, ChimFormat_Room): its matrix per record, and
+        # the same collision function as a chunk's placements
+        room = (SRC / 'chim/chim_room.c').read_text(encoding='utf-8')
+        # the matrix at load and a turning hinged door's matrix (RoomYaw, AW-20260928-12)
+        self.assertEqual(room.count('ChimPlaced_'), 2)
+        self.assertIn('ChimPlaced_AnglesMatrix (p->ent.angles, (float (*)[3])(room.rot + 9*i));', room)
+        self.assertIn('ChimChunks_ClipPlace (p, room.rot + 9*i, start, mins, maxs, end, best);', room)
         models = (SRC / 'chim/chim_models.c').read_text(encoding='utf-8')
         self.assertIn('cm->piece_bytes = kind == CHIM_KIND_MODEL && chim_world.minor >= CHIM_PLACED_MINOR ?', models)
         self.assertEqual(models.count('ChimPlaced_'), 1)
         chunks = (SRC / 'chim/chim_chunks.c').read_text(encoding='utf-8')
         self.assertIn('int placed = chim_world.minor >= CHIM_PLACED_MINOR', chunks)
         self.assertIn('c->rot = placed ? (float *)(c->places + n) : NULL;', chunks)
-        clip = chunks[chunks.index('static void ClipPlacement ('):]
+        # a chunk's placement: its matrix only when the catalogue has one (0.8)
+        self.assertIn('ChimChunks_ClipPlace (&c->places[j], c->rot ? c->rot + 9*j : NULL, start, mins, maxs, end, best);',
+                      chunks)
+        clip = chunks[chunks.index('void ChimChunks_ClipPlace ('):]
         clip = clip[:clip.index('\n}\n')]
-        self.assertLess(clip.index('if (c->rot)'), clip.index('ChimPlaced_TraceTable'))
+        self.assertLess(clip.index('if (rot9)'), clip.index('ChimPlaced_TraceTable'))
         # without a matrix (0.4-0.7) the old path, unchanged
         self.assertTrue(clip.rstrip().endswith('ClipModel (p->ent.model, p->ent.origin, p->s, p->c, start, mins, maxs, end, best);'))
-        self.assertEqual(chunks.count('ChimPlaced_'), 2)     # the matrix at load, the table trace
+        # the matrix at load, a turning hinged door's matrix (PlaceYaw, AW-20260928-12), the table trace
+        self.assertEqual(chunks.count('ChimPlaced_'), 3)
 
 
 @unittest.skipIf(np is None, 'numpy and scipy are required')

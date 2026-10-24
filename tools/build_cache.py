@@ -69,10 +69,14 @@ DEFAULT_SCOPE = 'units'
 # Forms of a module's import-time code in scope 'units' (unit_texts): 1 counts every function's default values,
 # 2 only defaults that run code on import. Stage fingerprints use 2; a reuse source fingerprinted with 1 is
 # compared in its own form (comparable), so the change costs no rebuild (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
-TOP_FORMATS = (1, 2)
-STAGE_TOP_FORMAT = 2
-TOP_TEXT = {1: '<top>', 2: '<top>#2'}
-UNIT_PREFIX = {1: 'units:', 2: 'units2:'}
+# Form 3 (stage keys only, BUILD-STAGE-KEY-WHOLE-CLASS-48): form 2, and a plain class (split_classes) is no longer
+# import-time code but units of its own, its body and each method, so an edit to a method a stage never reaches keeps
+# its key; the reach also follows the code a stage hands to a cache key (keyed_scripts) and the Python files it
+# reads as data (FOLDER.glob('*.py')). Per-unit caches (code_key, pass_cache) keep their forms.
+TOP_FORMATS = (1, 2, 3)
+STAGE_TOP_FORMAT = 3
+TOP_TEXT = {1: '<top>', 2: '<top>#2', 3: '<top>#3'}
+UNIT_PREFIX = {1: 'units:', 2: 'units2:', 3: 'units3:'}
 ENV_PREFIX = 'AMIWIND_'
 ENV_NAME = re.compile(r'AMIWIND_[A-Z0-9_]*[A-Z0-9]')
 ENV_ANY = '*'
@@ -90,6 +94,12 @@ NON_REUSABLE = {
 # (BUILD-CACHE-CHIM-UNITS-33). The media and intro stages use the per-file asset pool the same way.
 CONTENT_ADDRESSED = {('npc-gallery', '--cache'), ('world-terrain', '--cache'), ('chim', '--unit-cache'),
                      ('media', '--cache'), ('intro', '--cache')}
+# Content-addressed cache folders by place, whatever stage or option names them. The CHIM unit cache is shared:
+# the chim stage and the CHIM rooms stage (chim-interiors, tools/chim/interior.py: the same UnitCache, every unit
+# keyed by its own fingerprint and code key) both name WORKSPACE/cache/chim-units. Listed by stage only, the
+# rooms stage hashed the shared folder, which other builds grow past EXTERNAL_DIRECTORY_LIMIT: the stage was
+# never reusable (CHIM-INTERIORS-REUSE-MISS-48, "unexpected rebuild: chim-interiors (other)").
+CONTENT_ADDRESSED_FOLDERS = frozenset({'{WORKSPACE}/cache/chim-units'})
 # The shared storage pool (WORKSPACE/cache/asset-pool-v1, --storage-pool-dir, tools/storage_pool.py) is
 # content-addressed whatever stage or option names it: every object is stored by its own SHA-256 and every
 # reader (tools/file_cache.py FileCache) looks objects up by a reuse key made of the inputs the object depends
@@ -107,6 +117,20 @@ IGNORED_ENV = {'AMIWIND_BUILD_JOBS', 'AMIWIND_INPUTS_LOCK', 'AMIWIND_PROFILE_SEC
                'AMIWIND_BUILD_BUDGET', 'AMIWIND_ACTIVE_ENV', 'AMIWIND_PYTHON', 'AMIWIND_STAGE_TRACE',
                'AMIWIND_REBUILD_UNITS', 'AMIWIND_CACHE_FALLBACK', 'AMIWIND_SOURCE_COMMIT', 'AMIWIND_STORAGE_POOL',
                'AMIWIND_BUILD_RECIPE',
+               # how many small units go out in one pool task (build_parallel completed_map, BUILD-POOL-TINY-UNITS-48):
+               # every unit's result is the same either way
+               'AMIWIND_POOL_CHUNKS',
+               # the CHIM stats' pool method (chim.stats, BUILD-STATS-SERIAL-36) and the over-budget naming method
+               # (chim.budget_tiles.run_fitting, CHIM-BUDGET-RERUN-SERIAL-48): the same document and the same units
+               # either way, only how the work is spread over the cores
+               'AMIWIND_STATS_POOL', 'AMIWIND_BUDGET_RERUN',
+               # how parallel_json hands its batches to the pool (BUILD-STATS-SERIAL-36): the same text either way
+               'AMIWIND_JSON_POOL',
+               # BUILD-IMAGE-UNDERUSED-32: the engine map limits audit on the pool or one by one, the layout plan's
+               # file walk (os.walk or pathlib) and the room batch install's checks and copies: the same report,
+               # plan and files either way
+               'AMIWIND_MAP_LIMITS_POOL', 'AMIWIND_LAYOUT_WALK', 'AMIWIND_ROOM_INSTALL_THREADS',
+               'AMIWIND_PREFLIGHT_METHOD',
                # the stair walk's reuse and its check sample: the same rows either way (stair_walk.walk_cache_mode)
                'AMIWIND_STAIR_WALK_CACHE', 'AMIWIND_STAIR_WALK_SAMPLE', 'AMIWIND_STAIR_WALK_REUSE',
                # what the stages print and when the builder's heartbeat speaks: logs only (build_profile.phase)
@@ -147,7 +171,11 @@ PATH_CALLS = {'Path', 'PurePath', 'PurePosixPath', 'joinpath', 'join', 'open', '
 INSTRUMENTATION_MODULES = frozenset({'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
                                      'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py',
                                      'tools/resource_plan.py', 'tools/pool_status.py', 'tools/stage_watch.py',
-                                     'tools/build_digest.py', 'tools/code_key.py'})
+                                     'tools/build_digest.py', 'tools/code_key.py',
+                                     # the CHIM label's key line (BUILD-CHIM-LABEL-IN-KEYS-48): loaded only by this
+                                     # module's key code; read in a stage, it refused 5 rc1 stages
+                                     # (BUILD-REUSE-RC1-RECORDS-REFUSED-48)
+                                     'tools/chim_compat.py'})
 OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
 # Single functions that can never change a stage's outputs although they read files: the closure does not follow them
 # (explicit list with the reason, tested in tests/test_build_cache.py; add one only if no output can depend on it).
@@ -156,12 +184,38 @@ OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
 #   that can reach the preflight keyed tools/release-files.json and the other files there, and a release file list
 #   edit rebuilt the chim stage (BUILD-REUSE-KEYS-TOO-BROAD-35, v0.0.44-dev1 build try 2).
 OUTPUT_NEUTRAL_UNITS = frozenset({('tools/chim/regions.py', 'converter_note')})
+# The CHIM label in the keys (BUILD-CHIM-LABEL-IN-KEYS-48): a stage that reaches the CHIM_VERSION file counts it as
+# that file with the label replaced by its compatibility line (config/chim-compatibility.json, tools/chim_compat.py),
+# and the table itself counts in no key (the line is all of it a key needs). The x.x.1 label bump of a final release
+# then rebuilds nothing whose output does not show the label (v0.0.48: 0.2.1 -> 0.2.2 rekeyed about 25 stages, the
+# CHIM world among them); a new line still rebuilds every stage that reaches the file. Receipts keep the real label.
+# A key whose reach runs one of CHIM_LABEL_SHOWN_UNITS can write the label into an output (the engine's chim_version.h,
+# the boot check's "CHIM vY", the engine tree's CHIM_VERSION copy): it keys the raw file (shows_chim_label). Explicit
+# lists, tested (tests/test_build_cache.py ChimLabelKeyTests):
+# - CHIM_LABEL_SHOWN: the modules that hold those units (a reach without them never shows the label);
+# - CHIM_LABEL_HIDDEN_UNITS: units that run a shown unit for a host-side check whose result never holds the label:
+#   tools/chim/zone_sim.py build_library compiles chim_zone.c for the zone walk gate with the generated headers
+#   (generate_native), and chim_zone.c prints no CHIM version; the chim stage reached the label only through it.
+# SourceIndex(chim_label_keys=True) is the earlier method (every reach keys the raw label and the table), kept.
+CHIM_LABEL_FILE = 'CHIM_VERSION'
+CHIM_COMPAT_TABLE = 'config/chim-compatibility.json'
+CHIM_LABEL_SHOWN = frozenset({'tools/project_version.py', 'tools/miniwind.py', 'tools/build_aga.py'})
+CHIM_LABEL_SHOWN_UNITS = frozenset({('tools/project_version.py', 'chim_version'),
+                                    ('tools/project_version.py', 'read_chim_version'),
+                                    ('tools/project_version.py', 'generate_native'),
+                                    ('tools/miniwind.py', 'version_segments'),
+                                    ('tools/miniwind.py', 'version_line'),
+                                    ('tools/miniwind.py', 'logo_lines'),
+                                    ('tools/build_aga.py', 'stage_runtime')})
+CHIM_LABEL_HIDDEN_UNITS = frozenset({('tools/chim/zone_sim.py', 'build_library')})
 # Pool scheduling functions: how many units run at once, in which order and how long a pool waits before it starts
 # more. They hand each unit to the same function with the same item and return its result, so no output depends on
 # their code. Unlike OUTPUT_NEUTRAL_UNITS they are still followed (what they call, such as worker_environment(),
 # keys every stage that reaches it); only their own text is left out of the digests. Origin: v0.0.45, the
 # BUILD-CHIM-SERIAL-SECTIONS-44 pool changes turned 34 of 37 reusable stages into rebuilds. A function joins this
 # list only if it schedules and never builds, reads or writes a unit's data (tests/test_build_cache.py).
+# spread_map (ROOM-BATCH-CORES-49) also offers each unit a number of cores; the caller's own spread() turns that into
+# its task (keyed: it is the caller's code), and the unit's output must not depend on it.
 SCHEDULING_UNITS = frozenset({
     ('tools/build_parallel.py', '_running'),
     ('tools/build_parallel.py', '_grow_seconds'),
@@ -169,6 +223,32 @@ SCHEDULING_UNITS = frozenset({
     ('tools/build_parallel.py', 'completed_map'),
     ('tools/build_parallel.py', 'governed_map'),
     ('tools/build_parallel.py', '_sized_map'),
+    ('tools/build_parallel.py', 'spread_map'),
+    # the idle-worker watcher (BUILD-POOL-MEMORY-PEAK-48): ends idle worker processes above a stage's allowance; a
+    # unit's result never depends on which process runs it
+    ('tools/build_parallel.py', '_trim_after_seconds'),
+    ('tools/build_parallel.py', '_trim_poll_seconds'),
+    ('tools/build_parallel.py', '_watch_stage_pool'),
+    ('tools/build_parallel.py', '_watch_idle_workers'),
+    ('tools/build_parallel.py', '_can_retire'),
+    ('tools/build_parallel.py', '_trim_idle_loop'),
+    ('tools/build_parallel.py', '_retire_idle'),
+    ('tools/build_parallel.py', '_retire_worker'),
+    # chunks of small units in completed_map (BUILD-POOL-TINY-UNITS-48): every unit still runs its function on its
+    # item and yields its own result; only how many go out in one pool task changes
+    ('tools/build_parallel.py', '_chunks_on'),
+    ('tools/build_parallel.py', '_chunks_per_worker'),
+    ('tools/build_parallel.py', '_chunk_seconds'),
+    ('tools/build_parallel.py', '_chunk_plan'),
+    ('tools/build_parallel.py', '_chunk_size'),
+    ('tools/build_parallel.py', '_submit_chunk'),
+    ('tools/build_parallel.py', '_chunk_call'),
+    ('tools/build_parallel.py', '_chunk_results'),
+    ('tools/build_parallel.py', '_chunk_report'),
+    # completed_map's results put back in input order (BUILD-STATS-SERIAL-36): every unit runs its function on its
+    # item once; only the order in which units start and finish changes, never a result or its place
+    ('tools/build_parallel.py', '_indexed_call'),
+    ('tools/build_parallel.py', 'in_order_map'),
 })
 # Pool sizing constants: module-level literals (one line each) that only size and order a pool's units. Their
 # assignment lines are left out of their module's import-time text, so a new or changed sizing constant keys no
@@ -218,6 +298,13 @@ RUN_PRIVATE = {'logs', 'profile', 'scratch', 'build-state.json', 'build-state.tm
                # while stages run; never a stage's output
                'build-summary.md', 'build-summary.md.tmp', 'underused.jsonl'}
 TEMPORARY_SUFFIX = '.amiwind-reuse-tmp'
+
+
+def reuse_temporary(path):
+    """A reused stage's in-flight copy (NAME + TEMPORARY_SUFFIX, apply_stage): never any stage's output or deletion.
+    A stage whose watched folder another stage was being reused into saw these appear and vanish; recorded as its
+    deletions, its reuse removed the other stage's temporaries in the next build (BUILD-REUSE-TMP-RECORDED-DELETED-48)."""
+    return str(path).endswith(TEMPORARY_SUFFIX)
 
 
 # Provenance statements (tools/cache_provenance.py) in the cache writers: `import cache_provenance` and bare calls
@@ -386,7 +473,7 @@ class SourceIndex:
     every imported module. All are kept.
     """
 
-    def __init__(self, root=ROOT, scope=DEFAULT_SCOPE, top_format=1):
+    def __init__(self, root=ROOT, scope=DEFAULT_SCOPE, top_format=1, chim_label_keys=False):
         if scope not in SCOPES:
             raise ValueError(f'fingerprint scope must be one of {", ".join(SCOPES)}')
         if top_format not in TOP_FORMATS:
@@ -396,6 +483,12 @@ class SourceIndex:
         # Stage fingerprints use STAGE_TOP_FORMAT; the per-unit caches (gallery models, image passes, world
         # regions) keep format 1 until their own key format changes (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
         self.top_format = top_format
+        # Form 3 (stage keys): plain classes are units of their own (scope 'units'), and the reach follows keyed
+        # scripts and globbed Python files. The older forms of the same stages come from a companion index
+        # (previous_selections), so a reuse source keyed in them is compared in its own form.
+        self.stage_form = top_format >= 3
+        self.split = self.stage_form and scope == 'units'
+        self._companion = None
         self._files = None
         self._closures = {}
         self._parsed = {}
@@ -404,7 +497,57 @@ class SourceIndex:
         self._exact = {}
         self._data_maps = None
         self._reached = {}
+        self._keyed = {}
         self._json_values = {}
+        # True: the earlier method, the raw CHIM_VERSION label and the compatibility table in every key that reaches
+        # them (BUILD-CHIM-LABEL-IN-KEYS-48); False: the label counts as its compatibility line (_keyed_source)
+        self.chim_label_keys = chim_label_keys
+        self._chim_line = None
+
+    def chim_line_digest(self):
+        """SHA-256 of the CHIM_VERSION file with its label replaced by its compatibility line (chim_compat.key_bytes):
+        equal to the raw file's hash when the label is its own line, so keys made before the table still match. The
+        raw hash when the checkout has no table (an older tree, a test repository)."""
+        if self._chim_line is None:
+            raw = (self.root / CHIM_LABEL_FILE).read_bytes()
+            import chim_compat
+            rows = chim_compat.load(self.root)
+            self._chim_line = (self.files[CHIM_LABEL_FILE] if rows is None
+                               else hashlib.sha256(chim_compat.key_bytes(raw, rows)).hexdigest())
+        return self._chim_line
+
+    def shows_chim_label(self, script, function=None):
+        """True when the reach of SCRIPT (or of its FUNCTION, entry_digest) can write the CHIM label into an output:
+        it runs one of CHIM_LABEL_SHOWN_UNITS other than through CHIM_LABEL_HIDDEN_UNITS. Uncertain reaches, scope
+        'modules' and a label module counted whole (as data) show it."""
+        if function is None:
+            python, data, uncertain = self.closure(script)
+        else:
+            python, data, uncertain, _ = self.entry_units(script, function)
+        if uncertain or set(data) & CHIM_LABEL_SHOWN:
+            return True
+        if not set(python) & CHIM_LABEL_SHOWN:
+            return False
+        if self.scope == 'modules':
+            return True
+        script = Path(script).resolve()
+        key = '%s::%s::chim-label' % (script, function or '')
+        if key not in self._closures:
+            start = script.relative_to(self.root.resolve()).as_posix()
+            found = self._closure_symbols(start, key, entry=function, stop=CHIM_LABEL_HIDDEN_UNITS)
+            self._closures[key] = found
+        units = self._reached.get(key) or {}
+        return self._closures[key][2] or any(unit in units.get(path, ()) for path, unit in CHIM_LABEL_SHOWN_UNITS)
+
+    def _keyed_source(self, path, shows_label):
+        """(counts, value) of a whole-file source PATH in a key: the CHIM label as its compatibility line and the table
+        in no key (BUILD-CHIM-LABEL-IN-KEYS-48), unless SHOWS_LABEL() (shows_chim_label, asked only for these two
+        files) or the index keys the raw label (chim_label_keys)."""
+        if not self.chim_label_keys and path in (CHIM_LABEL_FILE, CHIM_COMPAT_TABLE) and not shows_label():
+            if path == CHIM_COMPAT_TABLE:
+                return False, None
+            return True, self.chim_line_digest()
+        return True, self.files[path]
 
     @property
     def files(self):
@@ -473,8 +616,29 @@ class SourceIndex:
                 python, data, uncertain, constants = self._closure_modules(start)
             else:
                 python, data, uncertain, constants = self._closure_symbols(start, key)
-            self._closures[key] = (python, data, uncertain, environment_names(constants, uncertain))
+            names = environment_names(constants, uncertain)
+            for target, function in sorted(self._keyed.get(key) or (), key=lambda item: (item[0], item[1] or '')):
+                # a cache key computed from that code reads all of it (pass_cache.source_digest, environment):
+                # its files count whole, as data (BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48)
+                k_python, k_data, k_uncertain, k_names = self.companion()._keyed_reach(target, function)
+                data = set(data) | k_python | k_data
+                uncertain = uncertain or k_uncertain
+                names = names | k_names
+            self._closures[key] = (python, data, uncertain, names if not uncertain else {ENV_ANY})
         return self._closures[key]
+
+    def _keyed_reach(self, relative, function=None):
+        """(python files, data files, uncertain, AMIWIND_* names) a cache key computed from RELATIVE (as a script, or
+        its FUNCTION's reach) reads, in this index's form (tools/pass_cache.py keys in form 2)."""
+        script = self.root / relative
+        if function is None:
+            python, data, uncertain = self.closure(script)
+            return set(python), set(data), uncertain, set(self.environment_names(script))
+        if function not in self._module_symbols(relative)['units']:
+            return {relative}, set(), False, set()
+        python, data, uncertain, _ = self.entry_units(script, function)
+        names = self._closures['%s::%s' % (Path(script).resolve(), function)][3]
+        return set(python), set(data), uncertain, set(names)
 
     def _closure_modules(self, start):
         """The earlier method: every import of every imported module (scope 'modules')."""
@@ -547,7 +711,7 @@ class SourceIndex:
     def _module_symbols(self, relative):
         if relative not in self._symbols:
             raw = (self.root / relative).read_text(encoding='utf-8', errors='replace')
-            key = (raw, self.scope == 'units')
+            key = (raw, self.scope == 'units', self.split)
             known = _SYMBOL_MEMO.get(key)
             if known is None:
                 text = strip_provenance(raw)
@@ -555,7 +719,7 @@ class SourceIndex:
                     tree = ast.parse(text)
                 except SyntaxError:
                     tree = None
-                known = _SYMBOL_MEMO[key] = module_symbols(tree, text, refined=key[1])
+                known = _SYMBOL_MEMO[key] = module_symbols(tree, text, refined=key[1], split=key[2])
             self._symbols[relative] = known
         return self._symbols[relative]
 
@@ -568,7 +732,9 @@ class SourceIndex:
                 self._files._hashes.pop(path, None)
         self._closures.clear()
         self._reached.clear()
+        self._keyed.clear()
         self._json_values.clear()
+        self._companion = None
 
     def reached_units(self, script):
         """{python file: reached units} of a stage script (scopes 'units' and 'symbols'), or None."""
@@ -606,14 +772,18 @@ class SourceIndex:
         module and globals() count the whole module; import_module()/__import__()
         with a computed name, eval() or exec() make the closure uncertain (all files).
         STOP: {(path, unit)} not followed in this closure only (entry_units: a loader whose output the caller
-        verifies by content).
+        verifies by content); (path, '*') stops the whole module without reading it (code_key.KEY_NEUTRAL: reading
+        a module to list its units made the NPC gallery stage read tools/chim/units.py, a file its fingerprint leaves
+        out, so the stage was never reused: BUILD-NPC-GALLERY-KEY-NEUTRAL-READ-47).
         """
         reached, pending, constants = set(), [], []
         state = {'uncertain': False}
         whole_done = set()
+        keyed = set()     # (module, function or None) handed to a cache key (form 3: _analysis adds their reach)
+        stopped = frozenset(path for path, unit in stop if unit == '*')
 
         def reach(relative, unit):
-            if relative in OUTPUT_NEUTRAL or relative not in self.files or (relative, unit) in reached \
+            if relative in OUTPUT_NEUTRAL or relative in stopped or relative not in self.files or (relative, unit) in reached \
                     or (relative, unit) in OUTPUT_NEUTRAL_UNITS or (relative, unit) in stop:
                 return
             reached.add((relative, unit))
@@ -625,12 +795,37 @@ class SourceIndex:
                 reach(relative, '<main>')
 
         def reach_whole(relative):
-            if relative in whole_done or relative in OUTPUT_NEUTRAL or relative not in self.files:
+            if relative in whole_done or relative in OUTPUT_NEUTRAL or relative in stopped or relative not in self.files:
                 return
             whole_done.add(relative)
             for unit in self._module_symbols(relative)['units']:
                 if unit != '<main>':
                     reach(relative, unit)
+
+        def reach_name(relative, name, chain=()):
+            """A top-level unit NAME of RELATIVE named by reached code (as NAME.chain). A class of its own (form 3,
+            split_classes): its body, and every method unless the use is Class.static_method (a staticmethod runs
+            without an instance, and any instance comes from a bare use of the class, which reaches them all)."""
+            reach(relative, name)
+            info = self._module_symbols(relative).get('classes', {}).get(name)
+            if info is None:
+                return
+            if chain and chain[0] in info['static']:
+                reach(relative, name + '.' + chain[0])
+                return
+            for method in info['methods']:
+                reach(relative, method)
+
+        def keyed_modules(relative, unit, symbols, name):
+            """Repository modules the module name NAME (bound in RELATIVE's UNIT) is, for a keyed script."""
+            binding = lookup(symbols, unit, name)
+            if binding is None:
+                return []
+            if binding[0] == 'module':
+                return self._exact_module(binding[1], relative_base(relative, binding[2]) if binding[2] else None)
+            _, module, level, attribute = binding
+            return self._exact_module(f'{module}.{attribute}' if module else attribute,
+                                      relative_base(relative, level) if level else None)
 
         def folder_of(relative):
             return relative.rsplit('/', 1)[0] if '/' in relative else ''
@@ -679,12 +874,12 @@ class SourceIndex:
                     descend(relative, module, level, (attribute, *chain), whole, seen)
 
         def reach_symbol(relative, name, chain, whole, seen):
-            if (relative, name) in seen or relative not in self.files:
+            if (relative, name) in seen or relative in stopped or relative not in self.files:
                 return
             seen = seen | {(relative, name)}
             symbols = self._module_symbols(relative)
             if name in symbols['units'] and not name.startswith('<'):
-                reach(relative, name)
+                reach_name(relative, name, () if whole else chain)
                 return
             binding = symbols['bindings'].get(name)
             if binding is not None:  # re-exported name
@@ -727,9 +922,14 @@ class SourceIndex:
                     reach_module(found)
             if facts['globals']:
                 reach_whole(relative)
+            if self.stage_form:
+                # code handed to a cache key: read in the key's own form (_keyed_reach), not reached here
+                for name, function in facts.get('keyed', ()):
+                    for target in [relative] if name is None else keyed_modules(relative, unit, symbols, name):
+                        keyed.add((target, function))
             for name in facts['names'] | facts['whole']:
                 if name in symbols['units'] and not name.startswith('<'):
-                    reach(relative, name)
+                    reach_name(relative, name)
                     continue
                 binding = lookup(symbols, unit, name)
                 if binding is not None:
@@ -737,7 +937,7 @@ class SourceIndex:
                             or self._binding_is_module(relative, binding), frozenset())
             for name, chain in facts['attributes']:
                 if name in symbols['units'] and not name.startswith('<'):
-                    reach(relative, name)
+                    reach_name(relative, name, chain)
                     continue
                 binding = lookup(symbols, unit, name)
                 if binding is not None:
@@ -761,6 +961,7 @@ class SourceIndex:
             units.setdefault(relative, set()).add(unit)
         if key is not None:
             self._reached[key] = units
+            self._keyed[key] = keyed
         paths = [path for relative, unit in reached
                  for path in self._module_symbols(relative)['units'].get(unit, {}).get('paths', ())]
         return python, self._match_data(constants, paths), state['uncertain'], constants
@@ -825,6 +1026,10 @@ class SourceIndex:
             if len(text) > 400 or '\n' in text:
                 continue
             parts = [part for part in text.replace('\\', '/').split('/') if part not in ('', '.', '..')]
+            if isinstance(open_ended, tuple) and open_ended[0] == 'py':
+                if parts and self.stage_form:          # stage keys (form 3); the unit caches keep their reach
+                    data |= self._python_files(parts, open_ended[1])
+                continue
             for index, part in enumerate(parts):
                 if any(mark in part for mark in '*?['):
                     parts, open_ended = parts[:index], True
@@ -853,6 +1058,24 @@ class SourceIndex:
                     named |= {path for path in candidates if path == posixpath.normpath(base + value)}
             data |= named if named else candidates
         return data
+
+    def _python_files(self, parts, recursive=False):
+        """The .py files of the folder PARTS names (FOLDER.glob('*.py') in reached code; RECURSIVE: below it too). One
+        name ('mwscript') is a folder at the top, in tools/ or in src/, as in _match_data."""
+        literal = '/'.join(parts)
+        bases = (literal,) if len(parts) > 1 else (literal, 'tools/' + literal, 'src/' + literal)
+        found = set()
+        for path in self.files:
+            if not path.endswith('.py'):
+                continue
+            folder = path.rsplit('/', 1)[0] if '/' in path else ''
+            for base in bases:
+                inside = folder == base or (len(parts) > 1 and folder.endswith('/' + base))
+                below = recursive and (folder.startswith(base + '/') or (len(parts) > 1 and '/' + base + '/' in folder))
+                if inside or below:
+                    found.add(path)
+                    break
+        return found
 
     def _json_values_for(self, relative, key):
         """Every string value stored under KEY anywhere in a JSON file of the repository."""
@@ -906,11 +1129,33 @@ class SourceIndex:
         for path in python | data:
             if path not in files:
                 continue
-            if units is not None and path in units and path.endswith('.py'):
+            # a module whose bytes the code reads as data (FOLDER.glob('*.py')) counts whole, also when reached
+            if units is not None and path in units and path.endswith('.py') and path not in data:
                 selected[path] = self.unit_digest(path, units[path], top_format)
             else:
-                selected[path] = files[path]
+                counts, value = self._keyed_source(path, lambda: self.shows_chim_label(script))
+                if counts:
+                    selected[path] = value
         return selected, False
+
+    def previous_selections(self, script):
+        """{older top format: selection} of SCRIPT, for reuse sources fingerprinted in an older form (comparable).
+        Form 3 reaches other units (classes of their own, keyed scripts, globbed Python files), so forms 1 and 2
+        come from a companion index of form 2, which reaches what the stage keys reached before."""
+        if self.top_format < 3:
+            return {form: self.selection(script, form)[0] for form in TOP_FORMATS if form < self.top_format}
+        companion = self.companion()
+        return {form: companion.selection(script, form)[0] for form in TOP_FORMATS if form < self.top_format}
+
+    def companion(self):
+        """The form 2 index of the same checkout (previous_selections; None-free: self when this index is older)."""
+        if self.top_format < 3:
+            return self
+        if self._companion is None:
+            self._companion = SourceIndex(self.root, scope=self.scope, top_format=2,
+                                          chim_label_keys=self.chim_label_keys)
+            self._companion._files = self.files       # the same checkout: its file hashes once
+        return self._companion
 
     def digest(self, script, exclude=()):
         """(digest, files, uncertain) of SCRIPT's selection; EXCLUDE: repository paths left out (a cache's own
@@ -954,10 +1199,12 @@ class SourceIndex:
         for path in python | data:
             if path not in files or path in exclude:
                 continue
-            if units is not None and path in units and path.endswith('.py'):
+            if units is not None and path in units and path.endswith('.py') and path not in data:
                 selected[path] = self.unit_digest(path, units[path])
             else:
-                selected[path] = files[path]
+                counts, value = self._keyed_source(path, lambda: self.shows_chim_label(script, function))
+                if counts:
+                    selected[path] = value
         return digest_json(selected), len(selected), False
 
 
@@ -1265,9 +1512,52 @@ def _search_path_use(body, use):
     return False
 
 
+# Calls that key a cache by the code of the modules they are given (tools/pass_cache.py): PassCache.open and
+# UnitCache.open take (name, options, *scripts), source_digest and previous_digests take (*scripts). A script is a
+# module (__file__, module.__file__), whose whole script reach is read and hashed (SourceIndex.digest), or
+# (module, 'function'), whose function's reach is (entry_digest).
+KEYED_OPENERS = frozenset({'PassCache', 'UnitCache'})
+KEYED_DIGESTS = frozenset({'source_digest', 'previous_digests'})
+
+
+def keyed_scripts(call):
+    """[(module name or None for this module, function or None)] that CALL hands to a cache key (KEYED_OPENERS,
+    KEYED_DIGESTS). The key computation reads every file of that reach: the stage that makes the call reads them,
+    so its own key must cover them (BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48: the room stage keyed its resident
+    bakes with UnitCache.open(..., __file__) of tools/prepare_area.py, whose script reach it did not have, and
+    read 17 files outside its key)."""
+    func = call.func
+    if isinstance(func, ast.Attribute) and func.attr == 'open' and isinstance(func.value, ast.Name) \
+            and func.value.id in KEYED_OPENERS:
+        arguments = call.args[2:]
+    elif (func.attr if isinstance(func, ast.Attribute) else getattr(func, 'id', '')) in KEYED_DIGESTS:
+        arguments = call.args
+    else:
+        return []
+
+    def module_of(node):
+        if isinstance(node, ast.Name) and node.id == '__file__':
+            return ''
+        if isinstance(node, ast.Attribute) and node.attr == '__file__' and isinstance(node.value, ast.Name):
+            return node.value.id
+        return None
+    found = []
+    for argument in arguments:
+        if isinstance(argument, ast.Tuple) and len(argument.elts) == 2 and isinstance(argument.elts[1], ast.Constant) \
+                and isinstance(argument.elts[1].value, str):
+            module = module_of(argument.elts[0])
+            if module is not None:
+                found.append((module or None, argument.elts[1].value))
+            continue
+        module = module_of(argument)
+        if module is not None:
+            found.append((module or None, None))
+    return found
+
+
 def _unit_facts(nodes, docstrings, constants=None, refined=True):
     facts = {'names': set(), 'attributes': set(), 'imports': [], 'bindings': {}, 'star': [], 'constants': [],
-             'paths': [], 'whole': set(), 'globals': False, 'dynamic_imports': [], 'uncertain': False}
+             'paths': [], 'whole': set(), 'globals': False, 'dynamic_imports': [], 'uncertain': False, 'keyed': []}
     under_attribute, path_parts, inner = set(), set(), set()
     walked = [node for root in nodes for node in ast.walk(root)]
     search_paths = import_path_nodes(walked) if refined else set()
@@ -1305,6 +1595,20 @@ def _unit_facts(nodes, docstrings, constants=None, refined=True):
             if function in PATH_CALLS:
                 path_parts.update(id(argument) for argument in node.args)
                 facts['paths'].extend(_literal_runs(node.args, constants, refined, choices))
+            if function in ('glob', 'rglob') and isinstance(node.func, ast.Attribute) and node.args \
+                    and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str) \
+                    and node.args[0].value.endswith('.py'):
+                # FOLDER.glob('*.py'): the Python files of that folder are read as data (their bytes hashed, such as
+                # prepare_mwscript.compiler_identity), not imported; ('py', recursive) names them (_match_data).
+                # Data files of a folder never count .py files, so the mwscript stage read tools/mwscript/measure.py
+                # outside its key (BUILD-MWSCRIPT-KEY-UNDERDECLARED-48)
+                receiver, pattern = node.func.value, node.args[0].value
+                recursive = function == 'rglob' or '**' in pattern or '/' in pattern
+                if isinstance(receiver, ast.BinOp) and isinstance(receiver.op, ast.Div):
+                    facts['paths'].extend((text, ('py', recursive)) for text, open_ended in
+                                          _literal_runs(_flatten_path(receiver), constants, refined, choices)
+                                          if open_ended is False)
+            facts['keyed'].extend(keyed_scripts(node))
             if function in INTROSPECTION_CALLS:
                 if node.args and isinstance(node.args[0], ast.Name):
                     facts['whole'].add(node.args[0].id)
@@ -1419,6 +1723,79 @@ def lazy_tables(tree):
     return tables
 
 
+METHOD_DECORATORS = frozenset({'staticmethod', 'classmethod', 'property'})
+PROPERTY_PARTS = frozenset({'setter', 'getter', 'deleter'})
+
+
+def split_classes(tree):
+    """{id(statement): (name, {method unit: [statements]}, {static methods})} of the plain classes of a module, the
+    classes that are units of their own in form 3 (BUILD-STAGE-KEY-WHOLE-CLASS-48: an edit to one method of
+    actor_grounding._Fitter, which the CHIM stage reaches only for two static methods, rekeyed the CHIM and room
+    stages, because a class was import-time code of its module). Plain: a top-level class bound once, without
+    decorators, keywords (metaclass) or bases other than builtin classes (a repository base class could register its
+    subclasses on import), whose body holds only a docstring, pass, literal assignments and methods with literal
+    default values and no decorators but staticmethod, classmethod and property ones. Defining such a class runs
+    nothing but its own text, so it matters only to the code that names it. A method unit is 'Class.method'."""
+    import builtins
+    bound = {}
+    for statement in tree.body:
+        names = set()
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(statement.name)
+        for node in ast.walk(statement):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+                names.add(node.id)
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                names.update((alias.asname or alias.name).split('.')[0] for alias in node.names)
+            elif isinstance(node, (ast.Global, ast.Nonlocal)):
+                names.update(node.names)
+        for name in names:
+            bound[name] = bound.get(name, 0) + 1
+
+    def plain_decorator(node):
+        if isinstance(node, ast.Name):
+            return node.id in METHOD_DECORATORS
+        return isinstance(node, ast.Attribute) and node.attr in PROPERTY_PARTS and isinstance(node.value, ast.Name)
+
+    found = {}
+    for statement in tree.body:
+        if not isinstance(statement, ast.ClassDef) or statement.decorator_list or statement.keywords \
+                or bound.get(statement.name) != 1 or statement.name.startswith('<'):
+            continue
+        if not all(isinstance(base, ast.Name) and isinstance(getattr(builtins, base.id, None), type)
+                   for base in statement.bases):
+            continue
+        methods, static, plain = {}, set(), True
+        for index, item in enumerate(statement.body):
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                defaults = [*item.args.defaults, *(d for d in item.args.kw_defaults if d is not None)]
+                if not all(plain_decorator(d) for d in item.decorator_list) or not all(_literal(d) for d in defaults):
+                    plain = False
+                    break
+                methods.setdefault(statement.name + '.' + item.name, []).append(item)
+                if [getattr(d, 'id', None) for d in item.decorator_list] == ['staticmethod']:
+                    static.add(item.name)
+            elif isinstance(item, ast.Pass) or (index == 0 and isinstance(item, ast.Expr)
+                                                 and isinstance(item.value, ast.Constant)
+                                                 and isinstance(item.value.value, str)):
+                continue
+            elif isinstance(item, ast.Assign) and all(isinstance(t, ast.Name) for t in item.targets) \
+                    and _literal(item.value):
+                continue
+            elif isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name) \
+                    and (item.value is None or _literal(item.value)):
+                continue
+            else:
+                plain = False
+                break
+        if plain:
+            # a name defined twice (a property and its setter) is one method unit; a static method is partial
+            # only when it is the one definition of its name
+            static = {name for name in static if len(methods[statement.name + '.' + name]) == 1}
+            found[id(statement)] = (statement.name, methods, static)
+    return found
+
+
 PATH_BUILDERS = frozenset({'Path', 'PurePath', 'PurePosixPath', 'PureWindowsPath'})
 
 
@@ -1445,8 +1822,13 @@ def path_value(node):
     return built(node)
 
 
-def module_symbols(tree, text=None, refined=False):
-    """{'units': {name: facts}, 'bindings', 'fallback', 'broken', 'texts'} for one parsed module.
+def module_symbols(tree, text=None, refined=False, split=False):
+    """{'units': {name: facts}, 'bindings', 'fallback', 'broken', 'texts', 'classes'} for one parsed module.
+
+    SPLIT (form 3, stage keys): every plain class (split_classes) is a unit of its own (its body without the
+    methods: name, bases, docstring, literal attributes) with one unit per method ('Class.method'), not '<top>';
+    CLASSES: {class: {'methods': [method units], 'static': {static method names}}}. '<top>' and '<top>#2' texts
+    keep the classes (the older forms), '<top>#3' leaves them out.
 
     Units: '<top>' (what runs on import: statements, decorators, default values,
     class bodies), '<main>' (the `if __name__ == '__main__'` block) and one per
@@ -1460,11 +1842,13 @@ def module_symbols(tree, text=None, refined=False):
     string constants and keyed lookups count in path expressions (_literal_runs).
     """
     if tree is None:
-        return {'units': {}, 'bindings': {}, 'fallback': {}, 'broken': True, 'texts': {}}
+        return {'units': {}, 'bindings': {}, 'fallback': {}, 'broken': True, 'texts': {}, 'classes': {}}
     docstrings = _docstring_ids(tree)
     constants = module_constants(tree) if refined else {}
     top, main, lazy, path_defaults = [], [], {}, []
     tables = lazy_tables(tree)
+    classes = split_classes(tree) if split else {}
+    class_info = {}
     for statement in tree.body:
         if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and not statement.decorator_list:
             lazy.setdefault(statement.name, []).append(statement)
@@ -1475,6 +1859,12 @@ def module_symbols(tree, text=None, refined=False):
             # A name defined twice (a def and an assignment) runs with the top level too.
         elif id(statement) in tables:
             lazy.setdefault(tables[id(statement)], []).append(statement)
+        elif id(statement) in classes:
+            name, methods, static = classes[id(statement)]
+            lazy[name] = [*statement.bases, *(item for item in statement.body
+                                              if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)))]
+            lazy.update(methods)
+            class_info[name] = {'methods': sorted(methods), 'static': set(static)}
         elif isinstance(statement, ast.If) and _is_main_guard(statement.test):
             main.extend(statement.body)
             top.extend(statement.orelse)
@@ -1507,16 +1897,33 @@ def module_symbols(tree, text=None, refined=False):
             for key, value in facts['bindings'].items():
                 fallback.setdefault(key, value)  # `global X; import x as X` inside a function
     return {'units': units, 'bindings': dict(units['<top>']['bindings']), 'fallback': fallback, 'broken': False,
-            'texts': unit_texts(tree, text, lazy) if text is not None else {}}
+            'texts': unit_texts(tree, text, lazy, classes) if text is not None else {}, 'classes': class_info}
 
 
-def unit_texts(tree, text, lazy):
-    """{unit: source} for scope 'units' (see module_symbols)."""
+def unit_texts(tree, text, lazy, classes=None):
+    """{unit: source} for scope 'units' (see module_symbols). CLASSES: split_classes of a form 3 index."""
     lines = text.splitlines(keepends=True)
     texts = {}
+    classes = classes or {}
+    split = {name for name, _, _ in classes.values()}
     for name, statements in lazy.items():
-        texts[name] = '\n'.join(''.join(lines[statement.lineno - 1:statement.end_lineno]).rstrip()
+        if name in split:
+            continue
+        texts[name] = '\n'.join(''.join(lines[min([statement.lineno] + [d.lineno for d in
+                                                   getattr(statement, 'decorator_list', ())]) - 1:
+                                              statement.end_lineno]).rstrip()
                                 for statement in statements)
+    for statement in tree.body:
+        if id(statement) in classes:
+            # a class's own unit: its lines without those of its methods (each method's, decorators included, is
+            # the method's unit)
+            name, methods, _ = classes[id(statement)]
+            skip = {number for items in methods.values() for item in items
+                    for number in range(min([item.lineno] + [d.lineno for d in item.decorator_list]),
+                                        item.end_lineno + 1)}
+            texts[name] = ''.join(line for number, line in enumerate(lines[statement.lineno - 1:statement.end_lineno],
+                                                                     statement.lineno)
+                                  if number not in skip).rstrip()
     # '<top>': the source of each top-level statement that is not a plain function (decorators included),
     # in order; blank lines and comments between statements do not count (a whitespace-only edit, such as
     # a removed blank line at the end of a module, keeps every fingerprint). A function's default values
@@ -1525,7 +1932,8 @@ def unit_texts(tree, text, lazy):
     # changed the module's import-time code and every key that reached it; format 2 lists only defaults that
     # run code on import (anything but literals). A literal default is part of its function's own text, which
     # only that function's callers reach (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36).
-    top, top2 = [], []
+    # Form 3: form 2 without the classes that are units of their own (CLASSES).
+    top, top2, top3 = [], [], []
     tables = lazy_tables(tree)
     for statement in tree.body:
         if id(statement) in tables:
@@ -1537,13 +1945,17 @@ def unit_texts(tree, text, lazy):
             top.append(line)
             if not all(_literal(d) for d in defaults):
                 top2.append(line)
+                top3.append(line)
             continue
         first = min([statement.lineno] + [d.lineno for d in getattr(statement, 'decorator_list', ())])
         source = ''.join(lines[first - 1:statement.end_lineno]).rstrip() + '\n'
         top.append(source)
         top2.append(source)
+        if id(statement) not in classes:
+            top3.append(source)
     texts['<top>'] = ''.join(top)
     texts[TOP_TEXT[2]] = ''.join(top2)
+    texts[TOP_TEXT[3]] = ''.join(top3)
     return texts
 
 
@@ -1713,7 +2125,8 @@ def external_inputs(name, command, run, metadata, skip_hashing=False, index=None
             prefix = '' if inside == '.' else inside + '/'
             result[key] = digest_json({p: h for p, h in index.files.items() if p == inside or p.startswith(prefix)})
             continue
-        if (name, option) in CONTENT_ADDRESSED or skip_hashing:
+        if (name, option) in CONTENT_ADDRESSED or normalize_path(part, rows) in CONTENT_ADDRESSED_FOLDERS \
+                or skip_hashing:
             result[key] = 'not hashed (content-addressed cache)' if not skip_hashing else 'not hashed'
             continue
         if in_storage_pool(path, run, metadata):
@@ -1767,9 +2180,12 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
             # Per file, so `explain` names the files that changed (BUILD-CACHE-OVERBROAD-33).
             components['sources']['by_file'] = selected
             if index.top_format != 1:
-                # The same files in the import-time form of format 1, for reuse sources fingerprinted with it
-                # (comparable); kept out of the fingerprint itself.
-                PREVIOUS_SOURCES[(str(run), name)] = index.selection(script, 1)[0]
+                # The same stage in each older form, for reuse sources fingerprinted with one (comparable); kept out
+                # of the fingerprint itself.
+                PREVIOUS_SOURCES[(str(run), name)] = index.previous_selections(script)
+                if index.companion() is not index:
+                    # the AMIWIND_* names the older reach read (form 3 may reach fewer or more)
+                    PREVIOUS_SOURCES[(str(run), name)]['environment'] = stage_environment(script, index.companion())
     else:
         components['sources'] = {'digest': digest_json(dict(index.files)), 'files': len(index.files), 'scope': 'all files (not a repository tool)'}
     tools = metadata.get('tools') or {}
@@ -1826,7 +2242,8 @@ def fingerprint_steps(steps, run, metadata, index=None, dependencies=None):
     return fingerprints, components, problems, {name: list(deps) for name, deps in dependencies.items()}
 
 
-# {(run, stage): {file: digest}}: a stage's sources in import-time form 1 (TOP_FORMATS), set by stage_components.
+# {(run, stage): {form: {file: digest}, 'environment': {...}}}: a stage's sources in each older import-time form
+# (TOP_FORMATS) and, from form 3 on, the environment its older reach keyed; set by stage_components.
 PREVIOUS_SOURCES = {}
 
 
@@ -1843,12 +2260,16 @@ def comparable(old_components, new_components, run, name):
     """NEW_COMPONENTS as OLD_COMPONENTS' import-time form (TOP_FORMATS) sees them: a reuse source fingerprinted
     with format 1 is compared with this checkout's format-1 digests, so a change of form alone rebuilds nothing
     while a real edit still shows (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36). Unchanged when the forms agree."""
-    if source_format(old_components) != 1 or source_format(new_components) in (None, 1):
+    old_form, new_form = source_format(old_components), source_format(new_components)
+    if old_form is None or new_form is None or old_form >= new_form:
         return new_components
-    previous = PREVIOUS_SOURCES.get((str(run), name))
+    previous = (PREVIOUS_SOURCES.get((str(run), name)) or {}).get(old_form)
     if previous is None:
         return new_components
-    sources = dict(new_components['sources'], by_file=previous, digest=digest_json(previous))
+    sources = dict(new_components['sources'], by_file=previous, digest=digest_json(previous), files=len(previous))
+    environment = (PREVIOUS_SOURCES.get((str(run), name)) or {}).get('environment')
+    if environment is not None and 'environment' in new_components:
+        return dict(new_components, sources=sources, environment=environment)
     return dict(new_components, sources=sources)
 
 
@@ -2040,6 +2461,26 @@ def _install():
         if any(t.startswith(root) or (' ' + root) in t for t in texts):
             flags.append('repo')
         os.write(handle, ('$' + exe + '\\t' + ','.join(flags) + '\\n').encode('utf-8', 'surrogateescape'))
+        if run is not None and ('py' not in flags or 'untraced' in flags):
+            # A process the trace does not follow (a compiler, ffmpeg) writes only where it is pointed: its working
+            # folder and the run paths on its command line. Those run folders are listed ('~' lines), so a file it
+            # wrote there is known to be this stage's when another stage running at the same time saw it change
+            # too (Recorder.close, BUILD-REUSE-INTRO-CENSUS-REPLACED-48).
+            base = os.fsdecode(cwd) if isinstance(cwd, bytes) else (str(cwd) if cwd else os.getcwd())
+            base = os.path.abspath(base)
+            places = [base]
+            for text in texts:
+                for part in [text] + ([text.split('=', 1)[1]] if '=' in text else []):
+                    if part and ('/' in part or os.path.exists(os.path.join(base, part))):
+                        places.append(os.path.abspath(os.path.join(base, part)))
+            for place in places:
+                if not (place + '/').startswith(run):
+                    continue
+                folder = place if os.path.isdir(place) or not os.path.splitext(place)[1] else os.path.dirname(place)
+                line = '~' + (folder + '/')[len(run):].rstrip('/') + '\\n'
+                if line not in seen:
+                    seen.add(line)
+                    os.write(handle, line.encode('utf-8', 'surrogateescape'))
 
     def is_diagnostic(path):
         return path.endswith('.log') or os.path.basename(path) in diagnostic_names
@@ -2169,7 +2610,10 @@ def _install():
             if not path.startswith('/'):
                 path = os.path.abspath(path)
             if path.startswith(root) and path.endswith('.py'):
-                name = code.co_qualname.split('.', 1)[0]
+                # the top-level function or class, and a class's method (Class.method: its own unit in form 3)
+                parts = code.co_qualname.split('.', 2)
+                name = parts[0] if len(parts) < 2 or parts[0].startswith('<') or parts[1].startswith('<') \\
+                    else parts[0] + '.' + parts[1]
                 os.write(handle, ('@' + path[len(root):] + '\\t' + name + '\\n').encode('utf-8', 'surrogateescape'))
         except Exception:  # noqa: BLE001 - tracing must never change the stage
             pass
@@ -2263,7 +2707,11 @@ def stage_units(steps, index):
         reached = index.reached_units(script) or {}
         stages[name] = {path: sorted(units) for path, units in sorted(reached.items())}
         for path in reached:
-            modules.setdefault(path, sorted(unit for unit in index._module_symbols(path)['units'] if not unit.startswith('<')))
+            # a class of its own (form 3) is left out: its body runs on every import of its module (literal
+            # attributes only) and is no use of it; each method it has is checked by name ('Class.method')
+            symbols = index._module_symbols(path)
+            modules.setdefault(path, sorted(unit for unit in symbols['units']
+                                            if not unit.startswith('<') and unit not in (symbols.get('classes') or {})))
     return stages, modules
 
 
@@ -2282,6 +2730,13 @@ def check_calls(lines, reached, modules, run_inside=None):
         path, _, name = line[1:].rstrip('\n').partition('\t')
         if (run_inside and (path == run_inside or path.startswith(run_inside + '/'))) or path in OUTPUT_NEUTRAL:
             continue
+        # a pool scheduling function never builds, reads or writes a unit's data (SCHEDULING_UNITS); the idle-worker
+        # watcher is started by an instrumentation hook (pool_status), which the reach does not follow, so 24 stages
+        # of the v0.0.48-rc1 build were refused for it (BUILD-REUSE-RC1-RECORDS-REFUSED-48)
+        if (path, name) in SCHEDULING_UNITS:
+            continue
+        if path in modules and name not in modules[path] and '.' in name:
+            name = name.split('.', 1)[0]   # Class.method of a class that is no unit of its own: the class's name
         if path not in modules or name not in modules[path]:
             continue  # import-time code, a class or a decorated function: counted with the module ('<top>')
         if name not in reached.get(path, ()):
@@ -2290,8 +2745,9 @@ def check_calls(lines, reached, modules, run_inside=None):
 
 
 # Trace lines that are not repository reads: '@' code entered, '>' run-folder writes, '<' run-folder diagnostics
-# read, '%' storage pool reads, '#' form and directory listings, '$' processes started (B7).
-TRACE_MARKS = ('@', '>', '<', '%', '#', '$')
+# read, '%' storage pool reads, '#' form and directory listings, '$' processes started (B7), '~' run folders a
+# process the trace does not follow was pointed at (BUILD-REUSE-INTRO-CENSUS-REPLACED-48).
+TRACE_MARKS = ('@', '>', '<', '%', '#', '$', '~')
 
 
 def check_reads(lines, covered, files, root, run_inside=None):
@@ -2326,6 +2782,8 @@ def check_reads(lines, covered, files, root, run_inside=None):
                 or parts[0].startswith('.') or line in OUTPUT_NEUTRAL:
             continue
         if line in files:
+            if line == CHIM_COMPAT_TABLE and covered is not None and CHIM_LABEL_FILE in covered:
+                continue  # read for the CHIM label's line, which the key holds (BUILD-CHIM-LABEL-IN-KEYS-48)
             if covered is not None and line not in covered:
                 misses.add(line)
         elif not any(part.startswith('.') for part in parts) and (Path(root) / line).is_file():
@@ -2439,12 +2897,20 @@ def used_record(lines, index, run_inside=None, reused=False):
         texts = symbols.get('texts') or {}
         functions = set(symbols.get('units') or ())
         wanted = {'<top>'}
+        classes = symbols.get('classes') or {}
         for name in names:
+            head = name.split('.', 1)[0]
             if name == '<module>':
                 if '<main>' in texts:
                     wanted.add('<main>')
             elif name in functions and not name.startswith('<'):
                 wanted.add(name)
+                if head in classes:
+                    wanted.add(head)                   # a method runs with its class's own unit
+            elif head in classes:
+                wanted.add(head)                       # its class's body (each method it ran is named: Class.method)
+                if name != head:                       # a method this module no longer has: all of them
+                    wanted.update(classes[head]['methods'])
             # a class, a decorated function, a comprehension or lambda at module level: part of '<top>'
         hashes = index.unit_hashes(path, wanted)
         if hashes is None or any(v is None for v in hashes.values()):
@@ -2519,6 +2985,7 @@ class Recorder:
         self.state = {}
         self.manifests = {}
         self.writes = {}  # stage -> run-relative paths its Python processes wrote (read trace '>' lines), or None
+        self.native = {}  # stage -> run folders its untraced processes were pointed at (read trace '~' lines), or None
         self.start = time.monotonic()
         plan = PLANS.pop(str(self.run), None)
         if plan is not None:
@@ -2527,6 +2994,11 @@ class Recorder:
         if details is not None:
             (self.run / 'profile' / 'fingerprints.json').write_text(json.dumps(details, indent=1, sort_keys=True) + '\n')
         self.closures = CLOSURES.pop(str(self.run), None) or {}
+        # The storage pool folders whose objects a reused stage's files are hard links to (Recorder.unshared)
+        self.pools = list(storage_pool_roots(self.run, metadata))
+        for row in (plan or {}).values():
+            if isinstance(row, dict) and row.get('pool') and Path(str(row['pool'])) not in self.pools:
+                self.pools.append(Path(str(row['pool'])))
         self.index = None     # the checkout's SourceIndex for the used records (prepare's, when it made one)
         # The prerendered store (tools/prerendered.py): passed stages are captured as they finish
         # and become store entries only when the whole build passed.
@@ -2650,18 +3122,67 @@ class Recorder:
             return None
         return {line[1:] for line in lines if line.startswith('>')}
 
+    def traced_native_folders(self, reads):
+        """Run-relative folders the stage pointed a process the trace does not follow at ('~' lines: a compiler's
+        working folder, the run paths on its command line; '' = the whole run folder), or None when the stage was
+        not traced. Such a process may have written anything under them."""
+        if not self.traced or reads is None:
+            return None
+        try:
+            lines = Path(reads).read_text(encoding='utf-8', errors='surrogateescape').splitlines()
+        except OSError:
+            return None
+        return {line[1:].strip('/') for line in lines if line.startswith('~')}
+
+    def unshared(self, before, files, regular, hashes):
+        """Paths of REGULAR (changed files) that the stage only made private and writable: before it ran the path was
+        a read-only hard link to the storage pool object named by the SHA-256 the file has now (same inode, same
+        size), and its mode differs at most in the write bits. A scene stage that edits its inherited tree in place
+        does that to every file a reused earlier stage left there (mwad.paths.unshare_tree); recorded as its outputs,
+        they made its record list the whole tree, and the next build, whose earlier stages ran and left writable
+        files, found its outputs different and refused every stage after it (BUILD-REUSE-OUTPUTS-DIFFER-48: door
+        audio in the v0.0.48-dev2 try 4 record held 2,124 files of intro-scene, in try 5 it wrote 18)."""
+        found = set()
+        if not self.pools:
+            return found
+        for path in regular:
+            old, now, digest = before.get(path), files.get(path), hashes.get(path)
+            if old is None or now is None or not digest or old[4] is not None or old[0] != now[0]:
+                continue
+            old_mode, new_mode = stat_module.S_IMODE(old[3]), stat_module.S_IMODE(now[3])
+            if old_mode & 0o222 or (old_mode & ~0o222) != (new_mode & ~0o222):
+                continue
+            for pool in self.pools:
+                try:
+                    if os.stat(Path(pool) / 'objects' / digest[:2] / digest).st_ino == old[2]:
+                        found.add(path)
+                        break
+                except OSError:
+                    continue
+        return found
+
     def after(self, name, entry, reads=None):
         state = self.state.pop(name, None)
         if state is None:
             return None
         self.writes[name] = self.traced_writes(reads)
+        self.native[name] = self.traced_native_folders(reads)
         state['window'][1] = round(time.monotonic() - self.start, 3)
         files, directories = snapshot(self.run, state['roots'])
-        before = state['files']
+        # another stage's reuse temporaries under this stage's roots are neither its outputs nor its deletions
+        # (BUILD-REUSE-TMP-RECORDED-DELETED-48)
+        files = {path: info for path, info in files.items() if not reuse_temporary(path)}
+        before = {path: info for path, info in state['files'].items() if not reuse_temporary(path)}
         changed = sorted(path for path, info in files.items() if before.get(path) is None or before[path][:4] != info[:4]
                          or before[path][4] != info[4])
         regular = [path for path in changed if files[path][4] is None]
         hashes = hash_files(self.run, regular)
+        # Files an in-place stage only made private and writable (mwad.paths.unshare_tree: the same bytes, a new
+        # inode, the write bit added) are not its outputs (BUILD-REUSE-OUTPUTS-DIFFER-48)
+        unshared = self.unshared(before, files, regular, hashes)
+        if unshared:
+            regular = [path for path in regular if path not in unshared]
+            changed = [path for path in changed if path not in unshared]
         reasons, trace = self.check_trace(name, reads)
         used = self.used(name, reads)
         # A reused stage copies into the run folder through NAME + TEMPORARY_SUFFIX while other stages run; that
@@ -2697,6 +3218,8 @@ class Recorder:
                     'reusable': not reasons, 'reasons': reasons, 'reads': trace}
         if used is not None:
             manifest['used'] = used
+        if unshared:
+            manifest['unshared'] = len(unshared)
         manifest['counts'] = {'files': len(regular), 'bytes': sum(files[path][0] for path in regular)}
         # Units -> segments -> stage hash (tools/unit_tree.py): compared in one step, drilled into on a mismatch.
         from unit_tree import of_manifest
@@ -2746,7 +3269,8 @@ class Recorder:
                 if not (a[0] < b[1] and b[0] < a[1]):
                     continue
                 shared = sorted(touched[first] & touched[second])
-                writer = attribute(shared, self.writes.get(first), self.writes.get(second))
+                writer = attribute(shared, self.writes.get(first), self.writes.get(second),
+                                   getattr(self, 'native', {}).get(first), getattr(self, 'native', {}).get(second))
                 if shared and writer is not None:
                     # Both saw the files change, but only one stage wrote them (its trace): they are its
                     # outputs, not the other's (BUILD-REUSE-ATTRIBUTION-33).
@@ -2791,16 +3315,32 @@ INDEXES = {}   # run -> the SourceIndex its fingerprints were made with (Recorde
 DETAILS = {}  # run -> fingerprint components, written into the run by Recorder
 
 
-def attribute(shared, first_writes, second_writes):
+def attribute(shared, first_writes, second_writes, first_native=(), second_native=()):
     """Which of two stages that ran at the same time and both saw SHARED change wrote them: 0 (the first), 1
-    (the second), or None when unknown. Known only when both were traced, one wrote every shared path and the
-    other none of them (a native tool's writes are not traced: then nobody is credited)."""
+    (the second), or None when unknown. Known only when both were traced, one may have written every shared path
+    and the other none of them. A stage may have written a path its Python processes wrote ('>' lines) or one
+    under a run folder it pointed an untraced process at ('~' lines, FIRST_NATIVE / SECOND_NATIVE: a compiler
+    writes beside the map it is given). A process started with no run folder named writes nothing in the run.
+    Before the '~' lines (BUILD-REUSE-INTRO-CENSUS-REPLACED-48), a compiler's .prt and logs made a room stage
+    unattributable whenever another stage that names the same scene folder ran beside it, and both were refused."""
     if not shared or first_writes is None or second_writes is None:
         return None
     shared = set(shared)
-    if shared <= first_writes and not shared & second_writes:
+    first_native = None if first_native is None else tuple(first_native)
+    second_native = None if second_native is None else tuple(second_native)
+
+    def may_have_written(path, writes, native):
+        if path in writes:
+            return True
+        if native is None:
+            return True   # not known: anything
+        return any(folder == '' or path.startswith(folder + '/') for folder in native)
+
+    first = {path for path in shared if may_have_written(path, first_writes, first_native)}
+    second = {path for path in shared if may_have_written(path, second_writes, second_native)}
+    if first == shared and not second:
         return 0
-    if shared <= second_writes and not shared & first_writes:
+    if second == shared and not first:
         return 1
     return None
 
@@ -3035,7 +3575,10 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
         files = {path: info for path, info in manifest['files'].items() if path not in skips[name]}
         plans[name] = {'from': str(old_run), 'fingerprint': fingerprints[name], 'files': files,
                        'links': {path: target for path, target in manifest['links'].items() if path not in skips[name]},
-                       'directories': manifest['directories'], 'deleted': manifest['deleted'],
+                       'directories': manifest['directories'],
+                       # records made before BUILD-REUSE-TMP-RECORDED-DELETED-48 may list another stage's reuse
+                       # temporaries as deleted: never replayed
+                       'deleted': [path for path in manifest['deleted'] if not reuse_temporary(path)],
                        'deleted_directories': manifest['deleted_directories'], 'inputs': manifest.get('inputs', {}),
                        'ancestors': sorted(lineage(name)), 'skipped_later_replaced': len(skips[name]),
                        # Stages before it that this build runs: each must write exactly its old files
@@ -3524,6 +4067,8 @@ def apply_stage(run, stage, command):
                 pass
         return refuse(f'old output not usable ({exc})')
     for relative in plan['deleted']:
+        if reuse_temporary(relative):     # another stage's in-flight copy (BUILD-REUSE-TMP-RECORDED-DELETED-48)
+            continue
         path = run / relative
         if path.is_symlink() or path.is_file():
             path.unlink()

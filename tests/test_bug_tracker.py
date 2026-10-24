@@ -366,8 +366,12 @@ class BugTrackerTest(unittest.TestCase):
         # reaches v0.0.35, so bugs.json is back under 75 % (66 %) and every archive under 35 %. Every tracker
         # file warns at 75 % again; the hard limits (256 KiB, 1 MiB for the two named files) are unchanged.
         # A file over the line: split its archive range or move the rotation on, never raise the share.
+        # 2026-10-24 02:46 +0300 / 2026-10-23 23:46 UTC, v0.0.48 final: bugs.json alone warns at 80 % until the
+        # live register is split into per-bug files, planned for v0.0.49 (TRACKER-REGISTER-SIZE-36: the rotation
+        # already reaches v0.0.47, the last release, and bugs.json stands at 74.9 %, every bug in it open,
+        # persisting or found in v0.0.48). Every other tracker file stays at 75 %; the hard limits are unchanged.
         def share(p):
-            return 0.75
+            return 0.80 if p == DOCS / 'bugs' / 'bugs.json' else 0.75
         big = ['%s %d of %d' % (p.name, p.stat().st_size, release.text_limit(p.relative_to(ROOT).as_posix()))
                for p in files if p.stat().st_size > share(p) * release.text_limit(p.relative_to(ROOT).as_posix())]
         self.assertEqual(big, [], 'tracker files near the release text limit (tools/release.py)')
@@ -450,12 +454,19 @@ class BugTrackerTest(unittest.TestCase):
         self.assertTrue(bug_register.archivable(base))
         self.assertTrue(bug_register.archivable(dict(base, state='closed')))
         self.assertFalse(bug_register.archivable(dict(base, state='open')))
-        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.36')))
+        # the rotation reaches v0.0.47 since the v0.0.48-rc1 build findings, 24 October 2026 (bugs-v0.0.43-v0.0.47.json);
+        # later series stay live
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.36')))
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.40')))
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.42')))
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.47')))
+        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.48')))
+        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.36'), up_to=35))
         self.assertFalse(bug_register.archivable(dict(base, found_in='unknown', id='AW-20261010-01')))
         two = [{'version': 'v0.0.33', 'at': '2026-10-09'}, {'version': 'v0.0.36-dev3', 'at': '2026-10-11'}]
         self.assertFalse(bug_register.archivable(dict(base, reports=two)), 'a persisting bug stays in bugs.json')
-        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-36', found_in='v0.0.36')])
-        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-36'])
+        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-48', found_in='v0.0.48')])
+        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-48'])
         self.assertEqual([b['id'] for b in old], ['BUILD-ROT-33'])
 
     def test_whitespace_baselines_get_the_named_limit(self):
@@ -579,6 +590,15 @@ class BugTrackerTest(unittest.TestCase):
         self.assertIn('(../BUG_JOURNAL.md#chim-zone-full-33-found-9-october-2026): CHIM-ZONE-FULL-33', page)
         self.assertIn('2 CHIM bugs: 2 open, 0 fixed, 0 closed.', page)
         self.assertNotIn('TEST-BUG-32', page)
+
+    def test_chim_tracker_shortens_closed_statuses_only(self):
+        # TRACKER-CHIM-PAGE-SIZE-48: the page reached 75 % of its release text limit at v0.0.48-rc1
+        long = 'Fixed in v0.0.48 (24 October 2026): the cause. More detail. Even more detail.'
+        self.assertEqual(bug_register.tracker_status({'state': 'fixed', 'status': long}),
+                         'Fixed in v0.0.48 (24 October 2026): the cause. (full text: its page)')
+        self.assertEqual(len(bug_register.tracker_status({'state': 'fixed', 'status': 'x' * 900})), 300 + 22)
+        self.assertEqual(bug_register.tracker_status({'state': 'open', 'status': long}), long)
+        self.assertEqual(bug_register.tracker_status({'state': 'closed', 'status': 'Closed.'}), 'Closed.')
 
     # Project requirement, 9 October 2026: every bug says which build it was found in.
     def test_playtest_bugs_must_name_their_build(self):

@@ -163,6 +163,7 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 
 Related bugs in other categories:
 
+- [CHIM-ROOM-HARVEST-DOUBLE-48](CHIM-ROOM-HARVEST-DOUBLE-48.md): CHIM rooms kept harvestable mushrooms in their room records: the image stopped on addamasartus (8 record placements not in the room map), and batch rooms had unpickable mushrooms
 - [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out)
 
 <!-- END GENERATED CATEGORY -->

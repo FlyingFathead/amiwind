@@ -2,11 +2,15 @@
 #include "quakedef.h"
 #include "r_local.h"
 #include "aw_state.h"
+#include "aw_torch.h"
 #include <assert.h>
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;
 entity_t cl_entities[MAX_EDICTS],*cl_visedicts[MAX_VISEDICTS];int cl_numvisedicts;
 int (*aw_view_torch_emitter)(vec3_t out);
 int (*aw_flame_depth_limit)(void);   /* aw_fog.c */
+/* r_light.c: dbg campfires (aw_lamps.c); weak, so a fixture that links r_light.c (the guard light surface
+ * test includes this file) takes the engine's */
+__attribute__((weak)) int r_campfires=1;
 dlight_t cl_dlights[MAX_DLIGHTS];viddef_t vid;refdef_t r_refdef;
 vec3_t vpn,vup,vright;float aliasxcenter,aliasycenter,aliasxscale,aliasyscale;
 short *d_pzbuffer;unsigned int d_zwidth;aw_state_t aw_state;
@@ -15,7 +19,7 @@ cvar_t aw_torch_strength={"aw_torch_strength","0.7",true,false,.7f};cvar_t aw_gu
 void Cvar_SetValue(char *n,float v){(void)n;aw_guard_torch_radius.value=v;}
 char strings[]="\0aw_npc\0aw_corpse\0guard_a\0guard_b\0ordinary_npc\0";char *pr_strings=strings;
 static edict_t actors[40];static eval_t source[40];
-static byte registry[20000],torch[716],pixels[336*210];static short depths[320*200];
+static byte registry[8+(AW_GUARD_TORCH_TYPES+1)*(260+21*12)],torch[716],pixels[336*210];static short depths[320*200];
 static int registry_size,argc_=1,clock_ms,exterior=1,gallery,liquid,blocked_x=-1;
 static const char *argument="";static cvar_t *cycle;static void(*cmd)(void);
 static float universal_radius=192;
@@ -174,5 +178,18 @@ int main(void)
     make_registry(8);put16(registry+4,33);AW_GuardTorchLoadAssets(torch);AW_GuardTorchUpdate();assert(cl_numvisedicts==1);
     make_registry(8);broken_model=1;AW_GuardTorchLoadAssets(torch);cl_entities[1].frame=0;AW_GuardTorchUpdate();assert(cl_numvisedicts==1);
     broken_model=0;body.numframes=held.numframes=8;AW_GuardTorchLoadAssets(NULL);AW_GuardTorchUpdate();assert(cl_numvisedicts==1);
+    /* GUARD-TORCH-TYPES-LIMIT-48: a full table of AW_GUARD_TORCH_TYPES records loads and its last record
+     * equips its guard (dev2 try12 staged 51, over the old 32); one record more fails closed. */
+    assert(AW_GUARD_TORCH_TYPES>=2*51);
+    for(i=0;i<2;i++){
+        int n=AW_GUARD_TORCH_TYPES+i,r;char id[24];
+        memset(registry,0,sizeof registry);memcpy(registry,"AWG1",4);put16(registry+4,n);registry_size=8;
+        for(r=0;r<n-1;r++){snprintf(id,sizeof id,"filler_%d",r);registry_size=add_record(registry_size,id,1,8);}
+        registry_size=add_record(registry_size,"guard_a",1,8);
+        assert(registry_size<=(int)sizeof registry);
+        AW_GuardTorchLoadAssets(torch);AW_GuardTorchUpdate();
+        assert(cl_numvisedicts==(i?1:2));
+        if(!i)assert(cl_visedicts[0]->model==&body && cl_visedicts[1]->model==&held);
+    }
     puts("guard torch registry, clock, pose, eligibility, bounded lights and scene depth passed");return 0;
 }

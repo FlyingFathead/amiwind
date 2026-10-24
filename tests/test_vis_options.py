@@ -176,8 +176,12 @@ class ConverterInvocation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             scene = Path(tmp) / 'scene'; (scene / 'id1/maps').mkdir(parents=True)
             (scene / 'id1/gfx').mkdir(); (scene / 'id1/gfx/palette.lmp').write_bytes(bytes(768))
-            from player_hull import pack_lumps
-            (scene / 'id1/maps/seyda.bsp').write_bytes(pack_lumps([b'{\n"aw_eye_height" "22"\n}\n\0'] + [b''] * 14))
+            # the hand timings come from the hands report, not seyda.bsp (BUILD-SEYDA-BSP-CARRIER-48)
+            import json
+            clips = {n: {'first': f, 'count': c, 'duration': .5}
+                     for n, f, c in (('idle', 0, 8), ('draw', 8, 6), ('lower', 14, 4), ('punch', 18, 10))}
+            (scene / 'scene-ready.json').write_text(json.dumps({'hands': {
+                'model': 'progs/v_nord.mdl', 'frames': 28, 'eye_above_origin': 22, 'clips': clips}}))
             with patch.object(prepare_area, 'resolve_data_files', side_effect=lambda p: Path(p)), \
                  patch.object(build_costs, 'costed_map', side_effect=fake_map), \
                  patch.object(prepare_area, 'populate', return_value={}):

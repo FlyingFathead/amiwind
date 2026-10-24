@@ -59,8 +59,21 @@ ARCHIVE_DIR = ROOT / 'docs' / 'bugs' / 'archive'
 ARCHIVES = ((ARCHIVE_DIR / 'bugs-to-v0.0.31.json', 31),
             (ARCHIVE_DIR / 'bugs-v0.0.32.json', 32),
             (ARCHIVE_DIR / 'bugs-v0.0.33.json', 33),
-            (ARCHIVE_DIR / 'bugs-v0.0.34-v0.0.35.json', 35))
-ARCHIVE_UP_TO = ARCHIVES[-1][1]   # fixed or closed bugs first found in v0.0.35 or earlier rotate into an archive
+            (ARCHIVE_DIR / 'bugs-v0.0.34-v0.0.35.json', 35),
+            # 2026-10-23: the merge of the v0.0.41-dev line into the interiors line took bugs.json to 76 % of its
+            # 1 MiB limit; the rotation moves on to v0.0.36 (TRACKER-REGISTER-SIZE-36's method)
+            (ARCHIVE_DIR / 'bugs-v0.0.36.json', 36),
+            # 2026-10-23 12:56 +0300 / 2026-10-23 09:56 UTC: the v0.0.48-rc1 merge of four fix branches took bugs.json
+            # to 76 % (798,119 of 1 MiB); the rotation moves on to v0.0.40 (about 47 KB out, TRACKER-REGISTER-SIZE-36)
+            (ARCHIVE_DIR / 'bugs-v0.0.37-v0.0.40.json', 40),
+            # 2026-10-23 15:40 +0300 / 2026-10-23 12:40 UTC: the rc1 guard fixes and their findings took bugs.json to
+            # 75.1 % (787,205 bytes); the rotation moves on to v0.0.42 (TRACKER-REGISTER-SIZE-36)
+            (ARCHIVE_DIR / 'bugs-v0.0.41-v0.0.42.json', 42),
+            # 2026-10-24 00:42 +0300 / 2026-10-23 21:42 UTC: the dev2 try 14 and rc1 findings took bugs.json to 75.4 %
+            # (790,329 bytes); up to v0.0.44 left 74.5 % and up to v0.0.46 74.0 %, so the rotation moves on to v0.0.47,
+            # the last release (TRACKER-REGISTER-SIZE-36)
+            (ARCHIVE_DIR / 'bugs-v0.0.43-v0.0.47.json', 47))
+ARCHIVE_UP_TO = ARCHIVES[-1][1]   # fixed or closed bugs first found in v0.0.40 or earlier rotate into an archive
 # Archive files of earlier layouts: still read when present, emptied into ARCHIVES and removed by render.
 RETIRED_ARCHIVES = (ARCHIVE_DIR / 'bugs-v0.0.29-v0.0.33.json',)
 FAMILIES = ROOT / 'docs' / 'bugs' / 'families.json'
@@ -152,10 +165,11 @@ def found_series(b):
     return series(b['id'])
 
 
-def archivable(b):
-    """Rotation rule: fixed or closed, first found in v0.0.35 (ARCHIVE_UP_TO) or earlier, and not persisting."""
+def archivable(b, up_to=ARCHIVE_UP_TO):
+    """Rotation rule: fixed or closed, first found in the last archive range's series (ARCHIVE_UP_TO) or earlier,
+    and not persisting."""
     n = found_series(b)
-    return b.get('state') in ('fixed', 'closed') and n is not None and n <= ARCHIVE_UP_TO \
+    return b.get('state') in ('fixed', 'closed') and n is not None and n <= up_to \
         and len(b.get('reports') or []) < PERSISTING_MIN
 
 
@@ -184,9 +198,10 @@ def load(path=DATA, archives=ARCHIVES, retired=RETIRED_ARCHIVES, rotate=None):
     return bugs
 
 
-def split(bugs):
-    """(live, archived) in the order given."""
-    return [b for b in bugs if not archivable(b)], [b for b in bugs if archivable(b)]
+def split(bugs, archives=ARCHIVES):
+    """(live, archived) in the order given; archived up to the last range of ARCHIVES."""
+    up_to = archives[-1][1] if archives else -1
+    return [b for b in bugs if not archivable(b, up_to)], [b for b in bugs if archivable(b, up_to)]
 
 
 def split_archives(old, archives=ARCHIVES):
@@ -199,7 +214,7 @@ def split_archives(old, archives=ARCHIVES):
 
 def rotation(bugs, archives=ARCHIVES, retired=RETIRED_ARCHIVES, path=DATA):
     """{file: text} for bugs.json and every archive that holds bugs or exists; None = a retired file to remove."""
-    live, old = split(bugs)
+    live, old = split(bugs, archives)
     files = {path: live_text(live)}
     for p, group in split_archives(old, archives).items():
         if group or p.is_file():
@@ -861,8 +876,20 @@ def chim_tracker(bugs, journal_text, version, pages=None):
                 cell += ' ([%d %s](../images/%s))' % (len(pics), 'frame' if len(pics) == 1 else 'frames', pics[0])
             out.append('| %s | %s | %s | %s | %s | %s | %s | %s |' % (
                 cell, b['title'], b['state'], b.get('severity', '-'), first_noticed(b), b['fixed_in'] or '-',
-                build_text(b.get('build')), b['status']))
+                build_text(b.get('build')), tracker_status(b)))
     return '\n'.join(out) + '\n'
+
+
+def tracker_status(b):
+    """The Status cell of the CHIM tracker: in full for an open bug; its first sentence for a fixed or closed one,
+    whose full text stays on its report page and in the register (TRACKER-CHIM-PAGE-SIZE-48: the page reached 75 %
+    of the 256 KiB release text limit at v0.0.48-rc1)."""
+    text = b['status']
+    if b['state'] == 'open':
+        return text
+    m = re.search(r'\.\s', text)
+    cut = min(m.start() + 1 if m else len(text), 300)
+    return text if cut >= len(text.rstrip()) else text[:cut].rstrip() + ' (full text: its page)'
 
 
 FACT_ROW = re.compile(r'^\|\s*(Reported by|First noticed)\s*\|')

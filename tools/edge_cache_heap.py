@@ -51,8 +51,10 @@ import struct
 # int values) and a format attribute on AW_BrushError's declaration; no allocation or loader code changed.
 # Re-pinned 2026-10-21 for GHOSTFENCE-NO-ANIMATION-46 (r_draw.c): one static table of CYCLE ints (stillturbtable,
 # dbg ghostfence off); no edge-cache allocation changes.
+# Re-pinned 2026-10-23 for ALIAS-BUDGET-32MB-48 (model.c): one #define, AW_ALIAS_STREAM_LIMIT, for the alias stream
+# (model_alias_stream.inc); edge-cache code and brush loaders are byte-identical.
 SOURCE_HASHES={
-    'model.c':'7865e39df3b8ea89ef5ad38a1cab239cd35eb5b7df19f222ac35a3e4fdaeb517',
+    'model.c':'6706721ab9bfa716d8d7708fbe13001de09acf6d2ce8f3dbbe88ba2112cde54c',
     'model.h':'6ca2bae523261a81ad9613620e84af3dfb355551ee4fc64fb9644fe435e28f3c',
     'r_draw.c':'08464e4c3bbb98ed197f7c42c5b013818d2ef4fffd1a5727ed9a6a4c3385cce4',
     'asm_draw.h':'15dafafe33898852972379fc48524346c287a342ba95f17c01becdc75926eba1',

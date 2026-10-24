@@ -82,8 +82,9 @@ def source_index(root=ROOT):
 def reach(entries, root=ROOT):
     """(python files, data files, uncertain, {python file: set of units}) the ENTRIES can reach."""
     index = source_index(root)
-    stop = frozenset((path, unit) for path in KEY_NEUTRAL if path in index.files
-                     for unit in {'<top>', '<main>', *(index._module_symbols(path).get('units') or ())})
+    # whole modules by path: listing their units would read them, and a stage that reads a file its fingerprint
+    # leaves out is never reused (BUILD-NPC-GALLERY-KEY-NEUTRAL-READ-47)
+    stop = frozenset((path, '*') for path in KEY_NEUTRAL)
     python, data, units, uncertain = set(), set(), {}, False
     for path, name in entries:
         if name == '<top>':

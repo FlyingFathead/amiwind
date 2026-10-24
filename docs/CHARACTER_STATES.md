@@ -1,6 +1,6 @@
 # Character presence, progression and placement
 
-_Last updated with AmiWind v0.0.25 (2 October 2026)._
+_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
 
 ## Status
 
@@ -65,7 +65,9 @@ are not a complete simulation of their lifetime behavior.
 | Contact | Support appropriate to the current active pose and position; grounded, swimming, flying or another evidenced state. |
 | Persistence | Changes survive scene unloading, overlap handoffs and save/restore without duplicating actors or resetting quests. |
 
-Grounding corrects a supported active placement against converted geometry.
+Grounding corrects a supported active placement against converted geometry
+(how and when it runs: [Actor placement](ACTOR_PLACEMENT.md); stationary actors are fitted at build time, moving
+actors get runtime grounding in v0.0.49).
 It must not enable an absent actor, replace a quest destination, reset movement
 on every scene entry, or turn a deliberately airborne pose into a ground resident.
 Conversely, later quest movement does not excuse visibly unsupported feet in a

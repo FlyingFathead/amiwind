@@ -33,8 +33,9 @@ STATUS_TEXT = collections.OrderedDict([
                       '(maintainer-approved and playtested cells also count here).'),
     ('empty_sea', 'Empty sea: terrain and water only, nothing placed. Counts as done.'),
     ('ocean', 'Open sea: a map cell without terrain data (no LAND record), the water surface over the flat seabed at the '
-              'default depth, stored once as one shared ocean chunk and referenced by every such cell. Shown in silver; the '
-              'engine does not place the chunk yet, so it is not counted as done and never as land.'),
+              'default depth, stored once as one shared ocean chunk and referenced by every such cell. Not counted as done '
+              'and never as land. In the legend groups below it is "sea, in the game" when the newest build holds it, '
+              '"settled" when the original game data has no record for it, and open sea not in the newest build otherwise.'),
     ('hull_policy_pending', 'Hull policy pending: converted; the only problem is a standing-hull chain deeper than the limit '
                             'below, waiting for one shared routing rule. Neither passed nor failed.'),
     ('converted_failing', 'Failed: converted, but at least one audit failed or the conversion reported an error.'),
@@ -106,6 +107,34 @@ def classes(cells):
         ('converted_failing', c['converted_failing'] + c['converted_unmeasured']),
         ('not_converted', c['not_converted']),
         ('not_started', c['not_started'])])
+
+
+# What each legend state of the three groups means (tools/cell_progress.py GROUP_STATES).
+STATE_TEXT = {
+    'complete': cp.COMPLETE_LABEL, 'terrain_complete': cp.TERRAIN_COMPLETE_LABEL,
+    'complete_unlit': cp.COMPLETE_UNLIT_LABEL, 'terrain_complete_unlit': cp.TERRAIN_COMPLETE_UNLIT_LABEL,
+    'approved': 'Maintainer-approved', 'playtested': 'Playtested', 'audits_passed': 'Passed (something still deferred)',
+    'converted_unmeasured': 'In the game, nothing measured', 'sea_in_game': 'Sea, in the game',
+    'solstheim': 'Solstheim (Bloodmoon)', 'not_started': 'Not started', 'not_in_build': 'Converted, not in the newest build',
+    'empty_sea': 'Empty sea, not in the newest build', 'ocean': 'Open sea, not in the newest build',
+    'converted_failing': 'Failed', 'not_converted': 'Not converted', 'hull_policy_pending': 'Hull policy pending',
+    'settled': 'Settled',
+}
+
+
+def group_lines(doc):
+    """The three legend groups over every cell of the tracker (both islands and the sea around them): in the game, not in
+    the game yet, and beyond the world's edge (settled). The same figures as the Toolkit legend."""
+    f = cp.group_figures(doc)
+    g, st = f['groups'], f['states']
+    out = ['**Every cell of the tracker, in three groups** (the Toolkit legend shows the same; newest ingested build: %s):' % (
+        f['build'] or 'none'), '']
+    for gid in cp.GROUPS:
+        parts = ['%s %s' % (STATE_TEXT[k], n(st.get(k, 0))) for k in cp.GROUP_STATES[gid] if st.get(k)]
+        out.append('- **%s: %s**%s' % (cp.GROUP_LABELS[gid], n(g[gid]), (' (' + ', '.join(parts) + ')') if parts else ''))
+    out += ['', 'Accounted for: %s of %s cells (in the game + settled). Settled squares count toward "accounted for", never '
+            'toward the cells in the game. Settled: %s' % (n(g['accounted_for']), n(g['cells']), cp.SETTLED_TEXT), '']
+    return out
 
 
 def lighting_lines(cells):
@@ -385,7 +414,8 @@ def inclusion_lines(doc, inclusion):
     for build in (inclusion or {}).get('builds', []):
         if build.get('state') not in ('packaged', 'released') or not build.get('evidence_sha256'):
             continue
-        count = len({key for key, value in build.get('cells', {}).items()
+        from chim_inclusion import entry_cells      # the ledger's compact form or the earlier per-cell form
+        count = len({key for key, value in entry_cells(build).items()
                      if value.get('state') == 'included'} & eligible)
         rows.append((build['version'], build['state'], '%s (%s)' % (n(count), pct(count, len(eligible)))))
     out = ['## Included in builds', '',
@@ -414,6 +444,47 @@ def on_chim_lines(doc):
             '([what we count](#%s)).' % COUNTING_ANCHOR, '']
 
 
+def interior_lines(doc):
+    """Interiors (tools/cell_progress_rooms.py): every room of the door graph, counted per island and per state in the
+    three groups of the legend. Aggregate counts only; the room list is in the Toolkit. Empty for data without
+    interiors."""
+    ir = doc.get('interior_rooms')
+    if not ir or not ir.get('headline'):
+        return []
+    labels = ir.get('labels') or {}
+    groups = ir.get('groups') or []
+    islands = ir.get('islands') or {}
+    order = ('Vvardenfell', 'Solstheim', 'Mournhold', 'none')     # the data's keys may come back sorted
+    head = {i: ir['headline'][i] for i in sorted(ir['headline'], key=lambda i: (
+        order.index(i) if i in order else len(order) - 1, i))}
+    tot = ir.get('totals') or {}
+    out = ['## Interiors', '',
+           'Every interior cell of the game has a room on the tracker, keyed by its cell ID: none is left out. A room '
+           'is in the game, not in the game yet, or set aside with its reason (a set-aside room keeps its state and is '
+           'converted in a later batch). Rooms are counted by the island their entrance is on; rooms with no entrance '
+           'area are counted on their own.', '']
+    if tot:
+        out += ['**%s rooms: %s.**' % (n(tot.get('total', 0)), '; '.join(
+            '%s %s' % (g['label'].lower(), n((tot.get('groups') or {}).get(g['id'], 0))) for g in groups)), '']
+    rows = []
+    for g in groups:
+        for st in g['states']:
+            rows.append([g['label'], labels.get(st, st)] + [n(h.get(st, 0)) for h in head.values()] +
+                        [n(tot.get(st, 0))])
+    rows.append(['Total', ''] + [n(h.get('total', 0)) for h in head.values()] + [n(tot.get('total', 0))])
+    out += table(['Group', 'State'] + [islands.get(i, i) for i in head] + ['All'], rows, right_from=2)
+    reasons = collections.Counter()
+    for h in head.values():
+        reasons.update(h.get('hard_reasons') or {})
+    if reasons:
+        out += ['', 'Reasons of the set-aside rooms (a room can have two): %s.' % ', '.join(
+            '%s %s' % (k.replace('_', ' '), n(v)) for k, v in sorted(reasons.items()))]
+    later = ir.get('later') or []
+    if later:
+        out += [''] + ['- %s (%s): %s.' % (b['batch'], b['master'], b['waits_for']) for b in later]
+    return out + ['']
+
+
 def updated_line(version, today=None):
     """The generator-written line of a generated page (documentation policy, 19 October 2026): what it is generated
     from and the AmiWind version, no date (doc_toc.generated_line). TODAY is no longer part of it."""
@@ -437,8 +508,8 @@ def render(doc, today=None, inclusion=None, version=None):
                MAIN_ISLAND, COUNTING_ANCHOR), '',
            '**Conversion/audit progress: %s of %s (%s)**' % (n(done), n(total), pct(done, total)), '',
            'These audit totals count the cells with a LAND record (land and seabed), not cells included in a playable '
-           'build; see Included in builds below.', ''] + on_chim_lines(doc) + [
-           'Map cells %s: cells with a LAND record %s (done %s, %s) and open-ocean cells %s (no LAND record; open ocean is not counted as done).' % (
+           'build; see Included in builds below.', ''] + group_lines(doc) + on_chim_lines(doc) + [
+           'Map cells %s: cells with a LAND record %s (done %s, %s) and open-sea cells %s (no LAND record, not counted as done; the groups above say which are in the game and which are settled).' % (
                n(map_total), n(land_total), n(land_done), pct(land_done, land_total), n(cl['ocean'])), '',
            '- %s: %s' % (cp.COMPLETE_LABEL, n(cl['complete'])),
            '- %s: %s' % (cp.TERRAIN_COMPLETE_LABEL, n(cl['terrain_complete'])),
@@ -446,7 +517,7 @@ def render(doc, today=None, inclusion=None, version=None):
            '- %s: %s' % (cp.TERRAIN_COMPLETE_UNLIT_LABEL, n(cl['terrain_complete_unlit'])),
            '- Passed (something still deferred): %s' % n(cl['audits_passed']),
            '- Empty sea: %s' % n(cl['empty_sea']),
-           '- Open ocean (silver, not counted as done): %s' % n(cl['ocean']), '',
+           '- Open sea, no LAND record (not counted as done): %s' % n(cl['ocean']), '',
            '**Conversion-eligible: %s of %s** (every audit-done cell, lighting done or not; this is not a release assignment).' % (
                n(eligible), n(total)), ''] + lighting_lines(cells) + [
            '',
@@ -485,7 +556,7 @@ def render(doc, today=None, inclusion=None, version=None):
     out += ['', '## Per object type (converted cells, island-wide)', '']
     isl = [g for g in (doc.get('totals') or {}).get('islands', []) if g.get('island') == MAIN_ISLAND]
     out += category_lines(isl[0] if isl else None)
-    out += [''] + policy_lines()
+    out += [''] + interior_lines(doc) + policy_lines()
     text = '\n'.join(x.rstrip() for x in out) + '\n'
     return text
 

@@ -188,20 +188,56 @@ def chunk_visibility(world, terrain, by_chunk, variants, visibility, jobs=1, cac
     from chim.visibility import pvl_unit
     boxes = {p['_pid']: p['_box'] for c in world.order for p in by_chunk[c]['owned']}
     pargs = (s['grain'], world.frame['low'], ground, occ)
-    pwhole = fingerprint('pvs', whole, sorted(boxes.items()))
-    pitems = []
+    # Placement ids run on across frames (frame_layout), so one placement more in an earlier frame renumbered every
+    # later frame's: keyed by those ids, every placement-visibility unit of the island was computed again for a
+    # change elsewhere (BUILD-CHIM-VIS-RECOMPUTED-48). A unit is keyed and computed in the frame's own numbering (id
+    # minus the frame's first id) and by what it reads: the ground, the occluder grid, grain and frame corner, its
+    # viewers, their candidates and near sets and the boxes of those candidates (not the chunk tops, the ring or the
+    # other placements' boxes); its result is renumbered back.
+    base = min(boxes) if boxes else 0
+    plocal = fingerprint('pvs', 'placement inputs', *ground_key, occ.lo, occ.hi, s['grain'], world.frame['low'])
+    pwhole = None
+    pitems, earlier = [], []
     for src in sources:
-        cand = {c: candidates[c] for c in src}
-        nr = {c: near[c] for c in src}
-        used = sorted({p for c in src for p in candidates[c]})
-        task = {'args': pargs, 'viewers': src, 'candidates': cand, 'near': nr, 'boxes': {p: boxes[p] for p in used}}
-        pitems.append((fingerprint('pvs', 'placements', pwhole, src, [cand[c] for c in src], [nr[c] for c in src]),
-                       task))
+        cand = {c: [p - base for p in candidates[c]] for c in src}
+        nr = {c: [p - base for p in near[c]] for c in src}
+        used = sorted({p for c in src for p in cand[c]})
+        task = {'args': pargs, 'viewers': src, 'candidates': cand, 'near': nr,
+                'boxes': {p: boxes[p + base] for p in used}}
+        pitems.append((fingerprint('pvs', 'placements local', plocal, src, [cand[c] for c in src],
+                                   [nr[c] for c in src], [task['boxes'][p] for p in used]), task))
+        if cache is not None:
+            # the unit as keyed before (frame-wide ids, whole-frame inputs): reused once, renumbered
+            if pwhole is None:
+                pwhole = fingerprint('pvs', whole, sorted(boxes.items()))
+            earlier.append(fingerprint('pvs', 'placements', pwhole, src, [candidates[c] for c in src],
+                                       [near[c] for c in src]))
+    results, todo = {}, []
+    for i, (fp, task) in enumerate(pitems):
+        hit = cache.get('pvs', fp) if cache is not None else None
+        if hit is None and cache is not None:
+            old = cache.get('pvs', earlier[i])
+            if old is None and getattr(earlier[i], 'previous', None):
+                old = cache.get('pvs', earlier[i].previous)
+            if old is not None:
+                hit = {'visible': {key: [p - base for p in pids] for key, pids in old['visible'].items()},
+                       'stats': old['stats']}
+                cache.put('pvs', fp, hit)
+                counts = cache.stats.setdefault('pvs', {})
+                counts['reused_earlier_key'] = counts.get('reused_earlier_key', 0) + 1
+        if hit is None:
+            todo.append(i)
+        else:
+            results[i] = hit
+    if results:
+        cache.count('pvs', 0, len(results))
+    results.update(zip(todo, run_units('pvs', [pitems[i] for i in todo], pvl_unit, jobs, cache)))
     pvl = {}
     pstats = {'placements_tested': 0, 'placements_blocked': 0}
-    for res in run_units('pvs', pitems, pvl_unit, jobs, cache):
+    for i in range(len(pitems)):
+        res = results[i]
         for key, pids in res['visible'].items():
-            pvl[tuple(int(v) for v in key.split(','))] = set(pids)
+            pvl[tuple(int(v) for v in key.split(','))] = {p + base for p in pids}
         for k in pstats:
             pstats[k] += res['stats'][k]
     stats.update(pstats)
@@ -781,6 +817,27 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
     import build_profile      # timed phases: start/end lines with time and cores (never part of a key)
     with section('visibility rows'), build_profile.phase('CHIM world: visibility rows', '%d frames' % len(frames)):
         layouts, visible, refusals = frame_rows([frames[fi] for fi in order], bases, settings, jobs, cache)
+    # Placement light levels (chim.placement_light, hybrid lighting part 2): the light the original's light sources
+    # give each placement, in the placed record's flags (world format 0.12). Off, or a world without placed records:
+    # nothing below changes.
+    from chim import placement_light as PL
+    light_mode, light_sources = PL.environment_sources()
+    light_levels, light_note = {}, None
+    if light_mode != 'off':
+        if not placed:
+            light_note = 'not stored: placement light levels need placed records (placement format 0.8)'
+            print('CHIM world: placement light %s' % light_note, flush=True)
+        else:
+            with build_profile.phase('CHIM world: placement light levels', '%d frames' % len(frames)):
+                for fi, layout in zip(order, layouts):
+                    by_chunk = layout[1]
+                    light_levels.update(PL.frame_levels(frames[fi]['frame'],
+                                                        [p for c in by_chunk for p in by_chunk[c]['owned']],
+                                                        light_sources))
+            if light_levels:
+                version = max(version, PL.FORMAT_VERSION)
+            print('CHIM world: placement light: %d of %d placements lit by %d sources (world format %d.%d)'
+                  % (len(light_levels), pid, len(light_sources), *version), flush=True)
     pack_timer = build_profile.phase('CHIM world: pack', '%d frames' % len(frames)).__enter__()
     # The pack itself stays one walk in this process: model, texture and terrain ids are handed out in the order
     # the walk first meets them and every sector holds the records first met there, so each frame depends on the
@@ -849,11 +906,13 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                         ref_at[c] = (terrain_content[digest], shift)
                     rows = {}
                     for kind in ('owned', 'reach'):
-                        rows[kind] = [write_record(p['_pid'], p['ref'], model_id_of(fi, p['variant']), p['origin'],
-                                                   (p.get('angles') or (0.0, p['yaw'], 0.0)) if placed else p['yaw'],
-                                                   world.chunk_index[p['_owner']], p['cell'][0] - cell[0],
-                                                  p['cell'][1] - cell[1], p['_box'], p['_leaves'],
-                                                  p.get('story_hidden', False))
+                        rows[kind] = [PL.with_light(
+                                          write_record(p['_pid'], p['ref'], model_id_of(fi, p['variant']), p['origin'],
+                                                       (p.get('angles') or (0.0, p['yaw'], 0.0)) if placed else p['yaw'],
+                                                       world.chunk_index[p['_owner']], p['cell'][0] - cell[0],
+                                                       p['cell'][1] - cell[1], p['_box'], p['_leaves'],
+                                                       p.get('story_hidden', False)),
+                                          light_levels.get(p['_pid'], 0))
                                       for p in sorted(by_chunk[c][kind], key=lambda q: q['_pid'])]
                     if reach_refs:
                         rows['reach'] = refs_of[c]      # format 0.9: references in place of the reach copies
@@ -966,6 +1025,10 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                'files_removed': ['chim/' + rel for rel in removed],
                'sectors': sum(r['sectors'] for r in frame_recs), 'largest_sector_bytes': largest,
                'placements': pid, 'reach_copies': reach_total,
+               # off: no key, the receipt as before
+               **({'placement_light': dict(PL.summary(light_levels, pid, light_sources, light_mode),
+                                           **({'note': light_note} if light_note else {}))}
+                  if light_mode != 'off' else {}),
                **({'reach_index': {'references': reach_total, 'reference_bytes': RI.reach_bytes(reach_total)[1],
                                    'copy_bytes': RI.reach_bytes(reach_total)[0]}} if reach_refs else {}),
                'models': len(model_records), 'model_variants': len(model_ids), 'model_aliases': aliases,

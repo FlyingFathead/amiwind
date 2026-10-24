@@ -9,7 +9,7 @@
 | Where | CHIM region frames near Hla Oad: (-8,-5) (-8,-4) (-7,-5) (-7,-4) (-6,-4) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.41-dev3 (last seen) |
+| Persists in | v0.0.48-rc1 (last seen) |
 | Severity | high: five ring-3 cells stay out of CHIM; any cell with large irregular ruins can hit it |
 | Family | Map heap and memory budget (`heap-memory`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -119,7 +119,12 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - MEM-GEOMETRY-01 (no report page): Light-range sharing could copy a too-short byte span
 - MEM-TOWN-02 (no report page): Bounded Balmora maps exceeded the modeled map heap limit
 - [NPC-ANIM-MEMORY-33](NPC-ANIM-MEMORY-33.md): Full animation kit models are 2.2 times the idle models; four Balmora residents exceed the 512 KiB alias staging buffer
+- [RAM-REQUIREMENT-32MB-48](RAM-REQUIREMENT-32MB-48.md): 16 MB of Fast RAM no longer holds the whole game: 32 MB is the safe minimum, 16 MB starts with a warning
 - [VIVEC-HEAP-31](VIVEC-HEAP-31.md): Dense Vivec maps exceed the loader heap budget once mappings and extents no longer stop them
 - WORLD-FLORA-HEAP-010 (no report page): Seyda sprite payload exceeds the final map heap headroom
+
+Related bugs in other categories:
+
+- CHIM-CAVE21-NONCONVEX-FACE-48 (no report page): The cave piece shared by in_moldcave_21, in_mudcave_21, in_pycave_21 and in_lavacave_21 has a non-convex face, so its collision falls back to the piece chain in every room that uses it
 
 <!-- END GENERATED CATEGORY -->

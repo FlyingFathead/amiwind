@@ -40,6 +40,16 @@ SETTINGS = ('fFatigueBase', 'fFatigueMult', 'fCombatDistance', 'fHandToHandReach
             'fFatigueBlockBase', 'fFatigueBlockMult', 'fWeaponFatigueBlockMult',
             'fCombatBlockLeftAngle', 'fCombatBlockRightAngle', 'fCombatDelayNPC',
             'fNPCHealthBarTime', 'fNPCHealthBarFade', 'fWeaponDamageMult')
+# The player's movement rules (engine/aga/src/aw_move.h, the same order; docs/PLAYER_MOVEMENT.md):
+# written as "move NAME VALUE" lines, which the combat loader skips.
+MOVE_SETTINGS = ('fMinWalkSpeed', 'fMaxWalkSpeed', 'fEncumberedMoveEffect', 'fBaseRunMultiplier',
+                 'fAthleticsRunBonus', 'fSwimRunBase', 'fSwimRunAthleticsMult', 'fSneakSpeedMultiplier',
+                 'fEncumbranceStrMult', 'fMinFlySpeed', 'fMaxFlySpeed',
+                 'fJumpAcrobaticsBase', 'fJumpAcroMultiplier', 'fJumpEncumbranceBase', 'fJumpEncumbranceMultiplier',
+                 'fJumpRunMultiplier', 'fJumpMoveBase', 'fJumpMoveMult',
+                 'fFatigueRunBase', 'fFatigueRunMult', 'fFatigueSwimWalkBase', 'fFatigueSwimWalkMult',
+                 'fFatigueSwimRunBase', 'fFatigueSwimRunMult', 'fFatigueSneakBase', 'fFatigueSneakMult',
+                 'fFatigueJumpBase', 'fFatigueJumpMult', 'fFatigueBase', 'fFatigueMult')
 # Settings only the builder needs (armour classes, magicka).
 BUILD_SETTINGS = ('iBaseArmorSkill', 'fLightMaxMod', 'fMedMaxMod', 'iHelmWeight', 'iCuirassWeight',
                   'iPauldronWeight', 'iGreavesWeight', 'iBootsWeight', 'iGauntletWeight', 'iShieldWeight',
@@ -93,6 +103,19 @@ def gmst(kinds, name):
     if name[0] == 'f':
         return struct.unpack('<f', first(fields, 'FLTV'))[0]
     return float(struct.unpack('<i', first(fields, 'INTV'))[0])
+
+
+def movement_lines(kinds, settings):
+    """The movement rules' settings and each race's male/female weight (RADT: heights, weights, flags at the
+    end), which scales an NPC's horizontal movement (OpenMW character.cpp, normalise race speed off)."""
+    lines = [f'move {name} {settings[name]:.6g}' for name in MOVE_SETTINGS]
+    for key in sorted(kinds['RACE']):
+        radt = first(kinds['RACE'][key], 'RADT')
+        if len(radt) < 20 or not key.isascii() or len(key) > 63:
+            continue
+        male, female = struct.unpack_from('<2f', radt, len(radt) - 12)
+        lines.append(f'moverace {male:.6g} {female:.6g} {key}')
+    return lines
 
 
 def round_even(value):
@@ -493,13 +516,14 @@ def prepare(data_files, id1, jobs=None, fighters=None):
     data = resolve_data_files(Path(data_files))
     id1 = Path(id1)
     kinds = load(child_ci(data, 'Morrowind.esm'))
-    settings = {name: gmst(kinds, name) for name in SETTINGS + BUILD_SETTINGS}
+    settings = {name: gmst(kinds, name) for name in SETTINGS + BUILD_SETTINGS + MOVE_SETTINGS}
     (id1 / 'combat').mkdir(parents=True, exist_ok=True)
     (id1 / 'sound/combat').mkdir(parents=True, exist_ok=True)
     from npc_geometry import Assets
     assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
     lines = ['AWCS1']
     lines += [f'{name} {settings[name]:.6g}' for name in SETTINGS]
+    lines += movement_lines(kinds, settings)
     sounds = {}
     for key, record in SOUNDS:
         fields = kinds['SOUN'].get(record.casefold())

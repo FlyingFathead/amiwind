@@ -97,6 +97,9 @@ def interior_map_cells(map_names):
     from town_config import town_interiors
     cells = {s['map']: s['cell'] for s in SCENES if s.get('interior') is True}
     cells.update({room['map']: room['cell'] for room in town_interiors()})
+    # the batch rooms of the repo's room list (tools/room_batches.py) under their batch map names
+    from room_batches import load, rows
+    cells.update({row['map']: row['room'] for row in rows(load()) if row['map'] not in cells})
     return {name: cells[name] for name in sorted(map_names) if name in cells}
 
 

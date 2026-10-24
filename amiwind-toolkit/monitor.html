@@ -8,6 +8,7 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#101923;color:#edf3fa;font:14px system-ui,sans-serif}
+#summary{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 14px;background:#13202d}
 #bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 14px;border-bottom:1px solid #345;background:#13202d}
 select,button,label.chk{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:5px;padding:6px 8px;font:inherit}
 button{cursor:pointer}button[aria-pressed="true"]{background:#386685;border-color:#8bd5ff}
@@ -30,6 +31,7 @@ h2{font-size:15px;margin:0 0 8px;color:#ffe28a}
 .s-passed{background:#3fbf7a}.s-running{background:#38a9e8}.s-failed{background:#e04848}.s-pending{background:#56677a}.s-skipped,.s-reused{background:#6f8a5f}
 #log{margin:0;height:min(62vh,640px);overflow:auto;background:#0b121a;border:1px solid #2c4256;border-radius:6px;padding:8px;
   font:12px/1.35 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+#runblock{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
 #logbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
 table{border-collapse:collapse;width:100%;font-size:12px}
 td,th{padding:3px 6px;border-bottom:1px solid #243649;text-align:left;vertical-align:top}
@@ -38,16 +40,23 @@ td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}
 .error{color:#ffaaaa}
 </style>
 <script src="header.js"></script>
+<script src="panel-fold.js"></script>
 </head>
 <body>
-<div id="bar">
-  <label class="muted" for="run">Build run</label>
-  <select id="run" aria-label="Build run"></select>
-  <button id="runrefresh" title="Read the run list again">&#x21bb; Refresh</button>
-  <label class="chk"><input type="checkbox" id="followlatest"> follow latest</label>
+<div id="summary">
   <span id="status" class="big">-</span>
   <span id="updated" class="muted"></span>
   <span class="muted" style="margin-left:auto">Read-only: this page only reads build files through the Toolkit server; it cannot start, stop or change anything.</span>
+</div>
+<hr class="foldrule">
+<div id="bar">
+  <button id="foldall" title="Fold or unfold every control block on this page">Collapse all</button>
+  <div id="runblock">
+    <label class="muted" for="run">Build run</label>
+    <select id="run" aria-label="Build run"></select>
+    <button id="runrefresh" title="Read the run list again">&#x21bb; Refresh</button>
+    <label class="chk"><input type="checkbox" id="followlatest"> follow latest</label>
+  </div>
 </div>
 <main>
   <div>
@@ -103,6 +112,12 @@ td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}
 // The AmiWind Toolkit Monitor: a build as it runs, read-only. Everything comes from the Toolkit server's /monitor/
 // endpoints (tools/toolkit_serve.py --builds or --builds-command, --results, --console-logs); nothing is sent back.
 if (window.AmiWindToolkitHeader) window.AmiWindToolkitHeader.mount('Monitor');
+// Every block of controls folds to its title (panel-fold.js); the choice is remembered in this browser. The status line and the
+// views (progress, stages, activity, log, timeline) stay.
+if (window.AmiWindFold) window.AmiWindFold.init({key: 'amiwind-monitor-folds-1', allButton: document.getElementById('foldall'), blocks: [
+  {id: 'run', el: document.getElementById('runblock'), title: 'Run'},
+  {id: 'log', el: document.getElementById('logbar'), title: 'Log controls'},
+  {id: 'timeline', el: document.getElementById('tlbar'), title: 'Timeline controls'}]});
 const $ = id => document.getElementById(id);
 const POLL_MS = 2000, LIST_MS = 10000, LOG_KEEP = 400000, FIRST_TAIL = 65536;
 const S = {run: null, log: null, next: -1, size: 0, paused: false, progress: null, lastList: 0, files: [], console: false,
@@ -314,7 +329,8 @@ function renderTimeline(bars, opts) {
   const anySections = bars.some(b => secs[b.name] && ((secs[b.name].sections || []).length || (secs[b.name].trace || []).length));
   const rows = lanes(bars), full = !!S.full;
   const W = Math.max(600, (chart.clientWidth || 900) - 2);
-  const coreH = cores ? (full ? 140 : 70) : 0, top = 16 + coreH;
+  // the cores label has its own 16 px band above the plot (TOOLKIT-TIMELINE-CORES-TOP-48: the line's top ran into it)
+  const coreH = cores ? (full ? 140 : 70) : 0, top = 24 + coreH, plotTop = 18, plotBottom = 12 + coreH;
   const avail = full && typeof window !== 'undefined' && window.innerHeight ? window.innerHeight - 140 : 0;
   const rowH = Math.max(anySections ? 50 : 14, avail ? Math.floor((avail - top - 18) / Math.max(1, rows)) : 0);
   const H = top + rows * rowH + 18;
@@ -329,19 +345,19 @@ function renderTimeline(bars, opts) {
       '<text x="' + (x(t) + 2).toFixed(1) + '" y="' + (H - 4) + '" fill="#9fb3c8" font-size="9">' + fmtS(t) + '</text>';
   }
   if (cores) {
-    const cap = Math.max(1, opts.budget || 0, ...cores.map(c => c[1])), y = c => 12 + (coreH - 8) * (1 - c / cap);
+    const cap = Math.max(1, opts.budget || 0, ...cores.map(c => c[1])), y = c => plotTop + (plotBottom - plotTop) * (1 - c / cap);
     const pts = cores.filter(c => c[0] >= view.t0 - 60 && c[0] <= view.t1 + 60);
     for (const r of red) if (vis(r.start, r.end)) {
       const inside = pts.filter(c => c[0] >= r.start && c[0] <= r.end);
-      if (inside.length) svg += '<polygon data-red="' + red.indexOf(r) + '" points="' + cx(r.start).toFixed(1) + ',' + (12 + coreH - 8) + ' ' + inside.map(c => cx(c[0]).toFixed(1) + ',' + y(c[1]).toFixed(1)).join(' ') +
-        ' ' + cx(r.end).toFixed(1) + ',' + (12 + coreH - 8) + '" fill="#ff3b3b" fill-opacity="0.45"/>';
+      if (inside.length) svg += '<polygon data-red="' + red.indexOf(r) + '" points="' + cx(r.start).toFixed(1) + ',' + plotBottom + ' ' + inside.map(c => cx(c[0]).toFixed(1) + ',' + y(c[1]).toFixed(1)).join(' ') +
+        ' ' + cx(r.end).toFixed(1) + ',' + plotBottom + '" fill="#ff3b3b" fill-opacity="0.45"/>';
     }
     svg += '<polyline fill="none" stroke="#8bd5ff" stroke-width="1" points="' + pts.map(c => cx(c[0]).toFixed(1) + ',' + y(c[1]).toFixed(1)).join(' ') + '"/>';
     for (const r of red) if (vis(r.start, r.end)) {
       const inside = pts.filter(c => c[0] >= r.start && c[0] <= r.end);
       if (inside.length > 1) svg += '<polyline fill="none" stroke="#ff4040" stroke-width="2" points="' + inside.map(c => cx(c[0]).toFixed(1) + ',' + y(c[1]).toFixed(1)).join(' ') + '"/>';
     }
-    svg += '<text x="4" y="10" fill="#9fb3c8" font-size="9">cores (max ' + cap + '); red: under ' + redSettings().threshold + ' cores for ' + redSettings().min + ' s or more · ' + red.length + ' stretch' + (red.length === 1 ? '' : 'es') + '</text>';
+    svg += '<text x="4" y="11" fill="#9fb3c8" font-size="9">cores (max ' + cap + '); red: under ' + redSettings().threshold + ' cores for ' + redSettings().min + ' s or more · ' + red.length + ' stretch' + (red.length === 1 ? '' : 'es') + '</text>';
   }
   if (S.sel && vis(S.sel.start, S.sel.end)) svg += '<rect x="' + cx(S.sel.start).toFixed(1) + '" y="0" width="' + Math.max(2, cx(S.sel.end) - cx(S.sel.start)).toFixed(1) + '" height="' + (H - 14) +
     '" fill="#ffe28a" fill-opacity="0.16" stroke="#ffe28a" stroke-width="1"/>';

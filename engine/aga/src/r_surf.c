@@ -246,7 +246,7 @@ void R_BuildLightMap (void)
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
 	float		static_factor;
 #endif
-	int			legacy_unlit;
+	int			legacy_unlit, placement_light, placement_add;
 
 	surf = r_drawsurf.surf;
 
@@ -258,6 +258,27 @@ void R_BuildLightMap (void)
 	static_factor = R_InteriorLumaFactor();
 #endif
 	legacy_unlit = !cl.worldmodel->lightdata && !R_SkyExterior();
+	/* World format 0.12 (docs/chim/INTERIOR_STORE.md): a CHIM placement drawn at
+	 * its own light level instead of the ambient, never the unlit fallback. */
+	placement_light = r_drawsurf.light;
+	if (placement_light > 0)
+		legacy_unlit = 0;
+	/* Outdoors (a CHIM exterior world, docs/chim/LIGHTING.md) the level is the
+	 * light the original's light sources give the placement: added to the
+	 * daylight-dimmed ambient, never dimmed itself (like the lamp styles;
+	 * r_lamps 0 turns it off for A/B), and never past the full-day ambient,
+	 * as the original clamps light at full: by day it shows nothing, at night
+	 * it fills the placement back up towards the day. Indoors it replaces
+	 * the ambient. */
+	placement_add = 0;
+	if (placement_light > 0 && R_SkyExterior ())
+	{
+		int dimmed = r_refdef.ambientlight*r_daylight>>8;
+		placement_add = r_lamps && r_campfires ? placement_light : 0;	/* dbg campfires off: none */
+		if (dimmed + placement_add > r_refdef.ambientlight)
+			placement_add = r_refdef.ambientlight > dimmed ? r_refdef.ambientlight - dimmed : 0;
+		placement_light = 0;
+	}
 
 	/* AmiWind exterior maps can have no lightmaps, or retain an unused lump.
 	 * Both must use the same ambient/dynamic-light path at region boundaries.
@@ -273,9 +294,11 @@ void R_BuildLightMap (void)
 		return;
 	}
 
-// clear to ambient (dimmed by night in light-space mode; r_daylight is 256 by day)
+// clear to ambient (dimmed by night in light-space mode; r_daylight is 256 by day),
+// or to the placement's own level (world format 0.12)
 	for (i=0 ; i<size ; i++)
-		blocklights[i] = (legacy_unlit ? 255 : r_refdef.ambientlight*r_daylight>>8)<<8;
+		blocklights[i] = (placement_light > 0 ? placement_light :
+			(legacy_unlit ? 255 : r_refdef.ambientlight*r_daylight>>8) + placement_add)<<8;
 
 
 // add all the lightmaps

@@ -74,8 +74,9 @@ def prepare(data_files, scene, qbsp, vis, light, jobs=None, vis_mode='fast'):
         a=low.copy();b=high.copy();a[axis]=high[axis]-8;walls.append(box(a,b,'voidwall'))
     palette=(scene/'id1/gfx/palette.lmp').read_bytes();tile=Image.new('P',(16,16),255);tile.putpalette(palette)
     (scene/'census.wad').write_bytes(wad([('voidwall',0x43,miptex('voidwall',tile))]))
-    ext=lumps((scene/'id1/maps/seyda.bsp').read_bytes())[0].decode('ascii')
-    timings='\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"',ext))
+    # the hand timings: the hands stage's report (BUILD-SEYDA-BSP-CARRIER-48)
+    from hand_metadata import scene_timings
+    timings=scene_timings(scene)
     # Actual exterior customs door destination supplies the default entry too.
     entrance=next(r for r in cell['entrances'] if r['id'].casefold()=='chargen customs door')
     spawn=[v*.25 for v in entrance['destination']['position']];spawn[2]+=16.875

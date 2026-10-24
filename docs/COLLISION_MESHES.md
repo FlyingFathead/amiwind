@@ -1,6 +1,6 @@
 # Morrowind collision meshes: where they are and how AmiWind uses them
 
-_Last updated with AmiWind v0.0.46 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -12,7 +12,7 @@ _Last updated with AmiWind v0.0.46 (21 October 2026)._
   - [The models AmiWind converts](#the-models-amiwind-converts)
 - [Stairs and ramps](#stairs-and-ramps)
 - [How the AmiWind converter uses collision today](#how-the-amiwind-converter-uses-collision-today)
-- [Stair collision method 1 (experimental)](#stair-collision-method-1-experimental)
+- [Stair collision method 1 (the default)](#stair-collision-method-1-the-default)
 - [Cost of using the authored collision](#cost-of-using-the-authored-collision)
 - [Recommendations](#recommendations)
 - [How the numbers were measured](#how-the-numbers-were-measured)
@@ -191,16 +191,44 @@ Findings:
 
 ## How the AmiWind converter uses collision today
 
-One reader, one proxy function, but the collision **source** is chosen per converter:
+Since v0.0.48-dev2 (decided for the project, 22 October 2026) one collision-source rule applies in
+every mesh converter: towns, Seyda Neen, rooms, census, prison ship, world scenery, CHIM exteriors
+and CHIM rooms. It is `tools/collision_source.py`, written from OpenMW's rules (above):
+
+- the model's `RootCollisionNode` when it is a direct child of a root node: only the triangles
+  under `RootCollisionNode`s collide (source `rcn`);
+- otherwise the drawn triangles (source `visual`); a `RootCollisionNode` deeper in the tree does
+  not count (in the base game only `in_dagoth_bridge00` and `xin_dagoth_bridge00`);
+- a root string starting with `NC` (any case) or `NCC`: nonsolid for the player (source `none`;
+  AmiWind has no camera collision); an empty root `RootCollisionNode` too;
+- `MRK`: the `Tri EditorMarker*` shapes never collide (`mwad.markers`, in `model_geometry`);
+- `AvoidNode` subtrees never collide.
+
+`export_refs` applies it to every model: a converter profile no longer opts in, and the
+`meshes/i/`-only limit of the room converters (`interior_visual_profile`, `prepare_census`) no
+longer limits the source. A profile may still require the authored collision
+(`collision_source` `root_node`: the census and prison ship kit pieces,
+`ex_imp_wall_stairs_01`/`_02`); a model without a root `RootCollisionNode` is then an export error.
+Each export's `scenery-report.json` lists the source of every model (`collision_sources`: `rcn`,
+`visual` or `none`, with the markers that decided it). `--collision-source profile` (on
+`tools/build.py` and `tools/chim_build.py`, `AMIWIND_COLLISION_SOURCE`) keeps the rule before for
+A/B: the profile opts in, only the exact strings `NC` and `NCO` make a model nonsolid.
+
+Measured on the base game's 5,798 `Morrowind.bsa` NIFs (no game data written): the rule gives
+2,680 `rcn`, 2,697 `visual` and 421 `none` (373 `NCO`, 48 `NCC`). Against the rule before, the
+48 `NCC` models (tapestries, `furn_rug_big_*`, the `furn_c_t_*` sign plaques) become nonsolid and
+the two Dagoth bridges collide with their drawn triangles; no root `RootCollisionNode` is empty;
+the six `AvoidNode` shapes (one hidden shape in each `in_lava_*` pool, models with a
+`RootCollisionNode`) never collide. Before the rule, the mesh converters already made `NCO` models nonsolid
+(`source_collision`); `NCC` was solid.
+
+The rest of the path:
 
 - `tools/prepare_scenery.py` `model_geometry(..., collision=True)` reads every `NiTriShape`
   under any `RootCollisionNode` (or a node named `RootCollisionNode`) anywhere in the tree,
-  hidden or not. OpenMW only accepts one that is a direct child of the root. The two Dagoth
-  bridges are the only files where this differs. The visual export (`collision=False`) skips
-  hidden shapes and everything under a `RootCollisionNode`.
-- `export_refs` only reads it when the model's profile sets `collision_source` to `root_node`
-  (missing collision is an error) or `root_node_or_visual` (fall back to the visual triangles).
-  Otherwise the visual triangles are the collision.
+  hidden or not; `collision_source.model_collision` calls it only for a model with a root
+  `RootCollisionNode`. The visual export (`collision=False`) skips hidden shapes and everything
+  under a `RootCollisionNode`.
 - `tools/prepare_mesh_bsp.py` `_prepare_model` passes that mesh to
   `tools/mesh_geometry.py` `collision_pieces`, shared by every converter and the estimators:
   - convex parts (`collision_parts`, at most 14 support points per hull,
@@ -230,41 +258,45 @@ One reader, one proxy function, but the collision **source** is chosen per conve
   else to draw) out of the drawn scenery at the input, keeping it as an invisible sound, effect
   or collision object in the build's emitter table (`emitters.json`). The rules are in
   `src/mwad/markers.py`; [COLLISION-NC-FLAGS-32](bugs/COLLISION-NC-FLAGS-32.md).
-- No converter reads `NC`/`NCC` strings, `AvoidNode`s or `Bounding Box` nodes. Only the
-  flora sprite path (`tools/prepare_tree_sprites.py` `collision_metadata`) honours `NC`/`NCO`
-  and makes ground plants nonsolid; it does not know `NCC`. AmiWind has no camera collision.
+- No converter reads `Bounding Box` nodes (the actor boxes come from the creature and NPC
+  converters). The flora sprite path (`tools/prepare_tree_sprites.py` `collision_metadata`) keeps
+  its own ground-vegetation rule. AmiWind has no camera collision.
 - Collision is static; animated (`x`-prefixed) collision is not modelled.
 
-| Converter | Scene | Collision source |
-| --- | --- | --- |
-| `import_town.py` (`town_regions.visual_profile`) | Balmora, Vivec Arena exteriors | RCN or visual, every model. Plates for the hand-made Hlaalu list (`ex_hlaalu_b_`, `_bal_`, `_bridge_`, `_dsteps_`, `_steps_`, `_wall_gate_`, `ex_velothi_temple_01`, `ex_velothi_temple_02`). Other `x/` models get plates when the convex fill closes more than a step. |
-| `world_scenery.py` / `prepare_world_scenery.py` | open-world scenery | RCN or visual, every model |
-| `prepare_scenery.py` main, `prepare_mesh_bsp.py` main, `prepare_seyda_regions.py` | Seyda Neen exterior | RCN only for `ex_de_ship` and `siltstrider` (`config/scenery_groups.json`); every other model collides with its **visual** mesh |
-| `prepare_area.py` `build_room` (`interior_visual_profile`) | Seyda Neen rooms, Balmora interiors (`prepare_balmora_interiors.py`), town interiors (`town_interiors.py`) | RCN or visual + plates (exact bevels in Balmora) **only for `meshes/i/`**; rocks and boulders convex. Furniture, doors, lights, containers and `x/` pieces in rooms collide with their **visual** mesh. |
-| `prepare_census.py` | Census and Excise Office | `meshes/i/` only, RCN required, plates. Other models visual. |
-| `prepare_interior.py` | Imperial prison ship | `in_prison_ship` only (RCN, plates); other models visual |
-| `prepare_original_door_overlay.py`, `prepare_tree_sprites.py`, estimators | doors, flora, world estimate | RCN or visual |
+| Converter | Scene | Collision source (since v0.0.48-dev2) | Before |
+| --- | --- | --- | --- |
+| `import_town.py` (`town_regions.visual_profile`), CHIM model builder (`chim/build.py`) | CHIM towns and regions | the rule, every model. Plates for the hand-made Hlaalu list (`ex_hlaalu_b_`, `_bal_`, `_bridge_`, `_dsteps_`, `_steps_`, `_wall_gate_`, `ex_velothi_temple_01`, `ex_velothi_temple_02`). Other `x/` models get plates when the convex fill closes more than a step. | RCN or visual for every model; `NCC` solid |
+| `world_scenery.py` / `prepare_world_scenery.py` | open-world scenery | the rule | RCN or visual; `NCC` solid |
+| `prepare_scenery.py` main, `prepare_mesh_bsp.py` main | Seyda Neen scenery | the rule | RCN only for `ex_de_ship` and `siltstrider`; every other model visual |
+| `prepare_area.py` `build_room` (`interior_visual_profile`) | Seyda Neen rooms, Balmora interiors (`prepare_balmora_interiors.py`), town interiors and CHIM rooms (`town_interiors.py`, `chim_rooms.py`) | the rule; plates (exact bevels in Balmora) for `meshes/i/`; rocks and boulders convex | RCN only for `meshes/i/`; furniture, doors, lights, containers and `x/` pieces visual |
+| `prepare_census.py` | Census and Excise Office | the rule; `meshes/i/` RCN required, plates | other models visual |
+| `prepare_interior.py` | Imperial prison ship | the rule; `in_prison_ship` RCN required, plates | other models visual |
+| `prepare_original_door_overlay.py`, `prepare_tree_sprites.py`, estimators | doors, flora, world estimate | the rule (estimators: `collision_source.uses_authored`) | RCN or visual |
 
 All interior converters use the shared `collision_pieces`; they differ only in the profile they
-pass. Measured consequences (two bug reports):
+pass. The two bug reports this closes in source:
 
-- [COLLISION-RCN-SCOPE-32](bugs/COLLISION-RCN-SCOPE-32.md): models whose authored collision is
-  ignored. Seyda Neen exterior: 86 models, 376 placements. Balmora rooms: 94 models, 1,138
-  placements. Seyda rooms: 62 models, 416 placements. Their proxies are built from the visual
-  mesh: more clip nodes (below) and convex fills over treads and furniture tops. The steepest face
-  over a tread is 52-89 degrees on Seyda houses, the lighthouse, the town gate and room furniture.
-- [COLLISION-NC-FLAGS-32](bugs/COLLISION-NC-FLAGS-32.md): every NC/NCC model placed by the mesh
-  converters is solid: banners, tapestries, rugs, hooks, candles, ground flora in rooms, and the
-  Vivec banners and waterfalls. In Morrowind they do not block the player.
+- [COLLISION-RCN-SCOPE-32](bugs/COLLISION-RCN-SCOPE-32.md): models whose authored collision was
+  ignored (Seyda Neen scenery, every non-`i/` model in rooms). Measured on the v0.0.47 release
+  build's rooms and Seyda Neen scenery (below): Balmora rooms 1,805 of 3,408 placements change,
+  Seyda rooms 378 of 770, Vivec rooms 6,220 of 13,271, Seyda Neen scenery 1,568 of 2,789.
+- [COLLISION-NC-FLAGS-32](bugs/COLLISION-NC-FLAGS-32.md): `NCC` models were solid (the 667
+  tapestry, rug and plaque placements of the Balmora rooms, 74 in the Seyda rooms); `AvoidNode`
+  and empty `RootCollisionNode`s were not handled.
 
-## Stair collision method 1 (experimental)
+## Stair collision method 1 (the default)
 
-`--stair-collision-method 1` (default 0, today's method; CHIM-STAIR-COLLISION-MESH-47) builds a flight's collision
-from the movement rules instead of repairing convex pieces after the fact, and proves it by arithmetic instead of a
-walk (`tools/stair_mesh.py`):
+Stair collision method 1 (`--stair-collision-method 1`, CHIM-STAIR-COLLISION-MESH-47) is the default since
+v0.0.48-dev2 (decided for the project, 22 October 2026); `--stair-collision-method 0` keeps the method before (the
+convex pieces with the stair rules) for A/B. It builds a flight's collision from the movement rules instead of
+repairing convex pieces after the fact, and proves it by arithmetic instead of a walk (`tools/stair_mesh.py`):
 
 - flights are found from the drawn level faces: treads that meet in plan within 2.5 units (a bevelled nosing between
-  them) at a rise of 1 unit to a step (8.5 units: Morrowind's 34), three or more levels in a chain;
+  them) at a rise of 1 unit to a step (8.5 units: Morrowind's 34), three or more levels in a chain; a mesh with a
+  RootCollisionNode takes a drawn face as a tread only where that node holds something under it (the original
+  collides with it alone: a tree's roots are no flight; CHIM-STAIR-METHOD1-UNFIXED-48);
+- the flights, their stairway mesh and the check come from the mesh as drawn, before a visual recipe or detail
+  budget reduces it (the build's stair check reads it so); method 0's visible-tread rule keeps the reduced mesh;
 - a flight whose collision (its RootCollisionNode, else the drawn mesh, as the convex pieces make it) already passes
   the check keeps it;
 - otherwise it gets one ramp (the hull of its tread corners, the top through the nosings), or one solid block per
@@ -291,10 +323,38 @@ collision fails the check on 34 of them; the check agrees with the recorded walk
 points they covered. Method 1 changes 14 meshes (all their flights then pass; 13 failed before) at +11 % collision
 bytes on those meshes (+3 % without one rope bridge and one curved stair), keeps 72 as they are, and cannot yet fix
 11 (the ships, the shipwreck, the silt strider, an ashlander tent, Daedric ruins among them). Not tried in game yet.
-`tools/stair_mesh_survey.py RUN --out DIR` repeats the measurement. A build with method 1 converts those meshes with
-its own worker and unit kind (default builds keep their mesh units and keys), collects the check of every mesh into
-`chim-world/chim-stair-check.json` and its build summary, and fails on a mesh that fails it under the collision it
-ships with.
+`tools/stair_mesh_survey.py RUN --out DIR` repeats the measurement. Repeated on the v0.0.47 release build for the
+default switch (22 October 2026, read only): the same 1,380 meshes, 97 with 132 flights, and the same result (14
+changed, 72 kept, 11 not fixed). The new collision-source rule changes nothing there: CHIM models already read their
+RootCollisionNode, and none of the 48 `NCC` models has a flight.
+
+How a default build applies it:
+
+- **Per mesh.** The CHIM model builder counts each distinct mesh's flights as drawn (`stair_mesh.flight_unit`,
+  unit kind `stair-flights`, cached by content). Only the meshes with a flight are converted by method 1's own
+  worker and unit kind (`mesh-stair`). Every other mesh keeps the default worker, profile and unit key (method 1 is
+  method 0 exactly on a mesh without a flight), so the switch rebuilds the flight meshes only.
+- **The check.** The check of every flight mesh goes into `chim-world/chim-stair-check.json` and the build summary.
+  The build fails on a mesh that fails it under the collision it ships with, unless the mesh is on
+  `config/stair-check-known.json`: the 11 meshes method 1 cannot fix yet (the ship, the shipwreck, the silt
+  strider, an ashlander tent, two skewed Daedric ruins and a ruin entry, a shack, a tall house, a Hlaalu balcony and
+  `ex_hlaalu_dsteps_01`), one class, CHIM-STAIR-METHOD1-UNFIXED-48. They are reported (status `known`), never
+  dropped.
+- **The authored stair ramp stays a ramp** (`tools/authored_ramps.py`, `stair_mesh.keep_stair_ramps`). A ramp of
+  the collision mesh is a walkable face (normal z at least 0.69) more than 10 degrees from level. It belongs to a
+  staircase when its centre lies over a drawn flight. The check (plane arithmetic): just over every such ramp, the
+  collision must not be a face steeper than walkable, nor stand more than a step over it, where the authored
+  surfaces themselves are not. A convex piece that does either becomes the authored plates of its own triangles
+  (exact standing bevels), as the stair-plate rules do for a piece that invents a steep face. The plates are kept
+  only when the stair check is not worse with them. Measured on the v0.0.47 build: 74 CHIM meshes have stair ramps
+  in their RootCollisionNode, method 0 covers or steepens them on 14, and the guard repairs 12 (`ex_de_ship` is on
+  the known list; `ex_v_palace_steps_01` keeps its pieces because the plates failed its stair check). In the rooms
+  and the Seyda Neen scenery, 33 models with a RootCollisionNode have stair ramps (the Hlaalu, Velothi, common and
+  Vivec stair pieces among them). After the new source rule, none of the room stair pieces has a ramp covered or
+  steepened. The three that do are exterior meshes in the Seyda Neen scenery, all on the known list or repaired on
+  CHIM (`ex_de_ship`, `ex_de_shipwreck`, `ex_common_house_tall_02`). The room converters do not run method 1.
+  Applied to every walkable slope rather than to stair ramps only, the same repair would grow those meshes'
+  collision by 58 % (a rock by x120) for no staircase, so it stays on stair ramps.
 
 ## Cost of using the authored collision
 
@@ -319,7 +379,27 @@ Fighters Guild 196,200). That is far over the per-map budget, so "exact plates f
 not affordable on the legacy engine. Using the RCN as the source is cheaper than today everywhere
 it applies.
 
+Measured again for the default switch (v0.0.48-dev2), on the v0.0.47 release build's own exports,
+before (the rule before: profile opt-in, `NCC` solid) and after (the collision-source rule), same
+proxy rules and profiles as each converter passes, summed over placements:
+
+| Area | Placements | Changed | Clip nodes before | after |
+| --- | ---: | ---: | ---: | ---: |
+| Balmora rooms (43) | 3,408 | 1,805 | 507,527 | 285,836 (-44 %) |
+| Seyda Neen rooms (13 and Addamasartus) | 770 | 378 | 149,774 | 114,304 (-24 %) |
+| Vivec rooms | 13,271 | 6,220 | 4,302,819 | 3,569,324 (-17 %) |
+| Seyda Neen scenery | 2,789 | 1,568 | 344,060 | 93,495 (-73 %) |
+
+These differ from the 8 October table above because the baseline differs: there every model with
+an RCN was compared against its visual mesh; here today's converters (rooms already used the RCN
+for `meshes/i/`, and `NCO` was already nonsolid) against the rule. On the changed placements only:
+Balmora rooms 234,412 to 12,721 (-95 %), Seyda Neen scenery 329,641 to 79,076 (-76 %), in line with
+the earlier -54 % and -79 %. The CHIM exteriors do not change (they already read every RCN).
+
 ## Recommendations
+
+Status 22 October 2026: 1, 2 (for CHIM stairs, through stair collision method 1 and the
+authored-ramp rule) and 5 are in source for v0.0.48-dev2; 3 and 4 stand.
 
 1. **One collision-source rule for every converter.** Every mesh converter (towns, Seyda Neen,
    rooms, census, prison ship, world scenery, CHIM) should follow Morrowind:

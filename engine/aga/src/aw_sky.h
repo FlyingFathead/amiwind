@@ -24,6 +24,9 @@ const unsigned char *R_DayNightFogColours(void);
 extern int r_daylight;
 /* 0 switches lamp styles off (light gallery A/B); 1 by default. */
 extern int r_lamps;
+/* dbg campfires (aw_campfires, aw_guard_torch.c): 0 hides the exterior fire light (the placed models' light
+ * levels, r_surf.c, and the fire rows of the night lamps, aw_lamps.c) and the exterior static flames; 1 by default. */
+extern int r_campfires;
 /* Night window glow (aw_lamps.c fills, r_surf.c reads): the loaded map's
  * window-glass textures, lit like emissive glass while r_night_windows_on. */
 #define R_NIGHT_WINDOWS 32

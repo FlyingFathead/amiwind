@@ -70,6 +70,8 @@ def cut_candidate(variant, cut_over, keep_whole=CUT_KEEP_WHOLE):
     named by keep_whole."""
     if cut_over <= 0 or max(variant['hi'][0] - variant['lo'][0], variant['hi'][1] - variant['lo'][1]) <= cut_over:
         return False
+    if variant.get('over_budget'):
+        return False            # no whole image to cut: frame_input tiles it to fit (chim.budget_tiles)
     return not str(variant.get('name', '')).lower().startswith(tuple(p.lower() for p in keep_whole))
 
 
@@ -173,6 +175,14 @@ def hull_surface_table(path=HULL_SURFACE_TABLE):
     return {m.replace(chr(92), '/').casefold() for m in data['meshes']}
 
 
+def hull_surface_recipe_table(path=HULL_SURFACE_TABLE):
+    """{visual recipe: meshes} that keep their source surface only where a cell's visual recipe reduces them (config
+    recipe_meshes; CHIM-HULL-SURFACE-RESURVEY-48: ex_de_ship under the Telvanni coast recipe), source paths in lower
+    case."""
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    return {r: {m.replace(chr(92), '/').casefold() for m in ms} for r, ms in data.get('recipe_meshes', {}).items()}
+
+
 def hull_surface_known(path=HULL_SURFACE_TABLE):
     """The measured meshes the collision surface gate does not fail: still over a step with the rule (another converter
     path), each with its depth and reason (config known_over_step)."""
@@ -182,16 +192,22 @@ def hull_surface_known(path=HULL_SURFACE_TABLE):
 
 def hull_surface_unit(task):
     """How far a mesh's walkable collision surface lies outside its prepared convex pieces
-    (mesh_geometry.surface_loss_depth; a pool worker): task (archive path, scenery index record, pieces)."""
+    (mesh_geometry.surface_loss_depth; a pool worker): task (archive path, scenery index record, pieces[, removed]).
+    removed: the collision triangles stair collision method 1 replaced by its stairway mesh (lod
+    'stair_removed_triangles', stair_mesh.mesh_unit_stair): not walked, so not measured; the stair check is their gate
+    (CHIM-HULL-SURFACE-RESURVEY-48: the removed treads of ex_hlaalu_b_06 counted 64 units deep)."""
     from mesh_geometry import surface_loss_depth
     from mwad.scene import read_asset, unpack_geometry
-    archive, model, pieces = task
+    archive, model, pieces, *rest = task
+    removed = rest[0] if rest else ()
     if not pieces:
         return 0.
     with Path(archive).open('rb') as stream:
         v, f, _ = unpack_geometry(read_asset(stream, model.get('collision') or model))
-    return surface_loss_depth(np.array(v, float), np.array(f), [(np.asarray(p, float), None, i, e)
-                                                                 for p, _, i, e in pieces])
+    f = np.array(f)
+    if len(removed):
+        f = np.delete(f, np.asarray(removed, int), axis=0)
+    return surface_loss_depth(np.array(v, float), f, [(np.asarray(p, float), None, i, e) for p, _, i, e in pieces])
 
 
 def hull_surface_gate(area, models, prepared, mesh_fps, archive, mode, jobs, cache):
@@ -202,8 +218,9 @@ def hull_surface_gate(area, models, prepared, mesh_fps, archive, mode, jobs, cac
     method before, A/B tests) reports the meshes without failing."""
     from player_hull import STEP_HEIGHT
     order = sorted(prepared)
-    items = [(fingerprint('hull-surface', mesh_fps[mi], 'surface-loss-v1'),
-              (str(models[mi].get('_archive') or archive), models[mi], prepared[mi][3])) for mi in order]
+    items = [(fingerprint('hull-surface', mesh_fps[mi], 'surface-loss-v2'),
+              (str(models[mi].get('_archive') or archive), models[mi], prepared[mi][3],
+               tuple((prepared[mi][4] or {}).get('stair_removed_triangles', ())))) for mi in order]
     depths = run_units('hull-surface', items, hull_surface_unit, jobs, cache)
     # the visible-tread rule replaces an authored ramp over a visible flight by the flight on purpose
     # (mesh_geometry.clear_visible_treads): the ramp's surface is not walked, so it is not measured
@@ -296,7 +313,7 @@ def build_frame(out, **kw):
 def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_fps, texture_records,
                 archive, palette, heights, materials, step, floor, ceiling, ground_textures,
                 qbsp=None, collision_cache=None, jobs=1, cache=None, timer=None, settings=None,
-                mesh_occluders=True, ground=None, liquids=None, height_at=None):
+                mesh_occluders=True, ground=None, liquids=None, height_at=None, terrain_on=True):
     """Units of one frame from prepared inputs (shared by the area build and the tests): the frame
     input of chim.world.build_frames, plus 'fallbacks' (meshes whose collision union fell back).
 
@@ -312,6 +329,7 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     height_at (terrain references): the ground height at any frame-local corner, also one tile past the
     frame, so a chunk at the frame's edge gets the whole ring of its standing hull and the same content as
     the same ground inside a neighbouring frame.
+    terrain_on=False (a CHIM room, chim.interior): no ground at all; the models, textures and placements only.
     Returns the receipt."""
     from chim.models import texture_unit, variant_ref, variant_unit, yaw_degrees, depth_compile_candidate
     timer = timer or Timer()
@@ -429,6 +447,7 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                 task['placed'] = True
                 fp = fingerprint('variant-placed', fp, 'piece-table-1')
             items.append((fp, task))
+        from chim.budget_tiles import run_fitting
         if any('bevel_tolerance' in t for _, t in items):
             from chim.bevels import variant_unit_bevels
             results = run_units('variant-bevels', items, variant_unit_bevels, jobs, cache)
@@ -437,12 +456,40 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
             for kind, run in (('variant', variant_unit), ('variant-placed', placed.variant_unit_placed)):
                 at = [i for i, (_, t) in enumerate(items) if bool(t.get('placed')) == (kind == 'variant-placed')]
                 if at:
-                    for i, res in zip(at, run_units(kind, [items[i] for i in at], run, jobs, cache)):
+                    for i, res in zip(at, run_fitting(run_units, kind, [items[i] for i in at], run, jobs, cache,
+                                                      _log)):
                         results[i] = res
         else:
-            results = run_units('variant', items, variant_unit, jobs, cache)
+            results = run_fitting(run_units, 'variant', items, variant_unit, jobs, cache, _log)
         variant_fps = {k: fp for k, (fp, _) in zip(order, items)}
         variant_tasks = {k: task for k, (_, task) in zip(order, items)}
+    # A model one brush image cannot hold (chim.budget_tiles: Akulakhan's cave shell, 6,281 collision plates and
+    # 162,975 standing clipnodes against 65,520; CHIM-ROOM-CLIPNODE-BUDGET-48) is stored as tiles of its own frame,
+    # whatever the cut settings: the frame's grain, halved until every tile fits. Every piece and face goes whole to
+    # one tile, so what is drawn and what is solid do not change. Models that fit keep their units and keys.
+    budget_tiled, over_budget = {}, {}
+    over = [i for i, res in enumerate(results) if res.get('over_budget')]
+    if over:
+        from chim.budget_tiles import TILE_MIN, budget_tile_unit, budget_tile_unit_placed, whole_of
+        with timer.section('over-budget model tiles'):
+            g0 = (settings or {}).get('grain', 256)
+            tile_items = []
+            for i in over:
+                task = dict(items[i][1], grain=g0)
+                for key in ('qbsp', 'collision_cache', 'terrain_clip'):
+                    task.pop(key, None)
+                kind = 'tiles-budget-placed' if task.get('placed') else 'tiles-budget'
+                tile_items.append((kind, fingerprint(kind, items[i][0], g0, TILE_MIN), task))
+            for kind, run in (('tiles-budget', budget_tile_unit), ('tiles-budget-placed', budget_tile_unit_placed)):
+                at = [j for j, item in enumerate(tile_items) if item[0] == kind]
+                if at:
+                    for j, (grain, tiles) in zip(at, run_units(kind, [tile_items[j][1:] for j in at], run, jobs,
+                                                               cache)):
+                        i = over[j]
+                        lo, hi, mats = whole_of(tiles)
+                        budget_tiled[order[i]] = (grain, tiles)
+                        results[i] = dict(results[i], lo=lo, hi=hi, materials=mats, texture_keys=[],
+                                          pieces=len(prepared[firsts[order[i]]['model_index']][3]))
     variants, names, fallbacks, routed, checks, reasons = {}, set(), [], [], [], {}
     for k, res in zip(order, results):
         model = models[firsts[k]['model_index']]
@@ -517,13 +564,15 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                 turn = placed.quake_angles(ref) if shared(ref) else (0.0, yaw_degrees(ref), 0.0)
                 tops.append(placed.placed_box(o, turn, v['lo'], v['hi'])[1][2])
         top = max(tops) if tops else None
-    ceiling = frame_ceiling(frame_ground_zmax(heights, ground, liquids, WATER_LEVEL), top, ceiling)
+    if terrain_on:
+        ceiling = frame_ceiling(frame_ground_zmax(heights, ground, liquids, WATER_LEVEL), top, ceiling)
     with timer.section('chunk terrain'):
         nx, ny = int(frame['span'][0] // g), int(frame['span'][1] // g)
         per = int(g // step)
         if per * step != g:
             raise ValueError('Chunk grain must be a whole number of terrain tiles')
-        chunks = [(cx, cy) for cx in range(nx) for cy in range(ny)]
+        # a CHIM room has no ground (chim.interior): no chunk, no terrain unit
+        chunks = [(cx, cy) for cx in range(nx) for cy in range(ny)] if terrain_on else []
         items = []
         refs = terrain_refs_on(settings)
         outer_ring = []                 # chunks whose standing hull ring reaches past the frame (height_at)
@@ -600,6 +649,16 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     cut_mode = (settings or {}).get('cut_mode', 'tiles')
     keep_whole = tuple((settings or {}).get('cut_keep_whole', CUT_KEEP_WHOLE))
     cuts, tiled = {}, {}
+    # the tiles of a model over the image budget (chim.budget_tiles, above): placed like the large-model cut's tiles
+    for k, (grain, tiles) in budget_tiled.items():
+        tiled[k] = tiles
+        for t in tiles:
+            variants[('tile', k, *t['tile'])] = dict(t, name='%s@tile%d,%d' % (variants[k]['name'], *t['tile']),
+                                                     collision_fallback=None)
+        over_budget[variants[k]['name']] = {'error': variants[k]['over_budget'], 'pieces': variants[k]['pieces'],
+                                            'grain': grain, 'tiles': len(tiles)}
+        _log('model over the image budget stored as %d tiles at grain %g: %s (%s)' % (
+            len(tiles), grain, variants[k]['name'], variants[k]['over_budget']))
     if cut_over > 0 and cut_mode == 'tiles':
         # the model is cut once in its own frame; every placement of it places the shared tiles
         from chim.cut import tile_unit
@@ -694,6 +753,7 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
     return {'frame': frame, 'placements': placements, 'variants': variants, 'textures': textures,
             'terrain': terrain, 'fallbacks': sorted(set(fallbacks)),
             'fallback_reasons': dict(sorted(reasons.items())), 'routed_hulls': sorted(set(routed)),
+            'over_budget_tiles': over_budget,
             'outer_ring_chunks': outer_ring, 'hull_checks': checks,
             'visibility': ({'heights': heights, 'step': step, 'low': tuple(low), 'mesh_occluders': mesh_occluders}
                            if ground is None else
@@ -1551,15 +1611,23 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     from mesh_geometry_env import hull_points_mode
     hull_points = hull_points_mode()
     hull_surface_meshes = hull_surface_table() if hull_points in ('table', 'table-whole') else set()
+    hull_surface_recipes = hull_surface_recipe_table() if hull_points in ('table', 'table-whole') else {}
     from stair_collision_env import stair_collision_method
     stair_collision = stair_collision_method()
-    # stair collision method 1: its own unit kind and worker (stair_mesh.mesh_unit_stair); default builds keep the
-    # mesh units, worker and code keys they had (CHIM-STAIR-COLLISION-MESH-47)
-    mesh_kind = 'mesh-stair' if stair_collision == '1' else 'mesh'
-    if mesh_kind == 'mesh-stair':
-        from stair_mesh import mesh_unit_stair as mesh_worker
-    else:
-        mesh_worker = mesh_unit
+    # stair collision method 1 (the default since v0.0.48-dev2; CHIM-STAIR-COLLISION-MESH-47): the meshes that hold a
+    # flight of stairs as drawn (stair_mesh.flight_unit, one cached unit per distinct mesh) are converted by its own
+    # worker and unit kind (stair_mesh.mesh_unit_stair, 'mesh-stair'); every other mesh keeps the default worker,
+    # profile and key (method 1 is method 0 exactly on a mesh without a flight), so only the flight meshes rebuild
+    flight_meshes = set()
+    if stair_collision == '1':
+        from stair_mesh import flight_unit
+        solid = [mi for mi, model in enumerate(index['models'])
+                 if (model.get('source_collision') or {}).get('mode') != 'nonsolid']
+        with timer.section('stair flights'):
+            counts = run_units('stair-flights', [(fingerprint('stair-flights', canonical_model(
+                index['models'][mi], index['textures'])), (index['models'][mi], str(archive))) for mi in solid],
+                flight_unit, jobs, cache)
+        flight_meshes = {mi for mi, n in zip(solid, counts) if n}
     for mi, model in enumerate(index['models']):
         profile = town_model_profile(group[model['source']], model['source'], model['triangles'],
                                      underpass_names=underside == 'names')
@@ -1569,11 +1637,15 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         # collision over the visible stair treads (and architecture's walkways) checked against the mesh as drawn
         # (mesh_geometry.clear_visible_treads, CHIM-STAIR-STEPS-SOLID-43)
         profile['visible_treads'] = True
-        if stair_collision == '1':
-            # stair collision method 1 (default off): a stairway collision mesh per flight that fails the geometric
-            # stair check (tools/stair_mesh.py, CHIM-STAIR-COLLISION-MESH-47); method 0 leaves the profile as it was
+        if mi in flight_meshes:
+            # stair collision method 1 (the default): a stairway collision mesh per flight that fails the geometric
+            # stair check (tools/stair_mesh.py, CHIM-STAIR-COLLISION-MESH-47); method 0, and every mesh without a
+            # flight, leaves the profile as it was
             profile['stair_collision'] = 'mesh'
-        if hull_points == 'all' or model['source'].replace(chr(92), '/').casefold() in hull_surface_meshes:
+        source_key = model['source'].replace(chr(92), '/').casefold()
+        if (hull_points == 'all' or source_key in hull_surface_meshes
+                or source_key in hull_surface_recipes.get(model.get('_visual_recipe', recipe_name) or '', ())):
+            # (a mesh listed for one visual recipe only: the cells of that recipe, CHIM-HULL-SURFACE-RESURVEY-48)
             # a convex piece keeps all its points when the reduced hull lies under its source surface (a dock walkway
             # sank the player 19 units into its planks, mesh_geometry.collision_parts, CHIM-VIVEC-DOCK-WALKWAY-43);
             # the measured table by default (config/collision-hull-surface.json: only these meshes change)
@@ -1609,12 +1681,19 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
             profile = apply_recipe(profile, model, everywhere, recipes)
         model['_profile'] = profile
         profiles[model['source']] = profile
-        fp = mesh_fingerprint(model, profile, index['textures'], mesh_kind)
+        fp = mesh_fingerprint(model, profile, index['textures'], 'mesh-stair' if mi in flight_meshes else 'mesh')
         if model['source'] in rebuild_meshes:
             fp = fingerprint('mesh', fp, 'rebuild', time.time_ns())
         items.append((fp, (mi, model, profile, archive, index['textures'])))
     with timer.section('meshes'):
-        prepared = dict(enumerate(run_units(mesh_kind, items, mesh_worker, jobs, cache)))
+        prepared = {}
+        plain = [mi for mi in range(len(items)) if mi not in flight_meshes]
+        prepared.update(zip(plain, run_units('mesh', [items[mi] for mi in plain], mesh_unit, jobs, cache)))
+        if flight_meshes:
+            from stair_mesh import mesh_unit_stair
+            stairs = sorted(flight_meshes)
+            prepared.update(zip(stairs, run_units('mesh-stair', [items[mi] for mi in stairs], mesh_unit_stair, jobs,
+                                                  cache)))
     mesh_fps = mesh_result_keys(items, prepared, range(len(items)))
     with timer.section('collision surface gate'):
         hull_surface_gate(town, index['models'], prepared, mesh_fps, archive, hull_points, jobs, cache)

@@ -68,6 +68,20 @@ def check_core(row):
                          f"the wide coordinate range (CHIM-FRAME-COORD-RANGE-33): split the frame or move its origin")
 
 
+def room_batch_lines(root=None):
+    """The batch rooms (config/room-batches.json, tools/room_batches.py engine_rows): map names and titles by id, their
+    save IDs from AW_ROOM_BATCH_BASE (aw_maps.h); a room a town or scene list holds keeps its own name there ("")."""
+    from room_batches import engine_rows, load
+    doc = load(root)
+    table = engine_rows(doc, root) if doc else []
+    if len(table) >= 4096:
+        raise ValueError('The room list has ids past 4095: AW_ROOM_BATCH_BASE holds 4096 rooms')
+    return ['/* Batch rooms (config/room-batches.json) by id: "" for an id held by a town or scene list. */',
+            f'#define AW_ROOM_BATCH_COUNT {len(table)}',
+            *c_list('AW_ROOM_BATCH_NAMES', [c_string(m) for m, _ in table] or ['""'], 8),
+            *c_list('AW_ROOM_BATCH_TITLES', [c_string(t) for _, t in table] or ['""'], 1)]
+
+
 def render_header(root=None):
     rows = runtime_towns(root)
     for r in rows:
@@ -94,6 +108,7 @@ def render_header(root=None):
         *c_list('AW_TOWN_INTERIOR_TITLES', [c_string(r['title']) for r in rooms] or ['""'], 1),
         '/* Town row (AW_Town index) whose door bank leads into each interior. */',
         *c_list('AW_TOWN_INTERIOR_TOWNS', [str(ids.index(r['town'])) for r in rooms] or ['0'], 32),
+        *room_batch_lines(root),
         '/* name,title,prefix,regions,travel_npc,travel_target,region_cap,draw_distance,',
         '   world_slot,flags,travel_return,handoff,origin[3],core[4] */',
         '#define AW_TOWN_ROWS {\\',

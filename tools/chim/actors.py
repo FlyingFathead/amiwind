@@ -267,7 +267,10 @@ def built_actors(maps, frame_centres):
     frame_centres: {frame cell: frame centre in Morrowind units} (the CHIM world's frame files). Intro roles are
     left out (the opening's own actors, not world state)."""
     out = {}
-    for path in sorted(Path(maps).glob('*.chim')):
+    from map_files import frame_maps
+    # the frame maps by their key, whatever their extension; a CHIM room map (an interior: its residents are not
+    # exterior actors) is not one (IMAGE-ROOM-MAPS-LATE-PASSES-48 sweep)
+    for path in frame_maps(maps):
         rows = map_entities(path)
         world = next((r for r in rows if r.get('classname') == 'worldspawn'), {})
         if '_chim_frame' not in world:
@@ -531,19 +534,26 @@ def frame_centres(chim_root):
     return out
 
 
-def write_table(path, master_path, maps, chim_root=None, library=None):
+def master_tables(master_path):
+    """What the table takes from the master alone: (exterior actors, levelled lists, creature ids, exterior scales).
+    About 5 s on one core; the image step works it out beside its finalize checks and hands it to write_table
+    (BUILD-IMAGE-FINALIZE-UNDERUSED-48)."""
+    master = Path(master_path).read_bytes()
+    return exterior_actors(master), levelled_lists(master), creature_ids(master), exterior_scales(master)
+
+
+def write_table(path, master_path, maps, chim_root=None, library=None, tables=None):
     """Write the table for an image (version 2, or 3 with instance scales): the game data's exterior actors, the built rows of the frame maps in
     MAPS (positions and bases as placed there) and the levelled creature lists the exterior uses; LIBRARY (a creature
     library manifest, tools/creature_library.py, or {record id: base text}: tools/actor_library.py install) gives
-    creature and NPC bases their model. Returns the report."""
-    master = Path(master_path).read_bytes()
-    refs = exterior_actors(master)
+    creature and NPC bases their model. TABLES: master_tables(MASTER_PATH), when worked out already. Returns the
+    report."""
+    refs, levelled, creatures, scales = master_tables(master_path) if tables is None else tables
     built = built_actors(maps, frame_centres(chim_root) if chim_root else {})
     if library is not None and not isinstance(library, dict):
         from creature_library import base_texts
         library = base_texts(library)
-    data, report = build_table(refs, built, levelled_lists(master), creature_ids(master), library,
-                               exterior_scales(master))
+    data, report = build_table(refs, built, levelled, creatures, library, scales)
     Path(path).write_bytes(data)
     return report
 

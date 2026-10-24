@@ -111,6 +111,21 @@ class StagedMapOptimizerTests(unittest.TestCase):
             report = json.loads((root/'receipt.json').read_text())
             self.assertEqual(report['rollback'], 'originals preserved/restored')
 
+    def test_chim_room_maps_join_the_receipt_unchanged(self):
+        # IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48: maps/<room>.chim (written by the CHIM rooms install) is never
+        # optimized, yet the final gates bind to it: it joins the receipt with input = output
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root);maps = root/'maps';maps.mkdir()
+            (maps/'a.bsp').write_bytes(repeated_geometry())
+            room = repeated_geometry();(maps/'room.chim').write_bytes(room)
+            with patch('map_files.is_chim_room', lambda p: Path(p).name == 'room.chim'):
+                report = optimize_maps(maps, root/'receipt.json')
+            rows = {r['map']: r for r in report['maps']}
+            self.assertEqual(rows['room.chim']['not_optimized'], 'CHIM room map')
+            self.assertEqual(rows['room.chim']['output_sha256'], hashlib.sha256(room).hexdigest())
+            self.assertEqual((maps/'room.chim').read_bytes(), room)
+            verify_optimized_maps(maps, report)
+
     def test_idempotence_final_gate_binding_and_late_mutation_rejected(self):
         with tempfile.TemporaryDirectory() as root:
             root = Path(root);maps = root/'maps';maps.mkdir()

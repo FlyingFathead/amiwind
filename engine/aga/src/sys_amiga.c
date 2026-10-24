@@ -258,16 +258,40 @@ void Sys_LowFPPrecision (void)
 /* The game heap (Quake's Hunk). The builder's --heap-mb N sets it through the
  * generated amiwind_heap.h; the start argument -heapmb N overrides it for one
  * start. Both are used exactly as asked; above AMIWIND_HEAP_SAFE_MB, the
- * largest size measured to run the whole game on the 16 MiB Fast RAM
- * profile, the start says so and goes on. */
+ * largest size tested on the 16 MiB Fast RAM baseline (the least that
+ * starts), the start says so and goes on. The whole game needs 32 MiB of Fast
+ * RAM, the safe minimum (RAM-REQUIREMENT-32MB-48); more is used automatically
+ * (aw_heapsize.c, chim_world.c). */
 #include "amiwind_heap.h"
 #include "aw_heapsize.h"
 #ifndef AMIWIND_HEAP_MB
-/* Expanded starting area plus renderer and actor cache, within the existing
- * 16 MiB Fast RAM playtest profile. Chip RAM remains reserved for hardware. */
+/* Expanded starting area plus renderer and actor cache, within the 16 MiB
+ * Fast RAM baseline. Chip RAM remains reserved for hardware. */
 #define AMIWIND_HEAP_MB 11
 #endif
 #define AMIWIND_HEAP_SAFE_MB 11
+
+/* Fast RAM under the safe minimum (AW_FAST_RAM_SAFE_MB, generated): the size
+ * found in whole MB (Exec's slack counted, as the boot check does), 0 when
+ * there is enough. The boot check already showed the note and counted down
+ * (ENTER skips); the engine says it again without a wait: on the CLI before the heap,
+ * on the console after Host_Init and on the startup logo (aw_movie.c). */
+static long aw_fast_ram_short_mb;
+extern char aw_fast_ram_screen[256];
+extern long aw_fast_ram_found_mb;
+
+static void Sys_FastRamNote(void) {
+    char line[320];
+    unsigned long kib = (unsigned long)AvailMem(MEMF_FAST|(1L<<19)) / 1024UL;
+    if (kib >= (unsigned long)(AW_FAST_RAM_SAFE_MB*1024L - AW_FAST_RAM_SLACK_KIB))
+        return;
+    aw_fast_ram_short_mb = (long)((kib + AW_FAST_RAM_SLACK_KIB) / 1024UL);
+    /* aw_scene.c: CHIM rooms marked for 32 MB are refused at their door (CHIM-ROOM-16MB-REFUSAL-48) */
+    aw_fast_ram_found_mb = aw_fast_ram_short_mb > 0 ? aw_fast_ram_short_mb : 1;
+    sprintf(line, AW_FAST_RAM_NOTE "\n", aw_fast_ram_short_mb);
+    PutStr(line);
+    snprintf(aw_fast_ram_screen, sizeof(aw_fast_ram_screen), AW_FAST_RAM_SCREEN, aw_fast_ram_short_mb);
+}
 
 /* -heapmb N from the start arguments (before COM_InitArgv, which runs after the
  * heap is allocated); 0 when absent or not a number from 1 to 2047. */
@@ -292,7 +316,7 @@ static int Sys_HeapArgument(int argc, char **argv) {
  * the console once it runs; 0: the built size or -heapmb. */
 static int aw_heap_grown;
 
-/* config.cfg's aw_autoram 0 (Options > Extra RAM: Off) keeps the built heap. */
+/* config.cfg's aw_autoram 0 (Options > Video > Extra RAM: Off) keeps the built heap. */
 static int Sys_AutoRamOff(void) {
     static char text[8192];
     FILE *f = fopen("PROGDIR:id1/config.cfg", "rb");
@@ -308,6 +332,7 @@ static int Sys_AutoRamOff(void) {
 static void Sys_Init(int heap_mb) {
     char line[200];
 
+    Sys_FastRamNote();
     // Allocate memory.
     if (heap_mb <= 0)
         heap_mb = AW_HeapAuto(AMIWIND_HEAP_MB, 0, AvailMem(MEMF_FAST|MEMF_LARGEST),
@@ -318,7 +343,7 @@ static void Sys_Init(int heap_mb) {
         PutStr(line);
     }
     else if (heap_mb > AMIWIND_HEAP_SAFE_MB) {
-        sprintf(line, "AmiWind: WARNING: game heap %d MiB is above the %d MiB measured to run the whole game on 16 MiB Fast RAM; starting as asked.\n",
+        sprintf(line, "AmiWind: WARNING: game heap %d MiB is above the %d MiB tested on the 16 MiB Fast RAM baseline; starting as asked.\n",
                 heap_mb, AMIWIND_HEAP_SAFE_MB);
         PutStr(line);
     }
@@ -332,7 +357,7 @@ static void Sys_Init(int heap_mb) {
     aw_heap_allocation = AllocMem(aw_heap_allocation_size, MEMF_FAST|MEMF_PUBLIC);
     if (!aw_heap_allocation) {
         sprintf(line, "AmiWind: cannot allocate the %d MiB game heap in Fast RAM.\n"
-                "Use more Fast RAM (16 MiB or more for the 11 MiB heap), or a smaller -heapmb, then reboot.\n", heap_mb);
+                "Use more Fast RAM (32 MiB, the safe minimum for the whole game), or a smaller -heapmb, then reboot.\n", heap_mb);
         PutStr(line);
         AW_PlatformClose();
         exit(EXIT_FAILURE);
@@ -673,6 +698,8 @@ int main(int argc, char *argv[]) {
     quakeparms.argc = com_argc;
     quakeparms.argv = com_argv;
     Host_Init(&quakeparms);
+    if (aw_fast_ram_short_mb)
+        Con_Printf(AW_FAST_RAM_NOTE "\n", aw_fast_ram_short_mb);
     if (aw_heap_grown)
         Con_Printf("Memory: game heap %ld MiB, grown from the built %ld MiB into spare Fast RAM (-heapmb N sets it)\n",
                    (long)(quakeparms.memsize/1048576), (long)AMIWIND_HEAP_MB);

@@ -1,6 +1,7 @@
 {
   "format": "AmiWind heap bypass 1",
-  "comment": "Temporary pre-CHIM bypass of the strict world-map heap gate: a temporary bypass for the legacy builder, removed when Seyda Neen moves to CHIM (milestone M2). Only modelled reserve-allowance failures of these exact maps (name and SHA-256) are bypassed; the allocation ceiling and every other map stay strict. tools/build_aga.py apply_map_budget_policy; HEAP-SEYDA-OVERLAP-32.",
+  "retired": "23 October 2026 (v0.0.48, BUILD-STALE-BSP-CONFIG-48): milestone M2 is reached, Seyda Neen is CHIM-native since v0.0.36 and no default build makes or ships a Seyda Neen region map, so no build meets these entries. They match only the recorded v0.0.31 maps by SHA-256, with --builder legacy and the retired --seyda-recorded: kept for that historical A/B path (no method is deleted), never used by a default build.",
+  "comment":"Temporary pre-CHIM bypass of the strict world-map heap gate: a temporary bypass for the legacy builder, removed when Seyda Neen moves to CHIM (milestone M2). Only modelled reserve-allowance failures of these exact maps (name and SHA-256) are bypassed; the allocation ceiling and every other map stay strict. tools/build_aga.py apply_map_budget_policy; HEAP-SEYDA-OVERLAP-32.",
   "temporary_pre_chim_heap_bypass": [
     {
       "map": "sn019.bsp",

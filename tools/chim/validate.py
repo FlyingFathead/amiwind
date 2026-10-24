@@ -596,6 +596,12 @@ def _read_frames_task(task):
     return out
 
 
+def _terrain_records_task(datas):
+    """Worker of load_world: the terrain image of each TERR record's data (_terrain_image, as the parent decoded it
+    for each chunk that references the record)."""
+    return [_terrain_image(data, 0)[0] for data in datas]
+
+
 def load_world(out, fails, jobs=1):
     """World format 0.8 (EXPERIMENTAL) is read too (chim.placed widens chim.format's versions when imported).
     Read every file of a CHIM world and check the file structure: the index lists exactly the
@@ -665,6 +671,7 @@ def load_world(out, fails, jobs=1):
         lean = [{k: f[k] for k in ('path', 'kind', 'cell', 'sector', 'entries')} for f in files]
         size = max(1, -(-len(fram_rows) // (4 * jobs)))
         groups = [fram_rows[k:k + size] for k in range(0, len(fram_rows), size)]
+        wanted = {}               # (file row, offset) of a terrain record -> the chunks that reference it
         for found in ordered_map(_read_frames_task, [(str(root), group, lean) for group in groups],
                                  min(jobs, len(groups)), cost=lambda t: sum(t[2][r]['entries'] for r in t[1])):
             for found_fails, frame_row, used, refs in found:
@@ -674,8 +681,28 @@ def load_world(out, fails, jobs=1):
                     continue
                 for c in frame_row[2]:
                     if c['index'] in refs:
-                        c['terrain_record'] = _terrain_image(records[refs[c['index']]]['data'], 0)[0]
+                        wanted.setdefault(refs[c['index']], []).append(c)
                 frames.append(frame_row)
+        # each referenced terrain record decoded once, on the workers (the parent decoded it again for every chunk
+        # that references it, 305,568 decodes of 97,369 records on one core: about 4.5 of the 7.8 minutes the
+        # v0.0.48-dev2 validation took on 2.1 of 13.8 cores, BUILD-POOL-TINY-UNITS-48); chunks sharing a record
+        # share its bytes. The same bytes as before (_terrain_image of the record, as _read_frames_task leaves out).
+        for k in [k for k in wanted if bytes(records[k]['data'][:4]) not in (b'THG1', b'TRC1')]:
+            image = _terrain_image(records[k]['data'], 0)[0]       # a plain record is its own image
+            for c in wanted.pop(k):
+                c['terrain_record'] = image
+        keys = sorted(wanted)
+        step = max(1, -(-len(keys) // (4 * jobs)))
+        batches = [[records[k]['data'] for k in keys[at:at + step]] for at in range(0, len(keys), step)]
+        decoded = [image for batch in ordered_map(_terrain_records_task, batches, min(jobs, len(batches)) or 1,
+                                                  cost=lambda b: sum(len(d) for d in b))
+                   for image in batch]
+        if len(decoded) != len(keys):
+            raise ValueError('CHIM world: %d of %d terrain records decoded' % (len(decoded), len(keys)))
+        for k, image in zip(keys, decoded):
+            for c in wanted[k]:
+                c['terrain_record'] = image
+        del wanted, batches, decoded
     else:
         def sector_of(cell, si):
             sec = sectors.get((cell, si))
@@ -1651,10 +1678,12 @@ def visibility_report(world, jobs=1):
             'faces_share_of_chunk_rows': round(sum(pvl_faces) / sum(entity_faces), 4) if sum(entity_faces) else None}}
 
 
-def camera_report(world, cameras):
+def camera_report(world, cameras, model_faces=None):
     """Per camera (name, Morrowind x, y): placements and model faces the views would send:
-    every placement of the ring, the chunk rows' placements, and the placement list."""
-    model_faces = [len(F.read_brush_image(m['image'])[7]) // 20 for m in world['models']]
+    every placement of the ring, the chunk rows' placements, and the placement list. MODEL_FACES: each model's faces
+    when the caller has them (chim.stats: made once on the worker pool, BUILD-STATS-SERIAL-36)."""
+    if model_faces is None:
+        model_faces = [len(F.read_brush_image(m['image'])[7]) // 20 for m in world['models']]
     record_of = {r['pid']: r for c in world['chunks'] for r in c['owned']}
     out = []
     for name, x, y in cameras:

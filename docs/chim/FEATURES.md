@@ -1,12 +1,12 @@
 # CHIM feature tracker
 
-_Generated from `docs/chim/features.json` with AmiWind v0.0.48-dev1._
+_Generated from `docs/chim/features.json` with AmiWind v0.0.48._
 
 <!-- Generated whole by tools/chim_features.py render from docs/chim/features.json; do not edit by hand. -->
 
 What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, where it stands, the gain that was measured (what was compared, how and when) and how Quake's visibility culling still works with it. Generated from [`features.json`](features.json); a test fails when this page is stale. Bugs are on the [CHIM bug tracker](../bugs/CHIM_TRACKER.md); ideas and held-back work are collected in [CHIM ideas](IDEAS.md). How far the open world has been converted, cell by cell, is on the [CHIM cell tracker](CELL_TRACKER.md).
 
-CHIM version: 0.2.1. 42 features: 21 shipped, 1 in this release, 15 in progress, 3 planned, 2 ideas. Updated 21 October 2026.
+CHIM version: 0.2.2. 45 features: 21 shipped, 1 in this release, 19 in progress, 3 planned, 1 ideas. Updated 23 October 2026.
 
 ## What CHIM has done so far
 
@@ -29,17 +29,17 @@ The headline measured gains. Each links to its feature, which says what was comp
 - **Extra Fast RAM as CHIM cache, automatic:** 128 MiB against 16 MiB Fast RAM, two sessions each: failed zone loads 625-655 (Seyda Neen) and 288-312 (Ebonheart plaza) to 0, evictions on a 58 s flight 487-550 to 0; frame time unchanged within drift. *emulator, relative, quiet host, 17 October 2026.* [Details](#extra-fast-ram-as-chim-cache-automatic)
 - **Cells ahead read into spare Fast RAM:** Open-world cell crossings: median 452 ms to 209-223 ms, worst 724 ms to 477-498 ms; seconds with a frame of 300 ms or more 11 to 2-3 of 178; a four-cell corner 426 ms to 146-239 ms; one heavy crossing (cells 10,0 to 11,0) 598 ms to 245 ms. *emulator, relative, busy host, 18 October 2026.* [Details](#cells-ahead-read-into-spare-fast-ram)
 
-Several features also have a cost, listed under their caveats: CHIM leaves less of the Hunk free at the load peak, spends more time outside the 3D view and draws slightly more spans. Each shipped feature names the CHIM version it came with; the features marked "in this release" are in the development line of CHIM 0.2.1, not yet published.
+Several features also have a cost, listed under their caveats: CHIM leaves less of the Hunk free at the load peak, spends more time outside the 3D view and draws slightly more spans. Each shipped feature names the CHIM version it came with; the features marked "in this release" are in the development line of CHIM 0.2.2, not yet published.
 
 ## Features by status
 
 | Status | Meaning | Features |
 | --- | --- | --- |
 | Shipped | in a published release | 21 |
-| In this release (CHIM 0.2.1) | in the line that becomes the next release; not yet published | 1 |
-| In progress | being built or measured; not finished | 15 |
+| In this release (CHIM 0.2.2) | in the line that becomes the next release; not yet published | 1 |
+| In progress | being built or measured; not finished | 19 |
 | Planned | decided; no finished design or code | 3 |
-| Idea | written down, not decided | 2 |
+| Idea | written down, not decided | 1 |
 
 ### Shipped
 
@@ -67,11 +67,11 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | [Statics and flora sprites streamed with their chunks](#statics-and-flora-sprites-streamed-with-their-chunks) | Streaming and memory | The frame map tags its static models and flora sprites with their chunk; the engine loads and links them when the chunk joins the ring and frees them when it leaves, instead of holding all of them in the map's fixed cost in the Hunk. | Seyda Neen Hunk gap 1.1 MB to 2.1 MB |
 | [--heap-mb builder option](#--heap-mb-builder-option) | Builder and tools | A builder option like --jobs: the map heap in MiB, exact, default 11; beyond the safe profile it prints one loud warning and runs anyway, and every gate uses the build's own value. | not measured |
 
-### In this release (CHIM 0.2.1)
+### In this release (CHIM 0.2.2)
 
 | Feature | Area | What it does | Measured gain |
 | --- | --- | --- | --- |
-| [Extra Fast RAM as CHIM cache, automatic](#extra-fast-ram-as-chim-cache-automatic) | Streaming and memory | At start-up the free Fast RAM beyond a margin (2 MiB plus an eighth of all Fast RAM) becomes CHIM zone banks that survive map changes, one per memory region, each under 2 GiB, no other upper limit; the look-ahead grows with it. 16 MiB takes nothing. A startup notice (M skips), Options > Extra RAM and -chimcache override it. | zone failures and evictions to 0 at 128 MiB |
+| [Extra Fast RAM as CHIM cache, automatic](#extra-fast-ram-as-chim-cache-automatic) | Streaming and memory | At start-up the free Fast RAM beyond a margin (2 MiB plus an eighth of all Fast RAM) becomes CHIM zone banks that survive map changes, one per memory region, each under 2 GiB, no other upper limit; the look-ahead grows with it. 16 MiB takes nothing. A startup notice (M skips), Options > Video > Extra RAM and -chimcache override it. | zone failures and evictions to 0 at 128 MiB |
 
 ### In progress
 
@@ -79,14 +79,18 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | --- | --- | --- | --- |
 | [Crossings without a level change (type 1)](#crossings-without-a-level-change-type-1) | Streaming and memory | The region frames around the player run as one window in one frame world, so walking from one cell into the next streams instead of restarting the level. The builder's default since v0.0.47 (decided for the project, 2026-10-21): chim crossing 1 in the game's start-up settings; chim crossing 0 gives type 0 back. Towns, doors and saves keep the level change. | not like for like: type 1 creates no entities yet |
 | [Modular NPCs](#modular-npcs) | Characters | Humanoid NPCs are assembled from shared body parts converted once, with one small recipe per actor, instead of one complete baked model per actor. Equipment changes and looting can then change how an actor looks. The baked whole-actor method stays selectable. | about 0.4 million triangles in parts against 12.3 million baked |
+| [People and creatures in the region frames](#people-and-creatures-in-the-region-frames) | Characters | Every CHIM region frame map places the NPCs and creatures of its cells as a town frame places its residents. Actors start where the game puts them: each at its authored position and rotation, ground contact within 32 units of the ground, and one authored higher kept where it is and listed with its height and script. Levelled creature lists are deferred: the game rolls them at the player's level. Experimental, off by default. | 781 actors in 336 region frames, none before |
 | [NPC pathfinding and companions](#npc-pathfinding-and-companions) | Characters | A ladder that starts with plain Quake chase movement and stair climbing, and escalates only when stuck: a local ping, then A* on a small walkable graph stored with the chunks. dbg companion is a prototype follower that tests the first steps. | not measured |
 | [Routed standing hulls for many-piece models](#routed-standing-hulls-for-many-piece-models) | Builder and tools | Models with more than 16 collision pieces get one routed standing hull (same solid set, nested routing) instead of a long chain of pieces, in CHIM and in the legacy converter alike; tools/hull_chain_audit.py sweeps every map for deep hull chains. --model-hull (auto, chain, routed or balanced) keeps every method selectable. | not measured |
-| [Stairway collision mesh (stair collision method 1)](#stairway-collision-mesh-stair-collision-method-1) | Builder and tools | A flight of stairs whose collision fails a geometric check gets one ramp per run of steps, or one solid block per tread, as its collision; the drawn steps are unchanged. The check is plane arithmetic on the collision (stand height against the drawn tread within a step, walkable slope, standing room, rise between neighbouring points within a step), no walk. --stair-collision-method 0 or 1; 0 (today's convex pieces with the stair rules) stays the default. | not measured |
+| [Stairway collision mesh (stair collision method 1)](#stairway-collision-mesh-stair-collision-method-1) | Builder and tools | A flight of stairs whose collision fails a geometric check gets one ramp per run of steps, or one solid block per tread, as its collision; the drawn steps are unchanged. The check is plane arithmetic on the collision, no walk. The default since v0.0.48-dev2 (decided for the project, 22 October 2026), per mesh: only meshes with a flight use it; an authored stair ramp a convex piece makes steeper becomes plates. --stair-collision-method 0 keeps the method before. | not measured |
 | [CHIMport: the whole island, cell by cell](#chimport-the-whole-island-cell-by-cell) | Builder and tools | An autobuilder that converts every exterior cell with everything placed in it to CHIM, from the sea at the edge of the map inwards ring by ring, runs every builder audit on each cell, records its figures and feeds the CHIM Progress Tracker. | not measured |
 | [Memory estimator](#memory-estimator) | Builder and tools | A predictor of how many bytes the chunk zone must hold at any position on the island, before anything is built, from the distinct models in the ring, terrain, catalogue entries and textures. | about 20 % to 40 % accuracy |
 | [Vivec on CHIM (milestone M3)](#vivec-on-chim-milestone-m3) | Roadmap | Stage A moves the Vivec Arena canton onto CHIM with the v0.0.32 parity gates; stage B puts all of Vivec on CHIM (one city frame does not fit the engine's coordinate range: the frame layout is an open decision). | not measured |
 | [CHIM cells inside the legacy open world](#chim-cells-inside-the-legacy-open-world) | World format and disk | Finished CHIMport cells (the seabed, the coast, a region or a cell list) replace their legacy open-world maps one cell at a time, in place and under the same map names, so the island moves to CHIM area by area. | not measured |
 | [Run-time scale and tilt of shared models](#run-time-scale-and-tilt-of-shared-models) | World format and disk | One stored model per mesh instead of one per scale and tilt: the placement carries the full rotation (and later a uniform scale); the mesh's convex pieces are stored once and expanded by the world-aligned player box when a trace meets them. Decided for the project, 20 October 2026. Tilt: world format 0.8 (--chim-placement-format 0.8, experimental, off). | models 735.8 MB to about 272 MB in format 0.8 (tilt), estimated, not built yet |
+| [Shared interior props with per-placement lighting](#shared-interior-props-with-per-placement-lighting) | World format and disk | Store interior props once and light each placement separately, which would remove the per-map model limit indoors. | not measured |
+| [Fires burn on CHIM frames](#fires-burn-on-chim-frames) | Rendering and visibility | Every campfire, brazier, fire pit, torch and flame lamp placed in a CHIM town, region frame or batch room gets the engine's flame animation, the fire the census office hearth has had since the earlier versions: the frame map carries one flame entry per fire emitter of the frame's models, and the engine animates only the nearest ones on screen. Each fire also lights the placed models around it (on by default; dbg campfires on/off). | not measured |
+| [Light sources light the placed models (experimental)](#light-sources-light-the-placed-models-experimental) | Rendering and visibility | Every exterior light source that adds light, the lights without a mesh among them, gives the placed models it reaches one light level, stored in their placement records (world format 0.12). Outdoors the level fills the model back up towards the day light at night and shows nothing by day, as the original clamps light at full. Off by default (--chim-placement-light sources). | not measured |
 | [Lighting audit in the cell tracker](#lighting-audit-in-the-cell-tracker) | Builder and tools | Every exterior cell is checked for light like the original: its original lights by class, with and without a mesh, how each reaches the frame (baked, night lamps only, not at all) and the share of lit surfaces. Lit is required for both completion levels; cells that wait only for light are shown as awaiting lighting. | not measured |
 | [Lit like the original](#lit-like-the-original) | Rendering and visibility | The hybrid lighting type (builder default, --chim-lighting-type): Morrowind lights as Quake light entities baked into CHIM terrain lightmaps with lightstyles for flicker and pulse, one light level per placed model, the nearest sources of every class as dynamic lights, and per-plant glow generated at build time. | not measured |
 | [Ground stored once](#ground-stored-once) | World format and disk | Terrain references (world format 0.7, --chim-terrain-refs, on by default since v0.0.36): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record. | 9.0 MB to 1.9 MB for seven region cells |
@@ -106,7 +110,6 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | Feature | Area | What it does | Measured gain |
 | --- | --- | --- | --- |
 | [Terrain generated from a heightfield at load](#terrain-generated-from-a-heightfield-at-load) | World format and disk | Generate the ground from height samples when a chunk loads instead of storing its faces, once the 68040 cost of doing so is measured. | not measured |
-| [Shared interior props with per-placement lighting](#shared-interior-props-with-per-placement-lighting) | World format and disk | Store interior props once and light each placement separately, which would remove the per-map model limit indoors. | not measured |
 
 ## Features
 
@@ -233,19 +236,20 @@ Generate the ground from height samples when a chunk loads instead of storing it
 
 #### Shared interior props with per-placement lighting
 
-**Status:** Idea. **ID:** `shared-interior-props`.
+**Status:** In progress. **ID:** `shared-interior-props`.
 
 Store interior props once and light each placement separately, which would remove the per-map model limit indoors.
 
-**Measured gain:** Not measured.
+**Measured gain:** Not measured. Size measured on 22 October 2026: 55 test rooms on a store of 20.7 MB plus 0.59 MB of room maps, against 79.3 MB of today's room maps (about 3.7 times smaller). Speed and memory in game are not measured yet.
 
 **Visibility:** Interiors keep Quake's vis today; shared props would have to keep it, checked with the renderer counters.
 
 **Caveats:**
 
-- Interiors stay ordinary Quake maps in CHIM 0.1.0, where Quake's vis works well.
+- Interiors stay ordinary Quake maps in CHIM 0.1.0. CHIM rooms are in development on the v0.0.48 line; today's rooms stay selectable.
+- First version: one light level per placement; rooms with water or lava stay room maps for now.
 
-**Read more:** [World streamer](../WORLD_STREAMER.md); [CHIM ideas: also held back](IDEAS.md#also-held-back).
+**Read more:** [Interiors on CHIM: the store, the measurements and the bar](INTERIOR_STORE.md); [World streamer](../WORLD_STREAMER.md); [CHIM ideas: also held back](IDEAS.md#also-held-back).
 
 #### Ground stored once
 
@@ -409,9 +413,9 @@ The frame map tags its static models and flora sprites with their chunk; the eng
 
 #### Extra Fast RAM as CHIM cache, automatic
 
-**Status:** In this release (CHIM 0.2.1). **ID:** `auto-fast-ram`.
+**Status:** In this release (CHIM 0.2.2). **ID:** `auto-fast-ram`.
 
-At start-up the free Fast RAM beyond a margin (2 MiB plus an eighth of all Fast RAM) becomes CHIM zone banks that survive map changes, one per memory region, each under 2 GiB, no other upper limit; the look-ahead grows with it. 16 MiB takes nothing. A startup notice (M skips), Options > Extra RAM and -chimcache override it.
+At start-up the free Fast RAM beyond a margin (2 MiB plus an eighth of all Fast RAM) becomes CHIM zone banks that survive map changes, one per memory region, each under 2 GiB, no other upper limit; the look-ahead grows with it. 16 MiB takes nothing. A startup notice (M skips), Options > Video > Extra RAM and -chimcache override it.
 
 **Measured gain:**
 
@@ -546,6 +550,44 @@ Closed low-poly shells for landmarks such as Vivec's cantons, so they stand on t
 
 **Read more:** [Distant shells](../DISTANT_SHELLS.md); [CHIM ideas: the distant view](IDEAS.md#the-distant-view-far-terrain-and-mold-shells).
 
+#### Fires burn on CHIM frames
+
+**Status:** In progress. **ID:** `frame-flames`.
+
+Every campfire, brazier, fire pit, torch and flame lamp placed in a CHIM town, region frame or batch room gets the engine's flame animation, the fire the census office hearth has had since the earlier versions: the frame map carries one flame entry per fire emitter of the frame's models, and the engine animates only the nearest ones on screen. Each fire also lights the placed models around it (on by default; dbg campfires on/off).
+
+**Measured gain:** Not measured in game yet. Counted on the v0.0.47 world: 719 fires in 299 of 1,351 frames (none before), at most 49 in one frame against the engine's 128; 106,859 bytes of entity text over the island with the fires' light, at most 7,350 in one map; the fires' light reaches 6,320 placements, 144 in the busiest fire frame (23 October 2026).
+
+**Visibility:** No new entity is drawn: the flames are particles; the engine draws at most 12 on screen within 640 units each frame, as in the rooms.
+
+**Caveats:**
+
+- A flame of a neighbouring frame shows only once that frame's map is loaded.
+- Emitters of blight and mist clouds, steam and lava vents, lava sparks and the ash mire get no flame.
+
+**Read more:** [CHIM lighting: fires](LIGHTING.md#fires-on-chim-frames).
+
+**Bugs:** [CHIM-EXTERIOR-FLAMES-MISSING-48](../bugs/CHIM-EXTERIOR-FLAMES-MISSING-48.md).
+
+#### Light sources light the placed models (experimental)
+
+**Status:** In progress. **ID:** `placement-light`.
+
+Every exterior light source that adds light, the lights without a mesh among them, gives the placed models it reaches one light level, stored in their placement records (world format 0.12). Outdoors the level fills the model back up towards the day light at night and shows nothing by day, as the original clamps light at full. Off by default (--chim-placement-light sources).
+
+**Measured gain:** Not measured in game yet. On the v0.0.47 world it would light 155,246 of 469,266 placements in 1,000 frames; frame cost to measure first (two placements of one model at different levels rebuild its cached surface in turn).
+
+**Visibility:** No new entity or brush: the level is a byte of the existing placement record.
+
+**Caveats:**
+
+- Experimental: off by default until its frame cost is measured on the slow preset.
+- Terrain gets no stored light yet (terrain lightmaps, planned); darkeners give none.
+
+**Read more:** [CHIM lighting](LIGHTING.md#placement-light-levels-experimental).
+
+**Bugs:** [CHIM-MESHLESS-LIGHTS-33](../bugs/CHIM-MESHLESS-LIGHTS-33.md).
+
 #### Lit like the original
 
 **Status:** In progress. **ID:** `lit-like-the-original`.
@@ -588,6 +630,29 @@ A census, not a CHIM run. The expected drop of the NPC gallery stage from about 
 **Read more:** [Modular NPCs](../MODULAR_NPCS.md); [NPC model cache](../NPC_MODEL_CACHE.md); [Character equipment roadmap](../CHARACTER_EQUIPMENT_ROADMAP.md).
 
 **Bugs:** [NPC-BAKED-WHOLE-DUPLICATION-33](../bugs/NPC-BAKED-WHOLE-DUPLICATION-33.md).
+
+#### People and creatures in the region frames
+
+**Status:** In progress. **ID:** `region-frame-actors`.
+
+Every CHIM region frame map places the NPCs and creatures of its cells as a town frame places its residents. Actors start where the game puts them: each at its authored position and rotation, ground contact within 32 units of the ground, and one authored higher kept where it is and listed with its height and script. Levelled creature lists are deferred: the game rolls them at the player's level. Experimental, off by default.
+
+**Measured gain:**
+
+- 781 actors placed in 336 region frames (468 NPCs, 313 creatures); 101 start more than 32 units off the ground and keep their authored spot (9 with a script); 4,853 levelled creature references deferred; actor models per frame: median 624 KB, at most 4.1 MB, 14 frames past the 2.1 MB Cache room of the 16 MB baseline and none past the 15.7 MB room of the larger heap. Compared: the v0.0.47 release run's CHIM world, actor library and frame reports, read only; the region frames' actor units run without a build. *exact counts, 22 October 2026.*
+
+Placed on the builder side only: not built into an image and not looked at in game yet.
+
+**Visibility:** Actors are ordinary Quake entities of the frame map, linked and culled as before; nothing in the CHIM chunks changes.
+
+**Caveats:**
+
+- Levelled creature lists are not placed in the frame maps; the actor table rolls them when a cell joins the type 1 window.
+- Actor models live in Quake's Cache: a frame whose actors pass the Cache room is reported, and the engine evicts least recently used models there (slower, not fatal).
+
+**Read more:** [Actors start where the game puts them](../NPC_GROUND_CONTACT.md); [Experimental flags](../EXPERIMENTAL_FLAGS.md).
+
+**Bugs:** [CHIM-EXTERIOR-ACTORS-MISSING-46](../bugs/CHIM-EXTERIOR-ACTORS-MISSING-46.md).
 
 #### NPC pathfinding and companions
 
@@ -712,15 +777,15 @@ Models with more than 16 collision pieces get one routed standing hull (same sol
 
 **Status:** In progress. **ID:** `stair-collision-mesh`.
 
-A flight of stairs whose collision fails a geometric check gets one ramp per run of steps, or one solid block per tread, as its collision; the drawn steps are unchanged. The check is plane arithmetic on the collision (stand height against the drawn tread within a step, walkable slope, standing room, rise between neighbouring points within a step), no walk. --stair-collision-method 0 or 1; 0 (today's convex pieces with the stair rules) stays the default.
+A flight of stairs whose collision fails a geometric check gets one ramp per run of steps, or one solid block per tread, as its collision; the drawn steps are unchanged. The check is plane arithmetic on the collision, no walk. The default since v0.0.48-dev2 (decided for the project, 22 October 2026), per mesh: only meshes with a flight use it; an authored stair ramp a convex piece makes steeper becomes plates. --stair-collision-method 0 keeps the method before.
 
-**Measured gain:** Not measured in game. On the v0.0.46 release build's meshes (read only): the check agrees with the recorded stair walks on 97.9 % of the 3,098 tread points they covered; method 1 changes 14 of 97 meshes with flights (all their flights then pass) at +11 % collision bytes on them; 11 meshes it cannot make pass keep today's collision. Default builds keep their mesh units and code keys.
+**Measured gain:** Not measured in game. On the v0.0.46 and v0.0.47 release builds' meshes (read only): the check agrees with the recorded stair walks on 97.9 % of the 3,098 tread points they covered; method 1 changes 14 of 97 meshes with flights (all their flights then pass) at +11 % collision bytes on them; 11 meshes it cannot make pass keep method 0's collision and are listed (config/stair-check-known.json, CHIM-STAIR-METHOD1-UNFIXED-48). Meshes without a flight keep their mesh units and code keys.
 
 **Visibility:** Not a drawing change: collision only.
 
 **Caveats:**
 
-- Experimental and off by default; no image built with it yet.
+- The default since v0.0.48-dev2, not yet built into an image or checked in game; 11 meshes still fail the check (listed, never dropped).
 
 **Read more:** [Stair collision method 1](../bugs/CHIM-STAIR-COLLISION-MESH-47.md).
 

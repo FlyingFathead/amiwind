@@ -50,6 +50,10 @@ GROUPS = {
 ATTACK_HITS = ('attack1: hit', 'handtohand: chop hit')
 STANDING = (('idle', 8), ('hit', 3), ('death', 5))                      # as the NPC 'react' profile
 MOVER = (('idle', 8), ('walk', 8), ('run', 6), ('attack', 8), ('hit', 3), ('death', 5))
+# An authored-dead creature (health 0: the corpses the game data lays out, 'dead rat'): one frame, the last of its own
+# death group (a 'hold' group of one sample is its stop key), as the NPC corpses take 'death1: stop'
+# (prepare_area.build_resident); ACTOR-LIBRARY-LEFT-OUT-48
+CORPSE = (('death', 1),)
 
 
 def actor_files(read, mesh):

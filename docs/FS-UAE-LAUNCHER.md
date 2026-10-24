@@ -1,6 +1,6 @@
 # Portable FS-UAE launcher
 
-_Last updated with AmiWind v0.0.46 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -148,7 +148,7 @@ FPU:                  68040 internal          [x] OK
 CPU speed:            Fastest possible        [x] OK
 JIT:                  ON                      [x] OK
 24-bit addressing:    OFF                     [x] OK
-Fast RAM in total:    128 MiB (default)       [x] OK
+Fast RAM in total:    32 MiB (default)        [x] OK
 Cycle-exact speed:    OFF (cpu_speed=max)     [x] OK
 Kickstart:            3.1 A1200 40.68         [x] OK
 ```
@@ -161,20 +161,26 @@ ship-exit/menu freeze.
 
 ## Fast RAM
 
-The emulated Amiga gets 128 MiB of Zorro III Fast RAM by default, like a 68060
-accelerator card (decided for the project, 21 October 2026; earlier launchers
-started with 16 MiB). 16 MiB, the smallest machine the game runs on, stays a
-choice (menu entry 2 or `--fast-ram 16`), so that baseline can still be played
-and tested. Testers can also give it more:
+The emulated Amiga gets 32 MiB of Zorro III Fast RAM by default: for now the game
+requires 32 MB of Fast RAM, the safe minimum, which should be enough for the entire
+game (decided for the project, 23 October 2026; the default was 128 MiB from
+21 October and 16 MiB before; [why 32 MB](REAL_HARDWARE.md#why-32-mb-of-fast-ram)).
+More RAM is used automatically (a larger game heap, CHIM's caches, reading ahead).
+16 MiB still starts and stays a choice (menu entry 2 or `--fast-ram 16`), so that
+baseline can still be played and tested: the launcher prints a warning and shows
+`[!] WARN` on the preflight's Fast RAM row, and the game's boot check warns and counts
+down ten seconds (ENTER skips; it never blocks); the game then loads more often. Testers can also give it more:
 
 | Choice | Fast RAM | Zorro III boards |
 | --- | --- | --- |
-| 1 (default) | 128 MiB, like a 68060 accelerator card | one 128 MiB board |
-| 2 | 16 MiB, the smallest the game runs on (the earlier default) | one 16 MiB board |
-| 3 | 256 MiB | one board |
-| 4 | 512 MiB | one board |
-| 5 | 1 GiB | one 1 GiB board |
-| 6 | 1.5 GiB, the most the emulators give | 1 GiB + 512 MiB |
+| 1 (default) | 32 MiB, the safe minimum for the whole game | one 32 MiB board |
+| 2 | 16 MiB, starts with a warning; loads more often | one 16 MiB board |
+| 3 | 64 MiB | one board |
+| 4 | 128 MiB, like a 68060 accelerator card (the default from 21 to 23 October 2026) | one board |
+| 5 | 256 MiB | one board |
+| 6 | 512 MiB | one board |
+| 7 | 1 GiB | one 1 GiB board |
+| 8 | 1.5 GiB, the most the emulators give | 1 GiB + 512 MiB |
 | C | custom, in MiB | checked, see below |
 
 At the launch question (`Run latest AmiWind ...? [Y/n, M = Fast RAM]`) type
@@ -184,7 +190,7 @@ At the launch question (`Run latest AmiWind ...? [Y/n, M = Fast RAM]`) type
 removed again, so a later default change reaches folders that never chose a size. The launcher
 prints the size it starts with (`Fast RAM:` and `Starting with ... of Fast RAM`)
 and checks it in the host preflight; the game's own boot check shows what the
-Amiga sees (`Fast RAM: 131072K, free ...` for 128 MiB).
+Amiga sees (`Fast RAM: 32768K, free ...` for 32 MiB; `Fast RAM: 16 MB (32 MB needed) [!] WARN` below 32 MiB).
 
 What the emulators can make (measured 17 October 2026 in FS-UAE 3.1.66 with
 the JIT on, by booting the game and reading its boot check):
@@ -196,7 +202,7 @@ the JIT on, by booting the game and reading its boot check):
   is not larger than the first (384 MiB = 256 + 128).
 - Both boards together reach at most 1.5 GiB: asking for 2 GiB gave
   1 GiB + 512 MiB, and 4 GiB gave none. 2 GiB or more is therefore not offered.
-- The smallest choice is 16 MiB, the game's own minimum.
+- The smallest choice is 16 MiB, the least the game starts on (32 MiB is the safe minimum).
 - A size the emulator cannot make is refused with the two nearest sizes.
 
 WinUAE uses the same rule for each board (power of two, at most 1 GiB, read from
@@ -204,7 +210,7 @@ its source); the launcher writes `z3mem_size` and `z3mem2_size` (MiB) and, above
 1 GiB, `z3mem_start=0x10000000`, where FS-UAE places the boards too. WinUAE was
 not started with these sizes here; please report what its boot check shows.
 `tools/emulator_configs.py --fast-ram MIB` writes both profiles beside a built
-image with the same choice (the build writes them with the 128 MiB default), and
+image with the same choice (the build, and so every playtest package, writes them with the 32 MiB default), and
 `tools/run_fs_uae.py --fast-ram MIB` takes it too.
 
 ## Quitting and the "not validated" request

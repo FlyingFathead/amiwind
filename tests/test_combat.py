@@ -36,7 +36,8 @@ class CombatNativeTests(unittest.TestCase):
 
     def test_engine_layer_chase_swings_punch_bar_music_death_and_residents(self):
         native.NativeSourceTests().compile_run(
-            'aga_combat_test.c', [SRC / n for n in ('aw_combat.c', 'aw_combat_rules.c', 'aw_npcpath.c', 'mathlib.c', 'aw_anim.c')],
+            'aga_combat_test.c', [SRC / n for n in ('aw_combat.c', 'aw_combat_rules.c', 'aw_move_rules.c', 'aw_npcpath.c',
+                                                    'mathlib.c', 'aw_anim.c')],
             defines=('AW_ANIM_HOST_TEST',), cflags=UBSAN)
 
     def test_actual_no_dice_readout_and_negative_sentinels(self):
@@ -266,8 +267,9 @@ class CombatBuilderTests(unittest.TestCase):
         # one tag row per frame of the model beside it: the standing model's and the mover's (ANIMKIT-ITEM-TAG-FRAMES-35)
         self.assertIn('npc_items.resident_items(assets,palette,appearance,kit or skeleton,item_times)', area)
         self.assertIn('npc_items.resident_items(assets,palette,appearance,kit,item_times,mover_item_times)', area)
-        for source in (area, town):
-            self.assertIn('npc_items.publish(scene', source)
+        # the room stages publish into each resident's unit folder, installed into the scene (resident-bake units)
+        self.assertIn('npc_items.publish(folder', area)
+        self.assertIn('npc_items.publish(scene', town)
         for source in (area, town):
             self.assertIn('npc_items.attach_items(kinds', source)
         combat = code('aw_combat.c')

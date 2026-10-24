@@ -4,11 +4,41 @@
 // and tests/test_cell_progress.py runs them with node. A row that is unticked DIMS its cells (the same dimming the status
 // chips and the "Show" filter use), so the island stays readable around what you picked.
 (function (root) {
-  // Every CHIM status, in legend order. Keys of the legend rows are 'chim:status:<status>'.
+  // Every CHIM status, in legend order. Keys of the legend rows are 'chim:status:<status>'. Data with the legend groups
+  // (tools/cell_progress.py classify: chim.state) adds solstheim, not_in_build and settled; older data never has them.
   const STATUSES = ['complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested',
-    'audits_passed', 'converted_failing', 'not_converted', 'converted_unmeasured', 'not_started', 'empty_sea', 'hull_policy_pending', 'ocean'];
+    'audits_passed', 'converted_failing', 'not_converted', 'converted_unmeasured', 'not_started', 'empty_sea', 'sea_in_game', 'hull_policy_pending', 'ocean',
+    'solstheim', 'not_in_build', 'settled'];
+  // The three legend groups (tools/cell_progress.py GROUP_STATES, TOOLKIT-LEGEND-STATES-UNCLEAR-48), states in legend order.
+  const GROUPS = [
+    ['in_game', 'In the game', ['complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed', 'converted_unmeasured', 'sea_in_game']],
+    ['not_in_game', 'Not in the game yet', ['solstheim', 'not_started', 'not_in_build', 'empty_sea', 'ocean', 'converted_failing', 'not_converted', 'hull_policy_pending']],
+    ['settled', "Beyond the world's edge: settled", ['settled']],
+  ];
+  const IN_GAME = GROUPS[0][2], NOT_IN_GAME = GROUPS[1][2];
+  // The "More states" fold-out is open or closed for the chips and the legend alike (chim-head.js uses the same key).
+  const MORE_KEY = 'amiwind-chim-more-1';
+  const SETTLED_TEXT = "No cell exists here in the original game data. AmiWind's edge current turns the player back before this point, so there is nothing to build.";
+  // The grouped legend of a headline: [{id, title, count, rows: [[state, count]]}] with only the states that have cells, and
+  // `more`: [[state, count, group]] for the states at 0 (the "More states" fold-out). A state comes back to its group's row by
+  // itself once it has cells. null for older data without the groups (the flat legend is drawn as before).
+  function groupLayout(h) {
+    if (!h || !h.groups || !h.states) return null;
+    const out = {groups: [], more: []};
+    for (const [id, title, states] of GROUPS) {
+      const rows = [];
+      for (const s of states) {
+        const n = h.states[s] || 0;
+        if (n) rows.push([s, n]); else out.more.push([s, 0, id]);
+      }
+      out.groups.push({id, title, count: h.groups[id] || 0, rows});
+    }
+    out.accounted = h.groups.accounted_for || 0;
+    out.cells = h.groups.cells || 0;
+    return out;
+  }
   // Eligible for the next release: every passed status plus empty and open sea (tools/cell_progress.py ELIGIBLE_SELECT).
-  const ELIGIBLE = ['complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed', 'empty_sea'];
+  const ELIGIBLE = ['complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed', 'empty_sea', 'sea_in_game'];
   const AWAITING = ['complete_unlit', 'terrain_complete_unlit'];
   const PROBLEMS = ['converted_failing', 'not_converted', 'hull_policy_pending'];
   const statusKey = s => 'chim:status:' + s;
@@ -45,8 +75,9 @@
   // tier: 'next' = planned for the upcoming release (the lowest plan release that has not shipped), 'later' = a release after
   // that, 'shipped'. Gold is the gold of the Toolkit header (header.js h1), so it always means "planned for the next release".
   const PLAN_GOLD = '#e8c46a', PLAN_LATER = '#f6ebc4';
-  // Open ocean cells (no LAND, one shared ocean chunk): drawn silver, never counted as done (TRACKER-OCEAN-COUNTED-DONE-36).
-  const OCEAN_SILVER = '#c0c6cc', OCEAN_TEXT = 'Open ocean: shared ocean chunk made, not yet placed in the game';
+  // Open sea cells (no LAND record) that the newest build does not hold: drawn silver, never counted as done
+  // (TRACKER-OCEAN-COUNTED-DONE-36). One the build holds is "sea, in the game"; one with no game record is settled.
+  const OCEAN_SILVER = '#c0c6cc', OCEAN_TEXT = 'Open sea the game defines, not in the newest build';
   const PLAN_CORE = ['release', 'state', 'since', 'source', 'tier'];
   const planTier = c => (c.plan && c.plan.tier) || null;
   const planColour = c => planTier(c) === 'next' ? PLAN_GOLD : planTier(c) === 'later' ? PLAN_LATER : null;
@@ -71,7 +102,7 @@
     for (let i = 2; i < 9; i++) tot.push(rows.reduce((a, r) => a + r[i], 0));
     const out = rows.concat([tot]);
     // The open ocean has a totals row of its own: island-wide, silver, and not part of the done figures above.
-    if (oceanTotal != null) out.push(['OPEN OCEAN (silver, not counted as done)', '', '', '', '', '', '', '', oceanTotal]);
+    if (oceanTotal != null) out.push(['OPEN SEA (silver, not counted as done)', '', '', '', '', '', '', '', oceanTotal]);
     return out;
   }
   // One text line for the cell panel: every key of the plan record is shown, unknown ones too.
@@ -87,10 +118,12 @@
   function presets(release, planNext) {
     return [
       {id: 'everything', name: 'Everything', on: null, colour: 'status', rel: ''},
+      {id: 'ingame', name: 'In the game (the newest build)', on: IN_GAME, colour: 'status', rel: ''},
+      {id: 'workleft', name: 'Not in the game yet (work left)', on: NOT_IN_GAME, colour: 'status', rel: ''},
       {id: 'eligible', name: 'Eligible for ' + (release || 'the next release'), on: ELIGIBLE, colour: 'status', rel: ''},
       {id: 'awaiting', name: 'Awaiting lighting', on: AWAITING, colour: 'status', rel: ''},
       {id: 'problems', name: 'Problems only (failed, not converted, hull pending)', on: PROBLEMS, colour: 'status', rel: ''},
-      {id: 'notstarted', name: 'Not started', on: ['not_started'], colour: 'status', rel: ''},
+      {id: 'notstarted', name: 'Not started (Solstheim included)', on: ['not_started', 'solstheim'], colour: 'status', rel: ''},
       {id: 'lighting', name: 'Lighting (the lighting layer)', on: null, colour: 'lighting', rel: ''},
       {id: 'lava', name: 'Lava (the lava layer: mapped / converted)', on: null, colour: 'lava', rel: ''},
       {id: 'release', name: 'Release content (cells assigned to a release)', on: null, colour: 'status', rel: '__any'},
@@ -168,7 +201,7 @@
     } catch (_) { /* unreadable: start clean */ }
     return null;
   }
-  const api = {MAP_MIN_H, MIN_ZOOM, MAX_ZOOM, mapLayout, clampView, zoomAt, fitView, ringLabelsVisible, OCEAN_SILVER, OCEAN_TEXT, PLAN_GOLD, PLAN_LATER, planTier, planColour, planRows, planTable, planLine, STATUSES, ELIGIBLE, AWAITING, PROBLEMS, statusKey, presets, presetState, matchPreset, relOk, cellKey, visible, compareClass, stripState, agoText, save, load, STORE};
+  const api = {MAP_MIN_H, MIN_ZOOM, MAX_ZOOM, mapLayout, clampView, zoomAt, fitView, ringLabelsVisible, OCEAN_SILVER, OCEAN_TEXT, GROUPS, IN_GAME, NOT_IN_GAME, SETTLED_TEXT, MORE_KEY, groupLayout, PLAN_GOLD, PLAN_LATER, planTier, planColour, planRows, planTable, planLine, STATUSES, ELIGIBLE, AWAITING, PROBLEMS, statusKey, presets, presetState, matchPreset, relOk, cellKey, visible, compareClass, stripState, agoText, save, load, STORE};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ChimLegend = api;
 })(typeof window !== 'undefined' ? window : this);

@@ -26,6 +26,7 @@ LEGACY_EXT = '.bsp'
 FRAME_EXT = '.chim'
 MAP_EXTS = (FRAME_EXT, LEGACY_EXT)          # resolution order: a frame map first, as the engine
 FRAME_KEY = '_chim_frame'
+ROOM_KEY = '_chim_room'                        # a CHIM room map's worldspawn key (tools/chim/interior.py room_map)
 STREAM_CHUNK_KEY = '_chim_chunk'               # chim/frame_map.py CHUNK_KEY
 STREAMED_CLASSES = ('aw_static', 'aw_flora')   # chim/frame_map.py STREAMED_CLASSES
 
@@ -141,6 +142,43 @@ def is_chim_frame(data):
     if isinstance(data, (str, Path)):
         data = head_bytes(data)
     return FRAME_KEY in worldspawn(data)
+
+
+def is_chim_room(data):
+    """True for a CHIM room map: a BSP29 file whose worldspawn names a CHIM room ("_chim_room"); its models are on the
+    interior store, so the map optimizer leaves it as written. DATA: the file's bytes or a path."""
+    if isinstance(data, (str, Path)):
+        data = head_bytes(data)
+    return ROOM_KEY in worldspawn(data)
+
+
+def room_maps(maps_dir):
+    """Every CHIM room map in MAPS_DIR (by its key, whatever its extension), sorted by file name."""
+    return [p for p in map_files(maps_dir) if is_chim_room(p)]
+
+
+def scene_maps(maps_dir):
+    """The maps a per-map image check reads as a whole scene, sorted by file name: every x.bsp (as before) and every
+    CHIM room map (maps/<room>.chim: its entities in the map, its placed meshes in its room record, room_record).
+    A CHIM frame map (.chim) is checked through its CHIM world instead (IMAGE-ROOM-MAPS-LATE-PASSES-48: the checks
+    after the CHIM rooms install selected maps as x.bsp and skipped every CHIM room)."""
+    return [p for p in map_files(maps_dir) if p.name.lower().endswith(LEGACY_EXT) or is_chim_room(p)]
+
+
+def room_record(data):
+    """(store folder, room) a CHIM room map names ("_chim_world", "_chim_room"), or None. DATA: bytes or a path."""
+    if isinstance(data, (str, Path)):
+        data = head_bytes(data)
+    world = worldspawn(data)
+    if ROOM_KEY not in world:
+        return None
+    return world.get('_chim_world') or 'chim', world[ROOM_KEY]
+
+
+def room_record_path(id1, data):
+    """id1/<store>/rooms/<room>.crm of a CHIM room map (room_record), or None for any other map."""
+    found = room_record(data)
+    return None if found is None else Path(id1) / found[0] / 'rooms' / (found[1] + '.crm')
 
 
 def frame_maps(maps_dir):

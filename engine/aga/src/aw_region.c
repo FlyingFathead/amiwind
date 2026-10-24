@@ -149,6 +149,8 @@ int AW_RegionSelect(const char *name,const float *point,int intro)
         return 1;
     }
     if(intro && scenes(area) && chim_map(name) && chim_map("intro_docks"))return 1;   /* and the intro docks' frame map */
+    /* LEGACY TOWN REGIONS (aw_town.h AW_LEGACY_TOWN_REGIONS) from here on. */
+    if(!AW_LEGACY_TOWN_REGIONS)return 0;
     /* Legacy full single-map payload (Seyda) when its directory is absent. */
     if(!read_regions(area))return (AW_Town(area)->flags&AW_TOWN_LEGACY_PAYLOAD)!=0;
     a=&areas[area];id=AW_RegionOwner(a->regions,a->count,point,-1,0);
@@ -171,7 +173,8 @@ const char *AW_RegionWorldModel(const char *name,int intro)
         if(read_regions(area)){areas[area].current=-1;areas[area].kind=0;areas[area].requested=-1;}
         Con_Printf("%s (intro docks): CHIM frame map %s.\n",AW_Town(area)->title,chim);return chim;
     }
-    if(area<0 || !read_regions(area))return NULL;
+    /* LEGACY TOWN REGIONS (aw_town.h AW_LEGACY_TOWN_REGIONS) from here on. */
+    if(!AW_LEGACY_TOWN_REGIONS || area<0 || !read_regions(area))return NULL;
     a=&areas[area];
     if(a->requested<0){a->requested=AW_RegionOwner(a->regions,a->count,a->arrival,-1,0);a->requested_kind=scenes(area)&&intro?1:0;}
     a->current=a->requested;a->kind=a->requested_kind;a->requested=-1;
@@ -183,7 +186,8 @@ const char *AW_RegionWorldModel(const char *name,int intro)
 int AW_RegionCrossing(const float *point,int intro)
 {
     int area=area_id(sv.name),id,kind;aw_region_area_t *a;
-    if(area<0 || !read_regions(area))return 0;
+    /* region crossings are LEGACY TOWN REGIONS only (aw_town.h AW_LEGACY_TOWN_REGIONS) */
+    if(!AW_LEGACY_TOWN_REGIONS || area<0 || !read_regions(area))return 0;
     if(chim_running())return 0;   /* one frame map: no region crossings */
     a=&areas[area];kind=scenes(area)?seyda_kind(point,intro,a->kind):0;
     if(kind!=a->kind)return 1;
@@ -194,7 +198,8 @@ int AW_RegionCrossing(const float *point,int intro)
 const char *AW_RegionAhead(const float *point,const float *velocity,int intro,float seconds) {
     int area=area_id(sv.name),id;aw_region_area_t *a;static char next[40];
     if(area<0)return AW_SectionAhead(sv.name,point,velocity,seconds);
-    if(intro || !read_regions(area) || chim_running())return NULL;
+    /* the next region map is LEGACY TOWN REGIONS only (aw_town.h AW_LEGACY_TOWN_REGIONS) */
+    if(!AW_LEGACY_TOWN_REGIONS || intro || !read_regions(area) || chim_running())return NULL;
     a=&areas[area];if(a->kind || a->current<0)return NULL;
     id=AW_RegionNextOwner(a->regions,a->count,point,velocity,a->current,a->hysteresis,seconds);
     if(id<0 || id==a->current)return NULL;
@@ -294,6 +299,8 @@ int AW_TownArrival(const char *name,int returning,float *point,float *yaw)
     id=AW_RegionOwner(a->regions,a->count,a->arrival,-1,0);
     if(returning){if(AW_SceneMapSize(t->travel_target,NULL,0)<0)return 0;}
     else if(!chim_map(name)){
+        /* the arrival region's map: LEGACY TOWN REGIONS only (aw_town.h AW_LEGACY_TOWN_REGIONS) */
+        if(!AW_LEGACY_TOWN_REGIONS)return 0;
         AW_MapPath(a->regions[id].name,model_path,sizeof(model_path));
         if(COM_FOpenFile(model_path,&f)<0 || !f)return 0;
         fclose(f);

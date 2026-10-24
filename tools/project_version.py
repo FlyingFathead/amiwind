@@ -61,9 +61,64 @@ def python_version(root=ROOT):
     return public_version(root).replace('-dev', '.dev').replace('-rc', 'rc')
 
 
+# Fast RAM the whole game needs (RAM-REQUIREMENT-32MB-48, decided for the project 23 October 2026): the safe
+# minimum. With every outdoor NPC and creature placed, 14 CHIM region frames need more model cache than 16 MiB
+# gives; 16 MiB still starts (the built heap fits) and evicts and reloads models: slower, not a crash. More RAM
+# than this is used automatically (aw_heapsize.c, chim_world.c). The boot check and the engine warn below it.
+FAST_RAM_SAFE_MB = 32
+FAST_RAM_SINCE = '0.0.48'
+# Exec leaves a few bytes of a board out of MEMF_TOTAL; a board counts as its size within this much.
+FAST_RAM_SLACK_KIB = 64
+# The boot check's wait after the note (maintainer, 23 October 2026: "let it run then even with 16MB but at least
+# so that the user/player is warned"): a countdown, ENTER skips, never a block.
+FAST_RAM_WAIT_SECONDS = 10
+# The trailing space clears the last dot when 10 s becomes 9 s (the row overwrites itself after a carriage return).
+FAST_RAM_COUNTDOWN = 'Starting in %ld s... '
+STARTUP_SCREEN_COLUMNS = 40  # the startup logo's notice rows (aw_movie.c draw_line: 8-pixel glyphs on 320)
+
+
+def fast_ram_found_mb(kib):
+    """<N> of the warning: the measured Fast RAM in whole MB, rounded down after the Exec slack (a 16 MiB
+    board that reports 16320 KiB is 16, not 15). The boot check and the engine compute the same."""
+    return (int(kib) + FAST_RAM_SLACK_KIB) // 1024
+
+
+def fast_ram_short(kib):
+    """True when the Fast RAM (MEMF_TOTAL in KiB) is under the safe minimum: the warning is shown."""
+    return int(kib) < FAST_RAM_SAFE_MB * 1024 - FAST_RAM_SLACK_KIB
+
+
+def fast_ram_note(found='%ld', enter=True):
+    """The maintainer's warning text (23 October 2026), exactly; found = the measured MB (or the %ld the
+    boot check and the engine fill in). The boot check then counts down FAST_RAM_WAIT_SECONDS (ENTER skips,
+    never a block); the engine leaves the ENTER sentence out."""
+    text = (f'NOTE: AmiWind has grown since v{FAST_RAM_SINCE}: {FAST_RAM_SAFE_MB} MB of Fast RAM is now the '
+            f'minimum. Only {found} MB Fast RAM found, hence the game will start but may load more often.')
+    return text + (' Press ENTER to continue anyway.' if enter else '')
+
+
+def fast_ram_note_lines(width, enter=True):
+    """The warning wrapped to rows of at most width columns, with %ld for the size counted at its widest
+    (six digits); "Press ENTER to continue anyway." starts its own row."""
+    import textwrap
+    wide = 'x' * 6
+    rows = textwrap.wrap(fast_ram_note(wide, enter=False), width, break_long_words=False)
+    rows = [row.replace(wide, '%ld') for row in rows]
+    if enter:
+        rows.append('Press ENTER to continue anyway.')
+    return rows
+
+
+def fast_ram_row(found='%2ld'):
+    """The boot checklist's Fast RAM row below the safe minimum (the [!] WARN in the column of the other rows)."""
+    # %2ld prints two digits (the sizes under 32 MB), two columns fewer than its own text.
+    pad = 49 + (len(found) - 2 if found.startswith('%') else 0)
+    return f'Fast RAM:             {found} MB ({FAST_RAM_SAFE_MB} MB needed)'.ljust(pad) + '[!] WARN'
+
+
 def heap_defaults(source=None):
     """The game heap (Quake's Hunk) in MiB: the engine's default AMIWIND_HEAP_MB and AMIWIND_HEAP_SAFE_MB,
-    the largest size measured to run the whole game on the 16 MiB Fast RAM profile, read from
+    the largest size tested on the 16 MiB Fast RAM baseline (the least that starts), read from
     sys_amiga.c (the one source: the repository's engine/aga/src or a staged engine tree's src)."""
     if source is None:
         source = next((p for p in (ROOT/'engine/aga/src/sys_amiga.c', ROOT/'src/sys_amiga.c') if p.is_file()), None)
@@ -93,8 +148,8 @@ def heap_plan(heap_mb=None, source=None):
         board *= 2
     warning = None
     if mb > safe:
-        warning = (f'Game heap {mb} MiB is above the {safe} MiB measured to run the whole game on the 16 MiB '
-                   f'Fast RAM profile; built as asked (the boot check and the engine say so at start)')
+        warning = (f'Game heap {mb} MiB is above the {safe} MiB tested on the 16 MiB Fast RAM baseline; '
+                   f'built as asked (the boot check and the engine say so at start)')
     return {'heap_mb': mb, 'heap_default_mb': default, 'heap_safe_mb': safe, 'fast_free_mb': free,
             'fast_board_mb': board, 'heap_warning': warning}
 
@@ -109,7 +164,11 @@ def need_fast_lines(plan):
     second = f'      Need {free} MiB free; {mb} MiB + 16 bytes must be contiguous.'
     if len(second) > BOOT_COLUMNS:
         second = f'      Need {free} MiB free; {mb} MiB + 16 bytes in one block.'
-    return f'FAIL: select {plan["fast_board_mb"]} MB Fast RAM or more.', second
+    board = plan['fast_board_mb']
+    if board < FAST_RAM_SAFE_MB:
+        # The least that starts is smaller than the safe minimum: ask for the safe one (RAM-REQUIREMENT-32MB-48).
+        return f'FAIL: select {FAST_RAM_SAFE_MB} MB Fast RAM ({board} MB is the least that starts).', second
+    return f'FAIL: select {board} MB Fast RAM or more.', second
 
 
 def heap_note(plan):
@@ -134,16 +193,30 @@ def generate_heap(out, heap_mb=None, source=None):
     plan = heap_plan(heap_mb, source)
     out = Path(out); out.mkdir(parents=True, exist_ok=True)
     mb = plan['heap_mb']
-    _write_if_changed(out/'amiwind_heap.h', "/* Generated from the build's heap size (--heap-mb); do not edit. */\n"
+    screen = '\\n'.join(fast_ram_note_lines(STARTUP_SCREEN_COLUMNS, enter=False))
+    _write_if_changed(out/'amiwind_heap.h', "/* Generated from the build's heap size (--heap-mb) and the safe Fast RAM\n"
+        ' * minimum (tools/project_version.py, RAM-REQUIREMENT-32MB-48); do not edit. */\n'
         '#ifndef AMIWIND_HEAP_H\n#define AMIWIND_HEAP_H\n'
-        f'#define AMIWIND_HEAP_MB {mb}\n#endif\n')
+        f'#define AMIWIND_HEAP_MB {mb}\n'
+        f'#define AW_FAST_RAM_SAFE_MB {FAST_RAM_SAFE_MB}\n'
+        f'#define AW_FAST_RAM_SLACK_KIB {FAST_RAM_SLACK_KIB}\n'
+        f'#define AW_FAST_RAM_NOTE "{fast_ram_note(enter=False)}"\n'
+        f'#define AW_FAST_RAM_SCREEN "{screen}"\n#endif\n')
     note = heap_note(plan)
-    _write_if_changed(out/'amiwind_heap.i', "; Generated from the build's heap size (--heap-mb); do not edit.\n"
+    note_rows = fast_ram_note_lines(BOOT_COLUMNS)
+    _write_if_changed(out/'amiwind_heap.i', "; Generated from the build's heap size (--heap-mb) and the safe Fast RAM\n"
+        '; minimum (tools/project_version.py, RAM-REQUIREMENT-32MB-48); do not edit.\n'
         f'AW_HEAP_BYTES equ {mb}*1048576\n'
         f'AW_FAST_FREE_BYTES equ {plan["fast_free_mb"]}*1048576\n'
+        f'AW_FAST_SAFE_KIB equ {FAST_RAM_SAFE_MB * 1024 - FAST_RAM_SLACK_KIB}\n'
+        f'AW_FAST_SLACK_KIB equ {FAST_RAM_SLACK_KIB}\n'
+        f'AW_FAST_WAIT_SECONDS equ {FAST_RAM_WAIT_SECONDS}\n'
         f'need_fast:      dc.b "{need_fast_lines(plan)[0]}",10\n'
         f'                dc.b "{need_fast_lines(plan)[1]}",10,0\n'
-        + (f'heap_note:      dc.b "{note}",10,0\n' if note else 'heap_note:      dc.b 0\n'))
+        + (f'heap_note:      dc.b "{note}",10,0\n' if note else 'heap_note:      dc.b 0\n')
+        + f'fast_warn_format: dc.b "{fast_ram_row()}",10,0\n'
+        + f'fast_countdown_format: dc.b 13,"{FAST_RAM_COUNTDOWN}",0\n'
+        + 'fast_note:      ' + '\n                '.join(f'dc.b "{row}",10' for row in note_rows) + ',0\n')
     return plan
 
 

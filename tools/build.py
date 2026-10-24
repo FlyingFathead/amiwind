@@ -88,6 +88,15 @@ SEYDA_RECORDED_WARNING = ("WARNING: --seyda-recorded is NOT RECOMMENDED since v0
 # --anim-kit on|off: the resident animation profile each value selects (tools/npc_anim.py, config/npc-anim-kit.json).
 ANIM_KIT_PROFILES = {"on": "react+full", "off": "idle"}
 
+# --room-batches not given: every batch (the maintainer's decision of 23 October 2026). The default is a str subclass
+# so room_batch_selection tells it from an explicit value: not given, a MiniWind and --interior-format bsp build no
+# batch room (never an error); given, a MiniWind takes numbers only and bsp refuses it.
+ROOM_BATCHES_DEFAULT = 'all'
+
+
+class RoomBatchesDefault(str):
+    """The --room-batches value when the option is not given (equal to its text)."""
+
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
@@ -215,6 +224,8 @@ def parser():
     creature_residents.add_option(p)
     import start_disabled
     start_disabled.add_option(p)
+    import seyda_entities
+    seyda_entities.add_option(p)
     p.add_argument("--actor-search", choices=("wide", "near"), default="wide", help="Actor support search: wide (default; a ground actor that no spot within 32 units fits is also tried up to 48 units away, CHIM-VIVEC-FRAME-WIDE-41; an actor the 32-unit search places never moves) or near (32 units only: the method before v0.0.41). Part of the actor stages' cache keys (AMIWIND_ACTOR_SEARCH)")
     from build_exclusions import add_options as add_exclusion_options
     add_exclusion_options(p)
@@ -397,6 +408,18 @@ def parser():
                    help='CHIM builder: edge bevels of the model standing hulls (EXPERIMENTAL; '
                         'CHIM-COMPILED-HULL-OVERFILL-46): exact, or tol:N; not given or profile = only the meshes whose '
                         'profile asks for them (the method before)')
+    p.add_argument('--interior-format', choices=('chim', 'bsp'), default='chim',
+                   help='CHIM builder: the form of the interiors (EXPERIMENTAL; docs/chim/INTERIOR_STORE.md): chim = CHIM '
+                        'rooms on one interior store, each mesh and texture once, loaded whole at the door (the '
+                        'default, maintainer 22 October 2026); bsp = a Quake map per room (the method before)')
+    p.add_argument('--room-batches', default=RoomBatchesDefault(ROOM_BATCHES_DEFAULT), metavar='none|all|N|N-M[,...]',
+                   help='CHIM builder: convert the interior rooms of these batches of the room list of the repo '
+                        '(config/room-batches.json; EXPERIMENTAL, docs/chim/DOOR_GRAPH.md "Rooms by batch in the builder") as '
+                        'CHIM rooms, each door linked both ways; a room another room stage of the plan converts is left to '
+                        'it. Not given = all (the maintainer\'s decision of 23 October 2026: every base-game interior); '
+                        'none = no batch rooms. A MiniWind takes batch numbers only (e.g. --miniwind-balmora '
+                        '--room-batches 1): not given, it builds none; so does --interior-format bsp, which refuses '
+                        'an explicit selection')
     p.add_argument('--chim-placement-format', choices=('0.7', '0.8'), default=None,
                    help='CHIM builder: world format of the placements (EXPERIMENTAL; CHIM-TILT-VARIANTS-SPLIT-33): 0.8 = '
                         'one model per mesh + scale, the full rotation in the record, collision from the placed pieces; '
@@ -417,6 +440,12 @@ def parser():
                         'v0.0.47) = every exterior NPC and creature reference of the game data in maps/chim-actors.cca, '
                         'read by the type 1 window with "chim actors table 1", and the actor library stage; off = none '
                         '(only the frame maps place actors; the method before)')
+    p.add_argument('--chim-region-actors', choices=('off', 'on'), default='on',
+                   help='CHIM builder (CHIM-EXTERIOR-ACTORS-MISSING-46; on by default, the maintainer, 23 October 2026): on = every CHIM region frame '
+                        'map places the exterior NPC and creature references of its cells at their authored spots, '
+                        'grounded on the frame collision as the towns\' residents (tools/chim/region_actors.py; the '
+                        'actor library stage gives the models; levelled creature lists are listed as deferred); off '
+                        '(the default) = region frames place no actors (the method before)')
     p.add_argument('--chim-mesh-method', choices=('table', 'converter', 'merge', 'meshopt+merge'), default=None,
                    help='CHIM builder: how meshes become faces: table (default: config/mesh-methods.json), or one method '
                         'for every mesh: converter (the method before v0.0.36-dev3), merge, meshopt+merge '
@@ -430,6 +459,17 @@ def parser():
                         'waterfalls, the ash mire; not lava): turbulent (default since v0.0.47) a Quake turbulent '
                         'texture that ripples over time, unlit (in game: dbg ghostfence on/off); off a still texture, '
                         'the method before v0.0.47 (GHOSTFENCE-NO-ANIMATION-46)')
+    p.add_argument('--chim-fire-light', choices=('on', 'off'), default='on',
+                   help='CHIM builder (CHIM-EXTERIOR-FLAMES-MISSING-48; on by default, the maintainer 2026-10-23: '
+                        '"set it on by default but add some dbg command like dbg campfires on|off"): on = each fire '
+                        'outdoors (campfire, brazier, fire pit, torch, flame lamp) carries its light record in its '
+                        'frame map flame row, and the engine lights the placed models around it (in game: dbg '
+                        'campfires on/off); off = flames without light (the frame maps of before this option)')
+    p.add_argument('--chim-placement-light', choices=('off', 'sources'), default=None,
+                   help='CHIM builder, EXPERIMENTAL (CHIM-MESHLESS-LIGHTS-33): sources = every exterior light source '
+                        'that adds light (the lights without a mesh among them) gives the placed models it reaches a '
+                        'light level (world format 0.12; hybrid lighting only; tools/chim/placement_light.py); off '
+                        '(the default until its in-game frame cost is measured) = none, the world as before')
     p.add_argument('--chim-draw-distance', type=int, metavar='UNITS',
                    help='DEBUG ONLY (--miniwind --miniwind-debug): a stated closer view; the CHIM world is built '
                         'and heap-gated for this draw distance and the image starts with it (default 540)')
@@ -593,10 +633,9 @@ def parser():
                         'the map-switch margin; its border copies of other cells are walked where they are owned) '
                         'or frame (the method before v0.0.42: the whole frame with its border copies)')
     p.add_argument('--stair-collision-method', choices=('0', '1'), default=None,
-                    help='How a flight of stairs gets its collision: 0 (default) the convex proxies with the stair '
-                         'rules, proven by the stair walk; 1 (EXPERIMENTAL) a stairway collision mesh (one ramp, or one '
-                         'block per tread) for every flight whose collision fails the geometric stair check '
-                         '(tools/stair_mesh.py); sets AMIWIND_STAIR_COLLISION_METHOD')
+                   help='How a flight of stairs gets its collision: 1 (default since v0.0.48-dev2) a stairway collision mesh (one ramp, or one block per tread) for every flight whose collision fails the geometric stair check (tools/stair_mesh.py; a mesh without a flight keeps its collision and unit key); 0 the convex proxies with the stair rules (the method before, kept for A/B); sets AMIWIND_STAIR_COLLISION_METHOD')
+    p.add_argument('--collision-source', choices=('authored', 'profile'), default=None,
+                   help='Which triangles of a model collide: authored (default since v0.0.48-dev2) one rule for every mesh converter: the root RootCollisionNode, else the drawn triangles; NC* and NCC models nonsolid, AvoidNode subtrees left out (tools/collision_source.py, COLLISION-RCN-SCOPE-32); profile the rule before (each converter profile opts in, the drawn triangles otherwise; kept for A/B); sets AMIWIND_COLLISION_SOURCE')
     p.add_argument('--collision-underside', choices=('rule', 'split', 'whole', 'names'), default=None,
                    help='How a CHIM model keeps collision that a convex piece closes under an authored ceiling '
                         '(CHIM-VOS-TEMPLE-WALKWAY-41): names (default): a list of mesh names (the Velothi temples) '
@@ -1035,6 +1074,32 @@ def hand_catalog_steps(args, tool, run, jobs=None):
     return step, ['--hand-catalog', str(run / 'hand-catalog')]
 
 
+def mwscript_status(args):
+    """The compiled game scripts (id1/mwscript.awm) in this build: (built, status).
+
+    Every real AGA image build compiles them (docs/MWSCRIPT_BYTECODE.md): one unit of a few seconds,
+    reused from the pool when its inputs are unchanged. The engine runs them only with aw_mwscript on
+    (EXPERIMENTAL, off by default). Asset-free dry runs, terrain-only builds and the rc3 image recovery
+    make none."""
+    if getattr(args, 'dry_run', False):
+        return False, 'asset-free'
+    if getattr(args, 'stage', 'aga') != 'aga':
+        return False, 'not applicable (terrain stage)'
+    if getattr(args, 'recover_image_from', None):
+        return False, 'not part of the rc3 image recovery'
+    if getattr(args, 'builder', 'chim') == 'legacy':
+        return False, 'not part of the legacy builder (kept unchanged for A/B regression tests)'
+    return True, 'enabled (engine switch aw_mwscript, experimental, off by default)'
+
+
+def mwscript_steps(args, tool, run):
+    """The mwscript step and its image option: every script compiled against the media stage's catalogue and the
+    soundtrack (sounds by index, no audio copied)."""
+    step = ('mwscript', tool('prepare_mwscript.py', '--data-files', args.data_files, '--media', run / 'media',
+                             '--music', run / 'music', '--out', run / 'mwscript', *media_file_cache(args, run, 'mwscript')))
+    return step, ['--mwscript', str(run / 'mwscript')]
+
+
 def harvest_status(args):
     """Harvestable mushrooms in this build: (built, status).
 
@@ -1212,6 +1277,92 @@ def chim_town_commands(args, builder, steps, tool, run, tools, jobs):
     return [(name, image(command) if name == 'image' else command) for name, command in steps]
 
 
+def chim_interior_commands(args, steps, tool, run, tools, jobs):
+    """CHIM rooms (EXPERIMENTAL, docs/chim/INTERIOR_STORE.md; --interior-format chim): the stage chim-interiors, right
+    before the image, makes the interior store and the room records from every room the run's room stages converted
+    (their work folders), and the image installs them over the final room maps (--chim-interiors)."""
+    names = [name for name, _ in steps]
+    sources = [run / 'intro-scene' / 'area-work'] + [run / name / 'scene' / 'area-work' for name in names
+                                                       if name.startswith('chim-rooms-')]
+    # the room stages write shell rooms, no qbsp, vis or light: this stage keeps only a room's entities, boxes and
+    # liquid brushes (BUILD-SEYDA-BSP-CARRIER-48; prepare_area.add_room_form_option)
+    shells = {'area', 'balmora-interiors'} | {name for name in names if name.startswith('chim-rooms-')}
+    steps = [(name, [*command, '--room-form', 'shell'] if name in shells and '--room-form' not in command else command)
+             for name, command in steps]
+    at = names.index('image')
+    steps.insert(at, ('chim-interiors', tool(
+        'chim_interiors.py', *[part for s in sources for part in ('--rooms-from', s)],
+        '--palette', run / 'intro-scene/id1/gfx/palette.lmp', '--out', run / 'chim-interiors',
+        '--qbsp', tools['qbsp'], '--unit-cache', args.workspace / 'cache/chim-units', '--jobs', jobs,
+        # the rooms leave the harvestable plants out; the image places them as harvest entities, as the CHIM world
+        # does outdoors (CHIM-ROOM-HARVEST-DOUBLE-48; --no-harvest: no harvest stage, the plants stay placed meshes)
+        *(['--harvest', run / 'harvest', '--data-files', args.data_files] if 'harvest' in names else []))))
+    return [(name, command + ['--chim-interiors', str(run / 'chim-interiors')] if name == 'image' else command)
+            for name, command in steps]
+
+
+def room_batch_selection(args):
+    """The batches --room-batches selects (tools/room_batches.py), checked before any stage runs: [] or the batch
+    numbers. Not given = ROOM_BATCHES_DEFAULT (all: the maintainer's decision of 23 October 2026) for a full build
+    with CHIM rooms; not given, a MiniWind and a build with --interior-format bsp build none (the default never
+    errors). A MiniWind takes explicit numbers only (all is a full interior build, not a sandbox); the batch rooms are
+    CHIM rooms only, so an explicit selection with --interior-format bsp is refused."""
+    import room_batches
+    value = getattr(args, 'room_batches', None)
+    if value is None or isinstance(value, RoomBatchesDefault):
+        if getattr(args, 'miniwind', False) or getattr(args, 'interior_format', 'chim') != 'chim':
+            return []
+        value = str(value or ROOM_BATCHES_DEFAULT)
+    if str(value).strip().casefold() == room_batches.SELECTION_NONE:
+        return []
+    doc = room_batches.load()
+    if doc is None:
+        raise ValueError('--room-batches: the repo has no room list (config/%s)' % room_batches.CONFIG)
+    if getattr(args, 'miniwind', False) and str(value).strip().casefold() == room_batches.SELECTION_ALL:
+        raise ValueError('--room-batches all is every interior of the list: a MiniWind takes batch numbers '
+                         '(e.g. --room-batches 1)')
+    chosen = room_batches.parse_selection(value, doc)
+    if chosen and getattr(args, 'interior_format', 'chim') != 'chim':
+        raise ValueError('--room-batches makes CHIM rooms only: drop --interior-format %s' % args.interior_format)
+    if chosen and getattr(args, 'miniwind', False) and getattr(args, 'miniwind_scope', None) in ('exterior', 'interior'):
+        raise ValueError('--room-batches: the MiniWind %s scope builds no batch rooms' % args.miniwind_scope)
+    return chosen
+
+
+def room_batch_commands(args, steps, tool, run, tools, jobs):
+    """--room-batches (docs/chim/DOOR_GRAPH.md "Rooms by batch in the builder"): the stage chim-room-batches before the
+    CHIM interiors stage converts the selected batches' rooms (tools/chim_room_batches.py: one unit per room on the
+    shared pool, the unit cache), leaving every room another room stage of this plan converts to that stage (--held-by,
+    after the MiniWind and exclusion filters, so a stage the plan dropped holds nothing); the CHIM interiors stage
+    reads its rooms too, and the image installs them and links their doors both ways. No selection: the plan as
+    before (no stage, no option)."""
+    import room_batches
+    chosen = room_batch_selection(args)
+    names = [name for name, _ in steps]
+    if not chosen or 'image' not in names:
+        return steps
+    if 'chim-interiors' not in names and isinstance(getattr(args, 'room_batches', None), (RoomBatchesDefault, type(None))):
+        return steps            # the default on a plan without CHIM rooms (the legacy builder): nothing, no error
+    if 'chim-interiors' not in names:
+        raise ValueError('--room-batches needs the CHIM interiors stage (--builder chim, --interior-format chim)')
+    stage = run / 'chim-room-batches'
+    command = tool('chim_room_batches.py', '--batches', room_batches.selection_text(chosen).replace(' ', ''),
+                   '--data-files', args.data_files, '--scene', run / 'intro-scene', '--out', stage,
+                   *[part for held in room_batches.room_stages(names) for part in ('--held-by', held)],
+                   '--ffmpeg', tools['ffmpeg'],
+                   '--jobs', jobs, *npc_lod_arguments(args, run, 'chim-room-batches'))
+    at = names.index('chim-interiors')
+    steps = steps[:at] + [('chim-room-batches', command)] + steps[at:]
+    out = []
+    for name, command in steps:
+        if name == 'chim-interiors':
+            command = [*command, '--rooms-from', str(stage / 'scene' / 'area-work')]
+        elif name == 'image':
+            command = [*command, '--chim-room-batches', str(stage)]
+        out.append((name, command))
+    return out
+
+
 def seyda_town_options(run, names):
     """chim_town.py options of a CHIM-native Seyda Neen: the image's town flora rule needs the world flora assets
     and the town scenery's source index and scene report (when the plan builds world flora)."""
@@ -1279,7 +1430,7 @@ def npc_lod_arguments(args, run, stage):
     """Near/far NPC model options (tools/npc_lod.py) for the stages that bake residents: only
     non-default choices, so default command lines stay unchanged, plus the asset pool on
     development builds (the media cache's rule, media_file_cache)."""
-    if stage not in ('area', 'balmora', 'balmora-interiors') and not stage.startswith(('town-', 'chim-rooms-')):
+    if stage not in ('area', 'balmora', 'balmora-interiors', 'chim-room-batches') and not stage.startswith(('town-', 'chim-rooms-')):
         return []
     import npc_lod
     options = npc_lod.resolve_options(args)
@@ -1338,6 +1489,16 @@ def chim_actor_table(args):
     builder; a legacy-builder build has no CHIM world and no actor table (its plan as before)."""
     value = getattr(args, 'chim_actor_table', None)
     if value != 'on':
+        return 'off'
+    builder = getattr(args, 'builder_options', None) or resolve_builder(args)
+    return 'on' if builder['builder'] == 'chim' else 'off'
+
+
+def chim_region_actors(args):
+    """'on' or 'off': --chim-region-actors for a CHIM builder. On by default (the maintainer, 23 October 2026: "the
+    switch should be on by default, we should have all the actors in their places by default"); off keeps the region
+    frames without actors (the method before)."""
+    if getattr(args, 'chim_region_actors', None) == 'off':
         return 'off'
     builder = getattr(args, 'builder_options', None) or resolve_builder(args)
     return 'on' if builder['builder'] == 'chim' else 'off'
@@ -1516,7 +1677,7 @@ def commands(args, tools, run):
                             *[part for name in (getattr(args, "engine_experiment", None) or []) for part in ("--engine-experiment", name)],
                             # narrow coordinates only when asked: the default (wide) command line has no option
                             *(["--coord-range", "narrow"] if getattr(args, "coord_range", "wide") == "narrow" else []))),
-            ("image", tool("build_aga.py", "image", "--jobs", jobs, *(["--chim-actor-table", "on"] if chim_actor_table(args) == "on" else []), *(["--kickstart-file", args.kickstart_file] if getattr(args,"kickstart_file",None) else []), *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *[part for fid in (getattr(args, "accept_known_stair_findings", None) or []) for part in ("--accept-known-stair-findings", fid)], *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--sdk", args.sdk, "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--world-scenery", run / "world-scenery", "--music", run / "music", "--media", run / "media", "--engine", binary, "--out", run / "image",
+            ("image", tool("build_aga.py", "image", "--jobs", jobs, *(["--chim-actor-table", "on"] if chim_actor_table(args) == "on" else []), *(["--chim-region-actors", "on"] if chim_region_actors(args) == "on" else []), *(["--kickstart-file", args.kickstart_file] if getattr(args,"kickstart_file",None) else []), *(["--allow-known-actor-ground-findings", args.allow_known_actor_ground_findings] if getattr(args,"allow_known_actor_ground_findings",None) else []), *[part for fid in (getattr(args, "accept_known_stair_findings", None) or []) for part in ("--accept-known-stair-findings", fid)], *(["--intro-captions", args.intro_captions] if getattr(args,"intro_captions",None) else []), "--sdk", args.sdk, "--data-files", args.data_files, "--hands", args.hands, *(["--no-npc-gallery"] if args.no_npc_gallery else ["--gallery", run / "npc-gallery"]), "--scene", run / "intro-scene", "--world-scenery", run / "world-scenery", "--music", run / "music", "--media", run / "media", "--engine", binary, "--out", run / "image",
                 *[part for name in ("qcc", "qbsp", "vis", "light", "xdftool", "rdbtool") for part in ("--" + name, tools[name])])),
         ]
         # Shipped towns (by default) and --extra-town towns convert in the same
@@ -1551,7 +1712,8 @@ def commands(args, tools, run):
                       '--town-flora-source-index', str(run / 'scenery/scenery-index.json'),
                       '--town-flora-scene-report', str(run / 'alias-scene/scene-report.json')] if name == 'image' else command)
                  for name, command in steps]
-    if chim_actor_table(args) == 'on' and any(name == 'image' for name, _ in steps):
+    if 'on' in (chim_actor_table(args), chim_region_actors(args)) and any(name == 'image' for name, _ in steps):
+        # with --chim-region-actors on the region frame maps name the same models
         # --chim-actor-table on (the default since v0.0.47; CHIM-EXTERIOR-ACTORS-MISSING-46): the actor library stage bakes
         # the models of the exterior creatures and of the NPCs outside the CHIM towns (tools/actor_library.py); the
         # image step installs them and gives the actor table their base texts. Off: no stage, no option.
@@ -1568,6 +1730,11 @@ def commands(args, tools, run):
         steps = [(name, command + options if name == 'image' else command) for name, command in steps]
     if hand_catalog_status(args)[0]:
         step, options = hand_catalog_steps(args, tool, run, jobs)
+        image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
+        steps.insert(image_index, step)
+        steps = [(name, command + options if name == 'image' else command) for name, command in steps]
+    if mwscript_status(args)[0] and any(name == 'image' for name, _ in steps) and any(name == 'media' for name, _ in steps):
+        step, options = mwscript_steps(args, tool, run)
         image_index = next(i for i, (name, _) in enumerate(steps) if name == 'image')
         steps.insert(image_index, step)
         steps = [(name, command + options if name == 'image' else command) for name, command in steps]
@@ -1672,6 +1839,8 @@ def commands(args, tools, run):
                                        builder.get('chim_lighting_type') or 'hybrid'] if name == 'image' else command)
                      for name, command in steps]
             steps = chim_town_commands(args, builder, steps, tool, run, tools, jobs)
+            if getattr(args, 'interior_format', 'chim') == 'chim':
+                steps = chim_interior_commands(args, steps, tool, run, tools, jobs)
     if args.no_npc_gallery:
         steps = [(name, command) for name, command in steps if name != "npc-gallery"]
     if getattr(args, 'miniwind', False) and args.stage == 'aga':
@@ -1691,6 +1860,14 @@ def commands(args, tools, run):
         steps = build_exclusions.apply(steps, groups, run=run, area_cells=getattr(args, 'closure_cells', None),
                                        data_files=args.data_files,
                                        closure_groups=getattr(args, 'unreferenced_groups', None))
+    # a filter that left the harvest stage out: the CHIM rooms keep their plants (CHIM-ROOM-HARVEST-DOUBLE-48)
+    if not any(name == 'harvest' for name, _ in steps):
+        steps = [(name, _drop_option(_drop_option(command, '--harvest'), '--data-files')
+                  if name == 'chim-interiors' else command) for name, command in steps]
+    # --room-batches (tools/room_batches.py): after the MiniWind and exclusion filters, so --held-by names only the room
+    # stages this plan runs; a quick build without interiors (--exclude interiors) converts no batch room either
+    if args.stage == 'aga' and not getattr(args, 'dry_run', False) and 'interiors' not in (groups or ()):
+        steps = room_batch_commands(args, steps, tool, run, tools, jobs)
     # A direct start (tools/direct_start.py): the image resolves the start against its final maps.
     start = getattr(args, 'direct_start', None)
     character = getattr(args, 'quick_character_record', None)
@@ -1836,6 +2013,10 @@ def miniwind_commands(args, steps):
                  *('chim-rooms-' + a for a in default_areas if a not in (town, 'balmora')
                    and __import__('chim_rooms').has_rooms(a))):
         left_out.setdefault(name, miniwind.omitted(name, scope, town))
+    if not room_batch_selection(args):
+        # the default build converts every room batch; a MiniWind takes batch numbers only (--room-batches N)
+        left_out.setdefault('chim-room-batches', 'room batches: a MiniWind converts the batches named with '
+                                                 '--room-batches N only')
     names = [name for name, _ in steps]
     if 'chim' not in names:
         raise ValueError('--miniwind needs the CHIM builder stage')
@@ -1916,6 +2097,10 @@ def chim_stage_options(args):
     uv_scroll = getattr(args, 'chim_uv_scroll', None) or 'turbulent'
     if uv_scroll != 'off':
         out += ['--uv-scroll', uv_scroll]
+    # EXPERIMENTAL placement light levels (CHIM-MESHLESS-LIGHTS-33): off by default, so a default command line
+    # stays unchanged
+    if getattr(args, 'chim_placement_light', None) not in (None, 'off'):
+        out += ['--placement-light', args.chim_placement_light]
     if getattr(args, 'chim_regions_cells', None):
         # the cells themselves (resolve_chim_regions), so the stage key covers exactly them
         out += ['--chim-regions-cells', args.chim_regions_cells]
@@ -2218,6 +2403,27 @@ def size_ledger_step(args, run):
     return size_ledger.step(run, VERSION, [args.size_baseline] if getattr(args, 'size_baseline', None) else [],
                             getattr(args, 'size_guard', 'auto'), getattr(args, 'size_growth_margin', 0.05),
                             getattr(args, 'size_growth_reason', None), log=lambda line: print(line, flush=True))
+
+
+def inclusion_step(args, run):
+    """The CHIM inclusion entry of a passed build with a CHIM world (tools/chim_inclusion.py build_step): RUN/toolkit/
+    chim-inclusion.json/.js = the repository ledger with this run's entry (state built) on top, so the run's World map
+    and the served Toolkit list the build they belong to (TRACKER-INCLUSION-NOT-RUN-SINCE-44-48). Always on; not a
+    stage, so it keys no stage and no stage keys it; reused when its inputs are unchanged; under a second (two small
+    JSON reads, two writes), run beside the size ledger. A problem is a warning, never a failed build."""
+    if args.stage != 'aga' or args.dry_run or not (Path(run) / 'chim-world' / 'chim-source.json').is_file():
+        return None
+    try:
+        import chim_inclusion
+        import run_name
+        commit = ((getattr(args, 'run_name_record', None) or {}).get('commit')
+                  or run_name.source_commit(ROOT, getattr(args, 'source_commit', None))[0])
+        return chim_inclusion.build_step(run, VERSION, commit, getattr(args, 'chim_regions_cells', None),
+                                         log=lambda line: print(line, flush=True))
+    except Exception as exc:     # noqa: BLE001 - never fail a build over the ledger copy
+        print('WARNING: the CHIM inclusion entry was not written (%s: %s); the build is unaffected'
+              % (type(exc).__name__, exc), flush=True)
+        return None
 
 
 def provenance(args, tools):
@@ -2724,6 +2930,11 @@ def export_option_environment(args, announce=True):
     if export_start_disabled(getattr(args, 'start_disabled', None) or 'placed') == 'original' and announce:
         print('Start-disabled actors: original (off by default, A/B: the actors the start script disables are '
               'left out; nothing enables them during play yet)', flush=True)
+    # Where the scene stages read Seyda Neen's entities (tools/seyda_entities.py reads AMIWIND_SEYDA_ENTITIES; part
+    # of the scene stages' keys; BUILD-SEYDA-ENTITY-BUS-48). Default list: the variable is removed.
+    from seyda_entities import export_mode as export_seyda_entities
+    if export_seyda_entities(getattr(args, 'seyda_entities', None) or 'list') == 'bsp' and announce:
+        print('Seyda Neen entities: bsp (the legacy read path: the seyda.bsp carrier\'s entity lump)', flush=True)
     # Resident animation kit profile (tools/npc_anim.py reads AMIWIND_NPC_ANIM; part of the stage cache identity).
     if getattr(args, 'npc_anim', 'idle') != 'idle':
         os.environ['AMIWIND_NPC_ANIM'] = args.npc_anim
@@ -2797,6 +3008,9 @@ def export_option_environment(args, announce=True):
     if getattr(args, 'stair_collision_method', None):
         from stair_collision_env import export_stair_collision_method   # chim.build: profile stair_collision
         export_stair_collision_method(args.stair_collision_method)
+    if getattr(args, 'collision_source', None):
+        from collision_source_env import export_collision_source   # prepare_scenery.export_refs: the source rule
+        export_collision_source(args.collision_source)
     if getattr(args, 'scale_snap', None):
         os.environ['AMIWIND_SCALE_SNAP'] = '' if args.scale_snap == 'on' else 'off'   # chim.build.scale_snap_step
     if announce and walk_cache == 'full':
@@ -2828,6 +3042,10 @@ def export_converter_environment(args):
     from build_font_options import export_world_map
     export_world_map(args.font_options["world_map"])
     export_chim_stream_statics(args.font_options["chim_stream_statics"])
+    # The fires' light in the CHIM frame maps (chim.flames, CHIM-EXTERIOR-FLAMES-MISSING-48): read by the image step
+    # from the environment, with the master it reads the fires' light records from.
+    from chim.flames import export_fire_light
+    export_fire_light(getattr(args, 'chim_fire_light', None) or 'on', getattr(args, 'data_files', None))
     # CHIM frame map extension (tools/map_files.py): read by the image step from the environment.
     from map_files import DEFAULT_FRAME_EXT, export_frame_ext
     export_frame_ext(getattr(args, 'chim_frame_ext', None) or DEFAULT_FRAME_EXT)
@@ -3034,6 +3252,7 @@ def main(argv=None):
             configure_miniwind(args)  # refused for rc/final and contradictory options, before any work
         if args.chim_draw_distance is not None and not args.miniwind:
             raise ValueError('--chim-draw-distance is DEBUG ONLY: a --miniwind --miniwind-debug build')
+        room_batch_selection(args)  # --room-batches: unknown batches and contradictory options, before any work
         town_selection(args)  # contradictory town options stop here, before any work
         # Quick test builds: unknown/refused groups and rc/final versions stop here, before any work.
         import build_exclusions
@@ -3481,8 +3700,13 @@ def main(argv=None):
                 result = run/'image'/name
             if args.allow_known_actor_ground_findings and acceptance is None:
                 raise ValueError('Private-test build is missing its actor acceptance receipt')
+        # The run's CHIM inclusion entry (seconds at most) runs beside the size ledger, never in front of it.
+        import threading
+        inclusion = threading.Thread(target=inclusion_step, args=(args, run), name='chim-inclusion', daemon=True)
+        inclusion.start()
         size_verdict = size_ledger_step(args, run)
         resource_after_build(args, run)
+        inclusion.join()
         summary.finish('passed', result, actor_acceptance=acceptance)
         save_recipe(args, 'passed')
         if live:

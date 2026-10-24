@@ -193,8 +193,11 @@ class StairRulePlumbingTests(unittest.TestCase):
         method 1, run only by its own mesh worker (stair_mesh.mesh_unit_stair, unit kind 'mesh-stair') for a profile
         with stair_collision 'mesh'; its own calls of collision_pieces are method 0's, for the rest of the mesh
         (CHIM-STAIR-COLLISION-MESH-47).
-        stair_mesh_survey.py and stair_mesh_calibrate.py measure both methods on a finished build, read only."""
-        allowed = {'mesh_geometry.py', 'prepare_bsp.py', 'routed_hull.py', 'stair_mesh.py'}
+        stair_mesh_survey.py, stair_mesh_calibrate.py and step_rules_survey.py (STEP-MOVEMENT-OPENMW-RULES-48) measure
+        both methods on a finished build, read only.
+        authored_ramps.py turns a convex piece that stands over an authored stair ramp into the authored plates of its
+        own triangles (shell_collision_parts), called by method 1 only (stair_mesh.keep_stair_ramps)."""
+        allowed = {'mesh_geometry.py', 'prepare_bsp.py', 'routed_hull.py', 'stair_mesh.py', 'authored_ramps.py'}
         offenders = []
         for path in sorted((ROOT / 'tools').glob('*.py')):
             text = path.read_text(encoding='utf-8')
@@ -206,7 +209,7 @@ class StairRulePlumbingTests(unittest.TestCase):
         users = sorted(p.name for p in (ROOT / 'tools').glob('*.py')
                        if 'collision_pieces(' in p.read_text(encoding='utf-8') and p.name != 'mesh_geometry.py')
         self.assertEqual(users, ['asset_census.py', 'prepare_mesh_bsp.py', 'stair_mesh.py', 'stair_mesh_calibrate.py',
-                                 'stair_mesh_survey.py',
+                                 'stair_mesh_survey.py', 'step_rules_survey.py',
                                  'world_estimate_data.py'])
         # Every map converter (towns, world, interiors, census, prison) assembles through prepare_mesh_bsp.
         for name in ('import_town.py', 'prepare_world_scenery.py', 'prepare_area.py', 'prepare_census.py',

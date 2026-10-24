@@ -1,6 +1,6 @@
 # Building and playing
 
-_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 How to build AmiWind from your own Morrowind copy and run it in an emulator. The short version is in the [README](../README.md#build-it-from-your-own-morrowind).
 
@@ -140,9 +140,10 @@ For manual setup or WinUAE, use the guides and steps below.
 4. Start emulation and click inside the window to capture the mouse. Use
    **WASD** to move and the mouse to look; see [controls and setup](AGA_BUILD.md).
 
-The presets use A1200/AGA, 68040 with FPU, 2 MiB Chip and 128 MiB Z3 Fast RAM
-(16 MiB before 21 October 2026; 16 MiB stays the smallest machine the game runs
-on, see [Fast RAM](FS-UAE-LAUNCHER.md#fast-ram)), with JIT and maximum CPU speed. The v0.0.16 playable image was tested with
+The presets use A1200/AGA, 68040 with FPU, 2 MiB Chip and 32 MiB Z3 Fast RAM, the
+safe minimum for the whole game (since 23 October 2026; 128 MiB from 21 October, 16 MiB
+before; more is used automatically; 16 MiB still starts with a warning and loads more
+often, see [Fast RAM](FS-UAE-LAUNCHER.md#fast-ram)), with JIT and maximum CPU speed. The v0.0.16 playable image was tested with
 FS-UAE 3.1.66 on Linux. The Windows checkpoint reached the game in WinUAE 6.0.3
 using this hardware profile; see the [test scope](VALIDATION-WINDOWS-2026-10-02.md).
 The public [dry-run build](CI_DRY_RUN.md) contains no game assets or ROMs

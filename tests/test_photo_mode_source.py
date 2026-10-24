@@ -67,6 +67,54 @@ class PhotoModeSourceTests(unittest.TestCase):
         self.assertIn('"crosshair"', photo)
         self.assertIn('Cvar_SetValue("crosshair"', photo)
 
+    def test_default_sensitivity_unchanged_and_saved(self):
+        # OPTIONS-MOUSE-SENSITIVITY-48: the menu and dbg sensitivity edit Quake's own saved setting; its
+        # default stays 3 in the engine and in the shipped default.cfg.
+        self.assertIn('cvar_t\tsensitivity = {"sensitivity","3", true};', (SRC / 'cl_main.c').read_text(encoding='utf-8'))
+        self.assertIn('cvar_t\tm_pitch = {"m_pitch","0.022", true};', (SRC / 'cl_main.c').read_text(encoding='utf-8'))
+        self.assertRegex((ROOT / 'tools' / 'prepare_quake.py').read_text(encoding='utf-8'), r'\nsensitivity 3\n')
+        self.assertIn('mouse_x *= sensitivity.value;', source('in_amiga.c'))
+        photo = source('aw_photo.c')
+        self.assertIn('Cvar_SetValue("sensitivity",tenths/10.0f);', photo)
+        self.assertIn('Cmd_AddCommand("aw_sensitivity",sensitivity_command);', photo)
+        header = (SRC / 'quakedef.h').read_text(encoding='utf-8')
+        for line in ('#define AW_SENSITIVITY_MENU_MIN 5', '#define AW_SENSITIVITY_MENU_MAX 100',
+                     '#define AW_SENSITIVITY_CONSOLE_MIN 1', '#define AW_SENSITIVITY_CONSOLE_MAX 200'):
+            self.assertIn(line, header)
+
+    def test_crosshair_style_saved_and_classic_look_kept(self):
+        # OPTIONS-CROSSHAIR-STYLE-48: colour and shape are saved settings, default 0 = Warm white, Cross.
+        photo = source('aw_photo.c')
+        self.assertIn('static cvar_t crosshair_colour={"aw_crosshair_colour","0",true};', photo)
+        self.assertIn('static cvar_t crosshair_shape={"aw_crosshair_shape","0",true};', photo)
+        self.assertIn('{"Warm white","Yellow","Green","Blue"}', photo)
+        self.assertIn('{"Cross","Open cross","Small cross","Dot"}', photo)
+        view = source('view.c')
+        draw = body(view, 'void AW_CrosshairDraw')
+        # Classic + Cross is the old draw call itself, byte for byte the same pixels.
+        self.assertRegex(draw, r"if \(!shape && !colour\)\s*\{\s*Draw_Character \(x, y, '\+'\);\s*return;")
+        self.assertIn('AW_CrosshairDraw (x, y);', view)
+        # The pick crosshair (dbg companion pick) keeps its own red cross and its white "picking" one.
+        self.assertRegex(view, r"if \(pick == 1\)\s*Draw_Character \(x, y, '\+'\);")
+        self.assertIn('Draw_Fill(x,y+3,8,2,red);Draw_Fill(x+3,y,2,8,red);', source('aw_companion.c'))
+        # No per-frame palette search: the entry is cached per colour and palette.
+        colour = body(view, 'static int V_CrosshairColour')
+        self.assertIn('if (value == cached_value && host_basepal == cached_palette)', colour)
+
+    def test_options_pages_and_full_screen(self):
+        menu = source('aw_menu.c')
+        self.assertIn('{"Prefs","Audio","Controls","Video"}', menu)
+        for text in ('"Show crosshairs: On"', '"Crosshair colour: %s"', '"Crosshair shape: %s"', '"Mouse sensitivity"',
+                     '"Invert Y axis: On"', '"Reset to defaults"', '"Extra RAM: Automatic"', '"Photo mode"'):
+            self.assertIn(text, menu)
+        self.assertIn('Cvar_SetValue("m_pitch",-Cvar_VariableValue("m_pitch"));', menu)
+        self.assertIn('AW_UIBox(0,0,vid.width,vid.height);', body(menu, 'static void options_draw'))
+        self.assertIn('aw_menu_fullscreen=fullscreen;', menu)
+        # The world is not drawn behind the full-screen Options panel, whatever aw_modal_black says.
+        hidden = body(source('aw_ui.c'), 'int AW_ModalWorldHidden')
+        self.assertIn('if(aw_menu_fullscreen && aw_menu_fullscreen() && !cl.intermission && !death_prompt())return 1;', hidden)
+        self.assertRegex(body(source('screen.c'), 'SCR_UpdateScreen'), r'if\(!AW_ModalWorldHidden\(\)\) \{\s*VID_LockBuffer \(\);\s*V_RenderView \(\);')
+
     def test_photo_mode_switches_and_saved_settings(self):
         photo = source('aw_photo.c')
         self.assertIn('{"aw_photomode_nofog","1",true}', photo)
@@ -142,10 +190,12 @@ class PhotoModeSourceTests(unittest.TestCase):
     def test_catalogue_names_and_docs(self):
         catalogue = (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8')
         for words, handler in (('photomode', 'aw_photomode'), ('killhud', 'aw_photomode'),
-                               ('crosshair', 'aw_crosshair'), ('crosshairs', 'aw_crosshair')):
+                               ('crosshair', 'aw_crosshair'), ('crosshairs', 'aw_crosshair'),
+                               ('sensitivity', 'aw_sensitivity')):
             self.assertRegex(catalogue, r'\n[A-Z /]+\|%s\|%s\|' % (words, handler))
         keymaps_doc = (ROOT / 'docs' / 'KEYMAPS.md').read_text(encoding='utf-8')
-        for text in ('Ctrl+F', 'Ctrl+H', 'dbg photomode', 'Show crosshairs'):
+        for text in ('Ctrl+F', 'Ctrl+H', 'dbg photomode', 'Options > Prefs > Show crosshairs', 'dbg crosshair colour',
+                     'dbg sensitivity', 'Invert Y axis', '[ Prefs ]  [ Audio ]  [ Controls ]  [ Video ]'):
             self.assertIn(text, keymaps_doc)
 
 

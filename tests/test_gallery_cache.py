@@ -117,7 +117,11 @@ class GalleryCacheTests(unittest.TestCase):
         The form is part of every key, so the change itself is explicit."""
         import build_cache
         self.assertEqual(c.KEY_FORMAT, 'reached code 2')
-        self.assertEqual(c.KEY_TOP_FORMAT, build_cache.STAGE_TOP_FORMAT)
+        # form 2 of build_cache's import-time forms; the stage keys moved on to form 3 (BUILD-STAGE-KEY-WHOLE-
+        # CLASS-48) and the faces did not follow: a new form would convert every face again
+        # (BUILD-FACE-KEY-FORM-TEST-48)
+        self.assertEqual(c.KEY_TOP_FORMAT, 2)
+        self.assertIn(c.KEY_TOP_FORMAT, build_cache.TOP_FORMATS)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root/'tools').mkdir()

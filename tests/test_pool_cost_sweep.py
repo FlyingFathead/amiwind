@@ -16,7 +16,7 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-POOLS = {'ordered_map', 'completed_map', 'governed_map', 'costed_map'}
+POOLS = {'ordered_map', 'completed_map', 'governed_map', 'costed_map', 'spread_map'}
 
 FEW = 'a handful of units (one per race, town, room kind or pass): no tail to speak of'
 UNIFORM = 'many units of about the same cost (one file, one map stamp or one copy each)'
@@ -31,9 +31,11 @@ LATER = ('no cost yet; the units are measured in the build profile and a cost fo
 REASONS = {
     'tools/actor_grounding.py:annotate': GATE,
     'tools/actor_grounding.py:bake_ground': LATER,
+    'tools/room_actor_bake.py:_bake': LATER,   # the CHIM room actor bake, the same pools as bake_ground
     'tools/actor_grounding_census.py:measure': LATER,
     'tools/asset_census.py:scan_meshes': UNIFORM,
     'tools/audit_gallery_budgets.py:main': GATE,
+    'tools/interior_store.py:main': GATE,
     'tools/build_gallery.py:prefetch_dependencies': UNIFORM,
     'tools/build_gallery.py:collect_models': SMALL,
     'tools/build_gallery.py:parts_models': SMALL,
@@ -47,6 +49,8 @@ REASONS = {
     'tools/check_actor_ground.py:audit': GATE,
     'tools/check_world_map_heap.py:inspect_maps': LATER,
     'tools/chim/collision.py:stair_gate': SORTED,
+    'tools/chim/flames.py:measure': ('the fires\' measure command on a built world (read only, never a build stage): '
+                                     'one unit per frame, each a fraction of a second'),
     'tools/chim/heap.py:ring_peak': SORTED,
     'tools/chim/heap.py:_frame_ring': SMALL,
     'tools/chim/ownership.py:binary_failures': SMALL,
@@ -87,7 +91,6 @@ REASONS = {
     'tools/prepare_media_assets.py:stage_catalogue': UNIFORM,
     'tools/prepare_mesh_bsp.py:_append_meshes': LATER,
     'tools/prepare_music.py:prepare_music': FEW,
-    'tools/prepare_player_view.py:prepare': FEW,
     'tools/prepare_quake.py:prepare': STREAM,
     'tools/prepare_scenery.py:export_refs': LATER,
     'tools/prepare_seyda_regions.py:convert': 'the recorded Seyda Neen method (retired flag), kept as it was',

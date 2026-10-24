@@ -116,6 +116,9 @@ def contact_samples(frames, angles, intro=False, layout=None):
 
 
 ACTOR_CLASSES = ('aw_npc', 'aw_corpse')
+# What a CHIM room's actors are checked against (chim.room_scene.RoomScene.COLLISION; kept here so the receipt needs
+# no CHIM import when the image has no CHIM room)
+ROOM_COLLISION = 'store models (each placement turned by its record angles), piece tables not read'
 CONTACT_ERRORS = (ValueError, KeyError, OSError, struct.error)
 
 
@@ -124,6 +127,18 @@ def _scan_map(path):
     raw = Path(path).read_bytes()
     actors = [e for e in entities(raw) if e.get('classname') in ACTOR_CLASSES]
     return Path(path).name, hashlib.sha256(raw).hexdigest(), actors
+
+
+def _scan_map_shell(path):
+    """Worker: _scan_map plus whether the map is a room shell (chim.interior.is_shell_map: no placed mesh, no
+    collision of its own until the image makes it a CHIM room)."""
+    from chim.interior import is_shell_map
+    return _scan_map(path) + (is_shell_map(Path(path).read_bytes()),)
+
+
+# A resident of a room shell before the image: the room has no collision to stand on until the image installs it as
+# a CHIM room, and the image's actor check measures it there on the store models (CHIM-ROOM-SHELL-ACTORS-EARLY-48)
+SHELL_DEFERRED = 'deferred-to-chim-room'
 
 
 def _measure_target(task):
@@ -135,6 +150,8 @@ def _measure_target(task):
     path, requests = task
     scene = None
     results = []
+    from map_files import is_chim_room
+    room = is_chim_room(path)
     for point, samples in requests:
         try:
             measured = []
@@ -142,7 +159,12 @@ def _measure_target(task):
             for local, frames in samples:
                 foot = tuple(point[k]+local[k] for k in range(3))
                 if scene is None:  # built at the first sample, as the serial audit did
-                    scene = Scene(Path(path).read_bytes(), hull=0)
+                    if room:
+                        # a CHIM room: its actors stand on store models (chim.room_scene.RoomScene)
+                        from chim.room_scene import RoomScene
+                        scene = RoomScene(path, hull=0)
+                    else:
+                        scene = Scene(Path(path).read_bytes(), hull=0)
                 hit = scene.floor((foot[0], foot[1], foot[2]+2), 6)
                 sample = dict(foot=foot, frames=sorted(set(frames)), support_status=hit['status'])
                 if hit['status'] == 'supported':
@@ -158,7 +180,7 @@ def _measure_target(task):
     return results
 
 
-def audit(maps, jobs=1, chim_frames=None):
+def audit(maps, jobs=1, chim_frames=None, defer_shells=False):
     """Audit every packaged actor; jobs > 1 reads maps and measures in workers.
 
     Map reading/parsing and contact measurement are independent per map and run
@@ -166,10 +188,20 @@ def audit(maps, jobs=1, chim_frames=None):
     overlap-copy comparison, model hashing and row/error order stay serial in
     sorted map order: the first copy of a placement is the canonical one, and
     the receipt's key order is part of its bytes. Output equals jobs=1.
+
+    defer_shells (a scene stage's check, before the image): residents of a room shell map are classified and
+    recorded as SHELL_DEFERRED instead of measured; the image's check (defer_shells off) measures them on the CHIM
+    room, and a shell still in the image is measured as before and refused.
     """
     from build_parallel import ordered_map
+    from map_files import is_chim_room, map_file, map_stem, scene_maps
     maps = Path(maps)
-    paths = sorted(maps.glob('*.bsp'))
+    # every x.bsp and every CHIM room map (IMAGE-ROOM-MAPS-LATE-PASSES-48: the glob of x.bsp checked 0 of the 93
+    # room actors once the rooms were CHIM rooms); CHIM frame residents come in through chim_frames
+    paths = scene_maps(maps)
+    rooms = {map_stem(p.name) for p in paths if is_chim_room(p)}
+    from room_actor_bake import room_exceptions
+    room_kept = room_exceptions() if rooms else {}
     rows = []; placements = {}; hashes = {}; copies = 0; owner_seen = set()
     model_cache = {}
     pending = {}
@@ -183,17 +215,28 @@ def audit(maps, jobs=1, chim_frames=None):
             hashes[name] = hashlib.sha256(raw).hexdigest()
             model_cache[name] = (model_frames(raw), layout_of(maps.parent/p))
         return model_cache[name]
-    for name, sha, actors in ordered_map(_scan_map, paths, max(1, min(jobs, len(paths)))):
-        stem = name[:-4]
+    shells = set()
+    scanned = ordered_map(_scan_map_shell if defer_shells else _scan_map, paths, max(1, min(jobs, len(paths))))
+    for name, sha, actors, *shell in scanned:
+        stem = map_stem(name)
+        if shell and shell[0]:
+            shells.add(stem)
         map_seen = set()
         hashes['maps/'+name] = sha
         for e in actors:
             copies += 1
             row = dict(map=stem, reference=e.get('aw_ref'), source_id=e.get('aw_source_id'),
                        name=e.get('netname'), model=e.get('model'))
+            if stem in rooms:
+                row['collision'] = ROOM_COLLISION
             try:
                 if not row['source_id']: raise ValueError('Missing original actor identity')
-                state = initial_state(row['source_id']); row['initial_state'] = state
+                state = initial_state(row['source_id'], e.get('aw_ref')); row['initial_state'] = state
+                kept = room_kept.get((stem, e.get('aw_ref'))) if stem in rooms else None
+                if state == 'ground' and kept and kept[0] == row['source_id'].casefold():
+                    # a CHIM room resident decided case by case to stay where the game data puts it
+                    # (config/actor_room_placements.json 'authored', ROOM-ACTORS-FLOATING-48)
+                    state = 'authored'; row.update(initial_state=state, exception_reason=kept[1])
                 if int(e.get('aw_ground_mode', -1)) != int(state != 'ground'):
                     raise ValueError('Entity support mode disagrees with classified source')
                 if (e['classname'] == 'aw_corpse') != (state == 'authored_dead'):
@@ -214,6 +257,8 @@ def audit(maps, jobs=1, chim_frames=None):
                 placements[key] = signature; row['position'] = point
                 if state != 'ground':
                     row['status'] = 'explicit-exception'; rows.append(row); continue
+                if target in shells:
+                    row['status'] = SHELL_DEFERRED; rows.append(row); continue
                 frames, layout = poses(row['model'])
                 samples = contact_samples(frames, angles, bool(float(e.get('aw_intro_role', 0))), layout)
                 requests = pending.setdefault(target, [])
@@ -223,7 +268,7 @@ def audit(maps, jobs=1, chim_frames=None):
                 row.update(status='invalid', error=str(exc))
             rows.append(row)
     targets = sorted(pending)
-    tasks = [(maps/(target+'.bsp'), pending[target]) for target in targets]
+    tasks = [(map_file(maps, target), pending[target]) for target in targets]
     measured = dict(zip(targets, ordered_map(_measure_target, tasks, max(1, min(jobs, len(tasks))))))
     errors = []
     for row in rows:
@@ -267,7 +312,18 @@ def audit(maps, jobs=1, chim_frames=None):
                 tolerance={'minimum_gap': -.5, 'maximum_gap': 1.0, 'sole_band': .5},
                 scope='Initial ground-resident idle poses, packaged point collision, explicit source classification; no moving platforms, footsteps, IK or future animation proof.',
                 rows=rows, errors=errors, payload_sha256=hashes,
-                **({'chim_frame_actors': len(frame_rows)} if frame_rows else {}))
+                **({'chim_frame_actors': len(frame_rows)} if frame_rows else {}),
+                **({'chim_rooms': room_summary(rooms, rows)} if rooms else {}))
+
+
+def room_summary(rooms, rows):
+    """Per CHIM room: what its actors were checked against and how they came out (a room with no actor says so)."""
+    out = {}
+    for room in sorted(rooms):
+        mine = [r for r in rows if r.get('map') == room]
+        out[room] = dict(collision=ROOM_COLLISION, actors=len(mine),
+                         summary=dict(sorted(Counter(r['status'] for r in mine).items())))
+    return out
 
 
 def waivable(error):
@@ -310,7 +366,7 @@ def evidence(report, before_world=False, findings_only=False):
 
 
 def require(maps, output, allow_known=None, before_world=False, findings_only=False, jobs=1, chim_frames=None,
-            empty_scene=None):
+            empty_scene=None, defer_shells=False):
     approved = None
     if before_world and findings_only:
         raise ValueError('Choose one actor comparison scope')
@@ -318,7 +374,7 @@ def require(maps, output, allow_known=None, before_world=False, findings_only=Fa
         if Path(allow_known).resolve() == Path(output).resolve():
             raise ValueError('Approved actor report must be separate from the new audit output')
         approved, approved_hash = load_approved_report(allow_known)
-    report = audit(maps, jobs=jobs, chim_frames=chim_frames)
+    report = audit(maps, jobs=jobs, chim_frames=chim_frames, defer_shells=defer_shells)
     if empty_scene and report['errors'] == [{'error': 'No actor placements found'}]:
         report.update(status='not-applicable', errors=[], empty_scene=empty_scene)
     raw = json.dumps(report, indent=2) + '\n'

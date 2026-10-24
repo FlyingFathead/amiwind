@@ -93,7 +93,7 @@ int Mod_TryStreamAlias(model_t *mod) {
     bytes=COM_FOpenFile(mod->name,&s.file);
     if(!s.file)return 0;
     base=ftell(s.file);s.left=bytes;
-    if(base<0 || bytes<(int)sizeof(disk) || bytes>AW_ALIAS_STAGING_LIMIT){fclose(s.file);return 0;}
+    if(base<0 || bytes<(int)sizeof(disk) || bytes>AW_ALIAS_STREAM_LIMIT){fclose(s.file);return 0;}
     AW_AliasStreamRead(&s,&disk,sizeof(disk));
     if(LittleLong(disk.ident)!=IDPOLYHEADER){fclose(s.file);return 0;}
     nv=LittleLong(disk.numverts);nt=LittleLong(disk.numtris);nf=LittleLong(disk.numframes);
@@ -111,7 +111,7 @@ int Mod_TryStreamAlias(model_t *mod) {
     /* A frame consumes at least 28 + 4*nv bytes. Bound loops before parsing. */
     if((size_t)nf>(size_t)bytes/(28+(size_t)nv*4))AW_AliasStreamError(&s,"frame count");
     for(i=0;i<nf;i++)if(!AW_AliasBlock(&total,(size_t)nv*sizeof(trivertx_t)))AW_AliasStreamError(&s,"size overflow");
-    if(total>AW_ALIAS_STAGING_LIMIT){fclose(s.file);return 0;}
+    if(total>AW_ALIAS_STREAM_LIMIT){fclose(s.file);return 0;}
     s.total=(int)total;
     AW_AliasStreamRead(&s,&kind,sizeof(kind));
     if(LittleLong(kind.type)==ALIAS_SKIN_GROUP){fclose(s.file);return 0;}

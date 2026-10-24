@@ -74,6 +74,8 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 - [AW-20260928-01](AW-20260928-01.md): Prison ship to deck transition is intermittently very slow or freezes (FS-UAE)
 - AW-20260929-04 (no report page): Loading artwork flashes after intro movie
 - AW25-01 (no report page): Seyda Neen walking reaches water before the island handoff
+- [CHIM-32MB-SAVE-ENTRY-48](CHIM-32MB-SAVE-ENTRY-48.md): A save, a start or a console jump into a place marked for 32 MB of Fast RAM was not refused on 16 MB
+- DOOR-HALL-SWING-DIRECTION-48 (no report page): The census hall door may open the opposite way from the original game: it turns to closed plus 90 degrees where the original rule gives closed minus 90
 - [ENGINE-SCENE-NAME-BOUND-35](ENGINE-SCENE-NAME-BOUND-35.md): Scene links copied map names into 16-byte fields with strcpy
 - INPUT-01 (no report page): Held Ctrl/Shift flight modifiers reset on cell changes
 - [INTERIOR-SPAWN-UNDERWATER-41](INTERIOR-SPAWN-UNDERWATER-41.md): Vivec underworks rooms spawn under their water

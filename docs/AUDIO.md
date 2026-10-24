@@ -1,10 +1,12 @@
 # Streamed music and speech
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Every NPC's voice lines: 23 October 2026](#every-npcs-voice-lines-23-october-2026)
+- [Sounds the game's scripts start: 23 October 2026](#sounds-the-games-scripts-start-23-october-2026)
 - [Music on and off, and the packet fix: 11 October 2026](#music-on-and-off-and-the-packet-fix-11-october-2026)
 - [Music reads never stop the game: 10 October 2026](#music-reads-never-stop-the-game-10-october-2026)
 - [Host CPU load: 9 October 2026](#host-cpu-load-9-october-2026)
@@ -23,6 +25,35 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [RC1 Audio options candidate](#rc1-audio-options-candidate)
 
 <!-- contents end -->
+
+## Every NPC's voice lines: 23 October 2026
+
+[NPC-GREETINGS-LIBRARY-MUTE-48](bugs/NPC-GREETINGS-LIBRARY-MUTE-48.md): the NPCs of the actor library (the outdoor
+region actors) had no greeting at all, and town residents said only the few bark lines their model's layout named.
+The image now carries the [NPC voice table](NPC_VOICE_TABLE.md) (`id1/npc-voices.lut`, 757 KB): every NPC record's
+Hello, Idle, Intruder, Thief, Hit, Attack and Flee lines and its conversation greeting, chosen by the original's
+rules, with the conditions that change in play kept as small condition records the engine tests when the line is
+said.
+
+- **No voice is converted twice:** the table names the media stage's converted files (`sound/pool/a<16 hex>.wav`).
+  It needs 4,224 of them (108.4 MB); a full build's payload already has 4,223 (the one missing has no source in the
+  game data). The image grows by the table only.
+- **Greetings:** an NPC placed without its own hello says the table's when the player comes near; a town resident
+  keeps its own. A talk with an NPC that has no conversation greeting of its own opens with the table's.
+- **Barks:** Idle, Hit, Attack and Flee come from the table for every NPC, town residents too. Intruder and Thief
+  have no event in the engine yet.
+- A line whose voice file the build lacks (a MiniWind build keeps only the voices its actors can say) is shown and
+  stays quiet. `aw_npc_voice_lut 0` brings back the previous method (each model's own bark lines).
+## Sounds the game's scripts start: 23 October 2026
+
+The game's own scripts start most of its incidental audio: ambient loops at sound markers (cave wind, water spouts,
+creaking boats), activator sounds, NPC lines and music cues. From v0.0.48 the builder compiles every script
+(stage `mwscript`) and maps each sound, voice and music file a script names to the converted file the media stage
+already made, by index: nothing is converted or stored a second time. Of the 82 sounds the scripts name, 81 map;
+of 132 voice files, 131; the one music file a script names is not in the soundtrack (a developer's test door). The
+engine plays them through Quake's mixer, loops included, with each sound record's own volume and hearing distance.
+EXPERIMENTAL and off by default (`dbg mwscript on`) until the in-game check. Design, the unmapped names and their
+reasons, and the costs: [MWSCRIPT_BYTECODE.md](MWSCRIPT_BYTECODE.md#sounds-voices-and-music-by-index).
 
 ## Music on and off, and the packet fix: 11 October 2026
 
@@ -303,9 +334,18 @@ the first 64 successful opens. It does not claim to record audible start times.
 ## Authored door sounds (dev5)
 
 `prepare_door_audio.py` resolves placed DOOR references, their SNAM/ANAM IDs and
-the corresponding SOUN files/volumes. It converts only sounds needed by the
-entrance catalogue and the Census hall door, sharing identical source files.
-The bounded AWSFX1 catalogue stores paths, volumes and durations. Native
+the corresponding SOUN files/volumes: every load door of the game data (a door
+reference with a destination) and the Census hall door, so every converted door
+plays its own record's sounds whatever form its map has (room map, CHIM room,
+CHIM frame, town interior: all name their doors by the game's reference number).
+Until 22 October 2026 it listed only the opening scene's doors (28 rows: Seyda
+Neen and the prison ship), and every Balmora door was silent (AW-20260928-10).
+It converts each source file once (16 door sounds in Morrowind.esm). The
+AWSFX2 catalogue (`id1/door-sounds.txt`) stores each sound pair once (paths,
+volumes, durations: `p` rows) and one `<reference> <pair>` row per door, in
+ascending order; the engine reads it once at the first door and finds a door by
+binary search (up to 64 pairs and 8,192 doors; the earlier AWSFX1 form, one row
+per door and at most 256 rows, is still read). Native
 `aw_door_sounds` defaults on and persists; `dbg door sounds on/off` is the short
 command. Transition openings play before the map change (at most a one-second
 lead-in); their closing sample plays after sign-on. The existing Census hall

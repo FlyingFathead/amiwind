@@ -1,6 +1,6 @@
 # AGA checkpoint build and controls
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -33,8 +33,11 @@ can play the game is not known.
 
 A small 68000 program checks the hardware and the free memory before the
 engine loads. If the machine is not suitable, it says why and stops the startup
-script. The game needs 2 MiB Chip and 16 MiB Fast RAM; the 4 MiB Quickstart
-preset is too small.
+script. The game needs 2 MiB Chip and 32 MiB Fast RAM, the safe minimum for the
+whole game; more is used automatically. With 16 MiB it still starts: the Fast RAM row
+shows `[!] WARN`, a note says 32 MB is needed and a ten-second countdown follows (ENTER
+skips; it never blocks), then it goes on and loads more often ([why 32 MB](REAL_HARDWARE.md#why-32-mb-of-fast-ram)). The 4 MiB
+Quickstart preset is too small.
 See [WinUAE setup](WINUAE.md) for panel-by-panel instructions and
 [FS-UAE playtesting](FS-UAE-PLAYTESTING.md) for the Linux recipe/preset.
 

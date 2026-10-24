@@ -171,6 +171,9 @@ class FileFormatTests(unittest.TestCase):
         self.assertEqual(unknown_formats(['arena/f08c7f92da6db.anm', 'progs/m.tag', 'progs/m.mdl', 'maps/a.bsp',
                                           'gfx/palette.lmp', 'save-content.bin', 'sound/a.wav']), [])
         self.assertEqual(unknown_formats(['progs/new.xyz', 'README']), ['progs/new.xyz', 'README'])
+        # CHIM rooms: the room store and room records pass through like the CHIM world (IMAGE-FORMATS-CHIM-ROOMS-48)
+        self.assertEqual(unknown_formats(['chimi/world.cwi', 'chimi/p00.ccs', 'chimi/rooms/bmastius.crm',
+                                          'maps/bmastius.chim']), [])
         with tempfile.TemporaryDirectory() as tmp:
             id1 = Path(tmp)
             (id1 / 'arena').mkdir()

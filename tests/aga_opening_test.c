@@ -2,6 +2,8 @@
 #include "quakedef.h"
 #include "aw_story.h"
 #include "aw_character.h"
+#include "aw_activated.h"
+#include "aw_hinged_door.h"
 #include <assert.h>
 server_t sv;server_static_t svs;double host_frametime=.1;
 aw_character_t aw_character;char *pr_strings;
@@ -79,7 +81,7 @@ int main(void)
     for(i=0;i<70;i++)AW_OpeningTick();assert(!strcmp(line,"chargendock3"));
     /* Prompt and E share aim/range/visibility and the same stateful target. */
     {
-        const char *name,*action;model_t door_model;
+        const char *name,*action;
         sv.active=1;sv.num_edicts=3;strcpy(sv.name,"census");
         player.v.movetype=MOVETYPE_WALK;VectorCopy(vec3_origin,player.v.origin);
         player.v.view_ofs[2]=13;object.v.modelindex=1;
@@ -95,27 +97,20 @@ int main(void)
         occluded=1;assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());occluded=0;
         object.v.modelindex=0;assert(!AW_OpeningHint(&name,&action));object.v.modelindex=1;
         player.v.origin[0]=-80;assert(!AW_OpeningHint(&name,&action));player.v.origin[0]=0;
-        reference._float=172860;object.v.absmax[2]=145;assert(AW_OpeningHint(&name,&action) && strstr(action,"Locked"));
-        aw_story.hall=1;assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Open: E"));
-        /* A rotated brush's broad-phase radius box can contain the eye even
-         * though the actual door is ahead. Use its local bounds for targeting. */
-        memset(&door_model,0,sizeof(door_model));door_model.type=mod_brush;
-        door_model.mins[0]=-12;door_model.maxs[0]=12;
-        door_model.mins[1]=-1;door_model.maxs[1]=1;
-        door_model.mins[2]=0;door_model.maxs[2]=140;
-        sv.models[1]=&door_model;object.v.origin[0]=30;object.v.angles[1]=90;
-        object.v.absmin[0]=-40;object.v.absmax[0]=100;
-        object.v.absmin[1]=-70;object.v.absmax[1]=70;
-        object.v.absmin[2]=-70;object.v.absmax[2]=145;
-        assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Open: E"));
-        obstructed=1;links=door_sounds=probes=0;
-        assert(AW_OpeningUse() && !aw_story.hall_open && object.v.angles[1]==90);
-        assert(!links && !door_sounds && probes==1);
-        assert(player.v.origin[0]==0 && player.v.origin[1]==0 && player.v.origin[2]==0);
-        assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Open: E"));
-        obstructed=0;
-        assert(AW_OpeningUse() && aw_story.hall_open && !AW_OpeningHint(&name,&action));
-        assert(links==1 && door_sounds==1 && object.v.angles[1]==-90);
+        /* The census hall door is a hinged door (aw_hinged_door.c, AW-20260928-12): the opening no longer aims
+         * at it or uses it; its story hook holds the lock until the guard has unlocked it (aw_story.hall, the
+         * original's CharGenDoorGuardTalker) and keeps whether it stands open (aw_story.hall_open, saved). */
+        reference._float=AW_REF_CENSUS_HALL_DOOR;object.v.absmax[2]=145;
+        aw_story.hall=0;assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());
+        assert(AW_OpeningHingedStory(AW_REF_CENSUS_HALL_DOOR,AW_HINGE_STORY_LOCK)==1);
+        aw_story.hall=1;assert(!AW_OpeningHint(&name,&action) && !AW_OpeningUse());
+        assert(AW_OpeningHingedStory(AW_REF_CENSUS_HALL_DOOR,AW_HINGE_STORY_LOCK)==0);
+        assert(AW_OpeningHingedStory(397586,AW_HINGE_STORY_LOCK)==-1);	/* an ordinary door: no story rule */
+        aw_story.hall_open=0;
+        assert(AW_OpeningHingedStory(AW_REF_CENSUS_HALL_DOOR,AW_HINGE_STORY_OPEN)==1 && aw_story.hall_open);
+        assert(AW_OpeningHingedStory(AW_REF_CENSUS_HALL_DOOR,AW_HINGE_STORY_SPAWN)==1);
+        assert(AW_OpeningHingedStory(AW_REF_CENSUS_HALL_DOOR,AW_HINGE_STORY_CLOSED)==1 && !aw_story.hall_open);
+        assert(AW_OpeningHingedStory(AW_REF_CENSUS_HALL_DOOR,AW_HINGE_STORY_SPAWN)==0);
         sv.models[1]=NULL;object.v.absmin[0]=object.v.absmax[0]=30;
         object.v.absmin[1]=object.v.absmax[1]=0;object.v.absmin[2]=13;
         reference._float=172851;object.v.absmax[2]=13;AW_StoryReset(0); /* No false empty outside tutorial stage. */

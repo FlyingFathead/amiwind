@@ -24,6 +24,8 @@ class AreaVoiceDirectoryTests(unittest.TestCase):
         (scene/'id1/gfx').mkdir();(scene/'id1/gfx/palette.lmp').write_bytes(bytes(768))
         chunks=empty_world([-32.,-32.,-32.],[32.,32.,32.]);chunks[0]=b'{"classname" "worldspawn"}'+bytes([0])
         (scene/'id1/maps/seyda.bsp').write_bytes(pack_lumps(chunks))
+        # the bsp stage publishes Seyda Neen's scene entity list beside its map (BUILD-SEYDA-ENTITY-BUS-48)
+        import seyda_entities;seyda_entities.publish(scene,pack_lumps(chunks))
         identifier='fargoth';stem='a_'+hashlib.sha256(identifier.encode()).hexdigest()[:12]
         voice=scene/'id1/sound/npc'/(stem+'.wav')
         if existing:

@@ -1,5 +1,14 @@
 # CHIM-MESHLESS-LIGHTS-33: Exterior lights without a mesh have no CHIM light path: 2,284 placed lights give no light in a CHIM frame
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.33-dev at 2026-10-09 (time not recorded): Found by CHIMport: 2,284 exterior lights without a mesh give no light in a CHIM frame.
+- Reported with v0.0.48-dev2 at 2026-10-23 02:03 +0300: Maintainer, 23 October 2026: CHIM exteriors still miss lights. v0.0.47 world: no static light from any of them; only the nearest 2 of the night lamp table light, at night.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,8 +18,8 @@
 | Where | CHIM frames (tools/chim/): no light entities or lightmaps; tools/light_sources.py |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
-| Severity | medium: Every exterior light without a mesh (1,936 plain lights, 332 glowing plants, 12 darkeners, 4 fires) is lost on CHIM; only 4 of them reach the night lamp table. |
+| Persists in | v0.0.33-dev, v0.0.48-dev2 (last seen) |
+| Severity | medium: No exterior light without a mesh gives static light on CHIM: only the nearest 2 of the night lamp table light, at night; darkeners give none |
 | Family | Lighting, lamps and night (`lighting-night`) |
 | CHIM | Rendering and visibility ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -80,6 +89,8 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [ANIMKIT-TORCH-STANDING-35](ANIMKIT-TORCH-STANDING-35.md): With the animation kit, guards hold their torch only while standing; walking and running drop it
 - [BALMORA-LAMPS-DIM-31](BALMORA-LAMPS-DIM-31.md): Balmora's street lamps are far too dim at night
 - [CENSUS-OFFICE-BRIGHT-32](CENSUS-OFFICE-BRIGHT-32.md): The Census and Excise Office walls are about twice as bright as the original
+- [CHIM-EXTERIOR-FLAMES-MISSING-48](CHIM-EXTERIOR-FLAMES-MISSING-48.md): CHIM exteriors draw no fire: campfires, braziers, fire pits and flame lamps outdoors have no flame animation
+- CHIM-ROOM-LIGHT-FLAT-48 (no report page): CHIM rooms light each placement at one level: Temple arch trims and Rithleen walls look flat and brighter than the room maps baked light
 - [DLIGHT-WALLS-31](DLIGHT-WALLS-31.md): Torches barely light town walls at night
 - [EMISSIVE-UNSHIPPED-31](EMISSIVE-UNSHIPPED-31.md): Glowing lantern glass never reached the shipped maps (only the Temple has it)
 - [FLAME-RANGE-NEAREST-32](FLAME-RANGE-NEAREST-32.md): A hearth fire shows only up close when many candles are nearer

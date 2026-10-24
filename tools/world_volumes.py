@@ -336,15 +336,25 @@ def _pack_batch(task):
     batch = [Path(p) for p in batch]
     volume=f'AW_WORLD{index}';part=Path(out)/f'world{index}-partition.hdf'
     if part.exists():raise ValueError('World partitions are immutable')
-    payload=sum(p.stat().st_size for p in batch)
+    # an entry is a map (written to id1/maps/<name>) or a (source, volume path) pair: a boot unit the compact layout
+    # moved off DH0 (tools/layout_plan.py movable_unit), written at its boot path
+    batch = [(Path(p[0]),str(p[1])) if isinstance(p,(tuple,list)) else (Path(p),'id1/maps/'+Path(p).name)
+             for p in batch]
+    payload=sum(p.stat().st_size for p,_ in batch)
     # the compact layout passes its planned size (tools/layout_plan.py); the legacy layout sizes it here
     mib=task[4] if len(task)>4 else partition_mib(payload)
     if mib>=2048:raise ValueError('World partition must remain below 2 GiB')
     command=[str(xdftool),str(part),'create',f'size={mib}Mi','+','format',volume,'ffs',
              '+','makedir','id1','+','makedir','id1/maps']
+    made={'id1','id1/maps'}
+    for _,name in batch:
+        parts=name.split('/')[:-1]
+        for k in range(1,len(parts)+1):
+            folder='/'.join(parts[:k])
+            if folder not in made:
+                made.add(folder);command+=['+','makedir',folder]
     files=[]
-    for path in batch:
-        name='id1/maps/'+path.name
+    for path,name in batch:
         command+=['+','write',str(path),name]
         files.append(dict(path=name,bytes=path.stat().st_size,sha256=digest(path)))
     from build_windows_xdftool import run_any as run_xdftool
@@ -492,6 +502,39 @@ def write_layout(plan, boot, out, xdftool, boot_part, chim_root=None, omitted=()
         for path in paths:
             path.rename(target/path.name)
             moved[name].append(target/path.name)
+    # the boot units the plan moved to a world volume (IMAGE-BOOT-PAYLOAD-OVER-2GIB-48): out of BOOT into the
+    # staging folder at their boot path (the volume path they keep), back where they were if a write fails
+    units={}
+    if any(row.get('moved') for row in plan['partitions'][1:]):
+        staged=[(p,p.relative_to(boot).as_posix()) for p in sorted(boot.rglob('*')) if p.is_file()]
+        for name,pairs in layout_plan.assign_units(plan,staged).items():
+            units[name]=[]
+            for path,rel in pairs:
+                target=staging/(name+'-units')/rel
+                target.parent.mkdir(parents=True,exist_ok=True)
+                path.rename(target)
+                units[name].append((target,rel))
+        # a folder the moves emptied (id1/chimi when the store moves whole) is not written to DH0
+        for folder in sorted({(boot/rel).parent for pairs in units.values() for _,rel in pairs},
+                             key=lambda p:-len(p.parts)):
+            while folder!=boot and folder.is_dir() and not any(folder.iterdir()):
+                folder.rmdir();folder=folder.parent
+    def undo():
+        # the staged maps and units go back where they were: a failed write leaves the payload as it found it
+        for paths in moved.values():
+            for path in paths:
+                if path.is_file():path.rename(id1/'maps'/path.name)
+        for pairs in units.values():
+            for path,rel in pairs:
+                if path.is_file():
+                    (boot/rel).parent.mkdir(parents=True,exist_ok=True)
+                    path.rename(boot/rel)
+        if staging.exists():shutil.rmtree(staging)
+    for row in plan['partitions'][1:]:
+        if row.get('moved') and not units.get(row['partition']):
+            undo()
+            raise ValueError('Layout plan moves %d boot units to %s; the staged payload has none of them'
+                             %(len(row['moved']),row['partition']))
     write_volumes_file(id1,plan['world_volumes'])
     tasks=[('boot',str(xdftool),str(boot_part),str(boot),rows['DH0']['mib'])]
     for row in plan['partitions'][1:]:
@@ -499,11 +542,12 @@ def write_layout(plan, boot, out, xdftool, boot_part, chim_root=None, omitted=()
         if row['role']=='chim':
             if chim_root is None:raise ValueError('The layout plan has a CHIM world volume; no CHIM world given')
             extra=[(str(p),'id1/maps/'+p.name) for p in moved.get(row['partition'],[])]
+            extra+=[(str(p),rel) for p,rel in units.get(row['partition'],[])]
             tasks.append(('chim',str(xdftool),str(out/('world%d-partition.hdf'%index)),str(chim_root),row['volume'],
                           row['mib'],extra))
         else:
-            tasks.append(('maps',str(xdftool),index,[str(p) for p in moved.get(row['partition'],[])],str(out),
-                          row['mib']))
+            tasks.append(('maps',str(xdftool),index,[str(p) for p in moved.get(row['partition'],[])]
+                          +[(str(p),rel) for p,rel in units.get(row['partition'],[])],str(out),row['mib']))
     workers=max(1,min(int(jobs or 1),len(tasks)))
     log('Image: partitions: %d written at once on %d workers (one per partition; a single FFS volume is written '
         'serially by xdftool)'%(len(tasks),workers))
@@ -514,11 +558,7 @@ def write_layout(plan, boot, out, xdftool, boot_part, chim_root=None, omitted=()
                                                cost=lambda t:t[4] if t[0]=='boot' else t[5]):
             results.setdefault(kind,[]).append((seconds,result))
     except BaseException:
-        # the staged maps go back where they were: a failed write leaves the payload as it found it
-        for paths in moved.values():
-            for path in paths:
-                if path.is_file():path.rename(id1/'maps'/path.name)
-        if staging.exists():shutil.rmtree(staging)
+        undo()
         raise
     boot_seconds,boot_check=results['boot'][0]
     log('Image: partition DH0 (boot): %d MiB - took %.1fs, 1 worker'%(rows['DH0']['mib'],boot_seconds))

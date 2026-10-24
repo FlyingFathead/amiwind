@@ -1,6 +1,6 @@
 # CHIM engine: shared models, chunk placements and the ring loader
 
-_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev1 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -11,6 +11,7 @@ _Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
 - [Limits that do not apply](#limits-that-do-not-apply)
 - [Memory](#memory)
 - [Loading](#loading)
+- [Rooms (interiors on CHIM, 0.12)](#rooms-interiors-on-chim-012)
 - [Placements: stored once, drawn once](#placements-stored-once-drawn-once)
 - [Streamed statics](#streamed-statics)
 - [Vis and culling](#vis-and-culling)
@@ -372,6 +373,16 @@ detail](../NPC_MODEL_CACHE.md#npc-model-levels-of-detail)).
   moves.
 - Released chunks and unused models stay in the zone, least recently used
   first out; a chunk that cannot be loaded waits 50 ticks and says so.
+
+## Rooms (interiors on CHIM, 0.12)
+
+A map whose worldspawn names `"_chim_room" "<room>"` loads its placements from the room record
+`<store>/rooms/<room>.crm` (`chim/chim_room.c`; the store from `"_chim_world"`, default `chim`): as in the original
+game a room loads on its own, so the whole room (its models, locked, and its placements) is loaded under the loading
+plaque, linked with efrags into the room map's world, collided through the placed collision path and dropped at the next
+map. No frame, terrain or chunk ring. A placement may carry its own light level (world format 0.12), drawn instead of
+the ambient. Format: [WORLD_FORMAT.md](WORLD_FORMAT.md#placement-light-stores-and-room-records-012); design:
+[INTERIOR_STORE.md](INTERIOR_STORE.md).
 
 ## Placements: stored once, drawn once
 

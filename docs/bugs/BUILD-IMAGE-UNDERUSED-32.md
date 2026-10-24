@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 7 times; something has to be done
+## PERSISTING: reported 8 times; something has to be done
 
 - Reported with v0.0.32-dev at 2026-10-08 (time not recorded): BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: audio payload and CHIM maps serial, stats on one core
@@ -11,6 +11,7 @@
 - Reported with v0.0.46 at 2026-10-20 20:02 +0300: v0.0.46 release image: CHIM world volume 43.4 s then boot partition 42.0 s, each on 1 core, one after the other; written at once on branch v0.0.46-span-what-we-need
 - Reported with v0.0.47-dev1 at 2026-10-21 14:44 +0300: dev1 try 2: image 8m00s at 8.4 of 24, 4 windows (3m16s); finalize 3m19s at 2.95; preflight 16.0 s and 18.5 s at 1.1; partitions 36.9 s at 1.67 of 2
 - Reported with v0.0.47-dev2 at 2026-10-21 17:30 +0300: dev2 try 3, FIX-NOW: frame-read pool 102 s on 2.96 of 24 cores, 91 units; see BUILD-IMAGE-WORLD-READ-FRAMES-47
+- Reported with v0.0.48-dev2 at 2026-10-23 (time not recorded): dev2 try8 payload preflight 47 s on 1.6 of 24 cores; try5 bake_unit map 66 s on 0.0 of 24 (waits); image failed both runs
 
 <!-- END GENERATED PERSISTING -->
 
@@ -23,18 +24,19 @@
 | Where | image step passes (tools/build_aga.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.48 |
 | Severity | medium: Several image passes run serially or leave most CPUs idle, slowing builds. |
 | Family | Build speed (`build-speed`) |
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
+_Last updated with AmiWind v0.0.48 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
+- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
+- [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Remaining serial work (profile of 8 October 2026, after the image-step parallel work)](#remaining-serial-work-profile-of-8-october-2026-after-the-image-step-parallel-work)
@@ -49,6 +51,34 @@ _Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## Status: 23 October 2026 (v0.0.48)
+
+Fixed for v0.0.48 on the branch v0.0.48-fix-serial-steps: the payload preflight, which the image step runs twice
+(45 s at 1.6 cores in the dev2 try 9 build; 21.7 s and 23.5 s), and the room batch install.
+
+Measured read-only on the try 9 staged payload (container of 12 cores, the whole `payload_preflight.run`, the same
+report either way): 36 to 44 s with the method before, 10.5 to 12.6 s now. Per part:
+
+- **Engine map limits** (`map_engine_limits.audit_maps`): 1,135 maps read and parsed one by one, 12.5 to 15 s at
+  0.17 cores (waiting for the disk) -> 2.0 to 2.2 s on the worker pool, the report in map order as before. Also in
+  finalize's own engine limits check.
+- **The source manifest's sprite sections** (`chim.frame_map.region_source_sections`, the disk layout): the whole
+  694 MB manifest parsed to keep three keys of each frame, 10.4 s on one core -> 2.1 s at 6.9 cores
+  (`parallel_json.load_list`: each worker parses whole frames of its byte range; the same sections, SHA-256 compared).
+- **The layout walk** (`layout_plan.walk`, the disk layout's file sizes): pathlib over 37,000 CHIM and 27,000 boot
+  files, about 4 s on one core -> os.walk with string paths, the same list.
+- **One interpreter lock.** The checks ran on threads of one process; the Python-bound ones (payload names, file
+  formats, host paths, actor frame layouts: under 1 s each alone) took 8 to 18 s side by side. They now run in
+  processes of their own (`build_parallel.Background`), and the disk layout starts beside them as soon as the music
+  sizes are known instead of after all of them.
+- **The room batch install** (`room_batches.install`): 13,141 files hashed twice and copied one by one, untimed (5 to
+  14 s) -> hashed and copied on the stage's threads, and a timed phase "Image: room batches install".
+
+The methods before stay behind `AMIWIND_MAP_LIMITS_POOL=off`, `AMIWIND_JSON_POOL=ordered`,
+`AMIWIND_LAYOUT_WALK=pathlib`, `AMIWIND_PREFLIGHT_METHOD=threads` and `AMIWIND_ROOM_INSTALL_THREADS=1`. Tests:
+`tests/test_image_preflight_pool.py`. Still on one core and under a minute: the torch conversion (7.5 s, its receipt
+order) and the world UI (14.6 s, beside the combat data).
 
 ## Status: 8 October 2026
 
@@ -171,6 +201,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-DOOR-REFERENCE-SERIAL-33](BUILD-DOOR-REFERENCE-SERIAL-33.md): The door step reads the whole master once per destination cell
 - [BUILD-ENGINE-SOURCE-KEY-BROAD-36](BUILD-ENGINE-SOURCE-KEY-BROAD-36.md): Any engine source edit changes the keys of the chim and world-flora stages
 - [BUILD-ENV-FINGERPRINT-GLOBAL-33](BUILD-ENV-FINGERPRINT-GLOBAL-33.md): The stair rule setting invalidates the reuse cache of every build stage, including stages that never read it
+- BUILD-ETA-CHIM-STALE-48 (no report page): The build ETA said the CHIM world had about 4 minutes left for over 20 minutes while 40 % of its frames remained
 - [BUILD-ETA-CLOCK-UTC-ONLY-46](BUILD-ETA-CLOCK-UTC-ONLY-46.md): The build ETA printed its finish time on the container clock (UTC) only: 12:53 read as three hours ago on a +03:00 host
 - [BUILD-EXCLUDE-STAGE-CLOSURE-33](BUILD-EXCLUDE-STAGE-CLOSURE-33.md): The quick test build table entered every conversion stage's fingerprint through the stage scheduler
 - [BUILD-FLORA-FALLBACK-RETRY-35](BUILD-FLORA-FALLBACK-RETRY-35.md): The routed-hull fallback of a flora overlay could not retry: the failed try's candidate folder was looked up from the wrong place
@@ -179,6 +210,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IDLE-STAGES-33](BUILD-IDLE-STAGES-33.md): Scene-chain stages leave most of the workers they hold idle
 - [BUILD-IMAGE-AUDIO-SERIAL-36](BUILD-IMAGE-AUDIO-SERIAL-36.md): The image step puts the audio payload in one file at a time while 22 of 24 cores sit idle
 - [BUILD-IMAGE-CHIM-MAPS-SERIAL-36](BUILD-IMAGE-CHIM-MAPS-SERIAL-36.md): The image step writes the CHIM region cells' .chim maps one by one on half a core, silently
+- [BUILD-IMAGE-FINALIZE-UNDERUSED-48](BUILD-IMAGE-FINALIZE-UNDERUSED-48.md): The image step ran on about 4 of 24 cores for 85 s after the player view (serial steps, then finalize at 2.6 cores), and the underused warning named no sub-step
 - [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md): The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle
 - [BUILD-IMAGE-HASH-UNDERUSED-36](BUILD-IMAGE-HASH-UNDERUSED-36.md): The image step hashes 34,592 payload files on 3 of 24 cores (one file per pool task)
 - [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): The image step's world map heap audit estimates 170 maps on 5.3 of 24 cores
@@ -195,6 +227,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module
 - [BUILD-MINIWIND-STAGE-CLOSURE-33](BUILD-MINIWIND-STAGE-CLOSURE-33.md): The MiniWind plan puts the CHIM builder modules into every conversion stage's fingerprint
 - [BUILD-NESTED-POOL-ALLOWANCE-33](BUILD-NESTED-POOL-ALLOWANCE-33.md): Pool workers open their own pools sized to the whole stage's allowance
+- [BUILD-NPC-GALLERY-KEY-NEUTRAL-READ-47](BUILD-NPC-GALLERY-KEY-NEUTRAL-READ-47.md): The NPC gallery stage is never reused: making its model keys reads tools/chim/units.py, which the stage key leaves out
 - [BUILD-NPC-GALLERY-REBUILT-46](BUILD-NPC-GALLERY-REBUILT-46.md): The NPC gallery (3,551 models, 36 minutes) is rebuilt after a change in collision code that its models do not use
 - [BUILD-NPCLOD-PATH-ARG-34](BUILD-NPCLOD-PATH-ARG-34.md): The first --npc-lod on build stopped at its area stage: a Path in the command broke build-state.json
 - [BUILD-OPTIMIZER-CACHE-KEY-BROAD-36](BUILD-OPTIMIZER-CACHE-KEY-BROAD-36.md): Regression: the image step's BSP optimizer pass cache reused 13 of 2,658 maps; its key covers the whole image tool, so any image-code change redoes every map
@@ -203,6 +236,11 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs
+- BUILD-PLAN-BESIDE-STALE-48 (no report page): The resource plan held a reuse build at 1 of 24 room batch workers against memory that stages it no longer runs held in the measured run
+- BUILD-PLAN-PESSIMISTIC-48 (no report page): The start-up resource plan predicts hours for stages that run in minutes: it sums every stage that could run beside one at full speed
+- [BUILD-PLAYER-VIEW-UNDERUSED-48](BUILD-PLAYER-VIEW-UNDERUSED-48.md): The image step player view remade all 80 player bodies in every build on four fresh worker pools (2m05s at 16.2 of 24 cores)
+- BUILD-POOL-MEMORY-PEAK-48 (no report page): The CHIM and room stages ran side by side at 42 of 44 GiB and were both throttled to one worker for over ten minutes
+- BUILD-POOL-TINY-UNITS-48 (no report page): Stages hand their pools units too small to keep the cores busy (CHIM slices, the town stages)
 - [BUILD-PRERENDERED-PRUNE-ORDER-33](BUILD-PRERENDERED-PRUNE-ORDER-33.md): Prerendered store prune picks the superseded entry by folder name when two entries share a timestamp
 - [BUILD-PROFILE-JOBS-START-ONLY-33](BUILD-PROFILE-JOBS-START-ONLY-33.md): The build profile compares a stage's cores with the workers it started with, not the ones it held
 - [BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42](BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42.md): The build profiler's sampled timeline counts a finished child process twice
@@ -214,11 +252,15 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-REUSE-APPLY-SERIAL-41](BUILD-REUSE-APPLY-SERIAL-41.md): A reused stage staged its files one at a time: world terrain, scenery and flora took 8 to 12 seconds each, one after another, at the start of every reuse build
 - [BUILD-REUSE-KEYS-TOO-BROAD-35](BUILD-REUSE-KEYS-TOO-BROAD-35.md): A whole build reused no stage, and the cost was not visible before the build started
 - [BUILD-REUSE-TMP-UNDECLARED-33](BUILD-REUSE-TMP-UNDECLARED-33.md): A stage that runs while a reused stage is copied becomes non-reusable
+- [BUILD-REUSE-VERIFY-DISK-48](BUILD-REUSE-VERIFY-DISK-48.md): Reusing the chim stage reads and hashes all 9.35 GB of its outputs again: 78 s at 1.7 of 11 cores, counted as an underused stage
 - [BUILD-SCHEDULER-EVEN-SHARE-33](BUILD-SCHEDULER-EVEN-SHARE-33.md): The stage scheduler splits the workers evenly between running stages, so the longest stage gets no more than the shortest (MiniWind media on 1 of 4 workers for 1,195 s)
 - [BUILD-SCHEDULER-JOBSHARE-32](BUILD-SCHEDULER-JOBSHARE-32.md): The stage scheduler fixes a stage's worker share when it starts
 - [BUILD-SCHEDULER-LOWBUDGET-33](BUILD-SCHEDULER-LOWBUDGET-33.md): With a small --jobs budget the stage scheduler starts nothing when more branches are ready than the budget (busy loop)
 - [BUILD-SCHEDULER-MEMORY-STARVED-42](BUILD-SCHEDULER-MEMORY-STARVED-42.md): The scheduler's memory guard held the v0.0.42 final's chim stage on 1 of its 6 workers for over an hour, and nothing said so before or while it happened
+- BUILD-SEYDA-BSP-CARRIER-48 (no report page): Stages pass data through a legacy map file: seyda.bsp's entities and compiled room.bsp files carry what JSON could
+- [BUILD-SEYDA-ENTITY-BUS-48](BUILD-SEYDA-ENTITY-BUS-48.md): Four scene stages still pass Seyda Neen's entities through the seyda.bsp carrier's entity lump
 - [BUILD-SILENT-PHASES-36](BUILD-SILENT-PHASES-36.md): Builder phases run silent: no start/end timing, no progress, no heartbeat; the CHIM stats step is a single-core tail
+- [BUILD-SIZE-GUARD-LATE-48](BUILD-SIZE-GUARD-LATE-48.md): The size guard judges only after the image is built: an rc that grew for a known reason stops after 32 minutes of image work, and the rerun assembles the whole image again
 - [BUILD-SIZE-GUARD-OLD-BASELINE-45](BUILD-SIZE-GUARD-OLD-BASELINE-45.md): The size guard compared a release build with an older release's record: v0.0.45, every folder the size of v0.0.44's, failed on 0.44 GiB of CHIM world growth against v0.0.41
 - [BUILD-STAGE-ALLOWANCE-STUCK-43](BUILD-STAGE-ALLOWANCE-STUCK-43.md): A build stage's worker allowance stays at 1 after the other stages finish, so the CHIM stage runs on one core
 - [BUILD-STAGE-INTERRUPT-ABSORBED-36](BUILD-STAGE-INTERRUPT-ABSORBED-36.md): The stage wrapper absorbed Ctrl-C: a stage that handled the interrupt and returned 0 counted as passed, and the build went on
@@ -232,15 +274,23 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them
 - [BUILD-UNDERUSE-GATE-36](BUILD-UNDERUSE-GATE-36.md): The profiler did not flag long underused phases: 7 min 44 s of CHIM statistics on 1 of 24 cores and 77 s of zone walk on 1 core showed nowhere
 - [BUILD-WINDOWS-DOCKER-SLOW-31](BUILD-WINDOWS-DOCKER-SLOW-31.md): Docker builds and disk-image steps on Windows folders are slow
+- [CHIM-BUDGET-RERUN-SERIAL-48](CHIM-BUDGET-RERUN-SERIAL-48.md): When one CHIM unit is over the brush image budget, every unit of its kind runs again one by one on one core to name it
 - [CHIM-EMPTY-MODEL-REPORT-40](CHIM-EMPTY-MODEL-REPORT-40.md): Terrain-only CHIM validation crashes while reporting the largest scenery model
+- [CHIM-INTERIORS-UNDERUSED-48](CHIM-INTERIORS-UNDERUSED-48.md): The CHIM interiors stage ran at 8.6 of 24 cores for 1 min 11 s
 - [CHIM-LEGACY-CHAIN-33](CHIM-LEGACY-CHAIN-33.md): CHIM builds still run the legacy exterior chain: frame maps read the legacy region maps, and the open world is built
 - [CHIM-PVS-SLOW-33](CHIM-PVS-SLOW-33.md): Seyda Neen's CHIM visibility rows take 5.5 minutes and are rebuilt whenever the worker count changes
+- [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
+- [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
+- [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
 - [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
+- [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
+- [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
+- ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
 
 Related bugs in other categories:
 

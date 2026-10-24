@@ -32,6 +32,18 @@ class HarvestFingerprintTests(unittest.TestCase):
             write_content_fingerprint(root)
         return (root / 'save-content.bin').read_bytes()
 
+    def test_a_room_map_made_into_a_chim_room_map_is_fingerprinted_by_its_file(self):
+        # IMAGE-ROOM-MAPS-FINGERPRINT-48: with CHIM rooms, maps/<room>.bsp becomes maps/<room>.chim; the fingerprint
+        # names the file the image holds, as the engine resolves it
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); names = self.seed(root)
+            (root / 'maps/sncourt.bsp').rename(root / 'maps/sncourt.chim')
+            names = [n.replace('maps/sncourt.bsp', 'maps/sncourt.chim') for n in names]
+            expected = hashlib.sha256()
+            for name in names:
+                expected.update(name.encode() + b'\0' + hashlib.sha256((root/name).read_bytes()).digest())
+            self.assertEqual(self.fingerprint(root), expected.digest())
+
     def test_generated_catalogue_sorted_raw_bytes_and_bsp_bind_save_namespace(self):
         raw = source(); region, bsp = inputs(raw)
         payload, receipt = prepare(raw, region, bsp)

@@ -1,0 +1,33 @@
+{
+ "schema": "aw-collision-room-roof-1",
+ "bug": "ROOM-PYLON-ROOF-48",
+ "rule": "prepare_area.interior_visual_profile: a listed exterior mesh placed in a room gets roof_collision_beyond (the step height, 8.5): a convex piece whose hull stands more than that over a walkable face of its own source triangles (mesh_geometry.piece_roof) becomes the authored plates of its triangles with exact standing bevels (mesh_geometry.roof_plates); every other piece and every unlisted mesh is converted as before",
+ "measured": "23 October 2026, every meshes/x/ model placed in an interior cell of the base master (209; 3 editor-marker models not converted), collision source as the room converter reads it (RootCollisionNode, else the visible mesh), mesh_geometry.collision_pieces with the rule on: 58 meshes have such a piece",
+ "meshes": [
+  "meshes/x/ex_stronghold_pylon01.nif"
+ ],
+ "measured_not_listed": {
+  "reason": "Measured with the rule but not listed in the v0.0.48 dev2 fix: each listed mesh adds authored plates with exact bevels to every room that places it, and the rooms' clip-node budget was not measured for these yet (ROOM-X-MESH-ROOF-SURVEY-48)",
+  "meshes": [
+   "meshes/x/ex_dae_azura.nif", "meshes/x/ex_dae_malacath_attack.nif", "meshes/x/ex_dae_mehrunesdagon.nif",
+   "meshes/x/ex_dae_molagbal.nif", "meshes/x/ex_dae_pillar_03.nif", "meshes/x/ex_dae_ruin_01.nif",
+   "meshes/x/ex_dae_ruin_04.nif", "meshes/x/ex_dae_ruin_entry.max.nif", "meshes/x/ex_dae_sheogorath.nif",
+   "meshes/x/ex_dwrv_alcove00.nif", "meshes/x/ex_dwrv_alcove10.nif", "meshes/x/ex_dwrv_bridge00.nif",
+   "meshes/x/ex_dwrv_bridge10.nif", "meshes/x/ex_dwrv_enter00.nif", "meshes/x/ex_dwrv_observ00.nif",
+   "meshes/x/ex_dwrv_ruin00.nif", "meshes/x/ex_dwrv_ruin60.nif", "meshes/x/ex_dwrv_ruin70.nif",
+   "meshes/x/ex_dwrv_wall40.nif", "meshes/x/ex_longboat02.nif", "meshes/x/ex_redoran_steps_01.nif",
+   "meshes/x/ex_redoran_steps_02.nif", "meshes/x/ex_redwall_b_01.nif", "meshes/x/ex_redwall_b_02.nif",
+   "meshes/x/ex_redwall_b_06.nif", "meshes/x/ex_redwall_corner_01.nif", "meshes/x/ex_ropebridge_01.nif",
+   "meshes/x/ex_ropebridge_512_01.nif", "meshes/x/ex_skiff.nif", "meshes/x/ex_strongruin_fort05.nif",
+   "meshes/x/ex_strongruin_fort05_half.nif", "meshes/x/ex_t_doorway_01.nif", "meshes/x/ex_t_slavemarket.nif",
+   "meshes/x/ex_t_slavepod_01.nif", "meshes/x/ex_velothi_entrance_02.nif", "meshes/x/ex_vivec_g_01.nif",
+   "meshes/x/ex_vivec_g_02.nif", "meshes/x/ex_vivec_h_01.nif", "meshes/x/ex_vivec_h_02.nif",
+   "meshes/x/ex_vivec_h_03.nif", "meshes/x/ex_vivec_h_04.nif", "meshes/x/ex_vivec_h_05.nif",
+   "meshes/x/ex_vivec_h_06.nif", "meshes/x/ex_vivec_h_07.nif", "meshes/x/ex_vivec_h_08.nif",
+   "meshes/x/ex_vivec_h_10.nif", "meshes/x/ex_vivec_h_11.nif", "meshes/x/ex_vivec_h_12.nif",
+   "meshes/x/ex_vivec_h_13.nif", "meshes/x/ex_vivec_h_14.nif", "meshes/x/ex_vivec_h_15.nif",
+   "meshes/x/ex_vivec_h_16.nif", "meshes/x/ex_vivec_w_c_01.nif", "meshes/x/ex_vivec_waterspout_02.nif",
+   "meshes/x/ex_vivec_waterspout_03.nif", "meshes/x/terrain_lava_ventlg01.nif", "meshes/x/terrain_volcano.nif"
+  ]
+ }
+}

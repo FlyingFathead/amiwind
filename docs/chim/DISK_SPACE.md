@@ -1,6 +1,6 @@
 # Disk space: Amiga limits and what CHIM saves
 
-_Last updated with AmiWind v0.0.46 (20 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -10,6 +10,7 @@ _Last updated with AmiWind v0.0.46 (20 October 2026)._
 - [3. What CHIM changes (measured)](#3-what-chim-changes-measured)
 - [4. Today's sizes](#4-todays-sizes)
 - [5. Whole-island estimate for the world data](#5-whole-island-estimate-for-the-world-data)
+- [Interiors (measured 22 October 2026)](#interiors-measured-22-october-2026)
 - [Whole game on CHIM: size budget](#whole-game-on-chim-size-budget)
 
 <!-- contents end -->
@@ -131,6 +132,15 @@ per-placement lightmaps; terrain becomes a quantized heightfield (12.9 KB per
 cell). Against the 20 GB of maps the legacy method needs, the recommended
 world data is roughly **twenty times smaller**; it is about 1.8 times the
 original game's `Morrowind.bsa` plus `Morrowind.esm`, as the census notes.
+
+## Interiors (measured 22 October 2026)
+
+Today every interior is its own map with its own copy of what it uses. Over the 1,324 interiors of Morrowind,
+Tribunal and Bloodmoon: a copy per placement is 8.95 GB; one map per room, each mesh once per room, is 3.46 GB; one
+store for every room is 386 MB. First CHIM test: 55 rooms on a store of 20.7 MB plus 0.59 MB of room maps, against
+79.3 MB of today's room maps for the same rooms (about 3.7 times smaller). Not measured yet: the whole set of rooms
+built this way, and the speed and memory inside rooms. Design, limits and the bar it must keep:
+[INTERIOR_STORE.md](INTERIOR_STORE.md).
 
 ## Whole game on CHIM: size budget
 

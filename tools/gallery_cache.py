@@ -76,7 +76,9 @@ PREVIOUS_IMPLEMENTATION = '78c62f4385b11bbe45ee3c31e9b3aa42d54ca6c4f0ba1e01f24ef
 # The model converter: its main() reaches convert_model and everything a model's conversion runs (previous form).
 CONVERTER_ENTRY = 'tools/prepare_gallery.py'
 # 'reached code 2': the converter's reached code with each module's import-time code in key form 2
-# (build_cache.STAGE_TOP_FORMAT, as the stage and pass keys): a function added to a shared module, or a literal
+# (build_cache TOP_FORMATS, as the pass keys; the stage keys moved on to form 3 in v0.0.48, BUILD-STAGE-KEY-WHOLE-
+# CLASS-48, and the per-unit caches keep form 2: moving the faces would convert every face again,
+# BUILD-FACE-KEY-FORM-TEST-48): a function added to a shared module, or a literal
 # default value added to one, no longer changes every face's key; a default that runs code on import still does.
 # Form 1 listed every function's default values in the import-time code: the v0.0.45 release build converted all
 # 3,551 faces again for two scheduling functions added to tools/build_parallel.py (BUILD-REUSE-SCHEDULER-TOP-45).

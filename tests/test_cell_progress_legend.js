@@ -20,7 +20,7 @@ for (const p of L.presets('v0.0.34')) {
   const st = L.presetState(p.id, 'v0.0.34');
   assert.strictEqual(L.matchPreset(st, 'v0.0.34'), p.id, p.id);
 }
-assert.strictEqual(L.presets('v0.0.34')[1].name, 'Eligible for v0.0.34');
+assert.strictEqual(L.presets('v0.0.34').find(p => p.id === 'eligible').name, 'Eligible for v0.0.34');
 const elig = L.presetState('eligible', 'v0.0.34');
 assert.ok(!elig.off.includes(L.statusKey('empty_sea')), 'eligible includes empty sea');
 assert.ok(elig.off.includes(L.statusKey('not_started')));
@@ -44,7 +44,7 @@ assert.strictEqual(L.OCEAN_SILVER, '#c0c6cc');
 assert.ok(![L.PLAN_GOLD, L.PLAN_LATER].includes(L.OCEAN_SILVER));
 assert.ok(elig.off.includes(L.statusKey('ocean')), 'the eligible preset hides the open ocean');
 assert.ok(!L.ELIGIBLE.includes('ocean'));
-assert.ok(L.OCEAN_TEXT.startsWith('Open ocean: shared ocean chunk made, not yet placed in the game'));
+assert.ok(L.OCEAN_TEXT.startsWith('Open sea the game defines, not in the newest build'));
 
 // release (version) filter
 assert.strictEqual(L.relOk('', cell('complete')), true);
@@ -80,7 +80,7 @@ assert.deepStrictEqual(tab[tab.length - 1], ['TOTALS', '', 5, 1, 1, 1, 1, 1, 0])
 assert.strictEqual(tab.length, 3);
 const tabO = L.planTable(plans.map(r => Object.assign({}, r, {ocean: r.planned === 3 ? 2 : 0})), 867);
 assert.deepStrictEqual(tabO[tabO.length - 2], ['TOTALS', '', 5, 1, 1, 1, 1, 1, 2]);
-assert.strictEqual(tabO[tabO.length - 1][0], 'OPEN OCEAN (silver, not counted as done)');   // its own totals row
+assert.strictEqual(tabO[tabO.length - 1][0], 'OPEN SEA (silver, not counted as done)');   // its own totals row
 assert.strictEqual(tabO[tabO.length - 1][8], 867);
 assert.strictEqual(tabO.length, 4);
 assert.strictEqual(tab[0][0], 'v0.0.36 - T36');

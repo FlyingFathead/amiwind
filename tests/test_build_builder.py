@@ -186,18 +186,33 @@ class ChimStageTests(unittest.TestCase):
         self.assertNotIn('chim', [name for name, _ in legacy])
         self.assertEqual(plan(['--jobs', '4']), plan(['--jobs', '4', '--builder', 'chim']))  # chim is the default
 
+    def test_chim_rooms_leave_out_the_harvest_plants(self):
+        # CHIM-ROOM-HARVEST-DOUBLE-48: the rooms stage reads the harvest step's output; without it, no option
+        command = [str(part) for part in dict(plan(['--jobs', '4']))['chim-interiors']]
+        self.assertEqual(command[command.index('--harvest') + 1], str(RUN / 'harvest'))
+        self.assertEqual(command[command.index('--data-files') + 1], str(Path('/owned')))
+        for argv in (['--jobs', '4', '--no-harvest'], ['--jobs', '4', '--exclude', 'harvest']):
+            steps = dict(plan(argv))
+            self.assertNotIn('harvest', steps, argv)
+            self.assertNotIn('--harvest', [str(part) for part in steps['chim-interiors']], argv)
+
     def test_chim_stage_command(self):
         steps = plan(['--jobs', '4', '--builder', 'chim'])
         names = [name for name, _ in steps]
         legacy = [name for name, _ in plan(['--jobs', '4', '--builder', 'legacy'])]
         # CHIM-native areas by default (BUILD-LEGACY-CHAIN-DEFAULT-36): Balmora's legacy chain stage is replaced.
         # actor-library: the actor table's stage, CHIM builder only (on by default since v0.0.47)
+        # mwscript: the compiled game scripts, CHIM builder only (v0.0.48; the legacy plan stays unchanged)
         self.assertEqual([n for n in names if n not in ('chim', 'cell-progress', 'chim-town-balmora', 'chim-town-seyda',
                                                         'chim-town-vivec_city', 'chim-rooms-vivec_city',
-                                                        'actor-library')],
+                                                        'actor-library', 'chim-interiors', 'mwscript',
+                                                        # every room batch, by default since v0.0.48
+                                                        'chim-room-batches')],
                          [n for n in legacy if n != 'balmora'])
         self.assertLess(names.index('census'), names.index('chim'))
         self.assertLess(names.index('chim'), names.index('image'))
+        # CHIM rooms (docs/chim/INTERIOR_STORE.md, the default): right before the image, after every room stage
+        self.assertEqual(names.index('chim-interiors'), names.index('image') - 1)
         command = [str(part) for part in dict(steps)['chim']]
         self.assertTrue(command[1].endswith('tools/chim_build.py'))
 

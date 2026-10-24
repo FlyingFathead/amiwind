@@ -15,7 +15,50 @@ INTRO_IDS = {1:'chargen name',2:'chargen boat guard 2',3:'chargen boat guard 3',
              7:'chargen captain',8:'chargen door guard'}
 
 
-def initial_state(identifier):
+# The room residents' classes by reference (ROOM-BATCH-NPC-GROUNDING-48): generated from the game data by
+# tools/actor_grounding_census.py --rooms for every room of config/room-batches.json. Read only for an actor the
+# policy above does not name, and only with its reference number: an id is never classified by it everywhere.
+ROOMS = Path(__file__).resolve().parents[1]/'config/actor_grounding_rooms.json'
+ROOMS_FORMAT = 'AmiWind room actor grounding 1'
+# measured class -> initial state: 'authored' keeps the authored spot (aw_ground_mode 1), as the region frames keep
+# an actor authored off the ground (tools/chim/region_actors.py; the maintainer's rule of 22 October 2026)
+ROOM_STATES = {'floor': 'ground', 'off_floor': 'authored', 'no_floor': 'authored', 'authored_dead': 'authored_dead'}
+_ROOMS = {}
+
+
+def room_classes(path=None):
+    """{reference number: (room, id lower case, class)} of the generated room file ({} when it is missing)."""
+    path = Path(path or ROOMS)
+    try:
+        stamp = path.stat().st_mtime_ns
+    except OSError:
+        return {}
+    key = (str(path), stamp)
+    if key not in _ROOMS:
+        doc = json.loads(path.read_text(encoding='utf-8'))
+        if doc.get('format') != ROOMS_FORMAT:
+            raise ValueError('Unsupported room grounding file: %s' % path.name)
+        index, twice = {}, set()
+        for room, classes in doc['rooms'].items():
+            for name, rows in classes.items():
+                if name not in ROOM_STATES:
+                    raise ValueError('Unknown room grounding class %r (%s)' % (name, room))
+                for row in rows:
+                    number, ident = int(row[0]), str(row[1]).casefold()
+                    if number in index:
+                        twice.add(number)
+                    index[number] = (room, ident, name)
+        for number in twice:          # a reference number two rooms claim names no actor: never used
+            index.pop(number)
+        _ROOMS.clear()
+        _ROOMS[key] = index
+    return _ROOMS[key]
+
+
+def initial_state(identifier, reference=None):
+    """The actor's initial support state: the policy's class of its id (config/actor_grounding.json), else, with its
+    REFERENCE number, the measured class of that room reference (config/actor_grounding_rooms.json: 'ground' on the
+    floor, 'authored' kept where the game data puts it, 'authored_dead'); else an error (never a guess)."""
     policy = json.loads(POLICY.read_text())
     if policy['format'] != 2 or policy['unclassified'] != 'error':
         raise ValueError('Unsupported grounding policy')
@@ -27,12 +70,20 @@ def initial_state(identifier):
             raise ValueError('Unknown or undocumented initial support state')
         return rule['mode']
     if identifier in policy['ground_npcs']:return 'ground'
+    if reference is not None:
+        try:
+            number = int(float(reference))
+        except (TypeError, ValueError):
+            number = None
+        found = room_classes().get(number) if number is not None else None
+        if found is not None and found[1] == identifier:
+            return ROOM_STATES[found[2]]
     raise ValueError('Unclassified initial support state: '+identifier)
 
 
-def fields(identifier):
+def fields(identifier, reference=None):
     if any(c in identifier for c in ('"','\n','\r','\0')):raise ValueError('Invalid source ID')
-    return {'aw_source_id': identifier, 'aw_ground_mode': int(initial_state(identifier)!='ground')}
+    return {'aw_source_id': identifier, 'aw_ground_mode': int(initial_state(identifier, reference)!='ground')}
 
 
 def _actor_numbers(path):
@@ -55,7 +106,9 @@ def _annotate_map(task):
         if e.get('classname') not in ('aw_npc','aw_corpse'): return block
         identifier = refs.get(int(float(e.get('aw_ref', '0')))) or INTRO_IDS.get(int(float(e.get('aw_intro_role',0))))
         if not identifier:raise ValueError(path.name+': actor has no original identity')
-        values = fields(identifier)
+        # the reference number too: room actors are classified by reference (config/actor_grounding_rooms.json,
+        # the authored corpses among them; ACTOR-ANNOTATE-ROOM-REFERENCE-48)
+        values = fields(identifier, e.get('aw_ref'))
         for key in values: block = re.sub(r'\n"'+key+r'"\s+"[^"\n]*"', '', block)
         addition = ''.join(f'"{key}" "{value}"\n' for key, value in values.items())
         changed[0] = True
@@ -123,6 +176,29 @@ def search_offsets():
     return OFFSETS + WIDE_RING if search_mode() == 'wide' else OFFSETS
 
 
+# A point trace exactly on the shared edge of two collision pieces passes between them: Bradil Elarven (reference
+# 180984, Vivec, St. Delyn Glassworker's Hall) is placed at x 4160, on the seam of two floor pieces of the 256-unit
+# grid, and his centre probe found no floor (ACTOR-BAKE-CENTRE-SEAM-48). Only then is the centre probed this far to
+# each side, the highest support kept: a placement whose centre has support is fitted exactly as before.
+CENTRE_SEAM_NUDGE = 1/16
+
+
+def centre_support(scene, authored):
+    """The support under an actor's authored spot (8 units above its feet, 40 down; actor_grounding._Fitter): the
+    centre's own when it has one, else the highest found CENTRE_SEAM_NUDGE to either side in x or y."""
+    probe = [*authored[:2], authored[2]+8]
+    center = scene.floor(probe, 40)
+    if center['status'] != 'unsupported':
+        return center
+    found = [scene.floor([probe[0]+dx, probe[1]+dy, probe[2]], 40)
+             for dx, dy in ((CENTRE_SEAM_NUDGE, 0), (-CENTRE_SEAM_NUDGE, 0), (0, CENTRE_SEAM_NUDGE), (0, -CENTRE_SEAM_NUDGE))]
+    found = [hit for hit in found if hit['status'] == 'supported']
+    if not found:
+        return center
+    best = max(found, key=lambda hit: hit['height'])
+    return dict(best, point=probe, seam_nudge=CENTRE_SEAM_NUDGE)
+
+
 class _Fitter:
     """Support fitting for actors owned by staged maps (one per worker)."""
 
@@ -133,7 +209,10 @@ class _Fitter:
         self.soles = lru_cache(maxsize=128)(self._soles)
 
     def _scene(self, name):
-        return Scene((self.maps/(name+'.bsp')).read_bytes(), hull=0)
+        try:
+            return Scene((self.maps/(name+'.bsp')).read_bytes(), hull=0)
+        except ValueError as error:   # every failure names its unit (the map)
+            raise ValueError(name + '.bsp: ' + str(error)) from error
 
     def _soles(self, model, angles, intro):
         from check_actor_ground import model_frames, layout_of, contact_samples
@@ -198,7 +277,7 @@ class _Fitter:
             return self.setups[key]
         samples = self.soles(e['model'], angles, bool(float(e.get('aw_intro_role', 0))))
         s = self.neighbourhood(name, authored, samples)
-        center = s.floor([*authored[:2], authored[2]+8], 40)
+        center = centre_support(s, authored)
         if len(self.setups) >= 32:  # slices of many placements interleave in one worker
             self.setups.pop(next(iter(self.setups)))
         self.setups[key] = (samples, s, center)
@@ -453,8 +532,15 @@ def bake_ground(maps, jobs=1, exclude=()):
     their recorded placements stay as they are and the packaged audit checks them.
     """
     from build_parallel import ordered_map
+    from map_files import is_chim_room
+    from chim.interior import is_shell_map
     maps = Path(maps)
-    paths = [p for p in sorted(maps.glob('*.bsp')) if p.name not in exclude]
+    # CHIM room maps and batch-room shells (placeholders until the CHIM rooms install replaces them) keep their
+    # collision on the interior store, not in the map: their actors were placed by the room stage's grounding rules
+    # (config/actor_grounding_rooms.json) and the packaged audit checks them on the installed room's own floor
+    # (check_actor_ground RoomScene), so the bake leaves them as written (ACTOR-GROUND-BAKE-CHIM-ROOMS-48)
+    paths = [p for p in sorted(maps.glob('*.bsp'))
+             if p.name not in exclude and not is_chim_room(p) and not is_shell_map(p.read_bytes())]
 
     def workers(count):
         return max(1, min(jobs, count))

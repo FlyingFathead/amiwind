@@ -57,13 +57,76 @@ class ChimHeapGateTests(unittest.TestCase):
         self.assertGreater(model, heap.collision_bytes(lumps, SIZES))
 
     def test_gate_is_strict_and_names_the_frame(self):
+        # a ring over the zone even with the 32 MB minimum's cache bank holding its models and textures fails
         r = heap.ring_peak(self.world, SIZES)
-        need_kib = r['frames'][0]['peak_bytes'] // 1024
+        f = r['frames'][0]
+        rest_kib = (f['peak_bytes'] - sum(f['peak_breakdown'].get(k, 0) for k in heap.BANKED)) // 1024
         with self.assertRaisesRegex(ValueError, 'heap gate failed'):
-            heap.require_heap(self.tmp.name, sizes=SIZES, zone_kib=need_kib + 2 * r['pool_kib'] - 1)
+            heap.require_heap(self.tmp.name, sizes=SIZES, zone_kib=rest_kib + 2 * r['pool_kib'] - 1)
         report = json.loads((Path(self.tmp.name) / 'chim-heap.json').read_text())
         self.assertEqual(report['status'], 'failed')
+        self.assertEqual(report['frames'][0]['fast_mb'], 0)
         self.assertEqual(heap.require_heap(self.tmp.name, sizes=SIZES)['status'], 'passed')
+
+    def test_over_or_near_the_16mb_budget_is_built_and_marked_for_32mb(self):
+        """CHIM-FRAME-16MB-REFUSAL-48 (the maintainer's rule: over the budget, mark it as needing 32 MB): a frame over
+        the 16 MB baseline's zone, or within FRAME_NEAR_BYTES of it, that fits the 32 MB minimum (the same zone and
+        the automatic cache bank for its models and textures) passes, marked; the receipt fields count it."""
+        r = heap.ring_peak(self.world, SIZES)
+        f = r['frames'][0]
+        need_kib = f['peak_bytes'] // 1024
+        over = heap.require_heap(self.tmp.name, sizes=SIZES, zone_kib=need_kib + 2 * r['pool_kib'] - 1)
+        self.assertEqual(over['status'], 'passed')
+        self.assertLess(over['frames'][0]['headroom_bytes'], 0)
+        self.assertEqual(over['frames'][0]['fast_mb'], 32)
+        self.assertEqual(over['marked_32mb'], [f['frame']])
+        self.assertEqual({k: over['fast_ram_32mb'][k] for k in ('frames', 'over_16mb', 'near_bytes')},
+                         {'frames': 1, 'over_16mb': 1, 'near_bytes': heap.FRAME_NEAR_BYTES})
+        self.assertEqual(over['fast_ram_32mb']['frame_records'], [f['frame']])
+        near = heap.require_heap(self.tmp.name, sizes=SIZES, zone_kib=need_kib + 2 * r['pool_kib'] + 2)
+        self.assertGreater(near['frames'][0]['headroom_bytes'], 0)
+        self.assertLess(near['frames'][0]['headroom_bytes'], heap.FRAME_NEAR_BYTES)
+        self.assertEqual((near['marked_32mb'], near['fast_ram_32mb']['over_16mb']), ([f['frame']], 0))
+        roomy = heap.require_heap(self.tmp.name, sizes=SIZES)
+        self.assertEqual((roomy['marked_32mb'], roomy['frames'][0]['fast_mb']), ([], 16))
+        # the efrag limit is not Fast RAM: a frame over it still fails, marked or not
+        from unittest import mock
+        import engine_limits
+        with mock.patch.object(engine_limits, 'chim_efrag_budget', return_value=0), \
+                self.assertRaisesRegex(ValueError, 'efrag links'):
+            heap.require_heap(self.tmp.name, sizes=SIZES, zone_kib=need_kib + 2 * r['pool_kib'] - 1)
+
+    def test_frame_cells_and_marked_frame_maps(self):
+        from chim import format as F
+        from chim.frame_map import entities, entity_text
+        self.assertEqual(heap.frame_cells(['frames/x-07/y-04/frame.ccf', 'frames/x+17/y+04/frame.ccf', 'other']),
+                         {(-7, -4), (17, 4)})
+        with tempfile.TemporaryDirectory() as tmp:
+            maps = Path(tmp, 'maps')
+            maps.mkdir()
+            hands = {'aw_hand_%02d' % i: '0.%d' % i for i in range(80)}     # a long worldspawn, as frame maps have
+            for name, cell in (('vf0001', '-7 -4'), ('vf0002', '-6 -4')):
+                lumps = [b''] * 15
+                lumps[0] = entity_text([dict({'classname': 'worldspawn', '_chim_frame': cell}, **hands),
+                                        {'classname': 'info_player_start'}])
+                (maps / (name + '.chim')).write_bytes(F.brush_image(lumps)[0])
+            before = (maps / 'vf0002.chim').read_bytes()
+            self.assertEqual(heap.mark_frame_maps(tmp, {(-7, -4)}), ['vf0001'])
+            rows = entities((maps / 'vf0001.chim').read_bytes())
+            self.assertEqual(list(rows[0])[:2], ['classname', heap.FRAME_FAST_KEY])   # first: the engine reads 1 KiB
+            self.assertEqual(rows[0][heap.FRAME_FAST_KEY], '32')
+            self.assertEqual({k: v for k, v in rows[0].items() if k != heap.FRAME_FAST_KEY},
+                             dict({'classname': 'worldspawn', '_chim_frame': '-7 -4'}, **hands))
+            self.assertEqual(rows[1], {'classname': 'info_player_start'})
+            self.assertEqual((maps / 'vf0002.chim').read_bytes(), before)
+            once = (maps / 'vf0001.chim').read_bytes()
+            self.assertEqual(heap.mark_frame_maps(tmp, {(-7, -4)}, maps=['vf0001.chim']), ['vf0001'])
+            self.assertEqual((maps / 'vf0001.chim').read_bytes(), once)                # marking twice: same bytes
+            import struct
+            at = struct.unpack_from('<i', once, 4)[0]                                    # the entity lump
+            text = once[at:at + 1023].decode('latin-1')
+            self.assertNotIn('}', text)                       # this worldspawn is longer than what the engine reads
+            self.assertIn('"%s" "32"' % heap.FRAME_FAST_KEY, text)
 
     def test_ring_placements_are_gated_on_the_engine_efrag_budget(self):
         # CHIM-EFRAG-UNCAPPED-35: one source for the limit (engine_limits reads client.h and chim_local.h)

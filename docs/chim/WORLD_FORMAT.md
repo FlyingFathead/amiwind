@@ -1,6 +1,6 @@
 # CHIM world format
 
-_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
+_Last updated with AmiWind v0.0.48 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -23,6 +23,7 @@ _Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 - [Terrain references (0.7, experimental)](#terrain-references-07-experimental)
 - [Compact terrain records (0.10, experimental)](#compact-terrain-records-010-experimental)
 - [Generated terrain records (0.11, experimental)](#generated-terrain-records-011-experimental)
+- [Placement light, stores and room records (0.12)](#placement-light-stores-and-room-records-012)
 - [Placed models (0.8, experimental)](#placed-models-08-experimental)
 - [Reach index (0.9, experimental)](#reach-index-09-experimental)
 - [Actor table (experimental)](#actor-table-experimental)
@@ -77,7 +78,7 @@ Toolkit tell a CHIM map by its `"_chim_frame"` key, never by its file name
 | File | Name | Format | What it holds |
 | --- | --- | --- | --- |
 | Quake map | `maps/<name>.bsp` | Regular Quake BSP29 map (little-endian), compiled by qbsp, vis and light | The legacy open world (region maps such as `maps/vfNNNN.bsp`) and every interior. An interior cut into sub-cell sections is one BSP29 map per section, joined by `interior-sections.txt` (`AWIS1`: each section's box and the portals where two sections meet). |
-| CHIM map | `maps/<town>-chim.chim`, `maps/intro_docks-chim.chim`, `maps/vfNNNN.chim` (a cell on CHIM inside the legacy open world, in place of `vfNNNN.bsp`) | CHIM's own map format, the modified BSP format. Today it is laid out like a BSP29 file (the version word 29 and 15 lumps, in the CHIM brush image's lump order with the clipnodes last), but it is not a playable Quake map and is only valid with its CHIM world. Planned: its own header and loader ([.chim map format](CHIM_MAP_FORMAT.md)). | An empty shell: a world with no faces (one node, two empty leaves, an empty standing hull, no visibility), the map's entities (characters, doors, the start, streamed statics with `"_chim_chunk"` and `"_chim_box"`), collision-only clip models (the frame's boundary walls) and the worldspawn keys `"_chim_frame" "CX CY"` (the frame it belongs to), `"_chim_hunk_rest"` and `"_chim_streamed_statics"`. Builds before v0.0.36 named it `.bsp`; `--chim-frame-ext bsp` still does ("Frame maps are .chim files" below). |
+| CHIM map | `maps/<town>-chim.chim`, `maps/intro_docks-chim.chim`, `maps/vfNNNN.chim` (a cell on CHIM inside the legacy open world, in place of `vfNNNN.bsp`) | CHIM's own map format, the modified BSP format. Today it is laid out like a BSP29 file (the version word 29 and 15 lumps, in the CHIM brush image's lump order with the clipnodes last), but it is not a playable Quake map and is only valid with its CHIM world. Planned: its own header and loader ([.chim map format](CHIM_MAP_FORMAT.md)). | An empty shell: a world with no faces (one node, two empty leaves, an empty standing hull, no visibility), the map's entities (characters, doors, the start, the frame's static flames `aw_flame`, streamed statics with `"_chim_chunk"` and `"_chim_box"`), collision-only clip models (the frame's boundary walls) and the worldspawn keys `"_chim_frame" "CX CY"` (the frame it belongs to), `"_chim_hunk_rest"` and `"_chim_streamed_statics"`. Builds before v0.0.36 named it `.bsp`; `--chim-frame-ext bsp` still does ("Frame maps are .chim files" below). |
 | CHIM index | `chim/world.cwi` | CHIM world, big-endian, kind `INDX` | Settings, the file table (every frame and sector file with its size and CRC-32), the model directory, the model name order, the texture directory and the names ("Index" below). |
 | CHIM frame file | `chim/frames/x-03/y-02/frame.ccf` (one per frame of 3 x 3 cells) | CHIM world, kind `FRAM` | The frame block (centre cell, origin, chunk grid), the chunk directory in pack order and the sector table ("Frame file"). |
 | CHIM sector file | `chim/frames/x-03/y-02/s00.ccs` ... `s63.ccs` | CHIM world, kind `SECT` | The records of 3 x 3 chunks, read whole: chunk records (`CHNK`: 48-byte placement records, the visibility rows and the chunk's ground as a small world subtree, or in 0.7 a 32-byte terrain reference), terrain records (`TERR`, 0.7: chunk ground stored once in chunk-local units), shared models (`MODL`: brush images in BSP29 lumps, little-endian) and textures (`TEXR`: Quake miptex), each stored once in the sector that first needs it ("Sector file" and the record sections). |
@@ -97,7 +98,7 @@ markers, with the frame it names) and a CHIM world folder, with the heap gate's 
 | | |
 | --- | --- |
 | World format | Written by default since v0.0.47: 0.11 generated terrain records (`--chim-terrain-pack generate` with terrain references, `--chim-terrain-refs on`); selectable: 0.10 compact terrain records (`--chim-terrain-pack compact`), 0.7 terrain references with BSP29 terrain records (`--chim-terrain-pack bsp29`), 0.5 (`--chim-terrain-refs off`); experimental and off by default: 0.8 placed models (`--chim-placement-format 0.8`), 0.9 placed models with reach references (`--chim-reach-index refs`). The engine reads 0.4 to 0.11 (`chim/chim_format.h`). History: 0.11 generated terrain records; 0.10 compact terrain records; 0.9 reach references; 0.8 placed models; 0.7 terrain references; 0.6 one folder per sector row for frames of more than 64 sectors (read by the engine, not yet written by the builder); 0.5 story-hidden placements and irregular ground; 0.4 regular terrain grids only and no story-hidden placements; 0.3 chunk standing hulls without the neighbouring ground; 0.2 no placement lists; 0.1 one model pack, one texture pack and one chunk pack per frame. Major 0 = still in development. |
-| CHIM version | 0.2.1 with AmiWind v0.0.41 (0.2.0 with v0.0.36; 0.1.0 first shipped with AmiWind v0.0.33); its own number, kept in the `CHIM_VERSION` file at the repository root, the one source: `tools/project_version.py` (`chim_version()`) and the builder receipts read it, and `generate_native` writes `chim_version.h` (`#define CHIM_VERSION`; the engine's `chim/chim.h` includes it) and the boot check's "AmiWind vX / CHIM vY" |
+| CHIM version | 0.2.2 with AmiWind v0.0.48, compatibility line 0.2.1: it reads the worlds and caches 0.2.1 built (the table: [CHIM compatibility](README.md#compatibility)) (0.2.1 with v0.0.41; 0.2.0 with v0.0.36; 0.1.0 first shipped with AmiWind v0.0.33); its own number, kept in the `CHIM_VERSION` file at the repository root, the one source: `tools/project_version.py` (`chim_version()`) and the builder receipts read it, and `generate_native` writes `chim_version.h` (`#define CHIM_VERSION`; the engine's `chim/chim.h` includes it) and the boot check's "AmiWind vX / CHIM vY" |
 | Builder | `tools/chim_build.py` (package `tools/chim/`), receipts say `builder: "chim"` |
 | Validator | `tools/chim/validate.py` |
 | Scope of 0.5 | town exterior frames (Balmora, the Vivec Arena, Seyda Neen with the intro docks): terrain (regular or irregular), water, every placed static object with a mesh |
@@ -353,7 +354,8 @@ Contents (the legacy converter's rules, `prepare_mesh_bsp`):
   nodes (point root, standing root, standing root, standing root), no vis
   leafs, all faces;
 - **entities**: the model's flame emitters (`aw_flame` with model-frame
-  origins), or empty.
+  origins), or empty. The engine does not read them from the model: from v0.0.48 every frame map carries the
+  flames of its frame's placements, made from these (`tools/chim/flames.py`; CHIM-EXTERIOR-FLAMES-MISSING-48).
 
 ## Chunk records
 
@@ -622,6 +624,43 @@ The work per generated version-1 chunk (mean of the
 8,333): 8 tiles, 15.5 ground polygons, 6 grid and water splits, 0.3 texture splits, 32 vertexes, 13 faces, 17 nodes,
 11 leaves, about 3.4 KB of image written, in two passes (count, then write); no 68040 or 68060 timing yet. The zone holds the same decoded chunk as before (the same image); the loading buffer holds the record and
 the image, as for a compact record.
+
+## Placement light, stores and room records (0.12)
+
+For interiors on CHIM ([INTERIOR_STORE.md](INTERIOR_STORE.md)). A world or room record that uses any of this is
+written as format 0.12; the engine reads 0.4 to 0.12, and an engine before 0.12 refuses it with the usual message.
+
+- **Placement light level.** In a placed record (0.8 layout) the high byte of the 16-bit flags (bits 8 to 15) is the
+  placement's light level: 0 = none (lit as before: ambient, dynamic lights, self-lit textures), 1 to 255 = the level
+  its faces are drawn at instead of the ambient, in the units of `r_refdef.ambientlight`. Bits 0 and 1 keep their
+  meaning; bits 2 to 7 stay 0. Before 0.12 the high byte is not read. Engine: `ChimFormat_RecordLight`
+  (`chim/chim_format.c`) into `entity_t.aw_light` (appended); `d_edge.c` hands it to `D_CacheSurface` in
+  `r_drawsurf.light`, `R_BuildLightMap` starts from it, and `surfcache_t.light` keeps the level a surface was built
+  with, so another level rebuilds it. In an exterior world (from v0.0.48, experimental, `--chim-placement-light
+  sources`: the light the original's light sources give the placement, `tools/chim/placement_light.py`) the level is
+  added to the daylight-dimmed ambient instead, never past the full-day ambient (`R_SkyExterior`; `r_lamps 0` turns
+  it off); an exterior world with levels is written as format 0.12 and needs placed records (0.8 and later).
+- **Store folders.** Every pack path is `<store>/<relative>`; the store is named by the map's worldspawn key
+  `"_chim_world" "<store>"` (1 to 8 of `a-z`, `0-9`, `_`; absent: `chim`, the exterior world). Changing stores drops
+  the resident index, every kept model and texture and the read-ahead blocks (ids are per store). An interior store
+  (`chimi/`) is an index with the exterior layout and no frame rows, its models and textures in pack files.
+- **Room records.** `<store>/rooms/<room>.crm` (room names: 1 to 22 of `a-z`, `0-9`, `_`, `-`), big-endian:
+
+| part | bytes | content |
+| --- | ---: | --- |
+| header | 32 | the common header: kind `ROOM`, count = placements, directory = 64 (the model list), data = 64 + 4 x models (the placements), file bytes |
+| room block | 32 | mins (3 x f32), maxs (3 x f32), model count (u32), 0 (u32) |
+| model list | 4 x models | store model ids (u32), in load order |
+| placements | 56 x placements | placed records (0.8 layout, the light level in the flags); the model field is a store id from the list |
+
+  A record with placements lists at least one model; a minor before 0.8 (no placed records), bounds that are not
+  numbers or with mins over maxs, a non-zero reserved word or offsets that do not match the counts are refused whole
+  (`ChimFormat_Room`).
+- **Room maps.** A map whose worldspawn has `"_chim_room" "<room>"` is a room map: under the loading plaque the engine
+  reads the record, loads every model it lists whole from the store (with their textures) and keeps them locked, links
+  each placement with efrags into the map's own world and collides with it through the placed collision path (piece
+  table, then the turned or yawed model); no frame, terrain or chunk ring. Everything goes at the next map
+  (`chim/chim_room.c`).
 
 ## Placed models (0.8, experimental)
 

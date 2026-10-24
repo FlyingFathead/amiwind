@@ -1,6 +1,6 @@
 # Build completion output
 
-_Last updated with AmiWind v0.0.46 (20 October 2026)._
+_Last updated with AmiWind v0.0.48 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -70,11 +70,33 @@ as `image/layout-plan.json`:
   same);
 - the Amiga limits win: if a partition's payload plus its headroom would reach
   2 GiB, another partition is opened; the headroom is never shrunk. Partition
-  starts below 2 GiB and drives below 4 GiB are kept as before.
+  starts below 2 GiB and drives below 4 GiB are kept as before;
+- a boot payload too large for one partition is split: the files the engine
+  opens only through its search path move to a world volume in units (the CHIM
+  interior store `id1/chimi/` whole, a map with its sidecars, an actor model
+  with its mover, layout and tag files), the largest first, only until `DH0`
+  fits with twice its headroom. They go onto the world volumes first (the CHIM
+  world volume first), and only when none has room into a further partition
+  (role `store`). Music, saves, settings and everything else stay on `DH0`. The
+  plan line `Boot payload ... moved to world volumes` gives the units by kind
+  and the largest boot folders; a payload that cannot fit even so is refused
+  with its largest folders named. The plan counts what the image step adds
+  later: the soundtrack, the media, the actor library, the room batches and
+  the CHIM interior store.
 
-The image step follows the plan: the same partitions with the same maps in
-each. It refuses when a partition's payload moved by more than its headroom
-since the plan, and it writes every partition at the same time (one worker per
+When the staged payload still matches the plan, the image step follows it: the
+same partitions with the same maps and boot units in each. Since v0.0.48, a
+payload that changed after the plan (the room actor bake adds actor models
+inside the image step; payload sharing then stores skins and files once) is
+planned once more from the staging folder as it is, with one fit rule for
+packing and the minimality check, and the partition count follows from that
+(fewer or more than the early plan is normal). In the v0.0.48 release candidate
+the boot payload went from 2.45 to 3.01 GB inside the image step and then lost
+156 MB to payload sharing; three builds stopped on the old rule before this.
+The [roadmap](ROADMAP.md#build-turnaround-first-24-october-2026) has the next
+step: a layout that always falls back to a valid layout and never throws away
+finished work. Otherwise the image step refuses when a partition's payload moved by more than
+its headroom since the plan, and it writes every partition at the same time (one worker per
 partition; one FFS volume is written by one `xdftool` process). After writing,
 the disk-layout gate refuses:
 

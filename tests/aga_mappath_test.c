@@ -31,6 +31,8 @@ int main (void)
 	static const char frame[] = "{\n\"classname\" \"worldspawn\"\n\"_chim_frame\" \"-7 2\"\n}\n{\n\"classname\" \"info_player_start\"\n}\n";
 	static const char plain[] = "{\n\"classname\" \"worldspawn\"\n}\n{\n\"_chim_frame\" \"1 1\"\n}\n";
 
+	static const char room[] = "{\n\"classname\" \"worldspawn\"\n\"_chim_world\" \"chimi\"\n\"_chim_room\" \"bmastius\"\n}\n";
+
 	present[0] = "maps/vf1637.chim";
 	present[1] = "maps/vf1637.bsp";
 	present[2] = "maps/balmora-chim.chim";
@@ -74,6 +76,9 @@ int main (void)
 	assert (!AW_MapRefused ("maps/vf1637.bsp", frame, why, sizeof(why)));	/* --chim-frame-ext bsp */
 	assert (AW_MapRefused ("maps/vf1639.chim", plain, why, sizeof(why)));
 	assert (!AW_MapChimOrphan ("vf1637", why, sizeof(why)));
+	/* a CHIM room map is a .chim file without a frame key (IMAGE-ROOM-MAPS-ENGINE-REFUSED-48) */
+	assert (!AW_MapRefused ("maps/bmastius.chim", room, why, sizeof(why)) && !why[0]);
+	assert (AW_MapRefused ("maps/vf1639.chim", plain, why, sizeof(why)) && strstr (why, "_chim_room"));
 	printf ("map path resolver ok\n");
 	return 0;
 }

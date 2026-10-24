@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The game heap size (--heap-mb N, build config heap_mb, start argument -heapmb N): used exactly as
-asked, like --jobs; above the size measured to run the whole game on 16 MiB Fast RAM, one warning in the
+asked, like --jobs; above the size tested on the 16 MiB Fast RAM baseline, one warning in the
 build output, the engine receipt, the boot check and the engine's start, and never a refusal. The heap
 gates measure against the build's own size."""
 import json
@@ -70,10 +70,10 @@ class GeneratedHeapFileTests(unittest.TestCase):
             include = (Path(tmp) / 'amiwind_heap.i').read_text()
             self.assertIn('AW_HEAP_BYTES equ 11*1048576', include)
             self.assertIn('AW_FAST_FREE_BYTES equ 14*1048576', include)
-            self.assertIn('"FAIL: select 16 MB Fast RAM or more."', include)
+            self.assertIn('"FAIL: select 32 MB Fast RAM (16 MB is the least that starts)."', include)
             self.assertIn('"      Need 14 MiB free; 11 MiB + 16 bytes must be contiguous."', include)
             self.assertIn('heap_note:      dc.b 0\n', include)
-            self.assertNotIn('WARN', include)
+            self.assertNotIn('Game heap', include)
 
     def test_a_larger_heap_changes_the_figures_and_warns_in_one_row(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -141,6 +141,280 @@ class GeneratedHeapFileTests(unittest.TestCase):
             self.assertIn((11 * 1048576 + 16).to_bytes(4, 'big'), outputs[11])
             self.assertIn((15 * 1048576).to_bytes(4, 'big'), outputs[12])
             self.assertIn((12 * 1048576 + 16).to_bytes(4, 'big'), outputs[12])
+            # The safe Fast RAM minimum (RAM-REQUIREMENT-32MB-48): its KiB threshold, the WARN row and the note.
+            self.assertIn((32 * 1024 - 64).to_bytes(4, 'big'), outputs[11])
+            self.assertIn(b'Fast RAM:             %2ld MB (32 MB needed)', outputs[11])
+            self.assertIn(b'Press ENTER to continue anyway.', outputs[11])
+            self.assertIn(b'\rStarting in %ld s... \0', outputs[11])
+
+
+def run_fast_ram_note(fast_bytes):
+    """sys_amiga.c Sys_FastRamNote compiled on the host from the engine's own text with the generated
+    amiwind_heap.h, AvailMem answering fast_bytes: (CLI text, startup-screen rows, the size in MB)."""
+    text = (ROOT / 'engine/aga/src/sys_amiga.c').read_text(encoding='utf-8')
+    body = re.search(r'static long aw_fast_ram_short_mb;.*?\nstatic void Sys_FastRamNote\(void\) \{.*?\n\}\n', text,
+                     re.S).group(0).replace('extern char aw_fast_ram_screen[256];', 'char aw_fast_ram_screen[256];') \
+        .replace('extern long aw_fast_ram_found_mb;', 'long aw_fast_ram_found_mb;')   # aw_scene.c's (the room doors)
+    harness = ('#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n#include "amiwind_heap.h"\n'
+               '#define MEMF_FAST 4L\nstatic unsigned long fast_bytes;\n'
+               'static unsigned long AvailMem(long flags){return flags==(MEMF_FAST|(1L<<19))?fast_bytes:0;}\n'
+               'static void PutStr(const char *s){fputs(s,stdout);}\n' + body +
+               'int main(int argc,char **argv){fast_bytes=strtoul(argv[1],0,10);Sys_FastRamNote();'
+               'printf("@screen %s\\n@mb %ld\\n",aw_fast_ram_screen,aw_fast_ram_short_mb);return 0;}\n')
+    with tempfile.TemporaryDirectory() as tmp:
+        generate_heap(tmp)
+        source = Path(tmp) / 'note.c'
+        source.write_text(harness)
+        binary = Path(tmp) / 'note'
+        subprocess.run(['cc', '-std=c99', '-Wall', '-Werror', '-I', tmp, '-o', str(binary), str(source)], check=True)
+        out = subprocess.run([str(binary), str(fast_bytes)], capture_output=True, text=True, check=True).stdout
+    cli, rest = out.split('@screen ', 1)
+    screen, mb = rest.rsplit('\n@mb ', 1)
+    return cli, screen, int(mb)
+
+
+class BootWaitRun:
+    """Runs a routine of engine/aga/boot/boot_wait.asm on the host, one source line at a time, for the few
+    instructions it uses (no 68k emulator in the gate image). The library calls are stubs: keys holds, per
+    WaitForChar call, the key typed in that second (None: the second passes). puts records each printed string,
+    RawDoFmt fills %ld/%2ld. Fails on any instruction it does not know, so the routine cannot drift past it."""
+    BOOT = ROOT / 'engine/aga/boot'
+
+    def __init__(self, routine, keys, console=True, found_mb=16):
+        with tempfile.TemporaryDirectory() as tmp:
+            generate_heap(tmp)
+            include = (Path(tmp) / 'amiwind_heap.i').read_text(encoding='utf-8')
+        boot = (self.BOOT / 'bootcheck.asm').read_text(encoding='utf-8')
+        self.strings = {}
+        for text in (include, boot):
+            for name, body in re.findall(r'^(\w+):\s*((?:dc\.b[^\n]*\n?(?:\s+dc\.b[^\n]*\n?)*))', text, re.M):
+                self.strings[name] = ''.join(self._dcb(line) for line in re.findall(r'dc\.b\s+([^\n]*)', body))
+        self.equ = {k: int(v) for k, v in re.findall(r'^(\w+) equ (\d+)\s*$', include, re.M)}
+        self.lines, self.labels = [], {}
+        scope = ''
+        for raw in (self.BOOT / 'boot_wait.asm').read_text(encoding='utf-8').splitlines():
+            line = raw.split(';', 1)[0].rstrip() if "';'" not in raw else raw.rstrip()
+            label = re.match(r'^(\.?\w+):', line)
+            if label:
+                name = label.group(1)
+                scope = scope if name.startswith('.') else name
+                self.labels[scope + name if name.startswith('.') else name] = len(self.lines)
+                line = line[label.end():]
+            if line.strip():
+                self.lines.append((scope, line.strip()))
+        self.keys, self.console = list(keys), console
+        self.reg = {r: 0 for r in ('d0', 'd1', 'd2', 'd3', 'd4', 'a0', 'a1', 'a2', 'a3', 'a4', 'a6')}
+        self.mem = {'fast_found_mb': found_mb, 'dos_base': 'dos'}
+        self.buffers, self.output, self.saved, self.pending = {}, [], [], None
+        self.seconds = self.reads = self.delays = 0
+        self.call(routine)
+
+    @staticmethod
+    def _dcb(args):
+        out = ''
+        for part in re.findall(r'"[^"]*"|\d+', args):
+            out += part[1:-1] if part.startswith('"') else chr(int(part))
+        return out.split('\0', 1)[0] if '\0' in out else out
+
+    def value(self, op):
+        if op in self.reg:
+            return self.reg[op]
+        if op.startswith('#'):
+            v = op[1:]
+            return ord(v[1]) if v.startswith("'") else self.equ[v] if v in self.equ else int(v)
+        if op == '4.w':
+            return 'exec'
+        return self.mem[op]
+
+    def text(self, ref):
+        kind, name = ref
+        return self.buffers[name] if name in self.buffers else self.strings[name]
+
+    def stub(self, name):
+        r = self.reg
+        if name == 'Input':
+            r['d0'] = 'stdin' if self.console else 0
+        elif name == 'RawDoFmt':
+            fmt = self.text(r['a0'])
+            arg = self.mem[r['a1'][1]]
+            self.buffers[r['a3'][1]] = re.sub(r'%\d*ld', str(arg), fmt, count=1)
+        elif name == 'WaitForChar':
+            assert r['d1'] == 'stdin' and r['d2'] == 1000000
+            key = self.keys.pop(0) if self.keys else None
+            self.pending = key
+            if key is None:
+                self.seconds += 1
+            r['d0'] = 0 if key is None else -1
+        elif name == 'Read':
+            assert r['d1'] == 'stdin' and r['d2'] == ('sym', 'input_byte') and r['d3'] == 1
+            self.reads += 1
+            self.mem['input_byte'] = ord(self.pending)
+            r['d0'] = 1
+        elif name == 'Delay':
+            assert r['d1'] == 50
+            self.delays += 1
+            self.seconds += 1
+        else:
+            raise AssertionError('library call not stubbed: ' + name)
+
+    def call(self, routine):
+        stack, pc, flag_z = [None], self.labels[routine], False
+        while pc is not None:
+            scope, line = self.lines[pc]
+            pc += 1
+            op, _, args = line.partition(' ')
+            ops = [a.strip() for a in re.findall(r"(?:'[^']*'|\([^)]*\)|[^,])+", args)]
+            target = lambda name: self.labels[scope + name if name.startswith('.') else name]
+            if op == 'movem.l':
+                if ops[1] == '-(sp)':
+                    self.saved.append(dict(self.reg))
+                else:
+                    self.reg.update(self.saved.pop())
+            elif op in ('move.l', 'moveq', 'move.b'):
+                v = self.value(ops[0])
+                if ops[1] in self.reg:
+                    self.reg[ops[1]] = v
+                else:
+                    self.mem[ops[1]] = v
+                if not ops[1].startswith('a'):
+                    flag_z = v in (0, None)  # a move to a data register or memory sets Z
+            elif op == 'lea':
+                self.reg[ops[1]] = ('sym', ops[0].replace('(pc)', ''))
+            elif op == 'jsr':
+                self.stub(re.match(r'_LVO(\w+)\(a6\)$', ops[0]).group(1))
+            elif op == 'bsr':
+                if ops[0] == 'puts':
+                    self.output.append(self.text(self.reg['a0']))
+                else:
+                    stack.append(pc)
+                    pc = target(ops[0])
+            elif op == 'rts':
+                pc = stack.pop()
+            elif op in ('tst.l',):
+                flag_z = self.value(ops[0]) in (0, None)
+            elif op in ('cmp.l', 'cmp.b'):
+                flag_z = self.value(ops[1]) == self.value(ops[0])
+            elif op == 'subq.l':
+                self.reg[ops[1]] -= self.value(ops[0])
+                flag_z = self.reg[ops[1]] == 0
+            elif op in ('beq', 'beq.s', 'bne', 'bne.s', 'bne.w', 'bra', 'bra.s'):
+                if op.startswith('bra') or flag_z == op.startswith('beq'):
+                    pc = target(ops[0])
+            else:
+                raise AssertionError('instruction not modelled: ' + line)
+
+
+class FastRamSafeMinimumTests(unittest.TestCase):
+    """RAM-REQUIREMENT-32MB-48: under 32 MB of Fast RAM the boot check shows a WARN row and the maintainer's
+    note and waits for ENTER, the engine repeats the note without a wait; at 32 MB and more nothing extra."""
+    MAINTAINER_TEXT = ('NOTE: AmiWind has grown since v0.0.48: 32 MB of Fast RAM is now the minimum. Only 16 MB '
+                       'Fast RAM found, hence the game will start but may load more often. Press ENTER to continue '
+                       'anyway.')
+
+    def test_the_text_is_the_maintainers_word_for_word(self):
+        self.assertEqual(project_version.fast_ram_note('16'), self.MAINTAINER_TEXT)
+        self.assertEqual(project_version.fast_ram_note('16', enter=False),
+                         self.MAINTAINER_TEXT[:-len(' Press ENTER to continue anyway.')])
+        for width in (BOOT_COLUMNS, project_version.STARTUP_SCREEN_COLUMNS):
+            rows = project_version.fast_ram_note_lines(width, enter=width == BOOT_COLUMNS)
+            joined = ' '.join(rows).replace('%ld', '16')
+            self.assertEqual(joined, self.MAINTAINER_TEXT if width == BOOT_COLUMNS
+                             else project_version.fast_ram_note('16', enter=False))
+            for row in rows:
+                self.assertLessEqual(len(row.replace('%ld', '999999')), width, row)
+        self.assertEqual(project_version.fast_ram_note_lines(BOOT_COLUMNS)[-1], 'Press ENTER to continue anyway.')
+
+    def test_the_size_rule_at_16_32_and_between(self):
+        short, found = project_version.fast_ram_short, project_version.fast_ram_found_mb
+        for kib, is_short, mb in ((16384, True, 16), (16320, True, 16), (24576, True, 24), (31 * 1024, True, 31),
+                                  (32704, False, 32), (32768, False, 32), (65536, False, 64), (131072, False, 128)):
+            self.assertEqual(short(kib), is_short, kib)
+            self.assertEqual(found(kib), mb, kib)
+
+    def test_the_boot_checklist_row_and_the_wait(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            generate_heap(tmp)
+            include = (Path(tmp) / 'amiwind_heap.i').read_text()
+        self.assertIn('AW_FAST_SAFE_KIB equ 32704\n', include)
+        self.assertIn('AW_FAST_SLACK_KIB equ 64\n', include)
+        row = re.search(r'fast_warn_format: dc\.b "([^"]*)"', include).group(1)
+        self.assertEqual(row, 'Fast RAM:             %2ld MB (32 MB needed)       [!] WARN')
+        # As printed (16 for %2ld) the marker sits in the column of the other rows.
+        self.assertEqual(row.replace('%2ld', '16').index('[!] WARN'), 49)
+        self.assertEqual(project_version.fast_ram_row('16'), row.replace('%2ld', '16'))
+        note = ' '.join(re.findall(r'dc\.b "([^"]*)",10', include.split('fast_note:', 1)[1]))
+        self.assertEqual(note.replace('%ld', '16'), self.MAINTAINER_TEXT)
+        self.assertIn('AW_FAST_WAIT_SECONDS equ 10\n', include)
+        self.assertIn('fast_countdown_format: dc.b 13,"Starting in %ld s... ",0\n', include)
+        boot = (ROOT / 'engine/aga/boot/bootcheck.asm').read_text()
+        # Below the minimum: the WARN row (never d7, never a stop); else the OK row.
+        warn = boot.split('cmp.l   #AW_FAST_SAFE_KIB,12(a0)', 1)[1].split('.fast_address:', 1)[0]
+        self.assertIn('bhs     .fast_full', warn)
+        self.assertIn('lea     fast_warn_format(pc),a0', warn)
+        self.assertNotIn('d7', warn)
+        self.assertIn('lea     fast_ok_format(pc),a0', warn.split('.fast_full:', 1)[1])
+        # The note right under the separator (nothing printed between), its countdown under it, then the verdict.
+        tail = boot.split('lea     separator(pc),a0\n        bsr     puts\n', 1)[1].split('failed:', 1)[0]
+        self.assertNotIn('puts', tail.split('bsr     fast_wait', 1)[0])
+        self.assertIn('bsr     fast_wait\n        lea     passed(pc),a0', tail)
+        self.assertIn('.countdown:\n        lea     passed(pc),a0\n        bsr     puts\n        bsr     countdown', tail)
+        self.assertIn('include "boot_wait.asm"', boot)
+
+    def test_the_boot_wait_never_blocks(self):
+        """boot_wait.asm run on the host, line by line (BootWaitRun): ENTER skips, the timeout goes on by itself."""
+        note = '\n'.join(project_version.fast_ram_note_lines(BOOT_COLUMNS)).replace('%ld', '16') + '\n'
+        # Nobody presses a key (an unattended run): ten rows of one second each, then it starts by itself.
+        run = BootWaitRun('fast_wait', keys=[])
+        self.assertEqual(run.output[0], note)
+        self.assertEqual(run.output[1:11], ['\rStarting in %d s... ' % n for n in range(10, 0, -1)])
+        # Each row overwrites the one before (carriage return): "10 s" is one column wider than "9 s", and its last
+        # column is a space, so no dot is left behind; "Starting now." covers the widest row.
+        widths = [len(row) for row in run.output[1:11]]
+        self.assertLessEqual(max(widths) - min(widths), 1)
+        self.assertTrue(all(row.endswith(' ') for row in run.output[1:11]))
+        self.assertGreaterEqual(len(run.output[11].rstrip('\n')), max(widths))
+        self.assertEqual(run.output[11:], ['\rStarting now.                                     \n'])
+        self.assertEqual((run.seconds, run.reads), (10, 0))
+        # ENTER in the fourth second: the wait ends there.
+        for key in ('\r', '\n'):
+            run = BootWaitRun('fast_wait', keys=[None, None, None, key])
+            self.assertEqual(run.output[1:5], ['\rStarting in %d s... ' % n for n in (10, 9, 8, 7)])
+            self.assertEqual(run.output[5:], ['\rStarting now.                                     \n'])
+            self.assertEqual((run.seconds, run.reads), (3, 1))
+        # Another key does not end it; the count goes on.
+        run = BootWaitRun('fast_wait', keys=['x'])
+        self.assertEqual((len(run.output), run.seconds, run.reads), (12, 9, 1))
+        # No console input at all: one-second Delay()s, still ten seconds, then the start.
+        run = BootWaitRun('fast_wait', keys=[], console=False)
+        self.assertEqual((len(run.output), run.seconds, run.delays), (12, 10, 10))
+        # The 32 MB path keeps its five-second countdown.
+        run = BootWaitRun('countdown', keys=[])
+        self.assertEqual(run.output[0], '\rSPACE or ENTER = start now.   Starting in 5 s...')
+        self.assertEqual((len(run.output), run.seconds), (6, 5))
+
+    @unittest.skipUnless(shutil.which('cc'), 'host C compiler required')
+    def test_the_engine_warns_at_16_mb(self):
+        for fast in (16 * 1048576, 16 * 1048576 - 32):
+            cli, screen, mb = run_fast_ram_note(fast)
+            self.assertEqual(mb, 16)
+            self.assertEqual(cli, self.MAINTAINER_TEXT[:-len(' Press ENTER to continue anyway.')] + '\n')
+            self.assertEqual(screen.split('\n'), ['NOTE: AmiWind has grown since v0.0.48:',
+                                                  '32 MB of Fast RAM is now the minimum.',
+                                                  'Only 16 MB Fast RAM found, hence the',
+                                                  'game will start but may load more often.'])
+
+    @unittest.skipUnless(shutil.which('cc'), 'host C compiler required')
+    def test_the_engine_is_quiet_at_32_mb_and_more(self):
+        for fast in (32 * 1048576, 32 * 1048576 - 32, 64 * 1048576, 128 * 1048576):
+            self.assertEqual(run_fast_ram_note(fast), ('', '', 0), fast)
+
+    def test_wired_into_the_start_the_console_and_the_logo(self):
+        text = (ROOT / 'engine/aga/src/sys_amiga.c').read_text(encoding='utf-8')
+        self.assertIn('    Sys_FastRamNote();\n    // Allocate memory.', text)
+        self.assertIn('if (aw_fast_ram_short_mb)\n        Con_Printf(AW_FAST_RAM_NOTE "\\n", aw_fast_ram_short_mb);', text)
+        movie = (ROOT / 'engine/aga/src/aw_movie.c').read_text(encoding='utf-8')
+        self.assertIn('char aw_fast_ram_screen[256];', movie)
+        self.assertIn('for(p=aw_fast_ram_screen;*p;y+=10)', movie)
 
 
 @unittest.skipUnless(shutil.which('cc'), 'host C compiler required')
@@ -207,13 +481,15 @@ class AutoHeapTests(unittest.TestCase):
         out = self.run_auto(
             (11, 0, 14, 16, 0),     # 16 MiB board, 14 free: the built heap, not grown
             (11, 0, 15, 16, 0),
-            (11, 0, 26, 32, 0),     # 32 MiB: room 26 - 6 = 20 < 19? no: 20 >= 19 -> 11 + 9/4 = 13
+            (11, 0, 26, 32, 0),     # 32 MiB (the safe minimum): room 26 - 6 = 20 >= 19 -> 11 + 9/4 = 13
             (11, 0, 113, 128, 0),   # 128 MiB: room 95 -> 11 + 21 = 32, at most 24
             (11, 12, 113, 128, 0),  # -heapmb 12: as asked
             (11, 0, 113, 128, 1),   # aw_autoram 0
-            (11, 0, 2000, 2048, 0))
-        self.assertEqual(out[:7], ['11 0', '11 0', '13 1', '24 1', '12 0', '11 0', '24 1'])
-        self.assertEqual(out[7], 'off 1 0 0')
+            (11, 0, 2000, 2048, 0),
+            (11, 0, 58, 64, 0))     # 64 MiB: room 58 - 10 = 48 -> 11 + 37/4 = 20
+        # RAM-REQUIREMENT-32MB-48 moved no tier: more than 32 MiB is still used automatically.
+        self.assertEqual(out[:8], ['11 0', '11 0', '13 1', '24 1', '12 0', '11 0', '24 1', '20 1'])
+        self.assertEqual(out[8], 'off 1 0 0')
 
     def test_wired_into_the_start(self):
         text = (ROOT / 'engine/aga/src/sys_amiga.c').read_text(encoding='utf-8')

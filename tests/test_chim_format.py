@@ -88,14 +88,17 @@ ROWS = [
 
 def fixture(out, placements=None, settings=None, duplicate_texture=False, jobs=1, cache=None, mesh_fps=None,
             heights_of=height, same_ground=False, hollow_large=False, mesh_occluders=True, large_size=(100, 64),
-            prepared_of=None, ground=None, own_profiles=False, qbsp=None, collision_cache=None):
-    """A 4 x 4 chunk frame through the real CHIM units (chim.build.build_frame)."""
+            prepared_of=None, ground=None, own_profiles=False, qbsp=None, collision_cache=None, flames_of=None):
+    """A 4 x 4 chunk frame through the real CHIM units (chim.build.build_frame). flames_of: {model index: the
+    model's particle flames (prepare_scenery.model_flames rows)}; none by default."""
     placements = ROWS if placements is None else placements
     models = [dict(source='meshes/x/small.nif', materials=[dict(texture_index=None, diffuse=[1, 1, 1])], flames=[]),
               dict(source='meshes/x/large.nif', materials=[dict(texture_index=None,
                                                                  diffuse=[1.006 if duplicate_texture else 0.5, 1, 1])],
                    flames=[]),
               dict(source='meshes/x/small-copy.nif', materials=[dict(texture_index=None, diffuse=[1, 1, 1])], flames=[])]
+    for index, flames in (flames_of or {}).items():
+        models[index]['flames'] = [list(f) for f in flames]
     if own_profiles:
         # models carrying their own (empty) converter profile, as the Seyda tutorial barrel does
         models = [dict(m, _profile={}) if 'small' in m['source'] else m for m in models]

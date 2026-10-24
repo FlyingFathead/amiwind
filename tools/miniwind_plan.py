@@ -35,6 +35,7 @@ SCOPE_OMITTED = {
     'exterior': {
         'balmora-interiors': 'Balmora interiors (--miniwind-scope exterior; their doors say Area unavailable)',
         'door-audio': 'door sounds (--miniwind-scope exterior; every Balmora door leads to a left-out interior)',
+        'chim-interiors': 'CHIM rooms (--miniwind-scope exterior: no interiors)',
     },
     # interior (MINIWIND-NO-INTERIOR-SCOPE-42): the start room of an interior:<cell> start, nothing else of
     # the town's rooms (tools/chim_rooms.py --only-cell); island-wide checks and tracker data stay out

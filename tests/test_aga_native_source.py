@@ -342,6 +342,12 @@ class NativeSourceTests(unittest.TestCase):
             defines=['AW_INVENTORY_RULES_ONLY'],
             cflags=['-Wl,--wrap=COM_FOpenFile','-Werror=implicit-function-declaration','-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
+    def test_stats_and_magic_windows_content_grouping_keys_and_live_update(self):
+        # The original's Stats window (P) and the Magic placeholder (O), aw_statswin.c.
+        self.compile_run('aga_statswin_test.c', [Path(SOURCE)/'src'/n for n in ('aw_statswin.c','aw_console_glyphs.c')],
+            cflags=['-Wl,--wrap=AW_SmallStringColor','-Wall','-Werror=implicit-function-declaration',
+                    '-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
     def test_world_map_journal_disk_bounds_navigation_and_modal_exit(self):
         self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
             defines=['AW_INVENTORY_RULES_ONLY'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
@@ -589,7 +595,16 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run("aga_console_buffer_test.c", [Path(SOURCE)/"src/console.c"])
 
     def test_authored_door_audio_setting_and_catalogue_bounds(self):
-        self.compile_run("aga_door_audio_test.c", [ROOT/"engine/aga/src/aw_door_audio.c"])
+        # AWSFX1 (earlier images), AWSFX2 (every load door, AW-20260928-10) and an AWSFX2 table with a bad pair row
+        self.compile_run("aga_door_audio_test.c", [ROOT/"engine/aga/src/aw_door_audio.c"],
+                         argument_sets=[("v1",), ("v2",), ("v2bad",)])
+
+    def test_hinged_doors_turn_hold_lock_and_follow_chim_placements(self):
+        # AW-20260928-12: ordinary hinged doors on the engine's own collision (world.c), 90 degrees in one second.
+        self.compile_run("aga_hinged_door_test.c", [ROOT/"engine/aga/src/aw_hinged_door.c", Path(SOURCE)/"src/world.c",
+                                                    Path(SOURCE)/"src/mathlib.c"],
+                         argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"]],
+                         cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_mesh_depth_crossings_and_span_coverage(self):
         self.compile_run("aga_mesh_spans_test.c", [ROOT/"engine/aga/src/r_edge.c"])
@@ -601,6 +616,15 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_noclip_pitch_vertical_stop_and_speed(self):
         self.compile_run("aga_noclip_test.c", [ROOT/"engine/aga/src/aw_walk.c", Path(SOURCE)/"src/mathlib.c"])
+
+    def test_movement_rules_match_the_original_speed_load_jump_and_fatigue(self):
+        self.compile_run("aga_move_rules_test.c", [ROOT/"engine/aga/src/aw_move_rules.c"],
+                         cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
+
+    def test_movement_live_sheet_superspeed_old_numbers_fatigue_and_command(self):
+        self.compile_run("aga_move_test.c", [ROOT/"engine/aga/src"/n for n in
+                         ("aw_move.c", "aw_move_rules.c", "sv_user.c", "mathlib.c")],
+                         cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_menu_disabled_options_cancel_and_confirm(self):
         self.compile_run("aga_menu_test.c", [ROOT/"engine/aga/src/aw_menu.c"])
@@ -658,6 +682,11 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_balmora_region_round_trip(self):
         self.compile_run('aga_region_test.c', [Path(SOURCE)/'src/aw_region.c'])
+
+    def test_chim_towns_without_the_legacy_town_regions(self):
+        # BUILD-LEGACY-ENGINE-PATHS-48: the engine built without the retired legacy town region streaming
+        self.compile_run('aga_region_chim_only_test.c', [Path(SOURCE)/'src/aw_region.c'],
+                         ['AW_LEGACY_TOWN_REGIONS=0'])
 
     def test_data_driven_town_table_and_generic_town_directory(self):
         self.compile_run('aga_town_table_test.c', [Path(SOURCE)/'src/aw_region.c'],
@@ -756,3 +785,9 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_grounded_walk_drift_steps_and_jump(self):
         self.compile_run('aga_walk_test.c', [ROOT/'engine/aga/src/aw_walk.c', Path(SOURCE)/'src/mathlib.c'])
+
+    def test_step_rules_match_openmw_over_synthetic_stairs_and_slopes(self):
+        # STEP-MOVEMENT-OPENMW-RULES-48 (docs/STEP_MOVEMENT.md): the real walk (aw_walk.c, sv_phys.c) over risers,
+        # ramps, lips and drops under aw_step_rules 0 (Quake, the default) and 1 (Morrowind's rules as OpenMW's).
+        self.compile_run('aga_step_rules_test.c', [ROOT/'engine/aga/src/aw_walk.c', ROOT/'engine/aga/src/sv_phys.c',
+                                                   Path(SOURCE)/'src/mathlib.c'])

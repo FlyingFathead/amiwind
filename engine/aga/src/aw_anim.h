@@ -124,4 +124,11 @@ struct model_s *Mod_FindName (char *name);
  * while the actor speaks already (OpenMW DialogueManager::say). The idle topic also needs the player in
  * sight within 3000 original units (750). */
 int AW_VoiceSay(struct edict_s *e,int topic,int odds);
+/* Play one voice file (sound/pool/a<16 hex of hash>.wav) on the actor's voice channel: 0 when the actor is speaking
+ * already or the file is not in this build's voice pool (then quiet). Barks and the voice table's hello use it. */
+int AW_VoicePlay(struct edict_s *e,const unsigned char hash[8]);
+/* The voice table (aw_glut.c) when the engine has it: an edict's table row (-1 none) and a bark's pick (-1 none,
+ * 0 without a sound, 1 with HASH). NULL: every actor keeps its model's lines. */
+extern int (*aw_voice_table_row)(struct edict_s *e);
+extern int (*aw_voice_table_bark)(struct edict_s *e,int row,int topic,int pick_random,unsigned char hash[8]);
 #endif

@@ -233,6 +233,30 @@ class HullSurfaceLoss(unittest.TestCase):
             self.assertEqual(len(hull_surface_gate('test', [model], old, {0: 'old2'}, archive, 'extremes', 1,
                                                    UnitCache())), 1)
 
+    def test_gate_skips_triangles_stair_method_1_removed(self):
+        # CHIM-HULL-SURFACE-RESURVEY-48: the collision triangles of flights stair collision method 1 replaced (lod
+        # stair_removed_triangles) are not walked and not measured; the rest of the mesh still is
+        import hashlib
+        import tempfile
+        from mesh_geometry import collision_parts
+        from mwad.scene import pack_geometry
+        from chim.build import hull_surface_gate, hull_surface_unit
+        from chim.units import UnitCache
+        v, f = bent_deck()
+        packet = bytes(pack_geometry([list(map(float, p[:5])) + [255, 255, 255, 255] for p in v], f.tolist(), 1))
+        model = {'source': 'meshes/x/test_deck.nif', 'offset': 0, 'bytes': len(packet),
+                 'sha256': hashlib.sha256(packet).hexdigest()}
+        pieces = [(p, None, i, e) for p, _, i, e in collision_parts(v, f)]
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / 'scenery.mwpak'
+            archive.write_bytes(packet)
+            self.assertGreater(hull_surface_unit((str(archive), model, pieces)), 8.5)
+            self.assertGreater(hull_surface_unit((str(archive), model, pieces, (0, 1))), 8.5)   # the slope stays
+            self.assertEqual(hull_surface_unit((str(archive), model, pieces, (0, 1, 2, 3))), 0.)  # both decks gone
+            prepared = {0: (v, f, [], pieces, {'stair_removed_triangles': [0, 1, 2, 3]})}
+            self.assertEqual(hull_surface_gate('test', [model], prepared, {0: 'removed'}, archive, 'table', 1,
+                                               UnitCache()), [])
+
     def test_table_holds_the_dock(self):
         from chim.build import hull_surface_table
         self.assertIn('meshes/x/ex_v_dock_01.nif', hull_surface_table())

@@ -63,7 +63,9 @@ class AuthoredStairCollisionTests(unittest.TestCase):
             for requested in (None,'root_node_or_visual'):
                 result=read_model(name,nif(with_root=False),requested)
                 self.assertIsNone(result[2]);self.assertIsNone(result[3])
-                self.assertIn('No supported visible static triangles',result[4])
+                # the collision-source rule (tools/collision_source.py, the default) names the missing root node; the
+                # rule before (AMIWIND_COLLISION_SOURCE=profile) failed in model_geometry
+                self.assertIn('No root RootCollisionNode (authored collision required)',result[4])
 
     def test_malformed_root_is_error_even_while_visible_mesh_is_valid(self):
         for name in MODELS:

@@ -19,6 +19,8 @@ ALLOWED = {
                                     'world, its residents are fitted on the CHIM frame by the chim-town stage'),
     'tools/analyze_subcell_redundancy.py': (1, 'measures legacy sub-cell maps (sn/bm prefix) only'),
     'tools/asset_census.py': (1, 'bakes: lightmaps of interior maps; frame maps are exterior and hold no faces'),
+    'tools/interior_store.py': (1, "measures today's room maps (a Quake map per room) only; a CHIM room map holds no "
+                                  'placed models'),
     'tools/build_aga.py': (1, 'empty MiniWind evidence: proves no legacy map but torchtest is staged'),
     'tools/check_actor_ground.py': (1, 'frame residents are judged by their town stage fit (chim_frames, '
                                        'BUILD-ACTOR-GATE-CHIM-FRAMES-36), not on the empty frame world'),

@@ -112,9 +112,9 @@
   },
   {
    "id": "door-sounds",
-   "description": "Original door sounds",
+   "description": "Original door sounds and the hinged door table",
    "steps": ["door-audio"],
-   "patterns": ["id1/door-sounds.txt", "id1/sound/doors/*.wav"]
+   "patterns": ["id1/door-sounds.txt", "id1/hinged-doors.txt", "id1/sound/doors/*.wav"]
   },
   {
    "id": "music",
@@ -140,13 +140,19 @@
   },
   {
    "id": "interiors",
-   "description": "Interior maps (prison, census, Seyda Neen area, Balmora) and their door banks",
+   "description": "Interior maps (prison, census, Seyda Neen area, Balmora) and their door banks. The prison and the census office ship as classic .bsp maps; with CHIM rooms (the default since v0.0.48) the other rooms ship as CHIM room maps (.chim, made by the chim-interiors stage from shell rooms) with the interior store id1/chimi/, and Vivec's rooms (v?i###, stage chim-rooms-vivec_city) and the batch rooms (ri + 10 hex digits) with them; the .bsp patterns are the classic form (--interior-format bsp)",
    "steps": ["interior", "census", "area", "balmora-interiors"],
    "patterns": ["id1/maps/bm[a-z]*.bsp", "id1/maps/prison.bsp", "id1/maps/census.bsp", "id1/maps/addamasartus.bsp",
                 "id1/maps/draren.bsp", "id1/maps/eldafire.bsp", "id1/maps/erene.bsp", "id1/maps/fargoth.bsp",
                 "id1/maps/finemouth.bsp", "id1/maps/foryn.bsp", "id1/maps/indrele.bsp", "id1/maps/lighthouse.bsp",
                 "id1/maps/terurise.bsp", "id1/maps/tharystomb.bsp", "id1/maps/tradehouse.bsp", "id1/maps/vodunius.bsp",
-                "id1/maps/warehouse.bsp", "id1/doors-*.txt", "id1/scene-links.txt", "id1/scene-doors.txt"]
+                "id1/maps/warehouse.bsp", "id1/doors-*.txt", "id1/scene-links.txt", "id1/scene-doors.txt",
+                "id1/maps/bm[a-z]*.chim", "id1/maps/addamasartus.chim", "id1/maps/draren.chim", "id1/maps/eldafire.chim",
+                "id1/maps/erene.chim", "id1/maps/fargoth.chim", "id1/maps/finemouth.chim", "id1/maps/foryn.chim",
+                "id1/maps/indrele.chim", "id1/maps/lighthouse.chim", "id1/maps/terurise.chim",
+                "id1/maps/tharystomb.chim", "id1/maps/tradehouse.chim", "id1/maps/vodunius.chim",
+                "id1/maps/warehouse.chim", "id1/maps/ri[0-9a-f]*.chim", "id1/maps/v[a-z]i[0-9][0-9][0-9].chim",
+                "id1/chimi/*", "id1/chimi/*/*"]
   },
   {
    "id": "extra-towns",
@@ -157,7 +163,7 @@
   },
   {
    "id": "world-maps",
-   "description": "Vvardenfell world maps with rocks and giant mushrooms, region directory and volumes",
+   "description": "Vvardenfell world maps with rocks and giant mushrooms, region directory and volumes (classic vf .bsp maps only for cells off CHIM: none by default since every exterior cell is on CHIM; the region frames ship as chim-frame-maps)",
    "steps": ["world-survey", "world-terrain", "world-scenery-assets", "world-scenery", "image"],
    "patterns": ["id1/maps/vf[0-9]*.bsp", "id1/world/regions.awr", "id1/world/conversion.json", "id1/world/volumes.awv"]
   },
@@ -201,10 +207,11 @@
   {
    "id": "chim-frame-maps",
    "builder": "chim",
-   "description": "CHIM frame maps: one map per CHIM area that the engine loads instead of its region maps",
+   "description": "CHIM frame maps: one map per CHIM area or region frame that the engine loads instead of its region maps, with its far and cut records. They ship as .chim (CHIM's own map format, the default); *-chim.bsp is the earlier form (--chim-frame-ext bsp)",
    "steps": ["chim", "image"],
    "image_options": ["--chim-world"],
-   "patterns": ["id1/maps/*-chim.bsp"]
+   "patterns": ["id1/maps/*-chim.bsp", "id1/maps/*-chim.chim", "id1/maps/*-chim.far", "id1/maps/*-chim.cut",
+                "id1/maps/vf[0-9]*.chim", "id1/maps/vf[0-9]*.far", "id1/maps/vf[0-9]*.cut", "id1/maps/chim-actors.cca"]
   }
  ]
 }

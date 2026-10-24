@@ -125,6 +125,11 @@ void AW_CombatPlayerSheet(aw_fighter_t *out);
 extern void (*aw_combat_equipment)(aw_fighter_t *sheet);
 extern void (*aw_combat_equipment_store)(const aw_fighter_t *sheet);
 void AW_CombatEquipmentStore(void);
+/* The movement rules' view of the player (aw_move.c): knocked down/out, the one fatigue value
+ * (and its maximum), and a fatigue loss (never below 0 unless already there). */
+int AW_CombatPlayerKnocked(void);
+float AW_CombatPlayerFatigue(float *maximum);
+void AW_CombatPlayerFatigueLoss(float loss);
 void AW_CombatEquipmentChanged(void);
 int AW_CombatLoadout(const char *loadout,aw_fighter_t *out,char *chosen);
 extern int (*aw_combat_input_locked)(void);

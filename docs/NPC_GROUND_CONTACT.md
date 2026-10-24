@@ -1,11 +1,14 @@
 # Initial NPC placement and ground-contact workflow
 
-_Last updated with AmiWind v0.0.46 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Classify the intended initial state first](#classify-the-intended-initial-state-first)
+- [Actors start where the game puts them](#actors-start-where-the-game-puts-them)
+- [Room residents by rule](#room-residents-by-rule)
+  - [Where a CHIM room's residents are fitted (v0.0.48)](#where-a-chim-rooms-residents-are-fitted-v0048)
 - [Interior creatures and the levitating class](#interior-creatures-and-the-levitating-class)
 - [Actors the original disables at the start](#actors-the-original-disables-at-the-start)
 - [Main gate: host build, before packaging](#main-gate-host-build-before-packaging)
@@ -20,7 +23,9 @@ _Last updated with AmiWind v0.0.46 (21 October 2026)._
 
 Ground residents must stand on the converted walkable surface, including stairs,
 bridges, platforms and interior floors. Original placement Z is an input, not
-proof of foot contact after geometry conversion.
+proof of foot contact after geometry conversion. The design behind it (why the game data puts actors a little above
+the floor, what OpenMW and Quake do, the build-time rule and the runtime safety net) is on
+[Actor placement](ACTOR_PLACEMENT.md); this page is the workflow and the checks.
 
 ## Classify the intended initial state first
 
@@ -52,6 +57,132 @@ Authored corpses keep their death pose and placement. Their pose/contact checks,
 swimming depth, flight clearance and later scripted movement are separate
 contracts. A future placement-specific override must use the placed reference,
 not change every instance of a source actor to hide one bad placement.
+
+## Actors start where the game puts them
+
+The maintainer's rule (22 October 2026): every NPC and creature starts at the position and rotation its reference
+has in the game data. Nothing relocates an actor to a nicer spot. Some starts are odd on purpose: the wizard who
+falls from the sky near Seyda Neen at the start of the game (Tarhiel) is placed high in the air, and his script
+makes him fall. So the ground check never pulls an actor down that the game put up.
+
+How the CHIM region frames apply it (experimental, `--chim-region-actors on`; the town frames place their
+residents as before):
+
+| The reference | What happens |
+| --- | --- |
+| stands within 32 Quake units (128 game units) of the ground, or of the water surface under it | the ordinary ground contact, x and y kept: the towns' contact rule sets the height where the actor's soles touch the frame's collision under it, and the frame map's contact check measures the result |
+| stands higher than that above the ground or the water, swims well above the sea floor, or lies under the ground | the authored spot is kept (`aw_ground_mode 1`, so the engine's floor snap leaves it too) and the build receipt lists it as authored off the ground, with its height and its script when the record has one |
+| is classified in `config/actor_grounding.json` as flying, levitating, swimming, scripted airborne or authored dead | the authored spot is kept, as in the towns |
+
+32 units is also how far the engine's own floor snap reaches when an actor spawns (`AW_NPCFloor`), so the builder
+and the engine draw the line in the same place. An NPC or creature the policy file does not list is classified
+from the data this way and recorded per actor in the receipt (`image/chim-region-actors.json`), never silently.
+
+Levelled creature lists are not placed in a frame map: the game rolls a list at the player's level when the cell
+loads, and a frame map row holds one fixed creature, so the builder does not pick one. They are listed per frame as
+deferred with that reason; the actor table rolls them when a cell joins the type 1 window.
+
+The ordinary ground contact keeps the reference's x and y. The towns' sideways search, which may move a resident
+up to 48 units to find a spot where every sole touches, is not used here: it would move the actor off the spot
+the game gave it. An actor whose soles do not all touch at its own spot (a slope, a rock edge) stands on the
+ground under its reference point, as the engine's own snap would put it, and the receipt records each sole's gap.
+
+Measured on 22 October 2026 on the v0.0.47 release run's game data and CHIM world, read only (the region frames'
+actor step run without a build):
+
+- 999 of the 1,348 region frames have exterior actor references; 336 of them get actors. 781 actors are placed
+  (468 NPCs, 313 creatures). 5 references are left to the town frame that places them and 9 have no model in the
+  actor library; each is listed with its reason.
+- 101 actors start more than 32 units above the ground or the water under them. 85 of them are creatures the
+  grounding policy or their record keeps off the ground (slaughterfish and dreugh swimming, netch and cliff racers
+  flying; one of them, a netch, has a breeding script). 16 others keep their authored spot and are listed: 8 have
+  a script (Dreamer_Talker07, Fjol, golden saint_staada, lucan ostorius, m'aiq, paur maston, viatrix petilia,
+  centurion_sphere_hts2), 8 have none (an Imperial Guard, four mudcrabs, a guar, a nix-hound, a shalk). Most of them
+  stand 33 to 68 units up, which looks more like ground or a rock the conversion lost than an airborne start: each
+  is a place to check in game.
+- Tarhiel (`agronian guy`) is not a region frame actor: his cell belongs to Seyda Neen's town frame, which keeps
+  him in the sky by the policy class `scripted_airborne`.
+- 601 actors get the ordinary ground contact: 354 with every sole touching, 247 on the ground under their
+  reference point with some soles off (94 of them within 2 units, 70 within 4, 83 more or over no support).
+- 4,853 levelled creature references are deferred (in 982 frames).
+
+## Room residents by rule
+
+From v0.0.48 the rooms of the room list (`config/room-batches.json`, every interior of the base game) follow the same
+rule, per reference, without a hand-made class per NPC (ROOM-BATCH-NPC-GROUNDING-48). Before, the room batches stage
+refused a batch whose residents the policy did not name (Ald-ruhn's first batch: 62 NPCs in 22 rooms).
+
+`tools/actor_grounding_census.py --rooms` reads every NPC and creature reference of every listed room from your game
+data and compares its feet with the room's floor under them: the room's own placements (statics, activators, doors,
+containers, lights) with their visible and collision triangles, placed as the scenery converter places them, which is
+what the room's CHIM collision is made from. The tolerance is the exterior census's: the highest support at most 32
+game units above the feet, at most 128 below them (32 Quake units: the support fitter's reach and the engine's floor
+snap, `AW_NPCFloor`).
+
+| Class | The reference | What happens |
+| --- | --- | --- |
+| `floor` | its feet within that band of the floor (or of a chair, bench or table it sits on) | the ordinary ground contact |
+| `off_floor` | more than 128 game units above the floor under it | its authored spot is kept (`aw_ground_mode 1`) and it is listed with its script |
+| `no_floor` | no floor under it in the room | kept and listed |
+| `authored_dead` | the record is placed dead | its death pose at its authored spot |
+
+`--write-rooms` writes the classes to `config/actor_grounding_rooms.json`: per room and class, the reference number
+and the record ID (and the script of one kept off the floor), no positions or heights. `tools/actor_grounding.py`
+reads it only for an actor `config/actor_grounding.json` does not name, and only by its reference number: an ID is
+never classified everywhere by it, and a town resident keeps the policy's class. The room batches preflight, the
+resident stage, the interior creatures and the contact check pass the reference. A levelled creature list is no actor
+yet (the game rolls it when the cell loads) and is listed as deferred; nothing is dropped.
+
+Measured on 23 October 2026 on the room list of 1,134 rooms (40 batches, every interior of the base game), read only,
+in 100 s on 6 cores:
+
+- 913 rooms have actors: 3,007 references (2,477 NPCs, 530 creatures). 2,819 stand on the floor, 143 are authored
+  dead, 45 are kept off the floor, none has no floor under it. 1,270 levelled lists are deferred.
+- The 45 kept off the floor: 43 creatures, nearly all slaughterfish and dreugh in the water rooms (they swim; up to
+  about 1,076 units over the bottom) and two winged twilights in Maelkashishi; and two NPCs: Alvos Sadri in
+  Kumarahaz (143 units up) and a Hlaalu guard in Caldera Mine (177 units up), whose record the policy already lists
+  as ground, so the policy's class stands there. Both are places to check in the game.
+- 667 references are of records the policy already names; the rest (2,340) take their class from the file.
+- Of the references on the floor, 440 stand more than 32 game units above it and 90 more than 64: the game data puts
+  many actors a little above their floor, as outdoors.
+
+The file is made from the game data and lists only reference numbers and record IDs. Run the census again when the
+room list changes (a new room makes the preflight name it and the command to run).
+
+### Where a CHIM room's residents are fitted (v0.0.48)
+
+A CHIM room has no classic floor until the image installs it. The town room stages convert their rooms as shells
+(`--room-form shell`), and the batch rooms always were: a room map with its entities and no placed mesh and no
+collision of its own, standing on the interior store's models once the image installs the CHIM rooms. So a shell
+room's residents are fitted and measured in the image step, in this order:
+
+1. The scene stage's early check (`tools/check_scene_actors.py`, before the image) classifies a shell room's
+   residents (identity, support mode, death pose, transform, owner) and records them as `deferred-to-chim-room`
+   (`defer_shells` in `tools/check_actor_ground.py`): there is no collision yet to measure. A shell still present at
+   the image is measured as before and refused (CHIM-ROOM-SHELL-ACTORS-EARLY-48).
+2. The image installs the CHIM rooms. A shell room's world declares the converted humanoid standing hull the check
+   reads, as a room converted whole does (CHIM-ROOM-SHELL-NO-HULL-48).
+3. The CHIM room actor bake (`tools/room_actor_bake.py`, `bake_room_ground`) fits every ground resident of every CHIM
+   room on exactly the collision the check measures (the store models, each moved and turned by its record). The
+   rule is the build-time one on [Actor placement](ACTOR_PLACEMENT.md#amiwinds-contract): the first walkable surface
+   of the room under the resident within 8 units over and 32 under its recorded spot, the origin 0.25 over it, every
+   idle sole within -0.5..1.0, else the nearest spot within 32 (then 48) units; a resident that fits nowhere is
+   refused and reported. It writes the same fields as the map bake (`aw_ground_valid`, `aw_ground_baked`,
+   `aw_authored_origin`). Before this bake the residents of batch rooms kept their game-data height, 1 to 15 units
+   over the floor, and the check refused 1,662 of them
+   ([ROOM-ACTORS-FLOATING-48](bugs/ROOM-ACTORS-FLOATING-48.md)).
+4. A guard (`require_fitted`) stops the image step, naming the maps, if any ground resident of any map the check
+   reads carries no mark of a ground bake.
+5. The actor contact check (`tools/check_actor_ground.py`, without `defer_shells`) measures all of them.
+
+Residents the bake cannot place are decided case by case in `config/actor_room_placements.json`: `authored` (kept
+where the game data puts them, with the reason; the check reports each as an explicit exception) and `placements`
+(an origin written as given, judged by the check). `AMIWIND_ROOM_ACTOR_BAKE=off` skips the bake (the method before it,
+for comparison). The 110 pose exceptions (108 authored dead, one authored, `vivec_god` levitating) are never fitted.
+
+Harvestable mushrooms are not residents and are not left in a room record: a plant exists once, as its harvest
+entity, in a CHIM room as on the CHIM world outdoors
+([CHIM-ROOM-HARVEST-DOUBLE-48](bugs/CHIM-ROOM-HARVEST-DOUBLE-48.md); [store details](chim/INTERIOR_STORE.md)).
 
 ## Interior creatures and the levitating class
 
@@ -89,7 +220,10 @@ mode and the number placed.
 Island-wide, the base master places 530 creature references in interiors (178 records, 222 cells). With
 `all`, Vivec is the only one classified today: 494 references have no grounding classification and 35 are
 authored dead. Classifying them is source work (Flies flag, the Levitate effect, water level, measured
-support), as for the NPCs; by their records 330 walk, 108 swim only, 1 flies and 91 have none of the three.
+support), as for the NPCs; by their records 330 walk, 108 swim only, 1 flies and 91 have none of the three. From
+v0.0.48 the creatures of the listed rooms take their class per reference from the room file
+([room residents by rule](#room-residents-by-rule)); authored-dead creatures are still left out of the rooms (the
+actor library's corpse model, its own death pose, is used outdoors only so far).
 
 ## Actors the original disables at the start
 
@@ -126,7 +260,8 @@ keys) are listed in the table but not filtered.
 
 1. Finish visible geometry and collision, including stairs, platforms and floors.
    Resolve each resident in its owning sub-cell, with that scene's full support
-   geometry. Use the bounded placement pass to fit the rendered initial idle soles. Preserve
+   geometry. Use the bounded placement pass to fit the rendered initial idle soles (for CHIM rooms, in the image step
+   after the rooms install: [above](#where-a-chim-rooms-residents-are-fitted-v0048)). Preserve
    source reference, authored XYZ, support reference and every adjustment in evidence.
 2. Write the canonical result into every overlap copy. Missing owners, inconsistent
    copies, unknown initial states and excessive or unsupported drops are errors.
@@ -163,7 +298,10 @@ scan and no need to keep the build reports or a second collision world in RAM.
 ## Runtime correction
 
 rc7 preserves a host-certified initial point exactly when the current position
-matches `aw_ground_baked` within 0.001 unit. Re-snapping only its origin would
+matches `aw_ground_baked` within 0.001 unit. A resident spawns with movetype none (it never falls), and 0.1 s later
+the engine's floor snap (`AW_NPCFloor`) keeps a baked resident exactly and sets it on the ground; the snap is a
+safety net, and build and runtime agree (on a baked copy of all the CHIM rooms of dev2 try 11, all 2,341 fitted
+residents were kept exactly). See [Actor placement](ACTOR_PLACEMENT.md#amiwinds-contract). Re-snapping only its origin would
 undo mesh-aware correction. Moved/legacy residents still use the bounded origin
 probe from 8 units above to 32 below, accepting walkable non-solid support with
 a quarter-unit clearance. That fallback is not certification of arbitrary

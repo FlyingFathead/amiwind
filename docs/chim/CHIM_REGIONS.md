@@ -1,6 +1,6 @@
 # CHIM regions: exterior cells on CHIM inside the legacy open world
 
-_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 Status: the default of a full CHIM build since v0.0.47 (`--chim-regions`, BUILD-CHIM-CELLS-PRIVATE-LIST-47): with no
 `--chim-regions`, `tools/build.py --builder chim` takes the cell list in the source tree, `config/chim-cells.json`
@@ -118,8 +118,8 @@ A build is refused, with every cell and its reason, when a selected cell:
 
 - is not finished in CHIMport (taken: cell / terrain complete with or without lighting, owner states,
   audits passed, empty sea);
-- is open sea without LAND (no legacy map to replace, and the engine does not read the shared ocean chunk
-  yet: [WORLD_FORMAT.md](WORLD_FORMAT.md));
+- is open sea without LAND (no legacy map to replace; the square lies beyond the game's own cells, outside the playable world:
+  [WORLD_FORMAT.md](WORLD_FORMAT.md), [WORLD_BOUNDS.md](../WORLD_BOUNDS.md));
 - lies in a town's frame (named on purpose; cells of `seabed`, `coast` and region names that do are left
   out and listed instead: towns keep their own frame);
 - or leaves a pocket: up to 8 unselected cells enclosed by selected cells (4-connected, so a pocket open
@@ -139,7 +139,7 @@ lists the replaced maps under `chim_rebind.replaced_by_region_frames`.
 
 ## Not yet
 
-- Open-sea cells (no LAND) on the shared ocean chunk: when the engine reads it.
+- Open-sea squares beyond the game's own cells (no cell record) stay outside the playable world by design; cells the game defines without land are built as flat seabed with water and are in the game.
 - Harvest catalogues of replaced maps, night-lamp entries of their cells, and the entity tracker's view of
   the replaced maps (it is taken before the replacement).
 - Prefetch across the hand-over. (The border audit measures region frames: `tools/chim/stitch.py audit

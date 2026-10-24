@@ -107,7 +107,7 @@ static void finish_signon(edict_t *p){
 }
 static char queued[64];static eval_t goal,torch,hand_state,hand_started,attack_latched;static int clear_buttons,events,occluded;
 static void (*start_demo)(void),(*teleport)(void),(*scene)(void),(*shroompicker)(void);static cvar_t *demo_option;
-static int command_argc;static char *command_args[4];
+static int command_argc;static char *command_args[8];
 static int opening_track=-1,ship_available=1,narrow_room;
 static int world_map_unavailable,map_place_calls,map_place_blocked;static vec3_t last_map_arrival;
 static int picker_file_mode,picker_file_reads,picker_list_rows;
@@ -125,7 +125,34 @@ int Cmd_Argc(void){return command_argc;}
 char *Cmd_Argv(int i){return i<command_argc?command_args[i]:"";}
 int AW_MusicStartTrack(int id){opening_track=id;return 1;}
 static int excluded_interiors;
+/* CHIM-ROOM-16MB-REFUSAL-48: two CHIM room maps, one marked by the builder for 32 MB of Fast RAM; Extra RAM. */
+static int room_maps,autoram=1;static char refused_first[96],refused_second[48];
+/* CHIM-32MB-SAVE-ENTRY-48: the census office's room map, marked for 32 MB like bigroom (a map dbg tp can reach) */
+static int census_marked;
+float Cvar_VariableValue(char *name){return !strcmp(name,"aw_autoram")?(float)autoram:0;}
+void AW_UIRoomRefused(const char *first,const char *second){
+ if(!first){refused_first[0]=0;return;}
+ strcpy(refused_first,first);strcpy(refused_second,second);
+}
+static int room_map(const char *name,FILE **f){
+ /* A BSP29 header (version, then lump 0: offset 124 and the entity text's length) and the worldspawn. */
+ /* CHIM-FRAME-16MB-REFUSAL-48: a region frame map marked for 32 MB (bigframe) and one without a mark */
+ const char *text=!strcmp(name,"maps/bigroom.chim")?
+  "{\n\"classname\" \"worldspawn\"\n\"_chim_world\" \"chimi\"\n\"_chim_room\" \"bigroom\"\n\"_chim_room_fast_mb\" \"32\"\n}\n"
+  "{\n\"classname\" \"info_player_start\"\n\"_chim_room_fast_mb\" \"64\"\n}\n":
+  !strcmp(name,"maps/bigframe.chim")?
+  "{\n\"classname\" \"worldspawn\"\n\"_chim_world\" \"chimi\"\n\"_chim_frame\" \"-7 -4\"\n\"_chim_frame_fast_mb\" \"32\"\n}\n":
+  !strcmp(name,"maps/smallframe.chim")?
+  "{\n\"classname\" \"worldspawn\"\n\"_chim_world\" \"chimi\"\n\"_chim_frame\" \"-6 -4\"\n}\n":
+  "{\n\"classname\" \"worldspawn\"\n\"_chim_world\" \"chimi\"\n\"_chim_room\" \"smallroom\"\n}\n";
+ unsigned char h[124];long n=(long)strlen(text);
+ memset(h,0,sizeof(h));h[0]=29;h[4]=124;h[8]=(unsigned char)n;h[9]=(unsigned char)(n>>8);
+ *f=tmpfile();assert(*f);fwrite(h,1,sizeof(h),*f);fputs(text,*f);rewind(*f);return (int)(124+n);
+}
 int COM_FOpenFile(char *name,FILE **f){
+ if(room_maps && census_marked && !strcmp(name,"maps/census.chim"))return room_map("maps/bigroom.chim",f);
+ if(room_maps &&(!strcmp(name,"maps/bigroom.chim") || !strcmp(name,"maps/smallroom.chim") ||
+                  !strcmp(name,"maps/bigframe.chim") || !strcmp(name,"maps/smallframe.chim")))return room_map(name,f);
  if(!strcmp(name,"miniwind.txt")){
   const char *s=miniwind_direct?
    "AWMW1\ntown balmora\ntitle ATTENTION: THIS IS A QUICK TEST BUILD\nfeatures DIRECT TO: Caius Cosades House\n"
@@ -487,6 +514,44 @@ int main(void){
  CL_ClearState();strcpy(sv.name,"seyda");AW_SceneSpawn(&p);finish_signon(&p);
  assert(p.v.origin[0]==804 && p.v.origin[1]==300);
  assert(cl.viewangles[0]==-31.125f && cl.viewangles[1]==287.625f);
+ /* CHIM-FRAME-16MB-REFUSAL-48: the crossing into a CHIM frame the builder marked for 32 MB of Fast RAM, on less
+  * (16 MB found, or Extra RAM off): the player goes back to the last spot inside the scene he stands in (the tick
+  * keeps it), nothing loads, the refused-room screen says "this area" the first time, then the message box every
+  * 3 seconds. With 32 MB, or a frame without the mark, the crossing goes on. */
+ {
+  extern int AW_SceneFrameRefuse(edict_t *p,const char *target);
+  extern int aw_chim_world;
+  p.v.origin[0]=0;p.v.origin[1]=300;queued[0]=0;AW_SceneTick();assert(!queued[0]);   /* inside seyda: the spot */
+  room_maps=1;aw_chim_world=1;realtime=200;
+  assert(AW_SceneFrameFastMb("bigframe")==32 && AW_SceneFrameFastMb("smallframe")==0);
+  assert(AW_SceneRoomFastMb("bigframe")==0 && AW_SceneFrameFastMb("bigroom")==0);   /* two marks, never mixed */
+  aw_fast_ram_found_mb=0;autoram=1;p.v.origin[0]=2200;
+  assert(!AW_SceneFrameRefuse(&p,"bigframe") && p.v.origin[0]==2200);                 /* 32 MB: crosses */
+  aw_fast_ram_found_mb=16;
+  assert(!AW_SceneFrameRefuse(&p,"smallframe") && p.v.origin[0]==2200 && key_dest==key_game);
+  p.v.velocity[0]=200;p.v.velocity[1]=50;p.v.velocity[2]=-10;clear_buttons=0;
+  assert(AW_SceneFrameRefuse(&p,"bigframe") && p.v.origin[0]==0 && p.v.origin[1]==300 && p.v.oldorigin[0]==0);
+  assert(p.v.velocity[0]==0 && p.v.velocity[1]==0 && p.v.velocity[2]==-10);
+  assert(key_dest==key_menu && AW_SceneRoomRefused() && clear_buttons==1 && !queued[0]);
+  assert(AW_TravelDraw() && !strcmp(refused_first,"Sorry, but this area cannot be run with 16MB of Fast RAM."));
+  assert(!strcmp(refused_second,"Press ENTER to return."));
+  assert(AW_TravelKey(K_ENTER) && key_dest==key_game && !AW_SceneRoomRefused());
+  /* again into the same frame: held, no screen; the message box once per 3 seconds */
+  notice[0]=0;p.v.origin[0]=2200;realtime=201;
+  assert(AW_SceneFrameRefuse(&p,"bigframe") && p.v.origin[0]==0 && key_dest==key_game && !notice[0]);
+  p.v.origin[0]=2200;realtime=203.5;
+  assert(AW_SceneFrameRefuse(&p,"bigframe") && p.v.origin[0]==0 && key_dest==key_game);
+  assert(!strcmp(notice,"Sorry, but this area cannot be run with 16MB of Fast RAM."));
+  /* Extra RAM off on a big machine: the 16 MB baseline */
+  aw_fast_ram_found_mb=0;autoram=0;p.v.origin[0]=2200;
+  assert(AW_SceneFrameRefuse(&p,"bigframe") && p.v.origin[0]==0);
+  /* a new scene forgets the spot and the screen: refused again with the screen, no spot to return to */
+  autoram=1;aw_chim_world=0;CL_ClearState();AW_SceneSpawn(&p);finish_signon(&p);aw_chim_world=1;
+  aw_fast_ram_found_mb=16;p.v.origin[0]=2200;
+  assert(AW_SceneFrameRefuse(&p,"bigframe") && p.v.origin[0]==2200 && key_dest==key_menu);
+  assert(AW_TravelKey(K_ENTER) && key_dest==key_game);
+  aw_fast_ram_found_mb=0;room_maps=0;aw_chim_world=0;p.v.origin[0]=804;p.v.origin[1]=300;
+ }
  /* An explicit named teleport following a crossing keeps its destination yaw
   * and level pitch. It must not inherit the saved streaming camera. */
  command_argc=2;command_args[0]="aw_teleport";command_args[1]="census";teleport();
@@ -762,6 +827,93 @@ int main(void){
   miniwind_direct=0;AW_MiniwindInit();
  }
 #endif
+ /* CHIM-ROOM-16MB-REFUSAL-48: a room the builder marked for 32 MB of Fast RAM is refused at its door before
+  * anything loads when this start has less (16 MB found, or Extra RAM off); the screen on the loading art says
+  * so, ENTER returns to the game where the player stood. With 32 MB the same door goes on as usual. */
+ {
+  extern int aw_chim_world;
+  room_maps=1;aw_chim_world=1;key_dest=key_game;queued[0]=0;
+  assert(AW_SceneRoomFastMb("bigroom")==32);            /* the worldspawn's mark, not the next entity's */
+  assert(AW_SceneRoomFastMb("smallroom")==0 && AW_SceneRoomFastMb("nosuchroom")==0);
+  /* 32 MB or more found (0: no shortfall), Extra RAM on: every room loads, nothing is read */
+  aw_fast_ram_found_mb=0;autoram=1;
+  assert(!AW_SceneRoomRefuse("bigroom") && !AW_SceneRoomRefused() && key_dest==key_game);
+  /* 16 MB found: the marked room is refused, the other is not */
+  aw_fast_ram_found_mb=16;
+  assert(!AW_SceneRoomRefuse("smallroom") && key_dest==key_game);
+  clear_buttons=0;
+  assert(AW_SceneRoomRefuse("bigroom") && AW_SceneRoomRefused() && key_dest==key_menu && clear_buttons==1);
+  assert(!queued[0]);                                   /* no map command: nothing loads */
+  drawn[0]=0;assert(AW_TravelDraw());
+  assert(!strcmp(refused_first,"Sorry, but this interior cannot be run with 16MB of Fast RAM."));
+  assert(!strcmp(refused_second,"Press ENTER to return."));
+  /* other keys are held by the screen; ENTER returns to the game */
+  assert(AW_TravelKey('e') && AW_TravelKey(K_ESCAPE) && key_dest==key_menu && AW_SceneRoomRefused());
+  assert(AW_TravelKey(K_ENTER) && key_dest==key_game && !AW_SceneRoomRefused() && !AW_TravelDraw());
+  assert(!queued[0]);
+  /* Extra RAM off on a big machine: the 16 MB baseline, refused too */
+  aw_fast_ram_found_mb=0;autoram=0;
+  assert(AW_SceneRoomRefuse("bigroom") && key_dest==key_menu);
+  assert(AW_TravelKey(K_ENTER) && key_dest==key_game);
+  autoram=1;room_maps=0;aw_chim_world=0;
+ }
+ /* CHIM-32MB-SAVE-ENTRY-48: every other way into a marked place goes through the same check and screen before
+  * anything loads: a save's scene (aw_save.c, through AW_SceneSaveEntryRefuse; the frame holding its position too),
+  * a quick start, dbg tp / aw_scene, a raw "map". A load or a start returns to the main menu after ENTER; a console
+  * jump during play returns to the game where the player stood. With 32 MB nothing changes. */
+ {
+  extern int aw_chim_world;float none[3]={0,0,0};
+  room_maps=1;aw_chim_world=1;census_marked=1;key_dest=key_game;queued[0]=0;
+  AW_SceneCancelTransition();sv.active=true;cls.state=ca_connected;cls.signon=SIGNONS;strcpy(sv.name,"seyda");
+  svs.clients[0].edict=&p;p.v.health=73;p.v.movetype=MOVETYPE_WALK;aw_story.stage=AW_STAGE_RELEASED;
+  /* 32 MB: no check stops anything */
+  aw_fast_ram_found_mb=0;autoram=1;
+  assert(!AW_SceneSaveEntryRefuse("bigroom",none) && !AW_SceneSaveEntryRefuse("bigframe",none));
+  assert(!AW_SceneMapRefuse("census") && !AW_SceneRoomRefused() && key_dest==key_game);
+  /* 16 MB: a save in a marked room, the screen says "interior"; ENTER: the main menu, even during play */
+  aw_fast_ram_found_mb=16;clear_buttons=0;
+  assert(!AW_SceneSaveEntryRefuse("smallroom",none) && !AW_SceneSaveEntryRefuse("smallframe",none) && key_dest==key_game);
+  assert(AW_SceneSaveEntryRefuse("bigroom",none) && AW_SceneRoomRefused() && key_dest==key_menu && clear_buttons==1);
+  assert(AW_TravelDraw() && !strcmp(refused_first,"Sorry, but this interior cannot be run with 16MB of Fast RAM."));
+  assert(!strcmp(refused_second,"Press ENTER to return.") && !queued[0]);
+  assert(AW_TravelKey(K_ESCAPE) && key_dest==key_menu && !queued[0]);
+  assert(AW_TravelKey(K_ENTER) && key_dest==key_game && !AW_SceneRoomRefused());
+  assert(!strcmp(queued,"disconnect\naw_main_menu\n"));
+  /* a save in a marked frame: the screen says "area" */
+  queued[0]=0;assert(AW_SceneSaveEntryRefuse("bigframe",none) && key_dest==key_menu);
+  assert(AW_TravelDraw() && !strcmp(refused_first,"Sorry, but this area cannot be run with 16MB of Fast RAM."));
+  assert(AW_TravelKey(K_ENTER) && !strcmp(queued,"disconnect\naw_main_menu\n"));
+  /* Extra RAM off on a big machine: the 16 MB baseline, refused too */
+  aw_fast_ram_found_mb=0;autoram=0;queued[0]=0;
+  assert(AW_SceneSaveEntryRefuse("bigroom",none) && AW_TravelKey(K_ENTER) && !strcmp(queued,"disconnect\naw_main_menu\n"));
+  aw_fast_ram_found_mb=16;autoram=1;
+  /* dbg tp / aw_scene to a marked room during play: nothing loads, ENTER returns to the game where he stood */
+  p.v.origin[0]=5;p.v.origin[1]=6;p.v.origin[2]=7;queued[0]=0;
+  command_args[0]="aw_teleport";command_argc=2;command_args[1]="census";teleport();
+  assert(!queued[0] && !AW_SceneStarting() && key_dest==key_menu && AW_SceneRoomRefused());
+  assert(AW_TravelKey(K_ENTER) && key_dest==key_game && !queued[0]);
+  assert(p.v.origin[0]==5 && p.v.origin[1]==6 && p.v.origin[2]==7 && p.v.health==73 && !strcmp(sv.name,"seyda"));
+  /* a raw "map census" (host_cmd.c Host_Map_f / changelevel): refused before the game is left */
+  assert(AW_SceneMapRefuse("census") && key_dest==key_menu);
+  assert(AW_TravelKey(K_ENTER) && key_dest==key_game && !queued[0]);
+  assert(!AW_SceneMapRefuse("seyda") && key_dest==key_game);
+  /* the same from the main menu (no game running): ENTER goes back to the main menu */
+  sv.active=false;assert(AW_SceneMapRefuse("census") && key_dest==key_menu);
+  assert(AW_TravelKey(K_ENTER) && !strcmp(queued,"disconnect\naw_main_menu\n"));
+  /* a quick start (New Game with --skip-census, a direct start) into a marked room: nothing starts, the main menu */
+  command_args[0]="aw_quick_start";command_args[1]="map";command_args[2]="census";command_args[3]="12";
+  command_args[4]="34";command_args[5]="77";command_args[6]="90";
+  command_argc=7;queued[0]=0;quick();
+  assert(!AW_SceneStarting() && key_dest==key_menu && AW_SceneRoomRefused() && !queued[0]);
+  assert(AW_TravelKey(K_ENTER) && !strcmp(queued,"disconnect\naw_main_menu\n"));
+  /* with 32 MB the same quick start goes on */
+  aw_fast_ram_found_mb=0;command_argc=7;queued[0]=0;quick();
+  assert(AW_SceneStarting() && !strcmp(queued,"map census\n") && key_dest==key_game);
+  /* while that start is pending its own "map census" passes Host_Map_f's check even on 16 MB */
+  aw_fast_ram_found_mb=16;assert(!AW_SceneMapRefuse("census") && key_dest==key_game);
+  AW_SceneCancelTransition();
+  sv.active=true;aw_fast_ram_found_mb=0;room_maps=0;aw_chim_world=0;census_marked=0;command_argc=1;
+ }
  puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");
  return 0;
 }

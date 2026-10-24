@@ -766,6 +766,9 @@ void AW_ControlsMigrate(void)
     }
     if(!keybindings['j'] || !*keybindings['j'])Key_SetBinding('j',"aw_journal");
     if(!keybindings['m'] || !*keybindings['m'])Key_SetBinding('m',"aw_worldmap");
+    /* The Stats (P) and Magic (O) windows, v0.0.48 (aw_statswin.c). */
+    if(!keybindings['p'] || !*keybindings['p'])Key_SetBinding('p',"aw_stats");
+    if(!keybindings['o'] || !*keybindings['o'])Key_SetBinding('o',"aw_magicmenu");
     if(!keybindings[K_UPARROW] || !*keybindings[K_UPARROW])Key_SetBinding(K_UPARROW,"+forward");
     if(!keybindings[K_DOWNARROW] || !*keybindings[K_DOWNARROW])Key_SetBinding(K_DOWNARROW,"+back");
     /* The Amiga right button is K_MOUSE3: the context action (aw_combat.c +aw_alt). */

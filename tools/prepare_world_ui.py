@@ -493,6 +493,16 @@ def prepare(data_files,survey,scene,world_map=None,lava_pools=None):
     (dest/'conversion.json').write_text(json.dumps(receipt,indent=2)+'\n')
     return receipt
 
+def prepare_image(data_files, scene):
+    """The image step's world UI (prepare with no survey: the terrain overview from the master) as its own timed
+    phase. build_aga.build_image runs it in a spawned worker beside the combat data and the player view (about 10 s
+    on one core, none of which reads or writes id1/world or the palette), then validates it where it ran before
+    (BUILD-IMAGE-FINALIZE-UNDERUSED-48)."""
+    import build_profile
+    with build_profile.phase('Image: world UI', detail='beside the combat data and the player view'):
+        return prepare(data_files, None, scene)
+
+
 def validate(id1):
     dest=Path(id1)/'world';receipt=json.loads((dest/'conversion.json').read_text())
     expected=set(WORLD_UI_FILES)

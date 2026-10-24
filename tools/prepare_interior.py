@@ -60,10 +60,10 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None,vis_mode='fast'):
     # not a claim to have implemented the authored camera/character-gen sequence.
     spawn=[0,-35,-4]
     hands=json.loads((out/'hands-report.json').read_text())
-    # Reuse the exact hand timing metadata already baked into the exterior.
-    import re
-    ext=lumps((out/'seyda.bsp').read_bytes())[0].decode('ascii')
-    timings='\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"',ext))
+    # The hand timing metadata of the hands stage's report, as every converted map carries it
+    # (BUILD-SEYDA-BSP-CARRIER-48: before, it was read back out of seyda.bsp's entity lump).
+    from hand_metadata import hand_fields, timing_lines
+    timings=timing_lines(hand_fields(hands))
     text='{\n"classname" "worldspawn"\n"wad" "prison.wad"\n"message" "AmiWind / Prison Ship"\n'+timings+'\n'+'\n'.join(walls)+'\n}\n'
     text+='{\n"classname" "info_player_start"\n"origin" "0 -35 -4"\n"angle" "90"\n}\n'
     (out/'prison.map').write_text(text)

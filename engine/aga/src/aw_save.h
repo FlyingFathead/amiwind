@@ -91,4 +91,7 @@ uint32_t AW_SaveChangeKey(uint32_t reference);
  * a loaded save's changes before the window spawns its actors. */
 extern int (*aw_save_changes_export)(aw_changes_t *changes);
 extern void (*aw_save_changes_import)(const aw_changes_t *changes);
+/* aw_scene.c AW_SceneSaveEntryRefuse (bound in aw_debug.c; NULL: no check): 1 when the saved scene and position lie
+ * in a place marked for more Fast RAM than this start has; the refusal screen is up (CHIM-32MB-SAVE-ENTRY-48). */
+extern int (*aw_save_entry_refuse)(const char *scene,const float *position);
 #endif

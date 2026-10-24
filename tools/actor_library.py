@@ -4,9 +4,10 @@ installs its models and gives the actor table their base texts; CHIM-EXTERIOR-AC
 
 Models for the exterior actors the town residents do not cover:
 - every creature the exterior can show (its creature references and every creature its levelled lists can give):
-  one standing and one mover model per creature mesh (tools/creature_library.py, method kf);
-- every exterior NPC record that is not a resident of a CHIM town of this run (their models come from the town
-  stages): one standing model per appearance (tools/npc_library.py).
+  one standing and one mover model per creature mesh (tools/creature_library.py, method kf); an authored-dead
+  creature placed outdoors: one corpse model per mesh, its own death pose (ACTOR-LIBRARY-LEFT-OUT-48);
+- every exterior NPC record with a reference the CHIM towns of this run do not place (a record only the towns place
+  has its model from the town stages): one standing model per appearance (tools/npc_library.py).
 
 Output: OUT/id1/progs (c_*.mdl, n_*.mdl and their .anm layouts), OUT/id1/sound (footstep sounds of the layouts),
 OUT/creature-library.json, OUT/npc-library.json and OUT/actor-library.json (counts, bytes, left out with reasons).
@@ -30,14 +31,28 @@ for _p in (ROOT / 'tools', ROOT / 'src'):
 
 def town_residents(run):
     """The NPC and creature record ids the CHIM town stages of RUN made models for (their residents.json)."""
-    out = set()
+    return town_cast(run)[0]
+
+
+def town_cast(run):
+    """(record ids, reference numbers) the CHIM town stages of RUN place (their residents.json models and cast)."""
+    ids, refs = set(), set()
     for path in sorted(Path(run).glob('chim-town-*/residents.json')):
-        out |= {k.casefold() for k in json.loads(path.read_text(encoding='utf-8')).get('models', {})}
-    return out
+        doc = json.loads(path.read_text(encoding='utf-8'))
+        ids |= {k.casefold() for k in doc.get('models', {})}
+        refs |= {int(c['number']) for c in doc.get('cast', []) if 'number' in c}
+    return ids, refs
 
 
-def plan(master, residents=()):
-    """(creature meshes {mesh: [ids]}, two-legged {mesh: bool}, scales {mesh: [scale]}, NPC ids) of the exterior."""
+def plan(master, residents=(), town_refs=None):
+    """(creature meshes {mesh: [ids]}, two-legged {mesh: bool}, scales {mesh: [scale]}, NPC ids, the creature plan,
+    corpse meshes {mesh: [ids]}) of the exterior.
+
+    An NPC record a CHIM town places (RESIDENTS) still gets a library model when it has an exterior reference the
+    towns do not place (TOWN_REFS: their cast's reference numbers): 'hlaalu guard_outside' and 'ordinator wander'
+    stand in Balmora or Vivec and on the roads around them, and the region frames need them too
+    (ACTOR-LIBRARY-LEFT-OUT-48). TOWN_REFS None: every exterior reference of a resident counts as the towns' (the
+    rule before v0.0.48). An authored-dead creature placed outdoors gets its mesh's corpse model (corpses)."""
     from chim import actors as A
     import creature_library as L
     refs = A.exterior_actors(master)
@@ -47,11 +62,11 @@ def plan(master, residents=()):
     for lid in used:
         want |= {e for e, _ in lists[lid][2] if e in creatures}
     planned = L.plan(master)
-    meshes, bipedal = {}, {}
+    meshes, bipedal, corpses = {}, {}, {}
     for ident in sorted(want):
         b = planned['bases'].get(ident)
-        if b and not b['dead'] and b['mesh']:
-            meshes.setdefault(b['mesh'], []).append(ident)
+        if b and b['mesh']:
+            (corpses if b['dead'] else meshes).setdefault(b['mesh'], []).append(ident)
             bipedal[b['mesh']] = bipedal.get(b['mesh'], False) or bool(b['flags'] & 1)
     scales = {}
     numbers = A.exterior_scales(master)
@@ -64,8 +79,10 @@ def plan(master, residents=()):
             b = planned['bases'].get(i)
             if b and b['mesh'] in meshes:
                 scales.setdefault(b['mesh'], set()).add(round(float(scale), 4))
-    npcs = sorted({b.casefold() for _, b, t, *_ in refs if t == 'NPC_'} - set(residents))
-    return meshes, bipedal, {m: sorted(v) for m, v in scales.items()}, npcs, planned
+    residents = {r.casefold() for r in residents}
+    npcs = sorted({b.casefold() for n, b, t, *_ in refs if t == 'NPC_' and
+                   (b.casefold() not in residents or (town_refs is not None and n not in town_refs))})
+    return meshes, bipedal, {m: sorted(v) for m, v in scales.items()}, npcs, planned, corpses
 
 
 def main(argv=None):
@@ -85,16 +102,17 @@ def main(argv=None):
     from mwad.paths import child_ci
     t0 = time.time()
     master = child_ci(a.data_files, 'Morrowind.esm').read_bytes()
-    residents = town_residents(a.run) if a.run else set()
-    meshes, bipedal, scales, npcs, planned = plan(master, residents)
-    print('Actor library: %d creature meshes, %d NPC records (%d town residents left to the town stages), '
-          '%d jobs' % (len(meshes), len(npcs), len(residents), a.jobs), flush=True)
+    residents, town_refs = town_cast(a.run) if a.run else (set(), set())
+    meshes, bipedal, scales, npcs, planned, corpses = plan(master, residents, town_refs)
+    print('Actor library: %d creature meshes, %d corpse meshes, %d NPC records (%d town residents: those placed '
+          'only by the towns are left to the town stages), %d jobs' % (len(meshes), len(corpses), len(npcs),
+                                                                       len(residents), a.jobs), flush=True)
     id1 = a.out / 'id1'
     id1.mkdir(parents=True, exist_ok=True)
     palette = a.palette.read_bytes()
     t1 = time.time()
     models, failed = L.bake(a.data_files, palette, meshes, id1, a.jobs, 'kf', bipedal,
-                            scales if a.scaled_variants else None)
+                            scales if a.scaled_variants else None, corpses=corpses)
     creature_manifest = dict(L.manifest(planned, models), left_out=failed)
     (a.out / 'creature-library.json').write_text(json.dumps(creature_manifest, indent=1, sort_keys=True) + '\n',
                                                  encoding='utf-8', newline='\n')
@@ -106,10 +124,15 @@ def main(argv=None):
                                             encoding='utf-8', newline='\n')
     print('Actor library: NPCs done - took %.1fs, %d appearances, %d left out' % (
         time.time() - t2, len(npc_manifest['models']), len(npc_manifest['left_out'])), flush=True)
-    summary = {'creature_meshes': len(meshes), 'creature_models': len(models), 'creature_left_out': failed,
+    summary = {'creature_meshes': len(meshes), 'corpse_meshes': len(corpses),
+               'corpse_models': sum(1 for k in models if k.endswith(L.CORPSE_KEY)),
+               'creature_models': len(models), 'creature_left_out': failed,
                'creature_bytes': sum(m.get('standing_bytes', 0) + m.get('mover_bytes', 0) for m in models.values()),
                'npc_records': len(npcs), 'npc_appearances': len(npc_manifest['models']),
                'npc_left_out': npc_manifest['left_out'],
+               # appearances baked at a smaller animation level (alias byte budget; RESIDENT-ANIM-BYTE-BUDGET-48)
+               'npc_anim_fallback': {key: {'level': f['level'], 'npcs': f['npcs']}
+                                     for key, f in npc_manifest.get('anim_fallback', {}).items()},
                'npc_bytes': sum(m['bytes'] for m in npc_manifest['models'].values()),
                'scaled_variants': bool(a.scaled_variants), 'town_residents_left_to_towns': len(residents),
                'seconds': round(time.time() - t0, 1)}
@@ -118,20 +141,23 @@ def main(argv=None):
     print('Actor library: done - took %.1fs' % summary['seconds'], flush=True)
 
 
-def install(library, id1):
+def install(library, id1, jobs=1):
     """Copy an actor library stage's models, layouts and sounds into an image's id1; returns the base texts
     {record id (or 'id@S'): entity text} of its creatures and NPCs for the actor table."""
     import shutil
     import creature_library as L
     import npc_library as NL
+    from concurrent.futures import ThreadPoolExecutor
     library, id1 = Path(library), Path(id1)
-    copied = 0
-    for src in sorted((library / 'id1').rglob('*')):
-        if src.is_file():
-            dst = id1 / src.relative_to(library / 'id1')
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(src, dst)
-            copied += 1
+    pairs = [(src, id1 / src.relative_to(library / 'id1')) for src in sorted((library / 'id1').rglob('*'))
+             if src.is_file()]
+    for folder in sorted({dst.parent for _, dst in pairs}):
+        folder.mkdir(parents=True, exist_ok=True)
+    # about a thousand small files: side by side (copying releases the interpreter lock), each to its own name, so
+    # the installed files are the same as one by one (BUILD-IMAGE-FINALIZE-UNDERUSED-48)
+    with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        list(pool.map(lambda pair: shutil.copyfile(*pair), pairs))
+    copied = len(pairs)
     texts = L.base_texts(library / 'creature-library.json')
     texts.update(NL.base_texts(library / 'npc-library.json'))
     return texts, copied

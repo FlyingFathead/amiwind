@@ -39,7 +39,9 @@ class StageTests(unittest.TestCase):
     def test_on_by_default_off_selectable(self):
         # on by default since v0.0.47 (decided for the project, 2026-10-21)
         self.assertEqual(steps(), steps('--chim-actor-table', 'on'))
-        plan = steps('--chim-actor-table', 'off')
+        # the region actors (on by default since v0.0.48-dev2) name the same models: the stage stays for them
+        self.assertIn('actor-library', [n for n, _ in steps('--chim-actor-table', 'off')])
+        plan = steps('--chim-actor-table', 'off', '--chim-region-actors', 'off')
         self.assertNotIn('actor-library', [n for n, _ in plan])
         self.assertNotIn('--actor-library', [str(x) for x in dict(plan)['image']])
 
@@ -126,6 +128,97 @@ class InstallTests(unittest.TestCase):
             head, cells, records, bases, _ = A.read_table(data)
             crab = next(r for r in records if r['key'] == 14)
             self.assertEqual(crab['flags'] & A.FLAG_SCALED_MODEL, A.FLAG_SCALED_MODEL)
+
+
+class LeftOutTests(unittest.TestCase):
+    """ACTOR-LIBRARY-LEFT-OUT-48: the library dropped the authored-dead creatures (no model at all, no reason) and
+    the NPC records a CHIM town also places ('hlaalu guard_outside', 'ordinator wander') although they also stand
+    outside the towns. Corpses now get the last key of their own death group as a one-frame aw_corpse model; an
+    NPC record gets a library model when a reference of it is not in the towns' cast."""
+
+    def master(self):
+        from test_chim_levelled import MASTER, cell, ref
+        return MASTER + cell('', False, 2, 0, ref(41, 'dead_rat', (2 * 8192.0 + 50.0, 60.0, 0.0)))
+
+    def test_plan_corpses_and_town_npcs(self):
+        import actor_library as AL
+        import creature_library as L
+        master = self.master()
+        self.assertEqual(L.plan(master)['corpses'], {'r/rust rat.nif': ['dead_rat']})
+        meshes, _, _, npcs, _, corpses = AL.plan(master)
+        self.assertEqual(corpses, {'r/rust rat.nif': ['dead_rat']})
+        self.assertNotIn('dead_rat', [i for v in meshes.values() for i in v])
+        self.assertIn('villager', npcs)
+        self.assertNotIn('villager', AL.plan(master, {'villager'})[3])               # the rule before v0.0.48
+        self.assertNotIn('villager', AL.plan(master, {'villager'}, {13})[3])         # its only reference: a town's
+        self.assertIn('villager', AL.plan(master, {'villager'}, {99})[3])            # a reference outside the towns
+
+    def test_town_cast(self):
+        import actor_library as AL
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / 'chim-town-x').mkdir()
+            (Path(tmp) / 'chim-town-x/residents.json').write_text(json.dumps(
+                {'models': {'Hlaalu Guard_Outside': {}}, 'cast': [{'number': 428715, 'id': 'hlaalu guard_outside'}]}))
+            self.assertEqual(AL.town_cast(tmp), ({'hlaalu guard_outside'}, {428715}))
+            self.assertEqual(AL.town_residents(tmp), {'hlaalu guard_outside'})
+
+    def test_corpse_base_text(self):
+        import creature_library as L
+        planned = L.plan(self.master())
+        models = {m: {'model': L.variant_path(m), 'step': 0.25} for m in planned['meshes']}
+        models[L.corpse_key('r/rust rat.nif')] = {'model': L.corpse_path('r/rust rat.nif'), 'step': 0.0,
+                                                  'corpse': True}
+        texts = L.base_texts(L.manifest(planned, models))
+        import re
+        dead = dict(re.findall(r'"([^"]*)" "([^"]*)"', texts['dead_rat']))
+        self.assertEqual(dead['classname'], 'aw_corpse')
+        self.assertEqual(dead['model'], L.corpse_path('r/rust rat.nif'))
+        self.assertTrue(dead['model'].endswith('_d.mdl'))
+        self.assertEqual(dead['aw_ground_mode'], '1')                               # lying at its authored spot
+        live = dict(re.findall(r'"([^"]*)" "([^"]*)"', texts['rat']))
+        self.assertEqual((live['classname'], live['model']), ('aw_npc', L.variant_path('r/rust rat.nif')))
+
+    def test_corpse_gets_the_death_pose_model(self):
+        """bake_kf(corpse=True) on a synthetic creature: one frame, posed at the last key of its death group
+        (death1: stop at 2 s, the bone moved 8 units), not its idle; a creature without a death group is refused."""
+        import numpy as np
+        import creature_library as L
+        import creature_pose as P
+        from test_creature_pose import FILES, kf, model, reader
+        from check_actor_ground import model_frames
+        files = dict(FILES)
+        files['meshes/r/xbeast.nif'] = model()
+        files['meshes/r/xbeast.kf'] = kf(
+            [(0.0, 'idle: start'), (1.0, 'idle: stop'), (1.0, 'death1: start'), (2.0, 'death1: stop')],
+            [(b'Bone', (1, [(0.0, (0, 0, 0)), (2.0, (8, 0, 0))]))])
+
+        class FakeAssets:
+            def __init__(self, files):
+                self.read = reader(files)
+
+            def texture(self, name):
+                raise KeyError(name)
+        from prepare_scenery import nif_reader
+        rig = P.CreatureRig(nif_reader(), reader(files), 'r/beast.nif', False)
+        samples, groups = rig.plan(P.CORPSE)
+        self.assertEqual([(s[0], s[1]) for s in samples], [(0, 2.0)])
+        self.assertEqual(groups[0]['name'], 'death')
+        palette = bytes(range(256)) * 3
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(L._assets, {str(Path(tmp).resolve()): FakeAssets(files)}):
+            out = L.bake_kf(tmp, palette, {'id': 'dead beast', 'mesh': 'r/beast.nif'}, False, corpse=True)
+            self.assertEqual([(r, p) for r, _, p in out['files']], [('corpse', L.corpse_path('r/beast.nif'))])
+            self.assertEqual(out['record']['corpse_frames'], 1)
+            frames = np.array(model_frames(out['files'][0][1]))
+            self.assertEqual(len(frames), 1)
+            # the bone's box (0..8 units) moved 8 by the death stop key: from 2 Quake units (x 0.25), not 0
+            self.assertAlmostEqual(float(frames[0][:, 0].min()), 2.0, delta=0.1)
+            live = L.bake_kf(tmp, palette, {'id': 'beast', 'mesh': 'r/beast.nif'}, False)
+            self.assertNotEqual(out['files'][0][1], live['files'][0][1])
+            idle_only = dict(files, **{'meshes/r/xbeast.kf': kf([(0.0, 'idle: start'), (1.0, 'idle: stop')],
+                                                              [(b'Bone', (1, [(0.0, (0, 0, 0)), (1.0, (0, 0, 0))]))])})
+            L._assets[str(Path(tmp).resolve())] = FakeAssets(idle_only)
+            with self.assertRaisesRegex(ValueError, 'no death group'):
+                L.bake_kf(tmp, palette, {'id': 'dead beast', 'mesh': 'r/beast.nif'}, False, corpse=True)
 
 
 class ScaleProtocolTests(unittest.TestCase):

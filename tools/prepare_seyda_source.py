@@ -193,7 +193,12 @@ def seed(scene, scenery, barrel, opening_source=None, jobs=1):
 def is_source_carrier(raw):
     """True when a BSP29 container is this source-only carrier (its worldspawn has the MARKER field)."""
     from player_hull import lumps
-    head = lumps(raw)[0].split(b'}', 1)[0]
+    return is_source_carrier_lump(lumps(raw)[0])
+
+
+def is_source_carrier_lump(entity_lump):
+    """is_source_carrier on a map's entity lump (Seyda Neen's scene entity list, BUILD-SEYDA-ENTITY-BUS-48)."""
+    head = bytes(entity_lump).split(b'}', 1)[0]
     return re.search(rb'"aw_source_carrier"\s+"' + MARKER.encode('ascii') + rb'"', head) is not None
 
 

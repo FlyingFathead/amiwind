@@ -529,6 +529,7 @@ PHASES = {
     ('build_aga image', 'optimize_world_maps:verify_optimized_maps'): 'Image: optimizer check',
     ('build_aga image', 'actor_grounding:annotate'): 'Image: actor annotate',
     ('build_aga image', 'actor_grounding:bake_ground'): 'Image: actor ground bake',
+    ('build_aga image', 'room_actor_bake:bake_room_ground'): 'Image: CHIM room actor bake',
     ('build_aga image', 'audit_world_map_heap_with_receipt'): 'Image: world map heap audit',
     ('build_aga image', 'world_volumes:pack'): 'Image: pack volumes',
     ('build_aga image', 'finalize_image'): 'Image: finalize',
@@ -562,6 +563,24 @@ PHASES = {
     ('build_aga image', 'arrival_spot:require'): 'Image: arrival check',
     ('build_aga image', 'chim_frame_maps'): 'Image: CHIM frame maps',
     ('build_aga image', 'chim.frame_map:remove_legacy_areas'): 'Image: remove legacy areas',
+    # the steps between the player view and finalize, and the untimed stretches inside finalize
+    # (BUILD-IMAGE-FINALIZE-UNDERUSED-48; the world UI times itself: prepare_world_ui.prepare_image)
+    ('build_aga image', 'prepare_inventory:prepare'): 'Image: inventory',
+    ('build_aga image', 'prepare_logo:prepare_menu_logo'): 'Image: menu logo',
+    ('build_aga image', 'prepare_logo:prepare_logo'): 'Image: logo stream',
+    ('build_aga image', 'chim_rooms:install'): 'Image: CHIM town rooms install',
+    ('build_aga image', 'chim_town:install'): 'Image: CHIM town install',
+    # the room batches' 13,141 files hashed and copied (BUILD-IMAGE-UNDERUSED-32: 5 to 14 s, untimed)
+    ('build_aga image', 'room_batches:install'): 'Image: room batches install',
+    ('build_aga image', 'harvest_build:clear_baked'): 'Image: harvest baked removal',
+    ('build_aga image', 'compile_quakec'): 'Image: QuakeC',
+    ('build_aga image', 'actor_library:install'): 'Image: actor library',
+    ('build_aga image', 'chim.actors:write_table'): 'Image: actor table',
+    ('build_aga image', 'harvest_build:require_chim_coverage'): 'Image: harvest CHIM coverage',
+    ('build_aga image', 'world_payload:prune'): 'Image: world payload prune',
+    ('build_aga image', 'audit_gallery_budgets:world_allowances'): 'Image: world model allowances',
+    ('build_aga image', 'payload_share:share_payload'): 'Image: payload sharing',
+    ('build_aga image', 'compact_layout'): 'Image: layout plan and partitions',
     ('world-terrain', 'plan'): 'World terrain: plan',
     ('world-terrain', 'terrain_wad'): 'World terrain: texture WAD',
     ('world-terrain', 'region_directory'): 'World terrain: region directory',
@@ -611,7 +630,8 @@ INSTRUMENT = {
         'audit_world_map_heap_with_receipt', 'stage_runtime', 'stage_fpu_support', 'check_image',
         'install_world_terrain:install', 'install_world_flora:install', 'install_town_flora:install',
         'prepare_seyda_regions:convert_builder_scene', 'repair_balmora_maps:repair',
-        'actor_grounding:annotate', 'actor_grounding:bake_ground', 'prepare_world_ui:prepare',
+        'actor_grounding:annotate', 'actor_grounding:bake_ground', 'room_actor_bake:bake_room_ground',
+        'prepare_world_ui:prepare',
         'build_gallery:stage_required', 'exterior_sky_build:configure_staged_maps',
         'hidden_surface_build:cull_staged_maps', 'optimize_world_maps:optimize_maps',
         'optimize_world_maps:verify_optimized_maps', 'check_actor_ground:require',
@@ -627,6 +647,13 @@ INSTRUMENT = {
         'world_volumes:assemble_drives', 'world_volumes:write_layout',
         # from the build-timeline line: finalize_image between the optimizer and the final checks
         'arrival_spot:require', 'chim_frame_maps', 'chim.frame_map:remove_legacy_areas',
+        # BUILD-IMAGE-FINALIZE-UNDERUSED-48: the untimed steps after the player view and inside finalize
+        'prepare_inventory:prepare', 'prepare_logo:prepare_menu_logo', 'prepare_logo:prepare_logo',
+        'chim_rooms:install', 'chim_town:install', 'room_batches:install', 'harvest_build:clear_baked',
+        'compile_quakec',
+        'actor_library:install', 'chim.actors:write_table',
+        'harvest_build:require_chim_coverage', 'world_payload:prune', 'audit_gallery_budgets:world_allowances',
+        'payload_share:share_payload', 'compact_layout',
         'build_parallel:ordered_map', 'build_parallel:completed_map'),
     'build_aga census': (
         'asset_census:scan_meshes', 'asset_census:collect_placements', 'asset_census:variant_table',
@@ -2969,6 +2996,7 @@ STAGE_CACHES = {
               'image-passes/character-head'),
     'balmora': ('image-passes/town-region',),
     'balmora-interiors': ('image-passes/interior-room',),
+    'chim-room-batches': ('image-passes/interior-room-chim',),
 }
 
 

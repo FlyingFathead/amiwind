@@ -1,6 +1,6 @@
 # Licensing, provenance and credits
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -167,6 +167,11 @@ OpenMW music reference: `46bd4599203ee52ffc0f3e8edb3fc159a0303a49`,
 `files/data-mw/scripts/omw/music/music.lua` and `helpers.lua`. These files
 describe how OpenMW picks playlists and shuffles their order. The 68000
 playlist code is original project code; no Lua source is included.
+OpenMW 0.51 script compiler and sound code (`components/compiler`, `apps/openmw/mwscript`,
+`apps/openmw/mwsound`), read for the rules of MWScript (argument kinds, the scanner's
+tolerances, junk after `else`, unknown variables) and the sound distance rule. AmiWind's
+MWScript compiler (`tools/mwscript/`) and interpreter (`engine/aga/src/aw_mwvm.c`) are
+original project code; no OpenMW source is included ([MWSCRIPT_BYTECODE.md](MWSCRIPT_BYTECODE.md)).
 
 ## Acknowledgements
 

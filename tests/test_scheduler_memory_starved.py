@@ -12,6 +12,7 @@ Every number is synthetic."""
 from pathlib import Path
 import sys
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]
@@ -142,11 +143,16 @@ class PlanBeside(unittest.TestCase):
             row['container_mib'] = container
         return row
 
+    # a second stage of this build that can hold more than the 6,800 MiB measured beside chim
+    WITH = STEPS + [('scene', ['python3', 'tools/scene.py', '--jobs', '12'])]
+    SCENE = {'jobs': 12, 'largest_mib': 4000.0, 'total_mib': 9000.0, 'worker_mib': 500.0, 'wall': 100.0, 'cores': 6.0}
+
     def test_the_memory_beside_a_stage_at_its_measured_peak_counts(self):
-        alone = rp.plan(self.STEPS, {'chim'}, 12, self.got(32), {'stages': {'chim': [self.measured()]}, 'stair': None,
-                                                                 'runs': []})
-        beside = rp.plan(self.STEPS, {'chim'}, 12, self.got(32),
-                         {'stages': {'chim': [self.measured(container=27000.0)]}, 'stair': None, 'runs': []})
+        alone = rp.plan(self.WITH, {'chim', 'scene'}, 12, self.got(32),
+                        {'stages': {'chim': [self.measured()], 'scene': [self.SCENE]}, 'stair': None, 'runs': []})
+        beside = rp.plan(self.WITH, {'chim', 'scene'}, 12, self.got(32),
+                         {'stages': {'chim': [self.measured(container=27000.0)], 'scene': [self.SCENE]},
+                          'stair': None, 'runs': []})
         a, b = alone['stages'][0], beside['stages'][0]
         self.assertEqual(a['beside_mib'], 0.0)
         self.assertEqual(b['beside_mib'], 6800.0)
@@ -157,6 +163,39 @@ class PlanBeside(unittest.TestCase):
         self.assertEqual(b['lease_gb_full_speed'], 42)
         self.assertTrue(any('a lease of 42 GB runs it at its 12 planned workers' in r for r in b['reasons']))
         self.assertEqual(rp.validate(beside), [])
+
+    def test_memory_beside_counts_only_what_this_builds_stages_can_hold(self):
+        # BUILD-PLAN-BESIDE-STALE-48: dev2 try14 reran 4 of 42 stages and planned the room batches at 1 of 24
+        # workers against 43 GB measured beside them in a run where most stages ran
+        steps = self.STEPS + [('mwscript', ['python3', 'tools/mwscript.py'])]
+        small = {'jobs': 1, 'largest_mib': 25.0, 'total_mib': 46.0, 'worker_mib': 21.0, 'wall': 1.0, 'cores': 1.0}
+        stages = {'chim': [self.measured(container=60000.0)], 'mwscript': [small]}
+        doc = rp.plan(steps, {'chim', 'mwscript'}, 12, self.got(40), {'stages': stages, 'stair': None, 'runs': []})
+        row = doc['stages'][0]
+        self.assertEqual(row['beside_mib'], 46.0)                 # mwscript's 25 + 1 x 21 MiB, not 47,000
+        self.assertEqual(row['workers'], 12)                      # 40 GiB x 80 % less 13,046 MiB: 16 x 1,200 fit
+        self.assertEqual(row['status'], 'OK')
+        lone = rp.plan(self.STEPS, {'chim'}, 12, self.got(32), {'stages': stages, 'stair': None, 'runs': []})
+        self.assertEqual(lone['stages'][0]['beside_mib'], 0.0)   # nothing else runs in this build
+        self.assertEqual(rp.validate(doc), [])
+
+    def test_a_stage_that_waits_for_it_is_never_beside_it(self):
+        # try14's other half: the image (10.7 GB at full speed) waits for every stage, so it is never beside them
+        # (the scheduler's table, cut to these stages: its real one checks the whole chain of a full build)
+        steps = [('census', ['python3', 'tools/census.py']),
+                 ('chim-room-batches', ['python3', 'tools/chim_room_batches.py', '--jobs', '12']),
+                 ('image', ['python3', 'tools/build_aga.py', 'image', '--jobs', '12'])]
+        table = {'census': (), 'chim-room-batches': ('census',), 'image': ('chim-room-batches',)}
+        image = {'jobs': 12, 'largest_mib': 9625.0, 'total_mib': 20000.0, 'worker_mib': 1075.0, 'wall': 900.0,
+                 'cores': 4.0}
+        stages = {'chim-room-batches': [self.measured(container=60000.0)], 'image': [image]}
+        with mock.patch('build_parallel.stage_dependencies', return_value=table):
+            doc = rp.plan(steps, {'chim-room-batches', 'image'}, 12, self.got(40),
+                          {'stages': stages, 'stair': None, 'runs': []})
+            self.assertEqual(rp._waits_for(steps)['image'], {'chim-room-batches', 'census'})
+        rows = {r['stage']: r for r in doc['stages']}
+        self.assertEqual(rows['chim-room-batches']['beside_mib'], 0.0)
+        self.assertEqual(rows['chim-room-batches']['workers'], 12)
 
     def test_measure_records_the_container_peak_while_the_stage_ran(self):
         row = {'name': 'chim', 'status': 'passed', 'jobs': 6, 'jobs_max': 6, 'wall': 3000.0, 'cores_avg': 2.0,

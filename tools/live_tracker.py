@@ -30,7 +30,10 @@ INTERVAL = 10
 STATUS_FILE = 'live-status.json'
 DATA_FILE = 'cell-progress-data.js'
 LIVE_FOLDER = 'live'
-PAGE_FILES = ('world-map.html', 'header.js', 'chim-legend.js', 'chim-inclusion.js', 'chim-inclusion.json', 'zebra.js', 'chim-head.js')
+PAGE_FILES = ('world-map.html', 'header.js', 'chim-legend.js', 'chim-inclusion.js', 'chim-inclusion.json', 'zebra.js', 'chim-head.js', 'panel-fold.js', 'interior-tracker.js')
+# Page files a run keeps its own copy of (BUILD/toolkit): the inclusion ledger with the run's entry on top, written at the
+# end of the build (tools/chim_inclusion.py build_step); until then the repository's copy is shown.
+RUN_FILES = ('chim-inclusion.js', 'chim-inclusion.json')
 DATA_MARKER = '<!--AW-LIVE-DATA-->'
 MODES = ('file', 'server')
 
@@ -222,6 +225,9 @@ class LiveTracker:
             for name in PAGE_FILES:
                 if name == 'world-map.html':
                     atomic_write(live / name, page_html())
+                elif name in RUN_FILES and (self.toolkit / name).is_file():
+                    # the run's own inclusion ledger (tools/chim_inclusion.py build_step): this build on top
+                    shutil.copyfile(self.toolkit / name, live / name)
                 elif (ROOT / 'amiwind-toolkit' / name).is_file():
                     shutil.copyfile(ROOT / 'amiwind-toolkit' / name, live / name)
             logo = ROOT / 'resources' / 'media' / 'AmiWind_logo_name_only.png'

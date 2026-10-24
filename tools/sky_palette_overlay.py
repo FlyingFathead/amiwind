@@ -4,6 +4,7 @@ from pathlib import Path
 import argparse, hashlib, json, struct
 from datetime import datetime
 import numpy as np
+from map_files import MAP_EXTS
 
 BANK={222:(223,(100,69,138)),133:(113,(52,73,110)),95:(94,(210,50,34)),
       156:(158,(250,104,45)),140:(138,(255,174,66)),83:(82,(255,232,160)),221:(223,(153,38,79))}
@@ -11,11 +12,16 @@ BANK={222:(223,(100,69,138)),133:(113,(52,73,110)),95:(94,(210,50,34)),
 # (tools/npc_items.py): plain ASCII text, no pixels (ANIMKIT-IMAGE-FORMATS-35).
 # .aww: region weather (tools/prepare_world_ui.region_weather): chances and RGB colours, no palette indices.
 OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awn','.awq','.awr','.awt','.awg','.awl',
-        '.anm','.tag','.aww'}
+        '.anm','.tag','.aww',
+        # CHIM rooms (tools/chim/interior.py, docs/chim/INTERIOR_STORE.md): the room store's index and packs and the room
+        # records, written by the same CHIM pipeline as the world partition, which is never overlaid either.
+        '.cwi','.ccs','.crm'}
 # Every extension spans() parses as indexed pixels or metadata (besides OPAQUE and the named files below).
 # .awk: a shared actor skin (tools/payload_share.py): indexed pixels only; a model that points to one carries no
 # pixels of its own (skin type AWSK, IMAGE-ACTOR-SKIN-REPEATS-46).
-PARSED={'.mdl','.spr','.bsp','.wad','.lmp','.awb','.awv','.awf','.mws','.awh','.awi','.awu','.awm','.aws','.awp','.awk'}
+# MAP_EXTS (tools/map_files.py): a map file, a Quake BSP (version 29) under either name; a CHIM room map
+# (tools/chim/interior.py room_map) is one under the frame-map extension and is read as one.
+PARSED={*MAP_EXTS,'.mdl','.spr','.wad','.lmp','.awb','.awv','.awf','.mws','.awh','.awi','.awu','.awm','.aws','.awp','.awk'}
 NAMED={'save-content.bin'}
 
 
@@ -78,7 +84,7 @@ def spans(raw,rel):
         need(size>0 and 0<=at and at+size<=n,'Invalid pixel span '+rel);out.append((at,size))
     def qpic(at,size):
         w,h=get('<2i',at);need(w>0 and h>0 and size==8+w*h,'Invalid qpic '+rel);add(at+8,w*h)
-    if ext=='.bsp':
+    if ext in MAP_EXTS:
         need(n>=124 and get('<i',0)[0]==29,'Unsupported BSP version')
         off,length=get('<2i',20);need(off>=124 and length>=4 and off+length<=n,'Invalid texture lump')
         count=get('<i',off)[0];need(0<=count<=65536 and 4+4*count<=length,'Invalid texture table')

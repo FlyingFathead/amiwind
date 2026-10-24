@@ -9,6 +9,7 @@ the worker pool, and puts the texts together where json.dumps would have written
 them with json.dumps). Only lists below dictionaries (a path of keys from the top) are split.
 """
 import json
+from pathlib import Path
 
 BATCH_ITEMS = 256           # items per worker task at most (small items such as a placement row are batched)
 TASKS_PER_WORKER = 4        # and at least this many tasks per worker for a list (large items: a frame's section)
@@ -34,7 +35,12 @@ def dumps(value, paths, indent=1, sort_keys=True, jobs=1):
     text = json.dumps(skeleton, indent=indent, sort_keys=sort_keys)
     if not lists:
         return text
-    from build_parallel import ordered_map, stage_ceiling
+    from build_parallel import in_order_map, ordered_map, stage_ceiling
+    # in_order_map (BUILD-STATS-SERIAL-36): completed_map's scheduling, no scan of every held batch per submission;
+    # AMIWIND_JSON_POOL=ordered keeps ordered_map (the method before v0.0.48). The same text either way.
+    import os
+    if os.environ.get('AMIWIND_JSON_POOL', 'in-order') != 'ordered':
+        ordered_map = in_order_map
     jobs = stage_ceiling(jobs)
     tasks, owners = [], []
     for n, (path, items, marker) in enumerate(lists):
@@ -60,6 +66,65 @@ def dumps(value, paths, indent=1, sort_keys=True, jobs=1):
             raise ValueError('parallel_json: the place of %s is not unique' % (path,))
         text = text.replace(encoded, body)
     return text
+
+
+def _load_items(task):
+    """Worker of load_list: the items of one byte range of the list (whole items, each followed by ',' or the end),
+    each cut to the KEEP keys."""
+    path, start, end, keep = task
+    with open(path, 'rb') as stream:
+        stream.seek(start)
+        raw = stream.read(end - start)
+    items = json.loads('[' + raw.decode('utf-8').rstrip().rstrip(',') + ']')
+    return [{k: item[k] for k in keep if k in item} for item in items] if keep is not None else items
+
+
+def _whole_list(path, key, keep):
+    items = json.loads(Path(path).read_text(encoding='utf-8'))[key]
+    return [{k: item[k] for k in keep if k in item} for item in items] if keep is not None else items
+
+
+def load_list(path, key, keep=None, jobs=None, indent=1):
+    """The list at the top-level KEY of the JSON document at PATH, written as dumps writes it (INDENT, one item per
+    '{' line at the list's item indent), each item cut to the KEEP keys (None: whole): what
+    json.loads(text)[key] gives, read on the worker pool (BUILD-IMAGE-UNDERUSED-32: the image step parsed the
+    694 MB CHIM source manifest on one core for 8.5 to 12 s to keep three keys of each frame). The items' byte
+    ranges are found in the file (no string holds a raw newline, so a line that opens a list item at the item
+    indent is one), each worker parses whole items of its ranges. A document of any other layout, or
+    AMIWIND_JSON_POOL=ordered (the method before), is parsed whole (a missing KEY: KeyError, as json.loads(...)[key])."""
+    import mmap
+    import os
+    from build_jobs import resolve_jobs
+    from build_parallel import in_order_map, stage_ceiling
+    jobs = stage_ceiling(resolve_jobs(jobs))
+    if os.environ.get('AMIWIND_JSON_POOL', 'in-order') == 'ordered' or jobs <= 1:
+        return _whole_list(path, key, keep)
+    pad = b' ' * indent
+    with open(path, 'rb') as stream:
+        if os.fstat(stream.fileno()).st_size == 0:
+            return _whole_list(path, key, keep)
+        with mmap.mmap(stream.fileno(), 0, access=mmap.ACCESS_READ) as data:
+            opening = data.find(b'\n' + pad + json.dumps(key).encode('utf-8') + b': [\n')
+            if opening < 0 or data[:2] != b'{\n':
+                return _whole_list(path, key, keep)
+            first = data.find(b'\n', opening + 1) + 1
+            closing = data.find(b'\n' + pad + b']', first - 1)
+            item = b'\n' + pad * 2 + b'{'
+            starts, at = [first], first - 1
+            if data[first:first + len(item) - 1] != item[1:] or closing < 0:
+                return _whole_list(path, key, keep)
+            while True:
+                at = data.find(item, at + 1, closing)
+                if at < 0:
+                    break
+                starts.append(at + 1)
+    if len(starts) < 2:
+        return _whole_list(path, key, keep)
+    size = max(1, -(-len(starts) // (TASKS_PER_WORKER * jobs)))
+    bounds = starts[::size] + [closing]
+    tasks = [(str(path), bounds[k], bounds[k + 1], tuple(keep) if keep is not None else None)
+             for k in range(len(bounds) - 1)]
+    return [item for items in in_order_map(_load_items, tasks, min(jobs, len(tasks))) for item in items]
 
 
 def _skeleton(value, paths):

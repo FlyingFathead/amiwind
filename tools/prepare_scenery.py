@@ -356,7 +356,13 @@ def _read_model(task):
         N = nif_reader()
         result = model_geometry(raw, N)
         collision_result = None
-        if collision:
+        from collision_source_env import collision_source_mode
+        if collision and collision_source_mode() == 'authored':
+            # the one collision-source rule (tools/collision_source.py, COLLISION-RCN-SCOPE-32): the root
+            # RootCollisionNode, else the drawn triangles (without AvoidNode subtrees)
+            from collision_source import model_collision
+            _, collision_result, _ = model_collision(raw, N, collision)
+        elif collision:
             try:collision_result = model_geometry(raw, N, collision=True)
             except ValueError as exc:
                 if collision != 'root_node_or_visual' or str(exc) != 'No supported visible static triangles':raise
@@ -383,7 +389,14 @@ def _flames(flames):
 
 
 def source_collision_metadata(raw, N):
-    """Retain explicit TES3 collision markers independently of visual geometry."""
+    """Retain explicit TES3 collision markers independently of visual geometry: mode 'nonsolid' for a model the
+    player does not collide with. The collision-source rule (tools/collision_source.py, the default): a root string
+    NC* or NCC, or an empty root RootCollisionNode; AMIWIND_COLLISION_SOURCE=profile: the exact strings NC and NCO
+    anywhere in the model (the rule before v0.0.48-dev2)."""
+    from collision_source_env import collision_source_mode
+    if collision_source_mode() == 'authored':
+        from collision_source import collision_metadata
+        return collision_metadata(raw, N)
     if not raw.startswith(NIF_MAGIC):
         return {'mode': 'unchanged', 'no_collision_markers': []}
     data = N.Data(); data.read(io.BytesIO(raw))
@@ -392,6 +405,39 @@ def source_collision_metadata(raw, N):
     disabled = [m for m in markers if m in ('NC', 'NCO')]
     return {'mode': 'nonsolid' if disabled else 'unchanged',
             'no_collision_markers': disabled}
+
+
+def collision_source_row(model):
+    """The collision source of one exported model record (the converter report, COLLISION-RCN-SCOPE-32): rcn (its root
+    RootCollisionNode), visual (its drawn triangles) or none (nonsolid), with the markers that decided it."""
+    marks = (model.get('source_collision') or {})
+    record = model.get('collision') or {}
+    if marks.get('mode') == 'nonsolid':
+        source = 'none'
+    elif record.get('source') == 'NIF RootCollisionNode':
+        source = 'rcn'
+    else:
+        source = 'visual'
+    row = {'source': source}
+    if marks.get('no_collision_markers'):
+        row['markers'] = marks['no_collision_markers']
+    if marks.get('reason'):
+        row['reason'] = marks['reason']
+    if record and record.get('source') != 'NIF RootCollisionNode':
+        row['avoid_node'] = True
+    editor = sum(1 for s in model.get('skipped_shapes', ()) if s.get('reason') == 'editor_marker')
+    if editor:
+        row['editor_marker_shapes'] = editor
+    return row
+
+
+def collision_source_report(sources):
+    """{'rule', 'counts', 'models'} of the export's collision sources (scenery-report.json)."""
+    counts = {}
+    for row in sources.values():
+        counts[row['source']] = counts.get(row['source'], 0) + 1
+    return {'rule': 'authored (root RootCollisionNode, else drawn; NC/NCC nonsolid; tools/collision_source.py)',
+            'counts': dict(sorted(counts.items())), 'models': dict(sorted(sources.items()))}
 
 
 def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,metadata=None,jobs=None,
@@ -426,8 +472,15 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
         pad = (-f.tell()) % 512
         f.write(bytes(pad)); offset = f.tell(); f.write(raw)
         return {'offset': offset, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+    # The collision each model is read with: by default the one rule for every converter (the root
+    # RootCollisionNode, else the drawn triangles; collision_source.export_collision); AMIWIND_COLLISION_SOURCE=profile:
+    # only where the profile opts in (the rule before v0.0.48-dev2)
+    from collision_source import export_collision, AVOID_LABEL
+    from collision_source_env import collision_source_mode
+    rule = collision_source_mode()
     tasks = [(name, bsa.path, bsa.entries.get(name, {'offset': 0, 'bytes': 0}),
-              profiles.get(name, {}).get('collision_source') if profiles.get(name, {}).get('collision_source') in ('root_node', 'root_node_or_visual') else None) for name in names]
+              export_collision(profiles.get(name, {}).get('collision_source'), rule)) for name in names]
+    sources = {}
     workers = min(resolve_jobs(jobs), max(1, len(tasks)))
     print(f'Scenery geometry workers: {workers}', flush=True)
     with archive.open('xb') as f:
@@ -443,9 +496,12 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                         metadata['scene_kind'])
                 collision_record = None
                 if collision_result is not None:
-                    cpacket, _, cbounds, cskipped = collision_result
+                    cpacket, cmaterials, cbounds, cskipped = collision_result
                     cv, cf, _ = unpack_geometry(cpacket)
-                    collision_record={'source':'NIF RootCollisionNode','bounds':cbounds,
+                    # the drawn triangles less AvoidNode subtrees when the model has no root RootCollisionNode
+                    # (collision_source.model_collision); otherwise its RootCollisionNode
+                    authored = any(m['source_visibility']['collision_node'] for m in cmaterials)
+                    collision_record={'source':'NIF RootCollisionNode' if authored else AVOID_LABEL,'bounds':cbounds,
                                       'vertices':len(cv),'triangles':len(cf),
                                       'skipped_shapes':cskipped, **put(f,cpacket)}
                 texture_refs = []
@@ -477,6 +533,8 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                                         'exterior_visibility': visibility_selection,
                                         'skipped_shapes': skipped,
                                         'flames': _flames(flames), **put(f, packet)})
+                if rule == 'authored':
+                    sources[name] = collision_source_row(index['models'][-1])
                 print('model',len(index['models']),'/',len(names),name,flush=True)
             except VisibilityPolicyError:
                 raise
@@ -514,6 +572,7 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
                   'note': 'Metadata retained; alternate draw modes need explicit runtime/converter acceptance.'},
               'exterior_visual_triangles_selected': sum(len(m['exterior_visibility']['excluded_packet_faces'])
                   for m in index['models'] if m.get('exterior_visibility')),
+              **({'collision_sources': collision_source_report(sources)} if rule == 'authored' else {}),
               'camera_spheres': {str(d): resident_set(index, visible_refs(index, centre, d)) for d in (768,1536,2304,3840)},
               'note': 'Host geometry/cache accounting only. No Amiga frame-rate or disk-throughput claim. RGBA textures are an intermediate, not a Paula/AGA format.'}
     (out/'scenery-index.json').write_text(json.dumps(index,indent=2)+'\n',encoding='utf-8',newline='\n')

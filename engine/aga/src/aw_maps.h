@@ -16,8 +16,13 @@
 /* Interiors of the table's towns (aw_town_table.h, append-only lists) take
  * fixed IDs after the extra towns' range. */
 #define AW_TOWN_INTERIOR_BASE (AW_TOWN_MAP_BASE+4096)
-#define AW_SCENE_COUNT (AW_TOWN_INTERIOR_BASE+AW_TOWN_INTERIOR_COUNT)
+/* Batch rooms (config/room-batches.json, tools/room_batches.py) take fixed IDs by their id after the
+ * town interiors' range; an id a town or scene list holds is "" (that room keeps its own name and ID). */
+#define AW_ROOM_BATCH_BASE (AW_TOWN_INTERIOR_BASE+4096)
+#define AW_SCENE_COUNT (AW_ROOM_BATCH_BASE+AW_ROOM_BATCH_COUNT)
 typedef char aw_town_extra_range_check[AW_TOWN_EXTRA_COUNT<4096?1:-1];
+typedef char aw_town_interior_range_check[AW_TOWN_INTERIOR_COUNT<4096?1:-1];
+typedef char aw_room_batch_range_check[AW_ROOM_BATCH_COUNT<4096?1:-1];
 static __inline__ const char *AW_InteriorMapName(int n)
 {
     static const char *const names[AW_INTERIOR_MAP_COUNT]={"mi5b8154939f7aa","mi5b8154939f7ab"};
@@ -52,6 +57,17 @@ static __inline__ int AW_TownInteriorTown(int n)
     return n>=0 && n<AW_TOWN_INTERIOR_COUNT?towns[n]:-1;
 }
 
+static __inline__ const char *AW_RoomBatchName(int n)
+{
+    static const char *const names[AW_ROOM_BATCH_COUNT>0?AW_ROOM_BATCH_COUNT:1]=AW_ROOM_BATCH_NAMES;
+    return n>=0 && n<AW_ROOM_BATCH_COUNT?names[n]:"";
+}
+static __inline__ const char *AW_RoomBatchTitle(int n)
+{
+    static const char *const titles[AW_ROOM_BATCH_COUNT>0?AW_ROOM_BATCH_COUNT:1]=AW_ROOM_BATCH_TITLES;
+    return n>=0 && n<AW_ROOM_BATCH_COUNT && titles[n][0]?titles[n]:"Cancel";
+}
+
 static __inline__ int AW_TerrainId(const char *name)
 {
     int i,n=0;if(strlen(name)!=6 || name[0]!='v' || name[1]!='f')return -1;
@@ -67,6 +83,9 @@ static __inline__ int AW_MapId(const char *name)
     for(i=0;i<AW_INTERIOR_MAP_COUNT;i++)if(!strcmp(name,AW_InteriorMapName(i)))return AW_INTERIOR_MAP_BASE+i;
     for(i=0;i<AW_TOWN_EXTRA_COUNT;i++)if(!strcmp(name,AW_TownExtraName(i)))return AW_TOWN_MAP_BASE+i;
     for(i=0;i<AW_TOWN_INTERIOR_COUNT;i++)if(!strcmp(name,AW_TownInteriorName(i)))return AW_TOWN_INTERIOR_BASE+i;
+    /* batch rooms: "ri" and 10 hex digits (room_batches.room_map); only such a name is looked up */
+    if(name[0]=='r' && name[1]=='i' && strlen(name)==12)
+        for(i=0;i<AW_ROOM_BATCH_COUNT;i++)if(!strcmp(name,AW_RoomBatchName(i)))return AW_ROOM_BATCH_BASE+i;
     return -1;
 }
 static __inline__ const char *AW_MapName(int id)
@@ -76,7 +95,8 @@ static __inline__ const char *AW_MapName(int id)
     if(id>=AW_MAP_COUNT && id<AW_INTERIOR_MAP_BASE){sprintf(terrain,"vf%04ld",(long)(id-AW_MAP_COUNT));return terrain;}
     if(id>=AW_INTERIOR_MAP_BASE && id<AW_INTERIOR_MAP_END)return AW_InteriorMapName(id-AW_INTERIOR_MAP_BASE);
     if(id>=AW_TOWN_MAP_BASE && id<AW_TOWN_INTERIOR_BASE)return AW_TownExtraName(id-AW_TOWN_MAP_BASE);
-    if(id>=AW_TOWN_INTERIOR_BASE && id<AW_SCENE_COUNT)return AW_TownInteriorName(id-AW_TOWN_INTERIOR_BASE);
+    if(id>=AW_TOWN_INTERIOR_BASE && id<AW_TOWN_INTERIOR_BASE+AW_TOWN_INTERIOR_COUNT)return AW_TownInteriorName(id-AW_TOWN_INTERIOR_BASE);
+    if(id>=AW_ROOM_BATCH_BASE && id<AW_SCENE_COUNT)return AW_RoomBatchName(id-AW_ROOM_BATCH_BASE);
     return id>=0 && id<AW_MAP_COUNT ? names[id] : "";
 }
 static __inline__ const char *AW_MapTitle(int id)
@@ -85,7 +105,8 @@ static __inline__ const char *AW_MapTitle(int id)
     if(id>=AW_MAP_COUNT && id<AW_INTERIOR_MAP_BASE)return "Vvardenfell";
     if(id>=AW_INTERIOR_MAP_BASE && id<AW_INTERIOR_MAP_END)return "Abaelun Mine";
     if(id>=AW_TOWN_MAP_BASE && id<AW_TOWN_INTERIOR_BASE)return AW_TownExtraTitle(id-AW_TOWN_MAP_BASE);
-    if(id>=AW_TOWN_INTERIOR_BASE && id<AW_SCENE_COUNT)return AW_TownInteriorTitle(id-AW_TOWN_INTERIOR_BASE);
+    if(id>=AW_TOWN_INTERIOR_BASE && id<AW_TOWN_INTERIOR_BASE+AW_TOWN_INTERIOR_COUNT)return AW_TownInteriorTitle(id-AW_TOWN_INTERIOR_BASE);
+    if(id>=AW_ROOM_BATCH_BASE && id<AW_SCENE_COUNT)return AW_RoomBatchTitle(id-AW_ROOM_BATCH_BASE);
     return id>=0 && id<AW_MAP_COUNT ? titles[id] : "Cancel";
 }
 /* Actor facts use the original cell; save.scene still names the physical section. */

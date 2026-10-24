@@ -19,6 +19,12 @@ class Tests(unittest.TestCase):
         for broken in (raw[:31],raw[:-1],raw+b'!'):
             with self.assertRaises(ValueError):spans(broken,'world/map.awm')
 
+    def test_a_chim_room_map_is_read_as_a_bsp(self):
+        # IMAGE-FORMATS-CHIM-ROOMS-48: maps/<room>.chim is a Quake BSP under its own name, checked as one
+        wrong=struct.pack('<i',30)+bytes(200)
+        for name in ('maps/room.bsp','maps/room.chim'):
+            with self.subTest(name=name),self.assertRaisesRegex(ValueError,'Unsupported BSP version'):spans(wrong,name)
+
     def test_awm2_lava_colour_is_a_palette_span_and_section_is_checked(self):
         from prepare_world_ui import lava_section
         rows=[{'cell':[1,2],'points':[[0,0],[10,0],[10,10]],'bounds':[0,0,10,10]}]

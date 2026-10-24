@@ -7,7 +7,7 @@
 #include <assert.h>
 client_static_t cls;client_state_t cl;server_t sv;refdef_t r_refdef;vec3_t vpn={1,0,0};
 dlight_t cl_dlights[MAX_DLIGHTS];
-int r_lamps=1,r_daylight=256;
+int r_lamps=1,r_daylight=256,r_campfires=1;
 unsigned char *r_warm_colormap;
 int R_SkyExterior(void){return 1;}
 static void (*lamp_status_command)(void);
@@ -15,7 +15,7 @@ void Cmd_AddCommand(char *n,void (*f)(void)){assert(!strcmp(n,"aw_lamp_status"))
 void Con_Printf(char *fmt,...){(void)fmt;}
 unsigned char r_dlight_cool[32];
 struct texture_s *r_night_windows[R_NIGHT_WINDOWS];int r_night_window_count,r_night_windows_on;
-static int night=1,opens,corrupt,overflow,flushes,window_opens;static cvar_t *lamp_cvar,*window_cvar,*warm_cvar;
+static int night=1,opens,corrupt,overflow,flushes,window_opens;static cvar_t *lamp_cvar,*window_cvar,*warm_cvar,*campfire_cvar;
 void D_FlushCaches(void){flushes++;}
 cvar_t aw_warm_light={"aw_warm_light","1",true}; /* defined in r_surf.c, registered here */
 float AW_TorchLightRadius(void){return 192;}
@@ -23,6 +23,7 @@ int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);
     if(!strcmp(v->name,"aw_lamp_lights"))lamp_cvar=v;else if(!strcmp(v->name,"aw_night_window_lights"))window_cvar=v;
     else if(!strcmp(v->name,"aw_lamp_radius"))assert(v->value==1 && v->archive);
+    else if(!strcmp(v->name,"aw_campfires")){assert(v->value==1 && !v->archive);campfire_cvar=v;}
     else{assert(!strcmp(v->name,"aw_warm_light"));warm_cvar=v;}}
 int AW_GuardTorchNight(void){return night;}
 /* Local frame: original coordinates / 4, region origin (0,0,0). */
@@ -32,10 +33,13 @@ dlight_t *CL_AllocDlight(int key){int i;
     for(i=0;i<MAX_DLIGHTS;i++)if(cl_dlights[i].key==key){memset(&cl_dlights[i],0,sizeof cl_dlights[i]);cl_dlights[i].key=key;return &cl_dlights[i];}
     for(i=0;i<MAX_DLIGHTS;i++)if(!cl_dlights[i].key || cl_dlights[i].die<cl.time){memset(&cl_dlights[i],0,sizeof cl_dlights[i]);cl_dlights[i].key=key;return &cl_dlights[i];}
     assert(0);return NULL;}
-static void row(FILE *f,int cx,int cy,float x,float y,float z,int radius){
-    short c[2];float p[3];unsigned short r=(unsigned short)radius;unsigned char tail[2]={1,0};
+static void row_class(FILE *f,int cx,int cy,float x,float y,float z,int radius,int kind){
+    short c[2];float p[3];unsigned short r=(unsigned short)radius;unsigned char tail[2];
+    tail[0]=(unsigned char)kind;tail[1]=0;
     c[0]=(short)cx;c[1]=(short)cy;p[0]=x;p[1]=y;p[2]=z;
     fwrite(c,2,2,f);fwrite(p,4,3,f);fwrite(&r,2,1,f);fwrite(tail,1,2,f);}
+/* class 1 a lamp, 3 a fire (tools/light_sources.py LAMP_CLASSES) */
+static void row(FILE *f,int cx,int cy,float x,float y,float z,int radius){row_class(f,cx,cy,x,y,z,radius,1);}
 int COM_FOpenFile(char *name,FILE **out){
     FILE *f;unsigned count=5;
     if(!strcmp(name,"world/night-windows.txt")){
@@ -51,7 +55,7 @@ int COM_FOpenFile(char *name,FILE **out){
     fwrite("AWL1",1,4,f);if(corrupt)count=9;fwrite(&count,4,1,f);
     /* Sorted by cell: (-1,0), (0,0) x3, (5,5). Little-endian host assumed. */
     row(f,-1,0,-400,100,0,223);
-    row(f,0,0,100,0,0,223);row(f,0,0,400,0,0,64);row(f,0,0,1200,0,0,512);
+    row_class(f,0,0,100,0,0,223,3);row(f,0,0,400,0,0,64);row(f,0,0,1200,0,0,512);   /* the first a fire */
     row(f,5,5,41000,41000,0,223);
     rewind(f);*out=f;return 8+5*20;}
 static int lit(float x){int i;for(i=0;i<MAX_DLIGHTS;i++)
@@ -78,6 +82,12 @@ int main(void){
     frame();assert(count_lit()==1 && lit(25));
     night=0;frame();assert(count_lit()==0);night=1;
     r_lamps=0;frame();assert(count_lit()==0);r_lamps=1;
+    /* dbg campfires off: the fire (local x 25) gives no light, the lamps keep theirs; one cache rebuild per switch,
+     * live (no table read); on again, the fire is chosen again. */
+    assert(campfire_cvar && r_campfires==1);
+    {int before=flushes,reads=opens;campfire_cvar->value=0;frame();frame();
+     assert(r_campfires==0 && flushes==before+1 && opens==reads && !lit(25) && lit(100));
+     campfire_cvar->value=1;frame();frame();assert(r_campfires==1 && flushes==before+2 && lit(25));}
     lamp_cvar->value=0;frame();assert(count_lit()==0);lamp_cvar->value=2;
     /* Lamps lit again fade in: the first frame at 5% of the radius, then full. */
     frame();{int i;for(i=0;i<MAX_DLIGHTS;i++)if(cl_dlights[i].key<=AW_LAMP_LIGHT_KEY && cl_dlights[i].die>=cl.time)assert(cl_dlights[i].radius<10);}
@@ -111,6 +121,6 @@ int main(void){
         strcpy(world.name,"maps/vf0001.bsp");cl.worldmodel=NULL;frame();cl.worldmodel=&world;frame();
         assert(window_opens==2 && r_night_window_count==0 && !r_night_windows_on);
     }
-    puts("night lamps: per-cell table, nearest lit at night, torch radius, switches, corrupt table, cache overflow, night windows");
+    puts("night lamps: per-cell table, nearest lit at night, torch radius, switches, dbg campfires, corrupt table, cache overflow, night windows");
     return 0;
 }

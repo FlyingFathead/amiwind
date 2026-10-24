@@ -1,6 +1,6 @@
 # Character animation
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -85,10 +85,29 @@ the mover's frames (same faces and skin), written as `<model>.mdl`, the mover as
 **Byte budget.** Frames are limited by bytes, not by count
 ([TOOL-ALIAS-FRAMES-33](bugs/TOOL-ALIAS-FRAMES-33.md)): the alias writer's frame
 budget (`npc_geometry.animated_mdl`, at most 256 frames), and the kit keeps every
-model within the alias stream loader's 512 KiB staging buffer
-(`npc_anim.fit`): idle stays whole, the largest other group loses a frame first
-(loops keep two, others one), steps grow so each group keeps its duration. On
-Balmora four heavy-armour movers drop from 64 to 43 to 49 frames.
+actor model within the actors' byte budget, 768 KiB (`npc_anim.ACTOR_BYTE_BUDGET`,
+sized for 32 MB of Fast RAM, ALIAS-BUDGET-32MB-48 in the [register](BUGS.md)): the engine's
+direct alias stream limit (`AW_ALIAS_STREAM_LIMIT`), which decodes a model straight
+into its Cache block, so a model over the older 512 KiB staging limit loads the same
+way on 16 MB. Every kit fits it at the first vertex rung its outfit allows (at most
+666 faces and 64 samples: 720,032 bytes). `npc_anim.fit` still guards it: idle stays
+whole, the largest other group loses a frame first (loops keep two, others one),
+steps grow so each group keeps its duration. The player's own models keep the 512 KiB
+staging limit (`npc_anim.ALIAS_BYTE_BUDGET`).
+
+Measured on 23 October 2026 (all 1,769 room residents and 415 actor library
+appearances, read only): under the 512 KiB budget 161 kits were over it at their
+first rung and were baked at a lower one (Neloth and Ienas Nadus fell back to their
+standing model, no mover); with the 32 MB budget none is reduced and none falls back.
+
+**When the kit does not fit.** A resident whose kit model is over the byte budget
+at every rung of the vertex budget ladder (480 to 192), or whose frames do not
+fit even at the smallest counts, is not an error any more
+([RESIDENT-ANIM-BYTE-BUDGET-48](bugs/RESIDENT-ANIM-BYTE-BUDGET-48.md)): it is baked
+again with the kit's standing profile alone (`react`, no mover), else with the
+idle-only model (the previous method). The record says which level it got and
+why (`anim_fallback`), the room batches stage counts them by level, and the build
+summary prints the line. The same appearance always takes the same level.
 
 ### Sampling
 
@@ -191,6 +210,10 @@ OpenMW 0.51 and the game settings:
 | Standing near the player | Idle | `fVoiceIdleOdds` 10: 0.6 % a second, within 3,000 original units (750 here), in sight, not fighting (Actors::playIdleDialogue) |
 | The player comes near | Hello | the greeting already in game |
 
+- **Since v0.0.48-dev2** every NPC whose record is in the [NPC voice table](NPC_VOICE_TABLE.md)
+  (`id1/npc-voices.lut`, all NPC records of the game) takes these lines from it, with the original's full filter
+  and its run-time conditions as condition records; the per-model lines below are the previous method
+  (`aw_npc_voice_lut 0`) and what creatures use.
 - An actor already speaking says nothing new (DialogueManager::say); there is
   no global voice cooldown in the original.
 - **Which line:** the first line whose conditions hold, in file order (OpenMW
@@ -237,6 +260,14 @@ bytes), freed when the actor stops (Cache measured 2,001,536 while following,
 Cache demand per map (`actor_cache`: standing models plus two movers against the
 Hunk gap); an overflow evicts least recently used models, so it is recorded, not
 fatal.
+
+The 32 MB actor budget (ALIAS-BUDGET-32MB-48) changes 161 of the 2,184 actor bakes
+(140 room residents in 132 rooms, 21 library appearances): their standing models grow
+by 12.6 KB on average (largest +89.6 KB; 2.2 MB in all), their movers by 3.8 MB in
+all, the largest mover 720,032 bytes. Two movers at once (`MOVERS_AT_ONCE`) are at
+most 1.44 MB of the Cache: within the 2 MiB Hunk gap the 16 MB baseline keeps
+(`chim_reserve_kib`, older models evicted for them), about a third of what the 13 MiB
+heap leaves at 32 MB.
 
 ## Visibility
 

@@ -33,6 +33,7 @@ FUNCTIONS = ("FacReactionLowest FacReactionHighest RankRequirement Reputation He
              "PcCorprus Weather PcVampire Level Attacked TalkedToPc PcHealth CreatureTarget FriendHit Fight "
              "Hello Alarm Flee ShouldAttack Werewolf PcWerewolfKills").split()
 UNKNOWN = None
+RUNTIME = 'runtime'      # Context.static: decided while the game runs, not at build time
 
 # The start-of-game state the build evaluates against (a new character who has not yet met the
 # speaker): no faction, level 1, no bounty, reputation 0, no disease, vampirism, corprus or
@@ -145,6 +146,29 @@ def conditions(fields):
     return [(f, v, op, 0 if value is None else value) for f, v, op, value in out]
 
 
+_PARSED = {}
+
+
+def _parsed(fields):
+    """What compile() reads of an INFO, parsed once per INFO list object (a build compiles every INFO for
+    thousands of speakers): (disposition, rank, gender, pcrank, actor, race, class, faction, player faction,
+    cell, conditions), or None for a malformed DATA. The list itself is kept with its entry, so an id is
+    never reused while the entry exists."""
+    hit = _PARSED.get(id(fields))
+    if hit is not None and hit[0] is fields:
+        return hit[1]
+    raw = first(fields, 'DATA')
+    if len(raw) != 12:
+        value = None
+    else:
+        _, disposition, rank, gender, pcrank, _ = struct.unpack('<iibbbb', raw)
+        value = (disposition, rank, gender, pcrank) + tuple(
+            text(fields, tag).casefold() for tag in ('ONAM', 'RNAM', 'CNAM', 'FNAM', 'DNAM', 'ANAM')) + (
+            tuple(conditions(fields)),)
+    _PARSED[id(fields)] = (fields, value)
+    return value
+
+
 class Context:
     """The build-time game state one speaker is evaluated in (FIXTURE + the data's own values)."""
 
@@ -216,53 +240,121 @@ class Context:
             return _compare(-1 - npc['rank'] if npc['faction'] else 0, op, value)
         return UNKNOWN                                     # NOT_KNOWN and anything else
 
-    def info(self, fields):
-        """True, False or UNKNOWN for one INFO, in OpenMW's order of tests."""
-        raw = first(fields, 'DATA')
-        if len(raw) != 12:
-            return False
-        _, disposition, rank, gender, pcrank, _ = struct.unpack('<iibbbb', raw)
+    def static(self, function, variable, op, value):
+        """True or False for a condition that only reads the speaker's record (its id, race, class, faction,
+        level, reputation, Hello/Fight/Flee/Alarm settings, the locals its script declares) or is fixed (Choice, a missing global);
+        RUNTIME for one whose value can change while the game runs (globals, journal, items, the dead, the
+        player, the speaker's health, disposition, locals' values, the cell when not known)."""
+        npc = self.npc
+        if function == 'Invalid':
+            return False                                   # OpenMW drops invalid rules at load; be strict
+        if function == 'Global':
+            if variable != 'random100' and variable not in self.globals:
+                return True                                # filter.cpp: a missing global is ignored
+            return RUNTIME
+        if function in ('Local', 'NotLocal'):
+            # OpenMW testFunctionLocal: no script or no such variable = false (NotLocal: true)
+            if self.locals is None or variable not in self.locals:
+                return function == 'NotLocal'
+            return RUNTIME
+        if function == 'NotId':
+            return npc['id'] != variable
+        if function == 'NotFaction':
+            return npc['faction'] != variable
+        if function == 'NotClass':
+            return npc['class'] != variable
+        if function == 'NotRace':
+            return npc['race'] != variable
+        if function == 'NotCell':
+            return RUNTIME if self.cell is None else not self.cell.startswith(variable)
+        if function == 'Choice':
+            return False                                   # filter.cpp: no choice open at the greeting
+        if function == 'Level':
+            return _compare(npc['level'], op, value)
+        if function == 'Reputation':
+            return _compare(npc['reputation'], op, value)
+        if function in npc['ai']:
+            return _compare(npc['ai'][function], op, value)
+        return RUNTIME
+
+    def compile(self, fields):
+        """One INFO split into what the build decides and what the game decides (OpenMW's order of tests:
+        testActor, testPlayer, testSelectStructs, testDisposition): None when a test that only reads the
+        speaker's record fails (the INFO can never be said by this speaker); otherwise the list of conditions
+        left for run time, each (function, variable, op, value) as conditions() gives them, plus
+        ('PcFaction', faction, '3', rank) for the player's faction test (faction '': the speaker's own),
+        ('Cell', name, '0', 1) for the
+        cell test when the cell is not known, and ('Disposition', '', '3', value) when the INFO needs a
+        disposition above 0. An empty list: the INFO always passes for this speaker."""
+        parsed = _parsed(fields)
+        if parsed is None:
+            return None
+        disposition, rank, gender, pcrank, actor, race, cls, faction, pc_faction, cell, rules = parsed
         npc = self.npc
         # testActor
-        actor = text(fields, 'ONAM').casefold()
         if actor and actor != npc['id']:
-            return False
-        race = text(fields, 'RNAM').casefold()
+            return None
         if race and race != npc['race']:
-            return False
-        cls = text(fields, 'CNAM').casefold()
+            return None
         if cls and cls != npc['class']:
-            return False
-        faction = text(fields, 'FNAM').casefold()
+            return None
         if faction == 'ffff':                              # "no faction" marker (ESM::DialInfo mFactionLess)
             if npc['faction']:
-                return False
+                return None
         elif faction:
             if faction != npc['faction'] or npc['rank'] < rank:
-                return False
+                return None
         elif rank != -1 and npc['rank'] < rank:
-            return False
+            return None
         if gender == (0 if npc['female'] else 1):         # 0 male-only, 1 female-only, -1 either
-            return False
-        # testPlayer: the new character belongs to no faction
-        if text(fields, 'DNAM') or pcrank != -1:
-            return False
-        cell = text(fields, 'ANAM').casefold()
-        unknown = False
+            return None
+        runtime = []
+        # testPlayer: the player's faction and rank (the speaker's faction when only a rank is given)
+        if pc_faction or pcrank != -1:
+            if not pc_faction and not npc['faction']:
+                return None                                # no faction to be ranked in: never
+            runtime.append(('PcFaction', pc_faction, '3', pcrank))   # '': the speaker's faction
         if cell:
             if self.cell is None:
-                unknown = True
+                runtime.append(('Cell', cell, '0', 1))
             elif not self.cell.startswith(cell):
-                return False
+                return None
         # testSelectStructs
-        for condition in conditions(fields):
-            result = self.condition(*condition)
+        for condition in rules:
+            result = self.static(*condition)
+            if result is False:
+                return None
+            if result is RUNTIME:
+                runtime.append(condition)
+        # testDisposition (0 always passes)
+        if disposition > 0:
+            runtime.append(('Disposition', '', '3', disposition))
+        return runtime
+
+    def evaluate(self, function, variable, op, value):
+        """True, False or UNKNOWN for one run-time condition of compile() in this context (the build-time
+        fixture: a new character with no faction, the start-of-game values)."""
+        if function == 'PcFaction':
+            return False                                   # the new character belongs to no faction
+        if function == 'Cell':
+            return UNKNOWN
+        if function == 'Disposition':
+            return self.disposition >= value
+        return self.condition(function, variable, op, value)
+
+    def info(self, fields):
+        """True, False or UNKNOWN for one INFO, in OpenMW's order of tests (compile(), then its run-time
+        conditions evaluated against the fixture)."""
+        runtime = self.compile(fields)
+        if runtime is None:
+            return False
+        unknown = False
+        for condition in runtime:
+            result = self.evaluate(*condition)
             if result is False:
                 return False
             if result is UNKNOWN:
                 unknown = True
-        if self.disposition < disposition:
-            return False
         return UNKNOWN if unknown else True
 
 

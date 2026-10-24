@@ -307,7 +307,8 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 			&& cache->lightadj[0] == r_drawsurf.lightadj[0]
 			&& cache->lightadj[1] == r_drawsurf.lightadj[1]
 			&& cache->lightadj[2] == r_drawsurf.lightadj[2]
-			&& cache->lightadj[3] == r_drawsurf.lightadj[3] )
+			&& cache->lightadj[3] == r_drawsurf.lightadj[3]
+			&& cache->light == r_drawsurf.light )
 		return cache;
 
 //
@@ -342,6 +343,7 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 	r_drawsurf.surfdat = (pixel_t *)cache->data;
 
 	cache->texture = r_drawsurf.texture;
+	cache->light = r_drawsurf.light;
 	cache->lightadj[0] = r_drawsurf.lightadj[0];
 	cache->lightadj[1] = r_drawsurf.lightadj[1];
 	cache->lightadj[2] = r_drawsurf.lightadj[2];

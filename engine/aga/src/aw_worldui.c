@@ -10,6 +10,7 @@
 #include "aw_combat.h"
 #include "aw_maps.h"
 #include "aw_world.h"
+#include "aw_statswin.h"
 #include <stdint.h>
 /* AWM1: header, areas, pixels. AWM2 adds the LAVA section (docs/WORLD_MAP_AND_JOURNAL.md "Map file formats"). */
 #define LAVA_POOLS_MAX 2048
@@ -101,7 +102,14 @@ static void cursor(void){
     AW_UIFill(x,y,3,8,dark);AW_UIFill(x,y,8,3,dark);
     AW_UIFill(x+1,y+1,1,6,c);AW_UIFill(x+1,y+1,6,1,c);
 }
+/* Modal 4: a window drawn by another file (aw_statswin.c: Stats on P, the Magic placeholder on O)
+ * with the inventory's input handling: the pause, Escape, F10/console, closing on a scene change. */
+static void (*panel_draw)(void);
+static int (*panel_key)(int key,int mouse_x,int mouse_y);
+static void (*panel_closed)(void);
 static void close_panel(void){
+    if(modal==4 && panel_closed)panel_closed();
+    panel_draw=NULL;panel_key=NULL;panel_closed=NULL;
     if(inventory && inventory->preview_frames)
         Con_Printf("Inventory preview (%s): %d renders, last %d ms; %u frames, %d us per frame; picture %d bytes kept, pose model freed after each render.\n",
             AW_ViewInventoryLive()?"live":"still",inventory->preview_renders,(int)(inventory->preview_render_seconds*1000),
@@ -122,6 +130,10 @@ static int allowed(void){
 static void opened(int kind){
     strncpy(opened_scene,sv.name,sizeof(opened_scene)-1);opened_scene[sizeof(opened_scene)-1]=0;
     modal=kind;key_dest=key_menu;IN_AWClearButtons();
+}
+int AW_WorldUIOpenPanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mouse_y),void (*closed)(void)){
+    if(!draw || !key || !allowed())return 0;
+    panel_draw=draw;panel_key=key;panel_closed=closed;opened(4);return 1;
 }
 void AW_InventoryOpen(void){
     int i;
@@ -752,6 +764,7 @@ int AW_WorldUIKey(int key,int down){
     if(key==K_F10 || key=='`'){close_panel();return 0;}
     if(key==K_ESCAPE || (modal==1 && (key=='m' || key=='M')) || (modal==2 && (key=='j' || key=='J')) || (modal==3 && (key=='i' || key=='I'))){close_panel();return 1;}
     if(modal==3){inventory_key(key);return 1;}
+    if(modal==4){if(!panel_key(key,mouse_x,mouse_y))close_panel();return 1;}
     if(modal==1){
         if(key!=K_MOUSE1 && key!=K_MOUSE2 && key!=K_MOUSE3)marker_click=0;
         if(key==K_MOUSE1 && !teleport_mode && mouse_y>=1 && mouse_y<16){
@@ -1062,5 +1075,5 @@ int AW_WorldUIDraw(void){
         if(map_y<-map_h)map_y=-map_h;
         if(map_y>2*map_h)map_y=2*map_h;
         map_draw();
-    }else if(modal==3)inventory_draw();else journal_draw();cursor();scr_copyeverything=1;return 1;
+    }else if(modal==3)inventory_draw();else if(modal==4)panel_draw();else journal_draw();cursor();scr_copyeverything=1;return 1;
 }

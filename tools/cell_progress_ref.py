@@ -13,7 +13,7 @@ REFERENCE_FORMAT = 'aw-cell-reference-1'
 # Built from parts on purpose: the build cache reads every path-like string of a stage's modules as an input, and the CHIM
 # stage reaches this module through cell_progress; a published reference file is not an input of any build stage.
 REFERENCE_PATH = '/'.join(('docs', 'chim', 'cell-progress-reference.json'))
-CELL_KEYS = ('name', 'status', 'lighting', 'ring', 'island', 'release', 'audits', 'stats', 'audited')
+CELL_KEYS = ('name', 'status', 'state', 'lighting', 'ring', 'island', 'release', 'audits', 'stats', 'audited')
 STAT_KEYS = ('records.refs_total', 'faces.chim_placed', 'bytes.chim', 'chunks.count')
 # Status order for the compare layer (higher = further along). Empty sea is as good as it gets.
 RANK = {'not_started': 0, 'not_converted': 1, 'converted_failing': 2, 'hull_policy_pending': 3, 'converted_unmeasured': 3,
@@ -38,6 +38,8 @@ def build(doc):
             continue
         row = {'name': c.get('name') or c.get('region'), 'status': c['chim']['bucket'], 'ring': c.get('ring'), 'island': c['island'],
                'lighting': (c.get('lighting') or {}).get('status'), 'release': (c.get('release') or {}).get('name')}
+        if c['chim'].get('state'):
+            row['state'] = c['chim']['state']      # the legend state of its group (in the game, not yet, settled)
         if c['chim']['converted']:
             row['audits'] = {m: a['status'] for m, a in sorted(c['audits'].items()) if a['status'] != 'not_measured'}   # absent = not measured
             row['stats'] = {s: dotted(c.get('stats') or {}, s) for s in STAT_KEYS if dotted(c.get('stats') or {}, s) is not None}

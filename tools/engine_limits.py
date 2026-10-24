@@ -74,6 +74,62 @@ def chim_memory(source=SOURCE, heap_mb=None):
             'gap_bytes': reserve * 1024, 'heap_safe_mb': define('sys_amiga.c', 'AMIWIND_HEAP_SAFE_MB', source)}
 
 
+# Measured in FS-UAE (23 October 2026, A1200 profile, 32 MiB Fast RAM, the interiors A/B runs A32/B32 of the
+# v0.0.48-dev2 Balmora sandboxes): "Memory: 14 MiB Fast RAM free of 32 MiB; CHIM cache 8 MiB in 1 bank
+# (automatic)" with the 13 MiB heap. What the system, the engine binary and its static buffers take before
+# the heap is sized: 32 - 13 - 14 = 5 MiB (the 16 MiB smoke runs: 0 MiB free with the 11 MiB heap).
+# The safe minimum Fast RAM (decided for the project, 23 October 2026, RAM-REQUIREMENT-32MB-48) and the baseline that
+# still starts.
+MIN_FAST_RAM_MIB = 32
+BASELINE_FAST_RAM_MIB = 16
+MEASURED_FAST = {'fast_mib': 32, 'heap_mib': 13, 'free_after_heap_mib': 14, 'bank_mib': 8,
+                 'system_mib': 5, 'run': 'interiors A/B B32, 23 October 2026'}
+
+
+def _mib_define(header, name, source=SOURCE):
+    """A #define written as (N UL*CHIM_AUTO_MIB) in chim_zone.h, in MiB."""
+    text = (Path(source) / header).read_text(encoding='utf-8', errors='replace')
+    match = re.search(r'#\s*define\s+' + name + r'\s+\(\s*(\d+)UL\s*\*\s*CHIM_AUTO_MIB\s*\)', text)
+    if not match:
+        raise ValueError('Engine value %s not found in %s' % (name, header))
+    return int(match.group(1))
+
+
+def fast_ram_memory(fast_mib, source=SOURCE, system_mib=None):
+    """What a machine with fast_mib MiB of Fast RAM gives a CHIM map, by the engine's own start-up rules: the heap
+    (aw_heapsize.c AW_HeapAuto: margin 2 MiB plus an eighth of all Fast RAM; it grows when the room past the margin
+    holds the built heap plus AW_HEAP_GROW_MIN_MB, by a quarter of what is beyond the built size, to
+    AW_HEAP_AUTO_MAX_MB), then the automatic CHIM cache banks of the Fast RAM left (chim_zone.c ChimZone_AutoBudget
+    and ChimZone_AutoStep, one memory region), and the zone a map takes from the heap (chim_zone_kib at most).
+    The Fast RAM the system takes before the heap is the measured MEASURED_FAST['system_mib'].
+    Models and textures prefer the cache banks (chim_zone.c AllocIn), so a CHIM room's models and textures fit when
+    they fit the banks and the zone together (aw_autoram 1, the default)."""
+    system = MEASURED_FAST['system_mib'] if system_mib is None else system_mib
+    built = define('sys_amiga.c', 'AMIWIND_HEAP_MB', source)
+    grow_min = define('aw_heapsize.h', 'AW_HEAP_GROW_MIN_MB', source)
+    auto_max = define('aw_heapsize.h', 'AW_HEAP_AUTO_MAX_MB', source)
+    floor = _mib_define('chim/chim_zone.h', 'CHIM_AUTO_FLOOR', source)
+    keep = _mib_define('chim/chim_zone.h', 'CHIM_AUTO_KEEP', source)
+    first_min = _mib_define('chim/chim_zone.h', 'CHIM_AUTO_FIRST', source)
+    bank_max = _mib_define('chim/chim_zone.h', 'CHIM_AUTO_BANK_MAX', source)
+    largest = max(0, fast_mib - system)
+    margin = floor + fast_mib / 8.0
+    room = int(largest - margin) if largest > margin else 0
+    heap = built
+    if room >= built + grow_min:
+        heap = min(auto_max, built + (room - built) // 4)
+        heap = max(heap, built)
+    free = max(0, largest - heap)
+    budget = max(0, int(free - margin))
+    bank = min(max(0, free - keep), budget, bank_max)
+    if bank < first_min:
+        bank = 0
+    memory = chim_memory(source, heap_mb=heap)
+    return {'fast_mib': fast_mib, 'system_mib': system, 'heap_mb': heap, 'free_after_heap_mib': free,
+            'bank_bytes': bank * 1024 * 1024, 'zone_bytes': memory['zone_kib'] * 1024,
+            'buffer_bytes': cvar_default('chim/chim_world.c', 'chim_buffer_kib', source) * 1024}
+
+
 def whole_map_zone(before_zone_bytes, after_zone_bytes, memory=None):
     """The whole-map Hunk rule of a CHIM map (CHIM-ZONE-RESERVE-EARLY-33), which the engine keeps and the
     builder's heap gate checks: the Hunk holds what the map loads before its zone (the engine at start-up

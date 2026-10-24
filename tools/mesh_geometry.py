@@ -616,12 +616,66 @@ def collision_pieces_classic(v,f,profile,stairs=None):
   if fill>limit:
    return shell_collision_parts(v,f),True,('authored collision surfaces: convex approximation closes '
                                            f'{fill:.2f} units > {limit} step height')
+ note=None
  if mode!='off':
   pieces,plates,stats=mitigate_stairs(v,f,pieces,mode)
   if stats:
    note='stairs: '+'; '.join(f"{s['action']} (proxy {s['proxy_angle']:.1f} deg, {s['buried_depth']:.1f} over a tread)" for s in stats)
-   return pieces,True if exact else plates,note
- return pieces,exact,None
+   exact=True if exact else plates
+ if profile.get('roof_collision_beyond') is not None:
+  pieces,exact,note=roof_plates(v,f,pieces,exact,note,profile['roof_collision_beyond'])
+ return pieces,exact,note
+
+def piece_roof(tris,hull):
+ """How far a convex piece's hull stands over the walkable faces of its own source triangles (tris, converter
+ units; ROOM-PYLON-ROOF-48): for each walkable face (normal z at least WALKABLE_Z, at least 2 square units) the
+ largest height of the hull's top over the face, anywhere over it (a linear programme per face: the hull top is
+ piecewise linear, so its largest rise over a plane face can lie inside the face). collision_parts measures the
+ space a hull closes at the faces' centres only, as depth inside the hull: a face on the hull's own bottom (the
+ floor of ex_stronghold_pylon01's top, one 320 x 960 triangle, in one piece with a 16-unit wall at its edge) measures
+ 0 there while the hull rises in a slope up to 16 units over it, the floor two residents of the Ministry of Truth
+ stand on. 0 for a piece without walkable faces."""
+ from scipy.optimize import linprog
+ from player_hull import WALKABLE_Z
+ n=np.cross(tris[:,1]-tris[:,0],tris[:,2]-tris[:,0]);a=np.linalg.norm(n,axis=1)
+ nz=np.zeros(len(tris));ok=a>1e-6;nz[ok]=n[ok,2]/a[ok]
+ eq=hull.equations;worst=0.
+ for t,normal in zip(tris[ok&(nz>=WALKABLE_Z)&(a/2>=2.)],n[ok&(nz>=WALKABLE_Z)&(a/2>=2.)]):
+  # the face's height over (x, y): z = t0z - (nx (x - t0x) + ny (y - t0y)) / nz; maximise z_hull - z_face
+  gx,gy=normal[0]/normal[2],normal[1]/normal[2]
+  rows=[eq[:,:3]];rhs=[-eq[:,3]]
+  turn=np.sign((t[1,0]-t[0,0])*(t[2,1]-t[0,1])-(t[2,0]-t[0,0])*(t[1,1]-t[0,1]))
+  for i in range(3):
+   p,q=t[i,:2],t[(i+1)%3,:2]
+   # inside the face (seen from above): turn * cross(q - p, xy - p) >= 0
+   e=np.array([turn*(q[1]-p[1]),-turn*(q[0]-p[0]),0.])
+   rows.append(e[None]);rhs.append(np.array([e[0]*p[0]+e[1]*p[1]]))
+  res=linprog(np.array([-gx,-gy,-1.]),A_ub=np.vstack(rows),b_ub=np.concatenate(rhs),
+              bounds=[(None,None)]*3,method='highs')
+  if res.status!=0:continue
+  x,y,z=res.x
+  worst=max(worst,float(z-(t[0,2]-gx*(x-t[0,0])-gy*(y-t[0,1]))))
+ return worst
+
+def roof_plates(v,f,pieces,exact,note,limit):
+ """A profile with roof_collision_beyond (a step; interior placements of exterior architecture,
+ prepare_area.interior_visual_profile): a convex piece whose hull stands more than LIMIT over a walkable face of its
+ own (piece_roof) becomes the authored plates of its triangles, with exact standing bevels, as Morrowind collides
+ with the triangles (ROOM-PYLON-ROOF-48); every other piece stays as it is. Returns (pieces, exact, note)."""
+ tris=v[f[:,:3],:3]*.25
+ bad=[i for i,(_,hull,ids,_) in enumerate(pieces) if hull is not None and len(ids) and piece_roof(tris[np.asarray(ids,int)],hull)>limit]
+ if not bad:return pieces,exact,note
+ keep=[p for i,p in enumerate(pieces) if i not in set(bad)]
+ if exact is not True and exact:
+  # the stair plates' exact-bevel positions move with the pieces before them
+  old=[i for i in range(len(pieces)) if i not in set(bad)]
+  exact=frozenset(old.index(i) for i in exact if i in old)
+ plates=shell_collision_parts(v,f[np.concatenate([np.asarray(pieces[i][2],int) for i in bad])])
+ held=keep+plates
+ if exact is not True:
+  exact=frozenset(exact or ())|frozenset(range(len(keep),len(held)))
+ extra='%d convex pieces standing more than %.1f units over a walkable face of their own made authored plates'%(len(bad),limit)
+ return held,exact,(extra if not note else note+'; '+extra)
 
 # Stair mitigation (COLLISION-STAIR-SLOPE-32). Reference behaviour: Morrowind,
 # as reimplemented by OpenMW 0.51, collides against the authored triangles

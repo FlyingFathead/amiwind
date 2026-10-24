@@ -116,6 +116,50 @@ class CodeKeyTests(unittest.TestCase):
         key = code_key.code_key((('tools/entry_mod.py', 'work'), ('tools/things.py', '<top>')), (), self.root)
         self.assertEqual(code_key.uncovered(ran, key, self.root), [])
 
+    def test_a_key_neutral_module_is_never_read(self):
+        # BUILD-NPC-GALLERY-KEY-NEUTRAL-READ-47: listing a key-neutral module's units to stop them read the file, and
+        # the NPC gallery stage (which makes its model keys here) then read a file its fingerprint leaves out: the
+        # stage was never reused. The stop is by path now; the key is the same as with the listed units.
+        from build_cache import SourceIndex
+        (self.root / 'tools/chim').mkdir()
+        self.write('tools/chim/__init__.py', '')
+        self.write('tools/chim/units.py', 'def run_units(items):\n    return list(items)\n')
+        self.write('tools/entry_mod.py', 'from side import helper\nfrom chim import units\n'
+                                         'def work(thing):\n    return units.run_units([helper() + thing.run()])\n')
+        read = []
+        symbols = SourceIndex._module_symbols
+
+        def recording(index, relative):
+            read.append(relative)
+            return symbols(index, relative)
+        with patch.object(SourceIndex, '_module_symbols', recording):
+            key = code_key.code_key((('tools/entry_mod.py', 'work'),), (), self.root)
+        self.assertNotIn('tools/chim/units.py', read)
+        self.assertNotIn('tools/chim/units.py', key['files'])
+        self.assertIn('tools/side.py', key['files'])
+        fresh()
+        index = code_key.source_index(self.root)
+        listed = frozenset(('tools/chim/units.py', unit) for unit in
+                           {'<top>', '<main>', *index._module_symbols('tools/chim/units.py')['units']})
+        python, _, _, _ = index.entry_units(self.root / 'tools/entry_mod.py', 'work', stop=listed)
+        self.assertEqual(set(key['files']), set(python))
+
+    def test_the_gallery_model_key_reads_no_key_neutral_module(self):
+        # the real NPC gallery model key (tools/gallery_cache.py CODE_ENTRIES), as the stage makes it
+        from build_cache import SourceIndex
+        import gallery_cache
+        read = []
+        symbols = SourceIndex._module_symbols
+
+        def recording(index, relative):
+            read.append(relative)
+            return symbols(index, relative)
+        fresh()
+        with patch.object(SourceIndex, '_module_symbols', recording):
+            key = code_key.code_key(gallery_cache.CODE_ENTRIES, gallery_cache.CODE_DATA, ROOT)
+        self.assertFalse(key['uncertain'])
+        self.assertEqual(sorted(code_key.KEY_NEUTRAL & set(read)), [])
+
 
 class ChimUnitKeyTests(unittest.TestCase):
     def tearDown(self):

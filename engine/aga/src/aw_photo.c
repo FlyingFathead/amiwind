@@ -174,16 +174,117 @@ static void photo_command(void) {
     }
     AW_PhotoModeSet(on);
 }
+/* Crosshair colour and shape (Options > Prefs, dbg crosshair colour / shape; saved in
+ * config.cfg like the crosshair itself). Warm white + Cross is the look of every release
+ * before v0.0.48: Quake's '+' of the console font in its ink, palette index 254
+ * (238,221,170 in the generated palette), drawn unchanged. The other colours are the
+ * palette entries nearest to their targets, resolved by view.c; yellow, green and blue
+ * come from the 225..253 bank (the original status-bar colours). The palette has no pure
+ * white; warm white (index 254), its brightest entry, is the default and stays as it is,
+ * so no palette is rebuilt (maintainer, 22 October 2026; UI-PALETTE-NO-WHITE-48). Red
+ * stays the pick mode's colour (dbg companion pick). */
+static cvar_t crosshair_colour={"aw_crosshair_colour","0",true};
+static cvar_t crosshair_shape={"aw_crosshair_shape","0",true};
+static const char *const colour_names[]={"Warm white","Yellow","Green","Blue"};
+static const unsigned char colour_rgb[][3]={{238,221,170},{255,186,0},{110,180,60},{150,180,230}};
+static const char *const shape_names[]={"Cross","Open cross","Small cross","Dot"};
+#define CROSSHAIR_COLOURS ((int)(sizeof(colour_names)/sizeof(colour_names[0])))
+#define CROSSHAIR_SHAPES ((int)(sizeof(shape_names)/sizeof(shape_names[0])))
+int AW_CrosshairStyleCount(int shape){return shape?CROSSHAIR_SHAPES:CROSSHAIR_COLOURS;}
+int AW_CrosshairStyle(int shape) {
+    float v=shape?crosshair_shape.value:crosshair_colour.value;
+    return v>=0 && v<AW_CrosshairStyleCount(shape)?(int)v:0;
+}
+const char *AW_CrosshairStyleName(int shape,int value) {
+    if(value<0 || value>=AW_CrosshairStyleCount(shape))value=0;
+    return shape?shape_names[value]:colour_names[value];
+}
+/* The target RGB of a crosshair colour; view.c picks the nearest palette entry. */
+const unsigned char *AW_CrosshairColourRGB(int value){return colour_rgb[value>=0 && value<CROSSHAIR_COLOURS?value:0];}
+void AW_CrosshairStyleSet(int shape,int value) {
+    int n=AW_CrosshairStyleCount(shape);
+    value=((value%n)+n)%n;
+    Cvar_SetValue(shape?crosshair_shape.name:crosshair_colour.name,(float)value);scr_copyeverything=1;
+}
+/* A name (any case; a unique start is enough) or its number; -1 when unknown. */
+static int style_word(int shape,const char *s) {
+    int i,n=AW_CrosshairStyleCount(shape),found=-1,length=(int)strlen(s);
+    if(s[0]>='0' && s[0]<='9' && !s[1])return s[0]-'0'<n?s[0]-'0':-1;
+    for(i=0;i<n && length;i++)if(!Q_strncasecmp((char *)s,(char *)AW_CrosshairStyleName(shape,i),length)){
+        if(!AW_CrosshairStyleName(shape,i)[length])return i;
+        found=found==-1?i:-2;
+    }
+    return found>=0?found:-1;
+}
+static void style_list(int shape,char *out) {
+    int i;out[0]=0;
+    for(i=0;i<AW_CrosshairStyleCount(shape);i++){if(i)strcat(out,", ");strcat(out,AW_CrosshairStyleName(shape,i));}
+}
+static int style_kind(const char *s) {
+    if(!Q_strcasecmp((char *)s,"colour") || !Q_strcasecmp((char *)s,"color"))return 0;
+    if(!Q_strcasecmp((char *)s,"shape"))return 1;
+    return -1;
+}
 static void crosshair_command(void) {
-    int on=!AW_CrosshairShown();
+    int on=!AW_CrosshairShown(),shape=Cmd_Argc()>=2?style_kind(Cmd_Argv(1)):-1,value;char list[96];
+    if(shape>=0){
+        style_list(shape,list);
+        if(Cmd_Argc()==2){Con_Printf("Crosshair %s: %s (%s).\n",shape?"shape":"colour",AW_CrosshairStyleName(shape,AW_CrosshairStyle(shape)),list);return;}
+        value=Cmd_Argc()==3?style_word(shape,Cmd_Argv(2)):-1;
+        if(value<0){Con_Printf("Usage: dbg crosshair %s [%s, or 0 to %ld].\n",shape?"shape":"colour",list,(long)(AW_CrosshairStyleCount(shape)-1));return;}
+        AW_CrosshairStyleSet(shape,value);
+        Con_Printf("Crosshair %s: %s.\n",shape?"shape":"colour",AW_CrosshairStyleName(shape,value));return;
+    }
+    if(Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"style")){
+        Con_Printf("Crosshair %s, colour %s, shape %s.\n",AW_CrosshairShown()?"on":"off",
+            AW_CrosshairStyleName(0,AW_CrosshairStyle(0)),AW_CrosshairStyleName(1,AW_CrosshairStyle(1)));return;
+    }
     if(Cmd_Argc()>2 || (Cmd_Argc()==2 && !toggle_word(Cmd_Argv(1),&on))){
-        Con_Printf("Usage: dbg crosshair [on/off, true/false or 1/0]; no argument toggles.\n");return;
+        Con_Printf("Usage: dbg crosshair [on/off, true/false or 1/0]; no argument toggles.\n"
+                   "dbg crosshair colour [name], dbg crosshair shape [name], dbg crosshair style.\n");return;
     }
     AW_CrosshairSet(on);
     Con_Printf("Crosshair %s%s.\n",on?"on":"off",active?" (applies when photo mode ends)":"");
 }
+/* Mouse sensitivity: Quake's saved sensitivity cvar (cl_main.c; default 3, the value of
+ * every release so far). Options > Controls steps it from 0.5 to 10 by 0.5 (Shift: 0.1);
+ * dbg sensitivity takes 0.1 to 20. Kept in tenths here: no float printing. */
+int AW_SensitivityTenths(void) {
+    float v=Cvar_VariableValue("sensitivity");
+    if(!(v>0))return 0;
+    if(v>1000)return 10000;
+    return (int)(v*10+.5f);
+}
+void AW_SensitivitySetTenths(int tenths) {
+    if(tenths<AW_SENSITIVITY_CONSOLE_MIN)tenths=AW_SENSITIVITY_CONSOLE_MIN;
+    if(tenths>AW_SENSITIVITY_CONSOLE_MAX)tenths=AW_SENSITIVITY_CONSOLE_MAX;
+    Cvar_SetValue("sensitivity",tenths/10.0f);
+}
+/* "2.5" -> 25 tenths, "3" -> 30; -1 for anything else (one decimal at most). */
+static int tenths_word(const char *s) {
+    int whole=0,digits=0,tenth=0;
+    while(*s>='0' && *s<='9'){if(++digits>4)return -1;whole=whole*10+*s++-'0';}
+    if(*s=='.'){
+        s++;
+        if(*s>='0' && *s<='9'){tenth=*s++-'0';digits++;}
+    }
+    if(*s || !digits)return -1;
+    return whole*10+tenth;
+}
+static void sensitivity_command(void) {
+    int t=AW_SensitivityTenths(),n;
+    if(Cmd_Argc()==1){Con_Printf("Mouse sensitivity: %ld.%ld (default 3.0; also Options > Controls).\n",(long)(t/10),(long)(t%10));return;}
+    n=Cmd_Argc()==2?tenths_word(Cmd_Argv(1)):-1;
+    if(n<AW_SENSITIVITY_CONSOLE_MIN || n>AW_SENSITIVITY_CONSOLE_MAX){
+        Con_Printf("Usage: dbg sensitivity [0.1 to 20]; no argument prints it (default 3).\n");return;
+    }
+    AW_SensitivitySetTenths(n);
+    Con_Printf("Mouse sensitivity: %ld.%ld.\n",(long)(n/10),(long)(n%10));
+}
 void AW_PhotoInit(void) {
     Cvar_RegisterVariable(&photo_nofog);Cvar_RegisterVariable(&photo_noclip);Cvar_RegisterVariable(&photo_hands);
+    Cvar_RegisterVariable(&crosshair_colour);Cvar_RegisterVariable(&crosshair_shape);
     Cmd_AddCommand("aw_photomode",photo_command);
     Cmd_AddCommand("aw_crosshair",crosshair_command);
+    Cmd_AddCommand("aw_sensitivity",sensitivity_command);
 }

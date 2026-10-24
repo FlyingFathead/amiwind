@@ -83,6 +83,7 @@ static uint32_t actor_id(edict_t *e)
     return v && v->_float>0?0x800000U+(uint32_t)v->_float:0;
 }
 int (*aw_companion_home)(edict_t *,vec3_t,vec3_t);   /* aw_companion.c */
+int (*aw_save_entry_refuse)(const char *scene,const float *position);   /* aw_scene.c, bound in aw_debug.c */
 void AW_SaveCapture(void)
 {
     int i,j,k,scene;uint32_t ref;edict_t *e;eval_t *v;aw_saved_actor_t *a;
@@ -268,6 +269,9 @@ int AW_SaveRead(uint32_t profile,int slot)
     /* Loading an older manual save must still produce newer generations than
      * every existing autosave of this character. */
     for(i=0;i<=20;i++)if(newest(profile,i,&other)>=0 && other.sequence>candidate.sequence)candidate.sequence=other.sequence;
+    /* A save in a room or frame marked for more Fast RAM than this start has: nothing is left or loaded, the
+     * refusal screen is up and ENTER goes to the main menu (CHIM-32MB-SAVE-ENTRY-48). 2: refused, handled. */
+    if(aw_save_entry_refuse && aw_save_entry_refuse(candidate.scene,candidate.position))return 2;
     if(!AW_RegionSelect(candidate.scene,candidate.position,0))return 0;
     pending=candidate;loading=1;scheduled=0;
     IN_AWClearButtons();key_dest=key_game;

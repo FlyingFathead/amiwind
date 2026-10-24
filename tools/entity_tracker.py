@@ -145,7 +145,14 @@ def _path_refs(path):
     (harvestable plants are placed by the catalogue beside the maps folder)."""
     path = Path(path)
     catalogue = path.parent.parent / ('harvest-' + path.stem + '.txt')
-    return bsp_refs(path.read_bytes()) | (harvest_refs(catalogue.read_bytes()) if catalogue.is_file() else set())
+    refs = bsp_refs(path.read_bytes()) | (harvest_refs(catalogue.read_bytes()) if catalogue.is_file() else set())
+    from map_files import is_chim_room
+    if is_chim_room(path):
+        # a CHIM room map's placed meshes are its room record's placements, not entities: counted from the record
+        # (IMAGE-ROOM-MAPS-LATE-PASSES-48: 5 Balmora cells and the bmkarlirah dressing were missing)
+        from chim.interior import installed_room_refs
+        refs |= installed_room_refs(path)
+    return refs
 
 
 def refs_by_map(dirs, jobs=1):

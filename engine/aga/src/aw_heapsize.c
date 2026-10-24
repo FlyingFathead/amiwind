@@ -42,7 +42,7 @@ int AW_HeapAuto (int built_mb, int asked_mb, unsigned long largest, unsigned lon
 	return heap;
 }
 
-/* config.cfg turns the extra RAM off with aw_autoram 0 (Options > Extra RAM):
+/* config.cfg turns the extra RAM off with aw_autoram 0 (Options > Video > Extra RAM):
  * the heap is sized before the config runs, so the saved line is read here. */
 int AW_HeapAutoOff (const char *config_text)
 {

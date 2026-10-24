@@ -73,6 +73,7 @@ void AW_Mark(int n){}
 void AW_EndMark(int n){}
 void AW_IntroTick(void){intro++;}
 void AW_WaitTick(void){waits++;}
+void AW_MwscriptTick(float dt){(void)dt;}
 void AW_SaveTick(void){saves++;}
 void AW_SceneTick(void){scenes++;}
 void AW_ProfileFrame(void){}

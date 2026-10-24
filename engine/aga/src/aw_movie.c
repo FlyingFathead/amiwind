@@ -10,6 +10,9 @@
  * measures and takes the memory, 1 fills the notice's two lines (1: shown),
  * 2 skips it for this start (1: done), 3 ends the notice. */
 int (*aw_chim_memory)(int op,char *first,char *second,int size);
+/* Fast RAM under the safe minimum (sys_amiga.c Sys_FastRamNote, RAM-REQUIREMENT-32MB-48):
+ * the note's rows, '\n' between them, drawn on the startup logo; empty with enough RAM. */
+char aw_fast_ram_screen[256];
 #define MAX_PIXELS 64000
 #define RATE 11025
 #define DATA_START 800
@@ -127,13 +130,22 @@ static void draw_prompt(void){draw_line(AW_MINIWIND_PROMPT,AW_MINIWIND_PROMPT_Y,
  * the startup logo, in the brightest colour of the stream's palette; M skips
  * the extra memory for this start (AW_MovieKey). It never waits for a key. */
 static void draw_memory_notice(void){
-    char first[48],second[48];long luma,top=-1;int i;byte colour=0;
-    if(branding!=1 || !aw_chim_memory || !aw_chim_memory(1,first,second,sizeof(first)))return;
+    char first[48],second[48],row[48];long luma,top=-1;int i,n,extra,y=4;byte colour=0;const char *p;
+    if(branding!=1)return;
+    extra=aw_chim_memory && aw_chim_memory(1,first,second,sizeof(first));
+    if(!extra && !aw_fast_ram_screen[0])return;
     for(i=0;i<256;i++){
         luma=buffers->palette[i*3]*299L+buffers->palette[i*3+1]*587L+buffers->palette[i*3+2]*114L;
         if(luma>top){top=luma;colour=(byte)i;}
     }
-    draw_line(first,4,colour);draw_line(second,14,colour);
+    if(extra){draw_line(first,4,colour);draw_line(second,14,colour);y=26;}
+    /* The Fast RAM note under it, one row per '\n' (never waits for a key). */
+    for(p=aw_fast_ram_screen;*p;y+=10){
+        for(n=0;p[n] && p[n]!='\n' && n<(int)sizeof(row)-1;n++)row[n]=p[n];
+        row[n]=0;draw_line(row,y,colour);
+        p+=n;while(*p && *p!='\n')p++;
+        if(*p)p++;
+    }
 }
 static int start_movie(char *path,int brand){
     byte h[32];long size,audio_size,expected;int i;

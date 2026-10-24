@@ -26,7 +26,23 @@ def fixed(text, size):
     return raw.ljust(size, b'\0')
 
 
-def catalogue(master, eye_base=None):
+def spell_table(kinds, ids):
+    """character/spells.aws for the Magic window placeholder (engine aw_statswin.c): the races' and
+    birthsigns' spells (RACE/BSGN NPCS) by id with their SPEL name (FNAM) and type (SPDT: 0 spell,
+    5 power; abilities and the rest are kept and skipped by the engine). Names come from the
+    player's own game data; nothing is stored in the source tree."""
+    rows = []
+    for spell_id in sorted(set(ids)):
+        fields = dict(kinds['SPEL'][spell_id])
+        name = string(fields.get('FNAM', b'')) or spell_id
+        kind = struct.unpack_from('<i', fields['SPDT'])[0]
+        rows.append(fixed(spell_id, 64) + fixed(name, 48) + bytes([kind & 255]))
+    if len(rows) > 65535:
+        raise ValueError('Spell table limit exceeded')
+    return struct.pack('<4sH', b'AWS1', len(rows)) + b''.join(rows)
+
+
+def catalogue(master, eye_base=None, spells_out=None):
     kinds = {k: {} for k in ('RACE', 'BODY', 'CLAS', 'BSGN', 'SPEL', 'SKIL')}
     player = None
     for tag, flags, raw in records(Path(master).read_bytes()):
@@ -105,6 +121,12 @@ def catalogue(master, eye_base=None):
         extra, magicka, powers = bonuses(kinds['BSGN'][identifier])
         raw += struct.pack('<64s48s8hH', fixed(identifier, 64), fixed(string(f['FNAM']), 48), *extra, magicka)
         raw += powers_bytes(powers)
+    if spells_out is not None:
+        ids = []
+        for kind, rows in (('RACE', races), ('BSGN', births)):
+            for identifier, _ in rows:
+                ids += [string(v).casefold() for tag, v in kinds[kind][identifier] if tag == 'NPCS']
+        spells_out.append(spell_table(kinds, ids))
     for part in parts:
         raw += struct.pack('<64s3Bx', fixed(part['id'], 64), part['race'], part['female'], part['kind'])
     eyes = {}
@@ -262,8 +284,10 @@ def prepare(data_files, scene, previews=True, jobs=None):
     first_person = Skeleton(assets, 'meshes/base_anim.1st.nif')
     # Ordinary standing idle, independent of the Nord hand-to-hand fixture.
     eye_base = float(first_person.pose(first_person.events['idle: start'])('Camera')[3, 2]) * .25
-    raw, parts, report = catalogue(master, eye_base)
+    spells = []
+    raw, parts, report = catalogue(master, eye_base, spells)
     (dest/'catalog.awc').write_bytes(raw)
+    (dest/'spells.aws').write_bytes(spells[0])
     raw, refs = barriers(master); (scene/'id1/intro/barriers.awb').write_bytes(raw)
     (scene/'id1/intro/seyda.awn').write_bytes(exterior_navigation(master))
     if previews:

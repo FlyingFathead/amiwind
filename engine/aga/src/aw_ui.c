@@ -92,10 +92,15 @@ int AW_ModalWorldFrozen(void) {
 /* Only the explicit legacy value selects V1; invalid values use V2. */
 int AW_UIMode(void) {return ui_mode.value==1?1:2;}
 int AW_ModalBlackBackground(void) {return modal_black.value!=0;}
+/* aw_menu.c: the Options screen covers the whole screen (OPTIONS-CROSSHAIR-STYLE-48). */
+int (*aw_menu_fullscreen)(void);
 int AW_ModalWorldHidden(void) {
     /* Blackout is independent of simulation pause. An opaque background can
      * skip world drawing without a saved framebuffer; with black disabled,
-     * draw the existing background using the selected world-clock policy. */
+     * draw the existing background using the selected world-clock policy.
+     * The full-screen Options panel hides the world whatever the policy: it is
+     * not drawn behind it at all. */
+    if(aw_menu_fullscreen && aw_menu_fullscreen() && !cl.intermission && !death_prompt())return 1;
     return (AW_InventoryActive() || AW_ModalBlackBackground()) && modal_world_ready() && !cl.intermission && !death_prompt();
 }
 void AW_ModalFrame(void) {
@@ -256,6 +261,30 @@ void AW_UILoading(void) {
         for(row=0;row<200;row++)memcpy(vid.buffer+row*vid.rowbytes,loading_background+776+row*320,320);
     }else if(!AW_UIBackground())AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
     AW_UIBox(70,160,180,30);AW_UITextBox(74,164,172,22,"Loading...",-1);
+}
+/* A CHIM room this start's Fast RAM cannot hold (aw_scene.c AW_SceneRoomRefuse, CHIM-ROOM-16MB-REFUSAL-48): the
+ * loading art the level change shows (gfx/loading00.awb; the menu art or black without it) and one box in the
+ * game's UI style with FIRST wrapped to the box and SECOND under it. Nothing is loading: the art is read into
+ * the loading screen's own buffer, which the next level change reads again. */
+void AW_UIRoomRefused(const char *first,const char *second) {
+    static int art;char line[96];const char *p;int row,rows=0,w=260,h,x,y,i;
+    if(!first){art=0;return;}   /* a new refusal: read the art again (a level change may have used the buffer) */
+    if(!loading_active && !art){
+        art=read_asset("gfx/loading00.awb",loading_background,sizeof(loading_background))==sizeof(loading_background) &&
+            !memcmp(loading_background,"AWB2",4) && u16(loading_background+4)==320 && u16(loading_background+6)==200?1:-1;
+        loading_state=0;
+    }
+    if(art==1 && vid.width==320 && vid.height==200)
+        for(row=0;row<200;row++)memcpy(vid.buffer+row*vid.rowbytes,loading_background+776+row*320,320);
+    else if(!AW_UIBackground())AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
+    for(p=first;*p && rows<6;rows++)p=AW_UILine(p,w-20,line,sizeof(line));
+    h=(rows+2)*AW_UIHeight()+16;x=((int)vid.width-w)/2;y=((int)vid.height-h)/2;
+    AW_UIBox(x,y,w,h);
+    for(p=first,i=0;*p && i<rows;i++){
+        p=AW_UILine(p,w-20,line,sizeof(line));
+        AW_UITextBox(x+10,y+8+i*AW_UIHeight(),w-20,AW_UIHeight(),line,-1);
+    }
+    AW_UITextBox(x+10,y+8+(rows+1)*AW_UIHeight(),w-20,AW_UIHeight(),second,-1);
 }
 byte *AW_UIMenuPalette(void){
     if(AW_LoadingScreen()){

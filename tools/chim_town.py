@@ -157,7 +157,6 @@ def prepare(town, data_files, scene, chim_world, out, ffmpeg='ffmpeg', jobs=None
     from build_jobs import resolve_jobs
     from mwad.npc import load_master
     from mwad.paths import child_ci, ensure_external, resolve_data_files
-    from player_hull import lumps
     from town_config import load_settings, town_field
     from town_regions import regions
     from import_town import (arrival_point, door_bank_text, frame_references, region_directory_text, residents,
@@ -182,8 +181,9 @@ def prepare(town, data_files, scene, chim_world, out, ffmpeg='ffmpeg', jobs=None
     kinds, cells, topics = load_master(child_ci(data, 'Morrowind.esm'))
     palette = (scene / 'id1/gfx/palette.lmp').read_bytes()
     texts = residents(data, out, out, references, settings, kinds, topics, palette, ffmpeg, jobs, cells)
-    ext = lumps((scene / 'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
-    timings = '\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"', ext))
+    # the hand timings: the hands stage's report (BUILD-SEYDA-BSP-CARRIER-48)
+    from hand_metadata import scene_timings
+    timings = scene_timings(scene)
     # The frame's own collision: the arrival is a standing spot on it and the actors stand on it.
     cell = tuple(settings['source_cell'])
     world, frame_index = frame_world(chim_world, cell)
@@ -231,15 +231,22 @@ def seyda_maps(raw):
     stage's maps/seyda.bsp, made from the game data): each region of the layout (prepare_seyda_regions.select on
     its coverage) and each special scene (prepare_intro_docks.keep_entity on its bounds, then select with its
     route polygon), by the same rules on the same entities, with nothing compiled. Returns (maps, entries,
-    models): entries are the region table rows plus the specials, as the image's flora pass takes them."""
+    models): entries are the region table rows plus the specials, as the image's flora pass takes them.
+    The legacy read path (--seyda-entities bsp); seyda_maps_from takes the scene entity list's lump and models."""
     import struct
-    from compact_bsp import entities as town_entities
     from player_hull import lumps
+    data = lumps(raw)
+    return seyda_maps_from(data[0], list(struct.iter_unpack('<9f7i', data[14])))
+
+
+def seyda_maps_from(entity_lump, models):
+    """seyda_maps on the town's entity lump and brush model rows (Seyda Neen's scene entity list, seyda_entities:
+    BUILD-SEYDA-ENTITY-BUS-48)."""
+    from compact_bsp import entities as town_entities
     from prepare_intro_docks import keep_entity
     from prepare_seyda_regions import SPECIALS, regions as seyda_layout, select_entities, special_polygon
-    data = lumps(raw)
-    models = list(struct.iter_unpack('<9f7i', data[14]))
-    town = town_entities(data[0])
+    models = list(models)
+    town = town_entities(entity_lump)
     entries = [dict(e) for e in seyda_layout()]
     maps = {e['name']: select_entities(town, models, e['coverage']) for e in entries}
     for name, bounds in SPECIALS:
@@ -348,12 +355,20 @@ def seyda_frame_rows(maps, names, default):
 
 
 def source_carrier_record(scene, raw):
-    """Validate a marked source-only transport; ordinary complete-town BSPs stay unchanged."""
+    """Validate a marked source-only transport; ordinary complete-town BSPs stay unchanged. The legacy read path
+    (--seyda-entities bsp); source_carrier_check takes the scene entity list's fields."""
     import hashlib
     from player_hull import lumps
-    from prepare_seyda_source import MARKER, FORMAT as SOURCE_FORMAT
     parts = lumps(raw)
-    fields = parse_entity(parts[0].decode('cp1252').split('}', 1)[0])
+    return source_carrier_check(scene, parts[0], [len(p) for p in parts], hashlib.sha256(raw).hexdigest())
+
+
+def source_carrier_check(scene, entity_lump, lump_sizes, carrier_sha256):
+    """source_carrier_record on the town's entity lump, its map's lump sizes and the map's SHA-256 (Seyda Neen's
+    scene entity list, seyda_entities: BUILD-SEYDA-ENTITY-BUS-48)."""
+    import hashlib
+    from prepare_seyda_source import MARKER, FORMAT as SOURCE_FORMAT
+    fields = parse_entity(bytes(entity_lump).decode('cp1252').split('}', 1)[0])
     if 'aw_source_carrier' not in fields:
         return None
     scene = Path(scene)
@@ -363,7 +378,7 @@ def source_carrier_record(scene, raw):
         # the standalone carrier tool (tools/prepare_seyda_carrier.py): its receipt binds the final carrier
         receipt = json.loads((scene / 'seyda-carrier.json').read_text())
         bound = receipt.get('source_only') is True and \
-            receipt.get('carrier_bsp_sha256') == hashlib.sha256(raw).hexdigest()
+            receipt.get('carrier_bsp_sha256') == carrier_sha256
     else:
         # the builder's bsp stage (prepare_mesh_bsp --seyda-source carrier): the later scene stages edit the
         # entity lump, so its scene record binds the source entities (SHA-256); no geometry may appear
@@ -373,9 +388,9 @@ def source_carrier_record(scene, raw):
     if fields['aw_source_carrier'] != MARKER or not bound or \
             receipt.get('source_entities_sha256') != hashlib.sha256(source_raw).hexdigest() or \
             source.get('format') != SOURCE_FORMAT or source.get('runtime_payload') is not False or \
-            any(parts[k] for k in (3, 7, 8)):
+            any(lump_sizes[k] for k in (3, 7, 8)):
         raise ValueError('Invalid non-runtime source carrier receipt or geometry (scene %s, seyda.bsp sha256 %s)'
-                         % (scene, hashlib.sha256(raw).hexdigest()))
+                         % (scene, carrier_sha256))
     return receipt
 
 
@@ -422,12 +437,23 @@ def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_in
     from chim.seyda import source_cell
     from harvest_build import town_origin
     scene, chim_world = Path(scene), Path(chim_world)
-    raw = (scene / 'id1/maps/seyda.bsp').read_bytes()
-    source_record = source_carrier_record(scene, raw)
+    # The town's entities: the scene entity list the writing stages publish (BUILD-SEYDA-ENTITY-BUS-48), or the
+    # legacy read path, the seyda.bsp carrier itself (--seyda-entities bsp). The same bytes either way.
+    import seyda_entities
+    if seyda_entities.mode() == 'bsp':
+        raw = (scene / 'id1/maps/seyda.bsp').read_bytes()
+        carrier_sha256 = hashlib.sha256(raw).hexdigest()
+        source_record = source_carrier_record(scene, raw)
+    else:
+        entity_lump, town_models, lump_sizes, carrier_sha256 = seyda_entities.source(scene)
+        source_record = source_carrier_check(scene, entity_lump, lump_sizes, carrier_sha256)
     out = ensure_external(Path(out), 'Seyda Neen CHIM town')
     out.mkdir(parents=True, exist_ok=False)
     (out / 'id1').mkdir()
-    maps, entries, models = seyda_maps(raw)
+    if seyda_entities.mode() == 'bsp':
+        maps, entries, models = seyda_maps(raw)
+    else:
+        maps, entries, models = seyda_maps_from(entity_lump, town_models)
     layout = seyda_layout()
     region_names = [e['name'] for e in layout]
     # the opening objects first (seconds): a missing edict refuses before the CHIM frame is read
@@ -485,10 +511,10 @@ def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_in
               'statics': statics, 'report': report, 'flora': flora_record,
               'activated_expected': expected_activated,
               'source': 'game data: the scene stage\'s complete converted town maps/seyda.bsp (sha256 %s); '
-                        'no legacy region maps' % hashlib.sha256(raw).hexdigest()}
+                        'no legacy region maps' % carrier_sha256}
     if source_record is not None:
         record['source'] = 'original source entity/model-box carrier; no complete town BSP compilation'
-        record['source_carrier_sha256'] = hashlib.sha256(raw).hexdigest()
+        record['source_carrier_sha256'] = carrier_sha256
     write_json(out / 'entities.json', record)
     print('Seyda Neen on CHIM: %d frame entities (%d actors fitted on the frame collision), special frames %s, '
           '%d statics checked against the CHIM frame; no legacy region maps'

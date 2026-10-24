@@ -1,10 +1,14 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-rc1 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Build turnaround first, 24 October 2026](#build-turnaround-first-24-october-2026)
+  - [Why the image is bigger than the original game](#why-the-image-is-bigger-than-the-original-game)
+  - [A disk layout that cannot dead-end](#a-disk-layout-that-cannot-dead-end)
+  - [The actors get the CHIM rule: store once, place many times](#the-actors-get-the-chim-rule-store-once-place-many-times)
 - [Test on Amiberry, 21 October 2026](#test-on-amiberry-21-october-2026)
 - [30-minute rebuilds, 20 October 2026](#30-minute-rebuilds-20-october-2026)
 - [Collision from what the game already knows, 20 October 2026](#collision-from-what-the-game-already-knows-20-october-2026)
@@ -88,6 +92,117 @@ _Last updated with AmiWind v0.0.47 (21 October 2026)._
 [CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) — 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
+
+## Build turnaround first, 24 October 2026
+
+Decided by the maintainer on 24 October 2026, during the v0.0.48 release builds: the next version starts with build
+turnaround, before game logic and MWScript. Slow builds hold back every fix and feature behind them, and MWScript
+will bring hundreds of small fix-and-rebuild loops.
+
+| What (measured on the v0.0.48 builds) | Took | Target |
+| --- | --- | --- |
+| A release candidate from the previous development build's caches | about 1 h 35 min (28 of 43 stages rebuilt) | minutes, when the candidate is that build plus its version |
+| The image step | 20 to 30 min, parts of it on 2 or 3 of 24 cores | the cores it has |
+| A bug register update with its tests | 5 to 6 min on one core | seconds (cached), under a minute (parallel) |
+| A gate with one failing test | 4 min | seconds (fail-fast) |
+
+### Why the image is bigger than the original game
+
+The original game's Data Files (Morrowind, Tribunal and Bloodmoon, with every video, sound and music file) take
+1,840 MB. The v0.0.48 release image takes about 4 GB unpacked:
+
+| Part of the v0.0.48 image | Size | Why |
+| --- | --- | --- |
+| Actor models | about 1.5 GB | Bloat: every character stores its own animation frames and skin (next section) |
+| CHIM world | about 2.0 GB | Mostly a trade: Morrowind computes lighting, collision and visibility while it runs, on a PC with a graphics card; a 68040 cannot, so the build computes them once and stores them (baked lighting, collision hulls, visibility, distant terrain) |
+| Interior store | about 320 MB | The same trade for the interiors |
+| Sound, intro video, music | about 390 MB | Converted for the Amiga |
+
+The actors are the part to cut. The world's share has never been measured by kind, so the next version also measures
+what each byte of the CHIM world is (geometry, lighting, collision, visibility, textures, distant terrain), to keep the
+trade that is needed and find anything stored twice.
+
+### A disk layout that cannot dead-end
+
+The image's partitions are planned by a small packer (`tools/layout_plan.py`). The release candidate builds of v0.0.48
+stopped three times on it: the plan was made before the image step had finished adding and sharing files, and the
+packer and its minimality check used two different rules for "fits". v0.0.48 plans once more from the staged files with
+one rule ([build output](BUILD_OUTPUT.md#disk-layout-the-fewest-partitions-each-with-headroom)). The next version makes
+it a solver that:
+
+- **never throws away finished work**: a layout problem leaves every built file valid, and a retry redoes the layout
+  only, in seconds, never the image or anything before it;
+- **treats the partition count as a result**: a MiniWind on a fraction of one partition, the whole island on two or
+  three, a larger world on many; fewer or more partitions than before is never an error by itself;
+- **always has a fallback**: the minimal layout first, then one more partition, then units moved by size, then a second
+  drive; a layout that is valid but not minimal is a warning with the bytes it would save, and only a payload that no
+  layout can hold within the Amiga's limits stops, before anything is written;
+- **uses one rule** for packing, checking and the free space left on each partition, tested with real payloads from a
+  MiniWind up to far beyond the island.
+
+### The actors get the CHIM rule: store once, place many times
+
+The world shrank when it moved to CHIM: a rock, a wall or a house is stored once and placed thousands of times. The
+actors never got that treatment, and they now take more space than the whole original game:
+
+| Measured on 24 October 2026 | Size |
+| --- | --- |
+| The original game's Data Files (Morrowind, Tribunal, Bloodmoon, with music, video and sound) | 1,840 MB |
+| `Morrowind.bsa`, the base game's meshes and textures | 297 MB |
+| AmiWind's actor models in the v0.0.48 release candidate image | about 1,500 MB |
+
+The reason is the model format. Morrowind animates people with a skeleton: one animation file is shared by every
+humanoid, and the body parts (head, hair, chest, hands) are separate meshes shared between characters and assembled
+when the game runs. The Quake model format the engine draws stores every vertex of every animation frame. Every NPC
+record with its own look is baked into its own model of 64 full frames of about 1,500 vertices, roughly 400 to 700 KB,
+for about 1,769 records ([ROOM-RESIDENT-MODELS-SIZE-48](bugs/ROOM-RESIDENT-MODELS-SIZE-48.md)). That is fast to draw
+on a 68040 and very large on disk, and on an Amiga every megabyte on disk is also loading time.
+
+Inside those 1,468 MB (4,225 complete models): 992 MB of animation frames and 587 MB of skin textures, one skin stored
+inside every model. Two design faults double it: each character has a standing model and a separate "mover" model
+for walking and fighting, although every character can move, so every body is stored twice, each copy with its own
+skin. Every character keeps all of its animation; the size comes from storing things once
+([where the modular NPC plan stands](MODULAR_NPCS.md#where-it-stands-24-october-2026)).
+
+The work, measured before and after each step:
+
+0. **One model per character, not two**: all animation groups in one set of frames, one skin.
+
+1. **Finish the modular NPCs.** The design has existed since 9 October 2026: [Modular NPCs: every body part stored
+   once, assembled per actor](MODULAR_NPCS.md) (1,726 distinct parts serve 3,500 appearances, each part used about 39
+   times; [NPC-BAKED-WHOLE-DUPLICATION-33](bugs/NPC-BAKED-WHOLE-DUPLICATION-33.md)). The builder half exists: the
+   parts library (`tools/npc_parts.py`, `--npc-models parts`, its own cache) converts each part once and composes
+   appearances from recipes, but it is not the default and is used for the gallery only, and it still writes one
+   complete model per actor, which saves build time but not disk. Never built: the residents made from the library
+   (stage 2) and the engine composing actors from the shared parts at load time (stage 3), the half that ships only
+   the parts. The room residents of v0.0.48 were baked whole, every one with its own frames. Stages 2 and 3 come
+   first; the disk then falls to the parts library.
+2. **Frames per role.** A merchant behind a counter never runs; frames nobody will see are not stored.
+3. **Compact frames**, and frames shared between characters wherever they come out the same.
+4. **A size budget** for the actors in the build's size ledger, so the payload can never again grow unnoticed.
+
+The work:
+
+1. **The AmiWind version keys nothing that does not show it.** A version-only change (a release candidate becoming
+   the final) rebuilt the whole CHIM world, because the world's records carried the version
+   ([BUILD-CHIM-KEY-VERSION-48](bugs/BUILD-CHIM-KEY-VERSION-48.md)). The CHIM label already has this treatment: a
+   label change keys only what shows the label, the rest counts its compatibility line
+   (`config/chim-compatibility.json`). The AmiWind version gets the same: it moves out of the CHIM world's records into
+   the image receipts, and a version-only change rebuilds only the stages whose outputs show it.
+2. **Other over-broad keys**: engine sources in the keys of stages that never use them
+   ([BUILD-ENGINE-SOURCE-KEY-BROAD-36](bugs/BUILD-ENGINE-SOURCE-KEY-BROAD-36.md)), and stages that read files their
+   key leaves out and so rerun on every reuse
+   ([BUILD-STAGE-READS-UNFINGERPRINTED-48](bugs/BUILD-STAGE-READS-UNFINGERPRINTED-48.md)).
+3. **Development builds carry the NPC gallery from the cache**, so a release candidate never builds it fresh.
+4. **The image step on its cores**
+   ([BUILD-IMAGE-WORLD-READ-FRAMES-47](bugs/BUILD-IMAGE-WORLD-READ-FRAMES-47.md)).
+5. **The bug register's own tools**: cached and parallel, with size warnings at the moment a bug is added.
+6. **A realistic resource plan**: it plans with the measured overlap of stages, not every stage at full speed at once.
+
+Each item is measured before and after on the same work and kept by a test. A release candidate is the last passing
+development build plus its version and notes, and a final is that candidate plus its version. The final is rebuilt
+from the finished candidate's caches: a test plans that build and fails if any stage but the engine and the image would
+run again, so the image step (assembled and checked fresh for every release) is the whole cost of a final.
 
 ## Test on Amiberry, 21 October 2026
 
@@ -301,6 +416,13 @@ as with the outdoors: the world first, then what is in it, then what happens in 
    the way the outdoors went: each mesh and texture stored once in the shared CHIM store and placed by reference in
    every room that uses it. That comes first; then the entrance audit, the tracker and the conversion batches
    described [below](#next-the-outdoors-complete-then-every-entrance-and-every-interior-18-october-2026).
+   Status, 22 October 2026: CHIM rooms are being built on the v0.0.48 line (design:
+   [INTERIORS ON CHIM](chim/INTERIOR_STORE.md)). Measured so far: 55 test rooms on a store of 20.7 MB plus 0.59 MB of
+   room maps, against 79.3 MB of today's room maps (about 3.7 times smaller); frame time, memory and door load time
+   in game are not measured yet. Next goal: every interior and its exterior entrances in the game without bloating
+   the image; then the game logic (MWScript) is measured.
+   The rooms set aside (water, lava, over the size limit, Levitate-only, no entrance area) and how each comes back are in
+   [the door graph page](chim/DOOR_GRAPH.md#rooms-set-aside-and-how-they-come-back).
 4. **Object and container state.** The game remembers what the player changes: an object moved, taken or
    dropped, a door unlocked, a container's contents. As in the original game, only the changes are stored, each
    against the object's original record in the game data, so an untouched object or an unopened chest costs
@@ -313,6 +435,26 @@ as with the outdoors: the world first, then what is in it, then what happens in 
    (details [below](#next-the-outdoors-complete-then-every-entrance-and-every-interior-18-october-2026)): the
    globals, journal indexes and each object's script values as small tables, scripts as checks that run only when
    their inputs change, the whole machine measured for its size and its cost per frame on the 68040 and 68060.
+   Status, 23 October 2026: started with audio, at the maintainer's request ("all of the audio is already in the
+   game so we should start utilizing it as per MWscript"); design and measurements in
+   [MWSCRIPT_BYTECODE.md](MWSCRIPT_BYTECODE.md). Every script of the three masters is measured (1,207 scripts,
+   942,627 bytes of source; 251 distinct functions); the builder compiles them into one file of typed bytecode
+   (156,838 bytes of code, 39 % of the original editor's compiled form) with the sounds, voices and music they name
+   mapped by index to the media catalogue's converted files. The engine's interpreter runs the audio, journal,
+   globals, timers and distance tests (142 scripts whole, more in part); everything else is "not yet", logged once.
+   EXPERIMENTAL: off by default (`dbg mwscript on`) until the in-game check. 55 % of the scripts also need AI packages,
+   inventory, combat, spells or positioning, and most need object state (step 4) first.
+7. **Tribunal and Bloodmoon included, the base game alone still buildable.** Decided for the project, 22 October
+   2026. The expansions are part of AmiWind: Bloodmoon's Solstheim (its 144 exterior cells, then its interiors from
+   the same shared interior store) and Tribunal's Mournhold, whose way in needs the scripts of step 6. A player who
+   owns only the base game can still build it. The builder's first search of the game data reports which masters it
+   found; if `Tribunal.esm` or `Bloodmoon.esm` is missing, it warns at once, names the missing expansion, and builds
+   without it, and the summary at the end of the build repeats the warning: "Bloodmoon (and/or Tribunal) was not
+   found and is not included in this build". Nothing that belongs to a missing expansion is referenced by the image.
+   Bloodmoon comes first (the maintainer, 23 October 2026: "an essential part of Morrowind"): right after the
+   base game's interiors and actors are in, Solstheim's 144 exterior cells go to CHIM the way Vvardenfell's did, then
+   its 96 rooms by batch from the same door graph and room store, with its actors. Both expansions' audio and video
+   are already converted into AmiWind by default, so what remains is the territory, not the media.
 
 ## Interiors: shell baked, takeable things as objects
 
@@ -333,6 +475,12 @@ group its untouched clutter into one object until the player touches it. Proven 
 picking ([HARVEST-INTERIOR-PICK-47](bugs/HARVEST-INTERIOR-PICK-47.md)). Order: interiors next after v0.0.47, then
 object and container state, then the game logic (MWScript compiled to bytecode). Report:
 [INTERIOR-PLACED-ITEMS-47](bugs/INTERIOR-PLACED-ITEMS-47.md).
+
+Status, 22 October 2026: CHIM rooms are being built on the v0.0.48 line (design:
+[INTERIORS ON CHIM](chim/INTERIOR_STORE.md)). Measured so far: 55 test rooms on a store of 20.7 MB plus 0.59 MB of
+room maps, against 79.3 MB of today's room maps (about 3.7 times smaller); speed and memory in game are not measured
+yet. Next goal: every interior and its exterior entrances in the game without bloating the image; then the game logic
+(MWScript) is measured.
 
 ## Distant views without pop-in, and the screen the Amiga need not redraw, 19 October 2026
 

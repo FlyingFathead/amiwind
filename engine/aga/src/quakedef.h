@@ -45,6 +45,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 /* Inspected Hlaalu stair ramps reach normal Z=0.69766 (~45.76 degrees). */
 #define AW_WALKABLE_Z 0.69f
+/* Step rules (docs/STEP_MOVEMENT.md, STEP-MOVEMENT-OPENMW-RULES-48): aw_step_rules 1 makes the walking player step
+ * and stand by Morrowind's rules as OpenMW states them; 0 (default) keeps the Quake rules above. OpenMW's walkable
+ * slope: normal z over cos 46 degrees (sMaxSlope 46, strictly greater). aw_step_rules lives in aw_walk.c. */
+#define AW_OPENMW_WALKABLE_Z 0.69465837f
+#define AW_WALKABLE(nz) (aw_step_rules.value ? (nz) > AW_OPENMW_WALKABLE_Z : (nz) >= AW_WALKABLE_Z)
 
 #include <math.h>
 #include <string.h>
@@ -302,6 +307,7 @@ extern	quakeparms_t host_parms;
 extern	cvar_t		sys_ticrate;
 extern	cvar_t		sys_nostdout;
 extern	cvar_t		developer;
+extern	cvar_t		aw_step_rules;	/* aw_walk.c: AW_WALKABLE, the step rules (docs/STEP_MOVEMENT.md) */
 
 extern	qboolean	host_initialized;		// true if into command execution
 extern	double		host_frametime;
@@ -413,6 +419,20 @@ void AW_PhotoConsoleReminder(void);
 int AW_PhotoKey(int key);
 int AW_CrosshairShown(void);
 void AW_CrosshairSet(int on);
+/* Crosshair colour (shape 0) and shape (shape 1): aw_crosshair_colour / aw_crosshair_shape. */
+int AW_CrosshairStyleCount(int shape);
+int AW_CrosshairStyle(int shape);
+const char *AW_CrosshairStyleName(int shape,int value);
+const unsigned char *AW_CrosshairColourRGB(int value);
+void AW_CrosshairStyleSet(int shape,int value);
+void AW_CrosshairDraw(int x,int y);   /* view.c: the crosshair cell at x,y (centre x+3,y+3), also the Options preview */
+/* Mouse sensitivity in tenths (Quake's sensitivity cvar; default 3.0 = 30), dbg sensitivity. */
+#define AW_SENSITIVITY_MENU_MIN 5
+#define AW_SENSITIVITY_MENU_MAX 100
+#define AW_SENSITIVITY_CONSOLE_MIN 1
+#define AW_SENSITIVITY_CONSOLE_MAX 200
+int AW_SensitivityTenths(void);
+void AW_SensitivitySetTenths(int tenths);
 void IN_AWClearButtons(void);
 
 void AW_ConsoleInit(void);
@@ -442,6 +462,10 @@ int AW_Unstuck(edict_t *p);
 void AW_SceneInit(void);
 void AW_DoorAudioInit(void);
 float AW_DoorSound(unsigned reference,int closing);
+/* Compiled game scripts (aw_mwhost.c, aw_mwvm.c; docs/MWSCRIPT_BYTECODE.md), experimental: aw_mwscript 0 by default. */
+void AW_MwscriptInit(void);
+void AW_MwscriptTick(float dt);
+int AW_MusicScriptTrack(int track);
 void AW_SceneTick(void);
 void AW_SceneryClear(void);
 void AW_SceneryBegin(const char *entities);
@@ -491,6 +515,7 @@ void AW_UIInit(void);
 int AW_ModalWorldFrozen(void);
 extern int (*aw_death_prompt_active)(void); /* aw_view: finished death animation, choice still open */
 int AW_ModalWorldHidden(void);
+extern int (*aw_menu_fullscreen)(void);   /* aw_menu.c: the full-screen Options panel is open */
 int AW_ModalBlackBackground(void);
 int AW_UIMode(void);
 void AW_SceneCancelTransition(void);
@@ -519,6 +544,16 @@ extern const char *(*aw_hand_to_hand_name)(void);   /* aw_icons.c: GMST sSkillHa
 extern int (*aw_inventory_row_icon)(int slot,const char *id,int equipped,int x,int y);   /* aw_icons.c */
 int AW_UILogo(int,int);
 void AW_UILoading(void);
+void AW_UIRoomRefused(const char *first,const char *second);
+int AW_SceneRoomFastMb(const char *target);
+int AW_SceneFrameFastMb(const char *target);
+int AW_SceneRoomRefused(void);
+int AW_SceneRoomRefuse(const char *target);
+int AW_SceneFrameRefuse(edict_t *p,const char *target);   /* aw_scene.c: a marked CHIM frame refused on less RAM */
+int AW_SceneEntryRefuse(const char *target,const float *point,int to_menu);   /* CHIM-32MB-SAVE-ENTRY-48 */
+int AW_SceneSaveEntryRefuse(const char *scene,const float *position);
+int AW_SceneMapRefuse(const char *name);
+extern long aw_fast_ram_found_mb;
 int AW_LoadingScreen(void);
 typedef enum { AW_LOADING_NORMAL, AW_LOADING_BLANK, AW_LOADING_FROZEN } aw_loading_style_t;
 void AW_SetNextLoadingStyle(aw_loading_style_t);

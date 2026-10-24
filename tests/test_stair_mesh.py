@@ -162,7 +162,12 @@ class StairMeshTests(unittest.TestCase):
         cv, cf = ramp(lift=64.)       # 16 units over the nosings after scaling: higher than a step
         base, _, _ = collision_pieces(cv, cf, profile(), stairs='on')
         self.assertTrue(failures(base, (vv, vf)))
-        pieces, exact, note = collision_pieces(cv, cf, profile('mesh'), stairs='on', visible=(vv, vf))
+        record = {}
+        pieces, exact, note = collision_pieces(cv, cf, profile('mesh'), stairs='on', visible=(vv, vf), record=record)
+        # the replaced flight's collision triangles, for the collision surface gate (CHIM-HULL-SURFACE-RESURVEY-48)
+        self.assertTrue(record['removed'])
+        self.assertIn('%d collision triangles of the flights removed' % len(record['removed']), note)
+        self.assertTrue(all(0 <= i < len(cf) for i in record['removed']))
         self.assertIn('1 ramps, 0 tread blocks', note)
         self.assertIn('check: passed', note)
         self.assertIs(exact, True)
@@ -210,8 +215,10 @@ class StairMeshTests(unittest.TestCase):
         cv2 = np.vstack((cv, roof_v))
         cf2 = np.vstack((cf, roof_f + [len(cv), len(cv), len(cv), 0]))
         a = collision_pieces(cv2, cf2, profile(), stairs='on', visible=(vv, vf))
-        b = collision_pieces(cv2, cf2, profile('mesh'), stairs='on', visible=(vv, vf))
+        record = {}
+        b = collision_pieces(cv2, cf2, profile('mesh'), stairs='on', visible=(vv, vf), record=record)
         self.assertIn('method 0 kept', b[2])
+        self.assertNotIn('removed', record)      # method 0's collision: nothing removed
         self.assertTrue(same(a[0], b[0]))
 
     def test_one_ramp_per_run(self):
@@ -401,16 +408,189 @@ class StairCheckReportTests(unittest.TestCase):
 
 
 @unittest.skipUnless(READY, 'numpy and scipy required')
+class AuthoredRampTests(unittest.TestCase):
+    """An authored 45-degree ramp (a RootCollisionNode over 32-unit risers, as the Hlaalu stairs) stays walkable after
+    conversion: every upward collision face over it has normal z at least 0.69 (tools/authored_ramps.py)."""
+
+    def top_faces_over(self, pieces, cv, cf):
+        from authored_ramps import ramp_faces, ramp_samples, _columns
+        pts, _ = ramp_samples(cv, cf, ramp_faces(cv, cf))
+        lows, highs, tops = _columns(pieces, pts)
+        out = []
+        for i in range(len(pts)):
+            near = np.flatnonzero((highs[:, i] > pts[i, 2] - .5) & (highs[:, i] < pts[i, 2] + 8.5))
+            if len(near):
+                out.append(float(tops[near[np.argmax(highs[near, i])], i]))
+        return out
+
+    def test_45_degree_ramp_stays_walkable(self):
+        import mesh_geometry as mg
+        from authored_ramps import ramp_faces, invented_ramp_faults
+        from prepare_area import interior_visual_profile
+        vv, vf = flight()
+        cv, cf = ramp(lift=0.)
+        self.assertEqual(len(ramp_faces(cv, cf)), 2)        # the authored ramp: 45 degrees, nz 0.707
+        for name, prof in (('CHIM', profile()), ('CHIM method 1', profile('mesh')), ('room i/', interior_visual_profile(
+                'meshes/i/in_hlaalu_hall_stairsl.nif', 'balmora')), ('room other', {})):
+            with self.subTest(profile=name):
+                from stair_mesh import collision_pieces
+                pieces, _, _ = collision_pieces(cv, cf, prof, stairs='on', visible=(vv, vf))
+                tops = self.top_faces_over(pieces, cv, cf)
+                self.assertTrue(tops)
+                self.assertGreaterEqual(min(tops), 0.69)
+                self.assertEqual(invented_ramp_faults(pieces, cv, cf), [])
+                if prof.get('stair_collision'):
+                    self.assertEqual(failures(pieces, (vv, vf)), [])
+
+    def test_a_convex_piece_over_the_ramp_becomes_plates(self):
+        from scipy.spatial import ConvexHull
+        from authored_ramps import keep_authored_ramps, invented_ramp_faults, stair_ramp_faces
+        vv, vf = flight()
+        # the ramp and a 64-unit parapet at its top edge in one collision mesh
+        v, f = [], []
+        quad(v, f, [(0, 0, 0), (192, 0, 192), (192, 160, 192), (0, 160, 0)])
+        quad(v, f, [(192, 0, 192), (192, 0, 256), (192, 160, 256), (192, 160, 192)])
+        cv, cf = mesh(v, f)
+        pts = cv[:, :3] * .25
+        hull = ConvexHull(np.vstack((pts, pts + [-.2, 0, 0])))
+        bad = [(np.vstack((pts, pts + [-.2, 0, 0])), hull, list(range(len(cf))), 0.)]   # one piece over both
+        ids = stair_ramp_faces(cv, cf, vv, vf)
+        self.assertEqual(len(ids), 2)
+        faults = invented_ramp_faults(bad, cv, cf, ids)
+        self.assertTrue(faults)
+        self.assertIn('steep', {x['kind'] for x in faults})
+        kept, exact, note = keep_authored_ramps(cv, cf, bad, False, ids)
+        self.assertIn('authored plates', note)
+        self.assertEqual(invented_ramp_faults(kept, cv, cf, ids), [])
+        self.assertTrue(exact)
+        self.assertGreaterEqual(min(self.top_faces_over(kept, cv, cf)), 0.69)
+
+    def test_slopes_off_a_flight_are_not_stair_ramps(self):
+        from authored_ramps import stair_ramp_faces
+        vv, vf = flight()
+        v, f = [], []
+        quad(v, f, [(1000, 0, 0), (1192, 0, 192), (1192, 160, 192), (1000, 160, 0)])   # far from the flight
+        cv, cf = mesh(v, f)
+        self.assertEqual(len(stair_ramp_faces(cv, cf, vv, vf)), 0)
+
+
+@unittest.skipUnless(READY, 'numpy and scipy required')
+class KnownMeshTests(unittest.TestCase):
+    """The meshes method 1 cannot fix yet are listed as one class (config/stair-check-known.json), never dropped."""
+
+    def test_listed_meshes_are_reported_not_stopped(self):
+        import json
+        import tempfile
+        import stair_mesh
+        failed = {'flights': 1, 'ships_method': 0, 'how': 'method 0 kept',
+                  'failed': [{'flight': 0, 'checks': {'floor': 1}, 'first': {'check': 'floor', 'point': [0, 0, 0]}}]}
+        good = {'flights': 1, 'ships_method': 1, 'how': 'replaced', 'failed': []}
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / 'work' / 'rca').mkdir(parents=True)
+            (out / 'work' / 'rca' / stair_mesh.REPORT_NAME).write_text(json.dumps({'meshes': [
+                dict(failed, mesh='meshes/x/ex_de_ship.nif'), dict(good, mesh='meshes/x/ok.nif'),
+                dict(good, mesh='meshes/r/siltstrider.nif')]}))
+            report = stair_mesh.require(out)
+            self.assertEqual(report['status'], 'known')
+            self.assertEqual([x['mesh'] for x in report['known']], ['meshes/x/ex_de_ship.nif'])
+            self.assertEqual(report['known_passing'], ['meshes/r/siltstrider.nif'])
+            self.assertEqual(report['known_class'], 'CHIM-STAIR-METHOD1-UNFIXED-48')
+            with self.assertRaises(ValueError):
+                stair_mesh.require(out, known={})
+
+    def test_known_list_is_the_registered_class(self):
+        import json
+        data = json.loads((ROOT / 'config/stair-check-known.json').read_text(encoding='utf-8'))
+        # 11 measured on 22 October; the 2 the dev2 verify run found pass since (CHIM-STAIR-METHOD1-UNFIXED-48)
+        self.assertEqual(len(data['meshes']), 11)
+        self.assertNotIn('meshes/f/flora_tree_gl_06.nif', data['meshes'])
+        self.assertNotIn('meshes/x/ex_t_slavemarket.nif', data['meshes'])
+        self.assertTrue((ROOT / 'docs/bugs' / (data['class'] + '.md')).is_file())
+
+    def test_flight_unit_finds_the_drawn_flights(self):
+        import tempfile
+        import stair_mesh
+        from mwad.scene import pack_geometry
+        vv, vf = flight()
+        packet = pack_geometry([[*map(float, p[:3]), 0., 0., 255, 255, 255, 255] for p in vv],
+                               [tuple(map(int, t)) for t in vf], 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'a.mwpak'
+            path.write_bytes(packet)
+            model = {'offset': 0, 'bytes': len(packet), 'sha256': __import__('hashlib').sha256(packet).hexdigest()}
+            self.assertEqual(stair_mesh.flight_unit((model, str(path))), 1)
+            bv, bf = box((0, 0, 0), (64, 64, 64))
+            packet = pack_geometry([[*map(float, p[:3]), 0., 0., 255, 255, 255, 255] for p in bv],
+                                   [tuple(map(int, t)) for t in bf], 1)
+            path.write_bytes(packet)
+            model = {'offset': 0, 'bytes': len(packet), 'sha256': __import__('hashlib').sha256(packet).hexdigest()}
+            self.assertEqual(stair_mesh.flight_unit((model, str(path))), 0)
+
+
+@unittest.skipUnless(READY, 'numpy and scipy required')
+class AuthoredCollisionFlightTests(unittest.TestCase):
+    """CHIM-STAIR-METHOD1-UNFIXED-48: a drawn level face the mesh's own RootCollisionNode holds nothing under is no
+    tread (the original stands nobody there: OpenMW collides with the RootCollisionNode alone)."""
+
+    def test_treads_need_the_authored_collision_under_them(self):
+        from stair_mesh import flights
+        v, f = flight()
+        self.assertEqual(len(flights(v, f)), 1)
+        self.assertEqual(len(flights(v, f, collision=(v, f))), 1)              # the drawn mesh collides
+        self.assertEqual(len(flights(v, f, collision=box((0, 0, 0), (192, 160, 192)))), 1)   # a block under it
+        self.assertEqual(flights(v, f, collision=box((-400, -400, 0), (-300, -300, 400))), [])  # a trunk beside it
+        # collision under the first two treads only: two levels, no flight
+        self.assertEqual(flights(v, f, collision=box((0, 0, -10), (64, 160, 64))), [])
+
+    def test_tree_roots_are_no_flight(self):
+        """The four root faces of flora_tree_gl_06 (converter units x 4: source units) read as a flight of three
+        levels; its RootCollisionNode (the trunk) holds nothing under them."""
+        from stair_mesh import flights
+        roots = [[(8.75, 136.39, 86.68), (-5.86, 147.76, 85.87), (-1.0, 110.45, 89.67)],
+                 [(22.42, 124.4, 85.22), (8.75, 136.39, 86.68), (-1.0, 110.45, 89.67)],
+                 [(-13.06, 88.05, 82.14), (-0.22, 135.31, 86.35), (-4.94, 135.43, 85.96)],
+                 [(-13.06, 88.05, 82.14), (-6.87, 87.25, 82.56), (-0.22, 135.31, 86.35)]]
+        v = [tuple(4. * c for c in p) for t in roots for p in t]
+        f = [[3 * k, 3 * k + 1, 3 * k + 2, 0] for k in range(4)]
+        v, f = mesh(v, f)
+        self.assertEqual(len(flights(v, f)), 1)
+        self.assertEqual(flights(v, f, collision=box((-40, 600, 0), (40, 680, 800))), [])
+
+    def test_method_1_takes_the_flights_and_proof_from_the_drawn_mesh(self):
+        """A visual recipe's reduced mesh (here the drawn steps 20 units higher) is what method 0's visible-tread rule
+        sees; the flights, their stairway mesh and the check come from the mesh as drawn, as the build's stair check
+        (mesh_report) reads it: built on the reduced mesh, the slave market's ramp left a drawn tread 18.8 units over
+        its floor."""
+        from stair_mesh import collision_pieces_mesh
+        v, f = flight()
+        up = v.copy()
+        up[:, 2] += 80.
+        reduced = (up, f)
+        pieces, _, note = collision_pieces_mesh(v, f, profile('mesh'), visible=reduced, drawn=(v, f), authored=True)
+        self.assertEqual(failures(pieces, (v, f)), [], note)
+        old, _, _ = collision_pieces_mesh(v, f, profile('mesh'), visible=reduced)
+        self.assertNotEqual(failures(old, (v, f)), [])
+
+
+@unittest.skipUnless(READY, 'numpy and scipy required')
 class StairCollisionSwitchTests(unittest.TestCase):
-    def test_switch_defaults_off_and_refuses_unknown(self):
+    def test_switch_defaults_to_method_1_and_refuses_unknown(self):
+        # method 1 is the default since v0.0.48-dev2 (decided for the project 22 October 2026); 0 stays selectable
         import os
         from unittest.mock import patch
-        from stair_collision_env import stair_collision_method, STAIR_COLLISION_VARIABLE
+        from stair_collision_env import (stair_collision_method, export_stair_collision_method,
+                                         STAIR_COLLISION_VARIABLE)
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop(STAIR_COLLISION_VARIABLE, None)
-            self.assertEqual(stair_collision_method(), '0')
-        with patch.dict(os.environ, {STAIR_COLLISION_VARIABLE: '1'}):
             self.assertEqual(stair_collision_method(), '1')
+            export_stair_collision_method('0')
+            self.assertEqual(os.environ[STAIR_COLLISION_VARIABLE], '0')
+            self.assertEqual(stair_collision_method(), '0')
+            export_stair_collision_method('1')
+            self.assertNotIn(STAIR_COLLISION_VARIABLE, os.environ)
+        with patch.dict(os.environ, {STAIR_COLLISION_VARIABLE: '0'}):
+            self.assertEqual(stair_collision_method(), '0')
         with patch.dict(os.environ, {STAIR_COLLISION_VARIABLE: 'walk'}):
             with self.assertRaises(ValueError):
                 stair_collision_method()

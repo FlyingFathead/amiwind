@@ -1,6 +1,6 @@
 # Voiced dialogue: event lookup and runtime plan
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -13,6 +13,12 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [Automatic cell-handoff voice continuity candidate](#automatic-cell-handoff-voice-continuity-candidate)
 
 <!-- contents end -->
+
+**v0.0.48-dev2:** the [NPC voice table](NPC_VOICE_TABLE.md) gives every NPC record its
+Hello, Idle, Hit, Attack and Flee lines and its conversation greeting by the first-eligible rule below,
+the static filters decided by the builder and the rest as run-time condition records
+([NPC-GREETINGS-LIBRARY-MUTE-48](bugs/NPC-GREETINGS-LIBRARY-MUTE-48.md)); Intruder and Thief are in the
+table but have no engine event yet. The notes below describe the earlier bounded audition.
 
 AmiWind currently auditions one generic voiced HELLO for a small NPC set. The
 source records contain a wider event vocabulary, ordered response records,

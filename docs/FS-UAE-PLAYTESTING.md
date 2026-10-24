@@ -1,6 +1,6 @@
 # AmiWind playtesting with FS-UAE
 
-_Last updated with AmiWind v0.0.46 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -135,8 +135,9 @@ The tested setup uses:
 - JIT enabled
 - Fastest possible CPU speed
 - 2 MiB Chip RAM
-- 128 MiB Zorro III Fast RAM (16 MiB before 21 October 2026; 16 MiB, `zorro_iii_memory = 16384`, is the
-  smallest machine the game runs on)
+- 32 MiB Zorro III Fast RAM, the safe minimum for the whole game (since 23 October 2026; 128 MiB from 21 October,
+  16 MiB before); more is used automatically; 16 MiB, `zorro_iii_memory = 16384`, still starts with a warning at
+  boot and loads more often ([why 32 MB](REAL_HARDWARE.md#why-32-mb-of-fast-ram))
 - Kickstart 3.1 for A1200
 - AmiWind bootable HDF
 - Emulated floppy-drive mechanical sounds disabled
@@ -192,7 +193,7 @@ uae_cpu_24bit_addressing = false
 chip_memory = 2048
 slow_memory = 0
 fast_memory = 0
-zorro_iii_memory = 131072
+zorro_iii_memory = 32768
 
 # Disable emulated floppy-drive mechanical sounds
 floppy_drive_volume = 0
@@ -261,10 +262,10 @@ check that the configuration contains:
 
 ```ini
 cpu = 68040-NOMMU
-zorro_iii_memory = 131072
+zorro_iii_memory = 32768
 ```
 
-(or another Zorro III size; 16384 is the 16 MiB minimum).
+(or another Zorro III size; 32768 is the 32 MiB safe minimum, 16384 the 16 MiB that still starts with a warning).
 
 Do not use plain:
 
@@ -316,7 +317,7 @@ For compatibility or minimum-spec testing, use a separate emulator configuration
 
 [resources/emulators/AmiWind-SlowAccelerator-FS-UAE.fs-uae](../resources/emulators/AmiWind-SlowAccelerator-FS-UAE.fs-uae)
 plays the game roughly like an A1200 with a TF1260-class accelerator: a 68040 at about
-50 MHz with its FPU, the same 2 MB Chip RAM and 128 MB Zorro III RAM as the normal preset.
+50 MHz with its FPU, the same 2 MB Chip RAM and 32 MB Zorro III RAM as the normal preset.
 It is the normal preset with only the CPU speed lines changed:
 
 ```ini

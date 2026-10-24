@@ -272,7 +272,7 @@ class BudgetTests(unittest.TestCase):
         self.assertLess(at, aga.index('require_stairs(boot/'))
         self.assertLess(at, aga.index('world_heap=audit_world_map_heap_with_receipt('))
         self.assertGreater(at, aga.index('chim_frames = chim_frame_maps(args.chim_world'))
-        self.assertIn("('engine-map-limits', lambda: check_engine_map_limits(id1, removed))",
+        self.assertIn("('engine-map-limits', lambda: check_engine_map_limits(id1, removed, jobs))",
                       (ROOT / 'tools/payload_preflight.py').read_text())
         self.assertIn('budget_problems()', (ROOT / 'tools/build_preflight.py').read_text())
 

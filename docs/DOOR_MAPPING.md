@@ -1,6 +1,6 @@
 # Original door mapping
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 The converter reads base DOOR records and their placed CELL references from the
 maintainer's Morrowind.esm. A door's model/name/script and open/close sound IDs belong
@@ -11,8 +11,9 @@ base model: the other side is a separate placed reference.
 | Source field | Meaning | AmiWind conversion |
 | --- | --- | --- |
 | DOOR NAME/MODL/FNAM | Base ID, model and displayed name | Retained in the private catalogue |
-| DOOR SCRI/SNAM/ANAM | Script, opening sound, closing sound | Audited; general script/lock/audio handling still pending |
+| DOOR SCRI/SNAM/ANAM | Script, opening sound, closing sound | Sounds played by load doors and hinged doors; scripts not run (flagged in the hinged door table) |
 | CELL FRMR/DATA/XSCL | Placed ID, XYZ/rotation and scale | Stable audit identity and transformed mesh bounds |
+| CELL FLTV/KNAM/TNAM | Lock level, key, trap of a placed door | Hinged door table: locked doors stay shut (see below) |
 | DODT | Destination XYZ and rotation | Quarter-scale coordinates and destination yaw |
 | DNAM | Named interior destination | Empty/absent means an exterior world position |
 
@@ -46,7 +47,173 @@ health/hand state and queue at most one map load per activation.
 Hostile-pursuit, companion eligibility and original teleport-door rules are recorded in the planned [NPC cell-traversal requirements](NPC_CELL_TRAVERSAL.md); no cross-boundary NPC gameplay is claimed as shipped.
 
 This remains one active BSP at a time. Door mapping does not implement general lock/key rules, ownership,
-character-creation gates or persistent reference state. Original transition sound IDs are catalogued but not yet played.
+character-creation gates or persistent reference state.
+
+## Ordinary hinged doors (v0.0.48-dev2)
+
+A placed DOOR reference without a destination (no DODT) is an ordinary hinged door: the game has 1,026 of them in
+Morrowind.esm, 729 unlocked. Before v0.0.48-dev2 they were drawn and solid but never opened (AW-20260928-12); only
+the census hall door had its own story rule, which snapped it open. Now the use key (E) opens one and the next use
+closes it, the census hall door included: the story only holds its lock ([the worked example](#the-worked-example-the-census-hall-door)).
+
+How it behaves (rules learned from OpenMW, our own code: `apps/openmw/mwclass/door.cpp` `Door::activate` and
+`apps/openmw/mwworld/worldimp.cpp` `World::rotateDoor`):
+
+- The door turns about its placement's origin and the Z axis (the model's hinge) by 90 degrees, at 90 degrees a
+  second: one second to open, one to close. The original's Z rotation grows by 90; AmiWind's yaw is its negative,
+  so an opening door's yaw falls by 90.
+- Opening plays the DOOR record's Open Sound (SNAM), closing its Close Sound (ANAM), at the door. A use while it
+  turns reverses it from where it is.
+- A step that would turn the door into the player or a solid actor is undone: the door holds and its sound stops,
+  and it goes on once they step aside. It never pushes anyone and never closes on the player. When it holds against
+  the player, the screen says "The door is obstructed. Step aside." once for that hold. These words are AmiWind's:
+  the original holds the door without a word (no game setting, script or message in Morrowind.esm says anything;
+  OpenMW's `World::rotateDoor` only stops the turn). They come from the census hall door's earlier story rule.
+- A locked door (a lock level above 0, or a key named: the rule OpenMW uses for content files) stays shut and plays
+  the original `LockedDoor` sound; the prompt says "Locked". Keys, lockpicks, Open spells and traps are not in the
+  game yet: the table records them (226 doors name a key, 166 a trap, 90 of those unlocked; an unlocked trapped
+  door opens without its trap for now). The 3 doors with a script open like the others (scripts are not run). A
+  story rule can hold a door's lock in place of its lock level (`aw_hinged_story`, today only the census hall door).
+- The prompt shows the door's name (DOOR FNAM) with "Open: E", "Close: E" or "Locked"; the reach is the load
+  doors' 56 units, and an actor or object in front hides the door.
+- Doors close again when the map is loaded again; open doors are not in saves yet (the census hall door is: the
+  story keeps whether it stands open).
+
+The builder writes `id1/hinged-doors.txt` (format AWHD1) in the door-audio step (`tools/prepare_door_audio.py`):
+the converted samples (the same `sound/doors/d<hash>.wav` files as the load doors), one row per DOOR record (open
+and close sample, name) and one per placed door (reference, record, lock level, flags: locked, key, trap,
+script). The engine (`engine/aga/src/aw_hinged_door.c`) reads it once (about 40 KB of fixed tables) and finds a map's
+doors by reference:
+
+| Door form | Where | How it turns |
+| --- | --- | --- |
+| Room maps (legacy room maps and the CHIM-native towns' room maps, `chim_rooms.py`) | each placement is a `func_wall` edict at the placement's origin and yaw | the edict's yaw: drawn by `R_RotateBmodel`, collided by `SV_ClipMoveToEntity`, relinked with the rotation box |
+| CHIM frame maps outdoors | the door is a chunk placement (no edict) | its placement's yaw, collision sine and cosine (and the 0.8 placement matrix) on every copy in the zone; its box covers every pose, so nothing is relinked; a chunk loaded again starts at the door's present pose |
+| CHIM rooms (`maps/<room>.chim` on the interior store, [INTERIOR_STORE.md](chim/INTERIOR_STORE.md); the batch rooms of `--room-batches` too) | the door is a placement of the room record `chimi/rooms/<room>.crm`, which keeps its reference (no edict) | `chim_room.c` asks the same hook as the frames when the room loads; the placement's yaw, sine and cosine and matrix (`ChimRoom_DoorYaw`), its collision through the placed path (`ChimRoom_DoorClip`); its box covers every pose. An activated object's collision-only marker edict for the same reference (the census hall door's) stops being solid |
+| Legacy town region maps (retired) | captured scenery | a hinged door is kept out of the capture and works as a room map door |
+
+Not supported yet: doors with a
+tilt (12 in the game; their tilt is baked, so they turn about the world Z axis), Tribunal and Bloodmoon doors (the
+table reads Morrowind.esm only). Collision against a turned door has the known limit of every yawed model
+(CHIM-YAW-PLAYER-BOX-TURNS-46: the player's box turns with it, up to about 2.9 units at 45 degrees).
+
+Cost on a 68040: a closed or open door does nothing per frame. The prompt looks only when a door is within reach
+(one point trace); a turning door (one second) is turned and tested against the actors near it each frame.
+
+For testing, `dbg door` opens or closes the door under the crosshair even when it is locked; `dbg door status` and
+`dbg door list` show the table and this map's doors.
+
+### The worked example: the census hall door
+
+The first door a new game meets after the boat is the one out of the census office's first room, toward the guard
+and the next building: you cannot leave that room without your release papers. It is the model for every other
+door: the same record fields, the same table rows, the same turn. Its values, read from Morrowind.esm:
+
+**The DOOR record** `chargen door hall`: name (FNAM) "Door"; model `d\In_C_door_wood_square.nif`; Open Sound (SNAM)
+"Door Latched Two Open" (`Fx\trans\drlatch_opn2.wav`); Close Sound (ANAM) "Door Latched One Close"
+(`Fx\trans\drlatch_cls.wav`); no script (SCRI).
+
+**The placement**: reference 172860 in "Seyda Neen, Census and Excise Office"; position 258.30, 255.69, 189.97; Z
+rotation 3.14 radians (180 degrees); scale 1.02; lock level 100 (FLTV), no key (KNAM), no trap (TNAM); no
+destination (DODT), so it is a hinged door, not a load door. The model's origin is its hinge edge, so the door turns
+about the placement's origin. In the census map (quarter scale, the cell's own origin) it stands at about 64.6,
+63.9, 47.5 with AmiWind yaw -180 (the negative of the original's Z rotation); opening takes the original's Z
+rotation to 270 degrees, AmiWind's yaw to -270.
+
+**Why it is shut, in the original**: the door itself has no script. It is locked at level 100, and the door guard
+next to it ("chargen door guard") runs the script `CharGenDoorGuardTalker`: within 180 units of the player he checks
+whether the player carries the papers (the item `CharGen StatsSheet`, taken from the desk). Without them he repeats
+his "no further without your papers" line (`vo\Misc\CharGen Door1.wav`) every few seconds; with them he says his
+second line (`CharGen Door2.wav`, go on to the next building and see Sellus Gravius), unlocks "CharGen Door Hall" and
+plays the "Open Lock" sound. From then on it is an ordinary unlocked door.
+
+**How AmiWind does it today** (`engine/aga/src/aw_opening.c`, `aw_hinged_door.c`):
+
+- The papers: the desk's papers (reference 172859, `AW_REF_CENSUS_PAPERS`) are read and taken in the opening's
+  reader; `AW_Papers()` is then true.
+- The guard: the opening's proximity rule speaks `chargen_door1` every 3 seconds while the player is within 45 units
+  (180 game units) without papers, and `chargen_door2` with them; when he has spoken it, `aw_story.hall` is set (the
+  original's Unlock). Talking to him (E) does the same. The "Open Lock" sound is not played yet.
+- The door: a hinged door like every other (its row is in the table: lock level 100, flag locked). The story hook
+  `AW_OpeningHingedStory` holds its lock: locked while `aw_story.hall` is 0, unlocked after. Before that it was a
+  separate story rule that snapped the door to yaw -90 (the other side: DOOR-HALL-SWING-DIRECTION-48); now it turns
+  by the original's rule.
+- Whether it stands open is kept in the save (`aw_story.hall_open`): a loaded game or the census map loaded again
+  shows it as it was left.
+
+**How the builder carries it**:
+
+- `id1/hinged-doors.txt` (AWHD1, the door-audio step): a `W` row for each of its two samples (`doors/d<hash>.wav`,
+  the same files as the load doors), a `B` row for `chargen door hall` (open sample, close sample, "Door") and the
+  row `D 172860 <B> 100 1` (lock level 100, flag 1 = locked); the `L` row names the `LockedDoor` sample.
+- `id1/door-sounds.txt` (AWSFX2) keeps a row for it too (the opening scene's links and the hall door), as before.
+- The census map `maps/census.bsp` (`tools/prepare_census.py`, a room map in the default build: the CHIM rooms are
+  made from the area rooms, which leave the census office and the prison ship to their own converters): the door is
+  a `func_wall` edict with `"aw_ref" "172860"`, its own brush model at the placement's origin and its yaw.
+- In a CHIM room it would be the room record's placement with reference 172860, plus the collision-only marker edict
+  every activated object keeps (`tools/chim/frame_map.py keep_activated`); the hinged door code takes the placement
+  and makes the marker non-solid. It is not a load door, so it has no door bank row.
+
+**What the player sees and hears**:
+
+- Before the papers: aiming at it within reach (56 units) shows "Door" and "Locked". The use key plays the locked
+  sound and the line "The door is locked. Show your papers to the guard."; nothing turns. The guard repeats his line.
+- After the guard's second line: "Door" and "Open: E". The use key plays the latch opening sound at the door and it
+  turns 90 degrees in one second; its collision turns with it, so the doorway is free as it opens. "Close: E" turns
+  it back with the latch closing sound.
+- Standing in its swing: it turns until it would touch you and holds there, its sound stops, and the screen says
+  "The door is obstructed. Step aside." once; step back and it finishes.
+
+**Each form**:
+
+| Form | The door is | It turns by |
+| --- | --- | --- |
+| Room map (`census.bsp`, the default build) | edict `func_wall` with `aw_ref` 172860 | the edict's yaw (`R_RotateBmodel`, `SV_ClipMoveToEntity`, relinked with its rotation box) |
+| CHIM room (if the office became one) | room record placement, reference 172860 | `ChimRoom_DoorYaw` / `ChimRoom_DoorClip`; the marker edict is not solid |
+| CHIM frame (outdoor doors, e.g. the census gates) | chunk placement | `ChimChunks_DoorYaw` / `ChimChunks_DoorClip` on every copy |
+
+**Checking it**: `dbg door status` prints the table and this map's doors ("Hinged doors: 1026 in the table, N here
+(E room map edicts, C CHIM placements), 0 moving"); `dbg door list` prints each, for this door a line like
+`172860 edict 0/90 deg lock 100 locked (story) at 64 63 47` before the papers and without "locked" after;
+`dbg door` aimed at it turns it whatever the lock (testing only). In a CHIM room, `chim` also says how many of the
+room's placements are hinged doors.
+
+### In-game check (pending)
+
+In FS-UAE, on a build with this change (v0.0.48-dev2 or later). The census office's doors come first: they are the
+first a new game meets.
+
+1. **New game, at the desk without the papers: the hall door refuses; take the papers: it opens.** Start a new game
+   and go up to the census office's first room. Before taking the papers, aim at the hall door (172860, beside the
+   door guard): "Door", "Locked"; press E: the locked sound and "The door is locked. Show your papers to the
+   guard."; the guard repeats his line. Take the papers from the desk, walk up to the guard: he says his second
+   line. Aim again: "Open: E"; press E: the latch opening sound, the door swings 90 degrees in about one second; walk
+   through. Note which way it swings against the original (DOOR-HALL-SWING-DIRECTION-48). Close it with E: the latch
+   closing sound.
+2. **The hall door holds against you.** Open it, stand in its swing, close it: it stops against you, its sound stops,
+   "The door is obstructed. Step aside." shows once; step back: it shuts. The same while opening.
+3. **The hall door keeps its state.** Leave it open, save, load: it is still open. Go out and come back in: still
+   open.
+4. Seyda Neen, Census and Excise Office: the Sturdy Arched Door (reference 397586, unlocked). Open it, hear "Door
+   Heavy Open"; it swings away in about one second; walk through; close it, hear "Door Heavy Close".
+5. Seyda Neen: the two Census and Excise gates outdoors (321262, 321263, CHIM frame): the prompt says "Locked" and
+   the use plays the locked sound; `dbg door` opens one (a CHIM placement turning) and you can walk through; walk
+   away until its chunk unloads and come back: it is still open.
+6. Seyda Neen, Arrille's Tradehouse: the door 331481 (lock 40, key_arrile) stays locked.
+7. Balmora in CHIM rooms (the default `--interior-format chim`): Council Club 57033 and 484383, Guild of Fighters
+   56722 and 56780, Lucky Lockup 42064 and 42069, Eastern Guard Tower 213135, Western Guard Tower South 384326 and
+   384332, Hlaalo Manor 378371, Hlaalu Council Manor 378381, Drarayne Thelas' House 378032 open and close with
+   "Door Latched One/Two Open/Close"; walk through each way. `chim` shows the room's hinged doors; `dbg door list`
+   shows them as CHIM placements.
+8. Balmora locked doors stay shut, in CHIM rooms too: Eight Plates 244039, 56661, 56691; Lucky Lockup 42065; The
+   Razor Hole 56408; Guild of Fighters 56718; Morag Tong 57288, 378730; Nerano Manor 64596; Milie Hastien 65187;
+   Ra'Virr 131949; South Wall Cornerclub 367744; Council Club 244040.
+9. Tharys Ancestral Tomb (in the Balmora MiniWind's CHIM rooms), where the maintainer first saw the doors stay shut;
+   the same Balmora rooms on `--interior-format bsp` (room maps); and the doors of a batch room (`--room-batches 1`).
+10. Frame time with a door turning and with it still (the like-for-like A/B rule), in a room map and in a CHIM
+   room: no change while it is still.
+
+Original transition sound IDs of load doors are played by the door-audio catalogue (`id1/door-sounds.txt`).
 
 Reference: [OpenMW, Doors and Connecting Cells](https://openmw.readthedocs.io/en/latest/reference/modding/doors-and-teleports.html)
 corroborates the interior-name/exterior-coordinate distinction. The owned master

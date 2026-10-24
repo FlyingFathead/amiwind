@@ -49,6 +49,9 @@ aside{flex:0 1 300px;background:var(--panel);border:1px solid var(--line);border
 #stdot[data-state="red"]{background:#e5484d}
 #stlabel{margin-right:2px}
 #legend div{margin:2px 0}
+#legend .leghead{margin:8px 0 2px;font-weight:600;color:#9fb3c8}
+#legend .legmore{margin-top:6px;color:#9fb3c8}
+#legend .legmore .foldbtn{background:none;border:0;color:inherit;cursor:pointer;padding:0 4px}
 #legend label{cursor:pointer}
 #legend input{margin:0 6px 0 0;vertical-align:middle}
 #legendctl{margin:0 0 8px;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
@@ -69,6 +72,8 @@ aside{flex:0 1 300px;background:var(--panel);border:1px solid var(--line);border
 #gridtoggle button[aria-pressed="true"]{background:#2e4a66;border-color:#ffe28a;color:#ffe28a}
 #gridtoggle button#copycells{display:inline-flex;align-items:center;padding:0 7px;margin-left:4px}
 #gridtoggle button#copycells:disabled{opacity:.45;cursor:default}
+#gridtoggle button#undocells{display:inline-flex;align-items:center;padding:0 7px;margin-left:4px}
+#gridtoggle button#undocells:disabled{opacity:.45;cursor:default}
 #ctaslot .cta{display:block;width:100%;margin:0 0 14px}
 .cta{margin:0;padding:9px 16px;font-size:15px;font-weight:700;border-radius:7px;cursor:pointer;background:#ffcf55;color:#101923;border:2px solid #fff3c4;box-shadow:0 0 12px #ffcf5580}
 .cta.pick{background:#203346;color:#ffe28a;border-color:#ffcf55}
@@ -93,13 +98,11 @@ body.embedded #localpanel{max-width:none;flex:1 1 100%}
 #picked{margin-top:8px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:14px;color:var(--ink);min-height:40px}
 /* Map metrics layer (tools/world_metrics.py via toolkit_serve.py --metrics) */
 #metricsbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);background:#13202d}
-#metricsbar[hidden],#metricspanel[hidden],#interiorsview[hidden],#chimpanel[hidden],#chimhead[hidden]{display:none}
+#metricsbar[hidden],#metricspanel[hidden],#interiorsview[hidden],#chimpanel[hidden],#chimhead[hidden],#legendblock[hidden]{display:none}
 /* CHIM Progress Tracker (tools/cell_progress.py via toolkit_serve.py --progress) */
 #chimbar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);background:#13202d}
 #chimbar select{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px;max-width:260px}
 #chimbar button,#chimbar input[type=file]{cursor:pointer}
-#chimbar.folded>:not(.chimkeep){display:none}
-#chimfold{background:none;border:0;color:var(--ink);font-size:14px;padding:0 2px}
 #chimcount{color:#46c37b;font-weight:600}
 #chimpanel .meshtitle{font-size:20px;margin:14px 0 4px;color:var(--ink)}
 #chimpanel .meshsub{font-size:14px;margin:0 0 8px}
@@ -123,15 +126,18 @@ body.embedded #localpanel{max-width:none;flex:1 1 100%}
 #chimresults small{color:var(--muted)}
 #chimpanel td.tree{text-align:left;white-space:nowrap}
 #chimpanel .dim{color:var(--muted)}
-#chimhead{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;padding:6px 16px;border-bottom:1px solid var(--line);background:#13202d}
-#chimhead .chimtitle{font-size:17px;white-space:nowrap}
-#chimhead .chimtitle b{color:#46c37b}
-#chimhead .chimparts{display:flex;flex-wrap:wrap;gap:4px 8px}
-#chimhead button{font-size:12px;padding:3px 8px;cursor:pointer}
-#chimhead button[aria-pressed="true"]{border-color:#ffe28a;color:#ffe28a}
-#chimhead button i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
-#chimhead .chimnote,#chimhead .chimhist{color:var(--muted);font-size:12px}
-#chimhead .chimhist svg{vertical-align:middle}
+#legendblock{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;padding:6px 16px;border-bottom:1px solid var(--line);background:#13202d}
+#legendblock button.foldbtn{font-size:14px;padding:2px 5px;border:0;background:none}
+.filesblock{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+#chimhead{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;padding:6px 16px;background:#13202d}
+:is(#chimhead,#legendblock) .chimtitle{font-size:17px;white-space:nowrap}
+:is(#chimhead,#legendblock) .chimtitle b{color:#46c37b}
+:is(#chimhead,#legendblock) .chimparts{display:flex;flex-wrap:wrap;gap:4px 8px}
+:is(#chimhead,#legendblock) button{font-size:12px;padding:3px 8px;cursor:pointer}
+:is(#chimhead,#legendblock) button[aria-pressed="true"]{border-color:#ffe28a;color:#ffe28a}
+:is(#chimhead,#legendblock) button i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+:is(#chimhead,#legendblock) .chimnote,:is(#chimhead,#legendblock) .chimhist{color:var(--muted);font-size:12px}
+:is(#chimhead,#legendblock) .chimhist svg{vertical-align:middle}
 #metricsbar select{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px}
 #metricsbar button{cursor:pointer}
 #metricsbar button[aria-pressed="true"]{background:#2e4a66;border-color:#ffe28a;color:#ffe28a}
@@ -148,21 +154,40 @@ table.mt small{opacity:.8}
 #interiorsfilters{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:8px}
 #interiorsfilters select,#interiorsfilters input{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px}
 #interiorswrap{max-height:70vh;overflow:auto}
+/* Interior tracker (interior-tracker.js): a foldable block under the map; title and counts stay visible when folded. */
+#interiortracker{margin-top:8px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:14px}
+#interiortracker[hidden]{display:none}
+#itcounts{margin-left:8px;color:var(--ink)}
+#itsearch{margin:8px 0;width:min(420px,100%);background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px}
+#itlist{max-height:60vh;overflow:auto}
+#itlist details{margin:2px 0 2px 4px}
+#itlist details.itentrance{margin-left:18px}
+#itlist summary{cursor:pointer;padding:2px 0}
+#itlist table.mt{margin:4px 0 6px 18px}
+#itlist tr.itgo{cursor:pointer}
+#itlist tr.itgo:hover td{background:#203346}
+.itchip{display:inline-block;border:1px solid;border-radius:9px;padding:0 7px 0 4px;font-size:12px;white-space:nowrap}
+.itchip i,.itn i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.itn{margin-left:8px;font-size:12px;color:var(--muted,#9fb3c8)}
 </style>
 </head>
 <body>
 <div id="chimhead" hidden aria-label="CHIM Progress Tracker headline"></div>
+<hr class="foldrule" id="summaryrule">
 <div id="ctlbar"><button id="ctltoggle" aria-expanded="true" title="Show or hide the file, layer, metrics and CHIM controls">Controls &#9662;</button>
+  <button id="foldall" title="Fold or unfold every control block below">Collapse all</button>
   <span id="strip"><i id="stdot" data-state="grey"></i><b id="stlabel">no data</b>
     · Source: <span id="stsrc">nothing loaded</span>
     · Last updated: <span id="stupd">not yet</span> <span id="stago"></span>
     · Auto-update: <label><input type="checkbox" id="chimlive" title="Read the progress again on every interval (a running build keeps it current)"> <b id="stauto">OFF</b></label></span>
   <span id="livestatus" class="muted"></span></div>
 <div id="controls">
+<div id="legendblock" hidden></div>
 <header>
   <h1 id="pagetitle">AmiWind Toolkit · World Map</h1>
   <span role="tablist"><button class="mode on" id="mode-world" role="tab">World</button>
   <button class="mode" id="mode-local" role="tab">Local</button></span>
+  <div id="filesblock" class="filesblock">
   <label>Status <input id="status" type="file" accept=".json"></label>
   <label>Island (local) <input id="island" type="file" accept=".png,.json" multiple></label>
   <label>Maps folder (local) <input id="mapsdir" type="file" webkitdirectory multiple></label>
@@ -170,10 +195,11 @@ table.mt small{opacity:.8}
   <button id="copystate" title="Copy the toolkit version, loaded data, layers and selection as JSON">Copy state (JSON)</button>
   <a id="toinspector" href="map-inspector.html" target="_blank" style="color:#ffe28a;display:none">3D Map Inspector &#8599;</a>
   <span id="copied" class="muted"></span>
+  </div>
 </header>
 <div id="layers"></div>
 <div id="metricsbar" hidden>
-  <label><input type="checkbox" id="layer-metrics"> <b>Map metrics</b></label>
+  <label class="foldkeep"><input type="checkbox" id="layer-metrics"> <b>Map metrics</b></label>
   <label>Metric <select id="metric" aria-label="Metric"></select></label>
   <span role="group" aria-label="Content"><button id="mmode-cur" aria-pressed="false">Current content</button>
   <button id="mmode-evr" aria-pressed="true">Everything</button></span>
@@ -184,8 +210,7 @@ table.mt small{opacity:.8}
 </div>
 <p id="inclusionsummary" class="muted"></p>
 <div id="chimbar">
-  <button id="chimfold" class="chimkeep" aria-expanded="true" aria-controls="chimbar" title="Show or hide the tracker settings">&#9662;</button>
-  <label class="chimkeep"><input type="checkbox" id="layer-chim"> <b>CHIM Progress Tracker</b></label>
+  <label class="chimkeep foldkeep"><input type="checkbox" id="layer-chim"> <b>CHIM Progress Tracker</b></label>
   <label>Included in build <select id="inclusionbuild" aria-label="Included in build"><option value="">Loading package coverage</option></select></label>
   <label>Colour by <select id="chimcolour" aria-label="Colour by"></select></label>
   <label>Sweep order <select id="chimorder" aria-label="Sweep order">
@@ -207,9 +232,12 @@ table.mt small{opacity:.8}
 <main>
   <div id="stage"><canvas id="map" width="820" height="820"></canvas><div id="cell-highlight" hidden aria-hidden="true"><div id="cell-highlight-box"></div></div><div id="tip"></div>
     <div id="hbar" class="sbar" title="Scroll west / east"><div></div></div><div id="vbar" class="sbar" title="Scroll north / south"><div></div></div>
-    <div id="gridtoggle" role="group" aria-label="Map grid and names">Grid:<button id="gridon" aria-pressed="false">on</button><button id="gridoff" aria-pressed="true">off</button><span style="margin-left:8px">Names:</span><button id="nameson" aria-label="Names on" aria-pressed="true">on</button><button id="namesoff" aria-label="Names off" aria-pressed="false">off</button><span style="margin-left:8px">Paint:</span><button id="painton" aria-label="Paint cells on" aria-pressed="false" title="Paint: click or drag over cells to mark them (a drag that starts on a marked cell erases); shift-drag selects a rectangle in any mode">on</button><button id="paintoff" aria-label="Paint cells off" aria-pressed="true">off</button><button id="copycells" title="Copy the painted cells (aw-chim-cells-1 JSON with place names)" aria-label="Copy painted cells" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button><span id="copycellsdone" role="status" aria-live="polite" style="margin-left:4px;color:#ffe28a"></span></div>
+    <div id="gridtoggle" role="group" aria-label="Map grid and names">Grid:<button id="gridon" aria-pressed="false">on</button><button id="gridoff" aria-pressed="true">off</button><span style="margin-left:8px">Names:</span><button id="nameson" aria-label="Names on" aria-pressed="true">on</button><button id="namesoff" aria-label="Names off" aria-pressed="false">off</button><span style="margin-left:8px">Paint:</span><button id="painton" aria-label="Paint cells on" aria-pressed="false" title="Paint: click or drag over cells to mark them (a drag that starts on a marked cell erases); shift-drag selects a rectangle in any mode">on</button><button id="paintoff" aria-label="Paint cells off" aria-pressed="true">off</button><button id="undocells" title="Undo the last paint stroke, rectangle or clear (Ctrl+Z)" aria-label="Undo painting" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button id="copycells" title="Copy the painted cells (aw-chim-cells-1 JSON with place names)" aria-label="Copy painted cells" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button><span id="copycellsdone" role="status" aria-live="polite" style="margin-left:4px;color:#ffe28a"></span></div>
     <div id="zoom"><button id="zoomout" title="Zoom out">&minus;</button><button id="zoomfit" title="Fit the whole map to the window">fit</button><button id="zoomreset" title="Back to the fitted view">reset</button><button id="zoomin" title="Zoom in">+</button></div>
-    <div id="picked" class="muted">Click a cell to show it here.</div></div>
+    <div id="picked" class="muted">Click a cell to show it here.</div>
+    <section id="interiortracker" hidden aria-label="Interior tracker"><span id="itcounts" class="foldkeep"></span>
+      <div><input id="itsearch" type="search" placeholder="Find a room: name, cell ID, town, state, batch or reason" aria-label="Find a room" autocomplete="off"></div>
+      <div id="itlist"></div></section></div>
   <aside>
     <div id="ctaslot"></div>
     <div id="summary" class="muted">Load world-progress.json from an image build.</div>
@@ -262,14 +290,19 @@ table.mt small{opacity:.8}
   <iframe id="inspector3d" title="3D Map Inspector"></iframe>
 </section>
 <script src="chim-head.js"></script>
+<script src="panel-fold.js"></script>
 <script src="zebra.js"></script>
 <script src="header.js"></script>
 <script src="chim-legend.js"></script>
 <script src="chim-inclusion.js"></script>
+<script src="interior-tracker.js"></script>
 <!--AW-LIVE-DATA-->
 <script>
 const $ = id => document.getElementById(id), canvas = $('map'), ctx = canvas.getContext('2d');
 let data = null, maxOriginal = 1;
+// The interior tracker (interior-tracker.js; drawn by interiorTrackerUi below): its section, the entrance cells, its fold.
+const IT = window.AmiWindInteriors || null;
+let itIr = null, itEntr = null, itFold = null;
 // Local images by style: {img, bounds}. Each is drawn at its own cell bounds.
 const images = {topo: {}, world: {}};
 // Local level: per-cell terrain and original placements (local cells JSON).
@@ -299,8 +332,10 @@ const LAYERS = [
   {id: 'missing', name: 'Content missing', on: false, kind: 'mark',
    legend: [['#ff3b3b', 'original entities not placed (outline)']],
    mark: (g, c) => { if (c.original > c.placed) outline(g, c, '#ff3b3b'); }},
-  {id: 'interiors', name: 'Interiors', on: false, kind: 'mark',
-   legend: [['#ef4545', 'interior entrances, none converted'], ['#32cfa0', 'all converted']],
+  // With the tracker's interiors (interior-tracker.js): every exterior cell that holds an entrance, coloured by its rooms' state
+  // (the most common one; a tie goes to the state further from the game). Older data: the converted share of the map's rooms.
+  {id: 'interiors', name: 'Interiors', on: false, kind: 'mark', ownRows: true,
+   get legend() { return itEntr ? IT.legendRows(itIr).map(([c, t]) => [c, 'interior entrance: ' + t]) : [['#ef4545', 'interior entrances, none converted'], ['#32cfa0', 'all converted']]; },
    mark: (g, c) => { if (c.interiors) dot(g, c, ramp(c.interiors_converted / c.interiors), .3); }},
   {id: 'places', name: 'Named places', on: false, kind: 'mark',
    legend: [['#c9a6ff', 'named place']], mark: (g, c) => { if (c.places) dot(g, c, '#c9a6ff', .18, -.25); }},
@@ -358,6 +393,14 @@ function groupOutline(g, cells, style) {
   ctx.setLineDash([]);
 }
 function outline(g, c, col, w) { ctx.strokeStyle = col; ctx.lineWidth = (w || 1.5) / view.z; ctx.strokeRect(g.px(c.x) + 1, g.py(c.y) + 1, g.s - 2, g.s - 2); }
+// The Interiors layer from the tracker's rooms: one dot per entrance cell, coloured by state; an unticked legend row hides its state.
+function drawInteriorEntrances(g) {
+  for (const [k, e] of itEntr) {
+    if (legendOff.has('interiors:' + IT.STATES.indexOf(e.state))) continue;
+    const [x, y] = k.split(',').map(Number);
+    dot(g, {x, y}, e.colour, .3);
+  }
+}
 function dot(g, c, col, r, dx) {
   ctx.fillStyle = col; ctx.beginPath();
   ctx.arc(g.px(c.x) + g.s * (.5 + (dx || 0)), g.py(c.y) + g.s * .5, Math.max(2, g.s * r), 0, 7); ctx.fill();
@@ -403,18 +446,6 @@ $('ctltoggle').onclick = () => {
   draw();
 };
 ctlApply(ctlState());
-// The CHIM Progress Tracker bar folds to its title (the switch stays); the build summary line folds with it.
-function chimFoldApply(open) {
-  $('chimbar').classList.toggle('folded', !open); $('inclusionsummary').hidden = !open;
-  $('chimfold').setAttribute('aria-expanded', open ? 'true' : 'false'); $('chimfold').innerHTML = open ? '&#9662;' : '&#9656;';
-}
-$('chimfold').onclick = () => {
-  const open = $('chimbar').classList.contains('folded');
-  chimFoldApply(open);
-  try { window.localStorage.setItem('amiwind-map-chimbar-1', open ? 'open' : 'closed'); } catch (_) { /* no storage */ }
-  draw();
-};
-try { chimFoldApply(window.localStorage.getItem('amiwind-map-chimbar-1') !== 'closed'); } catch (_) { chimFoldApply(true); }
 const MIN_ZOOM = 0.2, MAX_ZOOM = 16, LABEL_MIN_PX = 16;
 // The map fills the stage: full width, and the window height below the controls (at least 420 px). chim-legend.js mapLayout.
 let layout = null;
@@ -465,6 +496,7 @@ function draw() {
   for (const L of LAYERS) {
     if (!on(L.id) || L.kind === 'selection') continue;
     if (L.legend) legend.push(...L.legend.map((r, i) => [r[0], r[1], L.id + ':' + i]));
+    if (L.id === 'interiors' && itEntr) { drawInteriorEntrances(g); continue; }
     if (legendOff.has(L.id + ':0') && L.kind !== 'fill' && L.kind !== 'chim' && L.kind !== 'metrics' && L.kind !== 'base') continue;
     if (L.kind === 'base') {
       const im = images[L.style];
@@ -515,8 +547,13 @@ function draw() {
   scrollbars();
   viewSaveSoon();
   legendKeys = legend.filter(r => r[2]).map(r => r[2]);
-  $('legend').innerHTML = legend.map(([c, t, k]) => '<div><label>' + (k ? '<input type="checkbox" data-k="' + escapeHtml(k) + '"' + (legendOff.has(k) ? '' : ' checked') + ' aria-label="Show ' + escapeHtml(t.replace(/<[^>]*>/g, '')) + '">' :
-    '<input type="checkbox" checked disabled title="A scale, not a set of rows: nothing to untick">') + '<span style="background:' + c + '"></span>' + t + '</label></div>').join('');
+  $('legend').innerHTML = legendHtml(legend);
+  const lmb = $('legmorebtn');
+  if (lmb) lmb.onclick = () => {
+    const open = lmb.getAttribute('aria-expanded') !== 'true';
+    try { window.localStorage.setItem(window.ChimLegend.MORE_KEY, open ? 'open' : 'closed'); } catch (_) { /* no storage */ }
+    lmb.setAttribute('aria-expanded', open ? 'true' : 'false'); lmb.textContent = open ? '\u25be' : '\u25b8'; $('legmorebox').hidden = !open;
+  };
   legendCtl();
 }
 function emptyMessage() {
@@ -585,6 +622,14 @@ $('layers').innerHTML = '<span class="bottomsel"><b>Bottom layer</b><button id="
   '<span id="optwrap"><button id="optbtn" aria-label="Options" aria-expanded="false" aria-controls="options">&#9881;</button>' +
   '<div id="options" hidden role="dialog" aria-label="Options"><h2>Options</h2>' + LAYERS.filter(L => L.option).map(layerBox).join('') + '</div></span>';
 for (const L of LAYERS) if (L.kind !== 'base') $('layer-' + L.id).onchange = draw;
+// Every block of controls folds to its title (panel-fold.js); each block's state is remembered per page. The summary line above
+// them stays. The tracker's build summary line folds with the tracker bar.
+if (window.AmiWindFold) window.AmiWindFold.init({key: 'amiwind-map-folds-1', allButton: $('foldall'), onChange: () => draw(), blocks: [
+  {id: 'legend', el: $('legendblock'), title: 'Colour legend'},
+  {id: 'files', el: $('filesblock'), title: 'Files'},
+  {id: 'layers', el: $('layers'), title: 'Layer views'},
+  {id: 'metrics', el: $('metricsbar'), label: 'Map metrics'},
+  {id: 'chim', el: $('chimbar'), label: 'CHIM Progress Tracker', onChange: open => { $('inclusionsummary').hidden = !open; }}]});
 // Place and town names can be hidden without removing map markers.
 let mapNames = true;
 try { mapNames = localStorage.getItem('amiwind-map-names-1') !== 'off'; } catch (_) { /* no storage */ }
@@ -772,26 +817,31 @@ function paintRect(e) {
   // the rectangle from the start cell to the cell under the pointer, on top of the selection the drag started from
   const {x, y} = cellAt(e), [x0, y0] = paint.start;
   multi.clear(); for (const k of paint.base) multi.add(k);
-  const have = new Set(data.cells.map(c => c.x + ',' + c.y));
   for (let i = Math.min(x0, x); i <= Math.max(x0, x); i++)
     for (let j = Math.min(y0, y); j <= Math.max(y0, y); j++) {
       const k = i + ',' + j;
-      if (!have.has(k)) continue;
+      if (!paintable(i, j)) continue;
       if (paint.add) multi.add(k); else multi.delete(k);
     }
   showMulti(); draw();
 }
+// A cell can be painted when the map knows it: a cell of the loaded progress data, or a cell of the CHIM progress tracker
+// (sea cells too: seabed, empty sea and open ocean have no land entry in the progress data; TOOLKIT-PAINT-SEA-CELLS-48).
+function paintable(x, y) {
+  const k = x + ',' + y;
+  return !!(data && data.cells.some(c => c.x === x && c.y === y)) || chimCells.has(k);
+}
 function paintCell(e) {
   if (paint.rect) return paintRect(e);
-  const {x, y, c} = cellAt(e); if (!c) return;
+  const {x, y} = cellAt(e); if (!paintable(x, y)) return;
   const k = x + ',' + y, had = multi.has(k);
   if (paint.add && !had) multi.add(k); else if (!paint.add && had) multi.delete(k); else return;
   showMulti(); draw();
 }
 canvas.addEventListener('mousedown', e => {
   if ((e.shiftKey || paintMode) && data && e.button === 0) {
-    const {x, y, c} = cellAt(e);
-    if (c) { paint = {add: !multi.has(x + ',' + y), moved: false, rect: e.shiftKey, start: [x, y], base: new Set(multi)}; paintCell(e); }
+    const {x, y} = cellAt(e);
+    if (paintable(x, y)) { paintSave(multi); paint = {add: !multi.has(x + ',' + y), moved: false, rect: e.shiftKey, start: [x, y], base: new Set(multi)}; paintCell(e); }
     e.preventDefault(); return;
   }
   drag = {x: e.clientX, y: e.clientY, vx: view.x, vy: view.y}; dragMoved = false;
@@ -804,14 +854,27 @@ window.addEventListener('mousemove', e => {
   if (dragMoved) { view.x = drag.vx + dx; view.y = drag.vy + dy; clampView(); draw(); canvas.style.cursor = 'grabbing'; }
 });
 window.addEventListener('mouseup', () => {
-  if (paint) { paint = null; dragMoved = true; setTimeout(() => { dragMoved = false; }, 0); return; }
+  if (paint) {
+    const base = paintUndo[paintUndo.length - 1];   // a stroke that changed nothing leaves no undo step
+    if (base && base.size === multi.size && [...multi].every(k => base.has(k))) { paintUndo.pop(); showMulti(); }
+    paint = null; dragMoved = true; setTimeout(() => { dragMoved = false; }, 0); return; }
   drag = null; setTimeout(() => { dragMoved = false; }, 0);
 });
 function showMulti() {
   const n = multi.size;
   $('multi').textContent = n ? n + ' cell' + (n === 1 ? '' : 's') + ' selected (' + (paintMode ? 'click / drag paints, ' : '') + 'shift-drag selects a rectangle, Esc clears)' : '';
   $('copycells').disabled = !n;
+  $('undocells').disabled = !paintUndo.length;
 }
+// Undo for painting: each stroke, rectangle or Esc clear saves the selection it started from (newest last, at most 50).
+const paintUndo = [];
+function paintSave(base) { paintUndo.push(new Set(base)); if (paintUndo.length > 50) paintUndo.shift(); }
+function paintUndoLast() {
+  if (!paintUndo.length) return;
+  multi.clear(); for (const k of paintUndo.pop()) multi.add(k);
+  showMulti(); draw();
+}
+$('undocells').onclick = paintUndoLast;
 function paintApply(on) {
   paintMode = on; $('painton').setAttribute('aria-pressed', on ? 'true' : 'false'); $('paintoff').setAttribute('aria-pressed', on ? 'false' : 'true');
   canvas.style.cursor = on ? 'crosshair' : ''; showMulti();
@@ -1107,7 +1170,7 @@ $('metricsfile').onchange = e => {
   load(f, text => { if (setMetrics(JSON.parse(text))) metricsFileName = f.name; });
 };
 // Copy state: toolkit version, loaded data, layers and selection, as JSON to paste.
-const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.9'};
+const TOOLKIT = {name: 'AmiWind Toolkit · World Map', version: '0.1.10'};
 let statusFileName = null;
 function stateJson() {
   const sel = picked && data ? data.cells.find(c => c.x === picked.x && c.y === picked.y) : null;
@@ -1267,7 +1330,22 @@ function placeName(x, y) {
   return (d.name || d.region) + (d.name && d.region ? ' (' + d.region + ')' : '');
 }
 let inclusionBuilds = [], inclusionSelected = '';
-function inclusionBuild() { return inclusionBuilds.find(b => b.version === inclusionSelected); }
+// One ledger entry per build: version and, for a build's own entry (tools/chim_inclusion.py), its run; states built,
+// packaged, released (packaged and released carry the archive and readback digests: verified).
+function inclusionKey(b) { return b.run ? b.version + ' ' + b.run : b.version; }
+function inclusionVerified(b) { return !!b && (b.state === 'packaged' || b.state === 'released'); }
+function inclusionStateLabel(b) { return b.state === 'released' ? 'released' : b.state === 'packaged' ? 'packaged' : b.state === 'built' ? 'built, not packaged' : 'pending'; }
+// The stored form is compact (tools/chim_inclusion.py): region_cells "x,y x,y" (each in the region frame named after
+// it, rcm19_p14 for -19,14) and frame_cells {frame: "x,y ..."}; the earlier per-cell form (cells) still loads.
+function inclusionRegionName(k) { const [x, y] = k.split(',').map(Number); return 'rc' + (x < 0 ? 'm' : 'p') + Math.abs(x) + '_' + (y < 0 ? 'm' : 'p') + Math.abs(y); }
+function inclusionExpand(b) {
+  if (b.cells) return b;
+  const cells = {};
+  for (const k of (b.region_cells || '').split(' ').filter(Boolean)) cells[k] = {state: 'included', frame: inclusionRegionName(k)};
+  for (const [frame, ks] of Object.entries(b.frame_cells || {})) for (const k of ks.split(' ').filter(Boolean)) cells[k] = {state: 'included', frame};
+  return Object.assign({}, b, {cells});
+}
+function inclusionBuild() { return inclusionBuilds.find(b => inclusionKey(b) === inclusionSelected); }
 function inclusionCell(c) { const b = inclusionBuild(); return b && b.cells[c.x + ',' + c.y]; }
 function inclusionCountLabel(b, count) {
   return count.toLocaleString() + (b.coverage_total > 0 ? ' (' + (100 * count / b.coverage_total).toFixed(1) + '%)' : '');
@@ -1275,28 +1353,28 @@ function inclusionCountLabel(b, count) {
 function inclusionSummary() {
   const b = inclusionBuild();
   $('inclusionsummary').textContent = b ? b.version + ': ' + inclusionCountLabel(b, Object.keys(b.cells).length) +
-    (b.state === 'packaged' ? ' region cells verified in package (green). ' : ' cells selected, packaging pending (amber). ') +
+    (b.run ? ' (run ' + b.run + ')' : '') + (inclusionVerified(b) ? ' region cells verified in package (green). ' : b.state === 'built' ? ' cells in the CHIM world of this build, not packaged yet (amber). ' : ' cells selected, packaging pending (amber). ') +
     (b.coverage_total ? 'Percentage of ' + b.coverage_total.toLocaleString() + ' ' + b.coverage_basis + '. ' : '') + 'Grey = coverage not established here. ' + b.scope + (b.evidence_sha256 ? ' Readback SHA-256: ' + b.evidence_sha256 : '') : 'Choose a build to inspect package coverage separately from plans.';
 }
 async function loadInclusion() {
   try {
     const d = window.ChimInclusionMetadata; if (d.format !== 'aw-chim-inclusion-1') throw new Error('unsupported coverage');
-    inclusionBuilds = d.builds;
-    $('inclusionbuild').innerHTML = '<option value="">Conversion / plan view</option>' + inclusionBuilds.map(b => '<option value="' + escapeHtml(b.version) + '">' + escapeHtml(b.version) + (b.state === 'packaged' ? ' - packaged' : ' - pending') + '</option>').join('');
-    inclusionSelected = inclusionBuilds[0]?.version || ''; $('inclusionbuild').value = inclusionSelected;
+    inclusionBuilds = d.builds.map(inclusionExpand);
+    $('inclusionbuild').innerHTML = '<option value="">Conversion / plan view</option>' + inclusionBuilds.map(b => '<option value="' + escapeHtml(inclusionKey(b)) + '">' + escapeHtml(b.version) + ' - ' + inclusionStateLabel(b) + (b.run && b.state !== 'released' ? ' (' + escapeHtml(b.run) + ')' : '') + '</option>').join('');
+    inclusionSelected = inclusionBuilds[0] ? inclusionKey(inclusionBuilds[0]) : ''; $('inclusionbuild').value = inclusionSelected;
     inclusionSummary(); if (chim) { legendCtl(); draw(); if (chimClicked) showChimCell(chimClicked.x, chimClicked.y); }
   } catch (_) { $('inclusionsummary').textContent = 'Package coverage unavailable; plans are not inclusion evidence.'; }
 }
 function chimInclusionLine(c) {
   const key = c.x + ',' + c.y;
-  const found = inclusionBuilds.filter(b => b.state === 'packaged' && b.cells[key]?.state === 'included');
+  const found = inclusionBuilds.filter(b => inclusionVerified(b) && b.cells[key]?.state === 'included');
   const b = inclusionBuild(), row = b && b.cells[key];
   return 'CHIM package coverage: ' + (found.length ? found.map(b => b.version).join(', ') + ' verified; earlier history not reconciled' : 'not verified in recorded packages') +
     (b ? ' · selected build: ' + (row ? row.state : 'not established') : '');
 }
 function chimIncludedCount(release) {
-  const b = inclusionBuilds.find(b => b.version === release);
-  return b && b.state === 'packaged' ? inclusionCountLabel(b, Object.values(b.cells).filter(c => c.state === 'included').length) : 'not verified';
+  const b = inclusionBuilds.find(b => b.version === release && inclusionVerified(b));
+  return b ? inclusionCountLabel(b, Object.values(b.cells).filter(c => c.state === 'included').length) : 'not verified';
 }
 function describe(x, y, c, sep, noMetrics) {
   const base = describeBase(x, y, c, sep, noMetrics), ct = noMetrics ? '' : chimTip(x, y, sep);
@@ -1359,7 +1437,9 @@ canvas.addEventListener('mouseenter', () => { mapHover = true; });
 canvas.addEventListener('mousedown', () => canvas.focus());
 const PAN_KEYS = {w: [0, 1], arrowup: [0, 1], s: [0, -1], arrowdown: [0, -1], a: [1, 0], arrowleft: [1, 0], d: [-1, 0], arrowright: [-1, 0]};
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && multi.size && mode === 'world') { multi.clear(); showMulti(); draw(); return; }
+  if (e.key === 'Escape' && multi.size && mode === 'world') { paintSave(multi); multi.clear(); showMulti(); draw(); return; }
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'z' && mode === 'world' && paintUndo.length &&
+      !['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement || {}).tagName)) { e.preventDefault(); paintUndoLast(); return; }
   if (mode !== 'world' || e.ctrlKey || e.altKey || e.metaKey) return;
   if (document.activeElement !== canvas && !mapHover) return;
   if (document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
@@ -1378,8 +1458,16 @@ const CHIM_FORMAT = 'aw-cell-progress-1';
 // "Awaiting lighting" cells: the complete green crossed by cyan stripes (zebra.js, the inspector's zebra tile).
 const CHIM_ZEBRA = '#00e5ff';
 // Eligible for the next release (tools/cell_progress.py ELIGIBLE): every done cell, empty sea included, lighting done or not.
-const CHIM_SEA = new Set(['empty_sea', 'ocean']);    // sea cells drawn beside the land cells
-const CHIM_ELIGIBLE = new Set(['complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed', 'empty_sea']);
+const CHIM_SEA = new Set(['empty_sea', 'ocean', 'sea_in_game']);    // sea cells drawn beside the land cells
+const CHIM_ELIGIBLE = new Set(['complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested', 'audits_passed', 'empty_sea', 'sea_in_game']);
+// The cell's legend state (tools/cell_progress.py classify: chim.state, one of three groups, TOOLKIT-LEGEND-STATES-UNCLEAR-48).
+// Older data: a sea cell the newest CHIM build holds (mark_sea_in_game) has its own class; data without the flag keeps its bucket.
+function chimCls(c) { return c.chim.state || (c.chim.sea_in_game ? 'sea_in_game' : c.chim.bucket); }
+// Drawn in the status colours: every cell of grouped data (settled ones faint grey); in older data land and sea cells only.
+function chimDrawn(c) { return !!c.chim.state || c.land || CHIM_SEA.has(chimCls(c)); }
+// Eligible for the next release: the data's bucket (tools/cell_progress.py ELIGIBLE) or a sea cell in the game.
+function chimEligible(c) { return CHIM_ELIGIBLE.has(chimCls(c)) || (chimCls(c) === 'not_in_build' && CHIM_ELIGIBLE.has(c.chim.bucket)); }
+const CHIM_SETTLED_ALPHA = .45;
 const CHIM_BUCKETS = {
   complete: ['#7dffa6', 'Cell complete: terrain and every placed object converted, all audits passed (solid white border around a group)'],
   terrain_complete: ['#7dffa6', 'Terrain complete: all audits passed, everything but actors converted'],
@@ -1387,8 +1475,15 @@ const CHIM_BUCKETS = {
   terrain_complete_unlit: ['#7dffa6', 'Terrain complete, awaiting lighting: everything but actors and the lighting audit (zebra)', CHIM_ZEBRA],
   approved: ['#ffd23f', 'maintainer-approved'], playtested: ['#2ec4b6', 'playtested'], audits_passed: ['#46c37b', 'passed (something still deferred)'],
   converted_failing: ['#e5484d', 'converted, failing audits'], not_converted: ['#c2185b', 'not converted (tried, could not finish)'], converted_unmeasured: ['#6ea4df', 'converted, nothing measured'],
-  not_started: ['#3a4f66', 'not started'], empty_sea: ['#2f7fa6', 'empty sea (terrain and water only)'], hull_policy_pending: ['#b07ae0', 'hull policy pending'],
-  ocean: ['#c0c6cc', 'Open ocean: shared ocean chunk made, not yet placed in the game (no LAND record)']};
+  not_started: ['#3a4f66', 'not started'], empty_sea: ['#2f7fa6', 'empty sea (terrain and water only)'],
+  sea_in_game: ['#2f7fa6', 'Sea, in the game (CHIM): a sea cell with no LAND record that the selected CHIM build holds (sea colour, striped)', '#7dffa6'], hull_policy_pending: ['#b07ae0', 'hull policy pending'],
+  ocean: ['#c0c6cc', 'Open sea the game defines, not in the newest build (a cell record without LAND)'],
+  // Grouped data only (chim.state): Solstheim named as such, converted cells the newest build lacks, and the settled squares.
+  solstheim: ['#7f6fb0', 'Solstheim (Bloodmoon): not in the game yet'],
+  not_in_build: ['#4f6f93', 'converted, not in the newest build'],
+  settled: ['#5a626b', "Beyond the world's edge, settled: " + window.ChimLegend.SETTLED_TEXT]};
+// The three legend groups of grouped data, in order: [id, title, states] (chim-legend.js GROUPS).
+const CHIM_GROUPS = window.ChimLegend.GROUPS;
 const CHIM_GRADES = {A: '#32cfa0', B: '#7fd36b', C: '#e0c341', D: '#c8803c', E: '#5a2a2a'};
 const CHIM_AUDIT = {passed: '#46c37b', failed: '#e5484d', accepted: '#ffcf55', not_measured: '#4a5d72'};
 // Lighting audit (tools/cell_lighting.py): lit like the original is required for both completion levels.
@@ -1441,9 +1536,9 @@ function legendCtl() {
   $('relsummary').textContent = rows.length ? rows.map(r => (r.release || 'unassigned') + (r.shipped ? ' (shipped)' : '') + ': ' + r.approved.toLocaleString() + ' cells · ' + r.complete +
     ' complete · ' + r.awaiting_lighting + ' awaiting lighting · ' + r.lit + ' lit · ' + r.failing + ' failing').join(' | ') : 'No cells are assigned to a release yet.';
   // "Planned for ..." counts per release with a TOTALS row; nothing is shown while no release plan exists.
-  const pt = L.planTable(chim.plans, chim.headline && chim.headline.ocean != null ? chim.headline.ocean : null);
-  $('plansummary').innerHTML = pt.length ? '<table class="mt"><thead><tr><th class="l">Release plan</th><th class="l">State</th><th>Planned</th><th title="Percentage of Vvardenfell’s 1,292 terrain cells; package coverage only">Included</th><th>Complete</th><th>Awaiting<br>lighting</th><th>Failing</th><th>Hull pending</th><th>Not started</th><th>Open ocean</th></tr></thead><tbody>' +
-    pt.map(r => '<tr' + (r[0] === 'TOTALS' ? ' style="font-weight:700"' : String(r[0]).startsWith('OPEN OCEAN') ? ' style="font-weight:700;color:' + L.OCEAN_SILVER + '"' : '') + '><td class="l">' + escapeHtml(String(r[0])) + '</td><td class="l">' + escapeHtml(r[1]) + '</td>' + r.slice(2).map((v, i) => '<td>' + (v === '' ? '' : Number(v).toLocaleString()) + '</td>' + (i === 0 ? '<td>' + (String(r[0]).startsWith('OPEN OCEAN') ? 'not verified' : r[0] === 'TOTALS' ? 'see releases' : escapeHtml(chimIncludedCount(String(r[0]).split(' - ')[0]))) + '</td>' : '')).join('') + '</tr>').join('') + '</tbody></table><p class="muted">Included counts verified region cells in each package, independently of the cells assigned to that release plan. Unknown does not mean absent. Open ocean: shared chunk generated; runtime placement remains unverified.</p>' : '';
+  const pt = L.planTable(chim.plans, chim.headline && chim.headline.states ? chim.headline.states.ocean || 0 : chim.headline && chim.headline.ocean != null ? chim.headline.ocean : null);
+  $('plansummary').innerHTML = pt.length ? '<table class="mt"><thead><tr><th class="l">Release plan</th><th class="l">State</th><th>Planned</th><th title="Percentage of Vvardenfell’s 1,292 terrain cells; package coverage only">Included</th><th>Complete</th><th>Awaiting<br>lighting</th><th>Failing</th><th>Hull pending</th><th>Not started</th><th>Open sea</th></tr></thead><tbody>' +
+    pt.map(r => '<tr' + (r[0] === 'TOTALS' ? ' style="font-weight:700"' : String(r[0]).startsWith('OPEN SEA') ? ' style="font-weight:700;color:' + L.OCEAN_SILVER + '"' : '') + '><td class="l">' + escapeHtml(String(r[0])) + '</td><td class="l">' + escapeHtml(r[1]) + '</td>' + r.slice(2).map((v, i) => '<td>' + (v === '' ? '' : Number(v).toLocaleString()) + '</td>' + (i === 0 ? '<td>' + (String(r[0]).startsWith('OPEN SEA') ? 'not verified' : r[0] === 'TOTALS' ? 'see releases' : escapeHtml(chimIncludedCount(String(r[0]).split(' - ')[0]))) + '</td>' : '')).join('') + '</tr>').join('') + '</tbody></table><p class="muted">Included counts verified region cells in each package, independently of the cells assigned to that release plan. Unknown does not mean absent. Open sea: cells the game defines without LAND that the newest build does not hold; sea the build holds is in the game, and squares with no game record are settled.</p>' : '';
 }
 function legendSet(state) { legendOff = new Set([...legendOff].filter(k => !k.startsWith('chim:')).concat(state.off)); relFilter = state.rel; cset.colour = state.colour; }
 let chim = null, chimCells = new Map(), chimCellList = [], chimClicked = null, chimBucket = null, chimSource = null,
@@ -1457,10 +1552,10 @@ function chimOpenBugs(c) {
 function chimMech(id) { const m = chim.mechanisms.find(m => m.id === id); return m ? m.label : id; }
 function chimColour2(c, m) { const keep = cset.colour; cset.colour = m; try { return chimColour(c); } finally { cset.colour = keep; } }
 function chimColour(c) {
-  if (inclusionBuild()) { const r = inclusionCell(c); return r ? (r.state === 'included' ? '#35cf80' : '#f4b942') : '#536170'; }
+  if (inclusionBuild()) { const r = inclusionCell(c); return r ? (r.state === 'included' && inclusionVerified(inclusionBuild()) ? '#35cf80' : '#f4b942') : '#536170'; }
   const m = cset.colour;
-  if (m === 'compare') return chimRef && (c.land || CHIM_SEA.has(c.chim.bucket)) ? CHIM_COMPARE[chimCompareClass(c)][0] : null;
-  if (m === 'status') return c.land || c.chim.converted || CHIM_SEA.has(c.chim.bucket) ? CHIM_BUCKETS[c.chim.bucket][0] : (c.contents && c.contents.refs_total ? '#2a3a4c' : null);
+  if (m === 'compare') return chimRef && chimDrawn(c) ? CHIM_COMPARE[chimCompareClass(c)][0] : null;
+  if (m === 'status') return chimDrawn(c) || c.chim.converted ? (CHIM_BUCKETS[chimCls(c)] || CHIM_BUCKETS.not_started)[0] : (c.contents && c.contents.refs_total ? '#2a3a4c' : null);
   if (m === 'plan') return window.ChimLegend.planColour(c) || chimColour2(c, 'status');
   if (m === 'ring') {
     if (c.ring == null) return null;
@@ -1485,7 +1580,7 @@ function chimMatch(c) {
   const f = cset.filter;
   if (!f) return true;
   if (f === 'failing') return c.audit_counts.failed > 0;
-  if (f === 'eligible') return CHIM_ELIGIBLE.has(c.chim.bucket);
+  if (f === 'eligible') return chimEligible(c);
   if (f === 'unmeasured') return c.chim.converted && c.audit_counts.not_measured > 0;
   const [kind, id] = f.split(':'), a = c.audits[id];
   if (!a || !c.chim.converted) return false;
@@ -1493,8 +1588,9 @@ function chimMatch(c) {
 }
 function chimLegend() {
   const m = cset.colour;
+  if (m === 'status' && chim.headline && chim.headline.groups && chim.headline.states) return window.ChimLegend.planRows(chim.plans).slice(0, 1).map(r => [r[0], 'Gold outline: ' + r[1].replace(/: .*$/, ''), null]).concat(chimGroupRows());
   if (m === 'status') return window.ChimLegend.planRows(chim.plans).slice(0, 1).map(r => [r[0], 'Gold outline: ' + r[1].replace(/: .*$/, ''), null]).concat(
-    Object.entries(CHIM_BUCKETS).map(([k, [c, t, z]]) => [z ? chimZebraCss(c, z) : c, k === 'ocean' && chim.headline ? t.replace(' (no LAND record)', '') + ': ' + (chim.headline.ocean || 0).toLocaleString() + ' cells' : t, 'chim:status:' + k]));
+    Object.entries(CHIM_BUCKETS).filter(([k]) => !CHIM_GROUPED_ONLY.has(k)).map(([k, [c, t, z]]) => [z ? chimZebraCss(c, z) : c, k === 'ocean' && chim.headline ? t.replace(' (no LAND record)', '') + ': ' + (chim.headline.ocean || 0).toLocaleString() + ' cells' : k === 'sea_in_game' && chim.headline ? t.replace(/ \(sea colour.*$/, '') + ': ' + (chim.headline.sea_in_game || 0).toLocaleString() + ' cells' : t, 'chim:status:' + k]));
   if (m === 'lighting') return Object.entries(CHIM_LIGHTING).map(([k, [c, t]]) => [c, t, 'chim:lighting:' + k]);
   if (m === 'lava') return Object.entries(CHIM_LAVA).map(([k, [c, t]]) => [c, t, 'chim:lava:' + k]);
   if (m === 'plan') return window.ChimLegend.planRows(chim.plans).concat([['#3a4f66', 'All other cells (shipped or not planned): drawn in their status colours', 'chim:plan:other']]);
@@ -1506,25 +1602,52 @@ function chimLegend() {
   if (m === 'lastbuild') return [['#1f3b73', 'quick last build'], ['#ef4545', 'slow'], ['#555f6b', 'no ledger entry']];
   return Object.entries({passed: 'passed', failed: 'failed', accepted: 'failed, maintainer-accepted', not_measured: 'not measured'}).map(([k, t]) => [CHIM_AUDIT[k], chimMech(m.slice(6)) + ': ' + t, 'chim:audit:' + k]);
 }
-function chimIsComplete(c) { return c.chim.bucket === 'complete' || c.chim.bucket === 'complete_unlit'; }
+// Grouped legend rows: a header row per group ([null, title, null, 'head']), then its states with cells; states at 0 are
+// marked 'more' and drawn inside the "More states" fold-out (chim-head.js keeps it open or closed for both places).
+const CHIM_GROUPED_ONLY = new Set(['solstheim', 'not_in_build', 'settled']);
+function chimGroupRows() {
+  const lay = window.ChimLegend.groupLayout(chim.headline), rows = [], more = [];
+  const row = (k, n) => { const [c, t, z] = CHIM_BUCKETS[k]; return [z ? chimZebraCss(c, z) : c, escapeHtml(t) + ': ' + n.toLocaleString() + ' cells', 'chim:status:' + k]; };
+  for (const g of lay.groups) {
+    rows.push([null, escapeHtml(g.title) + ': ' + g.count.toLocaleString() + ' cells', null, 'head']);
+    for (const [k, n] of g.rows) rows.push(row(k, n));
+  }
+  for (const [k, n] of lay.more) more.push(row(k, n).concat(['more']));
+  rows.push([null, 'Accounted for: ' + lay.accounted.toLocaleString() + ' of ' + lay.cells.toLocaleString() + ' cells (in the game + settled)', null, 'head']);
+  return rows.concat(more);
+}
+// One legend row as HTML: a group header, a checkbox row, or a scale row (disabled box).
+function legendRowHtml([c, t, k, kind]) {
+  if (kind === 'head') return '<div class="leghead">' + t + '</div>';
+  return '<div><label>' + (k ? '<input type="checkbox" data-k="' + escapeHtml(k) + '"' + (legendOff.has(k) ? '' : ' checked') + ' aria-label="Show ' + escapeHtml(t.replace(/<[^>]*>/g, '')) + '">' :
+    '<input type="checkbox" checked disabled title="A scale, not a set of rows: nothing to untick">') + '<span style="background:' + c + '"></span>' + t + '</label></div>';
+}
+function legendHtml(legend) {
+  const main = legend.filter(r => r[3] !== 'more'), more = legend.filter(r => r[3] === 'more');
+  let open = false;
+  try { open = window.localStorage.getItem(window.ChimLegend.MORE_KEY) === 'open'; } catch (_) { open = false; }
+  return main.map(legendRowHtml).join('') + (more.length ? '<div class="legmore"><button type="button" class="foldbtn" id="legmorebtn" aria-expanded="' + open + '" aria-controls="legmorebox">' +
+    (open ? '\u25be' : '\u25b8') + '</button> More states (' + more.length + ' with no cells now)<div id="legmorebox"' + (open ? '' : ' hidden') + '>' + more.map(legendRowHtml).join('') + '</div></div>' : '');
+}
+function chimIsComplete(c) { return chimCls(c) === 'complete' || chimCls(c) === 'complete_unlit'; }
 // Zebra only for the awaiting-lighting statuses, only in the status colouring.
-function chimZebra(c) { if (inclusionBuild()) return null; const b = CHIM_BUCKETS[c.chim.bucket]; return cset.colour === 'status' && b && b[2] ? b[2] : null; }
+function chimZebra(c) { if (inclusionBuild()) return null; const b = CHIM_BUCKETS[chimCls(c)]; return cset.colour === 'status' && b && b[2] ? b[2] : null; }
 function chimZebraCss(base, stripe) { return 'repeating-linear-gradient(135deg,' + base + ' 0 4px,' + stripe + ' 4px 7px)'; }
 function chimPx(g) { return cellPx(g); }
 function drawChim(g) {
   const px = chimPx(g), dim = chimBucket || cset.filter || legendActive();
   for (const c of chimCellList) {
     const col = chimColour(c); if (!col) continue;
-    const hit = chimVisible(c) && (!cset.filter || chimMatch(c)) && (!chimBucket || (c.land || CHIM_SEA.has(c.chim.bucket)) && c.chim.bucket === chimBucket);
+    const hit = chimVisible(c) && (!cset.filter || chimMatch(c)) && (!chimBucket || chimDrawn(c) && chimCls(c) === chimBucket);
     const zebra = chimZebra(c);
-    ctx.globalAlpha = (anyImage() ? .85 : 1) * (dim && !hit ? .14 : 1); ctx.fillStyle = zebra ? ZebraPattern(ctx, col, zebra) : col;
+    ctx.globalAlpha = (anyImage() ? .85 : 1) * (dim && !hit ? .14 : 1) * (cset.colour === 'status' && chimCls(c) === 'settled' && chimBucket !== 'settled' ? CHIM_SETTLED_ALPHA : 1); ctx.fillStyle = zebra ? ZebraPattern(ctx, col, zebra) : col;
     ctx.fillRect(g.px(c.x) + .5, g.py(c.y) + .5, g.s - 1, g.s - 1);
   }
   ctx.globalAlpha = 1;
   groupOutline(g, chimCellList.filter(c => chimIsComplete(c) && chimVisible(c)));
   // Planned for the next release: a gold outline on every other colouring (the plan colouring fills them gold instead).
   if (cset.colour !== 'plan' && chim.plan_next) for (const c of chimCellList) if (window.ChimLegend.planTier(c) === 'next' && chimVisible(c)) outline(g, c, window.ChimLegend.PLAN_GOLD, 2);
-  if (chimBucket) for (const c of chimCellList) if ((c.land || CHIM_SEA.has(c.chim.bucket)) && c.chim.bucket === chimBucket) outline(g, c, '#ffe28a', 2.5);
+  if (chimBucket) for (const c of chimCellList) if (chimDrawn(c) && chimCls(c) === chimBucket) outline(g, c, '#ffe28a', 2.5);
   const showOrder = cset.next ? chimNext[cset.order] : new Map(), other = cset.next ? chimNext[cset.order === 'spiral' ? 'risk' : 'spiral'] : new Map();
   if (cset.next) {
     for (const [k] of showOrder) { const c = chimCells.get(k); if (c) outline(g, c, '#ffffff', 3); }
@@ -1552,7 +1675,7 @@ function drawChim(g) {
 }
 function chimTip(x, y, sep) {
   const c = chimCell(x, y); if (!c) return '';
-  const lines = ['CHIM Progress Tracker: ' + CHIM_BUCKETS[c.chim.bucket][1] + (c.chim.build ? ' (build ' + c.chim.build + ')' : '')];
+  const lines = ['CHIM Progress Tracker: ' + CHIM_BUCKETS[chimCls(c)][1] + (c.chim.build ? ' (build ' + c.chim.build + ')' : '')];
   if (c.plan) lines.push(window.ChimLegend.planLine(c.plan));
   if (c.ring != null) lines.push('sweep: ring ' + c.ring + ', spiral #' + c.spiral_rank + (c.risk_rank ? ', scout #' + c.risk_rank : ''));
   if (c.risk) lines.push('risk ' + pct(c.risk.score, 1) + ' of the ' + c.risk.limiting + ' limit');
@@ -1670,6 +1793,31 @@ function chimBuildIndex() {
       text: [r.name, r.id, r.our_map, r.set, ...(r.entrances || []).map(e => e.door_ref)].join(' ').toLowerCase()});
   }
 }
+// Interior tracker (interior-tracker.js): the foldable block under the map, collapsed by default and remembered like the other
+// blocks (panel-fold.js); its title line always shows the counts per group. Hidden with tracker data that has no interiors.
+function interiorTrackerUi() {
+  itIr = IT && chim ? IT.section(chim) : null;
+  itEntr = itIr ? IT.entranceCells(itIr) : null;
+  $('interiortracker').hidden = !itIr;
+  if (!itIr) return;
+  if (!itFold && window.AmiWindFold) itFold = window.AmiWindFold.init({key: 'amiwind-map-interiors-1',
+    blocks: [{el: $('interiortracker'), id: 'interiortracker', title: 'Interior tracker', closed: true, onChange: open => { if (open) itRender(); }}]});
+  $('itcounts').textContent = IT.titleLine(itIr);
+  itRender();
+}
+function itRender() {
+  if (!itIr) return;
+  if (itFold && itFold.blocks[0] && itFold.blocks[0].folded) return;   // drawn when opened
+  $('itlist').innerHTML = IT.listHtml(itIr, $('itsearch').value);
+}
+$('itsearch').addEventListener('input', () => itRender());
+$('itlist').addEventListener('click', e => {
+  const tr = e.target.closest && e.target.closest('tr[data-cell]');
+  if (!tr) return;
+  const [x, y] = tr.dataset.cell.split(',').map(Number);
+  chimJump(x, y);
+  if (canvas.scrollIntoView) canvas.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+});
 function chimJump(x, y) {
   const g = geometry(); view.z = Math.max(view.z, 6);
   view.x = g.w / 2 - view.z * (g.px(x) + g.s / 2); view.y = g.h / 2 - view.z * (g.py(y) + g.s / 2);
@@ -1703,7 +1851,7 @@ $('chimsearch').addEventListener('keydown', ev => {
 $('chimresults').addEventListener('click', ev => { const d = ev.target.closest('div[data-i]'); if (d) chimGo(chimIndex[+d.dataset.i]); });
 document.addEventListener('click', ev => { if (!ev.target.closest('#chimsearchwrap')) $('chimresults').hidden = true; });
 // Export what is shown: CSV (status, audits and every numeric stat) or JSON (records in full).
-function chimShown() { return chimCellList.filter(c => chimVisible(c) && chimMatch(c) && (!chimBucket || ((c.land || CHIM_SEA.has(c.chim.bucket)) && c.chim.bucket === chimBucket))); }
+function chimShown() { return chimCellList.filter(c => chimVisible(c) && chimMatch(c) && (!chimBucket || (chimDrawn(c) && chimCls(c) === chimBucket))); }
 function flatNums(o, pre, out) {
   for (const [k, v] of Object.entries(o || {})) {
     if (typeof v === 'number') out[pre + k] = v;
@@ -1855,7 +2003,7 @@ function chimOverview() {
     Object.entries(chim.sources).map(([k, v]) => k + (v ? '' : ' (missing)')).join(', ') + '</p>' +
     '<h3>Next cells: ' + (o === 'spiral' ? 'spiral, coast inwards' : 'risk, scout list (riskiest first)') + '</h3><table class="mt"><thead><tr><th class="l">Name</th><th>Cell</th><th>Ring</th><th>Spiral</th><th>Scout</th><th>Risk</th><th>Refs</th><th>Meshes</th></tr></thead><tbody>' + rows + '</tbody></table>' +
     '<h3>Audits over converted cells</h3><table class="mt"><thead><tr><th class="l">Mechanism</th><th>Passed</th><th>Failed</th><th>Accepted</th><th>Not measured</th></tr></thead><tbody>' + mech + '</tbody></table>' +
-    chimTotalsBlock() + '<h3>CHIM builds read</h3><table class="mt"><thead><tr><th class="l">Run</th><th class="l">Label</th><th>Areas</th><th>CHIM</th><th>Format</th><th>Source commit</th><th>Built (UTC)</th></tr></thead><tbody>' + runs + '</tbody></table>' + mesh;
+    (itIr ? IT.overviewHtml(itIr) : '') + chimTotalsBlock() + '<h3>CHIM builds read</h3><table class="mt"><thead><tr><th class="l">Run</th><th class="l">Label</th><th>Areas</th><th>CHIM</th><th>Format</th><th>Source commit</th><th>Built (UTC)</th></tr></thead><tbody>' + runs + '</tbody></table>' + mesh;
 }
 function chimLightingBlock(c) {
   const lt = c.lighting, nf = v => v == null ? 'not measured' : Number(v).toLocaleString();
@@ -1893,7 +2041,7 @@ function showChimCell(x, y) {
   chimShownInterior = null;
   panel.innerHTML = '<h2>CHIM Progress Tracker: ' + (name ? escapeHtml(name) + ' · ' : '') + 'cell ' + x + ', ' + y + '</h2>' +
     '<p class="muted">Exterior cell ' + x + ', ' + y + (c.region && c.region !== name ? ' · region ' + escapeHtml(c.region) : '') + (c.set ? ' · ' + escapeHtml(c.set) : '') + (c.island ? ' · island ' + c.island : '') + ' · cell ID exterior:' + x + ',' + y + '</p>' +
-    '<p>' + chimSpan(CHIM_BUCKETS[c.chim.bucket][2] ? chimZebraCss(CHIM_BUCKETS[c.chim.bucket][0], CHIM_BUCKETS[c.chim.bucket][2]) : CHIM_BUCKETS[c.chim.bucket][0], CHIM_BUCKETS[c.chim.bucket][1]) + (c.land ? '' : ' · not land (sea-only cell with content)') +
+    '<p>' + chimSpan(CHIM_BUCKETS[chimCls(c)][2] ? chimZebraCss(CHIM_BUCKETS[chimCls(c)][0], CHIM_BUCKETS[chimCls(c)][2]) : CHIM_BUCKETS[chimCls(c)][0], CHIM_BUCKETS[chimCls(c)][1]) + (c.land || chimCls(c) === 'settled' ? '' : ' · not land (a sea cell)') +
     (c.chim.owner ? ' · owner: ' + escapeHtml(c.chim.owner) + (c.chim.owner_date ? ' ' + escapeHtml(c.chim.owner_date) : '') : '') +
     (c.chim.partial_terrain ? ' · terrain only in a CHIM build (no placements owned here)' : '') + '</p>' +
     '<p><strong>' + escapeHtml(chimInclusionLine(c)) + '</strong></p>' +
@@ -1933,7 +2081,14 @@ function chimHeadSend() {
   if (!chim) return;
   const msg = {type: 'amiwind-chim-head', headline: chim.headline, history: chim.history};
   if (window.parent !== window) window.parent.postMessage(msg, '*');
-  else window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket);
+  else {
+    window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket);
+    // The summary line stays at the top; the colour chips, lighting and history lines move into the foldable legend block.
+    const head = $('chimhead'), box = $('legendblock');
+    for (const n of Array.from(box.children)) if (!n.classList.contains('foldbtn') && !n.classList.contains('foldtitle')) n.remove();
+    for (const n of Array.from(head.children)) if (!n.classList.contains('chimtitle')) box.append(n);
+    box.hidden = head.hidden;
+  }
 }
 function chimPickBucket(b) {
   chimBucket = b;
@@ -1972,7 +2127,7 @@ function setChim(doc, source, keepView) {
   if (first) { $('layer-chim').checked = true; $('layer-metrics').checked = false; if (metrics) metricsUi(); }
   if (first || !keepView) { view.z = 1; view.x = view.y = 0; }
   if (first) viewRestore();
-  chimBuildIndex();
+  chimBuildIndex(); interiorTrackerUi();
   chimUi(); chimHeadSend(); draw(); loadChimCurve();
   if (!SERVED) openLinkedCell();
   return true;

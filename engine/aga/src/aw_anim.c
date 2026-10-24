@@ -290,6 +290,7 @@ void AW_AnimEvents(const aw_anim_t *a,int group,unsigned long crossed,void (*emi
 #ifndef AW_ANIM_HOST_TEST
 #include "quakedef.h"
 #include "aw_combat.h"
+#include "aw_glut.h"      /* AW_GLUT_* topics only: the table is reached through the hooks below */
 
 /* One parsed layout per model in use (by model index), reset per level. */
 #define TABLE 64
@@ -422,15 +423,39 @@ static int pool_has(const char *name) {
     if(f)fclose(f);
     return bytes>=44;
 }
-static int voice_file(const aw_voice_line_t *l,char *out) {
+static int voice_file(const unsigned char hash[8],char *out) {
     static const char hex[]="0123456789abcdef";int i;
     strcpy(out,"pool/a");
-    for(i=0;i<8;i++){out[6+2*i]=hex[l->hash[i]>>4];out[7+2*i]=hex[l->hash[i]&15];}
+    for(i=0;i<8;i++){out[6+2*i]=hex[hash[i]>>4];out[7+2*i]=hex[hash[i]&15];}
     strcpy(out+22,".wav");
     return 1;
 }
+static int speaker_slot(edict_t *e) {
+    int k,free_slot=-1;double now=realtime;
+    for(k=0;k<SPEAKERS;k++)if(speaking[k].e==e){
+        if(speaking[k].until>now)return -1;                                  /* already speaking */
+        free_slot=k;
+    }
+    for(k=0;free_slot<0 && k<SPEAKERS;k++)if(!speaking[k].e || speaking[k].until<=now)free_slot=k;
+    return free_slot;
+}
+/* The voice table's hooks (aw_glut.c AW_GlutInit sets them; without it, the per-model lines below). */
+int (*aw_voice_table_row)(edict_t *e);
+int (*aw_voice_table_bark)(edict_t *e,int row,int topic,int pick_random,unsigned char hash[8]);
+int AW_VoicePlay(edict_t *e,const unsigned char hash[8]) {
+    char name[32],path[40];sfx_t *sfx;sfxcache_t *sc;int slot_k;
+    if(!e || e->free || !voices_on.value || cls.state!=ca_connected || (slot_k=speaker_slot(e))<0)return 0;
+    voice_file(hash,name);
+    strcpy(path,"sound/");strcat(path,name);
+    if(!pool_has(path))return 0;                        /* left out of this build's voice pool: silent */
+    if(!(sfx=S_PrecacheSound(name)) || !(sc=S_LoadSound(sfx)))return 0;
+    S_StartSound(NUM_FOR_EDICT(e),2,sfx,e->v.origin,1,1);    /* the voice channel (aw_greet uses 2 too) */
+    speaking[slot_k].e=e;speaking[slot_k].until=realtime+(sc->speed>0?(double)sc->length/sc->speed:2);
+    return 1;
+}
 int AW_VoiceSay(edict_t *e,int topic,int odds) {
-    const aw_anim_t *a;int k,free_slot=-1,line,player;char name[32];sfx_t *sfx;sfxcache_t *sc;double now=realtime;
+    static const int lut_topic[AW_VOICE_TOPICS]={AW_GLUT_ATTACK,AW_GLUT_HIT,AW_GLUT_FLEE,AW_GLUT_IDLE};
+    const aw_anim_t *a;int line,player,row;unsigned char hash[8];
     edict_t *p=svs.maxclients>0?EDICT_NUM(1):NULL;
     if(!e || e->free || !voices_on.value || cls.state!=ca_connected)return 0;
     /* Dead: nobody talks to the player any more (OpenMW Actors greets only a living player; no idle or fight
@@ -446,23 +471,20 @@ int AW_VoiceSay(edict_t *e,int topic,int odds) {
         tr=SV_Move(from,vec3_origin,vec3_origin,to,MOVE_NOMONSTERS,e);
         if(tr.fraction<1)return 0;
     }
-    for(k=0;k<SPEAKERS;k++)if(speaking[k].e==e){
-        if(speaking[k].until>now)return 0;                                   /* already speaking */
-        free_slot=k;
+    if(speaker_slot(e)<0)return 0;
+    if(topic<0 || topic>=AW_VOICE_TOPICS)return 0;
+    /* the NPC's whole vocabulary from the voice table (aw_glut.c, NPC-GREETINGS-LIBRARY-MUTE-48): every NPC record,
+     * town residents too; its picks follow the original's filter. aw_npc_voice_lut 0, or an actor whose record is
+     * not in the table (creatures), keeps the previous method: the lines its model's layout names. */
+    if(aw_voice_table_row && (row=aw_voice_table_row(e))>=0){
+        int got=aw_voice_table_bark(e,row,lut_topic[topic],voice_pick.value!=0,hash);
+        return got>0?AW_VoicePlay(e,hash):0;
     }
-    for(k=0;free_slot<0 && k<SPEAKERS;k++)if(!speaking[k].e || speaking[k].until<=now)free_slot=k;
-    if(free_slot<0)return 0;
     {model_t *m=model_of(e);if(m && !slot(m))AW_AnimPrep(e);}   /* spawned after the load (Arena fighters) */
     a=AW_AnimOf(e);
     player=p && !p->free && p->v.max_health>0?(int)(p->v.health*100/p->v.max_health):100;
     if((line=AW_VoicePick(a,topic,health_percent(e),player,rand()%101,voice_pick.value!=0,rand()))<0)return 0;
-    voice_file(&a->voice[topic][line],name);
-    {char path[40];strcpy(path,"sound/");strcat(path,name);
-     if(!pool_has(path))return 0;}                      /* left out of this build's voice pool: silent */
-    if(!(sfx=S_PrecacheSound(name)) || !(sc=S_LoadSound(sfx)))return 0;
-    S_StartSound(NUM_FOR_EDICT(e),2,sfx,e->v.origin,1,1);    /* the voice channel (aw_greet uses 2 too) */
-    speaking[free_slot].e=e;speaking[free_slot].until=now+(sc->speed>0?(double)sc->length/sc->speed:2);
-    return 1;
+    return AW_VoicePlay(e,a->voice[topic][line].hash);
 }
 /* aw_combat.c's hook: the original's rules (OpenMW): the fight starts = Attack, always
  * (MechanicsManager::startCombat); every new swing 10 % (iVoiceAttackOdds, AiCombat startAttackIfReady);

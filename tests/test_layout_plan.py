@@ -134,6 +134,39 @@ class PlannerTests(unittest.TestCase):
             L.require_follows(planned, shrunk)
         self.assertTrue(L.require_follows(planned, shrunk, shrink={'DH0': 150 * MIB}))
 
+    def test_a_payload_that_only_grew_is_laid_out_from_the_staged_files(self):
+        # IMAGE-LAYOUT-PLAN-ACTOR-LIBRARY-48: the room actor bake writes about 310 MB of actor models after the preflight
+        # plan; a grown payload is laid out anew (the headroom gate still decides), anything else still stops
+        planned = L.plan_compact(boot_payload(500 * MIB), frame_maps(20), chim_payload(300 * MIB))
+        self.assertIsNone(L.follows_or_grew(planned, planned))
+        grown = L.plan_compact(boot_payload(500 * MIB + 101 * MIB), frame_maps(20), chim_payload(300 * MIB))
+        bytes_grown, why = L.follows_or_grew(planned, grown)
+        self.assertGreater(bytes_grown, 100 * MIB)
+        self.assertIn('more than its 100 MiB headroom', why)
+        # rc1-try4: payload sharing took 156 MB off after the plan; a payload that shrank is laid out anew too
+        shrunk = L.plan_compact(boot_payload(500 * MIB - 150 * MIB), frame_maps(20), chim_payload(300 * MIB))
+        bytes_changed, why = L.follows_or_grew(planned, shrunk)
+        self.assertLess(bytes_changed, -100 * MIB)
+        self.assertIn('more than its 100 MiB headroom', why)
+        # a partition role the plan had and the payload lost still stops it
+        no_chim = L.plan_compact(boot_payload(500 * MIB), frame_maps(20), None)
+        with self.assertRaisesRegex(ValueError, 'Layout plan has partitions'):
+            L.follows_or_grew(planned, no_chim)
+        # a mismatch with no change of payload is a planning bug and still stops it
+        moved = L.plan_compact(boot_payload(500 * MIB), frame_maps(21), chim_payload(300 * MIB))
+        if sum(r['payload'] for r in moved['partitions']) == sum(r['payload'] for r in planned['partitions']):
+            with self.assertRaisesRegex(ValueError, 'other maps than planned'):
+                L.follows_or_grew(planned, moved)
+
+    def test_a_final_plan_packs_by_the_rule_require_minimal_checks(self):
+        # rc1-try5: the packer kept twice the headroom free in DH0 and spilled ~100 MB to a third partition that
+        # require_minimal then refused; a plan from the finished staging folder packs with one headroom (margin=1)
+        boot = boot_payload(int((2048 - 100 - 150) * MIB))   # fits DH0 with one headroom, not with two
+        early = L.plan_compact(boot, frame_maps(20), chim_payload(300 * MIB))
+        final = L.plan_compact(boot, frame_maps(20), chim_payload(300 * MIB), margin=1)
+        self.assertLessEqual(len(final['partitions']), len(early['partitions']))
+        self.assertTrue(L.require_minimal(final))
+
     def test_headroom_gate_on_written_partitions(self):
         plan = L.plan_compact(boot_payload(500 * MIB), [], chim_payload(300 * MIB))
         ok = [dict(partition='DH0', bytes=700 * MIB, payload_bytes=1, free_bytes=150 * MIB),
@@ -176,9 +209,192 @@ class PlannerTests(unittest.TestCase):
         self.assertLess(image.index('payload_preflight(args, out, excluded, jobs'), image.index('finalize_image(args)'))
         compact = inspect.getsource(build_aga.compact_layout)
         self.assertIn("planned_path = out/'layout-plan.json'", compact)
-        self.assertIn('layout_plan.require_follows(planned, plan, shrink=shrink)', compact)
-        self.assertLess(compact.index('require_follows'), compact.index('write_layout('))
+        # followed, or laid out from the staged files when the payload only grew (IMAGE-LAYOUT-PLAN-ACTOR-LIBRARY-48)
+        self.assertIn('layout_plan.follows_or_grew(planned, plan, shrink=shrink)', compact)
+        self.assertLess(compact.index('follows_or_grew'), compact.index('write_layout('))
         self.assertIn('compact_disk_layout', inspect.getsource(payload_preflight.check_disk_layout))
+
+    def test_the_plan_counts_the_actor_library_the_image_step_installs(self):
+        # IMAGE-LAYOUT-PLAN-ACTOR-LIBRARY-48: finalize_image installs the actor library stage (148.8 MB in the MiniWind
+        # Balmora build) after the payload preflight planned DH0; the plan left it out and the layout check refused
+        # the staged payload (+145 MB, more than the 100 MiB headroom). The plan counts it, over the files it replaces.
+        import build_aga
+        import inspect
+        import payload_preflight
+        from types import SimpleNamespace
+        layout = dict(mode='compact', headroom_mib=1, boot_headroom_mib=1)
+        with tempfile.TemporaryDirectory() as tmp:
+            boot = Path(tmp) / 'image/boot'
+            (boot / 'id1/progs').mkdir(parents=True)
+            (boot / 'AmiWind').write_bytes(b'e' * 4096)
+            (boot / 'id1/progs/n_shared.mdl').write_bytes(b's' * 1000)
+            library = Path(tmp) / 'actor-library'
+            (library / 'id1/progs').mkdir(parents=True)
+            (library / 'id1/progs/n_shared.mdl').write_bytes(b'S' * 3000)   # replaces the staged file
+            (library / 'id1/progs/c_creature.mdl').write_bytes(b'c' * (3 * MIB))
+            without = payload_preflight.check_disk_layout(boot, set(), [], None, layout)['layout_plan']
+            planned = payload_preflight.check_disk_layout(boot, set(), [], None, layout,
+                                                          actor_library=library)['layout_plan']
+            # the image step installs the library (actor_library.install copies id1/ over id1/), then plans again
+            shutil.copytree(library / 'id1', boot / 'id1', dirs_exist_ok=True)
+            staged = {p.relative_to(boot).as_posix(): p.stat().st_size for p in boot.rglob('*') if p.is_file()}
+            actual = L.plan_compact(staged, [], None, 1, 1)
+        self.assertEqual(planned['partitions'][0]['payload'], actual['partitions'][0]['payload'])
+        self.assertEqual(planned['partitions'][0]['files'], actual['partitions'][0]['files'])
+        self.assertTrue(L.require_follows(planned, actual))
+        with self.assertRaisesRegex(ValueError, 'no longer matches the layout plan: DH0 payload'):
+            L.require_follows(without, actual)
+        # the image step passes the library it installs, and only when it installs it (the actor table on)
+        self.assertIn('actor_library=installed_actor_library(args)', inspect.getsource(build_aga.payload_preflight))
+        self.assertIn('installed_actor_library(args)', inspect.getsource(build_aga.finalize_image))
+        self.assertEqual(build_aga.installed_actor_library(SimpleNamespace(chim_actor_table='on', actor_library=library)),
+                         library)
+        self.assertIsNone(build_aga.installed_actor_library(SimpleNamespace(chim_actor_table='off', actor_library=library)))
+        self.assertIsNone(build_aga.installed_actor_library(SimpleNamespace(chim_actor_table='on', actor_library=None)))
+
+    def test_movable_units_are_the_search_path_files(self):
+        # IMAGE-BOOT-PAYLOAD-OVER-2GIB-48: files the engine opens only through its search path, grouped as they load
+        self.assertEqual(L.movable_unit('id1/chimi/rooms/vci000.crm'), 'id1/chimi/')
+        self.assertEqual(L.movable_unit('id1/chimi/world.cwi'), 'id1/chimi/')
+        self.assertEqual(L.movable_unit('id1/maps/vci000.chim'), 'id1/maps/vci000')
+        self.assertEqual(L.movable_unit('id1/maps/vf0001.cut'), 'id1/maps/vf0001')
+        for name in ('a_0123456789ab.mdl', 'a_0123456789ab.anm', 'a_0123456789ab.tag', 'a_0123456789ab_m.mdl',
+                     'a_0123456789ab_m.anm', 'a_0123456789ab_m.tag'):
+            self.assertEqual(L.movable_unit('id1/progs/' + name), 'id1/progs/a_0123456789ab', name)
+        # music is opened by its own path (aw_music.c), the rest of DH0 stays where the engine expects it
+        for path in ('id1/music/track04.awm', 'id1/progs/player.mdl', 'id1/progs/body/b.mdl', 'id1/world/volumes.awv',
+                     'id1/default-game.cfg', 'AmiWind', 'id1/chimi', 'id1/maps/sub/x.bsp'):
+            self.assertIsNone(L.movable_unit(path), path)
+
+    def split_payload(self):
+        """A boot payload over 2 GiB: 1,700 MiB that stays, a 250 MiB interior store, 40 actors of 8 MiB, 6 maps."""
+        rows = boot_payload(1700 * MIB)
+        rows.update({'id1/chimi/world.cwi': 50 * MIB, 'id1/chimi/p00.ccs': 200 * MIB, 'id1/chimi/rooms/r.crm': 1000})
+        for i in range(40):
+            stem = 'id1/progs/a_%012x' % i
+            rows.update({stem + '.mdl': 3 * MIB, stem + '_m.mdl': 5 * MIB, stem + '.anm': 900, stem + '_m.anm': 1200,
+                         stem + '.tag': 1300})
+        for i in range(6):
+            rows.update({'id1/maps/room%02d.chim' % i: 2 * MIB, 'id1/maps/room%02d.cut' % i: 700})
+        return rows
+
+    def test_boot_over_the_limit_moves_the_largest_units_to_the_chim_volume(self):
+        rows = self.split_payload()
+        plan = L.plan_compact(rows, frame_maps(20), chim_payload(300 * MIB))
+        L.require_minimal(plan)
+        boot, chim = plan['partitions']
+        self.assertEqual([r['role'] for r in plan['partitions']], ['boot', 'chim'])
+        self.assertLess(boot['bytes'], 2 * GIB)
+        self.assertGreaterEqual(boot['free_bytes'], 100 * MIB)
+        moved = set(chim['moved'])
+        self.assertIn('id1/chimi/', moved)                               # the largest unit first
+        actors = [k for k in moved if k.startswith('id1/progs/a_')]
+        self.assertTrue(0 < len(actors) < 40, len(actors))             # only as many as DH0 needs
+        # DH0 would not fit with one unit fewer moved: the split is the smallest one in that order
+        fewer = L.Part('DH0', 'AMIWIND', 'boot', 200)       # planned with room for one headroom of drift
+        fewer.add(sorted((k, v) for k, v in rows.items() if L.movable_unit(k) not in moved - {sorted(actors)[-1]}))
+        self.assertFalse(L.fits(fewer, ()))
+        self.assertEqual(chim['moved_bytes'], sum(v for k, v in rows.items() if L.movable_unit(k) in moved))
+        self.assertEqual(plan['split']['units'], len(moved))
+        self.assertEqual(plan['split']['kinds']['store'], dict(units=1, bytes=250 * MIB + 1000))
+        self.assertEqual(plan['payload'], sum(rows.values()) + L.VOLUMES_BYTES + 20 * 850 +
+                         sum(b for _, b in chim_payload(300 * MIB)))
+        # a unit moves whole: every file of a moved actor (model, mover, layouts, tags) goes with it
+        on_chim = {p for p, _ in L.assign_units(plan, sorted(rows))['DW0']}
+        for key in actors:
+            self.assertEqual({p for p in rows if L.movable_unit(p) == key} - on_chim, set())
+        self.assertTrue(any('boot units' in line for line in L.lines(plan)))
+        self.assertTrue(any('moved to world volumes' in line for line in L.lines(plan)))
+        # one drive: DH0 and the CHIM volume each below 2 GiB, both starting below 2 GiB, the drive below 4 GiB
+        drives = W.plan_drives(dict(partition='DH0', bytes=boot['bytes'], files=[]),
+                               [dict(partition='DW0', bytes=chim['bytes'], files=[])])
+        self.assertEqual(len(drives), 1)
+
+    def test_units_open_a_store_volume_when_no_world_volume_has_room(self):
+        plan = L.plan_compact(self.split_payload(), [], None)
+        self.assertEqual([(r['partition'], r['volume'], r['role']) for r in plan['partitions']],
+                         [('DH0', 'AMIWIND', 'boot'), ('DW0', 'AW_WORLD0', 'store')])
+        self.assertEqual(plan['world_volumes'], 1)
+        self.assertIn('id1/chimi/', plan['partitions'][1]['moved'])
+        L.require_minimal(plan)
+        # the store volume holding too little next to a boot volume with room is refused like a maps volume
+        small = dict(partitions=[
+            dict(partition='DH0', role='boot', used_blocks=1000, payload=1, headroom_mib=100, maps=[]),
+            dict(partition='DW0', role='store', used_blocks=10, payload=2, headroom_mib=100, maps=[], moved=['k'])])
+        with self.assertRaisesRegex(ValueError, r'DW0 \(0 maps, 1 moved units, payload 2 bytes\) fits into DH0'):
+            L.require_minimal(small)
+
+    def test_a_payload_that_cannot_split_names_its_folders(self):
+        rows = boot_payload(2200 * MIB)
+        rows['id1/chimi/world.cwi'] = 10 * MIB
+        with self.assertRaisesRegex(ValueError, r'Boot payload \d+ bytes in \d+ files \+ 100 MiB headroom needs a '
+                                                r'\d+ MiB partition .*moving 1 of the 1 units .*largest boot folders: '
+                                                r'id1/f0\d \d+ bytes in \d+ files'):
+            L.plan_compact(rows, [], None)
+
+    def test_the_image_step_follows_the_planned_units(self):
+        rows = self.split_payload()
+        planned = L.plan_compact(rows, frame_maps(20), chim_payload(300 * MIB))
+        # the image step's payload changed a little (and differently): it still puts the planned units where planned
+        grown = dict(rows)
+        grown['id1/f00/extra.bin'] = 30 * MIB
+        for key in [k for k in grown if k.startswith('id1/progs/a_%012x' % 39)]:
+            grown[key] += 1
+        actual = L.plan_compact(grown, frame_maps(20), chim_payload(300 * MIB), follow=planned)
+        self.assertEqual(actual['partitions'][1]['moved'], planned['partitions'][1]['moved'])
+        self.assertTrue(L.require_follows(planned, actual))
+        # a unit stored once after the plan (tools/payload_share.py: gone from the payload) is not a mismatch
+        shared = {k: v for k, v in rows.items() if L.movable_unit(k) != planned['partitions'][1]['moved'][-1]}
+        removed = sum(rows.values()) - sum(shared.values())
+        actual = L.plan_compact(shared, frame_maps(20), chim_payload(300 * MIB), follow=planned)
+        self.assertTrue(L.require_follows(planned, actual, shrink={'DH0': removed}))
+        # a unit on another partition than planned is refused
+        stray = dict(actual, partitions=[dict(actual['partitions'][0]),
+                                         dict(actual['partitions'][1], moved=actual['partitions'][1]['moved'] + ['x'])])
+        with self.assertRaisesRegex(ValueError, 'DW0 holds boot units not planned there'):
+            L.require_follows(planned, stray)
+        # without the plan the image step plans the same split itself
+        self.assertEqual(L.plan_compact(rows, frame_maps(20), chim_payload(300 * MIB))['partitions'][1]['moved'],
+                         planned['partitions'][1]['moved'])
+
+    def test_the_plan_counts_the_room_batches_and_the_interior_store(self):
+        # IMAGE-BOOT-PAYLOAD-OVER-2GIB-48: the image step copies the room batches in after its first preflight and
+        # installs the CHIM interior store (id1/chimi/, each held room's .bsp made a small .chim) after finalize's
+        # preflight; both plans left them out (1.66 GB of residents, the 321 MB store in v0.0.48-dev2)
+        import build_aga
+        import inspect
+        import payload_preflight as P
+        layout = dict(mode='compact', headroom_mib=1, boot_headroom_mib=1)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            boot = tmp / 'image/boot'
+            (boot / 'id1/maps').mkdir(parents=True)
+            (boot / 'AmiWind').write_bytes(b'e' * 4096)
+            bsp = struct.pack('<i', 29) + struct.pack('<ii', 124, 3000) + bytes(2 * MIB)
+            (boot / 'id1/maps/held.bsp').write_bytes(bsp)
+            batches = tmp / 'chim-room-batches'
+            (batches / 'id1/maps').mkdir(parents=True)
+            (batches / 'id1/progs').mkdir(parents=True)
+            (batches / 'id1/maps/batch.bsp').write_bytes(bsp)
+            (batches / 'id1/progs/a_000000000001.mdl').write_bytes(b'm' * (3 * MIB))
+            (batches / 'room-batches.json').write_text(json.dumps({'files': {'maps/batch.bsp': 'x',
+                                                                             'progs/a_000000000001.mdl': 'y'}}))
+            interiors = tmp / 'chim-interiors'
+            (interiors / 'chimi/rooms').mkdir(parents=True)
+            (interiors / 'chimi/world.cwi').write_bytes(b'w' * (5 * MIB))
+            for room in ('held', 'batch', 'absent'):
+                (interiors / 'chimi/rooms' / (room + '.crm')).write_bytes(b'r' * 1000)
+            (interiors / 'chim-rooms-receipt.json').write_text(json.dumps(
+                {'rooms': [{'room': 'held'}, {'room': 'batch'}, {'room': 'absent'}]}))
+            plan = P.check_disk_layout(boot, set(), [], None, layout, room_batches=batches,
+                                       chim_interiors=interiors)['layout_plan']
+        rows = plan['partitions'][0]
+        self.assertEqual(rows['files'], 7)   # AmiWind, the batch model, 2 room maps, world.cwi, 2 held room records
+        expected = 4096 + 3 * MIB + 2 * (3000 + P.ROOM_MAP_SHELL_BYTES) + 5 * MIB + 2 * 1000
+        self.assertEqual(rows['payload'], expected)
+        wrapper = inspect.getsource(build_aga.payload_preflight)
+        self.assertIn("room_batches=getattr(args, 'chim_room_batches', None)", wrapper)
+        self.assertIn("chim_interiors=getattr(args, 'chim_interiors', None)", wrapper)
 
     def test_build_config_keys_are_known_and_checked(self):
         from build_font_options import _read
@@ -350,6 +566,66 @@ class WrittenLayoutTests(unittest.TestCase):
             for rel in names:
                 self.assertEqual(engine_find(volumes, 2, rel), 'AW_WORLD0', rel)
             self.assertEqual(engine_find(volumes, 2, 'chim/world.cwi'), 'AW_WORLD1')
+
+    def split_fixture(self, root):
+        """The fixture with boot units over a 4 MiB partition limit: an interior store and three actors."""
+        boot, chim = self.fixture(root)
+        units = {'id1/chimi/world.cwi': 400000, 'id1/chimi/p00.ccs': 800000, 'id1/chimi/rooms/vci000.crm': 3000}
+        for i in range(3):
+            units.update({'id1/progs/a_%012x.mdl' % i: 200000 + i, 'id1/progs/a_%012x_m.mdl' % i: 300000,
+                          'id1/progs/a_%012x.anm' % i: 900})
+        for rel, size in units.items():
+            (boot / rel).parent.mkdir(parents=True, exist_ok=True)
+            (boot / rel).write_bytes(bytes([len(rel) % 251]) * size)
+        maps = W.region_map_paths(boot / 'id1')
+        rows = {p.relative_to(boot).as_posix(): p.stat().st_size for p in boot.rglob('*')
+                if p.is_file() and p not in set(maps)}
+        plan = L.plan_compact(rows, [(p.relative_to(boot).as_posix(), p.stat().st_size) for p in maps],
+                              L.walk(chim), headroom_mib=1, limit=4 * MIB)
+        return boot, chim, plan, units
+
+    def test_engine_search_path_finds_the_moved_boot_units(self):
+        # IMAGE-BOOT-PAYLOAD-OVER-2GIB-48: the units the plan moves are written on their world volume at their boot
+        # path, DH0 is written without them, and the engine's search path finds each one there
+        with tempfile.TemporaryDirectory() as tmp:
+            boot, chim, plan, units = self.split_fixture(Path(tmp))
+            moved = {k for row in plan['partitions'][1:] for k in row['moved']}
+            self.assertIn('id1/chimi/', moved)
+            before = {p.relative_to(boot).as_posix() for p in boot.rglob('*') if p.is_file()}
+            out = Path(tmp) / 'out'
+            out.mkdir()
+            boot_check, worlds, _ = W.write_layout(plan, boot, out, XDFTOOL, out / 'partition.hdf', chim, jobs=2,
+                                                   log=lambda line: None)
+            volumes = {}
+            for part in [out / 'partition.hdf'] + [out / w['file'] for w in worlds]:
+                name, found, free = read_volume(part)
+                volumes[name] = {p[4:] for p in found if p.startswith('id1/')}
+                self.assertGreaterEqual(free, MIB)
+            count = (boot / 'id1/world/volumes.awv').read_bytes()[4]
+            self.assertEqual(count, plan['world_volumes'])
+            for rel in sorted(before):
+                if not rel.startswith('id1/') or rel == L.VOLUMES_FILE or rel.startswith('id1/maps/vf'):
+                    continue
+                where = engine_find(volumes, count, rel[4:])
+                if L.movable_unit(rel) in moved:
+                    self.assertTrue(where and where.startswith('AW_WORLD'), rel)
+                    self.assertNotIn(rel[4:], volumes['AMIWIND'])
+                else:
+                    self.assertEqual(where, 'AMIWIND', rel)
+            self.assertFalse((out / 'world-maps-staging').exists())
+
+    def test_a_failed_write_puts_the_boot_units_back(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            boot, chim, plan, units = self.split_fixture(Path(tmp))
+            before = sorted(p.relative_to(boot).as_posix() for p in boot.rglob('*') if p.is_file())
+            out = Path(tmp) / 'out'
+            out.mkdir()
+            (out / 'world0-partition.hdf').write_bytes(b'')       # partitions are written once
+            with self.assertRaises(Exception):
+                W.write_layout(plan, boot, out, XDFTOOL, out / 'partition.hdf', chim, jobs=1, log=lambda line: None)
+            after = sorted(p.relative_to(boot).as_posix() for p in boot.rglob('*') if p.is_file())
+            self.assertEqual([p for p in after if p != L.VOLUMES_FILE], [p for p in before if p != L.VOLUMES_FILE])
+            self.assertFalse((out / 'world-maps-staging').exists())
 
     def test_a_failed_write_puts_the_maps_back(self):
         with tempfile.TemporaryDirectory() as tmp:

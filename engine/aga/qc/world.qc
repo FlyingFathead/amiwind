@@ -118,6 +118,13 @@ entity aw_player;
  * DialogueManager::startDialogue; pr_cmds.c PF_aw_converse); 0 when it has none, then
  * the hello line below is said as before (the previous method). */
 float(entity npc, float again) aw_converse = #83;
+/* The voice table (id1/npc-voices.lut, engine aw_glut.c; NPC-GREETINGS-LIBRARY-MUTE-48): every NPC record's voice
+ * lines and conversation greeting by the original's rules. aw_glut_prep at spawn: 1 when the record is in it; an
+ * NPC placed without its own greeting (library, region and batch-room actors) takes its hello distance from it.
+ * aw_glut_say: topic 0 Hello (the others go through aw_bark); 1 when a line was picked, aw_glut_text its text. */
+float(entity npc) aw_glut_prep = #84;
+float(entity npc, float topic) aw_glut_say = #85;
+string() aw_glut_text = #86;
 /* Small independent scene policy, not a full original dialogue evaluator. */
 void(entity npc, entity listener, float automatic) aw_greet = {
     local float seconds;
@@ -133,8 +140,13 @@ void(entity npc, entity listener, float automatic) aw_greet = {
             return;
         }
     }
-    sound(npc,2,npc.aw_voice,0.9,1);
-    centerprint(listener,npc.netname,"\n",npc.aw_line);
+    if (npc.aw_voice != "") {
+        sound(npc,2,npc.aw_voice,0.9,1);
+        centerprint(listener,npc.netname,"\n",npc.aw_line);
+    } else if (aw_glut_say(npc,0)) {
+        /* no greeting of its own: the NPC's Hello from the voice table (its voice plays when the build has it) */
+        if (aw_glut_text() != "") centerprint(listener,npc.netname,"\n",aw_glut_text());
+    }
     npc.aw_hello_done = 1;
     npc.aw_hello_polls = 0;
     npc.aw_face_until = time + npc.aw_greet_duration;
@@ -203,6 +215,7 @@ void() aw_npc = {
     self.solid = 0;
     setmodel(self,self.model);
     aw_animprep(self);   /* animation layout + footstep sounds (docs/ANIMATION.md) */
+    aw_glut_prep(self);  /* the voice table's record; the hello distance of an NPC without its own greeting */
     setsize(self,'0 0 0','0 0 0');
     self.think = aw_npc_idle;
     self.yaw_speed = 22.5;
@@ -226,7 +239,8 @@ void() aw_interact = {
     if (self.movetype != 3 || time < aw_voice_deadline) return;
     npc = aw_npctarget(self);
     if (npc == world) return;
-    if (npc.classname == "aw_npc" && !npc.aw_intro_role && npc.aw_voice != "")
+    /* an NPC without its own hello line talks when the voice table has its record (a cached lookup) */
+    if (npc.classname == "aw_npc" && !npc.aw_intro_role && (npc.aw_voice != "" || aw_glut_prep(npc)))
         aw_greet(npc,self,0);
 };
 void() worldspawn = {

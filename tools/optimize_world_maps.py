@@ -182,6 +182,15 @@ def optimize_maps(maps, report_path, jobs=1):
             if row['changed']:
                 os.replace(transaction/'candidate'/row['map'], maps/row['map'])
                 committed.append(row['map'])
+        # CHIM room maps (maps/<room>.chim, IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48): written by the CHIM rooms install,
+        # never optimized; they join the receipt unchanged so the later gates bind to the whole staged map set.
+        from map_files import is_chim_room, map_files
+        rooms = [p for p in map_files(maps) if p.suffix != '.bsp' and is_chim_room(p)]
+        for path, value in zip(rooms, hash_files(rooms, jobs)):
+            size = path.stat().st_size
+            report['maps'].append({'map': path.name, 'input_sha256': value, 'output_sha256': value, 'input_bytes': size,
+                                   'output_bytes': size, 'file_bytes_saved': 0, 'changed': False,
+                                   'not_optimized': 'CHIM room map'})
         verify_optimized_maps(maps, report, require_committed=False, jobs=jobs)
         report.update(status='verified', committed_maps=committed,
                       map_count=len(report['maps']), changed_maps=len(committed),
@@ -272,6 +281,40 @@ def rebind_chim_maps(maps, report, report_path, removed, jobs=1, replaced=()):
                   chim_rebind=dict({'removed': gone, 'added_frame_maps': added},
                                    **({'replaced_by_region_frames': sorted(present_stems[n] for n in replaced)}
                                       if replaced else {})))
+    write_report(report_path, report)
+    verify_optimized_maps(maps, report, jobs=jobs)
+    return report
+
+
+def rebind_marked_maps(maps, report, report_path, names, mark, jobs=1):
+    """A late mark written into maps the optimizer never optimizes (CHIM-ROOM-FAST-MB-AFTER-OPTIMIZER-48: the room heap
+    gate's "_chim_room_fast_mb" "32" in the worldspawn of the CHIM rooms that need 32 MB of Fast RAM). The caller
+    checks the receipt (verify_optimized_maps) right before it writes the mark, so between that check and this call
+    only the mark changed these maps. The receipt follows exactly the NAMES (map file names): each must be a receipt
+    row that was not optimized and must be a CHIM room map; its row takes the marked bytes (input = output, as for
+    every map the optimizer leaves as written) and keeps the hash before the mark ('marked_from_sha256'); the change
+    is recorded under 'post_optimizer_marks' with MARK (the key and value written). Every other map must still match
+    its row (verify_optimized_maps): any other change stops the image as before."""
+    from build_parallel import hash_files
+    from map_files import is_chim_room
+    maps = Path(maps)
+    names = sorted(set(names))
+    rows = {r['map']: r for r in report['maps']}
+    unknown = [n for n in names if n not in rows]
+    if unknown:
+        raise ValueError('Marked maps not in the optimizer receipt: ' + ', '.join(unknown[:8]))
+    optimized = [n for n in names if rows[n].get('changed') or not rows[n].get('not_optimized')]
+    if optimized:
+        raise ValueError('Marked maps the optimizer optimized: ' + ', '.join(optimized[:8]))
+    others = [n for n in names if not is_chim_room(maps / n)]
+    if others:
+        raise ValueError('Marked maps that are not CHIM room maps: ' + ', '.join(others[:8]))
+    for name, value in zip(names, hash_files([maps / n for n in names], jobs)):
+        row, size = rows[name], (maps / name).stat().st_size
+        row.setdefault('marked_from_sha256', row['output_sha256'])
+        row.update(input_sha256=value, output_sha256=value, input_bytes=size, output_bytes=size, marked=mark)
+    marks = report.setdefault('post_optimizer_marks', [])
+    marks.append({'mark': mark, 'maps': names})
     write_report(report_path, report)
     verify_optimized_maps(maps, report, jobs=jobs)
     return report

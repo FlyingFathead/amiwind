@@ -86,6 +86,8 @@ def prepare(data_files,scene,out,hand_report_path,hand_catalog_report_path,jobs=
         (out/'source-entities.json').write_text(json.dumps(source_record,indent=2)+'\n',encoding='utf-8',newline='\n')
     timed=stamp(source_bsp,fields)
     (out/'id1/maps/seyda.bsp').write_bytes(timed);(out/'seyda.bsp').write_bytes(timed)
+    # the scene entity list the writers below read (BUILD-SEYDA-ENTITY-BUS-48)
+    from seyda_entities import publish as publish_entities;publish_entities(out,timed)
     actors=populate_intro_actors(data,out,kinds,cells,prison,palette,jobs,
                                  map_names=('seyda',),include_prototypes=False)
     ui_receipt=reserve(data,out/'id1')

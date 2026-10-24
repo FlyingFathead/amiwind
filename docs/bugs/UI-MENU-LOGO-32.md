@@ -20,6 +20,22 @@
 
 _Last updated with AmiWind v0.0.42 (17 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 8 October 2026
 
 Fixed in source on the post-v0.0.32 line (not shipped yet). Reported by the maintainer as a long-standing
@@ -124,6 +140,8 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - MAP-SPOTS-28 (no report page): In-game map screen has white/yellow spots
 - [NOCLIP-BOB-DEFAULT-42](NOCLIP-BOB-DEFAULT-42.md): Head bob still on in noclip mode by default, although the noclip bob was set to off by default
 - [NPC-DREAMER-GREETING-DEFAULT-42](NPC-DREAMER-GREETING-DEFAULT-42.md): Dreamers (Sixth House sleepers) give a default greeting instead of their own Sixth House greeting
+- OPTIONS-CROSSHAIR-STYLE-48 (no report page): Requested: crosshair colour and shape in Options, and Options in framed categories, full screen
+- OPTIONS-MOUSE-SENSITIVITY-48 (no report page): Requested: mouse sensitivity in Options and the console (the default is too fast for some players)
 - [PHOTO-DEBUG-STRIP-33](PHOTO-DEBUG-STRIP-33.md): Photo mode with Ctrl+H: the coordinate strip blacks out only from x=88, leaving the bottom-left corner of the view
 - [PHOTO-GALLERY-TEXT-33](PHOTO-GALLERY-TEXT-33.md): Photo mode leaves test-room and gallery instruction text over the view
 - [PLACE-NAMES-INTERIOR-31](PLACE-NAMES-INTERIOR-31.md): Location label has no place name inside interiors
@@ -141,6 +159,8 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [UI-INVENTORY-PREVIEW-STILL-42](UI-INVENTORY-PREVIEW-STILL-42.md): The inventory character is drawn live and turns instead of being a still picture
 - [UI-KEY-HELP-STALE-38](UI-KEY-HELP-STALE-38.md): Key help exposes raw actions and uses a sparse outdated layout
 - UI-OPTIONS-WRAP-29 (no report page): Setup selection wraps despite a bounded scrollbar
+- UI-PALETTE-NO-WHITE-48 (no report page): The game palette has no white: a White crosshair draws as the console ink cream (238,221,170)
+- [UI-STATS-WINDOW-48](UI-STATS-WINDOW-48.md): No Stats window (attributes, skills, health/magicka/fatigue) and no Magic window: the original's P and O windows
 - [UI-WINDOW-TITLE-BAR-42](UI-WINDOW-TITLE-BAR-42.md): Menu windows lack the original title bar (tiled frame with the window name on a dark plaque)
 - [WAIT-NOCLIP-MESSAGE-32](WAIT-NOCLIP-MESSAGE-32.md): Wait refusal names registration, dry ground and speech together instead of the reason that applied (noclip)
 - [WORLDMAP-LAVA-MISMATCH-36](WORLDMAP-LAVA-MISMATCH-36.md): The in-game map shows a lava band in Molag Amar where the world has grass and no lava

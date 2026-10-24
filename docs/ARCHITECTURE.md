@@ -1,6 +1,6 @@
 # Architecture
 
-_Last updated with AmiWind v0.0.46 (20 October 2026)._
+_Last updated with AmiWind v0.0.48 (24 October 2026)._
 
 How AmiWind is put together today: a host-side builder that converts your own Morrowind files, and the CHIM Engine
 (the AmiQuake engine with a world streamer added) that runs the result on an Amiga. Each claim below points at the
@@ -11,7 +11,9 @@ file or page that backs it. What is not done yet is marked *planned* and linked 
 The host reads your own copy of the game data, converts it and writes the game as disk images and files outside the
 repository; the repository holds the tools, the engine source and the documentation, and no game data
 ([licensing and credits](LICENSING_AND_CREDITS.md)). The target is an Amiga with AGA, a 68040 with FPU and 2 MiB Chip
-plus 16 MiB Fast RAM as the baseline ([AGA runtime](AGA_RUNTIME.md), [real hardware](REAL_HARDWARE.md)). The engine
+plus 32 MiB Fast RAM, the safe minimum for the whole game since 23 October 2026 (16 MiB, the baseline the engine
+must keep starting on, warns and loads more often; [why 32 MB](REAL_HARDWARE.md#why-32-mb-of-fast-ram),
+[AGA runtime](AGA_RUNTIME.md)). The engine
 is AmiQuake, which is Quake's renderer, lighting, collision, sound and QuakeC; AmiWind reuses Quake's machinery
 before building anything new ([engine study](ENGINE_STUDY.md)).
 
@@ -80,7 +82,7 @@ current release is described in the [v0.0.46 notes](RELEASE-v0.0.46.md).
 
 Not on CHIM: the interiors, which remain ordinary Quake maps, one per room, reached through doors by a level change.
 Many of the base game's interiors are not converted yet, and Solstheim is not converted
-([README](../README.md#where-amiwind-stands-21-october-2026)). Putting interiors on CHIM's store-once layout is
+([README](../README.md#where-amiwind-stands-24-october-2026)). Putting interiors on CHIM's store-once layout is
 *planned* ([v0.0.45 plan](PLAN-v0.0.45.md#3-every-interior-of-the-base-game)).
 
 ## Crossing from one cell to the next

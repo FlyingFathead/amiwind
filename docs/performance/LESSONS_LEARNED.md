@@ -1,10 +1,12 @@
 # Performance lessons learned
 
-_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Equal meshes that were not equal (22 October 2026)](#equal-meshes-that-were-not-equal-22-october-2026)
+- [Rooms one after another (22 October 2026)](#rooms-one-after-another-22-october-2026)
 - [A walkway fix that weighed on every rock (20 October 2026)](#a-walkway-fix-that-weighed-on-every-rock-20-october-2026)
 - [The ruin that was mostly collision (16 October 2026)](#the-ruin-that-was-mostly-collision-16-october-2026)
 - [What a town frame is spent on (8 October 2026)](#what-a-town-frame-is-spent-on-8-october-2026)
@@ -15,6 +17,35 @@ _Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 
 Lessons from measuring AmiWind's loading on the emulated reference machine.
 Newest first.
+
+## Equal meshes that were not equal (22 October 2026)
+
+Cutting today's interiors into a shared store saved nothing: 16,950 placements gave 7,313 distinct models, 244 MB plus
+48 MB of light, from 303 MB of rooms. The cause was in how the rooms are made. A tilted placement has its rotation
+baked into its own model, and a lit placement has its faces split on its own light grid. So two copies of the same mesh
+differ by up to 0.27 units and in texture mapping, and no two can be stored as one.
+
+What we learned:
+
+- Baking a placement's tilt and light into its model makes equal meshes differ. Sharing needs one model per mesh, with
+  the turn applied at run time and the light kept as a small value per placement.
+- Measure what makes copies differ before building a store on the idea that they are equal. One measuring pass
+  (`tools/interior_store.py measure`) showed the cause.
+- With one model per mesh the same 56 rooms came to 20.7 MB of store plus 0.59 MB of room maps, against 79.3 MB.
+  Speed and memory inside the rooms are not measured yet.
+
+## Rooms one after another (22 October 2026)
+
+The builder stage that converts interiors handled the rooms one after another, and ran only a few meshes of each room
+in parallel. Most cores sat idle. Running the rooms side by side, one room per worker, largest first, cut the 56 rooms
+from about 5 minutes to 19 seconds on 20 workers (about 18 cores busy).
+
+What we learned:
+
+- Never serialize independent units. A room does not depend on another room, so rooms are the unit of work, not the
+  few meshes inside one room.
+- Give the largest units out first, so the last worker is not left with the biggest room.
+- A stage that uses under half its cores for over a minute is a bug to register and fix, not a number to list.
 
 ## A walkway fix that weighed on every rock (20 October 2026)
 

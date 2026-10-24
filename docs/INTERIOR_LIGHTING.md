@@ -1,6 +1,6 @@
 # Interior and exterior brightness
 
-_Last updated with AmiWind v0.0.29 (6 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 ## RC2 brightness measurement: 6 October 2026
 
@@ -8,7 +8,7 @@ Recorded after the RC2 source snapshot was sealed. This is follow-up
 documentation for v0.0.29-rc2; the measured executable was not rebuilt for
 these notes. This checkpoint supersedes earlier debug-only/default-1.0 plans.
 RC2 enables controls by default: interior 1.2x including NPC static light,
-exterior 1.0x, with six Options > Graphics steps from 1.0 to 1.5. Live
+exterior 1.0x, with six Options > Video > Graphics steps from 1.0 to 1.5. Live
 `dbg luma interior 1.3` works; both settings saved correctly after clean exit.
 
 In the Census Office, three alternating `timerefresh` pairs gave median
@@ -32,7 +32,7 @@ checks remain open. Brightness does not repair the separate Temple holes.
 For v0.0.29-rc2, brightness controls are enabled by default. All gameplay
 interiors use 1.2x static light by default, including NPC static lighting.
 Exterior brightness is separate and defaults to the original 1.0x balance.
-Options > Graphics offers six steps: 1.0, 1.1, 1.2, 1.3, 1.4 and 1.5.
+Options > Video > Graphics offers six steps: 1.0, 1.1, 1.2, 1.3, 1.4 and 1.5.
 Settings are archived as `aw_interiorluma` and `aw_exteriorluma`.
 
 Use `dbg luma interior 1.3` or `dbg luma exterior 1.1` for live adjustment.

@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
+_Last updated with AmiWind v0.0.48 (24 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,20 +25,48 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (21 October 2026)
+## Where AmiWind stands (24 October 2026)
 
-The newest release is **v0.0.47: CHIM: The More, The Merrier**, running on CHIM Engine v0.2.1
-([release notes](docs/RELEASE-v0.0.47.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+The newest release is **v0.0.48: Inner CHIM & Actors On Stage**, running on CHIM Engine v0.2.2
+([release notes](docs/RELEASE-v0.0.48.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
 [the counting table](docs/chim/CELL_TRACKER.md#what-we-count); every cell: the
-[CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md). Interiors are still ordinary Quake maps, and many of the
-base game's interiors are not converted yet; Solstheim is not converted.
+[CHIM Progress Tracker](docs/chim/PROGRESS_TRACKER.md). Since v0.0.48 every interior of the base game but two (the
+prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
+converted.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): streamed crossings into and out of the towns first,
-collision built from the game's own
-movement rules, then the open bugs from the playtests, then every interior of the base game.
+What comes next is in the [roadmap](docs/ROADMAP.md): build turnaround first (a release rebuilt from its candidate's
+caches in minutes), then streamed crossings into and out of the towns, collision built from the game's own movement
+rules, and the open bugs from the playtests.
+
+### Memory: 32 MB of Fast RAM is the safe minimum (23 October 2026)
+
+The base game's main pieces are finally coming together:
+- every interior of the base game on its way in as a CHIM room;
+- the people and creatures standing where the game places them;
+- every NPC speaking with its own voice.
+
+The good news: the whole thing still takes a reasonable amount of disk space. The sad part: some of it would need
+far too much squeezing to fit a 16 MB expansion. Everything runs so smoothly with 32 MB that 32 MB is the default
+from here on. On today's accelerator cards that is rarely a problem: many of them carry well over 32 MB of Fast
+RAM, and AmiWind puts the extra to use. Most of the island can still be explored with 16 MB: of the base game's 1,134 interiors, the 16
+biggest ask for 32 MB at the door (and 5 region frames at their border), and the rest open as before.
+
+For now the game requires **32 MB of Fast RAM, the safe minimum**, which should be enough for the entire game. More
+RAM is used automatically (a larger game heap, CHIM's caches and reading ahead). 16 MB still starts, with a warning
+at boot, but loads more often. The emulator presets and the launcher start with 32 MB. Why, with the measured
+numbers: [why 32 MB](docs/REAL_HARDWARE.md#why-32-mb-of-fast-ram).
+
+### What v0.0.48 changed
+
+The indoors follow the outdoors onto CHIM: 1,132 of the base game's 1,134 interiors are CHIM rooms, their models and
+textures stored once. The people and creatures the game places in them stand where it puts them, grounded when the
+game is built ([actor placement](docs/ACTOR_PLACEMENT.md)), with their full set of animations and their own voices,
+and the plants in the rooms can be picked. There are a Stats window and a Magic window placeholder, the original
+movement speeds, burning campfires and the original's sound markers. CHIM moves to 0.2.2 with a compatibility table,
+and the builder rebuilds less and keeps more cores busy.
 
 ### What v0.0.47 changed
 
@@ -56,7 +84,7 @@ Red Mountain is red again: every region chooses its weather the way the original
 draws its blight sky. The Ebonheart dragon statue is back on its pedestal, the torch shows in third person, the
 Vivec dock walkways hold the player up and the Dreamers greet you. The collision of the whole island now keeps only
 the surface you walk on exactly, so every frame fits its memory again. Earlier releases: the
-[release notes](docs/RELEASE-v0.0.47.md) link back through every version, and the sections the front page used to
+[release notes](docs/RELEASE-v0.0.48.md) link back through every version, and the sections the front page used to
 carry are kept in [earlier README sections](docs/README_ARCHIVE.md).
 
 ### What works, and the honest limits
@@ -64,7 +92,8 @@ carry are kept in [earlier README sections](docs/README_ARCHIVE.md).
 - You can walk the whole outdoors of Vvardenfell, enter Balmora, Seyda Neen and the city of Vivec, and go through
   the doors of the interiors that are converted; characters are created through the opening sequence, and music streams from disk.
 - Combat, quests, services, schedules and most game logic are unfinished.
-- The reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 16 MiB Fast RAM; development and
+- The reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (the safe minimum;
+  16 MiB starts with a warning); development and
   every performance figure so far come from emulators and are relative. The one real-hardware figure, from a tester
   in October 2026, is about 0.2 frames per second on an A4000 with a 68060 at 100 MHz with an earlier build: not
   playable yet. See [AmiWind on real hardware](docs/REAL_HARDWARE.md) and [AmiWind on the 68060](docs/68060.md).
@@ -103,14 +132,14 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.47-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.47-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.47-WinUAE.uae`](resources/emulators/AmiWind-v0.0.47-WinUAE.uae).
+[`AmiWind-v0.0.48-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.48-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.48-WinUAE.uae`](resources/emulators/AmiWind-v0.0.48-WinUAE.uae).
 
 ## Where to read more
 
 - Project: [FAQ](docs/FAQ.md) · [Gallery](docs/GALLERY.md) · [Project state](docs/PROJECT_STATE.md) ·
   [Roadmap](docs/ROADMAP.md) · [Changelog](docs/CHANGELOG.md) · [Open bug reports](docs/BUGS.md)
-- How it works: [Architecture](docs/ARCHITECTURE.md) · [CHIM](docs/chim/README.md) ·
+- How it works: [Architecture](docs/ARCHITECTURE.md) · [Actor placement](docs/ACTOR_PLACEMENT.md) · [CHIM](docs/chim/README.md) ·
   [CHIM progress tracker](docs/chim/PROGRESS_TRACKER.md) · [CHIM progress map (colours)](docs/chim/CHIM_PROGRESS_MAP.md) · [Asset coverage](docs/ASSET_COVERAGE.md)
 - Building: [Building and playing](docs/BUILDING_AND_PLAYING.md) · [Build dependencies](docs/BUILD_DEPENDENCIES.md) ·
   [Build/compiler toolkit roadmap](docs/BUILD_TOOLKIT_ROADMAP.md) · [Release workflow](docs/RELEASE_WORKFLOW.md)

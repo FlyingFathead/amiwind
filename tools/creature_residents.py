@@ -106,7 +106,7 @@ def select(refs, kinds, slug, selection=None):
         if initially_dead(fields):
             leave(ref, 'authored dead creature: no creature death pose bake yet'); continue
         try:
-            state = initial_state(key)
+            state = initial_state(key, ref['number'])
         except ValueError as error:
             if selection == 'listed':
                 raise ValueError('Listed interior creature %s: %s' % (key, error)) from error

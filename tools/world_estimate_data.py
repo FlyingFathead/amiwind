@@ -259,7 +259,9 @@ def mesh_costs(vertices, faces, collision, profile, materials=None):
                 out['area_q'] += float(np.linalg.norm(np.cross(rel, np.roll(rel, -1, axis=0)).sum(axis=0)) / 2)
     out['texinfo'] = len(mappings)
     if not profile.get('collision_none'):
-        cv, cf = collision if (collision is not None and profile.get('collision_source')) else (v, f)
+        # the converters' collision-source rule (collision_source.uses_authored, COLLISION-RCN-SCOPE-32)
+        from collision_source import uses_authored
+        cv, cf = collision if (collision is not None and uses_authored(profile)) else (v, f)
         pieces, exact, _ = collision_pieces(cv, cf, profile)
         for k, (points, hull, ids, error) in enumerate(pieces):
             point_eq = np.unique(np.round(hull.equations, 5), axis=0)

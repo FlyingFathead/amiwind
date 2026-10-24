@@ -13,27 +13,31 @@ from mwad.paths import resolve_data_files, ensure_external
 from area_config import BALMORA_INTERIORS
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
-from player_hull import lumps
 from prepare_area import build_room_cached, populate
 from vis_options import add_vis_option, map_threads
 
 
-def prepare(data_files, scene, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis_mode='fast', rooms=True):
+def prepare(data_files, scene, qbsp, vis, light, ffmpeg='ffmpeg', jobs=None, vis_mode='fast', rooms=True,
+            room_form='compiled'):
     """rooms=False: a quick test build without interiors (--exclude interiors,
     tools/build_exclusions.py): no room is compiled; the door tables are still
-    written, so Balmora's doors say the area is unavailable."""
+    written, so Balmora's doors say the area is unavailable. room_form: compiled or shell
+    (prepare_area.add_room_form_option: a shell room is not compiled; the CHIM interiors stage makes it)."""
+    from prepare_area import ROOM_FORMS
+    if room_form not in ROOM_FORMS:
+        raise ValueError('room_form must be one of %s' % ', '.join(ROOM_FORMS))
+    listed = [dict(e, room_form='shell') for e in BALMORA_INTERIORS] if room_form == 'shell' else BALMORA_INTERIORS
     data = resolve_data_files(data_files)
     scene = ensure_external(scene, 'Balmora interiors')
     from mwad.paths import unshare_tree
     unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
-    # The hand timings every exterior carries (import_town copies them from seyda.bsp); Balmora on CHIM
-    # has no legacy balmora.bsp (CHIM-LEGACY-CHAIN-33), so they come from where it got them.
-    source = scene / 'id1/maps/balmora.bsp'
-    exterior = lumps((source if source.is_file() else scene / 'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
-    timings = '\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"', exterior))
+    # The hand timings every converted map carries: the hands stage's report (BUILD-SEYDA-BSP-CARRIER-48; a legacy
+    # balmora.bsp took the same fields from the same report through seyda.bsp).
+    from hand_metadata import scene_timings
+    timings = scene_timings(scene)
     # Rooms compile side by side: divide the job budget between them.
     threads = map_threads(resolve_jobs(jobs), min(resolve_jobs(jobs), max(1, len(BALMORA_INTERIORS))))
-    tasks = [(data, scene, entry, qbsp, vis, light, timings, threads, vis_mode) for entry in BALMORA_INTERIORS]
+    tasks = [(data, scene, entry, qbsp, vis, light, timings, threads, vis_mode) for entry in listed]
     if not rooms:
         print(f'Quick test build: {len(tasks)} Balmora rooms left out (--exclude interiors).', flush=True)
         tasks = []
@@ -65,10 +69,13 @@ if __name__ == '__main__':
     add_vis_option(p)
     p.add_argument('--no-rooms', action='store_true',
                    help='Quick test build (--exclude interiors): do not compile the rooms')
+    from prepare_area import add_room_form_option
+    add_room_form_option(p)
     import npc_lod
     npc_lod.add_converter_options(p)
     a = p.parse_args()
     npc_lod.apply_options(a)
     import build_profile; build_profile.instrument('balmora-interiors')  # sub-stage timers (docs/BUILD_PROFILE.md)
-    report = prepare(a.data_files, a.scene, a.qbsp, a.vis, a.light, a.ffmpeg, a.jobs, a.vis_mode, rooms=not a.no_rooms)
+    report = prepare(a.data_files, a.scene, a.qbsp, a.vis, a.light, a.ffmpeg, a.jobs, a.vis_mode, rooms=not a.no_rooms,
+                     room_form=a.room_form)
     print(json.dumps({'interiors': len(report['rooms']), 'residents': len(report['cast'])}))

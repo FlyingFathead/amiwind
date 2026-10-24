@@ -201,9 +201,29 @@ bootcheck_start:
         blo     .fast_fail
         cmp.l   #AW_HEAP_BYTES+16,20(a0)
         blo     .fast_fail
+        ; Under the safe Fast RAM minimum (32 MB, RAM-REQUIREMENT-32MB-48): a WARN
+        ; row with the size in whole MB, never a failure; the note and its ten
+        ; second countdown (ENTER skips) follow the separator (fast_wait,
+        ; boot_wait.asm). amiwind_heap.i has the figures.
+        lea     memory_kib,a0
+        cmp.l   #AW_FAST_SAFE_KIB,12(a0)
+        bhs     .fast_full
+        move.l  12(a0),d0
+        add.l   #AW_FAST_SLACK_KIB,d0
+        lsr.l   #8,d0
+        lsr.l   #2,d0
+        move.l  d0,fast_found_mb
+        moveq   #1,d0
+        move.l  d0,fast_short
+        lea     fast_warn_format(pc),a0
+        lea     fast_found_mb,a1
+        bsr     format_memory
+        bra     .fast_address
+.fast_full:
         lea     fast_ok_format(pc),a0
         lea     memory_kib+12,a1
         bsr     format_memory
+.fast_address:
         lea     address_ok_line(pc),a0
         bsr     puts
         bra     .host_notes
@@ -238,6 +258,15 @@ bootcheck_start:
 
         tst.l   d7
         bne     failed
+        tst.l   fast_short
+        beq.s   .countdown
+        ; Below the safe Fast RAM minimum: the note right under the separator, its
+        ; countdown under the note (ten seconds, never a block), then the verdict.
+        bsr     fast_wait
+        lea     passed(pc),a0
+        bsr     puts
+        bra     close_dos
+.countdown:
         lea     passed(pc),a0
         bsr     puts
         bsr     countdown
@@ -255,65 +284,9 @@ finish:
         movem.l (sp)+,d2-d7/a2-a6
         rts
 
-; Keep the successful preflight visible briefly without relying on console
-; scrollback. WaitForChar uses DOS/timer time, so accelerated CPU/JIT execution
-; does not collapse the delay into a tight busy loop. SPACE or Enter skips it.
-countdown:
-        movem.l d0-d4/a0-a3/a6,-(sp)
-        move.l  dos_base,a6
-        jsr     _LVOInput(a6)
-        move.l  d0,input_handle
-        moveq   #5,d4
-.loop:
-        move.l  d4,countdown_value
-        move.l  4.w,a6
-        lea     countdown_format(pc),a0
-        lea     countdown_value,a1
-        lea     put_char(pc),a2
-        lea     report_buffer,a3
-        jsr     _LVORawDoFmt(a6)
-        lea     report_buffer,a0
-        bsr     puts
-
-        move.l  input_handle,d1
-        beq.s   .no_input
-        move.l  #1000000,d2
-        move.l  dos_base,a6
-        jsr     _LVOWaitForChar(a6)
-        tst.l   d0
-        beq.s   .next
-
-        move.l  input_handle,d1
-        lea     input_byte,a0
-        move.l  a0,d2
-        moveq   #1,d3
-        jsr     _LVORead(a6)
-        cmp.l   #1,d0
-        bne.s   .next
-        moveq   #0,d0
-        move.b  input_byte,d0
-        cmp.b   #' ',d0
-        beq.s   .done
-        cmp.b   #13,d0
-        beq.s   .done
-        cmp.b   #10,d0
-        beq.s   .done
-        bra.s   .next
-
-.no_input:
-        ; An inherited console normally supplies an input handle. If it does not,
-        ; use dos.library Delay() as a non-busy one-second fallback.
-        moveq   #50,d1
-        move.l  dos_base,a6
-        jsr     _LVODelay(a6)
-.next:
-        subq.l  #1,d4
-        bne.w   .loop
-.done:
-        lea     countdown_done(pc),a0
-        bsr     puts
-        movem.l (sp)+,d0-d4/a0-a3/a6
-        rts
+; countdown, fast_wait (RAM-REQUIREMENT-32MB-48), countdown_run, put_char and
+; puts: boot_wait.asm (also run on the host by tests/test_heap_size.py).
+        include "boot_wait.asm"
 
 ; Format a0 with the longwords at a1 into the buffer at a3 (no output).
 format_into:
@@ -343,28 +316,6 @@ format_memory:
         jsr     _LVORawDoFmt(a6)
         lea     report_buffer,a0
         bsr     puts
-        rts
-
-; RawDoFmt callback includes the terminating zero byte.
-put_char:
-        move.b  d0,(a3)+
-        rts
-
-; Write a NUL-terminated message to the inherited CLI output.
-puts:
-        movem.l d0-d3/a0-a1/a6,-(sp)
-        move.l  a0,d2
-        moveq   #0,d3
-.length:
-        tst.b   (a0)+
-        beq     .write
-        addq.l  #1,d3
-        bra     .length
-.write:
-        move.l  output_handle,d1
-        move.l  dos_base,a6
-        jsr     _LVOWrite(a6)
-        movem.l (sp)+,d0-d3/a0-a1/a6
         rts
 
         include "fpu_support_inc.asm"
@@ -421,4 +372,7 @@ version_values: ds.l 3
 support_name:   ds.b 64
 memory_bytes:   ds.l 6
 memory_kib:     ds.l 6
+fast_found_mb:  ds.l 1
+fast_short:     ds.l 1
 report_buffer:  ds.b 256
+note_buffer:    ds.b 320

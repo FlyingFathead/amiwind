@@ -626,8 +626,8 @@ class ResultTests(unittest.TestCase):
         self.assertIn('ocean', cp.BUCKETS)
         import cell_progress_md as md
         page = md.render(doc, today='2026-10-10 15:00 +0300')
-        self.assertIn('- Open ocean (silver, not counted as done): 2', page)
-        self.assertIn('open-ocean cells 2', page)
+        self.assertIn('- Open sea, no LAND record (not counted as done): 2', page)
+        self.assertIn('open-sea cells 2', page)
         self.assertIn('not counted as done', page)
 
     def test_hull_policy_pending_is_neither_passed_nor_failed(self):
@@ -935,7 +935,8 @@ class CompleteAndPageTests(unittest.TestCase):
             self.assertIn(label.lower(), md.policy_section(text))
         self.assertEqual(d['headline']['done'], 5)                        # both awaiting-lighting cells count as done
         self.assertEqual((d['headline']['complete_unlit'], d['headline']['terrain_complete_unlit']), (1, 1))
-        self.assertEqual((d['headline']['eligible'], d['headline']['eligible_release']), (5, cp.ELIGIBLE_RELEASE))
+        self.assertEqual((d['headline']['eligible'], d['headline']['eligible_release']),
+                         (5, cp.eligible_release(None, cp.working_version())))
         self.assertIn('**Conversion-eligible: 5 of 25**', text)
         self.assertIn('Eligible for the next release = every done cell', md.policy_section(text))
         self.assertIn('empty_sea', cp.ELIGIBLE)
@@ -960,7 +961,7 @@ class CompleteAndPageTests(unittest.TestCase):
         zebra = {k for k, _, _, z in rows if z}
         self.assertEqual(zebra, {'complete_unlit', 'terrain_complete_unlit'})
         self.assertIn('awaiting lighting', ' '.join(t for _, _, t, _ in rows))
-        self.assertIn("c.chim.bucket === 'complete_unlit'", page)      # white border like Cell complete
+        self.assertIn("chimCls(c) === 'complete_unlit'", page)      # white border like Cell complete
         self.assertIn('<script src="zebra.js"></script>', page)
         head = (self.KIT / 'chim-head.js').read_text(encoding='utf-8')
         self.assertIn("['complete_unlit', 'cell complete, awaiting lighting'", head)
@@ -1046,7 +1047,7 @@ class CompleteAndPageTests(unittest.TestCase):
         self.assertIn("['complete', 'cell complete'", head)
         self.assertIn("['terrain_complete', 'terrain complete'", head)
         # the white outline is drawn around complete cells only; the legacy full-town border is dashed amber
-        self.assertIn("function chimIsComplete(c) { return c.chim.bucket === 'complete' || c.chim.bucket === 'complete_unlit'; }", page)
+        self.assertIn("function chimIsComplete(c) { return chimCls(c) === 'complete' || chimCls(c) === 'complete_unlit'; }", page)
         self.assertIn('groupOutline(g, chimCellList.filter(c => chimIsComplete(c) && chimVisible(c)));', page)
         self.assertIn("data.cells.filter(c => c.map === 'full'), 'dashed')", page)
         self.assertIn("legacy full town/area map (dashed amber border", page)
@@ -1165,6 +1166,17 @@ class ReleaseUiTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn('legend ok', r.stdout)
 
+    def test_interior_tracker_in_node(self):
+        import shutil
+        import subprocess
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('Node.js unavailable; the interior tracker checks need an existing interpreter')
+        r = subprocess.run([node, str(ROOT / 'tests' / 'test_interior_tracker.js'), str(self.KIT)],
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('interior tracker ok', r.stdout)
+
     def test_toolkit_header_is_unchanged_from_the_lighting_branch(self):
         # Project rule (2026-10-09): the Toolkit's logo header (logo, "Toolkit", "Last updated with AmiWind ...", the World / Local /
         # 3D Inspector buttons, the browser note, then the headline line and chips) keeps its layout, logo, fonts and colours.
@@ -1191,7 +1203,10 @@ class ReleaseUiTests(unittest.TestCase):
         head = (self.KIT / 'chim-head.js').read_bytes()
         # K-OCEAN (v0.0.36) added the open-sea row on purpose; TRACKER-OCEAN-COUNTED-DONE-36 (maintainer, 2026-10-11) made it silver and renamed it.
         # 2026-10-17: the approved row's label reads "maintainer-approved" (public wording); nothing else changed.
-        self.assertEqual(hashlib.sha256(head).hexdigest(), 'c436722e86770a56f50a02656cf7e1bc8fb67f311ed33888a6daca50af1574a4')
+        # 2026-10-22 (maintainer): the sea-in-game row (sea colour with stripes) and its chip, shown only when the data has the count.
+        # 2026-10-22 (maintainer, TOOLKIT-LEGEND-STATES-UNCLEAR-48): the chips grouped under three headers (In the game, Not in the
+        # game yet, Beyond the world's edge: settled), zero-count chips in a "More states" fold-out; old data keeps the flat row.
+        self.assertEqual(hashlib.sha256(head).hexdigest(), 'c7579a020332354af26c6a92d1933ebb70afe18fdda1d8f63b88e7d3023ff010')
 
     def test_one_header_for_every_toolkit_page(self):
         # The shared header (header.js) is the logo block of index.html: same logo file, same version line. Pages opened on their
@@ -1417,17 +1432,30 @@ class PlanTests(ReleaseUiTests):
     def test_eligible_label_follows_the_upcoming_plan_release(self):
         import cell_progress_md as md
         d = self.doc()
-        self.assertEqual(d['headline']['eligible_release'], cp.ELIGIBLE_RELEASE)         # no plan: the old constant
+        working = 'v' + cp.working_version().split('-')[0]                            # VERSION 0.0.48-dev2 -> v0.0.48
+        self.assertEqual(d['headline']['eligible_release'], working)                    # no plan: the version in development
         self.assertEqual(self.plan('--release', 'v0.0.36', '--cells', '0,0'), 0)
         d = self.read()
-        self.assertEqual(d['headline']['eligible_release'], 'v0.0.36')
-        self.assertIn('**Conversion-eligible:', md.render(d, 'now'))
-        self.assertNotIn('Eligible for %s:' % cp.ELIGIBLE_RELEASE, md.render(d, 'now'))
-        self.assertEqual(self.plan('--release', 'v0.0.37', '--cells', '1,0'), 0)
-        self.assertEqual(self.read()['headline']['eligible_release'], 'v0.0.36')        # the lowest unshipped
+        self.assertEqual(d['headline']['eligible_release'], working)                    # a plan older than VERSION is stale
         self.assertEqual(self.ship('v0.0.36'), 0)
+        self.assertEqual(self.plan('--release', 'v9.0.36', '--cells', '0,0'), 0)
         d = self.read()
-        self.assertEqual(d['headline']['eligible_release'], 'v0.0.37')                  # no code change after a release
+        self.assertEqual(d['headline']['eligible_release'], 'v9.0.36')
+        self.assertIn('**Conversion-eligible:', md.render(d, 'now'))
+        self.assertNotIn('Eligible for v0.0.34', md.render(d, 'now'))
+        self.assertEqual(self.plan('--release', 'v9.0.37', '--cells', '1,0'), 0)
+        self.assertEqual(self.read()['headline']['eligible_release'], 'v9.0.36')        # the lowest unshipped
+        self.assertEqual(self.ship('v9.0.36'), 0)
+        d = self.read()
+        self.assertEqual(d['headline']['eligible_release'], 'v9.0.37')                  # no code change after a release
+        # the rule itself: plan release when not older than the version in development, else that version
+        self.assertEqual(cp.eligible_release('v0.0.41', '0.0.48-dev2'), 'v0.0.48')
+        self.assertEqual(cp.eligible_release('v0.0.48', '0.0.48-dev2'), 'v0.0.48')
+        self.assertEqual(cp.eligible_release('v0.0.49', '0.0.48-dev2'), 'v0.0.49')
+        self.assertEqual(cp.eligible_release(None, '0.0.48-dev2'), 'v0.0.48')
+        self.assertEqual(cp.eligible_release('v0.0.41', None), 'v0.0.41')
+        self.assertIsNone(cp.eligible_release(None, None))
+        self.assertFalse(hasattr(cp, 'ELIGIBLE_RELEASE'))                              # no version written in the code
         self.assertIn('**Conversion-eligible:', md.render(d, 'now'))
         page = (self.KIT / 'world-map.html').read_text(encoding='utf-8')
         self.assertIn("doc.headline.eligible_release || 'the next release'", page)      # the page takes the label from the data
@@ -1459,6 +1487,22 @@ class PlanTests(ReleaseUiTests):
                            capture_output=True, text=True, timeout=120)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn('page run ok', r.stdout)
+        self.assertNotIn('interiors', r.stdout)            # older data: no interior tracker
+        # with interiors: the block under the map, the side panel counts and the entrance layer load and draw
+        import cell_progress_rooms as RM
+        graph = {'rooms': [{'name': 'Hut', 'hard': [], 'island': 'Vvardenfell', 'master': 'Morrowind.esm',
+                            'access': 'door', 'entrance_exterior': '0,0', 'settlement': 'Village'},
+                           {'name': 'ToddTest', 'hard': ['unreachable'], 'island': 'none', 'master': 'Morrowind.esm',
+                            'access': 'unreachable'}]}
+        path = self.out / cp.OUT_FILES['progress']
+        data = json.loads(path.read_text(encoding='utf-8'))
+        data['interior_rooms'] = RM.section(RM.rooms(graph))
+        path.write_text(json.dumps(data), encoding='utf-8')
+        r = subprocess.run([node, str(ROOT / 'tests' / 'test_cell_progress_page_run.js'), str(self.KIT), str(path)],
+                           capture_output=True, text=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('interiors 2 rooms · in the game 0 · not in the game yet 1 · set aside 1 · entrance cells 1 · '
+                      'list rows 2', r.stdout)
 
     def test_open_ocean_is_silver_and_not_done(self):
         js = (self.KIT / 'chim-legend.js').read_text(encoding='utf-8')
@@ -1466,9 +1510,9 @@ class PlanTests(ReleaseUiTests):
         head = (self.KIT / 'chim-head.js').read_text(encoding='utf-8')
         silver = re.search(r"OCEAN_SILVER = '(#[0-9a-f]{6})'", js).group(1)
         self.assertEqual(silver, '#c0c6cc')
-        self.assertIn("ocean: ['" + silver + "', 'Open ocean: shared ocean chunk made, not yet placed in the game", page)
+        self.assertIn("ocean: ['" + silver + "', 'Open sea the game defines, not in the newest build", page)
         self.assertIn("'" + silver + "'],", head)
-        self.assertIn("'audits_passed', 'empty_sea']);", page)          # CHIM_ELIGIBLE has no ocean
+        self.assertIn("'audits_passed', 'empty_sea', 'sea_in_game']);", page)          # CHIM_ELIGIBLE has no ocean
         others = set(re.findall(r"'(#[0-9a-fA-F]{6})'", page.split('const CHIM_BUCKETS')[1].split('const CHIM_GRADES')[0]))
         others.discard(silver)
         self.assertNotIn(silver, others)
@@ -1618,7 +1662,8 @@ class PageTests(unittest.TestCase):
                      'tools/cell_progress_ref.py', 'tools/cell_progress_build.py', 'amiwind-toolkit/chim-legend.js',
                      'tests/test_cell_progress_legend.js', 'tests/test_cell_progress_page_run.js', 'amiwind-toolkit/header.js',
                      'amiwind-toolkit/chim-head.js', 'amiwind-toolkit/zebra.js', 'config/cell-progress-areas.json',
-                     'tests/test_cell_progress.py'):
+                     'amiwind-toolkit/interior-tracker.js', 'amiwind-toolkit/panel-fold.js',
+                     'tests/test_interior_tracker.js', 'tools/cell_progress_rooms.py', 'tests/test_cell_progress.py'):
             self.assertIn(name, shipped)
             self.assertTrue((ROOT / name).is_file(), name)
 

@@ -27,6 +27,19 @@ def fixture(root):
     (root / "tools/release-files.json").write_text(json.dumps(["README.md", "VERSION", "pyproject.toml", "tools/release-files.json"]))
 
 
+def ledger(root, state="released", other=None):
+    """A CHIM inclusion ledger in the fixture (tools/chim_inclusion.py): VERSION's entry in STATE (None: no entry),
+    and OTHER (another version) as released."""
+    evidence = {"cells": {}, "archive_sha256": "a" * 64, "evidence_sha256": "b" * 64}
+    builds = [dict(evidence, version="v" + (root / "VERSION").read_text().strip(), state=state)] if state else []
+    builds += [dict(evidence, version=other, state="released")] if other else []
+    (root / "amiwind-toolkit").mkdir(exist_ok=True)
+    (root / "amiwind-toolkit/chim-inclusion.json").write_text(
+        json.dumps({"format": "aw-chim-inclusion-1", "builds": builds}) + "\n")
+    files = json.loads((root / "tools/release-files.json").read_text())
+    (root / "tools/release-files.json").write_text(json.dumps(files + ["amiwind-toolkit/chim-inclusion.json"]))
+
+
 class Release(unittest.TestCase):
     def test_only_project_authored_source_graphic_is_allowed(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -128,11 +141,28 @@ class Release(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root, workspace = Path(tmp)/"repo", Path(tmp)/"workspace"
             fixture(root)
+            ledger(root, "released")
             first = release(root, workspace)
             before = Path(first["archive"]).read_bytes()
             with self.assertRaises(ValueError):
                 release(root, workspace)
             self.assertEqual(before, Path(first["archive"]).read_bytes())
+
+    def test_a_release_the_inclusion_ledger_lacks_is_refused(self):
+        # TRACKER-INCLUSION-NOT-RUN-SINCE-44-48: rc and final need their version in the ledger as released
+        for version, state, refused in (("0.1.0", None, "lacks v0.1.0"), ("0.1.0", "packaged", "only as packaged"),
+                                        ("0.1.0-rc1", None, "lacks v0.1.0-rc1"), ("0.1.0-dev1", None, None)):
+            with self.subTest(version=version, state=state), tempfile.TemporaryDirectory() as tmp:
+                root, workspace = Path(tmp)/"repo", Path(tmp)/"workspace"
+                fixture(root)
+                (root / "VERSION").write_text(version + "\n")
+                ledger(root, state, "v9.9.9")
+                if refused:
+                    with self.assertRaisesRegex(ValueError, "Release refused: .*" + refused):
+                        release(root, workspace)
+                    self.assertFalse((workspace / "releases").exists() and any((workspace / "releases").iterdir()))
+                else:
+                    self.assertEqual(release(root, workspace)["status"], "passed")
 
     def test_whitespace_blocks_inspection_and_packaging(self):
         for bad in (b'word \n', b'word\t\n', b' \n', b'    \n', b' \tword\n', b'word\n\n'):

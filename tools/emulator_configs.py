@@ -167,9 +167,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--image', type=Path, required=True)
     parser.add_argument('--kickstart-file', type=Path)
-    parser.add_argument('--fast-ram', metavar='MIB', help='Fast RAM in MiB for both profiles (default: 128 MiB, like a 68060 '
-                        'card; 16 = the smallest machine the game runs on); the same sizes as the launcher: 16, 128, 256, '
-                        '512, 1024, 1536 or another size the emulator can make')
+    parser.add_argument('--fast-ram', metavar='MIB', help='Fast RAM in MiB for both profiles (default: 32 MiB, the safe '
+                        'minimum for the whole game; more is used automatically; 16 starts with a warning and loads more '
+                        'often); the same sizes as the launcher: 16, 32, 64, 128, 256, 512, 1024, 1536 or another size '
+                        'the emulator can make')
     args = parser.parse_args()
     names = write_configs(args.image, args.kickstart_file, fast_ram_mib=args.fast_ram)
     receipt = args.image.resolve().parent / 'build.json'

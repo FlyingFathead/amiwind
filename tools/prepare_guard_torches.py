@@ -22,7 +22,11 @@ import actor_frames
 from map_files import map_files
 
 GUARD_CLASSES = frozenset(('guard', 'ordinator guard'))
-MAX_RECORDS = 32
+# Registry records, one per staged (guard source id, base model): the engine's table holds the same number
+# (engine/aga/src/aw_torch.h AW_GUARD_TORCH_TYPES; tests/test_guard_torch_assets.py keeps them equal). 32 until
+# v0.0.48: with every interior on CHIM rooms dev2 try12 staged 51 records over 49 base models, two models shared by
+# two guards of different appearance, so sharing records by model saves nothing (GUARD-TORCH-TYPES-LIMIT-48).
+MAX_RECORDS = 128
 sha = lambda value: hashlib.sha256(value).hexdigest()
 
 
@@ -61,7 +65,7 @@ def safe_model(name):
 
 def registry(records_):
     if len(records_) > MAX_RECORDS:
-        raise ValueError('Guard registry exceeds bounded record count')
+        raise ValueError('Guard registry exceeds bounded record count: %d of %d' % (len(records_), MAX_RECORDS))
     raw = bytearray(struct.pack('>4sHH', b'AWG1', len(records_), 0))
     seen = set()
     for item in records_:
@@ -118,10 +122,23 @@ class BaseNotReproduced(ValueError):
     guard still fails the step (GUARD-TORCH-CHIM-FRAMES-44)."""
 
 
-def check_skips(skipped):
-    """Only the intro actors' own models (tools/prepare_intro.py bakes progs/np_*.mdl with its own settings) may be
-    skipped; any other guard that does not rebake exactly still fails the step, so torches are never lost silently."""
-    strict = [row for row in skipped if not row['base_model'].startswith(SKIPPABLE_PREFIX)]
+# Guards first staged in v0.0.48 (every interior on CHIM rooms) whose base model this tool does not rebake exactly
+# yet, by source id, with the register entry that tracks them (dev2 try12: six orc guards and one nord: positions
+# 26..33 quantisation steps off in 916..2194 coordinates; todd: every candidate bake over the alias vertex budget).
+# They never had a torch; they get none, named in the receipt, until GUARD-TORCH-REBAKE-MISMATCH-48 is fixed. Any
+# other guard that does not rebake still fails the step.
+KNOWN_NOT_REPRODUCED = {source: 'GUARD-TORCH-REBAKE-MISMATCH-48' for source in (
+    'bagamul gro-dumul', 'largakh gro-bulfim', 'nash gro-khazor', 'thalestris', 'todd', 'ughash gro-batul',
+    'yambul gro-bogrol', 'yashnarz gro-ufthamph')}
+
+
+def check_skips(skipped, known=None):
+    """Only the intro actors' own models (tools/prepare_intro.py bakes progs/np_*.mdl with its own settings) and the
+    listed known guards (KNOWN_NOT_REPRODUCED; known={} is the earlier rule, intro models only) may be skipped; any
+    other guard that does not rebake exactly still fails the step, so torches are never lost silently."""
+    known = KNOWN_NOT_REPRODUCED if known is None else known
+    strict = [row for row in skipped if not row['base_model'].startswith(SKIPPABLE_PREFIX)
+              and row['source_id'] not in known]
     if strict:
         raise ValueError('; '.join(row['reason'] for row in strict))
 
@@ -151,10 +168,35 @@ def _creature_ids(master):
 
 
 def _guard_models(id1, kinds, lights, mesh, creatures=frozenset()):
-    found = {}
     # every map, CHIM frame maps (x.chim) included: town and region frames hold the exterior guards
     # (GUARD-TORCH-CHIM-FRAMES-44: a *.bsp-only scan found only interior guards since v0.0.36)
-    for path in map_files(id1 / 'maps'):
+    found = _scan_guards(map_files(id1 / 'maps'), kinds, lights, mesh, creatures)
+    check_record_count(len(found))
+    return [found[key] for key in sorted(found)]
+
+
+def check_record_count(count, when=''):
+    """The engine's guard torch table holds MAX_RECORDS (AW_GUARD_TORCH_TYPES) records; more stops the build."""
+    if count > MAX_RECORDS:
+        raise ValueError('Too many distinct staged guard models: %d (guard source, model) records%s, the engine '
+                         'holds %d' % (count, when, MAX_RECORDS))
+
+
+def staged_guard_records(map_paths, data_files, unstamped=None):
+    """{(source, model)} of the guards in MAP_PATHS, read only: the payload preflight counts them in the image step's
+    first seconds (tools/payload_preflight.py check_guard_records, GUARD-TORCH-TYPES-LIMIT-48). UNSTAMPED, a list:
+    NPCs with no aw_source_id yet are appended as (map, aw_ref) and skipped instead of refused; the image step stamps
+    the scene maps' NPCs later (PREFLIGHT-GUARD-UNSTAMPED-NPCS-48: the census NPCs in v0.0.48-rc1)."""
+    master = child_ci(Path(data_files), 'Morrowind.esm')
+    kinds, _, _ = load_master(master)
+    lights = _source_records(master)
+    return set(_scan_guards(map_paths, kinds, lights, text(lights['torch'], 'MODL'), _creature_ids(master),
+                            unstamped))
+
+
+def _scan_guards(paths, kinds, lights, mesh, creatures=frozenset(), unstamped=None):
+    found = {}
+    for path in paths:
         with path.open('rb') as stream:
             header = stream.read(124)
             if len(header) != 124 or struct.unpack_from('<i', header)[0] != 29:
@@ -172,6 +214,9 @@ def _guard_models(id1, kinds, lights, mesh, creatures=frozenset()):
             # creature records: never guards, no torch (BUILD-TORCH-CREATURE-RESIDENT-42)
             if source not in kinds['NPC_'] and source in creatures:
                 continue
+            if not source and unstamped is not None:
+                unstamped.append((path.name, ent.get('aw_ref', '')))
+                continue
             if source not in kinds['NPC_']:
                 raise ValueError('Staged NPC lacks original source identity: ' + path.name)
             guard, eligible, inventory = guard_eligibility(kinds['NPC_'][source], lights, mesh)
@@ -179,9 +224,7 @@ def _guard_models(id1, kinds, lights, mesh, creatures=frozenset()):
                 model = safe_model(ent['model'])
                 found[(source, model)] = {'source_id': source, 'base_model': model,
                     'auto_inventory_eligible': eligible, 'inventory': inventory}
-    if len(found) > MAX_RECORDS:
-        raise ValueError('Too many distinct staged guard models')
-    return [found[key] for key in sorted(found)]
+    return found
 
 
 class AuditedAssets(Assets):
@@ -265,7 +308,7 @@ def _reproduce_base(shapes, materials, textures, palette, count, faces, uv, orig
     budget' stopped the guard torches; NPC-HEAD-DECIMATION-33). The error names the guard."""
     import os
     from mesh_geometry_env import NPC_HEAD_REDUCER_VARIABLE, npc_head_reducer
-    from npc_geometry import bake
+    from npc_geometry import bake, AliasOverflow
     configured = npc_head_reducer()
     saved = os.environ.get(NPC_HEAD_REDUCER_VARIABLE)
     tried = []
@@ -276,6 +319,11 @@ def _reproduce_base(shapes, materials, textures, palette, count, faces, uv, orig
                 try:
                     positions, candidate_faces, candidate_uv, _ = bake(shapes, materials, textures, palette,
                         budget=budget, reference_frames=count)
+                except AliasOverflow:
+                    # a candidate over the alias vertex budget is not the existing model either (v0.0.48-dev2 try12:
+                    # this stopped the whole step for one guard; GUARD-TORCH-REBAKE-MISMATCH-48)
+                    tried.append('%s/%d: over the alias vertex budget' % (reducer, budget))
+                    continue
                 except ValueError as error:
                     if str(error) != 'Too many separate shapes for budget':
                         raise

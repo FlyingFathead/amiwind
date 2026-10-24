@@ -38,6 +38,11 @@ float	*origin;
 float	*velocity;
 
 qboolean	onground;
+/* The original's movement speed and its fatigue cost (aw_move.c sets these,
+ * docs/PLAYER_MOVEMENT.md). NULL, or superspeed on: the fixed Quake speeds. */
+void	(*aw_move_ground)(float *forwardmove, float *sidemove);
+int	(*aw_move_water)(float forwardmove, float sidemove, float upmove, float *wishspeed);
+void	(*aw_move_after)(float seconds);
 
 usercmd_t	cmd;
 
@@ -268,7 +273,8 @@ void SV_WaterMove (void)
 		VectorScale (wishvel, sv_maxspeed.value/wishspeed, wishvel);
 		wishspeed = sv_maxspeed.value;
 	}
-	wishspeed *= 0.7;
+	if (!aw_move_water || !aw_move_water(cmd.forwardmove, cmd.sidemove, cmd.upmove, &wishspeed))
+		wishspeed *= 0.7;
 
 //
 // water friction
@@ -336,6 +342,9 @@ void SV_AirMove (void)
 // hack to not let you back into teleporter
 	if (sv.time < sv_player->v.teleport_time && fmove < 0)
 		fmove = 0;
+
+	if (aw_move_ground && (int)sv_player->v.movetype == MOVETYPE_WALK)
+		aw_move_ground (&fmove, &smove);
 
 	for (i=0 ; i<3 ; i++)
 		wishvel[i] = forward[i]*fmove + right[i]*smove;
@@ -436,12 +445,11 @@ void SV_ClientThink (void)
 	if ( (sv_player->v.waterlevel >= 2)
 	&& (sv_player->v.watertype != CONTENTS_LAVA)
 	&& (sv_player->v.movetype != MOVETYPE_NOCLIP) )
-	{
 		SV_WaterMove ();
-		return;
-	}
-
-	SV_AirMove ();
+	else
+		SV_AirMove ();
+	if (aw_move_after)
+		aw_move_after (host_frametime);
 }
 
 

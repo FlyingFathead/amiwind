@@ -31,10 +31,46 @@ def hand_fields(report):
     return result
 
 
+def timing_lines(fields):
+    """The worldspawn lines of FIELDS (hand_fields), one "<field>" "<value>" pair a line in hand_fields order (a
+    placeholder, not a map key: the spawn contract scan reads entity text in tools/): the text every
+    converted map's worldspawn carries (the order stamp() appends them in, so a map written from these lines has the
+    bytes it had when they were read back out of the stamped seyda.bsp)."""
+    return '\n'.join('"%s" "%s"' % (key, value) for key, value in fields.items())
+
+
+def scene_report(scene):
+    """The hands stage's report of a scene folder: scene-ready.json["hands"], else hands-report.json (both written by
+    tools/prepare_hands.py and copied down the scene chain). BUILD-SEYDA-BSP-CARRIER-48: stages read the hand timings
+    from here, never from seyda.bsp's entity lump."""
+    import json
+    scene = Path(scene)
+    ready = scene / 'scene-ready.json'
+    report = json.loads(ready.read_text()).get('hands') if ready.is_file() else None
+    if not report and (scene / 'hands-report.json').is_file():
+        report = json.loads((scene / 'hands-report.json').read_text())
+    if not report:
+        raise ValueError('The scene %s has no hands report (scene-ready.json "hands" or hands-report.json): '
+                         'run the hands stage first' % scene)
+    return report
+
+
+def scene_timings(scene):
+    """The hand timing and eye height lines (timing_lines) of a scene folder's hands report (scene_report)."""
+    return timing_lines(hand_fields(scene_report(scene)))
+
+
 def stamp(raw, fields):
     """Change only the first entity's five metadata fields; keep other lumps."""
+    return stamp_lump(raw, lumps(raw)[0], fields)
+
+
+def stamp_lump(raw, entity_lump, fields):
+    """stamp() with the entity lump given (the hands stage: Seyda Neen's scene entity list, seyda_entities,
+    BUILD-SEYDA-ENTITY-BUS-48): RAW's other lumps are kept, its lump 0 becomes ENTITY_LUMP stamped (RAW itself
+    when that is RAW's own lump 0 already)."""
     data = lumps(raw)
-    text = bytes(data[0])
+    text = bytes(entity_lump)
     block = re.match(rb'\s*\{([^{}]*)\}', text)
     if not block or not re.search(rb'"classname"\s+"worldspawn"', block[1]):
         raise ValueError('Map must begin with worldspawn')
@@ -50,7 +86,7 @@ def stamp(raw, fields):
         else:
             body += replacement + b'\n'
     changed = text[:block.start(1)] + body + text[block.end(1):]
-    if changed == text:
+    if changed == bytes(data[0]):
         return raw
     data[0] = changed
     return pack_lumps(data)

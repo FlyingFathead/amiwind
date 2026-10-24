@@ -39,11 +39,11 @@ static int Finite (float f)
 
 static int Kind (const unsigned char *p, char *out)
 {
-	static const char *const kinds[] = {"INDX", "FRAM", "SECT"};
+	static const char *const kinds[] = {"INDX", "FRAM", "SECT", "ROOM"};
 	int i;
 	memcpy (out, p, 4);
 	out[4] = 0;
-	for (i=0 ; i<3 ; i++)
+	for (i=0 ; i<4 ; i++)
 		if (!memcmp (out, kinds[i], 4))
 			return 1;
 	return 0;
@@ -266,6 +266,76 @@ void ChimFormat_ReachRef (const unsigned char *p, int *owner, int *record)
 int ChimFormat_RecordBytes (int minor)
 {
 	return minor >= CHIM_PLACED_MINOR ? CHIM_RECORD_BYTES_PLACED : CHIM_RECORD_BYTES;
+}
+
+int ChimFormat_RecordLight (int minor, int flags)
+{
+	return minor >= CHIM_LIGHT_MINOR ? (flags >> CHIM_RECORD_LIGHT_SHIFT) & 255 : 0;
+}
+
+int ChimFormat_StoreNameValid (const char *name)
+{
+	int n;
+	if (!name)
+		return 0;
+	for (n=0 ; name[n] ; n++)
+		if (n >= CHIM_STORE_CHARS || !((name[n] >= 'a' && name[n] <= 'z') || (name[n] >= '0' && name[n] <= '9') ||
+			name[n] == '_'))
+			return 0;
+	return n > 0;
+}
+
+int ChimFormat_RoomNameValid (const char *name)
+{
+	int n;
+	if (!name)
+		return 0;
+	for (n=0 ; name[n] ; n++)
+		if (n >= CHIM_ROOM_NAME_CHARS || !((name[n] >= 'a' && name[n] <= 'z') || (name[n] >= '0' && name[n] <= '9') ||
+			name[n] == '_' || name[n] == '-'))
+			return 0;
+	return n > 0;
+}
+
+int ChimFormat_Room (const unsigned char *p, long bytes, chim_header_t *h, chim_room_t *room)
+{
+	const unsigned char *b;
+	int k;
+	unsigned long list;
+	memset (room, 0, sizeof(*room));
+	if (!ChimFormat_Header (p, bytes, "ROOM", h) || h->minor < CHIM_PLACED_MINOR ||
+		bytes < CHIM_HEADER_BYTES + CHIM_ROOM_BLOCK_BYTES || h->count > 65535)
+		return 0;
+	b = p + CHIM_HEADER_BYTES;
+	for (k=0 ; k<3 ; k++)
+	{
+		room->mins[k] = ChimFormat_F32 (b + 4*k);
+		room->maxs[k] = ChimFormat_F32 (b + 12 + 4*k);
+		if (!Finite (room->mins[k]) || !Finite (room->maxs[k]) || room->mins[k] > room->maxs[k] ||
+			room->mins[k] <= -32768 || room->maxs[k] >= 32768)
+			return 0;
+	}
+	room->models = ChimFormat_U32 (b + 24);
+	if (ChimFormat_U32 (b + 28) != 0 || room->models > 65535 || (h->count && !room->models))
+		return 0;
+	list = (unsigned long)CHIM_HEADER_BYTES + CHIM_ROOM_BLOCK_BYTES;
+	return h->directory == list && h->data == list + 4UL*room->models &&
+		(unsigned long)h->bytes == h->data + (unsigned long)CHIM_RECORD_BYTES_PLACED*h->count;
+}
+
+int ChimFormat_StorePath (char *out, int size, const char *store, const char *relative)
+{
+	int n, r;
+	if (!out || size <= 0 || !relative || !ChimFormat_StoreNameValid (store))
+		return 0;
+	n = (int)strlen (store);
+	r = (int)strlen (relative);
+	if (n + 1 + r + 1 > size)
+		return 0;
+	memcpy (out, store, n);
+	out[n] = '/';
+	memcpy (out + n + 1, relative, r + 1);
+	return 1;
 }
 
 /* 1 when a texture of this name and size is drawn turbulent and must be tiled to 64 x 64 first. */

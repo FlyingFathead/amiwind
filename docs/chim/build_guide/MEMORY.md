@@ -1,6 +1,6 @@
 # Memory on the Amiga: the game heap, the CHIM zone and what the builder checks
 
-_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -150,7 +150,13 @@ piece large enough for one house model. Three rules keep the room in one piece:
 
 - **The CHIM heap gate** (`tools/chim/heap.py`): over a grid of player positions in every frame, the
   largest active ring and load ring against the zone's room for chunks (the zone less the frame-world
-  pool), and the largest single block.
+  pool), and the largest single block. A frame whose ring is over the 16 MB baseline's budget, or within
+  64 KiB of it, but fits what the 32 MB minimum gives it (the same zone and the automatic cache bank for
+  its models and textures) is built as it is and marked as needing 32 MB of Fast RAM: `"_chim_frame_fast_mb"
+  "32"` in its frame map's worldspawn, the counts in `chim-receipt.json` (`fast_ram_32mb`). On less Fast
+  RAM, or with Extra RAM off, the engine keeps the player out of that frame at the crossing and says why,
+  as a marked room's door does (CHIM-FRAME-16MB-REFUSAL-48). Measured on the v0.0.48-dev2 builds: 5 of
+  1,351 frames, none over the budget. A frame that fits neither fails the gate.
 - **The whole-map rule**: each frame map's `"_chim_hunk_rest"`, and the zone the rule allows on that
   map with the build's heap size.
 - **The zone walk** (`tools/chim/zone_sim.py`): the engine's own zone code run on the host over a walk
@@ -168,7 +174,9 @@ The heap is 11 MiB unless you ask otherwise:
     ./build.sh --heap-mb 12          # or "heap_mb": 12 in a --build-config file
 
 The builder uses exactly what you ask, like `--jobs N`: it is never refused. 11 MiB is the size
-measured to run the whole game on 16 MiB of Fast RAM; above it the build prints one warning and
+tested on the 16 MiB Fast RAM baseline (the least the game starts on; since 23 October 2026 the
+whole game needs 32 MiB, the safe minimum, where the heap grows to 13 MiB by itself:
+[why 32 MB](../../REAL_HARDWARE.md#why-32-mb-of-fast-ram)); above it the build prints one warning and
 records it in `engine-build.json` (`heap_mb`, `heap_mb_selected_by`, `heap_warning`), the boot check
 prints a `Game heap: ... [!] WARN` row and the engine says so at start. The map heap gates use the
 size you chose. To try a size for one start without rebuilding, start the game with `-heapmb N`
@@ -207,7 +215,7 @@ Fast RAM uses it by itself (since v0.0.42-rc1; [real hardware](../../REAL_HARDWA
 - 16 MiB of Fast RAM with the 11 MiB heap leaves about 1 MiB free at start-up: under the margin, no bank, the game
   plays exactly as before (measured in FS-UAE on 17 October 2026, below).
 - If an allocation fails, everything taken is given back and the start plays on the standard memory. `-chimcache KIB`
-  (by hand, `0` = none) and Options > Extra RAM: Off (`aw_autoram 0`) replace the automatic size.
+  (by hand, `0` = none) and Options > Video > Extra RAM: Off (`aw_autoram 0`) replace the automatic size.
 
 The console line on every start, for example on a 128 MiB Zorro III machine in FS-UAE:
 

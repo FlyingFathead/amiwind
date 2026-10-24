@@ -68,7 +68,21 @@ int main(int argc,char **argv) {
     /* Save IDs: fixed names unchanged, the extra town clear of interiors. */
     assert(AW_MapId("seyda")==1 && AW_MapId("balmora")==16 && AW_MapId("vf0000")==AW_MAP_COUNT);
     assert(AW_MapId("vivec_arena")==AW_TOWN_MAP_BASE && AW_TOWN_MAP_BASE>AW_INTERIOR_MAP_END);
-    assert(AW_TOWN_INTERIOR_BASE==AW_TOWN_MAP_BASE+4096 && AW_SCENE_COUNT==AW_TOWN_INTERIOR_BASE+AW_TOWN_INTERIOR_COUNT);
+    assert(AW_TOWN_INTERIOR_BASE==AW_TOWN_MAP_BASE+4096 && AW_ROOM_BATCH_BASE==AW_TOWN_INTERIOR_BASE+4096);
+    assert(AW_SCENE_COUNT==AW_ROOM_BATCH_BASE+AW_ROOM_BATCH_COUNT && !AW_MapName(AW_TOWN_INTERIOR_BASE+AW_TOWN_INTERIOR_COUNT)[0]);
+    /* Batch rooms (config/room-batches.json): IDs by their id, round trip; an id held by a town list is "". */
+    {
+        int k,named=0;
+        for(k=0;k<AW_ROOM_BATCH_COUNT;k++){
+            const char *room=AW_RoomBatchName(k);
+            if(!room[0]){assert(!strcmp(AW_MapTitle(AW_ROOM_BATCH_BASE+k),"Cancel"));continue;}
+            named++;assert(strlen(room)==12 && room[0]=='r' && room[1]=='i');
+            assert(AW_MapId(room)==AW_ROOM_BATCH_BASE+k && !strcmp(AW_MapName(AW_ROOM_BATCH_BASE+k),room));
+            assert(strcmp(AW_MapTitle(AW_ROOM_BATCH_BASE+k),"Cancel") && AW_TownFind(room)<0 && AW_TerrainId(room)<0);
+        }
+        assert(AW_ROOM_BATCH_COUNT==0 || named>0);
+        assert(AW_MapId("ri0000000000")<0 && AW_MapId("")<0);
+    }
     assert(!strcmp(AW_MapName(AW_TOWN_MAP_BASE),"vivec_arena") && !strcmp(AW_MapTitle(AW_TOWN_MAP_BASE),"Vivec, Arena"));
     assert(!AW_MapName(AW_TOWN_MAP_BASE-1)[0] && !AW_MapName(AW_INTERIOR_MAP_END)[0] && !AW_MapName(AW_SCENE_COUNT)[0]);
     assert(!AW_MapName(AW_TOWN_MAP_BASE+AW_TOWN_EXTRA_COUNT)[0] && !AW_MapName(AW_TOWN_INTERIOR_BASE-1)[0]);

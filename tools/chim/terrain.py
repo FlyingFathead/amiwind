@@ -305,6 +305,58 @@ def chunk_ceiling(task, ceiling=TERRAIN_CEILING):
     return covering_ceiling(task_zmax(task), CHUNK_HEADROOM, ceiling)
 
 
+def lava_prisms(liquids, lava_depth=8.0):
+    """Lava prisms [{'hull': [[x, y], ...] counter-clockwise, 'top': z}] as the plan rows lava_plan splits on: the hull
+    as (x, y) tuples, top, bottom (top - lava_depth) and the plan box."""
+    lavas = []
+    for k, l in enumerate(liquids or ()):
+        hull_xy = [(float(x), float(y)) for x, y in l['hull']]
+        if len(hull_xy) < 3 or polygon_area_xy(np.array([(x, y, 0.0) for x, y in hull_xy])) <= 0:
+            raise ValueError('A lava prism needs a counter-clockwise plan polygon')
+        lavas.append({'k': k, 'hull': hull_xy, 'top': float(l['top']), 'bottom': float(l['top']) - lava_depth,
+                      'box': (min(x for x, _ in hull_xy), min(y for _, y in hull_xy),
+                              max(x for x, _ in hull_xy), max(y for _, y in hull_xy))})
+    return lavas
+
+
+def lava_overlaps(region, l):
+    """True when lava prism l (lava_prisms) covers part of the convex plan region."""
+    b = l['box']
+    if b[2] <= min(x for x, _ in region) or b[0] >= max(x for x, _ in region) or \
+            b[3] <= min(y for _, y in region) or b[1] >= max(y for _, y in region):
+        return False
+    piece = clip_convex_xy(l['hull'], region)
+    return len(piece) >= 3 and abs(polygon_area_xy(np.array([(x, y, 0.0) for x, y in piece]))) > 1e-6
+
+
+def lava_plan(region, ls):
+    """A plan BSP of a convex region (counter-clockwise (x, y) rows) over the lava prisms ls, as qbsp splits a
+    liquid brush: ['split', normal, dist, front, back] on a pool's side line that crosses the region,
+    ['lava', region, top, bottom] where the region lies inside pools (overlapping pools merge: the highest top,
+    the lowest bottom), ['air'] where no pool reaches. Each side line is used once per region it crosses, so
+    neighbouring and overlapping pools cost a node per side, not a copy of every other pool. Exterior chunks
+    (chunk_terrain) and CHIM rooms (chim.interior.liquid_world) share it."""
+    if len(region) < 3:
+        return ['air']
+    ls = [l for l in ls if lava_overlaps(region, l)]
+    if not ls:
+        return ['air']
+    for l in ls:
+        for (ax, ay), (bx, by) in zip(l['hull'], l['hull'][1:] + l['hull'][:1]):
+            nx, ny = by - ay, ax - bx
+            length = math.hypot(nx, ny)
+            if length < 1e-9:
+                continue
+            n = np.array([nx / length, ny / length, 0.0])
+            d = float(n[0] * ax + n[1] * ay)
+            sides = [n[0] * x + n[1] * y - d for x, y in region]
+            if max(sides) > 1e-6 and min(sides) < -1e-6:
+                halves = [clean_xy([(p[0], p[1]) for p in split_keep([(x, y, 0.0) for x, y in region], n, d, k)])
+                          for k in (1.0, -1.0)]
+                return ['split', n, d, lava_plan(halves[0], ls), lava_plan(halves[1], ls)]
+    return ['lava', region, max(l['top'] for l in ls), min(l['bottom'] for l in ls)]
+
+
 def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_id,
                   water_level=WATER_LEVEL, light=TERRAIN_LIGHT, ceiling=TERRAIN_CEILING, collision_box=None,
                   tiles=None, hull='routed', qbsp=None, collision_cache=None, liquids=None, lava_texture_id=None,
@@ -359,14 +411,7 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
     tree = TerrainTree()
     node_rows, leaf_rows, marks, pieces, zs = [], [], [], [], []
     counts = {'tiles': 0, 'ground_faces': 0, 'water_faces': 0, 'lava_faces': 0, 'lava_leaves': 0}
-    lavas = []
-    for k, l in enumerate(liquids or ()):
-        hull_xy = [(float(x), float(y)) for x, y in l['hull']]
-        if len(hull_xy) < 3 or polygon_area_xy(np.array([(x, y, 0.0) for x, y in hull_xy])) <= 0:
-            raise ValueError('A lava prism needs a counter-clockwise plan polygon')
-        lavas.append({'k': k, 'hull': hull_xy, 'top': float(l['top']), 'bottom': float(l['top']) - lava_depth,
-                      'box': (min(x for x, _ in hull_xy), min(y for _, y in hull_xy),
-                              max(x for x, _ in hull_xy), max(y for _, y in hull_xy))})
+    lavas = lava_prisms(liquids, lava_depth)
     if lavas and lava_texture_id is None:
         raise ValueError('Lava prisms need the lava texture')
 
@@ -376,40 +421,6 @@ def chunk_terrain(box, step, height, material, floor, texture_id, water_texture_
         if m[0] == 'lava':
             return lava_texture_id
         return texture_id(m[1])
-
-    def overlaps(region, l):
-        b = l['box']
-        if b[2] <= min(x for x, _ in region) or b[0] >= max(x for x, _ in region) or \
-                b[3] <= min(y for _, y in region) or b[1] >= max(y for _, y in region):
-            return False
-        piece = clip_convex_xy(l['hull'], region)
-        return len(piece) >= 3 and abs(polygon_area_xy(np.array([(x, y, 0.0) for x, y in piece]))) > 1e-6
-
-    def lava_plan(region, ls):
-        """A plan BSP of a convex region (counter-clockwise (x, y) rows) over the lava prisms ls, as qbsp splits a
-        liquid brush: ['split', normal, dist, front, back] on a pool's side line that crosses the region,
-        ['lava', region, top, bottom] where the region lies inside pools (overlapping pools merge: the highest top,
-        the lowest bottom), ['air'] where no pool reaches. Each side line is used once per region it crosses, so
-        neighbouring and overlapping pools cost a node per side, not a copy of every other pool."""
-        if len(region) < 3:
-            return ['air']
-        ls = [l for l in ls if overlaps(region, l)]
-        if not ls:
-            return ['air']
-        for l in ls:
-            for (ax, ay), (bx, by) in zip(l['hull'], l['hull'][1:] + l['hull'][:1]):
-                nx, ny = by - ay, ax - bx
-                length = math.hypot(nx, ny)
-                if length < 1e-9:
-                    continue
-                n = np.array([nx / length, ny / length, 0.0])
-                d = float(n[0] * ax + n[1] * ay)
-                sides = [n[0] * x + n[1] * y - d for x, y in region]
-                if max(sides) > 1e-6 and min(sides) < -1e-6:
-                    halves = [clean_xy([(p[0], p[1]) for p in split_keep([(x, y, 0.0) for x, y in region], n, d, k)])
-                              for k in (1.0, -1.0)]
-                    return ['split', n, d, lava_plan(halves[0], ls), lava_plan(halves[1], ls)]
-        return ['lava', region, max(l['top'] for l in ls), min(l['bottom'] for l in ls)]
 
     def lava_over(poly, faces):
         """The lava plan over one ground polygon's plan area and its warp faces (both sides, on the top plane)."""

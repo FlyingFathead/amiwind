@@ -177,7 +177,7 @@ void AW_FogDraw(void) {
 
 /* Far clipping uses the same forward depth as palette fog. Radial/cubic
  * cutoffs removed visible edge-of-screen ground before it reached the fog.
- * aw_cull (dbg cull, Options > Far detail; saved in config.cfg): 0 no far
+ * aw_cull (dbg cull, Options > Video > Far detail; saved in config.cfg): 0 no far
  * test; 1 the far plane alone (the method from v0.0.31 to v0.0.41, "Full"
  * in the menu); 2: 1 plus the fog-exact test below (the same picture, fewer
  * faces; measured 2026-10-17 at the five Balmora benchmark cameras: -3.2 %
@@ -192,7 +192,7 @@ static cvar_t aw_cull={"aw_cull","4",true};
 /* aw_cull carries two switches above its far test (bits, so they cost no
  * registry entry of their own: tests/resident_registry_budget.json):
  * value = test 0..7 + AW_CULL_FOG_RULE + AW_CULL_GROUPS; dbg fog rule and dbg
- * cut groups set the bits (aw_console.c), Options > Far detail keeps them.
+ * cut groups set the bits (aw_console.c), Options > Video > Far detail keeps them.
  *
  * The fog rule (AW_CULL_FOG_RULE, dbg fog rule; saved; CHIM-BRIDGE-POP-PIECES-44): no distance cut
  * nearer than the fog's full-opacity depth. The fog table (AW_FogDepths) ramps

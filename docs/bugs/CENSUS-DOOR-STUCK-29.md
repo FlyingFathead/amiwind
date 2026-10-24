@@ -17,6 +17,17 @@
 
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [6 October 2026 activation guard candidate](#6-october-2026-activation-guard-candidate)
+- [Report and expected behavior](#report-and-expected-behavior)
+- [Reproduction and cause](#reproduction-and-cause)
+- [Repair and acceptance](#repair-and-acceptance)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## 6 October 2026 activation guard candidate
 
 The proposed overlap guard is now implemented in the next source candidate.
@@ -107,8 +118,9 @@ See [the issue index](../BUGS.md) and [RC1 issues](../BUGS-v0.0.29-RC1.md).
 Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and game state. See [families](README.md#families).
 
 - [AW-20260928-10](AW-20260928-10.md): Interior door animation and sound missing
-- AW-20260928-12 (no report page): Downstairs interior doors cannot open
+- [AW-20260928-12](AW-20260928-12.md): Downstairs interior doors cannot open
 - AW-20260928-19 (no report page): Courtyard barrel incorrectly says empty
+- AW-STATE-32-SLOTS-48 (no report page): The game state table holds 32 globals, 32 quests and 32 items; the game has 143 globals and 318 journal topics
 - AW25-06 (no report page): Quicksave shown as empty; save ordering confusing
 - [CHIM-COURT-BARREL-USE-33](CHIM-COURT-BARREL-USE-33.md): Census courtyard on CHIM: Fargoth's ring barrel cannot be used, so the opening cannot proceed
 - CLOCK-01 (no report page): Automatic clock dropped fractional milliseconds each frame
@@ -129,8 +141,12 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [ENGINE-QC-ARGS-SYSERROR-35](ENGINE-QC-ARGS-SYSERROR-35.md): Bad QuakeC sound arguments stopped the program; lightstyle had no range check
 - [INTRO-CAMERA-GATING-38](INTRO-CAMERA-GATING-38.md): Opening vanity and third-person cameras expose an unselected default race
 - [INVENTORY-CATALOG-LOOKUP-40](INVENTORY-CATALOG-LOOKUP-40.md): Inventory catalogue lookup and name sorting use an equality-only comparison
+- MWSCRIPT-DATA-UNKNOWN-NAMES-48 (no report page): Four Bloodmoon scripts read names declared nowhere in the game data and do not compile
+- MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
+- MWSCRIPT-STATE-NOT-SAVED-48 (no report page): The compiled scripts' values (globals, object and script locals, journal indexes) are not in saved games
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
 - [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry
+- [PLAYER-JUMP-ORIGINAL-RULES-48](PLAYER-JUMP-ORIGINAL-RULES-48.md): The jump height and in-air control are still Quake's, not the original's Acrobatics, load and fatigue rules
 - [PLAYER-JUMP-THIRDPERSON-38](PLAYER-JUMP-THIRDPERSON-38.md): Third-person player jump animation is missing
 - [PLAYER-MOVEMENT-STATS-PARITY-39](PLAYER-MOVEMENT-STATS-PARITY-39.md): Walking/running use fixed debug speeds and do not apply original stats or running fatigue
 - [PLAYER-READY-MOVEMENT-39](PLAYER-READY-MOVEMENT-39.md): Third-person player cannot move with fists drawn

@@ -46,11 +46,14 @@ def prepare(data_files,scene,allow_append=True):
     unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     refs,wanted,disabled=opening_references(data_files)
     def point(ref):return [(ref['position'][i]-(CENTRE[i] if i<2 else 0))*.25 for i in range(3)]
-    path=scene/'id1/maps/seyda.bsp';raw=path.read_bytes();b=lumps(raw);found=set();ent=b[0].rstrip(b'\0').decode('cp1252')
+    path=scene/'id1/maps/seyda.bsp';raw=path.read_bytes();b=lumps(raw);found=set()
+    # Seyda Neen's entities come from the scene entity list, not the carrier's lump (BUILD-SEYDA-ENTITY-BUS-48)
+    from seyda_entities import publish as publish_entities, writer_lump
+    b[0]=writer_lump(scene,raw);ent=b[0].rstrip(b'\0').decode('cp1252')
     # A source-only carrier (the bsp stage's --seyda-source carrier, BUILD-SEYDA-HULL2-32) has no geometry: the
     # barrel is already one of its placements, and appending meshes to it is refused.
-    from prepare_seyda_source import is_source_carrier
-    carrier=is_source_carrier(raw)
+    from prepare_seyda_source import is_source_carrier_lump
+    carrier=is_source_carrier_lump(b[0])
     if carrier:allow_append=False
     by_number={r['number']:r for r in wanted}
     def bind(match):
@@ -85,6 +88,7 @@ def prepare(data_files,scene,allow_append=True):
         base=scene/'seyda-before-barrel.bsp';replace_copy(path,base)
         append_meshes(base,path,parts,scene/'id1/gfx/palette.lmp');found.add(barrel['number'])
     replace_copy(path,scene/'seyda.bsp')
+    publish_entities(scene,path.read_bytes())
     result={'bound':sorted(found),'not_converted':[r['number'] for r in wanted if r['number'] not in found],
             'source_disable_ids':sorted(disabled)}
     (scene/'opening-refs.json').write_text(json.dumps(result,indent=2)+'\n')

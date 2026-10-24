@@ -48,6 +48,39 @@ class HandMetadata(unittest.TestCase):
         self.assertEqual(bytes(lumps(fixed)[0]).count(b'"aw_hand_draw"'), 1)
         self.assertIn(b'"aw_hand_draw" "0.47"', lumps(fixed)[0])
 
+    def test_scene_timings_are_the_stamped_carrier_lines(self):
+        # BUILD-SEYDA-BSP-CARRIER-48: the readers take the timings from the hands report; the lines are the ones the
+        # old readers' regex read back out of the stamped seyda.bsp, byte for byte (same map bytes, same unit keys)
+        import json
+        import re
+        from hand_metadata import scene_report, scene_timings, timing_lines
+        stamped = bytes(lumps(stamp(self.map_bytes(), hand_fields(self.report())))[0]).decode('cp1252')
+        old = '\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"', stamped))
+        self.assertEqual(timing_lines(hand_fields(self.report())), old)
+        with tempfile.TemporaryDirectory() as tmp:
+            scene = Path(tmp)
+            with self.assertRaisesRegex(ValueError, 'no hands report'):
+                scene_timings(scene)
+            (scene / 'hands-report.json').write_text(json.dumps(self.report()))
+            self.assertEqual(scene_timings(scene), old)
+            # scene-ready.json["hands"] first (the image's own source, build_aga stamp_staged_hands)
+            other = self.report(); other['eye_above_origin'] = 20.5
+            (scene / 'scene-ready.json').write_text(json.dumps({'hands': other}))
+            self.assertEqual(scene_report(scene)['eye_above_origin'], 20.5)
+            self.assertIn('"aw_eye_height" "20.5"', scene_timings(scene))
+            # no seyda.bsp is read at all
+            self.assertFalse((scene / 'id1').exists())
+
+    def test_no_reader_parses_hand_timings_out_of_a_map(self):
+        # the nine stage readers of BUILD-SEYDA-BSP-CARRIER-48 take the report; only the legacy region rebuild
+        # (rebuild_balmora_region: the region map it rebuilds keeps its own fields) still reads a map
+        tools = Path(__file__).resolve().parents[1] / 'tools'
+        for name in ('chim_room_batches', 'prepare_area', 'chim_town', 'chim_rooms', 'prepare_census',
+                     'prepare_balmora_interiors', 'prepare_interior', 'import_town'):
+            text = (tools / (name + '.py')).read_text(encoding='utf-8')
+            self.assertNotIn('eye_height)', text, name)
+            self.assertTrue('scene_timings' in text or 'timing_lines' in text, name)
+
     def test_invalid_source_timing_and_frame_contract_are_rejected(self):
         for value in (0, -1, 61, float('nan'), float('inf'), True, '0.4'):
             report = self.report(); report['clips']['draw']['duration'] = value

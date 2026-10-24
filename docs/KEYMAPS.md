@@ -1,11 +1,12 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [v0.0.29 F/V regression gate](#v0029-fv-regression-gate)
+- [Options](#options)
 - [Options > Controls](#options--controls)
 - [Configurable gameplay bindings](#configurable-gameplay-bindings)
 - [Reserved and contextual controls](#reserved-and-contextual-controls)
@@ -37,18 +38,55 @@ writes the current bindings to `keymaps.cfg` and settings to `config.cfg`.
 Edit the personal file while the game is closed; an active session saves its own
 bindings when it exits. Keep the shipped defaults for recovery.
 
+## Options
+
+Options (from the pause menu or the title screen) fills the whole screen. Like
+the original game's Options it has four pages, each a framed tab along the top:
+Prefs, Audio, Controls and Video. A page's settings sit in one framed group under
+the tabs (seven rows at a time; a longer page scrolls), with a help line and Back
+at the bottom. Up and Down move between the tab row, the page's rows and Back;
+on the tab row Left and Right change the page, on a row they change its value;
+Enter or a click acts and Escape returns to the menu. The mouse works throughout:
+click a tab, a row, a slider or Back; the wheel moves like Up and Down. The game
+world is not drawn while Options is open.
+
+```text
+[ Prefs ]  [ Audio ]  [ Controls ]  [ Video ]
+Prefs     Show crosshairs, Crosshair colour, Crosshair shape, Gold frame,
+          UI font, Voice speaker names, Dialogue style, Aimed NPC names,
+          NPC (name place), Objects (name place), Autosave history
+Audio     Master, Music, Effects, Dialogue (sliders)
+Controls  Mouse sensitivity (slider), Invert Y axis, the gameplay actions,
+          Combat style, Dice rolls, Blocking, Reset to defaults
+Video     Fog distance, Reset distance, Far detail, Photo mode, Area loading,
+          Load method, Read-ahead buffer, Extra RAM
+```
+
+Until v0.0.48 these were one list with Interface..., Audio... and Controls...
+sub-menus; every setting kept its name and its saved value.
+
 ## Options > Controls
 
-Options > Controls lists the gameplay actions with their current keys. Select an
+Mouse sensitivity is Quake's `sensitivity` setting, saved in `config.cfg`. Its
+default stays 3.0. The page steps it from 0.5 to 10 by 0.5 (Shift with an arrow:
+0.1; Home and End: the ends), or drag its rail. `dbg sensitivity` prints it, and
+`dbg sensitivity 1.5` sets any value from 0.1 to 20. Invert Y axis turns the
+vertical mouse look upside down (Quake's own invert: the sign of the saved
+`m_pitch`), as the original game's Invert Y Axis.
+
+The gameplay actions follow with their current keys. Select an
 action and press Enter or click, then press the new key; Escape cancels.
 Delete or Backspace clears the action's keys. Each action holds up to two keys;
 a third key replaces both. A key already used by another action moves to the
-new action. Reset to defaults reloads the shipped `keymaps-default.cfg`.
-Changes use the same bindings as `bind` and are saved to `keymaps.cfg` on exit.
+new action. Reset to defaults reloads the shipped `keymaps-default.cfg` (the key
+bindings only; sensitivity and invert stay). Changes use the same bindings as
+`bind` and are saved to `keymaps.cfg` on exit.
 F1-F12 and the console keys are handled before the menu and cannot be captured
 there; bind them with the console.
 
-The inventory is bound to I by default (`aw_inventory`). Greyed rows are planned
+The inventory is bound to I by default (`aw_inventory`), the Stats window to P
+(`aw_stats`) and the Magic window to O (`aw_magicmenu`); older saved key files get
+P and O when those keys are free. Greyed rows are planned
 actions (quick keys, magic) with their intended
 keys. They become selectable when the action exists. The action table
 and the steps for adding one are documented in `engine/aga/src/aw_menu.c`.
@@ -80,6 +118,9 @@ is tracked in [UI-KEY-HELP-STALE-38](bugs/UI-KEY-HELP-STALE-38.md).
 | Mouse wheel up / down | `aw_view_zoom 1` / `aw_view_zoom -1` | Third-person camera zoom in / out; see [camera behavior](THIRD_PERSON.md) |
 | M | `aw_worldmap` | Open world map, including debug/noclip |
 | J | `aw_journal` | Open journal |
+| I | `aw_inventory` | Open inventory |
+| P | `aw_stats` | Open the Stats window: health, magicka, fatigue, level, race, class, attributes, skills ([windows](INVENTORY.md#stats-and-magic-windows-23-october-2026)) |
+| O | `aw_magicmenu` | Open the Magic window (placeholder until spells exist: race and birthsign spells by name) |
 | T | `aw_wait` | Wait panel |
 | F1 | `aw_quick_help` | Quick help |
 | F5 / F9 | `aw_quicksave` / `aw_quickload` | Quick save / load |
@@ -131,6 +172,9 @@ all remappable through gameplay bindings.
 | Debug teleport map | Enter / Escape | Confirm selected target / cancel |
 | Debug teleport map | Right drag / arrows | Pan without selecting a target |
 | Journal | J, Escape | Close journal |
+| Stats window | P (or its bound key), Escape | Close the window |
+| Stats window | Up / Down, wheel, Page Up / Down, Home / End, scrollbar | Scroll the skill list |
+| Magic window | O (or its bound key), Escape | Close the window |
 | Gallery | Wheel / middle mouse | Navigate model view / return to browser |
 | Menus | Arrows, Enter, Escape | Select, activate, back |
 
@@ -149,7 +193,7 @@ The compass is normal gameplay UI and does not require debug mode.
 ## Photo mode and crosshair
 
 `dbg photomode` (also `dbg killhud`) toggles photo mode for clean screenshots;
-`dbg photomode on` / `off` set it. Options > Photo mode does the same from the
+`dbg photomode on` / `off` set it. Options > Video > Photo mode does the same from the
 pause menu (Leave photo mode while it is on). Photo mode hides everything drawn
 over the view: the health/magicka/fatigue bars, the crosshair, the first-person
 hands, weapon and torch (Quake's `r_drawviewmodel`; the torch light stays, so
@@ -175,9 +219,37 @@ Photo mode is not saved: game saves need the player on foot, and `config.cfg`
 is written with the settings from before photo mode.
 
 `dbg crosshair` (also `dbg crosshairs`) toggles the crosshair; `on` / `off` set
-it. Options > Show crosshairs does the same. It is the player's preference,
+it. Options > Prefs > Show crosshairs does the same. It is the player's preference,
 saved in `config.cfg` (Quake's `crosshair` setting, default on). A change made
 during photo mode applies when photo mode ends.
+
+Options > Prefs > Crosshair colour and Crosshair shape choose its look, with a
+preview beside each row; `dbg crosshair colour NAME` and `dbg crosshair shape
+NAME` do the same (a number or the start of a name is enough; no name prints the
+current one and the choices), and `dbg crosshair style` prints all three. Both
+are saved in `config.cfg` (`aw_crosshair_colour`, `aw_crosshair_shape`).
+
+| Colour | Drawn with |
+| --- | --- |
+| Warm white (default) | The look of every release before v0.0.48: palette entry 254, the brightest colour of the game's palette (238, 221, 170). The palette has no pure white; it stays as it is, so no palette is rebuilt (UI-PALETTE-NO-WHITE-48) |
+| Yellow | The enemy health bar's yellow from the reserved status-bar colours (palette 225 to 253) |
+| Green | The fatigue bar's green from the same colours |
+| Blue | The magicka bar's light blue from the same colours |
+
+Red is left out: the red crosshair means "this NPC can be picked" in
+`dbg companion pick`, which keeps drawing its own red cross.
+
+| Shape | Form |
+| --- | --- |
+| Cross (default) | The 5 by 5 pixel plus of every release before v0.0.48 |
+| Open cross | Four 3-pixel arms around a gap, the form of the original game's crosshair |
+| Small cross | A 3 by 3 pixel plus |
+| Dot | A 3 by 3 pixel square |
+
+The original game has only Crosshair on/off (Options > Prefs); its crosshair is a
+white open cross drawn partly transparent. OpenMW offers the same on/off switch
+(Options > Prefs) and tints the crosshair red over items an NPC owns when its
+"show owned" setting asks for it; neither offers a colour or shape choice.
 
 ## Console line editing
 Animation kit console commands (`dbg animkit`): [ANIMKIT.md](ANIMKIT.md#console-dbg-animkit).
@@ -215,7 +287,7 @@ Shift/Ctrl/Alt are refreshed from each native input qualifier, with Caps Lock
 limited to letters and focus changes clearing held input. Legacy personal
 keymap.cfg loads before keymaps.cfg. The maintained canonical reference is
 KEYMAPS.md. Autosave default is five; aw_autosaves 0..16 remains an archived
-setting in config.cfg and Options > Autosave history.
+setting in config.cfg and Options > Prefs > Autosave history.
 
 
 The compass/heading HUD defaults to hidden in rc6. Use `dbg compass on` or

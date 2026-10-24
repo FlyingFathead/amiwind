@@ -243,6 +243,28 @@ def combat_summary(report):
                          for k, v in report.get('fighters', {}).items()}}
 
 
+def install_mwscript(stage, id1):
+    """Put the compiled game scripts (prepare_mwscript.py) into the payload: id1/mwscript.awm, checked against the
+    stage receipt's SHA-256 and read back as an AWMS1 file; hard-linked (stored once), copied where a link cannot be
+    made. Nothing else of the stage enters the image (its report stays beside it)."""
+    stage = Path(stage)
+    receipt = json.loads((stage/'mwscript-receipt.json').read_text(encoding='utf-8'))
+    source = stage/'id1'/'mwscript.awm'
+    if hashlib.sha256(source.read_bytes()).hexdigest() != receipt.get('sha256'):
+        raise ValueError(f'Compiled scripts differ from their stage receipt: {source}')
+    from mwscript import awms
+    awms.read(source.read_bytes())
+    target = Path(id1)/'mwscript.awm'
+    if target.exists():
+        target.unlink()
+    try:
+        os.link(source, target);how = 'linked'
+    except OSError:
+        shutil.copyfile(source, target);how = 'copied'
+    return {'file': 'id1/mwscript.awm', 'sha256': receipt['sha256'], 'bytes': target.stat().st_size, 'how': how,
+            'unit_key': receipt.get('unit_key'), 'cache': receipt.get('cache')}
+
+
 def stage_debug_catalogues(id1, debug_luma=False):
     """Required on-disk metadata: fail the build instead of shipping broken dbg."""
     # camera-marks.txt: the public camera marks of dbg cam recall (docs/CAMERA_MARKS.md), checked as the engine reads them.
@@ -964,6 +986,11 @@ def write_content_fingerprint(id1, jobs=1, partial=False, removed=(), excluded=(
         from map_files import is_chim_frame, map_files
         names+=['maps/'+p.name for p in map_files(Path(id1)/'maps')
                 if not re.fullmatch(r'vf[0-9]{4}', p.stem) and is_chim_frame(p)]
+    # A room map the CHIM rooms install made into maps/<room>.chim is that room as the engine opens it (map_rel):
+    # the fingerprint names the file the image holds (IMAGE-ROOM-MAPS-FINGERPRINT-48); without CHIM rooms nothing changes.
+    from map_files import map_rel
+    names=[map_rel(id1,name[5:-4]) if name.startswith('maps/') and name.endswith('.bsp') and
+           not (Path(id1)/name).is_file() else name for name in names]
     for name in names:
         if not (Path(id1)/name).is_file():raise ValueError('Required character-creation asset missing: '+name)
     for name,value in zip(names,hash_files([Path(id1)/name for name in names],jobs)):
@@ -1149,7 +1176,8 @@ def empty_miniwind_actor_evidence(args, maps):
     frames = chim_town_grounding(args)
     if not town or set(frames) != {town} or frames[town]:
         return None
-    if any(p.stem != 'torchtest' for p in Path(maps).glob('*.bsp')):
+    from map_files import scene_maps   # x.bsp and the CHIM room maps (IMAGE-ROOM-MAPS-LATE-PASSES-48)
+    if any(p.stem != 'torchtest' for p in scene_maps(maps)):
         return None
     from mwad.audit import load_esm
     from mwad.paths import child_ci
@@ -1310,7 +1338,7 @@ def chim_world_once(chim_world, held):
 
 
 def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, special_rows=None, activated=None,
-                    keep_catalogues=None, world=None):
+                    keep_catalogues=None, world=None, region_actors=None):
     """Check a CHIM world's receipts and write its frame maps into id1: maps/<town>-chim.chim for each
     area (.bsp with chim_frame_ext bsp; tools/map_files.py; the engine loads it instead of the town's
     region maps when CHIM is on), and for Seyda Neen its special maps (format 0.5). Each is checked against the town's final legacy maps, which must
@@ -1324,6 +1352,7 @@ def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, s
     keep_catalogues: {map name: SHA-256} of the harvest step's catalogues for the region frame maps (they stay with
     their frame map: chim.frame_map.install_region, HARVEST-CHIM-REGION-LOSS-41).
     world: the CHIM world already read (chim_world_once); without it it is read here.
+    region_actors: the region frames' actors (region_actor_inputs, EXPERIMENTAL --chim-region-actors on), or None.
     Returns {'areas', 'receipt', 'frame_maps', 'region_maps', 'region_cache'}."""
     import build_profile
     import progress_line
@@ -1378,12 +1407,26 @@ def chim_frame_maps(chim_world, id1, town_rows=None, jobs=1, hand_fields=None, s
                                                           (timer.count, timer.total, 'maps')))
             region_maps, reused = build_regions(id1, table['frames'], chim_world, world=world, jobs=workers,
                                                 cache=cache, progress=progress, rows=rows, hand_fields=hand_fields,
-                                                keep_catalogues=keep_catalogues)
+                                                keep_catalogues=keep_catalogues, actors=region_actors)
             region_cache = dict(cache.summary() if cache is not None else {'status': 'off'}, reused=reused,
                                 made=len(region_maps) - reused, rows=rows)
             timer.done('Image: CHIM region frame maps: %d written (%d from the pass cache, %d made)'
                        % (len(region_maps), reused, len(region_maps) - reused))
         frame_maps += region_maps
+    # CHIM frames over or near the 16 MB budget (the CHIM stage's heap gate, receipt 'fast_ram_32mb'): their frame
+    # maps carry the 32 MB mark the engine reads at the crossing into them (CHIM-FRAME-16MB-REFUSAL-48)
+    fast = (receipt.get('fast_ram_32mb') or {}).get('frame_records') or []
+    if fast:
+        from chim.heap import FRAME_FAST_KEY, SAFE_FAST_MB, frame_cells, mark_frame_maps
+        marked = set(mark_frame_maps(id1, frame_cells(fast), maps=[r['map'][5:] for r in frame_maps]))
+        for record in frame_maps:
+            if Path(record['map']).stem in marked:
+                record['fast_mb'] = SAFE_FAST_MB
+                if 'bytes' in record:
+                    record['bytes'] = (Path(id1) / record['map']).stat().st_size
+        print('[chim] CHIM frame maps marked "%s" "%d" (the player is kept out on less Fast RAM): %d of %d frames: %s'
+              % (FRAME_FAST_KEY, SAFE_FAST_MB, len(marked), len(fast), ', '.join(sorted(marked)) or 'none'),
+              flush=True)
     # Each frame map's far terrain (chim.far): maps/<frame map>.far beside it, like a Quake .lit file.
     with build_profile.phase('Image: CHIM far terrain', total=len(frame_maps), unit='maps') as timer:
         for record in frame_maps:
@@ -1405,7 +1448,7 @@ def legacy_maps_summary(id1, removed_legacy):
     still in the payload as legacy maps (must be none: a CHIM frame map written under the legacy name, chim_frame_ext
     bsp, is a frame map), and the payload's maps by kind (CHIM frame maps, far terrain, open-world legacy maps,
     interiors and other maps)."""
-    from map_files import is_chim_frame, is_map_name, map_stem
+    from map_files import is_chim_frame, is_chim_room, is_map_name, map_stem
     maps = Path(id1)/'maps'
     removed = [row for row in removed_legacy or [] if row['file'].startswith('maps/')]
     shipped = sorted(row['file'] for row in removed
@@ -1420,6 +1463,8 @@ def legacy_maps_summary(id1, removed_legacy):
             kind = 'other files'
         elif is_chim_frame(path):                       # by its key, whatever its extension (tools/map_files.py)
             kind = 'CHIM frame maps'
+        elif is_chim_room(path):                        # IMAGE-ROOM-MAPS-LATE-PASSES-48: not counted as room maps
+            kind = 'CHIM room maps'
         elif re.fullmatch(r'vf[0-9]{4}', map_stem(path.name)):
             kind = 'open-world legacy maps'
         else:
@@ -1940,6 +1985,15 @@ def image(args):
                                     out/'torchtest-build',args.qbsp,args.vis,args.light)
     (out/'torchtest-staging.json').write_text(json.dumps(torchtest_report,indent=2)+'\n', newline='\n')
     (out/'torch-conversion.json').write_text(json.dumps(torch_report,indent=2)+'\n', newline='\n')
+    # The world UI (map, journal, region names and weather: about 10 s on one core) reads only the game data and the
+    # final palette and writes only id1/world: it runs in a spawned worker beside the combat data, the player view
+    # and the inventory (none of which reads or writes either), and is validated where it ran before
+    # (BUILD-IMAGE-FINALIZE-UNDERUSED-48). One job: it runs there, in this process, as before.
+    world_ui=None
+    if args.data_files:
+        from build_parallel import Background
+        from prepare_world_ui import prepare_image as prepare_world_ui_image
+        world_ui=Background(prepare_world_ui_image,args.data_files,boot,jobs=jobs)
     # Melee combat for every NPC and the Vivec Arena minigame (docs/COMBAT.md):
     # game settings, one combat sheet per NPC record, the hit/miss sounds and the
     # Arena fighters' combat-frame models, all from the owned master.
@@ -1957,8 +2011,8 @@ def image(args):
     print('Converting original inventory metadata and selected item resources...',flush=True)
     inventory_report=prepare_inventory(args.data_files,boot/'id1',jobs=jobs)
     (out/'inventory-data.json').write_text(json.dumps(inventory_report,indent=2)+'\n',encoding='utf-8',newline='\n')
-    from prepare_world_ui import prepare as prepare_world_ui, validate as validate_world_ui
-    if args.data_files:prepare_world_ui(args.data_files,None,boot)
+    from prepare_world_ui import validate as validate_world_ui
+    if world_ui is not None:world_ui.result()
     validate_world_ui(boot/'id1')
     logo=ROOT/'resources/media/AmiWind_wordmark.png'
     # Menu logo: the gold name without the rule, on the palette's gold ramp
@@ -2068,6 +2122,13 @@ def image(args):
         installed=[install_chim_town(path,boot/'id1') for path in args.chim_town]
         (out/'chim-towns.json').write_text(json.dumps(installed,indent=2)+'\n',encoding='utf-8',newline='\n')
         print('CHIM towns from the game data (no legacy region maps): '+', '.join(native),flush=True)
+    if getattr(args,'chim_room_batches',None):
+        # Interior rooms by batch (tools/chim_room_batches.py): their shell room maps, residents and door banks; the
+        # CHIM rooms install makes their .chim maps; the door links follow the frame maps (finalize_image)
+        from room_batches import install as install_room_batches
+        batches=install_room_batches(args.chim_room_batches,boot/'id1',jobs=jobs)
+        print('Room batches %s: %d rooms installed (%d files)'%(batches['record']['selection'],len(batches['rooms']),
+                                                               batches['files']),flush=True)
     if getattr(args, 'balmora_cache', None):
         from repair_balmora_maps import repair as repair_balmora_maps
         print('Preparing measured bounded Balmora layout from complete source cache...', flush=True)
@@ -2117,14 +2178,10 @@ def image(args):
         # Harvestable mushrooms replace baked ones before the final map passes (BUILD-HARVEST-NOT-BUILT-32).
         from harvest_build import clear_baked
         clear_baked(args.harvest,boot/'id1',out/'harvest',data_files=args.data_files,jobs=jobs,native=native,
-                    chim_world=getattr(args,'chim_world',None))
-    qc=out/'qc';qc.mkdir()
-    for name in ['defs.qc','world.qc']:shutil.copyfile(ROOT/'engine/aga/qc'/name,qc/name)
-    if args.hands=='sprites':
-        if not (scene/'id1/gfx/hands.aws').is_file():raise ValueError('Bake hand sprites first')
-        q=qc/'world.qc';q.write_text(q.read_text().replace('progs/v_nord.mdl','progs/player.mdl'), newline='\n')
-    (qc/'progs.src').write_text('../boot/id1/progs.dat\ndefs.qc\nworld.qc\n', newline='\n');run([args.qcc],qc)
-    validate_quakec(boot/'id1/progs.dat')
+                    chim_world=getattr(args,'chim_world',None),
+                    # CHIM rooms: a room whose record keeps its plants keeps them baked (CHIM-ROOM-HARVEST-DOUBLE-48)
+                    chim_interiors=getattr(args,'chim_interiors',None))
+    compile_quakec(args, out, boot, scene)
     # Saved mutable state is only restored against this exact converted content.
     if args.data_files:
         from actor_grounding import annotate, bake_ground
@@ -2134,6 +2191,18 @@ def image(args):
         (out/'actor-ground-support.json').write_text(json.dumps(bake_ground(boot/'id1/maps',jobs=jobs,exclude=frozen),indent=2)+'\n', newline='\n')
     recorded_stage.check(boot/'id1',out/'bounded-seyda','image map passes (flora, harvest removal, actor grounding)',jobs=jobs)
     return finalize_image(args)
+
+
+def compile_quakec(args, out, boot, scene):
+    """The game code (engine/aga/qc) compiled into id1/progs.dat (out/qc the work folder) and checked; a timed phase
+    of the image step (build_profile PHASES)."""
+    qc=out/'qc';qc.mkdir()
+    for name in ['defs.qc','world.qc']:shutil.copyfile(ROOT/'engine/aga/qc'/name,qc/name)
+    if args.hands=='sprites':
+        if not (scene/'id1/gfx/hands.aws').is_file():raise ValueError('Bake hand sprites first')
+        q=qc/'world.qc';q.write_text(q.read_text().replace('progs/v_nord.mdl','progs/player.mdl'), newline='\n')
+    (qc/'progs.src').write_text('../boot/id1/progs.dat\ndefs.qc\nworld.qc\n', newline='\n');run([args.qcc],qc)
+    validate_quakec(boot/'id1/progs.dat')
 
 
 def miniwind_hdf_tag(args):
@@ -2219,17 +2288,51 @@ def staged_exterior_map_names(id1, chim_world=None, exterior_terrain=None):
 
 
 def staged_town_interiors(id1):
-    """Converted town interiors (config/towns.json town lists) present in the stage."""
+    """Converted town interiors (config/towns.json town lists) present in the stage, as a room map or, after the
+    CHIM rooms install, as a CHIM room map (map_files.map_file)."""
+    from map_files import map_file
     from town_config import town_interiors
-    return [room['map'] for room in town_interiors() if (Path(id1) / 'maps' / (room['map'] + '.bsp')).is_file()]
+    return [room['map'] for room in town_interiors() if map_file(Path(id1) / 'maps', room['map']).is_file()]
 
 
-def staged_interior_map_names(id1):
-    """Only explicit authored scene catalogue interior classifications apply."""
+def write_room_batch_links(args, id1, out, chim_frames):
+    """The door links of the batch rooms (tools/room_batches.py link_banks) into id1's door banks; the receipt goes to
+    OUT/room-batch-links.json. Returns it."""
+    import room_batches
+    from map_files import map_file
+    from mwad.interior import original_doors
+    from mwad.paths import child_ci
+    from town_interiors import frame_towns, room_offsets
+    id1 = Path(id1)
+    maps = id1 / 'maps'
+    record = json.loads((Path(args.chim_room_batches) / room_batches.RECORD).read_text(encoding='utf-8'))
+    batch = {r['room'].casefold(): r['map'] for r in record['rooms'] if map_file(maps, r['map']).is_file()}
+    present = {cell: name for cell, name in room_batches.listed_maps().items()
+               if name and map_file(maps, name).is_file()}
+    present.update(batch)
+    towns = [t for t in frame_towns(prefer=chim_native_towns(args)) if map_file(maps, t[0]).is_file()]
+    regions = room_batches.region_frames(chim_region_table(args.chim_world), (chim_frames or {}).get('region_maps'))
+    listed = {r['room'].casefold() for r in room_batches.rows(room_batches.load())}
+    receipt = room_batches.link_banks(id1, batch, present, original_doors(child_ci(args.data_files, 'Morrowind.esm')
+                                                                          .read_bytes()),
+                                      {'towns': towns, 'regions': regions}, room_offsets(), listed)
+    receipt.update(rooms=len(batch), town_frames=[t[0] for t in towns], region_frames=len(regions))
+    (Path(out)/'room-batch-links.json').write_text(json.dumps(receipt, indent=1, sort_keys=True)+'\n',
+                                                   encoding='utf-8', newline='\n')
+    print('Room batches: door links %s; %d rows left unlinked (room-batch-links.json)'
+          % (', '.join('%s %d' % kv for kv in receipt['linked'].items()), receipt['unlinked_count']), flush=True)
+    return receipt
+
+
+def staged_interior_map_names(id1, room_batches=None):
+    """Only explicit authored scene catalogue interior classifications apply, plus the town lists' rooms and the batch
+    rooms the image holds (room_batches: the --chim-room-batches stage folder; tools/room_batches.py)."""
     from area_config import SCENES
+    from room_batches import staged_rooms
     id1 = Path(id1)
     return {scene["map"] for scene in SCENES if scene.get("interior") is True
-            and (id1 / "maps" / (scene["map"] + ".bsp")).is_file()} | set(staged_town_interiors(id1))
+            and (id1 / "maps" / (scene["map"] + ".bsp")).is_file()} | set(staged_town_interiors(id1)) \
+        | set(staged_rooms(id1, room_batches))
 
 
 def require_complete_media_outputs(media_coverage):
@@ -2312,9 +2415,69 @@ def payload_preflight(args, out, excluded, jobs, pending=None):
                          exterior_terrain=getattr(args, 'exterior_terrain', None) or getattr(args, 'world_terrain', None),
                          layout=disk_layout_settings(args), media=getattr(args, 'media', None),
                          media_catalogue=getattr(args, 'media_catalogue', False),
+                         # the actor library finalize_image installs after the plan (only with the actor table on)
+                         # is counted in it (IMAGE-LAYOUT-PLAN-ACTOR-LIBRARY-48)
+                         actor_library=installed_actor_library(args),
+                         # the room batches and the CHIM rooms install the image step adds after a preflight
+                         # (IMAGE-BOOT-PAYLOAD-OVER-2GIB-48)
+                         room_batches=getattr(args, 'chim_room_batches', None),
+                         chim_interiors=getattr(args, 'chim_interiors', None),
                          # the layout plan the image step follows (tools/layout_plan.py): written by every run of the
                          # preflight on a real image run, so finalize_image follows the latest one
                          layout_plan_path=None if getattr(args, 'payload_preflight_only', False) else out/'layout-plan.json')
+
+def installed_actor_library(args):
+    """The actor library stage finalize_image installs into id1 (--actor-library with --chim-actor-table on or
+    --chim-region-actors on), or None: the payload preflight counts its files in the layout plan."""
+    if (getattr(args, 'chim_actor_table', 'off') == 'on' or region_actors_on(args)) and \
+            getattr(args, 'actor_library', None):
+        return args.actor_library
+    return None
+
+
+def write_actor_table(args, out, boot, library, actor_tables):
+    """The actor table (--chim-actor-table on, tools/chim/actors.py, CHIM-EXTERIOR-ACTORS-MISSING-46): every exterior
+    NPC and creature reference in one table beside the frame maps, for the type 1 window; its report in OUT."""
+    from chim.actors import FILE_NAME, write_table
+    from mwad.paths import child_ci
+    actor_table = write_table(boot/'id1/maps'/FILE_NAME, child_ci(args.data_files,'Morrowind.esm'), boot/'id1/maps',
+                              Path(args.chim_world)/'chim' if getattr(args, 'chim_world', None) else None, library,
+                              tables=actor_tables.result())
+    (out/'chim-actor-table.json').write_text(json.dumps(actor_table, indent=1, sort_keys=True)+'\n', encoding='utf-8',
+                                             newline='\n')
+    print('Image: actor table: %d records (%d with a model), %d bases, %d bytes' % (
+        actor_table['records'], actor_table['spawnable_records'], actor_table['bases'], actor_table['bytes']),
+        flush=True)
+    return actor_table
+
+
+def region_actors_on(args):
+    """True with --chim-region-actors on (EXPERIMENTAL, tools/chim/region_actors.py) and a CHIM world."""
+    return getattr(args, 'chim_region_actors', 'off') == 'on' and bool(getattr(args, 'chim_world', None))
+
+
+def region_actor_inputs(args, census, town_rows, special_rows, heap_mb):
+    """The region frames' actor inputs (chim.frame_map.build_regions actors=) with --chim-region-actors on, else
+    None: the census of the master's exterior actors (CENSUS: a Background of chim.region_actors.census_file), the
+    actor library's base texts and models, the references the town frames place, the actors the start scripts hold
+    out (--start-disabled original) and the unit cache."""
+    if not region_actors_on(args):
+        return None
+    if not getattr(args, 'actor_library', None):
+        raise ValueError('--chim-region-actors on needs the actor library stage (--actor-library)')
+    from chim import region_actors
+    import start_disabled
+    refs = census.result()
+    town_refs = {int(float(e['aw_ref'])) for rows in list((town_rows or {}).values()) + list((special_rows or {}).values())
+                 for e in rows if e.get('classname') in ('aw_npc', 'aw_corpse') and e.get('aw_ref')}
+    held = {}
+    if start_disabled.mode() == 'original':
+        _, rows = start_disabled.held([r for r in refs if r['type'] != 'LEVC'], start_disabled.table_for(args.data_files))
+        held = {r['reference']: r['reason'] for r in rows}
+    return {'refs': region_actors.by_cell(refs), 'texts': region_actors.library_texts(args.actor_library),
+            'library_id1': Path(args.actor_library) / 'id1', 'town_refs': town_refs, 'held': held,
+            'cache': region_actors.cache(), 'heap_mb': heap_mb}
+
 
 def disk_layout_settings(args):
     """The disk layout settings of the image (tools/layout_plan.py): --disk-layout, --partition-headroom-mib and
@@ -2355,16 +2518,29 @@ def compact_layout(args, boot, out, part, omitted_maps, chim_frames, settings, j
     boot_rows = {p.relative_to(boot).as_posix(): p.stat().st_size for p in boot.rglob('*')
                  if p.is_file() and p not in map_set}
     chim_root = Path(args.chim_world)/'chim' if getattr(args, 'chim_world', None) else None
+    planned_path = out/'layout-plan.json'
+    planned = json.loads(planned_path.read_text(encoding='utf-8')) if planned_path.is_file() else None
+    # the boot units the preflight's plan moved to world volumes go where it put them (follow)
     plan = layout_plan.plan_compact(boot_rows, [(p.relative_to(boot).as_posix(), p.stat().st_size) for p in maps],
                                     layout_plan.walk(chim_root) if chim_root else None,
-                                    settings['headroom_mib'], settings['boot_headroom_mib'])
-    planned_path = out/'layout-plan.json'
-    if planned_path.is_file():
-        planned = json.loads(planned_path.read_text(encoding='utf-8'))
-        layout_plan.require_follows(planned, plan, shrink=shrink)
-        print('Layout plan followed: the staged payload matches %s (%d partitions, every payload within its '
-              'headroom)' % (planned_path.name, len(plan['partitions'])), flush=True)
-        source = planned_path.name
+                                    settings['headroom_mib'], settings['boot_headroom_mib'], follow=planned)
+    if planned is not None:
+        grown = layout_plan.follows_or_grew(planned, plan, shrink=shrink)
+        if grown is None:
+            print('Layout plan followed: the staged payload matches %s (%d partitions, every payload within its '
+                  'headroom)' % (planned_path.name, len(plan['partitions'])), flush=True)
+            source = planned_path.name
+        else:
+            # the payload changed after the preflight planned it: plan ONCE, fresh, from the staging folder as it is
+            # now (no follow), so the layout is minimal for what is actually staged (rc1-try5 followed the 3-partition
+            # plan after payload sharing had made 2 enough, and require_minimal refused it)
+            plan = layout_plan.plan_compact(boot_rows, [(p.relative_to(boot).as_posix(), p.stat().st_size) for p in maps],
+                                            layout_plan.walk(chim_root) if chim_root else None,
+                                            settings['headroom_mib'], settings['boot_headroom_mib'], margin=1)
+            print('WARNING: the staged payload changed by %+d bytes after the payload preflight planned it (%s); '
+                  'planned again from the staging folder: %d partitions' % (grown[0], grown[1], len(plan['partitions'])),
+                  flush=True)
+            source = 'image step (planned again from the staged files: the payload changed after %s)' % planned_path.name
     else:
         print('Layout plan: no plan from the payload preflight in this run; planned now from the staged payload',
               flush=True)
@@ -2378,13 +2554,18 @@ def compact_layout(args, boot, out, part, omitted_maps, chim_frames, settings, j
     # partitions below 2 GiB and starting below 2 GiB, files well under 2 GiB, drives below 4 GiB.
     placed = layout_plan.assign(plan, maps)
     rows = {row['partition']: row for row in plan['partitions']}
-    dh0_files = [dict(path=k, bytes=v) for k, v in sorted(boot_rows.items()) if k != layout_plan.VOLUMES_FILE]
+    # the boot units the plan moved to world volumes (layout_plan.movable_unit): on their volume, not on DH0
+    units = layout_plan.assign_units(plan, sorted(boot_rows))
+    unit_paths = {rel for pairs in units.values() for _, rel in pairs}
+    dh0_files = [dict(path=k, bytes=v) for k, v in sorted(boot_rows.items())
+                 if k != layout_plan.VOLUMES_FILE and k not in unit_paths]
     dh0_files += [dict(path=p.relative_to(boot).as_posix(), bytes=p.stat().st_size) for p in placed['DH0']]
     if plan['world_volumes']:
         dh0_files.append(dict(path=layout_plan.VOLUMES_FILE, bytes=layout_plan.VOLUMES_BYTES))
     worlds_planned = []
     for row in plan['partitions'][1:]:
         files = [dict(path='id1/maps/'+p.name, bytes=p.stat().st_size) for p in placed[row['partition']]]
+        files += [dict(path=rel, bytes=boot_rows[rel]) for _, rel in units[row['partition']]]
         if row['role'] == 'chim':
             files = [dict(path='id1/chim/'+k, bytes=v) for k, v in layout_plan.walk(chim_root)] + files
         worlds_planned.append(dict(partition=row['partition'], volume=row['volume'], bytes=row['bytes'], files=files))
@@ -2399,15 +2580,18 @@ def compact_layout(args, boot, out, part, omitted_maps, chim_frames, settings, j
                                                 packed=worlds[index])
             chim_world['frame_maps_on_volume'] = len(row['maps'])
             worlds[index] = entry
-    # the open-world maps of each world volume, as the legacy layout recorded them (size ledger, reference build)
+    # the open-world maps of each world volume, as the legacy layout recorded them, and the boot units the plan moved
+    # there (size ledger, reference build): every file of the volume but the CHIM world's own
     (out/'world-partitions.json').write_text(json.dumps(dict(
         format='AmiWind terrain partitions 1', version=VERSION, layout='compact',
         partitions=[dict(file=w['file'], volume=w['volume'], partition=w['partition'], role=row['role'],
-                         files=[f for f in w['files'] if f['path'].startswith('id1/maps/')])
-                    for w, row in zip(worlds, plan['partitions'][1:]) if row['maps']]), indent=2)+'\n',
+                         files=[f for f in w['files'] if not f['path'].startswith('id1/chim/')])
+                    for w, row in zip(worlds, plan['partitions'][1:]) if row['maps'] or row.get('moved')]),
+        indent=2)+'\n',
         encoding='utf-8', newline='\n')
     boot_paths = [p for p in sorted(boot.rglob('*')) if p.is_file()]
-    summary = dict(plan, partitions=[dict(r, maps=len(r['maps'])) for r in plan['partitions']])
+    summary = dict(plan, partitions=[dict(r, maps=len(r['maps']), moved=len(r.get('moved') or ()))
+                                     for r in plan['partitions']])
     record = {'mode': 'compact', 'headroom_mib': settings['headroom_mib'],
               'boot_headroom_mib': settings['boot_headroom_mib'], 'plan_source': source, 'plan': summary,
               'write_seconds': timings}
@@ -2449,6 +2633,23 @@ def finalize_image(args):
     if engine_record.get('hands','3d')!=args.hands:
         raise ValueError('Image hands choice must match engine build')
     heap_loader_source_sha256=verify_heap_loader_source_receipt(engine_record)
+    # The actor table's master part (chim.actors.master_tables: about 5 s on one core, the master only) in a spawned
+    # worker beside the checks and passes below; the table itself is written where it was (BUILD-IMAGE-FINALIZE-
+    # UNDERUSED-48). One job: worked out there, in this process, as before.
+    actor_tables=None
+    if getattr(args, 'chim_actor_table', 'off') == 'on':
+        from build_parallel import Background
+        from chim.actors import master_tables
+        from mwad.paths import child_ci
+        actor_tables=Background(master_tables, child_ci(args.data_files,'Morrowind.esm'), jobs=jobs)
+    # The region frames' actor census (EXPERIMENTAL --chim-region-actors on: chim.region_actors.census_file, the
+    # master only) beside the same checks
+    region_census=None
+    if region_actors_on(args):
+        from build_parallel import Background
+        from chim.region_actors import census_file
+        from mwad.paths import child_ci
+        region_census=Background(census_file, child_ci(args.data_files,'Morrowind.esm'), jobs=jobs)
     # Every read-only payload check first, all errors together, before any write (tools/payload_preflight.py).
     payload_preflight(args, out, excluded, jobs)
     gallery_report=json.loads((out/'npc-gallery-staging.json').read_text())
@@ -2479,6 +2680,9 @@ def finalize_image(args):
     # final palette contract, including reuse/custom-sky paths, before packaging.
     from prepare_world_ui import validate as validate_world_ui
     validate_world_ui(boot / 'id1')
+    if getattr(args,'mwscript',None):
+        (out/'mwscript-staging.json').write_text(json.dumps(install_mwscript(args.mwscript,boot/'id1'),indent=2)+'\n',
+                                                 encoding='utf-8',newline='\n')
     if getattr(args,'hand_catalog',None):
         # Per-race hands after the sky palette bank: converted against this final
         # palette, so no remap touches them (BUILD-HANDS-NOT-BUILT-32).
@@ -2491,7 +2695,7 @@ def finalize_image(args):
     exterior_sky_path = out / 'exterior-sky' / 'exterior-sky.json'
     exterior_sky = configure_staged_maps(boot / 'id1',
         exterior_maps=staged_exterior_map_names(boot / 'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)),
-        interior_maps=staged_interior_map_names(boot / 'id1'),
+        interior_maps=staged_interior_map_names(boot / 'id1', getattr(args, 'chim_room_batches', None)),
         local_skybox=getattr(args, 'local_skybox', 'false'),
         shared_sky_source=sky_asset_preparation['shared_sky_source'],
         work_dir=exterior_sky_path.parent, jobs=jobs,
@@ -2520,15 +2724,39 @@ def finalize_image(args):
     from hand_metadata import stamp_staged_hands
     hand_source = json.loads((Path(args.scene)/'scene-ready.json').read_text())['hands']
     hand_metadata = stamp_staged_hands(boot/'id1', hand_source,
-        staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)) | staged_interior_map_names(boot/'id1'), jobs=jobs)
+        staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)) | staged_interior_map_names(boot/'id1', getattr(args, 'chim_room_batches', None)), jobs=jobs)
     (out/'hand-metadata.json').write_text(json.dumps(hand_metadata,indent=2)+'\n', newline='\n')
     check_recorded(boot/'id1', out/'bounded-seyda', 'first-person hand metadata', jobs=jobs)
     # Stable interior cell numbers + full cell IDs for the debug HUD and `dbg cell`;
     # the lookup table goes into the build folder.
     from cell_numbers import stamp_staged_cells
-    cell_numbers = stamp_staged_cells(boot/'id1', args.data_files, staged_interior_map_names(boot/'id1'),
+    cell_numbers = stamp_staged_cells(boot/'id1', args.data_files, staged_interior_map_names(boot/'id1', getattr(args, 'chim_room_batches', None)),
                                       out/'cell-numbers.json', jobs=jobs)
     check_recorded(boot/'id1', out/'bounded-seyda', 'interior cell numbers', jobs=jobs)
+    if getattr(args,'chim_interiors',None):
+        # CHIM rooms (EXPERIMENTAL, docs/chim/INTERIOR_STORE.md): the interior store into id1/chimi/ and every room
+        # map the image holds made into its CHIM room map. After every pass that writes a room's worldspawn (interior
+        # sky, hand metadata, cell numbers: the room map keeps that worldspawn) and before the optimizer, which keeps
+        # the room maps as written (IMAGE-ROOM-MAPS-SKIP-PASSES-48).
+        from chim.interior import install as install_chim_interiors
+        interiors=install_chim_interiors(args.chim_interiors,boot/'id1',jobs=jobs)
+        (out/'chim-interiors.json').write_text(json.dumps(interiors,indent=2)+'\n',encoding='utf-8',newline='\n')
+        print('CHIM rooms: %d rooms on the interior store (%d bytes; their room maps were %d bytes), %d kept as room maps'
+              %(len(interiors['rooms']),interiors['store_bytes']+interiors['room_map_bytes'],
+                interiors['replaced_bsp_bytes'],len(interiors['kept_room_maps'])),flush=True)
+    # The residents of every CHIM room map fitted on the room's store collision, the collision the actor ground check
+    # below measures (ROOM-ACTORS-FLOATING-48, a regression of ACTOR-GROUND-BAKE-CHIM-ROOMS-48: the map bake skips CHIM room and shell maps, so a batch room's residents
+    # kept their game-data height; AMIWIND_ROOM_ACTOR_BAKE=off is the method before)
+    from room_actor_bake import bake_room_ground, require_fitted
+    from mwad.paths import child_ci as _child_ci
+    room_actor_bake=bake_room_ground(boot/'id1/maps',jobs=jobs,
+                                     master=_child_ci(args.data_files,'Morrowind.esm') if args.data_files else None)
+    (out/'room-actor-ground-support.json').write_text(json.dumps(room_actor_bake,indent=2)+'\n',encoding='utf-8',newline='\n')
+    if room_actor_bake['mode']!='off' and args.data_files:   # the map bake runs with the game data (image step above)
+        # every ground resident of every scene map went through a ground bake (a skipped scene kind stops here,
+        # ROOM-ACTORS-FLOATING-48); recorded-stage maps keep their recorded placements
+        from recorded_stage import frozen_maps
+        require_fitted(boot/'id1/maps',exclude=frozen_maps(out/'bounded-seyda'))
     # Finish immutable BSP sharing before contact/heap gates and fingerprinting.
     # This step is interpreted Python only; it never creates a native helper.
     from optimize_world_maps import optimize_maps, verify_optimized_maps, bind_heap_report
@@ -2561,22 +2789,26 @@ def finalize_image(args):
         getattr(args,'entity_baseline',None), getattr(args,'accept_entity_loss',None), jobs=jobs,
         dressing_terms=DRESSING_EXCLUDED, extra_maps={**chim_town_placements(args, boot/'id1', world=chim_world_data),
                                                      **chim_region_placements(args, boot/'id1', world=chim_world_data)})
+    # The NPC voice table (tools/greeting_lut.py, NPC-GREETINGS-LIBRARY-MUTE-48): every NPC record's voice lines and
+    # conversation greeting for the engine to look up by record (id1/npc-voices.lut); one unit, cached on its inputs.
+    # Its sounds are the media stage's converted voices (no voice converted again).
+    from greeting_lut import image_step as voice_table_step
+    voice_table_step(args.data_files, boot/'id1', out, jobs=jobs)
     # EXPERIMENTAL actor table (--chim-actor-table on, tools/chim/actors.py, CHIM-EXTERIOR-ACTORS-MISSING-46): every
     # exterior NPC and creature reference in one table beside the frame maps, for the type 1 window; off by default
-    if getattr(args, 'chim_actor_table', 'off') == 'on':
-        from chim.actors import FILE_NAME, write_table
-        library = None
-        if getattr(args, 'actor_library', None):
-            # the actor library stage's models (tools/actor_library.py): installed here, named by the table's bases
-            from actor_library import install as install_actor_library
-            library, installed = install_actor_library(args.actor_library, boot/'id1')
-            print('Image: actor library: %d files installed, %d base texts' % (installed, len(library)), flush=True)
-        actor_table = write_table(boot/'id1/maps'/FILE_NAME, child_ci(args.data_files,'Morrowind.esm'), boot/'id1/maps',
-                                  Path(args.chim_world)/'chim' if getattr(args, 'chim_world', None) else None, library)
-        (out/'chim-actor-table.json').write_text(json.dumps(actor_table, indent=1, sort_keys=True)+'\n', encoding='utf-8', newline='\n')
-        print('Image: actor table: %d records (%d with a model), %d bases, %d bytes' % (
-            actor_table['records'], actor_table['spawnable_records'], actor_table['bases'], actor_table['bytes']),
-            flush=True)
+    actor_library_texts = None
+    if installed_actor_library(args):
+        # the actor library stage's models (tools/actor_library.py): installed here, named by the table's bases and
+        # the region frame maps' actor rows; the payload preflight's layout plan counts them (installed_actor_library,
+        # IMAGE-LAYOUT-PLAN-ACTOR-LIBRARY-48)
+        from actor_library import install as install_actor_library
+        actor_library_texts, installed = install_actor_library(args.actor_library, boot/'id1', jobs=jobs)
+        print('Image: actor library: %d files installed, %d base texts' % (installed, len(actor_library_texts)),
+              flush=True)
+    # With --chim-region-actors on the table is written after the frame maps, so it takes the region frames' placed
+    # rows (positions grounded on the frame collision) as built rows; otherwise here, as before.
+    if getattr(args, 'chim_actor_table', 'off') == 'on' and not region_actors_on(args):
+        write_actor_table(args, out, boot, actor_library_texts, actor_tables)
     # World progress map data: topomap coverage plus entity and POI layers.
     from world_progress import build_step as world_progress_step
     if getattr(args, 'miniwind', False):
@@ -2626,7 +2858,26 @@ def finalize_image(args):
         chim_frames = chim_frame_maps(args.chim_world, boot/'id1', town_rows=chim_town_rows(args), jobs=jobs,
                                       special_rows=special_rows, activated=activated_rows,
                                       hand_fields=hand_metadata['worldspawn_fields'], keep_catalogues=keep_catalogues,
-                                      world=chim_world_data)
+                                      world=chim_world_data,
+                                      region_actors=region_actor_inputs(args, region_census, chim_town_rows(args),
+                                                                        special_rows, engine_record.get('heap_mb')))
+        if region_actors_on(args):
+            # the region frames' actors (EXPERIMENTAL): the receipt, island-wide counts first, then every frame's record
+            from chim.region_actors import summary as region_actor_summary
+            actor_records = [r['actors'] for r in chim_frames['region_maps'] if r.get('actors')]
+            actor_summary = region_actor_summary(actor_records)
+            (out/'chim-region-actors.json').write_text(json.dumps({'summary': actor_summary, 'frames': actor_records},
+                                                                  indent=1, sort_keys=True)+'\n', encoding='utf-8',
+                                                       newline='\n')
+            print('[chim] region frame actors: %d placed (%s) in %d frames; %d authored off the ground (%d with a '
+                  'script); deferred %s; left out %s; over the 16 MB Cache room: %d frames, over the larger heap\'s: %d'
+                  % (actor_summary['placed_total'], actor_summary['placed'], actor_summary['frames_with_actors'],
+                     actor_summary['off_the_ground'], len(actor_summary['off_the_ground_with_script']),
+                     actor_summary['deferred'], actor_summary['left_out'],
+                     len(actor_summary['over_budget']['baseline']), len(actor_summary['over_budget']['more_ram'])),
+                  flush=True)
+            if getattr(args, 'chim_actor_table', 'off') == 'on':
+                write_actor_table(args, out, boot, actor_library_texts, actor_tables)
         from chim.frame_map import remove_legacy_areas, remove_towns_not_on_chim
         removed_legacy = remove_legacy_areas(boot/'id1', chim_frames['areas'], 'the town runs on CHIM')
         # Extra towns not on CHIM yet (the Vivec Arena) leave a CHIM image whole: exterior maps, region and
@@ -2641,6 +2892,12 @@ def finalize_image(args):
         # cores; record the remaining removals before image gates and packing.
         from world_payload import prune as prune_world_payload
         removed_legacy += prune_world_payload(boot/'id1', out/'world-payload-pruning.json')
+        if getattr(args, 'chim_room_batches', None):
+            # Interior rooms by batch: every door of a batch room linked both ways now that the image knows its rooms and
+            # its frames (tools/room_batches.py link_banks): exterior doors into them (town and region frame banks),
+            # their exits (a town frame, else the CHIM region frame of the exit's cell), room to room; a door to a room
+            # or a place this build does not hold stays "-" and is listed.
+            write_room_batch_links(args, boot/'id1', out, chim_frames)
         if getattr(args, 'harvest', None):
             # The final payload: every harvestable plant the CHIM world leaves out is in a shipped catalogue,
             # each CHIM region cell's in its own frame map's (HARVEST-CHIM-REGION-LOSS-41).
@@ -2697,7 +2954,7 @@ def finalize_image(args):
     # entities, the scenery catalogue (tools/map_engine_limits.py, BUILD-BUDGET-ENGINE-LIMITS-35); a map
     # over one stops the game at load ("no free edicts", precache overflow), so it never ships.
     from map_engine_limits import check_maps as check_engine_map_limits
-    engine_map_limits = check_engine_map_limits(boot/'id1/maps', out/'engine-map-limits.json')
+    engine_map_limits = check_engine_map_limits(boot/'id1/maps', out/'engine-map-limits.json', jobs=jobs)
     print('Engine map limits passed: %d maps; tightest: %s.' % (engine_map_limits['maps'], ', '.join(
         '%s %s %d/%d' % (key, row['top'][0]['map'], row['top'][0]['value'], row['limit'])
         for key, row in engine_map_limits['worst'].items() if row['top'])), flush=True)
@@ -2716,6 +2973,29 @@ def finalize_image(args):
         accepted = known_stair_findings(getattr(args, 'accept_known_stair_findings', None) or [])
         require_stairs(boot/'id1', out/'stair-walk.json', jobs=jobs,
                        exempt=[name[:-4] for name in frozen_maps(out/'bounded-seyda')], accepted=accepted)
+    if getattr(args,'chim_interiors',None):
+        # The BSP heap estimate below sees a CHIM room map's shell and entities only; the room loads its record's
+        # models and textures into the map's zone (IMAGE-ROOM-MAPS-LATE-PASSES-48): each room against its zone.
+        # It marks the rooms that need 32 MB in their maps, after the optimizer: the receipt is checked right before
+        # and follows exactly the marked maps after, before the final heap audit binds to it
+        # (CHIM-ROOM-FAST-MB-AFTER-OPTIMIZER-48; tests/test_post_optimizer_map_writers.py).
+        from chim.heap import ROOM_FAST_KEY, SAFE_FAST_MB, require_room_map_heap
+        from optimize_world_maps import rebind_marked_maps
+        verify_optimized_maps(boot/'id1/maps', optimization, jobs=jobs)
+        room_heap=require_room_map_heap(boot/'id1', args.sdk, heap_mb=engine_record.get('heap_mb'),
+                                        report_path=out/'chim-room-heap.json')
+        for name, r in sorted(room_heap.get('rooms', {}).items()):
+            print('[chim] room heap %s: %d models, %d textures, %d of %d zone bytes%s' % (
+                name, r['models'], r['textures'], r['need_bytes'], r['zone_bytes'],
+                '' if r['fits_16mb'] else '; needs %d MB of Fast RAM (%d of %d bytes there): marked' % (
+                    r['fast_mb'], r['need_bytes'], r['zone_32mb_bytes'])), flush=True)
+        if 'marked_32mb' in room_heap:
+            # CHIM-ROOM-16MB-REFUSAL-48: the engine refuses these at their door on 16 MB or with Extra RAM off
+            print('[chim] rooms that need 32 MB of Fast RAM (refused at their door on less): %d' %
+                  len(room_heap['marked_32mb']), flush=True)
+            optimization = rebind_marked_maps(boot/'id1/maps', optimization, optimization_path,
+                                              [room_heap['rooms'][n]['map'] for n in room_heap['marked_32mb']],
+                                              '"%s" "%d"' % (ROOM_FAST_KEY, SAFE_FAST_MB), jobs=jobs)
     world_heap=audit_world_map_heap_with_receipt(engine_record,boot/'id1/maps',args.sdk,world_heap_path,jobs=jobs)
     bind_heap_report(optimization, world_heap, world_heap_path, optimization_path)
     heap_watcher=heap_watcher_summary(world_heap,world_heap_path)
@@ -3047,13 +3327,20 @@ def main():
     i.add_argument('--world-flora',type=Path,help='Complete validated private world vegetation overlay; preserves rock/mushroom inputs')
     i.add_argument('--harvest',type=Path,help='Harvest source from harvest_build.py prepare (builder step harvest); the builder default')
     i.add_argument('--hand-catalog',type=Path,help='Per-race first-person hand catalogue from prepare_hand_catalog.py --runtime-palette; the builder default')
+    i.add_argument('--mwscript',type=Path,help='The compiled game scripts from prepare_mwscript.py (id1/mwscript.awm; docs/MWSCRIPT_BYTECODE.md); the builder default')
     i.add_argument('--chim-actor-table', choices=('off', 'on'), default='off',
                    help='write the CHIM actor table (maps/chim-actors.cca: every exterior NPC and creature reference, '
                         'for the type 1 window; CHIM-EXTERIOR-ACTORS-MISSING-46); off (the default of this step): none; '
                         'build.py passes on by default since v0.0.47')
     i.add_argument('--actor-library', type=Path,
-                   help='With --chim-actor-table on: the actor library stage (tools/actor_library.py): its '
-                        'models are installed and named by the actor table')
+                   help='With --chim-actor-table on or --chim-region-actors on: the actor library stage '
+                        '(tools/actor_library.py): its models are installed and named by the actor table and the '
+                        'region frame maps')
+    i.add_argument('--chim-region-actors', choices=('off', 'on'), default='off',
+                   help='EXPERIMENTAL: the CHIM region frame maps place every exterior NPC and creature reference of '
+                        'their cells at its authored spot, grounded as the towns\' residents '
+                        '(tools/chim/region_actors.py, CHIM-EXTERIOR-ACTORS-MISSING-46; needs --actor-library); off '
+                        '(the default): no actor rows')
     i.add_argument('--chim-world',type=Path,help='CHIM world (tools/chim_build.py output: chim/, chim-receipt.json, '
                    'chim-validate.json, chim-stats.json), added as one more world volume; tools/build.py --builder chim')
     i.add_argument('--chim-lighting-type',default=None,help='With --chim-world: the CHIM lighting type (tools/chim/light_types.py); it selects the night lamp table classes (none: empty, lamps: the warm lamp classes, hybrid: every class that adds light); default: the legacy lamp table')
@@ -3063,6 +3350,13 @@ def main():
                    help='The listed rooms of a CHIM-native town (tools/chim_rooms.py output), repeatable: their maps, '
                         'residents and room door banks, and the town door bank with the doors into them, installed '
                         'before the --chim-town outputs (BUILD-MINIWIND-ARENA-PIT-REFUSED-36)')
+    i.add_argument('--chim-interiors',dest='chim_interiors',type=Path,default=None,
+                   help='CHIM rooms (tools/chim/interior.py output; EXPERIMENTAL, docs/chim/INTERIOR_STORE.md): the '
+                        'interior store and every room map the image holds made into its CHIM room map')
+    i.add_argument('--chim-room-batches',dest='chim_room_batches',type=Path,default=None,
+                   help='Interior rooms by batch (tools/chim_room_batches.py output; EXPERIMENTAL, --room-batches): their '
+                        'room maps, residents and door banks installed after the CHIM towns; every door of a batch room '
+                        'linked both ways once the frame maps are written (tools/room_batches.py link_banks)')
     i.add_argument('--chim-town',dest='chim_town',type=Path,action='append',default=[],
                    help='A CHIM town made from the game data (tools/chim_town.py output), repeatable: its residents, '
                         'region table and door bank are installed and its CHIM frame map takes its entities; the '

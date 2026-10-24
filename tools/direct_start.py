@@ -313,8 +313,16 @@ def image_start_check(id1, start, report=None):
     record['map_file'] = 'maps/' + found.name
     if start.get('arrival') is not None and not is_chim_frame(found):
         from arrival_spot import Collision, standing_spot
+        from map_files import is_chim_room
         try:
-            spot = standing_spot(Collision(found.read_bytes()), tuple(start['arrival']))
+            # a CHIM room's floors are its store placements (chim.room_scene.room_collision), not its map's world
+            # (IMAGE-ROOM-MAPS-LATE-PASSES-48)
+            if is_chim_room(found):
+                from chim.room_scene import room_collision
+                collision = room_collision(found)
+            else:
+                collision = Collision(found.read_bytes())
+            spot = standing_spot(collision, tuple(start['arrival']))
         except ValueError as error:
             # The tool tracer's visit limit (audit_walkability.Scene.trace) stops on some routed-hull rooms whose
             # clipnode tails are shared (the Vivec Arena Pit; COLLISION-TRACE-LIMIT-ROUTED-ROOM-36); the engine's own
@@ -496,13 +504,15 @@ def resolve(start, id1, towns, collision_for=None):
     if start.kind == 'area':
         return 'town ' + start.town, {'kind': 'town', 'town': start.town}
     if start.kind == 'interior':
-        if not (id1 / 'maps' / (start.map + '.bsp')).is_file():
-            raise ValueError('%s "%s": the image has no map for this interior (maps/%s.bsp)'
-                             % (OPTION, start.text, start.map))
+        from map_files import map_file
+        found = map_file(id1 / 'maps', start.map)     # a room map or a CHIM room map (IMAGE-ROOM-MAPS-LATE-PASSES-48)
+        if not found.is_file():
+            raise ValueError('%s "%s": the image has no map for this interior (maps/%s)'
+                             % (OPTION, start.text, found.name))
         arrival, source = door_arrival(id1, start.map), 'door arrival'
         if arrival is None:
             # A room no door leads into (the prison ship): the map's own player start.
-            arrival, source = player_start(id1 / 'maps' / (start.map + '.bsp')), "the map's info_player_start"
+            arrival, source = player_start(found), "the map's info_player_start"
         if arrival is None:
             raise ValueError('%s "%s": no door leads into %s in this build and its map has no player start, '
                              'so it has no arrival point' % (OPTION, start.text, start.cell))

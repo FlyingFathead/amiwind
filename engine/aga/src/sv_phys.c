@@ -232,6 +232,8 @@ If steptrace is not NULL, the trace of any vertical wall hit will be stored
 ============
 */
 #define	MAX_CLIP_PLANES	5
+/* SV_WalkMove sets it for the move it runs: the walker stood on the ground before it (the step rules' "seen ground"). */
+static int sv_step_ground;
 int SV_FlyMove (edict_t *ent, float time, trace_t *steptrace)
 {
 	int			bumpcount, numbumps;
@@ -245,6 +247,7 @@ int SV_FlyMove (edict_t *ent, float time, trace_t *steptrace)
 	vec3_t		end;
 	float		time_left;
 	int			blocked;
+	int			steep = 0;
 
 	numbumps = 4;
 
@@ -284,7 +287,7 @@ int SV_FlyMove (edict_t *ent, float time, trace_t *steptrace)
 		if (!trace.ent)
 			Sys_Error ("SV_FlyMove: !trace.ent");
 
-		if (trace.plane.normal[2] >= AW_WALKABLE_Z)
+		if (AW_WALKABLE(trace.plane.normal[2]))
 		{
 			blocked |= 1;		// floor
 			if (trace.ent->v.solid == SOLID_BSP)
@@ -294,7 +297,7 @@ int SV_FlyMove (edict_t *ent, float time, trace_t *steptrace)
 			}
 		}
 		if (!trace.plane.normal[2] || (ent->v.movetype == MOVETYPE_WALK &&
-            trace.plane.normal[2] > 0 && trace.plane.normal[2] < AW_WALKABLE_Z))
+            trace.plane.normal[2] > 0 && !AW_WALKABLE(trace.plane.normal[2])))
 		{
 			blocked |= 2;		// step
 			if (steptrace)
@@ -319,6 +322,16 @@ int SV_FlyMove (edict_t *ent, float time, trace_t *steptrace)
 		}
 
 		VectorCopy (trace.plane.normal, planes[numplanes]);
+		/* Step rules (aw_step_rules 1, OpenMW movementsolver.cpp): a slope too steep to stand on is a wall to a
+		 * walker that stood on the ground (its normal laid flat), so it cannot crawl up it; in the air it may slide
+		 * along it but not gain height from it. */
+		steep = aw_step_rules.value && ent->v.movetype == MOVETYPE_WALK &&
+		        planes[numplanes][2] > 0 && !AW_WALKABLE(planes[numplanes][2]);
+		if (steep && sv_step_ground)
+		{
+			planes[numplanes][2] = 0;
+			VectorNormalize (planes[numplanes]);
+		}
 		numplanes++;
 
 //
@@ -340,6 +353,8 @@ int SV_FlyMove (edict_t *ent, float time, trace_t *steptrace)
 		if (i != numplanes)
 		{	// go along this plane
 			VectorCopy (new_velocity, ent->v.velocity);
+			if (steep && ent->v.velocity[2] > original_velocity[2])
+				ent->v.velocity[2] = original_velocity[2];
 		}
 		else
 		{	// go along the crease
@@ -962,6 +977,90 @@ Only used by players
 ======================
 */
 #define	STEPSIZE	8.5f
+/* Step rules (aw_step_rules 1; docs/STEP_MOVEMENT.md, STEP-MOVEMENT-OPENMW-RULES-48): Morrowind's step as OpenMW
+ * 0.51 states it (apps/openmw/mwphysics/stepper.cpp, constants.hpp, components/misc/constants.hpp), reimplemented
+ * here in map units (Morrowind units x 0.25, tools/chimport.py SCALE). */
+#define	AW_STEP_UP		8.75f	/* sStepSizeUp 34 over OpenMW's 1-unit ground offset (sGroundOffset): 35 x .25 */
+#define	AW_STEP_DOWN	15.5f	/* sStepSizeDown 62 */
+#define	AW_STEP_SNAP	16.0f	/* the ground test of a walker on the ground: sStepSizeDown + 2 sGroundOffset, 64 */
+#define	AW_STEP_MIN1	2.5f	/* sMinStep 10: the second try's fixed reach */
+#define	AW_STEP_MIN2	5.0f	/* sMinStep2 20: the third try's fixed reach (down no lower than it went up) */
+#define	AW_STEP_MARGIN	0.05f	/* sCollisionMargin 0.2 */
+
+/* Up by at most a step, forward (the frame's move; then 2.5 and 5 units), down onto walkable ground: as
+ * OpenMW's Stepper::step. Four to eight traces, only when the plain move was blocked by a wall or a steep slope.
+ * Returns 1 and leaves the walker on the step, or 0 and leaves it where it was put (the caller restores). */
+static int SV_StepRulesStep (edict_t *ent, vec3_t oldorg, vec3_t oldvel, int onground)
+{
+	vec3_t		top, end, dir, fwd;
+	trace_t		t, down;
+	float		up, len, reach, depth = 0;
+	int			attempt;
+
+	fwd[0] = oldvel[0]*host_frametime;
+	fwd[1] = oldvel[1]*host_frametime;
+	fwd[2] = 0;
+	VectorCopy (fwd, dir);
+	len = VectorNormalize (dir);
+	if (len <= 0)
+		return 0;
+	VectorCopy (oldorg, end);
+	end[2] += AW_STEP_UP;
+	t = SV_Move (oldorg, ent->v.mins, ent->v.maxs, end, MOVE_NORMAL, ent);
+	if (t.startsolid || t.allsolid)
+		return 0;
+	up = t.fraction*AW_STEP_UP;
+	if (t.fraction < 1)
+		up -= AW_STEP_MARGIN;
+	if (up <= AW_STEP_MARGIN)
+		return 0;
+	VectorCopy (oldorg, top);
+	top[2] += up;
+	memset (&down, 0, sizeof down);
+	for (attempt = 1 ; ; attempt++)
+	{
+		if (attempt > 3)
+			return 0;
+		reach = attempt == 1 ? len : attempt == 2 ? AW_STEP_MIN1 : AW_STEP_MIN2;
+		VectorMA (top, reach, dir, end);
+		t = SV_Move (top, ent->v.mins, ent->v.maxs, end, MOVE_NORMAL, ent);
+		if (t.startsolid || t.allsolid)
+			return 0;
+		if (t.fraction < 1)
+		{
+			reach = reach*t.fraction - AW_STEP_MARGIN;
+			if (reach <= 0)
+				return 0;
+			VectorMA (top, reach, dir, end);
+		}
+		depth = attempt > 2 ? up : reach + up + AW_STEP_DOWN;
+		VectorCopy (end, fwd);
+		fwd[2] -= depth;
+		down = SV_Move (end, ent->v.mins, ent->v.maxs, fwd, MOVE_NORMAL, ent);
+		if (!down.startsolid && !down.allsolid && down.fraction < 1 && down.ent &&
+		    down.ent->v.solid == SOLID_BSP && AW_WALKABLE(down.plane.normal[2]))
+			break;
+		/* a long second try that still found no ground: the walker is not snug against a lip, no third */
+		if (attempt == 2 && reach > up - down.fraction*depth)
+			return 0;
+	}
+	/* in the air a step never takes the walker lower than it went up */
+	if (!onground && down.fraction*depth - AW_STEP_MARGIN > up)
+		return 0;
+	VectorSubtract (down.endpos, oldorg, fwd);
+	if (DotProduct (fwd, fwd) < AW_STEP_MARGIN*AW_STEP_MARGIN)
+		return 0;
+	VectorCopy (down.endpos, ent->v.origin);
+	ent->v.velocity[0] = oldvel[0];
+	ent->v.velocity[1] = oldvel[1];
+	ent->v.velocity[2] = 0;
+	ClipVelocity (ent->v.velocity, down.plane.normal, ent->v.velocity, 1);
+	ent->v.flags = (int)ent->v.flags | FL_ONGROUND;
+	ent->v.groundentity = EDICT_TO_PROG(down.ent);
+	SV_LinkEdict (ent, true);
+	return 1;
+}
+
 void SV_WalkMove (edict_t *ent)
 {
 	vec3_t		upmove, downmove;
@@ -980,10 +1079,28 @@ void SV_WalkMove (edict_t *ent)
 	VectorCopy (ent->v.origin, oldorg);
 	VectorCopy (ent->v.velocity, oldvel);
 
+	sv_step_ground = oldonground != 0;
 	clip = SV_FlyMove (ent, host_frametime, &steptrace);
+	sv_step_ground = 0;
 
 	if ( !(clip & 2) )
 		return;		// move didn't block on a step
+
+	if (aw_step_rules.value)
+	{
+		/* Morrowind's step (OpenMW): also in the air, never lower than it went up there */
+		if (ent->v.movetype != MOVETYPE_WALK || sv_nostep.value || ((int)ent->v.flags & FL_WATERJUMP))
+			return;
+		VectorCopy (ent->v.origin, nosteporg);
+		VectorCopy (ent->v.velocity, nostepvel);
+		VectorCopy (oldorg, ent->v.origin);
+		if (!SV_StepRulesStep (ent, oldorg, oldvel, oldonground || ent->v.waterlevel))
+		{
+			VectorCopy (nosteporg, ent->v.origin);
+			VectorCopy (nostepvel, ent->v.velocity);
+		}
+		return;
+	}
 
 	if (!oldonground && ent->v.waterlevel == 0)
 		return;		// don't stair up while jumping

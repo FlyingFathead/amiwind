@@ -772,6 +772,8 @@ void _Host_Frame (float time)
     AW_AnimKitTick();
     AW_SPIKE_STAGE (AW_SP_SAVE, AW_SaveTick());
     if(!AW_ModalWorldFrozen())AW_SPIKE_STAGE (AW_SP_SCENE, AW_SceneTick());
+    /* Compiled game scripts (experimental, aw_mwscript): MenuMode scripts still run under a modal screen. */
+    AW_MwscriptTick(AW_ModalWorldFrozen()?0.0f:(float)host_frametime);
     CDAudio_Update();
     AW_ProfileFrame();
     AW_FpuCountFrame();

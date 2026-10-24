@@ -99,7 +99,8 @@ GROUPS = {
         'label': 'interiors',
         'notice': 'the interiors',
         'alias': '--exclude-interiors',
-        'skip': (),
+        # the room batches (--room-batches, all by default since v0.0.48) convert no room either
+        'skip': ('chim-room-batches',),
         # The rooms are not compiled; the stages still place the exterior residents
         # and write every door table, so doors say "Area unavailable".
         'options': {'area': ['--no-rooms'], 'balmora-interiors': ['--no-rooms']},

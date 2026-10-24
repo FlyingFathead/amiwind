@@ -112,7 +112,8 @@ def source_collision_metadata(raw, N):
     original = _STATE['originals'].get('source_collision_metadata') or prepare_scenery.source_collision_metadata
     if not enabled():
         return original(raw, N)
-    key = (hashlib.sha256(raw).hexdigest(), len(raw))
+    # the AMIWIND_* environment too: the rule depends on AMIWIND_COLLISION_SOURCE (tools/collision_source_env.py)
+    key = (hashlib.sha256(raw).hexdigest(), len(raw), _environment())
     value = _MARKERS.get(key)
     if value is not None:
         _STATS['collision_markers'][0] += 1

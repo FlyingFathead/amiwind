@@ -52,8 +52,14 @@ TOUCH = 2.5                # treads this close in plan meet at a step (a bevelle
 RISE_MIN = 1.              # a rise under this is trim, not a step (the stair walk's RISE_MIN)
 
 
-def flights(v, f, step=None, detector='levels'):
+def flights(v, f, step=None, detector='levels', collision=None):
     """The flights of a mesh as drawn: a list of tread triangle index arrays.
+
+    collision: the mesh's authored collision (its RootCollisionNode: (v, f)), or None (the drawn mesh collides). A
+    drawn level face with nothing of it under it is not a tread: the original stands nobody there (OpenMW 0.51
+    components/nifbullet/bulletnifloader.cpp collides with the RootCollisionNode alone). The roots of a Grazelands
+    tree (flora_tree_gl_06: faces within 10 degrees of level, 1 to 2.5 units apart, over none of its collision)
+    read as a flight without it (CHIM-STAIR-METHOD1-UNFIXED-48).
 
     levels (default): from the walkable level faces alone (level_flights): treads that meet in plan within TOUCH at a
     rise of RISE_MIN..step, along an edge the standing box fits (FLIGHT_WIDTH), FLIGHT_LEVELS or more levels in one
@@ -64,7 +70,7 @@ def flights(v, f, step=None, detector='levels'):
         raise ValueError('Unknown flight detector: %s' % detector)
     if detector == 'risers':
         return _riser_flights(v, f, step)
-    return level_flights(v, f, step)
+    return level_flights(v, f, step, collision)
 
 
 def _riser_flights(v, f, step=None):
@@ -175,13 +181,47 @@ def _meeting_length(upper, lower, touch=TOUCH):
     return total
 
 
-def level_flights(v, f, step=None):
-    """Flights from walkable level faces (the 'levels' detector of flights)."""
+def _uncovered(tris, ids, coll, step):
+    """Level faces ids of tris (drawn) under none of whose sample points (tread_samples) the authored collision
+    triangles coll hold anything (no collision triangle over the point in plan reaching up to a step over it)."""
+    if not len(ids):
+        return set()
+    pts, owner = tread_samples(tris, ids)
+    a, b, c = coll[:, 0, :2], coll[:, 1, :2], coll[:, 2, :2]
+    lo, hi = coll.min(axis=1), coll.max(axis=1)
+    v0, v1 = b - a, c - a
+    d00, d01, d11 = (v0 * v0).sum(1), (v0 * v1).sum(1), (v1 * v1).sum(1)
+    den = d00 * d11 - d01 * d01
+    good = np.abs(den) > 1e-12
+    held = set()
+    for p, i in zip(pts, owner):
+        if int(i) in held:
+            continue
+        near = good & (lo[:, 0] <= p[0]) & (hi[:, 0] >= p[0]) & (lo[:, 1] <= p[1]) & (hi[:, 1] >= p[1]) \
+            & (lo[:, 2] <= p[2] + step)
+        if not near.any():
+            continue
+        v2 = p[:2] - a[near]
+        d20, d21 = (v2 * v0[near]).sum(1), (v2 * v1[near]).sum(1)
+        u = (d11[near] * d20 - d01[near] * d21) / den[near]
+        w = (d00[near] * d21 - d01[near] * d20) / den[near]
+        if ((u >= -1e-6) & (w >= -1e-6) & (u + w <= 1 + 1e-6)).any():
+            held.add(int(i))
+    return {int(i) for i in ids} - held
+
+
+def level_flights(v, f, step=None, collision=None):
+    """Flights from walkable level faces (the 'levels' detector of flights). collision: see flights."""
     s_step, _, _ = player()
     step = s_step if step is None else step
     tris = _tris(v, f)
     nz, area = _normals(tris)
     level = np.flatnonzero((nz > mg.TREAD_NZ) & (area >= 2.))
+    if collision is not None and len(level):
+        # a drawn level face the mesh's own authored collision holds nothing under is not stood on in the original
+        # (OpenMW collides with the RootCollisionNode alone): never a tread (CHIM-STAIR-METHOD1-UNFIXED-48)
+        drop = _uncovered(tris, level, _tris(*collision), step)
+        level = np.array([i for i in level if int(i) not in drop], int)
     if len(level) < mg.FLIGHT_LEVELS:
         return []
     t = tris[level]
@@ -1132,7 +1172,8 @@ def _blocks_flight(piece, tris, ids, step, height):
     return bool(solid.any())
 
 
-def collision_pieces_mesh(v, f, profile, stairs=None, visible=None, runs=None):
+def collision_pieces_mesh(v, f, profile, stairs=None, visible=None, runs=None, record=None, drawn=None,
+                          authored=False):
     """Stair collision method 1 (see the module): (pieces, exact, note) as mesh_geometry.collision_pieces returns
     them. A mesh with no flight as drawn: exactly method 0. Every flight is checked (check_flight) on the mesh's own
     collision as method 0 converts it before its repairs over the drawn flights (no visible-tread rule); when every
@@ -1140,14 +1181,25 @@ def collision_pieces_mesh(v, f, profile, stairs=None, visible=None, runs=None):
     by a ramp or by tread blocks, the collision mesh's own triangles of those flights removed, the rest of the mesh
     converted as before, a remaining piece that stands in a replaced flight's standing space made the authored plates
     of its triangles. When the result still fails the check on any flight, the mesh keeps method 0's collision (never
-    worse than method 0) and the note names the flights that failed. The note records per flight what was done."""
+    worse than method 0) and the note names the flights that failed. The note records per flight what was done.
+    record (a dict, optional): 'removed' is set to the collision triangles (indices into f) of the replaced flights
+    when the stairway mesh is shipped (never on the method 0 fallback).
+    drawn: the mesh as drawn before any visual reduction (v, its exterior-selected faces), when it differs from
+    visible (a visual recipe's or detail budget's reduced mesh): the flights, their stairway mesh and its proof come
+    from it, as the build's stair check (mesh_report) and flight_unit read the mesh; method 0's visible-tread rule
+    keeps the visible mesh. Built and proved on the reduced mesh, the slave market's ramp (recipe ratio 0.1) left a
+    drawn tread 18.8 units over its floor (CHIM-STAIR-METHOD1-UNFIXED-48). None: the visible mesh is the drawn mesh.
+    authored: v, f is the mesh's RootCollisionNode (flights: collision)."""
     step, _, height = player()
     runs = profile.get('stair_ramps', 'run') if runs is None else runs
     if runs not in RAMP_UNITS:
         raise ValueError('Unknown stair ramp unit: %s' % runs)
     profile = {k: x for k, x in profile.items() if k not in ('stair_collision', 'stair_ramps')}   # method 0's calls
     vis_v, vis_f = (v, f) if visible is None else visible
-    groups = flights(vis_v, vis_f) if len(vis_f) else []
+    if drawn is not None:
+        vis_v, vis_f = drawn       # the flights and their proof: the mesh as drawn (visible stays method 0's)
+    # authored: (v, f) is the mesh's RootCollisionNode; a drawn face it holds nothing under is no tread (flights)
+    groups = flights(vis_v, vis_f, collision=(v, f) if authored else None) if len(vis_f) else []
     if not groups or profile.get('collision_none'):
         return mg.collision_pieces(v, f, profile, stairs, visible)
     vt = _tris(vis_v, vis_f)
@@ -1173,10 +1225,18 @@ def collision_pieces_mesh(v, f, profile, stairs=None, visible=None, runs=None):
         flight_vis.update(_flight_region(vt, groups[k], vt, step, height))
     off = np.array([i for i in range(len(vis_f)) if i not in flight_vis], int)
     others = vt[off].reshape(-1, 3) if len(off) else np.zeros((0, 3))
+    rest_visible = (vis_v, vis_f[off]) if len(off) else None
+    if drawn is not None and visible is not None:
+        # method 0's visible-tread rule on the visible mesh less its triangles over the replaced flights
+        seen = _tris(*visible)
+        gone = set()
+        for k in replace:
+            gone.update(_flight_region(vt, groups[k], seen, step, height))
+        left = np.array([i for i in range(len(visible[1])) if i not in gone], int)
+        rest_visible = (visible[0], visible[1][left]) if len(left) else None
     rest = []
     if len(keep):
-        rest, _, rest_note = mg.collision_pieces(v, f[keep], profile, stairs,
-                                                 (vis_v, vis_f[off]) if len(off) else None)
+        rest, _, rest_note = mg.collision_pieces(v, f[keep], profile, stairs, rest_visible)
         # the piece ids index f[keep]; back to f
         rest = [(p, h, [int(keep[i]) for i in ids], e) for p, h, ids, e in rest]
         if rest_note:
@@ -1274,6 +1334,8 @@ def collision_pieces_mesh(v, f, profile, stairs=None, visible=None, runs=None):
                     'passed' if not failed else '%d flights FAILED (%s)' % (
                         len(failed), '; '.join('flight %d: %d samples, first %s' % (k, len(x), x[0]['check'])
                                                for k, x in failed))))
+    if record is not None:
+        record['removed'] = sorted(int(i) for i in drop)
     return final, True, '; '.join(words)
 
 
@@ -1283,11 +1345,11 @@ REPORT_NAME = 'stair-check.json'          # per CHIM work folder (chim.build)
 WORLD_REPORT = 'chim-stair-check.json'    # the CHIM stage's collected report (chim_build)
 
 
-def mesh_report(pieces, vis_v, vis_f, note=''):
+def mesh_report(pieces, vis_v, vis_f, note='', collision=None):
     """The stair check of one converted mesh as the build ships it: its flights, which collision method it ships
     with (1: a stairway mesh replaced flights; 0: kept or fell back) and per failing flight the checks and the first
-    failing point. None for a mesh without flights."""
-    groups = flights(vis_v, vis_f) if len(vis_f) else []
+    failing point. None for a mesh without flights. collision: its authored collision (flights)."""
+    groups = flights(vis_v, vis_f, collision=collision) if len(vis_f) else []
     if not groups:
         return None
     tris = _tris(vis_v, vis_f)
@@ -1305,11 +1367,30 @@ def mesh_report(pieces, vis_v, vis_f, note=''):
             'failed': failed}
 
 
-def collect(out):
-    """The CHIM stage's stair check: every work folder's REPORT_NAME under OUT/work, as one report (written to
-    OUT/WORLD_REPORT). Status 'failed' when any mesh fails the check under the method it ships with."""
+KNOWN = 'config/stair-check-known.json'     # the meshes method 1 cannot make pass yet (one register class)
+
+
+def load_known(path=None):
+    """{mesh (lower case, forward slashes): reason} of the meshes whose flights method 1 cannot make pass yet: listed
+    and registered as one class (the file's 'class'), never dropped; their failures are reported, not a stop."""
     import json
     from pathlib import Path
+    path = Path(path) if path else Path(__file__).resolve().parents[1] / KNOWN
+    if not path.is_file():
+        return {}, None
+    data = json.loads(path.read_text(encoding='utf-8'))
+    return ({m.replace(chr(92), '/').casefold(): why for m, why in data.get('meshes', {}).items()},
+            data.get('class'))
+
+
+def collect(out, known=None):
+    """The CHIM stage's stair check: every work folder's REPORT_NAME under OUT/work, as one report (written to
+    OUT/WORLD_REPORT). Status 'failed' when a mesh that is not on the known list (config/stair-check-known.json)
+    fails the check under the method it ships with; 'known' when only listed meshes fail (each named in 'known' with
+    its failing flights; a listed mesh that now passes is named in 'known_passing'); 'passed' otherwise."""
+    import json
+    from pathlib import Path
+    listed, cls = load_known() if known is None else (known, None)
     rows = []
     for path in sorted((Path(out) / 'work').glob('*/' + REPORT_NAME)):
         for row in json.loads(path.read_text(encoding='utf-8')).get('meshes', ()):
@@ -1317,20 +1398,28 @@ def collect(out):
     meshes = {}
     for r in rows:
         meshes.setdefault(r['mesh'], r)
-    failing = sorted(m for m, r in meshes.items() if r['failed'])
-    report = {'format': 1, 'method': 1, 'status': 'failed' if failing else 'passed',
+    def key(m):
+        return m.replace(chr(92), '/').casefold()
+    failing = sorted(m for m, r in meshes.items() if r['failed'] and key(m) not in listed)
+    known_failing = sorted(m for m, r in meshes.items() if r['failed'] and key(m) in listed)
+    report = {'format': 1, 'method': 1,
+              'status': 'failed' if failing else ('known' if known_failing else 'passed'),
               'meshes': len(meshes), 'flights': sum(r['flights'] for r in meshes.values()),
               'ships_method_1': sorted(m for m, r in meshes.items() if r['ships_method'] == 1),
               'failing': [{'mesh': m, 'ships_method': meshes[m]['ships_method'], 'how': meshes[m]['how'],
-                           'failed': meshes[m]['failed']} for m in failing]}
+                           'failed': meshes[m]['failed']} for m in failing],
+              'known_class': cls,
+              'known': [{'mesh': m, 'reason': listed[key(m)], 'ships_method': meshes[m]['ships_method'],
+                         'how': meshes[m]['how'], 'failed': meshes[m]['failed']} for m in known_failing],
+              'known_passing': sorted(m for m, r in meshes.items() if not r['failed'] and key(m) in listed)}
     (Path(out) / WORLD_REPORT).write_text(json.dumps(report, indent=1) + '\n', encoding='utf-8', newline='\n')
     return report
 
 
-def require(out):
+def require(out, known=None):
     """collect, and a ValueError naming every mesh (and its first failing flight and point) that fails the check
-    under the method it ships with."""
-    report = collect(out)
+    under the method it ships with and is not on the known list (config/stair-check-known.json)."""
+    report = collect(out, known)
     if report['failing']:
         first = report['failing'][:5]
         raise ValueError('Stair check failed on %d of %d meshes with flights (method each ships with): %s%s'
@@ -1344,24 +1433,99 @@ def require(out):
 
 # ---------------------------------------------------------------- method 1 in the converter (its own worker)
 
-def collision_pieces(v, f, profile, stairs=None, visible=None):
+def collision_pieces(v, f, profile, stairs=None, visible=None, record=None, drawn=None, authored=False):
     """mesh_geometry.collision_pieces with stair collision method 1 for a profile with stair_collision 'mesh'
-    (collision_pieces_mesh); any other profile: mesh_geometry.collision_pieces exactly."""
+    (collision_pieces_mesh); any other profile: mesh_geometry.collision_pieces exactly. record, drawn, authored: see
+    collision_pieces_mesh (drawn also for the authored-ramp rule's check)."""
     if profile.get('stair_collision') == 'mesh':
-        return collision_pieces_mesh(v, f, profile, stairs, visible)
+        return keep_stair_ramps(v, f, *collision_pieces_mesh(v, f, profile, stairs, visible, record=record,
+                                                             drawn=drawn, authored=authored), visible, drawn)
     return mg.collision_pieces(v, f, profile, stairs, visible)
+
+
+def drawn_mesh(model, archive_path):
+    """(v, faces) of a scenery-index model as drawn: its triangles with the exterior selection applied, before any
+    visual reduction (what flight_unit, mesh_report and tools/stair_mesh_survey.py read)."""
+    from mwad.scene import read_asset, unpack_geometry
+    from exterior_visibility import apply_exterior_selection
+    with open(archive_path, 'rb') as archive:
+        vv, ff, _ = unpack_geometry(read_asset(archive, model))
+    v, f = np.array(vv), np.array(ff)
+    return v, apply_exterior_selection(f, model)
+
+
+def authored_collision(model, archive_path):
+    """(v, f) of a scenery-index model's authored collision (its RootCollisionNode), or None when the drawn mesh
+    collides (flights: collision)."""
+    if not model.get('collision'):
+        return None
+    from mwad.scene import read_asset, unpack_geometry
+    with open(archive_path, 'rb') as archive:
+        vv, ff, _ = unpack_geometry(read_asset(archive, model['collision']))
+    return np.array(vv), np.array(ff)
+
+
+def _same_mesh(a, b):
+    """True when two (v, f) meshes are the same arrays (no visual reduction between them)."""
+    return (a[0].shape == b[0].shape and a[1].shape == b[1].shape and np.array_equal(a[0], b[0])
+            and np.array_equal(a[1], b[1]))
+
+
+def keep_stair_ramps(v, f, pieces, exact, note, visible, drawn=None):
+    """An authored stair ramp stays a ramp (tools/authored_ramps.py): a convex piece that stands over a ramp of the
+    collision mesh lying on a drawn flight, steeper than walkable or more than a step over it where the authored
+    surfaces are not, becomes the authored plates of its own triangles; kept only when the stair check of the mesh's
+    flights is not worse with it (the check is the proof). drawn: as collision_pieces_mesh."""
+    from authored_ramps import keep_authored_ramps, stair_ramp_faces
+    if visible is None or not pieces:
+        return pieces, exact, note
+    vis_v, vis_f = visible if drawn is None else drawn
+    ids = stair_ramp_faces(v, f, vis_v, vis_f)
+    kept, kept_exact, extra = keep_authored_ramps(v, f, pieces, exact, ids)
+    if extra is None or kept is pieces:
+        return pieces, exact, note
+    before = sum(1 for _, x in check_flights(pieces, vis_v, vis_f) if x)
+    after = sum(1 for _, x in check_flights(kept, vis_v, vis_f) if x)
+    if after > before:
+        return pieces, exact, '; '.join(x for x in (note, extra + ': not kept (the stair check failed on %d flights '
+                                                    'with it, %d without)' % (after, before)) if x)
+    return kept, kept_exact, '; '.join(x for x in (note, extra) if x)
+
+
+def flight_unit(task):
+    """The number of flights of stairs one CHIM mesh holds as drawn (unit kind 'stair-flights', chim.units): flights()
+    on its drawn triangles with the exterior selection applied, before any visual reduction (as mesh_report and
+    tools/stair_mesh_survey.py read them). The CHIM model builder gives a mesh with a flight stair collision method 1
+    (profile stair_collision 'mesh', unit kind 'mesh-stair'); every other mesh keeps the default worker, profile and
+    unit key, since method 1 is method 0 exactly on a mesh without a flight. task: (scenery-index model record,
+    archive path)."""
+    model, archive_path = task
+    v, vis_f = drawn_mesh(model, archive_path)
+    return len(flights(v, vis_f, collision=authored_collision(model, archive_path))) if len(vis_f) else 0
 
 
 def mesh_unit_stair(task):
     """The CHIM mesh unit of a stair collision method 1 build (unit kind 'mesh-stair', chim.units.CODE_ENTRIES): the
     default worker (chim.build.mesh_unit, prepare_mesh_bsp._prepare_model) with its collision made by
     collision_pieces above, and the mesh's stair check in its lod ('stair_check', mesh_report). The shared converter
-    modules hold no method 1 code, so a default build's mesh units keep their code keys."""
+    modules hold no method 1 code, so a default build's mesh units keep their code keys. The collision triangles of
+    the flights the stairway mesh replaced (indices into the collision mesh) go into the lod
+    ('stair_removed_triangles'): the collision surface gate does not measure them (chim.build.hull_surface_unit,
+    CHIM-HULL-SURFACE-RESURVEY-48)."""
     import prepare_mesh_bsp
     from chim.build import mesh_unit
     from exterior_visibility import apply_exterior_selection
     default = prepare_mesh_bsp.collision_pieces
-    prepare_mesh_bsp.collision_pieces = collision_pieces
+    record = {}
+    _, model, profile, archive_path, *_ = task
+    drawn = drawn_mesh(model, archive_path) if profile.get('stair_collision') == 'mesh' else None
+    authored = bool(model.get('collision'))
+
+    def method1(v, f, profile, stairs=None, visible=None):
+        # the flights from the mesh as drawn when the visible mesh is a reduced one (collision_pieces_mesh drawn)
+        own = drawn if drawn is not None and visible is not None and not _same_mesh(drawn, visible) else None
+        return collision_pieces(v, f, profile, stairs, visible, record=record, drawn=own, authored=authored)
+    prepare_mesh_bsp.collision_pieces = method1
     try:
         out = mesh_unit(task)
     finally:
@@ -1369,8 +1533,11 @@ def mesh_unit_stair(task):
     _, model, profile, *_ = task
     if profile.get('stair_collision') == 'mesh':
         v, f, _, pieces, lod = out
+        if record.get('removed'):
+            lod['stair_removed_triangles'] = [int(i) for i in record['removed']]
         vis_f = apply_exterior_selection(np.asarray(f), model)
-        report = mesh_report(pieces, np.asarray(v), vis_f, lod.get('collision') or '')
+        report = mesh_report(pieces, np.asarray(v), vis_f, lod.get('collision') or '',
+                             collision=authored_collision(model, archive_path))
         if report:
             lod['stair_check'] = report
     return out

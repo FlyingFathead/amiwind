@@ -8,6 +8,9 @@
 #include "aw_harvest_runtime.h"
 #include "aw_town.h"
 #include "chim/chim.h"
+/* Ordinary hinged doors (aw_hinged_door.c sets these; NULL: none). */
+void (*aw_hinged_map_begin)(void);
+int (*aw_hinged_protect)(edict_t *e);
 extern void AW_MergeCollisionTrace(trace_t *,trace_t *,edict_t *);
 /* CHIM world streamer (chim/chim_world.c sets these only when its data
  * exists): chunk placements are this catalogue's successor, so they enter
@@ -41,7 +44,7 @@ void AW_SceneryClear(void) { placements=NULL;count=capacity=0;if(aw_chim_map_end
 void AW_SceneryBegin(const char *entities)
 {
     const char *p=entities;
-    AW_SceneryClear();AW_HarvestBegin();
+    AW_SceneryClear();AW_HarvestBegin();if(aw_hinged_map_begin)aw_hinged_map_begin();
     if(aw_chim_map_begin)aw_chim_map_begin(entities);
     if(!AW_SceneryMapEnabled(sv.name))return;
     while((p=strstr(p,"\"classname\" \"func_wall\""))!=NULL){capacity++;p++;}
@@ -55,6 +58,7 @@ int AW_SceneryCapture(edict_t *e)
     if(!AW_SceneryMapEnabled(sv.name) || !e->v.classname ||
        strcmp(pr_strings+e->v.classname,"func_wall"))return 0;
     if(AW_HarvestProtect(e))return 0;
+    if(aw_hinged_protect && aw_hinged_protect(e))return 0;   /* a hinged door turns: it stays an edict */
     if(count>=capacity)Host_Error("Balmora scenery catalogue count mismatch");
     p=&placements[count++];p->modelindex=SV_ModelIndex(pr_strings+e->v.model);
     model=sv.models[p->modelindex];

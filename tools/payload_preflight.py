@@ -31,6 +31,9 @@ placeholder files in a scratch folder (tools/build_scratch.py) that is always re
 - chim-native: each CHIM-native town (--chim-town output) takes its area from that output alone: no legacy-chain
   file of the town staged, no installed file staged with other bytes or from two outputs, the town an area of
   the CHIM world (chim_town.collisions, BUILD-IMAGE-CHIM-NATIVE-TOWN-36);
+- guard-records: the guard torch records (guard source, model) of the staged maps and batch rooms fit the engine's
+  guard torch table (tools/prepare_guard_torches.py MAX_RECORDS; a lower bound before the frame maps,
+  GUARD-TORCH-TYPES-LIMIT-48);
 - engine-map-limits: every staged map the image keeps fits the engine's per-map tables (edicts, model and
   sound precaches, static entities, the scenery catalogue; tools/map_engine_limits.py,
   BUILD-BUDGET-ENGINE-LIMITS-35). The image step checks the final map set again after the frame maps.
@@ -134,8 +137,8 @@ def planned_catalogues(id1, harvest, data_files, chim_world=None):
     with harvestable plants, before the heap admission drops some; with a CHIM world also one per CHIM region
     frame map with plants, HARVEST-CHIM-REGION-LOSS-41), read only. A superset: every map that can get a
     catalogue must be one the final image can bind it to."""
-    from harvest_build import chim_regions, map_selections, source_placements
-    _, _, refs = source_placements(harvest, data_files)
+    from harvest_build import chim_regions, held_placements, map_selections
+    _, _, refs = held_placements(harvest, data_files)
     regions = chim_regions(id1, chim_world)
     return sorted(map_selections(id1, refs, **({'regions': regions} if regions else {}))[1])
 
@@ -185,11 +188,12 @@ def check_interior_sections(id1, removed):
     return len(entries)
 
 
-def check_engine_map_limits(id1, removed):
-    """map_engine_limits.check_maps on the staged maps the image keeps; the number of maps checked."""
+def check_engine_map_limits(id1, removed, jobs=1):
+    """map_engine_limits.check_maps on the staged maps the image keeps, on JOBS workers (BUILD-IMAGE-UNDERUSED-32);
+    the number of maps checked."""
     from map_engine_limits import check_maps
     skip = {rel.split('/', 1)[1] for rel in removed if rel.startswith('maps/')}
-    return check_maps(id1/'maps', skip=skip)['maps']
+    return check_maps(id1/'maps', skip=skip, jobs=jobs)['maps']
 
 
 # A CHIM region frame map's size before the image step writes it (chim.frame_map._region_map_game_data): the empty
@@ -237,6 +241,17 @@ def planned_region_frame_maps(id1, chim_world):
     return planned, sidecars
 
 
+def actor_library_additions(library):
+    """{boot-relative path: bytes} the image step's actor library install (tools/actor_library.py install) copies
+    into id1 after the preflight: every file under the stage's id1/, at that path. {} without a library."""
+    if not library:
+        return {}
+    root = Path(library)/'id1'
+    if not root.is_dir():
+        return {}
+    return {'id1/' + p.relative_to(root).as_posix(): p.stat().st_size for p in sorted(root.rglob('*')) if p.is_file()}
+
+
 def media_additions(media, files, catalogue=False):
     """{boot-relative path: bytes} the image step's media catalogue adds to the payload after the preflight
     (prepare_media_assets.stage_catalogue): every included converted sound and video not staged yet, and, only
@@ -260,22 +275,109 @@ def media_additions(media, files, catalogue=False):
     return out
 
 
-def check_disk_layout(boot, removed, music_files, chim_world, layout=None, media=None, media_catalogue=False):
+def room_batch_additions(stage):
+    """{boot-relative path: bytes} the image step's room batch install (tools/room_batches.py install) copies into
+    id1 after the image step's first preflight: every file the batch stage's record lists. {} without a stage."""
+    if not stage:
+        return {}
+    import room_batches
+    path = Path(stage) / room_batches.RECORD
+    if not path.is_file():
+        return {}
+    record = json.loads(path.read_text(encoding='utf-8'))
+    return {'id1/' + rel: (Path(stage) / 'id1' / rel).stat().st_size for rel in record.get('files') or {}}
+
+
+def entity_lump_bytes(path):
+    """The entity lump's length of a BSP file (the header's first lump), or None when it is not readable."""
+    import struct
+    try:
+        with open(path, 'rb') as stream:
+            head = stream.read(12)
+    except OSError:
+        return None
+    if len(head) < 12:
+        return None
+    return struct.unpack_from('<i', head, 8)[0]
+
+
+ROOM_MAP_SHELL_BYTES = 4096   # a CHIM room map beside its entities: the six clip walls of its shell world, the header
+
+
+def interior_additions(stage, files, boot, room_batches=None):
+    """What the image step's CHIM rooms install (chim.interior.install, after finalize's preflight) does to the
+    payload FILES {boot-relative path: bytes}: ({path: bytes} it adds, [paths] it removes). The interior store
+    id1/chimi/ (without the records of rooms the payload does not hold) is added; every held room's map
+    id1/maps/<room>.bsp becomes id1/maps/<room>.chim, counted at the .bsp's entity lump + ROOM_MAP_SHELL_BYTES (the
+    room map keeps the entities in a shell world; measured: 43 Balmora rooms 472,720 bytes as .chim from 84,904,648
+    bytes as .bsp). IMAGE-BOOT-PAYLOAD-OVER-2GIB-48: the store (321 MB in v0.0.48-dev2) was not in the plan."""
+    if not stage:
+        return {}, []
+    from chim.interior import STORE
+    from map_files import frame_map_path
+    stage = Path(stage)
+    receipt_path = stage / 'chim-rooms-receipt.json'
+    if not receipt_path.is_file() or not (stage / STORE).is_dir():
+        return {}, []
+    receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+    held, add, drop = set(), {}, []
+    for row in receipt.get('rooms') or []:
+        rel = 'id1/maps/%s.bsp' % row['room']
+        if rel not in files:
+            continue
+        held.add(row['room'])
+        source = Path(boot) / rel
+        if not source.is_file() and room_batches:
+            source = Path(room_batches) / rel
+        lump = entity_lump_bytes(source)
+        size = files[rel] if lump is None or lump < 0 else min(files[rel], lump + ROOM_MAP_SHELL_BYTES)
+        drop.append(rel)
+        # an installed room map is always .chim (chim.interior.install), whatever the frame map extension
+        add['id1/' + frame_map_path('', row['room'], 'chim').as_posix()] = size
+    root = stage / STORE
+    for p in sorted(root.rglob('*')):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(root).as_posix()
+        if rel.startswith('rooms/') and rel.endswith('.crm') and rel[len('rooms/'):-len('.crm')] not in held:
+            continue
+        add['id1/%s/%s' % (STORE, rel)] = p.stat().st_size
+    return add, drop
+
+
+def check_disk_layout(boot, removed, music_files, chim_world, layout=None, media=None, media_catalogue=False,
+                      actor_library=None, room_batches=None, chim_interiors=None):
     """The planned partitions and drives through the disk-layout gate, before anything is written. LAYOUT: the
     disk layout settings (tools/layout_plan.resolve); the compact layout (default) is planned by
     tools/layout_plan.py and returned as layout_plan (the image step follows it), counting the media the image
-    step adds later (MEDIA, the converted media folder); the legacy layout is planned as before."""
+    step adds later (MEDIA, the converted media folder) and the actor library it installs later (ACTOR_LIBRARY,
+    the actor library stage, only when the image step installs it: --chim-actor-table on); the legacy layout is
+    planned as before."""
     import layout_plan
     layout = layout or layout_plan.resolve()
     from world_volumes import (RDB_BYTES, PlannedMap, map_bytes, partition_batches, plan_drives, plan_partitions,
                                partition_starts, planned_partition, require_partition_plans)
     id1 = boot/'id1'
-    files = {p.relative_to(boot).as_posix(): p.stat().st_size for p in boot.rglob('*') if p.is_file()}
+    # every staged file's size, by the layout plan's walk (os.walk; the pathlib walk with AMIWIND_LAYOUT_WALK=pathlib):
+    # the same sizes (every reader of FILES sorts it or looks paths up)
+    files = dict(layout_plan.walk(boot))
     for rel in removed:
         files.pop('id1/' + rel, None)
     # The soundtrack is copied before world_volumes.pack measures the boot payload: count it first.
     for name, size in music_files:
         files['id1/music/' + name] = size
+    # The actor library's models are copied into id1 by the image step after this plan (actor_library.install, at
+    # the actor table): count them at their own size, over any staged file of the same name they replace
+    # (IMAGE-LAYOUT-PLAN-ACTOR-LIBRARY-48: 148.8 MB left out of a MiniWind plan, +145 MB at the layout check).
+    files.update(actor_library_additions(actor_library))
+    # The room batches (copied in by the image step after its first preflight) and the CHIM rooms install (the
+    # interior store id1/chimi/ and each held room's .bsp made its .chim, after finalize's preflight): counted
+    # (IMAGE-BOOT-PAYLOAD-OVER-2GIB-48: 1.66 GB of batch room residents and the 321 MB store were not in the plan).
+    files.update(room_batch_additions(room_batches))
+    added_rooms, dropped_rooms = interior_additions(chim_interiors, files, boot, room_batches)
+    for rel in dropped_rooms:
+        files.pop(rel, None)
+    files.update(added_rooms)
     worlds, frame_maps = [], []
     directory = id1/'world/regions.awr'
     if directory.exists():
@@ -412,6 +514,39 @@ def check_actor_frames(id1, removed):
     return audit_payload(id1, removed)
 
 
+def check_guard_records(id1, removed, data_files, room_batches=None):
+    """The guard torch records (guard source, model) of the staged maps the image keeps and of the batch rooms it
+    installs, against the engine's table (tools/prepare_guard_torches.py MAX_RECORDS = AW_GUARD_TORCH_TYPES). The
+    CHIM frame maps are not written yet, so this is a lower bound: an overflow by the rooms and interiors stops the
+    build here in seconds instead of in the image step's guard torches (GUARD-TORCH-TYPES-LIMIT-48); the image
+    step counts the final map set again. Returns the count."""
+    from map_files import map_files
+    from prepare_guard_torches import MAX_RECORDS, check_record_count, staged_guard_records
+    if not data_files:
+        return None
+    skip = {rel.split('/', 1)[1] for rel in removed if rel.startswith('maps/')}
+    every = map_files(Path(id1) / 'maps')
+    if room_batches:
+        staged = {p.name for p in every}
+        every += [p for p in map_files(Path(room_batches) / 'id1' / 'maps') if p.name not in staged]
+    # scene maps' NPCs get their source identity later in the image step: counted, not refused here (the image
+    # step's guard torches refuse an NPC without one on the final maps; PREFLIGHT-GUARD-UNSTAMPED-NPCS-48)
+    unstamped = []
+    keys = staged_guard_records(every, data_files, unstamped)
+    kept = staged_guard_records([p for p in every if p.name not in skip], data_files, []) if skip else keys
+    if unstamped:
+        print('guard torch records: %d staged NPC(s) not stamped with a source identity yet (%s); the image step '
+              'checks them on the final maps' % (len(unstamped), ', '.join(sorted({m for m, _ in unstamped}))),
+              flush=True)
+    # The maps the image removes include the legacy town maps its CHIM town frame maps are written from: their
+    # guards come back in the frame maps, so they are counted as a warning (they also hold maps that do not ship)
+    if len(keys) > MAX_RECORDS >= len(kept):
+        print('WARNING: guard torch records: %d with the maps the image removes (the CHIM towns are written from '
+              'them), %d without; the engine holds %d' % (len(keys), len(kept), MAX_RECORDS), flush=True)
+    check_record_count(len(kept), ' before the CHIM frame maps')
+    return {'records_kept_maps': len(kept), 'records_with_removed_maps': len(keys)}
+
+
 def check_music(music):
     """The soundtrack the image copies: every file there, decodable, matching its manifest hash."""
     import hashlib
@@ -429,9 +564,23 @@ def check_music(music):
     return sizes
 
 
+def layout_beside():
+    """1 when the disk layout check runs beside the other checks and the Python-bound checks run in processes of
+    their own (the default since v0.0.48, BUILD-IMAGE-UNDERUSED-32: on the threads of one process they shared one
+    interpreter lock, 45 s at 1.6 cores in the dev2 try 9 build), 0 with AMIWIND_PREFLIGHT_METHOD=threads (every
+    check on a thread, the layout after them: the method before). The same report either way."""
+    import os
+    return 0 if os.environ.get('AMIWIND_PREFLIGHT_METHOD', 'pool') == 'threads' else 1
+
+
+# Checks that run Python over every staged file (names, formats, host paths, actor frame layouts): each in a process
+# of its own beside the others (layout_beside), as build_parallel.Background
+PROCESS_CHECKS = ('payload-names', 'file-formats', 'host-paths', 'actor-frames')
+
+
 def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=None, report_path=None,
         pending=None, chim_towns=(), chim_town_dirs=(), exterior_terrain=None, layout=None, media=None,
-        layout_plan_path=None, media_catalogue=False):
+        layout_plan_path=None, media_catalogue=False, actor_library=None, room_batches=None, chim_interiors=None):
     """Run every check over the staged payload OUT (OUT/boot). Prints one summary line; raises
     ValueError listing every error together. Returns the report. pending: files the image step still
     writes before its frame maps (check_chim_inputs). layout: the disk layout settings (tools/layout_plan.py);
@@ -454,36 +603,71 @@ def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=No
     except (OSError, ValueError, KeyError) as exc:
         added, removed, not_on_chim = [], set(), []
         errors.append(('chim-receipt', exc))
-    checks = [('payload-names', lambda: check_payload_names(boot)),
-              ('file-formats', lambda: check_file_formats(id1)),
-              ('host-paths', lambda: check_payload_host_paths(boot, [out.resolve()])),
+    beside = layout_beside()
+    calls = {'payload-names': (check_payload_names, boot), 'file-formats': (check_file_formats, id1),
+             'host-paths': (check_payload_host_paths, boot, [out.resolve()]),
+             'actor-frames': (check_actor_frames, id1, removed)}
+    started_apart = {}
+    if beside and int(jobs or 1) > 1:
+        from build_parallel import Background
+        started_apart = {name: Background(*calls[name], jobs=jobs) for name in PROCESS_CHECKS}
+
+    def check(name):
+        if name in started_apart:
+            return started_apart[name].result
+        return lambda: calls[name][0](*calls[name][1:])
+    checks = [('payload-names', check('payload-names')),
+              ('file-formats', check('file-formats')),
+              ('host-paths', check('host-paths')),
               ('harvest-catalogues', lambda: check_harvest(id1, added, removed, harvest, data_files, chim_world)),
               ('interior-sections', lambda: check_interior_sections(id1, removed)),
-              ('engine-map-limits', lambda: check_engine_map_limits(id1, removed)),
-              ('actor-frames', lambda: check_actor_frames(id1, removed))]
+              ('engine-map-limits', lambda: check_engine_map_limits(id1, removed, jobs)),
+              ('actor-frames', check('actor-frames'))]
     if chim_world:
         checks.append(('chim-inputs', lambda: check_chim_inputs(id1, chim_world, pending, set(chim_towns))))
     if chim_town_dirs:
         checks.append(('chim-native', lambda: check_chim_native(id1, chim_world, list(chim_town_dirs),
                                                                  installed=(out/'chim-towns.json').is_file())))
+    # the guard torch records against the engine's table (GUARD-TORCH-TYPES-LIMIT-48)
+    checks.append(('guard-records', lambda: check_guard_records(id1, removed, data_files, room_batches)))
     music_result = {}
     if music:
         def music_check():
             music_result['files'] = check_music(Path(music))
             return len(music_result['files']) - 1
         checks.append(('music', music_check))
-    with ThreadPoolExecutor(max_workers=max(1, min(int(jobs or 1), len(checks)))) as pool:
+    def disk_layout():
+        return check_disk_layout(boot, removed, music_result.get('files', []), chim_world, layout, media,
+                                 media_catalogue, actor_library, room_batches, chim_interiors)
+    layout_future = None
+    with ThreadPoolExecutor(max_workers=max(1, min(int(jobs or 1), len(checks) + beside))) as pool:
         futures = [(name, pool.submit(fn)) for name, fn in checks]
+        if beside:
+            # The layout needs the music sizes only: it starts as soon as they are known, beside the other checks
+            # (BUILD-IMAGE-UNDERUSED-32: it ran after all of them, 10.7 s on one core); its result and error keep
+            # their place in the report
+            music_future = dict(futures).get('music')
+            if music_future is not None:
+                try:
+                    music_future.result()
+                except (OSError, ValueError, KeyError):
+                    pass
+            if not music or 'files' in music_result:
+                layout_future = pool.submit(disk_layout)
         for name, future in futures:
             try:
                 results[name] = future.result()
             except (OSError, ValueError, KeyError) as exc:
                 errors.append((name, exc))
-    # The layout needs the music sizes; it runs last (seconds: stat only).
-    if not music or 'files' in music_result:
+    # The layout needs the music sizes; without layout_beside() it runs last (the method before v0.0.48).
+    if layout_future is not None:
         try:
-            results['disk-layout'] = check_disk_layout(boot, removed, music_result.get('files', []), chim_world,
-                                                       layout, media, media_catalogue)
+            results['disk-layout'] = layout_future.result()
+        except (OSError, ValueError) as exc:
+            errors.append(('disk-layout', exc))
+    elif not beside and (not music or 'files' in music_result):
+        try:
+            results['disk-layout'] = disk_layout()
         except (OSError, ValueError) as exc:
             errors.append(('disk-layout', exc))
     planned = (results.get('disk-layout') or {}).pop('layout_plan', None)

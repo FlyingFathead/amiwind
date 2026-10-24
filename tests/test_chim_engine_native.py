@@ -365,6 +365,26 @@ def write_test_world(root, first=0, story=(), rows=False, refs=False, placed=Fal
     return sum(len(r) for r in reach.values())
 
 
+def write_test_room(root):
+    """chim/rooms/doorroom.crm on the test world's store, written by the builder's room record writer
+    (tools/chim/interior.py room_record): placement 0 is a door (reference 1001, model 1 at 124 64, yaw 0),
+    placement 1 a plain box (reference 1002, model 0 at -100 -100). Returns the record's references."""
+    import math
+    from chim import placed as P
+    from chim.interior import read_room_record, room_record
+    records, refs = [], []
+    for pid, ref, model, origin in ((0, 1001, 1, (124.0, 64.0, 0.0)), (1, 1002, 0, (-100.0, -100.0, 0.0))):
+        angles = (0.0, 0.0, 0.0)
+        lo, hi = P.placed_box(origin, angles, *MODEL_BOXES[model][0])
+        box = ([math.floor(v - 1) for v in lo], [math.ceil(v + 1) for v in hi])
+        records.append(P.placement(pid, ref, model, origin, angles, 0, 0, 0, box, 1))
+        refs.append(ref)
+    data = room_record(((-140.0, -140.0, -1.0), (180.0, 120.0, 70.0)), [0, 1], records)
+    (Path(root) / 'chim/rooms').mkdir(parents=True, exist_ok=True)
+    (Path(root) / 'chim/rooms/doorroom.crm').write_bytes(data)
+    return [p['ref'] for p in read_room_record(data)['placements']]
+
+
 @unittest.skipIf(os.name == 'nt', 'native helper fixtures run on Linux, including the Docker gate')
 @unittest.skipUnless(COMPILER, 'install a host C compiler')
 def write_big_world(root):
@@ -443,12 +463,13 @@ class ChimWorldTests(unittest.TestCase):
 
     SOURCES = [SRC / 'chim' / n for n in ('chim_format.c', 'chim_zone.c', 'chim_models.c', 'chim_chunks.c', 'chim_graft.c',
                                           'chim_world.c', 'chim_statics.c', 'chim_far.c', 'chim_cuts.c',
-                                          'chim_prefetch.c', 'chim_placed_clip.c', 'chim_terc.c', 'chim_thgt.c')] + \
+                                          'chim_prefetch.c', 'chim_placed_clip.c', 'chim_terc.c', 'chim_thgt.c',
+                                          'chim_room.c')] + \
         [SRC / n for n in ('aw_scenery.c', 'world.c', 'r_efrag.c', 'mathlib.c', 'aw_format.c', 'aw_harvest.c',
                            'aw_harvest_runtime.c', 'aw_harvest_proxy.c', 'aw_state.c')]
 
     def run_world(self, modes, with_data=True, env=None, big=False, seam=False, first=0, story=(), rows=False,
-                  far=False, extra=(), refs=False, region=None, placed=False, reach=False, terc=False):
+                  far=False, extra=(), refs=False, region=None, placed=False, reach=False, terc=False, room=False):
         with tempfile.TemporaryDirectory(prefix='amiwind-chim-world-') as tmp:
             if region:
                 from chim_fixture import write_region_world
@@ -467,6 +488,9 @@ class ChimWorldTests(unittest.TestCase):
                 write_big_world(tmp)
             elif with_data:
                 self.assertGreater(write_test_world(tmp, first, story, rows, refs, placed, reach), 0)
+                if room:
+                    # the record keeps each placement's reference: the door's is what the hinged door table keys
+                    self.assertEqual(write_test_room(tmp), [1001, 1002])
                 if rows:
                     self.assertTrue(list(Path(tmp).glob('chim/frames/*/*/r*/s*.ccs')))
             old = dict(os.environ)
@@ -787,6 +811,20 @@ class ChimWorldTests(unittest.TestCase):
                     self.assertGreaterEqual(z, want - 1e-3)
                     self.assertLess(z, want + 0.03125 / nz + 2e-3)
         self.assertGreaterEqual(hits, 4)
+
+    def test_hinged_door_placement_turns_with_its_collision_and_keeps_its_pose(self):
+        # AW-20260928-12: an ordinary hinged door on a CHIM frame (chim_hinged_door, ChimChunks_DoorYaw/DoorClip).
+        out = self.run_world(['door'])[0]
+        self.assertIn('door ok', out)
+        out = self.run_world(['door'], placed=True)[0]
+        self.assertIn('door ok', out)
+
+    def test_hinged_door_in_a_chim_room_turns_with_its_collision(self):
+        # AW-20260928-12: an ordinary hinged door among a CHIM room's placements (chim_room.c through the frames'
+        # hook chim_hinged_door; ChimChunks_DoorYaw/DoorClip come to the room while it runs). Closed, half and
+        # fully open; a room loaded again starts at the door's present pose.
+        out = self.run_world(['roomdoor'], placed=True, room=True)[0]
+        self.assertIn('roomdoor ok', out)
 
     def test_story_hidden_placements_stay_out_while_the_story_hides_them(self):
         out = self.run_world(['story'], story=(0,))[0]

@@ -522,7 +522,15 @@ def in_place(skeleton, entries):
 # ---- profile policies, byte budget and frame subsets (project decision 2026-10-09: residents stand in
 # 'react' and wear the 'full' model only while they move: companion, followers, fighters)
 
-ALIAS_BYTE_BUDGET = 512 * 1024      # the engine's alias stream staging limit (model.c AW_ALIAS_STAGING_LIMIT)
+ALIAS_BYTE_BUDGET = 512 * 1024      # the engine's alias staging limit (model.c AW_ALIAS_STAGING_LIMIT): the player's models
+# The actors' budget (room and town residents, the actor library), sized for 32 MB of Fast RAM, the safe minimum
+# (ALIAS-BUDGET-32MB-48): the engine's direct alias stream limit (model.c AW_ALIAS_STREAM_LIMIT), which decodes a
+# model straight into its cache block, so a model over the 512 KiB staging limit loads the same way on 16 MB (its
+# Cache evicts older models for it). Every kit model fits it at the first vertex rung its outfit allows: at most
+# 666 faces x 64 samples, 720,032 bytes (measured on all 1,769 room residents and 415 library appearances, 23 October
+# 2026: 161 were over 512 KiB at their first rung, so the old budget baked them at a lower one, two fell back to the
+# standing model; the largest is 720,032 bytes), so no actor is reduced for bytes.
+ACTOR_BYTE_BUDGET = 768 * 1024
 MOVER_SUFFIX = '_m'
 
 

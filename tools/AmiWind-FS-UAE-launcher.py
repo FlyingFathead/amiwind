@@ -34,7 +34,7 @@ PROFILE_VALUES = {
     'chip_memory': '2048',
     'slow_memory': '0',
     'fast_memory': '0',
-    'zorro_iii_memory': '131072',
+    'zorro_iii_memory': '32768',
     'joystick_port_1': 'none',
     'middle_click_ungrab': '0',
     'keyboard_key_pageup': 'action_key_68',
@@ -51,24 +51,28 @@ PROFILE_LABELS = (
     ('JIT', 'jit_compiler', 'ON'),
     ('24-bit addressing', 'uae_cpu_24bit_addressing', 'OFF'),
     ('Chip RAM', 'chip_memory', '2048 KiB'),
-    ('Z3 Fast RAM', 'zorro_iii_memory', '131072 KiB'),
+    ('Z3 Fast RAM', 'zorro_iii_memory', '32768 KiB'),
 )
-# Fast RAM choice (Zorro III). The default is 128 MiB (decided for the project, 21 October 2026: like a 68060
-# accelerator card; earlier playtests started with 16 MiB). 16 MiB, the smallest machine the game runs on, stays a
-# choice (menu entry 2, --fast-ram 16) so that baseline can still be played and tested.
+# Fast RAM choice (Zorro III). The default is 32 MiB, the safe minimum for the whole game (decided for the project,
+# 23 October 2026, RAM-REQUIREMENT-32MB-48; 128 MiB from 21 October, 16 MiB before). More is used automatically
+# (bigger heap, CHIM caches, prefetch). 16 MiB, the least the game starts on, stays a choice (menu entry 2,
+# --fast-ram 16) with a warning: the game warns at boot too and loads more often there.
 # Limits measured in FS-UAE 3.1.66 (JIT on): every Zorro III board must be a power of two from 1 MiB to
 # 1 GiB (any other size gives NO Zorro III RAM at all), a second board may not be larger than the first,
 # and both boards together reach at most 1.5 GiB (a 2 GiB request ends up as 1 GiB + 512 MiB).
 # WinUAE uses the same per-board rule (power of two, 1 MiB to 1 GiB per board); the same limits apply to
 # both emulators so a choice means the same machine in either.
-FAST_RAM_DEFAULT_MIB = 128
+FAST_RAM_DEFAULT_MIB = 32
+FAST_RAM_SAFE_MIB = 32
 FAST_RAM_BASELINE_MIB = 16
 FAST_RAM_MIN_MIB = 16
 FAST_RAM_MAX_MIB = 1536
 FAST_RAM_BOARD_MAX_MIB = 1024
 FAST_RAM_PRESETS = (
-    (FAST_RAM_DEFAULT_MIB, 'default: like a 68060 accelerator card'),
-    (FAST_RAM_BASELINE_MIB, 'the smallest the game runs on (earlier default)'),
+    (FAST_RAM_DEFAULT_MIB, 'default: the safe minimum for the whole game'),
+    (FAST_RAM_BASELINE_MIB, 'starts with a warning; loads more often'),
+    (64, ''),
+    (128, 'like a 68060 accelerator card'),
     (256, ''),
     (512, ''),
     (1024, ''),
@@ -82,6 +86,14 @@ def fast_ram_label(mib):
     if mib >= 1024 and mib % 512 == 0:
         return ('%g GiB' % (mib / 1024))
     return '%d MiB' % mib
+
+
+def fast_ram_warning(mib):
+    """The launcher's warning below the safe minimum (the game's boot check says the same), else None."""
+    if mib >= FAST_RAM_SAFE_MIB:
+        return None
+    return ('WARNING: %s of Fast RAM is below the %d MiB safe minimum for the whole game. AmiWind starts, '
+            'warns at boot (ten seconds, ENTER skips) and may load more often.' % (fast_ram_label(mib), FAST_RAM_SAFE_MIB))
 
 
 def fast_ram_boards(mib):
@@ -212,7 +224,7 @@ uae_cpu_24bit_addressing = false
 chip_memory = 2048
 slow_memory = 0
 fast_memory = 0
-zorro_iii_memory = 131072
+zorro_iii_memory = 32768
 kickstart_file = {rom}
 hard_drive_0 = {image}
 hard_drive_0_type = hdf
@@ -521,7 +533,8 @@ def print_host_preflight(version, image, rom, config, fast_ram_mib=FAST_RAM_DEFA
         print(('%-21s %-23s %s' % ('Z3 Fast RAM board 2:', (second + ' MiB') if second else '<missing>',
                                           '[x] OK' if ok else '[!] FAIL')), flush=True)
     note = ' (default)' if fast_ram_mib == FAST_RAM_DEFAULT_MIB else ' (chosen)'
-    print(('%-21s %-23s %s' % ('Fast RAM in total:', fast_ram_label(fast_ram_mib) + note, '[x] OK')), flush=True)
+    print(('%-21s %-23s %s' % ('Fast RAM in total:', fast_ram_label(fast_ram_mib) + note,
+                                      '[!] WARN' if fast_ram_warning(fast_ram_mib) else '[x] OK')), flush=True)
     speed_ok = values.get('uae_cpu_speed', '').strip().casefold() == 'max'
     failed = failed or not speed_ok
     print(('%-21s %-23s %s' % ('Cycle-exact speed:', 'OFF (cpu_speed=max)' if speed_ok else 'possible / unknown',
@@ -630,8 +643,9 @@ def main(argv=None):
     parser.add_argument('--rom', help='Select and remember a ROM file (or search a ROM directory)')
     parser.add_argument('--fs-uae', metavar='EXECUTABLE', help='Select and remember FS-UAE executable (default: fs-uae on PATH)')
     parser.add_argument('--fast-ram', metavar='MIB', help='Fast RAM for the emulated Amiga, remembered: "default" (%d MiB, '
-                        'like a 68060 card) or a size in MiB, e.g. 16 (the smallest the game runs on), 256, 512, '
-                        '1024, 1536 (the most); '
+                        'the safe minimum for the whole game) or a size in MiB, e.g. 16 (starts with a warning, loads '
+                        'more often), 64, 128 (like a 68060 card), 256, 512, 1024, 1536 (the most; more is used '
+                        'automatically); '
                         'other sizes are checked against what the emulator can make' % FAST_RAM_DEFAULT_MIB)
     parser.add_argument('-y', '--yes', action='store_true', help='Run the newest image without the selection prompt')
     parser.add_argument('--configure-only', action='store_true', help='Validate files and create/reuse the preset without launching')
@@ -653,6 +667,8 @@ def main(argv=None):
             if chosen is not None:
                 fast_ram[0] = chosen
                 print('Fast RAM: ' + fast_ram_label(chosen), flush=True)
+                if fast_ram_warning(chosen):
+                    print(fast_ram_warning(chosen), flush=True)
         selected = select_image(root, None if requested == 'latest' else requested,
                                 ask=settings['confirm_launch'] and interactive, memory=memory_menu)
         if selected is None:
@@ -697,6 +713,8 @@ def main(argv=None):
         print('AmiWind v' + version + '\nHDF: ' + str(image) + '\nROM: ' + str(rom), flush=True)
         print('Starting with ' + fast_ram_label(fast_ram[0]) + ' of Fast RAM (Zorro III' +
               (', two boards' if fast_ram_fs_uae_values(fast_ram[0]).get('uae_z3mem2_size') else '') + ').', flush=True)
+        if fast_ram_warning(fast_ram[0]):
+            print(fast_ram_warning(fast_ram[0]), flush=True)
         if args.configure_only:
             print('Files matched. Configuration ready.', flush=True)
             return 0

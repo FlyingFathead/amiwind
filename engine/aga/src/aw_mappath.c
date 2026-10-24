@@ -99,14 +99,19 @@ int AW_MapPathIs (const char *path, const char *name)
 	return !strcmp (path + n, AW_MAP_EXT_LEGACY) || !strcmp (path + n, AW_MAP_EXT_CHIM);
 }
 
-/* "_chim_frame" in the worldspawn (the first entity) of the map's entities. */
-static int FrameKey (const char *entities)
+/* KEY ("\"_chim_frame\"", "\"_chim_room\"") in the worldspawn (the first entity) of the map's entities. */
+static int WorldKey (const char *entities, const char *quoted)
 {
 	const char *end, *key;
 	if (!entities || *entities != '{' || !(end = strchr (entities, '}')))
 		return 0;
-	key = strstr (entities, "\"_chim_frame\"");
+	key = strstr (entities, quoted);
 	return key && key < end;
+}
+
+static int FrameKey (const char *entities)
+{
+	return WorldKey (entities, "\"_chim_frame\"");
 }
 
 int AW_MapRefused (const char *path, const char *entities, char *why, int size)
@@ -120,10 +125,12 @@ int AW_MapRefused (const char *path, const char *entities, char *why, int size)
 			Q_snprintf (why, size, "%s is a CHIM frame map: its world is in chim/world.cwi, which this image does not have", path ? path : "map");
 		return 1;
 	}
-	if (!frame && AW_MapPathChim (path))
+	/* a CHIM room map (tools/chim/interior.py: "_chim_room", its models on the interior store) is a .chim file too
+	   (IMAGE-ROOM-MAPS-ENGINE-REFUSED-48) */
+	if (!frame && AW_MapPathChim (path) && !WorldKey (entities, "\"_chim_room\""))
 	{
 		if (why && size > 0)
-			Q_snprintf (why, size, "%s is a .chim file without a CHIM frame (\"_chim_frame\")", path);
+			Q_snprintf (why, size, "%s is a .chim file without a CHIM frame (\"_chim_frame\") or room (\"_chim_room\")", path);
 		return 1;
 	}
 	return 0;

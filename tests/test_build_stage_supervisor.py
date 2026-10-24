@@ -233,6 +233,34 @@ class Supervisor(unittest.TestCase):
                 w.sample({'chim': (20, 20)})
             self.assertFalse(lines)
 
+    def test_the_occurrence_names_the_phase_running_now(self):
+        # BUILD-IMAGE-FINALIZE-UNDERUSED-48: the record and the warning name the stage's current phase
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp)
+            sections = run / 'profile' / 'sections'
+            sections.mkdir(parents=True)
+            (sections / '33-chim.jsonl.now').write_text(json.dumps({'name': 'Image: payload preflight',
+                                                                    'started_at': 1010.0}))
+            cpu, lines = {'seconds': 0.0}, []
+            w, clock = self.watch(run, cpu, {'queued': 9, 'more': True, 'running': 1, 'slowest': None}, lines)
+            for step in range(1, 16):
+                clock.t, cpu['seconds'] = step * 5.0, step * 5.0
+                w.sample({'chim': (20, 20)})
+            row = json.loads((run / stage_watch.FILE).read_text().splitlines()[0])
+            self.assertEqual(row['phase'], 'Image: payload preflight')
+            self.assertEqual(row['phase_seconds'], round(row['time'] - 1010.0, 1))
+            self.assertGreater(row['phase_seconds'], 0)
+            self.assertIn('phase now: Image: payload preflight', lines[0])
+        with tempfile.TemporaryDirectory() as tmp:          # no phase file: named as none
+            run = Path(tmp)
+            cpu, lines = {'seconds': 0.0}, []
+            w, clock = self.watch(run, cpu, {'queued': 9, 'more': True, 'running': 1, 'slowest': None}, lines)
+            for step in range(1, 16):
+                clock.t, cpu['seconds'] = step * 5.0, step * 5.0
+                w.sample({'chim': (20, 20)})
+            self.assertIsNone(json.loads((run / stage_watch.FILE).read_text().splitlines()[0])['phase'])
+            self.assertIn('phase now: none named', lines[0])
+
 
 def slow_square(item):
     time.sleep(0.05)

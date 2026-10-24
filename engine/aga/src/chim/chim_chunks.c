@@ -53,6 +53,127 @@ void (*chim_actors_join)(int cx, int cy, const char *map, const float *offset);
 void (*chim_actors_leave)(int cx, int cy);
 void (*chim_actors_tick)(void);
 void (*chim_actors_cmd)(void);
+/* Fire light (CHIM-EXTERIOR-FLAMES-MISSING-48; the maintainer 2026-10-23: "set
+ * it on by default but add some dbg command like dbg campfires on|off"): the
+ * frame map's flame rows that carry "aw_flame_light" "R L" (the fire's light
+ * record: radius in map units, brightness 0..255; tools/chim/flames.py) light
+ * the placed models around them. A placement without a stored level gets the
+ * rooms' rule at its drawn-box centre: the sum of L x the original attenuation
+ * (full to R/3, then R/3d, faded out between R and 2R), rounded to steps of 8,
+ * none under 4 (tools/chim/placement_light.py level). Computed once, when the
+ * chunk's records are read; r_surf.c adds it to the dimmed ambient outdoors and
+ * dbg campfires off (r_campfires 0) leaves it out. A frame map has at most
+ * CHIM_FIRE_LIGHTS fires (the engine's static flame table is 128 flames). */
+#define CHIM_FIRE_LIGHTS	128
+typedef struct {float origin[3], radius, luma;} chim_fire_light_t;
+static chim_fire_light_t	fire_lights[CHIM_FIRE_LIGHTS];
+static int					fire_light_count;
+
+/* Up to N numbers of TEXT (decimal, as the builder writes them) into OUT; the count read. */
+static int FireNumbers (const char *text, float *out, int n)
+{
+	int k = 0;
+	while (k < n)
+	{
+		double v = 0, scale = 1;
+		int sign = 1, digits = 0;
+		while (*text == ' ')
+			text++;
+		if (*text == '-' || *text == '+')
+			sign = *text++ == '-' ? -1 : 1;
+		for (; *text >= '0' && *text <= '9'; text++, digits++)
+			v = v*10 + (*text - '0');
+		if (*text == '.')
+			for (text++; *text >= '0' && *text <= '9'; text++, digits++)
+				v += (*text - '0') * (scale *= 0.1);
+		if (!digits)
+			break;
+		out[k++] = (float)(sign*v);
+	}
+	return k;
+}
+
+/* One key's value inside an entity body [body, end): copied into VALUE; 0 when absent. */
+static int FireKey (const char *body, const char *end, const char *key, char *value, int size)
+{
+	char quoted[24];
+	const char *at, *q;
+	int n;
+	sprintf (quoted, "\"%s\"", key);
+	for (at = body; (at = strstr (at, quoted)) && at < end; at += strlen (quoted))
+	{
+		q = strchr (at + strlen (quoted), '"');
+		if (!q || q >= end)
+			return 0;
+		for (n = 0, q++; *q && *q != '"' && q < end && n < size-1; q++)
+			value[n++] = *q;
+		value[n] = 0;
+		return 1;
+	}
+	return 0;
+}
+
+void ChimChunks_FireLights (const char *entities)
+{
+	const char *body, *end;
+	char text[64];
+	float light[2];
+	chim_fire_light_t *f;
+	fire_light_count = 0;
+	for (body = entities ? strchr (entities, '{') : NULL; body; body = strchr (end, '{'))
+	{
+		if (!(end = strchr (body, '}')))
+			break;
+		if (fire_light_count >= CHIM_FIRE_LIGHTS)
+			break;
+		f = &fire_lights[fire_light_count];
+		if (FireKey (body, end, "classname", text, sizeof(text)) && !strcmp (text, "aw_flame") &&
+			FireKey (body, end, "aw_flame_light", text, sizeof(text)) && FireNumbers (text, light, 2) == 2 &&
+			FireKey (body, end, "origin", text, sizeof(text)) && FireNumbers (text, f->origin, 3) == 3 &&
+			light[0] > 0 && light[0] < 65536 && light[1] > 0 && light[1] <= 255)
+		{
+			f->radius = light[0];
+			f->luma = light[1];
+			fire_light_count++;
+		}
+	}
+}
+
+int ChimChunks_FireCount (void)
+{
+	return fire_light_count;
+}
+
+int ChimChunks_FireLevel (const vec3_t mins, const vec3_t maxs)
+{
+	float value = 0, d, r, w, t;
+	vec3_t centre, delta;
+	int i, level;
+	if (!fire_light_count)
+		return 0;
+	for (i=0 ; i<3 ; i++)
+		centre[i] = (mins[i] + maxs[i]) * 0.5f;
+	for (i=0 ; i<fire_light_count ; i++)
+	{
+		r = fire_lights[i].radius;
+		VectorSubtract (fire_lights[i].origin, centre, delta);
+		d = DotProduct (delta, delta);
+		if (d >= 4*r*r)
+			continue;
+		d = (float)sqrt (d);
+		w = d <= r/3 ? 1.0f : r / (3*d);
+		t = d/r - 1;
+		t = t < 0 ? 0 : t > 1 ? 1 : t;
+		t = 1 - t*t;
+		t = 1 - t*t;
+		value += fire_lights[i].luma * w * (1 - t);
+	}
+	if (!(value >= 4))
+		return 0;
+	level = (int)(value/8 + 0.5f) * 8;
+	return level < 8 ? 8 : level > 255 ? 255 : level;
+}
+
 static chim_user_t	index_user;
 static model_t		*link_world;		/* cl.worldmodel the efrags belong to */
 static unsigned long	ticks;
@@ -381,6 +502,61 @@ int (*chim_story_hidden)(void);
 static int Hidden (const chim_place_t *p)
 {
 	return (p->flags & CHIM_RECORD_STORY_HIDDEN) && chim_story_hidden && chim_story_hidden ();
+}
+
+/* Hinged doors (aw_hinged_door.c): a door turns about its origin, so its
+ * drawn box becomes the square of the farthest corner's distance in X and Y
+ * (every pose fits; efrags and the collision broadphase need no relink while
+ * it turns). The record box was drawn at the placed yaw. */
+int (*chim_hinged_door)(unsigned pid, unsigned ref, const float *origin, float radius, float *yaw);
+void (*chim_hinged_recentre)(const float *d);
+
+float ChimChunks_HingeRadius (const chim_place_t *p)
+{
+	int i;
+	float x, y, best = 0;
+	for (i=0 ; i<4 ; i++)
+	{
+		x = (i & 1 ? p->maxs[0] : p->mins[0]) - p->ent.origin[0];
+		y = (i & 2 ? p->maxs[1] : p->mins[1]) - p->ent.origin[1];
+		if (x*x + y*y > best)
+			best = x*x + y*y;
+	}
+	return (float)sqrt (best);
+}
+
+static void PlaceYaw (chim_chunk_t *c, int j, float yaw)
+{
+	chim_place_t *p = &c->places[j];
+	p->ent.angles[YAW] = yaw;
+	Q_SinCosDeg (yaw, &p->s, &p->c);
+	if (c->rot)
+		ChimPlaced_AnglesMatrix (p->ent.angles, (float (*)[3])(c->rot + 9*j));
+}
+
+/* Every copy of placement pid in a catalogue in the zone (owner and reach
+ * copies, active or only loaded) gets the yaw. Called only while a door
+ * turns. Returns the copies changed. A CHIM room's doors are its own
+ * placements (chim_room.c). */
+int ChimChunks_DoorYaw (unsigned pid, float yaw)
+{
+	int i, j, n = 0;
+	if (ChimRoom_Active ())
+		return ChimRoom_DoorYaw (pid, yaw);
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		chim_chunk_t *c = e->chunk.data;
+		if (e->state == CHIM_STATE_ABSENT || !c)
+			continue;
+		for (j=0 ; j<c->records ; j++)
+			if (c->places[j].pid == pid && (c->places[j].flags & CHIM_PLACE_HINGED))
+			{
+				PlaceYaw (c, j, yaw);
+				n++;
+			}
+	}
+	return n;
 }
 
 /* A window's slot holding placement id pid (ids of frames do not overlap). */
@@ -935,6 +1111,7 @@ static int LoadCatalogue (int index, long *budget)
 					memcpy (c->rot + 9*i, from_rot, 9*sizeof(float));
 				p->ent.colormap = vid.colormap;
 				p->ent.aw_cut_box = from->ent.aw_cut_box;
+				p->ent.aw_light = from->ent.aw_light;
 				p->s = from->s;
 				p->c = from->c;
 				VectorCopy (from->mins, p->mins);
@@ -975,6 +1152,8 @@ static int LoadCatalogue (int index, long *budget)
 		p->ent.colormap = vid.colormap;
 		/* A piece of a long structure: its structure's cut box (chim_cuts.c). */
 		p->ent.aw_cut_box = ChimCuts_Box (r.pid);
+		/* 0.12: the placement's light level (flags bits 8-15); 0 before 0.12 */
+		p->ent.aw_light = ChimFormat_RecordLight (chim_world.minor, r.flags);
 		Q_SinCosDeg (r.yaw, &p->s, &p->c);
 		/* The record's drawn box (the AW_SceneryCapture box, rounded
 		 * outward) serves efrags and the collision broadphase. */
@@ -982,6 +1161,26 @@ static int LoadCatalogue (int index, long *budget)
 		{
 			p->mins[j] = r.mins[j] + (j == 0 ? dx : j == 1 ? dy : 0);
 			p->maxs[j] = r.maxs[j] + (j == 0 ? dx : j == 1 ? dy : 0);
+		}
+		/* No stored level: the light of the frame map's fires (ChimChunks_FireLights) */
+		if (!p->ent.aw_light)
+			p->ent.aw_light = ChimChunks_FireLevel (p->mins, p->maxs);
+		/* A hinged door (aw_hinged_door.c): its present pose, a box for every
+		 * pose. Reach copies made from the owner above copy all of it. */
+		if (chim_hinged_door)
+		{
+			float radius = ChimChunks_HingeRadius (p), yaw = r.yaw;
+			if (chim_hinged_door (r.pid, r.ref, p->ent.origin, radius, &yaw))
+			{
+				p->flags |= CHIM_PLACE_HINGED;
+				if (yaw != r.yaw)
+					PlaceYaw (c, i, yaw);
+				for (j=0 ; j<2 ; j++)
+				{
+					p->mins[j] = p->ent.origin[j] - radius;
+					p->maxs[j] = p->ent.origin[j] + radius;
+				}
+			}
 		}
 	counted:
 		if (p->flags & CHIM_RECORD_OVER_16_LEAVES)
@@ -1890,14 +2089,13 @@ static void ClipModelTurned (model_t *m, const vec3_t origin, float rot[3][3], v
  * the world-aligned box (chim_placed_clip.c); without a usable table (or
  * when a trace meets more than the scratch holds) the stored hull: by the
  * yaw path for a yaw-only record, turned by the matrix otherwise. */
-static void ClipPlacement (const chim_chunk_t *c, int j, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end,
+void ChimChunks_ClipPlace (chim_place_t *p, float *rot9, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end,
 	trace_t *best)
 {
-	chim_place_t *p = &c->places[j];
-	if (c->rot)
+	if (rot9)
 	{
 		chim_model_t *cm = (chim_model_t *)p->ent.model;	/* the model is the block's first member */
-		float (*rot)[3] = (float (*)[3])(c->rot + 9*j);
+		float (*rot)[3] = (float (*)[3])rot9;
 		if (cm->pieces)
 		{
 			trace_t trace;
@@ -1918,6 +2116,39 @@ static void ClipPlacement (const chim_chunk_t *c, int j, vec3_t start, vec3_t mi
 		}
 	}
 	ClipModel (p->ent.model, p->ent.origin, p->s, p->c, start, mins, maxs, end, best);
+}
+
+static void ClipPlacement (const chim_chunk_t *c, int j, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end,
+	trace_t *best)
+{
+	ChimChunks_ClipPlace (&c->places[j], c->rot ? c->rot + 9*j : NULL, start, mins, maxs, end, best);
+}
+
+/* Hinged doors (aw_hinged_door.c): the trace against placement pid alone,
+ * its linked copy (the one drawn and solid). 0: not linked anywhere now.
+ * A CHIM room's doors are its own placements (chim_room.c). */
+int ChimChunks_DoorClip (unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace)
+{
+	int i, j;
+	if (ChimRoom_Active ())
+		return ChimRoom_DoorClip (pid, start, mins, maxs, end, trace);
+	for (i=0 ; i<chim_frame.count ; i++)
+	{
+		chim_entry_t *e = &chim_frame.entries[i];
+		chim_chunk_t *c;
+		if (e->state != CHIM_STATE_ACTIVE)
+			continue;
+		c = e->chunk.data;
+		for (j=0 ; j<c->records ; j++)
+		{
+			chim_place_t *p = &c->places[j];
+			if (p->pid != pid || !(p->flags & CHIM_PLACE_HINGED) || !p->linked || !p->ent.model)
+				continue;
+			ClipPlacement (c, j, start, mins, maxs, end, trace);
+			return 1;
+		}
+	}
+	return 0;
 }
 
 void ChimChunks_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *best)
@@ -2916,6 +3147,8 @@ int ChimChunks_WindowRecentre (int cx, int cy, float *d)
 	ChimStatics_Recentre (d);
 	ChimFar_Recentre (d);
 	ChimCuts_Recentre (d);
+	if (chim_hinged_recentre)
+		chim_hinged_recentre (d);
 	Layout ();
 	ChimGraft_Recentre ();
 	world_dirty = 1;

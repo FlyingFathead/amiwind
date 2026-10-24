@@ -55,8 +55,10 @@ def check(scene, data_files, output, allow_known=None, *, ericw_bin, canonical_l
     (output/'actor-ground-support.json').write_text(
         json.dumps(bake_ground(maps, jobs=jobs, exclude=frozen), indent=2)+'\n')
     check_recorded(id1, output/'bounded-seyda', 'actor-contact actor grounding', jobs=jobs)
+    # rooms converted as shells (--room-form shell, batch rooms) have no collision before the image makes them CHIM
+    # rooms: their residents are measured there (CHIM-ROOM-SHELL-ACTORS-EARLY-48)
     report = require(maps, output/'actor-initial-contact.json', allow_known, before_world=True,
-                     jobs=jobs)
+                     jobs=jobs, defer_shells=True)
     (output/'actor-ground-acceptance.json').write_text(json.dumps(report['acceptance'], indent=2)+'\n')
     print('Early actor check finished. Final image assembly repeats the complete audit.', flush=True)
     return report

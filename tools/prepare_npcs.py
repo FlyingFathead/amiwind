@@ -72,8 +72,12 @@ def prepare(data,scene,out,ffmpeg='ffmpeg'):
                     'aw_greet_duration':settings['duration']}
             entities.append('{\n'+'\n'.join(quote(k)+' '+quote(v) for k,v in fields.items())+'\n}')
             actors.append({'id':identifier,'reference':ref['number'],'position':pos,'angles':fields['angles']})
-    b=lumps((out/'seyda.bsp').read_bytes());b[0]=b[0].rstrip(b'\0')+('\n'+'\n'.join(entities)+'\n\0').encode('cp1252')
+    # Seyda Neen's entities come from the scene entity list, not the carrier's lump (BUILD-SEYDA-ENTITY-BUS-48)
+    from seyda_entities import publish as publish_entities, writer_lump
+    raw=(out/'seyda.bsp').read_bytes();b=lumps(raw)
+    b[0]=writer_lump(out,raw).rstrip(b'\0')+('\n'+'\n'.join(entities)+'\n\0').encode('cp1252')
     raw=pack_lumps(b);(out/'seyda.bsp').write_bytes(raw);(out/'id1/maps/seyda.bsp').write_bytes(raw)
+    publish_entities(out,raw)
     report={'scope':'three nonblocking idle actors; facing and bounded proximity/E Hello auditions; authored wandering retained but not executed; no full dialogue or combat',
             'actors':actors,'models':models,'master_sha256':input_sha256(data/'Morrowind.esm')}
     ready['npcs']=report;(out/'scene-ready.json').write_text(json.dumps(ready,indent=2)+'\n')

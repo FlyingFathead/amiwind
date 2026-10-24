@@ -20,7 +20,10 @@ maintainer's Morrowind.esm, 21 October 2026). The resident stage bakes a model p
 Support state (aw_ground_mode): the grounding policy's class when config/actor_grounding.json names the creature,
 else the creature record's movement flags (OpenMW 0.51 components/esm3/loadcrea.hpp: Swims 0x10, Flies 0x20, Walks
 0x40): a creature that flies or swims and does not walk is not put on the ground. Authored-dead creatures (health
-0) get no model (no creature death pose bake yet, as in creature_residents.select).
+0: 'dead rat', 'netch_bull_dead', the dead guar of a mudcrab nest) get a corpse model per mesh: one frame, the last
+key of the creature's own death group (creature_pose.CORPSE), drawn as an aw_corpse lying at its authored spot
+(ACTOR-LIBRARY-LEFT-OUT-48; before v0.0.48 they got none and were dropped without a reason). A dead variant whose
+record names its own mesh gets that mesh's corpse; one whose creature has no death group is left out with that reason.
 
 What it does not do: creature sounds on the animation frames (footsteps, roars) are not converted; a scaled
 reference needs its own model (bake SCALES); not wired into a build stage (the maintainer's go is needed for a build); its sizes were measured with a read-only
@@ -58,11 +61,23 @@ def plan(master):
                         'name': string(get('FNAM') or get('NAME'), errors='replace'),
                         'flags': cflags, 'ground_mode': ground_mode(ident, cflags),
                         'dead': len(npdt) == 96 and struct.unpack_from('<i', npdt, 40)[0] <= 0}
-    meshes = {}
+    meshes, corpses = {}, {}
     for ident in sorted(bases):
-        if bases[ident]['mesh'] and not bases[ident]['dead']:
-            meshes.setdefault(bases[ident]['mesh'], []).append(ident)
-    return {'bases': bases, 'meshes': meshes}
+        if bases[ident]['mesh']:
+            (corpses if bases[ident]['dead'] else meshes).setdefault(bases[ident]['mesh'], []).append(ident)
+    return {'bases': bases, 'meshes': meshes, 'corpses': corpses}
+
+
+CORPSE_KEY = '#dead'
+
+
+def corpse_key(mesh):
+    """The library key of a mesh's corpse model (an authored-dead creature: its death pose, one frame)."""
+    return mesh + CORPSE_KEY
+
+
+def corpse_path(mesh):
+    return model_path(mesh)[:-4] + '_d.mdl'
 
 
 def ground_mode(ident, flags):
@@ -90,7 +105,7 @@ def variant_path(mesh, scale=1.0, mover=False):
     return base + ('_m' if mover else '') + '.mdl'
 
 
-def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=None, scales=None):
+def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=None, scales=None, corpses=None):
     """Bake every mesh in MESHES ({mesh: [creature ids]}, plan()['meshes']) into OUT_ID1/progs.
 
     method 'kf' (default): the creature's animated model and keyframe files as the original reads them
@@ -99,7 +114,9 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
     format; the standing layout names the mover with '>'). method 'resident': the resident stage's creature bake
     (creature_residents.bake_task: 8 idle frames; kept, the previous method). BIPEDAL: {mesh: True} for meshes of
     two-legged creatures (they also take the shared xbase_anim.kf). SCALES: {mesh: [instance scales]} to bake
-    besides 1 ('kf' only). Returns {variant key: record} and {variant key: error} (left out with the reason)."""
+    besides 1 ('kf' only). CORPSES: {mesh: [creature ids]} of authored-dead creatures (plan()['corpses']): one
+    corpse model per mesh, the last key of the creature's own death group (key corpse_key(mesh), 'kf' only).
+    Returns {variant key: record} and {variant key: error} (left out with the reason)."""
     from build_parallel import ordered_map
     if method not in METHODS:
         raise ValueError('Unknown creature library method: ' + str(method))
@@ -110,6 +127,9 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
             if method == 'resident' and scale != 1.0:
                 continue
             tasks.append((method, data, palette, app, bool((bipedal or {}).get(mesh)), scale))
+    for mesh, ids in sorted((corpses or {}).items()):
+        app = {'id': ids[0], 'kind': 'CREA', 'name': ids[0], 'mesh': mesh}
+        tasks.append(('corpse', data, palette, app, bool((bipedal or {}).get(mesh)), 1.0))
     done, failed = {}, {}
     for key, out, seconds, error in ordered_map(_unit, tasks, jobs=max(1, jobs)):
         if out is None:
@@ -132,10 +152,12 @@ def _unit(task):
     """Worker (module level for the process pool): one mesh at one scale."""
     import time
     method, data, palette, app, bipedal, scale = task
-    key = variant_key(app['mesh'], scale)
+    key = corpse_key(app['mesh']) if method == 'corpse' else variant_key(app['mesh'], scale)
     t0 = time.time()
     try:
-        if method == 'resident':
+        if method == 'corpse':
+            out = bake_kf(data, palette, app, bipedal, corpse=True)
+        elif method == 'resident':
             import creature_residents
             _, raw, record = creature_residents.bake_task((data, palette, app))
             path = variant_path(app['mesh'])
@@ -154,8 +176,9 @@ def _unit(task):
 _assets = {}
 
 
-def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None):
-    """{'files': [(role, bytes, path)], 'record': {...}} of one mesh with the 'kf' method."""
+def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None, corpse=False):
+    """{'files': [(role, bytes, path)], 'record': {...}} of one mesh with the 'kf' method. corpse: the one-frame
+    model of an authored-dead creature (creature_pose.CORPSE: the last key of its own death group)."""
     import numpy as np
     from mwad.audit import BSA, normpath
     from mwad.paths import child_ci
@@ -171,7 +194,7 @@ def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None):
     assets = _assets[root]
     reader = nif_reader()
     rig = creature_pose.CreatureRig(reader, assets.read, app['mesh'], bipedal)
-    samples, groups = rig.plan(profile or creature_pose.MOVER)
+    samples, groups = rig.plan(creature_pose.CORPSE if corpse else (profile or creature_pose.MOVER))
     per_frame = []
     for source, time, fixed in samples:
         packet, materials, _bounds, _skipped = model_geometry(rig.raw, reader, repair_uv=True,
@@ -198,6 +221,30 @@ def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None):
                            faces=remap.reshape(-1, 3), uv=v0[used, 3:5], colours=v0[used, 5:9] / 255, material=i))
     if not shapes:
         raise ValueError('no visible geometry')
+    if corpse:
+        # one frame: the creature's own death pose (its last key); a creature without a death group would stand,
+        # so it is left out with that reason instead
+        if any(g.get('source') == 'idle' for g in groups):
+            raise ValueError('no death group in %s: no corpse pose to take' % ', '.join(s['name'] for s in rig.sources))
+        profile = quality_profiles().get(normpath(app['mesh']))
+        budgets = (profile['budget'],) if profile else creature_residents.BUDGETS
+        for budget in budgets:
+            try:
+                frames, faces, uv, skin = bake_model(shapes, materials, textures, palette, budget=budget,
+                                                     minimum_faces=(profile or {}).get('minimum_faces') or None)
+                break
+            except ValueError as error:
+                if 'Alias' not in str(error) or budget == budgets[-1]:
+                    raise
+        raw = animated_mdl(frames, faces, uv, skin)
+        path = corpse_path(app['mesh'])
+        record = {'model': path, 'roles': ['corpse'], 'method': 'kf', 'scale': scale, 'corpse': True,
+                  'animated_model': rig.model, 'sources': [s['name'] for s in rig.sources],
+                  'corpse_bytes': len(raw), 'corpse_frames': int(frames.shape[0]), 'triangles': int(len(faces)),
+                  'vertices': int(frames.shape[1]), 'skin': list(skin.size), 'step': 0.0, 'idle': 'death',
+                  'pose': 'death group, last key (%s)' % groups[0]['source'],
+                  'repeated_node_names': rig.duplicates, 'sha256': hashlib.sha256(raw).hexdigest()}
+        return {'files': [('corpse', raw, path)], 'record': record}
     profile = quality_profiles().get(normpath(app['mesh']))
     budgets = (profile['budget'],) if profile else creature_residents.BUDGETS
     for budget in budgets:
@@ -236,17 +283,27 @@ def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None):
 
 
 def manifest(planned, models):
-    return {'format': FORMAT, 'models': models,
-            'bases': {i: {k: b[k] for k in ('mesh', 'name', 'ground_mode')} for i, b in planned['bases'].items()
-                      if b['mesh'] in models and not b['dead']}}
+    """The library manifest: the models and every base that has one (an authored-dead base: its mesh's corpse
+    model, 'dead' true)."""
+    bases = {}
+    for i, b in planned['bases'].items():
+        if b['dead'] and corpse_key(b['mesh']) in models:
+            bases[i] = dict({k: b[k] for k in ('mesh', 'name', 'ground_mode')}, dead=True)
+        elif not b['dead'] and b['mesh'] in models:
+            bases[i] = {k: b[k] for k in ('mesh', 'name', 'ground_mode')}
+    return {'format': FORMAT, 'models': models, 'bases': bases}
 
 
 def entity_text(ident, base, model):
     """A creature base's entity text: a resident row's fields without the per-placement ones (origin, angles,
-    aw_ref, aw_ground_baked/valid, aw_authored_*), in the order prepare_area writes them; no greeting (hello 0)."""
+    aw_ref, aw_ground_baked/valid, aw_authored_*), in the order prepare_area writes them; no greeting (hello 0).
+    An authored-dead base is an aw_corpse (its death pose, frame 0) kept at its authored spot (ground mode 1), as
+    the NPC corpses (npc_library.entity_text)."""
     def clean(text):
         return ''.join(c for c in text if c not in '"\n\r\0')
-    fields = [('aw_source_id', ident), ('aw_ground_mode', str(base['ground_mode'])), ('classname', 'aw_npc'),
+    dead = bool(base.get('dead'))
+    fields = [('aw_source_id', ident), ('aw_ground_mode', '1' if dead else str(base['ground_mode'])),
+              ('classname', 'aw_corpse' if dead else 'aw_npc'),
               ('model', model['model']), ('netname', clean(base['name'])), ('aw_voice', ''), ('aw_line', ''),
               ('aw_idle_step', repr(float(model['step']))), ('aw_hello_distance', '0'), ('aw_hello_reset', '0'),
               ('aw_greet_duration', '0')]
@@ -260,9 +317,14 @@ def base_texts(source):
         raise ValueError('Not a creature library manifest')
     out = {}
     for key, model in m['models'].items():
+        if key.endswith(CORPSE_KEY):
+            for i, b in m['bases'].items():
+                if b.get('dead') and corpse_key(b['mesh']) == key:
+                    out[i] = entity_text(i, b, model)
+            continue
         mesh, _, scale = key.partition('@')
         for i, b in m['bases'].items():
-            if b['mesh'] == mesh:
+            if b['mesh'] == mesh and not b.get('dead'):
                 out[i if not scale else '%s@%s' % (i, scale)] = entity_text(i, b, model)
     return out
 
@@ -279,14 +341,17 @@ def main(argv=None):
     a = p.parse_args(argv)
     from mwad.paths import child_ci
     planned = plan(child_ci(a.data_files, 'Morrowind.esm').read_bytes())
-    meshes = planned['meshes']
+    meshes, corpses = planned['meshes'], planned['corpses']
     if a.only:
         want = {i.strip().casefold() for i in a.only.split(',')}
         meshes = {m: ids for m, ids in meshes.items() if want & set(ids)}
-    print('Creature library: %d meshes for %d creature records, %d jobs' % (
-        len(meshes), sum(len(v) for v in meshes.values()), a.jobs), flush=True)
-    bipedal = {m: any(planned['bases'][i]['flags'] & 1 for i in ids) for m, ids in meshes.items()}
-    models, failed = bake(a.data_files, a.palette.read_bytes(), meshes, a.out, a.jobs, a.method, bipedal)
+        corpses = {m: ids for m, ids in corpses.items() if want & set(ids)}
+    print('Creature library: %d meshes for %d creature records, %d corpse meshes, %d jobs' % (
+        len(meshes), sum(len(v) for v in meshes.values()), len(corpses), a.jobs), flush=True)
+    bipedal = {m: any(planned['bases'][i]['flags'] & 1 for i in ids)
+               for m, ids in list(meshes.items()) + list(corpses.items())}
+    models, failed = bake(a.data_files, a.palette.read_bytes(), meshes, a.out, a.jobs, a.method, bipedal,
+                          corpses=corpses if a.method == 'kf' else None)
     out = manifest(planned, models)
     out['left_out'] = failed
     (a.out / 'creature-library.json').write_text(json.dumps(out, indent=1, sort_keys=True) + '\n', encoding='utf-8',

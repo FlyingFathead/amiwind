@@ -36,7 +36,7 @@ typedef struct
 	long		base, bytes;
 	int			pins;
 	int			row;		/* its file-table row (Chim_File), -1: opened by path */
-	char		path[CHIM_PATH_CHARS+8];
+	char		path[CHIM_STORE_CHARS+1+CHIM_PATH_CHARS+1];	/* "<store>/<relative>" */
 } chim_pack_t;
 
 /* A shared model or terrain block: the model, then its decoded arena. */
@@ -219,6 +219,12 @@ int Chim_EdgeReached (const vec3_t origin);
 int Chim_HunkRest (int *stated, int *used, int *measured);
 extern cvar_t	chim_debug;			/* 1: a console line per CHIM stage (map, prime, rebuild) */
 int Chim_PackOpen (chim_pack_t *pack, const char *relative);
+/* The store folder every pack path is under (default "chim", the exterior
+ * world; docs/chim/INTERIOR_STORE.md). Chim_StoreSelect: 0 for an invalid name
+ * or while a CHIM map runs; a different store drops the resident index, every
+ * kept model and texture and the read-ahead blocks (ids are per store). */
+const char *Chim_Store (void);
+int Chim_StoreSelect (const char *name);
 void Chim_PackClose (chim_pack_t *pack);
 int Chim_PackRead (chim_pack_t *pack, long offset, void *out, long bytes);
 int Chim_PackReadRaw (chim_pack_t *pack, long offset, void *out, long bytes);
@@ -237,6 +243,7 @@ int ChimPrefetch_Active (void);
 int ChimPrefetch_Read (int row, long offset, void *out, long bytes);
 void ChimPrefetch_Step (const vec3_t origin, int spare);
 void ChimPrefetch_MapBegin (void);
+void ChimPrefetch_StoreChanged (void);
 void ChimPrefetch_Report (void);
 int ChimPrefetch_Owned (int row, unsigned *count);
 void ChimPrefetch_SetOwned (int row, unsigned count);
@@ -259,10 +266,25 @@ void ChimModels_IndexSlots (void);
 
 /* chim_chunks.c */
 int ChimChunks_Begin (int cx, int cy);
+/* The frame map's fire lights (aw_flame rows with aw_flame_light) and a placement's level from them. */
+void ChimChunks_FireLights (const char *entities);
+int ChimChunks_FireLevel (const vec3_t mins, const vec3_t maxs);
+int ChimChunks_FireCount (void);
 void ChimChunks_End (void);
 void ChimChunks_Tick (const vec3_t origin, long budget, int prime);
 void ChimChunks_Link (void);
 void ChimChunks_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *best);
+/* One placement's collision (rot9: its 0.8 matrix, NULL for the yaw path); the room loader's too. */
+void ChimChunks_ClipPlace (chim_place_t *p, float *rot9, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end,
+	trace_t *best);
+
+/* chim_room.c: a room map's placements from its room record (docs/chim/INTERIOR_STORE.md) */
+int ChimRoom_Begin (const char *name);
+void ChimRoom_End (void);
+int ChimRoom_Active (void);
+void ChimRoom_Link (void);
+void ChimRoom_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *best);
+void ChimRoom_Report (void);
 int ChimChunks_Pick (const vec3_t start, const vec3_t end, aw_chim_pick_t *out);
 /* 0.9 reach references: served from a resident owner catalogue, read from
  * disk, and the owner record runs read (chim_chunks.c ReachRecord). */
@@ -302,6 +324,22 @@ void ChimChunks_Prime (const vec3_t origin, long budget);
 int ChimChunks_Forget (entity_t *ent);
 const char *ChimChunks_Describe (const entity_t *ent, char *out, int size);
 extern int (*chim_story_hidden)(void);	/* 1: placements flagged story hidden stay out */
+/* Hinged doors (aw_hinged_door.c AW_HingedDoorPlacement): 1 when a placement's
+ * reference is an ordinary DOOR record without a destination; *yaw gets its
+ * current pose. Such a placement carries CHIM_PLACE_HINGED (a run-time flag
+ * above the record's 16 bits) and a drawn box that holds every pose. */
+#define CHIM_PLACE_HINGED	0x10000
+extern int (*chim_hinged_door)(unsigned pid, unsigned ref, const float *origin, float radius, float *yaw);
+extern void (*chim_hinged_recentre)(const float *d);
+int ChimChunks_DoorYaw (unsigned pid, float yaw);
+int ChimChunks_DoorClip (unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace);
+/* The distance from a placement's origin to its drawn box's farthest corner in
+ * X and Y: a hinged door's box for every pose is the square of this about it. */
+float ChimChunks_HingeRadius (const chim_place_t *p);
+/* CHIM rooms (chim_room.c): the same door hooks on a room's placements. While
+ * a room runs, ChimChunks_DoorYaw and ChimChunks_DoorClip come here. */
+int ChimRoom_DoorYaw (unsigned pid, float yaw);
+int ChimRoom_DoorClip (unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace);
 void ChimChunks_Streaming (int *margin, unsigned long *urgent_loads, int *ahead);
 float ChimChunks_ActiveRadius (void);
 float ChimChunks_LoadRadius (void);

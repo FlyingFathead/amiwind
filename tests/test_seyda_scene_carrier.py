@@ -112,6 +112,9 @@ class CarrierSceneTests(unittest.TestCase):
             parts = lumps((out / 'id1/maps/seyda.bsp').read_bytes())
             parts[0] = parts[0].decode('cp1252').replace('"aw_ref" "%d"' % BARREL, '"aw_ref" "7"').encode('cp1252')
             (out / 'id1/maps/seyda.bsp').write_bytes(pack_lumps(parts))
+            # an upstream writer publishes the scene entity list with its map (BUILD-SEYDA-ENTITY-BUS-48)
+            import seyda_entities
+            seyda_entities.publish(out, pack_lumps(parts))
             with patch('mwad.paths.unshare_tree'), patch.object(opening, 'resolve_data_files', side_effect=Path), \
                     patch.object(opening, 'opening_references', return_value=([], [moved], set())), \
                     patch.object(opening, 'append_meshes', side_effect=AssertionError('append refused')), \

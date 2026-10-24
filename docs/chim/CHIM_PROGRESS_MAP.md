@@ -1,6 +1,6 @@
 # The CHIM progress map: what CHIMport is and what every colour means
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -270,6 +270,12 @@ cells do not require placed-object conversion. A successful geometry audit is
 not proof of original actors, gameplay, lighting, native traversal or inclusion
 in an image. Keep those checks separate for each original reference type.
 
+Since v0.0.48-dev2 the Toolkit's chips and legend sort every square into three groups: **in the game** (what the newest
+ingested build ships), **not in the game yet** (the work left, Solstheim named as such) and **beyond the world's edge:
+settled** (no cell record in the original game data, nothing to build). Settled squares count toward "accounted for", never
+toward the cells in the game. A state with no cells waits in the "More states" fold-out. The full rule is in the
+[progress tracker guide](PROGRESS_TRACKER.md#the-legend-groups-in-the-game-not-in-the-game-yet-settled).
+
 The compact README image groups audit milestones in green and failures or
 unfinished conversions in red. The Toolkit distinguishes more states, including
 lighting stripes, blue empty sea and magenta unconverted cells. The counts above
@@ -333,6 +339,9 @@ as the current count or as evidence that lava is still wholly unconverted.
 
 ## Dark grey: not started
 
+In the grouped legend, Solstheim's cells have a chip and colour of their own (greyish violet, "Solstheim (Bloodmoon)") under
+"not in the game yet", so "not started" is left for any other cell the conversion has not reached.
+
 The public reference includes **144 Solstheim land cells** as not started.
 Vvardenfell has been reached throughout. These are separate island totals;
 Solstheim is not in the 1,292-cell Vvardenfell denominator.
@@ -345,10 +354,15 @@ compact README image groups them with the green milestone cells.
 
 ## Silver: open ocean
 
-The **865 Vvardenfell open-ocean cells** are counted separately. A shared ocean
+The **865 Vvardenfell open-ocean cells** of the 15 October snapshot are counted separately. A shared ocean
 piece or ocean-coloured square does not establish runtime placement. Keep them
 outside the land and empty-sea denominator until the tracker policy and evidence
 support a change.
+
+The grouped legend splits that old "open ocean" label in three. A sea cell the newest build holds is **sea, in the game**
+(sea blue with green stripes): the seabed cells and the empty cell records in open water such as -15,-8. A square with no
+cell record in the original game data is **settled** (faint grey): the edge current turns the player back before it, so
+there is nothing to build. Silver is left for open sea the game defines that the newest build does not hold.
 
 ## Gold: planned for a release
 

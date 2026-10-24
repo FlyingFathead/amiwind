@@ -75,6 +75,79 @@ int (*aw_inspect_crosshair)(void);
 cvar_t	cl_crossx = {"cl_crossx", "0", false};
 cvar_t	cl_crossy = {"cl_crossy", "0", false};
 
+/* The player's crosshair (aw_photo.c: aw_crosshair_colour / aw_crosshair_shape).
+ * Classic + Cross is Quake's '+' character exactly as before v0.0.48 (centre at
+ * x+3, y+3 of its 8x8 cell); the rest are a few Draw_Fill spans in one palette
+ * entry, found once per colour/palette change (no per-frame search). */
+static int V_CrosshairColour (int value)
+{
+    static int cached_value = -1, cached_index;
+    static byte *cached_palette;
+    const unsigned char *rgb;
+    int i, first, last, bank, d, best, r, g, b;
+
+    if (value <= 0 || !host_basepal)
+        return 254;
+    if (value == cached_value && host_basepal == cached_palette)
+        return cached_index;
+    rgb = AW_CrosshairColourRGB (value);
+    /* Yellow, green and blue: the reserved status-bar bank 225..253 when the
+     * palette has it (ui_palette.py), else the whole palette. */
+    bank = 0;
+    for (i = 225; i < 254 && value >= 2; i++)
+        if (memcmp (host_basepal + i*3, host_basepal + 224*3, 3))
+            bank = 1;
+    first = bank ? 225 : 0;
+    last = bank ? 253 : 254;
+    best = 2147483647;
+    cached_index = 254;
+    for (i = first; i <= last; i++)
+    {
+        r = host_basepal[i*3] - rgb[0];
+        g = host_basepal[i*3+1] - rgb[1];
+        b = host_basepal[i*3+2] - rgb[2];
+        d = r*r + g*g + b*b;
+        if (d < best)
+        {
+            best = d;
+            cached_index = i;
+        }
+    }
+    cached_value = value;
+    cached_palette = host_basepal;
+    return cached_index;
+}
+
+void AW_CrosshairDraw (int x, int y)
+{
+    int shape = AW_CrosshairStyle (1), colour = AW_CrosshairStyle (0), c, cx = x + 3, cy = y + 3;
+
+    if (!shape && !colour)
+    {
+        Draw_Character (x, y, '+');
+        return;
+    }
+    if (cx < 4 || cy < 4 || cx + 5 > (int)vid.width || cy + 5 > (int)vid.height)
+        return;
+    c = V_CrosshairColour (colour);
+    switch (shape)
+    {
+    case 1:	/* open cross: four arms around a gap (the original's target.dds form) */
+        Draw_Fill (cx - 4, cy, 3, 1, c); Draw_Fill (cx + 2, cy, 3, 1, c);
+        Draw_Fill (cx, cy - 4, 1, 3, c); Draw_Fill (cx, cy + 2, 1, 3, c);
+        break;
+    case 2:	/* small cross */
+        Draw_Fill (cx - 1, cy, 3, 1, c); Draw_Fill (cx, cy - 1, 1, 3, c);
+        break;
+    case 3:	/* dot */
+        Draw_Fill (cx - 1, cy - 1, 3, 3, c);
+        break;
+    default:	/* the classic '+' form */
+        Draw_Fill (cx - 2, cy, 5, 1, c); Draw_Fill (cx, cy - 2, 1, 5, c);
+        break;
+    }
+}
+
 cvar_t	gl_cshiftpercent = {"gl_cshiftpercent", "100", false};
 
 float	v_dmg_time, v_dmg_roll, v_dmg_pitch;
@@ -1203,7 +1276,7 @@ void V_RenderView (void)
             else if (pick == 0)
             {
                 if (crosshair.value)
-                    Draw_Character (x, y, '+');
+                    AW_CrosshairDraw (x, y);
             }
         }
     }

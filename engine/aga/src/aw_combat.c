@@ -24,8 +24,9 @@
 #include "aw_items.h"
 #include "aw_character.h"
 #include "aw_anim.h"
+#include "aw_move.h"
 
-#define SLOTS 4                 /* hostile NPCs at a time */
+#define SLOTS 4                /* hostile NPCs at a time */
 #define SCALE .25f              /* original units -> game units (tools/prepare_quake.py SCALE) */
 #define STEP_UP 8.5f
 enum {S_CHASE,S_SWING,S_HIT,S_KNOCK,S_DEAD,S_FLEE,S_BLOCK,S_DODGE};
@@ -631,6 +632,22 @@ static float player_strength(void) {
  * floor, rising over the last 40 % of a knockdown or 0.8 s after a knockout. */
 /* A paused combat simulation cannot recover knockdown; it must not lock input. */
 static int player_locked(void) {return combat_on.value && you_valid && !you.dead && you.knocked;}
+/* The movement rules' view of the player (aw_move.c, docs/PLAYER_MOVEMENT.md): knocked down or
+ * out, and the player's one fatigue value (the fight sheet while it is live, else the character
+ * sheet). The loss follows OpenMW DynamicStat::setCurrent: never below 0 unless already there. */
+int AW_CombatPlayerKnocked(void) {return player_locked();}
+float AW_CombatPlayerFatigue(float *maximum) {
+    if(you_valid){if(maximum)*maximum=you.fatigue_max;return you.fatigue;}
+    if(maximum)*maximum=aw_character.valid?aw_character.maximum[2]:0;
+    return aw_character.valid?aw_character.current[2]:0;
+}
+void AW_CombatPlayerFatigueLoss(float loss) {
+    if(loss<=0)return;
+    if(you_valid){
+        you.fatigue=AW_MoveFatigueAfter(you.fatigue,loss);
+        if(aw_character.valid)aw_character.current[2]=you.fatigue;
+    }else if(aw_character.valid)aw_character.current[2]=AW_MoveFatigueAfter(aw_character.current[2],loss);
+}
 static void player_down_view(edict_t *p) {
     float low,base,t,f=1;
     if(!pv.view_saved){

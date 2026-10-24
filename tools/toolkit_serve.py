@@ -24,11 +24,13 @@ opens any map without picking a folder. Python standard library only.
   --build DIR  a build folder of your own (tools/build.py run folder): its toolkit/cell-progress.json becomes
                --progress and, when the folder holds them, its world-progress.json / island files become --data,
                so `toolkit_serve.py --build BUILD` shows your own build's cell progress with nothing else to pass
+               (and its toolkit/chim-inclusion.json: the World Map's "Included in build" list with this build on top)
   --reference F  the project's reference progress file (default: docs/chim/cell-progress-reference.json of this
                repository, if present); the World Map's Compare layer shows your cells next to it
 
 The Monitor (amiwind-toolkit/monitor.html), read-only: follow a build as it runs.
   --builds DIR       the folder holding your build runs (tools/build.py run folders: build-progress.json, logs/)
+               (the World Map's "Included in build" list also shows the newest runs' own entries)
   --monitor-docker VOLUME[:PATH]  instead of --builds: builds kept in a Docker named volume, read through a throwaway
                read-only container (tools/build_docker.py and tools/run_docker.py write their runs to the volume
                amiwind-docker-builds under build/, which is the default PATH); --monitor-image picks the image that
@@ -73,6 +75,8 @@ PROGRESS_SOURCES = {'live-status.json': 'live-status.json', 'cell-progress.json'
 
 
 REFERENCE_FILE = 'cell-progress-reference.json'
+# The CHIM inclusion ledger: served from the build when there is one (tools/chim_inclusion.py served_ledger).
+INCLUSION_FILES = ('chim-inclusion.js', 'chim-inclusion.json')
 REFERENCE_DEFAULT = ROOT / 'docs' / 'chim' / REFERENCE_FILE
 
 
@@ -354,6 +358,7 @@ class Handler(SimpleHTTPRequestHandler):
     mesh_cache = None   # Mesh Compare: the folder of mesh exports, or None
     mesh_exporter = None   # Mesh Compare: a MeshExporter when --mesh-data-files is given, or None
     chim_worlds = {}   # --chim-world NAME=DIR: CHIM world folders served read-only at /chim-world/NAME/
+    builds_dir = None   # --builds DIR (a local folder of runs): their CHIM inclusion entries join the served ledger
 
     def log_message(self, fmt, *args):  # quiet: one line per request is noise here
         pass
@@ -375,6 +380,15 @@ class Handler(SimpleHTTPRequestHandler):
         if not path.is_file():
             return self.send_error(404)
         self.send_bytes(path.read_bytes(), mimetypes.guess_type(path.name)[0] or 'application/octet-stream')
+
+    def send_inclusion(self, name):
+        """The CHIM inclusion ledger the page reads: the build's own copy (--build, this build on top) or the repository's,
+        plus the newest local runs' entries (--builds); tools/chim_inclusion.py served_ledger."""
+        import chim_inclusion
+        doc = chim_inclusion.served_ledger(self.progress_dir, self.builds_dir)
+        if name.endswith('.js'):
+            return self.send_bytes(chim_inclusion.script_text(doc).encode('utf-8'), 'text/javascript')
+        return self.send_bytes(chim_inclusion.ledger_text(doc).encode('utf-8'), 'application/json')
 
     def send_json(self, doc, status=200):
         body = json.dumps(doc, separators=(',', ':')).encode('utf-8')
@@ -486,6 +500,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.monitor(parts[1:], split.query)
         if parts and parts[0] == 'mesh':
             return self.mesh(parts[1:], split.query)
+        if len(parts) == 2 and parts[0] == 'amiwind-toolkit' and parts[1] in INCLUSION_FILES:
+            return self.send_inclusion(parts[1])
         if len(parts) == 2 and parts[0] == 'amiwind-toolkit' and parts[1].endswith(('.html', '.js')):
             return self.send_file(ROOT / 'amiwind-toolkit' / parts[1])
         if parts == ['docs', 'chim', 'CHIM_PROGRESS_MAP.md']:      # the legend's "what do these colours mean?" guide, shown as text
@@ -606,6 +622,7 @@ def main(argv=None):
         Handler.builds = Cached(LocalBuilds(a.builds.resolve()))
     elif a.builds_command:
         Handler.builds = Cached(CommandBuilds(shlex.split(a.builds_command, posix=True)))
+    Handler.builds_dir = a.builds.resolve() if a.builds else None
     Handler.results_dir = a.results.resolve() if a.results else None
     Handler.console_dir = a.console_logs.resolve() if a.console_logs else None
     Handler.reference = (a.reference or REFERENCE_DEFAULT).resolve() if (a.reference or REFERENCE_DEFAULT.is_file()) else None

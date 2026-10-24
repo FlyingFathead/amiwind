@@ -6,6 +6,7 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_activated.h"
+#include "aw_hinged_door.h"
 static int route_started,route_failed,route_done;
 static float near_actor(int role)
 {
@@ -56,7 +57,8 @@ void AW_OpeningSpawn(void)
         if(!strcmp(sv.name,"seyda") && aw_story.ship_disabled && v && v->_float)hide(e);
         if(!strcmp(sv.name,"census")){
             if(reference==AW_REF_CENSUS_PAPERS && (aw_story.stage<AW_STAGE_PAPERS || AW_Papers() || aw_story.captain))hide(e);
-            if(reference==AW_REF_CENSUS_HALL_DOOR && aw_story.hall_open){e->v.angles[1]=-90;SV_LinkEdict(e,false);}
+            /* The hall door is a hinged door (aw_hinged_door.c); its pose comes back from hall_open through
+             * the story hook below (AW_HINGE_STORY_SPAWN). */
         }
     }
     if(aw_story.ship_disabled && !strcmp(sv.name,"seyda")){
@@ -183,25 +185,9 @@ int AW_OpeningTick(void)
 }
 /* A pure query shared by the prompt and activation. Hidden, occluded and
  * out-of-reach objects cannot advertise an action. Automatic actor scripts
- * retain their separate proximity triggers above. */
-static void door_point(edict_t *e,vec3_t eye,vec3_t point)
-{
-    model_t *m;int i,index=(int)e->v.modelindex;vec3_t local,delta,f,r,u;
-    m=index>0 && index<MAX_MODELS?sv.models[index]:NULL;
-    if(m && m->type==mod_brush){
-        AngleVectors(e->v.angles,f,r,u);VectorSubtract(eye,e->v.origin,delta);
-        local[0]=DotProduct(delta,f);local[1]=-DotProduct(delta,r);local[2]=DotProduct(delta,u);
-        for(i=0;i<3;i++){
-            if(local[i]<m->mins[i])local[i]=m->mins[i];
-            if(local[i]>m->maxs[i])local[i]=m->maxs[i];
-        }
-        for(i=0;i<3;i++)point[i]=e->v.origin[i]+local[0]*f[i]-local[1]*r[i]+local[2]*u[i];
-    }else for(i=0;i<3;i++){
-        point[i]=eye[i];
-        if(point[i]<e->v.absmin[i])point[i]=e->v.absmin[i];
-        if(point[i]>e->v.absmax[i])point[i]=e->v.absmax[i];
-    }
-}
+ * retain their separate proximity triggers above. The census hall door is not
+ * here: it is a hinged door (aw_hinged_door.c) whose lock the story holds
+ * (AW_OpeningHingedStory below). */
 /* On a CHIM frame the object's drawn shape and collision are a chunk
  * placement; its edict (kept by the frame map for every AW_REF_ in
  * aw_activated.h) is a brush model without faces that only marks where it
@@ -231,16 +217,11 @@ static edict_t *opening_target(void)
                (role==6 && aw_story.census!=0) || (role==7 && aw_story.stage!=AW_STAGE_CAPTAIN))continue;
             VectorCopy(e->v.origin,point);point[2]+=27;
         }else{
-            if(ref!=AW_REF_CENSUS_PAPERS && ref!=AW_REF_CENSUS_HALL_DOOR && ref!=AW_REF_COURTYARD_BARREL)continue;
-            if(ref==AW_REF_CENSUS_HALL_DOOR && aw_story.hall_open)continue;
+            if(ref!=AW_REF_CENSUS_PAPERS && ref!=AW_REF_COURTYARD_BARREL)continue;
             VectorAdd(e->v.absmin,e->v.absmax,point);VectorScale(point,.5f,point);
-            /* A tall hinged door's centre can be above the player's reach.
-             * Aim toward its nearest visible surface at eye height, while
-             * retaining facing, distance and occlusion checks. */
-            if(ref==AW_REF_CENSUS_HALL_DOOR)door_point(e,eye,point);
         }
         VectorSubtract(point,eye,delta);distance=Length(delta);
-        if(distance<.1f || distance>=best || distance>=(ref==AW_REF_CENSUS_HALL_DOOR?56:49) || DotProduct(delta,forward)/distance<.65f)continue;
+        if(distance<.1f || distance>=best || distance>=49 || DotProduct(delta,forward)/distance<.65f)continue;
         tr=SV_Move(eye,vec3_origin,vec3_origin,point,MOVE_NORMAL,p);
         if(tr.startsolid || (tr.fraction<1 && tr.ent!=e && !own_surface(e,&tr)))continue;
         best=distance;target=e;
@@ -256,31 +237,31 @@ int AW_OpeningHint(const char **name,const char **action)
     }
     v=GetEdictFieldValue(target,"aw_ref");ref=(int)v->_float;
     if(ref==AW_REF_CENSUS_PAPERS){*name="Identification papers";*action="Read: E";}
-    else if(ref==AW_REF_CENSUS_HALL_DOOR){*name="Hall door";*action=aw_story.hall?"Open: E":"Locked - show papers";}
     else{*name="Barrel";*action=AW_CourtyardRingAvailable()?"Take ring: E":"Empty";}
     return 1;
 }
-/* Probe the destination pose before relinking a hinged door. Instant rotation
- * must not insert a solid brush into the player or a nearby solid actor. The
- * probe changes no linked bounds, actor coordinates, sound or story state. */
-static int hall_door_can_open(edict_t *door)
+/* The census hall door (AW_REF_CENSUS_HALL_DOOR, DOOR "chargen door hall": lock level 100, no
+ * key, no script) is an ordinary hinged door (aw_hinged_door.c) whose lock
+ * the story holds, as in the original: the door guard's script
+ * CharGenDoorGuardTalker unlocks it ("CharGen Door Hall"->Unlock) once the
+ * player carries the papers (CharGen StatsSheet) and he has said
+ * "chargen_door2"; here that is aw_story.hall (set where he speaks it, below
+ * and in the proximity rule above). Until then the use key plays the locked
+ * sound and says why; after it the door turns like every hinged door (90
+ * degrees in one second, its record's sounds, holding against the player).
+ * Whether it stands open is kept in aw_story.hall_open (saved), so a loaded
+ * game or a census map loaded again shows it as it was left. */
+int AW_OpeningHingedStory(unsigned ref,int event)
 {
-    edict_t *actor,*player;trace_t tr;float yaw=door->v.angles[1];int i,clear=1;
-    player=svs.clients?svs.clients[0].edict:NULL;
-    door->v.angles[1]=-90;
-    if(player && player->v.movetype!=MOVETYPE_NOCLIP){
-        tr=SV_ClipMoveToEntity(door,player->v.origin,player->v.mins,player->v.maxs,player->v.origin);
-        if(tr.startsolid || tr.allsolid)clear=0;
+    if(ref!=AW_REF_CENSUS_HALL_DOOR)return -1;
+    switch(event){
+    case AW_HINGE_STORY_LOCK:return aw_story.hall?0:1;
+    case AW_HINGE_STORY_REFUSED:AW_UISubtitle("","The door is locked. Show your papers to the guard.",4);return 1;
+    case AW_HINGE_STORY_OPEN:aw_story.hall_open=1;return 1;
+    case AW_HINGE_STORY_CLOSED:aw_story.hall_open=0;return 1;
+    case AW_HINGE_STORY_SPAWN:return aw_story.hall_open?1:0;
     }
-    for(i=1;clear && i<sv.num_edicts;i++){
-        actor=EDICT_NUM(i);
-        if(actor==door || actor==player || actor->free ||
-           (actor->v.solid!=SOLID_BBOX && actor->v.solid!=SOLID_SLIDEBOX))continue;
-        tr=SV_ClipMoveToEntity(door,actor->v.origin,actor->v.mins,actor->v.maxs,actor->v.origin);
-        if(tr.startsolid || tr.allsolid)clear=0;
-    }
-    door->v.angles[1]=yaw;
-    return clear;
+    return -1;
 }
 int AW_OpeningUse(void)
 {
@@ -305,16 +286,6 @@ int AW_OpeningUse(void)
             AW_UISubtitle("","Cannot record registration. Papers retained.",4);return 1;
         }
         AW_ReaderOpen("papers",1);return 1;
-    }
-    if(ref==AW_REF_CENSUS_HALL_DOOR){
-        if(aw_story.hall){
-            if(!hall_door_can_open(target)){
-                AW_UISubtitle("","The door is obstructed. Step aside and try again.",4);return 1;
-            }
-            AW_DoorSound(ref,0);target->v.angles[1]=-90;SV_LinkEdict(target,false);aw_story.hall_open=1;
-        }
-        else AW_UISubtitle("","The door is locked. Show your papers to the guard.",4);
-        return 1;
     }
     if(AW_CourtyardRingAvailable()){
         if(AW_CourtyardTakeRing()){

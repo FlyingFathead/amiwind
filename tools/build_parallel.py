@@ -511,6 +511,8 @@ def completed_map(function, items, jobs=None, cost=None):
     restore stable key order before exporting catalogues or shared receipts.
     Existing order-dependent conversion stages continue to use ordered_map.
     `cost` (item -> number): submitted largest first (BUILD-CHIM-REGION-FRAMES-TAIL-43).
+    Many small units go out in guided chunks, one pool task each (BUILD-POOL-TINY-UNITS-48, _chunk_size); each unit
+    still runs `function(item)` and yields its own result.
     """
     import pool_status
     count = resolve_jobs(jobs)
@@ -519,6 +521,10 @@ def completed_map(function, items, jobs=None, cost=None):
         yield from map(function, (item for _, item in _by_cost(items, cost)))
         return
     status = pool_status.watch(getattr(function, '__name__', 'map'), items)
+    try:
+        total = len(items)
+    except TypeError:
+        total = None
     items = _by_cost(items, cost)
     # In a pool of its own (exactly `size` workers) two tasks per worker are kept in flight, so a worker never
     # waits for its next task. In the stage's shared pool, which may hold more workers than this map asked for,
@@ -526,19 +532,26 @@ def completed_map(function, items, jobs=None, cost=None):
     # (CHIM-STAIR-GATE-POOL-BROKEN-42: 11 walk workers asked, 22 frame walks ran at once in a 24-worker pool
     # and the container ran out of memory).
     stage = active_stage_pool()
+    # BUILD-POOL-TINY-UNITS-48: many small units go out in chunks (_chunk_size), one task per chunk
+    chunks = _chunk_plan(total)
     with worker_environment(), _map_pool(size) as pool:
         pending = set()
         window = count if stage is not None and stage.capacity > size else 2 * count
 
         def refill():
             while len(pending) < (window if limit is None else limit()):
-                try:
-                    index, item = next(items)
-                except StopIteration:
+                cap = window if limit is None else limit()
+                batch = []
+                for _ in range(_chunk_size(chunks, cap)):
+                    try:
+                        batch.append(next(items))
+                    except StopIteration:
+                        break
+                if not batch:
                     if status:
                         status.end_of_input()
                     return
-                pending.add(_submit(pool, function, index, item, status))
+                pending.add(_submit_chunk(pool, function, batch, status, chunks))
 
         try:
             refill()
@@ -547,7 +560,112 @@ def completed_map(function, items, jobs=None, cost=None):
                 # unit finishes (maintainer 2026-10-19: pools follow the live allowance continuously)
                 done, pending = wait(pending, timeout=None if limit is None else _grow_seconds(),
                                      return_when=FIRST_COMPLETED)
-                results = [future.result() for future in done]
+                results, error = [], None
+                for future in done:
+                    values, failed = _chunk_results(future)
+                    results += values
+                    error = error or failed
+                if error is None:
+                    refill()
+                yield from results
+                if error is not None:
+                    raise error
+        finally:
+            for future in pending:
+                future.cancel()
+            if status:
+                status.close()
+            _chunk_report(chunks, getattr(function, '__name__', 'map'))
+
+
+def _indexed_call(function, pair):
+    """Pool worker of in_order_map: (index, FUNCTION(item)) of one (index, item) pair."""
+    return pair[0], function(pair[1])
+
+
+def in_order_map(function, items, jobs=None, cost=None):
+    """completed_map with its results handed back in input order: what ordered_map yields, scheduled as
+    completed_map schedules (a bounded window, guided chunks of small units: BUILD-POOL-TINY-UNITS-48). A result that
+    finishes early is held until the ones before it are back. ordered_map with a COST keeps every finished but not
+    yet handed back unit in its pending table and counts the running ones over the whole table before each
+    submission: with 1,351 frames or 3,000 encoding batches the parent spent most of its time in that count
+    (BUILD-STATS-SERIAL-36: the CHIM stats ran at 1.4 cores). Scheduling only: every unit runs FUNCTION(item) once
+    and its own result is yielded at its place."""
+    from functools import partial
+    items = list(items)
+    call = partial(_indexed_call, function)
+    call.__name__ = getattr(function, '__name__', 'map')           # the supervisor's label (pool_status)
+    weight = None if cost is None else (lambda pair: cost(pair[1]))
+    held, following = {}, 0
+    for index, value in completed_map(call, list(enumerate(items)), jobs, cost=weight):
+        held[index] = value
+        while following in held:
+            yield held.pop(following)
+            following += 1
+
+
+def spread_map(function, items, jobs=None, cost=None, spread=None):
+    """completed_map whose units may take more than one core each: the idle cores of a map's tail go to the units
+    still to start (ROOM-BATCH-CORES-49: the room batches ran their last rooms on one core each while the rest of the
+    stage's share sat idle).
+
+    SPREAD(item, offered) -> (task, cores): the task handed to FUNCTION and the cores it will use (1 <= cores <=
+    offered; a unit with too little work to split takes 1). A unit is offered more than one core only when fewer
+    units are left to start than cores are free (the tail); then the free cores are shared among them by COST (largest
+    first, as the units are handed out). The units in flight keep to the stage's live allowance counted in cores, so
+    the stage never runs more than its share. Without SPREAD it is completed_map. Scheduling only: every unit gets the
+    same FUNCTION and its results are yielded as they finish; a unit's output must not depend on its cores."""
+    import pool_status
+    if spread is None:
+        yield from completed_map(function, items, jobs, cost=cost)
+        return
+    count = resolve_jobs(jobs)
+    size, limit = _throttle(count)
+    items = list(items)
+    if size == 1:
+        for _, item in _by_cost(items, cost):
+            yield function(spread(item, 1)[0])
+        return
+    status = pool_status.watch(getattr(function, '__name__', 'map'), items)
+    weight = (lambda item: max(0.0, float(cost(item)))) if cost is not None else (lambda item: 1.0)
+    order = list(_by_cost(items, cost))
+    left_weight = [0.0] * (len(order) + 1)
+    for at in range(len(order) - 1, -1, -1):
+        left_weight[at] = left_weight[at + 1] + weight(order[at][1])
+    with worker_environment(), _map_pool(size) as pool:
+        pending = {}              # future -> cores
+        state = {'next': 0}
+
+        def refill():
+            cap = count if limit is None else limit()
+            while state['next'] < len(order):
+                busy = sum(pending.values())
+                free = cap - busy
+                if free < 1:
+                    return
+                at = state['next']
+                index, item = order[at]
+                left = len(order) - at
+                offered = 1
+                if left < free:
+                    share = weight(item) / left_weight[at] if left_weight[at] > 0 else 1.0 / left
+                    offered = max(1, min(free - (left - 1), int(free * share)))
+                task, cores = spread(item, offered)
+                cores = max(1, min(int(cores), offered))
+                state['next'] += 1
+                pending[_submit(pool, function, index, task, status)] = cores
+            if status:
+                status.end_of_input()
+
+        try:
+            refill()
+            while pending:
+                done, _ = wait(list(pending), timeout=None if limit is None else _grow_seconds(),
+                               return_when=FIRST_COMPLETED)
+                results = []
+                for future in done:
+                    pending.pop(future)
+                    results.append(future.result())
                 refill()
                 yield from results
         finally:
@@ -559,12 +677,251 @@ def completed_map(function, items, jobs=None, cost=None):
 
 def _submit(pool, function, index, item, status):
     """One task of a completed or governed map, counted for the stage pool and shown to the supervisor."""
+    _watch_idle_workers(pool)
     future = pool.submit(function, item)
     _count_task()
     if status:
         status.submit(index, item)
         future.add_done_callback(lambda _f: status.finish(index))
     return future
+
+
+# Idle workers end when a stage's allowance falls (BUILD-POOL-MEMORY-PEAK-48). A pool's worker processes stay alive
+# between units and keep the memory they reached (Python does not hand freed heap back, and module memos stay), so a
+# cut of the allowance stopped new units but freed nothing: the v0.0.48-dev2 build held chim and chim-room-batches at
+# one worker each for over ten minutes at 42 of 44 GiB, 41 GiB of it the two parents and their idle ~0.75 GiB
+# workers. Under the scheduler a watcher thread per worker pool ends the idle workers above the allowance once the
+# pool has held more of them than allowed for _trim_after_seconds(); a running unit is never stopped, and new workers
+# start on demand when the allowance grows again. Scheduling only (build_cache.SCHEDULING_UNITS): which process runs a
+# unit never changes what it returns.
+
+def _trim_after_seconds():
+    """How long a pool may hold more live workers than its allowance before the idle ones end: longer than a
+    rebalance between two stage starts, short against a memory cut that lasts minutes."""
+    return 20.0
+
+
+def _trim_poll_seconds():
+    return 2.0
+
+
+def _watch_stage_pool():
+    """The idle-worker watcher of the running stage pool (called for every unit an ordered map submits, through the
+    supervisor's status, tools/pool_status.py: ordered_map's own text keys every stage, so it is not edited)."""
+    stage = active_stage_pool()
+    if stage is not None and stage.executor is not None:
+        _watch_idle_workers(stage.executor)
+
+
+def _watch_idle_workers(pool):
+    """Start, once per worker pool and only under the scheduler (its allowance file), the thread that ends the pool's
+    idle workers above the stage's allowance (_trim_idle_loop)."""
+    path = os.environ.get(ALLOWANCE_ENV)
+    if not path or getattr(pool, '_aw_idle_watch', None) is not None or not _can_retire(pool):
+        return
+    import threading
+    import weakref
+    watcher = threading.Thread(target=_trim_idle_loop, args=(weakref.ref(pool), path), daemon=True,
+                               name='aw-idle-workers')
+    pool._aw_idle_watch = watcher
+    watcher.start()
+
+
+def _can_retire(pool):
+    """Whether POOL is a process pool whose idle workers _retire_idle can end: the worker loop and executor fields of
+    Python 3.11 and later (3.12 in the builder images); anything else keeps its workers, as before."""
+    import concurrent.futures.process as process
+    return (sys.version_info >= (3, 11) and isinstance(pool, ProcessPoolExecutor)
+            and hasattr(process, '_sendback_result') and hasattr(pool, '_idle_worker_semaphore')
+            and isinstance(getattr(pool, '_processes', None), dict)
+            and isinstance(getattr(pool, '_pending_work_items', None), dict))
+
+
+def _trim_idle_loop(reference, path):
+    """Watcher thread of one worker pool: every _trim_poll_seconds() it compares the pool's live worker processes with
+    the stage's allowance (the scheduler's file at PATH) and its units in flight; when the pool has held more workers
+    than both for _trim_after_seconds(), it ends the idle ones (_retire_idle) and says so. Ends with the pool."""
+    over_since = None
+    while True:
+        time.sleep(_trim_poll_seconds())
+        pool = reference()
+        if pool is None or getattr(pool, '_shutdown_thread', False) or getattr(pool, '_broken', False):
+            return
+        try:
+            allowed = max(1, int(Path(path).read_text().strip()))
+        except (OSError, ValueError):
+            del pool
+            continue
+        processes, work = pool._processes, pool._pending_work_items
+        if processes is None or work is None:
+            return
+        live, busy = len(processes), len(work)
+        keep = max(allowed, busy)
+        now = time.monotonic()
+        if live <= keep:
+            over_since = None
+        elif over_since is None:
+            over_since = now
+        elif now - over_since >= _trim_after_seconds():
+            ended = _retire_idle(pool, live - keep)
+            if ended:
+                print('[pool] %d idle worker process(es) ended: %d alive for an allowance of %d with %d unit(s) in '
+                      'flight; their memory goes back to the machine, new workers start when the allowance grows '
+                      '(BUILD-POOL-MEMORY-PEAK-48)' % (ended, live, allowed, busy), flush=True)
+            over_since = None
+        del pool
+
+
+def _retire_idle(pool, count):
+    """End COUNT idle worker processes of POOL: each takes one _retire_worker task (only an idle worker reads the
+    pool's call queue), hands back its result marked as a worker exit (the way a worker of max_tasks_per_child leaves)
+    and exits; the pool removes it and starts a new one only when it needs one. Returns the tasks submitted."""
+    semaphore = pool._idle_worker_semaphore
+
+    def settle(future):
+        # the pool counts idle workers on a semaphore: the exit path takes one more than it gave, so the exit of a
+        # retired worker gives it back here (this callback runs before the pool's own count, in its manager thread)
+        if not future.cancelled() and future.exception() is None and future.result() is True:
+            semaphore.release()
+    ended = 0
+    for _ in range(int(count)):
+        try:
+            future = pool.submit(_retire_worker)
+        except RuntimeError:           # shut down or broken meanwhile
+            break
+        future.add_done_callback(settle)
+        ended += 1
+    return ended
+
+
+def _retire_worker():
+    """Pool worker task of _retire_idle: hand back this task's result as a worker exit and end this process. Returns
+    False (the worker stays) when the caller is not the Python 3.11+ worker loop it expects."""
+    import concurrent.futures.process as process
+    names = sys._getframe(1).f_locals
+    call_item, results = names.get('call_item'), names.get('result_queue')
+    if call_item is None or results is None or not hasattr(call_item, 'work_id'):
+        return False
+    process._sendback_result(results, call_item.work_id, result=True, exit_pid=os.getpid())
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
+
+
+# Chunks of small units (BUILD-POOL-TINY-UNITS-48). A pool task costs the parent its pickling (one feeder thread for
+# the whole pool) and a round trip; with units of a tenth of a second, or units that each carry the same large input,
+# the parent could not keep the pool fed: the v0.0.48-dev2 chim stage ran 579 queued units of 0.1 s at 3.75 of 24
+# cores and the heap gate's 1,392 position slices (each pickled with its whole frame's arrays) at 4.5 of 24.
+# completed_map now hands out guided chunks: after the first wave of single units has measured the unit time, each
+# task takes up to the units left divided by _chunks_per_worker() tasks per worker, and no more than
+# _chunk_seconds() of work, so chunks shrink to single units in the tail. One task pickles its chunk at once (a frame's
+# arrays shared by its slices go once). Every unit still runs FUNCTION(item) and yields its own result as before; a
+# unit's failure ends the map as before, after the results of the units before it in its chunk.
+# AMIWIND_POOL_CHUNKS=off keeps one task per unit (the method before v0.0.48). Scheduling only
+# (build_cache.SCHEDULING_UNITS; the variable is in build_cache.IGNORED_ENV).
+
+def _chunks_on():
+    return os.environ.get('AMIWIND_POOL_CHUNKS', 'on') != 'off'
+
+
+def _chunks_per_worker():
+    """Guided chunking: a chunk takes the units left divided by this many tasks per worker."""
+    return 4
+
+
+def _chunk_seconds():
+    """The most measured work one chunk takes (seconds), so a chunk of slow units stays short (and a lowered
+    allowance still takes effect within seconds). Measured on the v0.0.48-dev2 world: units of about 1 s (the zone
+    walk's routes) gain nothing from chunks and lose in the tail at a 10 s cap (74 s -> 84 s); the heap gate's 0.1 s
+    slices gain at any cap."""
+    return 2.0
+
+
+def _chunk_plan(total):
+    """The chunk state of one map of TOTAL units (None: a generator of unknown length, never chunked)."""
+    return {'on': _chunks_on(), 'left': total, 'units': 0, 'seconds': 0.0, 'chunks': 0, 'chunked': 0, 'largest': 1}
+
+
+def _chunk_size(state, cap):
+    """Units in the next task: 1 until the first wave of CAP single units has measured the unit time, then the guided
+    share of the units left, capped by _chunk_seconds() of measured work."""
+    if not state['on'] or state['left'] is None or state['units'] < max(1, cap):
+        return 1
+    guided = -(-state['left'] // (_chunks_per_worker() * max(1, cap)))
+    per_unit = state['seconds'] / state['units']
+    by_time = int(_chunk_seconds() / per_unit) if per_unit > 0 else guided
+    return max(1, min(guided, by_time))
+
+
+def _submit_chunk(pool, function, batch, status, state):
+    """One task of completed_map: a single unit (_submit, as before) or a chunk of units (_chunk_call)."""
+    if state['left'] is not None:
+        state['left'] -= len(batch)
+    started = time.monotonic()
+    if len(batch) == 1:
+        index, item = batch[0]
+        future = _submit(pool, function, index, item, status)
+        future._aw_chunk = None
+    else:
+        _watch_idle_workers(pool)
+        future = pool.submit(_chunk_call, function, [item for _, item in batch])
+        _count_task()
+        future._aw_chunk = len(batch)
+        state['chunks'] += 1
+        state['chunked'] += len(batch)
+        state['largest'] = max(state['largest'], len(batch))
+        if status:
+            first, count = batch[0][0], len(batch)
+            status.submit_many(first, batch[0][1], count)
+            future.add_done_callback(lambda _f: status.finish_many(first, count))
+
+    def timed(_future, units=len(batch)):
+        state['units'] += units
+        state['seconds'] += time.monotonic() - started
+    future.add_done_callback(timed)
+    return future
+
+
+def _chunk_call(function, items):
+    """Pool worker: FUNCTION over a chunk of ITEMS, in order: [('ok', result) ...], ending at the first failure with
+    ('error', exception, traceback text)."""
+    out = []
+    for item in items:
+        try:
+            out.append(('ok', function(item)))
+        except BaseException as error:
+            import traceback
+            out.append(('error', error, traceback.format_exc()))
+            break
+    return out
+
+
+def _chunk_results(future):
+    """(results, error or None) of one finished task of completed_map, a single unit or a chunk."""
+    try:
+        value = future.result()
+    except BaseException as error:
+        return [], error
+    if getattr(future, '_aw_chunk', None) is None:
+        return [value], None
+    values = []
+    for outcome in value:
+        if outcome[0] == 'ok':
+            values.append(outcome[1])
+            continue
+        error = outcome[1]
+        from concurrent.futures.process import _RemoteTraceback
+        error.__cause__ = _RemoteTraceback(outcome[2])
+        return values, error
+    return values, None
+
+
+def _chunk_report(state, label):
+    """One line when a map handed out chunks (no silent scheduling)."""
+    if state['chunks']:
+        print('[pool] %s: %d small units went out in %d chunks of up to %d (about %.2f s a unit), the rest one by one '
+              '(BUILD-POOL-TINY-UNITS-48)' % (label, state['chunked'], state['chunks'], state['largest'],
+                                              state['seconds'] / max(1, state['units'])), flush=True)
 
 
 def governed_map(function, items, jobs=None, unit_mib=None, label='pool', cost=None, item_mib=None):
@@ -713,6 +1070,8 @@ DEPENDENCIES = {
     # The tracker data of the CHIM world (BUILD/toolkit), its own stage (BUILD-CHIM-KEY-UNDERDECLARED-35).
     'cell-progress': ('chim',),
     'media': (), 'music': (), 'engine': (),
+    # The compiled game scripts index the media catalogue's files and the soundtrack's tracks (no audio copied).
+    'mwscript': ('media', 'music'),
     'image': ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'media', 'engine', 'dialogue-lookup'),
     'dry-run-image': ('engine',),
 }
@@ -756,7 +1115,8 @@ def stage_dependencies(steps, skipped=()):
         deps = tuple(d for d in deps if d not in skipped)
         if name.startswith('chim-town-'):
             # A CHIM town (tools/chim_town.py) reads the CHIM world and the census palette; Seyda Neen also reads
-            # the scene chain's complete town, which the area and opening-references stages finish last.
+            # the scene chain's complete town, which the area and opening-references stages finish last: their scene
+            # entity list (SCENE/seyda-entities.json, BUILD-SEYDA-ENTITY-BUS-48; no .bsp is read).
             deps = ('chim', 'census', *(d for d in (('area', 'opening-references') if name == 'chim-town-seyda' else ())
                                         if d in names))
         # A CHIM town's legacy chain stage is not built (CHIM-LEGACY-CHAIN-33): the ordered
@@ -786,6 +1146,8 @@ def stage_dependencies(steps, skipped=()):
             deps = (*deps, 'hand-catalog')
         if name == 'image' and 'harvest' in names:
             deps = (*deps, 'harvest')
+        if name == 'image' and 'mwscript' in names:
+            deps = (*deps, 'mwscript')
         # the actor library (--chim-actor-table on only) reads the census palette and the CHIM towns' residents
         if name == 'actor-library':
             deps = ('census', *(n for n in names if n.startswith('chim-town-')))
@@ -795,6 +1157,24 @@ def stage_dependencies(steps, skipped=()):
             # the image installs every CHIM town's stage output and its rooms (BUILD-CHIM-ROOMS-IMAGE-RACE-36: the
             # image ran beside chim-rooms-vivec_city and read its record before it existed)
             deps = (*deps, 'chim', *(n for n in names if n.startswith(('chim-town-', 'chim-rooms-'))))
+        # CHIM rooms (tools/chim/interior.py) read every room stage's work folders and the census palette; the image
+        # installs them over the final room maps
+        # interior rooms by batch (tools/chim_room_batches.py): the census palette and the scene chain's hand timings
+        if name == 'chim-room-batches':
+            # it reads the census palette and colormap and the hands stage's report (intro-scene/scene-ready.json,
+            # written by the intro stage and by no later stage), never a scene map: the hand timings no longer come
+            # out of seyda.bsp (BUILD-SEYDA-BSP-CARRIER-48), so it no longer waits for the stages that rewrite the
+            # scene maps (BUILD-ROOM-BATCHES-SCENE-RACE-48's wait on area .. opening-references)
+            deps = tuple(n for n in names if n == 'census')
+        if name == 'chim-interiors':
+            # and the harvest step's output: the rooms leave its plants out (CHIM-ROOM-HARVEST-DOUBLE-48)
+            deps = tuple(n for n in names if n in ('census', 'area', 'interior', 'balmora-interiors', 'chim-room-batches',
+                                                   'harvest')
+                         or n.startswith(('town-', 'chim-rooms-')))
+        if name == 'image' and 'chim-interiors' in names:
+            deps = (*deps, 'chim-interiors')
+        if name == 'image' and 'chim-room-batches' in names:
+            deps = (*deps, 'chim-room-batches')
         # the CHIM world leaves out the harvest placements and adds the town flora (payload parity)
         if name == 'chim':
             deps = (*deps, *(d for d in ('harvest', 'world-flora-assets', 'world-survey') if d in names))

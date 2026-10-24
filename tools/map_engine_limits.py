@@ -286,15 +286,59 @@ def check(data, name='map', table=None, rules=None, scenery=None, plants=0, id1=
     return refused, counts
 
 
-def audit_maps(maps_dir, skip=()):
+_EXTRAS = {}       # pool worker: model_extras' memo of the audit it serves ({audit token: memo}, one audit at a time)
+
+
+def _audit_map(task):
+    """Pool worker of audit_maps: (stem, counts, refusals), or (stem, None, error text) for a map that is not a
+    BSP29 map. The actor models' extras are remembered per audit (TOKEN), as the serial audit does in one pass."""
+    path, table, rules, scenery, plants, id1, token = task
+    if token not in _EXTRAS:
+        _EXTRAS.clear()
+        _EXTRAS[token] = {}
+    path = Path(path)
+    try:
+        errors, counts = check(path.read_bytes(), path.stem, table, rules, scenery, harvest_plants(Path(plants)),
+                               Path(id1), _EXTRAS[token])
+    except (ValueError, struct.error) as exc:
+        return path.stem, None, str(exc)
+    return path.stem, counts, errors
+
+
+def maps_pool_on():
+    """The maps of an audit on the worker pool (BUILD-IMAGE-UNDERUSED-32, v0.0.48): the payload preflight's engine
+    map limits read and parsed 1,100 to 2,000 maps one by one, 7.8 s and 17.5 s at 0.2 to 2 cores (mostly waiting for
+    the disk). AMIWIND_MAP_LIMITS_POOL=off: one by one, the method before. The same report either way."""
+    import os
+    return os.environ.get('AMIWIND_MAP_LIMITS_POOL', 'on') != 'off'
+
+
+def audit_maps(maps_dir, skip=(), jobs=1):
     """The report of every map in MAPS_DIR (*.bsp and the CHIM frame maps *.chim: tools/map_files.py, less
-    the file names in SKIP) against the engine's tables, refusals listed."""
+    the file names in SKIP) against the engine's tables, refusals listed. JOBS > 1: the maps on the worker pool
+    (maps_pool_on), the report in map order as before."""
     from map_files import map_files
     table, rules, towns = limits(), spawn_rules(), scenery_towns()
     rows, refused, unreadable, extras = {}, [], {}, {}
-    for path in map_files(maps_dir):
-        if path.name in skip:
-            continue
+    paths = [path for path in map_files(maps_dir) if path.name not in skip]
+    from build_parallel import stage_ceiling
+    if maps_pool_on() and stage_ceiling(jobs) > 1 and len(paths) > 1:
+        import os
+        from build_parallel import in_order_map
+        token = '%d-%s' % (os.getpid(), os.urandom(8).hex())
+        parent = Path(maps_dir).parent
+        tasks = [(str(path), table, rules, scenery_map(path.stem, towns),
+                  str(parent / ('harvest-%s.txt' % path.stem)), str(parent), token) for path in paths]
+        sizes = {task[0]: Path(task[0]).stat().st_size for task in tasks}
+        for stem, counts, errors in in_order_map(_audit_map, tasks, min(stage_ceiling(jobs), len(tasks)),
+                                                 cost=lambda task: sizes[task[0]]):
+            if counts is None:
+                unreadable[stem] = errors
+                continue
+            rows[stem] = counts
+            refused += errors
+        paths = []
+    for path in paths:
         try:
             errors, counts = check(path.read_bytes(), path.stem, table, rules, scenery_map(path.stem, towns),
                                    harvest_plants(Path(maps_dir).parent / ('harvest-%s.txt' % path.stem)),
@@ -316,10 +360,10 @@ def audit_maps(maps_dir, skip=()):
             'per_map': rows}
 
 
-def check_maps(maps_dir, report_path=None, skip=()):
+def check_maps(maps_dir, report_path=None, skip=(), jobs=1):
     """Every map in MAPS_DIR (*.bsp, less SKIP) against the engine's tables. Raises ValueError listing
-    every map that does not fit; returns the report (worst headroom per table first)."""
-    report = audit_maps(maps_dir, skip)
+    every map that does not fit; returns the report (worst headroom per table first). JOBS: audit_maps."""
+    report = audit_maps(maps_dir, skip, jobs)
     refused = report['refused']
     if report_path is not None:
         Path(report_path).write_text(json.dumps(report, indent=1) + '\n', encoding='utf-8', newline='\n')

@@ -10,8 +10,21 @@
 #include <string.h>
 /* Intro docks and Census courtyard sub-scenes (Seyda Neen). */
 #define AW_TOWN_SEYDA_SCENES 1
-/* Without its region directory the town runs as one full legacy map. */
+/* Without its region directory the town runs as one full legacy map
+ * (LEGACY TOWN REGIONS below). */
 #define AW_TOWN_LEGACY_PAYLOAD 2
+/* LEGACY TOWN REGIONS (retired behind this flag, BUILD-LEGACY-ENGINE-PATHS-48):
+ * a town streamed as region maps (aw_region.c: AW_RegionCrossing,
+ * AW_RegionAhead, the region branches of AW_RegionSelect, AW_RegionWorldModel
+ * and AW_TownArrival) or run as one full map (AW_TOWN_LEGACY_PAYLOAD). Every
+ * shipped town runs on its CHIM frame map; these paths run only in an image
+ * made with --builder legacy (no CHIM world) or after "chim_towns 0" (the A/B
+ * of a historical regression). 1 (default) keeps them, as those builds still
+ * reach them (no method is deleted); 0 builds the engine without them: every
+ * CHIM town runs the same (tests/aga_region_chim_only_test.c). */
+#ifndef AW_LEGACY_TOWN_REGIONS
+#define AW_LEGACY_TOWN_REGIONS 1
+#endif
 /* Own door bank only; never the shared scene-doors.txt/scene-links.txt. */
 #define AW_TOWN_OWN_DOORS 4
 /* func_wall placements go to the shared scenery catalogue (aw_scenery.c). */

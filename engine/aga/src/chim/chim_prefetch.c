@@ -611,6 +611,24 @@ void ChimPrefetch_Step (const vec3_t origin, int spare)
 		Slice (pos);
 }
 
+/* Another store (chim_world.c Chim_StoreSelect): its file rows mean other
+ * files, so every block and placement count goes. */
+void ChimPrefetch_StoreChanged (void)
+{
+	int i;
+	for (i=0 ; table && i<SLOTS ; i++)
+		while (table[i].id)
+			Drop (&table[i]);
+	if (owned)
+	{
+		ChimZone_Unlock (owned_user.data);
+		ChimZone_Free (&owned_user);
+		owned = NULL;
+		owned_rows = 0;
+	}
+	wants = have_side = 0;
+}
+
 /* A new map: the plan starts again from the arrival (the blocks stay). */
 void ChimPrefetch_MapBegin (void)
 {

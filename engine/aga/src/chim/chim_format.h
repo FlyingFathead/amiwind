@@ -28,7 +28,7 @@
 #define CHIM_FORMAT_H
 
 #define CHIM_FORMAT_MAJOR	0
-#define CHIM_FORMAT_MINOR	11
+#define CHIM_FORMAT_MINOR	12
 #define CHIM_FORMAT_MINOR_OLDEST	4	/* the oldest minor of this major the engine reads */
 
 #define CHIM_HEADER_BYTES		32
@@ -52,7 +52,13 @@
 #define CHIM_TERC_MINOR		10	/* the first minor with compact terrain records (chim_terc.c); its chunk heads name the record size */
 #define CHIM_RECORD_OVER_16_LEAVES	1	/* record flag: reaches more than MAX_ENT_LEAFS */
 #define CHIM_RECORD_STORY_HIDDEN	2	/* record flag (0.5): hidden by the opening story */
+#define CHIM_LIGHT_MINOR		12	/* the first minor whose record flags carry a light level (docs/chim/INTERIOR_STORE.md) */
+#define CHIM_RECORD_LIGHT_SHIFT	8	/* 0.12: flags bits 8-15, the placement's light level (0 none, 1-255) */
 #define CHIM_INDEX_NAME			"chim/world.cwi"
+#define CHIM_STORE_DEFAULT		"chim"	/* the store folder of the exterior world */
+#define CHIM_STORE_CHARS		8		/* a store folder name: 1-8 of a-z 0-9 _ */
+#define CHIM_ROOM_BLOCK_BYTES	32	/* a room record's block after its header (docs/chim/INTERIOR_STORE.md) */
+#define CHIM_ROOM_NAME_CHARS	22	/* "rooms/<name>.crm" within CHIM_PATH_CHARS */
 #define CHIM_PATH_CHARS			32
 
 typedef struct
@@ -154,6 +160,26 @@ int ChimFormat_Record (const unsigned char *p, chim_record_t *out);
 int ChimFormat_RecordPlaced (const unsigned char *p, chim_record_t *out);
 /* The placement record size of a world of this minor (48 or 56). */
 int ChimFormat_RecordBytes (int minor);
+/* 0.12: a record's light level from its flags (0 before 0.12 or none). */
+int ChimFormat_RecordLight (int minor, int flags);
+/* A store folder name: 1 when valid (1-8 of a-z 0-9 _). */
+int ChimFormat_StoreNameValid (const char *name);
+/* "<store>/<relative>" into out (size bytes); 0 when the name is invalid or it does not fit. */
+int ChimFormat_StorePath (char *out, int size, const char *store, const char *relative);
+
+/* A room record (<store>/rooms/<room>.crm, docs/chim/INTERIOR_STORE.md): the
+ * common header (kind ROOM, count = placements, directory = the model list at
+ * 64, data = the placements after it), the room block (bounds, model count),
+ * the store model ids (u32 each), then 56-byte placed records. */
+typedef struct
+{
+	float		mins[3], maxs[3];
+	unsigned	models;
+} chim_room_t;
+/* 1 when the whole file checks out: header, sizes and offsets, the block. */
+int ChimFormat_Room (const unsigned char *p, long bytes, chim_header_t *h, chim_room_t *room);
+/* A room name: 1-22 of a-z 0-9 _ - (the map name). */
+int ChimFormat_RoomNameValid (const char *name);
 /* 0.9: a reach reference: the owner chunk's index in its frame and the
  * record's position among that chunk's owned records. */
 void ChimFormat_ReachRef (const unsigned char *p, int *owner, int *record);

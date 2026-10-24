@@ -1,6 +1,6 @@
 # Third person, vanity camera and the death scene
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -104,6 +104,14 @@ original jump takeoff/held-air and landing sections from ground and velocity
 state. All twenty regenerated models/layouts passed RC1 readback; matched
 original-game and broader native verification remain pending under
 [PLAYER-JUMP-THIRDPERSON-38](bugs/PLAYER-JUMP-THIRDPERSON-38.md).
+
+In the image step the 80 bakes (body, torch body, water body and inventory poses per race and sex) run in one
+worker pool for the whole step, the longest first, and each is kept in the image unit cache
+(`WORKSPACE/cache/image-passes/player-view`) by the SHA-256 of its inputs: the game data (the build's input lock),
+the palette, race and sex, the body fields a torch or water body reads, the code and the settings it reads. A
+build with the same inputs takes every model from there byte for byte (about 3 s instead of about a minute);
+`player-view.json` counts the units reused and made, and `--rebuild-unit "player-view:body nord male"` makes one
+again ([BUILD-PLAYER-VIEW-UNDERUSED-48](bugs/BUILD-PLAYER-VIEW-UNDERUSED-48.md)).
 
 A source candidate also selects original `idlehh`, `walkforwardhh`,
 `runforwardhh` and `jumphh` clips from the first-person rules' bare-hand ready

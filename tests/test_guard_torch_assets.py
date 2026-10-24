@@ -54,6 +54,86 @@ class GuardTorchAssetsTests(unittest.TestCase):
         with self.assertRaises(ValueError):registry([self.row()]*2)
         with self.assertRaises(ValueError):registry([self.row()]*33)
 
+    def distinct(self, count):
+        return [{**self.row(),'source_id':'guard %d'%index,'base_model':'progs/a_%04d.mdl'%index} for index in range(count)]
+
+    def test_registry_holds_the_engine_table_size(self):
+        # GUARD-TORCH-TYPES-LIMIT-48: dev2 try12 staged 51 (guard source, model) records over the old 32; the builder
+        # limit is the engine's table size, read from its header so the two never drift apart
+        import prepare_guard_torches as guard
+        header=(Path(__file__).resolve().parents[1]/'engine/aga/src/aw_torch.h').read_text(encoding='utf-8')
+        import re
+        engine=int(re.search(r'#define AW_GUARD_TORCH_TYPES (\d+)',header).group(1))
+        self.assertEqual(guard.MAX_RECORDS,engine)
+        self.assertGreaterEqual(guard.MAX_RECORDS,2*51)
+        raw=registry(self.distinct(51))
+        self.assertEqual(struct.unpack_from('>4sHH',raw),(b'AWG1',51,0))
+        self.assertEqual(len(registry(self.distinct(guard.MAX_RECORDS))),8+guard.MAX_RECORDS*(260+8*12))
+        with self.assertRaisesRegex(ValueError,'%d of %d'%(guard.MAX_RECORDS+1,guard.MAX_RECORDS)):
+            registry(self.distinct(guard.MAX_RECORDS+1))
+
+    def test_staged_scan_takes_51_records_and_refuses_over_the_limit(self):
+        import prepare_guard_torches as guard
+        def stage(id1, count):
+            entities=''.join('{"classname" "aw_npc" "aw_source_id" "guard %d" "model" "progs/a_%04d.mdl"}\n'%(i,i)
+                             for i in range(count)).encode()+b'\0'
+            (id1/'maps/many.bsp').write_bytes(struct.pack('<i2i',29,124,len(entities))+bytes(112)+entities)
+            return {'NPC_':{'guard %d'%i:[('CNAM',field('Guard'))] for i in range(count)}}
+        with tempfile.TemporaryDirectory() as tmp:
+            id1=Path(tmp);(id1/'maps').mkdir()
+            self.assertEqual(len(_guard_models(id1,stage(id1,51),{},'l/light_torch10.nif')),51)
+            with self.assertRaisesRegex(ValueError,'Too many distinct staged guard models: %d'%(guard.MAX_RECORDS+1)):
+                _guard_models(id1,stage(id1,guard.MAX_RECORDS+1),{},'l/light_torch10.nif')
+
+    def test_payload_preflight_counts_guard_records_early(self):
+        # GUARD-TORCH-TYPES-LIMIT-48: the overflow surfaced 22 minutes into the image step; the payload preflight now
+        # counts the staged maps and batch rooms in its first seconds, with the same limit
+        from unittest import mock
+        import prepare_guard_torches as guard
+        import payload_preflight
+        with tempfile.TemporaryDirectory() as tmp:
+            id1=Path(tmp)/'id1';(id1/'maps').mkdir(parents=True);rooms=Path(tmp)/'rooms';(rooms/'id1/maps').mkdir(parents=True)
+            def put(folder,name,first,count):
+                entities=''.join('{"classname" "aw_npc" "aw_source_id" "guard %d" "model" "progs/a_%04d.mdl"}\n'%(i,i)
+                                 for i in range(first,first+count)).encode()+b'\0'
+                (folder/name).write_bytes(struct.pack('<i2i',29,124,len(entities))+bytes(112)+entities)
+            put(id1/'maps','inside.bsp',0,40);put(id1/'maps','gone.bsp',40,200);put(rooms/'id1/maps','room.chim',30,20)
+            seen=[]
+            def records(paths,data_files,unstamped=None):
+                kinds={'NPC_':{'guard %d'%i:[('CNAM',field('Guard'))] for i in range(300)}}
+                seen.append(sorted(p.name for p in paths))
+                return set(guard._scan_guards(paths,kinds,{},'l/light_torch10.nif',unstamped=unstamped))
+            with mock.patch.object(guard,'staged_guard_records',records):
+                self.assertEqual(payload_preflight.check_guard_records(id1,{'maps/gone.bsp'},'/data',rooms),
+                                 {'records_kept_maps':50,'records_with_removed_maps':240})
+                self.assertEqual(seen[-1],['inside.bsp','room.chim'])
+                with self.assertRaisesRegex(ValueError,'before the CHIM frame maps, the engine holds %d'%guard.MAX_RECORDS):
+                    payload_preflight.check_guard_records(id1,set(),'/data',rooms)
+            self.assertIsNone(payload_preflight.check_guard_records(id1,set(),None))
+
+    def test_preflight_counts_unstamped_npcs_and_the_image_still_refuses_them(self):
+        # PREFLIGHT-GUARD-UNSTAMPED-NPCS-48: v0.0.48-rc1 stopped in the payload preflight on census.bsp, whose three
+        # NPCs get their source identity later in the image step; the early count skips them, the image refuses them
+        import prepare_guard_torches as guard
+        with tempfile.TemporaryDirectory() as tmp:
+            maps=Path(tmp)
+            entities=('{"classname" "aw_npc" "aw_source_id" "guard 1" "model" "progs/a.mdl"}\n'
+                      '{"classname" "aw_npc" "netname" "Socucius Ergalla" "aw_ref" "119636" "model" "progs/np_census.mdl"}\n'
+                      ).encode()+b'\0'
+            (maps/'census.bsp').write_bytes(struct.pack('<i2i',29,124,len(entities))+bytes(112)+entities)
+            kinds={'NPC_':{'guard 1':[('CNAM',field('Guard'))]}}
+            unstamped=[]
+            self.assertEqual(set(guard._scan_guards([maps/'census.bsp'],kinds,{},'l/light_torch10.nif',unstamped=unstamped)),
+                             {('guard 1','progs/a.mdl')})
+            self.assertEqual(unstamped,[('census.bsp','119636')])
+            with self.assertRaisesRegex(ValueError,'lacks original source identity: census.bsp'):
+                guard._scan_guards([maps/'census.bsp'],kinds,{},'l/light_torch10.nif')
+            # an identity that names no record is still refused early
+            bad=('{"classname" "aw_npc" "aw_source_id" "nobody" "model" "progs/a.mdl"}\n').encode()+b'\0'
+            (maps/'bad.bsp').write_bytes(struct.pack('<i2i',29,124,len(bad))+bytes(112)+bad)
+            with self.assertRaisesRegex(ValueError,'lacks original source identity: bad.bsp'):
+                guard._scan_guards([maps/'bad.bsp'],kinds,{},'l/light_torch10.nif',unstamped=[])
+
     def test_layer_changes_only_left_clavicle_descendants_and_keeps_gait(self):
         class Base:
             N=None
@@ -208,6 +288,36 @@ class GuardBaseReproductionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Guard hlaalu guard_outside'):
             check_skips([{'source_id': 'hlaalu guard_outside', 'base_model': 'progs/a_bf6e2596469c.mdl',
                           'reason': 'Guard hlaalu guard_outside: source bake does not reproduce'}])
+
+    def test_known_unreproduced_guards_are_skipped_others_still_fail(self):
+        # GUARD-TORCH-REBAKE-MISMATCH-48 (v0.0.48-dev2 try12): listed guards are receipted skips; known={} is the
+        # earlier rule (intro models only)
+        from prepare_guard_torches import check_skips, KNOWN_NOT_REPRODUCED
+        row = {'source_id': 'nash gro-khazor', 'base_model': 'progs/a_c128e2b2e562.mdl', 'reason': 'Guard nash'}
+        self.assertIn('nash gro-khazor', KNOWN_NOT_REPRODUCED)
+        check_skips([row])
+        with self.assertRaisesRegex(ValueError, 'Guard nash'):
+            check_skips([row], known={})
+
+    def test_candidate_over_the_alias_budget_is_not_fatal(self):
+        # v0.0.48-dev2 try12: one guard's candidate bake raised AliasOverflow and stopped the whole step
+        from unittest import mock
+        import prepare_guard_torches as guard
+        from npc_geometry import AliasOverflow
+        faces, uv, original = self.arrays()
+        def fake_bake(shapes, materials, textures, palette, budget, reference_frames):
+            if budget == 480:
+                raise AliasOverflow('Alias vertex budget exceeded', 1)
+            return np.zeros((4, 3, 3)), faces, uv, None
+        with mock.patch('npc_geometry.bake', side_effect=fake_bake), \
+             mock.patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'locked'}):
+            positions, proof = guard._reproduce_base([], [], {}, b'', 2, faces, uv, original, np.ones(3),
+                                                     np.zeros(3), {'id': 'todd'})
+        self.assertEqual(proof['coordinates_off'], 0)
+        with mock.patch('npc_geometry.bake', side_effect=AliasOverflow('Alias vertex budget exceeded', 1)), \
+             mock.patch.dict('os.environ', {'AMIWIND_NPC_HEAD_REDUCER': 'locked'}):
+            with self.assertRaisesRegex(guard.BaseNotReproduced, 'over the alias vertex budget'):
+                guard._reproduce_base([], [], {}, b'', 2, faces, uv, original, np.ones(3), np.zeros(3), {'id': 'todd'})
 
     def test_one_step_rounding_counts_as_reproduced_more_does_not(self):
         """v0.0.44-dev1: the boat guard's rebuild was 8 of 85,050 coordinates one quantisation step off."""

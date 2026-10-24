@@ -17,17 +17,20 @@ void Cvar_SetValue(char *name,float value){char s[32];sprintf(s,"%g",value);Cvar
 float Cvar_VariableValue(char *name){cvar_t *v=Cvar_FindVar(name);return v?v->value:0;}
 static const char *str(const char *name){return Cvar_FindVar((char *)name)->string;}
 int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
+int Q_strncasecmp(char *a,char *b,int n){return strncasecmp(a,b,n);}
 float Q_atof(char *s){return (float)atof(s);}
-static void (*photo)(void),(*crosshair)(void);
+static void (*photo)(void),(*crosshair)(void),(*sensitivity_cmd)(void);
 void Cmd_AddCommand(char *name,void (*fn)(void)){
- if(!strcmp(name,"aw_photomode"))photo=fn;else if(!strcmp(name,"aw_crosshair"))crosshair=fn;else assert(0);
+ if(!strcmp(name,"aw_photomode"))photo=fn;else if(!strcmp(name,"aw_crosshair"))crosshair=fn;
+ else if(!strcmp(name,"aw_sensitivity"))sensitivity_cmd=fn;else assert(0);
 }
-static int argc;static char *argv[3];
+static int argc;static char *argv[4];
 int Cmd_Argc(void){return argc;}
 char *Cmd_Argv(int n){return n<argc?argv[n]:"";}
 static void run(void (*fn)(void),char *a){argv[1]=a;argc=a?2:1;fn();}
 static char printed[4096];
 void Con_Printf(char *fmt,...){va_list a;size_t n=strlen(printed);va_start(a,fmt);vsnprintf(printed+n,sizeof(printed)-n,fmt,a);va_end(a);}
+static void run2(void (*fn)(void),char *a,char *b){argv[1]=a;argv[2]=b;argc=3;printed[0]=0;fn();}
 /* dbg hud = amiwind_show_debug: the overlay and coordinates follow it. */
 void Cbuf_AddText(char *text){
  if(!strcmp(text,"amiwind_show_debug 1\n")){Cvar_Set("_aw_debug_all","1");Cvar_Set("_aw_debug_coords","1");}
@@ -69,9 +72,15 @@ static void fly(void){
 int main(void){
  cvar_t extra[]={{"crosshair","0",true},{"aw_fog","1",true},{"_aw_debug_all","0",true},{"_aw_debug_coords","0",true},
   {"aw_ui_hud","1",true},{"aw_compass","0",true},{"aw_ui_frame","0",true},{"r_drawviewmodel","1"},{"aw_noclipwobble","0",true}};
+ /* cl_main.c's sensitivity as registered there: "3", saved. */
+ cvar_t mouse={"sensitivity","3",true};
  int i;
  for(i=0;i<NAMES;i++)Cvar_RegisterVariable(&extra[i]);
- AW_PhotoInit();assert(photo && crosshair);
+ Cvar_RegisterVariable(&mouse);
+ AW_PhotoInit();assert(photo && crosshair && sensitivity_cmd);
+ /* Crosshair colour and shape: saved settings, Classic + Cross by default. */
+ assert(Cvar_FindVar("aw_crosshair_colour")->value==0 && Cvar_FindVar("aw_crosshair_colour")->archive);
+ assert(Cvar_FindVar("aw_crosshair_shape")->value==0 && Cvar_FindVar("aw_crosshair_shape")->archive);
  assert(Cvar_FindVar("aw_photomode_nofog")->value==1 && Cvar_FindVar("aw_photomode_nofog")->archive);
  assert(Cvar_FindVar("aw_photomode_noclip")->value==1 && Cvar_FindVar("aw_photomode_noclip")->archive);
  assert(Cvar_FindVar("aw_photomode_hands")->value==0 && Cvar_FindVar("aw_photomode_hands")->archive);
@@ -133,6 +142,38 @@ int main(void){
  AW_CrosshairSet(1);assert(AW_CrosshairShown() && !strcmp(str("crosshair"),"0"));AW_CrosshairSet(0);
  run(photo,"off");assert(!strcmp(str("crosshair"),"0") && !AW_CrosshairShown());
  AW_CrosshairSet(1);assert(!strcmp(str("crosshair"),"1"));
+ /* dbg crosshair colour / shape: a name (any case, a unique start) or its number; no name prints. */
+ assert(AW_CrosshairStyle(0)==0 && !strcmp(AW_CrosshairStyleName(0,0),"Warm white") && !strcmp(AW_CrosshairStyleName(1,0),"Cross"));
+ assert(AW_CrosshairStyleCount(0)==4 && AW_CrosshairStyleCount(1)==4);
+ run2(crosshair,"colour","green");assert(AW_CrosshairStyle(0)==2 && !strcmp(str("aw_crosshair_colour"),"2") && strstr(printed,"colour: Green"));
+ run2(crosshair,"COLOR","Ye");assert(AW_CrosshairStyle(0)==1);
+ run2(crosshair,"colour","warm");assert(AW_CrosshairStyle(0)==0);
+ run2(crosshair,"colour","3");assert(AW_CrosshairStyle(0)==3 && strstr(printed,"Blue"));
+ run2(crosshair,"colour","red");assert(AW_CrosshairStyle(0)==3 && strstr(printed,"Usage: dbg crosshair colour"));
+ run2(crosshair,"colour","9");assert(AW_CrosshairStyle(0)==3);
+ run(crosshair,"colour");assert(strstr(printed,"Crosshair colour: Blue (Warm white, Yellow, Green, Blue)"));
+ run2(crosshair,"shape","open");assert(AW_CrosshairStyle(1)==1 && strstr(printed,"shape: Open cross"));
+ run2(crosshair,"shape","cross");assert(AW_CrosshairStyle(1)==0); /* the exact name wins over a longer one */
+ run2(crosshair,"shape","dot");assert(AW_CrosshairStyle(1)==3);
+ run2(crosshair,"shape","s");assert(AW_CrosshairStyle(1)==2); /* the only name starting with s */
+ printed[0]=0;run(crosshair,"style");assert(strstr(printed,"Crosshair on, colour Blue, shape Small cross."));
+ assert(AW_CrosshairShown()); /* the style words never toggle it */
+ AW_CrosshairStyleSet(0,-1);assert(AW_CrosshairStyle(0)==3);AW_CrosshairStyleSet(0,4);assert(AW_CrosshairStyle(0)==0);
+ AW_CrosshairStyleSet(1,0);Cvar_Set("aw_crosshair_colour","7");assert(AW_CrosshairStyle(0)==0); /* a bad saved value reads Warm white */
+ assert(AW_CrosshairColourRGB(0)[0]==238 && AW_CrosshairColourRGB(1)[1]==186 && AW_CrosshairColourRGB(99)==AW_CrosshairColourRGB(0));
+ /* dbg sensitivity: no argument prints; 0.1..20 with one decimal; the default stays 3. */
+ assert(AW_SensitivityTenths()==30);
+ printed[0]=0;run(sensitivity_cmd,NULL);assert(strstr(printed,"Mouse sensitivity: 3.0 (default 3.0"));
+ printed[0]=0;run(sensitivity_cmd,"1.5");assert(AW_SensitivityTenths()==15 && strstr(printed,"Mouse sensitivity: 1.5."));
+ run(sensitivity_cmd,"20");assert(AW_SensitivityTenths()==200 && Cvar_VariableValue("sensitivity")==20);
+ run(sensitivity_cmd,"0.1");assert(AW_SensitivityTenths()==1);run(sensitivity_cmd,".5");assert(AW_SensitivityTenths()==5);
+ run(sensitivity_cmd,"7.");assert(AW_SensitivityTenths()==70);
+ printed[0]=0;run(sensitivity_cmd,"0");assert(AW_SensitivityTenths()==70 && strstr(printed,"Usage: dbg sensitivity"));
+ run(sensitivity_cmd,"20.1");run(sensitivity_cmd,"fast");run(sensitivity_cmd,"1.25");run(sensitivity_cmd,"-2");run(sensitivity_cmd,".");
+ assert(AW_SensitivityTenths()==70);
+ run2(sensitivity_cmd,"2","3");assert(AW_SensitivityTenths()==70);
+ AW_SensitivitySetTenths(0);assert(AW_SensitivityTenths()==1);AW_SensitivitySetTenths(999);assert(AW_SensitivityTenths()==200);
+ run(sensitivity_cmd,"3");assert(!strcmp(str("sensitivity"),"3"));
  /* Switches: fog kept and no free camera. */
  settings();scene();Cvar_Set("aw_photomode_nofog","0");Cvar_Set("aw_photomode_noclip","0");
  run(photo,"on");assert_hidden(0);assert(player.v.movetype==MOVETYPE_WALK && !noclip_anglehack);
@@ -162,6 +203,6 @@ int main(void){
  assert(!AW_PhotoModeActive());assert_restored();
  scene();run(photo,"on");fly();AW_PhotoConfigRestore();assert(!AW_PhotoModeActive());assert_restored();
  assert(player.v.origin[0]==500); /* shutdown: settings only */
- puts("photo mode: hide, notice, Ctrl+F/Ctrl+H, exact restore, start point, switches, crosshair");
+ puts("photo mode: hide, notice, Ctrl+F/Ctrl+H, exact restore, start point, switches, crosshair, crosshair style, sensitivity");
  return 0;
 }

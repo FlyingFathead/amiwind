@@ -45,6 +45,7 @@ typedef struct surfcache_s
 	unsigned			width;
 	unsigned			height;		// DEBUG only needed for debug
 	int					mip; // integer key for the owning surface's four mips
+	int					light;		// the placement light level it was built with (0.12)
 	struct texture_s	*texture;	// checked for animating textures
 	byte				data[4];	// width*height elements
 } surfcache_t;

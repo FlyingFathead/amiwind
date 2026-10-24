@@ -1,6 +1,9 @@
 # Horstator’s musings (7 Oct 2026): “Well, It Looks Like You Should Always Check and Recheck—”
 
-_Last updated with AmiWind v0.0.31 (8 October 2026)._
+_Last updated with AmiWind v0.0.48 (24 October 2026)._
+
+> Next musings, 24 Oct 2026: the whole island is in, and efficiency is the question in the game and in the build. See
+> [[C]hunks and [H]eaps in [M]emory](HORSTATORS_MUSINGS_2026-10-24.md).
 
 —and then check again, and then, just to be thorough, look at the thing you
 were sure you had already looked at.

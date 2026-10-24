@@ -397,6 +397,28 @@ def _wall(model, workers):
     return round(wall * at(workers) / at(jobs), 1)
 
 
+def _waits_for(steps):
+    """{stage: every stage it waits for, directly or through others} from the scheduler's own table
+    (build_parallel.stage_dependencies); a step list it does not know waits for nothing."""
+    try:
+        from build_parallel import stage_dependencies
+        deps = stage_dependencies(steps)
+    except (ImportError, ValueError, KeyError):
+        deps = {}
+    found = {}
+
+    def walk(name, seen=()):
+        if name not in found:
+            found[name] = set()
+            for dep in deps.get(name, ()):
+                if dep not in seen:
+                    found[name] |= {dep} | walk(dep, seen + (name,))
+        return found[name]
+    for name, _ in steps:
+        walk(name)
+    return found
+
+
 def plan(steps, running, jobs, got, gathered, reuse_from=None):
     """The resource plan document (schema resource-plan-1) of STEPS [(name, command)] of which RUNNING (names) will
     actually run, at --jobs JOBS, against GOT (limits())."""
@@ -405,15 +427,26 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None):
     threads = max(1, int(got.get('threads') or jobs or 1))
     jobs = max(1, int(jobs or 1))
     rows, refusals, models = [], [], {}
+    # a stage without --jobs runs one process (the scheduler holds one worker for it)
+    plans = {name: jobs if '--jobs' in [str(part) for part in command or ()] else 1 for name, command in steps}
+    for name, command in steps:
+        if name in running:
+            models[name] = stage_model(name, command, gathered['stages'].get(name), gathered.get('stair'))
+    # BUILD-PLAN-BESIDE-STALE-48: the memory measured beside a stage in an earlier run counts only up to what the
+    # other stages running in THIS build can hold at full speed; a reuse build that reruns four stages planned the
+    # room batches at 1 of 24 workers against 43 GB that stages it no longer runs held in the measured run
+    full = {n: m['parent_mib'] + plans[n] * m['worker_mib'] for n, m in models.items()}
+    after = _waits_for(steps)
     for name, command in steps:
         if name not in running:
             continue
-        model = stage_model(name, command, gathered['stages'].get(name), gathered.get('stair'))
-        models[name] = model
-        # a stage without --jobs runs one process (the scheduler holds one worker for it)
-        planned = jobs if '--jobs' in [str(part) for part in command or ()] else 1
+        model = models[name]
+        planned = plans[name]
         by_threads = min(planned, threads)
-        beside = model.get('beside_mib') or 0.0
+        # only a stage that neither waits for this one nor is waited for can run beside it (the image waits for all)
+        beside = min(model.get('beside_mib') or 0.0,
+                     sum(v for n, v in full.items() if n != name and n not in after[name]
+                         and name not in after[n]))
         if room is None or model['worker_mib'] <= 0:
             by_memory = planned
         else:
@@ -1260,6 +1293,12 @@ class SchedulerGuard:
     Do NOT reintroduce a cut below PRESSURE_CRITICAL, a "memory tight" cut on a share of the limit, or a cut that
     assumes idle workers shrink, unless the same change also ends the cut workers' processes (and a test proves the
     memory comes back). tests/test_build_stage_supervisor.py and tests/test_scheduler_memory_starved.py pin this.
+
+    Since v0.0.48 (BUILD-POOL-MEMORY-PEAK-48) a cut above the critical line does free memory: each stage's pools end
+    their idle worker processes above the stage's allowance once it has held more for about 20 s
+    (build_parallel._watch_idle_workers; tests/test_pool_idle_retire.py measures the memory coming back), so the
+    pressure falls under the line and the share comes back instead of both stages sitting on one worker. The rule
+    above (no cut below the critical line) stays as it is.
     """
 
     def __init__(self, budget, units=None, reader=None, clock=time.monotonic, interval=None, log=None, parents=None,

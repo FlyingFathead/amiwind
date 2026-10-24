@@ -193,7 +193,9 @@ def mesh_census(vertices, faces, collision, profile, materials):
         out['vertexes'], out['edges'], out['planes'], out['texinfo'] = len(verts), len(edges), len(planes), len(mappings)
     out['textures'] = sorted({texture_key(materials[m], texsize) for m in used if m < len(materials)})
     if not profile.get('collision_none'):
-        cv, cf = collision if (collision is not None and profile.get('collision_source')) else (v, f)
+        # the converters' collision-source rule (collision_source.uses_authored, COLLISION-RCN-SCOPE-32)
+        from collision_source import uses_authored
+        cv, cf = collision if (collision is not None and uses_authored(profile)) else (v, f)
         pieces, exact, _ = collision_pieces(cv, cf, profile, visible=(visual_v, visual_f))
         cpl = set()
         for k, (points, hull, ids, error) in enumerate(pieces):

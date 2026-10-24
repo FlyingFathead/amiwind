@@ -13,6 +13,10 @@ int (*aw_chim_frozen)(edict_t *);
  * reach there and the ground to lift it onto. NULL or 0: no floor (legacy maps,
  * outside the layer, chim_terrain_floor 0). */
 int (*aw_chim_floor)(const vec3_t origin, float *lowest, float *surface);
+/* Step rules (docs/STEP_MOVEMENT.md, STEP-MOVEMENT-OPENMW-RULES-48): 1 = Morrowind's step and slope rules as
+ * OpenMW states them (sv_phys.c SV_StepRulesStep, quakedef.h AW_WALKABLE); 0 (default) = the Quake rules. Not saved:
+ * the default stays until the maintainer decides. */
+cvar_t aw_step_rules={"aw_step_rules","0"};
 static int floor_held;  /* the player stands on the terrain floor: the world has no ground under it */
 static int actor_step;  /* AW_ActorStep is walking an actor through AW_WalkPlayer */
 extern qboolean SV_CheckWater(edict_t *ent);
@@ -55,7 +59,7 @@ static qboolean support(edict_t *p, float depth, trace_t *t)
     VectorCopy(p->v.origin,end);end[2]-=depth;
     *t=SV_Move(p->v.origin,p->v.mins,p->v.maxs,end,MOVE_NORMAL,p);
     return !t->startsolid && !t->allsolid && t->fraction<1 &&
-           t->plane.normal[2]>=AW_WALKABLE_Z && t->ent && t->ent->v.solid==SOLID_BSP;
+           AW_WALKABLE(t->plane.normal[2]) && t->ent && t->ent->v.solid==SOLID_BSP;
 }
 
 /* Anything of the world (not bodies) within depth below the box. */
@@ -143,7 +147,8 @@ void AW_WalkPlayer(edict_t *p)
     SV_WalkMove(p);
     /* Only a previously supported walker follows downward steps. Jumping,
      * free fall, swimming and noclip must never be glued to nearby ground. */
-    if(held && support(p,8.75f,&floor)) {
+    /* The step rules follow the ground down as OpenMW's ground test does: 64 Morrowind units (16). */
+    if(held && support(p,aw_step_rules.value?16.0f:8.75f,&floor)) {
         ground(p,&floor);p->v.velocity[2]=0;
     }
     /* Never below the terrain (the player; an actor's trial step is atomic). */

@@ -2199,6 +2199,12 @@ ALIAS MODELS
  * Preserve the old 16-byte block padding and offsets, including zero tail
  * padding, so target cache budgets do not change. No resident staging slab. */
 #define AW_ALIAS_STAGING_LIMIT (512*1024)
+/* The largest alias the direct stream (model_alias_stream.inc) decodes straight into its cache block: the actor
+ * byte budget for 32 MB of Fast RAM (tools/npc_anim.py ACTOR_BYTE_BUDGET, ALIAS-BUDGET-32MB-48). It needs no
+ * staging and no Hunk beyond that one block, so a model over the 512 KiB staging limit loads the same way on the
+ * 16 MB baseline (its Cache, the Hunk gap, evicts older models for it: slower, never a failure). The malloc
+ * staging paths below keep the 512 KiB limit. */
+#define AW_ALIAS_STREAM_LIMIT (768*1024)
 static byte *aw_alias_stage;
 static int aw_alias_stage_used,aw_alias_stage_size;
 static int AW_AliasSum(size_t *total,int count,size_t unit) {

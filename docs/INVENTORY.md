@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +14,7 @@ _Last updated with AmiWind v0.0.42-rc1 (17 October 2026)._
 - [Dedicated pose source progress, 14 October 2026](#dedicated-pose-source-progress-14-october-2026)
 - [Inventory native checkpoint, 14 October 2026](#inventory-native-checkpoint-14-october-2026)
 - [Icons and the HUD boxes, 17 October 2026](#icons-and-the-hud-boxes-17-october-2026)
+- [Stats and Magic windows, 23 October 2026](#stats-and-magic-windows-23-october-2026)
 
 <!-- contents end -->
 
@@ -364,3 +365,27 @@ and bar art into one lookup table (`gfx/icons.awl`, pictures in the pack `gfx/ic
 writes each item's enchantment type and maximum charge into the catalogue (bytes 496..511, zero in older
 catalogues). It prints one line with the rows, pictures and anything held back. The HUD weapon and magic boxes
 draw from it, and so do the inventory rows: every ownable item's original icon (UI-ICONS-INVENTORY-42). Details: [the HUD](HUD.md).
+
+## Stats and Magic windows, 23 October 2026
+
+**P** opens the original's Stats window (`aw_stats`) and **O** the Magic window (`aw_magicmenu`). Both use
+the inventory's window: the same frame, the original title bar, the same fonts and colours, the same pause
+and input handling. Escape, or the window's own key (P or O, or whatever key is bound to it), closes it.
+Both keys can be changed in Options > Controls ([keymaps](KEYMAPS.md)).
+
+The Stats window is titled with the character's name, as in the original. The left side shows the health,
+magicka and fatigue bars with current and maximum, the level, race and class, the eight attributes and the
+birthsign. The right side lists the 27 skills under Major Skills, Minor Skills and Misc Skills as the class
+defines them; Up/Down, the wheel, Page Up/Down, Home/End or the scrollbar scroll it. Everything is read
+from the character sheet every frame, so values change as they change in the game. An attribute
+raised or lowered by a modifier shows in green. The layout follows the original window, read from OpenMW's
+stats window for structure (`mwgui/statswindow.cpp` and its layout). Two differences: the birthsign
+sits under the attributes instead of under the skills, and factions, reputation and bounty are not shown,
+because the engine has no faction state yet.
+
+The Magic window is a placeholder until spells exist. It shows the original's headings, Powers, Spells
+and Magic Items, lists the character's race and birthsign spells by their names from the game data
+(`character/spells.aws`, written by the image builder; powers under Powers, spells under Spells,
+abilities left out), shows "None" under an empty heading, and says "(Not yet implemented)" at the bottom.
+Its title is "Magic"; the original titles it with the selected spell. Starting spells the original picks
+from the class and skills are not listed yet.

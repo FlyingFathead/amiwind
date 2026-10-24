@@ -108,10 +108,35 @@ class TalkGreetings:
                 for (i, c), talk in sorted(self.cache.items(), key=lambda kv: (kv[0][0], kv[0][1] or ''))}
 
 
+ROOM_ROOF_TABLE = Path(__file__).resolve().parents[1]/'config/collision-room-roof.json'
+
+
+_ROOM_ROOF = {}
+
+
+def room_roof_meshes(path=ROOM_ROOF_TABLE):
+    """The exterior meshes whose convex pieces may not stand a step over their own floor in a room
+    (config/collision-room-roof.json 'meshes'; ROOM-PYLON-ROOF-48): source paths in lower case."""
+    if path in _ROOM_ROOF:
+        return _ROOM_ROOF[path]
+    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    if data.get('schema') != 'aw-collision-room-roof-1':
+        raise ValueError('Unsupported room roof table: %s' % Path(path).name)
+    _ROOM_ROOF[path] = frozenset(m.replace(chr(92), '/').casefold() for m in data['meshes'])
+    return _ROOM_ROOF[path]
+
+
 def interior_visual_profile(model, area=None):
     """Visual/collision profile of one interior mesh ('meshes/...' path), or
     None when the mesh keeps the assembly default. Shared with the world
     estimate (tools/world_estimate_data.py) so both use the same rule."""
+    if model in room_roof_meshes():
+        # a listed exterior mesh placed in a room keeps the assembly default, except that a convex piece standing
+        # more than a step over a walkable face of its own becomes its authored plates (mesh_geometry.roof_plates):
+        # the pylons of the Ministry of Truth's Hall of Processing put a 16-unit slope over the floor two residents
+        # stand on (ROOM-PYLON-ROOF-48; config/collision-room-roof.json)
+        from player_hull import STEP_HEIGHT
+        return {'roof_collision_beyond': STEP_HEIGHT}
     if not model.startswith('meshes/i/'):
         return None
     profile = {'ratio':1., 'texture_size':32,
@@ -122,6 +147,94 @@ def interior_visual_profile(model, area=None):
     # the stair-plate rules (mesh_geometry.collision_pieces: steep toes cut to vertical steps, STAIRS-VIVEC-ROOMS-JOINT-36)
     profile['stair_plates'] = True
     return profile
+
+
+ROOM_FORMS = ('compiled', 'shell')
+
+
+def add_room_form_option(parser):
+    """--room-form: how a room stage writes its rooms (BUILD-SEYDA-BSP-CARRIER-48). compiled: qbsp, vis and light (a
+    room map the engine loads: --interior-format bsp, the legacy rooms); shell: the CHIM room's inputs only (scenery
+    export, kept placements, entities and liquid brushes in a shell map with no faces, as the batch rooms,
+    tools/chim_room_batches.py), for the CHIM interiors stage, which keeps nothing else of a compiled room. build.py
+    passes shell whenever the build makes CHIM rooms."""
+    parser.add_argument('--room-form', choices=ROOM_FORMS, default='compiled',
+                        help='compiled (default: qbsp, vis, light) or shell (no compile; the CHIM interiors stage '
+                             'makes the room); a room with an activated object is compiled either way')
+
+
+def mesh_placements(index, references=None, retain_dressing=False, centre=(0, 0)):
+    """(kept reference numbers in index order, omitted rows, dressing retained rows, selection report): the placements
+    prepare_mesh_bsp.append_meshes places as func_walls for these arguments (its selection, its dressing rule), without
+    building anything. A shell room's placements.json is this list, so its CHIM room places what the compiled room
+    map placed (tests/test_room_shell.py checks it against append_meshes)."""
+    from prepare_mesh_bsp import DRESSING_EXCLUDED
+    from scenery_selection import select_runtime_refs
+    if references is None:
+        selected, selection = select_runtime_refs(index, centre, SCALE, 736)
+    else:
+        wanted = set(references)
+        selected = [dict(r) for r in index['references'] if r['number'] in wanted]
+        if {r['number'] for r in selected} != wanted:
+            raise ValueError('Explicit BSP references were not all converted')
+        selection = {'selected_groups': [], 'omitted': [], 'explicit_references': len(wanted)}
+    excluded = ([] if retain_dressing is True else
+                [t for t in DRESSING_EXCLUDED if not retain_dressing or t not in retain_dressing])
+
+    def term(ref, terms):
+        return next((t for t in terms if t in index['models'][ref['model_index']]['source']), None)
+    omitted = [dict(reference=r['number'], id=r.get('id'), model=index['models'][r['model_index']]['source'],
+                    reason='dressing excluded by the mesh converter (%s)' % t)
+               for r in selected for t in [term(r, excluded)] if t]
+    retained = [dict(reference=r['number'], id=r.get('id'), model=index['models'][r['model_index']]['source'], rule=t)
+                for r in selected for t in [term(r, DRESSING_EXCLUDED)] if t and t not in excluded]
+    kept = [r['number'] for r in selected if not term(r, excluded)]
+    return kept, omitted, retained, selection
+
+
+def shell_room(root, index, refs, entry, label, timings, point_entities, textures, low, high, retain_selected,
+               dressing, sprite_numbers, tree_numbers, tree_solid, plant_rows, lighting, palette, scene):
+    """build_room's shell form (--room-form shell): ROOT/room.bsp a shell map (chim_room_batches.shell_map: no faces,
+    the room's bounds, its worldspawn marked _chim_room_shell, the start, lava and loop entities, plant sprites; the
+    "*water" and "*lava" textures in its texture lump), ROOT/placements.json the placements the compiled room map
+    would place (mesh_placements). The room.map is written as before (its liquid brushes are what the CHIM interiors
+    stage reads). Returns the report, or None when a kept placement is an object the engine activates (aw_activated.h):
+    a shell room has no CHIM room form for its box yet (chim.interior.room_map), so that room is compiled."""
+    import interior_plants
+    from chim.frame_map import activated_refs
+    from chim_room_batches import SHELL_KEY, shell_map
+    solid_models = set(tree_solid)
+    skipped = set(sprite_numbers) | {r['number'] for r in refs if r['number'] in tree_numbers and
+                                     'meshes/' + r['model'].replace('\\', '/').casefold() not in solid_models}
+    explicit = [r['number'] for r in index['references'] if r['number'] not in skipped] if retain_selected else None
+    kept, omitted, retained, selection = mesh_placements(index, explicit, True if retain_selected else dressing)
+    activated = sorted(set(kept) & set(activated_refs()))
+    if activated:
+        print('Room %s: activated object(s) %s: compiled, not a shell (no CHIM room form for their box yet)'
+              % (entry['map'], ', '.join(map(str, activated))), flush=True)
+        return None
+    world = '{\n"classname" "worldspawn"\n"message" ' + quote(label) + '\n"%s" "1"\n' % SHELL_KEY + \
+        (timings + '\n' if timings else '') + '}'
+    entities = [world] + list(point_entities)
+    report = {'form': 'chim room shell', 'placements': len(kept), 'references': len(index['references']),
+              'omitted': omitted, 'dressing_retained': retained, 'selection': selection}
+    if sprite_numbers or tree_numbers:
+        sprites, plants = interior_plants.place(root / 'source', refs, sprite_numbers + tree_numbers, lighting, palette,
+                                                (Path(scene) / 'id1/gfx/colormap.lmp').read_bytes(), root / 'id1')
+        entities += sprites
+        report['plant_sprites'] = {'placements': len(sprite_numbers) + len(tree_numbers),
+                                   'sprite_files': plants['files'], 'sprites': plants['sprites'],
+                                   'decisions': plant_rows, 'mode': interior_plants.plant_mode(),
+                                   'trees': len(tree_numbers), 'collision_only_models': tree_solid,
+                                   'rule': 'nonsolid static plants and static trees drawn as shaded sprites; a solid '
+                                           'tree keeps its collision (tools/interior_plants.py)'}
+    elif plant_rows:
+        report['plant_sprites'] = {'placements': 0, 'decisions': plant_rows}
+    liquids = [blob for name, _, blob in textures if name != 'voidwall']
+    (root / 'room.bsp').write_bytes(shell_map(low, high, entities, liquids))
+    (root / 'placements.json').write_text(json.dumps(kept) + '\n', encoding='utf-8', newline='\n')
+    report['bytes'] = (root / 'room.bsp').stat().st_size
+    return report
 
 
 def build_room(task):
@@ -224,13 +337,32 @@ def build_room(task):
     yaw = (90-math.degrees(entrance['rotation_radians'][2]))%360
     label = cell['name'].removeprefix('Seyda Neen, ').removeprefix('Balmora, ')
     source = '{\n"classname" "worldspawn"\n"wad" "room.wad"\n"message" '+quote(label)+'\n'+timings+'\n'+'\n'.join(walls)+'\n}\n'
-    source += entity({'classname':'info_player_start','origin':' '.join(map(str,spawn)),'angle':yaw})+'\n'
-    source += ''.join(text+'\n' for text in lava_entities)
+    point_entities = [entity({'classname':'info_player_start','origin':' '.join(map(str,spawn)),'angle':yaw})]
+    point_entities += list(lava_entities)
     if pools:
         # the pools' "lava layer" loop (their script's sound), at most lava.LOOP_LIMIT emitters per room
         lava_volumes,lava_sound_receipts=lava_rules.convert_sounds(data,pools,scene/'id1/sound',shutil.which('ffmpeg') or 'ffmpeg')
-        source += ''.join(text+'\n' for text in lava_rules.loop_entities(pools,[0,0,0],SCALE,lava_volumes))
+        point_entities += list(lava_rules.loop_entities(pools,[0,0,0],SCALE,lava_volumes))
+    source += ''.join(text+'\n' for text in point_entities)
     (root/'room.map').write_text(source,encoding='cp1252')
+    # the room stages of a build with CHIM rooms (--room-form shell, build.py chim_interior_commands): a shell map, no
+    # compile (BUILD-SEYDA-BSP-CARRIER-48: the CHIM interiors stage keeps only the entities, boxes and liquid brushes)
+    if entry.get('room_form') == 'shell':
+        shell = shell_room(root, index, refs, entry, label, timings, point_entities, textures, low, high,
+                           retain_selected, dressing, sprite_numbers, tree_numbers, tree_solid, plant_rows,
+                           lighting, palette, scene)
+        if shell is not None:
+            report = shell
+            report.update(map=slug,cell=cell['name'],spawn=spawn,yaw=yaw,omitted=omitted+report['omitted'],
+                          water_height=water,master_sha256=cell['master_sha256'],
+                          lava={'mode':lava_mode,'pools':lava_records})
+            if entry.get('original_door_arrivals') or entry.get('harvest_references'):
+                report.update(original_arrivals=cell['entrances'],
+                              harvest_excluded_references=[r['number'] for r in entry.get('harvest_references', ())],
+                              retained_geometry_references=[r['number'] for r in refs],
+                              bsp_sha256=hashlib.sha256((root/'room.bsp').read_bytes()).hexdigest())
+            (root/'conversion.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8',newline='\n')
+            return report, cell
     with (root/'compile.log').open('w') as log:
         for exe,args in [(qbsp,['-nopercent','room.map']),
                          (vis,vis_args('room.bsp',vis_threads,vis_mode)),
@@ -320,11 +452,220 @@ def build_room_cached(task):
     return report, cell
 
 
+RESIDENT_UNIT = 'resident-bake'
+RESIDENT_UNIT_FORMAT = 1
+RESIDENT_LEVELS = '.levels'       # a unit folder's near/far level files (npc_lod '_levels'), not installed
+
+
+def open_residents():
+    """(unit cache, game data identity) of the resident bakes, or (None, None) when the cache is off or the game data
+    identity is unknown. Opened once per stage (ROOM-RESIDENTS-KEY-SERIAL-49): opening the cache analyses the
+    repository's sources for its environment and the identity reads the build's input lock (about 7 MB of JSON);
+    once per resident that was 233 s on one core for 1,769 residents before the first restore. The same values
+    whichever way it is opened, so the same keys."""
+    from pass_cache import UnitCache, game_data_digest
+    cache = UnitCache.open(RESIDENT_UNIT, {}, __file__)
+    identity = game_data_digest() if cache is not None else None
+    if identity is None:
+        return None, None
+    return cache, identity
+
+
+def resident_unit(task, opened=None, digests=None):
+    """(unit cache, inputs) of one resident bake (build_resident and the files it publishes), or (None, None) when
+    the cache is off or an input has no content key (ROOM-RESIDENTS-NOT-CACHED-48: the room stages baked every
+    resident again on every run). The key is what the bake reads: the appearance and greeting the stage resolved
+    from the game data, the game data identity (the input lock: models, textures, sounds), the palette, the level
+    settings (not the asset pool's folder), ffmpeg by content, and the code and AMIWIND_* settings this module reaches
+    (UnitCache: the animation profile and head settings come from the environment).
+    OPENED: open_residents() of the stage (opened here when not given); DIGESTS: a dict the stage shares between its
+    residents for the SHA-256 of the level list file (read once, not once per resident). Same inputs either way."""
+    import hashlib
+    import shutil as _shutil
+    from pass_cache import tool_digest
+    cache, identity = open_residents() if opened is None else opened
+    if cache is None or identity is None:
+        return None, None
+    data, palette, appearance, greeting, ffmpeg = task[:5]
+    lod = dict(task[5]) if len(task) > 5 and task[5] is not None else None
+    if lod is not None:
+        pool = lod.pop('pool', None)          # where bakes are pooled, not what they are
+        if lod.get('list'):
+            listed = str(lod['list'])
+            known = digests.get(listed) if digests is not None else None
+            if known is None:
+                known = hashlib.sha256(Path(listed).read_bytes()).hexdigest()
+                if digests is not None:
+                    digests[listed] = known
+            lod['list'] = known
+    program = _shutil.which(str(ffmpeg)) or str(ffmpeg)
+    if not Path(program).is_file():
+        return None, None
+
+    def digest(value):
+        return hashlib.sha256(json.dumps(value, sort_keys=True, default=repr).encode()).hexdigest()
+    return cache, {'entry': {'name': appearance['id']}, 'format': RESIDENT_UNIT_FORMAT,
+                   'appearance': digest(appearance), 'greeting': digest(greeting),
+                   'palette': hashlib.sha256(palette).hexdigest(), 'lod': lod, 'ffmpeg': tool_digest(program),
+                   'game_data': identity}
+
+
+def resident_files(task, folder):
+    """build_resident, then its files written into FOLDER (publish_resident). Returns (identifier, record)."""
+    return publish_resident(folder, *build_resident(task))
+
+
+def publish_resident(folder, identifier, raw, voice, record):
+    """A baked resident's files written into FOLDER as they go into id1 (the model, its layouts, item models and
+    sounds, the greeting voice; npc_lod level files under RESIDENT_LEVELS). Returns (identifier, record)."""
+    folder = Path(folder)
+    stem = 'a_' + hashlib.sha256(identifier.encode()).hexdigest()[:12]
+    record.update(model='progs/' + stem + '.mdl', voice='npc/' + stem + '.wav' if voice else '')
+    (folder / 'progs').mkdir(parents=True, exist_ok=True)
+    (folder / record['model']).write_bytes(raw)
+    publish_anim(folder, record)
+    npc_items.publish(folder, record)
+    if voice:
+        target = folder / 'sound' / record['voice']
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(voice)
+    levels = record.pop('_levels', None)
+    if levels is not None:
+        (folder / RESIDENT_LEVELS).mkdir()
+        for level, data in levels.items():
+            (folder / RESIDENT_LEVELS / ('%d.mdl' % int(level))).write_bytes(data)
+    return identifier, record
+
+
+def restore_resident(task, folder, opened=None, digests=None):
+    """(cache, inputs, record or None) of one resident: its record and files restored into FOLDER from the unit cache
+    when its inputs are unchanged. OPENED, DIGESTS: as resident_unit (the stage's shared open)."""
+    folder = Path(folder)
+    shutil.rmtree(folder, ignore_errors=True)
+    try:
+        cache, inputs = resident_unit(task, opened, digests)
+    except (TypeError, ValueError, OSError):
+        cache, inputs = None, None
+    if cache is None:
+        return None, None, None
+    row = cache.restore_unit(inputs, folder)
+    if row is None:
+        shutil.rmtree(folder, ignore_errors=True)
+        return cache, inputs, None
+    return cache, inputs, row['record']
+
+
+def json_record(record):
+    """A resident's record as JSON holds it (tuples become lists, numpy numbers plain numbers): the stage writes it to
+    its report as JSON anyway, and a baked and a restored resident then hand the stage the same record (the first
+    measured run stored only 69 of its residents: the others' records held tuples, so json_exact refused them)."""
+    def plain(value):
+        if hasattr(value, 'tolist'):
+            return value.tolist()
+        if hasattr(value, 'item'):
+            return value.item()
+        raise TypeError('not JSON: %r' % type(value))
+    return json.loads(json.dumps(record, default=plain))
+
+
+def store_resident(cache, inputs, folder, identifier, record):
+    """Record a baked resident's folder and record (json_record) in the unit cache. A record that does not survive JSON
+    exactly is never stored, so a restored resident is what a baked one would be."""
+    from pass_cache import json_exact
+    if cache is not None and json_exact(record):
+        cache.store_unit(inputs, {'identifier': identifier, 'record': record}, folder)
+
+
+def build_resident_cached(job):
+    """One resident's bake into its unit folder: restored from the unit cache when its inputs are unchanged, else
+    baked and stored. Returns (identifier, record, made)."""
+    task, folder = job
+    cache, inputs, record = restore_resident(task, folder)
+    if record is not None:
+        return task[2]['id'], record, False
+    identifier, record = resident_files(task, folder)
+    record = json_record(record)
+    store_resident(cache, inputs, folder, identifier, record)
+    return identifier, record, True
+
+
+def install_resident(folder, id1, record):
+    """Copy one resident's unit folder into id1 (each file replaced whole: BUILD-POOL-READONLY-SCENE-WRITE-35);
+    the level files go back into the record for npc_lod.publish. Removes the folder."""
+    folder, id1 = Path(folder), Path(id1)
+    for path in sorted(p for p in folder.rglob('*') if p.is_file()):
+        relative = path.relative_to(folder)
+        if relative.parts[0] == RESIDENT_LEVELS:
+            record.setdefault('_levels', {})[int(path.stem)] = path.read_bytes()
+            continue
+        target = id1 / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.is_file() or target.read_bytes() != path.read_bytes():
+            replace_bytes(target, path.read_bytes())
+    shutil.rmtree(folder, ignore_errors=True)
+
+
 _resident_assets={}
 _resident_rigs={}
 _resident_sounds={}
 
+class ResidentBudgetError(ValueError):
+    """A resident's animation kit model does not fit the alias byte budget at any rung of the vertex budget ladder
+    (npc_geometry.bake's full-sample check at budget 192, or npc_anim.fit at the smallest frame counts)."""
+
+
+RESIDENT_LADDER = (480, 384, 320, 256, 192)
+BYTE_BUDGET_ERROR = 'Alias byte budget exceeded with full samples'
+
+
+def resident_levels(profile_name):
+    """The animation levels a resident bake tries, in order (RESIDENT-ANIM-BYTE-BUDGET-48): (level, profile).
+    'kit' = the build's profile (e.g. react+full: the standing model and its mover); 'standing' = the kit's
+    standing profile alone, no mover (only when the build's profile has a mover and its standing profile is not
+    idle); 'idle' = the previous method (8 idle frames, the town residents' older models). The engine plays all
+    three (aw_anim.c: a layout without a mover never swaps models; a model without a layout plays its idle frames)."""
+    import npc_anim
+    if profile_name == 'idle':
+        return [('kit', 'idle')]
+    standing, mover = npc_anim.split_profile(profile_name)
+    levels = [('kit', profile_name)]
+    if mover and standing != 'idle':
+        levels.append(('standing', standing))
+    return levels + [('idle', 'idle')]
+
+
 def build_resident(task):
+    """One resident's bake: (identifier, model bytes, voice bytes, record). The build's animation profile first; a
+    resident whose kit model does not fit the alias byte budget at any rung of the ladder falls back to the kit's
+    standing model alone, else to the idle-only model (resident_levels), and its record says so
+    (record['anim_fallback']: the build's profile, the level and profile baked, the reasons). The same inputs
+    take the same path, so the same bytes."""
+    import npc_anim
+    profile_name, _ = npc_anim.selected_profile()
+    reasons = []
+    for level, name in resident_levels(profile_name):
+        try:
+            identifier, raw, voice, record = _bake_resident(task, name)
+        except ResidentBudgetError as error:
+            if level == 'idle':
+                raise
+            reasons.append('%s (%s): %s' % (level, name, error))
+            continue
+        if reasons:
+            record['anim_fallback'] = {'profile': profile_name, 'level': level, 'baked': name, 'reasons': reasons}
+            print('Resident animation fallback: %s: profile %s does not fit the alias byte budget (%s); baked as %s '
+                  '(%s)' % (identifier, profile_name, '; '.join(reasons), level, name), flush=True)
+        return identifier, raw, voice, record
+    raise AssertionError('resident_levels ends with idle')
+
+
+def anim_fallbacks(models):
+    """[{id, level, baked, profile, reasons}] of the residents (populate's models) that fell back, by id."""
+    return [dict(id=identifier, **record['anim_fallback']) for identifier, record in sorted(models.items())
+            if record.get('anim_fallback')]
+
+
+def _bake_resident(task, profile_name):
     # Optional 6th field: the near/far model settings (tools/npc_lod.py task_settings);
     # older 5-field tasks bake the single model as before.
     data, palette, appearance, greeting, ffmpeg = task[:5]
@@ -336,7 +677,7 @@ def build_resident(task):
     skeleton=_resident_rigs[rig]
     dead=appearance.get('initially_dead',False)
     import npc_anim
-    profile_name,profile=npc_anim.selected_profile()
+    profile=npc_anim.plan_profile(profile_name)
     kit=None
     if dead:times,step=np.array([skeleton.events['death1: stop']]),0.
     elif profile_name=='idle':times,step=skeleton.idle_times(8)   # the previous method, unchanged
@@ -361,13 +702,15 @@ def build_resident(task):
         facts={'triangles':lod_facts['far_triangles'],'frames':lod_facts['frames'],'bounds':lod_facts['bounds']}
     else:
         shapes,materials,textures=assemble(assets,appearance,kit or skeleton,times)
-        for budget in (480,384,320,256,192):
+        for budget in RESIDENT_LADDER:
             # reference_frames=8: the face quotas of the idle-only model (head topology unchanged).
             try:frames,faces,uv,skin=bake(shapes,materials,textures,palette,budget=budget,reference_frames=8 if kit else None,
-                                               full_frame_budget=npc_anim.ALIAS_BYTE_BUDGET if kit else None);break
+                                               full_frame_budget=npc_anim.ACTOR_BYTE_BUDGET if kit else None);break
             except ValueError as error:
-                if str(error) not in ('Alias vertex budget exceeded','Alias byte budget exceeded with full samples') or budget==192:
-                    raise ValueError(appearance['id']+': '+str(error)) from error
+                if str(error) not in ('Alias vertex budget exceeded',BYTE_BUDGET_ERROR) or budget==RESIDENT_LADDER[-1]:
+                    # over the byte budget at every rung: build_resident falls back (resident_levels)
+                    kind=ResidentBudgetError if kit and str(error)==BYTE_BUDGET_ERROR else ValueError
+                    raise kind(appearance['id']+': '+str(error)) from error
         if kit:
             # One bake gives both models: the standing model is a subset of the mover's frames (react+full).
             standing_name,mover_name=npc_anim.split_profile(profile_name)
@@ -380,13 +723,16 @@ def build_resident(task):
             foot=appearance.get('foot','bare')
             if key not in _resident_sounds:
                 _resident_sounds[key]=npc_anim.soun_records(child_ci(data,'Morrowind.esm'))
-            if mover_name:
-                mover_groups,mover_index=npc_anim.fit(groups,nv,nt,sw,sh)
-                keep={g['name']:g['count'] for g in groups if g['name'] in dict(npc_anim.profiles()[standing_name])}
-                standing_groups,standing_index=npc_anim.select(groups,keep)
-            else:
-                mover_groups=None
-                standing_groups,standing_index=npc_anim.fit(groups,nv,nt,sw,sh)
+            try:
+                if mover_name:
+                    mover_groups,mover_index=npc_anim.fit(groups,nv,nt,sw,sh,npc_anim.ACTOR_BYTE_BUDGET)
+                    keep={g['name']:g['count'] for g in groups if g['name'] in dict(npc_anim.profiles()[standing_name])}
+                    standing_groups,standing_index=npc_anim.select(groups,keep)
+                else:
+                    mover_groups=None
+                    standing_groups,standing_index=npc_anim.fit(groups,nv,nt,sw,sh,npc_anim.ACTOR_BYTE_BUDGET)
+            except npc_anim.AliasBudgetError as error:
+                raise ResidentBudgetError(appearance['id']+': '+str(error)) from error
             raw=model(standing_groups,standing_index)
             # Item tags (<model>.tag) have one row per frame of THIS model (aw_items.c refuses any other
             # count): the standing model's frames, not every kit sample (ANIMKIT-ITEM-TAG-FRAMES-35).
@@ -434,19 +780,24 @@ def build_resident(task):
     return appearance['id'],raw,voice,record
 
 
-def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None,vis_mode='fast',rooms=True):
+def prepare(data_files,scene,qbsp,vis,light,ffmpeg='ffmpeg',jobs=None,vis_mode='fast',rooms=True,room_form='compiled'):
     """rooms=False: a quick test build without interiors (--exclude interiors,
     tools/build_exclusions.py). The rooms are not compiled; the exterior residents
     are placed and the door tables written as usual, so their doors say the area is
-    unavailable."""
+    unavailable. room_form: compiled or shell (add_room_form_option)."""
+    if room_form not in ROOM_FORMS:
+        raise ValueError('room_form must be one of %s' % ', '.join(ROOM_FORMS))
     data=resolve_data_files(data_files);scene=ensure_external(scene,'area conversion')
     from mwad.paths import unshare_tree
     unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     palette=(scene/'id1/gfx/palette.lmp').read_bytes()
-    ext=lumps((scene/'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
-    timings='\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"',ext))
+    # the hand timings every converted map carries: the hands stage's report (BUILD-SEYDA-BSP-CARRIER-48)
+    from hand_metadata import scene_timings
+    timings=scene_timings(scene)
     entries=[s for s in SCENES if s['interior'] and s['map'] not in ('prison','census')
              and s.get('area', 'seyda') == 'seyda']
+    if room_form=='shell':
+        entries=[dict(s,room_form='shell') for s in entries]
     if not rooms:
         print(f'Quick test build: {len(entries)} Seyda Neen rooms left out (--exclude interiors).',flush=True)
         entries=[]
@@ -515,20 +866,56 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         if not appearance['initially_dead']:appearance['voices']=voices_of(topics,appearance)
         greeting={'text':'','voice':''} if appearance['initially_dead'] else greeting_fixture(topics,appearance)
         tasks.append((data,palette,appearance,greeting,ffmpeg,npc_lod.task_settings()))
-    for identifier,raw,voice,record in ordered_map(build_resident,tasks,max(1,min(resolve_jobs(jobs),len(tasks)))):
-        stem='a_'+hashlib.sha256(identifier.encode()).hexdigest()[:12]
-        record.update(model='progs/'+stem+'.mdl',voice='npc/'+stem+'.wav' if voice else '')
-        replace_bytes(scene/'id1'/record['model'],raw)
-        publish_anim(scene/'id1',record)
-        npc_items.publish(scene/'id1',record)
-        if voice:
-            target=scene/'id1/sound'/record['voice']
-            target.parent.mkdir(parents=True,exist_ok=True)
-            replace_bytes(target,voice)
+    # one unit per resident through the unit cache (resident-bake, ROOM-RESIDENTS-NOT-CACHED-48): a resident baked
+    # once is restored while its inputs are unchanged; each bakes into its own folder, installed in identifier order
+    units=scene/'resident-work'
+    done={};pending=[]
+    # ROOM-RESIDENTS-KEY-SERIAL-49: the unit cache and the game data identity are opened once for the stage (once per
+    # resident was 233 s on one core for 1,769 residents), and the restores (file reads, SHA-256 checks, writes, each
+    # into its own folder) run on the stage's threads; the same keys and files, in the same order afterwards
+    import time
+    started=time.perf_counter()
+    try:opened=open_residents() if tasks else (None,None)
+    except (TypeError,ValueError,OSError):opened=(None,None)
+    digests={}
+    folders=[units/('a_'+hashlib.sha256(task[2]['id'].encode()).hexdigest()[:12]) for task in tasks]
+    from concurrent.futures import ThreadPoolExecutor
+    from build_parallel import live_jobs
+    threads=max(1,min(live_jobs(resolve_jobs(jobs)),len(tasks) or 1))
+    def restore(pair):
+        return restore_resident(pair[0],pair[1],opened,digests)
+    pairs=list(zip(tasks,folders))
+    # the first one alone: it fills the shared digests (ffmpeg by content, the level list) the others then read
+    restored_rows=[restore(pair) for pair in pairs[:1]]
+    with ThreadPoolExecutor(threads) as restorers:
+        restored_rows+=list(restorers.map(restore,pairs[1:]))
+    for task,folder,(cache,inputs,record) in zip(tasks,folders,restored_rows):
+        if record is not None:done[task[2]['id']]=(record,folder,False)
+        else:pending.append((task,cache,inputs,folder))
+    if tasks:print('Residents: %d looked up in the unit cache %s (%d found) in %.1f s on %d threads'%(
+        len(tasks),RESIDENT_UNIT,len(tasks)-len(pending),time.perf_counter()-started,threads),flush=True)
+    # the bakes left, on the shared pool as before (only the misses)
+    for (task,cache,inputs,folder),baked in zip(pending,ordered_map(build_resident,[p[0] for p in pending],max(1,min(resolve_jobs(jobs),len(pending) or 1))) if pending else ()):
+        identifier,record=publish_resident(folder,*baked)
+        record=json_record(record)
+        store_resident(cache,inputs,folder,identifier,record)
+        done[identifier]=(record,folder,True)
+    restored=0
+    for identifier in [t[2]['id'] for t in tasks]:
+        record,folder,made=done[identifier]
+        install_resident(folder,scene/'id1',record)
+        restored+=not made
         behavior=behavior_record(kinds['NPC_'][identifier],SCALE)
         record['behavior']=behavior;record['settings']=greeting_settings(kinds,behavior,SCALE)
         models[identifier]=record
-        print('Resident ready:',identifier,flush=True)
+        print('Resident ready:',identifier,'' if made else '(unit cache)',flush=True)
+    shutil.rmtree(units,ignore_errors=True)
+    if tasks:print(f'Residents: {len(tasks)} ({restored} from the unit cache {RESIDENT_UNIT}, {len(tasks)-restored} baked)',flush=True)
+    # residents whose kit model did not fit the alias byte budget (build_resident, RESIDENT-ANIM-BYTE-BUDGET-48)
+    fallbacks=anim_fallbacks(models)
+    if fallbacks:
+        print('Residents with a smaller animation level (alias byte budget): %d: %s'%(len(fallbacks),
+              ', '.join('%s (%s)'%(f['id'],f['level']) for f in fallbacks)),flush=True)
     # Near/far models (tools/npc_lod.py): near files and the pairing manifest (NPC records only).
     lod_report=npc_lod.publish(scene/'id1',models,kinds)
     creature_ids=sorted({r['id'].casefold() for _,r in creatures})
@@ -553,7 +940,11 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
     cast.extend((slug,r) for slug,r in creatures if r['id'].casefold() in baked)
     placed=[];talk=TalkGreetings(data,kinds,topics,cells)
     for slug in (['seyda'] if include_exterior else []) + list(rooms):
-        path=scene/'id1/maps'/f'{slug}.bsp';b=lumps(path.read_bytes())
+        path=scene/'id1/maps'/f'{slug}.bsp';raw=path.read_bytes();b=lumps(raw)
+        # Seyda Neen's entities come from the scene entity list, not the carrier's lump (BUILD-SEYDA-ENTITY-BUS-48)
+        if slug=='seyda':
+            from seyda_entities import writer_lump
+            b[0]=writer_lump(scene,raw)
         # Replace the three prototype residents, retaining scripted intro actors.
         entities=re.findall(r'\{[^{}]*\}',b[0].decode('cp1252'))
         entities=[e for e in entities if
@@ -565,7 +956,7 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
             record=models[ref['id'].casefold()];settings=record['settings']
             pos=[(v-(CENTRE[a] if slug=='seyda' and a<2 else 0))*SCALE for a,v in enumerate(ref['position'])]
             from actor_grounding import fields as grounding_fields
-            fields={**grounding_fields(ref['id']),'classname':'aw_corpse' if record['appearance'].get('initially_dead') else 'aw_npc','aw_ref':ref['number'],'model':record['model'],
+            fields={**grounding_fields(ref['id'],ref['number']),'classname':'aw_corpse' if record['appearance'].get('initially_dead') else 'aw_npc','aw_ref':ref['number'],'model':record['model'],
                     'origin':' '.join(f'{v:.5f}' for v in pos),
                     'angles':f"0 {-math.degrees(ref['rotation_radians'][2]):.5f} 0",
                     'netname':display_text(record['appearance']['name']),'aw_voice':record['voice'],
@@ -578,13 +969,15 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
             entities.append(entity(fields));placed.append({'map':slug,'reference':ref['number'],'id':ref['id'],'position':pos})
         # replaced whole: an earlier stage made this map (BUILD-POOL-READONLY-SCENE-WRITE-35)
         b[0]=('\n'.join(entities)+'\n\0').encode('cp1252');replace_bytes(path,pack_lumps(b))
-        if slug=='seyda':replace_copy(path,scene/'seyda.bsp')
+        if slug=='seyda':
+            replace_copy(path,scene/'seyda.bsp')
+            from seyda_entities import publish as publish_entities;publish_entities(scene,path.read_bytes())
     # Town interiors (import_town.py) write their own door banks.
     doors=prepare_doors(data,scene) if doors else None
     left_out.sort(key=lambda r:(r['map'],r['reference']))
     if left_out:
         print(f'Resident stage: {len(left_out)} room references left out (reasons in {report_name} left_out)',flush=True)
-    report={'rooms':reports,'cast':placed,'models':models,'doors':doors,'npc_lod':lod_report,
+    report={'rooms':reports,'cast':placed,'models':models,'doors':doors,'npc_lod':lod_report,**({'anim_fallback':fallbacks} if fallbacks else {}),
             'creatures':{'mode':creature_residents.mode(),'placed':sum(1 for _,r in creatures if r['id'].casefold() in baked)},
             'left_out':left_out,'talk_greetings':talk.record(),
             **({'start_disabled':{'mode':'original','held':sum(1 for r in left_out if 'disabled_by' in r)}}
@@ -599,9 +992,11 @@ if __name__=='__main__':
     for name in ('data-files','scene','qbsp','vis','light'):p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--ffmpeg',default='ffmpeg');add_jobs(p);add_vis_option(p);add_dressing_option(p);add_root_rule_arg(p)
     p.add_argument('--no-rooms',action='store_true',help='Quick test build (--exclude interiors): do not compile the rooms')
+    add_room_form_option(p)
     npc_lod.add_converter_options(p)
     a=p.parse_args()
     apply_root_rule(a)
     apply_dressing_option(a);npc_lod.apply_options(a)
     import build_profile; build_profile.instrument('area')  # sub-stage timers (docs/BUILD_PROFILE.md)
-    prepare(a.data_files,a.scene,a.qbsp,a.vis,a.light,a.ffmpeg,a.jobs,a.vis_mode,rooms=not a.no_rooms)
+    prepare(a.data_files,a.scene,a.qbsp,a.vis,a.light,a.ffmpeg,a.jobs,a.vis_mode,rooms=not a.no_rooms,
+            room_form=a.room_form)

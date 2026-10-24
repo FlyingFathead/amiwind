@@ -277,6 +277,30 @@ class HarvestBuild(HarvestCase):
                 harvest_build.install(self.root / 'harvest', id1, id1.parent / 'work', data_files=self.data,
                                       sizes={}, chim_world='w')
 
+    def test_chim_coverage_reads_a_one_area_world(self):
+        # HARVEST-CHIM-COVERAGE-ONE-AREA-48: a world of one area (every MiniWind sandbox of one town) writes its own
+        # parity record, not {area: record}; the check reads both forms and finds the same plants
+        self.prepare()
+        _, _, refs = harvest_build.source_placements(self.root / 'harvest', self.data)
+        id1 = stage(self.root / 's')
+        reports = []
+        for name, receipt in (('keyed', {'areas': ['balmora'], 'parity': {'balmora': {'harvest_removed': [102, 103]}}}),
+                              ('one', {'areas': ['balmora'], 'town': 'balmora',
+                                       'parity': {'harvest_removed': [102, 103], 'town_flora_added': []}})):
+            world = self.root / ('world-' + name)
+            world.mkdir()
+            (world / 'chim-receipt.json').write_text(json.dumps(receipt))
+            reports.append(harvest_build.chim_coverage(id1, world, refs, harvest_build.plan_rows(id1)))
+        def found(report):          # what the check found (the receipt's own hash differs between the two files)
+            return {k: v for k, v in report.items() if 'sha' not in k and 'receipt' not in k}
+        self.assertEqual(found(reports[1]), found(reports[0]))
+        # and the plants were read (a world that removed none gives another result)
+        empty = self.root / 'world-none'
+        empty.mkdir()
+        (empty / 'chim-receipt.json').write_text(json.dumps({'areas': ['balmora'], 'parity': {'harvest_removed': []}}))
+        self.assertNotEqual(found(harvest_build.chim_coverage(id1, empty, refs, harvest_build.plan_rows(id1))),
+                            found(reports[0]))
+
     def test_chim_coverage_finds_plants_the_chim_world_left_out(self):
         # The island-wide check: every plant the CHIM world leaves out (receipt parity harvest_removed) is in a
         # shipped catalogue, a CHIM region cell's in the catalogue of its own frame map; the dev4 loss fails it.

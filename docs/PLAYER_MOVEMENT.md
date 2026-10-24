@@ -1,10 +1,11 @@
 # Player scale, collision and camera motion
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Movement speed](#movement-speed)
 - [Verified base dimensions](#verified-base-dimensions)
 - [Physical recheck, v0.0.24-dev2](#physical-recheck-v0024-dev2)
 - [Original race-based heights](#original-race-based-heights)
@@ -20,6 +21,87 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 The maintainer reported blocked stairs, excessive resistance on mild slopes and
 idle downhill sliding in checkpoint-011. The old standing player used Quake's
 32 x 32 x 56 box although the imported Morrowind world is scaled by 0.25.
+
+## Movement speed
+
+From v0.0.48-dev2 the player walks, runs and swims at the original game's speed, worked out from the
+character's own Speed, Athletics and Strength, the carried load and the race, by the rules the OpenMW
+engine implements (OpenMW 0.51 `mwclass/npc.cpp` getMaxSpeed / getWalkSpeed / getRunSpeed,
+`mwclass/actor.hpp` swim speed, `mwclass/actor.cpp` current speed and load, `mwmechanics/character.cpp`
+race weight, strafing and movement fatigue; [PLAYER-MOVEMENT-STATS-PARITY-39](bugs/PLAYER-MOVEMENT-STATS-PARITY-39.md)).
+Before it, walking and running used fixed speeds of 120 and 216 units/s whatever the character, which
+crossed the island far faster than a new character can. The maintainer asked for this on 23 October 2026
+and for the old speeds to stay as a debug mode, **superspeed**.
+
+**The rules** (original units/s; AmiWind units are a quarter of that, the world's 0.25 scale):
+
+```text
+walk  = (fMinWalkSpeed + Speed/100 x (fMaxWalkSpeed - fMinWalkSpeed)) x (1 - fEncumberedMoveEffect x load)
+run   = walk x (fBaseRunMultiplier + Athletics/100 x fAthleticsRunBonus)
+swim  = (walk or run) x (fSwimRunBase + Athletics/100 x fSwimRunAthleticsMult)
+load  = carried weight / (fEncumbranceStrMult x Strength); over 1: the player cannot move
+moved = speed x input (0..1) x 0.75 when strafing x race weight (male/female, from the race record)
+```
+
+The settings are the master file's own (`combat/settings.txt`, "move" lines written by the builder from
+the user's Morrowind.esm). Diagonal input is no longer faster than straight input.
+
+**Read live.** Speed, Athletics, Strength and the load are read from the character sheet every frame,
+never baked at build time or at character creation: a level-up, a skill gain, a scripted change, and
+later a Fortify or Drain effect change the speed at once. `superspeed` with no argument prints the
+current walk, run and swim speed with the stats it used.
+
+| Character | Walk (units/s) | Run (units/s) | Old walk / run |
+| --- | ---: | ---: | ---: |
+| New Nord male Barbarian (Speed 50, Athletics 35, nothing carried) | 46.9 | 98.4 | 120 / 216 |
+| Speed 100, Athletics 100, Nord male | 62.5 | 171.9 | 120 / 216 |
+
+**Fatigue.** Running costs fFatigueRunBase + fFatigueRunMult x load per second of full input, swimming
+fFatigueSwimWalkBase or fFatigueSwimRunBase, a jump fFatigueJumpBase + fFatigueJumpMult x load; walking
+costs nothing, and no cost goes below 0 (OpenMW lets only a fight's damage take fatigue below 0). The
+fatigue comes back as before (fFatigueReturnBase + fFatigueReturnMult x Endurance per second). Godmode
+pays nothing.
+
+**Superspeed** (`dbg superspeed on|off`, also plain `superspeed on|off`; on/off, true/false or 1/0; default
+off, not saved): the earlier movement exactly as it was, `cl_forwardspeed`, Shift x `cl_movespeedkey`,
+`sv_maxspeed`, water x 0.7, with no running fatigue. For debugging and fast travel checks.
+
+Every factor of the OpenMW rules, and where it comes from in AmiWind:
+
+| Factor | OpenMW | In AmiWind | From |
+| --- | --- | --- | --- |
+| Speed attribute | walk speed | now | character sheet (base + race/birthsign modifiers - damage) |
+| Athletics skill | run and swim speed | now | character sheet |
+| Strength | carrying capacity | now | character sheet |
+| Carried weight | load | now | owned items x catalogue weight (re-read when the items change) |
+| Race weight | movement scale | now | race record, male/female (builder) |
+| Running | run speed, fatigue | now | Shift held |
+| Swimming | swim speed, fatigue | now | the water movement path |
+| Strafing | x 0.75 | now | sideways input (first-person rule) |
+| Input amount | x 0..1 | now | the movement command |
+| Knocked down / out | speed 0 | now | combat state |
+| Dead | speed 0 | now | health |
+| Godmode | no fatigue cost, Burden ignored | now | dbg godmode |
+| Running / swimming / jump fatigue | fatigue loss | now | character sheet fatigue (the HUD bar) |
+| Fatigue return | fatigue gain | now (before this change) | combat rules, Endurance |
+| Fatigue at or below 0 | knocked out | now, for a fight's damage | combat rules; movement never takes it below 0 |
+| Sneaking | x fSneakSpeedMultiplier, no running, fatigue | later | no sneak input yet |
+| Paralysis | speed 0 | later | magic effects (none yet) |
+| Feather / Burden | load | later | magic effects |
+| Fortify / Drain / Damage Speed, Athletics, Strength, Acrobatics | the stats | later (the sheet's damage field already counts) | magic effects |
+| Swift Swim | swim x (1 + magnitude/100) | later | magic effects |
+| Levitate | fly speed from fMinFlySpeed / fMaxFlySpeed | later | magic effects |
+| Jump effect, Acrobatics, load, fatigue | jump height (getJump) | later (rule written and tested, not applied) | needs the gravity scale first ([PHYSICS-GRAVITY-SCALE-36](bugs/PHYSICS-GRAVITY-SCALE-36.md)) |
+| Acrobatics | in-air control (fJumpMoveBase / fJumpMoveMult) | later | Quake air control is kept |
+| Slowfall, Water Walking | fall and water surface | later | magic effects |
+| Werewolf | run x fWereWolfRunMult | later | no werewolf form |
+
+The rules are pure functions in `engine/aga/src/aw_move_rules.c` (tested against hand-worked OpenMW
+values in `tests/aga_move_rules_test.c`); `engine/aga/src/aw_move.c` gathers the inputs into one
+structure (`aw_move_inputs_t`, a field per factor above, 0 = no effect) and applies them in
+`sv_user.c`, so a later effect only fills its field. `tests/aga_move_test.c` checks the engine side:
+the old numbers under superspeed, the live sheet, the load, the fatigue costs and the command. In-game
+timing against the original is not measured yet.
 
 ## Verified base dimensions
 

@@ -7,8 +7,10 @@ import struct
 
 # Updated for aw_alias_single_pass (one read while decoding; same cache block, no staging), then for shared
 # actor skins (IMAGE-ACTOR-SKIN-REPEATS-46: the pixels read from progs/skins/ through the same 4 KiB scratch
-# into the same cache block; no allocation added).
-STREAM_SHA256='7529bdd787b4d7d5e47cf61dac9d106e4bb97d95c27d0cda620f2d9799592d4f'
+# into the same cache block; no allocation added), then for the 32 MB actor budget (ALIAS-BUDGET-32MB-48: the stream
+# takes aliases up to AW_ALIAS_STREAM_LIMIT, the malloc staging keeps AW_ALIAS_STAGING_LIMIT; no allocation added).
+STREAM_SHA256='ba597f98811c4bb6348b07d5f9f24188ab5c721c8a20045711164e63f3e14025'
+STREAM_LIMIT=768*1024          # model.c AW_ALIAS_STREAM_LIMIT (tools/npc_anim.py ALIAS_BYTE_BUDGET)
 
 def runtime_policy(source):
     source=Path(source)
@@ -21,14 +23,15 @@ def runtime_policy(source):
     digest=hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
     if (clean.count(dispatch)!=1 or '#include "model_alias_stream.inc"' not in clean or
         '#define AW_ALIAS_STAGING_LIMIT (512*1024)' not in clean or
+        '#define AW_ALIAS_STREAM_LIMIT (%d*1024)' % (STREAM_LIMIT//1024) not in clean or
         clean.index(dispatch)>clean.index('alias_file=AW_AliasFile(mod->name);') or digest!=STREAM_SHA256):
         raise ValueError('Unrecognized alias streaming allocation policy')
     return dict(alias_streaming=1,mode='bounded_single_skin_direct_cache',source_sha256=digest,
-                payload_stack_chunk_bytes=4096,source_and_decoded_limit_bytes=524288,
+                payload_stack_chunk_bytes=4096,source_and_decoded_limit_bytes=STREAM_LIMIT,
                 validation='Source policy only; real decoder/cache and target checks remain separate.')
 
 def eligible(raw,decoded):
-    if not 84<=len(raw)<=524288 or decoded>524288 or raw[:8]!=b'IDPO\x06\x00\x00\x00':return False
+    if not 84<=len(raw)<=STREAM_LIMIT or decoded>STREAM_LIMIT or raw[:8]!=b'IDPO\x06\x00\x00\x00':return False
     skins,w,h,nv,nt,nf=struct.unpack_from('<6i',raw,48)
     if skins!=1 or w<=0 or w%4 or not 0<h<=480 or not 0<nv<=2000 or nt<=0 or nf<=0:return False
     at=88+w*h+nv*12+nt*16

@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-_Last updated with AmiWind v0.0.46 (21 October 2026). FAQ revision 22._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -220,7 +220,7 @@ configuration**:
 | Machine and chipset | A1200 / AGA / PAL |
 | CPU and FPU | Emulated 68040 with FPU |
 | Chip RAM | 2 MiB |
-| Additional RAM | 128 MiB Zorro III memory in the playtest emulator setup (since 21 October 2026); 16 MiB is the smallest the game runs on |
+| Additional RAM | 32 MiB Zorro III Fast RAM, the safe minimum for the whole game (since 23 October 2026; 128 MiB from 21 October); more is used automatically; 16 MiB starts with a warning and loads more often |
 | CPU execution | JIT enabled, maximum emulated CPU speed |
 | Default game display | 320 × 200, 8-bit indexed colour |
 
@@ -301,18 +301,24 @@ selected configuration.
 looks at the Fast RAM that is free beyond a safety margin and uses it as CHIM's cache:
 shared models, textures and world chunks stay in memory across map changes instead of
 being read from disk again. The startup logo says how much it found; pressing **M** there
-starts that session on the standard memory, and Options > Extra RAM: Off keeps it off.
+starts that session on the standard memory, and Options > Video > Extra RAM: Off keeps it off.
 See [real hardware](REAL_HARDWARE.md) for the settings (`-chimcache`, `aw_autoram`,
 `-heapmb`).
 
-The baseline stays the contract: **2 MiB Chip RAM and 16 MiB Fast RAM** is the
-machine AmiWind has to work on, and every route is tested there first. Extra memory
-means fewer loading pauses, not heavier frames: the view distance, detail and number of
-active characters stay the same.
+**For now the game requires 32 MB of Fast RAM, the safe minimum** (with 2 MiB Chip RAM),
+which should be enough for the entire game; more RAM is used automatically. 16 MB still
+starts: the start-up check warns (`[!] WARN` on the Fast RAM row and a note), counts down
+ten seconds (ENTER skips) and goes on by itself, and the game then loads more often. Why: with every outdoor NPC and
+creature placed, 14 of the 336 CHIM region frames need more model cache than 16 MB leaves
+(about 2.1 MB; the worst frame needs 2.0 MB more), so the engine evicts models and loads
+them again: slower, not a crash
+([why 32 MB](REAL_HARDWARE.md#why-32-mb-of-fast-ram)). Extra memory beyond that means
+fewer loading pauses, not heavier frames: the view distance, detail and number of active
+characters stay the same.
 
-The game heap itself (Quake's own cache for actors and sounds) is still a fixed
-**11 MiB** from the build unless the start argument `-heapmb N` says otherwise; sizing it
-from the free Fast RAM is planned
+The game heap itself (Quake's own cache for actors and sounds) grows with the machine
+since v0.0.43: 11 MiB on 16 MiB of Fast RAM, 13 MiB on 32 MiB, up to 24 MiB with plenty
+of Fast RAM; the start argument `-heapmb N` sets it by hand
 ([ENGINE-HEAP-FIXED-SIZE-43](bugs/ENGINE-HEAP-FIXED-SIZE-43.md)).
 
 Two limits stay whatever the RAM: Chip RAM (the display and sound hardware can only

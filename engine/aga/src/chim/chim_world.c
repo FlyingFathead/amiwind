@@ -13,7 +13,7 @@
  * Without -chimcache, the same kind of bank is taken automatically at the
  * start (Chim_MemoryStart, after config.cfg): the free Fast RAM beyond a
  * margin for the system, in one bank per memory region (chim_zone.h
- * ChimZone_AutoStep); aw_autoram 0 (Options > Extra RAM) turns it off. The
+ * ChimZone_AutoStep); aw_autoram 0 (Options > Video > Extra RAM) turns it off. The
  * 16 MiB baseline never reaches the first bank and plays exactly as before.
  */
 #include "quakedef.h"
@@ -23,6 +23,7 @@
 #include "aw_town.h"
 #include "aw_mappath.h"
 #include "aw_spike.h"
+#include "aw_hinged_door.h"
 #ifdef AMIGA
 #include <proto/exec.h>
 #include <exec/memory.h>
@@ -44,7 +45,9 @@ static cvar_t	chim_reserve_kib = {"chim_reserve_kib", "2048"};
 static cvar_t	chim_rest_measured = {"chim_rest_measured", "1"};
 static cvar_t	chim_read_kib = {"chim_read_kib", "32"};
 static cvar_t	chim_buffer_kib = {"chim_buffer_kib", "32"};
-static cvar_t	chim_towns = {"chim_towns", "1"};	/* 0: towns use their region maps (A/B tests) */
+/* 0: towns use their region maps: LEGACY TOWN REGIONS, the A/B of a historical regression only (an image that ships
+ * region maps, an engine built with AW_LEGACY_TOWN_REGIONS 1: aw_town.h, BUILD-LEGACY-ENGINE-PATHS-48) */
+static cvar_t	chim_towns = {"chim_towns", "1"};
 cvar_t	chim_debug = {"chim_debug", "0"};
 /* Ring and frame-world settings (CHIM-ZONE-RING-THRASH-33): the frame-world
  * pool reserved at map start, two slots of chim_pool_kib each (0: taken from
@@ -108,6 +111,10 @@ extern int (*aw_chim_recentre)(int cx, int cy, const float *d, int apply);
 extern cvar_t aw_drawdistance;
 int AW_DrawDistance (void);
 int AW_OpeningStoryHidden (void);
+/* aw_hinged_door.c turns hinged door placements through these (chim.h);
+ * defined here so the host tests of the streamer link without it. */
+int (*aw_chim_door_yaw)(unsigned pid, float yaw);
+int (*aw_chim_door_clip)(unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace);
 
 static int		available;			/* chim/world.cwi exists */
 static int		active;				/* the current map is a CHIM frame */
@@ -187,6 +194,14 @@ static int		work_framecount = -1;
 
 /* ---------------------------------------------------------------- packs */
 
+/* The store folder of every pack path (Chim_StoreSelect). */
+static char		store_name[CHIM_STORE_CHARS+1] = CHIM_STORE_DEFAULT;
+
+const char *Chim_Store (void)
+{
+	return store_name;
+}
+
 int Chim_PackOpen (chim_pack_t *pack, const char *relative)
 {
 	FILE *f = NULL;
@@ -194,9 +209,9 @@ int Chim_PackOpen (chim_pack_t *pack, const char *relative)
 
 	memset (pack, 0, sizeof(*pack));
 	pack->row = -1;
-	if (strlen (relative) > CHIM_PATH_CHARS)
+	if (strlen (relative) > CHIM_PATH_CHARS ||
+		!ChimFormat_StorePath (pack->path, sizeof(pack->path), store_name, relative))
 		return 0;
-	sprintf (pack->path, "chim/%s", relative);
 	bytes = COM_FOpenFile (pack->path, &f);
 	if (!f)
 		return 0;
@@ -637,6 +652,7 @@ static void MapEnd (void)
 	ChimGraft_End ();
 	ChimChunks_End ();
 	ChimStatics_End ();
+	ChimRoom_End ();
 	ChimModels_Abort ();
 	Chim_FilesClose ();
 	/* A resident index stays (locked) for the next map of the world. */
@@ -665,6 +681,38 @@ static void MapEnd (void)
 	map_bank = -1;
 	active = primed = 0;
 	tick_frame = -1;
+}
+
+static int KeepNothing (void *data, unsigned id)
+{
+	(void)data;
+	(void)id;
+	return 0;
+}
+
+int Chim_StoreSelect (const char *name)
+{
+	if (!ChimFormat_StoreNameValid (name))
+	{
+		Con_Printf ("CHIM: store \"%s\" refused: a store name is 1 to %ld of a-z, 0-9 and _\n", name ? name : "",
+			(long)CHIM_STORE_CHARS);
+		return 0;
+	}
+	if (!strcmp (name, store_name))
+		return 1;
+	if (active || map_bank >= 0)
+	{
+		Con_Printf ("CHIM: store \"%s\" refused while a CHIM map runs\n", name);
+		return 0;
+	}
+	/* Model, texture and file ids belong to one store: nothing kept from the
+	 * other one may be found by id again. */
+	IndexDrop ();
+	ChimZone_EvictKind (CHIM_KIND_MODEL, KeepNothing);
+	ChimZone_EvictKind (CHIM_KIND_TEXTURE, KeepNothing);
+	ChimPrefetch_StoreChanged ();
+	strcpy (store_name, name);
+	return 1;
 }
 
 /* A frame map's worldspawn key: "_chim_edge" "closed" (world format 0.5,
@@ -783,17 +831,52 @@ static void MapBegin (const char *entities)
 	MapBeginWork (entities, spike_t0);
 }
 
+/* A room map (docs/chim/INTERIOR_STORE.md) that cannot load is not a
+ * playable map either: its placements are its geometry. */
+static void RefuseRoom (const char *name, const char *why)
+{
+	strncpy (failure, why, sizeof(failure)-1);
+	failure[sizeof(failure)-1] = 0;
+	MapEnd ();
+	far_only = 0;
+	if (hunk_mark >= 0)
+		Hunk_FreeToLowMark (hunk_mark);
+	hunk_mark = -1;
+	Host_Error ("CHIM room map %s (room %s): %s", MapModel () ? MapModel ()->name : "?", name, why);
+}
+
 static void MapBeginWork (const char *entities, double spike_t0)
 {
-	int cx, cy, size, free_bytes;
+	int cx = 0, cy = 0, size, free_bytes, is_room;
 	void *memory;
 	double index_t0;
+	char room_name[CHIM_ROOM_NAME_CHARS+2], store[CHIM_STORE_CHARS+2];
 
 	MapEnd ();
 	failure[0] = 0;
 	ChimPrefetch_MapBegin ();
-	if (!available || !WorldspawnFrame (entities, &cx, &cy))
+	if (!available)
 		return;
+	/* "_chim_room" "<room>": a room map, its placements from the room record
+	 * (chim_room.c); else "_chim_frame": a frame map of the exterior world. */
+	is_room = WorldspawnKey (entities, "_chim_room", room_name, sizeof(room_name));
+	/* An exterior frame map's fire lights, before any chunk reads its records
+	 * (chim_chunks.c); a room has none (its placements carry their levels). */
+	ChimChunks_FireLights (is_room ? NULL : entities);
+	if (!is_room && !WorldspawnFrame (entities, &cx, &cy))
+		return;
+	/* The store the map names ("_chim_world", default chim): its index and
+	 * packs (Chim_StoreSelect drops what another store left). */
+	if (!WorldspawnKey (entities, "_chim_world", store, sizeof(store)))
+		strcpy (store, CHIM_STORE_DEFAULT);
+	if (!Chim_StoreSelect (store))
+	{
+		if (is_room)
+			RefuseRoom (room_name, "its store name is refused");
+		else
+			Refuse (cx, cy, "its store name is refused");
+		return;
+	}
 	{
 		char text[24];
 		rest_stated = WorldspawnKey (entities, "_chim_hunk_rest", text, sizeof(text)) ? atoi (text) : 0;
@@ -844,10 +927,26 @@ static void MapBeginWork (const char *entities, double spike_t0)
 	AW_SPIKE_BEGIN (index_t0);
 	if (!ReadIndex ())
 	{
-		Refuse (cx, cy, "its CHIM world (chim/world.cwi) cannot be read");
+		if (is_room)
+			RefuseRoom (room_name, "its store index cannot be read");
+		else
+			Refuse (cx, cy, "its CHIM world (chim/world.cwi) cannot be read");
 		return;
 	}
 	AW_SPIKE_END (AW_SP_CHIM_INDEX, index_t0, 0);
+	if (is_room)
+	{
+		/* Loaded whole, now, under the loading plaque: no frame, terrain or ring. */
+		if (!ChimRoom_Begin (room_name))
+		{
+			RefuseRoom (room_name, "its room record or models cannot be loaded");
+			return;
+		}
+		hunk_mark = -1;
+		Con_DPrintf ("CHIM %s: room %s from store %s, zone %ld KiB\n", CHIM_VERSION, room_name, store, (long)(size/1024));
+		AW_SPIKE_END (AW_SP_CHIM_BEGIN, spike_t0, 0);
+		return;
+	}
 	if (!ChimChunks_Begin (cx, cy))
 	{
 		Refuse (cx, cy, "the CHIM world has no valid pack for this frame");
@@ -1025,6 +1124,11 @@ static int Frozen (edict_t *ent)
 static void Link (void)
 {
 	double started;
+	if (ChimRoom_Active ())
+	{
+		ChimRoom_Link ();
+		return;
+	}
 	if (!active)
 		return;
 	if (cls.signon == SIGNONS && cl.viewentity > 0 && cl.viewentity < MAX_EDICTS)
@@ -1054,6 +1158,8 @@ static void Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *b
 {
 	if (active)
 		ChimChunks_Clip (start, mins, maxs, end, best);
+	else if (ChimRoom_Active ())
+		ChimRoom_Clip (start, mins, maxs, end, best);
 }
 
 /* dbg hud: which placement a pin ray hit (aw_inspect.c). */
@@ -1294,6 +1400,7 @@ static void Status (void)
 	chim_zone_stats_t s;
 	if (Subcommand ())
 		return;
+	ChimRoom_Report ();
 	ChimZone_Stats (&s);
 	Con_Printf ("CHIM %s, reads world format %ld.%ld-%ld.%ld (this world: %ld.%ld): %s\n", CHIM_VERSION,
 		(long)CHIM_FORMAT_MAJOR, (long)CHIM_FORMAT_MINOR_OLDEST, (long)CHIM_FORMAT_MAJOR, (long)CHIM_FORMAT_MINOR,
@@ -1600,7 +1707,7 @@ static void Chim_MemoryStart (void)
 	else if (cache_manual)
 		memory_state = "-chimcache given";
 	else if (!aw_autoram.value)
-		memory_state = "turned off: aw_autoram 0, Options > Extra RAM";
+		memory_state = "turned off: aw_autoram 0, Options > Video > Extra RAM";
 	else if (!chim_fast_avail || !chim_fast_alloc)
 		memory_state = "no Fast RAM query";
 	else
@@ -1747,7 +1854,11 @@ void Chim_Init (void)
 	aw_chim_recentre = Recentre;
 #ifdef AMIGA
 	chim_story_hidden = AW_OpeningStoryHidden;		/* aw_opening.c */
+	chim_hinged_door = AW_HingedDoorPlacement;		/* aw_hinged_door.c */
+	chim_hinged_recentre = AW_HingedDoorRecentre;
 #endif
+	aw_chim_door_yaw = ChimChunks_DoorYaw;
+	aw_chim_door_clip = ChimChunks_DoorClip;
 	aw_chim_view_reach = ViewReach;
 #ifdef AMIGA
 	aw_chim_spike_counts = SpikeCounts;

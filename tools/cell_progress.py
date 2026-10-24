@@ -14,6 +14,10 @@ Inputs (all optional; anything missing is "not measured", never guessed):
   --bugs      docs/bugs/bugs.json     the bug register, linked to cells by area name or coordinates
   --ledger    build-ledger.jsonl      the build and perf ledger: the last build per area
   --areas     config/cell-progress-areas.json   area names used to link bugs and builds to cells
+  --door-graph door-graph.json        the interiors: a state per room and counts per island (tools/cell_progress_rooms.py)
+  --batch-plan batch-plan.json        the batch of each room ready for conversion (tools/door_graph.py plan)
+  --chim-rooms FILE                    rooms made as CHIM rooms (repeatable): a chim-rooms-receipt.json, or a build's
+                                       chim-interiors.json (the rooms its image installed: on CHIM rooms)
   OUT/audits/*.json                    audit results from other tools (format aw-cell-audit-1), see `record`
   OUT/results/*.json                   per-cell conversion results (format aw-cell-result-1), see `result`
   OUT/owner-status.json                playtested / approved cells, see `owner`
@@ -79,6 +83,7 @@ BUCKETS = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_u
 # without LAND, a reference to the shared ocean chunk: chimport.py ocean, K-OCEAN). Empty sea counts as done. The open ocean
 # does NOT (TRACKER-OCEAN-COUNTED-DONE-36): the engine does not place the ocean chunk yet, so it has its own line and colour (silver).
 SEA_BUCKETS = ('empty_sea', 'ocean')
+SEA_FLAG_SKIP = ('converted_failing', 'not_converted', 'hull_policy_pending')   # these keep their own colour
 DONE_SEA = ('empty_sea',)
 # SUCCESS = every bucket that counts as passed (complete cells included). Precedence of the statuses, strongest first:
 # complete > terrain_complete > complete_unlit > terrain_complete_unlit > approved > playtested > passed (audits_passed) >
@@ -92,7 +97,10 @@ COMPLETE_LEVELS = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_co
 # (cell / terrain complete, awaiting lighting or not, maintainer states, passed) and empty sea (it passes as it is; the
 # open world needs the water around the coast).
 ELIGIBLE = SUCCESS + DONE_SEA
-ELIGIBLE_RELEASE = 'v0.0.34'
+# The release the eligible figure is for is derived, never written here: the upcoming plan release when it is not older than
+# the version in development (the repository's VERSION file), else that version (TOOLKIT-LEGEND-STATES-UNCLEAR-48: a stale
+# plan named v0.0.41 while v0.0.48 was in development).
+VERSION_FILE = Path(__file__).resolve().parents[1] / 'VERSION'
 # The "eligible" selector of the release tool and the Toolkit preset: eligible statuses plus empty sea (done = usable).
 ELIGIBLE_SELECT = tuple(dict.fromkeys(tuple(ELIGIBLE) + DONE_SEA))
 # Two completion levels (maintainer, 2026-10-09). Terrain complete: all audits pass and every placed object except actors is
@@ -104,6 +112,30 @@ ACTOR_CATEGORIES = ('npcs', 'creatures')
 # level (maintainer, 2026-10-09). Door destinations come from the door records. They stay in the by-type table.
 MARKERS_BLOCK_COMPLETE = False
 ISLAND_NAMES = {1: 'Vvardenfell', 2: 'Solstheim'}
+SOLSTHEIM_ISLAND = 2
+# The three groups of the legend (maintainer, 2026-10-22, TOOLKIT-LEGEND-STATES-UNCLEAR-48). Every cell is in exactly one:
+#   in_game      what the newest ingested CHIM build ships: its land cells in their completion states, and every sea cell it
+#                holds ("sea, in the game"), whatever an older run called it (TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48)
+#   not_in_game  work left: Solstheim, cells not started, converted but not in the newest build, the problem states, and sea
+#                cells the game defines that the newest build does not hold
+#   settled      beyond the world's edge: no cell record in the original game data and not in the newest build. The edge
+#                current (docs/WORLD_BOUNDS.md) turns the player back before them, so there is nothing to build.
+# Settled cells count toward "accounted for" (in the game + settled), never toward the cells in the game.
+GROUPS = ('in_game', 'not_in_game', 'settled')
+GROUP_LABELS = {'in_game': 'In the game', 'not_in_game': 'Not in the game yet', 'settled': "Beyond the world's edge: settled"}
+SETTLED_TEXT = ("No cell exists here in the original game data. AmiWind's edge current turns the player back before this "
+                "point, so there is nothing to build.")
+# Each cell's legend state (chim.state), in legend order per group. The in-game states are the land buckets of a cell the
+# newest build holds plus sea_in_game; not_in_build is a converted cell the newest build does not hold.
+GROUP_STATES = collections.OrderedDict([
+    ('in_game', ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested',
+                 'audits_passed', 'converted_unmeasured', 'sea_in_game')),
+    ('not_in_game', ('solstheim', 'not_started', 'not_in_build', 'empty_sea', 'ocean', 'converted_failing', 'not_converted',
+                     'hull_policy_pending')),
+    ('settled', ('settled',)),
+])
+STATE_GROUP = {st: g for g, sts in GROUP_STATES.items() for st in sts}
+STATES = tuple(STATE_GROUP)
 # Audit outcome "kept as chain for memory": meshes the heap fallback deliberately left as hull chains. It passes. The result
 # file marks it with outcome == KEPT_CHAIN_OUTCOME on the audit (PLACEHOLDER name until the conversion job fixes its field).
 KEPT_CHAIN_OUTCOME = 'kept_as_chain'
@@ -463,6 +495,121 @@ def promote_complete(cells):
                 rec['chim']['blockers'] = blockers(rec, actors=level not in ('terrain_complete', 'terrain_complete_unlit'))
 
 
+def mark_sea_in_game(cells, build):
+    """Flag the sea cells the newest ingested CHIM build holds: no LAND record, or a seabed LAND record measured as empty sea,
+    and the build's world owns the cell. The page draws them as the sea colour with stripes ("sea, in the game"), apart from
+    sea that is not in the game. The flag is only a display class: buckets and the done/eligible figures do not change. A
+    failing or not-converted cell keeps its own class. No build ingested (or an older file without the flag): no cell is
+    flagged and the colouring is as before."""
+    n = 0
+    for c in cells.values():
+        ch = c['chim']
+        on = (bool(build) and (not c['land'] or ch['bucket'] == 'empty_sea') and build in (ch.get('on_chim_builds') or [])
+              and ch['bucket'] not in SEA_FLAG_SKIP)
+        if on:
+            ch['sea_in_game'] = True
+            n += 1
+        else:
+            ch.pop('sea_in_game', None)
+    return n
+
+
+def has_game_record(c, census=True):
+    """True when the original game data defines the cell (a CELL or LAND record). Ingest writes `game_record`; for older
+    data the census contents stand in for it (census=False: data made without a census, where the estimator's rows are all
+    there is). The estimator's rows alone are no proof: a region frame's core cells include cells without a record."""
+    if 'game_record' in c:
+        return bool(c['game_record'])
+    got = c.get('contents')
+    return bool(c.get('land')) or (got is not None and (not census or got.get('source') == 'census'))
+
+
+def _island_guess(cells):
+    """Island of every cell, a cell without one taking the island of the nearest cell that has one (Chebyshev distance,
+    then the lower island): sea cells off Solstheim's coast carry no island of their own."""
+    known = [(c['x'], c['y'], c['island']) for c in cells.values() if c.get('island') and c.get('land') and 'x' in c]
+    out = {}
+    for k, c in cells.items():
+        if c.get('island') or not known or 'x' not in c:
+            out[k] = c.get('island')
+        else:
+            out[k] = min(known, key=lambda p: (max(abs(p[0] - c['x']), abs(p[1] - c['y'])), p[2]))[2]
+    return out
+
+
+def cell_state(c, build, island=None, census=True):
+    """The legend state of one cell (see GROUP_STATES) against the newest ingested build `build` (None: no build)."""
+    ch = c['chim']
+    b = ch['bucket']
+    if b in SEA_FLAG_SKIP:
+        return b                                           # a problem stays a problem, in or out of the build
+    if build and build in (ch.get('on_chim_builds') or []):
+        if not c['land'] or b in SEA_BUCKETS:
+            return 'sea_in_game'
+        return b if STATE_GROUP.get(b) == 'in_game' else 'converted_unmeasured'
+    if not has_game_record(c, census):
+        return 'settled'
+    if (island if island is not None else c.get('island')) == SOLSTHEIM_ISLAND:
+        return 'solstheim'                                 # Solstheim (Bloodmoon), named as such: not in the game yet
+    if b in SUCCESS or b == 'converted_unmeasured':
+        return 'not_in_build'
+    return b if b in STATE_GROUP else 'not_started'
+
+
+def classify(cells, build, census=True):
+    """Set chim.group and chim.state on every cell (against the newest ingested build) and return the headline figures:
+    {'groups': {in_game, not_in_game, settled, accounted_for, cells}, 'states': {state: count}}. The page, the Markdown
+    tracker and a build snapshot read these, so they all say the same thing."""
+    isl = _island_guess(cells)
+    states = collections.Counter()
+    for k, c in cells.items():
+        st = cell_state(c, build, isl.get(k), census)
+        c['chim']['state'], c['chim']['group'] = st, STATE_GROUP[st]
+        states[st] += 1
+    groups = {g: sum(states[s] for s in GROUP_STATES[g]) for g in GROUPS}
+    groups['accounted_for'] = groups['in_game'] + groups['settled']
+    groups['cells'] = len(cells)
+    return {'groups': groups, 'states': {s: states[s] for s in STATES}}
+
+
+def group_figures(doc):
+    """The group figures of a tracker document: the headline's when ingest wrote them, else derived now from the cells
+    (older data), without changing the document."""
+    h = doc.get('headline') or {}
+    if h.get('groups') and h.get('states'):
+        return {'groups': h['groups'], 'states': h['states'], 'build': h.get('in_game_build')}
+    o = h.get('on_chim')
+    build = o['build'] if o else None
+    cells = {k: dict(c, chim=dict(c['chim'])) for k, c in (doc.get('cells') or {}).items()}
+    out = classify(cells, build, (doc.get('sources') or {}).get('census', True))
+    out['build'] = build
+    return out
+
+
+def group_line(f):
+    """One plain line of the three legend groups (group_figures)."""
+    g = f['groups']
+    return 'In the game %d | not in the game yet %d | settled %d | accounted for %d of %d cells (newest build %s)' % (
+        g['in_game'], g['not_in_game'], g['settled'], g['accounted_for'], g['cells'], f.get('build') or 'none')
+
+
+def working_version(path=None):
+    """The version in development, from the repository's VERSION file ('0.0.48-dev2'), or None."""
+    try:
+        return Path(path or VERSION_FILE).read_text(encoding='utf-8').strip() or None
+    except OSError:
+        return None
+
+
+def eligible_release(plan_next, version):
+    """The release the eligible figure is for: the upcoming plan release when it is not older than the version in
+    development, else that version's release name ('0.0.48-dev2' -> 'v0.0.48'). None when neither is known."""
+    base = ('v' + str(version).lstrip('v').split('-')[0]) if version else None
+    if plan_next and (not base or PL.version_key(plan_next) >= PL.version_key(base)):
+        return plan_next
+    return base or plan_next
+
+
 def on_map(c):
     """A cell of an island's map: land, empty sea or open sea (ocean)."""
     return bool(c['land']) or c['chim']['bucket'] in SEA_BUCKETS
@@ -507,7 +654,7 @@ def headline(cells):
     out['eligible'] = out['done']      # every done status, empty sea included (= done)
     sea_only = sum(1 for c in cells.values() if not c['land'] and c['chim']['bucket'] in SEA_BUCKETS)
     out['map_cells'] = len(land) + sea_only      # land cells + sea cells without LAND (the map's cells)
-    out['eligible_release'] = ELIGIBLE_RELEASE
+    out['eligible_release'] = eligible_release(None, working_version())
     out.update({'land_cells': len(land), 'passed': passed,
                 'percent': round(100.0 * passed / len(land), 2) if land else 0.0,
                 'converted': sum(1 for c in land if c['chim']['converted']),
@@ -925,7 +1072,8 @@ def _later(a, b):
 
 
 def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chim_runs=(), labels=None, commits=None,
-           bugs=None, ledger=None, areas=None, now=None, png=False, config_dir=None):
+           bugs=None, ledger=None, areas=None, now=None, png=False, config_dir=None, door_graph=None, batch_plan=None,
+           chim_rooms=()):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     now = now_iso(now)
@@ -979,6 +1127,9 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
         cells[k] = {
             'x': x, 'y': y, 'name': d.get('name') or nm.get('name') or '', 'region': d.get('region') or nm.get('region') or '',
             'set': land_set.get(k) or (mc or {}).get('set') or '', 'land': k in land,
+            # the original game data defines this cell (census, LAND record or estimator row); a cell without any came
+            # only from an ocean run's grid around the island and lies beyond the world's edge
+            'game_record': bool(cc) or k in land or k in land_records or (not census and bool(mc)),
             'contents': contents, 'legacy': legacy_of(pc), 'risk': risk, 'cost': cost,
             'chim': {'converted': False, 'builds': [], 'owner': None, 'on_chim_build': None, 'on_chim_builds': []},
             'audits': {m: {'status': 'not_measured', 'detail': None, 'build': None} for m in MECHANISMS},
@@ -1220,6 +1371,12 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     head = headline(cells)
     head['on_chim_builds'] = on_chim_summary(cells, digests)
     head['on_chim'] = head['on_chim_builds'][0] if head['on_chim_builds'] else None
+    newest = head['on_chim']['build'] if head['on_chim'] else None
+    head['sea_in_game'] = mark_sea_in_game(cells, newest)   # sea cells the newest build holds
+    # The three legend groups and their states (TOOLKIT-LEGEND-STATES-UNCLEAR-48), against the same newest build.
+    head.update(classify(cells, newest))
+    head['in_game_build'] = newest
+    head['in_game_label'] = head['on_chim'].get('label') if head['on_chim'] else None
     per_mech = {m: {r: sum(1 for c in cells.values() if c['chim']['converted'] and c['audits'][m]['status'] == r)
                     for r in RESULTS} for m in MECHANISMS}
     runs_meta = [{'name': d['name'], 'label': d.get('label'), 'commit': d.get('commit'), 'chim_version': d.get('chim_version'),
@@ -1234,8 +1391,15 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     PL.attach(cells, plan_doc)
     plans = PL.summary(cells, plan_doc)
     # The release the "eligible" figure is for: the upcoming plan release (data), the old constant only while there is no plan.
-    head['eligible_release'] = PL.next_release(plan_doc) or ELIGIBLE_RELEASE
+    head['eligible_release'] = eligible_release(PL.next_release(plan_doc), working_version())
     interiors, entrances = build_interiors(census, metrics, cells, (cells_detail or {}).get('pois'), bugs, our_maps(config_dir))
+    # Interiors, additive (tools/cell_progress_rooms.py): a state per room and counts per island from the door graph.
+    interior_rooms = None
+    if door_graph:
+        import cell_progress_rooms as RM
+        room_rows = RM.rooms(door_graph, our_maps(config_dir), chim_rooms, batch_plan)
+        RM.attach(interiors, room_rows)
+        interior_rooms = RM.section(room_rows, batch_plan)
     for k, trees in entrances.items():
         if k in cells:
             cells[k]['entrances'] = trees
@@ -1263,6 +1427,8 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
         'totals': totals, 'owner_ignored': sorted(ignored), 'result_ignored': sorted(result_ignored),
         'cells': cells, 'interiors': interiors,
     }
+    if interior_rooms is not None:
+        doc['interior_rooms'] = interior_rooms
     write_json(out / OUT_FILES['progress'], doc)
     nxt = next_lists(cells, now)
     write_json(out / OUT_FILES['next'], nxt, pretty=True)
@@ -1432,6 +1598,10 @@ def main(argv=None):
     ing.add_argument('--run-label', action='append', default=[], metavar='NAME=TEXT')
     ing.add_argument('--run-commit', action='append', default=[], metavar='NAME=SHA')
     ing.add_argument('--config-dir', type=Path, help='the repo config folder (scene lists give our map names of interiors)')
+    ing.add_argument('--door-graph', type=Path, help='tools/door_graph.py graph output: the interiors and their states')
+    ing.add_argument('--batch-plan', type=Path, help='tools/door_graph.py plan output: the batch of each ready room')
+    ing.add_argument('--chim-rooms', type=Path, action='append', default=[],
+                     help="a CHIM rooms receipt (chim-rooms-receipt.json) or a build's chim-interiors.json; repeatable")
     ing.add_argument('--png', action='store_true', help='also write the mesh reuse curve as a PNG')
     ing.add_argument('--now', help='timestamp to stamp (tests)')
     rec = sub.add_parser('record', help='record audit results from another tool')
@@ -1505,6 +1675,7 @@ def main(argv=None):
             return 1
         h = doc['headline']
         print(on_chim_line(h))
+        print(group_line(group_figures(doc)))
         print('Cell complete %d | audits passed, all islands: %d / %d land cells (%.2f%%) | approved %d, playtested %d, audits passed %d, converted with failing audits %d, '
               'converted unmeasured %d, not started %d' % (h['complete'], h['passed'], h['land_cells'], h['percent'], h['approved'],
               h['playtested'], h['audits_passed'], h['converted_failing'], h['converted_unmeasured'], h['not_started']))
@@ -1603,10 +1774,12 @@ def main(argv=None):
         print('shipped %s: %d plan cells flipped to shipped' % (a.release, n))
     remembered = read_json(src_path) or {}
     if a.cmd == 'ingest':
-        for k in SOURCE_KEYS + ('data_files', 'config_dir'):
+        for k in SOURCE_KEYS + ('data_files', 'config_dir', 'door_graph', 'batch_plan'):
             v = getattr(a, k)
             if v:
                 remembered[k] = str(v)
+        if a.chim_rooms:
+            remembered['chim_rooms'] = [str(p) for p in a.chim_rooms]
         runs = dict(remembered.get('chim_runs', {}))
         for s in a.chim_run:
             runs[s.partition('=')[0]] = s.partition('=')[2]
@@ -1637,13 +1810,24 @@ def main(argv=None):
                  read_json(remembered['bugs']) if remembered.get('bugs') else None, remembered.get('ledger'),
                  read_json(remembered['areas']) if remembered.get('areas') else None,
                  getattr(a, 'now', None), getattr(a, 'png', False) or (out / OUT_FILES['png']).is_file(),
-                 remembered.get('config_dir') or str(Path(__file__).resolve().parents[1] / 'config'))
+                 remembered.get('config_dir') or str(Path(__file__).resolve().parents[1] / 'config'),
+                 read_json(remembered['door_graph']) if remembered.get('door_graph') else None,
+                 read_json(remembered['batch_plan']) if remembered.get('batch_plan') else None,
+                 [read_json(p) for p in remembered.get('chim_rooms', [])])
     h = doc['headline']
     print(on_chim_line(h))
     # The audit figure: cells whose audits passed, over the LAND cells of every island (Solstheim included); empty-sea
     # and open-ocean cells are not in it. It is not "on CHIM in the build" (TRACKER-CHIM-COUNT-STALE-44).
     print('Audit progress, all islands: passed %d / %d land cells (%.2f%%); converted %d, not started %d; %d cells recorded' %
           (h['passed'], h['land_cells'], h['percent'], h['converted'], h['not_started'], len(doc['cells'])))
+    for island, row in ((doc.get('interior_rooms') or {}).get('headline') or {}).items():
+        g = row.get('groups') or {}
+        print('Interiors, %s: %d rooms; in the game %d (on CHIM rooms %d, room maps %d); not in the game yet %d '
+              '(converted %d, not started %d); set aside %d (hard cases %d, test cells %d, teleport only %d, '
+              'no entrance %d)' %
+              (island, row['total'], g.get('in_game', 0), row['on_chim_rooms'], row['room_map'],
+               g.get('not_in_game', 0), row['converted'], row['not_started'], g.get('set_aside', 0),
+               row['hard_case'], row.get('test_cell', 0), row.get('teleport_only', 0), row.get('no_entrance', 0)))
     return 0
 
 

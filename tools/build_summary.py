@@ -210,7 +210,45 @@ def read_stair_check(run):
     return {k: record.get(k) for k in ('status', 'meshes', 'flights')} | {
         'ships_method_1': len(record.get('ships_method_1') or ()),
         'failing': [{'mesh': x['mesh'], 'ships_method': x['ships_method'], 'flights': [f['flight'] for f in x['failed']]}
-                    for x in record.get('failing') or ()]}
+                    for x in record.get('failing') or ()],
+        # the meshes method 1 cannot make pass yet (config/stair-check-known.json): reported, never dropped
+        'known': [x['mesh'] for x in record.get('known') or ()], 'known_class': record.get('known_class')}
+
+
+def read_resident_fallback(run):
+    """The room batches stage's residents baked at a smaller animation level than the build's profile (their kit
+    model over the alias byte budget; RESIDENT-ANIM-BYTE-BUDGET-48): {'count', 'by_level', 'ids'}, or None (no
+    room batches stage, or a record from before the count)."""
+    from room_batches import RECORD
+    path = Path(run) / 'chim-room-batches' / RECORD
+    if not path.is_file():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {'status': 'unreadable'}
+    return (record.get('residents') or {}).get('anim_fallback')
+
+
+def read_interior_counts(run):
+    """How many interiors the build includes (tools/interior_counts.py, BUILD-SUMMARY-INTERIOR-COUNTS-48): the plan,
+    the CHIM rooms, the classic maps with reasons, the 32 MB rooms and the residents by animation level; None for a
+    build without the room records. Never fails the summary."""
+    try:
+        from interior_counts import counts
+        return counts(run)
+    except Exception as exc:      # noqa: BLE001 (a summary line, never a build failure)
+        return {'format': 'unreadable', 'error': str(exc)}
+
+
+def resident_fallback_line(record):
+    if record.get('status') == 'unreadable':
+        return 'Room residents at a smaller animation level: report unreadable'
+    if not record.get('count'):
+        return 'Room residents at a smaller animation level: none (every resident has the build\'s animation profile)'
+    return 'Room residents at a smaller animation level (alias byte budget): %d (%s)' % (
+        record['count'], '; '.join('%s %d: %s' % (level, n, ', '.join(record['ids'].get(level, [])))
+                                   for level, n in sorted(record['by_level'].items())))
 
 
 def stair_check_line(record):
@@ -221,6 +259,10 @@ def stair_check_line(record):
     if record['failing']:
         line += '; failing: ' + ', '.join('%s (method %d)' % (x['mesh'], x['ships_method'])
                                           for x in record['failing'][:8])
+    if record.get('known'):
+        line += '; %d known meshes method 1 cannot fix yet (%s): %s' % (
+            len(record['known']), record.get('known_class') or 'config/stair-check-known.json',
+            ', '.join(record['known'][:12]) + (' ...' if len(record['known']) > 12 else ''))
     return line
 
 
@@ -383,6 +425,8 @@ class BuildSummary:
         engine = read_engine_profile(self.run)
         file_cache = read_file_cache(self.run)
         stair_check = read_stair_check(self.run)
+        resident_fallback = read_resident_fallback(self.run)
+        interiors = read_interior_counts(self.run)
         import size_ledger
         sizes = size_ledger.read(self.run) if status == 'passed' else None
         elapsed = max(0, time.monotonic() - self.started)
@@ -408,6 +452,8 @@ class BuildSummary:
                   'harvest': harvest,
                   'file_cache': file_cache,
                   **({'stair_check': stair_check} if stair_check else {}),
+                  **({'resident_anim_fallback': resident_fallback} if resident_fallback is not None else {}),
+                  **({'interior_counts': interiors} if interiors is not None else {}),
                   'size_ledger': sizes,
                   'known_inputs': self.known_inputs,
                   **({'build_type': self.build_type} if self.build_type else {}),
@@ -501,6 +547,11 @@ class BuildSummary:
         lines.extend(file_cache_lines(file_cache))
         if stair_check:
             lines.append(stair_check_line(stair_check))
+        if resident_fallback is not None:
+            lines.append(resident_fallback_line(resident_fallback))
+        if interiors is not None:
+            from interior_counts import summary_lines as interior_lines
+            lines.extend(interior_lines(interiors))
         if fpu_receipt is not None:
             from fpu_support import summary_lines as fpu_support_lines
             lines.extend(fpu_support_lines(fpu_receipt))

@@ -1,6 +1,6 @@
 # Recover an rc3 image-stage failure
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -61,6 +61,8 @@ actual converted maps/models, creates the Seyda subregions, annotates source
 identities and applies the same grounding baker. It leaves the input scene
 untouched. The rc6 baker reproduces 23 strict failures on the retained rc3 scene. The rc7
 mesh-aware fitter corrects initial placement before this unchanged audit.
+The early check leaves the residents of a shell room (a CHIM room not yet installed) to the image, which fits and
+measures them on the installed CHIM room ([room residents](NPC_GROUND_CONTACT.md#where-a-chim-rooms-residents-are-fitted-v0048)).
 Final image assembly repeats the complete audit. Content fingerprinting,
 filesystem limits and image readback also remain required.
 

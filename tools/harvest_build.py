@@ -399,6 +399,34 @@ def source_placements(source, data_files):
     return receipt, context, refs
 
 
+# The master's harvest context and the checked placements of one source, per process (held_placements): the image
+# step asks for them up to six times (both payload preflights, the baked-mushroom removal, install and both CHIM
+# coverage checks), about 4 s on one core each (BUILD-IMAGE-FINALIZE-UNDERUSED-48). A literal table, its own unit:
+# stages that do not reach held_placements (the chim stage reaches source_placements) keep their keys.
+_PLACEMENTS = {}
+
+
+def held_placements(source, data_files):
+    """source_placements, worked out once per process for one source receipt and master: keyed by the SHA-256 of the
+    source receipt (which pins the index, archive, palette and models; load_source verifies them on every call) and
+    of the master. Held as a pickle, so every caller gets its own copy, equal to a fresh parse (plain dicts, lists,
+    tuples and strings, in the same order)."""
+    import pickle
+    from mwad.paths import child_ci, resolve_data_files
+    source = Path(source)
+    receipt = load_source(source)
+    master = digest(child_ci(resolve_data_files(data_files), 'Morrowind.esm').read_bytes())
+    key = (str(source.resolve()), digest((source / SOURCE_RECEIPT).read_bytes()), master)
+    held = _PLACEMENTS.get(key)
+    if held is None:
+        receipt, context, refs = source_placements(source, data_files)
+        _PLACEMENTS[key] = pickle.dumps((context, refs), protocol=pickle.HIGHEST_PROTOCOL)
+        return receipt, context, refs
+    # the same receipt and master: source_placements checked them against each other when it worked this out
+    context, refs = pickle.loads(held)
+    return receipt, context, refs
+
+
 def _interior_bound(task):
     """Worker: the placements of `wanted` one map binds (entity aw_ref on a func_wall), each with its entity
     origin."""
@@ -454,6 +482,89 @@ def interior_rows(id1, refs, taken=(), jobs=None, known=()):
     return sorted((row for row in rows if row['numbers']), key=lambda row: row['name'])
 
 
+def chim_room_plants(id1, refs):
+    """{room: [reference numbers]} of the harvestable interior plants that CHIM room maps place as store placements
+    (their room records). Since CHIM-ROOM-HARVEST-DOUBLE-48 a room leaves them out of its record and gets a catalogue
+    (chim_room_rows); a room made without the harvest source keeps the plant as a placed mesh (it is drawn and
+    collides, it cannot be picked), so these are listed in the harvest receipt and printed, never skipped silently
+    (IMAGE-ROOM-MAPS-LATE-PASSES-48: interior_rows reads x.bsp room maps only)."""
+    from map_files import map_stem, room_maps
+    inside = {r['number'] for r in refs if interior(r)}
+    out = {}
+    if not inside:
+        return out
+    from chim.interior import installed_room_refs
+    for path in room_maps(Path(id1) / 'maps'):
+        found = sorted(installed_room_refs(path) & inside)
+        if found:
+            out[map_stem(path.name)] = found
+    return out
+
+
+CHIM_ROOMS_RECEIPT = 'chim-rooms-receipt.json'     # tools/chim/interior.py build
+
+
+def chim_room_receipt(chim_interiors):
+    """The CHIM rooms stage's receipt (tools/chim/interior.py build), or None without a CHIM rooms stage."""
+    if not chim_interiors or not (Path(chim_interiors) / CHIM_ROOMS_RECEIPT).is_file():
+        return None
+    return json.loads((Path(chim_interiors) / CHIM_ROOMS_RECEIPT).read_text(encoding='utf-8'))
+
+
+def chim_rooms_keeping_plants(chim_interiors):
+    """Rooms whose CHIM room record keeps its harvestable plants as placed meshes (a stage made without --harvest,
+    the earlier form): clear_baked must not remove their baked plants from the room map, or the record and the map
+    disagree and the image stops (CHIM-ROOM-HARVEST-DOUBLE-48, v0.0.48-dev2 try 9: addamasartus)."""
+    receipt = chim_room_receipt(chim_interiors)
+    if receipt is None:
+        return set()
+    return {row['room'] for row in receipt['rooms'] if 'harvest_left_out' not in row}
+
+
+def chim_room_rows(id1, refs, chim_interiors):
+    """Plan rows of the CHIM rooms that left harvestable plants out of their records (CHIM-ROOM-HARVEST-DOUBLE-48).
+
+    As the CHIM world outdoors (chim.build.harvest_numbers, the region frame rows): the room record leaves each such
+    plant out (tools/chim/interior.py room_input, receipt row harvest_left_out), so the image places it from the
+    room's catalogue harvest-<room>.txt, which the engine loads with the room map maps/<room>.chim (AW_HarvestBegin:
+    the map's name). One row per room the image installed (its .chim room map in id1/maps), whole-converted and batch
+    shell rooms alike (a shell map holds no entity to find the plants by): name, origin (the record's, the receipt's
+    harvest_origin), interior=True, chim=True, room=True, numbers. Every number must be a placement of this harvest
+    source and none may still be in the installed record (then the plant would exist twice); a ValueError names
+    them."""
+    from map_files import frame_map_path
+    receipt = chim_room_receipt(chim_interiors)
+    if receipt is None:
+        return []
+    id1 = Path(id1)
+    inside = {r['number'] for r in refs if interior(r)}
+    rows, problems = [], []
+    for row in receipt['rooms']:
+        numbers = sorted(int(n) for n in row.get('harvest_left_out') or ())
+        path = frame_map_path(id1, row['room'], 'chim')
+        if not numbers or not path.is_file():
+            continue
+        if not NAME.fullmatch(row['room']):
+            problems.append('%s: not a harvest map name' % row['room'])
+            continue
+        unknown = sorted(set(numbers) - inside)
+        if unknown:
+            problems.append('%s: left out %d plant(s) this harvest source does not place (%s)'
+                            % (row['room'], len(unknown), ', '.join(map(str, unknown[:5]))))
+        from chim.interior import installed_room_refs
+        twice = sorted(installed_room_refs(path) & set(numbers))
+        if twice:
+            problems.append('%s: %d plant(s) both in the room record and left out for harvest (%s)'
+                            % (row['room'], len(twice), ', '.join(map(str, twice[:5]))))
+        origin = [float(v) for v in row.get('harvest_origin') or (0., 0., 0.)]
+        rows.append(dict(name=row['room'], origin=origin, coverage=None, interior=True, chim=True, room=True,
+                         numbers=numbers))
+    if problems:
+        raise ValueError('Harvest: CHIM room plants cannot be placed exactly once (CHIM-ROOM-HARVEST-DOUBLE-48): '
+                         + '; '.join(problems[:8]))
+    return rows
+
+
 def map_selections(id1, refs, native=(), regions=None, jobs=None, interiors=()):
     """(plan rows, {map: placements}) for every shipped exterior map with plants and every shipped interior map
     that binds interior placements (interior_rows; `interiors`: its rows clear_baked recorded)."""
@@ -482,7 +593,7 @@ def _clear(task):
                                          removed=[str(r['number']) for r in targets])
 
 
-def clear_baked(source, id1, work, *, data_files, jobs=None, native=(), chim_world=None):
+def clear_baked(source, id1, work, *, data_files, jobs=None, native=(), chim_world=None, chim_interiors=None):
     """Image step, before the final passes: remove baked harvestable mushrooms.
 
     Some converters (Balmora) bake every mushroom as a brush entity bound to its
@@ -490,16 +601,24 @@ def clear_baked(source, id1, work, *, data_files, jobs=None, native=(), chim_wor
     so those exact entities are removed (tools/remove_harvest_geometry.py: exact
     original reference and pose, every surviving surface and hull verified).
     Runs before hidden-surface culling, compaction and the heap check.
+
+    chim_interiors (the CHIM rooms stage): a room map whose CHIM room record keeps its plants as placed meshes
+    (chim_rooms_keeping_plants: a stage made without the harvest source) is left as it is; a room whose record left
+    them out is cleared like any interior map, so the room map and its record agree (CHIM-ROOM-HARVEST-DOUBLE-48).
     """
     from build_parallel import ordered_map
     id1, work = Path(id1), Path(work)
-    _, _, refs = source_placements(source, data_files)
+    _, _, refs = held_placements(source, data_files)
     regions = chim_regions(id1, chim_world)
     rows, selections = map_selections(id1, refs, native, jobs=jobs, **({'regions': regions} if regions else {}))
     origins = {row['name']: row['origin'] for row in rows}
     chim = {row['name'] for row in rows if row.get('chim')}  # no map: the CHIM world leaves them out
+    keeping = chim_rooms_keeping_plants(chim_interiors) & set(selections)
+    for name in sorted(keeping):
+        print('[harvest] CHIM room %s: its record keeps its %d plant(s) as placed meshes (the CHIM rooms stage had no '
+              'harvest source): left baked, not pickable' % (name, len(selections[name])), flush=True)
     tasks = [(str(id1 / 'maps' / (name + '.bsp')), selections[name], origins[name]) for name in sorted(selections)
-             if name not in chim]
+             if name not in chim and name not in keeping]
     cleared = {}
     for name, count, report in ordered_map(_clear, tasks, jobs):
         if count:
@@ -510,13 +629,13 @@ def clear_baked(source, id1, work, *, data_files, jobs=None, native=(), chim_wor
                    maps=cleared, tool='tools/remove_harvest_geometry.py remove_geometry',
                    # the interior maps found by their bound entities (removed above): install reads them here
                    interior_rows=[dict(name=row['name'], origin=row['origin'], numbers=row['numbers'])
-                                  for row in rows if row.get('interior')])
+                                  for row in rows if row.get('interior') and row['name'] not in keeping])
     (work / 'harvest-baked-removal.json').write_text(json.dumps(receipt, indent=2) + '\n',
                                                      encoding='utf-8', newline='\n')
     return receipt
 
 
-def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_world=None):
+def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_world=None, chim_interiors=None):
     """Image step: catalogues for the final maps, geometry gate, heap admission.
 
     ``sizes`` are the target ABI sizes of the heap check
@@ -526,12 +645,17 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_
     mushrooms clear_baked removed but which the heap check then refuses, and a
     CHIM map (town sub-cell or region frame, chim_world) over the runtime bounds:
     the CHIM world leaves its plants out, so they would be lost.
+
+    chim_interiors (the CHIM rooms stage): every installed CHIM room that left its harvestable plants out of its record
+    gets its catalogue like a CHIM map (chim_room_rows: no baked plant to gate, no per-map heap admission here; the
+    final world heap audit reads the room map with its catalogue), so each plant exists once, as the harvest entity
+    (CHIM-ROOM-HARVEST-DOUBLE-48).
     """
     import numpy as np
     from prepare_harvest import identity_key
     from prepare_harvest_alias import catalogue
     source, id1, work = Path(source), Path(id1), Path(work)
-    receipt, context, refs = source_placements(source, data_files)
+    receipt, context, refs = held_placements(source, data_files)
     settings = receipt['settings']
     palette = (id1 / 'gfx/palette.lmp').read_bytes()
     if digest(palette) != receipt['palette']['sha256']:
@@ -549,7 +673,18 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_
     regions = chim_regions(id1, chim_world)
     rows, found = map_selections(id1, refs, native, jobs=jobs, interiors=removal.get('interior_rows', ()),
                                  **({'regions': regions} if regions else {}))
+    rooms = chim_room_rows(id1, refs, chim_interiors)
+    clash = sorted({row['name'] for row in rows} & {row['name'] for row in rooms})
+    if clash:
+        raise ValueError('Harvest: CHIM room(s) also found as another map: ' + ', '.join(clash))
+    rows = sorted(rows + rooms, key=lambda row: row['name'])
+    found.update({row['name']: select(row, refs) for row in rooms})
     chim = {row['name'] for row in rows if row.get('chim')}
+    room_plants = chim_room_plants(id1, refs)
+    for room, numbers in sorted(room_plants.items()):
+        print('[harvest] CHIM room %s: %d harvestable plant(s) stay placed meshes, not pickable (its record keeps '
+              'them: the CHIM rooms stage had no harvest source): %s' % (room, len(numbers),
+                                                                         ', '.join(map(str, numbers[:8]))), flush=True)
     candidates, selections, capacity = {}, {}, {}
     for row in rows:
         selected = found.get(row['name'])
@@ -594,8 +729,11 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_
     for name in candidates:
         if name in chim:
             (id1 / ('harvest-' + name + '.txt')).write_bytes(candidates[name]['raw'])
+    room_names = {row['name'] for row in rooms}
     heap.update({n: dict(gate='pass', estimated_clearance_bytes=None, estimated_total_bytes=None, harvest=None,
-                         rule='CHIM frame: no per-map heap check') for n in candidates if n in chim})
+                         rule='CHIM room: the final world heap audit reads its room map with this catalogue'
+                         if n in room_names else 'CHIM frame: no per-map heap check')
+                 for n in candidates if n in chim})
     admitted = sorted(n for n in candidates if heap[n]['gate'] == 'pass')
     lost = sorted(set(removal['maps']) - set(admitted))
     if lost:
@@ -610,12 +748,15 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_
     if not used and (id1 / 'progs/harvest').is_dir():
         (id1 / 'progs/harvest').rmdir()
     work.mkdir(parents=True, exist_ok=True)
+    from map_files import frame_map_path
     plan = dict(format=PLAN_FORMAT, max_plants=settings['max_plants'],
                 intern_root_spans=settings['intern_root_spans'], compact_models=settings['compact_models'],
                 global_catalogue_sha256=receipt['global_catalogue_sha256'], global_slots=receipt['global_slots'],
                 inputs={k: receipt[k] for k in ('master', 'index', 'packet', 'palette')},
                 maps=[dict(name=n, **(dict(path=None, chim=True, **({'frame': candidates[n]['row']['frame']}
-                                                                    if 'frame' in candidates[n]['row'] else {}))
+                                                                    if 'frame' in candidates[n]['row'] else {}),
+                                           **({'room': frame_map_path(id1, n, 'chim').relative_to(id1).as_posix()}
+                                              if n in room_names else {}))
                                        if n in chim else
                                        dict(path=f'maps/{n}.bsp', **pin((id1 / 'maps' / (n + '.bsp')).read_bytes()))),
                            origin=candidates[n]['row']['origin'], coverage=candidates[n]['row']['coverage'],
@@ -625,7 +766,7 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_
     families = {}
     for row in rows:
         family = 'world' if row['name'].startswith('vf') else row['name'] if row['name'] == 'intro_docks' else \
-            'interior' if row.get('interior') else row['name'][:2]
+            'chim_room' if row.get('room') else 'interior' if row.get('interior') else row['name'][:2]
         stats = families.setdefault(family, dict(maps=0, with_plants=0, admitted=0, plants=0))
         stats['maps'] += 1
         stats['with_plants'] += row['name'] in candidates or row['name'] in capacity
@@ -646,9 +787,15 @@ def install(source, id1, work, *, data_files, sizes, jobs=None, native=(), chim_
                                                                     'harvest')})
                                  for n in sorted(set(candidates) - set(admitted))},
                    over_runtime_capacity=capacity,
+                   chim_rooms_not_harvestable={room: dict(plants=len(numbers), references=numbers,
+                                                          reason='CHIM room record keeps the plant as a placed mesh '
+                                                                 '(the CHIM rooms stage had no harvest source)')
+                                               for room, numbers in sorted(room_plants.items())},
                    chim_region_catalogues={n: dict(frame=candidates[n]['row']['frame'], plants=candidates[n]['plants'],
                                                    **pin(candidates[n]['raw']))
                                            for n in admitted if 'frame' in candidates[n]['row']},
+                   chim_room_catalogues={n: dict(plants=candidates[n]['plants'], **pin(candidates[n]['raw']))
+                                         for n in admitted if n in room_names},
                    catalogues=[dict(map=n, path='harvest-' + n + '.txt', **pin(candidates[n]['raw']),
                                     plants=candidates[n]['plants'], models=len(candidates[n]['models']),
                                     heap_clearance_bytes=heap[n]['estimated_clearance_bytes'])
@@ -680,7 +827,12 @@ def chim_coverage(id1, chim_world, refs, rows, frame_maps=False):
     from map_files import frame_map_path
     id1 = Path(id1)
     receipt_path = Path(chim_world) / 'chim-receipt.json'
-    parity = json.loads(receipt_path.read_text(encoding='utf-8')).get('parity') or {}
+    receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+    parity = receipt.get('parity') or {}
+    if 'harvest_removed' in parity or 'town_flora_added' in parity:
+        # a world of one area writes its own parity record, not {area: record} (chim.build.build_world;
+        # HARVEST-CHIM-COVERAGE-ONE-AREA-48: every MiniWind sandbox of one town failed here)
+        parity = {(receipt.get('areas') or [receipt.get('town') or 'area'])[0]: parity}
     removed = {}
     for frame, record in sorted(parity.items()):
         for number in record.get('harvest_removed') or ():
@@ -734,7 +886,7 @@ def require_chim_coverage(source, id1, work, *, data_files, chim_world, native=(
     (reference, cell, frame, map) when any is left out. None without a CHIM world."""
     if not chim_world or not (Path(chim_world) / 'chim-receipt.json').is_file():
         return None
-    _, _, refs = source_placements(source, data_files)
+    _, _, refs = held_placements(source, data_files)
     rows = plan_rows(id1, native, chim_regions(id1, chim_world))
     report = chim_coverage(id1, chim_world, refs, rows, frame_maps=frame_maps)
     work = Path(work)
@@ -766,6 +918,12 @@ def native_towns(args):
 def image_step(args, id1, work, *, jobs=None):
     """build_aga.py finalize_image hook: install, print and summarize for build.json."""
     if not getattr(args, 'harvest', None):
+        receipt = chim_room_receipt(getattr(args, 'chim_interiors', None))
+        left = sorted(row['room'] for row in (receipt or {}).get('rooms', ()) if row.get('harvest_left_out'))
+        if left:
+            raise ValueError('Harvest: the CHIM rooms stage left harvestable plants out of %d room record(s) (%s), but '
+                             'this image has no harvest source to place them: they would be lost '
+                             '(CHIM-ROOM-HARVEST-DOUBLE-48)' % (len(left), ', '.join(left[:6])))
         print('[warning] No harvest source given: this image has no harvestable mushrooms '
               '(builder default is the harvest step; --no-harvest is for debugging only).', flush=True)
         return dict(status='not_requested')
@@ -773,7 +931,11 @@ def image_step(args, id1, work, *, jobs=None):
     chim_world = getattr(args, 'chim_world', None)
     staging = install(args.harvest, id1, work, data_files=args.data_files,
                       sizes=compile_target_sizes(args.sdk)[0], jobs=jobs, native=native_towns(args),
-                      chim_world=chim_world)
+                      chim_world=chim_world, chim_interiors=getattr(args, 'chim_interiors', None))
+    if staging['chim_room_catalogues']:
+        print('Harvest: %d CHIM rooms place their %d harvestable plants as harvest entities (left out of their '
+              'records).' % (len(staging['chim_room_catalogues']),
+                             sum(r['plants'] for r in staging['chim_room_catalogues'].values())), flush=True)
     print(f"Harvest: {staging['admitted']}/{staging['candidates']} maps with mushrooms admitted by the heap check, "
           f"{staging['plants']} plants, {staging['models']} shared models; not admitted: "
           f"{', '.join(staging['not_admitted']) or 'none'}.", flush=True)
@@ -802,6 +964,7 @@ def image_step(args, id1, work, *, jobs=None):
                                            'baked_removal', 'geometry_gate')},
                 not_admitted=sorted(staging['not_admitted']), over_runtime_capacity=sorted(staging['over_runtime_capacity']),
                 chim_region_catalogues=len(staging['chim_region_catalogues']),
+                chim_room_catalogues=len(staging['chim_room_catalogues']),
                 chim_coverage=None if coverage is None else dict(plants=coverage['plants'], placed=coverage['placed'],
                                                                  missing=len(coverage['missing'])))
 

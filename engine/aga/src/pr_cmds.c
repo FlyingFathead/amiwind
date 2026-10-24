@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "aw_items.h"
 #include "aw_anim.h"
+#include "aw_glut.h"
 
 #define	RETURN_EDICT(e) (((int *)pr_globals)[OFS_RETURN] = EDICT_TO_PROG(e))
 
@@ -1900,11 +1901,31 @@ static void PF_aw_converse(void)
     G_FLOAT(OFS_RETURN)=0;
     if(G_FLOAT(OFS_PARM1))v=GetEdictFieldValue(e,"aw_greeting_again");
     if(!v || !v->string || !pr_strings[v->string])v=GetEdictFieldValue(e,"aw_greeting");
-    if(!v || !v->string || !pr_strings[v->string])return;
-    AW_ExpandDialogue(text,sizeof(text),pr_strings+v->string);
+    if(v && v->string && pr_strings[v->string])AW_ExpandDialogue(text,sizeof(text),pr_strings+v->string);
+    /* no greeting of its own (library, region and batch-room actors; NPC-GREETINGS-LIBRARY-MUTE-48): the voice
+     * table's conversation greeting, the same rule picked when the talk opens (aw_glut.c) */
+    else if(!AW_GlutConverse(e,G_FLOAT(OFS_PARM1)!=0,text,sizeof(text)))return;
     seconds=strlen(text)/12.0;if(seconds<8)seconds=8;if(seconds>40)seconds=40;
     AW_UISubtitle(pr_strings+e->v.netname,text,seconds);
     G_FLOAT(OFS_RETURN)=(float)seconds;
+}
+
+/* The voice table (aw_glut.c, NPC-GREETINGS-LIBRARY-MUTE-48). #84 at spawn: 1 when the NPC's record is in it
+ * (an NPC without its own greeting takes its hello distance from it). #85: say a topic (0 Hello, 1 Idle, 2
+ * Intruder, 3 Thief, 4 Hit, 5 Attack, 6 Flee): 1 when a line was picked (its voice plays when the build has the
+ * file); #86: that line's text, "" when it has none. */
+static void PF_aw_glut_prep(void)
+{
+    G_FLOAT(OFS_RETURN)=AW_GlutPrep(G_EDICT(OFS_PARM0));
+}
+static void PF_aw_glut_say(void)
+{
+    edict_t *e=G_EDICT(OFS_PARM0);eval_t *talked=GetEdictFieldValue(e,"aw_manual_count");
+    G_FLOAT(OFS_RETURN)=AW_GlutSay(e,(int)G_FLOAT(OFS_PARM1),talked && talked->_float>0);
+}
+static void PF_aw_glut_text(void)
+{
+    G_INT(OFS_RETURN)=(char *)AW_GlutText()-pr_strings;
 }
 
 builtin_t pr_builtin[] =
@@ -2010,7 +2031,10 @@ PF_aw_npctarget, /* #79: entity(entity player) aw_npctarget */
 PF_aw_npcfloor,  /* #80: float(entity actor) aw_npcfloor */
 PF_aw_animprep,  /* #81: void(entity actor) aw_animprep */
 PF_aw_bark,      /* #82: float(entity actor, float topic, float odds) aw_bark */
-PF_aw_converse   /* #83: float(entity npc, float again) aw_converse */
+PF_aw_converse,  /* #83: float(entity npc, float again) aw_converse */
+PF_aw_glut_prep, /* #84: float(entity npc) aw_glut_prep */
+PF_aw_glut_say,  /* #85: float(entity npc, float topic) aw_glut_say */
+PF_aw_glut_text  /* #86: string() aw_glut_text */
 };
 
 builtin_t *pr_builtins = pr_builtin;

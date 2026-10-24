@@ -1,6 +1,6 @@
 # World map manifest (design)
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -179,9 +179,14 @@ docks' 56 and the courtyard's 14 are identical (three residents' fitted height d
 collision instead of the region map's), the activated barrel's box is identical, and 360 statics match the CHIM
 placements both ways. The stage takes about 40 s; the chain it replaces compiled 66 maps twice.
 
-Still built: the complete town map itself (the bsp stage), because the scene chain's later stages write the residents,
-hands and intro entities into it; it is the stage's source of entities and never staged or shipped. Moving that carrier
-off a compiled map is a follow-up.
+Still built: the town's source-only carrier (`scene/id1/maps/seyda.bsp`, `prepare_mesh_bsp.prepare_carrier`: BSP29
+lumps with the original entities and model boxes, no qbsp, vis or light since v0.0.36), because the npcs, intro, area
+and opening-references stages still append their entities to its entity lump and `chim-town-seyda` reads the full set;
+it is never staged or shipped (the image unlinks it). Since v0.0.48 the hand timings and eye height no longer travel
+through it: every stage reads them from the hands stage's report (`scene-ready.json` "hands",
+`hand_metadata.scene_timings`; BUILD-SEYDA-BSP-CARRIER-48), so the room stages no longer wait for the stages that
+rewrite it. Moving its entities to a JSON list (the carrier already writes `source-entities.json`) is
+BUILD-SEYDA-ENTITY-BUS-48.
 
 ## Collision check (before any stage)
 

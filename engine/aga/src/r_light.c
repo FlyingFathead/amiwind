@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include "aw_sky.h"
-int r_daylight=256,r_lamps=1;
+int r_daylight=256,r_lamps=1,r_campfires=1;
 unsigned char *r_warm_colormap; /* built by r_sky.c from aw_light_hue */
 unsigned char r_dlight_cool[32];
 /* A lightstyle's value with night dimming: lamps (AW_LAMP_STYLE and up) keep

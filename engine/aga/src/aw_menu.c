@@ -19,8 +19,8 @@ char m_return_reason[32];
 static int frontend,selection,confirming,confirmation_return;
 static int mouse_x=160,mouse_y=63,mouse_visible;
 static int graphics_top,scroll_drag;
-static int audio_options,audio_drag;
-/* Options > Fog distance slider (Morrowind style): drag, arrows, or type. */
+static int audio_drag,sens_drag;
+/* Options > Video > Fog distance slider (Morrowind style): drag, arrows, or type. */
 #define FOG_MIN 100
 #define FOG_MAX 1500
 #define FOG_X 60
@@ -48,19 +48,64 @@ static void fog_key(int key){
         else if(mouse_x>=122 && mouse_x<198 && mouse_y>=150 && mouse_y<175)fog_close(1);
     }
 }
-static int scene_picker,scene_available[AW_MAP_COUNT],scene_top,graphics,interface_options,intro_available;
+static int scene_picker,scene_available[AW_MAP_COUNT],scene_top,graphics,intro_available;
 static keydest_t picker_return;
 static int colours[4],ready;
 static const char *front_items[]={"New game","Load game","Options","Exit game"};
 static const char *items[]={"Return to game","New game","Save game","Load game","Options","Main menu"};
-
-/* Options list rows (Back is OPTION_ROWS-1). Display settings first. */
-enum {OPT_FOG,OPT_RESET,OPT_FAR,OPT_FRAME,OPT_CROSSHAIR,OPT_PHOTO,OPT_INTERFACE,OPT_AUDIO,OPT_CONTROLS,
-    OPT_AUTOSAVE,OPT_AREA,OPT_METHOD,OPT_BUFFER,OPT_MEMORY,OPT_GRAPHICS};
 #define ROW_Y 54
 #define ROW_H 19
+
+/* Options: one full-screen panel (maintainer 2026-10-22: categories like the original
+ * game, framed like its menus, edge to edge with nothing of the 3D view behind it).
+ * The four pages are the original's own (Morrowind.exe MenuPrefs / MenuAudio /
+ * MenuCtrls / MenuVideo; GMSTs sPrefs, sAudio, sControls, sVideo) in the order of
+ * OpenMW's settings window:
+ *   [ Prefs ][ Audio ][ Controls ][ Video ]    tab row, each tab framed
+ *   +--------------------------------------+
+ *   | the page's settings, 7 rows, scroll  |   one framed group
+ *   +--------------------------------------+
+ *   help line                       [ Back ]
+ * Focus is on the tab row, the page's rows or Back. Up/Down move between them (the
+ * row list stops at its ends: Up from the first row reaches the tabs, Down from the
+ * last reaches Back); Left/Right switch pages on the tab row and change values on a
+ * row; Enter/click acts; Esc returns to the menu. The world is not drawn behind it
+ * (aw_menu_fullscreen, aw_ui.c AW_ModalWorldHidden). */
+enum {TAB_PREFS,TAB_AUDIO,TAB_CONTROLS,TAB_VIDEO,TABS};
+static const char *const tab_names[TABS]={"Prefs","Audio","Controls","Video"};
+enum {FOCUS_TABS,FOCUS_ROWS,FOCUS_BACK};
+static int tab,focus;
+#define TAB_X 8
+#define TAB_STEP 76
+#define TAB_W 72
+#define TAB_Y 6
+#define TAB_H 22
+#define GROUP_X 8
+#define GROUP_Y 30
+#define GROUP_W 304
+#define GROUP_H 144
+#define LIST_X 14
+#define LIST_Y 36
+#define LIST_W 280
+#define VISIBLE 7
+#define SCROLL_X 296
+#define BACK_X 232
+#define BACK_Y 176
+#define BACK_W 80
+#define BACK_H 20
+/* Prefs and Video rows (Prefs: the HUD and gameplay; Video: view, loading, memory). */
+enum {ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_FRAME,ROW_FONT,ROW_VOICE,ROW_DIALOGUE,ROW_AIMED,ROW_NPC,ROW_OBJECTS,
+    ROW_AUTOSAVE,ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS};
+static const unsigned char prefs_rows[]={ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_FRAME,ROW_FONT,ROW_VOICE,ROW_DIALOGUE,
+    ROW_AIMED,ROW_NPC,ROW_OBJECTS,ROW_AUTOSAVE};
+static const unsigned char video_rows[]={ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-#define OPTION_ROWS 16
+    ,ROW_GRAPHICS
+#endif
+};
+#define PREFS_ROWS ((int)sizeof(prefs_rows))
+#define VIDEO_ROWS ((int)sizeof(video_rows))
+#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
 static int brightness_options,brightness_drag;
 extern int R_BrightnessStep(int outside);
 extern void R_BrightnessSetStep(int outside,int value);
@@ -68,13 +113,13 @@ extern void R_BrightnessSetStep(int outside,int value);
 #define BRIGHTNESS_W 200
 static int brightness_active(void){return brightness_options;}
 static void brightness_reset(void){brightness_options=brightness_drag=0;}
-static void brightness_back(void){brightness_reset();selection=OPT_GRAPHICS;mouse_visible=0;}
+static void brightness_back(void){brightness_reset();tab=TAB_VIDEO;focus=FOCUS_ROWS;selection=VIDEO_ROWS-1;mouse_visible=0;}
 static void brightness_pointer(void){R_BrightnessSetStep(brightness_drag-1,10+((mouse_x-BRIGHTNESS_X)*5+BRIGHTNESS_W/2)/BRIGHTNESS_W);}
 #else
-#define OPTION_ROWS 15
 #define brightness_active() 0
 #define brightness_reset() ((void)0)
 #endif
+/* Options > Audio: four sliders in the page's group. */
 #define AUDIO_Y 36
 #define AUDIO_H 30
 #define AUDIO_X 134
@@ -92,7 +137,27 @@ static void audio_set(int row,int percent){
     if(audio_levels[row]->value!=percent*.01f)Cvar_SetValue(audio_levels[row]->name,percent*.01f);
 }
 static void audio_pointer(int row){audio_set(row,((mouse_x-AUDIO_X)*100+AUDIO_W/2)/AUDIO_W);}
-static void audio_back(void){audio_options=audio_drag=0;selection=OPT_AUDIO;mouse_visible=0;}
+/* Options > Controls > Mouse sensitivity: Quake's saved sensitivity (default 3.0, unchanged),
+ * 0.5 to 10 in steps of 0.5 (Shift: 0.1); arrows, Home/End, or drag the rail. Invert Y axis:
+ * Quake's own invert, the sign of the saved m_pitch (the original's "Invert Y Axis", sMouseFlip). */
+#define SENS_X 170
+#define SENS_W 76
+static int sens_clamp(int t){return t<AW_SENSITIVITY_MENU_MIN?AW_SENSITIVITY_MENU_MIN:t>AW_SENSITIVITY_MENU_MAX?AW_SENSITIVITY_MENU_MAX:t;}
+static void sens_step(int direction){
+    int t=AW_SensitivityTenths();
+    if(keydown[K_SHIFT])t+=direction;
+    else t=direction>0?(t/5+1)*5:((t+4)/5-1)*5;
+    AW_SensitivitySetTenths(sens_clamp(t));
+}
+static void sens_pointer(void){
+    int range=AW_SENSITIVITY_MENU_MAX-AW_SENSITIVITY_MENU_MIN,t;
+    if(mouse_x<=SENS_X)t=AW_SENSITIVITY_MENU_MIN;
+    else if(mouse_x>=SENS_X+SENS_W)t=AW_SENSITIVITY_MENU_MAX;
+    else t=AW_SENSITIVITY_MENU_MIN+((mouse_x-SENS_X)*range+SENS_W/2)/SENS_W;
+    AW_SensitivitySetTenths(sens_clamp((t+2)/5*5));
+}
+static int invert_on(void){return Cvar_VariableValue("m_pitch")<0;}
+static void invert_toggle(void){Cvar_SetValue("m_pitch",-Cvar_VariableValue("m_pitch"));}
 /* Options > Controls edits the same bindings as bind/unbind and keymaps.cfg.
  * Each action shows up to two keys; a third key replaces both.
  *
@@ -114,19 +179,24 @@ static const control_t controls[]={
     {"Use","+aw_use"},{"Attack","+attack"},{"Block","+aw_alt"},{"Hands","impulse 202"},{"Torch","aw_torch"},
     {"Map","aw_worldmap"},{"Journal","aw_journal"},{"Wait","aw_wait"},
     {"Quick save","aw_quicksave"},{"Quick load","aw_quickload"},
-    {"Inventory","aw_inventory"},{"Quick keys",NULL,"1-9"},{"Ready magic",NULL,"R"},{"Cast spell",NULL,NULL}};
+    {"Inventory","aw_inventory"},{"Stats","aw_stats"},{"Magic","aw_magicmenu"},{"Quick keys",NULL,"1-9"},{"Ready magic",NULL,"R"},{"Cast spell",NULL,NULL}};
 #define CONTROL_ACTIONS ((int)(sizeof(controls)/sizeof(controls[0])))
-/* Then the combat options (docs/COMBAT.md; saved with the game config):
+/* The Controls page: the mouse rows, the actions, then the combat options (docs/COMBAT.md;
+ * saved with the game config):
  * Combat style: AmiWind (aw_combat_miss 1, AmiWind extension: a failed roll shows
  * the defender's dodge or block) / Original Morrowind (0: the swish);
  * Dice rolls: On (aw_combat_dice 1, the original rolls) / Off (no dice, extension);
  * Blocking: Hold to block (aw_combat_block 1, AmiWind extension: the block button raises the
  * shield, the original formula decides each blow) / Automatic (0: the original). */
-#define CONTROL_STYLE CONTROL_ACTIONS
-#define CONTROL_DICE (CONTROL_ACTIONS+1)
-#define CONTROL_BLOCK (CONTROL_ACTIONS+2)
-#define CONTROL_RESET (CONTROL_ACTIONS+3)
-#define CONTROL_ROWS (CONTROL_ACTIONS+5)
+#define CONTROL_SENS 0
+#define CONTROL_INVERT 1
+#define CONTROL_FIRST 2
+#define CONTROL_STYLE (CONTROL_FIRST+CONTROL_ACTIONS)
+#define CONTROL_DICE (CONTROL_STYLE+1)
+#define CONTROL_BLOCK (CONTROL_STYLE+2)
+#define CONTROL_RESET (CONTROL_STYLE+3)
+#define CONTROL_ROWS (CONTROL_RESET+1)
+#define CONTROL_ACTION(row) ((row)>=CONTROL_FIRST && (row)<CONTROL_STYLE)
 #define CONTROL_COMBAT(row) ((row)==CONTROL_STYLE || (row)==CONTROL_DICE || (row)==CONTROL_BLOCK)
 static void combat_toggle(int row){
     if(row==CONTROL_STYLE)Cvar_SetValue("aw_combat_miss",Cvar_VariableValue("aw_combat_miss")?0:1);
@@ -136,13 +206,12 @@ static void combat_toggle(int row){
 static void combat_line(int row,char *line){
     if(row==CONTROL_STYLE){
         strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat style: AmiWind":"Combat style: Original Morrowind");
-        if(AW_UIWidth(line)>226)strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat: AmiWind":"Combat: Original Morrowind");
+        if(AW_UIWidth(line)>LIST_W-4)strcpy(line,Cvar_VariableValue("aw_combat_miss")?"Combat: AmiWind":"Combat: Original Morrowind");
     }else if(row==CONTROL_BLOCK)strcpy(line,Cvar_VariableValue("aw_combat_block")?"Blocking: Hold to block":"Blocking: Automatic");
     else strcpy(line,Cvar_VariableValue("aw_combat_dice")?"Dice rolls: On":"Dice rolls: Off");
 }
-#define CONTROL_VISIBLE 6
-static int controls_options,controls_top,controls_capture;
-static int control_ready(int row){return row>=CONTROL_ACTIONS || controls[row].command!=NULL;}
+static int controls_capture;
+static int control_ready(int row){return !CONTROL_ACTION(row) || controls[row-CONTROL_FIRST].command!=NULL;}
 static int control_keys(int action,int *keys){
     int key,n=0;
     if(!controls[action].command)return 0;
@@ -169,36 +238,37 @@ static void control_line(int action,char *line){
         if(controls[action].planned_keys){strcat(line," ");strcat(line,controls[action].planned_keys);}
         strcat(line," (planned)");return;
     }
-    if(controls_capture && selection==action){strcat(line," ?");return;}
+    if(controls_capture && selection==action+CONTROL_FIRST){strcat(line," ?");return;}
     if(!n)strcat(line," -");
     for(i=0;i<n;i++){key_label(keys[i],name);strcat(line,i?", ":" ");strcat(line,name);}
 }
 static void control_clear(int action){int keys[2],n=control_keys(action,keys),i;for(i=0;i<n;i++)Key_SetBinding(keys[i],"");}
 static void control_capture(int key){
-    int keys[2],n;
+    int keys[2],n,action=selection-CONTROL_FIRST;
     controls_capture=0;
     if(key==K_ESCAPE)return;
-    if(key==K_BACKSPACE || key==K_DEL){control_clear(selection);return;}
+    if(key==K_BACKSPACE || key==K_DEL){control_clear(action);return;}
     if(key>='A' && key<='Z')key+='a'-'A';
-    if(!controls[selection].command)return;
-    if(keybindings[key] && !strcmp(keybindings[key],controls[selection].command))return;
-    n=control_keys(selection,keys);
-    if(n>=2)control_clear(selection);
-    Key_SetBinding(key,(char *)controls[selection].command);
+    if(!controls[action].command)return;
+    if(keybindings[key] && !strcmp(keybindings[key],controls[action].command))return;
+    n=control_keys(action,keys);
+    if(n>=2)control_clear(action);
+    Key_SetBinding(key,(char *)controls[action].command);
 }
-static void controls_back(void){controls_options=controls_capture=0;selection=OPT_CONTROLS;mouse_visible=0;}
-static void controls_open(void){controls_options=1;controls_capture=controls_top=selection=0;mouse_visible=0;}
-/* Setup lists stop at their ends so selection and scrollbar never jump back
- * across the list. This also applies to wheel/W/S input normalized below. */
+/* The brightness panel stops at its ends so the selection never jumps back across it;
+ * the Options rows stop the same way (rows_step). This also applies to wheel/W/S input
+ * normalized below. */
+#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
 static void option_step(int key,int rows){
     if(key==K_UPARROW){if(selection>0)selection--;}
     else if(selection<rows-1)selection++;
 }
-/* Options > Extra RAM: aw_autoram (chim_world.c; saved in config.cfg). Automatic:
+#endif
+/* Options > Video > Extra RAM: aw_autoram (chim_world.c; saved in config.cfg). Automatic:
  * free Fast RAM beyond a margin becomes CHIM cache at the next start; Off: the
  * standard memory always. Takes effect at the next start. */
 static void memory_toggle(void){Cvar_SetValue("aw_autoram",Cvar_VariableValue("aw_autoram")?0:1);}
-/* Options > Far detail: the far test (aw_cull, aw_fog.c; saved in config.cfg).
+/* Options > Video > Far detail: the far test (aw_cull, aw_fog.c; saved in config.cfg).
  * Full draws everything to the fog; the others leave out distant models
  * (docs/performance/FAR-TEST.md). Other aw_cull values (console) read Custom. */
 static const int far_values[4]={1,3,4,6};
@@ -220,21 +290,146 @@ static int enabled(int row){return row==3 || (row==2 && AW_SaveAllowed()) || row
 int AW_MenuFrontEnd(void){return frontend && !graphics && !confirming && key_dest==key_menu;}
 /* Photo mode is offered from the pause menu's Options, not the title screen. */
 static int photo_ready(void){return !frontend && AW_PhotoModeAvailable();}
-static void interface_change(int direction){
-    if(selection==0)font_step(direction);
-    else if(selection==1)AW_UIVoiceNamesToggle();
-    else if(selection==2)AW_UIDialogueCycle(direction);
-    else if(selection>=3 && selection<=5)AW_SceneUIOption(selection-3,direction);
+
+/* ---- Options pages ---- */
+static void close_menu(void);
+static int tab_rows(int t){return t==TAB_PREFS?PREFS_ROWS:t==TAB_AUDIO?4:t==TAB_CONTROLS?CONTROL_ROWS:VIDEO_ROWS;}
+static int row_id(int row){return tab==TAB_PREFS?prefs_rows[row]:video_rows[row];}
+static int row_active(int row){
+    if(tab==TAB_CONTROLS)return control_ready(row);
+    if(tab==TAB_VIDEO && row_id(row)==ROW_BUFFER)return AW_CellChangeMethod()==2;
+    if(tab==TAB_VIDEO && row_id(row)==ROW_PHOTO)return photo_ready();
+    return 1;
+}
+static void keep_visible(void){
+    if(selection<graphics_top)graphics_top=selection;
+    if(selection>=graphics_top+VISIBLE)graphics_top=selection-VISIBLE+1;
+}
+static void set_tab(int t){
+    tab=(t+TABS)%TABS;selection=graphics_top=0;audio_drag=sens_drag=controls_capture=0;
+}
+static void options_open(void){graphics=1;focus=FOCUS_TABS;selection=graphics_top=0;mouse_x=160;mouse_y=100;}
+static void options_close(void){
+    brightness_reset();
+    graphics=fog_slider=audio_drag=sens_drag=controls_capture=scroll_drag=0;selection=frontend?2:4;mouse_visible=0;
+}
+static int fullscreen(void){return key_dest==key_menu && graphics && !AW_SaveMenuActive();}
+/* Up/Down on the page's rows: planned controls are skipped; past the ends the
+ * focus moves to the tab row (up) or Back (down) and stays there. */
+static void rows_step(int key){
+    int row=selection,n=tab_rows(tab);
+    if(key==K_UPARROW){
+        do row--;while(row>=0 && !control_ready(row) && tab==TAB_CONTROLS);
+        if(row<0){focus=FOCUS_TABS;return;}
+    }else{
+        do row++;while(row<n && !control_ready(row) && tab==TAB_CONTROLS);
+        if(row>=n){focus=FOCUS_BACK;return;}
+    }
+    selection=row;keep_visible();
+}
+static void prefs_video_change(int id,int direction,int enter){
+    int photo;
+    switch(id){
+    case ROW_CROSSHAIR:AW_CrosshairSet(!AW_CrosshairShown());break;
+    case ROW_COLOUR:AW_CrosshairStyleSet(0,AW_CrosshairStyle(0)+direction);break;
+    case ROW_SHAPE:AW_CrosshairStyleSet(1,AW_CrosshairStyle(1)+direction);break;
+    case ROW_FRAME:AW_UIFrameToggle();break;
+    case ROW_FONT:font_step(direction);break;
+    case ROW_VOICE:AW_UIVoiceNamesToggle();break;
+    case ROW_DIALOGUE:AW_UIDialogueCycle(direction);break;
+    case ROW_AIMED:AW_SceneUIOption(0,direction);break;
+    case ROW_NPC:AW_SceneUIOption(1,direction);break;
+    case ROW_OBJECTS:AW_SceneUIOption(2,direction);break;
+    case ROW_AUTOSAVE:if(enter)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);else AW_SetAutosaveCount(AW_AutosaveCount()+direction);break;
+    case ROW_FOG:
+        if(enter){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
+        else AW_SetDrawDistance(AW_DrawDistance()+direction*(keydown[K_SHIFT]?1:10));
+        break;
+    case ROW_RESET:if(enter)AW_SetDrawDistance(540);break;
+    case ROW_FAR:far_step(direction);break;
+    /* Photo mode needs the running game; the menu closes first so the
+     * notice and then the clean frames follow at once. */
+    case ROW_PHOTO:if(enter && photo_ready()){photo=!AW_PhotoModeActive();options_close();close_menu();AW_PhotoModeSet(photo);}break;
+    case ROW_AREA:AW_RegionLoadingToggle();break;
+    case ROW_METHOD:AW_StreamOption(0,1);break;
+    case ROW_BUFFER:if(AW_CellChangeMethod()==2)AW_StreamOption(1,direction);break;
+    case ROW_MEMORY:memory_toggle();break;
+#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
+    case ROW_GRAPHICS:brightness_options=1;brightness_drag=0;selection=0;break;
+#endif
+    }
+}
+static void row_key(int key){
+    int direction=key==K_LEFTARROW?-1:key==K_RIGHTARROW?1:0,enter=key==K_ENTER || key==K_MOUSE1;
+    if(tab==TAB_AUDIO){
+        if(direction)audio_set(selection,audio_percent(selection)+direction*(keydown[K_SHIFT]?1:5));
+        if(key==K_HOME || key==K_END)audio_set(selection,key==K_HOME?0:100);
+        if(key==K_MOUSE1 && mouse_x>=AUDIO_X-4 && mouse_x<=AUDIO_X+AUDIO_W+4){audio_drag=selection+1;audio_pointer(selection);}
+        return;
+    }
+    if(tab==TAB_CONTROLS){
+        if(selection==CONTROL_SENS){
+            if(direction)sens_step(direction);
+            if(key==K_HOME || key==K_END)AW_SensitivitySetTenths(key==K_HOME?AW_SENSITIVITY_MENU_MIN:AW_SENSITIVITY_MENU_MAX);
+            if(key==K_MOUSE1 && mouse_x>=SENS_X-4 && mouse_x<=SENS_X+SENS_W+4){sens_drag=1;sens_pointer();}
+        }else if(selection==CONTROL_INVERT){if(direction || enter)invert_toggle();}
+        else if(CONTROL_ACTION(selection)){
+            if(key==K_BACKSPACE || key==K_DEL)control_clear(selection-CONTROL_FIRST);
+            else if(enter && control_ready(selection)){controls_capture=1;mouse_visible=0;}
+        }else if(CONTROL_COMBAT(selection)){if(direction || enter)combat_toggle(selection);}
+        else if(selection==CONTROL_RESET && enter)Cbuf_AddText("exec keymaps-default.cfg\n");
+        return;
+    }
+    if(direction || enter)prefs_video_change(row_id(selection),direction?direction:1,enter);
+}
+/* What the pointer is over on the Options page: 0 nothing, 1 a tab, 2 a row, 3 Back. */
+static int options_hit(int *index){
+    int i,n=tab_rows(tab);
+    for(i=0;i<TABS;i++)if(inside(TAB_X+i*TAB_STEP,TAB_Y,TAB_W,TAB_H)){*index=i;return 1;}
+    if(inside(BACK_X,BACK_Y,BACK_W,BACK_H))return 3;
+    if(tab==TAB_AUDIO){for(i=0;i<4;i++)if(inside(LIST_X,AUDIO_Y+i*AUDIO_H,LIST_W,AUDIO_H)){*index=i;return 2;}return 0;}
+    for(i=0;i<VISIBLE && graphics_top+i<n;i++)if(inside(LIST_X,LIST_Y+i*ROW_H,LIST_W,ROW_H)){*index=graphics_top+i;return 2;}
+    return 0;
+}
+static void options_key(int key){
+    int index=0,hit,row;
+    if(key==K_ESCAPE){options_close();return;}
+    if(key==K_MOUSE1){
+        if(tab!=TAB_AUDIO){
+            row=AW_UIScrollHit(mouse_x,mouse_y,SCROLL_X,LIST_Y,VISIBLE*ROW_H,tab_rows(tab),VISIBLE,graphics_top);
+            if(row>=0){graphics_top=row;selection=row;focus=FOCUS_ROWS;scroll_drag=mouse_y>=LIST_Y+10 && mouse_y<LIST_Y+VISIBLE*ROW_H-10;return;}
+        }
+        hit=options_hit(&index);
+        if(hit==1){if(index!=tab)set_tab(index);focus=FOCUS_TABS;return;}
+        if(hit==3){options_close();return;}
+        if(hit!=2)return;
+        focus=FOCUS_ROWS;selection=index;
+    }else mouse_visible=0;
+    if(focus==FOCUS_TABS){
+        if(key==K_LEFTARROW || key==K_RIGHTARROW)set_tab(tab+(key==K_LEFTARROW?-1:1));
+        else if(key==K_DOWNARROW || key==K_TAB || key==K_ENTER){focus=FOCUS_ROWS;selection=graphics_top=0;}
+        return;
+    }
+    if(focus==FOCUS_BACK){
+        if(key==K_UPARROW){
+            focus=FOCUS_ROWS;selection=tab_rows(tab)-1;
+            while(selection>0 && !control_ready(selection) && tab==TAB_CONTROLS)selection--;
+            keep_visible();
+        }else if(key==K_ENTER)options_close();
+        return;
+    }
+    if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB){audio_drag=sens_drag=0;rows_step(key==K_UPARROW?K_UPARROW:K_DOWNARROW);return;}
+    row_key(key);
 }
 static void close_menu(void){
     if(frontend)return;
     brightness_reset();
-    confirming=scene_picker=graphics=interface_options=audio_options=audio_drag=controls_options=controls_capture=0;key_dest=key_game;IN_AWClearButtons();
+    confirming=scene_picker=graphics=fog_slider=audio_drag=sens_drag=controls_capture=0;key_dest=key_game;IN_AWClearButtons();
 }
 void M_Menu_Main_f(void){
     FILE *f=NULL;intro_available=COM_FOpenFile("intro/chargenname1.txt",&f)>0 && f!=NULL;if(f)fclose(f);
     brightness_reset();
-    IN_AWClearButtons();key_dest=key_menu;selection=confirming=scene_picker=graphics=interface_options=audio_options=audio_drag=controls_options=controls_capture=mouse_visible=graphics_top=scroll_drag=0;
+    IN_AWClearButtons();key_dest=key_menu;selection=confirming=scene_picker=graphics=fog_slider=audio_drag=sens_drag=controls_capture=mouse_visible=graphics_top=scroll_drag=0;
     mouse_x=160;mouse_y=ROW_Y+ROW_H/2;
 }
 void M_ToggleMenu_f(void){if(key_dest==key_menu)close_menu();else M_Menu_Main_f();}
@@ -251,7 +446,7 @@ static void scene_menu(void){
     for(i=0;i<AW_MAP_COUNT;i++){size=AW_SceneMapSize(AW_MapName(i),path,sizeof(path));scene_available[i]=size>=124;}
     brightness_reset();
     picker_return=key_dest;IN_AWClearButtons();key_dest=key_menu;
-    scene_picker=1;graphics=interface_options=audio_options=audio_drag=controls_options=controls_capture=confirming=mouse_visible=0;selection=AW_MAP_COUNT;scene_top=0;
+    scene_picker=1;graphics=fog_slider=audio_drag=sens_drag=controls_capture=confirming=mouse_visible=0;selection=AW_MAP_COUNT;scene_top=0;
     for(i=0;i<AW_MAP_COUNT;i++)if(scene_available[i]){selection=i;break;}
     mouse_x=160;mouse_y=65+selection*24+12;
 }
@@ -259,6 +454,7 @@ void M_Init(void){
     Cmd_AddCommand("aw_main_menu",main_menu);Cmd_AddCommand("togglemenu",M_ToggleMenu_f);
     Cmd_AddCommand("menu_main",M_Menu_Main_f);Cmd_AddCommand("menu_quit",M_Menu_Quit_f);
     Cmd_AddCommand("aw_scene_menu",scene_menu);
+    aw_menu_fullscreen=fullscreen;
 }
 static int mouse_row(void){
     int i;
@@ -266,42 +462,50 @@ static int mouse_row(void){
     if(brightness_options){if(inside(36,34,248,55))return 0;if(inside(36,91,248,55))return 1;if(inside(222,165,86,25))return 2;return -1;}
 #endif
     if(confirming){if(inside(48,132,106,25))return 0;if(inside(166,132,106,25))return 1;return -1;}
-    if(audio_options){for(i=0;i<4;i++)if(inside(10,AUDIO_Y+i*AUDIO_H,300,AUDIO_H))return i;if(inside(222,165,86,25))return 4;return -1;}
-    if(interface_options){for(i=0;i<7;i++)if(inside(44,54+i*19,232,19))return i;return -1;}
-    if(controls_options){for(i=0;i<CONTROL_VISIBLE && controls_top+i<CONTROL_ROWS;i++)if(inside(44,54+i*19,230,19))return controls_top+i;return -1;}
-    if(graphics){for(i=0;i<7;i++)if(inside(44,54+i*19,230,19))return graphics_top+i;return -1;}
     if(scene_picker){for(i=0;i<6 && scene_top+i<=AW_MAP_COUNT;i++)if(inside(44,55+i*19,230,19))return scene_top+i;return -1;}
     if(frontend){for(i=0;i<4;i++)if(inside(12,front_top()+i*front_height(),front_width()-8,front_height()))return i;return -1;}
     for(i=0;i<6;i++)if(inside(44,ROW_Y+i*ROW_H,232,ROW_H))return i;
     return -1;
 }
 void AW_MenuMouse(int dx,int dy){
-    int row;if(key_dest!=key_menu || (!dx && !dy))return;
+    int row,index=0;if(key_dest!=key_menu || (!dx && !dy))return;
     mouse_visible=1;mouse_x+=dx;mouse_y+=dy;
     if(mouse_x<0)mouse_x=0;
     if(mouse_x>319)mouse_x=319;
     if(mouse_y<0)mouse_y=0;
     if(mouse_y>199)mouse_y=199;
-    if(!keydown[K_MOUSE1])scroll_drag=audio_drag=fog_drag=0;
+    if(!keydown[K_MOUSE1])scroll_drag=audio_drag=sens_drag=fog_drag=0;
     if(fog_slider){if(fog_drag)fog_pointer();return;}
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
     if(!keydown[K_MOUSE1])brightness_drag=0;
     if(brightness_options && brightness_drag){brightness_pointer();return;}
+    if(brightness_options){row=mouse_row();if(row>=0)selection=row;return;}
 #endif
-    if(audio_options && audio_drag){audio_pointer(audio_drag-1);return;}
-    if(controls_capture)return;
-    if(scroll_drag && ((graphics && !interface_options && !audio_options && !controls_options && !brightness_active()) || scene_picker)){
-        int total=graphics?OPTION_ROWS:AW_MAP_COUNT+1,visible=graphics?7:6;
-        row=AW_UIScrollHit(280,mouse_y<55?55:mouse_y>=54+visible*19?53+visible*19:mouse_y,276,54,visible*19,total,visible,graphics?graphics_top:scene_top);
-        if(row>=0){if(graphics)graphics_top=row;else scene_top=row;selection=row;}return;
+    if(graphics){
+        if(audio_drag){audio_pointer(audio_drag-1);return;}
+        if(sens_drag){sens_pointer();return;}
+        if(controls_capture)return;
+        if(scroll_drag && tab!=TAB_AUDIO){
+            row=AW_UIScrollHit(SCROLL_X,mouse_y<LIST_Y+1?LIST_Y+1:mouse_y>=LIST_Y+VISIBLE*ROW_H?LIST_Y-1+VISIBLE*ROW_H:mouse_y,
+                SCROLL_X,LIST_Y,VISIBLE*ROW_H,tab_rows(tab),VISIBLE,graphics_top);
+            if(row>=0){graphics_top=row;selection=row;focus=FOCUS_ROWS;}return;
+        }
+        row=options_hit(&index);
+        if(row==2){focus=FOCUS_ROWS;selection=index;}
+        else if(row==3)focus=FOCUS_BACK;
+        return;
+    }
+    if(scroll_drag && scene_picker){
+        row=AW_UIScrollHit(280,mouse_y<55?55:mouse_y>=54+6*19?53+6*19:mouse_y,276,54,6*19,AW_MAP_COUNT+1,6,scene_top);
+        if(row>=0){scene_top=row;selection=row;}return;
     }
     row=mouse_row();if(row>=0)selection=row;
 }
 void M_Keydown(int key){
-    int direction,row,photo;char command[48];
+    int direction,row;char command[48];
     if(AW_SaveMenuKey(key)){if(key_dest==key_game){frontend=0;graphics=0;}return;}
     /* Capture the raw key before W/A/S/D and wheel are normalized below. */
-    if(controls_options && controls_capture){control_capture(key);return;}
+    if(graphics && tab==TAB_CONTROLS && controls_capture){control_capture(key);return;}
     if(key=='a' || key=='A')key=K_LEFTARROW;
     if(key=='d' || key=='D')key=K_RIGHTARROW;
     if(key=='w' || key=='W')key=K_UPARROW;
@@ -309,10 +513,11 @@ void M_Keydown(int key){
     if(key==K_MWHEELUP)key=K_UPARROW;
     if(key==K_MWHEELDOWN)key=K_DOWNARROW;
     if(fog_slider){fog_key(key);return;}
+    if(graphics && !brightness_active()){options_key(key);return;}
     if(key==K_MOUSE1){
-        if((graphics && !interface_options && !audio_options && !controls_options && !brightness_active()) || scene_picker){
-            row=AW_UIScrollHit(mouse_x,mouse_y,276,54,graphics?133:114,graphics?OPTION_ROWS:AW_MAP_COUNT+1,graphics?7:6,graphics?graphics_top:scene_top);
-            if(row>=0){if(graphics)graphics_top=row;else scene_top=row;selection=row;scroll_drag=mouse_y>=64 && mouse_y<54+(graphics?133:114)-10;return;}
+        if(scene_picker){
+            row=AW_UIScrollHit(mouse_x,mouse_y,276,54,114,AW_MAP_COUNT+1,6,scene_top);
+            if(row>=0){scene_top=row;selection=row;scroll_drag=mouse_y>=64 && mouse_y<54+114-10;return;}
         }
         row=mouse_row();if(row<0)return;selection=row;
     }
@@ -329,16 +534,6 @@ void M_Keydown(int key){
         }
         return;
     }
-    if(audio_options){
-        if(key==K_ESCAPE){audio_back();return;}
-        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB){audio_drag=0;option_step(key,5);}
-        if(selection<4){
-            if(key==K_LEFTARROW || key==K_RIGHTARROW)audio_set(selection,audio_percent(selection)+(key==K_LEFTARROW?-1:1)*(keydown[K_SHIFT]?1:5));
-            if(key==K_HOME || key==K_END)audio_set(selection,key==K_HOME?0:100);
-            if(key==K_MOUSE1 && mouse_x>=AUDIO_X-4 && mouse_x<=AUDIO_X+AUDIO_W+4){audio_drag=selection+1;audio_pointer(selection);}
-        }else if(key==K_ENTER || key==K_MOUSE1)audio_back();
-        return;
-    }
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
     if(brightness_options){
         if(key==K_ESCAPE){brightness_back();return;}
@@ -351,75 +546,6 @@ void M_Keydown(int key){
         return;
     }
 #endif
-    if(controls_options){
-        if(key==K_ESCAPE){controls_back();return;}
-        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB){
-            row=selection;
-            do option_step(key,CONTROL_ROWS);while(!control_ready(selection) && selection>0 && selection<CONTROL_ROWS-1);
-            if(!control_ready(selection))selection=row;
-        }
-        if(selection<controls_top)controls_top=selection;
-        if(selection>=controls_top+CONTROL_VISIBLE)controls_top=selection-CONTROL_VISIBLE+1;
-        if((key==K_BACKSPACE || key==K_DEL) && selection<CONTROL_ACTIONS)control_clear(selection);
-        if((key==K_LEFTARROW || key==K_RIGHTARROW) && CONTROL_COMBAT(selection))combat_toggle(selection);
-        if(key==K_ENTER || key==K_MOUSE1){
-            if(selection<CONTROL_ACTIONS){if(control_ready(selection)){controls_capture=1;mouse_visible=0;}}
-            else if(CONTROL_COMBAT(selection))combat_toggle(selection);
-            else if(selection==CONTROL_RESET)Cbuf_AddText("exec keymaps-default.cfg\n");
-            else controls_back();
-        }
-        return;
-    }
-    if(interface_options){
-        if(key==K_ESCAPE){interface_options=0;selection=OPT_INTERFACE;return;}
-        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)option_step(key,7);
-        if(key==K_LEFTARROW || key==K_RIGHTARROW)interface_change(key==K_LEFTARROW?-1:1);
-        if(key==K_ENTER || key==K_MOUSE1){if(selection==6){interface_options=0;selection=OPT_INTERFACE;}else interface_change(1);}
-        return;
-    }
-    if(graphics){
-        if(key==K_ESCAPE){graphics=0;selection=frontend?2:4;return;}
-        if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)option_step(key,OPTION_ROWS);
-        if(selection<graphics_top)graphics_top=selection;
-        if(selection>=graphics_top+7)graphics_top=selection-6;
-#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-        if(selection==OPT_GRAPHICS && (key==K_LEFTARROW || key==K_RIGHTARROW)){brightness_options=1;brightness_drag=0;selection=0;return;}
-#endif
-        if(selection==OPT_FOG && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetDrawDistance(AW_DrawDistance()+(key==K_LEFTARROW?-1:1)*(keydown[K_SHIFT]?1:10));
-        if(selection==OPT_FAR && (key==K_LEFTARROW || key==K_RIGHTARROW))far_step(key==K_LEFTARROW?-1:1);
-        if(selection==OPT_CROSSHAIR && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_CrosshairSet(!AW_CrosshairShown());
-        if(selection==OPT_INTERFACE && (key==K_LEFTARROW || key==K_RIGHTARROW)){interface_options=1;selection=0;return;}
-        if(selection==OPT_AUDIO && (key==K_LEFTARROW || key==K_RIGHTARROW)){audio_options=1;selection=0;return;}
-        if(selection==OPT_CONTROLS && (key==K_LEFTARROW || key==K_RIGHTARROW)){controls_open();return;}
-        if(selection==OPT_AUTOSAVE && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_SetAutosaveCount(AW_AutosaveCount()+(key==K_LEFTARROW?-1:1));
-        if(selection==OPT_AREA && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_RegionLoadingToggle();
-        if(selection==OPT_METHOD && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(0,1);
-        if(selection==OPT_BUFFER && AW_CellChangeMethod()==2 && (key==K_LEFTARROW || key==K_RIGHTARROW))AW_StreamOption(1,key==K_LEFTARROW?-1:1);
-        if(selection==OPT_MEMORY && (key==K_LEFTARROW || key==K_RIGHTARROW))memory_toggle();
-        if(key==K_ENTER || key==K_MOUSE1){
-            if(selection==OPT_FOG){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
-            else if(selection==OPT_RESET)AW_SetDrawDistance(540);
-            else if(selection==OPT_FAR)far_step(1);
-            else if(selection==OPT_FRAME)AW_UIFrameToggle();
-            else if(selection==OPT_CROSSHAIR)AW_CrosshairSet(!AW_CrosshairShown());
-            /* Photo mode needs the running game; the menu closes first so the
-             * notice and then the clean frames follow at once. */
-            else if(selection==OPT_PHOTO && photo_ready()){photo=!AW_PhotoModeActive();close_menu();AW_PhotoModeSet(photo);}
-            else if(selection==OPT_INTERFACE){interface_options=1;selection=0;}
-            else if(selection==OPT_AUDIO){audio_options=1;audio_drag=0;selection=0;}
-            else if(selection==OPT_CONTROLS)controls_open();
-            else if(selection==OPT_AUTOSAVE)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);
-            else if(selection==OPT_AREA)AW_RegionLoadingToggle();
-            else if(selection==OPT_METHOD)AW_StreamOption(0,1);
-            else if(selection==OPT_BUFFER && AW_CellChangeMethod()==2)AW_StreamOption(1,1);
-            else if(selection==OPT_MEMORY)memory_toggle();
-#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-            else if(selection==OPT_GRAPHICS){brightness_options=1;brightness_drag=0;selection=0;}
-#endif
-            else if(selection==OPTION_ROWS-1){graphics=0;selection=frontend?2:4;}
-        }
-        return;
-    }
     if(scene_picker){
         if(key==K_ESCAPE){scene_picker=0;key_dest=picker_return;IN_AWClearButtons();return;}
         if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB){
@@ -439,7 +565,7 @@ void M_Keydown(int key){
         if(key==K_ENTER || key==K_MOUSE1){
             if(selection==0 && intro_available)confirm(3);
             else if(selection==1)AW_SaveMenuOpen(1);
-            else if(selection==2){graphics=1;graphics_top=0;selection=0;mouse_x=160;mouse_y=100;}
+            else if(selection==2)options_open();
             else if(selection==3)confirm(1);
         }
         return;
@@ -451,7 +577,7 @@ void M_Keydown(int key){
         else if(selection==1 && intro_available)confirm(3);
         else if(selection==2)AW_SaveMenuOpen(0);
         else if(selection==3)AW_SaveMenuOpen(1);
-        else if(selection==4){graphics=1;graphics_top=0;selection=0;mouse_x=160;mouse_y=100;}
+        else if(selection==4)options_open();
         else if(selection==5)confirm(2);
     }
 }
@@ -477,8 +603,85 @@ static void cursor(void){
     if(!mouse_visible)return;
     AW_UIFill(mouse_x,mouse_y,2,6,colours[1]);AW_UIFill(mouse_x,mouse_y,6,2,colours[1]);
 }
+static void rail(int x,int y,int w,int filled){
+    AW_UIFill(x,y,w+1,3,colours[2]);AW_UIFill(x,y,filled,3,colours[1]);
+    AW_UIFill(x+filled-3,y-5,7,13,colours[1]);AW_UIFill(x+filled-1,y-3,3,9,colours[0]);
+}
+static void prefs_video_line(int id,char *line){
+    static const char *places[]={"Below right","Top right","Above bars"};int value;
+    switch(id){
+    case ROW_CROSSHAIR:strcpy(line,AW_CrosshairShown()?"Show crosshairs: On":"Show crosshairs: Off");break;
+    case ROW_COLOUR:sprintf(line,"Crosshair colour: %s",AW_CrosshairStyleName(0,AW_CrosshairStyle(0)));break;
+    case ROW_SHAPE:sprintf(line,"Crosshair shape: %s",AW_CrosshairStyleName(1,AW_CrosshairStyle(1)));break;
+    case ROW_FRAME:strcpy(line,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off");break;
+    case ROW_FONT:value=AW_UIFontSize();if(value)sprintf(line,"UI font: %ld px",(long)value);else strcpy(line,"UI font: fallback");break;
+    case ROW_VOICE:strcpy(line,AW_UIVoiceStyle()==2?"Voice identity: Aim only":AW_UIVoiceNames()?"Voice speaker names: On":"Voice speaker names: Off");break;
+    case ROW_DIALOGUE:sprintf(line,"Dialogue style: %ld",(long)AW_UIDialogueMethod());break;
+    case ROW_AIMED:strcpy(line,AW_SceneUIOption(0,0)?"Aimed NPC names: On":"Aimed NPC names: Off");break;
+    case ROW_NPC:sprintf(line,"NPC: %s",places[AW_SceneUIOption(1,0)-1]);break;
+    case ROW_OBJECTS:sprintf(line,"Objects: %s",places[AW_SceneUIOption(2,0)-1]);break;
+    case ROW_AUTOSAVE:sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());break;
+    case ROW_FOG:sprintf(line,"Fog distance: %ld",(long)AW_DrawDistance());break;
+    case ROW_RESET:strcpy(line,"Reset distance: 540");break;
+    case ROW_FAR:if(far_index()<0)strcpy(line,"Far detail: Custom");else sprintf(line,"Far detail: %s",far_names[far_index()]);break;
+    case ROW_PHOTO:strcpy(line,AW_PhotoModeActive()?"Leave photo mode":"Photo mode");break;
+    case ROW_AREA:strcpy(line,AW_RegionLoadingFrozen()?"Area loading: Freeze frame":"Area loading: Black screen");break;
+    case ROW_METHOD:strcpy(line,AW_CellChangeMethod()==1?"Load method: Current":"Load method: Read-ahead (test)");break;
+    case ROW_BUFFER:sprintf(line,"Read-ahead buffer: %ld KiB",(long)AW_StreamOption(1,0));break;
+    case ROW_MEMORY:strcpy(line,Cvar_VariableValue("aw_autoram")?"Extra RAM: Automatic":"Extra RAM: Off");break;
+    default:strcpy(line,"Graphics...");break;
+    }
+}
+static void options_draw(void){
+    int i,yy,value,n=tab_rows(tab),selected;char line[64];const char *help;
+    AW_UIBox(0,0,vid.width,vid.height);
+    for(i=0;i<TABS;i++)button(TAB_X+i*TAB_STEP,TAB_Y,TAB_W,TAB_H,tab_names[i],1,tab==i);
+    AW_UIBox(GROUP_X,GROUP_Y,GROUP_W,GROUP_H);
+    if(tab==TAB_AUDIO){
+        static const char *names[]={"Master","Music","Effects","Dialogue"};
+        for(i=0;i<4;i++){
+            yy=AUDIO_Y+i*AUDIO_H;value=audio_percent(i);
+            if(focus==FOCUS_ROWS && selection==i)AW_UIFill(LIST_X,yy,LIST_W,AUDIO_H,colours[3]);
+            AW_UITextBox(18,yy,110,AUDIO_H,names[i],colours[1]);
+            rail(AUDIO_X,yy+13,AUDIO_W,value*AUDIO_W/100);
+            sprintf(line,"%ld%%",(long)value);AW_UITextBox(256,yy,38,AUDIO_H,line,colours[1]);
+        }
+    }else{
+        for(i=graphics_top;i<graphics_top+VISIBLE && i<n;i++){
+            yy=LIST_Y+(i-graphics_top)*ROW_H;selected=focus==FOCUS_ROWS && selection==i;
+            if(tab==TAB_CONTROLS && i==CONTROL_SENS){
+                value=AW_SensitivityTenths();
+                if(selected)AW_UIFill(LIST_X,yy,LIST_W,ROW_H,colours[3]);
+                strcpy(line,"Mouse sensitivity");if(AW_UIWidth(line)>SENS_X-LIST_X-8)strcpy(line,"Sensitivity");
+                AW_UITextBox(LIST_X+2,yy,SENS_X-LIST_X-8,ROW_H,line,colours[1]);
+                rail(SENS_X,yy+8,SENS_W,(sens_clamp(value)-AW_SENSITIVITY_MENU_MIN)*SENS_W/(AW_SENSITIVITY_MENU_MAX-AW_SENSITIVITY_MENU_MIN));
+                sprintf(line,"%ld.%ld",(long)(value/10),(long)(value%10));AW_UITextBox(SENS_X+SENS_W+6,yy,LIST_W-(SENS_X-LIST_X)-SENS_W-6,ROW_H,line,colours[1]);
+                continue;
+            }
+            if(tab==TAB_CONTROLS){
+                if(i==CONTROL_INVERT)strcpy(line,invert_on()?"Invert Y axis: On":"Invert Y axis: Off");
+                else if(CONTROL_ACTION(i))control_line(i-CONTROL_FIRST,line);
+                else if(CONTROL_COMBAT(i))combat_line(i,line);
+                else strcpy(line,"Reset to defaults");
+            }else prefs_video_line(row_id(i),line);
+            label(LIST_X,yy,LIST_W,ROW_H,line,row_active(i),selected);
+            /* A live preview of the chosen crosshair beside its colour and shape. */
+            if(tab==TAB_PREFS && (row_id(i)==ROW_COLOUR || row_id(i)==ROW_SHAPE))AW_CrosshairDraw(LIST_X+LIST_W-16,yy+6);
+        }
+        AW_UIScrollbar(SCROLL_X,LIST_Y,VISIBLE*ROW_H,n,VISIBLE,graphics_top);
+    }
+    if(focus==FOCUS_TABS)help="Left/Right: page   Down: settings";
+    else if(focus==FOCUS_BACK)help="Enter: back to the menu";
+    else if(tab==TAB_AUDIO)help="Arrows / drag: volume";
+    else if(tab==TAB_CONTROLS && controls_capture)help="Press a key   Esc: cancel";
+    else if(tab==TAB_CONTROLS && CONTROL_ACTION(selection))help="Enter: set   Del: clear";
+    else if(tab==TAB_CONTROLS && selection==CONTROL_SENS)help="Arrows / drag   Shift: fine";
+    else help="Left/Right: change   Esc: back";
+    AW_UISmallBegin();AW_UITextBox(10,BACK_Y,BACK_X-16,BACK_H,help,colours[1]);AW_UISmallEnd();
+    button(BACK_X,BACK_Y,BACK_W,BACK_H,"Back",1,focus==FOCUS_BACK);
+}
 void M_Draw(void){
-    int i,xx,yy,value,knob,w;char line[64];
+    int i,xx,yy,w;char line[64];
     /* A queued console/menu command may have changed destination without a
      * key event. Let the on-demand panels release their state in that case. */
     if(AW_WorldUIDraw())return;
@@ -497,28 +700,10 @@ void M_Draw(void){
         AW_UIFill(vid.width-w-10,180,w+8,20,AW_UIColor(0,0,0));
         AW_UITextBox(vid.width-w-6,180,w,20,line,colours[1]);cursor();return;
     }
-    if(frontend)AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
-    else for(yy=0;yy<(int)vid.height;yy++)for(xx=0;xx<(int)vid.width;xx++)
-        if((xx&3)!=((yy&1)<<1))vid.buffer[yy*vid.rowbytes+xx]=colours[0];
-    if(audio_options){
-        static const char *names[]={"Master","Music","Effects","Dialogue"};
-        AW_UIBox(2,2,316,196);AW_UITextBox(10,8,300,20,"Audio",colours[1]);
-        for(i=0;i<4;i++){
-            yy=AUDIO_Y+i*AUDIO_H;value=audio_percent(i);
-            if(selection==i)AW_UIFill(10,yy,300,AUDIO_H,colours[3]);
-            AW_UITextBox(14,yy,110,AUDIO_H,names[i],colours[1]);
-            AW_UIFill(AUDIO_X,yy+13,AUDIO_W+1,3,colours[2]);
-            AW_UIFill(AUDIO_X,yy+13,value*AUDIO_W/100,3,colours[1]);
-            knob=AUDIO_X+value*AUDIO_W/100;
-            AW_UIFill(knob-3,yy+8,7,13,colours[1]);AW_UIFill(knob-1,yy+10,3,9,colours[0]);
-            sprintf(line,"%ld%%",(long)value);AW_UITextBox(264,yy,44,AUDIO_H,line,colours[1]);
-        }
-        AW_UISmallBegin();AW_UITextBox(12,166,204,24,"Arrows / drag: volume",colours[1]);AW_UISmallEnd();
-        AW_UIBox(222,165,86,25);label(225,168,80,19,"Back",1,selection==4);cursor();return;
-    }
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
     if(brightness_options){
-        AW_UIBox(2,2,316,196);AW_UITextBox(10,8,300,20,"Graphics",colours[1]);
+        int value,knob;
+        AW_UIBox(0,0,vid.width,vid.height);AW_UITextBox(10,8,300,20,"Graphics",colours[1]);
         for(i=0;i<2;i++){
             yy=34+i*57;value=R_BrightnessStep(i);
             if(selection==i)AW_UIFill(36,yy,248,55,colours[3]);
@@ -535,31 +720,9 @@ void M_Draw(void){
         AW_UIBox(222,165,86,25);label(225,168,80,19,"Back",1,selection==2);cursor();return;
     }
 #endif
-    AW_UIBox(28,6,264,188);
-    if(!AW_UILogo(60,10))AW_UITextBox(44,10,232,40,"AmiWind",colours[1]);
-    if(interface_options){
-        static const char *places[]={"Below right","Top right","Above bars"};
-        value=AW_UIFontSize();if(value)sprintf(line,"UI font: %ld px",(long)value);else strcpy(line,"UI font: fallback");
-        label(44,54,232,19,line,1,selection==0);
-        label(44,73,232,19,AW_UIVoiceStyle()==2?"Voice identity: Aim only":AW_UIVoiceNames()?"Voice speaker names: On":"Voice speaker names: Off",1,selection==1);
-        sprintf(line,"Dialogue style: %ld",(long)AW_UIDialogueMethod());label(44,92,232,19,line,1,selection==2);
-        label(44,111,232,19,AW_SceneUIOption(0,0)?"Aimed NPC names: On":"Aimed NPC names: Off",1,selection==3);
-        sprintf(line,"NPC: %s",places[AW_SceneUIOption(1,0)-1]);label(44,130,232,19,line,1,selection==4);
-        sprintf(line,"Objects: %s",places[AW_SceneUIOption(2,0)-1]);label(44,149,232,19,line,1,selection==5);
-        label(44,168,232,19,"Back",1,selection==6);
-    }else if(controls_options){
-        for(i=controls_top;i<controls_top+CONTROL_VISIBLE && i<CONTROL_ROWS;i++){
-            if(i<CONTROL_ACTIONS)control_line(i,line);
-            else if(CONTROL_COMBAT(i))combat_line(i,line);
-            else strcpy(line,i==CONTROL_RESET?"Reset to defaults":"Back");
-            label(44,54+(i-controls_top)*19,230,19,line,control_ready(i),selection==i);
-        }
-        AW_UIScrollbar(276,54,CONTROL_VISIBLE*19,CONTROL_ROWS,CONTROL_VISIBLE,controls_top);
-        AW_UISmallBegin();
-        AW_UITextBox(36,170,236,17,controls_capture?"Press a key   Esc: cancel":"Enter: set   Del: clear",colours[1]);
-        AW_UISmallEnd();
-    }else if(graphics && fog_slider){
+    if(graphics && fog_slider){
         int fog_knob=FOG_X+(fog_value()-FOG_MIN)*FOG_W/(FOG_MAX-FOG_MIN);
+        AW_UIBox(0,0,vid.width,vid.height);
         AW_UITextBox(40,56,240,20,"Fog distance",colours[1]);
         if(fog_typing)sprintf(line,"%s_",fog_typed);else sprintf(line,"%ld",(long)fog_value());
         AW_UIFill(130,76,60,20,colours[3]);AW_UITextBox(130,76,60,20,line,colours[1]);
@@ -572,33 +735,15 @@ void M_Draw(void){
         if(AW_DrawDistance()!=fog_value()){sprintf(line,"This area draws up to %ld",(long)AW_DrawDistance());AW_UITextBox(40,116,240,17,line,colours[2]);}
         AW_UITextBox(30,132,260,17,"Drag / arrows / type a number   Esc: cancel",colours[1]);
         AW_UISmallEnd();
-        AW_UIBox(120,150,80,25);label(122,153,76,19,"OK",1,1);
-    }else if(graphics){
-        for(i=graphics_top;i<graphics_top+7;i++){
-            switch(i){
-            case OPT_FOG:sprintf(line,"Fog distance: %ld",(long)AW_DrawDistance());break;
-            case OPT_RESET:strcpy(line,"Reset distance: 540");break;
-            case OPT_FAR:if(far_index()<0)strcpy(line,"Far detail: Custom");else sprintf(line,"Far detail: %s",far_names[far_index()]);break;
-            case OPT_FRAME:strcpy(line,AW_UIFrameEnabled()?"Gold frame: On":"Gold frame: Off");break;
-            case OPT_CROSSHAIR:strcpy(line,AW_CrosshairShown()?"Show crosshairs: On":"Show crosshairs: Off");break;
-            case OPT_PHOTO:strcpy(line,AW_PhotoModeActive()?"Leave photo mode":"Photo mode");break;
-            case OPT_INTERFACE:strcpy(line,"Interface...");break;
-            case OPT_AUDIO:strcpy(line,"Audio...");break;
-            case OPT_CONTROLS:strcpy(line,"Controls...");break;
-            case OPT_AUTOSAVE:sprintf(line,"Autosave history: %ld",(long)AW_AutosaveCount());break;
-            case OPT_AREA:strcpy(line,AW_RegionLoadingFrozen()?"Area loading: Freeze frame":"Area loading: Black screen");break;
-            case OPT_METHOD:strcpy(line,AW_CellChangeMethod()==1?"Load method: Current":"Load method: Read-ahead (test)");break;
-            case OPT_BUFFER:sprintf(line,"Read-ahead buffer: %ld KiB",(long)AW_StreamOption(1,0));break;
-            case OPT_MEMORY:strcpy(line,Cvar_VariableValue("aw_autoram")?"Extra RAM: Automatic":"Extra RAM: Off");break;
-#if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
-            case OPT_GRAPHICS:strcpy(line,"Graphics...");break;
-#endif
-            default:strcpy(line,"Back");break;
-            }
-            label(44,54+(i-graphics_top)*19,230,19,line,(i!=OPT_BUFFER || AW_CellChangeMethod()==2) && (i!=OPT_PHOTO || photo_ready()),selection==i);
-        }
-        AW_UIScrollbar(276,54,133,OPTION_ROWS,7,graphics_top);
-    }else if(scene_picker){
+        AW_UIBox(120,150,80,25);label(122,153,76,19,"OK",1,1);cursor();return;
+    }
+    if(graphics){options_draw();cursor();return;}
+    if(frontend)AW_UIFill(0,0,vid.width,vid.height,AW_UIColor(0,0,0));
+    else for(yy=0;yy<(int)vid.height;yy++)for(xx=0;xx<(int)vid.width;xx++)
+        if((xx&3)!=((yy&1)<<1))vid.buffer[yy*vid.rowbytes+xx]=colours[0];
+    AW_UIBox(28,6,264,188);
+    if(!AW_UILogo(60,10))AW_UITextBox(44,10,232,40,"AmiWind",colours[1]);
+    if(scene_picker){
         for(i=scene_top;i<=AW_MAP_COUNT && i<scene_top+6;i++)
             label(44,55+(i-scene_top)*19,230,19,AW_MapTitle(i),i==AW_MAP_COUNT || scene_available[i],selection==i);
         AW_UIScrollbar(276,54,114,AW_MAP_COUNT+1,6,scene_top);
@@ -608,6 +753,6 @@ void M_Draw(void){
         button(48,132,106,25,"Cancel",1,selection==0);
         button(166,132,106,25,confirming==3?"New game":confirming==2?"Leave":"Exit",1,selection==1);
     }else for(i=0;i<6;i++)label(44,ROW_Y+i*ROW_H,232,ROW_H,items[i],enabled(i),selection==i);
-    if(!graphics)AW_UITextBox(36,174,248,17,"Enter / click   Esc: back",colours[1]);
+    AW_UITextBox(36,174,248,17,"Enter / click   Esc: back",colours[1]);
     cursor();
 }

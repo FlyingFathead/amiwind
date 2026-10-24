@@ -950,6 +950,98 @@
       "to": null,
       "source": "tools/build.py resolve_chim_regions (BUILD-CHIM-CELLS-PRIVATE-LIST-47)",
       "note": "not given: the public reference docs/chim/cell-progress-reference.json (before: required with --chim-regions)"
+    },
+    {
+      "version": "0.0.48-dev1",
+      "option": "interior_format",
+      "flag": "--interior-format",
+      "change": "added",
+      "to": "chim",
+      "source": "tools/build.py chim_interior_commands (docs/chim/INTERIOR_STORE.md)",
+      "note": "CHIM rooms on one interior store, the default by the maintainer's decision of 22 October 2026; bsp keeps a Quake map per room (the method before)"
+    },
+    {
+      "version": "0.0.48-dev2",
+      "option": "chim_region_actors",
+      "flag": "--chim-region-actors",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py chim_region_actors (CHIM-EXTERIOR-ACTORS-MISSING-46)",
+      "note": "null = off: the region frame maps place no actors (the method before); on = experimental: every region frame map places the exterior NPC and creature references of its cells at their authored spots, grounded as the towns' residents; levelled creature lists listed as deferred"
+    },
+    {
+      "version": "0.0.48-dev2",
+      "option": "chim_region_actors",
+      "flag": "--chim-region-actors",
+      "change": "default",
+      "from": "off",
+      "to": "on",
+      "source": "tools/build.py chim_region_actors (CHIM-EXTERIOR-ACTORS-MISSING-46)",
+      "note": "on by the maintainer's decision of 23 October 2026: every actor in its authored place by default; off keeps region frames without actors"
+    },
+    {
+      "version": "0.0.48-dev2",
+      "option": "room_batches",
+      "flag": "--room-batches",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py room_batch_commands (docs/chim/DOOR_GRAPH.md \"Rooms by batch in the builder\")",
+      "note": "EXPERIMENTAL: the interior rooms of these batches of config/room-batches.json as CHIM rooms, doors linked both ways; not given = none (the shipped-default rule until the maintainer decides; proposed: all)"
+    },
+    {
+      "version": "0.0.48-dev2",
+      "option": "room_batches",
+      "flag": "--room-batches",
+      "change": "default",
+      "from": null,
+      "to": "all",
+      "source": "tools/build.py ROOM_BATCHES_DEFAULT, room_batch_selection (docs/chim/DOOR_GRAPH.md \"Rooms by batch in the builder\")",
+      "note": "all by the maintainer's decision of 23 October 2026: every base-game interior of config/room-batches.json as a CHIM room; not given, a MiniWind and --interior-format bsp build no batch room (a MiniWind takes batch numbers; bsp refuses an explicit selection); none = no batch rooms"
+    },
+    {
+      "version": "0.0.48-dev2",
+      "option": "chim_fire_light",
+      "flag": "--chim-fire-light",
+      "change": "added",
+      "to": "on",
+      "source": "tools/build.py, tools/chim/flames.py (CHIM-EXTERIOR-FLAMES-MISSING-48)",
+      "note": "the maintainer, 2026-10-23: \"set it on by default but add some dbg command like dbg campfires on|off\": each fire outdoors carries its light record in its frame map flame row and the engine lights the placed models around it; off = flames without light; in game dbg campfires off hides the fires' flames and light"
+    },
+    {
+      "version": "0.0.48-dev2",
+      "option": "chim_placement_light",
+      "flag": "--chim-placement-light",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py, tools/chim/placement_light.py (CHIM-MESHLESS-LIGHTS-33)",
+      "note": "null = off; experimental: sources = every exterior light source gives the placed models a light level stored in the CHIM world (format 0.12); off by default until its in-game frame cost is measured"
+    },
+    {
+      "version": "0.0.48-dev2",
+      "option": "collision_source",
+      "flag": "--collision-source",
+      "change": "added",
+      "to": null,
+      "source": "tools/collision_source_env.py (COLLISION-RCN-SCOPE-32, COLLISION-NC-FLAGS-32)",
+      "note": "decided for the project, 2026-10-22: null = authored, one collision-source rule for every mesh converter (towns, Seyda Neen, rooms, census, prison ship, world scenery, CHIM exteriors and rooms): the root RootCollisionNode, else the drawn triangles; NC* and NCC models nonsolid, MRK marker shapes and AvoidNode subtrees never collide (tools/collision_source.py); profile = the rule before (each converter profile opts in, the drawn triangles otherwise; only NC and NCO nonsolid), kept for A/B"
+    },
+    {
+      "version": "0.0.48-dev2",
+      "option": "stair_collision_method",
+      "flag": "--stair-collision-method",
+      "change": "meaning",
+      "to": null,
+      "source": "tools/stair_collision_env.py (CHIM-STAIR-COLLISION-MESH-47)",
+      "note": "decided for the project, 2026-10-22: null now means 1, the stairway collision mesh for every flight whose collision fails the geometric stair check, chosen per mesh (a CHIM mesh without a flight keeps its worker, profile and unit key); the meshes method 1 cannot fix yet are listed in config/stair-check-known.json (CHIM-STAIR-METHOD1-UNFIXED-48) and reported, not a stop; 0 = the convex pieces with the stair rules (the default before), kept for A/B"
+    },
+    {
+      "version": "0.0.48-dev2",
+      "option": "seyda_entities",
+      "flag": "--seyda-entities",
+      "change": "added",
+      "to": "list",
+      "source": "tools/seyda_entities.py (BUILD-SEYDA-ENTITY-BUS-48)",
+      "note": "list (default) = the scene stages and chim-town-seyda read Seyda Neen's entities from the scene entity list SCENE/seyda-entities.json that each writing stage publishes; bsp = the legacy read path, the seyda.bsp carrier's entity lump, kept for A/B; the same bytes either way"
     }
   ],
   "current": {
@@ -999,6 +1091,7 @@
       "chim_cut_models_over": null,
       "chim_detail_budget": null,
       "chim_draw_distance": null,
+      "chim_fire_light": "on",
       "chim_frame_ext": "chim",
       "chim_lighting_type": null,
       "chim_mesh_method": null,
@@ -1007,7 +1100,9 @@
       "chim_model_weld": null,
       "chim_native_towns": "on",
       "chim_placement_format": null,
+      "chim_placement_light": null,
       "chim_reach_index": null,
+      "chim_region_actors": "on",
       "chim_region_rows": null,
       "chim_regions": [],
       "chim_regions_status": null,
@@ -1019,6 +1114,7 @@
       "chim_terrain_shoreline": "on",
       "chim_texture_effects": null,
       "chim_uv_scroll": "turbulent",
+      "collision_source": null,
       "collision_underside": null,
       "coord_range": "wide",
       "death_retry": null,
@@ -1041,6 +1137,7 @@
       "heap_mb": null,
       "hidden_surface_cull": "true",
       "interior_creatures": "listed",
+      "interior_format": "chim",
       "intro_captions": null,
       "lava": null,
       "legacy_areas": [],
@@ -1091,9 +1188,11 @@
       "resource_plan": false,
       "resource_plan_json": null,
       "resource_threads": null,
+      "room_batches": "all",
       "scale_snap": null,
       "scenery_reduce": null,
       "scenery_reduce_texels": null,
+      "seyda_entities": "list",
       "seyda_recorded": null,
       "seyda_scene_source": "auto",
       "shared_skins": "on",

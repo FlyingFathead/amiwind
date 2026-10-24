@@ -9,7 +9,7 @@
 | Where | CHIM region frames (1,348); town frames place their residents |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.46 (last seen) |
+| Persists in | v0.0.46, v0.0.48-dev2 (last seen) |
 | Severity | high: the open world is empty of people and creatures; gameplay outdoors is missing |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -21,10 +21,12 @@
 
 <!-- END GENERATED FACTS -->
 
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
+
 <!-- contents start -->
 ## Contents
 
-- [Status: 21 October 2026](#status-21-october-2026)
+- [Status: 22 October 2026](#status-22-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -37,9 +39,35 @@
 
 <!-- contents end -->
 
-## Status: 21 October 2026
+## Status: 22 October 2026
 
-Open. Third step in the source, experimental, off by default (no build yet): with `--chim-actor-table on` a build
+PERSISTING: the maintainer saw it again in v0.0.48-dev2 on 22 October 2026. Outdoors there are NPCs only in Seyda
+Neen, Balmora and Vivec (the CHIM town frames); the rest of the island has none.
+
+Fourth step in the source, experimental, off by default (no build yet): with `--chim-region-actors on` every CHIM
+region frame map places the NPC and creature references of its cells the way a town frame places its residents
+(`tools/chim/region_actors.py`): the actor library stage's models and base texts, each actor at its authored
+position and rotation ([actors start where the game puts them](../NPC_GROUND_CONTACT.md#actors-start-where-the-game-puts-them)),
+the ordinary ground contact for one within 32 units of the ground (x and y kept, the towns' contact rule for the
+height, the frame map's contact check), and one authored higher kept where it is and listed with its height and
+script. Levelled creature lists are listed per frame as deferred: the game rolls them at the player's level, so the
+builder does not pick one. One unit per region frame with actors on the shared worker pool, cached by the SHA-256 of
+what it reads; a frame without actors keeps its frame map bytes and its pass-cache key. With the actor table on, the
+table is now written after the frame maps when region actors are on, so it takes their placed rows.
+
+Measured read only on the v0.0.47 release run (its CHIM world, actor library stage and frame reports; no build):
+781 actors placed in 336 of the 999 region frames that have actor references (468 NPCs, 313 creatures; by region:
+Ascadian Isles 97, Ashlands 106, Azura's Coast 188, Bitter Coast 62, Grazelands 44, Molag Mar 58, Red Mountain 1,
+Sheogorad 74, West Gash 151). 5 references are left to the town frames, 9 have no library model, 4,853 levelled
+references are deferred. 101 actors start more than 32 units off the ground: 85 swimming or flying creatures kept
+by the policy or their record, and 16 others kept and listed (8 with a script). Memory (Quake's Cache, not the CHIM
+zone): the actors' models per frame take a median of 624 KB and at most 4.1 MB (rcp2_m7); 14 frames pass the
+2.1 MB Cache room of the 16 MB baseline (11 MiB heap), by 134 KB to 2.0 MB, and none passes the 15.7 MB room the
+engine has with more RAM (24 MiB heap); past the room the engine evicts models (slower, not fatal). At most 58 of
+600 edicts and 35 of 256 model slots per map; 240 KB more frame map bytes in all. The actor step took 36.7 s of CPU
+for the 336 frames (the longest frame 1.4 s).
+
+Status of 21 October 2026: open. Third step in the source, experimental, off by default (no build yet): with `--chim-actor-table on` a build
 gets an actor library stage (`tools/actor_library.py`, after the census and the CHIM towns, before the image) that
 bakes the creature models (39 meshes, standing and mover models, 24.3 MB) and a standing model for each appearance
 of the exterior NPCs outside the CHIM towns (434 NPC records, 413 appearances, 115 MB, median 257 KB: the resident
@@ -117,9 +145,19 @@ outside the towns; creature movement and attack frames; the respawn of levelled 
 The design: the actor layer of the next template places every actor from one world-state table, outside the
 frames, so outdoor NPCs and creatures come with type 1 streamed crossings (v0.0.47 goal 1).
 
+Fourth step (22 October 2026, experimental, off: `--chim-region-actors on`): the region frame maps carry their
+cells' NPCs and creatures as the town frames carry their residents (see the status above). Still missing: a build
+with it and a look in game; the levelled creature lists in the frame maps (deferred; the table rolls them on a
+join; if every creature a list can give were loaded, a frame's models would take a median of 2.5 MB, past the 16 MB
+baseline's Cache room in 519 frames); the 14 frames past that room; a check in game of the 16 actors authored high
+above the converted ground.
+
 ## Verification
 
-None yet.
+Host tests (`tests/test_chim_region_actors.py`): a region frame with an NPC and a creature reference places both,
+x and y kept; an actor 2,000 game units up with a script keeps its spot, one 2 units up gets the ground contact;
+a levelled reference is deferred with its reason; a frame over its Cache room is reported; a frame without actor
+references and the town frames are unchanged. Not built and not checked in game yet.
 
 ## Prevention
 
@@ -160,6 +198,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-FAR-OBJECTS-33](CHIM-FAR-OBJECTS-33.md): Houses between the CHIM ring and the legacy overlap depth are missing from the fogged horizon
 - [CHIM-FAR-TERRAIN-33](CHIM-FAR-TERRAIN-33.md): A CHIM frame has no distant ground: beyond the active ring the land is missing (empty valleys, Vivec not visible from the world)
 - [CHIM-FERN-NCO-SOLID-38](CHIM-FERN-NCO-SOLID-38.md): Fire ferns marked NCO become solid in CHIM mesh conversion
+- CHIM-FRAME-16MB-REFUSAL-48 (no report page): Five CHIM region frames are over or within 64 KiB of the 16 MB heap budget: on 16 MB of Fast RAM (or with Extra RAM off) their rings may not fit the zone
 - [CHIM-FRAME-COORD-RANGE-33](CHIM-FRAME-COORD-RANGE-33.md): One Vivec city frame does not fit Quake's coordinate range (network coordinates are 1/8-unit shorts)
 - [CHIM-FRAME-EDGE-EFRAG-CRASH-36](CHIM-FRAME-EDGE-EFRAG-CRASH-36.md): R_StoreEfrags: Bad entity type 270440 ends the game: a leaf link to an entity whose model is NULL (normal play in Seyda Neen; noclip past the Vivec frame edge)
 - [CHIM-FRAME-GROUND-TRACE-38](CHIM-FRAME-GROUND-TRACE-38.md): CHIM image assembly exceeds collision traversal guard in cell 6,-5
@@ -202,6 +241,13 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-REGION-MARGIN-STORAGE-36](CHIM-REGION-MARGIN-STORAGE-36.md): One-cell CHIM region frames store about 3.5 times their cell's terrain (the terrain-only margin)
 - [CHIM-REGION-POCKET-TOWN-CELLS-42](CHIM-REGION-POCKET-TOWN-CELLS-42.md): The legacy-pocket rule counts cells wholly inside a town frame as legacy: CHIM region cells around a town are left out for nothing
 - [CHIM-REGION-SEABED-NO-HEIGHTS-42](CHIM-REGION-SEABED-NO-HEIGHTS-42.md): The full build refuses the 98 heightless seabed cells as region cells (no original LAND), without naming the cell, although CHIMport converts them
+- CHIM-ROOM-16MB-REFUSAL-48 (no report page): On 16 MB of Fast RAM (or with Extra RAM off) a CHIM room larger than the zone ended the game with a host error at its door
+- [CHIM-ROOM-EFRAG-LIMIT-48](CHIM-ROOM-EFRAG-LIMIT-48.md): The efrag pool limit can leave CHIM room placements undrawn in large rooms
+- [CHIM-ROOM-ESTIMATE-48](CHIM-ROOM-ESTIMATE-48.md): 27 rooms set aside as too large for a CHIM room by a wrong estimate
+- [CHIM-ROOM-HARVEST-DOUBLE-48](CHIM-ROOM-HARVEST-DOUBLE-48.md): CHIM rooms kept harvestable mushrooms in their room records: the image stopped on addamasartus (8 record placements not in the room map), and batch rooms had unpickable mushrooms
+- [CHIM-ROOM-STORE-SWITCH-DROPS-MODELS-48](CHIM-ROOM-STORE-SWITCH-DROPS-MODELS-48.md): Switching CHIM room stores drops the kept models
+- [CHIM-ROOM-SURFCACHE-LIGHT-48](CHIM-ROOM-SURFCACHE-LIGHT-48.md): The surface cache must rebuild when the same model is drawn at different room light levels
+- [CHIM-ROOMS-WATER-LAVA-48](CHIM-ROOMS-WATER-LAVA-48.md): Rooms with water or lava are not converted to CHIM rooms yet
 - [CHIM-SEYDA-ACTOR-CONTACT-33](CHIM-SEYDA-ACTOR-CONTACT-33.md): rc1 image step refuses Seyda Neen's CHIM frame map: six actors stand 0.8-3.3 units off the CHIM ground
 - [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs)
 - [CHIM-STAIR-PLATE-BEVELS-PER-PIECE-43](CHIM-STAIR-PLATE-BEVELS-PER-PIECE-43.md): CHIM model variants take only the mesh-wide exact-bevel flag: stair plates marked for exact standing bevels get the approximate axial hull
@@ -232,6 +278,12 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIMPORT-RETRY-LAVA-STALE-SOURCE-36](CHIMPORT-RETRY-LAVA-STALE-SOURCE-36.md): CHIMport --retry-failed cannot rerun a lava cell of the island run: its stored source stage predates the lava conversion
 - [CHIMPORT-SEABED-NO-ISLAND-42](CHIMPORT-SEABED-NO-ISLAND-42.md): Seabed cells measured as empty sea lose their island in the tracker: they drop out of the published reference and the build calls them unknown
 - [COMBAT-PURSUIT-SLOPE-STALL-46](COMBAT-PURSUIT-SLOPE-STALL-46.md): A pursuer stops on a walkable slope: an actor step was refused when it moved more than a stair height along the slope
+- IMAGE-FORMATS-CHIM-ROOMS-48 (no report page): The payload preflight stops a CHIM rooms build: the image step does not know the room store and room record formats
+- IMAGE-ROOM-MAPS-ENGINE-REFUSED-48 (no report page): Every CHIM room is refused at its door and the game hangs on Loading: the engine accepts a .chim map only with a CHIM frame key
+- IMAGE-ROOM-MAPS-FINGERPRINT-48 (no report page): A CHIM rooms build stops at the content fingerprint: it requires maps/<room>.bsp after the room became maps/<room>.chim
+- [IMAGE-ROOM-MAPS-LATE-PASSES-48](IMAGE-ROOM-MAPS-LATE-PASSES-48.md): Image checks after the CHIM rooms install skip CHIM rooms: entity tracker 47 cells against 52, dressing 81 pieces against 99, actor contact 0 placements against 93
+- IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48 (no report page): A CHIM rooms build stops at the map optimizer check: the room maps are staged but not in the optimizer receipt
+- IMAGE-ROOM-MAPS-SKIP-PASSES-48 (no report page): CHIM rooms were installed before the image passes that write a room worldspawn, so CHIM room maps would miss interior sky, hand metadata and cell numbers
 
 Related bugs in other categories:
 

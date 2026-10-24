@@ -1,10 +1,13 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Where it stands, 24 October 2026](#where-it-stands-24-october-2026)
+  - [What OpenMW shares, and what AmiWind takes from it](#what-openmw-shares-and-what-amiwind-takes-from-it)
+- [Disk size plan for the actors (v0.0.49)](#disk-size-plan-for-the-actors-v0049)
 - [Summary](#summary)
 - [How an actor is built today](#how-an-actor-is-built-today)
 - [The part model](#the-part-model)
@@ -38,6 +41,102 @@ stay in the builder as a selectable method (comparison and fallback).
 Tracked as [NPC-BAKED-WHOLE-DUPLICATION-33](bugs/NPC-BAKED-WHOLE-DUPLICATION-33.md).
 Builds on the [model cache](NPC_MODEL_CACHE.md) ("Next experiment: component
 reuse") and the [equipment roadmap](CHARACTER_EQUIPMENT_ROADMAP.md).
+
+## Where it stands, 24 October 2026
+
+Only the builder half of this plan was built. The parts library (`tools/npc_parts.py`, `--npc-models parts`) converts
+each part once and composes the gallery from recipes, but it is not the default, and it still writes one complete
+model per actor: it saves build time, not disk. Stage 2 (residents from the library) and stage 3 (the engine composes
+actors from the shared parts at load time) were never built, and v0.0.48 placed the residents of every base-game
+interior with whole-baked models. The result, measured on the v0.0.48 release candidate image:
+
+| | Size |
+| --- | --- |
+| The original game's Data Files (Morrowind, Tribunal, Bloodmoon, with music, video and sound) | 1,840 MB |
+| `Morrowind.bsa`, the base game's meshes and textures | 297 MB |
+| AmiWind's actor models in the image (4,225 complete models, 1,769 resident records) | 1,468 MB |
+| of which animation frames (64 per model, about 1,500 vertices each) | 992 MB |
+| of which skin textures, one 512 x 256 or 512 x 336 skin inside every model | 587 MB |
+
+Two design faults multiply it, besides the missing composition:
+
+- **Two models per character.** The animation kit gives each resident a standing model (idle, hit, death) and a
+  separate "mover" model (walk, run, swim, knockdown, attack) worn while it moves. Every character can move, so every
+  body is stored twice, each copy with its own skin.
+- **The skin travels with every model.** The same textures are stored again inside each model that uses them,
+  standing and mover alike.
+
+Every character keeps all of its animation; the size must come from storing things once:
+
+1. **One model per character, not two**: all animation groups in one set of frames, one skin.
+2. **Stage 2 and 3 of this plan**: residents from the parts library, and the engine composing them at load time, so
+   the image ships the 1,726 distinct parts instead of 1,769 complete characters. The maintainer chose this first
+   (24 October 2026): each part keeps its own vertex frames on one shared animation clock, and its textures are
+   shared files, not part of a per-character skin.
+3. **Skins stored once**, shared by every model that uses the same texture.
+4. **A size budget for the actors** in the build's size ledger, so the payload cannot grow unnoticed again.
+
+Hashing the release candidate's actor models shows where sharing can and cannot help today: only 8 of the 4,225
+models are identical, and no skin is shared by more than two models (a character's standing and mover copies; sharing
+those saves about 178 MB). Each character's skin is its own atlas of all its body-part textures, so two characters in
+the same robe still carry two different skins. Texture sharing becomes possible only at the part level, which is why
+stage 2 and 3 come first.
+
+### What OpenMW shares, and what AmiWind takes from it
+
+Read from the OpenMW 0.51.0 source:
+
+- **Morrowind's own data**: an NPC record names its race, sex, head, hair and inventory, never a mesh of its own.
+  Body-part records point at shared meshes, textures are referenced by name, and one animation file per skeleton family
+  (`xbase_anim.kf` and its kin) serves every humanoid.
+- **One copy of every resource**: the scene, image and keyframe managers load each file once. An actor instance copies
+  only its node tree and controllers; geometry, textures and animation keys are shared. Textures are never stored
+  inside meshes.
+- **Assembly**: `NpcAnimation` puts each equipped body part on the actor's own skeleton: skinned parts follow the
+  skeleton, rigid parts hang on a named bone (the same idea as the engine's tag frames, which carry the guard torches).
+- **No separate mover**: animation sources stack on one skeleton, and blend masks let walking and attacking play at
+  once.
+- **Skinning on the CPU**: vertices with the same bone weights are grouped, one blended matrix per group, then about
+  nine multiplies and nine adds per vertex; actors off screen or far away are skipped.
+
+For the Amiga, the per-frame skinning is the part to avoid in a crowded street. The step after the parts library is to
+skin once when a character is first loaded, not every frame: ship the shared bone animation and each part once, and
+expand them into vertex frames in RAM (estimated at 0.2 to 0.5 seconds per appearance on a 25 MHz 68040, to be
+measured), with no per-frame cost after that. That could bring the actor payload down to tens of megabytes.
+
+The [roadmap](ROADMAP.md#the-actors-get-the-chim-rule-store-once-place-many-times) puts this first in the next
+version; the register entry is
+[ROOM-RESIDENT-MODELS-SIZE-48](bugs/ROOM-RESIDENT-MODELS-SIZE-48.md).
+
+## Disk size plan for the actors (v0.0.49)
+
+The goal: the actors take a size that belongs on an Amiga, with every character keeping all of its animation. The
+starting point is the v0.0.48 release candidate: **1,468 MB** of actor models in 4,225 complete models. Each stage is
+built, measured on the same rooms against the stage before it, and kept by a test. A stage that does not pay is
+reverted, not shipped.
+
+| Stage | What changes | Saving (estimate until measured) |
+| --- | --- | --- |
+| 0. Budget | The build's size ledger records the actor payload (frames, skins, files) and fails a build whose actors grew by more than a set margin over the previous release without a stated reason | none: it stops silent growth |
+| 1. One model per character | The standing and the mover model become one model holding all animation groups and one skin | about 178 MB of duplicate skins (measured) and half the files |
+| 2. Residents from the parts library | Every resident is a recipe over the parts library (stage 2 of the [staged plan](#recommendation-and-staged-plan)); the builder still writes composed models, so the engine is unchanged | build time; no disk yet |
+| 3. The engine composes at load time | The image ships the parts, each with its own frames on one shared animation clock and its textures as shared files, plus one recipe per character; the engine composes a character into the model cache when it is first needed ([runtime method A](#runtime-method-a-load-time-composition)) | frames from about 990 MB to under 100 MB; textures stored once per part instead of once per character |
+| 4. Skin once at load time | The image ships the shared bone animation and each part once; the engine expands a character's frames in RAM when it first loads, the way OpenMW skins on the CPU, but once instead of every frame | the actors toward tens of MB |
+
+How each stage is measured:
+
+- **Disk**: the actor bytes in the size ledger (frames, skins, files), and the image and partition count.
+- **Looks**: an A/B sheet of every appearance against the previous stage, same poses and frames.
+- **Load time**: entering a room full of residents (a Vivec canton, a Balmora tradehouse) in FS-UAE, 16 MB and 32 MB
+  of Fast RAM.
+- **Frame time**: a crowded Balmora street and the busiest rooms, slow CPU settings included; stage 3 may draw a few
+  more polygons per character, stage 4 adds load time, neither may cost frame time.
+- **RAM**: composed and expanded characters live in the model cache, so the cache budget at 16 MB and 32 MB is part
+  of each stage's result.
+
+Order and decision: stage 0 and 1 first (small, safe), then stages 2 and 3 as the main work (the maintainer's choice,
+24 October 2026), then stage 4 once stage 3 is measured. The joint seams of the parts
+([NPC-JOINT-GAPS-33](bugs/NPC-JOINT-GAPS-33.md)) are fixed in the parts library before stage 3 ships.
 
 ## Summary
 

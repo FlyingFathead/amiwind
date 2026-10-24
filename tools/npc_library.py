@@ -11,8 +11,9 @@ module's stage key must not change; tests and the measurement compare its bytes 
 appearance.
 
 What it does not do: no mover model (the moving frames; the standing model's layout names none), no carried items
-(weapons, shields: npc_items), no greeting voice or dialogue lines (aw_voice and aw_line empty, hello distance 0), no
-near/far levels of detail. The support state is the grounding policy's when it names the NPC, else on the ground.
+(weapons, shields: npc_items), no greeting fields of its own (aw_voice and aw_line empty, hello distance 0: the engine
+then takes the NPC's hello distance, voice lines and conversation greeting from the voice table by its aw_source_id,
+tools/greeting_lut.py, NPC-GREETINGS-LIBRARY-MUTE-48), no near/far levels of detail. The support state is the grounding policy's when it names the NPC, else on the ground.
 """
 import hashlib
 import json
@@ -69,9 +70,47 @@ def appearances(kinds, ids):
     return out, left
 
 
+BYTE_BUDGET_ERROR = 'Alias byte budget exceeded with full samples'
+
+
+class BudgetError(ValueError):
+    """The kit model of an appearance does not fit the alias byte budget at any rung of the ladder."""
+
+
+def levels(profile_name):
+    """The animation levels a bake tries, in order: prepare_area.resident_levels (RESIDENT-ANIM-BYTE-BUDGET-48)."""
+    import npc_anim
+    if profile_name == 'idle':
+        return [('kit', 'idle')]
+    standing, mover = npc_anim.split_profile(profile_name)
+    return [('kit', profile_name)] + ([('standing', standing)] if mover and standing != 'idle' else []) + \
+        [('idle', 'idle')]
+
+
 def bake_standing(task):
     """(model bytes, layout, sounds {name: bytes}, facts) of one appearance: build_resident's animation kit branch
-    with profile PROFILE ('react+full', 'react', ...; 'idle' = its idle-only branch), the standing model only."""
+    with profile PROFILE ('react+full', 'react', ...; 'idle' = its idle-only branch), the standing model only. An
+    appearance whose kit model does not fit the alias byte budget at any rung falls back as build_resident's does
+    (the standing profile alone, else idle only; facts['anim_fallback'] says which and why)."""
+    data, palette, appearance, profile_name = task
+    reasons = []
+    for level, name in levels(profile_name):
+        try:
+            raw, layout, sounds, facts = _bake_standing((data, palette, appearance, name))
+        except BudgetError as error:
+            if level == 'idle':
+                raise
+            reasons.append('%s (%s): %s' % (level, name, error))
+            continue
+        if reasons:
+            facts['anim_fallback'] = {'profile': profile_name, 'level': level, 'baked': name, 'reasons': reasons}
+            print('NPC library: animation fallback: %s: profile %s does not fit the alias byte budget (%s); baked as '
+                  '%s (%s)' % (appearance['id'], profile_name, '; '.join(reasons), level, name), flush=True)
+        return raw, layout, sounds, facts
+    raise AssertionError('levels ends with idle')
+
+
+def _bake_standing(task):
     import numpy as np
     import npc_anim
     from mwad.audit import BSA
@@ -109,12 +148,12 @@ def bake_standing(task):
         try:
             frames, faces, uv, skin = bake(shapes, materials, textures, palette, budget=budget,
                                            reference_frames=8 if kit else None,
-                                           full_frame_budget=npc_anim.ALIAS_BYTE_BUDGET if kit else None)
+                                           full_frame_budget=npc_anim.ACTOR_BYTE_BUDGET if kit else None)
             break
         except ValueError as error:
-            if str(error) not in ('Alias vertex budget exceeded', 'Alias byte budget exceeded with full samples') \
-                    or budget == 192:
-                raise ValueError(appearance['id'] + ': ' + str(error)) from error
+            if str(error) not in ('Alias vertex budget exceeded', BYTE_BUDGET_ERROR) or budget == 192:
+                kind = BudgetError if kit and str(error) == BYTE_BUDGET_ERROR else ValueError
+                raise kind(appearance['id'] + ': ' + str(error)) from error
     layout, sounds = '', {}
     if kit:
         nv, nt, (sw, sh) = frames.shape[1], len(faces), skin.size
@@ -123,7 +162,10 @@ def bake_standing(task):
             keep = {g['name']: g['count'] for g in groups if g['name'] in dict(npc_anim.profiles()[standing_name])}
             standing_groups, standing_index = npc_anim.select(groups, keep)
         else:
-            standing_groups, standing_index = npc_anim.fit(groups, nv, nt, sw, sh)
+            try:
+                standing_groups, standing_index = npc_anim.fit(groups, nv, nt, sw, sh, npc_anim.ACTOR_BYTE_BUDGET)
+            except npc_anim.AliasBudgetError as error:
+                raise BudgetError(appearance['id'] + ': ' + str(error)) from error
         names = [g['name'] + '%02d' % i for g in standing_groups for i in range(g['count'])]
         raw = animated_mdl(frames[standing_index], faces, uv, skin, names=names)
         foot = appearance.get('foot', 'bare')
@@ -196,12 +238,18 @@ def build(data, palette, ids, out_id1, jobs=1, kinds=None):
             for i in idents:
                 npcs[i] = {'key': key, 'name': text(kinds['NPC_'][i], 'FNAM') or i,
                            'dead': bool(apps[i].get('initially_dead'))}
-    return {'format': FORMAT, 'profile': profile, 'models': models, 'npcs': npcs, 'left_out': left}
+    fallback = {key: dict(m['anim_fallback'], npcs=sorted(groups[key])) for key, m in sorted(models.items())
+                if m.get('anim_fallback')}
+    if fallback:
+        print('NPC library: %d appearances at a smaller animation level (alias byte budget): %s' % (
+            len(fallback), ', '.join('%s (%s)' % (f['npcs'][0], f['level']) for f in fallback.values())), flush=True)
+    return {'format': FORMAT, 'profile': profile, 'models': models, 'npcs': npcs, 'left_out': left,
+            **({'anim_fallback': fallback} if fallback else {})}
 
 
 def entity_text(ident, npc, model):
     """An NPC base's entity text: the resident row's fields (prepare_area populate) without the per-placement ones
-    and without voice, greeting and dialogue (not made here)."""
+    and without voice, greeting and dialogue fields (the engine finds them in the voice table by aw_source_id)."""
     try:
         from actor_grounding import fields as grounding_fields
         ground = grounding_fields(ident)

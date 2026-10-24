@@ -4,6 +4,12 @@
 #define AW_TORCH_LIGHT_KEY (-0x415754)
 #define AW_GUARD_TORCH_LIGHT_KEY (-0x415747)
 #define AW_GUARD_TORCH_LIGHT_COUNT 2
+/* Guard torch registry records (gfx/guard-torches.awg), one per staged (guard source id, base model); the
+ * builder's limit is tools/prepare_guard_torches.py MAX_RECORDS, the same number. 32 until v0.0.48: every
+ * interior on CHIM rooms staged 51 (dev2 try12, GUARD-TORCH-TYPES-LIMIT-48). Each record is a fixed table
+ * entry of about 0.5 KiB static memory (128 records: about 68 KiB); companion models load only for guards
+ * in view (at most 6 distinct records in one map on dev2 try12), so the count does not raise the heap use. */
+#define AW_GUARD_TORCH_TYPES 128
 /* Night lamps (aw_lamps.c): up to AW_LAMP_LIGHT_COUNT steady dynamic lights. */
 #define AW_LAMP_LIGHT_KEY (-0x41574C)
 #define AW_LAMP_LIGHT_COUNT 4

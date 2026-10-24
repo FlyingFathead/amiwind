@@ -1,6 +1,6 @@
 # Development overlays
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -526,7 +526,7 @@ Shift/Ctrl/Alt are refreshed from each native input qualifier, with Caps Lock
 limited to letters and focus changes clearing held input. Legacy personal
 keymap.cfg loads before keymaps.cfg. The maintained canonical reference is
 KEYMAPS.md. Autosave default is five; aw_autosaves 0..16 remains an archived
-setting in config.cfg and Options > Autosave history.
+setting in config.cfg and Options > Prefs > Autosave history.
 
 
 The compass/heading HUD defaults to hidden in rc6. Use `dbg compass on` or

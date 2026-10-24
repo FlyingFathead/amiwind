@@ -30,13 +30,16 @@ HYBRID_PARTS = collections.OrderedDict([
     ('lightstyles', 'implemented'),            # sources in 32-36, generated flicker and pulse strings
     ('dynamic_every_class', 'implemented'),    # the night lamp table widened to every class that adds light
     ('terrain_lightmaps', 'planned'),
-    ('placement_light_level', 'planned'),
+    # chim.placement_light, world format 0.12 (v0.0.48): in source, off by default (--chim-placement-light sources)
+    # until its in-game frame cost is measured
+    ('placement_light_level', 'experimental'),
     ('plant_glow', 'planned'),
 ])
 assert set(IMPLEMENTED) | set(RESERVED) == set(TYPES)
 # The label "hybrid" carries until its planned parts exist (receipts list them in 'parts').
-PARTIAL_NOTE = (' (PARTIAL today: light styles and the night lamp table widened to every class; terrain lightmaps, '
-                'model light levels and plant glow not yet)')
+PARTIAL_NOTE = (' (PARTIAL today: light styles and the night lamp table widened to every class; one light level per '
+                'placed model from the light sources is experimental (--chim-placement-light sources); terrain '
+                'lightmaps and plant glow not yet)')
 
 
 def check(kind):

@@ -1,11 +1,14 @@
 # CHIM lighting
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Where CHIM lighting stands](#where-chim-lighting-stands)
+- [Fires on CHIM frames](#fires-on-chim-frames)
+  - [The fires' light (on by default)](#the-fires-light-on-by-default)
+- [Placement light levels (experimental)](#placement-light-levels-experimental)
 - [How Quake lights a world](#how-quake-lights-a-world)
 - [How the original lights a world](#how-the-original-lights-a-world)
 - [The options, measured](#the-options-measured)
@@ -38,6 +41,115 @@ The steps from here, with their checks and the pending decisions, are in the [CH
   plants, 12 darkeners, 4 fires) and 690 have one (545 lamps and lanterns, 70 fires, 69 torches, 6 candles). None of
   them is baked. In the converted cells, 647 reach the frame only as night lamps and 2,279 not at all.
 - Tracker result today: lit 0, partial 133, unlit 1,052 (the rest not converted).
+- Since the hybrid type (below) the night lamp table holds every light that adds light, the lights without a mesh
+  among them: 3,247 rows in the v0.0.47 image (1,936 plain lights, 332 glowing plants, 74 fires, 545 lamps, 69
+  torches, 6 candles, 285 lava glow rows). They reach the frame only as the nearest 2 dynamic lights at night
+  (CHIM-MESHLESS-LIGHTS-33, persisting).
+- Fires: from v0.0.48 the CHIM frame maps carry the flames of their fires ([Fires on CHIM frames](#fires-on-chim-frames)).
+
+## Fires on CHIM frames
+
+The flame of a placed fire is the engine's own particle flame, the one the Census and Excise Office hearth has had
+since the room maps (`engine/aga/src/aw_guard_torch.c`): the map's `aw_flame` entities give each flame's place, size
+and shape (the emitter's particle size, rise and spread from the original mesh), the engine reads them once per map
+into its table of 128 and animates the best 12 on screen within 640 units each frame (FLAME-RANGE-NEAREST-32). The
+large ones (particle size 4 and up: hearths, fire pits, braziers) are drawn with the hearth colour table and throw
+ember particles. One animation serves every fire: nothing per fire is stored but its entity, a few dozen bytes.
+
+Until v0.0.48 the CHIM towns, region frames and batch rooms showed no fire at all
+(CHIM-EXTERIOR-FLAMES-MISSING-48): each CHIM model keeps its emitters in its own entity lump, but the engine reads
+flames only from the loaded map, and the frame maps made from the game data had none. Now (`tools/chim/flames.py`):
+
+- every frame map (the town frame maps, Seyda Neen's docks and courtyard maps, every region frame map) gets one
+  `aw_flame` per fire emitter of the placements its frame owns, from the model's emitters turned by the placement's
+  angles, at the places the room and town converter puts them (`prepare_mesh_bsp.flame_entities`);
+- a batch room's shell map gets them from its room record and the interior store; a room converted whole keeps its
+  own map's flames;
+- meshes whose emitters are not fire (blight and mist clouds, steam and lava vents, lava sparks, the ash mire) get
+  none: their emitter names passed the converter's rule, but a flame there would burn in the air;
+- largest flames first, so a frame over the engine's 128 keeps its hearths and campfires and counts the rest.
+
+Measured on the v0.0.47 release build's CHIM world (read only, `tools/chim/flames.py measure`), per game region:
+
+| Region | Frames | Fires (emitters) | Of them hearth-size |
+| --- | ---: | ---: | ---: |
+| Ascadian Isles | 77 | 106 | 14 |
+| Ashlands | 162 | 75 | 65 |
+| Azura's Coast | 379 | 125 | 43 |
+| Bitter Coast | 152 | 56 | 4 |
+| Grazelands | 57 | 43 | 43 |
+| Molag Mar | 123 | 15 | 15 |
+| Red Mountain | 37 | 4 | 4 |
+| Sheogorad | 170 | 42 | 10 |
+| West Gash | 185 | 194 | 38 |
+| Seyda Neen (town frame) | 1 | 10 | 0 |
+| Balmora (town frame) | 1 | 0 | 0 |
+| Vivec (town frame) | 1 | 49 | 0 |
+| Island | 1,351 | 719 in 299 frames | 236 |
+
+No frame is over the cap: at most 49 flames in one map (Vivec), 19 in a region frame. The flames' entity text is
+106,859 bytes over the island and at most 7,350 bytes in one map with the fires' light (85,104 and 5,880 without
+it); it is counted in the map's `_chim_hunk_rest`, which
+moves the CHIM zone by at most one 16 KiB step (the smallest active-ring headroom of a frame in that build is 21,616
+bytes). Edicts: QuakeC removes each `aw_flame` at spawn (QC-AW-FLAME-SPAWN-32) and the load reuses the freed slot, so
+the high-water mark grows by one at most. Per frame the engine checks the map's flames for range and screen and draws
+at most 12, as in the rooms. 850 emitters of non-fire meshes are left out (the ash mire 314, lava vents 369, steam
+120, lava sparks 24, blight 9, mist 4).
+
+### The fires' light (on by default)
+
+The maintainer, 23 October 2026: "set it on by default but add some dbg command like dbg campfires on|off". Each
+fire placement's light record (the LIGH placement at the fire, same mesh, found in the game data by place) gives its
+first flame row `"aw_flame_light" "R L"`: the radius in map units and the brightness (the colour's luma, 0 to 255).
+When a chunk's records are read the engine gives every placed model without a stored level a level from the frame
+map's fires (`chim_chunks.c`): the rooms' rule at the model's drawn-box centre (full to R/3, then R/3d, faded out
+between R and 2R), rounded to steps of 8. Outdoors the level is added to the daylight-dimmed ambient and never past
+the full-day ambient (`r_surf.c`): by day nothing changes; at night the tents, bedrolls and rocks round a campfire
+keep their light. `dbg campfires off` (`aw_campfires 0`, not saved) hides the fires outdoors at once: their flames,
+their light on the models (one surface-cache rebuild) and their rows of the night lamps. Build setting
+`--chim-fire-light` (on; off = flames without light). Nothing is stored in the CHIM world: the world store is the
+same bytes, only the frame maps change.
+
+The ground: the terrain has no stored light (part 1, terrain lightmaps, is still planned), so the patch of ground
+round a fire is lit only by the night lamps: the fires are in the lamp table (class fire), and at night the nearest
+2 light sources around the player light the ground as dynamic lights. A campfire in the wilderness, with nothing
+nearer, is one of those 2 when the player is near it. A stored ground light round every fire is part 1: a lightmap
+for each terrain face a fire reaches (measured in [The options, measured](#the-options-measured): +17 to +27 KB in a
+town ring with one style), built by the CHIM builder from the same light records.
+
+Measured on the v0.0.47 world (read only, `tools/chim/flames.py measure`, the engine's rule computed by the builder
+and checked against the engine code in `tests/test_chim_exterior_flames.py`):
+
+| | All frames | Busiest fire frame: Vivec (49 fires) | Most mixed region frame: 18,4 (11 fires) |
+| --- | ---: | ---: | ---: |
+| Fire light sources (every fire placement found its light record) | 719 | 49 | 11 |
+| Placements lit | 6,320 in 299 frames (median 13 per frame with fires) | 144 of 7,537 | 121 of 725 |
+| Models drawn at two or more levels in the frame | 1,434 | 11 (221 placements, 1,669 faces) | 40 (149 placements, 5,787 faces) |
+
+The last row is the cost to watch: the renderer keeps one cached surface per model surface, so placements of one model
+at different levels rebuild it when drawn in turn. The faces are an upper bound of the surfaces rebuilt in one frame
+if every such placement were on screen at once; a campfire camp in the wilderness has a handful. Memory: the fire table
+is 128 x 20 bytes; each fire's row grows by about 30 bytes of entity text (21,755 bytes over the island); no new
+placement field (the level is the existing `aw_light`). Time: one distance check per fire for each placement, once
+when its chunk's records are read.
+
+## Placement light levels (experimental)
+
+Part 2 of the hybrid type, in source from v0.0.48 and off by default (`--chim-placement-light sources`,
+`tools/chim/placement_light.py`): every exterior light source that adds light gives each placed model it reaches a
+light level, stored in the high byte of the placement record's flags (world format 0.12, the byte the CHIM rooms use;
+[WORLD_FORMAT.md](WORLD_FORMAT.md#placement-light-stores-and-room-records-012)). The level is the rooms' rule without
+the cell ambient: the sum of each light's brightness times the original attenuation (full to a third of its radius,
+then radius over three times the distance, faded out between the radius and twice the radius) at the model's
+drawn-box centre, rounded to steps of 8. Outdoors the engine adds it to the daylight-dimmed ambient and never past the
+full-day ambient (`r_surf.c`): by day it shows nothing, as the original clamps light at full; at night the lit models
+keep their light. `r_lamps 0` turns it off for A/B.
+
+On the v0.0.47 world it would light 155,246 of 469,266 placements in 1,000 frames (at most 3,697 in one frame,
+Vivec). Most of the lights without a mesh are one record: 1,614 of the 1,936 plain lights are the blue coast light
+(radius 1,024) along the coasts. Before it goes on, its frame cost is measured in game: the renderer keeps one cached
+surface per model surface, so placements of one model at different levels drawn in turn rebuild it; 16,843
+model-in-frame cases (at most 170 in one frame) have two or more levels. Terrain still gets no stored light (part 1).
 
 ## How Quake lights a world
 
@@ -245,7 +357,9 @@ What is in source today:
 
 - the style scheme (LIGHT-STYLES-UNDEFINED-33);
 - the widened lamp table (part 3, at night as before);
-- the light-entity text (`light_sources.entity()`), with two entities per darkener.
+- the light-entity text (`light_sources.entity()`), with two entities per darkener;
+- from v0.0.48, experimental and off by default: one light level per placed model (part 2,
+  [Placement light levels](#placement-light-levels-experimental)).
 
 The CHIM receipt records the type and the state of each part (`lighting` in `chim-receipt.json`).
 

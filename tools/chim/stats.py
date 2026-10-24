@@ -44,6 +44,53 @@ WALK_FIELDS = ('crossings', 'crossings_reading', 'bytes_read', 'per_crossing_p50
                'resident_p50', 'resident_max')
 
 
+def pool_on():
+    """The worker pool method of the stats (BUILD-STATS-SERIAL-36, v0.0.48): in-order maps on completed_map's
+    scheduling (build_parallel.in_order_map), the model facts made once for the stats and the cameras, ring offsets
+    worked out once per grain, a timed phase per section. AMIWIND_STATS_POOL=off keeps the method before (ordered
+    maps, the cameras' own model pass); the same document either way."""
+    import os
+    return os.environ.get('AMIWIND_STATS_POOL', 'on') != 'off'
+
+
+def source_cells(source):
+    """What the stats read of a source manifest: each frame's area ('town') and 'cell' (chim_stats: the disk split
+    by area). chim_build hands this to main() instead of the stats parsing the whole manifest again."""
+    return {'frames': [{k: s[k] for k in ('town', 'cell') if k in s} for s in (source or {}).get('frames', [])]}
+
+
+def _in_order(function, tasks, jobs, cost):
+    """FUNCTION over TASKS, results in task order: on the worker pool with JOBS > 1 (in_order_map, or ordered_map
+    with AMIWIND_STATS_POOL=off), else here."""
+    from build_parallel import in_order_map, ordered_map, stage_ceiling
+    jobs = stage_ceiling(jobs)
+    if jobs > 1 and len(tasks) > 1:
+        return (in_order_map if pool_on() else ordered_map)(function, tasks, min(jobs, len(tasks)), cost=cost)
+    return map(function, tasks)
+
+
+class _Quiet:
+    """A phase that prints nothing (AMIWIND_STATS_POOL=off: the stats' sections as before, silent)."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def done(self, summary):
+        pass
+
+
+def _phase(name, detail=None):
+    """A timed phase of the stats ('CHIM stats: NAME: started' / '... done - took 3.1s, 11.2 cores'; build_profile)
+    so no section of the stats runs silent (BUILD-SILENT-PHASES-36)."""
+    if not pool_on():
+        return _Quiet()
+    import build_profile
+    return build_profile.phase('CHIM stats: ' + name, detail)
+
+
 def pct(values, q):
     """Nearest-rank percentile, the same rule as the validator's reports."""
     v = sorted(values)
@@ -54,8 +101,19 @@ def distribution(values):
     values = list(values)
     if not values:
         return {'count': 0, 'total': 0, 'min': 0, 'p50': 0, 'p95': 0, 'max': 0, 'mean': 0}
-    return {'count': len(values), 'total': sum(values), 'min': min(values), 'p50': pct(values, .5),
-            'p95': pct(values, .95), 'max': max(values), 'mean': round(statistics.mean(values), 2)}
+    if not pool_on() or not all(type(x) is int for x in values):
+        return {'count': len(values), 'total': sum(values), 'min': min(values), 'p50': pct(values, .5),
+                'p95': pct(values, .95), 'max': max(values), 'mean': round(statistics.mean(values), 2)}
+    # Whole numbers (every distribution of the stats): one sort for both percentiles, min and max, and the mean as the
+    # exact sum over the count as statistics.mean gives it: an int when the count divides the sum, else the true
+    # division of the two ints (rounded once, as its exact fraction is: the same float). BUILD-STATS-SERIAL-36: the
+    # distributions took a second of the stats on one core.
+    v = sorted(values)
+    n = len(v)
+    total = sum(v)
+    mean = total // n if total % n == 0 else total / n
+    return {'count': n, 'total': total, 'min': v[0], 'p50': v[min(n - 1, int(.5 * (n - 1)))],
+            'p95': v[min(n - 1, int(.95 * (n - 1)))], 'max': v[-1], 'mean': round(mean, 2)}
 
 
 def faces_of(image):
@@ -126,19 +184,21 @@ def resident_rings(world, model_tex, jobs=1):
         chunks_of[c['frame']][c['cell']] = ([r['model'] for r in c['records']], c['terrain_textures'],
                                             c['render'] + c['collision'])
     tasks = []
+    rings = {}                      # ring offsets per (grain, radius): the same list for every frame of one grain
+    radius = settings['draw_distance'] + settings['hysteresis']
     for path, frame, _ in world['frames']:
         by_cell = chunks_of[path]
-        offs = ring_offsets(frame['grain'], settings['draw_distance'] + settings['hysteresis'])
+        if pool_on():
+            offs = rings.get(frame['grain'])
+            if offs is None:
+                offs = rings[frame['grain']] = ring_offsets(frame['grain'], radius)
+        else:
+            offs = ring_offsets(frame['grain'], radius)
         mids = {m for c in by_cell.values() for m in c[0]}
         own = {m: (models[m]['bytes'], models[m]['render'], model_tex[m]) for m in mids}
         tids = {t for c in by_cell.values() for t in c[1]} | {t for m in mids for t in model_tex[m]}
         tasks.append((offs, by_cell, own, {t: textures[t]['bytes'] for t in tids}))
-    from build_parallel import ordered_map, stage_ceiling
-    jobs = stage_ceiling(jobs)
-    if jobs > 1 and len(tasks) > 1:
-        found = ordered_map(_frame_rings, tasks, min(jobs, len(tasks)), cost=lambda t: len(t[1]) * len(t[0]))
-    else:
-        found = map(_frame_rings, tasks)
+    found = _in_order(_frame_rings, tasks, jobs, lambda t: len(t[1]) * len(t[0]))
     return [row for rows in found for row in rows]
 
 
@@ -151,24 +211,55 @@ def model_facts(models, jobs=1):
     """([faces], [texture refs]) of every model, in groups of MODEL_GROUP on the worker pool with JOBS > 1."""
     images = [m['image'] for m in models]
     groups = [images[k:k + MODEL_GROUP] for k in range(0, len(images), MODEL_GROUP)]
-    from build_parallel import ordered_map, stage_ceiling
-    jobs = stage_ceiling(jobs)
-    if jobs > 1 and len(groups) > 1:
-        found = ordered_map(_model_facts, groups, min(jobs, len(groups)), cost=lambda g: sum(len(i) for i in g))
-    else:
-        found = map(_model_facts, groups)
+    found = _in_order(_model_facts, groups, jobs, lambda g: sum(len(i) for i in g))
     facts = [fact for group in found for fact in group]
     return [f[0] for f in facts], [f[1] for f in facts]
 
 
-def chim_stats(world, measured, receipt=None, areas=None, legacy=None, cameras=(), top=TOP, source=None, jobs=1):
+class _Steps:
+    """The stats' sections one after another as timed phases (_phase): next() ends the running one and starts the
+    next; leaving the block ends the last (FAILED when an error leaves it)."""
+
+    def __init__(self):
+        self.current = None
+
+    def next(self, name, detail=None):
+        self._end(None, None, None)
+        self.current = _phase(name, detail)
+        self.current.__enter__()
+
+    def _end(self, kind, value, traceback):
+        current, self.current = self.current, None
+        if current is not None:
+            current.__exit__(kind, value, traceback)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, kind, value, traceback):
+        self._end(kind, value, traceback)
+        return False
+
+
+def chim_stats(world, measured, receipt=None, areas=None, legacy=None, cameras=(), top=TOP, source=None, jobs=1,
+               facts=None):
     """The chim-stats document (schema SCHEMA) from a validated world (chim.validate.validate),
     its measurements (chim.validate.measure), the builder receipt and today's region maps. JOBS: the models' faces
     and textures and the resident rings go to the worker pool (BUILD-CHIM-SERIAL-SECTIONS-44: about a minute on
-    one core in v0.0.44-dev1); the same document."""
+    one core in v0.0.44-dev1); the same document. FACTS: model_facts(world['models']) when the caller made them
+    already (main: once for the stats and the cameras). Each section is a timed phase (BUILD-STATS-SERIAL-36)."""
+    with _Steps() as steps:
+        return _chim_stats(steps, world, measured, receipt, areas, legacy, cameras, top, source, jobs, facts)
+
+
+def _chim_stats(steps, world, measured, receipt, areas, legacy, cameras, top, source, jobs, facts):
     receipt = receipt or {}
     models, textures, chunks = world['models'], world['textures'], world['chunks']
-    model_faces, model_tex = model_facts(models, jobs)
+    if facts is None:
+        steps.next('model faces and textures', '%d models' % len(models))
+        facts = model_facts(models, jobs)
+    model_faces, model_tex = facts
+    steps.next('placements and chunks', '%d chunks' % len(chunks))
     owned = [(c, r) for c in chunks for r in c['owned']]
     uses = collections.Counter(r['model'] for _, r in owned)
     # models
@@ -200,7 +291,8 @@ def chim_stats(world, measured, receipt=None, areas=None, legacy=None, cameras=(
              'placed': sum(row[2] for row in placement_rows) + terrain_faces}
     faces['placed_over_stored'] = round(faces['placed'] / faces['stored'], 2) if faces['stored'] else None
     # views: benchmark cameras (terrain of the potentially visible chunks + the placement list)
-    views = {'cameras': [], 'all_chunks': measured.get('visibility', {})}
+    steps.next('views and disk')
+    views ={'cameras': [], 'all_chunks': measured.get('visibility', {})}
     by_name = {v['camera']: v for v in measured.get('cameras', [])}
     if world['visibility'] and cameras:
         from chim.validate import frame_of_point
@@ -256,7 +348,9 @@ def chim_stats(world, measured, receipt=None, areas=None, legacy=None, cameras=(
                        duplication_factor=round(legacy['bytes'] / chim_bytes, 2) if chim_bytes else None)
         disk['areas'][name] = row
     # memory
+    steps.next('resident rings', '%d frames' % len(world['frames']))
     rings = resident_rings(world, model_tex, jobs)
+    steps.next('memory, streaming and pain points')
     peak = max(rings, key=lambda r: (r['total_bytes'], r['cell'])) if rings else {}
     walk = measured.get('walk', {})
     memory = {'ring_chunks': walk.get('ring_chunks'),
@@ -368,19 +462,30 @@ def main(argv=None, world=None, measured=None, jobs=1, source=None):
     area_list = receipt.get('areas') or ([receipt['town']] if receipt.get('town') else [])
     cameras = [(n, float(x), float(y)) for n, x, y in a.camera] if a.camera is not None \
         else [(n, float(x), float(y)) for area in area_list for n, x, y in BENCHMARK_CAMERAS.get(area, [])]
+    facts = None
     if reused:
         # the same figures measure() gives: its result plus the cameras' report (validate.measure)
         measured = dict(measured)
         if cameras:
-            measured['cameras'] = camera_report(world, cameras)
+            if pool_on():
+                # the models' faces once, on the worker pool, for the cameras and the stats (the cameras' report
+                # decoded every model again on one core: BUILD-STATS-SERIAL-36)
+                with _phase('model faces and textures', '%d models' % len(world['models'])):
+                    facts = model_facts(world['models'], jobs)
+                with _phase('cameras', '%d cameras' % len(cameras)):
+                    measured['cameras'] = camera_report(world, cameras, model_faces=facts[0])
+            else:
+                measured['cameras'] = camera_report(world, cameras)
     else:
         measured = measure(world, source, a.legacy_maps, a.legacy_regions, None, cameras)
     measured.get('walk', {}).pop('_replay', None)
     legacy = legacy_summary(a.legacy_maps, a.legacy_regions) if a.legacy_maps and a.legacy_regions else None
-    stats = chim_stats(world, measured, receipt, area_list or None, legacy, cameras, source=source, jobs=jobs)
+    stats = chim_stats(world, measured, receipt, area_list or None, legacy, cameras, source=source, jobs=jobs,
+                       facts=facts)
     target = a.json or (a.out / 'chim-stats.json')
     # its long lists encoded on the worker pool (parallel_json), the rest of the document here
-    target.write_bytes(dumps(stats, jobs).encode('utf-8'))
+    with _phase('writing', str(target.name)):
+        target.write_bytes(dumps(stats, jobs).encode('utf-8'))
     print('chim-stats: %s (%d models, %d placements, %d chunks)' % (target, len(world['models']),
                                                                      stats['counts']['placements'], len(world['chunks'])))
     return 0

@@ -298,9 +298,18 @@ class UnitCache(PassCache):
         """Record a finished unit: its row and every file under DIRECTORY. Never fails a build."""
         try:
             directory = Path(directory)
+            files = {path.relative_to(directory).as_posix(): path.read_bytes()
+                     for path in sorted(p for p in directory.rglob('*') if p.is_file())}
+        except OSError:
+            return
+        self.store_files(inputs, row, files)
+
+    def store_files(self, inputs, row, contents):
+        """Record a finished unit: its row and CONTENTS {relative name: bytes}, for a unit whose worker returns
+        its files instead of writing them (load_unit gives the same {name: bytes} back). Never fails a build."""
+        try:
             files = {}
-            for path in sorted(p for p in directory.rglob('*') if p.is_file()):
-                data = path.read_bytes()
+            for relative, data in sorted(contents.items()):
                 sha256 = hashlib.sha256(data).hexdigest()
                 blob = self._blob(sha256)
                 if not blob.is_file():
@@ -308,7 +317,7 @@ class UnitCache(PassCache):
                     partial = blob.with_name(f'{blob.name}.{os.getpid()}.tmp')
                     partial.write_bytes(data)
                     os.replace(partial, blob)
-                files[path.relative_to(directory).as_posix()] = sha256
+                files[relative] = sha256
             import cache_provenance
             cache_provenance.name_unit(self, input_digest(inputs), lambda: unit_label(inputs) or None, lambda: sorted(inputs.items()) if isinstance(inputs, dict) else [('inputs', inputs)])
             self.store(input_digest(inputs), {'row': row, 'files': files, 'label': unit_label(inputs)})

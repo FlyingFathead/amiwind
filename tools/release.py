@@ -146,7 +146,7 @@ def allowed_files(root):
         if p.is_absolute() or ".." in p.parts or str(p) != name or "\\" in name:
             raise ValueError("Unsafe source file list entry")
         preset = (p.suffix in (".uae", ".fs-uae") and p.parent == PurePosixPath("resources/emulators")) or name in ("config/keymaps.cfg", "config/game.cfg") or name in DOCUMENTATION_IMAGES or name in DOCUMENTATION_CLIPS or name in PROJECT_MEDIA or name in DOCUMENTATION_SOURCE_GRAPHICS or name in DEBUG_CATALOGUES or name in WORLD_TABLES or (p.suffix == ".chimfx" and p.parent == CHIM_EFFECTS_DIR)
-        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "amiwind-toolkit/chim-head.js", "amiwind-toolkit/zebra.js", "amiwind-toolkit/chim-legend.js", "amiwind-toolkit/chim-inclusion.js", "amiwind-toolkit/header.js", "amiwind-toolkit/chim-reader.js", "amiwind-toolkit/monitor.html", "amiwind-toolkit/mesh-compare.html", "amiwind-toolkit/view-camera.js", "tests/test_mesh_compare.js", "tests/test_cell_progress_legend.js", "tests/test_cell_progress_page_run.js", "tests/test_toolkit_chim.js", "tests/test_toolkit_monitor.js", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
+        native_aux = name in ("tools/polycount_inspector.html", "amiwind-toolkit/map-inspector.html", "amiwind-toolkit/world-map.html", "amiwind-toolkit/index.html", "amiwind-toolkit/chim-head.js", "amiwind-toolkit/zebra.js", "amiwind-toolkit/chim-legend.js", "amiwind-toolkit/chim-inclusion.js", "amiwind-toolkit/panel-fold.js", "amiwind-toolkit/interior-tracker.js", "amiwind-toolkit/header.js", "amiwind-toolkit/chim-reader.js", "amiwind-toolkit/monitor.html", "amiwind-toolkit/mesh-compare.html", "amiwind-toolkit/view-camera.js", "tests/test_mesh_compare.js", "tests/test_cell_progress_legend.js", "tests/test_cell_progress_page_run.js", "tests/test_interior_tracker.js", "tests/test_toolkit_chim.js", "tests/test_toolkit_monitor.js", "tests/test_toolkit_fold.js", "tests/test_legend_groups.js", "tests/test_polycount_markup.js", "tests/test_world_metrics_layer.js", "engine/aga/Makefile", "engine/aga/qc/progs.src", "engine/aga/src/progdefs.q1", "engine/aga/src/progdefs.q2", "docs/aga/COPYING.NEWLIB", ".github/workflows/source-check.yml")
         if not preset and not native_aux and name not in NATIVE_SOURCE_INCLUDES and name not in VENDORED_SOURCES and p.suffix not in (".py", ".md", ".json", ".toml", ".c", ".h", ".asm", ".qc", ".patch") and name not in (".gitignore", ".gitattributes", "LICENSE", "VERSION", "CHIM_VERSION", "engine/aga/COPYING", "build.sh", "build.cmd", "build.ps1", "setup-windows.cmd", "setup-windows.ps1"):
             raise ValueError(f"Unexpected distributable file type: {name}")
     return sorted(paths)
@@ -468,6 +468,21 @@ def validate_candidate(root, archive_path):
     return {"status": "passed", "source_files": len(content), "version": version(root)}
 
 
+def ledger_check(root):
+    """A release (rc or final) is cut only when the CHIM inclusion ledger in the source holds its version as released
+    (tools/chim_inclusion.py release_problems; TRACKER-INCLUSION-NOT-RUN-SINCE-44-48). Development versions are not
+    releases. Only the cut checks it: `--check` runs on the release commit before its build, when the ledger cannot
+    hold the build yet."""
+    from previous_release import is_release_version
+    import chim_inclusion
+    ver = version(root)
+    if not is_release_version(ver):
+        return
+    problems = chim_inclusion.release_problems(ver, root / "amiwind-toolkit")
+    if problems:
+        raise ValueError("Release refused: " + "; ".join(problems))
+
+
 def release(root, workspace):
     workspace = ensure_external(workspace, "release workspace")
     incoming, releases = workspace / "incoming", workspace / "releases"
@@ -478,6 +493,7 @@ def release(root, workspace):
     checksum = releases / (name + ".sha256")
     if final.exists() or checksum.exists():
         raise ValueError("This release version already exists. Existing releases are immutable; bump the version.")
+    ledger_check(root)
     with tempfile.TemporaryDirectory(prefix="source-", dir=incoming) as tmp:
         candidate = Path(tmp) / name
         create_candidate(root, candidate)

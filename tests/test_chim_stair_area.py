@@ -194,7 +194,9 @@ class GateOrder(unittest.TestCase):
                 return run
             with patch('chim.build.build_areas', side_effect=world),                     patch('chim.validate.report_world', side_effect=lambda *a, **k: (
                         calls.append('validation') or {'ok': True, 'failure_count': 0, 'measured': {}}, None, None)),                     patch('chim.validate.report_text', return_value=''),                     patch('chim_build.write_stats', side_effect=step('stats', 0)),                     patch('chim.heap.require_heap', side_effect=step('heap', {'status': 'passed', 'frames': []})),                     patch('chim.zone_sim.require_zone_walk', side_effect=step('zone walk', {'status': 'passed',
-                                                                                             'walks': []})),                     patch('chim.collision.require_stairs', side_effect=step('stairs', {'status': 'passed'})):
+                                                                                             'walks': []})),                     patch('chim.collision.require_stairs', side_effect=step('stairs', {'status': 'passed'})), \
+                    patch.dict(os.environ):   # chim_build.main exports its switches (placement light) for its workers
+
                 code = chim_build.main(['--area', 'balmora', '--data-files', tmp, '--palette', str(palette), '--out',
                                         str(out), '--validate', '--stats', '--jobs', '1', '--pool', 'batch'] + extra)
         self.assertEqual(code, 0)

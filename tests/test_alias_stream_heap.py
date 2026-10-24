@@ -2,7 +2,7 @@
 from pathlib import Path
 import tempfile
 import unittest
-from alias_stream_heap import apply,eligible,runtime_policy
+from alias_stream_heap import STREAM_LIMIT,apply,eligible,runtime_policy
 from guard_torch_heap import alias_cost,map_cost
 from test_guard_torch_heap import SIZES,model
 
@@ -15,7 +15,9 @@ class AliasStreamHeapTests(unittest.TestCase):
         self.assertEqual(new['external_malloc_peak_bytes'],0)
         self.assertTrue(eligible(raw,new['decoded_hunk_bytes']))
         self.assertFalse(eligible(raw+b'\0',new['decoded_hunk_bytes']))
-        self.assertFalse(eligible(raw,524289))
+        self.assertFalse(eligible(raw,STREAM_LIMIT+1))
+        # ALIAS-BUDGET-32MB-48: the stream takes the 32 MB actor budget, past the 512 KiB staging limit
+        self.assertTrue(eligible(raw,524289))
         malformed=bytearray(raw);malformed[84]=1
         self.assertFalse(eligible(malformed,new['decoded_hunk_bytes']))
         item=dict(source_id='guard',base_model='progs/base.mdl',body_model='progs/held.mdl',torch_model='progs/held.mdl',auto_inventory_eligible=False)

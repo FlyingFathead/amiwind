@@ -36,7 +36,14 @@
 /* Seconds a lamp takes to grow to full radius when chosen, and to shrink
  * away when dropped (on the spare lamp keys); nothing snaps on or off. */
 #define LAMP_FADE .4f
-typedef struct {float origin[3],radius,lit_since,off_since;int cool,lit,fading;} lamp_t;
+typedef struct {float origin[3],radius,lit_since,off_since;int cool,lit,fading,fire;} lamp_t;
+/* The lamp table's class code of a fire (tools/light_sources.py LAMP_CLASSES). */
+#define LAMP_CLASS_FIRE 3
+/* dbg campfires on|off (the maintainer 2026-10-23: "set it on by default but add some dbg command like dbg
+ * campfires on|off"; not saved): 0 hides the fires outdoors, live, without a reload: their light on the placed
+ * models (r_surf.c), their rows of the night lamps (here) and their flames (aw_guard_torch.c). r_campfires follows
+ * it once a frame (AW_LampUpdate); a change rebuilds the cached surfaces. Interiors keep their fires. */
+static cvar_t aw_campfires={"aw_campfires","1"};
 static lamp_t lamps[LAMP_CACHE];
 static int lamp_count,lamp_dropped,lamp_cell_valid,lamp_cell[2];
 static cvar_t aw_lamp_lights={"aw_lamp_lights","2",true};
@@ -75,6 +82,7 @@ static void load_cell(FILE *f,long base,unsigned count,int cx,int cy)
         if(lamp_count>=LAMP_CACHE){lamp_dropped++;continue;} /* counted, shown by dbg lamps */
         for(k=0;k<3;k++)l->origin[k]=f32(row+4+k*4);
         l->radius=(float)(row[16]|(row[17]<<8));l->cool=row[19]==2;l->lit=l->fading=0;l->lit_since=l->off_since=0;
+        l->fire=row[18]==LAMP_CLASS_FIRE;
         if(isfinite(l->origin[0]) && isfinite(l->origin[1]) && isfinite(l->origin[2]) && l->radius>0)lamp_count++;
     }
 }
@@ -162,6 +170,7 @@ void AW_LampInit(void)
 {
     Cvar_RegisterVariable(&aw_lamp_lights);Cvar_RegisterVariable(&aw_night_window_lights);
     Cvar_RegisterVariable(&aw_warm_light);Cvar_RegisterVariable(&aw_lamp_radius);Cmd_AddCommand("aw_lamp_status",lamp_status);AW_RemoteInit();AW_FogLocationInit();
+    Cvar_RegisterVariable(&aw_campfires);
 }
 /* Each frame at night: the nearest lamps within range get a steady light that
  * dies unless refreshed, so lamps fade out as soon as they are not chosen. */
@@ -169,6 +178,7 @@ void AW_LampUpdate(void)
 {
     float view[3],global[3],local[3],best_d[AW_LAMP_LIGHT_COUNT],d,dx,dy,dz;
     int best[AW_LAMP_LIGHT_COUNT],wanted,found=0,i,j,cx,cy;dlight_t *light;
+    {int on=aw_campfires.value!=0;if(on!=r_campfires){r_campfires=on;D_FlushCaches();}} /* dbg campfires */
     memset(r_dlight_cool,0,sizeof r_dlight_cool);
     if(sv.active && cls.state==ca_connected)night_windows();
     wanted=aw_lamp_lights.value<0?0:aw_lamp_lights.value>AW_LAMP_LIGHT_COUNT?AW_LAMP_LIGHT_COUNT:(int)aw_lamp_lights.value;
@@ -184,6 +194,7 @@ void AW_LampUpdate(void)
         dx=lamps[i].origin[0]-global[0];dy=lamps[i].origin[1]-global[1];dz=lamps[i].origin[2]-global[2];
         d=(dx*dx+dy*dy+dz*dz)*(1.0f/16);
         if(!(d<LAMP_RANGE*LAMP_RANGE))continue;
+        if(lamps[i].fire && !r_campfires)continue;      /* dbg campfires off */
         /* Local and source axes are the same (scale and offset only). */
         if(dx*vpn[0]+dy*vpn[1]+dz*vpn[2]<0)d*=LAMP_BEHIND*LAMP_BEHIND;
         if(lamps[i].lit)d*=LAMP_KEEP;

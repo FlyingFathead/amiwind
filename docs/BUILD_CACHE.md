@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -10,6 +10,7 @@ _Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
 - [Why reuse is safe](#why-reuse-is-safe)
 - [Early cutoff](#early-cutoff)
 - [Code keys and early cutoff in the unit caches](#code-keys-and-early-cutoff-in-the-unit-caches)
+  - [Collision defaults of v0.0.48-dev2: what rebuilds once](#collision-defaults-of-v0048-dev2-what-rebuilds-once)
 - [Narrowed reuse: what a stage really used](#narrowed-reuse-what-a-stage-really-used)
 - [Reuse preflight](#reuse-preflight)
 - [Run names](#run-names)
@@ -67,6 +68,8 @@ A failure forces the builder to rebuild only the minimum, within safe limits:
 | Image step | one map in one per-map pass (sky, hidden-surface cull, BSP optimizer, stair walk) | the map's bytes, the pass options, the pass's sources | `tools/pass_cache.py` `PassCache` |
 | Stage units | one region of world scenery or world flora | the region record, its input bytes, every shared input by content, the sources, the settings | `tools/pass_cache.py` `UnitCache` |
 | Stage units | one interior room (Balmora interiors, the area rooms, town interiors), one town region (Balmora and the other towns), one character head preview | the room or region record, the game data (the build's input lock), the palette, the map compilers by content, the shared town inputs by content, the sources, the settings | `prepare_area.build_room_cached`, `import_town`, `prepare_character` |
+| Stage units | one batch room (stage `chim-room-batches`, `--room-batches`): its scenery export, kept placements, plant sprites and shell room map, no compiled visual world | the room record (map name, cell, room policy, recentring), the game data (the build's input lock), the palette and colormap, the plant mode, the hand timings, the sources | `tools/chim_room_batches.py` (`interior-room-chim`) |
+| Image step units | one guard torch model; one player view model (body, torch body, water body or inventory poses of one race and sex, 80 in all) | the game data (the build's input lock), the palette, the unit's record (for the player view: race, sex and the body fields a torch or water body reads), the sources, the settings | `prepare_guard_torches`, `prepare_player_view.run_units` (`player-view`) |
 | Stage units | one world terrain map, one NPC gallery model, one CHIM unit, one sound or movie | each stage's own content-addressed cache (a gallery model: its appearance record, the bytes of its meshes and textures, the palette, and the code its converter can reach) | `world-terrain-v1`, `npc-gallery-v1`, `chim-units`, `asset-pool-v1` |
 
 Development builds (`-devN`) use every cache. Release candidates and finals use
@@ -88,8 +91,16 @@ it a release build runs every unit.
 3. **Outputs are credited to their writer.** A stage's outputs are the files that
    changed under its run-folder paths while it ran. When two stages run at the
    same time and both saw a file change, the write trace decides: a file only one
-   of them wrote is that stage's output; with an unknown writer (a map compiler) or
-   two writers, neither stage is reused.
+   of them wrote is that stage's output; with an unknown writer or two writers,
+   neither stage is reused. A program the trace does not follow (a map compiler,
+   ffmpeg) writes only where it is pointed, so the trace lists its working folder
+   and the run paths on its command line: a file under one of them may be that
+   stage's, a file under none of a stage's folders is not. A room stage's compiler
+   output (`room.prt`, `standing-collision.bsp`, its logs) is then credited to the
+   room stage, not left unknown, when a town stage that names the same scene folder
+   runs beside it (BUILD-REUSE-INTRO-CENSUS-REPLACED-48: both were refused, and
+   with them intro, census, actor-library, door-audio, character, reading and
+   opening-references).
 4. **Diagnostics are not compared; a read of one is a hashed input.** Tool logs
    (`*.log`) and the reports `chim-stats.json`, `chim-timing.json`,
    `gallery-cache.json` and `world-terrain-cache.json` carry timings; a rerun stage
@@ -173,6 +184,33 @@ not on whole source files (`tools/code_key.py`):
   not found under its key is looked up under that form, and a gallery model under its
   previous identity, so the first build with code keys reuses everything stored before.
   `AMIWIND_UNIT_CODE_KEYS=off` keeps the whole-file keys (A/B).
+
+### Collision defaults of v0.0.48-dev2: what rebuilds once
+
+The collision-source rule (`--collision-source`, `tools/collision_source.py`) and stair
+collision method 1 (`--stair-collision-method`) became the defaults in v0.0.48-dev2. The first
+build after them rebuilds this, by design, and no more:
+
+- **Every CHIM source stage, once.** The stage's receipt (`import_town.source_receipt`) names
+  the rule (`conversion.collision_source`: its mode and the SHA-256 of the rule's two modules),
+  so every frame's source stage exports again under it (the earlier stage is kept as
+  `.stale-*`). The scenery indexes come out the same for every model except the 48 `NCC`
+  models (now nonsolid); CHIM models already read their RootCollisionNode.
+- **CHIM mesh units: only the changed meshes and the flight meshes.** A mesh unit is keyed by
+  the mesh's content, so only meshes whose exported record changed (`NCC` placements) and the
+  meshes holding a flight of stairs (97 of 1,380 on the v0.0.47 build: kind `mesh-stair`,
+  profile `stair_collision` `mesh`) rebuild; every other mesh keeps its unit, worker, profile
+  and key, and the variants, tiles and cuts after it keep theirs by early cutoff. A new unit
+  kind, `stair-flights` (`stair_mesh.flight_unit`), counts each distinct mesh's flights once
+  and is cached by content.
+- **Rooms, census, prison ship, Seyda Neen scenery, harvest and door exports.** Their export
+  (`prepare_scenery.export_refs`, `_read_model`) changed and their output changes (every
+  non-`meshes/i/` model now collides with its RootCollisionNode): each such stage and each
+  room unit (`interior-room`) runs again.
+- **Unchanged keys.** The default mesh worker's code (`mesh_unit`, `prepare_mesh_bsp`,
+  `mesh_geometry`) and `prepare_scenery`'s import-time code are untouched, so the gallery
+  models, terrain, ocean and texture units keep their keys
+  (`tests/test_stair_mesh_keys.py`).
 
 A setting the builder passes only for its logs (the host's UTC offset of the progress
 lines, `AMIWIND_LOCAL_UTC_OFFSET`) is no stage input. When a name joins that list, runs
@@ -382,7 +420,7 @@ recorded in the build state and listed by the reuse audit. Release candidates an
 finals follow the same rules as `--reuse-from` (`--allow-release-reuse`).
 
 `--rebuild-unit UNIT:NAME[,UNIT:NAME]` builds single stage units again although they
-are cached (`interior-room:bmtemple`, `town-region:bm003`, `world-scenery-region:vf0123`,
+are cached (`interior-room:bmtemple`, `interior-room-chim:riac1a439e70`, `town-region:bm003`, `world-scenery-region:vf0123`,
 or `UNIT:*` for every unit of that kind); the new result replaces the stored one.
 `python tools/pass_cache.py list WORKSPACE/cache/image-passes [UNIT]` lists the stored
 units with their names, keys, file counts and sizes. Units that read game data are
@@ -538,6 +576,11 @@ them stored is stored once for all of them. The folder is chosen in this order:
 Naming a pool changes no stage key: the pool is a content-addressed store, so a
 named pool gets the same location token in the stage fingerprints as the
 default one, and `AMIWIND_STORAGE_POOL` is not a stage input.
+
+The CHIM unit cache (`WORKSPACE/cache/chim-units`) counts the same way for every stage that
+names it (`build_cache.CONTENT_ADDRESSED_FOLDERS`): the chim stage and the CHIM rooms stage
+(chim-interiors) share it, and each of its units is keyed by its own fingerprint and code key
+(CHIM-INTERIORS-REUSE-MISS-48).
 
 Hard links need the pool on the same file system AND the same mount as the
 run (two container mounts of one disk are still two mounts). The builder checks

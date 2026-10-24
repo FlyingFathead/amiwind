@@ -3,11 +3,13 @@
  * name asks AW_MapPath: maps/<name>.chim when this image has a CHIM world
  * (chim/world.cwi) and that file exists, else maps/<name>.bsp.
  *
- * A .chim file is a CHIM frame map: a BSP29 file (Quake's model loader
+ * A .chim file is a CHIM frame map (worldspawn "_chim_frame") or a CHIM room
+ * map (worldspawn "_chim_room"): a BSP29 file (Quake's model loader
  * dispatches on the header, not the extension) that holds the map's entities,
  * collision-only boxes and an empty world; its geometry lives in the CHIM
- * world (chim/). Without that world it is not a playable map, so the engine
- * refuses it loudly instead of loading a void (AW_MapRefused).
+ * world (chim/) or, for a room, on the interior store (chimi/). Without that
+ * world it is not a playable map, so the engine refuses it loudly instead of
+ * loading a void (AW_MapRefused).
  */
 #ifndef AW_MAPPATH_H
 #define AW_MAPPATH_H
@@ -27,8 +29,10 @@ int AW_MapPathIs (const char *path, const char *name);
 /* 1 when path names a .chim file. */
 int AW_MapPathChim (const char *path);
 /* A loaded map that cannot run here: a CHIM frame map (worldspawn
- * "_chim_frame") without a CHIM world, or a .chim file that is no frame map.
- * Returns 1 and the reason in why. */
+ * "_chim_frame") without a CHIM world, or a .chim file that is neither a
+ * frame map nor a CHIM room map (worldspawn "_chim_room", its models on the
+ * interior store; IMAGE-ROOM-MAPS-ENGINE-REFUSED-48). Returns 1 and the
+ * reason in why. */
 int AW_MapRefused (const char *path, const char *entities, char *why, int size);
 /* After a failed load: 1 (reason in why) when maps/<name>.chim exists but
  * this image has no CHIM world to run it. */

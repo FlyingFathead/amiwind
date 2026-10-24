@@ -26,6 +26,11 @@ extern void (*aw_chim_spawn)(vec3_t origin);			/* aw_scene.c */
 extern const char *(*aw_chim_town_map)(const char *town);	/* aw_region.c */
 extern int (*aw_chim_entity)(char **data);				/* pr_edict.c: a streamed static taken (chim_statics.c) */
 extern int (*aw_chim_source)(const float *local, float *world);	/* aw_hud.c: CHIM frame -> original coordinates */
+/* aw_hinged_door.c: turn every copy of a hinged door placement to a yaw, and
+ * clip against the copy that is drawn and solid (chim_chunks.c; defined in
+ * chim_world.c, set by Chim_Init) */
+extern int (*aw_chim_door_yaw)(unsigned pid, float yaw);
+extern int (*aw_chim_door_clip)(unsigned pid, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *trace);
 
 void Chim_Init (void);
 int Chim_Active (void);

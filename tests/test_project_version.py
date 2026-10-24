@@ -109,7 +109,9 @@ class ProjectVersion(unittest.TestCase):
         self.assertIn('$(CHIM_VERSION_FILE)', make)
 
     def test_preflight_pause_and_dry_run_boot_order(self):
-        checker = (ROOT/'engine/aga/boot/bootcheck.asm').read_text()
+        # The waits live in boot_wait.asm, included by the boot check (RAM-REQUIREMENT-32MB-48).
+        checker = (ROOT/'engine/aga/boot/bootcheck.asm').read_text() + (ROOT/'engine/aga/boot/boot_wait.asm').read_text()
+        self.assertIn('include "boot_wait.asm"', checker)
         self.assertIn('_LVOWaitForChar', checker)
         self.assertIn('_LVORead', checker)
         self.assertIn('#1000000', checker)

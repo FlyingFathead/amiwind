@@ -167,8 +167,9 @@ def main(argv=None):
     parser.add_argument('--kickstart-file', '--kickstart', dest='kickstart_file', type=Path,
                         help='Owned ROM file or directory to scan for the reference checksum (default: ~/.roms/; asks if missing interactively)')
     parser.add_argument('--fast-ram', metavar='MIB',
-                        help='Fast RAM of the emulated Amiga: default 128 MiB (like a 68060 card); 16 = the smallest '
-                        'machine the game runs on; the same sizes as the launcher, up to 1536')
+                        help='Fast RAM of the emulated Amiga: default 32 MiB (the safe minimum for the whole game; more '
+                        'is used automatically); 16 starts with a warning and loads more often; the same sizes as '
+                        'the launcher, up to 1536')
     args = parser.parse_args(argv)
     try:
         executable, rom = prepare_launch(args.kickstart_file, interactive=sys.stdin.isatty())

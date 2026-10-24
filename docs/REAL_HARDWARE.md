@@ -1,12 +1,13 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Contents](#contents-1)
 - [What the game needs](#what-the-game-needs)
+- [Why 32 MB of Fast RAM](#why-32-mb-of-fast-ram)
 - [Before you start: 68060 and Kickstart 3.1](#before-you-start-68060-and-kickstart-31)
 - [First measure, then play](#first-measure-then-play)
 - [More Fast RAM: the memory settings that exist today](#more-fast-ram-the-memory-settings-that-exist-today)
@@ -19,8 +20,8 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents end -->
 
-AmiWind is developed in emulators (FS-UAE: A1200, AGA, 68040 with FPU, 2 MiB Chip and 16 MiB Fast RAM,
-JIT). The first figure from a real Amiga came from a tester in October 2026: an earlier build on an A4000 with a
+AmiWind is developed in emulators (FS-UAE: A1200, AGA, 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM,
+JIT; 16 MiB before 21 October 2026, 128 MiB until 23 October 2026). The first figure from a real Amiga came from a tester in October 2026: an earlier build on an A4000 with a
 68060 at 100 MHz ran at about 0.2 frames per second, about 0.1 above the same tester's emulator runs. That is not
 playable yet; making the frame cheaper is the main engine work now ([AmiWind on the 68060](68060.md)). More real
 measurements, with the details listed under [what to send back](#what-to-send-back), are what turn emulator figures
@@ -31,6 +32,7 @@ which settings use more memory. Measurements from real machines are very welcome
 ## Contents
 
 - [What the game needs](#what-the-game-needs)
+- [Why 32 MB of Fast RAM](#why-32-mb-of-fast-ram)
 - [Before you start: 68060 and Kickstart 3.1](#before-you-start-68060-and-kickstart-31)
 - [First measure, then play](#first-measure-then-play)
 - [More Fast RAM: the memory settings that exist today](#more-fast-ram-the-memory-settings-that-exist-today)
@@ -45,11 +47,43 @@ which settings use more memory. Measurements from real machines are very welcome
 - An AGA Amiga (A1200, A4000 or an AGA-compatible setup).
 - A 68040 or 68060 **with an FPU** (EC and LC versions of the CPU have none).
 - Kickstart 3.1 or later.
-- At least 2 MiB Chip RAM and 16 MiB Fast RAM (the tested baseline).
+- 2 MiB Chip RAM and **32 MiB of Fast RAM, the safe minimum** for now, which should be enough for the entire
+  game. More Fast RAM is used automatically ([below](#extra-ram-is-used-automatically)). 16 MiB still starts:
+  the start-up check shows the Fast RAM row as `[!] WARN` and the note below, counts down ten seconds (ENTER
+  starts at once) and goes on by itself, and the game loads more often ([why 32 MB](#why-32-mb-of-fast-ram)).
 - A disk or card for the game's drive images. Kickstart 3.1 limits: every partition under 2 GiB, and every
   partition must **start** within the first 2 GiB of its drive.
 - The game itself is built from your own copy of Morrowind with the builder ([build setup](../README.md));
   no game data is distributed.
+
+## Why 32 MB of Fast RAM
+
+Decided for the project on 23 October 2026, from measurements of 22 and 23 October 2026 with every outdoor NPC and
+creature placed (781 actors in the 336 CHIM region frames):
+
+- **Outdoors:** the 16 MB baseline leaves the game about 2.1 MB of model cache. 14 region frames need more than
+  that; the worst, `rcp2_m7`, needs 2.0 MB more. Actor models per frame are 624 KB at the median and 4.13 MB at
+  most. With more RAM (measured with a 24 MiB game heap, about 15.7 MB of cache) every frame fits.
+- **Interiors** share CHIM's room store: the largest Balmora room set is 4.10 MB against a 7.03 MB room zone.
+- **On 16 MB** the engine evicts models and loads them again: slower, not a crash.
+
+With less than 32 MB the start-up check shows, for example,
+
+    Fast RAM:             16 MB (32 MB needed)       [!] WARN
+
+and under the checklist's closing line:
+
+    -----------------------------------------------------
+    NOTE: AmiWind has grown since v0.0.48: 32 MB of Fast RAM is now
+    the minimum. Only 16 MB Fast RAM found, hence the game will
+    start but may load more often.
+    Press ENTER to continue anyway.
+    Starting in 10 s...
+
+The countdown never blocks the start: after ten seconds, or at once with ENTER, it reads `Starting now.` and the
+game starts as usual. It repeats the note (without the countdown) on the console and on the startup logo. With
+32 MB or more none of this is shown: the row reads `[x] OK` and the usual five-second countdown follows. Tracked as
+[RAM-REQUIREMENT-32MB-48](bugs/RAM-REQUIREMENT-32MB-48.md).
 
 ## Before you start: 68060 and Kickstart 3.1
 
@@ -84,7 +118,7 @@ travel (two chunks ahead from 8 MiB of cache, three from 32 MiB). There is no up
 Fast RAM spread over several boards (accelerator RAM and a Zorro III card) is taken as several banks, largest
 first, each under 2 GiB, so 2 GiB and more works too.
 
-- **16 MiB of Fast RAM (the reference machine) takes nothing:** with the 11 MiB game heap only about 1 MiB is
+- **16 MiB of Fast RAM (the least that starts) takes nothing:** with the 11 MiB game heap only about 1 MiB is
   free, under the margin, so the game plays exactly as without this feature. The first cache bank needs at least
   8 MiB beyond the margin (about 30 MiB of Fast RAM or more).
 - **The console says what happened on every start**, for example
@@ -94,7 +128,7 @@ first, each under 2 GiB, so 2 GiB and more works too.
 - **A notice on the startup logo** says how much extra RAM was found and what it is used for. Pressing **M**
   while it shows starts this session without it (the standard memory). It never waits for a key; starts that
   skip the logo (the test options `aw_boot_console`, `aw_test_start`, a test drive's `test.cfg`) skip the notice.
-- **Off for good:** Options > Extra RAM: Off (saved in `config.cfg` as `aw_autoram 0`; takes effect at the next
+- **Off for good:** Options > Video > Extra RAM: Off (saved in `config.cfg` as `aw_autoram 0`; takes effect at the next
   start).
 - **If the memory cannot be taken,** the console says so and the game plays on the standard memory.
 - **The game heap grows with the machine** (from v0.0.43, ENGINE-HEAP-FIXED-SIZE-43): the heap is sized at start,
@@ -102,7 +136,7 @@ first, each under 2 GiB, so 2 GiB and more works too.
   (11 MiB) unless that room holds the built size plus 8 MiB, then grows by a quarter of the room beyond it, to
   24 MiB at most; 128 MiB of Fast RAM gives a 24 MiB heap and an 82 MiB CHIM cache. Quake's own cache (actors and
   sounds) then keeps what it loaded across map changes, and the maps keep their 2 MiB safety gap. 16 MiB keeps
-  exactly the built 11 MiB. `-heapmb N` sets the heap by hand (used as asked); Options > Extra RAM: Off keeps the
+  exactly the built 11 MiB. `-heapmb N` sets the heap by hand (used as asked); Options > Video > Extra RAM: Off keeps the
   built size.
 - **The way ahead is read before you get there** (from v0.0.43, CHIM-CROSSING-SYNC-LOAD-43). Outdoors every cell is
   its own map, so walking over a cell border is a map change. With extra RAM the engine reads the files of the
@@ -124,7 +158,7 @@ These are in the engine now ([CHIM engine](chim/ENGINE.md), [memory guide](chim/
 | Setting | What it does | Default |
 | --- | --- | --- |
 | `-chimcache KIB` (start argument) | Extra Fast RAM for CHIM's cache, by hand: shared models and textures stay in memory across map changes instead of being read again. Taken once at start; if the memory is not there, the console says so and the standard budget is used. Given, it replaces the automatic size (`-chimcache 0`: no cache bank at all). | automatic |
-| `aw_autoram` (Options > Extra RAM, saved) | 1: free Fast RAM beyond the margin becomes CHIM's cache at the next start; 0: the standard memory always. | 1 |
+| `aw_autoram` (Options > Video > Extra RAM, saved) | 1: free Fast RAM beyond the margin becomes CHIM's cache at the next start; 0: the standard memory always. | 1 |
 | `-heapmb N` (start argument) | The game heap in MiB for this start (1 to 2047), used as asked. | automatic: 11 (the built size), up to 24 with plenty of Fast RAM |
 | `chim prefetch 0` / `1` (console, not saved) | 1: read the cells ahead into spare Fast RAM and keep the world index there (only with extra RAM); 0: every read from the disk, the first method. `chim prefetch` alone prints what it did. | 1 |
 | `chim prefetch mib N` / `kib N` | The most it reads ahead, in MiB (also at most a quarter of CHIM's cache); how much it reads per frame, in KiB (one 32 KiB block at least), only in frames where nothing else is read. | 24 / 32 |
@@ -137,7 +171,7 @@ The chunk and model cache evicts what was used longest ago (LRU), and loading ha
 
 On a machine with a lot of Fast RAM, for example an accelerator with 128 or 256 MiB, the cache is now sized by
 itself; `-chimcache` and `-heapmb 32` remain for comparisons, and the interesting part is how the numbers compare
-with Options > Extra RAM: Off.
+with Options > Video > Extra RAM: Off.
 
 ## Disk buffers and RAM disks
 
@@ -158,7 +192,7 @@ Suggested settings to compare (not measured recommendations; keep the heap at it
 
 | Run | Start arguments |
 | --- | --- |
-| Baseline | Options > Extra RAM: Off (or M on the startup logo) |
+| Baseline | Options > Video > Extra RAM: Off (or M on the startup logo) |
 | Automatic | none |
 | Small | `-chimcache 8192` |
 | Medium | `-chimcache 32768` |

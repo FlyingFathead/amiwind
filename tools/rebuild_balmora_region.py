@@ -44,6 +44,8 @@ def rebuild_cached_region(cache, source_runtime, palette, entry, settings, out, 
     grids={tuple(g['cell']):g for g in json.loads(grids_path.read_text())}
     original=source_runtime.read_bytes()
     original_entities=entities(lumps(original)[0])
+    # the region map being rebuilt keeps its own hand fields (read from that map, never from the seyda.bsp carrier:
+    # BUILD-SEYDA-BSP-CARRIER-48; legacy tool, reached only by the retired legacy Balmora chain)
     timings='\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"',
                                 lumps(original)[0].decode('cp1252')))
     spawn=[sum(entry['core'][j][i] for j in (0,1))/2 for i in range(2)]

@@ -29,6 +29,25 @@ static void write_member(int declared,int physical){
     assert(fwrite(raw,1,(size_t)physical,f)==(size_t)physical);
     assert(!fclose(f));member_size=declared;
 }
+/* An alias over the staging limit decodes through the Hunk in the older path: its cache copy carries the Hunk's
+ * block headers (hunk_t: sentinel, size, name) where the stream leaves the same 16 bytes zero (no reader uses
+ * them). 1 when every difference lies in such a header. */
+static int hunk_headers_only(const byte *old,const byte *now,int n){
+    int at,h,k,ok,s;
+    for(at=0;at<n;at++)if(old[at]!=now[at]){
+        /* the older path copies from its first block's data, so its last 16 bytes lie past the Hunk mark (whatever
+         * the Hunk held there); the stream writes them zero */
+        ok=at>=n-(int)sizeof(hunk_t) && !now[at];
+        for(h=at<15?0:at-15;h<=at && h+(int)sizeof(s)<=n && !ok;h++){
+            memcpy(&s,old+h,sizeof(s));
+            if(s!=HUNK_SENTINAL)continue;
+            for(k=0;k<(int)sizeof(hunk_t) && h+k<n && !now[h+k];k++);
+            ok=(k==(int)sizeof(hunk_t) || h+k==n) && at<h+(int)sizeof(hunk_t);
+        }
+        if(!ok){fprintf(stderr,"not a Hunk header: offset=%d old=%u new=%u\n",at,old[at],now[at]);return 0;}
+    }
+    return 1;
+}
 static void compare(int bytes,int move){
     model_t old,now;void *expected;int n,low,high;
     memset(&old,0,sizeof(old));memset(&now,0,sizeof(now));reset();
@@ -43,7 +62,7 @@ static void compare(int bytes,int move){
     assert(cache_allocated_seen && hunk_low_used==low && hunk_high_used==high);
     assert(now.cache.data && now.needload==0 && now.type==old.type);
     assert(((cache_system_t *)now.cache.data-1)->size-(int)sizeof(cache_system_t)==n);
-    if(memcmp(expected,now.cache.data,n)){
+    if(memcmp(expected,now.cache.data,n) && !(bytes>512*1024 && hunk_headers_only(expected,now.cache.data,n))){
         int at,shown=0;for(at=0;at<n && shown<16;at++)if(((byte *)expected)[at]!=((byte *)now.cache.data)[at]){
             fprintf(stderr,"offset=%d old=%u new=%u total=%d move=%d\n",at,((byte *)expected)[at],((byte *)now.cache.data)[at],n,move);shown++;
         }
@@ -64,8 +83,12 @@ int main(int argc,char **argv){
     int bytes,i;model_t m;FILE *f;
     aw_load_audio_tick=tick;
     bytes=make_alias(0);compare(bytes,0);compare(bytes,1);
-    /* Large aliases preserve the existing generic path and allocation policy. */
-    bytes=make_alias(2);memset(&m,0,sizeof(m));strcpy(m.name,"progs/stream.mdl");write_member(bytes,bytes);
+    /* ALIAS-BUDGET-32MB-48: an alias over the 512 KiB staging limit (the 32 MB actor budget) streams straight into
+     * its cache block with malloc failing (the 16 MB baseline has no Fast RAM outside the heap) and no Hunk, to the
+     * bytes the older path decodes. */
+    bytes=make_alias(2);assert(bytes>512*1024);compare(bytes,0);compare(bytes,1);
+    /* Aliases over the stream limit preserve the existing generic path and allocation policy. */
+    bytes=make_alias(3);assert(bytes>768*1024);memset(&m,0,sizeof(m));strcpy(m.name,"progs/stream.mdl");write_member(bytes,bytes);
     assert(Mod_TryStreamAlias(&m)==0 && !m.cache.data);
     bytes=make_alias(1);memset(&m,0,sizeof(m));strcpy(m.name,"progs/stream.mdl");write_member(bytes,bytes);
     assert(Mod_TryStreamAlias(&m)==0 && !m.cache.data); /* legal groups */

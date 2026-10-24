@@ -91,6 +91,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - [MAP-UNUSED-HULL2-32](MAP-UNUSED-HULL2-32.md): Shipped maps carry about 1.1 MB of collision data for a hull the engine never uses
 - MEM-GEOMETRY-01 (no report page): Light-range sharing could copy a too-short byte span
 - MEM-TOWN-02 (no report page): Bounded Balmora maps exceeded the modeled map heap limit
+- [RAM-REQUIREMENT-32MB-48](RAM-REQUIREMENT-32MB-48.md): 16 MB of Fast RAM no longer holds the whole game: 32 MB is the safe minimum, 16 MB starts with a warning
 - [VIVEC-HEAP-31](VIVEC-HEAP-31.md): Dense Vivec maps exceed the loader heap budget once mappings and extents no longer stop them
 - WORLD-FLORA-HEAP-010 (no report page): Seyda sprite payload exceeds the final map heap headroom
 

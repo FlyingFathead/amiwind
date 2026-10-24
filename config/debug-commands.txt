@@ -2,12 +2,15 @@ AWDC1
 # Group|debug words|registered handler|help arguments
 AUDIO|door sounds|aw_door_sounds|on/off (default on)
 AUDIO|music|aw_music_status|[on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again
+AUDIO|mwscript|aw_mwscript|on/off (EXPERIMENTAL, default off, saved) run the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): ambient and activator sounds, NPC lines, music cues, journal and globals; functions not carried out yet are logged once
+AUDIO|mwscript status|aw_mwscript_status|the compiled scripts: objects attached on this map, global scripts, sounds, runs, skipped runs, opcodes per frame
 AUDIO|ost play|aw_music_play|00..98 / original music filename stem (spaces as underscores)
 VIDEO|cam|aw_cam|[mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel distance, right click or Esc ends
 VIDEO|camera|aw_camera|[first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md)
-VIDEO|crosshair|aw_crosshair|[on/off, true/false or 1/0; no argument toggles] show the crosshair (saved; default on; also Options > Show crosshairs)
+VIDEO|campfires|aw_campfires|[on/off, true/false or 1/0] fires outdoors (default on; not saved): on = campfires, braziers, fire pits, torches and flame lamps burn and light the objects around them (and, at night, the ground near the nearest); off = no flame and no fire light outdoors, at once (interiors keep their fires)
+VIDEO|crosshair|aw_crosshair|[on/off or 1/0; no argument toggles / colour NAME / shape NAME / style] show the crosshair (saved; default on; also Options > Prefs); colours Warm white (default), Yellow, Green, Blue; shapes Cross (default), Open cross, Small cross, Dot (saved); a number or a name's start is enough, no name lists them; style prints all three
 VIDEO|crosshairs|aw_crosshair|same as crosshair
-VIDEO|cull|aw_cull|far detail (saved; also Options > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those)
+VIDEO|cull|aw_cull|far detail (saved; also Options > Video > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those)
 VIDEO|cut groups|aw_cull|[on/off, 1/0; no argument shows aw_cull] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own
 VIDEO|draw distance|aw_fog_distance|[100..4096 local units; default 540]
 VIDEO|drawdistance|aw_fog_distance|[100..4096 local units; default 540]
@@ -17,13 +20,13 @@ VIDEO|fog location|aw_fog_location|1/0 places in id1/world/fog-locations.txt set
 VIDEO|fog rule|aw_cull|[on/off, 1/0; no argument shows aw_cull] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster)
 VIDEO|foglocation|aw_fog_location|1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off)
 VIDEO|ghostfence|aw_ghostfence|[on/off, true/false or 1/0] animated scrolling textures (default on; not saved): on = the Ghostfence curtain, waterfalls and other turbulent textures ripple over time; off = drawn straight and still (unlit, as they are built; also stills water in interiors)
-VIDEO|killhud|aw_photomode|[on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode)
+VIDEO|killhud|aw_photomode|[on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Video > Photo mode)
 VIDEO|land fill|aw_land_fill|1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B
 VIDEO|land method|aw_terrain_horizon|1/0 legacy resident LAND rasterizer (default 0, experimental); separate from the CHIM far layer
 VIDEO|landfill|aw_land_fill|[on/off, true/false or 1/0; no argument shows the value] distant land layer (CHIM far layer, plus the terrain horizon when enabled; with the day/night sky off, also the fog colour below the horizon) on or off for debugging (default on, saved)
 VIDEO|noclipbob|aw_noclipwobble|same as noclipwobble
 VIDEO|noclipwobble|aw_noclipwobble|[on/off, true/false or 1/0; no argument = status] walking bob and movement roll in noclip (saved; default off); photo mode temporarily disables it
-VIDEO|photomode|aw_photomode|[on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode)
+VIDEO|photomode|aw_photomode|[on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Video > Photo mode)
 VIDEO|playvid|playvid|<1..17 / 01..17 / catalogue name> (drains queued game audio first)
 VIDEO|playvideo|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
 VIDEO|pov|aw_camera|same as camera
@@ -62,6 +65,7 @@ PLAYTESTING|shroomtracker|aw_shroomtracker|(picked mushrooms in this save; exclu
 PLAYTESTING|torchgallery|aw_torchtest|[npc ID/name] same as torchtest: one NPC in the dark room, V toggles your torch
 PLAYTESTING|torchtest|aw_torchtest|[npc ID/name; empty/center/help/exit] dark room, current hands, V toggles torch
 PLAYTESTING|tpscene|aw_tpscene|[list/headselection] (fresh debug scene; resets unsaved progress)
+WORLD / TRAVEL|door|aw_hinged_door|[status / list; no argument: open or close the hinged door under the crosshair, locks ignored] ordinary hinged doors (docs/DOOR_MAPPING.md): status counts the table and this map's doors, list prints each (reference, edict or CHIM, how far open, lock)
 WORLD / TRAVEL|god|aw_godmode|[on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage; the HUD shows GOD) (not saved)
 WORLD / TRAVEL|godmode|aw_godmode|same as god
 WORLD / TRAVEL|map format|aw_map_format|2 draws the v2 world map layers (default) / 1 draws a v2 map as the v1 map (terrain and settlements only)
@@ -72,6 +76,7 @@ WORLD / TRAVEL|recover|aw_recover|
 WORLD / TRAVEL|reset location|amiwind_debug_reset_location|0
 WORLD / TRAVEL|scene|aw_scene|ship/town/balmora/<map name>
 WORLD / TRAVEL|scene change|aw_scene_menu|(scene picker)
+WORLD / TRAVEL|superspeed|superspeed|[on/off, true/false or 1/0; no argument = status and current speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey) instead of the original's speed from Speed, Athletics and load; no running fatigue (default off; not saved; also plain superspeed on/off)
 WORLD / TRAVEL|tp|aw_teleport|[X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (also teluvirith) / <map name>; no argument opens menu]
 WORLD / TRAVEL|tp map|aw_teleport_map|select a destination on the world map
 WORLD / TRAVEL|tp menu|aw_scene_menu|(teleport picker)
@@ -140,6 +145,7 @@ UI / CONSOLE|ui targetnames|aw_target_names_set|on/off (after creation)
 UI / CONSOLE|ui targetplace|aw_target_place|below/topright/hudleft
 INPUT|input trace|aw_input_trace|on/off true/false 1/0 (alias; default off)
 INPUT|inputtrace|aw_input_trace|on/off true/false 1/0 (raw keys and mouse events; default off)
+INPUT|sensitivity|aw_sensitivity|[0.1..20, one decimal; no argument prints it] mouse sensitivity, Quake's sensitivity setting (saved; default 3, unchanged; also Options > Controls > Mouse sensitivity, 0.5..10 in steps of 0.5)
 DIAGNOSTICS|all|amiwind_show_debug|on/off
 DIAGNOSTICS|blockers|aw_blockers|
 DIAGNOSTICS|cell|aw_cell|(original Morrowind cell here: exterior grid CELL x,y, or interior INT n with its full cell ID; the debug HUD shows the same at the end of its shorter row)

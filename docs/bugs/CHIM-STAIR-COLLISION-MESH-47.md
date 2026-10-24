@@ -20,7 +20,7 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.46 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -147,9 +147,39 @@ brush image (no build, nothing in game):
 Not done: an image with method 1 on and an in-game check at stairs, docks and ladders (waits for a build the
 maintainer allows).
 
+### Default since v0.0.48-dev2
+
+Decided for the project on 22 October 2026 (the maintainer: "implement this"). Method 1 is the default;
+`--stair-collision-method 0` keeps method 0 for A/B. What changed:
+
+- **Per mesh.** The CHIM model builder first counts each distinct mesh's flights as drawn
+  (`stair_mesh.flight_unit`, unit kind `stair-flights`, cached by the mesh's content). Only a mesh with a flight
+  gets `stair_collision` `mesh` and method 1's worker (`mesh-stair`). Every other mesh keeps the default worker,
+  profile and unit key, because method 1 is method 0 exactly on a mesh without a flight. A default build
+  rebuilds the flight meshes only (97 of 1,380 on the v0.0.47 build), not every CHIM mesh.
+- **The authored stair ramp stays a ramp** (`tools/authored_ramps.py`, `stair_mesh.keep_stair_ramps`). A convex
+  piece that stands over a walkable ramp of the collision mesh lying on a drawn flight becomes the authored plates of
+  its own triangles. That applies where the piece is steeper than walkable there, or more than a step over the ramp,
+  and the authored surfaces themselves are not. The result is kept only when the stair check is not worse for it.
+  Measured on the v0.0.47 build: 74 meshes have such stair ramps, method 0 leaves 14 of them faulty, and the guard
+  repairs 12. Still faulty: `ex_de_ship` (on the known list) and `ex_v_palace_steps_01` (the plates failed the
+  stair check there, so the guard was not kept).
+- **Known meshes.** The 11 meshes method 1 cannot fix yet are listed in `config/stair-check-known.json` as one
+  class, [CHIM-STAIR-METHOD1-UNFIXED-48](CHIM-STAIR-METHOD1-UNFIXED-48.md). The CHIM stair check reports them
+  (status `known`) and stops only on a failing mesh that is not on the list.
+
+Measured again on the v0.0.47 release build (read only, `tools/stair_mesh_survey.py`, no walk). The collision
+source there already follows the new rule for CHIM exteriors (every CHIM model reads its RootCollisionNode); the
+new rule changes only the 48 `NCC` models, and none of them has a flight. The numbers are the same as on the
+v0.0.46 build: 1,380 distinct meshes, 97 with 132 flights; method 0 fails 34 flights on 24 meshes; method 1 changes
+14 meshes (918,460 to 1,022,284 collision bytes, +11.3 %), keeps 72, cannot fix 11; collision bytes of all 97 flight
+meshes 13,433,116 to 13,536,940 (+0.8 %).
+
 ## Prevention
 
-Method 1 stays off by default until the in-game check and the A/B on the same frames are recorded.
+Method 1 is the default since v0.0.48-dev2; the in-game check at stairs, docks and ladders is still to be recorded.
+`tests/test_stair_mesh.py` covers the default switch, the per-mesh flight count, the known list and an authored
+45-degree ramp kept walkable; `tests/test_stair_mesh_keys.py` keeps method 1's code out of the default mesh key.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -164,8 +194,11 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
 - [BUILD-STAIR-WALK-BRUTE-FORCE-46](BUILD-STAIR-WALK-BRUTE-FORCE-46.md): The builder walks every step of the island to find out whether its own collision can be walked, an answer the game data already holds
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
+- [CHIM-HULL-SURFACE-RESURVEY-48](CHIM-HULL-SURFACE-RESURVEY-48.md): The v0.0.48-dev2 build stopped at the collision surface gate in Balmora: the gate measured treads stair method 1 removed, and the hull-surface table was measured under the old collision defaults
+- [CHIM-ROOM-CLIP-DRAWN-BOX-48](CHIM-ROOM-CLIP-DRAWN-BOX-48.md): A CHIM room's runtime collision skips a placement by its drawn box, and a store model's hull can reach past that box
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
 - [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
+- [CHIM-STAIR-METHOD1-UNFIXED-48](CHIM-STAIR-METHOD1-UNFIXED-48.md): Stair collision method 1 cannot yet make 11 meshes' flights pass the geometric stair check (ships, shipwreck, silt strider, tent, Daedric ruins and four buildings)
 - [CHIM-VIVEC-DOCK-WALKWAY-43](CHIM-VIVEC-DOCK-WALKWAY-43.md): The player cannot climb the walkway at the Vivec Hlaalu canton dock and gets stuck
 - [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
@@ -177,6 +210,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-STAIR-SLOPE-32](COLLISION-STAIR-SLOPE-32.md): Convex collision proxies make stairs unclimbable
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
+- [ROOM-PYLON-ROOF-48](ROOM-PYLON-ROOF-48.md): Grand Inquisitor and Tamira Vian (Hall of Processing) stand inside collision: a convex piece of ex_stronghold_pylon01 slopes 14 units over the floor they stand on
+- [ROOM-X-MESH-ROOF-SURVEY-48](ROOM-X-MESH-ROOF-SURVEY-48.md): 57 more exterior meshes placed in rooms have a convex collision piece standing more than a step over their own floor
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
 - [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
 - [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
@@ -188,6 +223,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [STAIRS-SEYDA-LIGHTHOUSE-32](STAIRS-SEYDA-LIGHTHOUSE-32.md): Seyda Neen lighthouse stairs are blocked (outside and inside)
 - [STAIRS-SEYDA-WAREHOUSE-32](STAIRS-SEYDA-WAREHOUSE-32.md): A spiral stair in the Seyda Neen warehouse tower is blocked
 - [STAIRS-VIVEC-ROOMS-JOINT-36](STAIRS-VIVEC-ROOMS-JOINT-36.md): Six flight steps in three Vivec rooms are blocked where one stair piece meets the next
+- [STEP-MOVEMENT-OPENMW-RULES-48](STEP-MOVEMENT-OPENMW-RULES-48.md): The player steps by Quake's rules, not Morrowind's, so stairs are proven by walks instead of by rule
 - [TERRAIN-TRAP-29](TERRAIN-TRAP-29.md): v0.0.29-dev1: Player reportedly stuck on rocks beside structures
 - [VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md): Five Vivec Arena residents fail the actor placement gate
 - [VIVEC-ARENA-TP-ARRIVAL-32](VIVEC-ARENA-TP-ARRIVAL-32.md): dbg tp vivec_arena leaves the player at the frame origin under the water

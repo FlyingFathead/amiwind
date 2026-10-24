@@ -1,5 +1,6 @@
 """Stage fingerprints and --reuse-from: exact invalidation, byte-identical reuse, refusals."""
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -297,7 +298,9 @@ class FingerprintTests(unittest.TestCase):
                          {'tools/build_profile.py', 'tools/build_progress.py', 'tools/build_cache.py',
                           'tools/unit_tree.py', 'tools/progress_line.py', 'tools/cache_provenance.py',
                           'tools/resource_plan.py', 'tools/pool_status.py', 'tools/stage_watch.py',
-                          'tools/build_digest.py', 'tools/code_key.py'})
+                          'tools/build_digest.py', 'tools/code_key.py',
+                          # loaded only by the cache key code (BUILD-REUSE-RC1-RECORDS-REFUSED-48)
+                          'tools/chim_compat.py'})
         tools = self.repository / 'tools'
         (tools / 'build_progress.py').write_text('def show(text):\n    print(text)\n')
         (tools / 'build_profile.py').write_text('from build_progress import show\ndef instrument(stage):\n    show(stage)\n')
@@ -453,6 +456,123 @@ class FingerprintTests(unittest.TestCase):
         self.assertEqual(build_cache.explain(old, {'command': ['x'], 'environment': {'AMIWIND_LAVA': 'on'}}), [])
         self.assertEqual(build_cache.explain(old, {'command': ['x'], 'environment': {'AMIWIND_LAVA': 'off'}}),
                          ['environment'])
+
+    def stage3(self, name, text):
+        """(script, digest function) of a stage script NAME in form 3 (the stage keys)."""
+        script = self.repository / 'tools' / name
+        script.write_text(text)
+
+        def digest():
+            return build_cache.SourceIndex(self.repository, top_format=3).digest(script)[0]
+        return script, digest
+
+    def test_python_files_read_by_a_folder_glob_are_in_the_key(self):
+        # BUILD-MWSCRIPT-KEY-UNDERDECLARED-48: prepare_mwscript.compiler_identity hashes every tools/mwscript/*.py,
+        # measure.py too, which the stage never imports; data files of a folder never counted .py files.
+        package = self.repository / 'tools' / 'compiler'
+        package.mkdir()
+        (package / '__init__.py').write_text('')
+        (package / 'parse.py').write_text('def parse():\n    return 1\n\n\ndef spare():\n    return 3\n')
+        (package / 'measure.py').write_text('def measure():\n    return 2\n')
+        script, digest = self.stage3('stage_glob.py', (
+            'import hashlib\nfrom pathlib import Path\nfrom compiler.parse import parse\n'
+            "ROOT = Path(__file__).resolve().parents[1]\n\n\ndef identity():\n    h = hashlib.sha256()\n"
+            "    for path in sorted((ROOT / 'tools' / 'compiler').glob('*.py')):\n        h.update(path.read_bytes())\n"
+            '    return h.hexdigest()\n\n\nprint(identity(), parse())\n'))
+        python, data, uncertain = build_cache.SourceIndex(self.repository, top_format=3).closure(script)
+        self.assertFalse(uncertain)
+        self.assertIn('tools/compiler/measure.py', data)
+        self.assertNotIn('tools/compiler/measure.py', build_cache.SourceIndex(self.repository, top_format=2).closure(script)[1])
+        first = digest()
+        (package / 'measure.py').write_text('def measure():\n    return 22\n')
+        self.assertNotEqual(first, digest())
+        second = digest()
+        # read as bytes: the whole file counts, also the function the stage never runs
+        (package / 'parse.py').write_text('def parse():\n    return 1\n\n\ndef spare():\n    return 4\n')
+        self.assertNotEqual(second, digest())
+
+    def test_code_handed_to_a_cache_key_is_in_the_key(self):
+        # BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48: the room stage keyed its resident bakes with
+        # UnitCache.open(..., __file__) of prepare_area.py, whose key reads that tool's whole script reach.
+        tools = self.repository / 'tools'
+        (tools / 'deep.py').write_text("import json\nfrom pathlib import Path\n\n\ndef table():\n"
+                                       "    return json.loads((Path(__file__).resolve().parents[1] / 'config' / 'deep.json').read_text())\n")
+        (self.repository / 'config' / 'deep.json').write_text('{"a": 1}')
+        (tools / 'area_tool.py').write_text(
+            'from pathlib import Path\n\n\ndef resident_unit():\n    from pass_cache import UnitCache\n'
+            "    return UnitCache.open('resident', {}, __file__)\n\n\ndef worker_unit():\n"
+            "    from pass_cache import PassCache\n    return PassCache.open('w', {}, (__file__, 'work'))\n\n\n"
+            'def work():\n    return 1\n\n\n'
+            "if __name__ == '__main__':\n    import deep\n    print(deep.table())\n")
+        script, digest = self.stage3('stage_keyed.py', 'from area_tool import resident_unit\nresident_unit()\n')
+        python, data, _ = build_cache.SourceIndex(self.repository, top_format=3).closure(script)
+        self.assertIn('tools/deep.py', data)                 # the keyed script's main reach, counted whole
+        self.assertIn('config/deep.json', data)
+        old = build_cache.SourceIndex(self.repository, top_format=2).closure(script)
+        self.assertNotIn('tools/deep.py', old[0] | old[1])
+        first = digest()
+        (self.repository / 'config' / 'deep.json').write_text('{"a": 2}')
+        self.assertNotEqual(first, digest())
+        # (module, function): only that function's reach
+        script, _ = self.stage3('stage_keyed2.py', 'from area_tool import worker_unit\nworker_unit()\n')
+        python, data, _ = build_cache.SourceIndex(self.repository, top_format=3).closure(script)
+        self.assertNotIn('tools/deep.py', python | data)
+
+    def test_a_method_a_stage_never_reaches_keeps_its_key(self):
+        # BUILD-STAGE-KEY-WHOLE-CLASS-48: commit 62827968 edited one method of actor_grounding._Fitter (_scene); the
+        # class was import-time code of its module, so every stage importing the module was rekeyed.
+        tools = self.repository / 'tools'
+        fitter = ('import json\n\n\nclass Fitter:\n    """Support fitting."""\n    LIMIT = 4\n\n'
+                  '    def __init__(self, maps):\n        self.maps = maps\n\n'
+                  '    def scene(self, name):\n        return json.dumps(name)\n\n'
+                  '    @staticmethod\n    def contact(s, point):\n        return s + point\n\n\n'
+                  'def state(identifier):\n    return identifier\n')
+        (tools / 'grounding.py').write_text(fitter)
+        static, static_digest = self.stage3('stage_static.py', 'from grounding import Fitter, state\n'
+                                                                'print(Fitter.contact(1, 2), state(3))\n')
+        whole, whole_digest = self.stage3('stage_whole.py', 'from grounding import Fitter\nprint(Fitter(1).scene(2))\n')
+        other, other_digest = self.stage3('stage_other.py', 'from grounding import state\nprint(state(3))\n')
+        reached = build_cache.SourceIndex(self.repository, top_format=3).reached_units(static)['tools/grounding.py']
+        self.assertEqual(reached, {'<top>', 'Fitter', 'Fitter.contact', 'state'})
+        first = (static_digest(), whole_digest(), other_digest())
+        two = build_cache.SourceIndex(self.repository, top_format=2).digest(other)[0]
+        (tools / 'grounding.py').write_text(fitter.replace('json.dumps(name)', "json.dumps(name) + '!'"))
+        second = (static_digest(), whole_digest(), other_digest())
+        self.assertEqual(second[0], first[0])                # Fitter.contact only
+        self.assertNotEqual(second[1], first[1])             # an instance: every method
+        self.assertEqual(second[2], first[2])                # the class is not named at all
+        self.assertNotEqual(two, build_cache.SourceIndex(self.repository, top_format=2).digest(other)[0])  # form 2
+        (tools / 'grounding.py').write_text(fitter.replace('s + point', 's - point'))
+        self.assertNotEqual(static_digest(), first[0])       # the static method it calls
+        # a class that registers itself or runs code on its definition stays import-time code
+        (tools / 'grounding.py').write_text(fitter.replace('    LIMIT = 4\n', '    LIMIT = len(json.dumps(4))\n'))
+        reached = build_cache.SourceIndex(self.repository, top_format=3).reached_units(other)['tools/grounding.py']
+        self.assertNotIn('Fitter', reached)
+        self.assertNotEqual(other_digest(), first[2])
+
+    def test_stage_keys_of_the_older_form_are_compared_in_that_form(self):
+        # A reuse source keyed in form 2 is compared in form 2: the change of form rebuilds nothing.
+        (self.repository / 'tools' / 'grounding.py').write_text(
+            'class Fitter:\n    def scene(self):\n        return 1\n\n\ndef state():\n    return 2\n')
+        script, _ = self.stage3('stage_form.py', 'from grounding import state\nprint(state())\n')
+        steps = [('form', [sys.executable, str(script), '--out', str(self.root / 'run' / 'form')])]
+        run = self.root / 'run'
+        _, old, _, _ = build_cache.fingerprint_steps(steps, run, metadata(),
+                                                     build_cache.SourceIndex(self.repository, top_format=2))
+        _, new, _, _ = build_cache.fingerprint_steps(steps, run, metadata(),
+                                                     build_cache.SourceIndex(self.repository, top_format=3))
+        self.assertEqual(build_cache.source_format(old['form']), 2)
+        self.assertEqual(build_cache.source_format(new['form']), 3)
+        self.assertNotEqual(old['form']['sources'], new['form']['sources'])
+        self.assertEqual(build_cache.explain(old['form'], build_cache.comparable(old['form'], new['form'], run, 'form')),
+                         [])
+        (self.repository / 'tools' / 'grounding.py').write_text(
+            'class Fitter:\n    def scene(self):\n        return 3\n\n\ndef state():\n    return 2\n')
+        _, edited, _, _ = build_cache.fingerprint_steps(steps, run, metadata(),
+                                                        build_cache.SourceIndex(self.repository, top_format=3))
+        self.assertEqual(edited['form']['sources'], new['form']['sources'])     # form 3: unchanged
+        self.assertEqual(build_cache.explain(old['form'], build_cache.comparable(old['form'], edited['form'], run, 'form')),
+                         ['sources (tools/grounding.py)'])                       # form 2 sees the edit
 
     def test_real_stage_closures_leave_engine_sources_to_the_engine_and_image(self):
         """An engine C edit must not invalidate the conversion stages (measured on this repository)."""
@@ -681,6 +801,76 @@ class ReuseTests(unittest.TestCase):
         self.assertFalse(manifest['reusable'])
         self.assertIn('stray.txt', manifest['reasons'][0])
 
+    def test_reuse_temporaries_under_a_stage_root_are_never_its_deletions(self):
+        # BUILD-REUSE-TMP-RECORDED-DELETED-48: in the v0.0.48-dev2 MiniWind A build chim-town-balmora (roots include
+        # intro-scene) ran while balmora-interiors was reused into intro-scene/area-work; its record listed 665 of
+        # those in-flight '.amiwind-reuse-tmp' copies as deleted, and the B build reusing it removed balmora-interiors'
+        # temporaries mid-copy (FileNotFoundError at os.replace).
+        run = self.root / 'workspace' / 'tmp-deleted'
+        work = run / 'intro-scene' / 'area-work' / 'bmastius'
+        work.mkdir(parents=True)
+        steps = [('chim-town-balmora', [sys.executable, 'tools/x.py', str(run / 'intro-scene'), str(run / 'town')])]
+        recorder = build_cache.Recorder(run, steps, {})
+        temporary = work / ('base.bsp' + build_cache.TEMPORARY_SUFFIX)
+        temporary.write_text('partial copy')                         # the other stage's copy, in flight
+        recorder.before('chim-town-balmora', steps[0][1])
+        temporary.replace(work / 'base.bsp')                          # ... renamed into place while this stage runs
+        (work / ('room.bsp' + build_cache.TEMPORARY_SUFFIX)).write_text('next copy')
+        (run / 'town').mkdir()
+        (run / 'town' / 'frame.chim').write_text('town')
+        manifest = recorder.after('chim-town-balmora', {})
+        self.assertEqual(manifest['deleted'], [])
+        self.assertFalse([path for path in manifest['files'] if path.endswith(build_cache.TEMPORARY_SUFFIX)])
+        self.assertIn('town/frame.chim', manifest['files'])
+        # a record made before the repair is not replayed against another stage's temporaries
+        old = self.root / 'workspace' / 'tmp-deleted-old'
+        old.mkdir()
+        target = self.root / 'workspace' / 'tmp-deleted-new'
+        (target / 'profile').mkdir(parents=True)
+        live = target / 'intro-scene' / 'area-work' / 'bmastius' / ('base.bsp' + build_cache.TEMPORARY_SUFFIX)
+        live.parent.mkdir(parents=True)
+        live.write_text('balmora-interiors copy in flight')
+        plan = {'from': str(old), 'fingerprint': 'f', 'files': {}, 'links': {}, 'directories': [],
+                'deleted': ['intro-scene/area-work/bmastius/base.bsp' + build_cache.TEMPORARY_SUFFIX],
+                'deleted_directories': [], 'inputs': {}, 'ancestors': [], 'rebuilt_ancestors': [], 'mode': 'copy'}
+        (target / 'profile' / build_cache.PLAN_NAME).write_text(json.dumps({'chim-town-balmora': plan}))
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(build_cache.apply_stage(target, 'chim-town-balmora', ['false']), 0)
+        self.assertTrue(live.is_file())
+
+    def test_unshared_pool_links_are_not_outputs_of_an_in_place_stage(self):
+        # BUILD-REUSE-OUTPUTS-DIFFER-48: door audio (an in-place scene stage) ran after reused stages had linked
+        # intro-scene from the storage pool; its unshare_tree copy of every read-only file was recorded as 2,124
+        # outputs, the next build (earlier stages run, files writable) wrote 18, and seven stages after it were
+        # refused as "outputs differ".
+        from mwad.paths import unshare_tree
+        run = self.root / 'workspace' / 'build' / 'unshare-run'
+        pool = self.root / 'workspace' / 'cache' / 'asset-pool-v1'
+        scene = run / 'intro-scene' / 'id1'
+        scene.mkdir(parents=True)
+        linked = {}
+        for name, data in (('a.dat', b'pooled a'), ('b.dat', b'pooled b')):
+            digest = hashlib.sha256(data).hexdigest()
+            blob = pool / 'objects' / digest[:2] / digest
+            blob.parent.mkdir(parents=True, exist_ok=True)
+            blob.write_bytes(data)
+            os.chmod(blob, 0o444)
+            os.link(blob, scene / name)                 # what a reused stage leaves (apply_stage, pool mode)
+            linked[name] = blob
+        (scene / 'own.dat').write_bytes(b'written by an earlier stage that ran')
+        steps = [('door-audio', [sys.executable, 'tools/x.py', '--scene', str(run / 'intro-scene')])]
+        recorder = build_cache.Recorder(run, steps, {})
+        recorder.before('door-audio', steps[0][1])
+        self.assertEqual(unshare_tree(run / 'intro-scene')[0], 2)
+        (scene / 'b.dat').write_bytes(b'rewritten by the stage')     # a real edit of an unshared file
+        (run / 'intro-scene' / 'door-audio.json').write_text('{}')
+        manifest = recorder.after('door-audio', {})
+        self.assertEqual(sorted(manifest['files']), ['intro-scene/door-audio.json', 'intro-scene/id1/b.dat'])
+        self.assertEqual(manifest['unshared'], 1)
+        self.assertTrue(manifest['reusable'], manifest['reasons'])
+        for blob in linked.values():
+            os.chmod(blob, 0o644)
+
     def test_the_builder_scratch_folder_is_not_an_undeclared_output(self):
         # BUILD-REUSE-SCRATCH-UNDECLARED-33: RUN/scratch (AMIWIND_SCRATCH for every stage) appeared while the first
         # stages ran; they became non-reusable and the rc1c rerun reused 1 of 33 stages.
@@ -901,6 +1091,16 @@ class ReuseTests(unittest.TestCase):
                                                  {'tools/helper.py': ['<top>', 'payload']},
                                                  {'tools/helper.py': ['payload', 'unused']}, 'out/run'),
                          ['tools/helper.py:unused'])
+        # BUILD-REUSE-RC1-RECORDS-REFUSED-48: the idle-worker watcher, a scheduling unit an instrumentation hook
+        # starts, refused 24 stages of the v0.0.48-rc1 build; scheduling units never refuse a record
+        modules = {'tools/build_parallel.py': ['_watch_stage_pool', 'completed_map', 'worker_environment']}
+        self.assertEqual(build_cache.check_calls(['@tools/build_parallel.py\t_watch_stage_pool',
+                                                  '@tools/build_parallel.py\tworker_environment'],
+                                                 {'tools/build_parallel.py': ['completed_map']}, modules),
+                         ['tools/build_parallel.py:worker_environment'])
+        self.assertIn(('tools/build_parallel.py', '_watch_stage_pool'), build_cache.SCHEDULING_UNITS)
+        # the CHIM label's key line module is key machinery: its read refuses no stage
+        self.assertIn('tools/chim_compat.py', build_cache.OUTPUT_NEUTRAL)
 
     @unittest.skipUnless(MANIFESTS, 'the read trace runs with the stage wrapper on POSIX')
     def test_reuse_chain_with_another_checkout_on_pythonpath(self):
@@ -1044,7 +1244,7 @@ class WriteAttributionTests(unittest.TestCase):
     intro-scene/id1/character/*.awh change and both were refused. The read trace now records each stage's
     writes into the run folder, and a file only one of them wrote is that stage's output."""
 
-    def run_pair(self, run, character_writes, town_writes):
+    def run_pair(self, run, character_writes, town_writes, character_native=(), town_native=()):
         steps = [('character', [sys.executable, 'tools/x.py', '--scene', str(run / 'scene')]),
                  ('town', [sys.executable, 'tools/y.py', '--scene', str(run / 'scene'), '--out', str(run / 'town')])]
         (run / 'scene').mkdir(parents=True)
@@ -1058,12 +1258,14 @@ class WriteAttributionTests(unittest.TestCase):
         (run / 'town').mkdir()
         (run / 'town' / 'entities.json').write_text('{}')
         traces = {}
-        for name, writes in (('character', character_writes), ('town', town_writes)):
+        for name, writes, native in (('character', character_writes, character_native),
+                                     ('town', town_writes, town_native)):
             if writes is None:
                 traces[name] = None
                 continue
             traces[name] = run.parent / f'{name}.txt'
-            traces[name].write_text(''.join('>' + path + '\n' for path in writes) + 'tools/x.py\n')
+            traces[name].write_text(''.join('>' + path + '\n' for path in writes)
+                                    + ''.join('~' + folder + '\n' for folder in native) + 'tools/x.py\n')
         recorder.after('town', {}, traces['town'])
         recorder.after('character', {}, traces['character'])
         recorder.close({'status': 'passed'})
@@ -1088,6 +1290,75 @@ class WriteAttributionTests(unittest.TestCase):
                 self.assertFalse(character['reusable'])
                 self.assertFalse(town['reusable'])
                 self.assertIn('outputs cannot be attributed', town['reasons'][-1])
+
+    def test_a_compiler_pointed_at_the_folder_makes_its_stage_the_writer(self):
+        """BUILD-REUSE-INTRO-CENSUS-REPLACED-48: balmora-interiors' room compiler wrote room.prt and its logs (not
+        traced) while chim-town-balmora, which names the same scene folder, ran; both were refused and the refusal
+        took intro, census, actor-library and four more stages with it. The run folders an untraced process was
+        pointed at ('~' lines) make the compiling stage the writer."""
+        with tempfile.TemporaryDirectory() as temp:
+            # the shared file was written by a compiler started in scene/ (no '>' line), the town stage's own
+            # untraced process (ffmpeg) was pointed at town/ only
+            character, town = self.run_pair(Path(temp) / 'run', [], ['town/entities.json'],
+                                            character_native=['scene'], town_native=['town'])
+            self.assertTrue(character['reusable'], character['reasons'])
+            self.assertTrue(town['reusable'], town['reasons'])
+            self.assertIn('scene/h106.awh', character['files'])
+            self.assertNotIn('scene/h106.awh', town['files'])
+            self.assertEqual(town['attributed'][0]['stage'], 'character')
+
+    def test_a_compiler_of_either_stage_in_the_folder_still_refuses_both(self):
+        for character_native, town_native in ((['scene'], ['scene']),     # both pointed a compiler there
+                                              (['scene'], ['']),          # the town's at the whole run folder
+                                              (['other'], ['town'])):     # nobody's compiler was there
+            with tempfile.TemporaryDirectory() as temp:
+                character, town = self.run_pair(Path(temp) / 'run', [], ['town/entities.json'],
+                                                character_native=character_native, town_native=town_native)
+                self.assertFalse(character['reusable'], (character_native, town_native))
+                self.assertFalse(town['reusable'])
+
+    def test_attribute_reads_native_folders(self):
+        shared = ['intro-scene/area-work/bmbalyn/room.prt', 'intro-scene/area-work/bmbalyn/base.bsp']
+        writes = {'intro-scene/area-work/bmbalyn/base.bsp'}
+        self.assertIsNone(build_cache.attribute(shared, writes, set()))
+        self.assertEqual(build_cache.attribute(shared, writes, set(), {'intro-scene/area-work/bmbalyn'}, set()), 0)
+        self.assertEqual(build_cache.attribute(shared, set(), writes, {'chim-town-balmora'},
+                                               {'intro-scene/area-work'}), 1)
+        # a folder name that only starts the same is not the folder
+        self.assertIsNone(build_cache.attribute(shared, writes, set(), {'intro-scene/area-work/bmbal'}, set()))
+
+    @unittest.skipUnless(MANIFESTS, 'the read trace runs with the stage wrapper on POSIX')
+    def test_the_trace_hook_records_the_folders_of_untraced_processes(self):
+        """A native process started with a working folder or a run path on its command line lists that folder ('~');
+        one started with neither lists nothing."""
+        import shutil
+        import subprocess
+        true = shutil.which('true')
+        if true is None:
+            self.skipTest('no true executable')
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp) / 'run'
+            (run / 'profile').mkdir(parents=True)
+            (run / 'scene' / 'room').mkdir(parents=True)
+            (run / 'scene' / 'room' / 'room.map').write_text('{}')
+            (run / 'out').mkdir()
+            self.assertTrue(build_cache.write_trace_hook(run, ROOT))
+            target = run / 'profile' / build_profile.READS_FOLDER / 'stage.txt'
+            code = ("import os, subprocess\nfrom pathlib import Path\nr = Path(os.environ['R'])\nt = os.environ['T']\n"
+                    "subprocess.run([t, '-nopercent', 'room.map'], cwd=r / 'scene' / 'room', check=True)\n"
+                    "subprocess.run([t, '-i', '/nonexistent/in.wav', str(r / 'out' / 'a.wav')], check=True)\n"
+                    "subprocess.run([t, '-version'], check=True)\n")
+            env = dict(os.environ, R=str(run), T=true, PYTHONPATH=str(run / 'profile' / build_profile.TRACE_HOOK_FOLDER),
+                       **{build_profile.TRACE_ENV: str(target)})
+            subprocess.run([sys.executable, '-c', code], env=env, check=True, cwd=str(ROOT))
+            recorder = build_cache.Recorder.__new__(build_cache.Recorder)
+            recorder.traced = True
+            self.assertEqual(recorder.traced_native_folders(target), {'scene/room', 'out'})
+            # the '~' lines are not repository reads
+            lines = target.read_text().splitlines()
+            self.assertTrue(any(line.startswith('~') for line in lines))
+            self.assertEqual([line for line in lines if line.startswith('~')
+                              and not line.startswith(build_cache.TRACE_MARKS)], [])
 
     @unittest.skipUnless(MANIFESTS, 'the read trace runs with the stage wrapper on POSIX')
     def test_the_trace_hook_records_run_folder_writes(self):
@@ -1251,12 +1522,17 @@ class ReuseCascadeTests(unittest.TestCase):
 
     @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
     def test_a_reuse_source_in_the_old_key_form_is_reused_whole(self):
+        # form 2 -> 3 (BUILD-STAGE-KEY-WHOLE-CLASS-48), as 1 -> 2 before it
+        first, _ = self.build('first-2', top_format=2)
+        _, state = self.build('second-2', reuse_from=first)
+        self.assertEqual(self.reused(state), ['alpha', 'beta', 'delta', 'gamma'])
+        self.assertEqual(state['stage_cache']['preflight']['unexpected_stages'], [])
         first, _ = self.build('first', top_format=1)
         second, state = self.build('second', reuse_from=first)
         self.assertEqual(self.reused(state), ['alpha', 'beta', 'delta', 'gamma'])
         self.assertEqual(state['stage_cache']['preflight']['unexpected_stages'], [])
         details = json.loads((second / 'profile' / 'fingerprints.json').read_text())
-        self.assertEqual(build_cache.source_format(details['alpha']), 2)  # recorded in the new form
+        self.assertEqual(build_cache.source_format(details['alpha']), build_cache.STAGE_TOP_FORMAT)  # the new form
         # A real edit against the old form is still seen.
         (self.repository / 'tools' / 'stage_d.py').write_text(STAGE_D.replace("'d:'", "'D:'"))
         _, state = self.build('third', reuse_from=first)
@@ -1801,3 +2077,178 @@ class ReusePlanEnvironmentTests(unittest.TestCase):
                 self.assertIn('defaults', build.reuse_plan_environment(run))
             with self.assertRaises(ValueError):
                 build.reuse_plan_environment(run, ['--no-such-option'])
+
+
+# The CHIM label in the keys (BUILD-CHIM-LABEL-IN-KEYS-48): a stage that writes the label into a receipt, a stage that
+# shows it (project_version.chim_version, as the engine header does), and one that reaches the shown unit only through
+# the zone gate's library build (CHIM_LABEL_HIDDEN_UNITS).
+CHIM_PACKAGE = '''
+from pathlib import Path
+def _label():
+    return (Path(__file__).resolve().parents[1] / 'CHIM_VERSION').read_text().strip()
+LABEL = _label()
+'''
+STAGE_RECEIPT = '''
+import sys
+from pathlib import Path
+from chimlabel import LABEL
+out = Path(sys.argv[sys.argv.index('--out') + 1]); out.mkdir(parents=True)
+(out / 'receipt.txt').write_text('chim_version ' + LABEL)
+'''
+PROJECT_VERSION = '''
+from pathlib import Path
+def read_chim_version(path):
+    return Path(path).read_text().strip()
+def chim_version(version_file):
+    return read_chim_version(Path(version_file).parent / 'CHIM_VERSION')
+def generate_native(version_file, out):
+    (Path(out) / 'chim_version.h').write_text('#define CHIM_VERSION "%s"\\n' % chim_version(version_file))
+'''
+STAGE_SHOWN = '''
+import sys
+from pathlib import Path
+from project_version import generate_native
+out = Path(sys.argv[sys.argv.index('--out') + 1]); out.mkdir(parents=True)
+generate_native(Path(__file__).resolve().parents[1] / 'VERSION', out)
+'''
+ZONE_SIM = '''
+from pathlib import Path
+def build_library(out):
+    from project_version import generate_native
+    generate_native(Path(__file__).resolve().parents[2] / 'VERSION', out)
+    return Path(out) / 'zone.so'
+'''
+STAGE_ZONE = '''
+import sys
+from pathlib import Path
+from chimlabel import LABEL
+from chim.zone_sim import build_library
+out = Path(sys.argv[sys.argv.index('--out') + 1]); out.mkdir(parents=True)
+build_library(out)
+(out / 'world.txt').write_text('chim_version ' + LABEL)
+'''
+CHIM_TABLE = {'versions': [
+    {'version': '0.2.1', 'line': '0.2.1', 'reason': 'output change'},
+    {'version': '0.2.2', 'line': '0.2.1', 'reason': 'label only'},
+    {'version': '0.3.0', 'line': '0.3.0', 'reason': 'new world format'}]}
+
+
+class ChimLabelKeyTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.repository = self.root / 'repo'
+        make_repository(self.repository)
+        tools = self.repository / 'tools'
+        (tools / 'chim').mkdir()
+        for name, text in (('chim/__init__.py', ''), ('chimlabel.py', CHIM_PACKAGE), ('stage_receipt.py', STAGE_RECEIPT),
+                           ('project_version.py', PROJECT_VERSION), ('stage_shown.py', STAGE_SHOWN),
+                           ('chim/zone_sim.py', ZONE_SIM), ('stage_zone.py', STAGE_ZONE)):
+            (tools / name).write_text(text)
+        (self.repository / 'VERSION').write_text('0.0.48\n')
+        self.label('0.2.1')
+        self.table(CHIM_TABLE)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def label(self, value):
+        (self.repository / 'CHIM_VERSION').write_bytes((value + '\n').encode())
+
+    def table(self, document):
+        (self.repository / 'config' / 'chim-compatibility.json').write_text(json.dumps(document))
+
+    def steps(self):
+        tools = self.repository / 'tools'
+        (self.root / 'data').mkdir(exist_ok=True)
+        return steps_for(self.repository, self.root / 'run', self.root / 'data') + [
+            (name, [sys.executable, str(tools / script), '--out', str(self.root / 'run' / name)])
+            for name, script in (('receipt', 'stage_receipt.py'), ('shown', 'stage_shown.py'),
+                                 ('zone', 'stage_zone.py'))]
+
+    def fingerprints(self, **options):
+        # no dependencies: each stage's own key (a rekeyed stage rekeys the stages after it through them)
+        index = build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT, **options)
+        return build_cache.fingerprint_steps(self.steps(), self.root / 'run', metadata(), index, {})[0]
+
+    def test_the_label_files_are_reached(self):
+        index = build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT)
+        for script in ('stage_receipt.py', 'stage_shown.py', 'stage_zone.py'):
+            selected, uncertain = index.selection(self.repository / 'tools' / script)
+            self.assertFalse(uncertain, script)
+            self.assertIn('CHIM_VERSION', selected, script)
+            self.assertNotIn('config/chim-compatibility.json', selected, script)
+        self.assertFalse(index.shows_chim_label(self.repository / 'tools' / 'stage_receipt.py'))
+        self.assertTrue(index.shows_chim_label(self.repository / 'tools' / 'stage_shown.py'))
+        self.assertFalse(index.shows_chim_label(self.repository / 'tools' / 'stage_zone.py'))
+
+    def test_a_label_bump_within_its_line_keeps_every_key(self):
+        before = self.fingerprints()
+        self.label('0.2.2')
+        after = self.fingerprints()
+        changed = sorted(name for name in before if before[name] != after[name])
+        self.assertEqual(changed, ['shown'])      # only the stage that writes the label into its output
+
+    def test_a_new_line_rekeys_every_stage_that_reaches_the_label(self):
+        before = self.fingerprints()
+        self.label('0.3.0')
+        after = self.fingerprints()
+        changed = sorted(name for name in before if before[name] != after[name])
+        self.assertEqual(changed, ['receipt', 'shown', 'zone'])
+
+    def test_a_label_that_is_its_own_line_keys_as_the_raw_file(self):
+        # keys made before the table (the v0.0.48-dev2 runs at 0.2.1) still match
+        index = build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT)
+        self.assertEqual(index.chim_line_digest(), hashlib.sha256(b'0.2.1\n').hexdigest())
+        self.label('0.2.2')
+        index = build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT)
+        self.assertEqual(index.chim_line_digest(), hashlib.sha256(b'0.2.1\n').hexdigest())
+        self.assertEqual(index.files['CHIM_VERSION'], hashlib.sha256(b'0.2.2\n').hexdigest())
+
+    def test_a_table_edit_keeps_every_key(self):
+        before = self.fingerprints()
+        self.table({'versions': CHIM_TABLE['versions'] + [{'version': '0.3.1', 'line': '0.3.0', 'reason': 'x'}]})
+        self.assertEqual(before, self.fingerprints())
+
+    def test_an_unlisted_label_is_refused(self):
+        self.label('0.9.9')
+        with self.assertRaises(ValueError):
+            self.fingerprints()
+
+    def test_no_table_keys_the_raw_label(self):
+        (self.repository / 'config' / 'chim-compatibility.json').unlink()
+        before = self.fingerprints()
+        self.label('0.2.2')
+        self.assertNotEqual(before['receipt'], self.fingerprints()['receipt'])
+
+    def test_the_earlier_method_keys_the_raw_label(self):
+        before = self.fingerprints(chim_label_keys=True)
+        self.label('0.2.2')
+        after = self.fingerprints(chim_label_keys=True)
+        self.assertEqual(sorted(name for name in before if before[name] != after[name]), ['receipt', 'shown', 'zone'])
+
+    def test_unit_cache_keys_take_the_line_too(self):
+        def key():
+            index = build_cache.SourceIndex(self.repository)
+            return (index.entry_digest(self.repository / 'tools' / 'chimlabel.py', '_label')[0],
+                    index.entry_digest(self.repository / 'tools' / 'project_version.py', 'chim_version')[0])
+        label, shown = key()
+        self.label('0.2.2')
+        self.assertEqual(key()[0], label)
+        self.assertNotEqual(key()[1], shown)
+
+    def test_a_table_read_is_covered_by_the_label(self):
+        files = {'CHIM_VERSION': 'x', 'config/chim-compatibility.json': 'y'}
+        misses, _, _ = build_cache.check_reads(['config/chim-compatibility.json'], ['CHIM_VERSION'], files,
+                                                self.repository)
+        self.assertEqual(misses, [])
+        misses, _, _ = build_cache.check_reads(['config/chim-compatibility.json'], [], files, self.repository)
+        self.assertEqual(misses, ['config/chim-compatibility.json'])
+
+    def test_the_label_unit_lists_name_real_units(self):
+        # a rename in project_version, miniwind, build_aga or zone_sim must update CHIM_LABEL_SHOWN_UNITS or
+        # CHIM_LABEL_HIDDEN_UNITS, or a stage that shows the label would key its line
+        index = build_cache.SourceIndex(ROOT, top_format=build_cache.STAGE_TOP_FORMAT)
+        for path, unit in build_cache.CHIM_LABEL_SHOWN_UNITS | build_cache.CHIM_LABEL_HIDDEN_UNITS:
+            self.assertIn(unit, index._module_symbols(path)['units'], (path, unit))
+        self.assertEqual({path for path, _ in build_cache.CHIM_LABEL_SHOWN_UNITS}, build_cache.CHIM_LABEL_SHOWN)

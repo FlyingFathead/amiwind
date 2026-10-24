@@ -1,0 +1,17 @@
+{
+  "schema": "amiwind-mwscript-1",
+  "note": "MWScript compiled by the builder (tools/prepare_mwscript.py, docs/MWSCRIPT_BYTECODE.md). Every content setting of the compiled scripts lives here as the default.",
+  "handwritten": {
+    "patterns": ["chargen*"],
+    "reason": "The opening (the prison ship, the census office and the papers, the captain's door) is carried today by the engine's hand-written story rules (engine/aga/src/aw_opening.c, aw_intro.c). Its scripts are compiled and measured but not run, so nothing happens twice; each comes off this list when its hand-written rule is replaced by the compiled script."
+  },
+  "activation": {
+    "range_units": 12288,
+    "note": "A placed script runs while the player is within this many game units of it (1.5 exterior cells; the original runs the scripts of the 3 by 3 cells around the player). Interior scripts run while their room is loaded."
+  },
+  "budget": {
+    "ops_per_frame": 4000,
+    "ops_per_run": 2000,
+    "note": "Opcodes the interpreter may execute per frame across all scripts (round robin), and per script run (a guard against a loop that never ends)."
+  }
+}

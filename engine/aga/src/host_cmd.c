@@ -299,6 +299,10 @@ void Host_Map_f (void)
 	/* Refused before the running game is left (ENGINE-MAP-NAME-OVERFLOW-35). */
 	if (!SV_MapNameFits (Cmd_Argv(1)))
 		return;
+	/* A room or frame marked for more Fast RAM than this start has, typed or queued outside the scene paths
+	 * (CHIM-32MB-SAVE-ENTRY-48): refused before the running game is left; the refusal screen is up. */
+	if (AW_SceneMapRefuse (Cmd_Argv(1)))
+		return;
 	if (!Host_JoinArgs (cls.spawnparms, sizeof(cls.spawnparms), 2))
 	{
 		Con_Printf ("map command too long.\n");
@@ -388,6 +392,9 @@ void Host_Changelevel_f (void)
 	}
 	if (!SV_MapNameFits (Cmd_Argv(1)))
 		return;		// the game goes on where it is
+	/* A room or frame marked for more Fast RAM than this start has (CHIM-32MB-SAVE-ENTRY-48). */
+	if (AW_SceneMapRefuse (Cmd_Argv(1)))
+		return;		// the game goes on where it is, the refusal screen is up
 	SV_SaveSpawnparms ();
 	COM_FormatPath (level, sizeof(level), "%s", Cmd_Argv(1));
 	SV_SpawnServer (level);
@@ -681,6 +688,12 @@ void Host_Loadgame_f (void)
 	Q_fscanf(f, "%63s\n",mapname);		// MAX_QPATH - 1
 	Q_fscanf(f, "%f\n",&time);
 	if (!SV_MapNameFits (mapname))
+	{
+		fclose (f);
+		return;
+	}
+	/* The old Quake "load": the same Fast RAM check as AmiWind's saves (CHIM-32MB-SAVE-ENTRY-48). */
+	if (AW_SceneMapRefuse (mapname))
 	{
 		fclose (f);
 		return;

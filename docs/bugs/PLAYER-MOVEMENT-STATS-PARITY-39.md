@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Roadmap maxstats is explicitly proposed, not an available command. One affected catalogue-doc test passes after prose correction; failed full suite retained, no handler/movement implementation.
 - Reported with v0.0.40-dev1 at 2026-10-14 (time not recorded): Maintainer renewed turbo-traversal report. Source math study documents defaults, original GMST/OpenMW dependencies and matched timing gate. Numeric results are not native timing or a repair.
+- Reported with v0.0.48-dev2 at 2026-10-23 02:54 +0300: Maintainer: crossing the island as with boots of blinding speed; original speeds by default, old ones as dbg superspeed. Repaired in source (edf2509d); jump height open.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -18,7 +19,7 @@
 | Where | Normal walking/running, character Speed/Athletics and fatigue; debug movement presets |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.39-rc1, v0.0.39, v0.0.40-dev1 (last seen) |
+| Persists in | v0.0.39-rc1, v0.0.39, v0.0.40-dev1, v0.0.48-dev1 (last seen) |
 | Severity | high: Maintainer-visible mechanics or diagnostic requirement; original parity and candidate native verification remain pending. |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.39-rc1 |
@@ -29,7 +30,26 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Proposed debug option documentation correction, 13 October 2026](#proposed-debug-option-documentation-correction-13-october-2026)
+- [Source study, 14 October 2026](#source-study-14-october-2026)
+- [Reported again and repaired in source, 23 October 2026](#reported-again-and-repaired-in-source-23-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Symptom
 
@@ -74,6 +94,37 @@ The source4b968c2 suite rejects a roadmap mention that looks like an available m
 
 The renewed maintainer report describes turbo traversal. [Movement speed study](../MOVEMENT_SPEED_STUDY.md) records generated120/216 ground targets, the diagonal gain, 0.7 water factor, original-data/OpenMW formulas and a matched timing gate. The earlier unit-race50/137.5 example precedes actor/race scaling and is not a universal final speed; the default OpenMW reference applies Nord male weight1.25 to horizontal motion. Modified stats, load/effects, direction and gross-versus-net fatigue are explicit. No movement setting changed, and no native timing or maintainer acceptance is established. Keep this issue OPEN.
 
+## Reported again and repaired in source, 23 October 2026
+
+The maintainer, 23 October 2026 (~02:35 +0300, desktop chat): "we should probably make our character traverse at the
+beginner speeds with the variables set by the game, right now you can just go around the island with something akin
+to the boots of blinding speed or having taken enough potions etc"; "we could add like `dbg superspeed on` (also
+`superspeed on`) into the console, otherwise you'd traverse in Morrowind's parameter's set speed(s) and our current
+speed thing would be the "superspeed" setting"; "I need for debugging reasons that the athletics+whatever the else,
+that they are as they are now in that debug superspeed mode". He added that the speed must follow the character as it
+changes (levelling, skill gains, later effects), that encumbrance, paralysis and other effects belong to the same
+rule, and that running and jumping cost fatigue that returns over time.
+
+Fixed in source on branch v0.0.48-player-speed (edf2509d), not shipped at the time of writing:
+
+- Walking, running and swimming use the original's rules (OpenMW 0.51 getWalkSpeed / getRunSpeed / swim speed /
+  getMaxSpeed, race weight, strafing x 0.75, input amount), with the master file's own game settings, read from the
+  LIVE character sheet every frame: Speed, Athletics, Strength, the carried load and the race weight. A new Nord male
+  Barbarian walks 46.9 and runs 98.4 units/s (the old fixed speeds were 120 and 216, 2.56 and 2.19 times faster);
+  Speed 100 / Athletics 100 gives 62.5 / 171.9. Over capacity the player cannot move; knocked down or out, no movement.
+- Running and swimming cost fatigue per second, a jump costs fFatigueJumpBase; never below 0; godmode free. The
+  existing fatigue return is unchanged.
+- `superspeed` / `dbg superspeed on|off` (default off, not saved) keeps the previous movement byte for byte, with no
+  fatigue cost.
+- Every OpenMW factor is in one input structure; the ones the engine has no system for yet (sneaking, paralysis,
+  Feather/Burden, Fortify/Drain, Swift Swim, Levitate, Slowfall, Water Walking) are fields at 0 = no effect, listed
+  "later" in [PLAYER_MOVEMENT.md](../PLAYER_MOVEMENT.md#movement-speed).
+- Tests: `tests/aga_move_rules_test.c` (hand-worked OpenMW values), `tests/aga_move_test.c` (superspeed gives the old
+  120 / 216 / 169.7 / 84, raising Athletics or Speed raises the speed at once, load, fatigue, the command).
+
+Still open: the jump height and in-air control ([PLAYER-JUMP-ORIGINAL-RULES-48](PLAYER-JUMP-ORIGINAL-RULES-48.md)),
+in-game timing against the original, and the maintainer's check in a build. Keep this issue OPEN until then.
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -81,8 +132,9 @@ The renewed maintainer report describes turbo traversal. [Movement speed study](
 Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and game state. See [families](README.md#families).
 
 - [AW-20260928-10](AW-20260928-10.md): Interior door animation and sound missing
-- AW-20260928-12 (no report page): Downstairs interior doors cannot open
+- [AW-20260928-12](AW-20260928-12.md): Downstairs interior doors cannot open
 - AW-20260928-19 (no report page): Courtyard barrel incorrectly says empty
+- AW-STATE-32-SLOTS-48 (no report page): The game state table holds 32 globals, 32 quests and 32 items; the game has 143 globals and 318 journal topics
 - AW25-06 (no report page): Quicksave shown as empty; save ordering confusing
 - [CENSUS-DOOR-STUCK-29](CENSUS-DOOR-STUCK-29.md): Player stuck after opening Census Office hall door
 - [CHIM-COURT-BARREL-USE-33](CHIM-COURT-BARREL-USE-33.md): Census courtyard on CHIM: Fargoth's ring barrel cannot be used, so the opening cannot proceed
@@ -104,8 +156,12 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [ENGINE-QC-ARGS-SYSERROR-35](ENGINE-QC-ARGS-SYSERROR-35.md): Bad QuakeC sound arguments stopped the program; lightstyle had no range check
 - [INTRO-CAMERA-GATING-38](INTRO-CAMERA-GATING-38.md): Opening vanity and third-person cameras expose an unselected default race
 - [INVENTORY-CATALOG-LOOKUP-40](INVENTORY-CATALOG-LOOKUP-40.md): Inventory catalogue lookup and name sorting use an equality-only comparison
+- MWSCRIPT-DATA-UNKNOWN-NAMES-48 (no report page): Four Bloodmoon scripts read names declared nowhere in the game data and do not compile
+- MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
+- MWSCRIPT-STATE-NOT-SAVED-48 (no report page): The compiled scripts' values (globals, object and script locals, journal indexes) are not in saved games
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
 - [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry
+- [PLAYER-JUMP-ORIGINAL-RULES-48](PLAYER-JUMP-ORIGINAL-RULES-48.md): The jump height and in-air control are still Quake's, not the original's Acrobatics, load and fatigue rules
 - [PLAYER-JUMP-THIRDPERSON-38](PLAYER-JUMP-THIRDPERSON-38.md): Third-person player jump animation is missing
 - [PLAYER-READY-MOVEMENT-39](PLAYER-READY-MOVEMENT-39.md): Third-person player cannot move with fists drawn
 - [PLAYER-READY-WATER-MOVEMENT-38](PLAYER-READY-WATER-MOVEMENT-38.md): Readied weapon or torch appears to allow walking on water

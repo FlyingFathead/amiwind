@@ -1,6 +1,6 @@
 # CHIM
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+_Last updated with AmiWind v0.0.48 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -84,7 +84,8 @@ CHIM has its own version number, separate from AmiWind's:
 | | |
 | --- | --- |
 | First release | CHIM 0.1.0 with AmiWind v0.0.33 |
-| Current | CHIM 0.2.1, since AmiWind v0.0.41 (patch step: fixes: compiled collision for non-convex pieces, recorded audit provenance; world format unchanged) and still in v0.0.43 and v0.0.44. 0.2.0 shipped with AmiWind v0.0.36 |
+| Current | CHIM 0.2.2, since AmiWind v0.0.48 (release step on compatibility line 0.2.1: it reads everything 0.2.1 built). 0.2.1 shipped with AmiWind v0.0.41 (patch step: fixes: compiled collision for non-convex pieces, recorded audit provenance; world format unchanged), 0.2.0 with AmiWind v0.0.36 |
+| Release step | every final AmiWind release moves CHIM by x.x.1 and adds the version to the compatibility table below |
 | Where it is kept | the `CHIM_VERSION` file at the repository root, the one source for the builder receipts, the engine header and the boot check |
 | How it is shown | short form on the boot check, "AmiWind vX / CHIM vY"; long form "Running on CHIM Engine vY" in the README and release notes |
 | Numbering | semantic versions: a new world format major version is a new CHIM major version (the engine refuses a world of another major with a clear message); minor = features; patch = fixes |
@@ -96,6 +97,30 @@ The world format has a version of its own: the builder writes 0.5, or 0.7
 with terrain references; the engine reads 0.4 to 0.7 and refuses the rest. The
 file types, the format history and the roadmap of the format, in short:
 [CHIM file format](../CHIM_FILE_FORMAT.md).
+
+### Compatibility
+
+Every CHIM version has a compatibility line: the oldest CHIM version whose
+worlds and build caches it reads unchanged. A version that only moves the
+number (the release step) stays on the line before it; a version that
+changes what CHIM builds or reads starts a new line. The builder keys its
+stage and unit caches by the line, not by the number, so a release step
+rebuilds nothing whose output does not show the number (the engine and the
+boot check do), while a new line rebuilds everything that depends on CHIM.
+Builder receipts keep the real number. The table is
+`config/chim-compatibility.json`; `python3 tools/chim_compat.py check`
+checks it and `render` writes it here.
+
+<!-- chim-compatibility start (tools/chim_compat.py render) -->
+| CHIM | Compatibility line | Shipped with | Reason |
+| --- | --- | --- | --- |
+| 0.1.0 | 0.1.0 | AmiWind v0.0.33 | First CHIM release: the CHIM builder, world format 0.5 and the CHIM engine. |
+| 0.2.0 | 0.2.0 | AmiWind v0.0.36 | Feature step: builder and engine features that changed what CHIM builds. |
+| 0.2.1 | 0.2.1 | AmiWind v0.0.41 | Fix step that changed builder output: compiled collision for non-convex pieces, recorded audit provenance. |
+| 0.2.2 | 0.2.1 | AmiWind v0.0.48 | Release label step: no world format, builder output or cache change; reads everything 0.2.1 built. |
+
+CHIM 0.2.2 reads worlds and caches built by CHIM 0.2.1, 0.2.2.
+<!-- chim-compatibility end -->
 
 ## Design rules
 

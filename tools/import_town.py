@@ -91,7 +91,18 @@ def source_receipt(data, settings):
             'files': _receipt_files(data),
             'conversion': {'lava_mode': lava.lava_mode(),
                            'code_sha256': {name: hashlib.sha256((ROOT / 'tools' / name).read_bytes()).hexdigest()
-                                           for name in ('import_town.py', 'lava.py')}}}
+                                           for name in ('import_town.py', 'lava.py')},
+                           # the collision-source rule of the export (COLLISION-RCN-SCOPE-32): its mode and code
+                           'collision_source': collision_source_receipt()}}
+
+
+def collision_source_receipt():
+    """The collision-source rule the source stage's export applies: AMIWIND_COLLISION_SOURCE and the SHA-256 of the
+    rule's modules (tools/collision_source.py, tools/collision_source_env.py)."""
+    from collision_source_env import collision_source_mode
+    return {'mode': collision_source_mode(),
+            'code_sha256': {name: hashlib.sha256((ROOT / 'tools' / name).read_bytes()).hexdigest()
+                            for name in ('collision_source.py', 'collision_source_env.py')}}
 
 
 def in_frame(reference, settings):
@@ -636,8 +647,9 @@ def prepare(town, data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', job
         references = frame_references(out, settings)
     if collect_only: return json.loads((out / 'coverage.json').read_text())
     palette = (scene / 'id1/gfx/palette.lmp').read_bytes()
-    ext = lumps((scene / 'id1/maps/seyda.bsp').read_bytes())[0].decode('cp1252')
-    timings = '\n'.join(re.findall(r'"aw_(?:hand_[^"\n]+|eye_height)" "[^"\n]+"', ext))
+    # the hand timings: the hands stage's report (BUILD-SEYDA-BSP-CARRIER-48)
+    from hand_metadata import scene_timings
+    timings = scene_timings(scene)
     grids = {tuple(g['cell']): g for g in json.loads((out / 'audit/terrain-source.json').read_text())}
     pools = lava_pools(out, data, references)
     # the pools' loop sound (their script's "lava layer"), from the user's own files, beside the residents' voices
@@ -845,13 +857,14 @@ def _compile_region_now(task):
 
 
 def convert_interiors(data, scene, settings, qbsp, vis, light, ffmpeg, jobs, vis_mode, timings, dry_run=False,
-                      only_cells=None):
+                      only_cells=None, room_form='compiled'):
     """The town's listed rooms (town_interiors), their residents and door banks. only_cells: convert only these
-    listed rooms (a MiniWind interior scope); the others are recorded as left out."""
+    listed rooms (a MiniWind interior scope); the others are recorded as left out. room_form: compiled or shell
+    (prepare_area.add_room_form_option)."""
     import town_interiors
     from prepare_area import populate
     result = town_interiors.convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dry_run,
-                                    only_cells=only_cells)
+                                    only_cells=only_cells, room_form=room_form)
     result['receipt'] = []
     if result['rooms']:
         try:

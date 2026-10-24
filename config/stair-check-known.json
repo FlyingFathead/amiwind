@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "about": "Meshes whose flights of stairs stair collision method 1 (tools/stair_mesh.py, the default since v0.0.48-dev2) cannot yet make pass the geometric stair check: they keep method 0's collision, and the CHIM stage's stair check (chim-world/chim-stair-check.json, the build summary) lists them as known instead of stopping the build. One register class, never dropped: each stays on the list until method 1 or a per-mesh rule makes it pass (a listed mesh that passes is named under known_passing). Measured read-only with tools/stair_mesh_survey.py on the v0.0.47 release build's 1,380 distinct CHIM meshes (97 with 132 flights), 22 October 2026. The two added by the dev2 verify run of 23 October left again the same day: a Grazelands tree (flora_tree_gl_06: its roots are no flight, its RootCollisionNode holds nothing under them) and the Telvanni slave market (ex_t_slavemarket: method 1 now takes its flight and proof from the mesh as drawn, not from a visual recipe's reduced mesh); measured on all 103 stair units of the v0.0.48-dev2 build (2026_10_23_v0.0.48-dev2_dev2-try8_0754e9bc), read only.",
+  "class": "CHIM-STAIR-METHOD1-UNFIXED-48",
+  "meshes": {
+    "meshes/x/ex_de_ship.nif": "ship: 7 flights (deck ladders, stairs between decks), 6 still fail",
+    "meshes/x/ex_de_shipwreck.nif": "shipwreck: tilted hull, 5 flights, 2 still fail",
+    "meshes/r/siltstrider.nif": "silt strider: 1 flight (the boarding steps)",
+    "meshes/x/ex_ashl_tent_03.nif": "ashlander tent: 5 flights, 3 still fail",
+    "meshes/x/ex_dae_ruin_04_skew_01.nif": "Daedric ruin, skewed: 5 flights, 2 still fail",
+    "meshes/x/ex_dae_ruin_02_skew.nif": "Daedric ruin, skewed (no RootCollisionNode): 4 flights, 2 still fail",
+    "meshes/x/ex_dae_ruin_entry.max.nif": "Daedric ruin entry (no RootCollisionNode): 1 flight",
+    "meshes/x/ex_de_shack_04.nif": "Dunmer shack: 1 flight",
+    "meshes/x/ex_common_house_tall_02.nif": "common tall house: 1 flight",
+    "meshes/x/ex_hlaalu_bal_02.nif": "Hlaalu balcony: 1 flight",
+    "meshes/x/ex_hlaalu_dsteps_01.nif": "Hlaalu double steps: 1 flight (its own RootCollisionNode has 46-48 degree faces, not standable in OpenMW either)"
+  }
+}

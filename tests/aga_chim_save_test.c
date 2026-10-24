@@ -39,6 +39,13 @@ void IN_AWClearButtons(void){}
 float anglemod(float a){return a;}
 static char command[64];
 void Cbuf_InsertText(char *text){strncpy(command,text,sizeof(command)-1);}
+/* The scene's Fast RAM check as aw_debug.c binds it (CHIM-32MB-SAVE-ENTRY-48): what it was asked, and its answer. */
+static int refuse_calls,refuse_answer;static char refused_scene[16];static float refused_at[3];
+static int refuse_check(const char *scene,const float *position)
+{
+    refuse_calls++;strncpy(refused_scene,scene,sizeof(refused_scene)-1);
+    refused_at[0]=position[0];refused_at[1]=position[1];refused_at[2]=position[2];return refuse_answer;
+}
 
 /* The disk. legacy 1: every town map exists (and no CHIM frame map is asked
  * for); 0: only the CHIM frame maps of Balmora and Seyda Neen. */
@@ -166,6 +173,14 @@ static void disk(int on_legacy)
     assert(AW_SaveRead(world.profile,0) && !strcmp(command,"map balmora\n") && loading);
     AW_SaveSpawn();
     assert(!loading && player.v.origin[0]==123 && player.v.origin[1]==-45 && player.v.origin[2]==60);
+    /* CHIM-32MB-SAVE-ENTRY-48: the load asks the scene's Fast RAM check (aw_scene.c AW_SceneSaveEntryRefuse) with
+     * the saved scene and position before anything is queued; refused: 2, no map command, nothing pending. */
+    refuse_calls=0;refuse_answer=1;aw_save_entry_refuse=refuse_check;command[0]=0;
+    assert(AW_SaveRead(world.profile,0)==2 && !command[0] && !loading && refuse_calls==1);
+    assert(!strcmp(refused_scene,"balmora") && refused_at[0]==123 && refused_at[1]==-45 && refused_at[2]==60);
+    refuse_answer=0;
+    assert(AW_SaveRead(world.profile,0)==1 && !strcmp(command,"map balmora\n") && loading && refuse_calls==2);
+    AW_SaveSpawn();assert(!loading);aw_save_entry_refuse=NULL;
     /* Without the CHIM frame maps a CHIM disk has no town at all. */
     if(!on_legacy){
         aw_chim_town_map=NULL;

@@ -3,6 +3,7 @@
 #include <assert.h>
 keydest_t key_dest;qboolean keydown[256];viddef_t vid;server_t sv;int scr_copyeverything;
 char *keybindings[256];
+int (*aw_menu_fullscreen)(void);
 void Key_SetBinding(int keynum,char *binding){keybindings[keynum]=binding;}
 char *Key_KeynumToString(int keynum){static char s[2];s[0]=(char)keynum;s[1]=0;return s;}
 byte pixels[320*200];int clears,quit,changes,missing,intro_missing;
@@ -13,24 +14,28 @@ static void (*picker)(void),(*front)(void);static char queued[64];
 static int mx=160,my=63;
 cvar_t volume={"volume","0.7",true,false,.7f},bgmvolume={"bgmvolume","1",true,false,1};
 cvar_t effectsvolume={"effectsvolume","0.75",true,false,.75f},dialoguevolume={"dialoguevolume","1",true,false,1};
-static int audio_sets,audio_draws;
+static int audio_sets;
 static int highlight_y,highlight_w,scroll_top,scroll_total;
 /* Controls > Combat style / Dice rolls / Blocking (aw_combat.c's saved options). */
 static float combat_miss=1,combat_dice=1,combat_block=1;
-/* Options > Far detail (aw_cull, aw_fog.c; the engine default 4 = Strong). */
+/* Video > Far detail (aw_cull, aw_fog.c; the engine default 4 = Strong). */
 static float far_detail=4;static int far_sets;
-/* Options > Extra RAM (aw_autoram, chim_world.c; default 1 = automatic). */
+/* Video > Extra RAM (aw_autoram, chim_world.c; default 1 = automatic). */
 static float autoram=1;
+/* Controls > Invert Y axis: the sign of Quake's m_pitch (default 0.022). */
+static float pitch_value=.022f;
 float Cvar_VariableValue(char *name){
     if(!strcmp(name,"aw_cull"))return far_detail;
     if(!strcmp(name,"aw_autoram"))return autoram;
     if(!strcmp(name,"aw_combat_miss"))return combat_miss;
     if(!strcmp(name,"aw_combat_dice"))return combat_dice;
     if(!strcmp(name,"aw_combat_block"))return combat_block;
+    if(!strcmp(name,"m_pitch"))return pitch_value;
     assert(0);return 0;
 }
 void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&effectsvolume,&dialoguevolume};int i;
     if(!strcmp(name,"aw_cull")){assert(value==1 || value==3 || value==4 || value==6);far_detail=value;far_sets++;return;}
+    if(!strcmp(name,"m_pitch")){pitch_value=value;return;}
     assert(value>=0 && value<=1);
     if(!strcmp(name,"aw_combat_miss")){combat_miss=value;return;}
     if(!strcmp(name,"aw_autoram")){autoram=value;return;}
@@ -56,104 +61,185 @@ int AW_UIColor(int r,int g,int b){return r;}
 void AW_UIFill(int x,int y,int w,int h,int c){if(c==62){highlight_y=y;highlight_w=w;}}
 void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0 && x+10<=320 && y+h<=200);assert(top>=0 && top+visible<=total);scroll_top=top;scroll_total=total;}
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
-static char crosshair_label[64],photo_label[64],far_label[64];static int photo_colour;
-void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200);if(!strcmp(s,"Audio"))audio_draws++;
+/* What the Options page drew: labels by their start, every tab and box. */
+static char crosshair_label[64],photo_label[64],far_label[64],colour_label[64],shape_label[64],invert_label[64];
+static char sens_value[16],help[64];static int photo_colour,tabs_drawn,audio_draws,boxes,full_box,preview_x,previews;
+void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200 && x>=0 && x+w<=320);
+ if(!strcmp(s,"Prefs") || !strcmp(s,"Controls") || !strcmp(s,"Video"))tabs_drawn++;
+ if(!strcmp(s,"Audio")){tabs_drawn++;audio_draws++;}
  if(!strncmp(s,"Show crosshairs",15))strcpy(crosshair_label,s);
+ if(!strncmp(s,"Crosshair colour",16))strcpy(colour_label,s);
+ if(!strncmp(s,"Crosshair shape",15))strcpy(shape_label,s);
+ if(!strncmp(s,"Invert Y axis",13))strcpy(invert_label,s);
+ if(x==252)strcpy(sens_value,s); /* the value beside the sensitivity rail */
+ if(x==10 && y==176)strcpy(help,s);
  if(!strncmp(s,"Far detail",10)){strcpy(far_label,s);assert(AW_UIWidth(s)<=w-4);}
  if(!strcmp(s,"Photo mode") || !strcmp(s,"Leave photo mode")){strcpy(photo_label,s);photo_colour=c;}}
 /* Photo mode and the crosshair preference (aw_photo.c). */
-static int crosshair_on=1,photo_on,photo_available=1,photo_sets;
+static int crosshair_on=1,photo_on,photo_available=1,photo_sets,crosshair_style[2];
 int AW_CrosshairShown(void){return crosshair_on;}
 void AW_CrosshairSet(int on){crosshair_on=on;}
+int AW_CrosshairStyleCount(int shape){return shape?4:4;}
+int AW_CrosshairStyle(int shape){return crosshair_style[shape];}
+const char *AW_CrosshairStyleName(int shape,int value){
+ static const char *colours_[]={"Warm white","Yellow","Green","Blue"},*shapes[]={"Cross","Open cross","Small cross","Dot"};
+ return shape?shapes[value]:colours_[value];}
+void AW_CrosshairStyleSet(int shape,int value){int n=AW_CrosshairStyleCount(shape);crosshair_style[shape]=((value%n)+n)%n;}
+void AW_CrosshairDraw(int x,int y){preview_x=x;previews++;assert(y>=36 && y+8<=36+7*19);}
+/* Quake's sensitivity in tenths (aw_photo.c); the shipped default is 3. */
+static int sens_tenths=30;
+int AW_SensitivityTenths(void){return sens_tenths;}
+void AW_SensitivitySetTenths(int t){assert(t>=1 && t<=200);sens_tenths=t;}
 int AW_PhotoModeActive(void){return photo_on;}
 int AW_PhotoModeAvailable(void){return photo_available;}
 int AW_PhotoModeSet(int on){assert(key_dest==key_game);photo_on=on;photo_sets++;return 1;}
-void AW_UIBox(int x,int y,int w,int h){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
+void AW_UIBox(int x,int y,int w,int h){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);boxes++;if(!x && !y && w==320 && h==200)full_box++;}
 void AW_MusicTitle(void){}
 void AW_MusicTitleAfter(double seconds){(void)seconds;}
 void AW_MenuMouse(int,int);
 static void open_pause(void){M_Menu_Main_f();mx=160;my=63;}
 static void click(int x,int y){AW_MenuMouse(x-mx,y-my);mx=x;my=y;M_Keydown(K_MOUSE1);}
-/* Options > Controls: the raw key is captured (W is not turned into Up),
- * a third key replaces both, Escape cancels, Delete clears and the cursor
- * skips planned rows. */
+/* Options opens on the tab row of the page last shown; a click picks a page. */
+static void open_options(void){open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw();}
+static void page(int n){click(8+n*76+10,6+5);M_Draw();assert(highlight_y==9 && highlight_w==66);}   /* the tab is highlighted */
+static void down(int n){while(n--)M_Keydown(K_DOWNARROW);M_Draw();}
+static void up(int n){while(n--)M_Keydown(K_UPARROW);M_Draw();}
+/* The panel: edge to edge, four framed tabs, one framed group, Back; the world is not drawn. */
+static void check_layout(void){
+ open_options();assert(aw_menu_fullscreen && aw_menu_fullscreen());
+ boxes=full_box=tabs_drawn=0;M_Draw();
+ assert(full_box==1 && tabs_drawn==4 && boxes==1+4+1+1);
+ assert(!strcmp(help,"Left/Right: page   Down: settings"));
+ M_Keydown(K_ESCAPE);assert(!aw_menu_fullscreen() && key_dest==key_menu);
+ M_Draw();highlight_y=0;M_Keydown(K_ENTER);M_Draw();assert(aw_menu_fullscreen()); /* Options stays selected */
+ M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);assert(key_dest==key_game && !aw_menu_fullscreen());
+}
+/* Prefs: Show crosshairs, crosshair colour and shape (with a preview), then the HUD and
+ * interface rows that used to be top level or under Interface... */
+static void check_prefs(void){
+ int i;
+ open_options();page(0);
+ down(1);assert(!strcmp(crosshair_label,"Show crosshairs: On") && highlight_y==36 && highlight_w==280);
+ M_Keydown(K_ENTER);assert(!crosshair_on);M_Draw();assert(!strcmp(crosshair_label,"Show crosshairs: Off"));
+ M_Keydown(K_RIGHTARROW);assert(crosshair_on);M_Keydown(K_LEFTARROW);assert(!crosshair_on);M_Keydown(K_ENTER);assert(crosshair_on);
+ previews=0;down(1);assert(!strcmp(colour_label,"Crosshair colour: Warm white") && highlight_y==55);
+ assert(previews==2 && preview_x==14+280-16);
+ M_Keydown(K_RIGHTARROW);M_Draw();assert(!strcmp(colour_label,"Crosshair colour: Yellow"));
+ M_Keydown(K_LEFTARROW);M_Keydown(K_LEFTARROW);M_Draw();assert(!strcmp(colour_label,"Crosshair colour: Blue"));
+ M_Keydown(K_ENTER);M_Draw();assert(!strcmp(colour_label,"Crosshair colour: Warm white"));
+ down(1);M_Keydown(K_RIGHTARROW);M_Draw();assert(!strcmp(shape_label,"Crosshair shape: Open cross") && highlight_y==74);
+ M_Keydown(K_LEFTARROW);
+ down(1);M_Keydown(K_ENTER);assert(gold_frame);M_Keydown(K_ENTER);assert(!gold_frame);
+ down(1); /* UI font */
+ down(1);M_Keydown(K_ENTER);assert(AW_UIVoiceNames());
+ down(1);M_Keydown(K_RIGHTARROW);assert(AW_UIDialogueMethod()==3);
+ down(1);M_Keydown(K_ENTER);assert(!AW_SceneUIOption(0,0));
+ down(1);assert(scroll_top==2 && highlight_y==36+6*19);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
+ down(1);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(2,0)==2);
+ down(1);assert(scroll_total==11 && scroll_top==4 && highlight_y==150); /* Autosave history, the last row */
+ /* Past the last row: Back, which holds; Up returns to the last row, Up past the first to the tabs. */
+ down(3);assert(highlight_y==179 && highlight_w==74 && !strcmp(help,"Enter: back to the menu"));
+ up(1);assert(highlight_y==150 && highlight_w==280);
+ for(i=0;i<24;i++)M_Keydown(K_MWHEELUP);
+ M_Draw();assert(scroll_top==0 && highlight_y==9 && highlight_w==66);
+ M_Keydown(K_ENTER);M_Draw();assert(highlight_y==36); /* Enter on the tabs: the first row */
+ click(240,180);assert(key_dest==key_menu && !aw_menu_fullscreen()); /* Back */
+ M_Keydown(K_ESCAPE);
+}
+/* Controls: Mouse sensitivity (default 3.0, 0.5 steps, Shift 0.1, 0.5..10, drag), Invert Y axis,
+ * the key bindings: the raw key is captured (W is not turned into Up), a third key replaces both,
+ * Escape cancels, Delete clears and the cursor skips planned rows; the combat options. */
 static void check_controls(void){
  int i;
  keybindings['w']="+forward";keybindings[K_UPARROW]="+forward";keybindings[K_F9]="aw_quickload";
- open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw();
- for(i=0;i<8;i++)M_Keydown(K_DOWNARROW);
- M_Keydown(K_ENTER);M_Draw();assert(highlight_y==54); /* Forward */
- M_Keydown(K_ENTER);M_Draw();M_Keydown('k');
+ open_options();page(2);
+ down(1);assert(highlight_y==36 && !strcmp(sens_value,"3.0") && sens_tenths==30);
+ assert(!strcmp(help,"Arrows / drag   Shift: fine"));
+ M_Keydown(K_RIGHTARROW);assert(sens_tenths==35);M_Keydown(K_LEFTARROW);M_Keydown(K_LEFTARROW);assert(sens_tenths==25);
+ keydown[K_SHIFT]=true;M_Keydown(K_RIGHTARROW);keydown[K_SHIFT]=false;assert(sens_tenths==26);
+ M_Keydown(K_LEFTARROW);assert(sens_tenths==25);M_Keydown(K_RIGHTARROW);M_Keydown(K_RIGHTARROW);assert(sens_tenths==35);
+ M_Keydown(K_HOME);assert(sens_tenths==5);M_Keydown(K_LEFTARROW);assert(sens_tenths==5);
+ M_Keydown(K_END);assert(sens_tenths==100);M_Keydown(K_RIGHTARROW);assert(sens_tenths==100);M_Draw();assert(!strcmp(sens_value,"10.0"));
+ /* A console value outside the menu's range shows as is; a step brings it back in. */
+ sens_tenths=2;M_Draw();assert(!strcmp(sens_value,"0.2"));M_Keydown(K_RIGHTARROW);assert(sens_tenths==5);
+ /* The rail: a click sets the nearest 0.5, a drag follows outside the rail, release stops. */
+ click(170+38,36+9);assert(sens_tenths==55);keydown[K_MOUSE1]=true;
+ AW_MenuMouse(1000,0);mx=319;assert(sens_tenths==100);AW_MenuMouse(-1000,0);mx=0;assert(sens_tenths==5);
+ keydown[K_MOUSE1]=false;AW_MenuMouse(100,0);mx=100;assert(sens_tenths==5);
+ sens_tenths=30;
+ down(1);assert(!strcmp(invert_label,"Invert Y axis: Off"));M_Keydown(K_ENTER);assert(pitch_value<0);M_Draw();
+ assert(!strcmp(invert_label,"Invert Y axis: On"));M_Keydown(K_RIGHTARROW);assert(pitch_value>0);
+ down(1);assert(highlight_y==74 && !strcmp(help,"Enter: set   Del: clear")); /* Forward */
+ M_Keydown(K_ENTER);M_Draw();assert(!strcmp(help,"Press a key   Esc: cancel"));M_Keydown('k');
  assert(!strcmp(keybindings['k'],"+forward") && !*keybindings['w'] && !*keybindings[K_UPARROW]);
- M_Keydown(K_ENTER);M_Keydown(K_ESCAPE);assert(key_dest==key_menu && !strcmp(keybindings['k'],"+forward"));
+ M_Keydown(K_ENTER);M_Keydown(K_ESCAPE);assert(key_dest==key_menu && aw_menu_fullscreen() && !strcmp(keybindings['k'],"+forward"));
  M_Keydown(K_ENTER);M_Keydown('W');assert(!strcmp(keybindings['w'],"+forward") && !strcmp(keybindings['k'],"+forward"));
  M_Keydown(K_DEL);assert(!*keybindings['w'] && !*keybindings['k']);
  for(i=0;i<40;i++)M_Keydown(K_DOWNARROW);
- M_Draw();assert(highlight_y==149);  /* Back is the last row */
- /* Reset, Blocking, Dice rolls, Combat style above Back: Enter and the arrows switch the three options */
- M_Keydown(K_UPARROW);M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_block==0 && combat_dice==1 && combat_miss==1);
+ up(1);assert(highlight_y==150 && scroll_total==30 && scroll_top==23); /* Reset to defaults is the last row (Stats and Magic rows included) */
+ M_Keydown(K_ENTER);assert(!strcmp(queued,"exec keymaps-default.cfg\n"));changes--;
+ /* Blocking, Dice rolls, Combat style above it: Enter and the arrows switch the three options */
+ M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_block==0 && combat_dice==1 && combat_miss==1);
  M_Keydown(K_RIGHTARROW);assert(combat_block==1);
  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_dice==0 && combat_miss==1);
  M_Keydown(K_RIGHTARROW);assert(combat_dice==1);
  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);assert(combat_miss==0);M_Draw();M_Keydown(K_LEFTARROW);assert(combat_miss==1);
- M_Keydown(K_UPARROW);M_Draw(); /* Inventory is now an active gameplay binding. */
+ M_Keydown(K_UPARROW);M_Draw(); /* the planned rows are skipped: Magic (the placeholder window, O) and Stats (P) are bindable like the inventory */
+ M_Keydown(K_ENTER);M_Keydown('o');assert(!strcmp(keybindings['o'],"aw_magicmenu"));
+ M_Keydown(K_UPARROW);M_Draw();
+ M_Keydown(K_ENTER);M_Keydown('p');assert(!strcmp(keybindings['p'],"aw_stats"));
+ M_Keydown(K_UPARROW);M_Draw(); /* Inventory */
  M_Keydown(K_ENTER);M_Keydown('i');assert(!strcmp(keybindings['i'],"aw_inventory"));
  M_Keydown(K_UPARROW);M_Draw(); /* Quick load remains independently bindable. */
  M_Keydown(K_ENTER);M_Keydown('q');assert(!strcmp(keybindings['q'],"aw_quickload"));
- M_Keydown(K_ESCAPE);M_Draw();M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
+ M_Keydown(K_ESCAPE);M_Draw();M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);assert(key_dest==key_game);
  for(i=0;i<256;i++)keybindings[i]=NULL;
 }
-/* Options > Show crosshairs (the saved crosshair preference) and Options >
- * Photo mode: closes the menu first, toggles to Leave photo mode, greyed and
- * inert on the title screen or without a running game. */
-static void open_options(void){open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw();}
-static void check_photo_rows(void){
- int i;
- open_options();for(i=0;i<4;i++)M_Keydown(K_DOWNARROW);
- M_Draw();assert(!strcmp(crosshair_label,"Show crosshairs: On") && highlight_y==54+4*19);
- M_Keydown(K_ENTER);assert(!crosshair_on);M_Draw();assert(!strcmp(crosshair_label,"Show crosshairs: Off"));
- M_Keydown(K_RIGHTARROW);assert(crosshair_on);M_Keydown(K_LEFTARROW);assert(!crosshair_on);
- M_Keydown(K_ENTER);assert(crosshair_on && key_dest==key_menu);
- M_Keydown(K_DOWNARROW);photo_available=0;M_Draw();assert(!strcmp(photo_label,"Photo mode") && photo_colour==114);
+/* Video: fog, reset, far detail, photo mode (closes the menu first, greyed and inert on the title
+ * screen or without a running game), area loading, load method, read-ahead buffer, extra RAM. */
+static void check_video(void){
+ open_options();page(3);
+ down(1);M_Keydown('a');assert(distance==530);keydown[K_SHIFT]=true;M_Keydown('D');assert(distance==531);keydown[K_SHIFT]=false;
+ M_Keydown('s');M_Keydown(K_ENTER);assert(distance==540);
+ /* Far detail: plain names, Enter and the arrows step Full, Light, Strong,
+  * Strong + small faces (aw_cull 1, 3, 4, 6); a console-only value reads Custom. */
+ down(1);assert(!strcmp(far_label,"Far detail: Strong") && highlight_y==36+2*19);
+ M_Keydown(K_ENTER);M_Draw();assert(far_detail==6 && !strcmp(far_label,"Far detail: Strong + small faces"));
+ M_Keydown(K_ENTER);M_Draw();assert(far_detail==1 && !strcmp(far_label,"Far detail: Full"));
+ M_Keydown(K_RIGHTARROW);M_Draw();assert(far_detail==3 && !strcmp(far_label,"Far detail: Light"));
+ M_Keydown(K_LEFTARROW);M_Keydown(K_LEFTARROW);assert(far_detail==6);
+ far_detail=2;M_Draw();assert(!strcmp(far_label,"Far detail: Custom"));
+ M_Keydown(K_RIGHTARROW);assert(far_detail==1);M_Keydown(K_RIGHTARROW);M_Keydown(K_RIGHTARROW);assert(far_detail==4 && far_sets==8);
+ down(1);photo_available=0;M_Draw();assert(!strcmp(photo_label,"Photo mode") && photo_colour==114);
  M_Keydown(K_ENTER);assert(key_dest==key_menu && !photo_sets);
- photo_available=1;M_Draw();assert(photo_colour==210 && highlight_y==54+5*19);
- M_Keydown(K_ENTER);assert(key_dest==key_game && photo_on && photo_sets==1);
- open_options();for(i=0;i<5;i++)M_Keydown(K_DOWNARROW);
- M_Draw();assert(!strcmp(photo_label,"Leave photo mode"));
+ photo_available=1;M_Draw();assert(photo_colour==210 && highlight_y==36+3*19);
+ M_Keydown(K_ENTER);assert(key_dest==key_game && photo_on && photo_sets==1 && !aw_menu_fullscreen());
+ open_options();down(4);assert(!strcmp(photo_label,"Leave photo mode")); /* the page is kept */
  M_Keydown(K_ENTER);assert(key_dest==key_game && !photo_on && photo_sets==2);
- front();M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
- for(i=0;i<5;i++)M_Keydown(K_DOWNARROW);
- M_Draw();assert(photo_colour==114);M_Keydown(K_ENTER);assert(photo_sets==2 && key_dest==key_menu);
+ open_options();down(5);M_Keydown(K_ENTER);assert(!frozen_loading); /* Area loading */
+ M_Keydown(K_LEFTARROW);assert(frozen_loading);M_Keydown(K_RIGHTARROW);assert(!frozen_loading);
+ click(100,36+4*19+18);assert(frozen_loading); /* final pixel of the loading row */
+ down(1);M_Keydown(K_ENTER);M_Draw();assert(AW_CellChangeMethod()==2);
+ down(1);M_Keydown(K_ENTER);assert(AW_StreamOption(1,0)==256);
+ M_Keydown(K_RIGHTARROW);assert(AW_StreamOption(1,0)==512);
+ down(1);M_Keydown(K_ENTER);M_Draw();assert(autoram==0 && scroll_total==8 && scroll_top==1); /* Extra RAM: Off */
+ M_Keydown(K_RIGHTARROW);assert(autoram==1);M_Keydown(K_LEFTARROW);assert(autoram==0);M_Keydown(K_ENTER);assert(autoram==1);
  M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
 }
-static void check_setup_endpoints(void){
- int i,j,down[]={K_DOWNARROW,K_MWHEELDOWN,'s',K_TAB},up[]={K_UPARROW,K_MWHEELUP,'w'};
- front();M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);
- for(j=0;j<4;j++){
-  for(i=0;i<24;i++)M_Keydown(down[j]);
-  M_Draw();assert(scroll_total==15 && scroll_top==8 && highlight_y==168 && highlight_w==230);
-  M_Keydown(K_UPARROW);M_Draw();assert(scroll_top==8 && highlight_y==149);
-  for(i=0;i<24;i++)M_Keydown(up[j%3]);
-  M_Draw();assert(scroll_top==0 && highlight_y==54 && highlight_w==230);
-  M_Keydown(K_DOWNARROW);M_Draw();assert(scroll_top==0 && highlight_y==73);
- }
- /* Reversing at either end works; the Interface subpanel shares the rule. */
- for(i=0;i<5;i++)M_Keydown(K_DOWNARROW);
- M_Keydown(K_ENTER);
- for(i=0;i<24;i++)M_Keydown(K_MWHEELUP);
- M_Draw();assert(highlight_y==54 && highlight_w==232);
- for(i=0;i<24;i++)M_Keydown(K_DOWNARROW);
- M_Draw();assert(highlight_y==168 && highlight_w==232);
- M_Keydown(K_UPARROW);M_Draw();assert(highlight_y==149);
- for(i=0;i<24;i++)M_Keydown(K_UPARROW);
- M_Keydown(K_DOWNARROW);M_Draw();assert(highlight_y==73);
- M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);
+/* The title screen: the same panel; Photo mode greyed and inert. */
+static void check_title_options(void){
+ front();M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();assert(aw_menu_fullscreen());
+ down(4);assert(photo_colour==114);M_Keydown(K_ENTER);assert(photo_sets==2 && key_dest==key_menu);
+ M_Keydown(K_ESCAPE);M_Draw();assert(!aw_menu_fullscreen() && key_dest==key_menu);
+ M_Keydown(K_ENTER);M_Draw();assert(aw_menu_fullscreen()); /* Options stays selected on the title */
+ AW_MenuMouse(10000,10000);M_Draw();AW_MenuMouse(-10000,-10000);M_Draw(); /* the pointer stays on the screen */
+ M_Keydown(K_ESCAPE);
 }
 cvar_t aw_drawdistance={"aw_drawdistance","540",true,false,540};
 int main(void){
  vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=pixels;sv.active=true;
- M_Init();assert(picker && front);
- key_dest=key_game;open_pause();M_Draw();assert(scr_copyeverything);M_Keydown(K_ESCAPE);assert(key_dest==key_game);
+ M_Init();assert(picker && front && aw_menu_fullscreen && !aw_menu_fullscreen());
+ key_dest=key_game;open_pause();M_Draw();assert(scr_copyeverything && !aw_menu_fullscreen());M_Keydown(K_ESCAPE);assert(key_dest==key_game);
  /* Exact row boundaries are also the click boundaries; unavailable rows do nothing. */
  open_pause();click(100,54+2*19+18);assert(key_dest==key_menu && !changes);
  click(100,54+3*19);assert(key_dest==key_menu && !changes);
@@ -162,38 +248,12 @@ int main(void){
  M_Keydown(K_ESCAPE);assert(!changes);M_Keydown(K_ENTER);M_Keydown(K_LEFTARROW);M_Keydown(K_ENTER);assert(!changes);
  M_Keydown(K_ENTER);M_Keydown(K_ENTER);
  assert(changes==1 && !strcmp(queued,"aw_new_game\n") && key_dest==key_game);
- open_pause();click(100,54+4*19+18);mx=160;my=100;M_Draw(); /* last pixel in Options */
- M_Keydown('a');assert(distance==530);keydown[K_SHIFT]=true;M_Keydown('D');assert(distance==531);keydown[K_SHIFT]=false;
- M_Keydown('s');M_Keydown(K_ENTER);assert(distance==540);
- /* Far detail: plain names, Enter and the arrows step Full, Light, Strong,
-  * Strong + small faces (aw_cull 1, 3, 4, 6); a console-only value reads Custom. */
- M_Keydown(K_DOWNARROW);M_Draw();assert(!strcmp(far_label,"Far detail: Strong") && highlight_y==54+2*19);
- M_Keydown(K_ENTER);M_Draw();assert(far_detail==6 && !strcmp(far_label,"Far detail: Strong + small faces"));
- M_Keydown(K_ENTER);M_Draw();assert(far_detail==1 && !strcmp(far_label,"Far detail: Full"));
- M_Keydown(K_RIGHTARROW);M_Draw();assert(far_detail==3 && !strcmp(far_label,"Far detail: Light"));
- M_Keydown(K_LEFTARROW);M_Keydown(K_LEFTARROW);assert(far_detail==6);
- far_detail=2;M_Draw();assert(!strcmp(far_label,"Far detail: Custom"));
- M_Keydown(K_RIGHTARROW);assert(far_detail==1);M_Keydown(K_RIGHTARROW);M_Keydown(K_RIGHTARROW);assert(far_detail==4 && far_sets==8);
- M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(gold_frame);
- M_Keydown(K_ENTER);assert(!gold_frame);
- M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW); /* Show crosshairs, Photo mode: check_photo_rows */
- M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw(); /* Interface */
- M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(AW_UIVoiceNames());
- M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_UIDialogueMethod()==3);
- M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(!AW_SceneUIOption(0,0));
- M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(1,0)==3);
- M_Keydown(K_DOWNARROW);M_Keydown(K_RIGHTARROW);assert(AW_SceneUIOption(2,0)==2);
- M_Draw();M_Keydown(K_ESCAPE);
- M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(!frozen_loading);
- M_Keydown(K_LEFTARROW);assert(frozen_loading);M_Keydown(K_RIGHTARROW);assert(!frozen_loading);
- click(100,168+18);assert(frozen_loading); /* final pixel of the loading row */
- M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();assert(AW_CellChangeMethod()==2); /* scrolled loading method */
- M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(AW_StreamOption(1,0)==256);
- M_Keydown(K_RIGHTARROW);assert(AW_StreamOption(1,0)==512);
- M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();assert(autoram==0); /* Extra RAM: Off */
- M_Keydown(K_RIGHTARROW);assert(autoram==1);M_Keydown(K_LEFTARROW);assert(autoram==0);M_Keydown(K_ENTER);assert(autoram==1);
- M_Keydown(K_DOWNARROW);M_Draw();M_Keydown(K_ENTER); /* scrolled Back */
- M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);M_Draw();M_Keydown(K_ENTER);assert(changes==1);
+ check_layout();
+ check_prefs();
+ check_controls();
+ check_video();
+ /* Main menu from the pause menu, the front end, the scene picker, quit. */
+ open_pause();M_Keydown(K_UPARROW);M_Keydown(K_ENTER);M_Draw();M_Keydown(K_ENTER);
  M_Keydown(K_ENTER);M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);
  assert(changes==2 && !strcmp(queued,"disconnect\naw_main_menu\n"));
  front();mx=160;my=63;M_Draw();M_Keydown(K_ESCAPE);assert(key_dest==key_menu);
@@ -205,10 +265,8 @@ int main(void){
  picker();M_Keydown(K_DOWNARROW);M_Keydown(K_ENTER);assert(changes==4 && !strcmp(queued,"aw_scene town\n"));
  missing=1;picker();M_Draw();M_Keydown(K_ENTER);assert(changes==4 && key_dest==key_game);missing=0;
  M_Menu_Quit_f();M_Draw();M_Keydown(K_ENTER);assert(!quit);M_Menu_Quit_f();M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);assert(quit==1);
+ check_title_options();
  open_pause();AW_MenuMouse(10000,10000);M_Draw();AW_MenuMouse(-10000,-10000);M_Draw();
- check_controls();
- check_photo_rows();
- check_setup_endpoints();
  return 0;
 }
 

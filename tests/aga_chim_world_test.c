@@ -1537,9 +1537,9 @@ static void set_version(int major,int minor){
     assert(f);b[0]=(byte)(major>>8);b[1]=(byte)major;b[2]=(byte)(minor>>8);b[3]=(byte)minor;
     fseek(f,8,SEEK_SET);assert(fwrite(b,1,4,f)==4);fclose(f);
 }
-/* 0.4 to 0.11 are read; 0.12 and 1.5 are refused whole, with a console line. */
+/* 0.4 to 0.12 are read; 0.13 and 1.5 are refused whole, with a console line. */
 static void formats(void){
-    static const int version[6][2]={{0,4},{0,5},{0,6},{0,7},{0,12},{1,5}};static int k;
+    static const int version[6][2]={{0,4},{0,5},{0,6},{0,7},{0,13},{1,5}};static int k;
     for(k=0;k<6;k++){
         set_version(version[k][0],version[k][1]);
         reset_engine();Chim_Init();
@@ -1556,7 +1556,7 @@ static void formats(void){
             expect_host_error=1;host_error_text[0]=0;
             if(!setjmp(host_error_jump)){begin_map(frame_map);assert(!"the frame map was not refused");}
             expect_host_error=0;console_capture=0;
-            sprintf(said,"world format %d.%d; this engine reads 0.4 to 0.11",version[k][0],version[k][1]);
+            sprintf(said,"world format %d.%d; this engine reads 0.4 to 0.12",version[k][0],version[k][1]);
             assert(!Chim_Active() && strstr(console,said));
             assert(strstr(host_error_text,"cannot be read") && strstr(host_error_text,"not a playable map without its CHIM world"));
         }
@@ -1609,6 +1609,102 @@ static void story(void){
     }
     chim_story_hidden=NULL;
     printf("story ok%c",10);
+}
+
+/* Hinged doors (AW-20260928-12; aw_hinged_door.c through chim_hinged_door):
+ * placement 1 (reference 1001, model 1: x -8..8, y -40..40, z 0..32, at
+ * 124 64, yaw 0, reaching into the chunk east) is a door. It turns about its
+ * origin with every copy, its box holds every pose, its collision turns with
+ * it, and a catalogue made again starts at the pose the hook gives. */
+static float door_pose;static int door_seen;
+static int door_rule(unsigned pid,unsigned ref,const float *origin,float radius,float *yaw){
+    if(ref!=1001)return 0;
+    assert(pid==1 && fabs(origin[0]-124)<1e-3 && fabs(origin[1]-64)<1e-3 && radius>40.7f && radius<43);
+    door_seen++;*yaw=door_pose;return 1;
+}
+static int door_solid(float x,float y){
+    vec3_t a,b,zero={0,0,0};trace_t t;
+    VectorSet(a,x,y,200);VectorSet(b,x,y,10);t=chim_trace(a,zero,zero,b);
+    return t.fraction<1;
+}
+static void door(void){
+    vec3_t zero={0,0,0},a;trace_t t;chim_place_t *p;int k;
+    for(k=0;k<2;k++){
+        reset_engine();Chim_Init();
+        assert(aw_chim_door_yaw==ChimChunks_DoorYaw && aw_chim_door_clip==ChimChunks_DoorClip);
+        chim_hinged_door=door_rule;door_pose=k?-90.f:0.f;door_seen=0;
+        begin_map(frame_map);frame_at(64,64,40);check_once();
+        p=placement(1);assert(p && (p->flags&CHIM_PLACE_HINGED) && door_seen>=1);
+        assert(!(placement(0)->flags&CHIM_PLACE_HINGED));
+        /* the box holds every pose: a square about the hinge */
+        assert(p->maxs[0]-p->mins[0]>81 && fabs(p->mins[0]+p->maxs[0]-248)<.01f && fabs(p->mins[1]+p->maxs[1]-128)<.01f);
+        assert(p->ent.angles[YAW]==door_pose);
+        if(!k){
+            /* closed: across x 116..132, y 24..104 */
+            assert(door_solid(124,90) && !door_solid(150,64));
+            assert(ChimChunks_DoorYaw(1+chim_frame.first_pid,-90)>=1);
+            assert(p->ent.angles[YAW]==-90 && fabs(p->s+1)<1e-6f && fabs(p->c)<1e-6f);
+        }
+        /* open (yaw -90): along x 84..164, y 56..72 */
+        assert(!door_solid(124,90) && door_solid(150,64));
+        VectorSet(a,150,64,16);
+        memset(&t,0,sizeof(t));t.fraction=1;
+        assert(ChimChunks_DoorClip(1+chim_frame.first_pid,a,zero,zero,a,&t) && (t.startsolid || t.allsolid));
+        VectorSet(a,124,90,16);memset(&t,0,sizeof(t));t.fraction=1;
+        assert(ChimChunks_DoorClip(1+chim_frame.first_pid,a,zero,zero,a,&t) && !t.startsolid && !t.allsolid);
+        assert(!ChimChunks_DoorClip(0+chim_frame.first_pid,a,zero,zero,a,&t));	/* not a door */
+        assert(!ChimChunks_DoorYaw(4+chim_frame.first_pid,10));
+        end_map();
+    }
+    chim_hinged_door=NULL;
+    printf("door ok%c",10);
+}
+
+/* Hinged doors in a CHIM room (chim_room.c through chim_hinged_door, the
+ * frames' hook): the room record chim/rooms/doorroom.crm on the test world's
+ * store (tests/test_chim_engine_native.py write_test_room) holds placement 0,
+ * the door (reference 1001, model 1: x -8..8, y -40..40, z 0..32, at 124 64,
+ * yaw 0), and placement 1, a plain box (reference 1002, model 0 at -100
+ * -100). The room's door turns about its origin through ChimChunks_DoorYaw,
+ * its collision turns with it through ChimChunks_DoorClip (both come to the
+ * room while it runs), its box holds every pose, and a room loaded again
+ * starts at the pose the hook gives. */
+static const char *room_map="{\n\"classname\" \"worldspawn\"\n\"_chim_world\" \"chim\"\n\"_chim_room\" \"doorroom\"\n}\n{\n\"classname\" \"info_player_start\"\n}\n";
+static int room_rule(unsigned pid,unsigned ref,const float *origin,float radius,float *yaw){
+    if(ref!=1001)return 0;
+    assert(pid==0 && fabs(origin[0]-124)<1e-3 && fabs(origin[1]-64)<1e-3 && radius>40.7f && radius<43);
+    door_seen++;*yaw=door_pose;return 1;
+}
+static void roomdoor(void){
+    vec3_t zero={0,0,0},a;trace_t t;int k;
+    for(k=0;k<2;k++){
+        reset_engine();Chim_Init();
+        chim_hinged_door=room_rule;door_pose=k?-90.f:0.f;door_seen=0;
+        begin_map(room_map);assert(ChimRoom_Active());frame_at(64,64,40);
+        assert(door_seen==1);
+        ChimRoom_Report();
+        if(!k){
+            /* closed: across x 116..132, y 24..104 */
+            assert(door_solid(124,90) && !door_solid(150,64));
+            assert(ChimChunks_DoorYaw(0,-45)==1);
+            /* half way: neither the closed nor the open line */
+            assert(!door_solid(124,96) && !door_solid(156,64));
+            assert(ChimChunks_DoorYaw(0,-90)==1);
+        }
+        /* open (yaw -90): along x 84..164, y 56..72; the box held it, nothing was relinked */
+        assert(!door_solid(124,90) && door_solid(150,64) && door_solid(100,64));
+        VectorSet(a,150,64,16);memset(&t,0,sizeof(t));t.fraction=1;
+        assert(ChimChunks_DoorClip(0,a,zero,zero,a,&t) && (t.startsolid || t.allsolid));
+        VectorSet(a,124,90,16);memset(&t,0,sizeof(t));t.fraction=1;
+        assert(ChimChunks_DoorClip(0,a,zero,zero,a,&t) && !t.startsolid && !t.allsolid);
+        /* placement 1 is no door: not turned, not clipped alone, and it still stands */
+        assert(!ChimChunks_DoorClip(1,a,zero,zero,a,&t) && !ChimChunks_DoorYaw(1,10));
+        assert(door_solid(-100,-100));
+        end_map();
+        assert(!ChimRoom_Active() && !ChimChunks_DoorYaw(0,0));
+    }
+    chim_hinged_door=NULL;
+    printf("roomdoor ok%c",10);
 }
 
 /* World format 0.8 (EXPERIMENTAL, tests/test_chim_engine_native.py writes it
@@ -2320,6 +2416,8 @@ int main(int argc,char **argv){
     else if(!strcmp(argv[1],"edge"))edge();
     else if(!strcmp(argv[1],"rest"))rest();
     else if(!strcmp(argv[1],"story"))story();
+    else if(!strcmp(argv[1],"door"))door();
+    else if(!strcmp(argv[1],"roomdoor"))roomdoor();
     else if(!strcmp(argv[1],"placed"))placed_world();
     else if(!strcmp(argv[1],"catalogue"))catalogue_dump();
     else if(!strcmp(argv[1],"statics"))statics();

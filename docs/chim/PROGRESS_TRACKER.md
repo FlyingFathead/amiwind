@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -9,6 +9,7 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 - [Why it exists](#why-it-exists)
 - [Data flow](#data-flow)
 - [Statuses](#statuses)
+- [The legend groups: in the game, not in the game yet, settled](#the-legend-groups-in-the-game-not-in-the-game-yet-settled)
 - [Audits](#audits)
 - [The lighting audit](#the-lighting-audit)
 - [The lava audit and the Lava layer](#the-lava-audit-and-the-lava-layer)
@@ -17,6 +18,7 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 - [The release plan: gold for the next release](#the-release-plan-gold-for-the-next-release)
 - [Legend checkboxes and presets](#legend-checkboxes-and-presets)
 - [The map view](#the-map-view)
+- [Interiors: every room on the tracker](#interiors-every-room-on-the-tracker)
 - [Included in build: what each packaged build holds](#included-in-build-what-each-packaged-build-holds)
 - [Track your own build and compare with the project](#track-your-own-build-and-compare-with-the-project)
 - [Command reference](#command-reference)
@@ -104,7 +106,7 @@ A cell has exactly one status. Strongest first:
 | Maintainer-approved, Playtested | gold, teal | Set by the maintainer for a converted cell that passes |
 | Passed | green | Converted and every measured audit passed, but something placed is still deferred or skipped |
 | Empty sea | blue | Terrain and water only, nothing placed; counts as done |
-| Open ocean | silver | No LAND record; explicit ocean-frame conversion is tracked separately from native placement and packaging. Never counted as land |
+| Open ocean | silver | No LAND record; explicit ocean-frame conversion is tracked separately from native placement and packaging. Never counted as land. The legend shows it as sea in the game, settled or open sea not in the newest build (see the groups below) |
 | Hull policy pending | purple | The only open problem is a standing-hull chain deeper than the limit, waiting for one shared rule; neither passed nor failed |
 | Converted, failing audits | red | At least one audit failed or the conversion reported an error |
 | Not converted | magenta | The conversion was tried and could not finish the cell; a failure-type state, never counted as done |
@@ -114,6 +116,24 @@ A cell has exactly one status. Strongest first:
 Precedence: cell complete, terrain complete, the two awaiting-lighting levels, maintainer-approved, playtested, passed, hull policy pending, failed, not converted, not started. Nonvisual markers (door, travel, north and editor markers) are not drawn and not required, so they never block a level; light emitters without a mesh do cast light, so they stay under Lights and the lighting audit judges them.
 
 **Done** = cell complete + terrain complete + the two awaiting-lighting levels + passed + empty sea, each on its own line. The open ocean is **not** done: it is drawn silver, has its own legend row and its own totals row, and is counted apart (`ocean`, `map_cells`) until the tracker policy and exact runtime evidence establish otherwise. An island's figures count its land and empty-sea cells and keep the land-only figures beside them (land cells, land done, land percent); the headline's percent stays passed of land cells. The generated page repeats the exact definitions in its import policy section, built from the code's own constants.
+
+## The legend groups: in the game, not in the game yet, settled
+
+The status says how far a cell's conversion got; the legend group says where the cell stands today. Every square of the grid
+is in exactly one group, worked out by the tracker against the newest ingested build (`cell_progress.py ingest` writes
+`chim.group` and `chim.state` per cell and `groups`, `states`, `in_game_build` in the headline):
+
+| Group | Legend states | Which cells |
+| --- | --- | --- |
+| In the game | the land states above (cell and terrain complete, awaiting lighting, approved, playtested, passed, nothing measured) and **sea, in the game** (sea blue with green stripes) | The newest build holds the cell. Every sea cell it holds is "sea, in the game", whatever an older run called it: seabed cells and the empty cell records in open water such as -15,-8 |
+| Not in the game yet | **Solstheim (Bloodmoon)**, not started, converted but not in the newest build, empty sea and open sea not in the newest build, failing, not converted, hull policy pending | The work left. A problem state stays a problem even when the build holds the cell. Every other Solstheim cell the build does not hold counts as Solstheim, its sea cells included |
+| Beyond the world's edge: settled | **settled** (faint grey) | No cell record in the original game data (the mesh census has none) and not in the newest build. The edge current ([WORLD_BOUNDS.md](../WORLD_BOUNDS.md)) turns the player back before them: there is nothing to build |
+
+**Accounted for** = in the game + settled. Settled squares count toward it, never toward the cells in the game. In the
+Toolkit each group header shows its count; a state with no cells waits in the **More states** fold-out and comes back to its
+group by itself once it has cells. The generated [cell tracker](CELL_TRACKER.md) and `cell_progress.py status` print the same
+three figures. Older tracker data without the fields still draws, with the flat legend; the generated page then derives the
+groups from the cells.
 
 ## Audits
 
@@ -129,7 +149,7 @@ A cell is only complete when it is lit like Morrowind. `tools/cell_lighting.py` 
 
 ## Eligible for a release
 
-"Eligible for vX" is the set of cells usable now for the next release, lighting done or not: every passed status (the completion levels, awaiting lighting included, owner states and passed) plus empty and open sea. Eligibility is a planning filter; explicit ocean routing, frame validation and runtime/package checks still apply. The generated page prints the figure; the Toolkit has a "Show: eligible" filter and a legend preset.
+"Eligible for vX" is the set of cells usable now for the next release, lighting done or not: every passed status (the completion levels, awaiting lighting included, owner states and passed) plus empty sea and sea in the game. vX is the upcoming release of the release plan, or the version in development (the repository's `VERSION`) when the plan is older than it; no version is written in the code. Eligibility is a planning filter; explicit ocean routing, frame validation and runtime/package checks still apply. The generated page prints the figure; the Toolkit has a "Show: eligible" filter and a legend preset.
 
 ## The release field and the version tracker
 
@@ -176,7 +196,7 @@ In the Toolkit, nothing about the plan shows while no plan exists. With a plan: 
 
 ## Legend checkboxes and presets
 
-Every row of the map legend has a checkbox. Unticking a row **dims** the cells of that row (the same dimming as the status chips and the Show filter), so the island stays readable around what you picked; the box beside a gradient scale is disabled because a scale has no rows to untick. **all** and **none** tick or untick every row. The **Preset** pull-down sets the ticks in one go: Everything, Eligible for the next release, Awaiting lighting, Problems only (failed, not converted, hull pending), Not started, Lighting (switches to the lighting colouring), Lava (switches to the lava colouring) and Release content (only cells assigned to a release). Ticking a row by hand switches the pull-down to Custom. Your ticks, preset and version choice are remembered in the browser (local storage; the page works without it).
+Every row of the map legend has a checkbox. Unticking a row **dims** the cells of that row (the same dimming as the status chips and the Show filter), so the island stays readable around what you picked; the box beside a gradient scale is disabled because a scale has no rows to untick. **all** and **none** tick or untick every row. The **Preset** pull-down sets the ticks in one go: Everything, In the game, Not in the game yet (work left), Eligible for the next release, Awaiting lighting, Problems only (failed, not converted, hull pending), Not started (Solstheim included), Lighting (switches to the lighting colouring), Lava (switches to the lava colouring) and Release content (only cells assigned to a release). Ticking a row by hand switches the pull-down to Custom. Your ticks, preset and version choice are remembered in the browser (local storage; the page works without it).
 
 ## The map view
 
@@ -192,32 +212,85 @@ panel (a) shows meshes converted as cells are converted (store-once against ever
 panel (b) compares the spiral order with the risk order. Every Toolkit page carries the same header; see the
 [Toolkit guide](../AMIWIND_TOOLKIT.md#chim-progress-tracker).
 
+## Interiors: every room on the tracker
+
+Parity with the original game: every interior cell of the game is a room on the tracker, keyed by its cell ID, and
+none is left out. With the door graph and the batch plan ([DOOR_GRAPH.md](DOOR_GRAPH.md)), the ingest adds
+`interior_rooms` to the tracker data (`--door-graph`, `--batch-plan`, and `--chim-rooms` with a CHIM rooms receipt or
+a build's `chim-interiors.json`). Each room gets its master, its island (the island its entrance is on; `none` for a
+room with no entrance area), its entrance cell, its state, its batch and its reasons. The states fall into the three
+groups of the legend:
+
+- **In the game:** on CHIM rooms (a build's `chim-interiors.json` installed it), or as today's room map.
+- **Not in the game yet:** converted (a CHIM room record exists), or not started.
+- **Set aside, with a reason:** test cell, teleport only, no entrance and no script (the rooms no door reaches,
+  converted in the final parity batch or in their expansion's later batch), or another hard case (water, lava, size,
+  Levitate-only).
+
+On the World map, the **Interior tracker** block sits under the map: closed by default and remembered like the other
+blocks, its title line always shows the rooms in the game, not in the game yet and set aside. Opened, it lists the
+rooms by island, then by entrance (the town or place and its exterior cell; Mournhold's rooms are reached by script),
+each group folding out to its rooms with their state (a chip in the legend colour), batch, reasons and master. The
+search box filters by name, cell ID, town, state, batch or reason, and opens the groups that match. Clicking a room
+selects and centres its entrance cell on the map. The rooms with no entrance area are their own group at the end.
+The side panel's overview keeps a short table: rooms per island in the three groups. The **Interiors** layer marks
+every exterior cell that holds an entrance, coloured by its rooms' state (the most common one; a tie goes to the
+state further from the game); an unticked legend row hides that state.
+
+The generated page [CELL_TRACKER.md](CELL_TRACKER.md#interiors) has the counts per island and state (aggregate counts
+only). Tracker data without interiors still loads: the block stays hidden and the Interiors layer keeps its older
+colouring (the converted share of the rooms behind a cell's doors).
+
 ## Included in build: what each packaged build holds
 
-The plan says what a release should hold; the **Included in build** pull-down on the map says what a packaged build
-really holds. With a build selected, its cells are drawn green (included), amber (listed but not included) or grey
+The plan says what a release should hold; the **Included in build** pull-down on the map says what a build really
+holds. With a build selected, its cells are drawn green (included in a packaged or released build, checked against the
+package's disk readback), amber (included in a build that is not packaged yet, or listed but not included) or grey
 (not in that build); the line under it counts them.
 
 - The data is the inclusion ledger, `amiwind-toolkit/chim-inclusion.json` (format `aw-chim-inclusion-1`; the page
-  loads the same content from `chim-inclusion.js`). One entry per packaged build, newest first: version, state,
-  source commit, the SHA-256 of the package and of its disk readback, and per cell `{state, frame}`.
-- An entry is written from the build's own records, never by hand: `tools/chim_inclusion.py` reads the run's
+  loads the same content from `chim-inclusion.js`). One entry per build, newest first: version, state (built,
+  packaged or released), the build run, source commit, the SHA-256 of the package and of its disk readback, and the
+  cells with their frames. The cells are stored compactly: `region_cells` lists the cells each in the region frame named
+  after it (`rcm19_p14` for -19,14) and `frame_cells` the rest by frame (the town frames), one entry per line; the page
+  still reads the earlier per-cell form.
+- Every entry is written from the build's own records, never by hand: `tools/chim_inclusion.py` reads the run's
   `chim-world/chim-source.json` (every frame: region frames by cell, town frames by their ownership core, so the
-  cells of Vivec, Seyda Neen and Balmora count with their town frame), the cell list the build was given, the
-  package and the readback. An entry for the same version is replaced.
+  cells of Vivec, Seyda Neen and Balmora count with their town frame) and the cell list the build was given.
+- **Built:** every build with a CHIM world writes its own entry when it ends, into the run's own copy,
+  `BUILD/toolkit/chim-inclusion.json` and `.js`: the repository ledger with this build on top. The build's World map
+  (the live tracker page, `toolkit_serve.py --build BUILD`) shows the build it belongs to, and
+  `toolkit_serve.py --builds DIR` adds the newest runs' entries. It takes well under a second, runs beside the size
+  ledger after the stages, keys no stage, and is reused when its inputs (the code, version, run, commit, CHIM world
+  source and cell list) are unchanged. It needs no package yet and never fails a build.
+- **Packaged:** packaging adds the package's and the readback's SHA-256 to the run's entry (both required):
 
 ```bash
-python3 tools/chim_inclusion.py --version v0.0.41-dev4 --state packaged --source-commit COMMIT \
-    --chim-source RUN/chim-world/chim-source.json --cells CELLS.json --archive PACKAGE.zip \
-    --readback READBACK.json --evidence "boot smoke PASS, readback OK" [--shipped]
+python3 tools/chim_inclusion.py package --run BUILD --archive PACKAGE.zip --readback READBACK.json \
+    --evidence "boot smoke PASS, readback OK" [--shipped]
 ```
+
+- **Released:** only the release step changes the repository ledger, and it holds packaged and released builds only
+  (a built entry stays in its run). The release run's packaged entry goes in as released, replacing any earlier entry
+  of that version; commit the ledger before the source package is cut. `tools/release.py` refuses to cut the public
+  source of a release candidate or final whose version the ledger lacks (`chim_inclusion.py check-release` runs the
+  same check on its own).
+
+```bash
+python3 tools/chim_inclusion.py release --run BUILD
+python3 tools/chim_inclusion.py check-release [--version v0.0.48]
+```
+
+The earlier one-step form still writes a packaged or released entry straight into the repository ledger
+(`--version V --state packaged --source-commit C --chim-source RUN/chim-world/chim-source.json --cells CELLS.json
+--archive PACKAGE.zip --readback READBACK.json --evidence TEXT`).
 
 The cell list a build is given comes from the tracker too: `tools/chim_cell_list.py` takes the rings from the tracker
 data, keeps every cell already on CHIM, and leaves cells out only by name with a reason (`--leave-out X,Y=REASON`);
 `--open-pockets` also leaves out the neighbours that would enclose a classic cell in CHIM cells.
 
-**After every packaged build:** re-ingest the tracker (the build's run as `--chim-run`), add the build to the ledger
-with `chim_inclusion.py`, and check that the map's pull-down lists it with the right count.
+**After every packaged build:** re-ingest the tracker (the build's run as `--chim-run`), package the run's entry with
+`chim_inclusion.py package`, and check that the map's pull-down lists it with the right count.
 
 ## Track your own build and compare with the project
 
@@ -229,7 +302,7 @@ All commands take `--out DIR`, the tracker folder, and are run with `python3 too
 
 | Command | What it does |
 | --- | --- |
-| `ingest --out DIR [inputs...]` | Fill the records from everything that exists now: legacy progress table, metrics, census (`--data-files`), CHIM runs (`--chim-run NAME=PATH`), bugs, build ledger, area names. Idempotent |
+| `ingest --out DIR [inputs...]` | Fill the records from everything that exists now: legacy progress table, metrics, census (`--data-files`), CHIM runs (`--chim-run NAME=PATH`), bugs, build ledger, area names, interiors (`--door-graph`, `--batch-plan`, `--chim-rooms`, see [Interiors](#interiors-every-room-on-the-tracker)). Idempotent |
 | `result --out DIR --file RESULT.json` | Validate and store a per-cell result file ([format](CELL_RESULT_FORMAT.md)), then ingest again |
 | `record --out DIR --mechanism ID --build NAME (--results FILE or --status S --cells "x,y ...")` | Record one audit's results from another tool |
 | `owner --out DIR --status playtested/approved --cells "x,y ..." [--note T]` | The maintainer's verdict on cells |

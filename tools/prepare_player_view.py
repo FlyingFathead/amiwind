@@ -25,6 +25,12 @@ A separate torch-held body overlays the original left-clavicle torch pose on loc
 A separate water body carries the original idle-swim and forward-swim groups without reducing their frames.
 Not yet: the character's chosen head and hair and the inventory's worn equipment.
 
+The 80 bakes (body, torch body, water body, inventory poses per race and sex) run in one worker pool for the whole
+step, longest first, and each is kept in the image unit cache (tools/pass_cache.py UnitCache 'player-view') by the
+SHA-256 of its inputs: the game data (the build's input lock), the palette, race and sex, the body fields a torch or
+water body reads, the code and the AMIWIND_* settings it reads. A build with the same inputs takes them from there
+byte for byte (BUILD-PLAYER-VIEW-UNDERUSED-48).
+
 Build switches (tools/build.py): --player-body on|off (default on; off bakes no body: third person is then
 refused in game) and --death-retry on|off (default on; off writes aw_death_retry 0 into default-game.cfg).
 """
@@ -33,6 +39,7 @@ import hashlib
 import json
 import struct
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -552,6 +559,118 @@ def bake_swim_body(task):
     return path, raw, layout, report
 
 
+# ---------------------------------------------------------------- units: one pool, kept by their inputs
+
+# BUILD-PLAYER-VIEW-UNDERUSED-48: the four bakes (body, torch body, water body, inventory poses) of the 20 race/sex
+# bodies ran as four pools one after the other, each started fresh: every worker loaded the master, the archive and
+# the skeletons again (about 9 s) for about 2 s of work per torch, water or inventory unit, at most 20 of 24 cores
+# were busy, and all 80 units were made again in every build. Now they run in one worker pool kept for the whole
+# step (water and inventory beside the bodies, torch bodies after them: they need the body's frame groups), the
+# longest first, and every unit is kept in the image unit cache by the SHA-256 of its inputs.
+UNIT_CACHE = 'player-view'
+UNIT_COSTS = 'player-view'
+UNIT_FALLBACK_SECONDS = {'body': 30.0, 'torch': 3.0, 'swim': 3.0, 'inventory': 3.0}
+
+
+def _unit_worker(kind):
+    if kind == 'inventory':
+        from player_inventory_pose import bake_body as inventory_body
+        return inventory_body
+    return {'body': bake_body, 'torch': bake_torch_body, 'swim': bake_swim_body}[kind]
+
+
+def bake_unit(unit):
+    """Pool worker: one unit (kind, task) of the player view: kind 'body', 'torch', 'swim' or 'inventory'."""
+    kind, task = unit
+    return _unit_worker(kind)(task)
+
+
+def unit_name(unit):
+    kind, task = unit
+    return '%s %s %s' % (kind, task[2], 'female' if task[3] else 'male')
+
+
+def unit_inputs(unit):
+    """What one unit's result depends on besides the game data, the code and its settings (the cache's options and
+    sources): kind, race, sex, the palette by SHA-256 and, for the torch and water bodies, the body row fields they
+    read (its model path and, for the torch body, its frame groups)."""
+    kind, task = unit
+    _, palette, race, female = task[:4]
+    inputs = {'entry': {'name': unit_name(unit)}, 'kind': kind, 'race': race, 'female': bool(female),
+              'palette_sha256': hashlib.sha256(palette).hexdigest()}
+    if kind == 'torch':
+        inputs['base'] = {'model': task[4]['model'], 'groups': task[4]['groups']}
+    elif kind == 'swim':
+        inputs['base'] = {'model': task[4]['model']}
+    return inputs
+
+
+def pack_result(result):
+    """(row, {name: bytes}) of a unit's result tuple for the unit cache: its bytes as files, the rest as JSON; None
+    when a part does not survive a JSON round trip unchanged (then the unit is not cached)."""
+    from pass_cache import json_exact
+    parts, files = [], {}
+    for part in result:
+        if isinstance(part, bytes):
+            name = str(len(files))
+            files[name] = part
+            parts.append({'file': name})
+        else:
+            parts.append({'value': part})
+    row = {'parts': parts}
+    return (row, files) if json_exact(row) else None
+
+
+def unpack_result(row, files):
+    """The result tuple pack_result stored."""
+    return tuple(files[part['file']] if 'file' in part else part['value'] for part in row['parts'])
+
+
+def _unit_cache():
+    """The player view's share of the image unit cache (tools/pass_cache.py UnitCache, WORKSPACE/cache/image-passes),
+    or None: cache off, or no input lock naming the game data by SHA-256 (the inputs are then not known exactly)."""
+    from pass_cache import UnitCache, game_data_digest
+    game = game_data_digest()
+    if game is None:
+        return None
+    import player_inventory_pose
+    return UnitCache.open(UNIT_CACHE, {'game_data': game}, __file__, player_inventory_pose.__file__)
+
+
+def run_units(units, cache, jobs):
+    """Results of UNITS [(kind, task)] in input order and how many came from CACHE: a unit recorded for the same
+    inputs is taken from it byte for byte (unless --rebuild-unit player-view:NAME names it); the rest run on the
+    worker pool, longest first by their recorded seconds, and are recorded."""
+    from pass_cache import forced
+    results = [None] * len(units)
+    todo = []
+    for index, unit in enumerate(units):
+        if cache is not None and not forced(UNIT_CACHE, unit_name(unit)):
+            found = cache.load_unit(unit_inputs(unit))
+            if found is not None:
+                try:
+                    results[index] = unpack_result(*found)
+                    continue
+                except (KeyError, TypeError, AttributeError):
+                    pass
+        todo.append(index)
+    if todo:
+        from build_costs import costed_map
+        from build_jobs import resolve_jobs
+        items = [units[index] for index in todo]
+        workers = max(1, min(resolve_jobs(jobs), len(items)))
+        # list(): run the map to its end, where costed_map records this run's unit seconds for the next build
+        made = list(costed_map(UNIT_COSTS, bake_unit, items, [unit_name(unit) for unit in items], workers,
+                               fallback=lambda name: UNIT_FALLBACK_SECONDS[name.split(' ', 1)[0]]))
+        for index, result in zip(todo, made):
+            if cache is not None:
+                packed = pack_result(result)
+                if packed is not None:
+                    cache.store_files(unit_inputs(units[index]), *packed)
+            results[index] = result
+    return results, len(units) - len(todo)
+
+
 def bodies_text(entries):
     lines = [BODIES_FORMAT]
     seen = set()
@@ -584,39 +703,49 @@ def prepare(data_files, id1, jobs=None, bodies=True):
     if not races or len(races) * 2 > 32:
         raise ValueError('Playable race count outside the body catalogue bounds')
     tasks = [(str(data), palette, race, female) for race in races for female in (False, True)]
-    from build_jobs import resolve_jobs
-    from build_parallel import ordered_map
+    # The water body reads only the body's model path (swim_path), so it runs beside the bodies.
+    swim_tasks = [task + ({'model': body_path(task[2], task[3])},) for task in tasks]
+    from build_parallel import stage_pool
+    cache = _unit_cache()
     (id1 / BODY_DIR).mkdir(parents=True, exist_ok=True)
     entries = []
-    for path, raw, layout, row in ordered_map(bake_body, tasks, max(1, min(resolve_jobs(jobs), len(tasks)))):
-        (id1 / path).write_bytes(raw)
-        (id1 / (path[:-4] + '.anm')).write_text(layout + '\n', encoding='ascii', newline='\n')
-        (id1 / path).with_suffix('.tag').write_text(row.pop('_item_tags'), encoding='ascii', newline='\n')
-        entries.append((row['race'], row['female'], path))
-        report['bodies'].append(row)
-    torch_tasks = [(str(data), palette, row['race'], row['female'], row) for row in report['bodies']]
-    for body_path_, body_raw, layout, held_path, held_raw, metadata_path, metadata, row in \
-            ordered_map(bake_torch_body, torch_tasks, max(1, min(resolve_jobs(jobs), len(torch_tasks)))):
+    count = len(tasks)
+    started = time.monotonic()
+    with stage_pool(jobs, 'player view'):
+        first, reused = run_units([('body', t) for t in tasks] + [('swim', t) for t in swim_tasks] +
+                                  [('inventory', t) for t in tasks], cache, jobs)
+        for path, raw, layout, row in first[:count]:
+            (id1 / path).write_bytes(raw)
+            (id1 / (path[:-4] + '.anm')).write_text(layout + '\n', encoding='ascii', newline='\n')
+            (id1 / path).with_suffix('.tag').write_text(row.pop('_item_tags'), encoding='ascii', newline='\n')
+            entries.append((row['race'], row['female'], path))
+            report['bodies'].append(row)
+        torch_tasks = [(str(data), palette, row['race'], row['female'], row) for row in report['bodies']]
+        torch, torch_reused = run_units([('torch', t) for t in torch_tasks], cache, jobs)
+    reused += torch_reused
+    for body_path_, body_raw, layout, held_path, held_raw, metadata_path, metadata, row in torch:
         for path, raw in ((body_path_, body_raw), (held_path, held_raw), (metadata_path, metadata)):
             (id1 / path).write_bytes(raw)
         (id1 / body_path_[:-4]).with_suffix('.anm').write_text(layout + '\n', encoding='ascii', newline='\n')
         (id1 / held_path[:-4]).with_suffix('.anm').write_text(layout + '\n', encoding='ascii', newline='\n')
         report['torch_bodies'].append(row)
-    for path, raw, layout, row in ordered_map(bake_swim_body, torch_tasks,
-            max(1, min(resolve_jobs(jobs), len(torch_tasks)))):
+    for path, raw, layout, row in first[count:2 * count]:
         (id1 / path).write_bytes(raw)
         (id1 / path[:-4]).with_suffix('.anm').write_text(layout + '\n', encoding='ascii', newline='\n')
         report['swim_bodies'].append(row)
-    from player_inventory_pose import bake_body as bake_inventory_body
     report['inventory_bodies'] = []
-    for path, raw, tags, row in ordered_map(bake_inventory_body, tasks,
-            max(1, min(resolve_jobs(jobs), len(tasks)))):
+    for path, raw, tags, row in first[2 * count:]:
         (id1 / path).write_bytes(raw)
         (id1 / path).with_suffix('.tag').write_text(tags, encoding='ascii', newline='\n')
         report['inventory_bodies'].append(row)
     catalogue = bodies_text(entries)
     (id1 / 'view/bodies.txt').write_text(catalogue, encoding='ascii', newline='\n')
     report['catalogue_sha256'] = hashlib.sha256(catalogue.encode()).hexdigest()
+    units = len(first) + len(torch)
+    report['unit_cache'] = {'units': units, 'reused': reused, 'made': units - reused,
+                            'cache': 'off' if cache is None else UNIT_CACHE}
+    print('Player view: %d units (%d from the unit cache, %d made) in %.1f s' %
+          (units, reused, units - reused, time.monotonic() - started), flush=True)
     return report
 
 

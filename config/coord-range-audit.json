@@ -111,6 +111,24 @@
    "note": "a size, count, buffer or flag value, not a position"
   },
   {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "AW_ROOM_BATCH_BASE (AW_TOWN_INTERIOR_BASE+4096)",
+   "class": "unrelated",
+   "note": "a save ID range (the batch rooms after the town interiors), not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "heck[AW_TOWN_INTERIOR_COUNT<4096?1:-1];",
+   "class": "unrelated",
+   "note": "a count check of a save ID range, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_maps.h",
+   "contains": "heck[AW_ROOM_BATCH_COUNT<4096?1:-1];",
+   "class": "unrelated",
+   "note": "a count check of a save ID range, not a position"
+  },
+  {
    "file": "engine/aga/src/aw_movie.c",
    "contains": "_PIXELS];signed char pcm[4096];} movie",
    "class": "unrelated",
@@ -403,6 +421,18 @@
    "contains": "AW_WEATHER_ARRIVAL_UNITS 4096.0",
    "class": "unrelated",
    "note": "a jump distance in map units (half a cell) that counts as an arrival for the region weather (SKY-REDMOUNTAIN-BLUE-44), not a position against the coordinate range"
+  },
+  {
+   "file": "engine/aga/src/aw_mwvm.h",
+   "contains": "AW_MWVM_CELLS 4096",
+   "class": "unrelated",
+   "note": "the compiled-script machine's value cells (locals of attached objects and global scripts), a count, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_mwvm.h",
+   "contains": "AW_MWVM_PARK_CELLS 4096",
+   "class": "unrelated",
+   "note": "the compiled-script machine's parked value cells (locals kept for objects off the map), a count, not a position"
   }
  ]
 }

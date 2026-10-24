@@ -349,6 +349,13 @@ void AW_MusicDeath(void) {
     if(open_track(death_id,"death")){title_playing=0;paused=0;fade=128;}
     else advance("death-fallback");
 }
+/* StreamMusic from a compiled script (aw_mwhost.c): that track once, as the death track plays, then the
+ * current group's shuffle at its end. TRACK: the soundtrack's own number (music/trackNN.mws). */
+int AW_MusicScriptTrack(int track) {
+    if(!available || held || track<0 || track>98)return 0;
+    if(open_track(track,"script")){title_playing=0;paused=0;fade=128;return 1;}
+    advance("script-fallback");return 0;
+}
 static void music_next(void) {if(available && !title_playing){manual_changes++;fade=128;advance("next");}}
 static void music_previous(void) {
     if(!available || title_playing)return;

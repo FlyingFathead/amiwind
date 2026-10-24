@@ -75,6 +75,10 @@ typedef struct entity_s
      * mins x y z, maxs x y z; chim_cuts.c), shared by its pieces; NULL: cut on
      * the entity's own sphere (aw_fog.c AW_FarGroup). */
     const float *aw_cut_box;
+    /* CHIM placements, world format 0.12: the light level its faces are drawn at
+     * instead of the ambient (1-255, r_refdef.ambientlight units); 0 for every
+     * other entity, which is lit as before (docs/chim/INTERIOR_STORE.md). */
+    int aw_light;
 } entity_t;
 
 float R_SpriteEntityScale(const entity_t *ent);

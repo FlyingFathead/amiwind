@@ -119,7 +119,9 @@ def _measure(task):
                 cv, cf = np.array(a), np.array(b)
         out['rootcollisionnode'] = bool(rec.get('collision'))
         t = time.perf_counter()
-        groups = stair_mesh.flights(v, vis_f) if len(vis_f) else []
+        # a RootCollisionNode: drawn faces it holds nothing under are no treads (stair_mesh.flights collision)
+        authored = bool(rec.get('collision'))
+        groups = stair_mesh.flights(v, vis_f, collision=(cv, cf) if authored else None) if len(vis_f) else []
         out['flight_detect_s'] = round(time.perf_counter() - t, 4)
         out['flights'] = len(groups)
         out['flights_risers'] = len(stair_mesh.flights(v, vis_f, detector='risers')) if len(vis_f) else 0
@@ -134,7 +136,7 @@ def _measure(task):
         for method, prof in (('m0', profile), ('m1', dict(profile, stair_collision='mesh')),
                              ('m1f', dict(profile, stair_collision='mesh', stair_ramps='flight'))):
             t = time.perf_counter()
-            pieces, exact, note = collision_pieces(cv, cf, prof, visible=(v, vis_f))
+            pieces, exact, note = collision_pieces(cv, cf, prof, visible=(v, vis_f), authored=authored)
             build = time.perf_counter() - t
             t = time.perf_counter()
             found = [stair_mesh.check_flight(pieces, tris, ids) for ids in groups]

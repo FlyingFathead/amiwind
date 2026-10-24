@@ -9,7 +9,7 @@
 | Where | Converters' collision source (prepare_scenery, prepare_area, prepare_census) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.31 (last seen) |
+| Persists in | fixed in v0.0.48-dev2 |
 | Severity | medium: Some converters collide with visual meshes, inventing steep faces. |
 | Family | Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collision`) |
 | Playtest version | v0.0.31 |
@@ -19,12 +19,30 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
-## Status: 8 October 2026
+<!-- contents start -->
+## Contents
 
-Open. Found by the collision census ([COLLISION_MESHES.md](../COLLISION_MESHES.md)). Present in
-every release that ships the Seyda Neen exterior or converted rooms.
+- [Status: 22 October 2026](#status-22-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Status: 22 October 2026
+
+Fixed in source for v0.0.48-dev2 (branch v0.0.48-authored-collision): one collision-source rule
+for every mesh converter, the default (decided for the project, 22 October 2026). Not built and
+not checked in game yet. Found by the collision census ([COLLISION_MESHES.md](../COLLISION_MESHES.md));
+present in every release up to v0.0.47 that ships the Seyda Neen exterior or converted rooms.
 
 ## Symptom
 
@@ -78,19 +96,35 @@ visual). The measurement script and the per-model table are described in
 
 ## Repair
 
-Not yet. Planned: one shared collision-source rule for every converter (root
-`RootCollisionNode`, else visual), applied in the export (recommendation 1 in
-COLLISION_MESHES.md). The Seyda Neen exterior and room maps change, so the rebuild needs the
-walkability, actor-ground and clip-node gates.
+v0.0.48-dev2: `tools/collision_source.py`, rules from OpenMW 0.51 `bulletnifloader.cpp`. The
+root `RootCollisionNode` when present, else the drawn triangles; NC*/NCC nonsolid; `AvoidNode`
+subtrees never collide. `prepare_scenery.export_refs` applies it to every model of every
+converter, so no profile opts in and the `meshes/i/`-only limit of the room converters no
+longer limits the source. A profile can still require the authored collision (`root_node`).
+`--collision-source profile` (`AMIWIND_COLLISION_SOURCE`) keeps the rule before for A/B. The CHIM
+source stage's receipt names the rule, so every CHIM source stage runs again once.
 
 ## Verification
 
-Pending.
+Read only, on the v0.0.47 release build's room and Seyda Neen scenery exports with the
+maintainer's own data (estimated clip nodes, `collision_pieces` plus `standing_planes`, summed over
+placements; relative numbers):
+
+| Area | Placements | Changed | Clip nodes before | after |
+| --- | ---: | ---: | ---: | ---: |
+| Balmora rooms (43) | 3,408 | 1,805 | 507,527 | 285,836 (-44 %) |
+| Seyda Neen rooms (13 and Addamasartus) | 770 | 378 | 149,774 | 114,304 (-24 %) |
+| Vivec rooms (CHIM rooms) | 13,271 | 6,220 | 4,302,819 | 3,569,324 (-17 %) |
+| Seyda Neen scenery (`prepare_scenery`) | 2,789 | 1,568 | 344,060 | 93,495 (-73 %) |
+
+On the changed placements alone: Balmora rooms 234,412 to 12,721, Seyda Neen scenery 329,641 to
+79,076. Unit tests on synthetic NIFs: `tests/test_collision_source.py`. In-game check pending.
 
 ## Prevention
 
-Planned: the converter report records the collision source per model, and a test fails when a
-model with a root `RootCollisionNode` is converted from its visual mesh.
+Every export's `scenery-report.json` lists the collision source of each model
+(`collision_sources`). `tests/test_collision_source.py` fails when a model with a root
+`RootCollisionNode` is read without it, or when an NC/NCC model is solid.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -105,9 +139,12 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [BUILD-STAIR-FLAG-INERT-32](BUILD-STAIR-FLAG-INERT-32.md): The stair rule build option does nothing in v0.0.32
 - [BUILD-STAIR-WALK-BRUTE-FORCE-46](BUILD-STAIR-WALK-BRUTE-FORCE-46.md): The builder walks every step of the island to find out whether its own collision can be walked, an answer the game data already holds
 - [CHIM-HULL-STAIR-EDGE-33](CHIM-HULL-STAIR-EDGE-33.md): With the qbsp-compiled terrain hull on Balmora's regular ground, one flight of stairs fails at a chunk edge
+- [CHIM-HULL-SURFACE-RESURVEY-48](CHIM-HULL-SURFACE-RESURVEY-48.md): The v0.0.48-dev2 build stopped at the collision surface gate in Balmora: the gate measured treads stair method 1 removed, and the hull-surface table was measured under the old collision defaults
+- [CHIM-ROOM-CLIP-DRAWN-BOX-48](CHIM-ROOM-CLIP-DRAWN-BOX-48.md): A CHIM room's runtime collision skips a placement by its drawn box, and a store model's hull can reach past that box
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
 - [CHIM-STAIR-COLLISION-MESH-47](CHIM-STAIR-COLLISION-MESH-47.md): Stair collision method 1: a stairway collision mesh per flight, proven by a geometric check instead of a walk
 - [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
+- [CHIM-STAIR-METHOD1-UNFIXED-48](CHIM-STAIR-METHOD1-UNFIXED-48.md): Stair collision method 1 cannot yet make 11 meshes' flights pass the geometric stair check (ships, shipwreck, silt strider, tent, Daedric ruins and four buildings)
 - [CHIM-VIVEC-DOCK-WALKWAY-43](CHIM-VIVEC-DOCK-WALKWAY-43.md): The player cannot climb the walkway at the Vivec Hlaalu canton dock and gets stuck
 - [CHIM-VOS-TEMPLE-WALKWAY-41](CHIM-VOS-TEMPLE-WALKWAY-41.md): Vos walkway stair starts inside the Velothi temple's collision and fails the stair gate
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
@@ -118,6 +155,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-STAIR-SLOPE-32](COLLISION-STAIR-SLOPE-32.md): Convex collision proxies make stairs unclimbable
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
+- [ROOM-PYLON-ROOF-48](ROOM-PYLON-ROOF-48.md): Grand Inquisitor and Tamira Vian (Hall of Processing) stand inside collision: a convex piece of ex_stronghold_pylon01 slopes 14 units over the floor they stand on
+- [ROOM-X-MESH-ROOF-SURVEY-48](ROOM-X-MESH-ROOF-SURVEY-48.md): 57 more exterior meshes placed in rooms have a convex collision piece standing more than a step over their own floor
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
 - [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
 - [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
@@ -129,6 +168,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [STAIRS-SEYDA-LIGHTHOUSE-32](STAIRS-SEYDA-LIGHTHOUSE-32.md): Seyda Neen lighthouse stairs are blocked (outside and inside)
 - [STAIRS-SEYDA-WAREHOUSE-32](STAIRS-SEYDA-WAREHOUSE-32.md): A spiral stair in the Seyda Neen warehouse tower is blocked
 - [STAIRS-VIVEC-ROOMS-JOINT-36](STAIRS-VIVEC-ROOMS-JOINT-36.md): Six flight steps in three Vivec rooms are blocked where one stair piece meets the next
+- [STEP-MOVEMENT-OPENMW-RULES-48](STEP-MOVEMENT-OPENMW-RULES-48.md): The player steps by Quake's rules, not Morrowind's, so stairs are proven by walks instead of by rule
 - [TERRAIN-TRAP-29](TERRAIN-TRAP-29.md): v0.0.29-dev1: Player reportedly stuck on rocks beside structures
 - [VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md): Five Vivec Arena residents fail the actor placement gate
 - [VIVEC-ARENA-TP-ARRIVAL-32](VIVEC-ARENA-TP-ARRIVAL-32.md): dbg tp vivec_arena leaves the player at the frame origin under the water

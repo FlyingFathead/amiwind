@@ -60,7 +60,6 @@ LEGACY = {
     'tools/prepare_census.py': 2,
     'tools/prepare_character.py': 1,
     'tools/prepare_dialogue_lookup.py': 1,
-    'tools/prepare_door_audio.py': 2,
     'tools/prepare_doors.py': 5,
     'tools/prepare_gallery.py': 6,
     'tools/prepare_hand_catalog.py': 2,

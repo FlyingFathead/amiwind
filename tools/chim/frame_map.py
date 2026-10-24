@@ -274,6 +274,7 @@ def frame_record(world_dir, cell=None):
     """(cell, low corner, high corner, chunks, centre) of a frame of the CHIM world: the one with
     `cell`, or the only one."""
     from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
+    from chim import placement_light  # noqa: F401 (reads world format 0.12)
     root = Path(world_dir) / 'chim'
     _, files, _, _ = F.read_index((root / 'world.cwi').read_bytes())
     frames = [f for f in files if f['kind'] == b'FRAM' and (cell is None or tuple(f['cell']) == tuple(cell))]
@@ -308,6 +309,7 @@ def load(world_dir):
     writes (world=); each lookup used to read and check the whole world again, about 5 s per CHIM region
     frame on the 270-frame coast world (BUILD-IMAGE-CHIM-MAPS-SERIAL-36). Read only by its users."""
     from chim.validate import Failures, load_world
+    from chim import placement_light  # noqa: F401 (reads world format 0.12, --chim-placement-light sources)
     fails = Failures()
     settings, files, sizes, textures, models, frames = load_world(world_dir, fails)
     if fails:
@@ -324,12 +326,13 @@ def frames_at(frames, cell):
     world order. The positions by cell of the list last asked about are made once and kept (as numbers only: the
     world itself is not held here, and a position is checked against its frame before it is used): every region
     frame's task preparation looked its cell up by scanning all 1,351 frames three times
-    (BUILD-IMAGE-REGION-MAPS-SERIAL-43)."""
+    (BUILD-IMAGE-REGION-MAPS-SERIAL-43). FRAMES may also be frame_alone's {world index: frame row} (one frame read
+    alone): the positions are then its world indices (CHIM-FRAME-ALONE-FLAMES-48)."""
     cell = tuple(cell)
     for attempt in (0, 1):
         if attempt or _FRAME_INDEX.get('id') != id(frames) or _FRAME_INDEX.get('count') != len(frames):
             by_cell = {}
-            for position, entry in enumerate(frames):
+            for position, entry in (frames.items() if isinstance(frames, dict) else enumerate(frames)):
                 by_cell.setdefault(tuple(entry[1]['cell']), []).append(position)
             _FRAME_INDEX.clear()
             _FRAME_INDEX.update(id=id(frames), count=len(frames), by_cell=by_cell)
@@ -385,11 +388,25 @@ def model_radius(raw):
 def frame_grid(world_dir, cell):
     """(chunks, low (x, y), grain, nx, ny) of the frame at cell."""
     from chim import reach  # noqa: F401 (reads world formats 0.8 and 0.9)
+    from chim import placement_light  # noqa: F401 (reads world format 0.12)
     root = Path(world_dir) / 'chim'
     _, files, _, _ = F.read_index((root / 'world.cwi').read_bytes())
     path = next(f['path'] for f in files if f['kind'] == b'FRAM' and tuple(f['cell']) == tuple(cell))
     frame, chunks, _ = F.read_frame((root / path).read_bytes())
     return chunks, tuple(frame['low']), frame['grain'], frame['nx'], frame['ny']
+
+
+def add_flames(rows, world, world_dir, cell):
+    """The static flames of the frame at CELL into a frame map's rows (chim.flames: an aw_flame per fire emitter
+    of every placement the frame owns, as the room and town converters write them; CHIM-EXTERIOR-FLAMES-MISSING-48).
+    aw_flame rows the map's sources already had are replaced by the frame's own (one source for every flame of the
+    frame, never both). world: the CHIM world already loaded, or None (read here). Returns the report."""
+    from chim.flames import FLAME_CLASS, world_frame_rows
+    flames, report = world_frame_rows(world, world_dir, cell)
+    replaced = sum(1 for e in rows if e.get('classname') == FLAME_CLASS)
+    rows[:] = [e for e in rows if e.get('classname') != FLAME_CLASS] + flames
+    report['replaced_map_rows'] = replaced
+    return report
 
 
 def stream_statics(id1, rows, chunks, frame_low, grain, nx, ny):
@@ -499,10 +516,14 @@ def hunk_rest(id1, rows):
     streamed, each with SPRITE_HUNK_OVERHEAD (Mod_LoadSpriteModel allocates on the Hunk; alias models
     go to the Cache, model.c Mod_LoadAliasModel: actors measured 0), and HUNK_REST_MARGIN."""
     from engine_limits import MEASURED_HUNK
+    from chim.flames import FLAME_CLASS, entity_bytes
     models = {e['model'] for e in rows if e.get('model', '').endswith('.spr') and CHUNK_KEY not in e
               and (Path(id1) / e['model']).is_file()}
+    # The static flames' entity text (CHIM-EXTERIOR-FLAMES-MISSING-48): the map's entity lump is loaded into the
+    # Hunk (Mod_LoadEntities); 0 for a map without flames, so its value is as before
+    flames = entity_bytes([e for e in rows if e.get('classname') == FLAME_CLASS])
     return (MEASURED_HUNK['client_per_map_bytes'] + HUNK_REST_MARGIN + startup_sound_scratch(id1)['bytes']
-            + sum((Path(id1) / m).stat().st_size + SPRITE_HUNK_OVERHEAD for m in models))
+            + sum((Path(id1) / m).stat().st_size + SPRITE_HUNK_OVERHEAD for m in models) + flames)
 
 
 # ---------------------------------------------------------------- parity on the frame's own collision
@@ -522,11 +543,39 @@ REFIT_DZ = 8.0
 
 
 def frame_world(world_dir, cell, world=None):
-    """(world dict, frame index) of the frame at `cell` (chim.validate.load_world; world: already loaded)."""
-    world = world or load(world_dir)
+    """(world dict, frame index) of the frame at `cell` (world: already loaded, chim.validate.load_world). Without
+    WORLD only that frame is read (frame_alone)."""
+    if world is None:
+        return frame_alone(world_dir, cell)
     frames, models = world['frames'], world['models']
     index = next(i for i, (_, frame, _) in enumerate(frames) if tuple(frame['cell']) == tuple(cell))
     return {'frames': frames, 'models': models}, index
+
+
+def frame_alone(world_dir, cell):
+    """({'frames': {index: frame row}, 'models': {model id: entry}}, index) of the frame at CELL, read from its own
+    files (chim.validate.load_frame: load_world's frame row byte for byte and the models its chunks place), as the
+    stair gate's workers read a frame. The chim-town stages need one frame's collision; reading and checking the
+    whole world for it (load) cost each of them about 110 s on 2.5 of 8-12 cores in the v0.0.48-dev2 build, most of it
+    one core decoding every frame's terrain records (BUILD-POOL-TINY-UNITS-48). The world was validated by the chim
+    stage; the frame file and its sector files are checked against the world index (size and CRC) here."""
+    from chim import placed  # noqa: F401 (format 0.8 headers, as load_world reads them)
+    from chim import reach  # noqa: F401 (format 0.9 to 0.11 headers)
+    from chim import placement_light  # noqa: F401 (reads world format 0.12, --chim-placement-light sources)
+    from chim.validate import load_frame
+    root = Path(world_dir) / 'chim'
+    _, files, _, _ = F.read_index((root / 'world.cwi').read_bytes())
+    fram = [f for f in files if f['kind'] == b'FRAM']
+    index = next(i for i, f in enumerate(fram) if tuple(f['cell']) == tuple(cell))
+    for f in files:
+        if f['kind'] in (b'FRAM', b'SECT') and tuple(f['cell']) == tuple(cell):
+            data = (root / f['path']).read_bytes()
+            if len(data) != f['bytes'] or F.crc32(data) != f['crc']:
+                raise ValueError('CHIM world does not load: index size/CRC mismatch: ' + f['path'])
+    row, models = load_frame(world_dir, index)
+    if tuple(row[1]['cell']) != tuple(cell):
+        raise ValueError('CHIM world does not load: frame %d is %s, not %s' % (index, row[1]['cell'], cell))
+    return {'frames': {index: row}, 'models': models}, index
 
 
 ACCEPTED_ACTORS_VARIABLE = 'AMIWIND_ACCEPTED_FRAME_ACTORS'
@@ -770,6 +819,7 @@ def build(id1, town, world_dir, entity_rows=None, world=None, activated_rows=Non
     report['refused'] += refused
     if report['refused']:
         raise ValueError('CHIM frame map for %s: %s' % (town, '; '.join(report['refused'][:6])))
+    report['flames'] = add_flames(rows, world, world_dir, town_cell)
     cell, lo, hi = frame_bounds(world_dir, town_cell)
     rows[0][FRAME_KEY] = '%d %d' % cell
     streamed, streamed_bytes = 0, 0
@@ -1050,6 +1100,10 @@ def region_task(id1, frame, world_dir, world=None, directory=None, rows=None, ha
             if any(r.get('classname') != 'aw_flora' or r.get('model') not in assets for r in sprite_rows):
                 raise ValueError('Unbound recipe sprite entity')
             task['sprite_rows'], task['sprite_assets'] = sprite_rows, assets
+    # The frame's static flames (CHIM-EXTERIOR-FLAMES-MISSING-48): rows made here from the world held in this
+    # process, so the worker and the pass-cache key see them
+    from chim.flames import world_frame_rows
+    task['flame_rows'], task['flames'] = world_frame_rows(world, world_dir, cell)
     if task['rows'] == 'game-data':
         if world is None or hand_fields is None:
             raise ValueError('CHIM region frame %s: rows from the game data need the CHIM world and the hand fields'
@@ -1174,7 +1228,9 @@ def region_inputs(task, legacy):
                              'stream_statics': task['stream'], 'startup_sound': startup_sound_scratch(id1),
                              **({'aliases': task['aliases']} if task.get('aliases') else {}),
                              **({'sprite_rows': task['sprite_rows'], 'sprite_assets': task['sprite_assets']}
-                                if task.get('sprite_rows') else {})})
+                                if task.get('sprite_rows') else {}),
+                             # a frame without flames keeps its key
+                             **({'flame_rows': task['flame_rows']} if task.get('flame_rows') else {})})
     models = {}
     for e in entities(legacy):
         model = e.get('model', '')
@@ -1185,7 +1241,8 @@ def region_inputs(task, legacy):
                          'placed': _sha256(json.dumps(task['placed']).encode()), 'bounds': task['bounds'],
                          'grid': _sha256(json.dumps(task['grid']).encode()),
                          'models': models, 'activated': _sha256(Path(ACTIVATED_HEADER).read_bytes()),
-                         'stream_statics': task['stream'], 'startup_sound': startup_sound_scratch(id1)})
+                         'stream_statics': task['stream'], 'startup_sound': startup_sound_scratch(id1),
+                         **({'flame_rows': task['flame_rows']} if task.get('flame_rows') else {})})
 
 
 def region_map(task):
@@ -1220,7 +1277,59 @@ def region_unit(task):
     (region_door_rows: it reads the frame's scenery index, read only), so the parent only writes."""
     data, record, hit = region_map(task)
     doors = region_door_rows(task['world_dir'], task['frame'], task.get('rooms'), task['placed'])
+    if task.get('actors'):
+        data, record = region_actor_map(task, data, record)
+    elif task.get('actor_record'):
+        record = dict(record, actors=task['actor_record'])
     return data, record, hit, doors
+
+
+def region_actor_map(task, data, record):
+    """(frame map bytes, record) of a region frame map with its actors (EXPERIMENTAL, --chim-region-actors on:
+    chim.region_actors): the frame map region_map made (the same bytes and pass-cache key as without actors) with
+    the frame's NPC and creature rows added, fitted on the frame's own collision; the actors' own unit is keyed and
+    cached on its own (chim.region_actors.unit)."""
+    from chim import region_actors
+    from entity_tracker import bsp_refs
+    a = task['actors']
+    rows, actors, reused = region_actors.unit(a)
+    data, actors = region_actors.apply(data, rows, actors, a['library_id1'], task['name'], a.get('hunk_header'),
+                                       a.get('heap_mb'))
+    actors['reused'] = reused
+    rows_after = entities(data)
+    return data, dict(record, actors=actors, bytes=len(data), sha256=_sha256(data), tracker_refs=len(bsp_refs(data)),
+                      entities=len(rows_after))
+
+
+def region_actor_tasks(tasks, world, actors):
+    """Attach each region frame's actor work (chim.region_actors) to its map task: 'actors' (a pool unit: the frame's
+    subworld, its references to place with their base texts, what it defers and leaves out) for a frame with actors
+    to place, 'actor_record' for a frame whose references are all deferred or left out (its map is unchanged), nothing
+    for a frame without exterior actor references (its task, key and map stay as they were). ACTORS: {'refs': {cell:
+    [census rows]}, 'texts', 'library_id1', 'town_refs', 'held', 'cache', 'hunk_header', 'heap_mb'}."""
+    from chim import region_actors
+    out = []
+    for task in tasks:
+        frame = task['frame']
+        place, deferred, left = region_actors.plan_frame(frame, actors['refs'], actors['texts'],
+                                                         actors.get('town_refs', ()), actors.get('held'))
+        if place:
+            if task.get('rows') != 'game-data' or world is None:
+                raise ValueError('CHIM region frame %s: region actors need game-data frame rows and the CHIM world'
+                                 % frame['id'])
+            sub = frame_subworld(world, tuple(frame['cell']))
+            unit = {'frame': frame, 'subworld': sub, 'place': place, 'deferred': deferred, 'left_out': left,
+                    'library_id1': str(actors['library_id1']), 'hunk_header': actors.get('hunk_header'),
+                    'heap_mb': actors.get('heap_mb')}
+            if actors.get('cache') is not None:
+                unit['actor_cache'] = actors['cache']
+            task = dict(task, actors=unit)
+        elif deferred or left:
+            task = dict(task, actor_record={'format': region_actors.FORMAT, 'frame': frame['id'], 'placed': 0,
+                                            'actors': [], 'deferred': deferred, 'left_out': left, 'by_status': {},
+                                            'by_type': {}, 'over_budget': []})
+        out.append(task)
+    return out
 
 
 def _region_map(task, legacy):
@@ -1269,6 +1378,9 @@ def _region_map(task, legacy):
     if report['refused']:
         raise ValueError('CHIM region frame map %s (%s): %s' % (name, frame['id'], '; '.join(report['refused'][:6])))
     rows = [world_row, start or {'classname': 'info_player_start', 'origin': '0 0 0'}] + rows
+    rows += [dict(r) for r in task.get('flame_rows', [])]           # the frame's static flames (region_task)
+    if task.get('flame_rows'):
+        report['flames'] = task['flames']
     rows[0][FRAME_KEY] = '%d %d' % cell
     lo, hi = (tuple(v) for v in task['bounds'])
     streamed, streamed_bytes = 0, 0
@@ -1310,6 +1422,7 @@ def _region_map_game_data(task):
     rows = [dict(task['worldspawn']),
             {'angle': '90', 'classname': 'info_player_start', 'origin': '%g %g %g' % (0, 0, task['start_z'])}]
     rows.extend(dict(r) for r in task.get('sprite_rows', []))
+    rows.extend(dict(r) for r in task.get('flame_rows', []))       # the frame's static flames (region_task)
     problems, _ = static_check(rows)
     if problems:
         raise ValueError('; '.join(problems))
@@ -1329,6 +1442,8 @@ def _region_map_game_data(task):
               'streamed_statics': {'count': streamed, 'model_bytes': streamed_bytes, 'hunk_rest': int(rows[0][HUNK_KEY])}}
     if task.get('aliases'):
         report['aliases'] = list(task['aliases'])     # a divided cell's other directory rows (never a destination)
+    if task.get('flame_rows'):
+        report['flames'] = task['flames']
     return data, dict(report, map='maps/' + frame_map_path(id1, name).name, frame=list(cell), id=frame['id'],
                       bounds=[list(lo), list(hi)], bytes=len(data), sha256=_sha256(data),
                       tracker_refs=len(bsp_refs(data)), entities=len(rows), replaced=[], legacy_origin_z=task['origin'][2])
@@ -1436,11 +1551,12 @@ def region_source_sections(world_dir):
     if key in _SOURCE_SECTIONS:
         return _SOURCE_SECTIONS[key]
     sections = {}
-    source = json.loads(source_path.read_text(encoding='utf-8'))
-    for section in source['frames']:
+    # the frames' kept keys only, parsed on the worker pool (parallel_json.load_list, BUILD-IMAGE-UNDERUSED-32: 8.5 to
+    # 12 s on one core in the image step's first payload preflight); the same sections
+    import parallel_json
+    for section in parallel_json.load_list(source_path, 'frames', SPRITE_SECTION_KEYS):
         sections.setdefault(tuple(section['cell']),
                             {k: section[k] for k in SPRITE_SECTION_KEYS if k in section})
-    del source
     _SOURCE_SECTIONS.clear()            # one manifest at a time
     _SOURCE_SECTIONS[key] = sections
     return sections
@@ -1510,15 +1626,16 @@ def install_region_doors(id1, name, rows):
 
 
 def build_regions(id1, frames, world_dir, world=None, jobs=1, cache=None, progress=None, rows=None,
-                  hand_fields=None, keep_catalogues=None, rooms=None):
+                  hand_fields=None, keep_catalogues=None, rooms=None, actors=None):
     """build_region for every CHIM region frame: the frame maps are made on the shared worker pool
     (build_parallel.ordered_map; independent read-only workers: the map and its door bank rows, region_unit) and
     written here in table order, so the image is byte-identical with any worker count
     (BUILD-IMAGE-CHIM-MAPS-SERIAL-36, BUILD-IMAGE-REGION-MAPS-SERIAL-43). cache: a PassCache (region_cache):
     an unchanged frame map (region_inputs, by SHA-256) is taken from it. progress(record, reused): called after
     each map is written. keep_catalogues: the harvest step's frame map catalogues (install_region). rooms: the
-    converted rooms by original cell (region_door_rows); each frame with load doors gets its door bank. Returns
-    (records, number taken from the cache)."""
+    converted rooms by original cell (region_door_rows); each frame with load doors gets its door bank. actors
+    (EXPERIMENTAL, --chim-region-actors on): the region frames' NPCs and creatures (region_actor_tasks; each frame's
+    record gets 'actors'); None: no actor rows, the maps as before. Returns (records, number taken from the cache)."""
     import time
     from build_parallel import ordered_map
     id1 = Path(id1)
@@ -1537,6 +1654,8 @@ def build_regions(id1, frames, world_dir, world=None, jobs=1, cache=None, progre
     extra = dict({'world_dir': str(world_dir)}, **({'cache': cache} if cache is not None else {}),
                  **({'rooms': rooms} if rooms else {}))
     tasks = [dict(t, **extra) for t in tasks]
+    if actors is not None:
+        tasks = region_actor_tasks(tasks, world, actors)
     records, reused, heights = [], 0, {}
     # largest first by the seconds each frame map took in earlier builds (BUILD-CHIM-REGION-FRAMES-TAIL-43)
     results = ordered_map(region_unit, tasks, jobs, history='image-region-frame-maps', key=lambda t: t['name'])
@@ -1728,11 +1847,18 @@ def add_clip_models(lumps, boxes):
     clip brushes as func_wall entities: the server collides with them, nothing is drawn.
     Returns the new model numbers."""
     import numpy as np
+    pieces = [(np.array([[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])], float),
+               lo, hi) for lo, hi in boxes]
+    return add_clip_pieces(lumps, pieces)
+
+
+def add_clip_pieces(lumps, pieces):
+    """add_clip_models for convex pieces (points, lo, hi): the piece's convex hull of points, its box lo..hi (a CHIM
+    room's lava beds, chim.interior.room_map). Returns (lumps, the new model numbers)."""
     from chim.models import model_image_lumps
     lumps = [bytearray(x) for x in lumps]
     numbers = []
-    for lo, hi in boxes:
-        corners = np.array([[x, y, z] for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])], float)
+    for corners, lo, hi in pieces:
         w = model_image_lumps([], [(corners, None, [], 0.)], lo, hi, lambda m: 0)[0]
         pbase, nbase, lbase, cbase = len(lumps[1]) // 20, len(lumps[5]) // 24, len(lumps[10]) // 28, len(lumps[9]) // 8
         lumps[1] += w[1]
@@ -1937,6 +2063,7 @@ def build_docks(id1, world_dir, town='seyda', name=DOCKS, world=None, entity_row
     report['refused'] += refused
     if report['refused']:
         raise ValueError('CHIM frame map for %s: %s' % (name, '; '.join(report['refused'][:6])))
+    report['flames'] = add_flames(rows, world, world_dir, cell)
     cell, lo, hi = frame_bounds(world_dir, cell)
     rows[0][FRAME_KEY] = '%d %d' % cell
     streamed, streamed_bytes = 0, 0

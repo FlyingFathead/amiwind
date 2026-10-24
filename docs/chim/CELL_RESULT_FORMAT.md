@@ -1,6 +1,6 @@
 # CHIM cell result format (aw-cell-result-1)
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 A cell result file is how a conversion run (CHIMport, or any tool that converts cells) tells the [CHIM Progress Tracker](PROGRESS_TRACKER.md) what happened to each exterior cell: whether it converted, what each audit found, what went wrong and the figures that were measured. The tracker stores the file and folds it into `cell-progress.json`; the conversion run never edits that file itself.
 
@@ -57,7 +57,7 @@ Every field is optional; a field that is absent is left as it was.
 | `converted` | boolean | `true`: counts as converted. `false`: tried and not converted |
 | `status` | string | The run's own verdict: `passed`, `failed`, `not_converted`, `hull_pending` (alias `policy_pending`), `empty` or `ocean` |
 | `empty` | boolean | The cell holds only terrain and water; nothing was placed. Shown as empty sea, never counted as passed |
-| `ocean` | boolean | Open sea: the cell has no LAND record and is a reference to the shared ocean chunk. Shown as open ocean (silver), not counted as done while the engine does not place the chunk, never as land |
+| `ocean` | boolean | Open sea: the cell has no LAND record and is a reference to the shared ocean chunk. Shown as open ocean (silver), not counted as done (these squares lie beyond the game's own cells, outside the playable world), never as land |
 | `set` | string | Open sea only: the master set whose map the cell belongs to (`vvardenfell`); the tracker gives the cell the island of the nearest land cell of that set |
 | `policy_pending` | boolean | The only open problem is hull-chain depth, waiting for one shared rule. Neither passed nor failed |
 | `errors` | array | Replaces the cell's error list; `[]` clears it. Each entry is a string or `{"stage", "mechanism", "message"}` |

@@ -76,6 +76,9 @@ class PooledUnits(Temp):
             self.assertEqual(os.stat(one).st_ino, os.stat(two).st_ino)  # one inode: stored once, linked
             self.assertFalse(os.stat(two).st_mode & 0o222)          # shared files are read-only
 
+    # TEST-CHIMPORT-POOL-COPY-MODE-48: as root the pool's read-only files do not hold, and the units are built
+    # again; the gate runs as a plain user (--user 1000:1000), like the link test above
+    @unittest.skipUnless(LINKS, 'the read-only pool needs a non-root POSIX user')
     def test_copy_mode_reuses_by_verified_copy(self):
         calls = []
         self.build(self.root / 'run1' / 'units', link=False, calls=calls)

@@ -12,6 +12,9 @@ running unit by name with its seconds so far. The scheduler reads it to:
 
 Observability only: it never changes what a unit computes, the order units are handed out or the order results come
 back (a key-neutral module, tools/build_cache.py INSTRUMENTATION_MODULES). Outside the scheduler nothing is written.
+One upkeep hook: a map's first unit starts the stage pool's idle-worker watcher (build_parallel._watch_stage_pool,
+BUILD-POOL-MEMORY-PEAK-48), which ends idle worker processes above the stage's allowance; which process runs a unit
+never changes its result.
 """
 import json
 import os
@@ -81,6 +84,27 @@ class MapWatch:
         with _lock:
             self.submitted += 1
             self.running[index] = (name, time.monotonic())
+            first = self.submitted == 1
+        if first:
+            _watch_idle_workers()
+        self.flush()
+
+    def submit_many(self, index, item, count):
+        """A chunk of COUNT units handed out as one task (build_parallel completed_map): COUNT submitted, one running
+        entry named after its first unit."""
+        name = '%s (+%d)' % (unit_name(item, index), count - 1)
+        with _lock:
+            self.submitted += count
+            self.running[index] = (name, time.monotonic())
+            first = self.submitted == count
+        if first:
+            _watch_idle_workers()
+        self.flush()
+
+    def finish_many(self, index, count):
+        with _lock:
+            self.done += count
+            self.running.pop(index, None)
         self.flush()
 
     def finish(self, index):
@@ -117,6 +141,17 @@ class MapWatch:
         with _lock:
             _maps.pop(self.key, None)
         _write(self.path, time.monotonic())
+
+
+def _watch_idle_workers():
+    """At a map's first unit: the running stage pool's idle-worker watcher (build_parallel._watch_stage_pool,
+    BUILD-POOL-MEMORY-PEAK-48), so the idle workers of an ordered map's stage pool end when the stage's allowance
+    falls too. Which process runs a unit never changes its result; a problem here never fails a stage."""
+    try:
+        import build_parallel
+        build_parallel._watch_stage_pool()
+    except Exception:          # status and pool upkeep only
+        pass
 
 
 def _write(path, now):

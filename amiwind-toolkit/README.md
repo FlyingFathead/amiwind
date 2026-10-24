@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.39 (14 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 The AmiWind Toolkit is a set of web pages for looking at AmiWind's world: where the conversion stands on the
 island map, any converted map in 3D, and its polygon and memory figures. Everything runs in your own browser.
@@ -130,6 +130,6 @@ files: it is derived from the game and is not for sharing.
 
 ### Included in build
 
-The World map has an **Included in build** selector, independent of release plans and conversion colours. Green means a region frame and its chunks were verified against final HDF readback; amber means selected for an unfinished build; grey means coverage is not established by this dataset. Select Conversion / plan view to return to the normal layers. Cell details identify verified versions; they do not invent a first version when earlier history has not been reconciled.
+The World map has an **Included in build** selector, independent of release plans and conversion colours. Green means a region frame and its chunks were verified against final HDF readback (a packaged or released build); amber means in a build that is not packaged yet, or selected for an unfinished build; grey means coverage is not established by this dataset. Select Conversion / plan view to return to the normal layers. Cell details identify verified versions; they do not invent a first version when earlier history has not been reconciled.
 
-`chim-inclusion.json` contains only version labels, cell coordinates, frame identifiers, scope and receipt digests. The initial v0.0.36 record covers 325 region cells. Town-frame cell boundaries and earlier versions still need reconciliation. Package inclusion does not certify actors, lighting or traversal.
+`chim-inclusion.json` contains only version labels, run names, cell coordinates, frame identifiers, scope and receipt digests, stored compactly (one build per line). Every build with a CHIM world writes its own entry into its run's `toolkit/` copy (this build on top of the repository ledger); packaging adds the package digests; only the release step changes the copy here. See [Included in build](../docs/chim/PROGRESS_TRACKER.md#included-in-build-what-each-packaged-build-holds). Package inclusion does not certify actors, lighting or traversal.

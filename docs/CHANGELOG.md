@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
+_Last updated with AmiWind v0.0.48 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.48: Inner CHIM & Actors On Stage, 24 October 2026](#v0048-inner-chim--actors-on-stage-24-october-2026)
 - [v0.0.47: CHIM: The More, The Merrier, 21 October 2026](#v0047-chim-the-more-the-merrier-21-october-2026)
 - [v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes, 20 October 2026](#v0046-red-mountain-getting-red-a-whole-heap-of-fixes-20-october-2026)
 - [v0.0.45: CHIM Streaming Improved, Guard Torches Are Back, 20 October 2026](#v0045-chim-streaming-improved-guard-torches-are-back-20-october-2026)
@@ -155,6 +156,33 @@ _Last updated with AmiWind v0.0.47 (21 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.48: Inner CHIM & Actors On Stage, 24 October 2026
+
+- The interiors go on CHIM: the builder plans all 1,134 interiors of the base game as CHIM rooms and converts 1,132,
+  their models and textures stored once in the CHIM room store ([the interior store](chim/INTERIOR_STORE.md)); the
+  prison and the census office stay classic room maps for now. Rooms with water or lava are converted too, and the
+  plants in the rooms can be picked.
+- The actors the game places in the rooms stand there with their full animation kit (2,359 room residents in the
+  v0.0.48-dev2 build), grounded when the game is built by a six-step rule: the intended floor, a walkable surface,
+  the actor's fit, the resting height, the baked position, and a refusal of any ambiguous placement
+  ([actor placement](ACTOR_PLACEMENT.md)). Every NPC greets with its own voice.
+- 32 MB of Fast RAM is the safe minimum and the presets' default; the 16 interiors and 5 region frames that need
+  more than 16 MB are marked when the game is built and say so at the door
+  ([RAM-REQUIREMENT-32MB-48](bugs/RAM-REQUIREMENT-32MB-48.md)).
+- CHIM 0.2.2 with the [CHIM compatibility table](chim/README.md#compatibility): each CHIM version names the oldest
+  version whose worlds and caches it reads; 0.2.2 reads everything 0.2.1 built, and the version label no longer
+  counts in the builder's stage keys.
+- Build fixes: stages key on what they really read, the CHIM stage no longer recomputes every frame's visibility,
+  pools get units large enough for every core, the CHIM and room stages no longer starve each other of memory, and a
+  boot payload over one partition moves the interior store, the actor models and maps to the world volume.
+- New tool `tools/bug_lookup.py`: searches the bug register and its archives by id, words, state, family, CHIM part,
+  severity, version, persisting or a named file.
+- The Stats window (P), a Magic window placeholder (O), the original movement speeds, burning campfires and the
+  original's sound markers.
+- Next: the next version starts with build turnaround, a final rebuilt from its candidate's caches in minutes
+  ([roadmap: build turnaround first](ROADMAP.md#build-turnaround-first-24-october-2026)).
+- Details: [the v0.0.48 release notes](RELEASE-v0.0.48.md).
 
 ## v0.0.47: CHIM: The More, The Merrier, 21 October 2026
 

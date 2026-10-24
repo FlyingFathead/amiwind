@@ -196,7 +196,12 @@ def append_intro_rows(scene,entities):
     if not entities or not set(entities)<=set(INTRO_MAPS):raise ValueError('Invalid intro actor maps')
     plans=[]
     for name,rows in entities.items():
-        path=Path(scene)/f'id1/maps/{name}.bsp';b=lumps(path.read_bytes());ent=b[0].rstrip(b'\0').decode('cp1252')
+        path=Path(scene)/f'id1/maps/{name}.bsp';raw=path.read_bytes();b=lumps(raw)
+        # Seyda Neen's entities come from the scene entity list, not the carrier's lump (BUILD-SEYDA-ENTITY-BUS-48)
+        if name=='seyda':
+            from seyda_entities import writer_lump
+            b[0]=writer_lump(scene,raw)
+        ent=b[0].rstrip(b'\0').decode('cp1252')
         existing=set(re.findall(r'"aw_ref"\s+"([^"\n]+)"',ent));seen=set()
         for row in rows:
             refs=re.findall(r'"aw_ref"\s+"([^"\n]+)"',row)
@@ -207,6 +212,8 @@ def append_intro_rows(scene,entities):
         b[0]=(ent+'\n'+'\n'.join(rows)+'\n\0').encode('cp1252');plans.append((path,pack_lumps(b),name))
     for path,raw,name in plans:
         path.write_bytes(raw);(Path(scene)/(name+'.bsp')).write_bytes(raw)
+        if name=='seyda':
+            from seyda_entities import publish as publish_entities;publish_entities(scene,raw)
 
 
 def populate_intro_actors(data,scene,kinds,cells,prison,palette,jobs=None,map_names=None,include_prototypes=True):

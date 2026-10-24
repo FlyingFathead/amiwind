@@ -16,6 +16,10 @@ int main(void){
     assert(!strcmp(keybindings['j'],"aw_journal") && !strcmp(keybindings['m'],"aw_worldmap"));
     Key_SetBinding('j',"custom_journal");Key_SetBinding('m',"");
     AW_ControlsMigrate();assert(!strcmp(keybindings['j'],"custom_journal") && !strcmp(keybindings['m'],"aw_worldmap"));
+    /* Stats (P) and Magic (O) reach older key files only where the key is free. */
+    assert(!strcmp(keybindings['p'],"aw_stats") && !strcmp(keybindings['o'],"aw_magicmenu"));
+    Key_SetBinding('p',"custom_p");Key_SetBinding('o',"");
+    AW_ControlsMigrate();assert(!strcmp(keybindings['p'],"custom_p") && !strcmp(keybindings['o'],"aw_magicmenu"));
     assert(Key_AmigaRaw(0x26)=='j' && Key_AmigaRaw(0x37)=='m');
     AW_ControlsMigrate();assert(!strcmp(keybindings['2'],"impulse 2"));
     return 0;

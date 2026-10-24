@@ -2,37 +2,28 @@
  "schema": "aw-collision-hull-surface-1",
  "bug": "CHIM-VIVEC-DOCK-WALKWAY-43",
  "rule": "mesh_geometry.collision_parts surface_loss (SURFACE_LOSS 0.5): a convex piece of these meshes whose 14-direction extreme-point hull leaves a point of its walkable surface more than 0.5 units deep gets points of that surface added until none is (mesh_geometry.surface_hull, from v0.0.46: CHIM-HULL-SURFACE-HEAP-46); where the stair rules then leave walkable collision more than a step under the pieces, those pieces keep all their points (the rule as first shipped, AMIWIND_COLLISION_HULL_POINTS=table-whole for every piece)",
- "measured": "18 October 2026, every exterior mesh of the base master (1,436; 73 not converted as statics), RootCollisionNode or visual collision as the CHIM builder chooses, profile town_regions.visual_profile with the stair-plate and visible-tread rules: walkable collision more than a step (8.5) over the extreme-point pieces, and within a step with this rule",
+ "measured": "23 October 2026, every exterior mesh of the base master (1394; 0 not converted as statics), by tools/hull_surface_survey.py under the shipped defaults (collision source authored, stair collision method 1, underside rule names), the CHIM model builder profile with the stair-plate and visible-tread rules: walkable collision more than a step (8.5) over the extreme-point pieces, and within a step with this rule, in every profile variant its placements get (a cell's visual recipe, a town's detail budget); recipe_meshes: meshes that need it only in the cells of that visual recipe",
  "counts": {
-  "meshes": 484,
-  "placements": 68666,
+  "meshes": 413,
+  "placements": 48090,
   "clipnodes_before_after": [
-   132874,
-   203984
+   12349045,
+   12350086
   ],
-  "clip_bytes_before_after": [
-   1064320,
-   1633344
-  ]
+  "clipnodes_stored_once_before_after": [
+   749069,
+   749005
+  ],
+  "clipnodes_weighting": "standing-hull clipnodes of each measured mesh times its exterior placements (stored once: each mesh once); before: the table this one replaced, after: this table"
  },
  "meshes": [
   "meshes/a/a_studdedleather_c_gnd.nif",
   "meshes/d/ex_t_door_slavepod_01.nif",
   "meshes/d/ex_t_door_stone_large.nif",
-  "meshes/f/active_blight_large.nif",
+  "meshes/f/active_de_bedroll.nif",
   "meshes/f/ex_boulder08.nif",
-  "meshes/f/flora_ash_grass_b_01.nif",
-  "meshes/f/flora_ash_grass_r_01.nif",
-  "meshes/f/flora_ash_grass_w_01.nif",
-  "meshes/f/flora_bc_fern_02.nif",
-  "meshes/f/flora_bc_grass_01.nif",
-  "meshes/f/flora_bc_grass_02.nif",
   "meshes/f/flora_bc_log_01.nif",
   "meshes/f/flora_bc_log_02.nif",
-  "meshes/f/flora_bc_mushroom_01.nif",
-  "meshes/f/flora_bc_mushroom_03.nif",
-  "meshes/f/flora_bc_mushroom_04.nif",
-  "meshes/f/flora_bc_mushroom_05.nif",
   "meshes/f/flora_bc_tree_10.nif",
   "meshes/f/flora_bc_tree_12.nif",
   "meshes/f/flora_bc_tree_13.nif",
@@ -40,19 +31,10 @@
   "meshes/f/flora_emp_parasol_01.nif",
   "meshes/f/flora_emp_parasol_02.nif",
   "meshes/f/flora_emp_parasol_03.nif",
-  "meshes/f/flora_grass_02.nif",
-  "meshes/f/flora_grass_03.nif",
-  "meshes/f/flora_kelp_04.nif",
-  "meshes/f/flora_rm_scathecraw_01.nif",
-  "meshes/f/flora_rm_scathecraw_02.nif",
   "meshes/f/flora_root_wg_01.nif",
   "meshes/f/flora_root_wg_02.nif",
   "meshes/f/flora_root_wg_05.nif",
   "meshes/f/flora_root_wg_07.nif",
-  "meshes/f/flora_trama_shrub_01.nif",
-  "meshes/f/flora_trama_shrub_02.nif",
-  "meshes/f/flora_trama_shrub_05.nif",
-  "meshes/f/flora_trama_shrub_06.nif",
   "meshes/f/flora_tree_02.nif",
   "meshes/f/flora_tree_ai_05.nif",
   "meshes/f/flora_tree_gl_02.nif",
@@ -69,7 +51,6 @@
   "meshes/f/furn_ashl_bugbowl_01.nif",
   "meshes/f/furn_ashl_bugbowl_02.nif",
   "meshes/f/furn_ashl_bugbowl_03.nif",
-  "meshes/f/furn_bannerpost_02.nif",
   "meshes/f/furn_basket_01.nif",
   "meshes/f/furn_coalpile00.nif",
   "meshes/f/furn_cushion_square_03.nif",
@@ -80,7 +61,6 @@
   "meshes/f/furn_dae_rubble_pointy.nif",
   "meshes/f/furn_de_bellows_01.nif",
   "meshes/f/furn_de_forge_01.nif",
-  "meshes/f/furn_de_rope_04.nif",
   "meshes/f/furn_guarcart00.nif",
   "meshes/f/furn_netramp_01.nif",
   "meshes/f/furn_overhang_01.nif",
@@ -160,7 +140,6 @@
   "meshes/i/in_pyboulder03.nif",
   "meshes/i/in_pyboulder04.nif",
   "meshes/i/in_pyboulder05.nif",
-  "meshes/i/in_t_crystal_02.nif",
   "meshes/i/in_velothi_platform_01.nif",
   "meshes/l/light_pitfire00.nif",
   "meshes/m/misc_bowl_bugdesign_01.nif",
@@ -170,59 +149,30 @@
   "meshes/m/misc_bowl_white_01.nif",
   "meshes/m/misc_com_bucket_01.nif",
   "meshes/m/misc_com_bucket_metal.nif",
-  "meshes/m/misc_de_basket_01.nif",
   "meshes/m/misc_pot_blue_02.nif",
+  "meshes/m/text_parchment_02.nif",
+  "meshes/n/ingred_muck_01.nif",
   "meshes/o/contain_barrel_01.nif",
-  "meshes/o/contain_trama_shrub_01.nif",
-  "meshes/o/contain_trama_shrub_04.nif",
-  "meshes/o/contain_trama_shrub_05.nif",
-  "meshes/o/contain_trama_shrub_06.nif",
-  "meshes/o/contain_tramaroot_01.nif",
-  "meshes/o/contain_tramaroot_03.nif",
-  "meshes/o/contain_tramaroot_04.nif",
-  "meshes/o/contain_tramaroot_05.nif",
-  "meshes/o/contain_tramaroot_06.nif",
   "meshes/o/contain_urn_01.nif",
   "meshes/o/contain_urn_02.nif",
   "meshes/o/contain_urn_03.nif",
   "meshes/o/contain_urn_04.nif",
   "meshes/o/contain_urn_05.nif",
-  "meshes/o/flora_bittergreen_01.nif",
-  "meshes/o/flora_bittergreen_02.nif",
-  "meshes/o/flora_bittergreen_03.nif",
-  "meshes/o/flora_bittergreen_04.nif",
-  "meshes/o/flora_bittergreen_05.nif",
-  "meshes/o/flora_bittergreen_06.nif",
-  "meshes/o/flora_bittergreen_07.nif",
-  "meshes/o/flora_bittergreen_08.nif",
-  "meshes/o/flora_bittergreen_10.nif",
-  "meshes/o/flora_black_anther_02.nif",
   "meshes/o/flora_black_lichen_01.nif",
   "meshes/o/flora_black_lichen_02.nif",
-  "meshes/o/flora_fire_fern_01.nif",
-  "meshes/o/flora_fire_fern_02.nif",
-  "meshes/o/flora_fire_fern_03.nif",
-  "meshes/o/flora_gold_kanet_01.nif",
-  "meshes/o/flora_gold_kanet_02.nif",
   "meshes/o/flora_green_lichen_01.nif",
   "meshes/o/flora_green_lichen_02.nif",
-  "meshes/o/flora_kreshweed_01.nif",
-  "meshes/o/flora_kreshweed_02.nif",
-  "meshes/o/flora_kreshweed_03.nif",
   "meshes/o/flora_red_lichen_01.nif",
   "meshes/o/flora_red_lichen_02.nif",
-  "meshes/o/flora_saltrice_01.nif",
-  "meshes/o/flora_saltrice_02.nif",
-  "meshes/o/flora_stoneflower_02.nif",
-  "meshes/o/flora_wickwheat_01.nif",
-  "meshes/o/flora_wickwheat_02.nif",
-  "meshes/o/flora_wickwheat_03.nif",
-  "meshes/o/flora_wickwheat_04.nif",
+  "meshes/w/w_broadsword_iron.nif",
+  "meshes/w/w_longsword_silver.nif",
+  "meshes/w/w_steel_battleaxe.nif",
   "meshes/x/ex_ac_cave_entrance_01.nif",
   "meshes/x/ex_ai_cave_entrance_01.nif",
   "meshes/x/ex_al_cave_entrance_01.nif",
   "meshes/x/ex_ashl_tent_01.nif",
   "meshes/x/ex_ashl_tent_02.nif",
+  "meshes/x/ex_ashl_tent_04.nif",
   "meshes/x/ex_barnacles_02.nif",
   "meshes/x/ex_barnacles_06.nif",
   "meshes/x/ex_bc_cave_entrance.nif",
@@ -251,15 +201,14 @@
   "meshes/x/ex_dae_ruin_02.nif",
   "meshes/x/ex_dae_ruin_02_skew.nif",
   "meshes/x/ex_dae_ruin_04.nif",
+  "meshes/x/ex_dae_ruin_04_skew_01.nif",
   "meshes/x/ex_dae_ruin_entry.max.nif",
   "meshes/x/ex_dae_ruin_platform_01.nif",
-  "meshes/x/ex_dae_ruin_stair01_short.nif",
   "meshes/x/ex_dae_wall_512_01.nif",
   "meshes/x/ex_dae_wall_512_02.nif",
   "meshes/x/ex_dae_wall_512_03.nif",
   "meshes/x/ex_dae_wall_512_04.nif",
   "meshes/x/ex_de_docks_pilings.nif",
-  "meshes/x/ex_de_oar.nif",
   "meshes/x/ex_de_shack_01.nif",
   "meshes/x/ex_de_shack_02.nif",
   "meshes/x/ex_de_shack_03.nif",
@@ -280,6 +229,7 @@
   "meshes/x/ex_dwrv_boulder10.nif",
   "meshes/x/ex_dwrv_boulder20.nif",
   "meshes/x/ex_dwrv_cosmo00.nif",
+  "meshes/x/ex_dwrv_enter00.nif",
   "meshes/x/ex_dwrv_header00.nif",
   "meshes/x/ex_dwrv_observ00.nif",
   "meshes/x/ex_dwrv_ruin00.nif",
@@ -316,7 +266,6 @@
   "meshes/x/ex_hlaalu_wall_curve_01.nif",
   "meshes/x/ex_holamayan_cover_01.nif",
   "meshes/x/ex_imp_dragonstatue.nif",
-  "meshes/x/ex_imp_govman_stair.nif",
   "meshes/x/ex_imp_govmansion_gate.nif",
   "meshes/x/ex_imp_govmansion_wing.nif",
   "meshes/x/ex_imp_guardtower_01.nif",
@@ -326,6 +275,10 @@
   "meshes/x/ex_imp_keep_02.nif",
   "meshes/x/ex_imp_towerb_cons_01.nif",
   "meshes/x/ex_imp_towerb_top_01.nif",
+  "meshes/x/ex_longboat.nif",
+  "meshes/x/ex_longboat01.nif",
+  "meshes/x/ex_longboat02.nif",
+  "meshes/x/ex_longboatwrk.nif",
   "meshes/x/ex_ma_cave_entrance.nif",
   "meshes/x/ex_ma_cave_entrance_lava.nif",
   "meshes/x/ex_nord_doorf_01.nif",
@@ -354,10 +307,15 @@
   "meshes/x/ex_redwall_p_03.nif",
   "meshes/x/ex_redwall_up_01.nif",
   "meshes/x/ex_rm_cave_entrance_01.nif",
+  "meshes/x/ex_ropebridge_01.nif",
+  "meshes/x/ex_ropebridge_1024_01.nif",
+  "meshes/x/ex_ropebridge_2048_01.nif",
+  "meshes/x/ex_ropebridge_512_01.nif",
   "meshes/x/ex_ropebridge_stake_01.nif",
   "meshes/x/ex_ruin_00.nif",
   "meshes/x/ex_ruin_10.nif",
   "meshes/x/ex_ruin_20.nif",
+  "meshes/x/ex_ruin_30.nif",
   "meshes/x/ex_ruin_40.nif",
   "meshes/x/ex_ruin_rubble00.nif",
   "meshes/x/ex_scrapwood02.nif",
@@ -381,7 +339,6 @@
   "meshes/x/ex_t_brace_01.nif",
   "meshes/x/ex_t_bridge_lcurved.nif",
   "meshes/x/ex_t_clawgrowth_02.nif",
-  "meshes/x/ex_t_councilhall.nif",
   "meshes/x/ex_t_doorway_02.nif",
   "meshes/x/ex_t_hook.nif",
   "meshes/x/ex_t_housepod_02.nif",
@@ -392,39 +349,17 @@
   "meshes/x/ex_t_menhir_01.nif",
   "meshes/x/ex_t_menhir_l_01.nif",
   "meshes/x/ex_t_platform_02.nif",
-  "meshes/x/ex_t_playertower_sprout.nif",
   "meshes/x/ex_t_pole_hooked.nif",
   "meshes/x/ex_t_rock_coastal_02.nif",
   "meshes/x/ex_t_root_04.nif",
   "meshes/x/ex_t_root_hook.nif",
   "meshes/x/ex_t_root_spikes_01.nif",
-  "meshes/x/ex_t_root_stem.nif",
   "meshes/x/ex_t_rootball.nif",
   "meshes/x/ex_t_spiralramp.nif",
-  "meshes/x/ex_t_stair_lcurve.nif",
   "meshes/x/ex_t_stair_spiral.nif",
-  "meshes/x/ex_t_tower_seedling.nif",
   "meshes/x/ex_t_tower_strght_lrg.nif",
   "meshes/x/ex_t_tunnel.nif",
   "meshes/x/ex_t_turret_02.nif",
-  "meshes/x/ex_v_ban_arena_01.nif",
-  "meshes/x/ex_v_ban_avs_01.nif",
-  "meshes/x/ex_v_ban_child_01.nif",
-  "meshes/x/ex_v_ban_comfort_01.nif",
-  "meshes/x/ex_v_ban_count_01.nif",
-  "meshes/x/ex_v_ban_faith_01.nif",
-  "meshes/x/ex_v_ban_hlaalu_01.nif",
-  "meshes/x/ex_v_ban_imp_01.nif",
-  "meshes/x/ex_v_ban_redoran_01.nif",
-  "meshes/x/ex_v_ban_serving_01.nif",
-  "meshes/x/ex_v_ban_speak_01.nif",
-  "meshes/x/ex_v_ban_stdeyln_01.nif",
-  "meshes/x/ex_v_ban_stolms_01.nif",
-  "meshes/x/ex_v_ban_telvanni_01.nif",
-  "meshes/x/ex_v_ban_tribunal_01.nif",
-  "meshes/x/ex_v_ban_vivec_01.nif",
-  "meshes/x/ex_v_ban_vivec_02.nif",
-  "meshes/x/ex_v_ban_walk_01.nif",
   "meshes/x/ex_v_dock_01.nif",
   "meshes/x/ex_v_sign_arena_01.nif",
   "meshes/x/ex_v_sign_fq_01.nif",
@@ -444,12 +379,10 @@
   "meshes/x/ex_vivec_ent_b_01.nif",
   "meshes/x/ex_vivec_ent_t_01.nif",
   "meshes/x/ex_vivec_g_02.nif",
-  "meshes/x/ex_vivec_h_09.nif",
   "meshes/x/ex_vivec_h_12.nif",
   "meshes/x/ex_vivec_h_16.nif",
   "meshes/x/ex_vivec_hf_02.nif",
   "meshes/x/ex_vivec_hf_03.nif",
-  "meshes/x/ex_vivec_p_water_01.nif",
   "meshes/x/ex_vivec_pd_01.nif",
   "meshes/x/ex_vivec_pqs_01.nif",
   "meshes/x/ex_vivec_pqs_02.nif",
@@ -457,9 +390,6 @@
   "meshes/x/ex_vivec_sbase_01.nif",
   "meshes/x/ex_vivec_w_01.nif",
   "meshes/x/ex_vivec_w_c_01.nif",
-  "meshes/x/ex_vivec_waterfall_01.nif",
-  "meshes/x/ex_vivec_waterfall_03.nif",
-  "meshes/x/ex_vivec_waterfall_05.nif",
   "meshes/x/ex_vivec_waterspout_01.nif",
   "meshes/x/ex_vivec_waterspout_05.nif",
   "meshes/x/ex_wg_cave_entrance_01.nif",
@@ -501,146 +431,23 @@
   "meshes/x/terrain_rock_ma_59.nif",
   "meshes/x/terrain_volcano.nif"
  ],
- "known_over_step": {
-  "meshes/f/active_de_bedroll.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/f/flora_bc_fern_03.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/f/flora_bc_fern_04.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/i/in_lava_256a.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/i/in_lava_oval.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/m/text_parchment_02.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/n/ingred_muck_01.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/o/flora_black_anther_01.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/o/flora_marshmerrow_01.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/o/flora_marshmerrow_02.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/o/flora_stoneflower_01.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/o/flora_willow_flower_01.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/o/flora_willow_flower_02.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/r/sphere_centurions.nif": {
-   "depth": 14.5,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/w/w_broadsword_iron.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/w/w_claymore.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/w/w_longsword_silver.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/w/w_steel_battleaxe.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_ashl_tent_03.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_ashl_tent_04.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_dae_ruin_04_skew_01.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_de_ship.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_de_shipwreck.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_dwrv_enter00.nif": {
-   "depth": 24.5,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_longboat.nif": {
-   "depth": 12.7,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_longboat01.nif": {
-   "depth": 12.7,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_longboat02.nif": {
-   "depth": 12.7,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_longboatwrk.nif": {
-   "depth": 12.7,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_redoran_steps_02.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_rope_short.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_ropebridge_01.nif": {
-   "depth": 17.5,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_ropebridge_1024_01.nif": {
-   "depth": 17.6,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_ropebridge_2048_01.nif": {
-   "depth": 18.3,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_ropebridge_512_01.nif": {
-   "depth": 17.5,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  },
-  "meshes/x/ex_ruin_30.nif": {
-   "depth": 64.0,
-   "reason": "still over a step with the rule: another converter path (follow-up)"
-  }
- }
+ "recipe_meshes": {
+  "tel-uvirith-v1": [
+   "meshes/i/in_t_crystal_02.nif",
+   "meshes/x/ex_t_playertower_sprout.nif",
+   "meshes/x/ex_t_root_stem.nif",
+   "meshes/x/ex_t_tower_seedling.nif"
+  ],
+  "telvanni-v1": [
+   "meshes/f/furn_bannerpost_02.nif",
+   "meshes/m/misc_de_basket_01.nif",
+   "meshes/w/w_claymore.nif",
+   "meshes/x/ex_de_ship.nif",
+   "meshes/x/ex_t_councilhall.nif",
+   "meshes/x/ex_t_root_stem.nif",
+   "meshes/x/ex_t_stair_lcurve.nif",
+   "meshes/x/ex_vivec_h_09.nif"
+  ]
+ },
+ "known_over_step": {}
 }

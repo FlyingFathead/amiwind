@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +18,8 @@ _Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 - [CHIM Progress Tracker](#chim-progress-tracker)
   - [Making the data](#making-the-data)
   - [Showing it](#showing-it)
+  - [Sea squares on the map](#sea-squares-on-the-map)
+  - [Sea squares on the map](#sea-squares-on-the-map-1)
   - [One Toolkit, your data loaded locally](#one-toolkit-your-data-loaded-locally)
   - [Track your own build](#track-your-own-build)
 - [Monitor](#monitor)
@@ -119,6 +121,11 @@ Vvardenfell's exterior cells, one square per cell, north up.
   cog (Options).
 - **Map metrics** (only when a metrics layer is loaded): the estimated heap and
   BSP limits of every exterior cell; see [Map metrics layer](#map-metrics-layer).
+- **Collapsible panel**: the summary line (island totals) stays at the top with a thin line under it. Below it, each
+  block of controls (the colour legend, the file pickers, the layer views, Map metrics and the CHIM Progress Tracker)
+  has a triangle button, ▾ open or ▸ closed, before its title, and **Collapse all** / **Expand all** folds the lot, so
+  the map gets the room. Folded blocks keep their settings. Each block's state is remembered in this browser (everything
+  starts open); the Monitor tab folds its run, log and timeline controls the same way.
 - **Grid: on | off** at the map's top left switches the cell grid, in step with
   the Cell grid layer.
 - **Paint: on | off** and the copy button next to it: with Paint on, a click or drag marks cells (a drag
@@ -319,6 +326,11 @@ python3 tools/cell_progress.py ingest --out DIR \
 - `--data-files` parses your game files once into `DIR/mesh-census.json`: per exterior cell the references by type, the
   unique meshes, the doors and where they lead; per interior cell its counts and doors. Without it the tracker still
   works, without contents, mesh numbers and interiors.
+- `--door-graph door-graph.json --batch-plan batch-plan.json` (made by `tools/door_graph.py`,
+  [DOOR_GRAPH.md](chim/DOOR_GRAPH.md)) add the interiors: every interior cell of the game as a room with its state,
+  batch and reasons, none left out. `--chim-rooms FILE` (repeatable) is a CHIM rooms receipt or a build's
+  `chim-interiors.json`: the rooms on CHIM rooms. Without them the tracker works as before, without the interior
+  tracker.
 - The command remembers its inputs (`DIR/sources.json`). Run it again after every build; it is idempotent: the same
   inputs give the same files. Anything it cannot measure is `not_measured`, never a guess.
 
@@ -413,6 +425,14 @@ layer stays selectable.
   meshes against cells converted, in the spiral and risk orders, compared with every cell converting its own meshes) and the
   numbers behind it.
 - **Export CSV** and **Export JSON** write the cells shown (after the filter): status, audits and every numeric stat.
+- **Interior tracker** (under the map, with interiors in the data): a block that folds like the other blocks, closed
+  by default; its title line always shows how many rooms are in the game, not in the game yet and set aside. Opened,
+  it lists every interior by island, then by entrance (town or place and its exterior cell), each group folding out
+  to its rooms: name (the cell ID), state chip in the legend colours, batch, reasons and master. A search box filters
+  the list; clicking a room selects and centres its entrance cell on the map. The rooms with no entrance area are their
+  own group at the end. The overview keeps only a short table of rooms per island in the three groups. The
+  **Interiors** layer then marks each exterior cell that holds an entrance, coloured by its rooms' state. How the
+  states are decided: [Interiors](chim/PROGRESS_TRACKER.md#interiors-every-room-on-the-tracker).
 
 **Seeing the whole island.** The map canvas is sized to the window, so the whole island (Vvardenfell and Solstheim, or what
 the loaded data covers) is visible at once: the **fit** button (next to **-**, **reset** and **+**) returns to that view, and
@@ -436,13 +456,66 @@ sits below each panel, never over the lines. `cell_progress.py ingest --png` wri
 with "Last updated with AmiWind vX" under it, and the page's own name next to it. Inside the Toolkit's tabs only the index
 header shows. The standalone 3D inspector export carries the header too, without the logo picture.
 
+The status chips above the map and the status rows of the **legend** come in three groups, so every square says where it
+stands:
+
+- **In the game**: what the newest ingested build ships. The land cells in their states (complete, awaiting lighting,
+  passed with something deferred, and so on) and **sea, in the game**: every sea cell that build holds.
+- **Not in the game yet**: the work left. **Solstheim (Bloodmoon)** is named as such; converted cells the newest build does
+  not hold, sea it does not hold, cells not started and the problem states (failing, not converted, hull policy pending)
+  are here too.
+- **Beyond the world's edge: settled**: squares with no cell record in the original game data that no build holds. They are
+  drawn faint grey; their hover text says why: "No cell exists here in the original game data. AmiWind's edge current turns
+  the player back before this point, so there is nothing to build."
+
+Each group header gives its number of cells, and a line under them gives **accounted for**: in the game plus settled, out of
+every square of the grid. Settled squares count toward "accounted for", never toward the cells in the game. A state with no
+cells waits in the **More states** fold-out (open it with its triangle; the page remembers it) and comes back to its group by
+itself once it has cells. The tracker works the groups out (`cell_progress.py ingest`: `chim.group` and `chim.state` per
+cell, `groups` and `states` in the headline), so the page, the generated cell tracker and `cell_progress.py status` give the
+same figures. Tracker data made before the groups existed still draws, with the flat row of chips it had.
+
 The **legend** has a checkbox on every row (an unticked row dims its cells), **all** and **none** buttons, a **Preset**
-pull-down (everything, eligible for the next release, awaiting lighting, problems only, not started, lighting, release
-content; a hand tick switches it to Custom) and a **Version** pull-down with a summary line per release. Your choices are
+pull-down (everything, in the game, not in the game yet, eligible for the next release, awaiting lighting, problems only,
+not started, lighting, release content; a hand tick switches it to Custom) and a **Version** pull-down with a summary line
+per release. "Eligible for vX" names the upcoming release of the release plan, or the version in development when the plan
+is older than it. Your choices are
 remembered in the browser. The full explanation, every status and the maintainer's release commands are in the
 [CHIM Progress Tracker guide](chim/PROGRESS_TRACKER.md); the live figures are on the generated
-[CHIM cell tracker](chim/CELL_TRACKER.md). The **Included in build** pull-down shows what each packaged build really
-holds; how its data is made is in [Included in build](chim/PROGRESS_TRACKER.md#included-in-build-what-each-packaged-build-holds).
+[CHIM cell tracker](chim/CELL_TRACKER.md). The **Included in build** pull-down shows what each build really
+holds (built, packaged or released); a build's own World map lists that build on top. How its data is made is in [Included in build](chim/PROGRESS_TRACKER.md#included-in-build-what-each-packaged-build-holds).
+
+### Sea squares on the map
+
+The map draws the whole grid, so it also shows squares far out at sea. Three kinds look alike but mean different things:
+
+- **Open ocean (silver)**: squares beyond the game's own cells, for example -19,-5. The original game has no cell record
+  there, and no build contains them. AmiWind keeps the player near the island with the world-bounds drift (a current that
+  turns you back along the edge, [WORLD_BOUNDS.md](WORLD_BOUNDS.md)), so these squares are outside the playable world by
+  design, not unfinished work. Selecting one only shows that grid square; nothing is there.
+- **Empty sea (blue)**: cells the game defines with no land and no objects, such as the seabed cells. They are built as flat
+  seabed with water on top, as Morrowind and OpenMW do for a cell without land, and they count as done.
+- **Empty records in open water**: the game data also holds 112 empty cell records in open water (cell -15,-8 is a lone
+  example, far from the coast). Every release builds them, so they are in the game. Today some of them still read "open
+  ocean, not yet placed in the game", which is wrong; the maintainer reported it as
+  [TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48](bugs/TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48.md). Once it is fixed they draw as
+  "sea, in the game".
+
+### Sea squares on the map
+
+The map draws the whole grid, so it also shows squares far out at sea. They fall into the legend's groups:
+
+- **Settled (faint grey, beyond the world's edge)**: squares beyond the game's own cells, for example -19,-5. The original
+  game has no cell record there, and no build contains them. AmiWind keeps the player near the island with the edge current
+  (a current that turns you back along the edge, [WORLD_BOUNDS.md](WORLD_BOUNDS.md)), so these squares are outside the
+  playable world by design, not unfinished work. Selecting one only shows that grid square; nothing is there.
+- **Sea, in the game (sea blue with green stripes)**: every sea cell the newest build holds. These are the seabed cells
+  (built as flat seabed with water on top, as Morrowind and OpenMW do for a cell without land) and the 112 empty cell
+  records the game data holds in open water (cell -15,-8 is a lone example, far from the coast). Every release builds them.
+  Some of them used to read "open ocean, not yet placed in the game", which was wrong
+  ([TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48](bugs/TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48.md), fixed for v0.0.48).
+- **Not in the game yet**: a sea cell the game defines that the newest build does not hold is "empty sea" or "open sea, not
+  in the newest build"; around Solstheim it counts under Solstheim.
 
 ### One Toolkit, your data loaded locally
 
@@ -496,9 +569,11 @@ non-guided builds unless you give the flag), `--no-live-tracker` turns the offer
 after the build until you press Enter. The map page has a **status strip** in the bar directly above the map (visible even when the controls are folded), in every
 mode: a state dot with its word, **Source** (the live build folder, the server address, the project reference or the imported
 file), **Last updated** (the data's own timestamp, with an "N s ago" that ticks every second) and an **Auto-update** switch
-showing its interval. The dot is green when the data was updated within two intervals ("live"), amber when it is older
-("stale", or still waiting for the first data), grey when auto-update is off or the build is finished ("final"), and red when
-the last load failed. Under it a status line gives the stage, the cells done out of the total and a rough time left from the
+showing its interval. The dot is green only while a running build refreshes the data (updated within the last 20 seconds,
+"live"), amber when auto-update is on and the data is older ("stale", or still waiting for the first data), grey when
+auto-update is off or the build is finished ("final"), and red when the last load failed. Finished, ingested data therefore
+reads amber "stale" with auto-update on, because nothing refreshes it
+([TOOLKIT-STALE-DOT-FOR-INGESTED-DATA-48](bugs/TOOLKIT-STALE-DOT-FOR-INGESTED-DATA-48.md); it should show the data's date). Under it a status line gives the stage, the cells done out of the total and a rough time left from the
 finished stages; the switch unticks itself when the build finishes. Files are written
 atomically, so the page never reads half a file, and a tracker problem is one printed warning, never a failed build. It works
 the same on Linux, macOS and Windows hosts.

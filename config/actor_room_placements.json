@@ -1,0 +1,27 @@
+{
+ "format": "AmiWind room actor placements 1",
+ "bug": "ROOM-ACTORS-FLOATING-48",
+ "rule": "tools/actor_grounding.py bake_room_ground and room_exceptions; tools/check_actor_ground.py. 'placements': a CHIM room resident written at this origin as given (no fitting), judged by the actor ground check like every other resident. 'authored': a CHIM room resident kept where the game data puts it (aw_ground_mode 1), reported by the check as an explicit exception with its reason. Only for the residents the room bake refuses (no walkable placed floor within its probe under the resident, no spot within its search where every sole is on the floor), each decided with its reason (measured on dev2 try 11, 23 October 2026; ROOM-RESIDENTS-NO-FIT-48 holds the follow-up). Key: \"<room map> <reference number>\"; origin in AmiWind units (game units x 0.25).",
+ "placements": {},
+ "authored": {
+  "ri141888a772 300758": {"id": "Madsu Dreth", "reason": "Ainat: stands on a cave slope steeper than walkable (in_lavacave2_s_05, normal z 0.63, 4.2 units under her); no walkable spot within 48 units."},
+  "ri1ac3a85e8a 280157": {"id": "darvala romothran", "reason": "Zainsipilu: stands inside the collision of ex_ropebridge_01 (reference 298387), its convex top 9.3 units over her feet (ROOM-X-MESH-ROOF-SURVEY-48); no free spot."},
+  "ri2d25b87a5a 369590": {"id": "Bato Veranius", "reason": "Arkngthand, Heaven's Gallery: no surface within the probe (8 over, 32 under); long probes under him raise the trace visit guard (ROOM-TRACE-VISIT-GUARD-48)."},
+  "ri4594b1bf74 258900": {"id": "hlaalu guard", "reason": "Caldera Mine: the first surface under him (in_moldcave_lroom3_02) is 44.9 units down, beyond the 32-unit headroom bound; never dropped that far without a decision."},
+  "ri4c806318b4 282975": {"id": "Llondresa Reloth", "reason": "Ansi: stands on a cave slope steeper than walkable (in_moldcave2_s_05, normal z 0.39, 7.7 units under her); no walkable spot within 48 units."},
+  "ri73f61f120c 268756": {"id": "Ena", "reason": "Mannammu: a walkable but sloped cave floor (in_lavacave_17, normal z 0.89, 7.9 units under her) where no spot within 48 units puts every idle sole within -0.5..1.0."},
+  "ri77c209e3fc 374694": {"id": "redoran guard male", "reason": "Ald-ruhn, Redoran Council Hall: over the riser of in_r_l_int_stairs_03 (normal z 0.14, 2.9 units under him); no walkable spot within 48 units."},
+  "ri7e8d83f9cf 196911": {"id": "raxle berne", "reason": "Galom Daeus, Observatory: no placed mesh under him; only the room's closing clip floor, 280.8 units down (a missing floor piece or an unconverted support; ROOM-RESIDENTS-NO-FIT-48)."},
+  "ri8825e76530 268787": {"id": "gandela indoran", "reason": "Milk: stands on in_cavern_stairs00 steeper than walkable (normal z 0.46, 6.1 units under her); no walkable spot within 48 units."},
+  "ri8eba22e77b 283000": {"id": "Mecilvus Gabenagus", "reason": "Nund: stands on a cave slope steeper than walkable (in_moldcave2_s_05, normal z 0.52, 5.6 units under him); no walkable spot within 48 units."},
+  "ri9320428d8e 280153": {"id": "tininnus scinia", "reason": "Yakanalit: a walkable but sloped cave floor (in_mudcave2_s_04, normal z 0.81, 7.0 units under him) where no spot within 48 units puts every idle sole within -0.5..1.0."},
+  "ri9661d92a61 283071": {"id": "Drorayni Tharam", "reason": "Ahinipalit: a walkable but sloped cave floor (in_lavacave2_s_04, normal z 0.81, 1.1 units under her) where no spot within 48 units puts every idle sole within -0.5..1.0."},
+  "ri97f644f9c3 268807": {"id": "vaves virith", "reason": "Kunirai: stands on a cave slope steeper than walkable (in_mudcave2_s_04, normal z 0.67, 3.4 units under him); no walkable spot within 48 units."},
+  "ri97f644f9c3 268812": {"id": "alurue saryon", "reason": "Kunirai: against a cave wall (in_mudcave_09, normal z 0.09, 4.7 units under her); no walkable spot within 48 units."},
+  "ria304099872 281645": {"id": "arsyn salas", "reason": "Ald-ruhn, Sarethi Manor: on in_r_l_long_ramp_01 (normal z 0.93, 1.6 units under him) where no spot within 48 units puts every idle sole within -0.5..1.0."},
+  "ria304099872 281646": {"id": "gragus lleran", "reason": "Ald-ruhn, Sarethi Manor: on in_r_l_long_ramp_01 (normal z 0.93, 2.3 units under him) where no spot within 48 units puts every idle sole within -0.5..1.0."},
+  "rib7cabb31ff 81334": {"id": "dondreth", "reason": "Mababi: on in_velothismall_pitstep_01 (normal z 0.93, 1.7 units under him) where no spot within 48 units puts every idle sole within -0.5..1.0."},
+  "rie6ec921420 268828": {"id": "felsa hleran", "reason": "Sanabi: a walkable but sloped cave floor (in_lavacave_15, normal z 0.92, 9.8 units under her) where no spot within 48 units puts every idle sole within -0.5..1.0."},
+  "riebb6d4996f 282925": {"id": "hussonia", "reason": "Ashinabi: a walkable but sloped cave floor (in_moldcave2_s_04, normal z 0.92, 3.0 units under her) where no spot within 48 units puts every idle sole within -0.5..1.0."}
+ }
+}

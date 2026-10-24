@@ -121,19 +121,36 @@ class StageWatch:
                   if slowest else None, 'since_seconds': round(now - since, 1),
                   'held_by': 'memory guard' if allowance < share else 'stage (its pools run fewer units than allowed)',
                   'key': 'underused:%s' % name}
+        # the stage's phase running now (build_profile.phase, the stage's own timer): which step the cores wait in
+        # (BUILD-IMAGE-FINALIZE-UNDERUSED-48: the record named no sub-step and was read as the player view's)
+        current = self.phase_of(stage)
+        record['phase'] = current.get('name') if current else None
+        if current and current.get('started_at') is not None:
+            record['phase_seconds'] = round(max(0.0, self.wall() - float(current['started_at'])), 1)
         stage['open'] = record
         self.occurrences.append(record)
         self.log('[underused] WARNING: %s ran on %.1f of %d cores (allowance %d, share %d) for %.0f s with %s units '
-                 'queued and %d running; slowest running unit: %s; held by: %s; the build carries on (%s)' % (
+                 'queued and %d running; slowest running unit: %s; phase now: %s; held by: %s; the build carries on '
+                 '(%s)' % (
                      name, cores, max(allowance, share), allowance, share, now - since,
                      'more' if record['queued'] is None else record['queued'], record['running'] or 0,
-                     '%s (%.0f s)' % (slowest[0], slowest[1]) if slowest else 'none named', record['held_by'],
-                     self.run / FILE))
+                     '%s (%.0f s)' % (slowest[0], slowest[1]) if slowest else 'none named',
+                     '%s (running %.0f s)' % (record['phase'], record.get('phase_seconds', 0)) if record['phase']
+                     else 'none named', record['held_by'], self.run / FILE))
         try:
             with (self.run / FILE).open('a', encoding='utf-8', newline='\n') as out:
                 out.write(json.dumps(record) + '\n')
         except OSError:
             pass
+
+    def phase_of(self, stage):
+        """The stage's current phase ({name, started_at, ...}, build_profile.read_now) or None. The stage's sections
+        file is RUN/profile/sections/<NN-name>.jsonl, the name of its allowance file (build_parallel)."""
+        try:
+            import build_profile
+            return build_profile.read_now(self.run / 'profile' / 'sections' / (Path(stage['file']).name + '.jsonl'))
+        except (ImportError, OSError, TypeError, ValueError):
+            return None
 
     def _close(self, name, stage, now):
         if stage.get('open') is not None and stage.get('under_since') is not None:

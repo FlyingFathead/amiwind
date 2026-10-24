@@ -35,6 +35,9 @@ def scene(path):
     for name in ('prison','seyda'):
         raw=bsp('{\n"classname" "worldspawn"\n}\n')
         (path/'id1/maps'/(name+'.bsp')).write_bytes(raw);(path/(name+'.bsp')).write_bytes(raw)
+        # the bsp stage publishes Seyda Neen's scene entity list beside its map (BUILD-SEYDA-ENTITY-BUS-48)
+        if name=='seyda':
+            import seyda_entities;seyda_entities.publish(path,raw)
 
 def record(identifier='guard'):
     return {'model':'progs/'+identifier.replace(' ','_')+'.mdl','appearance':{'name':identifier},

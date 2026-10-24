@@ -1,0 +1,13 @@
+{
+ "about": "CHIM compatibility table (tools/chim_compat.py, docs/chim/README.md 'Compatibility'). Each CHIM version names its compatibility line: the oldest CHIM version whose worlds and build caches it reads unchanged. Stage and cache keys take the line, not the CHIM_VERSION label, so a version that keeps the line rebuilds nothing for its number alone; a version that changes what CHIM builds or reads starts a new line (line = itself). Every CHIM_VERSION bump adds its row here.",
+ "versions": [
+  {"version": "0.1.0", "line": "0.1.0", "amiwind": "v0.0.33",
+   "reason": "First CHIM release: the CHIM builder, world format 0.5 and the CHIM engine."},
+  {"version": "0.2.0", "line": "0.2.0", "amiwind": "v0.0.36",
+   "reason": "Feature step: builder and engine features that changed what CHIM builds."},
+  {"version": "0.2.1", "line": "0.2.1", "amiwind": "v0.0.41",
+   "reason": "Fix step that changed builder output: compiled collision for non-convex pieces, recorded audit provenance."},
+  {"version": "0.2.2", "line": "0.2.1", "amiwind": "v0.0.48",
+   "reason": "Release label step: no world format, builder output or cache change; reads everything 0.2.1 built."}
+ ]
+}

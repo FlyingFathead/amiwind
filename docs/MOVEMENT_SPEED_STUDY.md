@@ -1,6 +1,10 @@
 # Movement speed study
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+
+**Implemented in v0.0.48-dev2:** the original speeds from the live character sheet, the load, race weight
+and movement fatigue are now the default, and the old speeds are the `superspeed` debug mode; see
+[Movement speed](PLAYER_MOVEMENT.md#movement-speed). This study is kept as written on 14 October.
 
 14 October 2026. Source analysis for v0.0.39 and the v0.0.40-dev1 candidate. Current status: [PLAYER-MOVEMENT-STATS-PARITY-39](bugs/PLAYER-MOVEMENT-STATS-PARITY-39.md) remains open. No movement setting or implementation is changed by this study.
 

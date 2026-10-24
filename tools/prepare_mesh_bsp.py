@@ -951,6 +951,8 @@ def prepare_carrier(scene, out, scenery, data_files, jobs=None):
     presence=check_activated_present(raw,exterior,'seyda')
     for name in ('seyda.bsp','id1/maps/seyda.bsp'):
         target=out/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
+    # the scene entity list the later stages read (BUILD-SEYDA-ENTITY-BUS-48)
+    from seyda_entities import publish as publish_entities;publish_entities(out,raw)
     source=(json.dumps(record,indent=2)+'\n').encode('utf-8');(out/'source-entities.json').write_bytes(source)
     result={'format':CARRIER_SCENE_FORMAT,'seyda_source':'carrier','carrier_marker':MARKER,
             'terrain_compiled':False,'rendered_faces':0,'placements':len(record['references']),
@@ -982,6 +984,7 @@ def prepare(scene, out, scenery, qbsp, vis, light, jobs=None, terrain_visual_cul
     rebuild_world_hull(base,out/'seyda.map',qbsp,discard_stock_hulls=True,collision=collision)
     result=append_meshes(base,out/'seyda.bsp',scenery,out/'id1/gfx/palette.lmp',jobs=jobs,terrain_visual_cull=terrain_visual_cull,terrain_cull_config=terrain_cull_config,map_identity=map_identity,cell_identity=cell_identity,subcell_identity=subcell_identity,terrain_cull_overlap=terrain_cull_overlap)
     shutil.copyfile(out/'seyda.bsp',out/'id1/maps/seyda.bsp')
+    from seyda_entities import publish as publish_entities;publish_entities(out,(out/'seyda.bsp').read_bytes())
     result['format']='AmiWind compiled mesh BSP29'
     result['standing_hull_profile']=PROFILE
     result['standing_hull']=[MINS,MAXS]

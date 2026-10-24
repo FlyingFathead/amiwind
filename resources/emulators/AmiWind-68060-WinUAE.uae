@@ -1,10 +1,11 @@
-; AmiWind 68060 play preset (WinUAE): an A1200 with a 68060 card, 128 MB Z3 Fast RAM, JIT.
-; 16 MB (z3mem_size=16) is the smallest machine the game runs on.
+; AmiWind 68060 play preset (WinUAE): an A1200 with a 68060 card, 32 MB Z3 Fast RAM, JIT.
+; 32 MB is the safe minimum for the whole game; more (z3mem_size=128) is used automatically.
+; 16 MB (z3mem_size=16) still starts, with a warning at boot, and loads more often.
 ; Load it, select your licensed A1200 Kickstart ROM and add the game's HDFs on the UAE controller.
 ; A 68060 needs its support library on the game disk: build with --amiga-libs (your own 68060.library,
 ; mmu.library and, for MMULib's libraries, your Workbench's C/SetPatch). The game picks AmiWind060 at boot
 ; (docs/68060.md, docs/FPU_SUPPORT_LIBRARY.md). Not checked in WinUAE by the developers.
-config_description=AmiWind 68060 | AGA A1200 060/FPU | 2M Chip + 128M Z3 | JIT/max | select owned ROM and HDF
+config_description=AmiWind 68060 | AGA A1200 060/FPU | 2M Chip + 32M Z3 | JIT/max | select owned ROM and HDF
 config_hardware=true
 config_host=true
 config_version=6.0.3
@@ -35,7 +36,7 @@ cachesize=8192
 compfpu=true
 chipmem_size=4
 fastmem_size=0
-z3mem_size=128
+z3mem_size=32
 z3mem_start=0x40000000
 bogomem_size=0
 a3000mem_size=0

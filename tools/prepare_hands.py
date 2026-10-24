@@ -129,9 +129,13 @@ def prepare(data,scene,out,jobs=None):
     raw,report=bake_appearance(assets,kinds.result(),(scene/'id1/gfx/palette.lmp').read_bytes(),skeleton=skeleton)
     copy_tree(scene,out);(out/'id1/progs/v_nord.mdl').write_bytes(raw)
     # The full scene and carrier-only entry share validated source-derived fields.
-    from hand_metadata import hand_fields, stamp
-    raw_bsp=stamp((out/'seyda.bsp').read_bytes(),hand_fields(report))
+    # Seyda Neen's worldspawn comes from the scene entity list, not the carrier's lump (BUILD-SEYDA-ENTITY-BUS-48)
+    from hand_metadata import hand_fields, stamp_lump
+    from seyda_entities import publish as publish_entities, writer_lump
+    raw_bsp=(out/'seyda.bsp').read_bytes()
+    raw_bsp=stamp_lump(raw_bsp,writer_lump(out,raw_bsp),hand_fields(report))
     (out/'seyda.bsp').write_bytes(raw_bsp);(out/'id1/maps/seyda.bsp').write_bytes(raw_bsp)
+    publish_entities(out,raw_bsp)
     ready['hands']=report;(out/'scene-ready.json').write_text(json.dumps(ready,indent=2)+'\n')
     (out/'hands-report.json').write_text(json.dumps(report,indent=2)+'\n')
     from prepare_hand_sprites import prepare as sprites

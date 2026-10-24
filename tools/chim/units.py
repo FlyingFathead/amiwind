@@ -31,6 +31,8 @@ _GEOMETRY = ['tools/prepare_mesh_bsp.py', 'tools/mesh_geometry.py', 'tools/stati
 TOOLS = {
     'mesh': _GEOMETRY,
     'mesh-stair': _GEOMETRY + ['tools/stair_mesh.py', 'tools/chim/build.py'],
+    'stair-flights': ['tools/stair_mesh.py', 'tools/mesh_geometry.py', 'tools/exterior_visibility.py',
+                      'tools/player_hull.py', 'src/mwad/scene.py'],
     'variant': _GEOMETRY + ['tools/surface_grid.py', 'tools/collision_bsp.py', 'tools/prepare_scenery.py', 'tools/nif_common.py',
                             'tools/visual_offsets.py', 'config/visual-offsets.json', 'tools/chim/models.py',
                             'tools/chim/format.py', 'tools/chim/occluders.py'],
@@ -57,6 +59,9 @@ TOOLS['tiles-bevels'] = TOOLS['tiles'] + ['tools/chim/bevels.py']
 # EXPERIMENTAL world format 0.8 (chim.placed, build setting placement_format 0.8): the default kinds plus that module
 TOOLS['variant-placed'] = TOOLS['variant'] + ['tools/chim/placed.py']
 TOOLS['tiles-placed'] = TOOLS['tiles'] + ['tools/chim/placed.py']
+# a model over one brush image's budgets stored as tiles (chim.budget_tiles, CHIM-ROOM-CLIPNODE-BUDGET-48): own kinds
+TOOLS['tiles-budget'] = TOOLS['tiles'] + ['tools/chim/budget_tiles.py']
+TOOLS['tiles-budget-placed'] = TOOLS['tiles-placed'] + ['tools/chim/budget_tiles.py']
 # Build switches read from the environment by the converter functions (the stair rule:
 # mesh_geometry.collision_pieces, COLLISION-STAIR-SLOPE-32).
 # The standing-hull form (--model-hull, mesh_geometry_env.model_hull_mode) changes every big model's hull:
@@ -75,6 +80,8 @@ CODE_ENTRIES = {
     # stair collision method 1 builds only (CHIM-STAIR-COLLISION-MESH-47): the default mesh worker run with method 1's
     # collision; its code stays out of the default 'mesh' key
     'mesh-stair': [('tools/stair_mesh.py', 'mesh_unit_stair')],
+    # which meshes hold a flight of stairs as drawn (stair_mesh.flight_unit): the meshes method 1 converts
+    'stair-flights': [('tools/stair_mesh.py', 'flight_unit')],
     'hull-surface': [('tools/chim/build.py', 'hull_surface_unit')],
     'variant': [('tools/chim/models.py', 'variant_unit')],
     'texture': [('tools/chim/models.py', 'texture_unit')],
@@ -89,6 +96,8 @@ CODE_ENTRIES = {
     'variant-placed': [('tools/chim/placed.py', 'variant_unit_placed')],
     'tiles-placed': [('tools/chim/placed.py', 'tile_unit_placed')],
     'cut': [('tools/chim/cut.py', 'cut_unit')],
+    'tiles-budget': [('tools/chim/budget_tiles.py', 'budget_tile_unit')],
+    'tiles-budget-placed': [('tools/chim/budget_tiles.py', 'budget_tile_unit_placed')],
     'ocean': [('tools/chim/ocean.py', 'build_ocean')],
     # Ground and Occluders (chim/visibility.py, reached as the workers' module) and TriangleGround (chim/ground.py)
     # are handed to the workers as objects
@@ -437,8 +446,40 @@ def _traced(worker, task):
     return value, tracer.take()
 
 
-def run_units(kind, items, worker, jobs, cache):
+class SoftError(str):
+    """A unit's error handed back as its result instead of raised (run_units SOFT): the error text. Stored in the unit
+    cache under the unit's key like any result (the key holds the worker's code and inputs, so the same key fails the
+    same way): a later run with SOFT takes the verdict from the cache instead of making the model again
+    (CHIM-ROOM-OVER-BUDGET-RETRY-48: Akulakhan's cave shell was compiled whole and refused on every run). A run without
+    SOFT never takes a cached SoftError: it runs the unit and raises, as before."""
+
+
+def unit_name(task, fp):
+    """A unit's name for the log: its model's source mesh (a variant task), else its key."""
+    model = task.get('model') if isinstance(task, dict) else None
+    if isinstance(model, dict) and model.get('source'):
+        return str(model['source'])
+    return str(fp)
+
+
+def _soft_call(worker, soft, task):
+    """Pool worker of run_units with SOFT: worker(task), or SoftError(text) when it raises a ValueError whose text
+    starts with one of SOFT (chim.budget_tiles.BUDGET_ERRORS: the unit over the brush image budget is named in the
+    first pass, CHIM-BUDGET-RERUN-SERIAL-48). Any other error is raised as before."""
+    try:
+        return worker(task)
+    except ValueError as error:
+        if str(error).startswith(soft):
+            return SoftError(str(error))
+        raise
+
+
+def run_units(kind, items, worker, jobs, cache, soft=None):
     """items: [(fingerprint, task)]; returns results in order. Misses run through the pool.
+
+    SOFT (a tuple of error text prefixes): a unit whose worker raises a ValueError starting with one of them gets a
+    SoftError (the error text) as its result instead of stopping the run (CHIM-BUDGET-RERUN-SERIAL-48), stored and
+    reused like any result (SoftError). Without SOFT a cached SoftError counts as a miss.
 
     A unit not in the cache under its key is looked up under the key's previous form (UnitKey.previous). For a kind
     with a code key (CODE_ENTRIES) every built unit's worker is traced, and this call's units are stored only when
@@ -457,13 +498,16 @@ def run_units(kind, items, worker, jobs, cache):
         if hit is None and getattr(fp, 'previous', None):
             hit = cache.get(kind, fp.previous)
             previous_hits += hit is not None
+        if isinstance(hit, SoftError) and soft is None:
+            hit = None                  # a run without SOFT makes the unit and raises its error, as before
         if hit is not None:
             results[i] = hit
         else:
             todo.append(i)
     traced = kind in CODE_ENTRIES and code_keys_on()
     if todo:
-        call = partial(_traced, worker) if traced else worker
+        unit_worker = worker if soft is None else partial(_soft_call, worker, tuple(soft))
+        call = partial(_traced, unit_worker) if traced else unit_worker
         ran, untraced = set(), False
         for i, value in zip(todo, ordered_map(call, [items[i][1] for i in todo], max(1, min(jobs, len(todo))))):
             if traced:

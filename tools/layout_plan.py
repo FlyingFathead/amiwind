@@ -19,7 +19,15 @@ CHIM region frame maps, 98 % empty (BUILD-PARTITION-GROWTH-UNGATED-36). This pla
   boot_partition_headroom_mib, for saves and settings), rounded up to whole MiB;
 - the Amiga limits win: a partition stays below 2 GiB; if payload + headroom does not fit, another
   partition is opened, the headroom is never shrunk. Partition starts and drives below 4 GiB are the
-  drive grouping's job (world_volumes.plan_drives), gated as before.
+  drive grouping's job (world_volumes.plan_drives), gated as before;
+- a boot payload over the limit is split (IMAGE-BOOT-PAYLOAD-OVER-2GIB-48): the files the engine opens through
+  its search path (common.c COM_FindFile: the boot volume's id1, then AW_WORLD0..7:id1) can live on a world
+  volume. They move as units (movable_unit: the CHIM interior store id1/chimi/ as one unit, a map with its
+  sidecars, an actor's model with its mover, layout and tag files), the largest first, only as many as DH0
+  needs to fit with its headroom; they go into the world volumes first (the CHIM world volume first) and
+  only when none has room into a further partition (role "store"). What moves is decided from the measured
+  sizes, never from a list; a payload that still cannot fit is refused naming its largest folders. The
+  plan records the units each partition takes (moved); the image step follows the plan's placement.
 
 The plan is made by the payload preflight before the image step writes anything (seconds: file sizes
 only), printed, and written to the run as layout-plan.json; the image step follows it (same partitions,
@@ -55,6 +63,49 @@ SMALL_PARTITION = 16 * MIB       # the mostly-empty check applies above this siz
 VOLUMES_FILE = 'id1/world/volumes.awv'
 VOLUMES_BYTES = 5
 MAP_BASE = 'id1/maps/'
+# Boot files the engine opens only through its search path, so they may live on any world volume
+# (IMAGE-BOOT-PAYLOAD-OVER-2GIB-48): the CHIM interior store (chim_world.c Chim_PackOpen -> COM_FOpenFile), the
+# maps and their sidecars (aw_mappath.c, model.c, chim_cuts.c, chim_far.c: COM_FOpenFile) and the actor models
+# (model.c, aw_anim.c .anm, aw_items.c .tag: COM_FOpenFile / COM_Load*File). Music (aw_music.c opens
+# <gamedir>/music directly), saves, configs and everything else stay on DH0.
+STORE_UNITS = ('id1/chimi/',)
+ACTOR_PREFIX = 'id1/progs/a_'
+
+
+def movable_unit(path):
+    """The unit a boot-relative PATH moves with to a world volume, or None when it stays on DH0: a whole store
+    folder (id1/chimi/), a map with its sidecars (id1/maps/<stem>), an actor model with its mover, layout and tag
+    files (id1/progs/a_<id>, the mover a_<id>_m)."""
+    path = str(path).replace('\\', '/')
+    for store in STORE_UNITS:
+        if path.startswith(store) and len(path) > len(store):
+            return store
+    if path == VOLUMES_FILE:
+        return None
+    for base in (MAP_BASE, ACTOR_PREFIX[:len('id1/progs/')]):
+        if path.startswith(base) and '/' not in path[len(base):]:
+            name = path[len(base):]
+            if base == MAP_BASE:
+                return MAP_BASE + name.split('.', 1)[0]
+            if path.startswith(ACTOR_PREFIX):
+                stem = name.split('.', 1)[0]
+                return base + (stem[:-2] if stem.endswith('_m') else stem)
+    return None
+
+
+def folder_sizes(rows, depth=2):
+    """[(folder, bytes, files)] of ROWS (path, bytes) by their first DEPTH path parts, largest first."""
+    out = {}
+    for path, size in rows:
+        parts = str(path).split('/')
+        key = '/'.join(parts[:depth]) if len(parts) > depth else (parts[0] if len(parts) > 1 else '/')
+        bytes_, files = out.get(key, (0, 0))
+        out[key] = (bytes_ + int(size), files + 1)
+    return sorted(((k, b, n) for k, (b, n) in out.items()), key=lambda row: (-row[1], row[0]))
+
+
+def unit_kind(key):
+    return 'store' if key in STORE_UNITS else 'map' if key.startswith(MAP_BASE) else 'actor'
 
 
 def file_blocks(size):
@@ -102,6 +153,7 @@ class Part:
         self.partition, self.volume, self.role = partition, volume, role
         self.headroom_mib = int(headroom_mib)
         self.files, self.maps, self.dirs = [], [], set()
+        self.moved = {}                  # unit key -> bytes of the boot units this partition takes
         self.blocks = 0
 
     @property
@@ -135,21 +187,39 @@ class Part:
                     payload=payload, used_blocks=self.blocks, mib=mib, bytes=mib * MIB, free_bytes=free,
                     free_share=round(free / (mib * MIB), 4), headroom_mib=self.headroom_mib,
                     largest_file=max((size for _, size in self.files), default=0),
-                    largest_directory=dict(path=crowded[0], entries=crowded[1]), maps=sorted(self.maps))
+                    largest_directory=dict(path=crowded[0], entries=crowded[1]), maps=sorted(self.maps),
+                    moved=sorted(self.moved), moved_bytes=sum(self.moved.values()))
 
 
 def fits(part, files, limit=PARTITION_LIMIT):
     return part.mib_with(files) * MIB < limit
 
 
+def unit_rows(rows):
+    """{unit key: [(path, bytes)]} of the movable boot ROWS (movable_unit)."""
+    units = {}
+    for path, size in rows:
+        key = movable_unit(path)
+        if key is not None:
+            units.setdefault(key, []).append((path, size))
+    return units
+
+
+def unit_blocks(rows):
+    return sum(file_blocks(size) for _, size in rows)
+
+
 def plan_compact(boot_files, maps=(), chim_files=None, headroom_mib=DEFAULT_HEADROOM_MIB, boot_headroom_mib=None,
-                 limit=PARTITION_LIMIT):
+                 limit=PARTITION_LIMIT, follow=None, margin=2):
     """The compact layout of a payload, before anything is written.
 
     BOOT_FILES: {boot-relative path: bytes} of DH0 without the movable maps; MAPS: [(boot-relative path, bytes)]
     of the open-world maps (id1/maps/...); CHIM_FILES: [(path below chim/, bytes)] of the CHIM world, or None.
-    Returns the plan record (mode, headroom, partitions in order: DH0, the CHIM volume, map volumes). Raises
-    ValueError naming the payload sizes when a unit cannot fit below LIMIT with its headroom."""
+    A boot payload over LIMIT moves units of its search-path files (movable_unit) to world volumes, the largest
+    first, until DH0 fits; FOLLOW (a plan made earlier, the payload preflight's) puts the units it moved where it
+    put them instead of choosing again. Returns the plan record (mode, headroom, partitions in order: DH0, the
+    CHIM volume, further world volumes). Raises ValueError naming the payload sizes and the largest boot folders
+    when a part cannot fit below LIMIT with its headroom."""
     headroom_mib = int(headroom_mib)
     boot_headroom_mib = headroom_mib if boot_headroom_mib is None else int(boot_headroom_mib)
     if headroom_mib < 0 or boot_headroom_mib < 0:
@@ -157,13 +227,41 @@ def plan_compact(boot_files, maps=(), chim_files=None, headroom_mib=DEFAULT_HEAD
     maps = sorted(((str(p), int(b)) for p, b in maps), key=lambda row: row[0])
     boot = Part('DH0', 'AMIWIND', 'boot', boot_headroom_mib)
     boot_rows = sorted((str(p), int(b)) for p, b in boot_files.items() if str(p) != VOLUMES_FILE)
-    if chim_files is not None or maps:
+    units = unit_rows(boot_rows)
+    probe = Part('DH0', 'AMIWIND', 'boot', boot_headroom_mib)
+    probe.add(boot_rows + [(VOLUMES_FILE, VOLUMES_BYTES)])
+    largest_first = sorted(units, key=lambda k: (-unit_blocks(units[k]), k))
+    planned, chosen = {}, []
+    if follow is not None:
+        planned = {key: row['partition'] for row in follow.get('partitions', [])[1:] for key in row.get('moved', ())}
+        chosen = [k for k in largest_first if k in planned]
+    elif not fits(probe, (), limit):
+        # the largest units first, until DH0 fits with MARGIN times its headroom: the payload preflight's early plan
+        # keeps two (the image step may find DH0 up to one headroom larger than planned, require_follows); a plan made
+        # from the finished staging folder keeps one, the same rule require_minimal checks, or the two disagree
+        # (IMAGE-LAYOUT-PLAN-ACTOR-LIBRARY-48, rc1-try5: a third partition require_minimal then refused). The blocks of
+        # the directories a move empties are still counted here: an upper bound; DH0 is measured exactly below.
+        chosen, blocks = [], probe.blocks
+        for key in largest_first:
+            if size_mib(blocks, margin * boot.headroom) * MIB < limit:
+                break
+            blocks -= unit_blocks(units[key])
+            chosen.append(key)
+    moving = set(chosen)
+    if chim_files is not None or maps or moving:
         boot_rows.append((VOLUMES_FILE, VOLUMES_BYTES))   # written by the image step when a world volume exists
-    boot.add(boot_rows)
+    boot.add([row for row in boot_rows if movable_unit(row[0]) not in moving])
     if not fits(boot, (), limit):
+        total = sum(b for _, b in boot_rows)
+        moved = sum(b for k in moving for _, b in units[k])
+        detail = 'it cannot be split' if not units else (
+            'moving %d of the %d units a world volume can hold (%d bytes: the interior store, maps, actor models) '
+            'leaves %d bytes on it, a %d MiB partition' % (len(moving), len(units), moved, total - moved,
+                                                         boot.mib_with()))
         raise ValueError('Boot payload %d bytes in %d files + %d MiB headroom needs a %d MiB partition (limit below '
-                         '%d bytes, 2 GiB): it cannot be split' % (sum(b for _, b in boot_rows), len(boot_rows),
-                                                                    boot_headroom_mib, boot.mib_with(), limit))
+                         '%d bytes, 2 GiB): %s; largest boot folders: %s'
+                         % (total, len(boot_rows), boot_headroom_mib, probe.mib_with(), limit, detail,
+                            ', '.join('%s %d bytes in %d files' % row for row in folder_sizes(boot.files)[:6])))
     worlds = []
     if chim_files is not None:
         chim = Part('DW0', 'AW_WORLD0', 'chim', headroom_mib)
@@ -173,6 +271,21 @@ def plan_compact(boot_files, maps=(), chim_files=None, headroom_mib=DEFAULT_HEAD
                              '(limit below %d bytes, 2 GiB)' % (sum(b for _, b in chim.files), len(chim.files),
                                                                 headroom_mib, chim.mib_with(), limit))
         worlds.append(chim)
+    for key in chosen:
+        rows = units[key]
+        want = next((part for part in worlds if part.partition == planned.get(key)), None)
+        target = want if want is not None and fits(want, rows, limit) else \
+            next((part for part in worlds if fits(part, rows, limit)), None)
+        if target is None:
+            index = len(worlds)
+            target = Part('DW%d' % index, 'AW_WORLD%d' % index, 'store', headroom_mib)
+            if not fits(target, rows, limit):
+                raise ValueError('Boot unit %s is %d bytes in %d files: with %d MiB headroom it does not fit one '
+                                 'partition below %d bytes' % (key, sum(b for _, b in rows), len(rows), headroom_mib,
+                                                               limit))
+            worlds.append(target)
+        target.add(rows)
+        target.moved[key] = sum(b for _, b in rows)
     order = worlds + [boot]
     for path, size in maps:
         row = [(path, size)]
@@ -190,10 +303,19 @@ def plan_compact(boot_files, maps=(), chim_files=None, headroom_mib=DEFAULT_HEAD
     if len(worlds) > 8:
         raise ValueError('World payload needs %d world volumes; the engine reads at most 8' % len(worlds))
     parts = [boot] + worlds
+    kinds = {}
+    for key in chosen:
+        count, size = kinds.get(unit_kind(key), (0, 0))
+        kinds[unit_kind(key)] = (count + 1, size + sum(b for _, b in units[key]))
     return dict(format='AmiWind layout plan 1', mode='compact', headroom_mib=headroom_mib,
                 boot_headroom_mib=boot_headroom_mib, partition_limit=limit, world_volumes=len(worlds),
                 partitions=[part.record() for part in parts],
-                payload=sum(sum(b for _, b in part.files) for part in parts))
+                payload=sum(sum(b for _, b in part.files) for part in parts),
+                split=dict(units=len(chosen), bytes=sum(n for _, n in kinds.values()),
+                           kinds={k: dict(units=c, bytes=b) for k, (c, b) in sorted(kinds.items())},
+                           boot_payload_before=sum(b for p, b in boot_rows if p != VOLUMES_FILE),
+                           boot_folders=[dict(folder=f, bytes=b, files=n)
+                                         for f, b, n in folder_sizes(boot_rows)[:12]]))
 
 
 def require_minimal(plan, limit=PARTITION_LIMIT):
@@ -201,16 +323,17 @@ def require_minimal(plan, limit=PARTITION_LIMIT):
     (with their directory) would fit into another partition below LIMIT with that partition's headroom."""
     rows = plan['partitions']
     for row in rows:
-        if row['role'] != 'maps':
+        if row['role'] not in ('maps', 'store'):
             continue
         for other in rows:
             if other is row:
                 continue
             blocks = other['used_blocks'] + row['used_blocks']   # an upper bound: shared directories counted twice
             if size_mib(blocks, other['headroom_mib'] * MIB) * MIB < limit:
-                raise ValueError('More partitions than the payload needs: %s (%d maps, payload %d bytes) fits into %s '
-                                 '(payload %d bytes) below 2 GiB with its %d MiB headroom'
-                                 % (row['partition'], len(row['maps']), row['payload'], other['partition'],
+                units = ', %d moved units' % len(row.get('moved') or ()) if row['role'] == 'store' else ''
+                raise ValueError('More partitions than the payload needs: %s (%d maps%s, payload %d bytes) fits into '
+                                 '%s (payload %d bytes) below 2 GiB with its %d MiB headroom'
+                                 % (row['partition'], len(row['maps']), units, row['payload'], other['partition'],
                                     other['payload'], other['headroom_mib']))
     return True
 
@@ -239,10 +362,12 @@ def require_headroom(receipts, plan):
 
 def require_follows(planned, actual, shrink=None):
     """The image step follows the plan: the same partitions with the same roles and maps, and every partition's
-    payload within its headroom of the planned payload. A refusal names the partition, both payloads and the
-    headroom. SHRINK: {partition: bytes} the image step stored once after the plan was made (tools/payload_share.py),
-    added back before the comparison, so a payload made smaller on purpose still follows its plan."""
-    shrink = shrink or {}
+    payload within its headroom of the planned payload, and no boot unit on another partition than planned. A refusal
+    names the partition, both payloads and the headroom. SHRINK: {partition: bytes} the image step stored once after
+    the plan was made (tools/payload_share.py), added back before the comparison, so a payload made smaller on purpose
+    still follows its plan; the bytes are added back to the partitions that came out smaller than planned, DH0
+    first (a file stored once may be one a world volume took from DH0)."""
+    pool = sum(int(v) for v in (shrink or {}).values())
     if planned.get('mode') != actual.get('mode'):
         raise ValueError('Layout plan is %s, the image step lays out %s' % (planned.get('mode'), actual.get('mode')))
     for key in ('headroom_mib', 'boot_headroom_mib'):
@@ -259,13 +384,43 @@ def require_follows(planned, actual, shrink=None):
             moved = sorted(set(p['maps']) ^ set(a['maps']))
             problems.append('%s holds other maps than planned (%d differ, first %s)'
                             % (p['partition'], len(moved), ', '.join(moved[:4])))
-        delta = a['payload'] + int(shrink.get(p['partition'], 0)) - p['payload']
+        # a unit planned elsewhere is a moved unit; a planned unit the payload no longer has is not (stored once)
+        stray = sorted(set(a.get('moved') or ()) - set(p.get('moved') or ()))
+        if stray:
+            problems.append('%s holds boot units not planned there (%d, first %s)'
+                            % (p['partition'], len(stray), ', '.join(stray[:4])))
+        delta = a['payload'] - p['payload']
+        if delta < 0 and pool:
+            back = min(-delta, pool)
+            delta, pool = delta + back, pool - back
         if abs(delta) > p['headroom_mib'] * MIB:
             problems.append('%s payload %d bytes, planned %d bytes: %+d bytes, more than its %d MiB headroom'
                             % (p['partition'], a['payload'], p['payload'], delta, p['headroom_mib']))
     if problems:
         raise ValueError('The staged payload no longer matches the layout plan: ' + '; '.join(problems))
     return True
+
+
+def follows_or_grew(planned, actual, shrink=None):
+    """None when ACTUAL follows PLANNED (require_follows); (bytes grown, the mismatch) when it does not only because the
+    payload grew after the plan was made; any other mismatch raises. IMAGE-LAYOUT-PLAN-ACTOR-LIBRARY-48: the payload
+    preflight plans before the image step writes the room actors; the v0.0.48-rc1 boot payload grew from 2.45 to
+    3.01 GB inside the step and needed a third partition, and the image stopped on a plan that could not see it. Then
+    rc1-try4, planned at 3 partitions, stopped the other way: the image's payload sharing (shared skins, file aliases)
+    took 156 MB off after the plan and the maps moved between DW0 and DW1. A payload that CHANGED after the plan, in
+    either direction, is laid out from the staged files: require_minimal and the headroom gate on the written
+    partitions still decide whether it fits. Still refused: another mode or headroom, a partition role the plan had
+    and the payload lost, and a mismatch with no change of payload at all (a planning bug, not a later step)."""
+    try:
+        require_follows(planned, actual, shrink=shrink)
+        return None
+    except ValueError as exc:
+        changed = sum(r['payload'] for r in actual['partitions']) - sum(r['payload'] for r in planned['partitions'])
+        lost = {r['role'] for r in planned['partitions']} - {r['role'] for r in actual['partitions']}
+        if not changed or lost or planned.get('mode') != actual.get('mode') or any(
+                planned.get(key) != actual.get(key) for key in ('headroom_mib', 'boot_headroom_mib')):
+            raise
+        return changed, str(exc)
 
 
 def assign(plan, maps):
@@ -281,19 +436,40 @@ def assign(plan, maps):
     return out
 
 
+def assign_units(plan, paths):
+    """{partition: [(path, boot-relative path)]} of the boot PATHS (boot-relative path strings or (path, rel) pairs)
+    whose unit (movable_unit) the plan moved to a world volume; the other paths are not listed."""
+    where = {key: row['partition'] for row in plan['partitions'][1:] for key in row.get('moved') or ()}
+    out = {row['partition']: [] for row in plan['partitions'][1:]}
+    for item in paths:
+        path, rel = item if isinstance(item, tuple) else (item, item)
+        key = movable_unit(rel)
+        if key in where:
+            out[where[key]].append((path, rel))
+    return out
+
+
 def lines(plan):
-    """Printable plan: one summary line and one line per partition."""
+    """Printable plan: one summary line, the boot split when there is one, and one line per partition."""
     rows = plan['partitions']
     head = 'Layout plan (%s): %d partition%s, headroom %d MiB per partition%s' % (
         plan['mode'], len(rows), '' if len(rows) == 1 else 's', plan['headroom_mib'],
         '' if plan['boot_headroom_mib'] == plan['headroom_mib'] else ', DH0 %d MiB' % plan['boot_headroom_mib'])
     out = [head]
+    split = plan.get('split') or {}
+    if split.get('units'):
+        out.append('  Boot payload %d bytes is over one partition: %d units (%d bytes) moved to world volumes: %s; '
+                   'largest boot folders: %s'
+                   % (split['boot_payload_before'], split['units'], split['bytes'],
+                      ', '.join('%s %d (%d bytes)' % (k, v['units'], v['bytes']) for k, v in split['kinds'].items()),
+                      ', '.join('%s %d bytes' % (f['folder'], f['bytes']) for f in split['boot_folders'][:6])))
     for r in rows:
         out.append('  %s %s (%s): payload %d bytes in %d files + headroom -> %d MiB, %d bytes free (%.1f %%), '
-                   'largest directory %s %d entries%s'
+                   'largest directory %s %d entries%s%s'
                    % (r['partition'], r['volume'], r['role'], r['payload'], r['files'], r['mib'], r['free_bytes'],
                       100 * r['free_share'], r['largest_directory']['path'], r['largest_directory']['entries'],
-                      ', %d maps' % len(r['maps']) if r['maps'] else ''))
+                      ', %d maps' % len(r['maps']) if r['maps'] else '',
+                      ', %d boot units (%d bytes)' % (len(r['moved']), r['moved_bytes']) if r.get('moved') else ''))
     return out
 
 
@@ -321,6 +497,27 @@ def resolve(layout=None, headroom_mib=None, boot_headroom_mib=None, config=None)
 
 
 def walk(folder, prefix=''):
+    """[(PREFIX + relative posix path, bytes)] of every file under FOLDER, in path order (by path parts, as sorted
+    Path objects order). One os.walk with string paths (BUILD-IMAGE-UNDERUSED-32: the pathlib walk of the CHIM
+    world's 37,000 files took 4 s on one core in each payload preflight); AMIWIND_LAYOUT_WALK=pathlib keeps the
+    method before. The same list either way."""
+    import os
+    if os.environ.get('AMIWIND_LAYOUT_WALK', 'os') == 'pathlib':
+        return _walk_pathlib(folder, prefix)
+    root = os.fspath(folder)
+    found = []
+    for top, _, names in os.walk(root):
+        rel = os.path.relpath(top, root).replace(os.sep, '/')
+        base = '' if rel == '.' else rel + '/'
+        for name in names:
+            path = os.path.join(top, name)
+            if os.path.isfile(path):
+                found.append((base + name, path))
+    found.sort(key=lambda row: row[0].split('/'))
+    return [(prefix + rel, os.stat(path).st_size) for rel, path in found]
+
+
+def _walk_pathlib(folder, prefix=''):
     folder = Path(folder)
     return [(prefix + p.relative_to(folder).as_posix(), p.stat().st_size)
             for p in sorted(folder.rglob('*')) if p.is_file()]

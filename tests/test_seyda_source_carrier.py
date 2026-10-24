@@ -213,6 +213,7 @@ class DirectSourceTests(unittest.TestCase):
             root=Path(tmp);(root/'id1/maps').mkdir(parents=True)
             parts=empty_world((-10,-10,-10),(10,10,10));parts[0]=entity_text([{'classname':'worldspawn'}])
             raw=pack_lumps(parts);path=root/'id1/maps/seyda.bsp';path.write_bytes(raw)
+            import seyda_entities;seyda_entities.publish(root,raw)  # BUILD-SEYDA-ENTITY-BUS-48
             barrel=dict(number=BARREL,id=opening.BARREL,type='CONT',position=[*CENTRE,0])
             with patch.object(opening,'resolve_data_files',return_value=root), \
                  patch.object(opening,'opening_references',return_value=([barrel],[barrel],{'ship'})), \

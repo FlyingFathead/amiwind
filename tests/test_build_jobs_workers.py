@@ -38,7 +38,8 @@ import env_guard  # noqa: E402
 TOOLS = {k: '/tools/' + k for k in ('qbsp', 'vis', 'light', 'qcc', 'ffmpeg', 'xdftool', 'rdbtool')}
 # Stages whose tool has no worker pool: one process each, budgeted as one slot.
 SERIAL_BY_DESIGN = {'setup', 'terrain', 'npcs', 'hands', 'dialogue-lookup', 'door-audio',
-                    'reading', 'opening-references', 'world-ui', 'cell-progress'}  # cell-progress: one ingest pass
+                    'reading', 'opening-references', 'world-ui', 'cell-progress',  # cell-progress: one ingest pass
+                    'mwscript'}  # mwscript: one unit, the whole program (member access needs every script); seconds
 # Independent per-item loops not yet in the pool (tracked; remove when pooled).
 SERIAL_NOT_YET_POOLED = set()
 

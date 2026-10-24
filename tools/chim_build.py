@@ -102,6 +102,11 @@ def _cli(argv=None):
                     help='Shapes whose texture scrolls in the original (the Ghostfence curtain, waterfalls, the ash mire; '
                          'not lava): off (default) a still texture; turbulent a Quake turbulent texture that ripples '
                          'over time, unlit (GHOSTFENCE-NO-ANIMATION-46)')
+    ap.add_argument('--placement-light', choices=('off', 'sources'), default='off',
+                    help='EXPERIMENTAL (CHIM-MESHLESS-LIGHTS-33): sources = every exterior light source that adds '
+                         'light gives the placed models it reaches a light level in their records (world format '
+                         '0.12; needs the hybrid lighting type and placement format 0.8; '
+                         'tools/chim/placement_light.py); off (default) = none')
     ap.add_argument('--model-weld', choices=('base', 'placed'), default='base',
                     help='How a model variant shares its vertices: base (default: as its base, the prepared mesh '
                          'unscaled, so every scale and tilt has the same vertices and edges; '
@@ -167,10 +172,9 @@ def _cli(argv=None):
                          'margin) or frame (the whole frame with its border copies, the method before v0.0.42); '
                          'sets AMIWIND_STAIR_WALK_AREA (chim.collision.walk_area_mode)')
     ap.add_argument('--stair-collision-method', choices=('0', '1'), default=None,
-                    help='How a flight of stairs gets its collision: 0 (default) the convex proxies with the stair '
-                         'rules, proven by the stair walk; 1 (EXPERIMENTAL) a stairway collision mesh (one ramp, or one '
-                         'block per tread) for every flight whose collision fails the geometric stair check '
-                         '(tools/stair_mesh.py); sets AMIWIND_STAIR_COLLISION_METHOD')
+                    help='How a flight of stairs gets its collision: 1 (default since v0.0.48-dev2) a stairway collision mesh (one ramp, or one block per tread) for every flight whose collision fails the geometric stair check (tools/stair_mesh.py; a mesh without a flight keeps its collision and unit key); 0 the convex proxies with the stair rules (the method before, kept for A/B); sets AMIWIND_STAIR_COLLISION_METHOD')
+    ap.add_argument('--collision-source', choices=('authored', 'profile'), default=None,
+                    help='Which triangles of a model collide: authored (default since v0.0.48-dev2) one rule for every mesh converter: the root RootCollisionNode, else the drawn triangles; NC* and NCC models nonsolid, AvoidNode subtrees left out (tools/collision_source.py, COLLISION-RCN-SCOPE-32); profile the rule before (each converter profile opts in, the drawn triangles otherwise; kept for A/B); sets AMIWIND_COLLISION_SOURCE')
     ap.add_argument('--collision-underside', choices=('rule', 'split', 'whole', 'names'), default=None,
                     help='How a model keeps collision a convex piece closes under an authored ceiling: names '
                          '(default: a list of mesh names) or the EXPERIMENTAL general rules rule, split, whole '
@@ -268,6 +272,24 @@ def _main(ap, a):
         lighting_type = check_lighting(a.lighting_type or LIGHTING_DEFAULT)
     except ValueError as exc:
         ap.exit(1, 'Error: %s\n' % exc)
+    # Placement light levels (hybrid part 2, chim.placement_light; EXPERIMENTAL, --placement-light sources): the world
+    # writer reads the light sources from the master of the data files; off (the default) and the 'lamps' and 'none'
+    # types store none (the earlier methods, kept)
+    from chim import placement_light
+    if a.placement_light != 'off' and placement_light.mode_for_lighting(lighting_type) == 'off':
+        ap.exit(1, 'Error: --placement-light %s needs the hybrid lighting type (got %s)\n'
+                % (a.placement_light, lighting_type))
+    os.environ[placement_light.MODE_VARIABLE] = a.placement_light
+    if os.environ[placement_light.MODE_VARIABLE] != 'off':
+        from mwad.paths import child_ci
+        try:
+            master = child_ci(a.data_files, 'Morrowind.esm', required=False)
+        except (OSError, ValueError) as exc:
+            ap.exit(1, 'Error: the data files cannot be read (%s)\n' % exc)
+        if master is None:
+            ap.exit(1, 'Error: the %s lighting type needs Morrowind.esm in the data files (placement light levels)\n'
+                    % lighting_type)
+        os.environ[placement_light.MASTER_VARIABLE] = str(master)
     from chim.areas import area_problems
     problems = area_problems(areas)
     if problems:
@@ -279,6 +301,9 @@ def _main(ap, a):
     if a.stair_collision_method:
         from stair_collision_env import export_stair_collision_method
         export_stair_collision_method(a.stair_collision_method)
+    if a.collision_source:
+        from collision_source_env import export_collision_source
+        export_collision_source(a.collision_source)
     if a.scale_snap:
         os.environ['AMIWIND_SCALE_SNAP'] = '' if a.scale_snap == 'on' else 'off'
     if a.stair_walk_cache:
@@ -351,7 +376,11 @@ def _main(ap, a):
         if not report['ok']:
             ap.exit(1, 'Error: the CHIM world fails validation (%s)\n' % (a.out / 'chim-validate.json'))
         # the source manifest is let go (about 700 MB of JSON for 1,351 frames, several GB as objects: the stair
-        # gate's workers need that memory); the stats read it again (one C JSON parse, seconds)
+        # gate's workers need that memory). The stats keep only what they read of it, each frame's area and cell
+        # (chim.stats.source_cells); before v0.0.48 they parsed the whole manifest again, 16 to 18 s on one core
+        # (BUILD-STATS-SERIAL-36; AMIWIND_STATS_POOL=off still does)
+        from chim.stats import pool_on, source_cells
+        stats_source = source_cells(source_doc) if a.stats and pool_on() and source_doc is not None else None
         source_doc = None
         validated = (world, report['measured'])
         # the gates below read the world the validation read (--pool stage), instead of reading and decoding
@@ -369,8 +398,10 @@ def _main(ap, a):
             except ValueError as exc:
                 check_timer.__exit__(ValueError, exc, None)
                 ap.exit(1, 'Error: %s\n' % exc)
-            check_timer.done('CHIM stair check: %s (%d meshes with %d flights, %d ship a stairway collision mesh)'
-                             % (found['status'], found['meshes'], found['flights'], len(found['ships_method_1'])))
+            check_timer.done('CHIM stair check: %s (%d meshes with %d flights, %d ship a stairway collision mesh, '
+                             '%d known meshes method 1 cannot fix yet: %s)'
+                             % (found['status'], found['meshes'], found['flights'], len(found['ships_method_1']),
+                                len(found['known']), found['known_class'] or 'config/stair-check-known.json'))
             check_timer.__exit__(None, None, None)
 
         def stair_gate():
@@ -418,8 +449,8 @@ def _main(ap, a):
                   % ', '.join(fallback['kept_as_chain']), flush=True)
         if a.stats:
             # While the validation's world is in memory (the gates never change the world).
-            write_stats(a, build_profile, validated)
-            validated = None
+            write_stats(a, build_profile, validated, stats_source)
+            validated = stats_source = None
         # Order with --gate-order stairs-last (BUILD-CHIM-HEAP-GATE-LATE-36, the method before v0.0.42): the checks that
         # take seconds per frame first (heap, zone walk), the stair walk last, so a ring over the zone stops the stage at
         # once.
@@ -441,6 +472,18 @@ def _main(ap, a):
                f['largest_block_bytes'], f['budget_bytes'], f['gated_ring'])
             for f in heap.get('frames', []))))
         heap_timer.__exit__(None, None, None)
+        if 'fast_ram_32mb' in heap:
+            # frames over or near the 16 MB budget: built as they are, marked as needing 32 MB of Fast RAM (the image
+            # step writes the mark into their frame maps); the counts go into the receipt for the build summary
+            # (CHIM-FRAME-16MB-REFUSAL-48)
+            fast = heap['fast_ram_32mb']
+            print('CHIM frames that need 32 MB of Fast RAM (over or within %d bytes of the 16 MB budget; the player is '
+                  'kept out on less): %d%s' % (fast['near_bytes'], fast['frames'], (': ' + ', '.join(
+                      fast['frame_records'])) if fast['frame_records'] else ''), flush=True)
+            receipt_path = a.out / 'chim-receipt.json'
+            receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+            receipt['fast_ram_32mb'] = fast
+            receipt_path.write_text(receipt_text(receipt, a.jobs) + '\n', encoding='utf-8', newline='\n')
         # The engine's own zone allocator over a walk through every frame: never a step without ground
         # (CHIM-CHUNK-LOAD-FAIL-33, chim.zone_sim).
         from chim.zone_sim import require_zone_walk
@@ -477,13 +520,15 @@ def receipt_text(receipt, jobs):
     return parallel_json.dumps(receipt, RECEIPT_LISTS, jobs=resolve_jobs(jobs))
 
 
-def write_stats(a, build_profile, validated):
+def write_stats(a, build_profile, validated, source=None):
     """chim-stats.json (chim.stats), timed; with VALIDATED (world, measurements) of this build's validation the
-    world is not validated a second time."""
+    world is not validated a second time. SOURCE: what the stats read of the source manifest (chim.stats.source_cells
+    of the manifest the validation read), else they read the manifest file."""
     from chim.stats import main as stats
     with build_profile.phase('CHIM stats', 'reusing this build\'s validation' if validated else 'validating the world'):
         from build_jobs import resolve_jobs
-        code = stats([str(a.out)], *(validated or (None, None)), jobs=resolve_jobs(a.jobs))
+        code = stats([str(a.out)], *(validated or (None, None)), jobs=resolve_jobs(a.jobs),
+                     source=source if validated else None)
     return code
 
 

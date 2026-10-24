@@ -84,7 +84,8 @@ class FsUaeKeyboardPortTests(unittest.TestCase):
         self.assertNotIn('uae_cpu_speed', slow)
         normal = settings(ROOT / 'resources/emulators' / ('AmiWind-v%s-FS-UAE.fs-uae' % version()))
         # The normal machine is what the launcher and the build's emulator configs write: the template with the
-        # default Fast RAM (128 MiB since 21 October 2026; older version templates still say 16 MiB).
+        # default Fast RAM (32 MiB, the safe minimum, since 23 October 2026; 128 MiB from 21 October; older version
+        # templates still say 16 or 128 MiB).
         normal.update(launcher().fast_ram_fs_uae_values(launcher().FAST_RAM_DEFAULT_MIB))
         def machine(values):
             return {k: v for k, v in values.items() if k not in SPEED_KEYS and not k.startswith('hard_drive_')}

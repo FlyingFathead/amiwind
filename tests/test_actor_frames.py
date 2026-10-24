@@ -220,7 +220,9 @@ class PayloadAuditTests(unittest.TestCase):
 
     def test_preflight_runs_it(self):
         source = (ROOT / 'tools/payload_preflight.py').read_text(encoding='utf-8')
-        self.assertIn("('actor-frames', lambda: check_actor_frames(id1, removed))", source)
+        # (in a process of its own beside the other checks since v0.0.48, else on a thread: BUILD-IMAGE-UNDERUSED-32)
+        self.assertIn("'actor-frames': (check_actor_frames, id1, removed)", source)
+        self.assertIn("('actor-frames', check('actor-frames'))", source)
 
 
 # Every site that reads an actor model's frame count or frame indices, with its verdict (the sweep table in

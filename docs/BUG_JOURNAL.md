@@ -1,11 +1,12 @@
 # Bug journal
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
-_Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [CHIM-32MB-SAVE-ENTRY-48 fixed; BUILD-ACTOR-MODEL-UNSUPPORTED-48 closed, ACTOR-MODEL-ERROR-UNNAMED-48 registered, 23 October 2026](#chim-32mb-save-entry-48-fixed-build-actor-model-unsupported-48-closed-actor-model-error-unnamed-48-registered-23-october-2026)
+- [PLAYER-MOVEMENT-STATS-PARITY-39 persisting, repaired in source; PLAYER-JUMP-ORIGINAL-RULES-48 registered, 23 October 2026](#player-movement-stats-parity-39-persisting-repaired-in-source-player-jump-original-rules-48-registered-23-october-2026)
 - [INTERIOR-PLACED-ITEMS-47: design of record, the shell baked and everything takeable as objects, 21 October 2026](#interior-placed-items-47-design-of-record-the-shell-baked-and-everything-takeable-as-objects-21-october-2026)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47 and CHIM-ACTOR-TABLE-OFF-IN-GAME-47 registered, 21 October 2026](#build-chim-cells-private-list-47-and-chim-actor-table-off-in-game-47-registered-21-october-2026)
 - [BUILD-IMAGE-WORLD-READ-FRAMES-47: the v0.0.47-dev2 build's frame-read pool on 3 of 24 cores, 21 October 2026](#build-image-world-read-frames-47-the-v0047-dev2-builds-frame-read-pool-on-3-of-24-cores-21-october-2026)
@@ -117,6 +118,28 @@ _Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 - [INTERIOR-SPAWN-UNDERWATER-41, 17 October 2026](#interior-spawn-underwater-41-17-october-2026)
 
 <!-- contents end -->
+
+## CHIM-32MB-SAVE-ENTRY-48 fixed; BUILD-ACTOR-MODEL-UNSUPPORTED-48 closed, ACTOR-MODEL-ERROR-UNNAMED-48 registered, 23 October 2026
+
+[CHIM-32MB-SAVE-ENTRY-48](bugs/CHIM-32MB-SAVE-ENTRY-48.md): on 16 MB of Fast RAM (or Extra RAM off) a save, a start
+or a console jump into a room or frame marked for 32 MB loaded it anyway; only the door and the crossing were
+refused. Fixed in v0.0.48 (branch v0.0.48-fix-32mb-saves): every entry asks one check and shows the refused-room
+screen; ENTER returns to the main menu for a load or a start, to the game for a console jump.
+[BUILD-ACTOR-MODEL-UNSUPPORTED-48](bugs/BUILD-ACTOR-MODEL-UNSUPPORTED-48.md): the "Unsupported actor model" stop of
+a Balmora build-speed measurement does not reproduce on the release line (6,698 models decoded read only, none
+refused as unsupported; the run's log was deleted). Closed with that evidence;
+[ACTOR-MODEL-ERROR-UNNAMED-48](bugs/ACTOR-MODEL-ERROR-UNNAMED-48.md) registered for the message naming no model,
+left for v0.0.49.
+
+## PLAYER-MOVEMENT-STATS-PARITY-39 persisting, repaired in source; PLAYER-JUMP-ORIGINAL-RULES-48 registered, 23 October 2026
+
+[PLAYER-MOVEMENT-STATS-PARITY-39](bugs/PLAYER-MOVEMENT-STATS-PARITY-39.md), reported a third time by the maintainer:
+the character crosses the island far faster than a new character can. Fixed in source on branch
+v0.0.48-player-speed (edf2509d), not shipped at the time of writing: walking, running and swimming use the original's
+rules from the live character sheet, the load and the race weight (a new Nord male Barbarian walks 46.9 and runs 98.4
+units/s, was 120 and 216); running, swimming and jumping cost fatigue; the old speeds stay as `dbg superspeed`.
+[PLAYER-JUMP-ORIGINAL-RULES-48](bugs/PLAYER-JUMP-ORIGINAL-RULES-48.md) registered for what is left: the jump height
+and in-air control, which wait on the gravity scale.
 
 ## INTERIOR-PLACED-ITEMS-47: design of record, the shell baked and everything takeable as objects, 21 October 2026
 

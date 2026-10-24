@@ -192,6 +192,1288 @@
     8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9,9,9,9,\
     9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,11,11,11,11,11\
 }
+/* Batch rooms (config/room-batches.json) by id: "" for an id held by a town or scene list. */
+#define AW_ROOM_BATCH_COUNT 1134
+#define AW_ROOM_BATCH_NAMES {\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","ri62eedf6bdd","ri71005750d1","ri7b67e49c77","rie9133221ca","ri06d5f66bf2",\
+    "rif403da1b9b","ri7aa635c60d","ri3b9b6d9e41","rib9e3f36040","ri1c49002660","rieaf7e7e5a1","ri9777f711a0","ri5a93c6fb07",\
+    "ri91b948e452","ride87a1e2dc","rid32e2594bc","riadef560102","ri72ab0ebb3e","rie2b45e3f0f","ri0459bdc228","ri38ff526178",\
+    "ri4271da8877","rid04d5b87f9","ri828d27dbca","ri814777f250","rife6899da09","ria7f3234fd5","ri7aa1c07a66","ric3d8831e37",\
+    "ri101745eb6d","riab3809a8af","ria304099872","ribbd004285a","ri6365dd1274","ridda68832f6","rif048f7b1fa","ric0c276c959",\
+    "ri0ee8223f9f","ri77c209e3fc","rid1ab922d17","ri33c662816f","ri136c682ea5","ri8190d0e953","ri8b47ae4034","ri4e637e68be",\
+    "rib939c2dfd1","ri2585581ec9","ri01fb99766b","rid4b122f244","ri22d857d12a","rif01611dfde","rid3eb7fb70c","ri3c81acf364",\
+    "ri9ec1ea15fd","ri15d270e67b","ri31eb06d06e","ri68838e53b7","rifdf4dcf485","rie62bf0f626","ri1a454a5e47","ria796763697",\
+    "ri4d75b462f9","ria14616ed51","ri74f0c7a5e6","ri827acdd64f","ri0c2d3c1611","ri0787889fbc","ri2c4966dea7","ri9d0da4448a",\
+    "ri08eeabf36f","ri058bdb38bb","ri471df6e7f0","ri3c078b99a5","ri703c7c9b13","ric84ff617c0","ri2eea313d4b","ri1bed8986e6",\
+    "ri152b160ba3","ri6bb1bc3589","ri607d6c9db6","ri248063245a","ric35932b49b","ri75123a395e","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","ri1c11543f8b","ri19bb93088b","riee360aa07f","ri52b96d0daa","ri0ff6056a44","ri1ebda33a37",\
+    "ric148a3d4a5","ri57c6758922","ri3ecf473476","ri7c7a91b78d","ric9665a92dd","ri27b2474f9e","ri56aab62e86","ri94eb640f3e",\
+    "ri1b5fd7df9d","ria8e55def01","ric3b426652d","ri90137b91fc","ri5d677181e5","ri3f5a228d0c","ri2053902b82","ri631bc24d48",\
+    "ri4b379017d3","ri7dd7b6ce6c","ri5028c6e849","ri6d45c7bec9","ri69e731eccf","rie19492511f","ric9d2d377d8","ri89f2ec9f11",\
+    "ri903d0773d3","rid5caaaa137","ri58637e625e","ri505b983e75","ricb0f425dc9","rie982545fa4","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","","","","","","",\
+    "","","ric1a390d4b5","rif7e483802e","ri789528e9d5","ri029535eeed","ric9342a83a5","ri2c2cd5810d",\
+    "ri079498a32e","rid6e5dd1a19","ri898b7c70c6","ri3a7650f6f2","rie9b09f6871","ri5c5b3989be","ri296dc94740","ri40c455b7ea",\
+    "ri0dc9a11ecb","ri3ea1c01dd7","ri5089bee7a8","rifd97a4b9e5","ri39916f0eea","ri3b06e91757","ri814c323aa9","ric8922e0359",\
+    "ri12e942f378","ribc37865cc0","ri2668c09e45","ri815f5fdcee","ri5467ef67fa","rifea162ace2","riccd99b9fc2","ri49b6481803",\
+    "ri1865c1dd68","ri89b3681bb8","ri65bfd5746d","ri0683a6c8a5","rib888788906","rib228f06276","riebe68cb888","ri51be9f0b2a",\
+    "rie7b2411ead","riab2801d3fb","ri3c172d6bf7","ri3120a2a162","ri9089d7442f","","","",\
+    "","","","","","","","",\
+    "","","","","ri834662986a","ribe8c6fb0e6","ri395e591c3f","ri2c347f868f",\
+    "ribb3fcf577c","ri90fa83f7f4","ri06b9b9bf14","rie6857988bf","rif58b3b6ef6","ri654a4e2684","ri07037332af","ri8c89896a49",\
+    "ri71cb10ebef","ri8a43cb5be6","ric88eab28f2","rifd97caac39","ri5adbd455fe","ri17d620732d","ri2e51f2b0ec","ri162e1d079c",\
+    "riae5c682c65","ria12583249a","ri35195ebab7","ri869f3eb4ce","ri17d65bfcb2","ri17582fcd43","ri5bee9a1021","ri821601894b",\
+    "ri2eaf7121e8","ri4cc3f06016","rib635da1634","ri6311df2bc9","ri546fd27abb","ri968a0f79d4","ri5b00d48cc0","ri1c501a90fe",\
+    "ri57118e7f12","ri54896bd2ec","ri393fc4c156","ric5e9a38a4d","ria53b74cb54","rib318c18c90","ri955befc1aa","ri79b7af5d2d",\
+    "ri78ef86ca85","ri5ceaec323c","ri774fa9cb6c","rif0c21c8e7c","rib595951b97","rib6538161e7","ri528249b1e2","ri4bd0f397b2",\
+    "ri48694adc48","ric134e9e26c","rie4371edf61","ri30bb333412","rid6917a64c7","ri9e78f75213","rie1260de361","riee84ccd8d6",\
+    "rica41ed7a08","ri13ec2a6715","ri088366a967","ri6a1acf7353","ribf2a1fe30f","rid94a503477","ri1f4b8f3e4d","ri97a699639e",\
+    "ri3e958bac4c","ri2a1e55f5d3","ri25d3cf4801","rib8d5c0bc42","ri75a1486491","riae2cd77fa2","ri3fcac767e6","rie7f790ee10",\
+    "ri475cfd55b4","ri8059a11c3c","ri0d2ccecb96","ri814ad9a613","ri82372b4643","rie8ae506883","ria2f153a6f0","ri17b3b4b439",\
+    "ri6521e6f721","ri782c68d910","ri684129ca38","rifc8a9ce4a6","ri470cdb061d","ri06f0f09f7b","rid27317c019","ri49d4cb0083",\
+    "ria55680bcbf","ri0eabfb9ab6","rib0033cb6db","ri62e6723405","rida181732ba","ri63732b8135","riec354b6729","ri8fee3f26fc",\
+    "ria276873b2d","ridd05bf74e4","riafaaad6432","ridb50846d67","ricff6edb6f5","ri3e3961c883","ri9b21515544","ri90d7afeec9",\
+    "riff5232ddc2","rieaf921f000","ri46df5625c0","ri914c2085b0","ri8877c36604","ri7409716370","rif6a788e7a2","ri31f6e265ad",\
+    "ri0c3f61e64e","ri7b1090c12e","ri7f28273fd6","ri76bb98a796","ric966bd2de0","rid89c31069c","ric1f948c14b","ri5eee692f4c",\
+    "ri34e1c12e02","ri362bcc8b89","ri3f2711b887","rifd4385ab35","ri659d9dec8b","ri4aaa04b678","rife80fd9764","ri90b8d49b2c",\
+    "rid5517fabec","ric2b6a39e4a","ria85b7afa0d","ri4779ded14e","rif574b0a4d5","ric013e2b9c4","rifd12d81921","",\
+    "","","","","","ri29398fffac","ri244c77279d","ri65605e62e0",\
+    "rie03f62da00","ri1a7d76a4ea","ribaba6ef877","ri364ab30d00","ri036a9685ed","ri34fde6dac0","ri9fa0bef7a2","ri1fde52a8fa",\
+    "rib6444627c2","ri3b3af8cbbc","rib0a7ba650e","ri6560f30638","ri91cc3191cb","rid1c6111857","ri79e84f6209","ric1fbda8cd5",\
+    "riccdc47555b","ri601a4458a7","ri4cde3f0c10","rie4a7319c9b","ric1a8eec68b","ri2d1f65c50f","ri963334ad4a","ri3e1cda318d",\
+    "rif0d7e47939","riece54783ad","ri15c142340e","ri4dd20e2507","ri5d37f57561","ri87eae2521c","ri7183609747","rie103135026",\
+    "ri71c3339d8b","ri53e393fd9d","rie237147f17","rid914e42d48","ri3eb4e9b8dc","ri2d5268b33c","rif29f92c26d","ria8bd10187b",\
+    "ri1a163a039d","rid2a8b70685","riee649d0e25","rid9c2d9e062","ri841dc09c25","ri8d3c02d1f6","ri5ec1615488","ri223292a44c",\
+    "ria3fb315cd9","ri68cb4d463f","ricb1d0edb87","rieac01f99fa","ri2e6f186241","ri9ec7d20e81","riad7b8b847b","ri41ded11d46",\
+    "ri9b12852e15","ri59a6f3591e","ri7df359db4e","ri5c46ec1f25","rifb42c89f91","ribfbb7c2e64","riec68f566ef","ri2a3e24da36",\
+    "ri7c26ec0802","rifa2657cbe9","riaa080d8017","ri33e7b991d6","ri0dd9659473","ri7e3f12014a","ri6c5727b6bd","ri464e71a3b2",\
+    "ri06563b2a13","riccde1578c1","rid69ebf71b7","rid028fee80a","ri62ada0be19","ried49f91454","riba80e7639e","ri7bb68f8929",\
+    "ri052d5aa251","ri91e0046886","ri43f6a86c6a","riafd32be7ff","rie868f5df61","ri7f818982ea","ri058151e676","riac3c29a146",\
+    "ri3017ede59b","ri865810dc92","","ri0c65d019fd","ri537e703f88","ri2597164dee","ri4c806318b4","ribb7c1b3fe6",\
+    "rifa414fba1a","rif7b433c5ac","ribe87fa2aa2","riacf93c3ff2","rid98e30c427","ri963f0f2ac5","rif6fa78147b","rie050c95d46",\
+    "rib33dc46f3a","ria933169bb7","ri8eba22e77b","ric6f02cfe8a","ri28ad7886cb","ric9ff7ea290","ri106ff3a0aa","ri5e08bb7926",\
+    "ri0ed2e2fbaa","ri7a64464b52","ric1d29afbe4","ridbab470875","ri62fae6b9aa","ri6142fa700f","rib63d9f3faf","ri20c3097d35",\
+    "ri947d50f076","ri1e7f235ab1","ri92128a1a1d","rif70164db17","rif8b3811f08","ri93d76837b7","ri2fbecc33ce","ria786406ee4",\
+    "rid03b54af4e","ri8d8032b8b6","ri8a7e5d68aa","ri2ce48a45af","ri3049f6816d","riba834ec675","ribba3fbc118","rid1420ea445",\
+    "ri574576ad54","ri9168213259","ri0b6ea2a159","rib1fd0c30b5","rifd3f2b4021","rib7cb80cbdd","rib0aae94793","ric840067b35",\
+    "ribe46cee2d7","ri139fe1ea0f","ria8a524a4b7","ri881f7ab34a","ri32a5ffa255","ri4290293e50","ri1184f2f868","ri8849b29dde",\
+    "ri35fb323914","rida2f5c797e","rid63d76dc79","ri74adbc74c1","ric8bc98e71e","rid16fb56e79","ri7e570c6d28","rie6ec921420",\
+    "ri6c93c26f35","ri80da8d3ff4","ric698032b06","ri5390d49b8a","ri7d9c6f36e9","ri686369c47c","ri7a62cb4d21","ri278edb91f5",\
+    "rif438eeeebf","ri973c5bc903","ri784f882d6d","rie7ef016871","ri31c9a952be","ri3703ebd9e3","ric66fedb357","ri3853cdc856",\
+    "rica2e31c881","ri1f746a276e","ri38708fe054","ri2e24febe0a","ri9e7367e6e7","ri371ac67321","rifd8e74c977","ri86cad3b8ef",\
+    "rif68f45ec11","ria10e9e419a","rifb3c3ceea1","ri685ce156ce","ri2b39324e8f","rie1348d377e","ri1e6a498d38","ried0395e321",\
+    "ria2a3d4b0f3","rif7aca1832a","ri1c04e5bdf9","ri0535695ecc","riaaa1283947","ri46fd2fc3d1","ri818fa34e7c","ri7be23dabe5",\
+    "ric8070012e8","rib28beed15a","ria711b0f57f","ric47297e3e1","ri97197ee384","ri36b483e780","riee0bbf4097","ribfed5cbf51",\
+    "ri57bbb1a8d3","ri78bb70c1d9","ri253a33eb70","ri462c4b969a","ridba5ef0413","ri9320428d8e","ri2b91499555","ri9869d456d3",\
+    "ri4ba2fa892e","ri136093224d","ri25779d708c","rie894b30771","rib36c3b219e","ri21df0be601","ri8c361151ce","ric74336a6bb",\
+    "ric70e348a39","ria127f06695","ri01460bd9c0","ri5fdea99513","ri84f3427b6b","ribad5d15835","rie7301edc0d","rib85829e821",\
+    "ri16a0c0eea6","ri1c69b3e4ad","riba2b3c06bf","ri368e7c9ebe","rif67ddfaaa2","ridad1107874","rief260ea7e7","ri3a4cf14fd0",\
+    "ri8a96015c61","ri2f4693043e","rib7567c81f4","ri93c1cc1b0f","ria11ff03241","ri60357581dc","ri8f655b76e0","rib29e26c1c3",\
+    "ri2ff53770f2","ri1ece9a151a","rifc38ab1f07","ri45e855d1f6","ri8d986c0a7d","ri788440bc48","ri5f814317e7","ridb3479c17b",\
+    "ri7766f29e03","ri862846f25a","ri9661d92a61","ric770080610","ri25c01969ae","ri4b4ee7c383","ri805c203624","ri95800f1303",\
+    "ri0affe0bf72","ri8aac4a419a","ri4cb8602b60","ri7e831285c9","ri97f644f9c3","rib7cabb31ff","rif95422f053","ri58c2f01cdb",\
+    "ri98d998e639","ri5c5be2cc00","ri170a0aa9c5","ri2edd470df6","ri76eaa5d2f9","rid8be519fd6","rid6d1a14d72","ri504d2020d7",\
+    "ricd23599229","ri6bc1f3f4de","ri4fff03afff","ri24cf080dea","ri08b75fd732","ri80e7370459","ri273ed45816","riec139fa602",\
+    "ric84019a178","ri79d4bd4d94","ri23f6bfd97f","ri0d58f26bd6","ri75bb8c8daf","ri868b2e2c18","ri0e3bc3bcf1","ri9f4c8ccd45",\
+    "ri1ca5edfb6c","rid49923d904","ri7147ea56e6","ri176b3cfcef","ribfe0aa891a","rie3f7010280","ri1115e47d2f","ricc25667ef3",\
+    "ri7fbe56d061","ri162fa02db4","riaf558bc7e0","ri889f585d6d","ri49a793c63b","ri55a48cb827","ri568cedbec3","ri338ed59b74",\
+    "ri97db865765","rid9dfcbb72a","ri092595ddcb","ria9a5570cae","riff387c1fed","ri28ca352113","rib85bf8fed6","ri0acf9ff261",\
+    "ric860bfe42b","ri20b70354ed","ri12e32008eb","rid8c8c0dd5f","ri0f7b8e5e0c","ri21b8c5d653","ri2d07db42c4","ri62e5daea19",\
+    "ri9b90900e15","ri1531a25a64","ric1539037bb","ri15a06aa99b","ri4cf7fd4eae","ri591f15a1fa","ri2a817b0e06","rief61fa2e57",\
+    "ri00eb1c463a","ri048c97338b","ri1944b5b254","ri9b311d9ffa","ri4594b1bf74","ri20c76bd3cf","ri9025dbb3f9","rid717fec2b5",\
+    "ri4dee9463fd","ri85bd57fb06","rif5c545377a","ri7fb90ad026","ri306894df9c","ri1c282f4831","ria822402381","riee76238e9a",\
+    "ri8b38dbaf1a","ri28b9899a57","ri802d33547c","ri05921b602d","ri0c1c541af9","ri17223515c3","ridf56423cf4","ria5879ff9bf",\
+    "ri95c381b7da","ri2411fdc84a","ria94acf7b53","ric815d618e3","ri8090d6e1f9","ri60501e2e07","ri7779ca9cf0","ridc22479119",\
+    "rif13b16a17c","ri9cd15cf379","riff9edd4ba7","ri39b6e74785","ri2005b3766a","ri8b73ec1375","ri0c90256ac5","ri727893efd5",\
+    "ri64b5cef674","ri1473f95697","ri0e5a348fdc","ri48fbff6840","ri4a0d03669b","ric558038e3e","ri613ccfbc1a","",\
+    "","","rie242a8d69e","ri12fbfc0048","ri7f23974a28","riaa7da427b3","","",\
+    "","","","","riff3395ef71","ri0e14791eaf","ri3fb7a74361","rif9c7e051a7",\
+    "","","rid8651a9839","ric4cfe4f4a6","rib11172ab23","ri24bfc9fd55","ri450e117a08","",\
+    "ri73f61f120c","rib73a10e843","rib89b4e8367","ri64b7834888","ri612e145510","rie9116b8e34","ri53ef260a45","rib81b7c78a2",\
+    "ri40871fd6bf","ri94c8b2ce7f","ri1ef6e05c63","rib4948ad6bb","rif3176e5b3d","ribedc19c245","ri9dd7e15fd9","ri97d6f9ebcc",\
+    "ri561edf53dc","ried9eb954bf","rib7b6beaf37","rib37f3811f1","ri8f0840cb88","ri87d20daf78","ridd228ebfcc","ri0ef0d511bc",\
+    "ri5f88575ca6","ri94cd23c856","ri504cc05f5e","rifa4ef181ed","ri3a6958a9de","rie27652d0e2","rie31c881979","ri966718388c",\
+    "rief86434024","ria71ff976f3","ri2989f4294a","ri105f1ea478","ri7d107762a3","ri405a5c6781","ri8c254946a1","ri725a8367a0",\
+    "ri6243d752cf","","ri054d61fea8","ri73bc6ae3fb","ri4db2509a47","ricb26626cb6","ri3131f9873e","rid338124b42",\
+    "ri70e838d34b","","rid2734dcaa8","rifac83f2a4a","rib7bb52c89a","ri5b30dbcba8","ric4b13532b9","rib6b57dacaf",\
+    "rid896fe2a5b","ried69dd9c9b","ri427b013171","ri01022f4a66","ri6364852b2d","ric0cac0a133","ri1c2942d994","ri604c4f96be",\
+    "ri62ce09b7f9","rid923f8158d","riac3d87f379","ri0e6a88cb0f","rie339b10e59","ri8e762bacf5","ri387da53679","rif7b7e4fd3c",\
+    "ria024431682","ri5e46caef95","ri8314cb1064","ri76726c4e2c","ri94206dc472","ri3e199d5c68","ria3765b0d18","ri77e24388f9",\
+    "ri141888a772","ria625dc37b0","ridf1e96de67","rica53da4e67","rie39bd9bf72","ri75f92875ef","ri357215cd83","rifd64641858",\
+    "ri2db6621fbb","ri9ae778f2a4","ri643a582761","ri2ca36b452b","rif233bef7fb","ric1c7048d84","ri66e470b647","rib46f7577e5",\
+    "rife862a2c2d","ri0d4be0dd0c","ri9ef9f1ecd8","ri644b8d616d","ricf23684118","ri5b07c1acab","ri890010b8a7","ri8e1301bf6d",\
+    "ri5803e63b54","ricfa34e907e","ri58c371bf6a","ri71266c1699","ri5b3e959ab8","ri2d08bf6736","ri54cd756df8","ribc30e5c60f",\
+    "rib51b4f885d","riad2f65017b","ri17681be89a","rie9666ae74e","ri730e11656b","ri15fb67b19e","ri31c9652573","ri6d9b91bc17",\
+    "riecde599154","ri80f632ca98","rid9d5ec14fe","ri4c3444c401","riddfb54bff8","ri8d9058173f","rida15675a31","ri441506cafe",\
+    "ricabc3089c0","rid0dc683b62","ri7c33706d05","ri6756191189","ri6880942701","ri4c18ae62e0","ri213ee6a487","ri4fa160ef1c",\
+    "ri36ea0ac3de","ri93ed2ac0a2","riaf5316132e","rife271b60c5","ri5420743ad9","ri1ac3a85e8a","ri68c97f8719","riaae5873209",\
+    "ri0353b741ca","rifccddf7cd3","ri533776f156","ri80500f9971","ri33a7f84260","ri5e368e1829","ri73cebd29a8","ri137ca090c5",\
+    "ria38b558f64","rif974b2ebc7","ri722616b23c","ri530b0ebb22","ri1d24cf6452","ri124a72b990","ria1c9d422cb","ri3ae4fe73b6",\
+    "ri8f85649d2e","ri5a6bf95037","ria735e7fab5","ri865ec84a96","ri87c1162667","rie9802c0bf8","ri12bc4ab8e4","ri767107ac34",\
+    "ri2c2e06adb6","ri484f24153f","ri9a1a43a265","ri55a9a69a7b","ri7e8d83f9cf","ri2d25b87a5a","ri14e43d09ec","ri718d95f680",\
+    "ri5f636a860d","ri7878e3f55b","ri400caaf3c5","ri2a2f4f4d72","ridcbc2faeeb","rieb69889bf7","ricb72f25a02","ri8c79b24263",\
+    "ri45e4cc5c31","ria9170b6a7e","rib16117a588","rief775729ca","ri520fcaf6db","rib308c0c411","ria8caade945","rib241b023af",\
+    "ri6b9228e497","ri6de7771d83","ri69bb2e066a","ri4a485e1509","ri91e7dd5146","rie1b1e6034a","ric66b86d071","ri3bc9207e9f",\
+    "ri660f4c2c83","rif151d5be74","ri5b3528a419","ri98458e9ea8","ri3857685cf0","ri5669edf33a","riab82fef20a","ri24808f9c56",\
+    "ri68d85aff91","ri961749212c","rif822e0ad71","riebb6d4996f","ri45caee0ac1","ri461eea6587","ri9c52038c39","ri70146a59f2",\
+    "rie258def6fe","ri8825e76530","ri84000a3f51","ridebf62b23e","ri6f2e598a63","ri81f33b87cb","ri5b317562f4","ri2b11f8c8c0",\
+    "ri4f387fd912","rid7202423b4","ria3ca870a92","ri695b1f4224","ri1d28f47749","ri01010cd4a0"\
+}
+#define AW_ROOM_BATCH_TITLES {\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "Ald-ruhn, Ald Skar Inn",\
+    "Ald-ruhn, Aryni Orethi's House",\
+    "Ald-ruhn, Bevene Releth: Clothier",\
+    "Ald-ruhn, Codus Callonus: Bookseller",\
+    "Ald-ruhn, Council Club",\
+    "Ald-ruhn, Dandera Selaro: Smith",\
+    "Ald-ruhn, Daynes Redothril: Pawnbroker",\
+    "Ald-ruhn, Dravasa Andrethi's House",\
+    "Ald-ruhn, Drinar Varyon's House",\
+    "Ald-ruhn, Gildan's House",\
+    "Ald-ruhn, Gindrala Hleran's House",\
+    "Ald-ruhn, Guard Tower 1",\
+    "Ald-ruhn, Guard Tower 2",\
+    "Ald-ruhn, Guild of Fighters",\
+    "Ald-ruhn, Guild of Mages",\
+    "Ald-ruhn, Hanarai Assutlanipal's House",\
+    "Ald-ruhn, Ienas Sarandas's House",\
+    "Ald-ruhn, Ilmiril's House",\
+    "Ald-ruhn, Tauryon's House",\
+    "Ald-ruhn, Temple",\
+    "Ald-ruhn, The Rat In The Pot",\
+    "Ald-ruhn, Tiras Sadus: General Merchandise",\
+    "Morvayn Manor",\
+    "Ald-ruhn, Arobar Manor Entrance",\
+    "Ald-ruhn, Bivale Teneran: Clothier",\
+    "Ald-ruhn, Cienne Sintieve: Alchemist",\
+    "Ald-ruhn, Llether Vari: Enchanter",\
+    "Ald-ruhn, Llethri Manor Entrance",\
+    "Ald-ruhn, Morag Tong Guildhall",\
+    "Ald-ruhn, Ramoran Manor",\
+    "Ald-ruhn, Redoran Council Entrance",\
+    "Ald-ruhn, Sarethi Manor",\
+    "Ald-ruhn, Venim Manor Entrance",\
+    "Ald-ruhn, Arobar Guard Quarters",\
+    "Ald-ruhn, Llethri Guard Quarters",\
+    "Ald-ruhn, Llethri Manor Bedrooms",\
+    "Ald-ruhn, Llethri Private Quarters",\
+    "Ald-ruhn, Ramoran Private Quarters",\
+    "Ald-ruhn, Redoran Council Hall",\
+    "Ald-ruhn, Sarethi Guard Quarters",\
+    "Ald-ruhn, Venim Manor Guard Quarters",\
+    "Ald-ruhn, Venim Manor Private Quarters",\
+    "Ald-ruhn, Venim Manor Right Wing",\
+    "Ald-ruhn, Arobar Private Quarters",\
+    "Ald-ruhn, Boldrisa Andrano's House",\
+    "Ald-ruhn, Council Hostel",\
+    "Ald-ruhn, Galsa Gindu's House",\
+    "Ald-ruhn, Goras Andrelo's House",\
+    "Ald-ruhn, Guls Llervu's House",\
+    "Ald-ruhn, Malpenix Blonia: Trader",\
+    "Ald-ruhn, Morvayn Quarters",\
+    "Ald-ruhn, Practice Room",\
+    "Ald-ruhn, Tuveso Beleth: Smith",\
+    "Ald-ruhn, Venim Manor Bedrooms",\
+    "Ald-ruhn, Arobar Manor Bedrooms",\
+    "Elf-Skerring, Cabin",\
+    "Elf-Skerring, Upper Level",\
+    "Sadrith Mora, Anis Seloth: Alchemist",\
+    "Sadrith Mora, Balen Vendu: Monk",\
+    "Sadrith Mora, Fara's Hole in the Wall",\
+    "Sadrith Mora, Gateway Inn",\
+    "Sadrith Mora, Gateway Inn: North Wing",\
+    "Sadrith Mora, Hleras Gidren's House",\
+    "Sadrith Mora, Llaalam Madalas: Mage",\
+    "Sadrith Mora, Madran Ulvel's House",\
+    "Sadrith Mora, Meluria Seleth's House",\
+    "Sadrith Mora, Milara Vedran's House",\
+    "Sadrith Mora, Morag Tong Guild",\
+    "Sadrith Mora, Nevrila Areloth's House",\
+    "Sadrith Mora, Nirasa Aren's House",\
+    "Sadrith Mora, Rolis Garvon's House",\
+    "Sadrith Mora, Tel Naga Great Hall",\
+    "Sadrith Mora, Tel Naga Upper Tower",\
+    "Sadrith Mora, Telvanni Council House, Entry",\
+    "Sadrith Mora, Thervul Serethi: Healer",\
+    "Sadrith Mora, Urtisa Romayn's House",\
+    "Sadrith Mora, Urtiso Faryon: Sorcerer",\
+    "Sadrith Mora, Vaden Belas' House",\
+    "Elf-Skerring, Lower Level",\
+    "Sadrith Mora, Gateway Inn: South Wing",\
+    "Sadrith Mora, Gateway Inn: West Wing",\
+    "Sadrith Mora, Tel Naga General Quarters",\
+    "Sadrith Mora, Telvanni Council House",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "Caldera, Bashuk gra-Bat's House",\
+    "Caldera, Canodia Felannus' House",\
+    "Caldera, Dro'Shavir's House",\
+    "Caldera, Elmussa Damori's House",\
+    "Caldera, Falanaamo: Clothier",\
+    "Caldera, Ghorak Manor",\
+    "Caldera, Governor's Hall",\
+    "Caldera, Guild of Mages",\
+    "Caldera, Hodlismod: Armorer",\
+    "Caldera, Irgola: Pawnbroker",\
+    "Caldera, Keel-Raniur's House",\
+    "Caldera, Nedhelas' House",\
+    "Caldera, North Guard Towers",\
+    "Caldera, Odairan Ashummi-Ammus' House",\
+    "Caldera, Shenk's Shovel",\
+    "Caldera, South Guard Towers",\
+    "Caldera, Surane Leoriane's House",\
+    "Caldera, Valvius Mevureius' House",\
+    "Caldera, Verick Gemain: Trader",\
+    "Heleran Ancestral Tomb",\
+    "Gnisis, Abelmawia Hut",\
+    "Gnisis, Almu Cave Dwelling",\
+    "Gnisis, Arvs-Drelen",\
+    "Gnisis, Barracks",\
+    "Gnisis, Dinadad Hut",\
+    "Gnisis, Fort Darius",\
+    "Gnisis, Lasamsi Cave Dwelling",\
+    "Gnisis, Madach Tradehouse",\
+    "Gnisis, Man-llu Hut",\
+    "Gnisis, Mantiti Cave Dwelling",\
+    "Gnisis, Shand Hut",\
+    "Gnisis, Shishara Hut",\
+    "Gnisis, Tansumiran Cave Dwelling",\
+    "Gnisis, Temple",\
+    "Gnisis, Yahaz Hut",\
+    "Gnisis, Lower Eggmine",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "Arrow, Cabin",\
+    "Arrow, Upper Level",\
+    "Dagon Fel, End of the World Renter Rooms",\
+    "Dagon Fel, Fanar Fork-Beard's House",\
+    "Dagon Fel, Fjorrod's House",\
+    "Dagon Fel, Greidil Half-Troll's House",\
+    "Dagon Fel, Heifnir: Trader",\
+    "Dagon Fel, Itar the Gentle's House",\
+    "Dagon Fel, Mette's House",\
+    "Dagon Fel, Onmi Hard-mouth's House",\
+    "Dagon Fel, The End of the World",\
+    "Dagon Fel, Watch Tower",\
+    "Arrow, Lower Level",\
+    "Chun-Ook, Cabin",\
+    "Chun-Ook, Upper Level",\
+    "Ebonheart, East Empire Company Hall",\
+    "Ebonheart, East Empire North Warehouse",\
+    "Ebonheart, East Empire South Warehouse",\
+    "Ebonheart, Grand Council Chambers",\
+    "Ebonheart, Grand Council Chambers Tower",\
+    "Ebonheart, Hawkmoth Legion Garrison",\
+    "Ebonheart, Hawkmoth Towers",\
+    "Ebonheart, Imperial Chapels",\
+    "Ebonheart, Six Fishes",\
+    "Ebonheart, Skyrim Mission",\
+    "Chun-Ook, Lower Level",\
+    "Ebonheart, Imperial Guard Garrison",\
+    "Maar Gan, Andus Tradehouse",\
+    "Maar Gan, Assi Serimilk's Hut",\
+    "Maar Gan, Assirari Zama-Rasour's Hut",\
+    "Maar Gan, Garry's Hut",\
+    "Maar Gan, Guard Tower 1",\
+    "Maar Gan, Guard Tower 2",\
+    "Maar Gan, Guard Tower 3",\
+    "Maar Gan, Huleen's Hut",\
+    "Maar Gan, Kind Erushara's Hut",\
+    "Maar Gan, Mabrelle Geles's Hut",\
+    "Maar Gan, Outpost",\
+    "Maar Gan, Shilipuran Zama-Rasour's Hut",\
+    "Maar Gan, Shrine",\
+    "Maar Gan, Tashpi Ashibael's Hut",\
+    "Maar Gan, Ulisamsi Shaddarnuran's Hut",\
+    "Maar Gan, Yeherradad's Hut",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "Falvilo's Endeavor, Upper Level",\
+    "Vos, Dreynos Elvul's Farmhouse",\
+    "Vos, Fanisea Irano's Farmhouse",\
+    "Vos, Ienasa Radas's Farmhouse",\
+    "Vos, Maela Kaushad's Farmhouse",\
+    "Vos, Mandyn Ralas's Farmhouse",\
+    "Vos, Menus Felas's Farmhouse",\
+    "Vos, Runethyne Andas's Farmhouse",\
+    "Vos, Thilse Aralas's Farmhouse",\
+    "Vos, Trilam Drolnor's Farmhouse",\
+    "Vos, Ulvil Llothas's Farmhouse",\
+    "Vos, Varo Tradehouse",\
+    "Vos, Varo Tradehouse Entrance",\
+    "Vos, Vos Chapel",\
+    "Falvillo's Endeavor, Lower Level",\
+    "Vos, Varo Tradehouse Storage",\
+    "Pelagiad, Adanja's House",\
+    "Pelagiad, Ahnassi's House",\
+    "Pelagiad, Dralas Gilu's House",\
+    "Pelagiad, Erval's House",\
+    "Pelagiad, Farusea Salas' House",\
+    "Pelagiad, Fort Pelagiad",\
+    "Pelagiad, Guard Tower",\
+    "Pelagiad, Halfway Tavern",\
+    "Pelagiad, Madres Navur's House",\
+    "Pelagiad, Mebestien Ence: Trader",\
+    "Pelagiad, Murberius Harmevus' House",\
+    "Pelagiad, North Wall",\
+    "Pelagiad, South Wall",\
+    "Pelagiad, Uulernil : Armorer",\
+    "Tel Branora, Evos Goran's House",\
+    "Tel Branora, Fadase Selvayn: Trader",\
+    "Tel Branora, Fedar Davus's House",\
+    "Tel Branora, Galen Berer: Armorer",\
+    "Tel Branora, Lower Tower",\
+    "Tel Branora, Manos Vavyn's House",\
+    "Tel Branora, Seryne Relas's House",\
+    "Tel Branora, Sethan's Tradehouse",\
+    "Tel Branora, Tower Guardpost",\
+    "Suran, Desele's House of Earthly Delights",\
+    "Suran, Garothmuk gro-Muzgub: Smith",\
+    "Suran, Goldyn Belaram: Pawnbroker",\
+    "Suran, Guard Tower",\
+    "Suran, Ibarnadad Assirnarari: Apothecary",\
+    "Suran, Oran Manor",\
+    "Suran, Ralds Oril: Trader",\
+    "Suran, Ranosa Gilvayn: Outfitter",\
+    "Suran, Suran Slave Market",\
+    "Suran, Suran Temple",\
+    "Suran, Suran Tradehouse",\
+    "Suran, Verara Rendo: Clothier",\
+    "Ald Velothi, Fevila Bethrano's Shack",\
+    "Ald Velothi, Ienas Arvel's Shack",\
+    "Ald Velothi, Llerar Vinden's Shack",\
+    "Ald Velothi, Outpost",\
+    "Fair Helas, Cabin",\
+    "Fair Helas, Upper Level",\
+    "Fair Helas, Lower Level",\
+    "Tel Mora, Berwen: Trader",\
+    "Tel Mora, Elegnan: Clothier",\
+    "Tel Mora, Jolda: Apothecary",\
+    "Tel Mora, Kirsty's House",\
+    "Tel Mora, Liette's House",\
+    "Tel Mora, Lower Tower",\
+    "Tel Mora, Nona's House",\
+    "Tel Mora, Radras: Smith",\
+    "Tel Mora, The Covenant",\
+    "Tel Mora, Upper Tower",\
+    "Dren Plantation, Doves' Shack",\
+    "Dren Plantation, Dren's Villa",\
+    "Dren Plantation, Guardhouse",\
+    "Dren Plantation, Helvi's Shack",\
+    "Dren Plantation, Hlevala's Shack",\
+    "Dren Plantation, Rethan's Shack",\
+    "Dren Plantation, Shipping House",\
+    "Dren Plantation, Storage Shack",\
+    "Dren Plantation, Tower Shack",\
+    "Dren Plantation, Verethi and Dralor",\
+    "Erabenimsun Camp, Addut-Lamanu's Yurt",\
+    "Erabenimsun Camp, Ainab's Yurt",\
+    "Erabenimsun Camp, Ashkhan's Yurt",\
+    "Erabenimsun Camp, Ashu-Ahhe's Yurt",\
+    "Erabenimsun Camp, Assemmus' Yurt",\
+    "Erabenimsun Camp, Han-Ammu's Yurt",\
+    "Erabenimsun Camp, Massarapal's Yurt",\
+    "Erabenimsun Camp, Ranabi's Yurt",\
+    "Erabenimsun Camp, Salattanat's Yurt",\
+    "Erabenimsun Camp, Wise Woman's Yurt",\
+    "Khuul, Brurid's Shack",\
+    "Khuul, Miron Garer's Shack",\
+    "Khuul, Svadstar's Shack",\
+    "Khuul, Thongar's Tradehouse",\
+    "Seran Ancestral Tomb",\
+    "Molag Mar, Redoran Stronghold",\
+    "Molag Mar, St. Veloth's Hostel",\
+    "Molag Mar, Temple",\
+    "Molag Mar, Waistworks",\
+    "Molag Mar, Armigers Stronghold",\
+    "Molag Mar, Canalworks",\
+    "Molag Mar, Saetring the Nord: Smith",\
+    "Molag Mar, The Pilgrim's Rest",\
+    "Molag Mar, Vasesius Viciulus: Trader",\
+    "Urshilaku Camp, Ahasour's Yurt",\
+    "Urshilaku Camp, Ashkhan's Yurt",\
+    "Urshilaku Camp, Kurapli's Yurt",\
+    "Urshilaku Camp, Maeli's Yurt",\
+    "Urshilaku Camp, Sakiran's Yurt",\
+    "Urshilaku Camp, Shara's Yurt",\
+    "Urshilaku Camp, Shimsun's Yurt",\
+    "Urshilaku Camp, Wise Woman's Yurt",\
+    "Urshilaku Camp, Zabamund's Yurt",\
+    "Urshilaku Camp, Zanummu's Yurt",\
+    "Zainab Camp, Ababael Timsar-Dadisun's Yurt",\
+    "Zainab Camp, Ashibaal's Yurt",\
+    "Zainab Camp, Ashkhan's Yurt",\
+    "Zainab Camp, Ashur-Dan's Yurt",\
+    "Zainab Camp, Kuda's Yurt",\
+    "Zainab Camp, Kummu's Yurt",\
+    "Zainab Camp, Minassour's Yurt",\
+    "Zainab Camp, Patababi's Yurt",\
+    "Zainab Camp, Tussi's Yurt",\
+    "Zainab Camp, Wise Woman's Yurt",\
+    "Ahemmusa Camp, Addammus's Yurt",\
+    "Ahemmusa Camp, Ashkhan's Yurt",\
+    "Ahemmusa Camp, Assamma-Idan's Yurt",\
+    "Ahemmusa Camp, Dutadalk's Yurt",\
+    "Ahemmusa Camp, Kausi's Yurt",\
+    "Ahemmusa Camp, Lanabi's Yurt",\
+    "Ahemmusa Camp, Mamaea's Yurt",\
+    "Ahemmusa Camp, Nummu's Yurt",\
+    "Ahemmusa Camp, Wise Woman's Yurt",\
+    "Tel Aruhn, Aryne Telnim: Smith",\
+    "Tel Aruhn, Bildren Areleth: Apothecary",\
+    "Tel Aruhn, Ferele Athram: Trader",\
+    "Tel Aruhn, Maren Uvaren: Enchanter",\
+    "Tel Aruhn, Plot and Plaster",\
+    "Tel Aruhn, Tower Entry",\
+    "Tel Aruhn, Underground",\
+    "Tel Aruhn, Upper Tower",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "Vivec, Arena Storage",\
+    "Vivec, Arena Hidden Area",\
+    "Gnaar Mok, Anglalos's Shack",\
+    "Gnaar Mok, Arenim Manor",\
+    "Gnaar Mok, Druegh-jigger's Rest",\
+    "Gnaar Mok, Nadene Rotheran's Shack",\
+    "Sadrith Mora, Dirty Muriel's Cornerclub",\
+    "Sadrith Mora, Pierlette Rostorard: Apothecary",\
+    "Sadrith Mora, Trendrus Dral's House",\
+    "Sadrith Mora, Volmyni Dral's House",\
+    "Sadrith Mora, Wolverine Hall",\
+    "Sadrith Mora, Wolverine Hall: Fighter's Guild",\
+    "Sadrith Mora, Wolverine Hall: Imperial Shrine",\
+    "Sadrith Mora, Wolverine Hall: Mage's Guild",\
+    "Kogoruhn, Dome of Pollock's Eve",\
+    "Kogoruhn, Dome of Urso",\
+    "Kogoruhn, Hall of Phisto",\
+    "Kogoruhn, Hall of the Watchful Touch",\
+    "Kogoruhn, Temple of Fey",\
+    "Kogoruhn, Hall of Maki",\
+    "Kogoruhn, Vault of Aerode",\
+    "Tel Vos, Aryon's Chambers",\
+    "Tel Vos, Barracks and Armory",\
+    "Tel Vos, Central Tower",\
+    "Tel Vos, Jail",\
+    "Tel Vos, Northeastern Tower",\
+    "Tel Vos, Services Tower",\
+    "Tel Vos, Southern Tower",\
+    "Tel Uvirith, Arelas' House",\
+    "Tel Uvirith, Menas' House",\
+    "Tel Uvirith, Omavel's House",\
+    "Tel Uvirith, Seleth's House",\
+    "Tel Uvirith, Tower Lower",\
+    "Tel Uvirith, Tower Upper",\
+    "Dagoth Ur, Inner Tower",\
+    "Dagoth Ur, Facility Cavern",\
+    "Hla Oad, Fadila Balvel's House",\
+    "Hla Oad, Murudius Flaeus's House",\
+    "Hla Oad, Okur's House",\
+    "Hla Oad, Relien Rirne's House",\
+    "Hla Oad, Shurkul gro-Sharga's House",\
+    "Ilunibi, Marowak's Spine",\
+    "Ilunibi, Soul's Rattle",\
+    "Valenvaryon, Durz's Hut",\
+    "Valenvaryon, Gashna's Hut",\
+    "Valenvaryon, Lambug's Hut",\
+    "Valenvaryon, Lurog's Hut",\
+    "Valenvaryon, Propylon Chamber",\
+    "Valenvaryon, Umug's Hut",\
+    "Ald Daedroth, Outer Shrine",\
+    "Falasmaryon, Lower Level",\
+    "Falasmaryon, Missun Akin's Hut",\
+    "Falasmaryon, Propylon Chamber",\
+    "Falasmaryon, Upper Level",\
+    "Ghostgate, Tower of Dawn",\
+    "Ghostgate, Tower of Dusk",\
+    "Ghostgate, Temple",\
+    "Ghostgate, Tower of Dawn Lower Level",\
+    "Ghostgate, Tower of Dusk Lower Level",\
+    "Rethan Manor",\
+    "Rethan Manor, Berendas' House",\
+    "Rethan Manor, Drelas' House",\
+    "Rethan Manor, Gols' House",\
+    "Rethan Manor, Tures' House",\
+    "Arvel Manor",\
+    "Arvel Manor, Slave Shack",\
+    "Arvel Manor, Slavemaster's Shack",\
+    "Arvel Manor, Storage Shack",\
+    "Bal Fell, Outer Shrine",\
+    "Bal Fell, East Wing",\
+    "Bal Fell, Inner Shrine",\
+    "Bal Fell, West Wing",\
+    "Indarys Manor",\
+    "Indarys Manor, Berendas' House",\
+    "Indarys Manor, Manor Services",\
+    "Indarys Manor, Raram's House",\
+    "Berandas, Keep, Top Level",\
+    "Berandas, Propylon Chamber",\
+    "Berandas, Keep, Bottom Level",\
+    "Hlormaren, Dome",\
+    "Hlormaren, Keep, Bottom Level",\
+    "Hlormaren, Keep, Top Level",\
+    "Hlormaren, Propylon Chamber",\
+    "Marandus, Dome",\
+    "Marandus, Lower Level",\
+    "Marandus, Propylon Chamber",\
+    "Marandus, Upper Level",\
+    "Tower of Tel Fyr, Onyx Hall",\
+    "Tower of Tel Fyr, Hall of Fyr",\
+    "Corprusarium Bowels",\
+    "Tureynulal, Kagrenac's Library",\
+    "Tureynulal, Eye of Duggan",\
+    "Tureynulal, Eye of Thom Wye",\
+    "",\
+    "Adanumuran",\
+    "Ald Sotha, Upper Level",\
+    "Alof's Farmhouse",\
+    "Ansi",\
+    "Arano Plantation",\
+    "Balur's Farmhouse",\
+    "Dirara's Farmhouse",\
+    "Gro-Bagrat Plantation",\
+    "Hassour",\
+    "Hawia Egg Mine",\
+    "Hinnabi",\
+    "Lleran Ancestral Tomb",\
+    "Llovyn's Farmhouse",\
+    "Manat's Farmhouse",\
+    "Nilera's Farmhouse",\
+    "Nund",\
+    "Omani Manor",\
+    "Othrelas Ancestral Tomb",\
+    "Pelagiad, Junal-lei's House",\
+    "Piernette's Farmhouse",\
+    "Sandas Ancestral Tomb",\
+    "Sarano Ancestral Tomb",\
+    "Shulk Egg Mine",\
+    "Shurdan-Raplay Egg Mine",\
+    "Sinsibadon",\
+    "Small Farmhouse",\
+    "Sterdecan's Farmhouse",\
+    "Ules Manor",\
+    "Ules Manor, Slave Shack",\
+    "Ules Manor, Slavemaster's Shack",\
+    "Ulummusa",\
+    "Unchartered Shipwreck, Cabin",\
+    "Unchartered Shipwreck, Upper Level",\
+    "Vassir-Didanat Cave",\
+    "Ald Sotha, Lower Level",\
+    "Shulk Egg Mine, Mining Camp",\
+    "Shulk Egg Mine, Queen's Lair",\
+    "Uncharted Shipwreck, Lower Level",\
+    "Ald Sotha, Shrine",\
+    "Mudan, Central Vault",\
+    "Mudan, Right Tower",\
+    "Ahanibi-Malmus Egg Mine",\
+    "Ald-ruhn, Braynas Hlervu's House",\
+    "Ald-ruhn, Galthragoth's House",\
+    "Ald-ruhn, Pellecia Aurrus's House",\
+    "Aryon Ancestral Tomb",\
+    "Assarnatamat, Shrine",\
+    "Bthuand",\
+    "Buckmoth Legion Fort, Interior",\
+    "Buckmoth Legion Fort, Prison",\
+    "Buckmoth Legion Fort, Towers",\
+    "Cavern of the Incarnate",\
+    "Dareleth Ancestral Tomb",\
+    "Drath Ancestral Tomb",\
+    "Drinith Ancestral Tomb",\
+    "Druscashti, Upper Level",\
+    "Ebernanit, Shrine",\
+    "Fadathram Ancestral Tomb",\
+    "Hairat-Vassamsi Egg Mine",\
+    "Helas Ancestral Tomb",\
+    "Indaren Ancestral Tomb",\
+    "Llando Ancestral Tomb",\
+    "Mamshar-Disamus Camp, Maesat's Yurt",\
+    "Omalen Ancestral Tomb",\
+    "Panabanit-Nimawia Egg Mine",\
+    "Ramimilk, Shrine",\
+    "Rothan Ancestral Tomb",\
+    "Salvel Ancestral Tomb",\
+    "Sanabi",\
+    "Sandus Ancestral Tomb",\
+    "Saren Ancestral Tomb",\
+    "Sha-Adnius",\
+    "Shishara",\
+    "Shishi",\
+    "Thalas Ancestral Tomb",\
+    "Tin-Ahhe",\
+    "Zergonipal, Shrine",\
+    "Druscashti, Lower Level",\
+    "Hairat-Vassamsi Egg Mine, Queen's Lair",\
+    "Urshilaku, Juno Burial",\
+    "Abebaal Egg Mine",\
+    "Almurbalarammi, Shrine",\
+    "Andalen Ancestral Tomb",\
+    "Arano Ancestral Tomb",\
+    "Arenim Ancestral Tomb",\
+    "Arys Ancestral Tomb",\
+    "Ashamanu Camp, Kausha's Yurt",\
+    "Baram Ancestral Tomb",\
+    "Bensiberib Camp, Odaishah's Yurt",\
+    "Dreloth Ancestral Tomb",\
+    "Eretammus-Sennammu Egg Mine",\
+    "Esutanamus, Shrine",\
+    "Falvillo's Endeavor, Cabin",\
+    "Hanud",\
+    "Hlaalu Ancestral Tomb",\
+    "Hlervi Ancestral Tomb",\
+    "Hlervu Ancestral Tomb",\
+    "Holamayan Monastery",\
+    "Indoranyon, Propylon Chamber",\
+    "Kaushtababi Camp, Adibael's Yurt",\
+    "Marvani Ancestral Tomb",\
+    "Masseranit",\
+    "Matus-Akin Egg Mine",\
+    "Mawia",\
+    "Minabi",\
+    "Odirniran",\
+    "Pinsun",\
+    "Ravel Ancestral Tomb",\
+    "Raviro Ancestral Tomb",\
+    "Releth Ancestral Tomb",\
+    "Sadryon Ancestral Tomb",\
+    "Sanni",\
+    "Savel Ancestral Tomb",\
+    "Shashpilamat",\
+    "Shashpilamat, Shrine",\
+    "Shrine of Azura",\
+    "Sinamusa Egg Mine",\
+    "Sobitbael Camp, Mal's Yurt",\
+    "Strange Shipwreck, Cabin",\
+    "Strange Shipwreck, Upper Level",\
+    "Unknown Shipwreck, Cabin",\
+    "Verelnim Ancestral Tomb",\
+    "Yakanalit",\
+    "Zaintiraris, Shrine",\
+    "Hanud, Tower",\
+    "Matus-Akin Egg Mine, Queen's Lair",\
+    "Minabi, Bandit Lair",\
+    "Odirniran, Tower",\
+    "Strange Shipwreck, Lower Level",\
+    "Abaesen-Pulu Egg Mine",\
+    "Addadshashanammu, Shrine",\
+    "Andrano Ancestral Tomb",\
+    "Andrethi Ancestral Tomb",\
+    "Grytewake, Cabin",\
+    "Grytewake, Upper Level",\
+    "Heran Ancestral Tomb",\
+    "Norvayn Ancestral Tomb",\
+    "Samarys Ancestral Tomb",\
+    "Sarys Ancestral Tomb",\
+    "Shal",\
+    "Thelas Ancestral Tomb",\
+    "Grytewake, Lower Level",\
+    "Hlormaren, Underground",\
+    "Andalor Ancestral Tomb",\
+    "Aralen Ancestral Tomb",\
+    "Dissapla Mine",\
+    "Dubdilla",\
+    "Elanius Camp, Yapal's Yurt",\
+    "Falensarano, Propylon Chamber",\
+    "Falensarano, Upper Level",\
+    "Favel Ancestral Tomb",\
+    "Ienith Ancestral Tomb",\
+    "Massahanud Camp, Sargon's Yurt",\
+    "Mudan-Mul Egg Mine",\
+    "Nallit",\
+    "Nerano Ancestral Tomb",\
+    "Salit Camp, Zalit's Yurt",\
+    "Salit Camp, Zelay's Yurt",\
+    "Sethan Ancestral Tomb",\
+    "Sinarralit Egg Mine",\
+    "Thiralas Ancestral Tomb",\
+    "Venim Ancestral Tomb",\
+    "Yakaridan Camp, Kitbael's Yurt",\
+    "Yakin",\
+    "Falensarano, Lower Level",\
+    "Sanit, Shrine",\
+    "Yakin, Shrine",\
+    "Ahinipalit",\
+    "Alas Ancestral Tomb",\
+    "Andas Ancestral Tomb",\
+    "Andules Ancestral Tomb",\
+    "Aran Ancestral Tomb",\
+    "Arethan Ancestral Tomb",\
+    "Arkngthand, Hall of Centrifuge",\
+    "Dulo Ancestral Tomb",\
+    "Gimothran Ancestral Tomb",\
+    "Helan Ancestral Tomb",\
+    "Kunirai",\
+    "Mababi",\
+    "Maesa-Shammus Egg Mine",\
+    "Maren Ancestral Tomb",\
+    "Missir-Dadalit Egg Mine",\
+    "Mzanchend",\
+    "Nchuleftingth, Upper Levels",\
+    "Punabi",\
+    "Serano Ancestral Tomb",\
+    "Shashurari Camp, Zennammu's Yurt",\
+    "Shushan",\
+    "Sulipund",\
+    "Telasero, Propylon Chamber",\
+    "Tusenend, Shrine",\
+    "Vandus Ancestral Tomb",\
+    "Velas Ancestral Tomb",\
+    "Zaintirari",\
+    "Zalkin-Sul Egg Mine",\
+    "Arkngthand, Cells of Hollow Hand",\
+    "Arkngthand, Weepingbell Hall",\
+    "Nchardumz Lower Level",\
+    "Nchuleftingth, Test of Pattern",\
+    "Telasero, Lower Level",\
+    "Assalkushalit, Shrine",\
+    "Bthanchend",\
+    "Odrosal, Dwemer Training Academy",\
+    "Vemynal, Outer Fortress",\
+    "Yassu Mine",\
+    "Odrosal, Tower",\
+    "Vemynal, Hall of Torque",\
+    "Aharasaplit Camp, Zallay's Yurt",\
+    "Ancient Shipwreck, Cabin",\
+    "Ancient Shipwreck, Upper Level",\
+    "Andavel Ancestral Tomb",\
+    "Ashmelech",\
+    "Assurdirapal, Shrine",\
+    "Assurnabitashpi",\
+    "Assurnabitashpi, Shrine",\
+    "Big Head's Shack",\
+    "Dagon Fel, Andre Maul's Tower",\
+    "Dagon Fel, Sorkvild's Tower",\
+    "Derelict Shipwreck, Cabin",\
+    "Dralas Ancestral Tomb",\
+    "Drethan Ancestral Tomb",\
+    "Habinbaes",\
+    "Llirala's Shack",\
+    "Madas-Zebba Egg Mine",\
+    "Nchardahrk",\
+    "Nelas Ancestral Tomb",\
+    "Odirnamat",\
+    "Onnissiralis, Shrine",\
+    "Orethi Ancestral Tomb",\
+    "Pudai Egg Mine",\
+    "Rayna Drolan's Shack",\
+    "Rotheran, Arena",\
+    "Rotheran, Communal Hut",\
+    "Rotheran, Propylon Chamber",\
+    "Sarethi Ancestral Tomb",\
+    "Senim Ancestral Tomb",\
+    "Shara",\
+    "Vas, Entry Level",\
+    "Ancient Shipwreck, Lower Level",\
+    "Assurdirapal, Inner Shrine",\
+    "Vas, Tower",\
+    "Abaelun Mine",\
+    "Aidanat Camp, Abassel's Yurt",\
+    "Alen Ancestral Tomb",\
+    "Andasreth, Lower Level",\
+    "Andasreth, Propylon Chamber",\
+    "Andasreth, Upper Level",\
+    "Ashimanu Egg Mine",\
+    "Ashir-Dan",\
+    "Caldera Mine",\
+    "Caldera, Mining Bunkhouse",\
+    "Caldera, Mining Company Office",\
+    "Caldera, Mining Guard Tower",\
+    "Caldera, Slave Shack One",\
+    "Caldera, Slave Shack Two",\
+    "Drulene Falen's Hut",\
+    "Dushariran, Shrine",\
+    "Falas Ancestral Tomb",\
+    "Ginith Ancestral Tomb",\
+    "Gnisis, Vabdas Hut",\
+    "Hleran Ancestral Tomb",\
+    "Indalen Ancestral Tomb",\
+    "Llervu Ancestral Tomb",\
+    "Maelkashishi, Shrine",\
+    "Maelkashishi, Shrine, Forgotten Galleries",\
+    "Mat",\
+    "Mila-Nipal, Manat's Yurt",\
+    "Moonmoth Legion Fort, Interior",\
+    "Moonmoth Legion Fort, Prison Towers",\
+    "Panud Egg Mine",\
+    "Randas Ancestral Tomb",\
+    "Reloth Ancestral Tomb",\
+    "Rethandus Ancestral Tomb",\
+    "Salothan Ancestral Tomb",\
+    "Salothran Ancestral Tomb",\
+    "Sarimisun-Assa Egg Mine",\
+    "Shashmanu Camp, Anit's Yurt",\
+    "Sjorvar Horse-Mouth's House",\
+    "Telvayn Ancestral Tomb",\
+    "Uveran Ancestral Tomb",\
+    "Veloth Ancestral Tomb",\
+    "Ashimanu Egg Mine, Queen's Lair",\
+    "Sarimisun-Assa Egg Mine, Queen's Lair",\
+    "Mamaea, Shrine of Pitted Dreams",\
+    "Character Stuff Wonderland",\
+    "Clutter Warehouse - Everything Must Go!",\
+    "ken's test hole",\
+    "Mark's Vampire Test Cell",\
+    "Redoran interior",\
+    "Redoran interior2",\
+    "ToddTest",\
+    "Magas Volar",\
+    "",\
+    "",\
+    "",\
+    "Ald-ruhn, Manor District",\
+    "Sadrith Mora, Tel Naga Upper Hall",\
+    "Sadrith Mora, Telvanni Council House, Chambers",\
+    "Sadrith Mora, Telvanni Council House, Hermitage",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "",\
+    "Assarnud",\
+    "Gnisis, Eggmine",\
+    "Gnisis, Underground Stream",\
+    "Gnisis, Bethamez",\
+    "",\
+    "",\
+    "Dagon Fel, Anja Swift-Sailer's House",\
+    "Dagon Fel, Hurg's House",\
+    "Dagon Fel, Vacant Tower",\
+    "Ebonheart, Argonian Mission",\
+    "Ebonheart, Imperial Commission",\
+    "",\
+    "Mannammu",\
+    "Tel Branora, Ervyna Hlervu's Shack",\
+    "Tel Branora, Giron Manas's Shack",\
+    "Tel Branora, Upper Tower",\
+    "Tel Branora, Tower Dungeon",\
+    "Tel Branora, Upper Tower: Therana's Chamber",\
+    "Ald Velothi, Ganus Lloryn's Shack",\
+    "Ald Velothi, Lledsea Relas's Shack",\
+    "Ald Velothi, Sathas Rivul's Shack",\
+    "Ald Velothi, Vireveri Darethran's Shack",\
+    "Tel Mora, Tower Services",\
+    "Khuul, Aldi's Shack",\
+    "Khuul, Endris Dilmyn's Shack",\
+    "Khuul, Helga's Shack",\
+    "Khuul, Nelmyne Andules's Shack",\
+    "Khuul, Rivame Samandas's Shack",\
+    "Molag Mar, Underworks",\
+    "Tel Aruhn, Tower Living Quarters",\
+    "Vivec, Arena Underworks",\
+    "Gnaar Mok, Caryarel's Shack",\
+    "Gnaar Mok, Jerian Dolbanitte's Shack",\
+    "Gnaar Mok, Mush-Mere's Shack",\
+    "Gnaar Mok, Rostlogi's Shack",\
+    "Tel Uvirith, Tower Dungeon",\
+    "Dagoth Ur, Outer Facility",\
+    "Dagoth Ur, Inner Facility",\
+    "Dagoth Ur, Lower Facility",\
+    "Akulakhan's Chamber",\
+    "Hla Oad, Fatleg's Drop Off",\
+    "Ilunibi, Carcass of the Saint",\
+    "Neglected Shipwreck, Cabin",\
+    "Ilunibi, Tainted Marrow",\
+    "Ilunibi, Blackened Heart",\
+    "Ald Daedroth, Inner Shrine",\
+    "Ald Daedroth, Left Wing",\
+    "Ald Daedroth, Right Wing",\
+    "Ald Daedroth, Antechamber",\
+    "Falasmaryon, Sewers",\
+    "Berandas, Underground",\
+    "Corprusarium",\
+    "Tureynulal, Bladder of Clovis",\
+    "",\
+    "Beshara",\
+    "Desolate Shipwreck, Cabin",\
+    "Desolate Shipwreck, Upper Level",\
+    "Ebonheart, Underground Caves",\
+    "Mudan Grotto",\
+    "Panat",\
+    "Punammu",\
+    "",\
+    "Desolate Shipwreck, Lower Level",\
+    "Hassour, Shrine",\
+    "Mudan, Lost Dwemer Checkpoint",\
+    "Abinabi",\
+    "Akimaes-Ilanipu Egg Mine",\
+    "Bensamsi",\
+    "Bthungthumz",\
+    "Dun-Ahhe",\
+    "Dunirai Caverns",\
+    "Elith-Pal Mine",\
+    "Halit Mine",\
+    "Kora-Dur",\
+    "Maelu Egg Mine",\
+    "Maran-Adon",\
+    "Missamsi",\
+    "Odaishah",\
+    "Odibaal",\
+    "Sharapli",\
+    "Sudanit Mine",\
+    "Sur Egg Mine",\
+    "Urshilaku, Astral Burial",\
+    "Yesamsi",\
+    "Urshilaku, Karma Burial",\
+    "Urshilaku, Laterus Burial",\
+    "Urshilaku, Fragile Burial",\
+    "Urshilaku, Kakuna Burial",\
+    "Urshilaku, Kefka Burial",\
+    "Abanabi",\
+    "Ahallaraddon Egg Mine",\
+    "Aharnabi",\
+    "Ainat",\
+    "Ashirbadon",\
+    "Beran Ancestral Tomb",\
+    "Deserted Shipwreck, Cabin",\
+    "Deserted Shipwreck, Upper Level",\
+    "Eluba-Addon Grotto",\
+    "Kaushtarari, Shrine",\
+    "Kumarahaz",\
+    "Lonely Shipwreck, Cabin",\
+    "Lonely Shipwreck, Upper Level",\
+    "Lonesome Shipwreck, Cabin",\
+    "Lonesome Shipwreck, Upper Level",\
+    "Lost Shipwreck, Cabin",\
+    "Lost Shipwreck, Upper Level",\
+    "Maba-Ilu",\
+    "Mul Grotto",\
+    "Mzahnch",\
+    "Nchurdamz, Interior",\
+    "Omaren Ancestral Tomb",\
+    "Prelude Shipwreck, Cabin",\
+    "Prelude Shipwreck, Upper Level",\
+    "Redas Ancestral Tomb",\
+    "Rissun",\
+    "Salmantu",\
+    "Setus Egg Mine",\
+    "Unknown Shipwreck, Upper Level",\
+    "Vassamsi Grotto",\
+    "Yansirramus, Shrine",\
+    "Zalkin Grotto",\
+    "Deserted Shipwreck, Lower Level",\
+    "Lonely Shipwreck, Lower Level",\
+    "Lonesome Shipwreck, Lower Level",\
+    "Lost Shipwreck, Lower Level",\
+    "Mzahnch Lower Level",\
+    "Prelude Shipwreck, Lower Level",\
+    "Salmantu, Shrine",\
+    "Tukushapal",\
+    "Unknown Shipwreck, Lower Level",\
+    "Tukushapal, Sepulcher",\
+    "Abernanit",\
+    "Aharunartus",\
+    "Akimaes Grotto",\
+    "Aleft",\
+    "An Abandoned Shack",\
+    "Ashalmimilkala, Shrine",\
+    "Ashurnibibi, Shrine",\
+    "Assemanu",\
+    "Band Egg Mine",\
+    "Hlormaren, Sewers",\
+    "Mallapi",\
+    "Neglected Shipwreck, Upper Level",\
+    "Nimawia Grotto",\
+    "Remote Shipwreck, Cabin",\
+    "Remote Shipwreck, Upper Level",\
+    "Sennananit",\
+    "Shunned Shipwreck, Cabin",\
+    "Shunned Shipwreck, Upper Level",\
+    "Shurinbaal",\
+    "Unexplored Shipwreck, Cabin",\
+    "Unexplored Shipwreck, Upper Level",\
+    "Yasamsi",\
+    "Zainsipilu",\
+    "Zanabi",\
+    "Assemanu, Shrine",\
+    "Neglected Shipwreck, Lower Level",\
+    "Remote Shipwreck, Lower Level",\
+    "Shunned Shipwreck, Lower Level",\
+    "Unexplored Shipwreck, Lower Level",\
+    "Kushtashpi, Shrine",\
+    "Massama Cave",\
+    "Nammu",\
+    "Nchuleft",\
+    "Pulk",\
+    "Sanit",\
+    "Tel Vos, Dungeon",\
+    "Dubdilla, Uncharted Caverns",\
+    "Dubdilla, Uncharted Caverns, Lower",\
+    "Ashunartes, Shrine",\
+    "Assu",\
+    "Bal Ur, Shrine",\
+    "Galom Daeus, Entry",\
+    "Inanius Egg Mine",\
+    "Mount Kand, Cavern",\
+    "Nchardumz",\
+    "Nissintu",\
+    "Piran",\
+    "Saturan",\
+    "Telasero, Upper Level",\
+    "Vansunalit Egg Mine",\
+    "Zebabi",\
+    "Zenarbael",\
+    "Bal Ur, Underground",\
+    "Galom Daeus, Observatory",\
+    "Arkngthand, Heaven's Gallery",\
+    "Nchuleftingth, Lower Levels",\
+    "Arkngthand, Land's Blood Gallery",\
+    "Arkngthand, Deep Ore Passage",\
+    "Endusal, Kagrenac's study",\
+    "Kogoruhn, Charma's Breath",\
+    "Mausur Caverns",\
+    "Ularradallaku, Shrine",\
+    "Yanemus Mine",\
+    "Kogoruhn, Bleeding Heart",\
+    "Kogoruhn, Nabith Waterway",\
+    "Abandoned Shipwreck, Cabin",\
+    "Abandoned Shipwreck, Upper Level",\
+    "Ainab",\
+    "Ald Redaynia, Tower",\
+    "Assumanu",\
+    "Derelict Shipwreck, Upper Level",\
+    "Ibar-Dad",\
+    "Ilanipu Grotto",\
+    "Madas Grotto",\
+    "Malmus Grotto",\
+    "Mzuleft",\
+    "Obscure Shipwreck, Cabin",\
+    "Obscure Shipwreck, Upper Level",\
+    "Punsabanit",\
+    "Sargon",\
+    "Shallit",\
+    "Sud",\
+    "Surirulk",\
+    "Abandoned Shipwreck, Lower Level",\
+    "Ainab, Shrine",\
+    "Derelict Shipwreck, Lower Level",\
+    "Obscure Shipwreck, Lower Level",\
+    "Pudai Egg Mine, Queen's Lair",\
+    "Arkngthunch-Sturdumz",\
+    "Asha-Ahhe Egg Mine",\
+    "Ashalmawia, Shrine",\
+    "Ashanammu",\
+    "Ashinabi",\
+    "Eluba-Addon Egg Mine",\
+    "Forgotten Shipwreck",\
+    "Koal Cave",\
+    "Kudanat",\
+    "Mamaea, Sanctum of Awakening",\
+    "Milk",\
+    "Palansour",\
+    "Shushishi",\
+    "Unmarked Shipwreck, Upper Level",\
+    "Yasammidan, Shrine",\
+    "Ashalmawia, Shrine, Sunken Vaults",\
+    "Ashinabi, Smuggler Den",\
+    "Mamaea, Sanctum of Black Hope",\
+    "Subdun, Shrine",\
+    "Unmarked Shipwreck, Lower Level",\
+    "Indoranyon",\
+    "Forgotten Vaults of Anudnabia, Forge of Hilbongard",\
+    "Subdun"\
+}
 /* name,title,prefix,regions,travel_npc,travel_target,region_cap,draw_distance,
    world_slot,flags,travel_return,handoff,origin[3],core[4] */
 #define AW_TOWN_ROWS {\

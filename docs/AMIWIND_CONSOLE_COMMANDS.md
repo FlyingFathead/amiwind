@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.48-dev1._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.48._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -23,6 +23,8 @@ Type: "dbg help" for help.
 | --- | --- | --- |
 | `dbg door sounds` | - | on/off (default on) |
 | `dbg music` | - | [on/off, true/false or 1/0; no argument = status of the switch and the stream] background music (default on; not saved): off closes the stream at once and opens none until on again |
+| `dbg mwscript` | - | on/off (EXPERIMENTAL, default off, saved) run the game's compiled scripts (docs/MWSCRIPT_BYTECODE.md): ambient and activator sounds, NPC lines, music cues, journal and globals; functions not carried out yet are logged once |
+| `dbg mwscript status` | - | the compiled scripts: objects attached on this map, global scripts, sounds, runs, skipped runs, opcodes per frame |
 | `dbg ost play` | - | 00..98 / original music filename stem (spaces as underscores) |
 
 ## Video
@@ -31,15 +33,16 @@ Type: "dbg help" for help.
 | --- | --- | --- |
 | `dbg cam` | - | [mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel distance, right click or Esc ends |
 | `dbg camera` | `dbg pov`, `dbg thirdperson` | [first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / die] player view: no argument = status; Tab first/third person (held: orbit), wheel zooms; vanity = idle orbit; death = death camera; retry = Retry fight; die = test death (docs/THIRD_PERSON.md) |
-| `dbg crosshair` | `dbg crosshairs` | [on/off, true/false or 1/0; no argument toggles] show the crosshair (saved; default on; also Options > Show crosshairs) |
-| `dbg cull` | - | far detail (saved; also Options > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those) |
+| `dbg campfires` | - | [on/off, true/false or 1/0] fires outdoors (default on; not saved): on = campfires, braziers, fire pits, torches and flame lamps burn and light the objects around them (and, at night, the ground near the nearest); off = no flame and no fire light outdoors, at once (interiors keep their fires) |
+| `dbg crosshair` | `dbg crosshairs` | [on/off or 1/0; no argument toggles / colour NAME / shape NAME / style] show the crosshair (saved; default on; also Options > Prefs); colours Warm white (default), Yellow, Green, Blue; shapes Cross (default), Open cross, Small cross, Dot (saved); a number or a name's start is enough, no name lists them; style prints all three |
+| `dbg cull` | - | far detail (saved; also Options > Video > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those) |
 | `dbg cut groups` | - | [on/off, 1/0; no argument shows aw_cull] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own |
 | `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 540] |
 | `dbg fog` | - | on/off or 1/0 (default on) |
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt set their own day/night fog distance (Balmora 300 day, 250 night; default 0 off) |
 | `dbg fog rule` | - | [on/off, 1/0; no argument shows aw_cull] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster) |
 | `dbg ghostfence` | - | [on/off, true/false or 1/0] animated scrolling textures (default on; not saved): on = the Ghostfence curtain, waterfalls and other turbulent textures ripple over time; off = drawn straight and still (unlit, as they are built; also stills water in interiors) |
-| `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Photo mode) |
+| `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles] clean screenshots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full-screen view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; also Options > Video > Photo mode) |
 | `dbg land fill` | `dbg landfill` | 1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B |
 | `dbg land method` | - | 1/0 legacy resident LAND rasterizer (default 0, experimental); separate from the CHIM far layer |
 | `dbg noclipbob` | `dbg noclipwobble` | same as noclipwobble |
@@ -75,6 +78,7 @@ Type: "dbg help" for help.
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg door` | - | [status / list; no argument: open or close the hinged door under the crosshair, locks ignored] ordinary hinged doors (docs/DOOR_MAPPING.md): status counts the table and this map's doors, list prints each (reference, edict or CHIM, how far open, lock) |
 | `dbg god` | `dbg godmode` | [on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage; the HUD shows GOD) (not saved) |
 | `dbg map format` | - | 2 draws the v2 world map layers (default) / 1 draws a v2 map as the v1 map (terrain and settlements only) |
 | `dbg map lava` | - | 1/0 molten lava pools on the world map (M), v2 maps only (default 1, saved) |
@@ -84,6 +88,7 @@ Type: "dbg help" for help.
 | `dbg reset location` | - | 0 |
 | `dbg scene` | - | ship/town/balmora/<map name> |
 | `dbg scene change` | `dbg tp menu` | (scene picker) |
+| `dbg superspeed` | - | [on/off, true/false or 1/0; no argument = status and current speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey) instead of the original's speed from Speed, Athletics and load; no running fatigue (default off; not saved; also plain superspeed on/off) |
 | `dbg tp` | - | [X Y [Z] original Morrowind global coordinates (Z: land on the first floor at or below it) / mark or marker (the map marker you set on the map screen) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (also teluvirith) / <map name>; no argument opens menu] |
 | `dbg unstuck` | - | (nearest clear standing spot below or beside you; never into a wall or water; leaves noclip) |
 | `dbg view` | - | x y z yaw pitch |
@@ -153,6 +158,7 @@ Type: "dbg help" for help.
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
 | `dbg input trace` | `dbg inputtrace` | on/off true/false 1/0 (alias; default off) |
+| `dbg sensitivity` | - | [0.1..20, one decimal; no argument prints it] mouse sensitivity, Quake's sensitivity setting (saved; default 3, unchanged; also Options > Controls > Mouse sensitivity, 0.5..10 in steps of 0.5) |
 
 ## Diagnostics
 

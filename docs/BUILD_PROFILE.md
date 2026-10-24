@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
+_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -395,11 +395,13 @@ The live supervisor (`tools/stage_watch.py`) looks every 5 s at the cores each
 pooled stage really uses. A stage under half its share for over 60 s while its
 pools have units queued is an occurrence: one warning line, and one JSON line in
 `RUN/underused.jsonl` (stage, cores used, allowance and share, queued and
-running units, the slowest unit, since when, who holds it). One line per
+running units, the slowest unit, since when, who holds it, and the stage's phase
+running at that moment with its age, `phase` and `phase_seconds`, from the
+stage's own phase timer; BUILD-IMAGE-FINALIZE-UNDERUSED-48). One line per
 occurrence; the build carries on, and the build summary lists it as a warning:
 
 ```text
-[underused] WARNING: chim ran on 1.0 of 20 cores (allowance 1, share 20) for 65 s with 400 units queued and 1 running; slowest running unit: rcp16_p11 (42 s); held by: memory guard; the build carries on (RUN/underused.jsonl)
+[underused] WARNING: chim ran on 1.0 of 20 cores (allowance 1, share 20) for 65 s with 400 units queued and 1 running; slowest running unit: rcp16_p11 (42 s); phase now: CHIM stats: resident rings (running 12 s); held by: memory guard; the build carries on (RUN/underused.jsonl)
 ```
 
 The build summary's digest (`tools/build_digest.py`) is written into
@@ -416,9 +418,15 @@ than 20 % (and 30 s) against the last passed build of the same kind beside it.
 Pools hand out their heaviest units first: `ordered_map(..., history=NAME,
 key=...)` by the seconds recorded for each unit in earlier builds whenever such
 a history exists (this run's times are recorded for the next), `cost=` on
-`ordered_map`, `completed_map` and `governed_map`. Every caller gives a cost, a
+`ordered_map`, `completed_map`, `governed_map` and `spread_map`. Every caller gives a cost, a
 history or a recorded reason (`tests/test_pool_cost_sweep.py`,
 BUILD-CHIM-REGION-FRAMES-TAIL-43).
+
+`spread_map(..., spread=...)` is `completed_map` for units that can use more
+than one core: when fewer units are left to start than cores are free (the
+tail), the free cores are offered to them by their cost, and each unit takes
+what it can use; the cores in flight stay within the stage's share. The room
+batches stage gives them to a big room's scenery geometry (ROOM-BATCH-CORES-49).
 
 A stage sizes its own pools by its ceiling (the build budget under the
 scheduler, `build_parallel.stage_ceiling`), not by the `--jobs` it was launched
@@ -443,6 +451,25 @@ processes stay alive between units and keep the memory they reached; a cut only
 stops giving them new units. The earlier guard cut workers from 90 % and grew
 them back only when memory came free, so a cut never reversed: a from-scratch
 build's CHIM stage ran on 1 of 24 cores for an hour at 90 % memory.
+
+**Idle workers end when the allowance falls** (BUILD-POOL-MEMORY-PEAK-48). Under
+the scheduler each worker pool has a watcher thread: when the pool has held more
+live worker processes than its stage's allowance (and its units in flight) for
+about 20 s, the idle ones end and their memory goes back to the machine
+(`[pool] 7 idle worker process(es) ended: 8 alive for an allowance of 1 ...`);
+new workers start when the allowance grows again. A running unit is never
+stopped. In the v0.0.48-dev2 build the CHIM and room batches stages sat at one
+worker each for over ten minutes at 42 of 44 GiB, most of it idle workers.
+
+**Small units go out in chunks** (BUILD-POOL-TINY-UNITS-48). `completed_map`
+first hands out one unit per task; once a wave of units has measured the unit
+time, each task takes a guided share of the units left (the units left divided
+by four tasks per worker), at most about 2 s of measured work, so the chunks
+shrink to single units in the tail. A chunk is pickled once, so units that share
+a large input (the heap gate's position slices of one frame) send it once. Each
+unit still runs its function on its item and yields its own result; a failing
+unit ends the map as before. `AMIWIND_POOL_CHUNKS=off` keeps one task per unit
+(the method before v0.0.48); it is not part of any key.
 
 ## Perf database
 
@@ -748,7 +775,8 @@ CHIM stats: 2768 models - took 38.0s, 23.1 cores
   bar, also while the stage runs.
 - **Without code changes**: functions in `build_profile.PHASES` are timed as
   phases by `instrument()` (the image step's world, sky, cull, optimizer, heap,
-  pack, finalize and check passes; world terrain; actor contact). The chim stage
+  pack, finalize and check passes, including the CHIM room actor bake that runs after the CHIM rooms install and
+  before the actor ground check; world terrain; actor contact). The chim stage
   times its world conversion, validation, statistics, heap gate, zone walk and
   stair gate itself.
 - **Heartbeat**: the builder (the parent process, so a stage whose child prints
@@ -914,7 +942,16 @@ outside its plain functions, including the default values of every function)
 plus the source of each function the stage reaches, so an edit to a function
 no stage reaches (the build plan code in `build_parallel.py`, which every
 stage imports for its worker pool) keeps every fingerprint; data files are
-hashed whole. Scope `symbols` follows the same code but hashes whole files and
+hashed whole. Since v0.0.48 stage keys use import-time form 3: a plain class (no decorator, metaclass or
+repository base class; a body of methods and literal attributes) is no longer import-time code but a unit of its
+own, its body and each method (`Class.method`), so an edit to a method a stage never reaches keeps its key (an
+instance reaches every method; `Class.static_method()` only that one; BUILD-STAGE-KEY-WHOLE-CLASS-48: one method
+of `actor_grounding._Fitter` rekeyed the CHIM stages). Code a stage hands to a cache key
+(`UnitCache.open(..., __file__)`, `PassCache.open(..., (__file__, 'worker'))`, `source_digest`) counts with the
+reach that key reads, whole files (BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48), and the Python files of a folder the
+code reads as bytes (`FOLDER.glob('*.py')`) count whole (BUILD-MWSCRIPT-KEY-UNDERDECLARED-48). A reuse source keyed
+in an older form is compared in that form, so the change of form rebuilds nothing; the per-unit caches keep their
+own forms. Scope `symbols` follows the same code but hashes whole files and
 keeps the earlier path rules. Instrumentation modules (the profiler, its
 progress display and the stage cache itself, an explicit list in
 `tools/build_cache.py`) observe a build but never change its outputs; they
@@ -942,7 +979,7 @@ stage, the list is compared with what the fingerprint covered
 no fingerprint covers (prose, tests) or code from outside the checkout marks
 the stage's outputs as not reusable, prints a warning and is a bug to
 register. With scope `units` the same hook lists the first run of each
-repository function (`@file<TAB>function`, once per function, through
+repository function (`@file<TAB>function`, a method as `Class.method`, once per function, through
 `sys.monitoring` on Python 3.12 and later); a function that ran but whose
 source the fingerprint left out marks the outputs as not reusable the same
 way. The hook only observes; `AMIWIND_STAGE_TRACE=off` switches it off.
@@ -1105,6 +1142,15 @@ before anything else runs. `--gate-order stairs-last` keeps the earlier order (h
 BUILD-CHIM-HEAP-GATE-LATE-36, BUILD-CHIM-STAIR-WALK-UNCACHED-36); the reports are the same either way. The receipts record the mode and how many maps or frames were reused, walked
 and walked again.
 
+The CHIM visibility units follow the same rule (`chim.world.chunk_visibility`). A chunk-visibility block is keyed by
+the ground, the occluder grid (the solid columns of the placed collision pieces: a collision change that moves no
+column keeps it), the chunk tops and the ring. A placement-visibility block is keyed in the frame's own placement
+numbering (id minus the frame's first id) by what it reads: the ground, the occluder grid, its viewer chunks, their
+candidates and near sets and those candidates' boxes; its result is numbered back. Keyed by the world-wide ids, one
+placement more in an earlier frame recomputed every later frame's units (BUILD-CHIM-VIS-RECOMPUTED-48); units of
+that earlier key are still found once and stored in the new key. Fire rows (`chim.flames`) are written after the
+visibility rows and key none of them.
+
 A CHIM frame's key (key form `chim-stair-key-2`, `chim.collision.frame_stair_parts`) holds exactly what its walk
 reads: the frame's path, the stair tile and the frame grid (grain, low corner, size); per chunk its place and the
 lumps of its terrain image the walk reads (planes, vertexes, nodes, texinfo, faces, clipnodes, leafs, edges,
@@ -1238,6 +1284,11 @@ too, because their versions no longer exist in the old run.
 `--reuse-mode hardlink` links instead of copying and marks the linked files
 read-only in both runs, so a later stage that tries to rewrite one fails
 instead of changing the old run; it is refused as root (copies are made).
+A scene stage that edits its inherited tree in place first makes such files private and writable
+(`mwad.paths.unshare_tree`: same bytes, new inode); the stage's record leaves out every file it only unshared (the
+storage pool object it was linked to has the SHA-256 the file still has), so its record lists what it wrote,
+whether the stages before it were reused or ran (BUILD-REUSE-OUTPUTS-DIFFER-48: door audio recorded 2,124 files
+after reused stages, 18 after stages that ran, and seven stages after it were refused as "outputs differ").
 
 Assumptions, checked elsewhere: stage outputs do not depend on the worker
 count (parallel tests; the from-scratch gate); the map tools give the same

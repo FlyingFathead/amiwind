@@ -21,7 +21,139 @@
 #include "aw_miniwind.h"
 #include "aw_quickchar.h"
 #include "aw_testbox.h"
+/* Ordinary hinged doors (aw_hinged_door.c sets these; NULL: none). */
+int (*aw_hinged_use)(void);
+int (*aw_hinged_hint)(const char **name,const char **action);
+void (*aw_hinged_spawn)(void);
+void (*aw_hinged_tick)(double seconds);
+int (*aw_hinged_locked_sound)(void);
 #include "amiwind_version.h"
+
+/* CHIM rooms that need more Fast RAM than this start has (CHIM-ROOM-16MB-REFUSAL-48). The builder marks each
+ * room map whose store set does not fit the 16 MB baseline's zone with "_chim_room_fast_mb" "32" in its
+ * worldspawn (tools/chim/heap.py require_room_map_heap). At the door, before anything loads, a marked room is
+ * refused when this start runs on less: Fast RAM found under the safe minimum (sys_amiga.c sets
+ * aw_fast_ram_found_mb; 0 = the minimum or more) or Options > Video > Extra RAM off (aw_autoram 0: the built
+ * heap and no cache bank, the 16 MB baseline). The player stays at the door; a screen on the loading art says
+ * why, and ENTER returns to the game. */
+long aw_fast_ram_found_mb;
+#define ROOM_FAST_KEY "\"_chim_room_fast_mb\""
+#define ROOM_REFUSED_FIRST "Sorry, but this interior cannot be run with 16MB of Fast RAM."
+#define ROOM_REFUSED_SECOND "Press ENTER to return."
+/* CHIM region frames the builder marked for 32 MB of Fast RAM (CHIM-FRAME-16MB-REFUSAL-48; tools/chim/heap.py
+ * FRAME_FAST_KEY: a frame whose ring is over the 16 MB baseline's zone or within FRAME_NEAR_BYTES of it):
+ * "_chim_frame_fast_mb" "32" in its frame map's worldspawn. At the crossing into such a frame, on less Fast RAM (as
+ * for the rooms), the player stays at the last spot inside the frame he is in: the first time the same screen as a
+ * refused room says why (ENTER returns), then the message box every 3 seconds while he walks into it. Nothing of the
+ * frame is loaded. */
+#define FRAME_FAST_KEY "\"_chim_frame_fast_mb\""
+#define FRAME_REFUSED_FIRST "Sorry, but this area cannot be run with 16MB of Fast RAM."
+static int room_refused;
+static const char *refused_text=ROOM_REFUSED_FIRST;
+/* The Fast RAM a marked room may count on in this start, in MB: 0 when every room loads (enough Fast RAM or
+ * not known), else 16. */
+static int room_fast_have(void){
+    if(!Cvar_VariableValue("aw_autoram"))return 16;
+    return aw_fast_ram_found_mb>0?16:0;
+}
+/* The Fast RAM the map of TARGET needs, in MB, from its worldspawn's mark; 0 for every map without one (BSP room
+ * maps, frame maps, the census office). Reads the map's header and the start of its entity lump only. */
+static int map_fast_mb(const char *target,const char *key);
+int AW_SceneRoomFastMb(const char *target){return map_fast_mb(target,ROOM_FAST_KEY);}
+/* The same for a CHIM frame map's FRAME_FAST_KEY mark. */
+int AW_SceneFrameFastMb(const char *target){return map_fast_mb(target,FRAME_FAST_KEY);}
+static int map_fast_mb(const char *target,const char *key){
+    char path[MAX_QPATH+24],text[1024],*p,*end;FILE *f=NULL;unsigned char h[12];long base,at,len;int n,mb=0;
+    if(AW_SceneMapSize(target,path,sizeof(path))<124 || !AW_MapPathChim(path))return 0;
+    if(COM_FOpenFile(path,&f)<0 || !f)return 0;
+    base=ftell(f);
+    if(fread(h,1,12,f)==12){
+        at=(long)h[4]|((long)h[5]<<8)|((long)h[6]<<16)|((long)h[7]<<24);
+        len=(long)h[8]|((long)h[9]<<8)|((long)h[10]<<16)|((long)h[11]<<24);
+        if(at>=124 && len>0 && !fseek(f,base+at,SEEK_SET)){
+            n=(int)fread(text,1,len<(long)sizeof(text)-1?(size_t)len:sizeof(text)-1,f);text[n<0?0:n]=0;
+            if((end=strchr(text,'}'))!=NULL)*end=0;        /* the worldspawn only */
+            if((p=strstr(text,key))!=NULL && Q_sscanf(p+strlen(key)," \"%d\"",&mb)!=1)mb=0;
+        }
+    }
+    fclose(f);
+    return mb>0 && mb<=2048?mb:0;   /* Fast RAM in MB, as the -heapmb bound */
+}
+/* 1 when the door to TARGET is refused here (the screen is up). */
+int AW_SceneRoomRefuse(const char *target){
+    int have=room_fast_have(),mb;
+    if(!have || (mb=AW_SceneRoomFastMb(target))<=have)return 0;
+    if(!Cvar_VariableValue("aw_autoram"))
+        Con_Printf("CHIM room %s needs %ld MB of Fast RAM (its build mark); Extra RAM is off (Options > Video), the 16 MB baseline: refused at the door, nothing loaded.\n",
+            target,(long)mb);
+    else Con_Printf("CHIM room %s needs %ld MB of Fast RAM (its build mark); this machine has %ld MB: refused at the door, nothing loaded.\n",
+            target,(long)mb,aw_fast_ram_found_mb);
+    if(aw_hinged_locked_sound)aw_hinged_locked_sound();
+    AW_UIRoomRefused(NULL,NULL);
+    refused_text=ROOM_REFUSED_FIRST;room_refused=1;key_dest=key_menu;IN_AWClearButtons();
+    return 1;
+}
+int AW_SceneRoomRefused(void){return room_refused;}
+/* Every other way into a marked place (CHIM-32MB-SAVE-ENTRY-48): loading a save, a new/quick start, the console's
+ * dbg tp / aw_scene / raw "map" and "changelevel", the silt strider and a door out of a room all go through
+ * AW_SceneEntryRefuse before anything is left or loaded. The mark is the room's or the frame's on TARGET's own map, or,
+ * with POINT (a save's position in TARGET's coordinates), the frame that holds the point when it lies past TARGET's
+ * own core (a save written after a streamed crossing). On less Fast RAM the same screen as at a door says why; ENTER
+ * returns to the previous place when a game runs and TO_MENU is 0 (a console jump), else to the main menu (a load
+ * or a start: there is no previous place, or it is a death screen). 1 when refused. */
+static int refused_to_menu;
+static int entry_mark(const char *target,const float *point,int *room){
+    char other[16];float arrival[3];int mb;
+    *room=1;if((mb=AW_SceneRoomFastMb(target))>0)return mb;
+    *room=0;if((mb=AW_SceneFrameFastMb(target))>0)return mb;
+    if(point && AW_WorldDestination(target,point,other,arrival) && (mb=AW_SceneFrameFastMb(other))>0)return mb;
+    return 0;
+}
+int AW_SceneEntryRefuse(const char *target,const float *point,int to_menu){
+    int have=room_fast_have(),mb,room;
+    if(!have || !target || !*target || (mb=entry_mark(target,point,&room))<=have)return 0;
+    if(!Cvar_VariableValue("aw_autoram"))
+        Con_Printf("CHIM %s %s needs %ld MB of Fast RAM (its build mark); Extra RAM is off (Options > Video), the 16 MB baseline: refused, nothing loaded.\n",
+            room?"room":"area",target,(long)mb);
+    else Con_Printf("CHIM %s %s needs %ld MB of Fast RAM (its build mark); this machine has %ld MB: refused, nothing loaded.\n",
+            room?"room":"area",target,(long)mb,aw_fast_ram_found_mb);
+    AW_UIRoomRefused(NULL,NULL);
+    refused_text=room?ROOM_REFUSED_FIRST:FRAME_REFUSED_FIRST;room_refused=1;refused_to_menu=to_menu || !sv.active;
+    key_dest=key_menu;IN_AWClearButtons();
+    return 1;
+}
+/* A save's scene and position (aw_save.c AW_SaveRead, through aw_save_entry_refuse): ENTER goes to the main menu. */
+int AW_SceneSaveEntryRefuse(const char *scene,const float *position){return AW_SceneEntryRefuse(scene,position,1);}
+/* The crossing into a marked CHIM frame (FRAME_FAST_KEY) on less Fast RAM: the player P goes back to the last spot
+ * inside the frame he stands in (frame_last, AW_SceneTick), the screen the first time per frame, else the message
+ * box. 1 when refused. The mark is read once per target map (cached until the next scene). */
+static vec3_t frame_last;static int frame_last_ok;static double frame_said=-10;
+static char frame_refused[16],frame_mark_map[16];static int frame_mark_mb;
+int AW_SceneFrameRefuse(edict_t *p,const char *target){
+    int have=room_fast_have(),mb;
+    if(!have || !target || !*target)return 0;
+    if(strcmp(frame_mark_map,target)){
+        strncpy(frame_mark_map,target,sizeof(frame_mark_map)-1);frame_mark_map[sizeof(frame_mark_map)-1]=0;
+        frame_mark_mb=AW_SceneFrameFastMb(target);
+    }
+    if((mb=frame_mark_mb)<=have)return 0;
+    if(frame_last_ok){
+        VectorCopy(frame_last,p->v.origin);VectorCopy(frame_last,p->v.oldorigin);
+        p->v.velocity[0]=p->v.velocity[1]=0;SV_LinkEdict(p,false);
+    }
+    if(strcmp(frame_refused,target)){
+        strncpy(frame_refused,target,sizeof(frame_refused)-1);frame_refused[sizeof(frame_refused)-1]=0;
+        if(!Cvar_VariableValue("aw_autoram"))
+            Con_Printf("CHIM frame %s needs %ld MB of Fast RAM (its build mark); Extra RAM is off (Options > Video), the 16 MB baseline: the player stays out, nothing loaded.\n",
+                target,(long)mb);
+        else Con_Printf("CHIM frame %s needs %ld MB of Fast RAM (its build mark); this machine has %ld MB: the player stays out, nothing loaded.\n",
+                target,(long)mb,aw_fast_ram_found_mb);
+        AW_UIRoomRefused(NULL,NULL);
+        refused_text=FRAME_REFUSED_FIRST;room_refused=1;key_dest=key_menu;IN_AWClearButtons();
+        frame_said=realtime;
+    }else if(realtime>=frame_said+3 || realtime<frame_said){frame_said=realtime;AW_UISubtitle("",FRAME_REFUSED_FIRST,3);}
+    return 1;
+}
 /* CHIM: the harvest catalogue of the region the player is in while a town
  * runs its frame map; 0 on a legacy map. */
 static int harvest_follow(edict_t *p,int arrival){return AW_HarvestFollow(AW_RegionAt,p->v.origin,arrival);}
@@ -31,6 +163,13 @@ typedef struct {char source[16],target[16],label[96];vec3_t point,arrival,mins,m
 #define AW_SCENE_LINKS 256
 static aw_scene_link_t links[AW_SCENE_LINKS];static int count,loaded,pending;
 static aw_scene_link_t next;
+/* A raw "map" / "changelevel" (host_cmd.c), before the running game is left (CHIM-32MB-SAVE-ENTRY-48). A scene
+ * change this file started (load_scene, the quick start) was checked there, a region crossing by the tick: those
+ * pass. 1 when refused. */
+int AW_SceneMapRefuse(const char *name){
+    if(!name || (pending && !strcmp(next.target,name)))return 0;
+    return AW_SceneEntryRefuse(name,NULL,0);
+}
 static char links_map[16];
 static double door_ready;
 static aw_scene_link_t opening_door;
@@ -299,6 +438,9 @@ static void read_links(void){read_links_for(sv.name);}
 static void load_scene(aw_scene_link_t *link,int immediate) {
     edict_t *p=svs.clients[0].edict;char command[32];
     if(pending || !map_valid(link->target))return;
+    /* a marked room or frame on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48): the strider, a door out of a room, dbg tp;
+     * a region crossing was checked by the tick (AW_SceneFrameRefuse) */
+    if(!region_crossing && AW_SceneEntryRefuse(link->target,link->arrival,0))return;
     if(!AW_RegionSelect(link->target,link->arrival,intro_docks_variant.value==2 &&
        aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
     if(region_crossing){
@@ -448,6 +590,17 @@ static int travel_use(void) {
     key_dest=key_menu;IN_AWClearButtons();return 1;
 }
 int AW_TravelKey(int key) {
+    /* The refused room's screen (AW_SceneRoomRefuse): ENTER returns the player to the game at the door; it holds the
+     * other keys. */
+    if(room_refused){
+        if(key_dest!=key_menu){room_refused=refused_to_menu=0;return 0;}
+        if(key==K_ENTER){
+            room_refused=0;key_dest=key_game;IN_AWClearButtons();
+            /* a refused load or start (CHIM-32MB-SAVE-ENTRY-48): the main menu, as the death screen's "No" */
+            if(refused_to_menu){refused_to_menu=0;Cbuf_AddText("disconnect\naw_main_menu\n");}
+        }
+        return 1;
+    }
     if(!travel_open)return 0;
     if(!sv.active || key_dest!=key_menu){travel_open=0;return 0;}
     if(key==K_ESCAPE || (key==K_ENTER && travel_choice==travel_count-1)){
@@ -466,6 +619,7 @@ int AW_TravelKey(int key) {
 }
 int AW_TravelDraw(void) {
     int i;char line[96];const aw_town_t *town=AW_Town(travel_town),*home;
+    if(room_refused && key_dest==key_menu){AW_UIRoomRefused(refused_text,ROOM_REFUSED_SECOND);return 1;}
     if(!travel_open || key_dest!=key_menu || !town)return 0;
     home=AW_Town(AW_TownFind(town->travel_target));
     AW_UIBox(18,18,284,170);AW_UISmallBegin();
@@ -491,7 +645,8 @@ void (*aw_scene_census_exit)(void);
 int AW_SceneUse(void) {
     int i;float duration;char path[40];
     if(AW_PlayerDead())return 1;   /* dead: nothing is used (the key is spent) */
-    i=0;if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && (AW_InventoryUse() || AW_HarvestUse()))return 1;i=aimed_door();if(i<0)return 0;
+    i=0;if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && (AW_InventoryUse() || AW_HarvestUse()))return 1;i=aimed_door();
+    if(i<0)return aw_hinged_use?aw_hinged_use():0;   /* an ordinary hinged door (aw_hinged_door.c), else nothing here */
     if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==119513?"Finish registration and leave through the courtyard.":links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
     if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
     if(!map_valid(links[i].target) || AW_SceneMapSize(links[i].target,path,sizeof(path))<0){
@@ -499,6 +654,7 @@ int AW_SceneUse(void) {
         if(AW_ContentExcludedSay("interiors",1)){AW_UISubtitle("","Area unavailable in this quick test build.",3);return 1;}
         AW_UISubtitle("",AW_MiniwindActive()?AREA_UNAVAILABLE:"Interior not found.",3);return 1;
     }
+    if(AW_SceneRoomRefuse(links[i].target))return 1;   /* a CHIM room this start's Fast RAM cannot hold: nothing loads */
     if(AW_StoryRestricted() && links[i].reference==119659 && AW_StoryTransition(AW_STAGE_RELEASED) && aw_scene_census_exit)
         aw_scene_census_exit();
     duration=AW_DoorSound(links[i].reference,0);
@@ -532,6 +688,7 @@ void AW_SceneDraw(void) {
             action=!AW_StoryDoor(links[i].reference)?"Locked - finish duties":
                 AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE?"Speak to dock guard":
                 !map_valid(links[i].target)?(AW_ContentExcluded("interiors")?"Area unavailable":"Interior unavailable"):"Enter: E";
+        }else if(aw_hinged_hint && aw_hinged_hint(&name,&action)){
         }else{ name=npc_hint();if(name){
             eval_t *voice;edict_t *target=npc_target();npc=1;
             voice=target?GetEdictFieldValue(target,"aw_voice"):NULL;
@@ -733,7 +890,7 @@ static int stream_cross(edict_t *p,aw_scene_link_t *r){
 }
 void AW_SceneSpawn(edict_t *p) {
     int placed=0;float eye;
-    area_last_ok=0;
+    area_last_ok=0;frame_last_ok=0;frame_refused[0]=frame_mark_map[0]=0;
     logical_map[0]=0;VectorCopy(vec3_origin,logical_offset);logical_used=0;
     /* Quake's stuck recovery returns to oldorigin, which a fresh client edict
      * leaves at the frame origin; anchor it at the scene spawn instead. */
@@ -794,7 +951,7 @@ void AW_SceneSpawn(edict_t *p) {
         if(AW_Interior() || AW_TownFlag(sv.name,AW_TOWN_GROUND_PLACE) || AW_TerrainId(sv.name)>=0)AW_InteriorPlace(p,p->v.origin);
         else AW_PlacePlayer(p,p->v.origin);
     }
-    AW_IntroSpawn();AW_OpeningSpawn();AW_SaveSpawn();AW_InventorySpawn();if(!harvest_follow(p,1))AW_HarvestSpawn();
+    AW_IntroSpawn();AW_OpeningSpawn();if(aw_hinged_spawn)aw_hinged_spawn();AW_SaveSpawn();AW_InventorySpawn();if(!harvest_follow(p,1))AW_HarvestSpawn();
     if(aw_combat_scene)aw_combat_scene();
     AW_GallerySpawn(p);if(aw_companion_scene)aw_companion_scene(p);region_crossing=map_jump=0;
     if(AW_CharacterLoad() && (eye=AW_CharacterEyeHeight())>0)p->v.view_ofs[2]=eye+p->v.mins[2];
@@ -819,6 +976,7 @@ void AW_SceneSpawn(edict_t *p) {
 void AW_SceneTick(void) {
     aw_scene_link_t r;edict_t *p;
     AW_NPCFloorRetry();
+    if(!pending && aw_hinged_tick)aw_hinged_tick(host_frametime);   /* nothing unless a door turns */
     if(!pending && sv.active && cls.state==ca_connected && cls.signon==SIGNONS &&
        key_dest==key_game && svs.maxclients==1 && svs.clients && (p=svs.clients[0].edict))
         AW_StreamTick(AW_CellChangeMethod()==2?AW_RegionAhead(p->v.origin,p->v.velocity,
@@ -840,9 +998,11 @@ void AW_SceneTick(void) {
     if(AW_SectionDestination(sv.name,p->v.origin,r.target)){
         VectorCopy(p->v.origin,r.arrival);
     }else if(AW_StoryRestricted() || !world_destination(p->v.origin,r.target,r.arrival)){
+        VectorCopy(p->v.origin,frame_last);frame_last_ok=1;   /* inside the scene: where a refused crossing returns */
         if(!AW_RegionCrossing(p->v.origin,intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
         copy_name(r.target,sizeof(r.target),sv.name);VectorCopy(p->v.origin,r.arrival);
-    }else if(stream_cross(p,&r))return;
+    }else if(AW_SceneFrameRefuse(p,r.target))return;   /* a CHIM frame this start's Fast RAM cannot hold */
+    else if(stream_cross(p,&r))return;
     r.yaw=p->v.angles[1];
     /* The displayed local view can differ from the last rounded movement
      * packet. Preserve it and its drift policy across the client-state reset. */
@@ -1113,6 +1273,7 @@ static int quick_character(void) {
 int AW_SceneStarting(void){return pending;}
 static void quick_go(aw_scene_link_t *r,const char *title) {
     char command[48];
+    if(AW_SceneEntryRefuse(r->target,r->arrival,1))return;   /* a start in a marked place: the main menu after ENTER */
     AW_SaveReset();AW_SceneCancelTransition();
     health=aw_character.current[0];next=*r;pending=1;started=Sys_FloatTime();
     quick_notice=1;
@@ -1202,4 +1363,5 @@ void AW_SceneInit(void) {
     Cmd_AddCommand("aw_shroompicker",shroompicker_command);
     Cmd_AddCommand("aw_demo_start",demo_start);
     Cmd_AddCommand("aw_quick_start",quick_start);
+    /* aw_debug.c binds aw_save.c's aw_save_entry_refuse to AW_SceneSaveEntryRefuse (CHIM-32MB-SAVE-ENTRY-48) */
 }

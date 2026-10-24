@@ -85,7 +85,9 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [ANIMKIT-TORCH-STANDING-35](ANIMKIT-TORCH-STANDING-35.md): With the animation kit, guards hold their torch only while standing; walking and running drop it
 - [BALMORA-LAMPS-DIM-31](BALMORA-LAMPS-DIM-31.md): Balmora's street lamps are far too dim at night
 - [CENSUS-OFFICE-BRIGHT-32](CENSUS-OFFICE-BRIGHT-32.md): The Census and Excise Office walls are about twice as bright as the original
+- [CHIM-EXTERIOR-FLAMES-MISSING-48](CHIM-EXTERIOR-FLAMES-MISSING-48.md): CHIM exteriors draw no fire: campfires, braziers, fire pits and flame lamps outdoors have no flame animation
 - [CHIM-MESHLESS-LIGHTS-33](CHIM-MESHLESS-LIGHTS-33.md): Exterior lights without a mesh have no CHIM light path: 2,284 placed lights give no light in a CHIM frame
+- CHIM-ROOM-LIGHT-FLAT-48 (no report page): CHIM rooms light each placement at one level: Temple arch trims and Rithleen walls look flat and brighter than the room maps baked light
 - [DLIGHT-WALLS-31](DLIGHT-WALLS-31.md): Torches barely light town walls at night
 - [EMISSIVE-UNSHIPPED-31](EMISSIVE-UNSHIPPED-31.md): Glowing lantern glass never reached the shipped maps (only the Temple has it)
 - [FLAME-RANGE-NEAREST-32](FLAME-RANGE-NEAREST-32.md): A hearth fire shows only up close when many candles are nearer
@@ -117,5 +119,10 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - TORCH-LIGHT-29 (no report page): Torch flames look weak and provide little immediate light
 - TORCH-NPC-LIGHT-29 (no report page): Nearby NPCs do not visibly respond to torchlight
 - TORCHTEST-DARKNESS-29 (no report page): Torch test room floor stays dim gray at zero light
+
+Related bugs in other categories:
+
+- [GUARD-TORCH-REBAKE-MISMATCH-48](GUARD-TORCH-REBAKE-MISMATCH-48.md): Eight guards first staged in v0.0.48 get no torch: their base models do not rebake exactly
+- [GUARD-TORCH-TYPES-LIMIT-48](GUARD-TORCH-TYPES-LIMIT-48.md): The image step stops on Too many distinct staged guard models: the batch rooms bring more than 32 guard types
 
 <!-- END GENERATED CATEGORY -->
