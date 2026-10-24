@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -37,14 +37,13 @@ _Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 *Harry Horsperg's perspective as the project's author.*
 
-**Latest release:** v0.0.45 - CHIM Streaming Improved, Guard Torches Are Back. Crossing from one CHIM cell to the
-next reads the frames around the player ahead into spare Fast RAM, and the engine's heap grows with the RAM the
-machine has; the guards in the streets carry their torches at night again ([release notes](RELEASE-v0.0.45.md)).
+**Latest release:** v0.0.48 - Inner CHIM & Actors On Stage (24 October 2026, CHIM Engine v0.2.2). 1,132 of the 1,134
+base-game interiors are now CHIM rooms, and the actors stand on stage in them ([release notes](RELEASE-v0.0.48.md)).
 Since v0.0.43 every exterior cell of Vvardenfell is on the CHIM engine: 1,409 cells, 1,348 in one-cell region
 frames and 61 in the town frames of Balmora, Seyda Neen and Vivec
 ([what these numbers count](chim/CELL_TRACKER.md#what-we-count)).
-**Next:** crossings without a level restart (the frame switched in place), then every interior of the base game
-that is still missing, as listed in the [plan](PLAN-v0.0.45.md). See the
+**Next:** v0.0.49, the build turnaround; then much smaller actor models ([modular NPCs](MODULAR_NPCS.md)); then
+the game's scripts and object state ([roadmap](ROADMAP.md)). See the
 [progress tracker](chim/PROGRESS_TRACKER.md), the [roadmap](ROADMAP.md) and the [bug tracker](BUGS.md).
 
 ## What is possible on the Amiga?
@@ -225,8 +224,8 @@ configuration**:
 | Default game display | 320 × 200, 8-bit indexed colour |
 
 These settings are recorded in the
-[FS-UAE preset](../resources/emulators/AmiWind-v0.0.44-FS-UAE.fs-uae),
-[WinUAE preset](../resources/emulators/AmiWind-v0.0.44-WinUAE.uae) and
+[FS-UAE preset](../resources/emulators/AmiWind-v0.0.48-FS-UAE.fs-uae),
+[WinUAE preset](../resources/emulators/AmiWind-v0.0.48-WinUAE.uae) and
 [AGA build guide](AGA_BUILD.md). The Zorro III setting describes the emulator's
 memory configuration; it is not a specification for an ordinary A1200 expansion.
 
@@ -560,12 +559,12 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **19 October 2026**, the latest release is **v0.0.44: By Azura's Trees!**, a patch release for **v0.0.43: Let
-There Be CHIM: Vvardenfell's Outdoors, All of It**. Since v0.0.43 every exterior cell of Vvardenfell runs on the CHIM
+As of **24 October 2026**, the latest release is **v0.0.48: Inner CHIM & Actors On Stage** (CHIM Engine v0.2.2). Since
+v0.0.43 (**Let There Be CHIM: Vvardenfell's Outdoors, All of It**) every exterior cell of Vvardenfell runs on the CHIM
 engine (1,409 cells: 1,292 land cells, 98 sea-floor cells and 19 open-sea cells; [what these numbers count](chim/CELL_TRACKER.md#what-we-count)), from Seyda Neen, Balmora and the whole city of Vivec to Ald-ruhn, Maar Gan, Suran and Red
-Mountain; no classic region maps are left outdoors. Interiors are still classic Quake maps, and many of the base
-game's interiors are not in the build yet: on 19 October 2026, 176 of Vvardenfell's 1,134 interior cells were
-converted and reachable ([v0.0.45 plan](PLAN-v0.0.45.md#3-every-interior-of-the-base-game)). The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows
+Mountain; no classic region maps are left outdoors. Since v0.0.48, 1,132 of the 1,134 base-game interiors are CHIM
+rooms; the prison ship and the census office, where the opening sequence runs, stay classic room maps on purpose
+until rooms have object state ([v0.0.48 notes](RELEASE-v0.0.48.md)). The [CHIM Progress Tracker](chim/PROGRESS_TRACKER.md) shows
 which cell is which. "Release" here identifies the project's release track; AmiWind as a whole is still an early
 work in progress.
 
@@ -756,9 +755,9 @@ take it further.
 ---
 
 Technical baseline for this FAQ: the published
-[v0.0.44 release](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.44) (commit
-[ddaac34](https://github.com/FlyingFathead/amiwind/commit/ddaac346fc2f01f27d9d7b5c4b26da21289154fd)),
-19 October 2026; the next line is v0.0.45. Emulator results in this FAQ are not
+[v0.0.48 release](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.48) (commit
+[e2ed59d4](https://github.com/FlyingFathead/amiwind/commit/e2ed59d4)),
+24 October 2026; the next line is v0.0.49. Emulator results in this FAQ are not
 real-hardware acceptance.
 The linked project documents provide more detailed and evolving status.
 

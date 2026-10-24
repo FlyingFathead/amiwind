@@ -4,21 +4,21 @@
   "npc_gallery": true,
   "partial_area": null
  },
- "drive_bytes": 2823847936,
+ "drive_bytes": 4291854336,
  "drives": [
   {
-   "bytes": 2823847936,
-   "file": "AmiWind-v0.0.47.hdf"
+   "bytes": 4291854336,
+   "file": "AmiWind-v0.0.48-rc1.hdf"
   }
  ],
  "groups": {
   "chim-world": {
-   "bytes": 1102695418,
-   "files": 38364
+   "bytes": 1115103922,
+   "files": 39496
   },
   "classic-maps": {
-   "bytes": 305448576,
-   "files": 1386
+   "bytes": 7675980,
+   "files": 1189
   },
   "music": {
    "bytes": 56272804,
@@ -29,12 +29,12 @@
    "files": 7106
   },
   "other": {
-   "bytes": 27065172,
-   "files": 1234
+   "bytes": 355998208,
+   "files": 3391
   },
   "progs": {
-   "bytes": 473399141,
-   "files": 4085
+   "bytes": 1869578486,
+   "files": 12965
   },
   "sound": {
    "bytes": 200991172,
@@ -46,10 +46,10 @@
   }
  },
  "labels": [],
- "note": "the v0.0.47 release image's record, the previous release after the v0.0.47 pin",
- "payload_bytes": 2537014477,
- "run": "2026_10_21_v0.0.47_clean-public_791771f7",
+ "note": "v0.0.48 release (the rc1 image shipped as the final: run 2026_10_24_v0.0.48-rc1_rc1-try8_af1df936; its image says 0.0.48-rc1, the record is of the v0.0.48 release)",
+ "payload_bytes": 3976762766,
+ "run": "2026_10_24_v0.0.48-rc1_rc1-try8_af1df936",
  "schema": "amiwind-size-ledger-v1",
  "status": "complete",
- "version": "0.0.47"
+ "version": "0.0.48"
 }

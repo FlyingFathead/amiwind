@@ -1,4 +1,4 @@
-"""Shared release identity: VERSION (the game) and CHIM_VERSION (the CHIM engine and builder).
+"""Shared release identity: the game's version file and CHIM_VERSION (the CHIM engine and builder).
 
 CHIM has its own version number, separate from the game's: semver, major = world
 format change, minor = features, patch = fixes. Both files sit at the repository
@@ -16,7 +16,7 @@ PROJECT_URL = 'https://github.com/FlyingFathead/amiwind/'
 def read_version(path):
     value = Path(path).read_text().strip()
     if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-(?:dev|rc)[0-9]+)?', value):
-        raise ValueError('VERSION must contain one number such as 0.0.17 or 0.0.17-dev1')
+        raise ValueError('%s must contain one number such as 0.0.17 or 0.0.17-dev1' % Path(path).name)
     return value
 
 
@@ -28,7 +28,7 @@ def read_chim_version(path):
 
 
 def chim_version(version_file):
-    """The CHIM version from the CHIM_VERSION file beside VERSION (the repository root or the
+    """The CHIM version from the CHIM_VERSION file beside the version file (the repository root or the
     staged engine tree); None when there is none."""
     path = Path(version_file).parent / 'CHIM_VERSION'
     return read_chim_version(path) if path.is_file() else None
@@ -55,6 +55,16 @@ def require_private_test_version(version, waivers):
 
 def public_version(root=ROOT):
     return read_version(Path(root)/'VERSION')
+
+
+def run_version(root=ROOT, environ=None):
+    """The version for a record's provenance or a private-test refusal: the builder's AMIWIND_RUN_VERSION (in ENVIRON,
+    default the process environment), else the tree's version file. Its read keys no stage
+    (build_cache.VERSION_HIDDEN_UNITS): a value that only says which build wrote a record, or refuses a waiver, never
+    makes a stage's output differ (BUILD-CHIM-KEY-VERSION-48)."""
+    import os
+    environ = os.environ if environ is None else environ
+    return environ.get('AMIWIND_RUN_VERSION') or read_version(Path(root)/'VERSION')
 
 
 def python_version(root=ROOT):
@@ -276,7 +286,16 @@ def check_native_versions(root=ROOT):
     return expected
 
 
-if __name__ == '__main__':
+def __getattr__(name):
+    """VERSION, read when a module asks for it (from project_version import VERSION), not at import: importing this
+    module for anything else (a CHIM stage's private-test refusal) no longer reads the version file, so it keys no
+    stage that does not show the version (BUILD-CHIM-KEY-VERSION-48)."""
+    if name == 'VERSION':
+        return public_version()
+    raise AttributeError('module %r has no attribute %r' % (__name__, name))
+
+
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--version-file', type=Path, default=ROOT/'VERSION')
     parser.add_argument('--out', type=Path, required=True)
@@ -285,5 +304,7 @@ if __name__ == '__main__':
     # No warning here: make runs this twice per build; the builder prints it once (build_aga.py engine),
     # and the boot check and the engine say it at start.
     generate_native(args.version_file, args.out, args.heap_mb)
-else:
-    VERSION = public_version()
+
+
+if __name__ == '__main__':
+    main()

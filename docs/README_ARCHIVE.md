@@ -1,10 +1,11 @@
 # Earlier README sections
 
-_Last updated with AmiWind v0.0.48 (24 October 2026)._
+_Last updated with AmiWind v0.0.49 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes](#v0046-red-mountain-getting-red-a-whole-heap-of-fixes)
 - [v0.0.45: CHIM Streaming Improved, Guard Torches Are Back](#v0045-chim-streaming-improved-guard-torches-are-back)
 - [v0.0.44: By Azura's Trees!](#v0044-by-azuras-trees)
 - [v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It](#v0043-let-there-be-chim-vvardenfells-outdoors-all-of-it)
@@ -43,6 +44,14 @@ _Last updated with AmiWind v0.0.48 (24 October 2026)._
 <!-- contents end -->
 
 The front page ([README](../README.md)) used to carry these sections. They are dated records of earlier releases and of the work around them, kept as written; where one disagrees with the front page, the front page is newer. The release notes of each version are in `docs/RELEASE-v*.md`.
+
+## v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes
+
+Red Mountain is red again: every region chooses its weather the way the original game does, and the mountain
+draws its blight sky. The Ebonheart dragon statue is back on its pedestal, the torch shows in third person, the
+Vivec dock walkways hold the player up and the Dreamers greet you. The collision of the whole island now keeps only
+the surface you walk on exactly, so every frame fits its memory again.
+
 ## v0.0.45: CHIM Streaming Improved, Guard Torches Are Back
 
 Crossing from one CHIM cell to the next uses spare Fast RAM now: the frames around the player are read ahead into

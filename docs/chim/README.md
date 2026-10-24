@@ -1,6 +1,6 @@
 # CHIM
 
-_Last updated with AmiWind v0.0.48 (23 October 2026)._
+_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -51,10 +51,10 @@ collision, sound and QuakeC are Quake's. What changes is the outdoor world:
 - **Terrain is world geometry.** Each chunk's ground is a small BSP subtree
   grafted under the frame's world, so Quake's visibility, collision and water
   work on it as on any map.
-- **Interiors stay Quake maps.** Houses, caves and the prison ship are
-  ordinary Quake maps behind doors, built as before; Quake's `vis` works well
-  indoors. Moving the interiors onto CHIM's store-once layout is planned
-  ([v0.0.45 plan](../PLAN-v0.0.45.md#3-every-interior-of-the-base-game)).
+- **Interiors are CHIM rooms.** Since v0.0.48, 1,132 of the 1,134 base-game
+  interiors are CHIM rooms on the store-once layout. The prison ship and the
+  census office, where the opening sequence runs, stay ordinary Quake room maps
+  on purpose until rooms have object state ([v0.0.48 notes](../RELEASE-v0.0.48.md)).
 - **One frame map per area.** A small Quake map (`maps/<town>-chim.chim`) holds
   what is not chunk data: actors, flora sprites, the start point and the
   frame's position. Loading it switches the engine to CHIM for that area.

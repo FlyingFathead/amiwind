@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
+_Last updated with AmiWind v0.0.49-dev (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -894,8 +894,10 @@ of the files it read or wrote was touched by another stage at the same time. The
 run's own scratch folder (`RUN/scratch`) is private to the run and never makes a
 stage non-reusable (BUILD-REUSE-SCRATCH-UNDECLARED-33): before that fix release
 candidate reruns reused 17 to 25 of 34 stages; with it the v0.0.33 final reused 30.
-Release candidates and finals reuse only with `--allow-release-reuse`, while a
-from-scratch build of the same commit runs separately as the release check.
+Since v0.0.49 release candidates and finals reuse like development builds by
+default (the release kind never changes a key or switches a verified cache off;
+[BUILD_CACHE.md](BUILD_CACHE.md)); the from-scratch build of the same commit is
+its own release check (`--release-from-scratch`, or `--clean`).
 
 Each stage has an input fingerprint, recorded in every build:
 
@@ -1034,8 +1036,8 @@ and run only on maps without a result; the exterior sky pass does the same. Maps
 and receipts are byte-identical with and without the cache, apart from each
 receipt's `pass_cache` entry, which counts the run's hits and misses
 ([BUILD-IMAGE-NOT-INCREMENTAL-33](bugs/BUILD-IMAGE-NOT-INCREMENTAL-33.md)).
-Release candidates and finals use it only with `--allow-release-reuse` (the
-from-scratch reference build runs separately on the same commit), so a release
+Release candidates and finals use it too (by default since v0.0.49;
+`--release-from-scratch` turns it off for the from-scratch check), so a release
 build whose image step failed late resumes from the maps it had finished
 ([BUILD-IMAGE-NO-RESUME-33](bugs/BUILD-IMAGE-NO-RESUME-33.md)). Measured on 120
 maps of the v0.0.33 rc1 payload (4 workers): cull, optimizer and stair walk
@@ -1066,8 +1068,9 @@ stage that does not write the version into its outputs; a refused old record; ou
 inputs did not, with the files that differ). Exit status 1 when anything is
 UNEXPECTED, 2 for a run made without `--reuse-from`.
 
-Release candidates and finals use the pass cache only with
-`--allow-release-reuse` (project decision, 9 October 2026), the same rule as the
+Release candidates and finals use the pass cache by default since v0.0.49
+(`--release-from-scratch` turns it off; before, only with `--allow-release-reuse`,
+project decision 9 October 2026), the same rule as the
 world terrain and media caches: the from-scratch reference build runs separately
 on the same commit, and its payload is compared file by file with the release
 payload before the release; the hit counts in the optimizer, cull and stair-walk
@@ -1128,7 +1131,7 @@ and the run. A pass is a pass (BUILD-STAIR-PASS-NOT-KEPT-41): in development bui
 reused while its key is unchanged, whatever the rest of the build that walked it did, so a build that fails late
 keeps every frame that passed and its rerun walks only the frames that failed or changed. A failed walk is reused
 only with a check mark (a private test's accepted known finding). Release candidates and finals keep the check-mark
-rule: they reuse only checked records (and anything at all only with `--allow-release-reuse`). The rule is
+rule: they reuse only checked records (and nothing with `--release-from-scratch`). The rule is
 `AMIWIND_STAIR_WALK_REUSE` (`passes`, the default of development and stand-alone runs; `checked`, the earlier rule,
 selectable for any build; `passes` is refused for an rc or final); it never keys a stage. The legacy maps' walks keep
 the check-mark rule. A damaged record, or one written again since its check, is walked again. The build log and the
@@ -1315,9 +1318,9 @@ files (counted as for the stage fingerprints), the map compilers' SHA-256, and
 the Python and package versions. A hit is checked against its recorded
 SHA-256 before it is used; anything else converts the map. So when the stage
 reruns only because an earlier stage changed, the maps whose inputs did not
-change come from the cache. Development builds only: release candidates and
-finals convert every map (as the from-scratch gate does) unless
-`--allow-release-reuse` is given; `--no-unit-cache` turns it off for a
+change come from the cache. Release candidates and
+finals use it too since v0.0.49 (they convert every map, as the from-scratch
+gate does, with `--release-from-scratch`); `--no-unit-cache` turns it off for a
 debugging build.
 
 The media stage (every owned sound and movie) and the intro stage (the
@@ -1344,10 +1347,12 @@ Runs made before the fingerprint change (`amiwind-stage-cache-v1`) are not
 reuse sources; the plan says so for every stage. One build without reuse
 makes a new reuse source.
 
-Releases: release candidates and finals refuse `--reuse-from`; their images are
-built from scratch and compared with the from-scratch gate. Only while that
-gate runs separately on the same commit may `--allow-release-reuse` be used,
-and the receipt records it.
+Releases: since v0.0.49 release candidates and finals take `--reuse-from` like
+development builds (the version keys only what shows it, BUILD-CHIM-KEY-VERSION-48,
+so a final built from its passing candidate reruns the engine and the image); the
+receipt records it. The from-scratch reproducibility check is its own gate:
+`--release-from-scratch` (or `--clean`) refuses `--reuse-from` and the per-file
+caches for a release version.
 
 Across runs and workspaces, `--prerendered DIR` keeps the outputs of chosen
 stages (CHIM worlds, interiors, region maps) with these same fingerprints and

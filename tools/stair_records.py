@@ -152,13 +152,18 @@ def _version_file(name):
 def walk_facts(outcome, environ=None):
     """The outcome and provenance fields of a walk's record: outcome, walked_at (ISO 8601 with the zone), the CHIM
     version (the builder's AMIWIND_RUN_CHIM_VERSION, else this tree's CHIM_VERSION) and the AmiWind version and
-    commit when the builder did not give them (this tree's VERSION, AMIWIND_SOURCE_COMMIT)."""
+    commit when the builder did not give them (this tree's version file through project_version.run_version, which
+    keys no stage, and AMIWIND_SOURCE_COMMIT)."""
     if outcome not in OUTCOMES:
         raise ValueError('A walk outcome is one of %s, not %r' % (', '.join(OUTCOMES), outcome))
     environ = os.environ if environ is None else environ
     facts = run_facts(environ)
     if not facts['version']:
-        facts['version'] = _version_file('VERSION')
+        from project_version import run_version
+        try:
+            facts['version'] = run_version(ROOT, environ)
+        except (OSError, ValueError):
+            facts['version'] = None
     if not facts['commit']:
         facts['commit'] = environ.get('AMIWIND_SOURCE_COMMIT') or None
     facts.update(outcome=outcome, walked_at=datetime.datetime.now().astimezone().isoformat(timespec='seconds'),
@@ -175,7 +180,7 @@ def passed(record):
 
 
 def pass_provenance(record):
-    """'reused pass from RUN (VERSION, COMMIT, TIME)' of a passed walk's record."""
+    """'reused pass from RUN (version, commit, time)' of a passed walk's record."""
     return 'reused pass from %s (%s, %s, %s)' % (record.get('run') or '?', record.get('version') or '?',
                                                  record.get('commit') or '?', record.get('walked_at') or
                                                  record.get('time') or '?')
@@ -204,7 +209,7 @@ def listed(cache, input_sha256, record):
 
 
 def provenance(mark):
-    """'reused from RUN (VERSION, COMMIT, TIME)' of a check mark."""
+    """'reused from RUN (version, commit, time)' of a check mark."""
     return 'reused from %s (%s, %s, %s)' % (mark.get('run') or '?', mark.get('version') or '?',
                                             mark.get('commit') or '?', mark.get('record_time') or '?')
 

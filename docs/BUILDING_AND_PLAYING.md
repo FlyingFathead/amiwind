@@ -1,6 +1,6 @@
 # Building and playing
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 How to build AmiWind from your own Morrowind copy and run it in an emulator. The short version is in the [README](../README.md#build-it-from-your-own-morrowind).
 
@@ -123,17 +123,17 @@ subsequent launches. See the [launcher guide](FS-UAE-LAUNCHER.md).
 The FS-UAE autorun command above handles configuration and launch automatically.
 For manual setup or WinUAE, use the guides and steps below.
 
-| Emulator / official homepage | Host platforms | AmiWind setup | Historical v0.0.28-rc1 template |
+| Emulator / official homepage | Host platforms | AmiWind setup | v0.0.48 preset |
 | --- | --- | --- | --- |
-| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](../resources/emulators/AmiWind-v0.0.39-rc2-FS-UAE.fs-uae) |
-| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](WINUAE.md) | [Download/view `.uae` preset](../resources/emulators/AmiWind-v0.0.39-rc2-WinUAE.uae) |
+| [FS-UAE](https://fs-uae.net/) | Linux, Windows, macOS | [FS-UAE guide](FS-UAE-PLAYTESTING.md) | [Download/view `.fs-uae` preset](../resources/emulators/AmiWind-v0.0.48-FS-UAE.fs-uae) |
+| [WinUAE](https://www.winuae.net/) | Windows | [WinUAE guide](WINUAE.md) | [Download/view `.uae` preset](../resources/emulators/AmiWind-v0.0.48-WinUAE.uae) |
 
 1. Build the current source from your own Morrowind installation using the guide
    above. Keep every HDF listed in the build summary together. The source ZIP
    contains tools and templates; playable images are private build outputs.
 2. Install an emulator from its official homepage above. Prefer the matching
    configuration generated beside your HDFs: it lists every required disk. The
-   historical rc1 templates above provide a starting point for manual setup.
+   v0.0.48 presets above provide a starting point for manual setup.
 3. Follow the matching setup guide to select your licensed **A1200 Kickstart
    3.1 ROM** and all the built HDFs. WinUAE uses RDB hardfiles on the UAE
    controller; FS-UAE uses the ROM and HDF paths in its configuration file.
@@ -150,5 +150,5 @@ The public [dry-run build](CI_DRY_RUN.md) contains no game assets or ROMs
 and boots to a test notice; it is not the playable demo.
 
 The presets of the newest release are
-[`AmiWind-v0.0.47-dev1-FS-UAE.fs-uae`](../resources/emulators/AmiWind-v0.0.47-dev1-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.47-dev1-WinUAE.uae`](../resources/emulators/AmiWind-v0.0.47-dev1-WinUAE.uae).
+[`AmiWind-v0.0.48-FS-UAE.fs-uae`](../resources/emulators/AmiWind-v0.0.48-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.48-WinUAE.uae`](../resources/emulators/AmiWind-v0.0.48-WinUAE.uae).

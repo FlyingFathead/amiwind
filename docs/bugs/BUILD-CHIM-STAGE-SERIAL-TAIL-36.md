@@ -2,13 +2,14 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 5 times; something has to be done
+## PERSISTING: reported 6 times; something has to be done
 
 - Reported with v0.0.36-dev3 at 2026-10-11 01:43 +0300: maintainer via the Monitor: chim 19.0-29.1 min on about 1 core in the 270-frame coast build; validation 8 min, heap gate and zone walk 1 min each (file times)
 - Reported with v0.0.36-dev4 at 2026-10-11 10:20 +0300: perf guard seed: CHIM heap gate 295 s on 0.94 of 12 cores in the dev4 whole-city Vivec MiniWind (e7a8e82); the chim-speed repair has not reached the line
 - Reported with v0.0.41-dev5 at 2026-10-16 (time not recorded): dev5, 726 frames: validation on 1 core for over half of its 6 min, heap gate 2.9 cores, zone walk 1 core between frames (fixlist B1-B4)
 - Reported with v0.0.46-dev1 at 2026-10-20 14:48 +0300: dev1 try 2: validation 8m at 13.6 cores; zone walk 1.0-5.3 of 24 cores for 60-125 s with up to 1351 units queued (many 1-3 s units: batch per worker); stats 1m41s at 1.2 cores
 - Reported with v0.0.48-dev2 at 2026-10-23 (time not recorded): dev2 try8: CHIM validation 468 s on 2.1 of 13.8 cores; cause: the world read decoded each chunk's terrain record again in the parent
+- Reported with v0.0.49-dev1 at 2026-10-24 11:40 +0300: PERSISTING: CHIM validation on 5.45 of 23 cores for 1 min 50 s (perf guard FIX-NOW), and the CHIM world pack on 1 core for 1 min 41 s
 
 <!-- END GENERATED PERSISTING -->
 
@@ -21,7 +22,7 @@
 | Where | tools/chim/validate.py validate, chim/heap.py ring_peak, chim/zone_sim.py walk |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.48 |
+| Persists in | v0.0.36-dev3, v0.0.49-dev1 (last seen) |
 | Severity | high: About 10 minutes of one-core work in every chim stage of the coast build, on 24 held workers, redone on every build |
 | Family | Build speed (`build-speed`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -36,7 +37,7 @@ _Last updated with AmiWind v0.0.48 (23 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
+- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 16 October 2026](#status-16-october-2026)
 - [Status: 11 October 2026](#status-11-october-2026)

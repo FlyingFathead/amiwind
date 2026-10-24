@@ -652,11 +652,11 @@ def parser():
                    help='Reused maps or frames the stair walk walks again and compares on every build (default 2; '
                         '0 = none, development builds only): a difference stops the build (the cache key missed an '
                         'input)')
-    p.add_argument('--allow-release-reuse', action='store_true',
-                   help='With --reuse-from on a release candidate or final VERSION, and for the per-file caches '
-                        '(world terrain, media, the per-map passes of the image step, whose receipts count their hits): '
-                        'only while the from-scratch gate runs separately on the same commit and its payload is '
-                        'compared file by file with the release payload')
+    # Release reuse by default (build_cache.resolve_release_reuse)
+    p.add_argument('--allow-release-reuse', action='store_true', default=None,
+                   help='The default since v0.0.49: an rc or final takes --reuse-from and the per-file caches')
+    p.add_argument('--release-from-scratch', dest='allow_release_reuse', action='store_false',
+                   help='Build an rc or final from scratch (the reproducibility gate; --clean implies it)')
     p.add_argument('--prerendered', nargs='+', metavar='DIR',
                    help='Prerendered store (docs/chim/build_guide/SPEED.md): --prerendered DIR uses stored stage outputs '
                         'with the same fingerprint and stores the chosen stages of this build once the whole build passed; '
@@ -3186,6 +3186,8 @@ def main(argv=None):
                          (args.public_defaults_record, clean_build.public_line)):
         if record:
             print(line(record), file=retired_out, flush=True)
+    from build_cache import resolve_release_reuse
+    resolve_release_reuse(args)
     # The coordinate range (tools/coord_range.py): the engine compile switch and every builder check that
     # follows the engine's coordinate bound, before any stage.
     try:

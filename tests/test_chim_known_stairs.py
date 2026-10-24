@@ -55,7 +55,8 @@ class KnownStairFindingTests(unittest.TestCase):
     def test_refused_for_release_candidates_and_finals(self):
         import chim_build
         for version in ('0.0.33-rc1', '0.0.33'):
-            with self.subTest(version=version), mock.patch('project_version.public_version', return_value=version), \
+            # chim_build reads the version through project_version.run_version (BUILD-CHIM-KEY-VERSION-48)
+            with self.subTest(version=version), mock.patch('project_version.run_version', return_value=version), \
                     mock.patch('chim.build.build_areas') as run, contextlib.redirect_stderr(io.StringIO()), \
                     self.assertRaises(SystemExit) as stop:
                 chim_build.main(['--area', 'balmora', '--data-files', '/none', '--palette', '/none', '--out', '/none',

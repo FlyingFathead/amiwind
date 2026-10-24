@@ -1310,7 +1310,7 @@
       "gains": [],
       "gain_note": "Size measured on 22 October 2026: 55 test rooms on a store of 20.7 MB plus 0.59 MB of room maps, against 79.3 MB of today's room maps (about 3.7 times smaller). Speed and memory in game are not measured yet.",
       "caveats": [
-        "Interiors stay ordinary Quake maps in CHIM 0.1.0. CHIM rooms are in development on the v0.0.48 line; today's rooms stay selectable.",
+        "CHIM rooms shipped in v0.0.48: 1,132 of the 1,134 base-game interiors are CHIM rooms. The prison ship and the census office (where the opening sequence runs) stay classic room maps on purpose until rooms have object state.",
         "First version: one light level per placement; rooms with water or lava stay room maps for now."
       ],
       "vis": "Interiors keep Quake's vis today; shared props would have to keep it, checked with the renderer counters.",

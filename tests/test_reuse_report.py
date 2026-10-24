@@ -141,11 +141,13 @@ class ReuseReportTests(unittest.TestCase):
         self.assertEqual(rows['image-walk'], refused)
         self.assertEqual(rows['npc-gallery'], refused)
         self.assertEqual(rows['scene'], refused)
-        self.assertEqual(rows['chim'], ('EXPECTED', 'input change'))       # writes the version into its outputs
+        # v0.0.49 (BUILD-CHIM-KEY-VERSION-48): no stage writes the version into its outputs any more, so a chim
+        # rebuild for VERSION alone is a key bug and stops the build like the scheduler-only rebuilds
+        self.assertEqual(rows['chim'], refused)
         self.assertEqual(rows['scenery'], ('EXPECTED', 'input change'))    # a real file beside the scheduler
         self.assertEqual(rows['census'], ('EXPECTED', 'input change'))
         self.assertEqual(rows['harvest'], ('EXPECTED', 'input change'))    # follows a real change upstream
-        self.assertEqual(sorted(result['too_broad']), ['image-walk', 'npc-gallery', 'scene', 'world-survey'])
+        self.assertEqual(sorted(result['too_broad']), ['chim', 'image-walk', 'npc-gallery', 'scene', 'world-survey'])
         with contextlib.redirect_stdout(io.StringIO()) as text:
             reuse_report.print_preflight(result)
         self.assertIn('stopping before any stage runs', text.getvalue())

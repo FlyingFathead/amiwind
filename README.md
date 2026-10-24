@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.48 (24 October 2026)._
+_Last updated with AmiWind v0.0.49 (24 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,8 +27,8 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands (24 October 2026)
 
-The newest release is **v0.0.48: Inner CHIM & Actors On Stage**, running on CHIM Engine v0.2.2
-([release notes](docs/RELEASE-v0.0.48.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+The newest release is **v0.0.49: Build Turnaround (A Version Is Just A Number)**, a builder release on v0.0.48's
+game, running on CHIM Engine v0.2.2 ([release notes](docs/RELEASE-v0.0.49.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
@@ -60,6 +60,13 @@ RAM is used automatically (a larger game heap, CHIM's caches and reading ahead).
 at boot, but loads more often. The emulator presets and the launcher start with 32 MB. Why, with the measured
 numbers: [why 32 MB](docs/REAL_HARDWARE.md#why-32-mb-of-fast-ram).
 
+### What v0.0.49 changed
+
+The builder: a new version number no longer rebuilds the CHIM world, only the engine and the image that show it, and
+release candidates and finals reuse the caches like development builds. This release's final was built from its
+development build's caches (39 of 43 stages reused; one more CHIM world build, repaired for v0.0.50). The docs now describe the current game throughout, with the second real-hardware
+figure (an A3000 with a 68060, through RTG on the tester's own modified build). The game is v0.0.48's.
+
 ### What v0.0.48 changed
 
 The indoors follow the outdoors onto CHIM: 1,132 of the base game's 1,134 interiors are CHIM rooms, their models and
@@ -79,14 +86,8 @@ stored once, and the builder walks no stairs by default, reuses more on a rebuil
 while memory allows. The emulator presets and the
 launcher start with 128 MB of Fast RAM; 16 MB, the smallest machine the game runs on, stays a choice.
 
-### What v0.0.46 changed
-
-Red Mountain is red again: every region chooses its weather the way the original game does, and the mountain
-draws its blight sky. The Ebonheart dragon statue is back on its pedestal, the torch shows in third person, the
-Vivec dock walkways hold the player up and the Dreamers greet you. The collision of the whole island now keeps only
-the surface you walk on exactly, so every frame fits its memory again. Earlier releases: the
-[release notes](docs/RELEASE-v0.0.48.md) link back through every version, and the sections the front page used to
-carry are kept in [earlier README sections](docs/README_ARCHIVE.md).
+Earlier releases: the [release notes](docs/RELEASE-v0.0.49.md) link back through every version, and the sections the
+front page used to carry are kept in [earlier README sections](docs/README_ARCHIVE.md).
 
 ### What works, and the honest limits
 
@@ -142,8 +143,8 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.48-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.48-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.48-WinUAE.uae`](resources/emulators/AmiWind-v0.0.48-WinUAE.uae).
+[`AmiWind-v0.0.49-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.49-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.49-WinUAE.uae`](resources/emulators/AmiWind-v0.0.49-WinUAE.uae).
 
 ## Where to read more
 

@@ -208,6 +208,18 @@ CHIM_LABEL_SHOWN_UNITS = frozenset({('tools/project_version.py', 'chim_version')
                                     ('tools/miniwind.py', 'logo_lines'),
                                     ('tools/build_aga.py', 'stage_runtime')})
 CHIM_LABEL_HIDDEN_UNITS = frozenset({('tools/chim/zone_sim.py', 'build_library')})
+# The AmiWind version in the keys (BUILD-CHIM-KEY-VERSION-48; the maintainer, 2026-10-24: "A VERSION NUMBER CHANGE
+# SHOULD NOT FUCKING CAUSE THIS KIND OF A FUCKING HULABALLOO"): the VERSION file counts in a key only when the reach
+# names it other than through VERSION_HIDDEN_UNITS, the units that read it only for a record's provenance, a refusal
+# or a host-side check whose result never holds the version (names_version). v0.0.48 rebuilt the whole CHIM world
+# for its rc1 label: project_version read VERSION at import, so every stage importing it keyed the file. A version
+# change now rekeys only what shows the version (the engine, the image); tests/test_stage_version_key.py keeps it so
+# for every stage script of tools/build.py. Explicit list, tested:
+# - project_version.run_version: the version for provenance fields and the private-test refusal;
+# - zone_sim.build_library: compiles chim_zone.c for the zone walk gate with the generated headers; it prints none.
+VERSION_FILE = 'VERSION'
+VERSION_HIDDEN_UNITS = frozenset({('tools/project_version.py', 'run_version'),
+                                  ('tools/chim/zone_sim.py', 'build_library')})
 # Pool scheduling functions: how many units run at once, in which order and how long a pool waits before it starts
 # more. They hand each unit to the same function with the same item and return its result, so no output depends on
 # their code. Unlike OUTPUT_NEUTRAL_UNITS they are still followed (what they call, such as worker_environment(),
@@ -371,6 +383,17 @@ def sha256_file(path):
 
 def digest_json(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def resolve_release_reuse(args):
+    """Release reuse is the default (tools/build.py --allow-release-reuse; the maintainer, 2026-10-24: "IF THE WORLD
+    HASN'T CHANGED; WE CAN USE IT CACHED NO MATTER IF IT'S RC1 RC2 RC3 RC1000 or the FINAL ACTUAL RELEASE"): the caches
+    are keyed by content, so an rc or final reuses verified caches and --reuse-from like a -devN build unless
+    --release-from-scratch is given; a --clean build is the from-scratch check. Called after the --clean check
+    (tools/clean_build.py refuses only an explicit flag)."""
+    if getattr(args, 'allow_release_reuse', None) is None:
+        args.allow_release_reuse = not getattr(args, 'clean', False)
+    return args.allow_release_reuse
 
 
 def require_reuse_allowed(version, allow_release=False):
@@ -539,10 +562,33 @@ class SourceIndex:
         units = self._reached.get(key) or {}
         return self._closures[key][2] or any(unit in units.get(path, ()) for path, unit in CHIM_LABEL_SHOWN_UNITS)
 
-    def _keyed_source(self, path, shows_label):
+    def names_version(self, script, function=None):
+        """True when the reach of SCRIPT (or of its FUNCTION) names the VERSION file other than through
+        VERSION_HIDDEN_UNITS (BUILD-CHIM-KEY-VERSION-48). Uncertain reaches and scope 'modules' name it."""
+        if function is None:
+            python, data, uncertain = self.closure(script)
+        else:
+            python, data, uncertain, _ = self.entry_units(script, function)
+        if uncertain:
+            return True
+        if VERSION_FILE not in data:
+            return False
+        if self.scope == 'modules':
+            return True
+        script = Path(script).resolve()
+        key = '%s::%s::version' % (script, function or '')
+        if key not in self._closures:
+            start = script.relative_to(self.root.resolve()).as_posix()
+            self._closures[key] = self._closure_symbols(start, key, entry=function, stop=VERSION_HIDDEN_UNITS)
+        return self._closures[key][2] or VERSION_FILE in self._closures[key][1]
+
+    def _keyed_source(self, path, shows_label, names_version=None):
         """(counts, value) of a whole-file source PATH in a key: the CHIM label as its compatibility line and the table
         in no key (BUILD-CHIM-LABEL-IN-KEYS-48), unless SHOWS_LABEL() (shows_chim_label, asked only for these two
-        files) or the index keys the raw label (chim_label_keys)."""
+        files) or the index keys the raw label (chim_label_keys); the VERSION file only when NAMES_VERSION()
+        (names_version: a reach that reads it only through VERSION_HIDDEN_UNITS keys it nowhere)."""
+        if path == VERSION_FILE and names_version is not None and not names_version():
+            return False, None
         if not self.chim_label_keys and path in (CHIM_LABEL_FILE, CHIM_COMPAT_TABLE) and not shows_label():
             if path == CHIM_COMPAT_TABLE:
                 return False, None
@@ -1133,7 +1179,8 @@ class SourceIndex:
             if units is not None and path in units and path.endswith('.py') and path not in data:
                 selected[path] = self.unit_digest(path, units[path], top_format)
             else:
-                counts, value = self._keyed_source(path, lambda: self.shows_chim_label(script))
+                counts, value = self._keyed_source(path, lambda: self.shows_chim_label(script),
+                                                   lambda: self.names_version(script))
                 if counts:
                     selected[path] = value
         return selected, False
@@ -1202,7 +1249,8 @@ class SourceIndex:
             if units is not None and path in units and path.endswith('.py') and path not in data:
                 selected[path] = self.unit_digest(path, units[path])
             else:
-                counts, value = self._keyed_source(path, lambda: self.shows_chim_label(script, function))
+                counts, value = self._keyed_source(path, lambda: self.shows_chim_label(script, function),
+                                                   lambda: self.names_version(script, function))
                 if counts:
                     selected[path] = value
         return digest_json(selected), len(selected), False

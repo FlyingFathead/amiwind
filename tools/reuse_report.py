@@ -44,10 +44,11 @@ POLICY = ('engine', 'image', 'dry-run-image')
 # the diff shows a real change. The v0.0.45 release build redid about 30 minutes for tools/build_parallel.py alone.
 SCHEDULING_FILES = frozenset({'tools/build_parallel.py', 'tools/stair_parallel.py'})
 VERSION_FILE = 'VERSION'
-# Stages whose outputs carry the AmiWind version: a VERSION change is a real input of theirs.
-# chim: tools/chim/stitch.py writes source_version into the world's records, tools/chim_build.py checks the version
-# class (public or private test build) before it builds.
-VERSION_STAMPED = frozenset({'chim'})
+# Stages whose outputs carry the AmiWind version: a VERSION change is a real input of theirs. None since v0.0.49
+# (BUILD-CHIM-KEY-VERSION-48): the chim stage's source_version and private-test refusal read the version through
+# project_version.run_version, which keys no stage (build_cache.VERSION_HIDDEN_UNITS); the engine and the image
+# show it and are rebuilt by policy.
+VERSION_STAMPED = frozenset()
 SCHEDULING_OR_VERSION = 'scheduling or version only'
 # build_cache.plan_reuse: '<old run> reused it without <path> (replaced there by <stages>), which this build runs
 # again' - the old run's record of this stage is short a file a later stage replaced; the stage runs again so that

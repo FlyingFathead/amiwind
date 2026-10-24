@@ -17,6 +17,23 @@
 
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Image assembly recurrence, 13 October 2026](#image-assembly-recurrence-13-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 8 October 2026
 
 Open (infrastructure). Found while running parallel build jobs on the development host.
@@ -95,6 +112,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [BUILD-END-USER-LAUNCHERS-36](BUILD-END-USER-LAUNCHERS-36.md): Requested: the builder's simple mode writes a Python launcher, an FS-UAE config and a WinUAE config for the end user, matching the build
 - [BUILD-MOJIBAKE-32](BUILD-MOJIBAKE-32.md): A builder error message contains mojibake
 - [BUILD-NAME-MOJIBAKE-32](BUILD-NAME-MOJIBAKE-32.md): A builder error message shows mojibake
+- BUILD-PY-AT-TEXT-LIMIT-49 (no report page): tools/build.py stands at 99.6 % of the 256 KiB release text limit: a 1.2 KB builder change failed the gate preflight
 - BUILD-REPAIR-01 (no report page): Image-repair retry omitted region-ownership files
 - BUILD-REPAIR-02 (no report page): Retry assertion rejected an empty failure list as a failure
 - BUILD-STALE-BSP-CONFIG-48 (no report page): Docs and config still described things that ship as .chim as .bsp maps
@@ -117,6 +135,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - PACKAGE-PORTABILITY-28 (no report page): Rebundled ZIPs lost exec modes; Windows path aliases accepted
 - [PKG-STALE-RUNTIME-32](PKG-STALE-RUNTIME-32.md): The sealed v0.0.31 playtest contains a stale launcher preset folder
 - [PUBLIC-REFERENCE-SCREENSHOT-40](PUBLIC-REFERENCE-SCREENSHOT-40.md): Original-game reference screenshot included in the public source list
+- [REGISTER-ADD-NO-RELEASE-ROW-48](REGISTER-ADD-NO-RELEASE-ROW-48.md): bug_register.py add does not list a new report page in tools/release-files.json or write its contents list: the v0.0.48 final gate failed on both
 - [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [ROOM-RESIDENTS-NOT-CACHED-48](ROOM-RESIDENTS-NOT-CACHED-48.md): The room stages bake every resident again on every run: 26 s of a 39 s rerun with every room unit reused

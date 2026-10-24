@@ -1,6 +1,6 @@
 # WinUAE setup
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -59,7 +59,7 @@ Official homepage and downloads: [WinUAE](https://www.winuae.net/).
 
 The native Windows asset-free test image booted successfully in WinUAE 6.0.3
 with an owned complete A1200 Kickstart 3.1 ROM. The reference profile is **2 MiB
-Chip RAM, 16 MiB Z3 Fast RAM, 68040 with internal FPU and JIT**, fastest possible
+Chip RAM, 32 MiB Z3 Fast RAM, 68040 with internal FPU and JIT**, fastest possible
 CPU speed, AGA/PAL and 24-bit addressing disabled. The subsequent full Windows-built HDF also reached the main menu, played the
 opening and entered the prison scene with Jiub; name entry and menu input worked,
 and a clean exit returned to AmigaDOS. See the
@@ -95,7 +95,7 @@ implements these options. The installed WinUAE documentation also describes
 
 Prefer the matching configuration generated beside your HDFs: it mounts the
 complete verified disk list. For manual setup, load
-[AmiWind-v0.0.27-WinUAE.uae](../resources/emulators/AmiWind-v0.0.27-WinUAE.uae)
+[AmiWind-v0.0.48-WinUAE.uae](../resources/emulators/AmiWind-v0.0.48-WinUAE.uae)
 from WinUAE's Configurations panel. It sets the development machine below and
 opens the GUI. It deliberately leaves the ROM path empty and mounts no disk.
 In ROM, select your complete licensed A1200 Kickstart 3.1 ROM. In CD & Hard

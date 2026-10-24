@@ -1,6 +1,6 @@
 # Windows build entry points and WSL notes
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -374,7 +374,7 @@ separate checkpoint; Windows FS-UAE autorun is not implemented by these commands
 
 Install [WinUAE](https://www.winuae.net/) and prefer the matching configuration
 generated beside your images; it lists every required HDF. For manual setup,
-use the [v0.0.27 template](../resources/emulators/AmiWind-v0.0.27-WinUAE.uae)
+use the [v0.0.48 template](../resources/emulators/AmiWind-v0.0.48-WinUAE.uae)
 with the [WinUAE guide](WINUAE.md). If moving a WSL build to Windows, keep
 `build.json` and all listed HDFs together, then regenerate or update their host
 paths. Select your own **A1200 Kickstart 3.1 ROM** and save the private

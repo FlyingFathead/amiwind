@@ -5,6 +5,7 @@ _Last updated with AmiWind v0.0.48 (24 October 2026)._
 <!-- contents start -->
 ## Contents
 
+- [v0.0.49: Build Turnaround (A Version Is Just A Number), 24 October 2026](#v0049-build-turnaround-a-version-is-just-a-number-24-october-2026)
 - [v0.0.48: Inner CHIM & Actors On Stage, 24 October 2026](#v0048-inner-chim--actors-on-stage-24-october-2026)
 - [v0.0.47: CHIM: The More, The Merrier, 21 October 2026](#v0047-chim-the-more-the-merrier-21-october-2026)
 - [v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes, 20 October 2026](#v0046-red-mountain-getting-red-a-whole-heap-of-fixes-20-october-2026)
@@ -156,6 +157,19 @@ _Last updated with AmiWind v0.0.48 (24 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.49: Build Turnaround (A Version Is Just A Number), 24 October 2026
+
+- A version change rebuilds only what shows the version (the engine, the image, the tracker data); the CHIM world no
+  longer keys on it, kept by a gate test over every stage of the builder (BUILD-CHIM-KEY-VERSION-48). This release's
+  final was built from the v0.0.49-dev1 build's caches with only the version changed (39 of 43 stages reused); the
+  CHIM world was built once more because of a trace the first form of the fix left (BUILD-VERSION-GETATTR-TRACE-49,
+  repaired for v0.0.50).
+- Release candidates and finals reuse the caches like development builds; `--release-from-scratch` and `--clean`
+  build from scratch.
+- The front page, the progress tracker and twelve guides describe the current game (v0.0.48 presets, 32 MB of Fast
+  RAM, the interiors on CHIM); the second real-hardware figure (A3000, 68060 at 80 MHz, RTG on the tester's own modified build) and the timedemo
+  steps.
 
 ## v0.0.48: Inner CHIM & Actors On Stage, 24 October 2026
 

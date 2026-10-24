@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
+_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -60,7 +60,7 @@ out NPC models or the gallery.
 The guided builder converts a bounded Seyda Neen proof of concept and builds
 an experimental AGA HDF. It does not convert the complete game or promise stock
 A1200 performance. The current reference needs 040/FPU, AGA, 2 MiB Chip and
-16 MiB Fast RAM; see [AGA setup](AGA_BUILD.md) and [WinUAE](WINUAE.md).
+32 MiB Fast RAM (the safe minimum; 16 MiB starts with a warning); see [AGA setup](AGA_BUILD.md) and [WinUAE](WINUAE.md).
 
 **AmiWind needs your own installed copy of Morrowind**, available from
 [GOG](https://www.gog.com/en/game/the_elder_scrolls_iii_morrowind_goty_edition) or
@@ -561,10 +561,11 @@ town options stop the build before any work. Details: [TOWN_IMPORT.md](TOWN_IMPO
 ## Game heap size
 
 The game heap (Quake's Hunk: maps, models and the CHIM zone) is 11 MiB by default,
-which runs the whole game on an A1200 with 16 MiB of Fast RAM. `--heap-mb N` (or
+which is the size measured to start the game on 16 MiB of Fast RAM; 32 MiB is the safe minimum for the
+whole game. `--heap-mb N` (or
 `"heap_mb": N` in a `--build-config` file; the command line wins) builds with exactly
-N MiB, like `--jobs N`: it is never refused. Above the size measured to run the whole
-game on 16 MiB of Fast RAM (11 MiB), the build prints one warning and records it in
+N MiB, like `--jobs N`: it is never refused. Above the size measured to start
+on 16 MiB of Fast RAM (11 MiB), the build prints one warning and records it in
 `engine-build.json` (`heap_mb`, `heap_mb_selected_by`, `heap_warning`), the boot check
 prints a `Game heap: ... [!] WARN` row, and the engine says so at start. The boot
 check asks for the heap plus 3 MiB of free Fast RAM, and the heap plus 16 bytes in

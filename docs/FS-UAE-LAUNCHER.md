@@ -1,6 +1,6 @@
 # Portable FS-UAE launcher
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -114,7 +114,7 @@ file sizes are 256 KiB, 512 KiB and 1 MiB.
 
 The launcher creates `AmiWind-vVERSION-FS-UAE.fs-uae` beside the selected HDF,
 using a matching `resources/emulators/` template if present. Otherwise it uses
-the embedded accelerated A1200/AGA, 68040/FPU/JIT, 2 MiB Chip and 128 MiB Z3 preset.
+the embedded accelerated A1200/AGA, 68040/FPU/JIT, 2 MiB Chip and 32 MiB Z3 preset.
 This is the accelerated development target. Stock A1200 performance is unproven.
 
 On reruns it updates only the ROM/HDF paths, HDF type and the corrected

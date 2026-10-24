@@ -1,6 +1,6 @@
 # CHIM feature tracker
 
-_Generated from `docs/chim/features.json` with AmiWind v0.0.48._
+_Generated from `docs/chim/features.json` with AmiWind v0.0.49._
 
 <!-- Generated whole by tools/chim_features.py render from docs/chim/features.json; do not edit by hand. -->
 
@@ -246,7 +246,7 @@ Store interior props once and light each placement separately, which would remov
 
 **Caveats:**
 
-- Interiors stay ordinary Quake maps in CHIM 0.1.0. CHIM rooms are in development on the v0.0.48 line; today's rooms stay selectable.
+- CHIM rooms shipped in v0.0.48: 1,132 of the 1,134 base-game interiors are CHIM rooms. The prison ship and the census office (where the opening sequence runs) stay classic room maps on purpose until rooms have object state.
 - First version: one light level per placement; rooms with water or lava stay room maps for now.
 
 **Read more:** [Interiors on CHIM: the store, the measurements and the bar](INTERIOR_STORE.md); [World streamer](../WORLD_STREAMER.md); [CHIM ideas: also held back](IDEAS.md#also-held-back).

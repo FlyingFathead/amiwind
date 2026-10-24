@@ -1,12 +1,12 @@
 # AmiWind playtesting with FS-UAE
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Automatically generated image configurations](#automatically-generated-image-configurations)
-- [Current v0.0.27 preset](#current-v0027-preset)
+- [Current preset](#current-preset)
 - [Build and launch automatically](#build-and-launch-automatically)
 - [Requirements](#requirements)
 - [Create the FS-UAE configuration](#create-the-fs-uae-configuration)
@@ -63,17 +63,17 @@ For repeated runs of existing images, use the
 [portable FS-UAE launcher](FS-UAE-LAUNCHER.md). It selects the latest numeric
 version/development suffix, remembers the ROM and repairs local config paths.
 
-## Current v0.0.27 preset
+## Current preset
 
 Prefer the matching generated configuration described above, which lists every
 required HDF. For manual setup, save a local copy of
-[AmiWind-v0.0.27-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.27-FS-UAE.fs-uae),
+[AmiWind-v0.0.48-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.48-FS-UAE.fs-uae),
 set your ROM and all required HDF paths, then launch it with FS-UAE.
 To build the playable HDF from your Morrowind installation, use the
 [Linux](LINUX_BUILD.md) or [Windows / WSL build guide](WINDOWS_BUILD.md).
 The public source ZIP includes the preset, not game data, a playable HDF or
 a Kickstart ROM. A public dry-run HDF, when produced for the current version, boots only to a
-test notice. See [v0.0.27 release notes](RELEASE-v0.0.27.md) for current source
+test notice. See [v0.0.48 release notes](RELEASE-v0.0.48.md) for current source
 and build evidence. Actual FS-UAE multi-drive gameplay remains pending;
 [v0.0.17 validation](VALIDATION-v0.0.17.md) records the earlier local baseline.
 
@@ -405,7 +405,7 @@ uae_cpu_multiplier = 7
 ```
 
 Everything else stays as in the playtest configuration (A1200, `68040-NOMMU` with its
-FPU, 2 MB Chip RAM, 16 MB Zorro III RAM, Kickstart 3.1); warp mode stays off. Notes from
+FPU, 2 MB Chip RAM, 32 MB Zorro III RAM, Kickstart 3.1); warp mode stays off. Notes from
 setting it up (FS-UAE 3.1.66, checked in the effective configuration FS-UAE writes):
 
 - `uae_cpu_cycle_exact = true` also turns on memory cycle-exact mode for the 68020 and
@@ -459,7 +459,7 @@ these as relative numbers until a real 68040 measurement exists.
 ## Repository preset and validation note
 
 A matching example is supplied under
-[resources/emulators/AmiWind-v0.0.27-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.27-FS-UAE.fs-uae).
+[resources/emulators/AmiWind-v0.0.48-FS-UAE.fs-uae](../resources/emulators/AmiWind-v0.0.48-FS-UAE.fs-uae).
 It explicitly disables 24-bit addressing and keyboard joystick emulation,
 selects the internal FPU and supplies placeholders for the owned ROM and HDF.
 The guide above carries forward the maintainer's working v0.0.12-dev1 recipe with

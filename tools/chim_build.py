@@ -260,10 +260,10 @@ def _main(ap, a):
               % (regions_table['counts']['cells'], chim_regions.kind_summary(regions_table['counts']),
                  regions_table['counts']['frames']), flush=True)
     if a.accept_known_stair_findings:
-        from project_version import public_version, require_private_test_version
+        from project_version import run_version, require_private_test_version
         from chim.known import known_stair_findings
         try:
-            require_private_test_version(public_version(), ['--accept-known-stair-findings'])
+            require_private_test_version(run_version(), ['--accept-known-stair-findings'])
             known_stair_findings(a.accept_known_stair_findings)
         except ValueError as exc:
             ap.exit(1, 'Error: %s\n' % exc)

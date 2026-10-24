@@ -20,6 +20,22 @@
 
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Status: 9 October 2026](#status-9-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 9 October 2026
 
 Fixed in the tests on the v0.0.33 release line. No product code changed.
@@ -110,6 +126,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
 - [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
 - [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
+- [RELEASE-INCLUSION-CHECK-LATE-48](RELEASE-INCLUSION-CHECK-LATE-48.md): The release guard does not check the CHIM inclusion ledger: the v0.0.48 kit stopped in its source step after the guard and the full suite had passed
 - [RELEASE-KIT-NO-REPAIR-MODE-35](RELEASE-KIT-NO-REPAIR-MODE-35.md): The release kit has no repair mode for a commit already pushed
 - [RELEASE-KIT-PUSH-BEFORE-CI-45](RELEASE-KIT-PUSH-BEFORE-CI-45.md): The release kit pushes to main before CI has passed
 - [RELEASE-KIT-RETRY-REUSES-CI-45](RELEASE-KIT-RETRY-REUSES-CI-45.md): A kit retry after a CI failure reads the same failed run again

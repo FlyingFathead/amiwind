@@ -59,7 +59,9 @@ class FoldTests(unittest.TestCase):
         self.assertLess(html.index('<hr class="foldrule">'), html.index('<main>'))
 
     def test_toolkit_version_line(self):
-        self.assertIn('Last updated with AmiWind v0.0.48', page('header.js'))
+        # the tree's own version, not a literal (a literal went stale at the v0.0.49 release)
+        version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+        self.assertIn('Last updated with AmiWind v' + version, page('header.js'))
 
     @unittest.skipUnless(shutil.which('node'), 'Node.js unavailable')
     def test_helper_runs_with_blocked_storage(self):

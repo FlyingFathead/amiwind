@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
+_Last updated with AmiWind v0.0.49-dev (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -72,10 +72,14 @@ A failure forces the builder to rebuild only the minimum, within safe limits:
 | Image step units | one guard torch model; one player view model (body, torch body, water body or inventory poses of one race and sex, 80 in all) | the game data (the build's input lock), the palette, the unit's record (for the player view: race, sex and the body fields a torch or water body reads), the sources, the settings | `prepare_guard_torches`, `prepare_player_view.run_units` (`player-view`) |
 | Stage units | one world terrain map, one NPC gallery model, one CHIM unit, one sound or movie | each stage's own content-addressed cache (a gallery model: its appearance record, the bytes of its meshes and textures, the palette, and the code its converter can reach) | `world-terrain-v1`, `npc-gallery-v1`, `chim-units`, `asset-pool-v1` |
 
-Development builds (`-devN`) use every cache. Release candidates and finals use
-them only with `--allow-release-reuse`, which says the from-scratch reference
-build runs separately on the same commit and is compared with the result; without
-it a release build runs every unit.
+Every build uses every cache, release candidates and finals included (since
+v0.0.49): the caches are keyed by content, so the release kind never changes a
+key or switches a verified cache off, and a final built from its passing
+candidate reruns only what shows the version (the engine and the image). The
+from-scratch reproducibility check is its own gate: `--release-from-scratch`
+builds a release version with no `--reuse-from` and no per-file caches, and
+every `--clean` build does the same. `--allow-release-reuse` is still accepted
+(older launchers); it is the default.
 
 ## Why reuse is safe
 
@@ -417,7 +421,7 @@ although they could be reused. Nothing stale passes: every stage after them is
 still decided by its key, and is reused only if the forced stages wrote the same
 outputs as before; otherwise exactly the affected stages run. Forced stages are
 recorded in the build state and listed by the reuse audit. Release candidates and
-finals follow the same rules as `--reuse-from` (`--allow-release-reuse`).
+finals follow the same rules (`--release-from-scratch` turns reuse off).
 
 `--rebuild-unit UNIT:NAME[,UNIT:NAME]` builds single stage units again although they
 are cached (`interior-room:bmtemple`, `interior-room-chim:riac1a439e70`, `town-region:bm003`, `world-scenery-region:vf0123`,

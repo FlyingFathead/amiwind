@@ -1,6 +1,6 @@
 # Architecture
 
-_Last updated with AmiWind v0.0.48 (24 October 2026)._
+_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 How AmiWind is put together today: a host-side builder that converts your own Morrowind files, and the CHIM Engine
 (the AmiQuake engine with a world streamer added) that runs the result on an Amiga. Each claim below points at the
@@ -78,12 +78,12 @@ Every exterior cell of Vvardenfell has been on CHIM since v0.0.43: 1,409 cells, 
 sea floor and 19 are open sea; 1,348 are one-cell region frames and 61 sit in the town frames (Balmora, Seyda Neen
 and the whole city of Vivec). No classic region maps remain outdoors. The counts and what they mean are in
 [what we count](chim/CELL_TRACKER.md#what-we-count) and the [progress tracker](chim/PROGRESS_TRACKER.md); the
-current release is described in the [v0.0.46 notes](RELEASE-v0.0.46.md).
+current release is described in the [v0.0.48 notes](RELEASE-v0.0.48.md).
 
-Not on CHIM: the interiors, which remain ordinary Quake maps, one per room, reached through doors by a level change.
-Many of the base game's interiors are not converted yet, and Solstheim is not converted
-([README](../README.md#where-amiwind-stands-24-october-2026)). Putting interiors on CHIM's store-once layout is
-*planned* ([v0.0.45 plan](PLAN-v0.0.45.md#3-every-interior-of-the-base-game)).
+Interiors: since v0.0.48, 1,132 of the 1,134 base-game interiors are CHIM rooms, on CHIM's store-once layout. Only
+the prison ship and the census office, where the opening sequence runs, stay classic Quake room maps on purpose
+until rooms have object state. Solstheim is not converted
+([README](../README.md#where-amiwind-stands-24-october-2026)).
 
 ## Crossing from one cell to the next
 

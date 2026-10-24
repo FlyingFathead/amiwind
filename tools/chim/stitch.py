@@ -854,6 +854,15 @@ def area_objects(core, origin, chim, legacy):
             'chim_only_by_class': dict(sorted(classes.items(), key=lambda kv: -kv[1]['count']))}
 
 
+def _run_version():
+    """The report's source_version: provenance only (project_version.run_version keys no stage)."""
+    from project_version import run_version
+    try:
+        return run_version(ROOT)
+    except (OSError, ValueError):
+        return None
+
+
 def run_identity(run):
     run = Path(run)
     out = {'name': run.name}
@@ -881,8 +890,7 @@ def audit(run, areas=(), root=None, arrival=True, limits=LIMITS, regions=None):
     legacy = Legacy(run)
     others = [r for r, _, _ in found] + [r for r in region_rows if r['id'] not in {o['id'] for o, _, _ in found}]
     report = {'format': FORMAT, 'generated': time.strftime('%Y-%m-%d %H:%M %z'), 'run': run_identity(run),
-              'source_version': (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
-              if (ROOT / 'VERSION').is_file() else None,
+              'source_version': _run_version(),
               'limits': limits,
               'sampling': {'step': STEP, 'band': BAND, 'height_offsets': list(HEIGHT_OFFSETS),
                            'arrival_offsets': ARRIVAL, 'tile': TILE, 'water_level': WATER_LEVEL,

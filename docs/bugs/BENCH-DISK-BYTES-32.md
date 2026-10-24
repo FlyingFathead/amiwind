@@ -70,6 +70,7 @@ Family: Emulator measurement method (`benchmark-method`). Emulator numbers are r
 - [BENCH-FSUAE-JIT-HANG-32](BENCH-FSUAE-JIT-HANG-32.md): An FS-UAE JIT session hung with a Windows-folder hard file mounted
 - [BENCH-HOST-STORAGE-32](BENCH-HOST-STORAGE-32.md): Emulator disk timings with the hard file in a Windows folder measure the PC, not FFS
 - [BENCH-JIT-PROFILE-32](BENCH-JIT-PROFILE-32.md): Every frame-rate and load-time figure was measured with the emulator at host speed
+- [BENCH-NO-STANDARD-DEMO-48](BENCH-NO-STANDARD-DEMO-48.md): Testers on real hardware have no standard benchmark: no shipped timedemo, and the hardware page did not say how to show the frame rate
 - [BENCH-SESSION-DRIFT-32](BENCH-SESSION-DRIFT-32.md): Emulated disk time drifts about 1.6x between FS-UAE sessions
 - [EMU-JIT-FAULT-ADDRESS-36](EMU-JIT-FAULT-ADDRESS-36.md): FS-UAE JIT reports fault addresses during the Vivec stage A boot smoke
 

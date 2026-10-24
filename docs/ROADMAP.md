@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.48-rc1 (24 October 2026)._
+_Last updated with AmiWind v0.0.48 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -9,6 +9,7 @@ _Last updated with AmiWind v0.0.48-rc1 (24 October 2026)._
   - [Why the image is bigger than the original game](#why-the-image-is-bigger-than-the-original-game)
   - [A disk layout that cannot dead-end](#a-disk-layout-that-cannot-dead-end)
   - [The actors get the CHIM rule: store once, place many times](#the-actors-get-the-chim-rule-store-once-place-many-times)
+  - [One standard timedemo for real Amigas (v0.0.49)](#one-standard-timedemo-for-real-amigas-v0049)
 - [Test on Amiberry, 21 October 2026](#test-on-amiberry-21-october-2026)
 - [30-minute rebuilds, 20 October 2026](#30-minute-rebuilds-20-october-2026)
 - [Collision from what the game already knows, 20 October 2026](#collision-from-what-the-game-already-knows-20-october-2026)
@@ -203,6 +204,26 @@ Each item is measured before and after on the same work and kept by a test. A re
 development build plus its version and notes, and a final is that candidate plus its version. The final is rebuilt
 from the finished candidate's caches: a test plans that build and fails if any stage but the engine and the image would
 run again, so the image step (assembled and checked fresh for every release) is the whole cost of a final.
+
+### One standard timedemo for real Amigas (v0.0.49)
+
+Two real machines have now reported a frame rate: an A4000 with a 68060 at 100 MHz (AGA, an earlier build, about
+0.2 frames per second) and an A3000 with a 68060 at 80 MHz through RTG (the tester's own RTG changes on a build from the public repository of
+23 October 2026, about 0.6 to 0.7 on a short timedemo). The two cannot be compared: each tester recorded their own walk with their own settings, and the
+hardware page did not say how to show the frame rate (BENCH-NO-STANDARD-DEMO-48 in the [bug register](BUGS.md)).
+For v0.0.49:
+
+1. **A standard demo in every image**: one fixed walk in Balmora and one outdoors, recorded once on the shipped CHIM
+   world and kept with the source, so every machine draws the same frames.
+2. **One command to run it**: plays the standard demos with `timedemo`, and writes the machine (CPU, FPU, clock,
+   Chip and Fast RAM, AGA or RTG), the settings that change the frame (screen size, detail, the CHIM caches), the
+   frame rate and the renderer counters to one file to send back.
+3. **The hardware page leads with it** ([AmiWind on real hardware](REAL_HARDWARE.md)), and the results go into one
+   table there, machine by machine.
+4. **The same demos in the emulator** on every development build, so a frame-cost change shows up before a release,
+   and an emulator figure sits beside every real one.
+
+Until then, the steps on the hardware page give a comparable number by hand.
 
 ## Test on Amiberry, 21 October 2026
 

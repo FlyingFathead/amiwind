@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -22,8 +22,12 @@ _Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 AmiWind is developed in emulators (FS-UAE: A1200, AGA, 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM,
 JIT; 16 MiB before 21 October 2026, 128 MiB until 23 October 2026). The first figure from a real Amiga came from a tester in October 2026: an earlier build on an A4000 with a
-68060 at 100 MHz ran at about 0.2 frames per second, about 0.1 above the same tester's emulator runs. That is not
-playable yet; making the frame cheaper is the main engine work now ([AmiWind on the 68060](68060.md)). More real
+68060 at 100 MHz ran at about 0.2 frames per second, about 0.1 above the same tester's emulator runs. The second,
+on 23 October 2026, came from another tester who built the game from the public repository (the build took a large
+desktop PC and a night) and ran it on an **A3000 with a 68060 at 80 MHz through RTG**, with RTG changes the tester
+made to their own build (the shipped build has not been run on RTG yet): the menus were quick and the music played,
+and a short timedemo with settings the tester also changed gave about 0.6 to 0.7 frames per second; a clean retest is
+planned. Neither is playable yet; making the frame cheaper is the main engine work now ([AmiWind on the 68060](68060.md)). More real
 measurements, with the details listed under [what to send back](#what-to-send-back), are what turn emulator figures
 into predictions for real machines. If you have one, this page lists what the game needs, what to run first, and
 which settings use more memory. Measurements from real machines are very welcome: see
@@ -102,10 +106,24 @@ are installed; a file `S:AmiWind-68040` starts the 68040 engine instead, to comp
 
 `awbench` measures the machine without any game data: CPU and FPU speed, Chip and Fast RAM throughput, disk
 transfers and the CPU time left while the disk reads. Running it first gives useful numbers even if the game does
-not start ([hardware benchmark](HARDWARE-BENCHMARK.md)).
+not start ([hardware benchmark](HARDWARE-BENCHMARK.md)). It is not on the drive image yet: every build makes it, in
+the build run's `engine/awbench` ([getting the program](HARDWARE-BENCHMARK.md#getting-the-program)); copy it to the
+Amiga, for example to `RAM:`.
 
-In the game, `dbg rcount` (what each frame draws) and `dbg logs live on` (writes frame stalls, cell load times and
-a walk profile to log files) give the numbers that matter most ([console commands](AMIWIND_CONSOLE_COMMANDS.md)).
+In the game, open the console with F10 or the backquote key. `dbg fps on` shows the frame rate on screen. For a
+number another machine can be compared with, record a short walk once and play it back
+([timedemo](HARDWARE-BENCHMARK.md#timedemo)):
+
+1. `record bench balmora-chim`: the map starts again and everything from here is recorded; walk and look around
+   for a moment.
+2. `stop` ends the recording (`bench.dem` in the game's `id1` folder).
+3. `timedemo bench` plays it back as fast as the machine can draw it, prints the frames per second and the
+   renderer counters, and appends a line to `saves/timedemo-results.txt`.
+
+Send that file with the settings you had on and where you recorded. A standard demo that every image ships, run by
+one command, is planned for v0.0.49 ([roadmap](ROADMAP.md#one-standard-timedemo-for-real-amigas-v0049)). `dbg rcount`
+(what each frame draws) and `dbg logs live on` (writes frame stalls, cell load times and a walk profile to log
+files) give the numbers that matter most ([console commands](AMIWIND_CONSOLE_COMMANDS.md)).
 
 ## More Fast RAM: the memory settings that exist today
 
@@ -255,7 +273,7 @@ What it means for AmiWind, on paper (no AmiWind run on a PiStorm has been report
 
 - **The CPU and FPU.** Emu68 presents itself as a 68040 with an FPU, the CPU the standard engine build targets
   ([FAQ](FAQ.md#can-todays-heavily-upgraded-amigas-realistically-run-amiwind)).
-- **Memory.** A Pi gives the Amiga far more Fast RAM than the 16 MiB reference. AmiWind uses the extra Fast RAM by
+- **Memory.** A Pi gives the Amiga far more Fast RAM than the 32 MiB reference. AmiWind uses the extra Fast RAM by
   itself as the CHIM cache ([above](#extra-ram-is-used-automatically)), so a PiStorm machine keeps more of the
   world in memory and streams less from the disk.
 - **Use full speed for playing.** The timing-friendly JIT settings exist for software that needs exact 68k
