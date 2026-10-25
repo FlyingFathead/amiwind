@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
+_Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -218,6 +218,10 @@ A stack machine of 32-bit cells; operands follow their opcode, big-endian. `engi
 | 40-43 | SECONDS, RANDOM, MENUMODE, CELLCHANGED | | GetSecondsPassed (time since this script's last run), Random n, ... |
 | 44-46 | STARTSCRIPT, STOPSCRIPT, SCRIPTRUNNING | u16 script | global scripts |
 | 47 48 | DISTANCE, SQRT | u16 object / - | GetDistance in game units, GetSquareRoot |
+| 49-4E | ENABLE, DISABLE, GETDISABLED, LOCK, UNLOCK, GETLOCKED | - | object state (v0.0.51) on the object REF names, else the script's own; LOCK pops the level (-1: the level it had, as `Lock` without a number); GETDISABLED and GETLOCKED push a whole number |
+| 4F 50 | ONACTIVATE, ACTIVATE | - | activation (v0.0.51): ONACTIVATE pushes 1 once after the player used the script's object (the script took the use); ACTIVATE carries out the object's own use |
+| 51 | MESSAGEBOX | u16 text, u8 numbers, u8 buttons, u16 per button | a message box (v0.0.51): its numbers popped (each a number with a fraction) and formatted into the text, its buttons by string index |
+| 52 | GETBUTTONPRESSED | | pushes the button the player chose, once; -1 until then |
 
 QUERY numbers: 1 the speaker's disposition, 2 PC level, 3 PC sex, 4 PC reputation, 5 PC crime level, 6 PC health
 percent, 7 PC rank in a faction (operand: faction string, FFFF the speaker's), 8 PC expelled (same operand), 9 PC
@@ -318,11 +322,38 @@ and audio: `PlaySound`, `PlaySoundVP`, `PlaySound3D`, `PlaySound3DVP`, `PlayLoop
 their object leaves the range. Quake's mixer has no pitch, so the VP forms keep their volume only; voices play on
 the speaker without lip movement yet.
 
-Not yet (229 functions; the most used): Disable 830, Enable 498, GetDisabled 434, MessageBox 407, OnActivate 280,
-GetDeadCount 247, OnDeath 245, RemoveItem 239, SetFight 234, StartCombat 205, AddSpell 173, AddItem 157, Activate
-146, GetPCCell 139, ForceGreeting 134, AIWander 130, GetPos 127, Cast 126, StopCombat 119, AddTopic 105. They wait for
-object state, AI packages, inventory, combat, spells, positioning, menus and dialogue. Compiled script state is not in saved
-games yet ([MWSCRIPT-STATE-NOT-SAVED-48](BUGS.md)).
+Object state (v0.0.51): `Enable`, `Disable`, `GetDisabled`, `Lock`, `Unlock`, `GetLocked`, on the script's own
+object or the one named before `->`. A disabled object with an entity is hidden and not solid until `Enable`, also
+after a map change (its new entity is hidden again); `Lock` without a number takes the level the object had last
+(100 when it never had one). Both are kept in saved games, by the object's reference, in the same change list as the
+actors' state (an object's entry carries "disabled" and "lock set, level"). An actor the CHIM world spawns as its
+cell joins is not spawned while disabled; after `Enable` it comes with its cell's next join. Not yet: CHIM scenery
+without an entity keeps showing when disabled (its collision is part of the CHIM chunk, so hiding it alone would
+leave an invisible wall). Doors that turn in place
+(hinged doors) follow a script's lock: the opening's own locks come first, then the script's, then the game data's;
+`GetLocked` on a door no script has touched reads the game data's lock. Load doors into rooms read no lock at all
+yet ([DOOR-LOAD-LOCKS-MISSING-51](BUGS.md), waiting for a way to open a lock: keys, lockpicks, the Security skill).
+
+Activation (v0.0.51): `OnActivate` and `Activate` run, with the original's rule. A script that reads `OnActivate`
+takes over its object's use: when the player uses the object, it does nothing by itself, and `OnActivate` reads 1
+once on the script's next run; the script's `Activate` then carries out the object's own use (a door opens, locks
+kept). Today the use is taken over for doors (hinged doors and load doors); other objects' own use (items,
+containers, actors) is not yet. A script the engine carries by hand (the census office's) is never attached, so its
+door keeps the engine's own rules. The `aw_mwscript_status` command counts the uses the scripts took and their
+`Activate` calls.
+
+Messages (v0.0.51): `MessageBox` and `GetButtonPressed` run, as OpenMW shows them. The text takes its numbers
+(`%d`, `%f`, `%g` and `%e` with a precision, `%%`; a `%s` is kept as written, the compiler passes no strings). A box
+without buttons is a notice in the message line for its length times 0.1 s (3 to 10 s). A box with buttons stops
+the world until the player chooses (Left/Right or A/D move, Enter, Space, E or the mouse choose, 1-9 choose that
+button); a new box replaces a shown one, and `GetButtonPressed` reads the choice once, -1 until then
+(`engine/aga/src/aw_msgbox_rules.c`, `aw_msgbox.c`).
+
+Not yet (219 functions; the most used): GetDeadCount 247, OnDeath 245, RemoveItem 239, SetFight
+234, StartCombat 205, AddSpell 173, AddItem 157, GetPCCell 139, ForceGreeting 134, AIWander 130, GetPos 127, Cast
+126, StopCombat 119, AddTopic 105. They wait for menus, AI packages, inventory, combat, spells, positioning and
+dialogue. The scripts' own values are not in saved games yet
+([MWSCRIPT-STATE-NOT-SAVED-48](BUGS.md)).
 
 ## Sizes and costs
 
@@ -368,11 +399,12 @@ receipt's SHA-256, reads it back, and links it into the payload. The legacy buil
 
 1. In-game check in a MiniWind sandbox (Seyda Neen docks and Vivec's water spouts): sounds, loops, ranges, frame
    time with and without; then the default.
-2. Object state (roadmap step 4): `Enable`, `Disable`, `GetDisabled`, `OnActivate`, `Activate`, `Lock`, `Unlock`
-   (the census door), and the interpreter's values in saved games.
+2. Object state (roadmap step 4): `Enable`, `Disable`, `GetDisabled`, `Lock`, `Unlock` and `GetLocked` run since
+   v0.0.51 and are saved; next: the doors read a script's lock, `OnActivate` and `Activate` (the census door),
+   Disable on CHIM scenery and on actors the CHIM world spawns, and the interpreter's own values in saved games.
 3. Room placements checked in game: the stable room number and the quarter-scale positions, a recentred room's
    shift.
-4. `MessageBox` and the greeting conditions on the same interpreter.
+4. The greeting conditions on the same interpreter (`MessageBox` runs since v0.0.51).
 
 ## Credits
 

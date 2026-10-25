@@ -54,6 +54,13 @@ int AW_HingedDoorHint(const char **name,const char **action);
 int AW_HingedDoorProtect(edict_t *e);
 /* Table lookup by reference number: the row, -1 none (also for host tests). */
 int AW_HingedDoorRow(unsigned reference);
+/* Object state (v0.0.51): the game data's lock level of a placed door, -1 when it is not one; and the scripts'
+ * lock (aw_mwhost.c sets it: the level the scripts left, ORIGINAL when none). */
+int AW_HingedDoorOriginalLock(unsigned reference);
+extern int (*aw_object_lock_level)(unsigned reference,int original);
+/* Activation: a script that reads OnActivate takes the use (aw_mwhost.c sets it); its Activate opens the door. */
+extern int (*aw_hinged_intercept)(unsigned reference);
+int AW_HingedDoorActivate(unsigned reference);
 /* CHIM placements (chim/chim_chunks.c, through chim_hinged_door): 1 when the
  * reference is a hinged door; *yaw gets its current pose. */
 int AW_HingedDoorPlacement(unsigned pid,unsigned reference,const float *origin,float radius,float *yaw);

@@ -69,9 +69,12 @@ static int		aw_actors_trace;		/* aw_actors trace 1: one line per tick that spawn
 static struct
 {
 	unsigned long	joins, leaves, spawned, skipped_dead, skipped_alive, released, kept, rehomed, frees_by_tick, spawn_ticks;
+	unsigned long	skipped_disabled;
 	double			join_time, leave_time, spawn_time, spawn_worst;
 } st;
 
+/* Object state (aw_mwhost.c sets it; NULL without the scripts): 1 when a script disabled the placement REFERENCE. */
+int (*aw_actor_disabled)(unsigned reference);
 extern void (*chim_actors_join)(int cx, int cy, const char *map, const float *offset);
 extern void (*chim_actors_leave)(int cx, int cy);
 extern void (*chim_actors_tick)(void);
@@ -408,6 +411,14 @@ static int SpawnOne (pending_t *q)
 	{
 		ED_Free (ent);
 		st.skipped_dead++;
+		return 0;
+	}
+	/* a script's Disable (aw_mwhost.c object state, v0.0.51): not spawned while disabled; after Enable it comes with
+	 * its cell's next join */
+	if (aw_actor_disabled && ref > 0 && aw_actor_disabled ((unsigned)ref))
+	{
+		ED_Free (ent);
+		st.skipped_disabled++;
 		return 0;
 	}
 	if (AliveWithRef (ref, ent))
@@ -1150,10 +1161,10 @@ static void Command (void)
 		}
 	}
 	Con_Printf ("chim actors: %ld actors alive, %ld edicts; joins %lu (%.1f ms reading); spawned %lu in %lu ticks "
-		"(%.1f ms, worst tick %.1f ms, budget %ld per tick, %ld waiting; dead skipped %lu, alive skipped %lu); leaves %lu "
-		"(released %lu, kept %lu, by tick %lu, %.1f ms); change list %ld\n",
+		"(%.1f ms, worst tick %.1f ms, budget %ld per tick, %ld waiting; dead skipped %lu, alive skipped %lu, disabled "
+		"skipped %lu); leaves %lu (released %lu, kept %lu, by tick %lu, %.1f ms); change list %ld\n",
 		(long)n, (long)sv.num_edicts, st.joins, st.join_time*1000, st.spawned, st.spawn_ticks, st.spawn_time*1000,
-		st.spawn_worst*1000, (long)budget_n, (long)npending, st.skipped_dead, st.skipped_alive, st.leaves,
+		st.spawn_worst*1000, (long)budget_n, (long)npending, st.skipped_dead, st.skipped_alive, st.skipped_disabled, st.leaves,
 		st.released, st.kept, st.frees_by_tick, st.leave_time*1000, (long)nchanges);
 	Con_Printf ("chim actors: warm %d; warmed %lu models (%.1f ms), %lu voices (%.1f ms), %lu client sounds (%.1f ms), worst warm tick %.1f ms\n",
 		warm_on, wst.models, wst.model_time*1000, wst.voices, wst.voice_time*1000, wst.sounds, wst.sound_time*1000, wst.worst*1000);

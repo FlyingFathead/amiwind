@@ -178,6 +178,38 @@ class EngineSmokeTests(unittest.TestCase):
             done = subprocess.run(['sh', str(script)], capture_output=True, text=True, timeout=120)
             self.assertEqual(done.stdout.strip(), '')
 
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_zone_full_fails_a_pass_from_32_mb(self):
+        """CHIM-ZONE-BUDGET-33 (v0.0.51): a CHIM chunk waiting for room in the zone fails the smoke from 32 MB of Fast
+        RAM; at 16 MB the retries are the known cost; --allow-zone-full only counts them."""
+        text = engine_smoke.PROBE
+        start = text.index('zonefull(){')
+        body = text[start:text.index('exit 0; }', start) + len('exit 0; }')]
+        line = ('CHIM: chunk 395 not loaded: zone full (model 7530, 10896 bytes; largest free 4544, free 5792, '
+                'locked 6696768 of 6720064); retrying\n')
+
+        def verdict(fast_mb, lines, allow='fail', result='PASS boot'):
+            with tempfile.TemporaryDirectory() as tmp:
+                awctl = Path(tmp, 'awctl')
+                awctl.mkdir()
+                (awctl / 'console.log').write_text('Loading audio: 12 mixer updates\n' + line * lines,
+                                                   encoding='utf-8', newline='\n')
+                stubs = ('st(){ case "$1" in efrags_bad) echo 0;; screen) echo game;; esac; }\n'
+                         'alive(){ return 1; }\nsleep(){ :; }\nlog(){ echo "$*"; }\nFP=999999\nXP=999999\n')
+                script = Path(tmp, 'finish.sh')
+                script.write_text('R=%s\nFASTMB=%d\nZONEFULL=%s\n%s%s\nfinish "%s"\n'
+                                  % (Path(tmp).as_posix(), fast_mb, allow, stubs, body, result),
+                                  encoding='utf-8', newline='\n')
+                done = subprocess.run(['sh', str(script)], capture_output=True, text=True, timeout=60)
+                return done.stdout.strip().splitlines()[-1]
+        self.assertEqual(verdict(32, 0), 'smoke RESULT PASS boot')
+        self.assertEqual(verdict(32, 3), 'smoke RESULT FAIL CHIM zone full 3 times at 32 MB of Fast RAM (none '
+                                         'allowed from 32 MB: CHIM-ZONE-BUDGET-33)')
+        self.assertEqual(verdict(128, 1)[:32], 'smoke RESULT FAIL CHIM zone full')
+        self.assertEqual(verdict(16, 405), 'smoke RESULT PASS boot')
+        self.assertEqual(verdict(32, 3, allow='allow'), 'smoke RESULT PASS boot')
+        self.assertEqual(verdict(32, 3, result='FAIL music not reading'), 'smoke RESULT FAIL music not reading')
+
 if __name__ == '__main__':
     unittest.main()
 

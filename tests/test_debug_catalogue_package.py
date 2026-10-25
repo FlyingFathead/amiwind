@@ -34,7 +34,8 @@ class DebugCataloguePackageTests(unittest.TestCase):
             self.assertIn('aw_torch_strength 0.7', commands)
             build_aga.stage_game_config(target, debug_luma=True)
             self.assertEqual((target/'default-game.cfg').read_bytes(), (build_aga.ROOT/'config/game.cfg').read_bytes())
-            self.assertIn('aw_interiorluma 1.2', (target/'default-game.cfg').read_text().splitlines())
+            # 1.0 since v0.0.51: interiors are baked with their cell sunlight (INTERIOR-SUNLIGHT-UNBAKED-51)
+            self.assertIn('aw_interiorluma 1.0', (target/'default-game.cfg').read_text().splitlines())
 
     def test_engine_cli_flag_reaches_compiler_and_receipt(self):
         for flag, debug in ((None,True),("--disallow-luma-controls",False),("--no-luma-controls",False),("--debug-luma",True),("--interior-brightness",True)):

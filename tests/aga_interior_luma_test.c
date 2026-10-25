@@ -41,10 +41,11 @@ int main(int argc,char **argv)
     int i,flushes;unsigned static1,dynamic1,static12,dynamic12;byte old_pixel;
     exterior_regression_main();
     R_InteriorLumaInit();setting=Cvar_FindVar("aw_interiorluma");
-    assert(setting && setting->archive && luma_command);assert(fabs(setting->value-1.2f)<.00001f);
+    /* default 1.0 since v0.0.51: interiors baked with their cell sunlight (INTERIOR-SUNLIGHT-UNBAKED-51) */
+    assert(setting && setting->archive && luma_command);assert(fabs(setting->value-1.0f)<.00001f);
     sv.active=1;strcpy(sv.name,"census");exterior=0;r_refdef.ambientlight=0;
     surface.samples=samples;surface.styles[0]=0;memset(samples,50,sizeof samples);
-    R_InteriorLumaUpdate();factor(1.2f);assert(R_LightPoint(point)==60);
+    R_InteriorLumaUpdate();factor(1);assert(R_LightPoint(point)==50);
     flushes=cache_flushes;R_InteriorLumaUpdate();R_InteriorLumaUpdate();
     assert(cache_flushes==flushes);
     set("1.2");factor(1.2f);assert(R_LightPoint(point)==60);
@@ -75,10 +76,11 @@ int main(int argc,char **argv)
     }
     set("-3");factor(0);set("8");factor(4);set("1.2");
     set("nan");factor(1.2f);set("inf");factor(1.2f);set("oops");factor(1.2f);set("1x");factor(1.2f);
-    Cvar_Set("aw_interiorluma","nan");R_InteriorLumaUpdate();factor(1.2f);assert(isfinite(setting->value));
-    Cvar_Set("aw_interiorluma","inf");R_InteriorLumaUpdate();factor(1.2f);
-    Cvar_Set("aw_interiorluma","oops");R_InteriorLumaUpdate();factor(1.2f);
-    setting->value=NAN;R_InteriorLumaUpdate();factor(1.2f);assert(isfinite(setting->value));
+    /* an invalid saved value falls back to the default, 1.0 since v0.0.51 */
+    Cvar_Set("aw_interiorluma","nan");R_InteriorLumaUpdate();factor(1);assert(isfinite(setting->value));
+    Cvar_Set("aw_interiorluma","inf");R_InteriorLumaUpdate();factor(1);
+    Cvar_Set("aw_interiorluma","oops");R_InteriorLumaUpdate();factor(1);
+    setting->value=NAN;R_InteriorLumaUpdate();factor(1);assert(isfinite(setting->value));
     Cvar_Set("aw_interiorluma","-8");R_InteriorLumaUpdate();factor(0);
     Cvar_Set("aw_interiorluma","9");R_InteriorLumaUpdate();factor(4);set("1.2");
     set(NULL);assert(strstr(printed,"1.200") && strstr(printed,"gameplay interior"));

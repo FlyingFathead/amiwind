@@ -233,14 +233,31 @@ void Chim_PackClose (chim_pack_t *pack)
 	pack->file = NULL;
 }
 
-/* The disk read itself (the prefetch reads ahead through it, uncounted). */
+/* The disk read itself (the prefetch reads ahead through it, uncounted). In
+ * slices, the music and the mixer serviced between them (AUDIO-LOAD-29: a CHIM
+ * room or frame loads for seconds under the plaque, one model or chunk image
+ * up to megabytes in one read), as model.c AW_LoadRead: 4 KiB slices while a
+ * load plays the music (the OST's own stream reads get the disk between
+ * them), 64 KiB in play, where the tick does nothing. */
 int Chim_PackReadRaw (chim_pack_t *pack, long offset, void *out, long bytes)
 {
+	char *at = (char *)out;
+	long take, limit;
 	if (!pack->file || offset < 0 || bytes < 0 || offset > pack->bytes || bytes > pack->bytes - offset)
 		return 0;
-	if (fseek (pack->file, pack->base + offset, SEEK_SET) ||
-		fread (out, 1, (size_t)bytes, pack->file) != (size_t)bytes)
+	if (fseek (pack->file, pack->base + offset, SEEK_SET))
 		return 0;
+	while (bytes > 0)
+	{
+		limit = aw_loading_music ? 4096 : 65536;
+		take = bytes > limit ? limit : bytes;
+		if (fread (at, 1, (size_t)take, pack->file) != (size_t)take)
+			return 0;
+		at += take;
+		bytes -= take;
+		if (aw_load_audio_tick)
+			aw_load_audio_tick ();
+	}
 	return 1;
 }
 
@@ -1789,6 +1806,12 @@ static int Memory (int op, char *first, char *second, int size)
 	case 0: Chim_MemoryStart (); return 1;
 	case 1: return first && second ? Chim_MemoryNotice (first, second, size) : 0;
 	case 2: return Chim_MemorySkip ();
+	/* 4: the CHIM cache this start took, KiB (automatic banks or -chimcache); -1 before it is decided
+	 * (aw_scene.c: a room marked for 32 MB counts on it, CHIM-AUTO-BANK-CLIFF-51) */
+	case 4:
+		if (!memory_decided && cache_bank < 0)
+			return -1;
+		return (int)((auto_count ? auto_bytes : cache_bank >= 0 ? (unsigned long)cache_bytes : 0) / 1024);
 	default: Chim_MemoryNoticeDone (); return 1;
 	}
 }

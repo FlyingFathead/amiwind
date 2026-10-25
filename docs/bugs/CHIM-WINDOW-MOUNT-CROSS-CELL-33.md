@@ -12,6 +12,7 @@
 | Persists in | v0.0.33-dev, v0.0.39, v0.0.40-dev1 (last seen) |
 | Severity | medium: West Gash (-3,1) and Caldera (-2,2) remain unconverted. Pelagiad now passes measured offline conversion audits; native facade/traversal remains pending. |
 | Family | CHIM world streamer (`chim-streamer`) |
+| Deferred by the maintainer | 2026-10-25: the maintainer deferred it to v0.0.52 (v0.0.51 ships its dev3, everything else moves to v0.0.52) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source d23217e, engine d23217e, CHIM world unknown |

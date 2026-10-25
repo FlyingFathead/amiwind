@@ -15,10 +15,10 @@
 | --- | --- |
 | Reported by | developer |
 | First noticed | 10 October 2026, in v0.0.36-dev3 |
-| Where | Keys of the chim and world-flora stages (engine source folder named by engine_limits, zone_sim) |
+| Where | Stage keys of chim, chim-town, world-flora (engine folder named by three builder modules) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36-dev3, v0.0.45, v0.0.46-dev1, v0.0.48-dev2, v0.0.50 (last seen) |
+| Persists in | fixed in v0.0.51 |
 | Severity | medium: An engine-only change (no converter or data change) reruns the CHIM world conversion and the world flora stage on the next build. |
 | Family | Build speed (`build-speed`) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -27,12 +27,13 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.51 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Status: 24 October 2026](#status-24-october-2026)
 - [Status: 10 October 2026](#status-10-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -45,6 +46,15 @@ _Last updated with AmiWind v0.0.45 (19 October 2026)._
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## Status: 24 October 2026
+
+Repaired in v0.0.51. The v0.0.50 final rebuilt the CHIM world and the three town stages (about 40 extra minutes)
+for one edit of `engine/aga/src/aw_scene.c`. Three builder modules name the engine folder: `tools/engine_limits.py`
+(`SOURCE`), `tools/chim/zone_sim.py` (`SRC`) and the include folders of `check_world_map_heap.compile_target_sizes`.
+A folder named in reached code counts whole, so `chim_build.py` keyed 344 engine files and `chim_town.py` and
+`prepare_world_flora.py` 332. The `project_version` engine check suspected on 24 October is not in any CHIM stage's
+reach.
 
 ## Status: 10 October 2026
 
@@ -82,12 +92,19 @@ from the unedited checkout: `chim` and `world-flora` are planned for rebuild wit
 
 ## Repair
 
-Planned: the modules name only the headers they read (or the fingerprint takes the files the code opens),
-with a key-coverage test that edits an unrelated engine file and expects both stages reused.
+In the modules of `build_cache.C_HEADER_READERS` (the three above, each reviewed: they read, compile or include only
+the engine files they name), a folder of `C_HEADER_FOLDERS` counts as the engine files the stage's reach names and
+their `#include "..."` closure (`SourceIndex.include_closure`). Named anywhere else, a folder still counts whole.
+Stage keys only (form 3 and its companion); the unit caches keep their reach.
 
 ## Verification
 
-Pending.
+- `chim_build.py` keys 101 engine files (16 C files the zone gate compiles or the heap checks read and hash, and
+  their headers), `chim_town.py` and `prepare_world_flora.py` 65, the room stages 1 (`aw_activated.h`).
+- `tests/test_stage_engine_key.py`: no stage started by `tools/build.py` keys an engine C file outside its listed
+  inputs, none keys `aw_scene.c`, `r_main.c` or `sv_main.c`, and the rule's own cases (a named file and its
+  includes; a folder named elsewhere still whole; the unit caches unchanged).
+- The build proof (an engine-only edit reuses the CHIM world) comes with the first v0.0.51 dev build.
 
 ## Prevention
 
@@ -159,6 +176,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-NPCLOD-PATH-ARG-34](BUILD-NPCLOD-PATH-ARG-34.md): The first --npc-lod on build stopped at its area stage: a Path in the command broke build-state.json
 - [BUILD-OPTIMIZER-CACHE-KEY-BROAD-36](BUILD-OPTIMIZER-CACHE-KEY-BROAD-36.md): Regression: the image step's BSP optimizer pass cache reused 13 of 2,658 maps; its key covers the whole image tool, so any image-code change redoes every map
 - [BUILD-OPTION-RECORD-KEYS-STAGES-47](BUILD-OPTION-RECORD-KEYS-STAGES-47.md): A new builder option entry rebuilds the CHIM, town, flora, engine and image stages: their keys counted all of config/
+- BUILD-ORDERED-MAP-SCAN-51 (no report page): The pool map that hands results back in input order scans every held future on each turn: the main process works O(n squared) while large maps run
 - [BUILD-ORDERED-WINDOW-33](BUILD-ORDERED-WINDOW-33.md): The ordered worker pool idles behind one slow item, and hands long items out last
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
@@ -215,6 +233,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
+- RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored

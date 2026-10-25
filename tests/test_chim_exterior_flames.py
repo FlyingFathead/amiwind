@@ -426,6 +426,16 @@ class PlacementLightTests(unittest.TestCase):
         surf = (ENGINE / 'r_surf.c').read_text()
         self.assertIn('if (placement_light > 0 && R_SkyExterior ())', surf)
 
+    def test_the_fire_light_key_is_no_quakec_field(self):
+        # ENGINE-FLAME-LIGHT-KEY-WARNING-51 (v0.0.51): the frame map's fire rows carry aw_flame_light for the engine,
+        # which reads it from the entity text (chim_chunks.c FireKey); the QuakeC entity parser skips it quietly
+        # instead of printing "'aw_flame_light' is not a field" for every fire row of every load
+        edict = (ENGINE / 'pr_edict.c').read_text(encoding='latin-1')
+        skip = edict.index('if (!strcmp (keyname, "aw_flame_light"))')
+        self.assertLess(skip, edict.index('key = ED_FindField (keyname);'))
+        self.assertEqual(edict[skip:edict.index('\n', edict.index('\n', skip) + 1)].split()[-1], 'continue;')
+        self.assertIn('FireKey (body, end, "aw_flame_light"', (ENGINE / 'chim/chim_chunks.c').read_text(encoding='latin-1'))
+
 
 if __name__ == '__main__':
     unittest.main()

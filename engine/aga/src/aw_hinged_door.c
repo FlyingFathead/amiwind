@@ -110,10 +110,24 @@ int AW_HingedDoorRow(unsigned reference){
 /* Every placed DOOR without a destination, the census hall door included: its
  * lock is the story's (aw_hinged_story, aw_opening.c), its turn is everyone's. */
 static int door_row(unsigned reference){return AW_HingedDoorRow(reference);}
-/* Locked now: the story's word where it has one, else the table's flag. */
+/* The door's own lock in the game data: its level (1 when it is locked by a key only), 0 unlocked. */
+static int original_lock(int row){
+    if(!(rows[row].flags&AW_HINGE_LOCKED))return 0;
+    return rows[row].lock?rows[row].lock:1;
+}
+/* A script's Lock and Unlock (aw_mwhost.c, set there; NULL in builds and tests without it): the level the scripts
+ * left on REFERENCE, ORIGINAL when they set none. */
+int (*aw_object_lock_level)(unsigned reference,int original);
+/* Locked now: the story's word where it has one (the opening), else a script's lock, else the table's flag. */
 static int locked(const hd_door_t *d){
-    int s=story(d->ref,AW_HINGE_STORY_LOCK);
-    return s>=0?s!=0:(rows[d->row].flags&AW_HINGE_LOCKED)!=0;
+    int s=story(d->ref,AW_HINGE_STORY_LOCK),original=original_lock(d->row);
+    if(s>=0)return s!=0;
+    return (aw_object_lock_level?aw_object_lock_level(d->ref,original):original)>0;
+}
+/* The game data's lock level of a placed door (GetLocked on a door no script has locked), -1 not a door here. */
+int AW_HingedDoorOriginalLock(unsigned reference){
+    int row=AW_HingedDoorRow(reference);
+    return row<0?-1:original_lock(row);
 }
 static int sound_entity(const hd_door_t *d){return d->edict?d->edict:MAX_EDICTS+(int)(d-placed);}
 static void play(hd_door_t *d,int sample){
@@ -215,10 +229,24 @@ static hd_door_t *aimed(void){
     }
     return best;
 }
+/* Object state (v0.0.51, aw_mwhost.c sets it; NULL without the scripts): 1 when a script that reads OnActivate
+ * takes the use of the door REFERENCE (the original's rule); it opens on the script's Activate. */
+int (*aw_hinged_intercept)(unsigned reference);
+static int use_door(hd_door_t *d,int force);
 static int use(int force){
-    hd_door_t *d=aimed();const hd_row_t *r;const hd_base_t *b;
+    hd_door_t *d=aimed();
     if(!d)return 0;
-    r=&rows[d->row];b=&bases[r->base];
+    if(!force && aw_hinged_intercept && aw_hinged_intercept(d->ref))return 1;
+    return use_door(d,force);
+}
+/* A script's Activate on a placed door (aw_mwhost.c): its own use, locks kept. 0 when REFERENCE is no door here. */
+int AW_HingedDoorActivate(unsigned reference){
+    int i;
+    for(i=0;i<placed_count;i++)if(placed[i].ref==reference)return use_door(&placed[i],0);
+    return 0;
+}
+static int use_door(hd_door_t *d,int force){
+    const hd_row_t *r=&rows[d->row];const hd_base_t *b=&bases[r->base];
     if(!force && locked(d)){play(d,locked_sound);story(d->ref,AW_HINGE_STORY_REFUSED);return 1;}
     if(!d->dir){d->dir=d->amount>0?-1:1;moving++;}
     else d->dir=(signed char)-d->dir;

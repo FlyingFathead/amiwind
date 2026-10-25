@@ -23,12 +23,13 @@ SCRIPT_GLOBAL = 16       # started by StartScript somewhere (runs as a global sc
 SCRIPT_HANDWRITTEN = 32  # the engine carries this behaviour by hand today (config/mwscript.json): not run
 SCRIPT_INERT = 64        # nothing it can do today is seen outside its own values (no sound, global, journal, other
                          # object, script start or stop; only NOTYET calls): not attached until that changes
+SCRIPT_ONACTIVATE = 128  # reads OnActivate: the player's use of its object goes to the script (the original's rule)
 EFFECT_OPS = {'SETG', 'SETGS', 'SETM', 'SETMS', 'SETJ', 'JOURNAL', 'PLAYSOUND', 'PLAYSOUNDVP', 'PLAYSOUND3D',
               'PLAYSOUND3DVP', 'PLAYLOOP3D', 'PLAYLOOP3DVP', 'STOPSOUND', 'SAY', 'STREAMMUSIC', 'STARTSCRIPT',
-              'STOPSCRIPT'}
+              'STOPSCRIPT', 'ENABLE', 'DISABLE', 'LOCK', 'UNLOCK', 'ACTIVATE'}
 
 VOLATILE_OPS = {'SECONDS', 'RANDOM', 'MENUMODE', 'CELLCHANGED', 'SOUNDPLAYING', 'SAYDONE', 'DISTANCE', 'QUERY',
-                'SCRIPTRUNNING'}
+                'SCRIPTRUNNING', 'GETDISABLED', 'GETLOCKED', 'ONACTIVATE'}
 
 
 class CompileError(ValueError):
@@ -412,6 +413,42 @@ class ScriptCompiler:
             self.convert(self.expr(args[0]), 'f')
             self.e.op('SQRT')
             return 'f'
+        if n in ('enable', 'disable', 'unlock'):
+            self.e.op(n.upper())
+            return None
+        if n in ('getdisabled', 'getlocked'):
+            self.e.op(n.upper(), pushes=1); self.flags |= SCRIPT_VOLATILE
+            return 'i'
+        if n == 'onactivate':
+            # the object's use goes to this script from now on (the original's rule); read every frame
+            self.e.op('ONACTIVATE', pushes=1); self.flags |= SCRIPT_VOLATILE | SCRIPT_ONACTIVATE
+            return 'i'
+        if n == 'activate':
+            self.e.op('ACTIVATE')
+            return None
+        if n == 'messagebox':
+            # the text, its numbers (each pushed as a number with a fraction; %d formats the whole part), the buttons
+            numbers = args[1:1 + extra['nargs']]
+            for a in numbers:
+                self.convert(self.expr(a), 'f')
+            buttons = [self.p.string(b) for b in extra['buttons']]
+            if len(numbers) > 0x1F or len(buttons) > 0xFF:
+                raise CompileError('messagebox with too many numbers or buttons')
+            self.e.op('MESSAGEBOX', self.p.string(extra['format']), len(numbers), len(buttons), *buttons,
+                      layout='HBB' + 'H' * len(buttons), pops=len(numbers))
+            return None
+        if n == 'getbuttonpressed':
+            self.e.op('GETBUTTONPRESSED', pushes=1); self.flags |= SCRIPT_VOLATILE
+            return 'i'
+        if n == 'lock':
+            # Lock [level]: without a number the lock takes the level it had (-1 to the engine)
+            numbers = [a for a in args if a[0] != 'str']
+            if numbers:
+                self.convert(self.expr(numbers[0]), 'i')
+            else:
+                self.push_const(('int', -1))
+            self.e.op('LOCK', pops=1)
+            return None
         raise CompileError('run function without code: ' + n)
 
     def notyet(self, fn, ref, args, value):

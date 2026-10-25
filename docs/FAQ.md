@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
+_Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -37,8 +37,10 @@ _Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
 
 *Harry Horsperg's perspective as the project's author.*
 
-**Latest release:** v0.0.48 - Inner CHIM & Actors On Stage (24 October 2026, CHIM Engine v0.2.2). 1,132 of the 1,134
-base-game interiors are now CHIM rooms, and the actors stand on stage in them ([release notes](RELEASE-v0.0.48.md)).
+**Latest release:** v0.0.51 - Let There Be More Inner Light (25 October 2026, CHIM Engine v0.2.2). Akulakhan's
+Chamber loads on 32 MB, every interior is lit with the light the original gives it from above, and the music plays on
+through the loads ([release notes](RELEASE-v0.0.51.md)). Since v0.0.48, 1,132 of the 1,134 base-game interiors are
+CHIM rooms with the actors standing in them; since v0.0.50 every door leads in and back out.
 Since v0.0.43 every exterior cell of Vvardenfell is on the CHIM engine: 1,409 cells, 1,348 in one-cell region
 frames and 61 in the town frames of Balmora, Seyda Neen and Vivec
 ([what these numbers count](chim/CELL_TRACKER.md#what-we-count)).
@@ -559,7 +561,8 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **24 October 2026**, the latest release is **v0.0.48: Inner CHIM & Actors On Stage** (CHIM Engine v0.2.2). Since
+As of **25 October 2026**, the latest release is **v0.0.51: Let There Be More Inner Light** (CHIM Engine v0.2.2;
+[release notes](RELEASE-v0.0.51.md)). Since
 v0.0.43 (**Let There Be CHIM: Vvardenfell's Outdoors, All of It**) every exterior cell of Vvardenfell runs on the CHIM
 engine (1,409 cells: 1,292 land cells, 98 sea-floor cells and 19 open-sea cells; [what these numbers count](chim/CELL_TRACKER.md#what-we-count)), from Seyda Neen, Balmora and the whole city of Vivec to Ald-ruhn, Maar Gan, Suran and Red
 Mountain; no classic region maps are left outdoors. Since v0.0.48, 1,132 of the 1,134 base-game interiors are CHIM

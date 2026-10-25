@@ -707,6 +707,7 @@ void SCR_LoadingUpdate (void)
 
 void SCR_BeginLoadingPlaque (void)
 {
+    S_LoadingBegin();
     aw_loading_music = true;
     D_EnableBackBufferAccess();
     AW_BeginLoadingStyle();
@@ -741,6 +742,7 @@ SCR_EndLoadingPlaque
 */
 void SCR_EndLoadingPlaque (void)
 {
+    S_LoadingReport();
     aw_loading_music = false;
     AW_EndLoadingStyle();
     scr_disabled_for_loading = false;
@@ -857,6 +859,7 @@ needs almost the entire 256k of stack space!
 */
 /* aw_view.c: the death prompt (docs/THIRD_PERSON.md); NULL in fixtures without it. */
 void (*aw_view_draw)(void);
+void (*aw_msgbox_draw)(void);
 
 void SCR_UpdateScreen (void)
 {
@@ -1035,6 +1038,8 @@ void SCR_UpdateScreen (void)
         AW_IntroDraw();
         if (aw_view_draw)
             aw_view_draw ();
+        if (aw_msgbox_draw)
+            aw_msgbox_draw ();
         /* Test-room and gallery instruction text is not part of a photo
          * (PHOTO-GALLERY-TEXT-33); the light gallery strip stays, it is a tool. */
         if (!AW_PhotoModeActive() && !vanity)

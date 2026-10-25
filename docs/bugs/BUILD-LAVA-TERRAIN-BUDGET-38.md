@@ -19,7 +19,7 @@
 | Where | Legacy exterior world-terrain and world-scenery stages of a default build (no CHIM region selection) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev3, v0.0.43, v0.0.46 (last seen) |
+| Persists in | fixed in v0.0.47 |
 | Severity | high: Stops a default build from the public repository at the world-scenery stage (no image). |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
 | Playtest version | v0.0.38-dev3 full candidate |

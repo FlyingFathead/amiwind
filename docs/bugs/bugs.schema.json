@@ -160,6 +160,18 @@
         ],
         "description": "Marks a CHIM bug and names its part (docs/bugs/README.md \"CHIM bugs\"); required for CHIM- IDs and the chim-streamer family; listed on docs/bugs/CHIM_TRACKER.md."
       },
+      "waiting_on": {
+        "type": "string",
+        "pattern": "^Lacks dependency: \\S",
+        "maxLength": 120,
+        "description": "Open bugs only: the system the fix needs that the game does not have yet (docs/bugs/README.md \"Facts\"); shown in the register's Waiting on column."
+      },
+      "deferred": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}: \\S",
+        "maxLength": 200,
+        "description": "Open bugs only: the maintainer's written deferral, with its date and reason."
+      },
       "build": {
         "type": "object",
         "additionalProperties": false,

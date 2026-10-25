@@ -24,6 +24,7 @@
 | Persists in | unknown |
 | Severity | low: Bars show a healthy character as partly depleted; cosmetic. |
 | Family | Menus, HUD, map screen and text (`ui-text`) |
+| Waiting on | Lacks dependency: magic (spells, active effects, magic menu) |
 
 <!-- END GENERATED FACTS -->
 

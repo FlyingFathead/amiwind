@@ -121,6 +121,33 @@ End''',
     'chargenTest': '''Begin chargenTest
 PlaySound "Chime"
 End''',
+    # object state (v0.0.51): Disable when not disabled, another object's lock, Lock without a level, Unlock
+    'GateScript': '''Begin GateScript
+short step
+short choice
+if ( step == 0 )
+    set step to 1
+    if ( GetDisabled == 0 )
+        Disable
+    endif
+    "chime_obj"->Lock 50
+    Lock
+    Unlock
+    if ( GetLocked == 0 )
+        Enable
+    endif
+    MessageBox "Gate %.1f of %d" step 2 "Open" "Leave"
+endif
+; activation (v0.0.51): the player's use comes here; Activate hands it back to the object
+if ( OnActivate == 1 )
+    Activate
+endif
+; messages (v0.0.51): the button the player chose, once
+set choice to GetButtonPressed
+if ( choice == 0 )
+    "chime_obj"->Unlock
+endif
+End''',
 }
 
 
@@ -131,11 +158,11 @@ def master_bytes(scripts=SCRIPTS):
     out += [scpt(name, text) for name, text in scripts.items()]
     out += [acti('marker_wind', 'AmbientWind'), acti('chime_obj', 'TimerChime'), acti('quiet_obj', 'Quiet'),
             acti('notyet_obj', 'NotYetUser'), acti('loop_obj', 'Looper'), acti('cg_obj', 'chargenTest'),
-            acti('inert_obj', 'Inert')]
+            acti('inert_obj', 'Inert'), acti('gate_obj', 'GateScript')]
     out.append(cell_exterior(0, 0, [(101, 'marker_wind', (100, 200, 0)), (102, 'chime_obj', (400, 0, 0)),
                                     (103, 'quiet_obj', (0, 0, 0)), (104, 'notyet_obj', (8, 8, 0)),
                                     (105, 'loop_obj', (16, 16, 0)), (106, 'cg_obj', (0, 0, 0)),
-                                    (107, 'inert_obj', (0, 0, 0))]))
+                                    (107, 'inert_obj', (0, 0, 0)), (108, 'gate_obj', (0, 0, 0))]))
     return b''.join(out)
 
 
@@ -244,7 +271,7 @@ class CompilerTests(unittest.TestCase):
             self.assertEqual(bytes(again), row['code'])
         strings = awms.strings(f)
         self.assertIn('AmbientWind', strings)
-        self.assertEqual(len(binds), 7)
+        self.assertEqual(len(binds), 8)                           # GateScript (object state) is bound too
         self.assertTrue(names['Inert'].flags & SCRIPT_INERT)
         self.assertNotIn(107, [b['reference'] for b in bindings(prog, compiled)])   # inert: left out of the file
         self.assertFalse(names['NotYetUser'].flags & SCRIPT_INERT)
@@ -299,10 +326,28 @@ static int32_t h_jget(int t){return journal[t];}
 static void h_jset(int t,int32_t v,int adv){if(!adv || v>journal[t])journal[t]=v;printf("%d journal %d %d\n",tick,t,v);}
 static void h_notyet(int n,int s){printf("%d notyet %d\n",tick,n);}
 static void h_warn(const char *w,int s){printf("%d warn %s\n",tick,w);}
-static const aw_mwvm_host_t host={h_sound,h_playing,h_say,h_saydone,h_music,h_distance,h_menu,h_query,h_jget,h_jset,h_notyet,h_warn};
+static int disabled,locked;
+static int32_t h_object(int i,int t,int op,int32_t v){
+    printf("%d object %d %d %d %d\n",tick,i,t,op,(int)v);
+    if(op==AWM_DISABLE)disabled=1;
+    if(op==AWM_ENABLE)disabled=0;
+    if(op==AWM_LOCK && t==AW_MWVM_SELF)locked=v<0?100:v;
+    if(op==AWM_UNLOCK && t==AW_MWVM_SELF)locked=0;
+    return op==AWM_GETDISABLED?disabled:op==AWM_GETLOCKED?locked>0:0;
+}
+static void h_message(int i,int t,const float *v,int n,const unsigned char *b,int c){
+    int k;printf("%d message %d %d %d",tick,i,t,n);
+    for(k=0;k<n;k++)printf(" %.2f",v[k]);
+    printf(" buttons %d",c);
+    for(k=0;k<c;k++)printf(" %d",(b[2*k]<<8)|b[2*k+1]);
+    printf("\n");
+}
+static int h_button(int i){return tick==5?0:-1;}   /* the player chooses the first button at tick 5 */
+static const aw_mwvm_host_t host={h_sound,h_playing,h_say,h_saydone,h_music,h_distance,h_menu,h_query,h_jget,h_jset,h_notyet,h_warn,h_object,h_message,h_button};
 int main(int argc,char **argv){
     FILE *f=fopen(argv[1],"rb");static unsigned char buf[1<<20];long n=fread(buf,1,sizeof(buf),f);uint32_t off,rows,bytes,r;
     int ticks=atoi(argv[2]),i;float player[3]={0,0,0},dt=(float)atof(argv[3]);
+    unsigned used=argc>4?(unsigned)atoi(argv[4]):0;   /* the player uses this reference's object at tick 3 */
     fclose(f);
     if(!AW_MwvmLoad(buf,(unsigned long)n,&host)){printf("load failed\n");return 1;}
     AW_MwvmBeginMap();
@@ -313,7 +358,15 @@ int main(int argc,char **argv){
         printf("attach %u %d\n",(unsigned)((p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3]),
                AW_MwvmAttach(((uint32_t)p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3],(p[4]<<8)|p[5],(p[6]<<8)|p[7],-1,o));
     }
-    for(tick=1;tick<=ticks;tick++)AW_MwvmTick(dt,player);
+    for(tick=1;tick<=ticks;tick++){
+        if(used && tick==3)
+            for(i=0;i<AW_MwvmInstanceCount();i++){
+                aw_mwvm_instance_t *in=AW_MwvmInstance(i);
+                if(in && (in->flags&AWI_USED) && in->reference==used &&
+                   (AW_MwvmScriptFlags(in->script)&AWS_ONACTIVATE)){in->flags|=AWI_ACTIVATED;printf("%d used %d\n",tick,i);}
+            }
+        AW_MwvmTick(dt,player);
+    }
     {const aw_mwvm_stats_t *s=AW_MwvmStats();
      printf("stats runs %lu quiet %lu far %lu deferred %lu aborted %lu notyet %lu\n",s->runs,s->skipped_quiet,s->skipped_far,s->deferred,s->aborted,s->notyet_calls);}
     for(i=0;i<AW_MwvmGlobalCount();i++)printf("global %d %d %f\n",i,AW_MwvmGlobalInt(i),AW_MwvmGlobalFloat(i));
@@ -343,9 +396,9 @@ class InterpreterTests(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def run_vm(self, ticks, dt='0.25'):
-        r = subprocess.run([str(self.tmp / 'h'), str(self.tmp / 'test.awm'), str(ticks), dt],
-                           capture_output=True, text=True)
+    def run_vm(self, ticks, dt='0.25', used=None):
+        r = subprocess.run([str(self.tmp / 'h'), str(self.tmp / 'test.awm'), str(ticks), dt]
+                           + ([str(used)] if used else []), capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         return r.stdout.splitlines()
 
@@ -378,11 +431,52 @@ class InterpreterTests(unittest.TestCase):
         stats = next(l for l in out if l.startswith('stats')).split()
         self.assertGreater(int(stats[4]), 0)                       # quiet skips happened
         notyet = [l for l in out if l.split()[1:2] == ['notyet']]
-        # OnActivate and AiWander once each; Activate never runs (the not-yet OnActivate reads 0)
-        self.assertEqual(len(notyet), 2, notyet)
+        # AiWander once (OnActivate and Activate run since v0.0.51; never used here, OnActivate reads 0)
+        self.assertEqual(len(notyet), 1, notyet)
         self.assertTrue(all(int(l.split()[0]) <= 2 for l in notyet), notyet)   # on its first run (budget order)
         self.assertGreaterEqual(int(stats[10]), 1)                 # the endless loop was stopped
         self.assertTrue(any('opcode limit' in l for l in out))
+
+
+    def test_object_state_calls_reach_the_host(self):
+        # v0.0.51: Disable/Enable/GetDisabled/Lock/Unlock/GetLocked run (no longer "not yet"); in order, on the
+        # object REF names (the chime object for the second Lock) or the script's own (-2)
+        out = self.run_vm(4)
+        calls = [l.split()[2:] for l in out if l.split()[1:2] == ['object']]
+        chime = str(self.index('objects', 'chime_obj'))
+        codes = {name: str(code) for name, (code, _) in OPCODES.items()}
+        self.assertEqual([c[1:] for c in calls], [
+            ['-2', codes['GETDISABLED'], '0'], ['-2', codes['DISABLE'], '0'], [chime, codes['LOCK'], '50'],
+            ['-2', codes['LOCK'], '-1'], ['-2', codes['UNLOCK'], '0'], ['-2', codes['GETLOCKED'], '0'],
+            ['-2', codes['ENABLE'], '0']], out)
+        self.assertEqual(len({c[0] for c in calls}), 1)          # one instance, on its first run only
+
+    def test_onactivate_takes_the_use_and_activate_hands_it_back(self):
+        # v0.0.51: the script reads OnActivate (flag ONACTIVATE): the player's use at tick 3 reads 1 once there,
+        # and its Activate reaches the host on that run only
+        out = self.run_vm(6, used=108)
+        self.assertTrue(any(l.split()[1:2] == ['used'] for l in out), out)
+        activates = [l.split()[0] for l in out if l.split()[1:2] == ['object'] and l.split()[4] == str(OPCODES['ACTIVATE'][0])]
+        self.assertEqual(activates, ['3'], out)
+        self.assertNotIn(str(OPCODES['ACTIVATE'][0]), [l.split()[4] for l in self.run_vm(6) if l.split()[1:2] == ['object']])
+
+    def test_messagebox_reaches_the_host_and_getbuttonpressed_reads_the_choice(self):
+        # v0.0.51: MessageBox carries its text, its numbers (step 1, the constant 2, as numbers with a fraction) and
+        # its buttons by string index; the choice of the first button (tick 5) is read once: the Unlock follows
+        out = self.run_vm(7)
+        messages = [l.split() for l in out if l.split()[1:2] == ['message']]
+        self.assertEqual(len(messages), 1, out)
+        m = messages[0]
+        self.assertEqual(m[0], '1')
+        self.assertEqual(m[4:7], ['2', '1.00', '2.00'])
+        self.assertEqual(m[7:9], ['buttons', '2'])
+        strings = self.prog.strings.index
+        self.assertEqual(m[3], str(strings['Gate %.1f of %d']))
+        self.assertEqual(m[9:], [str(strings['Open']), str(strings['Leave'])])
+        chime = str(self.index('objects', 'chime_obj'))
+        unlocks = [l.split()[0] for l in out if l.split()[1:2] == ['object'] and l.split()[3] == chime
+                   and l.split()[4] == str(OPCODES['UNLOCK'][0])]
+        self.assertEqual(unlocks, ['5'], out)
 
 
 class BuilderStageTests(unittest.TestCase):

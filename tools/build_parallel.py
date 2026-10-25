@@ -28,6 +28,23 @@ ALLOWANCE_ENV = 'AMIWIND_BUILD_JOBS_FILE'
 BUDGET_ENV = 'AMIWIND_BUILD_BUDGET'
 
 
+def end_process_tree(process, force):
+    """End a stage process and everything it started: its process group on POSIX; on Windows the whole tree with
+    taskkill /T (WIN-02: terminate() and kill() end the child only, its workers kept running), /F when FORCE, falling
+    back to terminate()/kill() when taskkill is not there."""
+    try:
+        if os.name == 'posix':
+            os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+            return
+        try:
+            subprocess.run(['taskkill', '/T'] + (['/F'] if force else []) + ['/PID', str(process.pid)],
+                           capture_output=True, timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            process.kill() if force else process.terminate()
+    except ProcessLookupError:
+        pass
+
+
 @contextmanager
 def worker_environment():
     previous = {key: os.environ.get(key) for key in THREAD_LIMITS}
@@ -1231,19 +1248,13 @@ def execute_parallel(steps, run, metadata, root):
         for state in active.values():
             process = state['process']
             if process.poll() is None:
-                try:
-                    os.killpg(process.pid, signal.SIGTERM) if os.name == 'posix' else process.terminate()
-                except ProcessLookupError:
-                    pass
+                end_process_tree(process, force=False)
         for state in active.values():
             process = state['process']
             try:
                 process.wait(timeout=2)
             except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL) if os.name == 'posix' else process.kill()
-                except ProcessLookupError:
-                    pass
+                end_process_tree(process, force=True)
                 process.wait()
             state['entry'].update(status='cancelled', elapsed_seconds=round(time.monotonic() - state['start'], 3))
             profile.finished(state['entry']['name'], state['entry'])

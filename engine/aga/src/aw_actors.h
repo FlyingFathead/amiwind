@@ -6,6 +6,8 @@
 #define AW_ACTORS_H
 
 void AW_ActorsInit (void);
+/* Object state: a script's Disable keeps an actor of the CHIM window from spawning (aw_mwhost.c sets it). */
+extern int (*aw_actor_disabled)(unsigned reference);
 
 /* aw_combat.c: 0 not fighting, 1 fighting, 2 dead (health written if asked) */
 int AW_CombatSlotState (edict_t *e, float *health);

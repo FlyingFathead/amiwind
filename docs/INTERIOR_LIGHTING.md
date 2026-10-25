@@ -1,6 +1,41 @@
 # Interior and exterior brightness
 
-_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
+_Last updated with AmiWind v0.0.51 (25 October 2026)._
+
+## Interior sunlight and the 1.0 default: 25 October 2026 (v0.0.51)
+
+Every interior cell has a "sunlight" colour, and the original lights the room with it as one directional light
+from a fixed direction, as well as with its ambient and lamps. Our interiors were baked without it, which is why
+many rooms were dimmer than the original, and why the interior brightness default was 1.2. From v0.0.51 the bake
+includes the cell sunlight ([INTERIOR-SUNLIGHT-UNBAKED-51](bugs/INTERIOR-SUNLIGHT-UNBAKED-51.md)), and the interior default is back to 1.0, the
+original light. The prison ship keeps the light it was judged with. The controls stay: Options > Video > Graphics
+and `dbg luma interior` set 1.0 to 1.5 as before, and saved settings still override the default. At 1.0 the
+multiplier does no work.
+
+### What this taught us: every light input first, then any brightness knob
+
+The light of a converted room looked "off" for weeks, and each time it was tuned: a 1.2 brightness default for all
+interiors (RC2, [INTERIOR-LIGHT-29](bugs/INTERIOR-LIGHT-29.md)), per-room profiles, a darker census office. The
+cause was an input the bake never read. A global multiplier on top of a missing input lifts every room by the same
+amount, so rooms that live on the missing light stay too dark and the others get too bright.
+
+The rule from here on, for any lighting that looks wrong against the original:
+
+1. List every light input the game data holds for the place: the cell's ambient colour, its sunlight colour (a
+   directional light in interiors), its fog, each placed light (colour, radius, flags) and glowing surfaces.
+2. Check that the bake and the engine use each one, and in what form (brightness only, or colour too).
+3. Compare with the original or OpenMW at the same place and pose, and record which inputs the comparison had.
+4. Only then tune; a per-room profile records which inputs it was judged with (the prison ship's says it was judged
+   without the sunlight).
+
+What is still left out is in the bug register: the light colour is baked as brightness only, except warm lamps
+([INTERIOR-SUNLIGHT-COLOUR-51](bugs/INTERIOR-SUNLIGHT-COLOUR-51.md)), and placed lights without a mesh give no light
+on CHIM exteriors ([CHIM-MESHLESS-LIGHTS-33](bugs/CHIM-MESHLESS-LIGHTS-33.md)).
+
+The bug register is what made the cause findable: INTERIOR-LIGHT-29 recorded why the 1.2 default was set, and
+[CENSUS-OFFICE-BRIGHT-32](bugs/CENSUS-OFFICE-BRIGHT-32.md) recorded OpenMW's numbers for the census office, which
+already include its sunlight, so the office's excess light had to come from the bake itself. Findings go into the
+register the day they are made, with their numbers and how they were measured.
 
 ## RC2 brightness measurement: 6 October 2026
 

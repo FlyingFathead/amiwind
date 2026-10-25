@@ -91,7 +91,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [AUDIO-DMA-CLOCK-DRIFT-35](AUDIO-DMA-CLOCK-DRIFT-35.md): The mixer estimates the audio DMA position from the EClock, not from the hardware, so the two can drift apart over a long session
 - AUDIO-EFFECTS-DEFAULT-29 (no report page): Effects volume should default to 75%
 - AUDIO-ENTER-29 (no report page): Sub-second soundtrack cut on Enter to follow the guard
-- AUDIO-LOAD-29 (no report page): OST crackles under heavy loading
+- [AUDIO-LOAD-29](AUDIO-LOAD-29.md): OST crackles under heavy loading
 - [AUDIO-LOGO-31](AUDIO-LOGO-31.md): Music crackles while the startup logo plays (WinUAE)
 - [AUDIO-NEWGAME-30](AUDIO-NEWGAME-30.md): Music crackles when confirming New Game (WinUAE)
 - [AUDIO-STOP-CHANNEL-RANGE-39](AUDIO-STOP-CHANNEL-RANGE-39.md): Stopping an entity sound skips half the dynamic mixer slots

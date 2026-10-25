@@ -869,6 +869,7 @@ Should NOT be called during an interrupt!
  * prompt takes its keys. NULL in fixtures without it. */
 void (*aw_view_input)(int key,int down);
 int (*aw_view_key)(int key);
+int (*aw_msgbox_key)(int key);
 void Key_Event (int key, qboolean down)
 {
     char	*kb;
@@ -933,6 +934,8 @@ void Key_Event (int key, qboolean down)
     if (down && AW_IntroKey(shift_down?keyshift[key]:key)) return;
     /* aw_view.c: the death prompt (load the last save / main menu / retry). */
     if (down && aw_view_key && aw_view_key(key)) return;
+    /* aw_msgbox.c: a script's MessageBox with buttons. */
+    if (down && aw_msgbox_key && aw_msgbox_key(key)) return;
 
     /* Alt+V (maintainer 18 October 2026, was Shift+V: a Shift latched by a lost key-up,
      * AW25-05, turned plain V into a draw-distance change). */

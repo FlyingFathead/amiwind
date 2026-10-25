@@ -189,7 +189,17 @@ void Cbuf_Execute (void)
 		}
 
 // execute the command line
-		Cmd_ExecuteString (line, src_command);
+		{
+			/* AUDIO-LOAD-29: the command now running names the step in the "Loading audio" line */
+			static char phase[48];
+			int k;
+			memcpy (phase, "command: ", 9);
+			for (k = 0; line[k] && line[k] != ';' && line[k] != '\n' && k < (int)sizeof(phase) - 10; k++)
+				phase[9 + k] = line[k];
+			phase[9 + k] = 0;
+			aw_load_phase = phase;
+			Cmd_ExecuteString (line, src_command);
+		}
 
 		if (cmd_wait)
 		{	// skip out while text still remains in buffer, leaving it

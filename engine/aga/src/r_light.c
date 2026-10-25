@@ -48,20 +48,23 @@ extern int AW_TorchTestActive(void);
  * Method, raw samples and remaining checks: docs/INTERIOR_LIGHTING.md and
  * docs/bugs/INTERIOR-LIGHT-29.md. Measurements apply to the recorded RC2 build.
  */
-static cvar_t aw_interiorluma={"aw_interiorluma","1.2",true};
+/* Default 1.0 since v0.0.51 (the maintainer, 2026-10-25): the 1.2 default made up for interiors baked without
+ * their cell sunlight (INTERIOR-SUNLIGHT-UNBAKED-51); with it baked in, 1.0 is the original light. The control
+ * stays in the options and the console for players who want their rooms brighter. */
+static cvar_t aw_interiorluma={"aw_interiorluma","1.0",true};
 static cvar_t aw_exteriorluma={"aw_exteriorluma","1.0",true};
 static cvar_t *luma_controls[]={&aw_interiorluma,&aw_exteriorluma};
 static float interior_luma_factor=1;
 static char interior_luma_scene[64],luma_checked_text[2][64];
 static int interior_luma_mode;
-static float luma_checked_value[2],luma_settings[2]={1.2f,1};
+static float luma_checked_value[2],luma_settings[2]={1,1};
 static float R_LumaSetting(int outside)
 {
     cvar_t *control=luma_controls[outside];char *end;double value;int invalid;
     if(strcmp(control->string,luma_checked_text[outside]) || control->value!=luma_checked_value[outside]){
         value=Q_strtod(control->string,&end);
         invalid=end==control->string || *end || !isfinite(value) || !isfinite(control->value);
-        if(invalid)value=outside?1:1.2;
+        if(invalid)value=1;
         if(value<0)value=0;
         if(value>4)value=4;
         luma_settings[outside]=(float)value;

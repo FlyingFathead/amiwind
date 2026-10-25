@@ -25,6 +25,9 @@ int (*aw_hinged_hint)(const char **name,const char **action);
 void (*aw_hinged_spawn)(void);
 void (*aw_hinged_tick)(double seconds);
 int (*aw_hinged_locked_sound)(void);
+/* a script's lock on one reference (aw_mwhost.c AW_ObjectLockLevel in the engine) */
+static unsigned script_ref;static int script_level;
+static int script_lock(unsigned reference,int original){return reference==script_ref?script_level:original;}
 int (*aw_chim_door_yaw)(unsigned pid,float yaw);
 int (*aw_chim_door_clip)(unsigned pid,vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,trace_t *trace);
 
@@ -214,6 +217,15 @@ static void door_mode(void){
     place_player(-260,16,180);
     assert(AW_HingedDoorHint(&name,&action) && !strcmp(name,"Door") && !strcmp(action,"Locked"));
     assert(AW_HingedDoorUse());tick(.1,10);assert(edicts[4].v.angles[1]==0);
+    /* object state (v0.0.51): a script's Unlock opens a door the game data locks, its Lock shuts an open one;
+     * the story's word still comes first (tested below); the game data's own levels for GetLocked */
+    assert(AW_HingedDoorOriginalLock(200)==50 && AW_HingedDoorOriginalLock(100)==0 &&
+           AW_HingedDoorOriginalLock(172860)==100 && AW_HingedDoorOriginalLock(999)==-1);
+    script_ref=172860;script_level=0;aw_object_lock_level=script_lock;
+    assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Open: E"));
+    script_ref=172860;script_level=40;
+    assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Locked"));
+    aw_object_lock_level=NULL;
     /* out of reach: nothing */
     place_player(200,16,180);assert(!AW_HingedDoorHint(&name,&action));
     /* a new map forgets the doors */

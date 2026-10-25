@@ -2,7 +2,12 @@
  * Run the real mixer during a simulated blocking load and DMA ring wraps. */
 #include "quakedef.h"
 #include <assert.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
 extern int sound_started,paintedtime,total_channels,snd_blocked;
+static int movie;		/* the intro movie is playing (AW_MovieActive) */
+static char report[512];	/* the last "Loading audio:" line */
 extern cvar_t _snd_mixahead;
 extern channel_t channels[];
 client_static_t cls;client_state_t cl;
@@ -16,13 +21,18 @@ void CDAudio_Update(void){refills++;}
 void AW_AudioLate(int n){late+=n;}
 void AW_SpeechStop(int a,int b){}
 void Q_memset(void *p,int value,int n){memset(p,value,n);}
-int AW_MovieActive(void){return 0;}
+int AW_MovieActive(void){return movie;}
 int AW_MovieDebugActive(void){return 0;}
 int AW_MovieDebugPending(void){return 0;}
-void AW_MoviePaint(portable_samplepair_t *p,int n,int start){assert(0);}
+void AW_MoviePaint(portable_samplepair_t *p,int n,int start){assert(movie);}
 void AW_MusicPaint(portable_samplepair_t *p,int n){int i;for(i=0;i<n;i++){p[i].left=321;p[i].right=-321;}frames+=n;}
+unsigned long AW_MusicSilentSpans(void){return 0;}   /* the load meter's music dry count (snd_dma.c S_Update_) */
 sfxcache_t *S_LoadSound(sfx_t *s){assert(0);return NULL;}
-void Con_Printf(char *fmt,...){}
+void Con_Printf(char *fmt,...){
+ char line[512];va_list ap;
+ va_start(ap,fmt);vsnprintf(line,sizeof(line),fmt,ap);va_end(ap);
+ if(!strncmp(line,"Loading audio:",14))strcpy(report,line);
+}
 int main(void){
  dma_t dma;byte buffer[65536];sfx_t sound;int i,was;
  memset(&dma,0,sizeof(dma));dma.channels=2;dma.samplebits=16;dma.samples=32768;dma.speed=11015;dma.buffer=buffer;
@@ -45,6 +55,26 @@ int main(void){
  sound_started=0;S_LoadingUpdate();assert(loading_updates==402 && submits==400);sound_started=1;
  snd_blocked=1;S_LoadingUpdate();assert(loading_updates==403 && submits==400);snd_blocked=0;
  aw_loading_music=false;clock_now+=1;S_LoadingUpdate();assert(submits==400 && loading_updates==403);
+ /* AUDIO-LOAD-29: the load meter leaves the intro movie out (the music is paused under it, the mixer plays the
+  * movie's own sound): its 530 ms are no gap of the load's music, and the line says what it left out */
+ {
+  long gap=-1,left=-1;const char *at;
+  aw_loading_music=true;report[0]=0;S_LoadingBegin();
+  for(i=0;i<5;i++){clock_now+=.03;S_LoadingUpdate();}
+  movie=1;clock_now+=.03;S_LoadingUpdate();clock_now+=.5;S_LoadingUpdate();
+  movie=0;clock_now+=.03;S_LoadingUpdate();
+  for(i=0;i<5;i++){clock_now+=.04;S_LoadingUpdate();}
+  S_LoadingReport();
+  at=strstr(report,"longest gap ");assert(at && sscanf(at,"longest gap %ld ms",&gap)==1);
+  assert(gap>=38 && gap<=41);
+  at=strstr(report,"(intro movie, ");assert(at && sscanf(at,"(intro movie, %ld ms",&left)==1);
+  assert(left>=525 && left<=535);
+  /* without a movie the line names none */
+  report[0]=0;S_LoadingBegin();
+  for(i=0;i<5;i++){clock_now+=.03;S_LoadingUpdate();}
+  S_LoadingReport();assert(report[0] && !strstr(report,"intro movie"));
+  aw_loading_music=false;
+ }
  S_StopAllSounds(true);for(i=0;i<sizeof(buffer);i++)assert(!buffer[i]);
  return 0;
 }

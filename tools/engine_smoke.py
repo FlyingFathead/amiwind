@@ -114,7 +114,12 @@ st(){ i=0; while [ $i -lt ${STATE_TRIES:-20} ]; do cp $R/awctl/state.txt $R/stat
     sleep 0.2; i=$((i+1)); done; }
 reads(){ grep -o 'reads=[0-9]*' $R/awctl/console.log 2>/dev/null | tail -1 | cut -d= -f2; }
 # The engine's efrag safety net keeps the game running; a smoke still fails when it was used (CHIM-FRAME-EDGE-EFRAG-CRASH-36).
+# From 32 MB of Fast RAM no CHIM chunk may wait for room in the zone (CHIM-ZONE-BUDGET-33: 0 in Seyda Neen, Balmora and
+# Vivec at 32 MB since v0.0.51; at 16 MB the retries are the known cost). ZONEFULL=allow (--allow-zone-full) only counts.
+zonefull(){ grep -c "CHIM: .*zone full" $R/awctl/console.log 2>/dev/null; }
 finish(){ case "$1" in PASS*) b=$(st efrags_bad); [ -n "$b" ] && [ "$b" != 0 ] && set -- "FAIL efrag safety net used $b times (console: Efrag safety net)"
+    z=$(zonefull); [ "${z:-0}" -gt 0 ] && [ "$FASTMB" -ge 32 ] && [ "${ZONEFULL:-fail}" != allow ] && case "$1" in PASS*)
+      set -- "FAIL CHIM zone full $z times at $FASTMB MB of Fast RAM (none allowed from 32 MB: CHIM-ZONE-BUDGET-33)";; esac
     [ "$(st screen)" = game ] || set -- "FAIL the run ended outside play: screen $(st screen) (map $(st map))";; esac
   cp $R/home/Cache/Logs/fs-uae.log.txt $R/logs/fs-uae.log.txt 2>/dev/null
   grep -E "Caught illegal|Fault address|Suspicious" $R/logs/fs-uae.log.txt 2>/dev/null | tail -12 > $R/logs/emulator-faults.txt
@@ -378,6 +383,9 @@ def main(argv=None):
     ap.add_argument('--play', type=int, default=10)
     ap.add_argument('--no-stall-retry', action='store_true',
                     help='fail at once on an emulator disk stall instead of retrying the run once (used by the retry itself)')
+    ap.add_argument('--allow-zone-full', action='store_true',
+                    help='from 32 MB a CHIM "zone full" retry fails the smoke (CHIM-ZONE-BUDGET-33); with this it is '
+                    'only counted (diagnostic runs)')
     ap.add_argument('--repeat', type=int, default=3,
                     help='run the --tp map change this many times (back to --map in between), so an intermittent load hang '
                          'fails the smoke (CHIM-SEYDA-BALMORA-LOAD-HANG-43); default 3')
@@ -450,7 +458,7 @@ echo "readback=$(sha256sum /tmp/back | cut -d' ' -f1)"'''
             return 2
         docker(*base, '--cpus', args.cpus, '--memory', '3g', '--name', args.name + '-run', '--entrypoint', 'sh',
                '-e', f'PROF={args.prof}', '-e', f'WORLD={world.group(1) if world else ""}', '-e', f'MAP1={args.map}',
-               '-e', f'TP={args.tp}', '-e', f'PLAY={args.play}', '-e', f'REPEAT={max(1, args.repeat)}', '-e', f'START={args.start}', '-e', f'AFTER={args.after_load}', '-e', f'ILLEGAL={int(args.log_illegal)}', '-e', f'KICK={args.kickstart}', '-e', f'FASTMB={args.fast_mb}',
+               '-e', f'TP={args.tp}', '-e', f'PLAY={args.play}', '-e', f'REPEAT={max(1, args.repeat)}', '-e', f'START={args.start}', '-e', f'AFTER={args.after_load}', '-e', f'ILLEGAL={int(args.log_illegal)}', '-e', f'KICK={args.kickstart}', '-e', f'FASTMB={args.fast_mb}', '-e', 'ZONEFULL=%s' % ('allow' if args.allow_zone_full else 'fail'),
                '--mount', f'type=volume,src={args.volume},dst=/w,volume-subpath={scratch}',
                '--mount', f'type=volume,src={args.volume},dst=/img,volume-subpath={args.image_dir},readonly',
                '-v', f'{args.roms.resolve()}:/roms:ro', '-v', f'{out}:/out', args.fsuae_image, '/out/probe.sh',

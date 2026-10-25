@@ -12,6 +12,7 @@
 | Persists in | v0.0.28, v0.0.29, v0.0.30, v0.0.31, v0.0.32-dev (last seen) |
 | Severity | critical: The repository builder could not build the game from scratch. |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
+| Deferred by the maintainer | 2026-10-25: the maintainer deferred it to v0.0.52 (v0.0.51 ships its dev3, everything else moves to v0.0.52) |
 
 <!-- END GENERATED FACTS -->
 

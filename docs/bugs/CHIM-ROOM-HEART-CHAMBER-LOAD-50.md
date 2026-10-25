@@ -24,7 +24,10 @@ _Last updated with AmiWind v0.0.50 (24 October 2026)._
 
 ## Status: 24 October 2026
 
-Open. Known in v0.0.50; its repair is the first work of v0.0.51.
+Open. Known in v0.0.50. The cause is found (below, corrected) and fixed in source on v0.0.51-dev, not shipped at the
+time of writing: with the repaired engine, `dbg tp heartchamber` at 32 MB loads the room in play (365 placements, 135
+models of 10,014 KiB, 5.0 seconds). Still open: a room that cannot load during play stops at the console instead of
+refusing at the door.
 
 ## Symptom
 
@@ -45,11 +48,19 @@ The CHIM room load (room `rifa4ef181ed`) and the CHIM model zone (`chim_zone.c`,
 
 ## How it happened
 
-The heap had about 12.7 MB free when the room loaded, but a room's models go into the CHIM model zone, a fixed
-6,864 KiB at 16 MB and at 32 MB alike ([CHIM-ZONE-BUDGET-33](CHIM-ZONE-BUDGET-33.md)). Right after Seyda Neen was
-unloaded, the zone's largest free block was 26,336 bytes. The zone is a least-recently-used cache in which nothing
-moves and locked blocks are never evicted, so one of the chamber's large models found no free run that fits, and the
-room load ended the game instead of refusing at the door.
+Corrected on 24 October 2026; the first reading below the line was wrong.
+
+The chamber's models take 10.1 MiB ([CHIM-ROOM-CLIPNODE-BUDGET-48](CHIM-ROOM-CLIPNODE-BUDGET-48.md)), the CHIM zone of
+a room about 6.9 MiB. The room fits the 32 MB minimum only with the automatic CHIM cache bank, and the builder marked
+it for 32 MB on that assumption (an 8 MiB bank). The start of this run said `Memory: 13 MiB Fast RAM free of 32 MiB;
+CHIM cache off (not enough extra Fast RAM, standard memory)`: the margin left to the system is 6 MiB at 32 MB, so the
+budget was 7 MiB, and the first bank needed at least 8 MiB. No bank was made, the models did not fit, and the room load
+ended the game. On 23 October the same profile had 14 MiB free and an 8 MiB bank: one MiB less free memory took the
+whole bank away ([CHIM-AUTO-BANK-CLIFF-51](CHIM-AUTO-BANK-CLIFF-51.md)).
+
+First reading, wrong: "the zone's largest free block was 26,336 bytes". That figure in the `Heap` lines is the largest
+free block of Quake's small memory zone (`Z_Malloc`), the same at start-up before any map; it says nothing about the
+CHIM zone.
 
 ## Why it was not caught
 
@@ -63,11 +74,11 @@ Always: start a game with 32 MB of Fast RAM, `dbg tp heartchamber`.
 
 ## Repair
 
-1. Check whether the outgoing map's zone blocks are unlocked when a map unloads (Seyda Neen, then the chamber).
-2. Size the zone from the Fast RAM found at start, as the heap and the cache bank are
-   ([CHIM-ZONE-BUDGET-33](CHIM-ZONE-BUDGET-33.md)).
-3. Check each room's largest model against the zone in the build (the heap gate).
-4. A room that cannot load is refused at the door with a message, never a stop to the console.
+1. In source on v0.0.51-dev: the first automatic bank needs 4 MiB instead of 8 (`chim_zone.h CHIM_AUTO_FIRST`), so
+   32 MB gets a 7 MiB bank and the chamber's 10.1 MiB fit the zone and the bank; the builder's model of a 32 MB start
+   (`tools/engine_limits.py MEASURED_FAST`) has the v0.0.50 measurement, so its room marks and the engine agree.
+2. Still to do: a room that cannot load during play is refused at the door with a message, never a stop to the
+   console ([CHIM-ROOM-16MB-REFUSAL-48](CHIM-ROOM-16MB-REFUSAL-48.md) refuses by the build's mark only).
 
 ## Verification
 
@@ -86,6 +97,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - AW-20260929-06 (no report page): Expanded scene exhausts 9 MiB heap
 - [BUILD-CHIM-HULL-RING-33](BUILD-CHIM-HULL-RING-33.md): Routed and compiled CHIM model hulls grew Balmora's ring past the zone
 - [CHIM-ARENA-HUNK-GAP-36](CHIM-ARENA-HUNK-GAP-36.md): The Vivec Arena frame leaves less than 2 MiB of hunk gap (memory review before Vivec stage B)
+- [CHIM-AUTO-BANK-CLIFF-51](CHIM-AUTO-BANK-CLIFF-51.md): 32 MB of Fast RAM got no automatic CHIM cache bank: 13 MiB free gave a 7 MiB budget and the first bank needed 8 MiB
 - [CHIM-BALMORA-RING-GROWTH-36](CHIM-BALMORA-RING-GROWTH-36.md): Balmora's CHIM ring grew past the zone after v0.0.36-dev3 with the converter mesh method
 - [CHIM-BALMORA-RING-OVER-33](CHIM-BALMORA-RING-OVER-33.md): CHIM heap gate fails on Balmora in the first full v0.0.33 build: the south-west active ring needs 136,160 bytes more than the zone holds
 - [CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md): Two Bitter Coast CHIM frames over the heap zone after the trunk shape guard

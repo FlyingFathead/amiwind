@@ -362,6 +362,7 @@ void AW_EndMark(int stage);
 void AW_C2PRows(int rows, int height);
 void AW_AudioLate(int missed);
 void AW_MusicPaint(portable_samplepair_t *dst,int count);
+unsigned long AW_MusicSilentSpans(void);	/* the music blocks that ran dry so far (AUDIO-LOAD-29: per load) */
 void AW_FogInit(void);
 void AW_FogDraw(void);
 
@@ -451,6 +452,9 @@ int AW_DebugTranslate(int argc,char **argv,char *out,int capacity);
 
 int AW_Interior(void);
 int AW_SceneUse(void);
+/* Activation (v0.0.51): a script's Activate on a load door of this map; the scripts' take-over of a door's use. */
+int AW_SceneActivate(unsigned reference);
+extern int (*aw_scene_intercept)(unsigned reference);
 int AW_TravelKey(int key);
 int AW_TravelDraw(void);
 void AW_SceneDraw(void);
@@ -465,6 +469,10 @@ float AW_DoorSound(unsigned reference,int closing);
 /* Compiled game scripts (aw_mwhost.c, aw_mwvm.c; docs/MWSCRIPT_BYTECODE.md), experimental: aw_mwscript 0 by default. */
 void AW_MwscriptInit(void);
 void AW_MwscriptTick(float dt);
+/* Object state the scripts set (aw_mwhost.c): 1 when Disable hid the placement REFERENCE; its lock level, or
+ * ORIGINAL when no script set one (0 unlocked .. 100). */
+int AW_ObjectDisabled(unsigned int reference);
+int AW_ObjectLockLevel(unsigned int reference,int original);
 int AW_MusicScriptTrack(int track);
 void AW_SceneTick(void);
 void AW_SceneryClear(void);
@@ -567,6 +575,8 @@ int AW_RegionLoadingFrozen(void);
 void AW_RegionLoadingToggle(void);
 extern qboolean aw_loading_music;
 extern void (*aw_load_audio_tick)(void);
+extern const char *aw_load_phase;	/* the map load step now running (snd_dma.c; AUDIO-LOAD-29) */
+void S_LoadingMark(void);		/* a frame step reached: one line in the load's gap trace */
 void S_LoadingUpdate(void);
 int AW_UIWidth(const char *);
 int AW_UIHeight(void);

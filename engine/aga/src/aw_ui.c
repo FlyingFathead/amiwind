@@ -72,13 +72,16 @@ static cvar_t modal_black={"aw_modal_black","1",true};
 static cvar_t ui_mode={"aw_ui_mode","2",true};
 int (*aw_death_prompt_active)(void);
 static int death_prompt(void) {return aw_death_prompt_active && aw_death_prompt_active();}
+/* A script's MessageBox with buttons (aw_msgbox.c sets it at its first box): the world waits for the choice. */
+int (*aw_msgbox_active)(void);
+static int message_box(void) {return aw_msgbox_active && aw_msgbox_active() && key_dest==key_game;}
 
 /* Inspect current ownership instead of setting sv.paused: nested menus and an
  * existing explicit pause survive close/cancel/load. Original name entry,
  * follow-guard prompts, subtitles and the sky gallery keep their world context. */
 static int modal_world_active(void) {
     return key_dest==key_menu || AW_CharacterActive() || AW_QuickCharActive() || AW_ReaderActive() ||
-        AW_GalleryModal() || death_prompt();
+        AW_GalleryModal() || death_prompt() || message_box();
 }
 static int modal_world_ready(void) {
     /* Sign-on and remote/demo traffic must keep progressing. */
@@ -87,7 +90,7 @@ static int modal_world_ready(void) {
         !cls.demoplayback && !AW_MovieActive();
 }
 int AW_ModalWorldFrozen(void) {
-    return (AW_InventoryActive() || modal_freeze.value!=0 || death_prompt()) && modal_world_ready();
+    return (AW_InventoryActive() || modal_freeze.value!=0 || death_prompt() || message_box()) && modal_world_ready();
 }
 /* Only the explicit legacy value selects V1; invalid values use V2. */
 int AW_UIMode(void) {return ui_mode.value==1?1:2;}

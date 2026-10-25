@@ -184,6 +184,19 @@ OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
 #   that can reach the preflight keyed tools/release-files.json and the other files there, and a release file list
 #   edit rebuilt the chim stage (BUILD-REUSE-KEYS-TOO-BROAD-35, v0.0.44-dev1 build try 2).
 OUTPUT_NEUTRAL_UNITS = frozenset({('tools/chim/regions.py', 'converter_note')})
+# The engine's C folders in the stage keys (BUILD-ENGINE-SOURCE-KEY-BROAD-36): the modules of C_HEADER_READERS name
+# an engine folder only to read the engine files they name (engine_limits.define('client.h', ...)), to compile the
+# files they name (zone_sim: chim/chim_zone.c) or to give the compiler include folders (check_world_map_heap's target
+# ABI probe). Read whole, the folder put every engine file into the CHIM world's keys (chim_build 344 files), so any
+# engine edit rebuilt the world. In those modules a folder of C_HEADER_FOLDERS counts as the engine files the reach
+# names plus their #include closure (include_closure); named anywhere else, it is still the whole folder. Explicit
+# list, reviewed: a reader that lists the folder (glob, os.walk) or opens a file by a name it never writes out does
+# not belong here. Stage keys only (form 3 and its companion); the unit caches keep their reach. Tested in
+# tests/test_stage_engine_key.py.
+C_HEADER_FOLDERS = ('engine/aga', 'engine/aga/src', 'engine/aga/CDPlayerSDK', 'engine/aga/build/version')
+C_HEADER_READERS = frozenset({'tools/engine_limits.py', 'tools/chim/zone_sim.py', 'tools/check_world_map_heap.py'})
+C_INCLUDE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*"([^"\n]+)"', re.M)
+C_SOURCE_SUFFIXES = ('.c', '.h', '.inc')
 # The CHIM label in the keys (BUILD-CHIM-LABEL-IN-KEYS-48): a stage that reaches the CHIM_VERSION file counts it as
 # that file with the label replaced by its compatibility line (config/chim-compatibility.json, tools/chim_compat.py),
 # and the table itself counts in no key (the line is all of it a key needs). The x.x.1 label bump of a final release
@@ -496,7 +509,7 @@ class SourceIndex:
     every imported module. All are kept.
     """
 
-    def __init__(self, root=ROOT, scope=DEFAULT_SCOPE, top_format=1, chim_label_keys=False):
+    def __init__(self, root=ROOT, scope=DEFAULT_SCOPE, top_format=1, chim_label_keys=False, narrow_headers=None):
         if scope not in SCOPES:
             raise ValueError(f'fingerprint scope must be one of {", ".join(SCOPES)}')
         if top_format not in TOP_FORMATS:
@@ -526,6 +539,9 @@ class SourceIndex:
         # them (BUILD-CHIM-LABEL-IN-KEYS-48); False: the label counts as its compatibility line (_keyed_source)
         self.chim_label_keys = chim_label_keys
         self._chim_line = None
+        # C_HEADER_READERS name only the engine files they read (stage keys: form 3; its companion follows it)
+        self.narrow_headers = self.stage_form if narrow_headers is None else narrow_headers
+        self._includes = {}
 
     def chim_line_digest(self):
         """SHA-256 of the CHIM_VERSION file with its label replaced by its compatibility line (chim_compat.key_bytes):
@@ -664,14 +680,44 @@ class SourceIndex:
                 python, data, uncertain, constants = self._closure_symbols(start, key)
             names = environment_names(constants, uncertain)
             for target, function in sorted(self._keyed.get(key) or (), key=lambda item: (item[0], item[1] or '')):
-                # a cache key computed from that code reads all of it (pass_cache.source_digest, environment):
-                # its files count whole, as data (BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48)
-                k_python, k_data, k_uncertain, k_names = self.companion()._keyed_reach(target, function)
-                data = set(data) | k_python | k_data
+                # a cache key computed from that code reads it (pass_cache.source_digest, environment): its reach
+                # counts in the stage key (BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48). Stage form with units: by the
+                # units that reach runs, as the cache key itself hashes them (index.digest, entry_digest); counted
+                # whole, a helper added to a shared module rebuilt the CHIM world (BUILD-KEY-KEYED-REACH-WHOLE-51).
+                # Units no reach can name (a function missing from its module) still count whole.
+                if self.stage_form and self.scope == 'units':
+                    k_python, k_data, k_uncertain, k_names, k_units = self._keyed_units(target, function)
+                    python = set(python) | k_python
+                    reached = self._reached.setdefault(key, {})
+                    for path, units in k_units.items():
+                        reached[path] = set(reached.get(path, ())) | set(units)
+                    # a label module the keyed code reaches still counts whole: shows_chim_label reads it as shown
+                    data = set(data) | (k_python - set(k_units)) | (k_python & CHIM_LABEL_SHOWN) | k_data
+                else:
+                    k_python, k_data, k_uncertain, k_names = self.companion()._keyed_reach(target, function)
+                    data = set(data) | k_python | k_data
                 uncertain = uncertain or k_uncertain
                 names = names | k_names
             self._closures[key] = (python, data, uncertain, names if not uncertain else {ENV_ANY})
         return self._closures[key]
+
+    def _keyed_units(self, relative, function=None):
+        """(python files, data files, uncertain, AMIWIND_* names, {python file: units}) of the code a cache key
+        computed from RELATIVE (as a script, or its FUNCTION's reach) reads, in this index's form, with the units it
+        runs (stage keys, _analysis). The keyed code's own keyed scripts are not followed, as before."""
+        script = self.root / relative
+        if function is None:
+            key = '%s::keyed' % Path(script).resolve()
+            if key not in self._closures:
+                python, data, uncertain, constants = self._closure_symbols(relative, key)
+                self._closures[key] = (python, data, uncertain, environment_names(constants, uncertain))
+            python, data, uncertain, names = self._closures[key]
+            return set(python), set(data), uncertain, set(names), self._reached.get(key) or {}
+        if function not in self._module_symbols(relative)['units']:
+            return {relative}, set(), False, set(), {}
+        python, data, uncertain, units = self.entry_units(script, function)
+        names = self._closures['%s::%s' % (Path(script).resolve(), function)][3]
+        return set(python), set(data), uncertain, set(names), units
 
     def _keyed_reach(self, relative, function=None):
         """(python files, data files, uncertain, AMIWIND_* names) a cache key computed from RELATIVE (as a script, or
@@ -774,6 +820,7 @@ class SourceIndex:
         for path in paths:
             self._parsed.pop(path, None)
             self._symbols.pop(path, None)
+            self._includes.pop(path, None)
             if self._files is not None and path in self._files:
                 self._files._hashes.pop(path, None)
         self._closures.clear()
@@ -827,6 +874,14 @@ class SourceIndex:
         whole_done = set()
         keyed = set()     # (module, function or None) handed to a cache key (form 3: _analysis adds their reach)
         stopped = frozenset(path for path, unit in stop if unit == '*')
+        narrowed = set()  # C_HEADER_FOLDERS a C_HEADER_READERS module named: its named files and their includes
+
+        def header_folder(text):
+            folder = posixpath.normpath(text.replace('\\', '/')) if isinstance(text, str) and text else ''
+            if folder in C_HEADER_FOLDERS:
+                narrowed.add(folder)
+                return True
+            return False
 
         def reach(relative, unit):
             if relative in OUTPUT_NEUTRAL or relative in stopped or relative not in self.files or (relative, unit) in reached \
@@ -955,7 +1010,10 @@ class SourceIndex:
             if facts is None:
                 continue
             reach_module(relative)
-            constants.extend(facts['constants'])
+            if self.narrow_headers and relative in C_HEADER_READERS:
+                constants.extend(item for item in facts['constants'] if not header_folder(item[0]))
+            else:
+                constants.extend(facts['constants'])
             state['uncertain'] = state['uncertain'] or facts['uncertain']
             for module, level, names in facts['imports']:
                 import_targets(relative, module, level, names)
@@ -1009,8 +1067,12 @@ class SourceIndex:
             self._reached[key] = units
             self._keyed[key] = keyed
         paths = [path for relative, unit in reached
-                 for path in self._module_symbols(relative)['units'].get(unit, {}).get('paths', ())]
-        return python, self._match_data(constants, paths), state['uncertain'], constants
+                 for path in self._module_symbols(relative)['units'].get(unit, {}).get('paths', ())
+                 if not (self.narrow_headers and relative in C_HEADER_READERS and header_folder(path[0]))]
+        data = self._match_data(constants, paths)
+        if narrowed:
+            data |= self.include_closure(path for path in data if path.startswith(tuple(f + '/' for f in narrowed)))
+        return python, data, state['uncertain'], constants
 
     def _binding_is_module(self, relative, binding):
         """True when a 'from' binding names a submodule (a bare use of it counts the whole module)."""
@@ -1039,6 +1101,32 @@ class SourceIndex:
                         folders.setdefault('/'.join(parts[index:end]), set()).add(relative)
             self._data_maps = suffixes, folders, names
         return self._data_maps
+
+    def include_closure(self, seeds):
+        """SEEDS and every repository file their #include "..." lines reach, transitively: resolved next to the
+        including file, then in each of C_HEADER_FOLDERS (the engine's -I folders). Every include counts, conditional
+        or not; a name found nowhere (a header generated into the build folder, a system header) names nothing."""
+        found, pending = set(), [path for path in seeds if path in self.files]
+        while pending:
+            path = pending.pop()
+            if path in found:
+                continue
+            found.add(path)
+            if not path.endswith(C_SOURCE_SUFFIXES):
+                continue
+            if path not in self._includes:
+                text = (self.root / path).read_text(encoding='utf-8', errors='replace')
+                folder = path.rsplit('/', 1)[0] if '/' in path else ''
+                targets = []
+                for name in C_INCLUDE.findall(text):
+                    for base in (folder,) + C_HEADER_FOLDERS:
+                        candidate = posixpath.normpath(base + '/' + name if base else name)
+                        if candidate in self.files:
+                            targets.append(candidate)
+                            break
+                self._includes[path] = targets
+            pending.extend(self._includes[path])
+        return found
 
     def _match_data(self, constants, paths):
         """Non-Python repository files that reached code names.
@@ -1200,7 +1288,7 @@ class SourceIndex:
             return self
         if self._companion is None:
             self._companion = SourceIndex(self.root, scope=self.scope, top_format=2,
-                                          chim_label_keys=self.chim_label_keys)
+                                          chim_label_keys=self.chim_label_keys, narrow_headers=self.narrow_headers)
             self._companion._files = self.files       # the same checkout: its file hashes once
         return self._companion
 
@@ -2444,6 +2532,7 @@ def _install():
     run = globals().get('RUN')
     run = run.rstrip('/') + '/' if run else None
     diagnostic_names = globals().get('DIAGNOSTIC') or ()
+    neutral = frozenset(globals().get('NEUTRAL') or ())
     # Storage pool reads ('%' lines, BUILD-POOL-ARG-UNFINGERPRINTED-35): the pool is not fingerprinted by
     # content, so every read of it must be a keyed lookup (keys/NAMESPACE/..) or a verified object (objects/..).
     pools = [path.rstrip('/') + '/' for path in globals().get('POOLS') or ()]
@@ -2487,6 +2576,52 @@ def _install():
             fixed.append(part)
         listed('/'.join(fixed) or '/', recursive=('**' in pattern and bool(args[1])) or len(fixed) < len(parts) - 1)
 
+    def compiled_reads(texts, base):
+        folders, pending, seen = [], [], set()
+        i = 0
+        while i < len(texts):
+            t = texts[i]
+            if t == '-I' and i + 1 < len(texts):
+                folders.append(os.path.abspath(os.path.join(base, texts[i + 1])))
+                i += 1
+            elif t.startswith('-I'):
+                folders.append(os.path.abspath(os.path.join(base, t[2:])))
+            elif t.endswith(('.c', '.h', '.inc', '.s', '.S')) and not t.startswith('-'):
+                path = os.path.abspath(os.path.join(base, t))
+                if os.path.isfile(path):
+                    pending.append(path)
+            i += 1
+        while pending and len(seen) < 4000:
+            path = pending.pop()
+            if path in seen:
+                continue
+            seen.add(path)
+            if (path + '/').startswith(root) or path.startswith(root):
+                line = '^' + path[len(root):] + '\\n'
+                os.write(handle, line.encode('utf-8', 'surrogateescape'))
+            try:
+                with open(path, 'rb') as source:
+                    lines = source.read().decode('latin-1').split('\\n')
+            except OSError:
+                continue
+            here = os.path.dirname(path)
+            for raw in lines:
+                text = raw.strip()
+                if not text.startswith('#'):
+                    continue
+                text = text[1:].strip()
+                if not text.startswith('include'):
+                    continue
+                text = text[7:].strip()
+                if not text.startswith('"') or '"' not in text[1:]:
+                    continue
+                name = text[1:text.index('"', 1)]
+                for folder in [here] + folders:
+                    candidate = os.path.abspath(os.path.join(folder, name))
+                    if os.path.isfile(candidate):
+                        pending.append(candidate)
+                        break
+
     def spawned(event, args):
         if event == 'os.system':
             command = os.fsdecode(args[0]) if isinstance(args[0], bytes) else str(args[0])
@@ -2508,7 +2643,20 @@ def _install():
                 flags.append('untraced')
         if any(t.startswith(root) or (' ' + root) in t for t in texts):
             flags.append('repo')
+        compiler = 'py' not in flags and exe in ('cc', 'gcc', 'm68k-amigaos-gcc', 'clang')
+        if compiler:
+            flags.append('cc')
         os.write(handle, ('$' + exe + '\\t' + ','.join(flags) + '\\n').encode('utf-8', 'surrogateescape'))
+        if compiler:
+            # (relative paths too: a compiler run in the checkout with relative sources named no checkout path and
+            # read headers no record saw)
+            # BUILD-CHIM-RECORD-COMPILER-INCOMPLETE-51: what a C compiler reads of the checkout: the sources on its
+            # command line and their #include "..." closure through its -I folders ('^' lines), so the record of a
+            # stage that compiles is complete
+            try:
+                compiled_reads(texts, os.fsdecode(cwd) if isinstance(cwd, bytes) else (str(cwd) if cwd else os.getcwd()))
+            except Exception:  # noqa: BLE001 - tracing must never change the stage
+                os.write(handle, b'$compiler-reads\\tuntraced\\n')
         if run is not None and ('py' not in flags or 'untraced' in flags):
             # A process the trace does not follow (a compiler, ffmpeg) writes only where it is pointed: its working
             # folder and the run paths on its command line. Those run folders are listed ('~' lines), so a file it
@@ -2570,6 +2718,16 @@ def _install():
                     if frame.f_code.co_filename.startswith('<frozen importlib'):
                         return
                     frame, depth = frame.f_back, depth + 1
+                # a listing made by the key code itself (the SourceIndex walk of the checkout behind an in-stage
+                # cache key): not a read of the stage, as its calls are not (BUILD-REUSE-KEY-WALK-LISTED-51)
+                frame, depth = sys._getframe(1), 0
+                while frame is not None and depth < 12:
+                    name = frame.f_code.co_filename
+                    if name.startswith(root):
+                        if name[len(root):] in neutral:
+                            return
+                        break
+                    frame, depth = frame.f_back, depth + 1
                 listed(args[0])
             except Exception:  # noqa: BLE001 - tracing must never change the stage
                 pass
@@ -2617,6 +2775,20 @@ def _install():
                 return
             if path in seen:
                 return
+            if path.startswith(root):
+                # an open made by the key code itself (the SourceIndex walk behind an in-stage unit cache key
+                # hashes the source text it reaches): not a read of the stage, as its listings are not (the area,
+                # room and Balmora room stages "read" check_actor_ground, actor_frames, stair_walk, chim/collision
+                # and chim/cut that way and were refused on every reuse: BUILD-STAGE-READS-UNFINGERPRINTED-48).
+                # Checked before seen: a real import of the file later in this process is still recorded.
+                frame, depth = sys._getframe(1), 0
+                while frame is not None and depth < 12:
+                    name = frame.f_code.co_filename
+                    if name.startswith(root):
+                        if name[len(root):] in neutral:
+                            return
+                        break
+                    frame, depth = frame.f_back, depth + 1
             seen.add(path)
             if run is not None and path.startswith(run) and is_diagnostic(path):
                 # A run-folder diagnostic read by a stage ('<' lines): not allowed (Recorder.after).
@@ -2700,6 +2872,7 @@ def write_trace_hook(run, root, pools=()):
     text = TRACE_HOOK.replace('import os\n', f'import os\n\nROOT = {str(Path(root).resolve())!r}\n'
                               f'RUN = {str(Path(run).resolve())!r}\n'
                               f'DIAGNOSTIC = {sorted(DIAGNOSTIC_NAMES)!r}\n'
+                              f'NEUTRAL = {sorted(OUTPUT_NEUTRAL)!r}\n'
                               f'HOOK_FOLDER = {TRACE_HOOK_FOLDER!r}\n'
                               f'POOLS = {sorted({str(Path(pool)) for pool in pools})!r}\n', 1)
     temporary = folder / 'sitecustomize.tmp'
@@ -2794,8 +2967,9 @@ def check_calls(lines, reached, modules, run_inside=None):
 
 # Trace lines that are not repository reads: '@' code entered, '>' run-folder writes, '<' run-folder diagnostics
 # read, '%' storage pool reads, '#' form and directory listings, '$' processes started (B7), '~' run folders a
-# process the trace does not follow was pointed at (BUILD-REUSE-INTRO-CENSUS-REPLACED-48).
-TRACE_MARKS = ('@', '>', '<', '%', '#', '$', '~')
+# process the trace does not follow was pointed at (BUILD-REUSE-INTRO-CENSUS-REPLACED-48), '^' the checkout files a C
+# compiler the stage started reads (its sources and their include closure; BUILD-CHIM-RECORD-COMPILER-INCOMPLETE-51).
+TRACE_MARKS = ('@', '>', '<', '%', '#', '$', '~', '^')
 
 
 def check_reads(lines, covered, files, root, run_inside=None):
@@ -2910,7 +3084,7 @@ def used_record(lines, index, run_inside=None, reused=False):
 
     def inside(path):
         return bool(run_inside) and (path == run_inside or path.startswith(run_inside + '/'))
-    called, opened, listed = {}, set(), {}
+    called, opened, listed, compiled = {}, set(), {}, set()
     for line in lines:
         if line.startswith('@'):
             path, _, name = line[1:].partition('\t')
@@ -2924,8 +3098,11 @@ def used_record(lines, index, run_inside=None, reused=False):
             flags = set(flags.split(',')) if flags else set()
             if 'untraced' in flags:
                 record['why'].append('started a Python process without the trace (%s)' % exe)
-            elif 'repo' in flags and 'py' not in flags:
+            elif 'repo' in flags and 'py' not in flags and 'cc' not in flags:
                 record['why'].append('started %s with a checkout path' % exe)
+        elif line.startswith('^'):
+            # what a C compiler read of the checkout (its sources and their include closure, traced by the hook)
+            compiled.add(line[1:].strip())
         elif line.startswith('!'):
             name = line[1:].rpartition('/')[2]
             if name.split('.')[0] not in APPLY_STEMS:
@@ -2966,7 +3143,7 @@ def used_record(lines, index, run_inside=None, reused=False):
             return record
         units[path] = hashes
     data = {}
-    for path in sorted(opened):
+    for path in sorted(opened | compiled):
         parts = path.split('/')
         if inside(path) or path in OUTPUT_NEUTRAL or parts[0] in SKIP_DIRECTORIES \
                 or any(part.startswith('.') for part in parts):
@@ -4197,6 +4374,14 @@ def predict(old_run, scope=DEFAULT_SCOPE, root=ROOT, dependencies=None, index=No
                 result[name] = 'changed: ' + ', '.join(changed)
         else:
             result[name] = None
+        if result[name] is None:
+            # A record its own run marked not reusable (it read files its key left out) is refused by the build
+            # whatever the key says: the dry run says so too. The v0.0.51-dev2 entry check printed 0 unexpected
+            # rebuilds where the build's preflight found 6 (four stages' dev1 records were marked; their
+            # dependents followed).
+            manifest = load_manifest(old_run, name)
+            if manifest is not None and manifest.get('status') == 'complete' and not manifest.get('reusable'):
+                result[name] = 'old outputs not reusable: ' + '; '.join(manifest.get('reasons') or ['unknown'])
     return (result, components) if details else result
 
 

@@ -27,7 +27,7 @@
 | Where | tools/build.py --chim-regions default; the release build commands |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.36, v0.0.38, v0.0.39-rc1, v0.0.41, v0.0.42, v0.0.43, v0.0.44, v0.0.45, v0.0.46, v0.0.47-dev2 (last seen) |
+| Persists in | fixed in v0.0.47 |
 | Severity | high: The public builder never built the CHIM exterior of a release: GitHub users got the legacy region maps. |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |

@@ -90,5 +90,6 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 Related bugs in other categories:
 
 - [CHIM-SLOWCPU-FRAMETIME-33](CHIM-SLOWCPU-FRAMETIME-33.md): Balmora on CHIM runs at about 1 frame per second on a slow 68040 (cycle-exact emulation)
+- INTERIOR-FOG-UNUSED-51 (no report page): Interiors have no fog: the cell's fog colour and density are never used, so misty caves and tinted rooms show none
 
 <!-- END GENERATED CATEGORY -->

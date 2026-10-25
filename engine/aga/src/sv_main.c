@@ -1155,6 +1155,7 @@ void SV_SpawnServer (char *server)
 #endif
 
 // load progs to get entity field count
+    aw_load_phase = "server: progs";
     PR_LoadProgs ();
 
 // allocate server memory
@@ -1197,6 +1198,7 @@ void SV_SpawnServer (char *server)
             AW_MapPath (server, sv.modelname, sizeof(sv.modelname));
     }
     AW_HeapAuditPhase(sv.modelname,"before-bsp");
+    aw_load_phase = "server: world model";
     AW_StreamLoadBegin(sv.modelname);aw_world_start=Sys_FloatTime();
     {
         double spike_t0;
@@ -1245,6 +1247,7 @@ void SV_SpawnServer (char *server)
 //
 // clear world interaction links
 //
+    aw_load_phase = "server: inline models";
     SV_ClearWorld ();
 
     sv.sound_precache[0] = pr_strings;
@@ -1281,6 +1284,7 @@ void SV_SpawnServer (char *server)
 // serverflags are for cross level information (sigils)
     pr_global_struct->serverflags = svs.serverflags;
 
+    aw_load_phase = "server: entities";
     AW_SceneryBegin(sv.worldmodel->entities);
     aw_actors_start=Sys_FloatTime();
     ED_LoadFromFile (sv.worldmodel->entities);
@@ -1295,10 +1299,13 @@ void SV_SpawnServer (char *server)
 
 // run two frames to allow everything to settle
     host_frametime = 0.1;
+    aw_load_phase = "server: settle frame 1";
     SV_Physics ();
+    aw_load_phase = "server: settle frame 2";
     SV_Physics ();
 
 // create a baseline for more efficient communications
+    aw_load_phase = "server: baseline";
     SV_CreateBaseline ();
 
 // send serverinfo to all connected clients
@@ -1308,4 +1315,5 @@ void SV_SpawnServer (char *server)
 
     Con_DPrintf ("Server spawned.\n");
     AW_StreamLoadEnd(sv.modelname,aw_world_time,aw_actors_time,Sys_FloatTime()-aw_load_start);
+    aw_load_phase = "after the server spawn";
 }

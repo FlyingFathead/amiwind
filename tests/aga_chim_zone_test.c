@@ -370,10 +370,15 @@ static void auto_sizing (void)
 	int n;
 	/* The margin: 2 MiB plus an eighth of all Fast RAM. */
 	assert (ChimZone_AutoMargin (16*MIB) == 4*MIB && ChimZone_AutoMargin (128*MIB) == 18*MIB);
-	/* 16 MiB with the 11 MiB heap (about 4.5 MiB free), 24 MiB: nothing, the baseline. */
+	/* 16 MiB with the 11 MiB heap (about 4.5 MiB free): nothing, the baseline. */
 	assert (auto_plan (16, r16, 1, banks, &taken) == 0 && taken == 0);
 	{ unsigned long r[] = {5}; assert (auto_plan (16, r, 1, banks, &taken) == 0); }
-	assert (auto_plan (24, r24, 1, banks, &taken) == 0);
+	/* 24 MiB, 11 free, margin 5: one 6 MiB bank since the first bank needs 4 MiB (none while it needed 8). */
+	n = auto_plan (24, r24, 1, banks, &taken);
+	assert (n == 1 && banks[0] == 6);
+	/* The v0.0.50 32 MiB start (13 MiB free, margin 6, budget 7): one 7 MiB bank; with the 8 MiB least of before,
+	 * none, and Akulakhan's Chamber did not load (CHIM-AUTO-BANK-CLIFF-51). */
+	{ unsigned long r[] = {13}; n = auto_plan (32, r, 1, banks, &taken); assert (n == 1 && banks[0] == 7); }
 	/* 32 MiB: 19 free, margin 6: one 13 MiB bank. */
 	n = auto_plan (32, r32, 1, banks, &taken);
 	assert (n == 1 && banks[0] == 13);
@@ -405,11 +410,14 @@ static void auto_sizing (void)
 	assert (n == 2 && banks[0] == 2047 && banks[1] == 1439 && taken == 3486);
 	assert (ChimZone_AutoMargin (0xFFF00000UL) == 2*MIB + 0xFFF00000UL/8);
 	/* A step never takes more than the budget, nor less than its minimum. */
+	budget = 3*MIB;
+	assert (ChimZone_AutoStep (100*MIB, &budget, 1) == 0 && budget == 3*MIB);
 	budget = 7*MIB;
-	assert (ChimZone_AutoStep (100*MIB, &budget, 1) == 0 && budget == 7*MIB);
+	assert (ChimZone_AutoStep (100*MIB, &budget, 1) == 7*MIB && budget == 0);
+	budget = 7*MIB;
 	assert (ChimZone_AutoStep (100*MIB, &budget, 0) == 7*MIB && budget == 0);
 	budget = 100*MIB;
-	assert (ChimZone_AutoStep (3*MIB, &budget, 0) == 0 && ChimZone_AutoStep (9*MIB, &budget, 1) == 0);
+	assert (ChimZone_AutoStep (3*MIB, &budget, 0) == 0 && ChimZone_AutoStep (5*MIB, &budget, 1) == 0);
 	assert (ChimZone_AutoLookahead (0) == 1 && ChimZone_AutoLookahead (7*MIB) == 1 &&
 		ChimZone_AutoLookahead (8*MIB) == 2 && ChimZone_AutoLookahead (97*MIB) == 3);
 	printf ("auto sizing ok\n");

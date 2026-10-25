@@ -42,8 +42,10 @@ CELL_PROFILES = {
     # (0.25 in all), so the lanterns stand out; the lantern glass glows warm.
     # Judged in FS-UAE at the start poses against v0.0.32 and OpenMW
     # (start views 0.50 to 0.51 of v0.0.32, 0.86 to 0.94 of the original).
+    # 'sunlight_term': False: the profile was judged against the original without the cell sunlight term
+    # (INTERIOR-SUNLIGHT-UNBAKED-51 came later); adding it would brighten the judged look past it.
     'imperial prison ship': {
-        'falloff': 'original', 'facing': True, 'warm_style': True, 'glowing_glass': 7,
+        'falloff': 'original', 'facing': True, 'warm_style': True, 'glowing_glass': 7, 'sunlight_term': False,
         'zones': [{'box': [[-140, -240, -90], [140, 24, 140]], 'scale': 0.35, 'soft': 24, 'scope': 'ambient'},
                   {'box': [[-140, -240, -90], [140, 24, 140]], 'scale': 0.71, 'soft': 24}],
     },
@@ -136,12 +138,15 @@ def bake_surface(polygon, axes, offset, rotation, origin, lighting, *, sample_gr
     else:
         front=None
     world_normal=None if front is None else rotation@front
+    # the cell sunlight needs the face's facing whether or not the lamps use it (INTERIOR-SUNLIGHT-UNBAKED-51)
+    sun_front=front if front is not None else face_normal(polygon)
+    sun_normal=rotation@sun_front if sun_front is not None else np.zeros(3)
     for t in range(size[1]):
         for s in range(size[0]):
             local=(inverse@np.array([low[0]+s*16-offset[0],low[1]+t*16-offset[1],distance])
                    if inverse is not None else polygon.mean(axis=0))
             point=local@rotation.T+origin
-            samples.append(round(max(0,min(255,point_light(point,lighting,world_normal)))))
+            samples.append(round(max(0,min(255,point_light(point,lighting,world_normal,sun_normal)))))
     return bytes(samples)
 
 
@@ -174,16 +179,38 @@ def light_weight(light, point, lighting, normal=None):
     return weight
 
 
-def point_light(point, lighting, normal=None):
+# The cell's sunlight (AMBI bytes 4-6): the original lights an interior with it as a directional light from one
+# fixed direction for every interior (OpenMW 0.49 RenderingManager::configureAmbient, interiorSunPos
+# (-1, 45 degrees, 45 degrees, 0) in radians, "what Morrowind uses"), the sunlight colour as its diffuse colour.
+# INTERIOR-SUNLIGHT-UNBAKED-51: the bake left it out, so Akulakhan's Chamber (ambient luma 27, sunlight 174) was
+# near black. A face gets the sunlight's luma times the cosine toward that direction; an actor (light_grid, lit
+# from every side) half of it, an approximation of a body's average facing.
+INTERIOR_SUN_DIRECTION = np.array([-1.0, np.radians(45.0), np.radians(45.0)])
+INTERIOR_SUN_DIRECTION /= np.linalg.norm(INTERIOR_SUN_DIRECTION)
+SUN_ACTOR_SHARE = 0.5
+
+
+def sun_light(lighting, normal):
+    """The cell sunlight's luma on a face with this unit normal (None: an actor's share)."""
+    sun=lighting.get('sunlight')
+    if not sun or not lighting.get('sunlight_term',True):return 0.0
+    luma=float(np.dot(sun,[.299,.587,.114]))
+    if normal is None:return luma*SUN_ACTOR_SHARE
+    return luma*max(0.0,float(np.dot(normal,INTERIOR_SUN_DIRECTION)))
+
+
+def point_light(point, lighting, normal=None, sun_normal=None):
     """Baked light value (0..255 before clamping) at a point in local units:
-    the cell ambient's luma plus every light's luma times its weight, then
+    the cell ambient's luma, the cell sunlight on a face of SUN_NORMAL (an
+    actor's share without one), and every light's luma times its weight, then
     the box zones. Surfaces (bake_surface) and actors (light_grid) use it."""
     value=float(np.dot(lighting['ambient'],[.299,.587,.114]))
     zones=lighting.get('zones',())
     # Zones with "ambient" scope scale only the cell's ambient light: the
-    # lamps keep their full strength inside them.
+    # lamps and the sunlight keep their full strength inside them.
     ambient_zones=[z for z in zones if z.get('scope','all')=='ambient']
     if ambient_zones:value*=zone_scale(point,ambient_zones)
+    value+=sun_light(lighting,sun_normal)
     for light in lighting['lights']:
         weight=light_weight(light,point,lighting,normal)
         if weight:value+=np.dot(light['color'],[.299,.587,.114])*weight

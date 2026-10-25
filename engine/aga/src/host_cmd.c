@@ -340,7 +340,9 @@ void Host_Map_f (void)
 	if (cls.state != ca_dedicated)
 	{
 		/* cls.spawnparms was joined (bounded) before the old game was left. */
+		aw_load_phase = "client: connect local";
 		Cmd_ExecuteString ("connect local", src_command);
+		aw_load_phase = "after connect local";
 	}
 }
 

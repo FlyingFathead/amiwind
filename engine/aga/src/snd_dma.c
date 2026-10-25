@@ -918,15 +918,19 @@ void S_ExtraUpdate (void)
  * Music has its own FILE/buffers; detached speech owns a bounded PCM copy.
  * Never load an SFX cache here:
  * that could replace a model's live temporary hunk allocation. */
+static void load_trace(char why);
 void S_LoadingUpdate(void)
 {
     static double previous;
     static int servicing;
     double now;
+    if(!aw_loading_music || servicing)load_trace(!aw_loading_music?'m':'s');
     if(!aw_loading_music || servicing)return;
+    if(!sound_started || snd_blocked)load_trace('b');
     servicing=1;
     if(sound_started && !snd_blocked){
         now=Sys_FloatTime();
+        if(now>=previous && now-previous<0.02)load_trace('t');
         if(!(now>=previous && now-previous<0.02)){
             previous=now;
             CDAudio_Update();S_Update_();
@@ -934,6 +938,87 @@ void S_LoadingUpdate(void)
     }
     SCR_LoadingUpdate();
     servicing=0;
+}
+
+/* AUDIO-LOAD-29: the mixer during a load (the music must never crackle through
+ * one). From SCR_BeginLoadingPlaque to SCR_EndLoadingPlaque: the updates, the
+ * longest gap between two, and the updates that came after the DMA had passed
+ * the mixed sound (the samples it then played again: the crackle). One line
+ * at the end of every load (S_LoadingReport), so a load that starves the
+ * mixer is seen in any emulator's log, not only by ear. */
+static double load_last_mix, load_longest;
+static unsigned long load_updates, load_late, load_missed;
+static int load_open;	/* a load is being measured: the plaque can begin again inside one load */
+static unsigned long load_silent;	/* AW_MusicSilentSpans at the start: a music block that ran dry in the load */
+/* The step of a map load now running: set by the server and client load steps (sv_main.c, cl_parse.c), named in the
+ * "Loading audio" line at both ends of the longest gap, where the music waited. */
+const char *aw_load_phase = "";
+static const char *load_mix_phase,*load_gap_from,*load_gap_to;
+/* The ticks and updates of a load, kept in a ring with their time and step: a gap over LOAD_TRACE_MS is printed
+ * tick by tick at the report, with why each tick did not feed the mixer (m: no load music, s: a tick inside a tick,
+ * b: sound blocked or not started, t: under 20 ms since the last, U: an update, p: a frame step reached). */
+#define LOAD_TRACE 128
+#define LOAD_TRACE_MS 150
+static struct {double at;const char *phase;char why;} load_ring[LOAD_TRACE],load_gap_copy[40];
+static unsigned long load_ring_n;
+static int load_gap_n;
+static double load_gap_start,load_gap_end;
+/* the intro movie inside a load: its time and the music's silent spans while it plays are left out (S_Update_) */
+static int load_in_movie;
+static double load_movie_from,load_movie_seconds;
+static unsigned long load_movie_silent;
+/* the ring's entries since GAP_START (the last update): the ticks inside the new longest gap, kept before the rest of
+ * the load writes over them */
+static void load_keep_gap(double gap_start)
+{
+    unsigned long i=load_ring_n>LOAD_TRACE?load_ring_n-LOAD_TRACE:0;
+    load_gap_n=0;
+    for(;i<load_ring_n && load_gap_n<40;i++)
+        if(load_ring[i%LOAD_TRACE].at>=gap_start-0.0005)load_gap_copy[load_gap_n++]=load_ring[i%LOAD_TRACE];
+}
+static void load_trace(char why);
+/* A step of the frame reached (host.c): a trace line 'p' with the step now set, without feeding the mixer. */
+void S_LoadingMark(void){load_trace('p');}
+static void load_trace(char why)
+{
+    if(!load_open)return;
+    load_ring[load_ring_n%LOAD_TRACE].at=Sys_FloatTime();
+    load_ring[load_ring_n%LOAD_TRACE].phase=aw_load_phase;
+    load_ring[load_ring_n%LOAD_TRACE].why=why;
+    load_ring_n++;
+}
+
+void S_LoadingBegin(void)
+{
+    if(load_open)return;
+    load_open=1;
+    load_last_mix=Sys_FloatTime();load_longest=0;load_updates=load_late=load_missed=0;
+    load_silent=AW_MusicSilentSpans();
+    aw_load_phase="plaque";load_mix_phase=load_gap_from=load_gap_to=aw_load_phase;
+    load_ring_n=0;load_gap_n=0;load_gap_start=load_gap_end=load_last_mix;
+    load_in_movie=0;load_movie_seconds=0;
+}
+
+void S_LoadingReport(void)
+{
+    int open=load_open,i;
+    char movie_note[96];
+    load_open=0;
+    if(!open || !sound_started || !shm || !load_updates)return;
+    if(load_in_movie){load_movie_seconds+=Sys_FloatTime()-load_movie_from;load_silent+=AW_MusicSilentSpans()-load_movie_silent;load_in_movie=0;}
+    movie_note[0]=0;
+    if(load_movie_seconds>0)
+        sprintf(movie_note," (intro movie, %ld ms, not counted: the music is paused under it)",(long)(load_movie_seconds*1000));
+    Con_Printf("Loading audio: %lu mixer updates, longest gap %ld ms (mixes %ld ms ahead), %lu late (%ld ms played again), music ran dry %lu times; longest gap from %s to %s%s\n",
+        load_updates,(long)(load_longest*1000),(long)(shm->speed ? (shm->samples>>(shm->channels-1))*1000L/shm->speed : 0),
+        load_late,(long)(shm->speed ? load_missed*1000L/shm->speed : 0),AW_MusicSilentSpans()-load_silent,
+        load_gap_from,load_gap_to,movie_note);
+    if(load_longest*1000<LOAD_TRACE_MS)return;
+    for(i=0;i<load_gap_n;i++)
+        Con_Printf("Loading audio trace: +%ld ms %c %s\n",(long)((load_gap_copy[i].at-load_gap_start)*1000),
+            load_gap_copy[i].why,load_gap_copy[i].phase);
+    Con_Printf("Loading audio trace: +%ld ms U %s (the update that ended the gap)\n",
+        (long)((load_gap_end-load_gap_start)*1000),load_gap_to);
 }
 
 void S_Update_(void)
@@ -949,6 +1034,25 @@ void S_Update_(void)
 	GetSoundtime();
 
     if(AW_MovieDebugPending())return;
+
+    if(load_open){
+        double now=Sys_FloatTime();
+        int movie=AW_MovieActive()!=0;
+        /* The intro movie plays inside the first load of a session (New Game): it pauses the music and the mixer
+         * plays the movie's own sound, which AW_MovieUpdate feeds itself. Its time is no gap of the load's music
+         * and the music standing paused is not "ran dry" (that was the first load's 219-259 ms "gap" and its dry
+         * count in every measurement until v0.0.51-dev2); late updates still count, the movie's sound is sound. */
+        if(movie!=load_in_movie){
+            if(movie){load_movie_from=now;load_movie_silent=AW_MusicSilentSpans();}
+            else{load_movie_seconds+=now-load_movie_from;load_silent+=AW_MusicSilentSpans()-load_movie_silent;}
+            load_in_movie=movie;load_last_mix=now;load_trace(movie?'M':'E');
+        }
+        if(!movie && now-load_last_mix>load_longest){load_longest=now-load_last_mix;load_gap_from=load_mix_phase;load_gap_to=aw_load_phase;
+            load_gap_start=load_last_mix;load_gap_end=now;load_keep_gap(load_last_mix);}
+        load_last_mix=now;load_mix_phase=aw_load_phase;load_updates++;
+        load_trace('U');
+        if(paintedtime<soundtime){load_late++;load_missed+=soundtime-paintedtime;}
+    }
 
 // check to make sure that we haven't overshot
 	if (paintedtime < soundtime)

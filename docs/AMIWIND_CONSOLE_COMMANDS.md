@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.50._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.51._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -110,7 +110,7 @@ Type: "dbg help" for help.
 | `dbg guardtorch` | - | [on/off/auto] (all guard torches; auto follows guards_torch_cycle) or light radius 0.1..2.0 of the player torch (default 0.5) |
 | `dbg headlamp` | `dbg hlamp` | [on/off, true/false or 1/0] torch light without holding a torch (not saved) |
 | `dbg horizon veil` | - | 0..15 (default 0 off) haze the lowest sky bands into the far fog colour so distant gaps read as haze |
-| `dbg indoor luma` | `dbg interior luma`, `dbg interiorluma`, `dbg luma indoor`, `dbg luma interior` | [0..4] (brightness-enabled builds; static interior multiplier; default 1.2; no argument queries) |
+| `dbg indoor luma` | `dbg interior luma`, `dbg interiorluma`, `dbg luma indoor`, `dbg luma interior` | [0..4] (brightness-enabled builds; static interior multiplier; default 1.0; no argument queries) |
 | `dbg lamp lights` | - | [0..4] nearest exterior lamps, lanterns, torches and fires lit at night, each a torch's worth (default 2; 0 off) |
 | `dbg lamps` | - | status of the night lamps here: map, night, cached and lit lamps, night windows |
 | `dbg light hue` | - | [R G B 0..255] colour of torch, lamp and window light (default 255 210 140); no argument: current |

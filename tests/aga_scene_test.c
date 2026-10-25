@@ -130,6 +130,10 @@ static int room_maps,autoram=1;static char refused_first[96],refused_second[48];
 /* CHIM-32MB-SAVE-ENTRY-48: the census office's room map, marked for 32 MB like bigroom (a map dbg tp can reach) */
 static int census_marked;
 float Cvar_VariableValue(char *name){return !strcmp(name,"aw_autoram")?(float)autoram:0;}
+/* CHIM-AUTO-BANK-CLIFF-51: the CHIM cache this start took (chim_world.c Memory op 4, KiB; -1 not decided) */
+static int cache_kib=-1;
+static int memory_hook(int op,char *first,char *second,int size){(void)first;(void)second;(void)size;return op==4?cache_kib:0;}
+int (*aw_chim_memory)(int op,char *first,char *second,int size)=memory_hook;
 void AW_UIRoomRefused(const char *first,const char *second){
  if(!first){refused_first[0]=0;return;}
  strcpy(refused_first,first);strcpy(refused_second,second);
@@ -855,7 +859,17 @@ int main(void){
   aw_fast_ram_found_mb=0;autoram=0;
   assert(AW_SceneRoomRefuse("bigroom") && key_dest==key_menu);
   assert(AW_TravelKey(K_ENTER) && key_dest==key_game);
-  autoram=1;room_maps=0;aw_chim_world=0;
+  /* CHIM-AUTO-BANK-CLIFF-51: 32 MB found and Extra RAM on, but the start took no CHIM cache bank (0 KiB): the
+   * marked room is refused as on 16 MB; with a bank (7 MiB) or not decided (-1) it loads */
+  autoram=1;cache_kib=0;
+  assert(!AW_SceneRoomRefuse("smallroom") && key_dest==key_game);
+  assert(AW_SceneRoomRefuse("bigroom") && key_dest==key_menu && !queued[0]);
+  assert(AW_TravelKey(K_ENTER) && key_dest==key_game);
+  cache_kib=7168;
+  assert(!AW_SceneRoomRefuse("bigroom") && key_dest==key_game);
+  cache_kib=-1;
+  assert(!AW_SceneRoomRefuse("bigroom") && key_dest==key_game);
+  room_maps=0;aw_chim_world=0;
  }
  /* CHIM-32MB-SAVE-ENTRY-48: every other way into a marked place goes through the same check and screen before
   * anything loads: a save's scene (aw_save.c, through AW_SceneSaveEntryRefuse; the frame holding its position too),

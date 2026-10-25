@@ -297,6 +297,12 @@
    "note": "a size, count, buffer or flag value, not a position"
   },
   {
+   "file": "engine/aga/src/chim/chim_world.c",
+   "contains": "limit = aw_loading_music ? 4096 : 65536;",
+   "class": "unrelated",
+   "note": "a size, count, buffer or flag value, not a position (the CHIM pack read slice, AUDIO-LOAD-29)"
+  },
+  {
    "file": "engine/aga/src/model.c",
    "contains": "( (unsigned)mt->width > 4096 || (unsi",
    "class": "unrelated",

@@ -197,7 +197,7 @@ unsigned long ChimZone_AutoStep (unsigned long largest, unsigned long *budget, i
  * (the world's own) without extra memory, two from 8 MiB, three from 32 MiB. */
 int ChimZone_AutoLookahead (unsigned long auto_bytes)
 {
-	return auto_bytes >= 32UL*CHIM_AUTO_MIB ? 3 : auto_bytes >= CHIM_AUTO_FIRST ? 2 : 1;
+	return auto_bytes >= 32UL*CHIM_AUTO_MIB ? 3 : auto_bytes >= 8UL*CHIM_AUTO_MIB ? 2 : 1;
 }
 
 /* Merge b with a free successor; b must be free. */

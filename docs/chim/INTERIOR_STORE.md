@@ -1,6 +1,6 @@
 # Interiors on CHIM: CHIM rooms on a shared store
 
-_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
+_Last updated with AmiWind v0.0.51 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -179,7 +179,8 @@ Worldspawn of `maps/<room>.chim`: `"_chim_world" "chimi"` (the store folder, at 
    gate (`tools/chim/heap.py require_room_map_heap`) checks each room's models, textures and record against the zone
    of the built heap less the loading buffer (the 16 MB baseline, or Extra RAM off) and, when they do not fit,
    against what the 32 MB minimum gives a room (its zone and the automatic cache bank, with the largest model within
-   one block: the measured room model of [the door graph](DOOR_GRAPH.md), CHIM-ROOM-ESTIMATE-48, 15,384,576 bytes;
+   one block: the measured room model of [the door graph](DOOR_GRAPH.md), CHIM-ROOM-ESTIMATE-48, 14,336,000 bytes
+   since v0.0.51, CHIM-AUTO-BANK-CLIFF-51;
    the same thresholds the room plan uses for its `zone_over_16mb` note, `tests/test_chim_room_fast_ram.py`).
    A room that fits only the second is marked: `"_chim_room_fast_mb" "32"` in its room map's worldspawn; the
    build prints how many. At the door, before the door sound or anything loads, the engine reads the mark

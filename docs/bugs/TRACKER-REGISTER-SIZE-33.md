@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 6 times; something has to be done
+## PERSISTING: reported 7 times; something has to be done
 
 - Reported with v0.0.33 at 2026-10-09 (time not recorded): first: the register outgrew the 256 KiB release text limit (gate preflight)
 - Reported with v0.0.36-dev5 at 2026-10-11 14:55 +0300: bugs.json 789,008 of 1 MiB passed the 75 % warning again; follow-up TRACKER-REGISTER-SIZE-36 (second archive)
@@ -10,6 +10,7 @@
 - Reported with v0.0.40-dev2 at 2026-10-14 (time not recorded): Journal reached196510B,98B below its warning. Rotate133 older entries; preserve newer/CHIM entries, history, links and all limits. Unreleased documentation follow-up.
 - Reported with v0.0.43-dev2 at 2026-10-18 15:28 +0300: Journal reached 196,648 B, 40 B past its warning. Rotated 130 entries of 11-16 October into the v0.0.37-v0.0.41 archive.
 - Reported with v0.0.46-dev at 2026-10-20 09:12 +0300: The 2026-10-20 audit took the one archive to 232,832 B, 89 % of 256 KiB. Split into four found-in ranges and rotation to v0.0.35: archives 57-86 KB (22-33 %), bugs.json 688,666 B (66 %).
+- Reported with v0.0.51-dev2 at 2026-10-25 07:19 +0200: gate 3893: CHIM_TRACKER.md 196,861 of 262,144 bytes (over the 75 % warning); a status moved to its page, 195,727 now, 881 bytes under
 
 <!-- END GENERATED PERSISTING -->
 
@@ -33,7 +34,7 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
+- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

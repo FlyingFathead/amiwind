@@ -266,7 +266,11 @@ class BugTrackerTest(unittest.TestCase):
             rows = bug_register.parse_fact_table(text)
             build = b.get('build') or {}
             expected = ['Fact', 'Reported by', 'First noticed', 'Where', 'Reproduction', 'Duplicate of', 'Persists in',
-                        'Severity', 'Family'] + (['CHIM'] if 'chim' in b else [])
+                        'Severity', 'Family']
+            # the optional rows the register writes after Family (bug_register fact_rows; TEST-FACT-ROWS-WAITING-51)
+            expected += ['Waiting on'] if b.get('waiting_on') else []
+            expected += ['Deferred by the maintainer'] if b.get('deferred') else []
+            expected += ['CHIM'] if 'chim' in b else []
             if build:
                 expected += ['Playtest version', 'From commit', 'CHIM engine version']
                 expected += ['Unknown because'] if build.get('unknown_reason') else []
@@ -370,11 +374,21 @@ class BugTrackerTest(unittest.TestCase):
         # live register is split into per-bug files, planned for v0.0.49 (TRACKER-REGISTER-SIZE-36: the rotation
         # already reaches v0.0.47, the last release, and bugs.json stands at 74.9 %, every bug in it open,
         # persisting or found in v0.0.48). Every other tracker file stays at 75 %; the hard limits are unchanged.
-        def share(p):
-            return 0.80 if p == DOCS / 'bugs' / 'bugs.json' else 0.75
-        big = ['%s %d of %d' % (p.name, p.stat().st_size, release.text_limit(p.relative_to(ROOT).as_posix()))
-               for p in files if p.stat().st_size > share(p) * release.text_limit(p.relative_to(ROOT).as_posix())]
-        self.assertEqual(big, [], 'tracker files near the release text limit (tools/release.py)')
+        # 2026-10-25 07:36 +0200 / 2026-10-25 05:36 UTC, the maintainer ("well surely we can be at like 95% max of
+        # the text size?" / "you could warn but pass over 75%"): over 75 % of its limit a tracker file is named as a
+        # warning and the test passes; over 95 % it fails (the CHIM tracker stood at 74.7 %, and one bug tagged CHIM
+        # took it over the 75 % line and failed a gate); the hard limits are unchanged.
+        def row(p):
+            return '%s %d of %d' % (p.name, p.stat().st_size, release.text_limit(p.relative_to(ROOT).as_posix()))
+
+        def over(p, share):
+            return p.stat().st_size > share * release.text_limit(p.relative_to(ROOT).as_posix())
+        near = [row(p) for p in files if over(p, 0.75) and not over(p, 0.95)]
+        if near:
+            print('WARNING: tracker files over 75 %% of the release text limit (tools/release.py): %s'
+                  % ', '.join(near), file=sys.stderr)
+        big = [row(p) for p in files if over(p, 0.95)]
+        self.assertEqual(big, [], 'tracker files over 95 % of the release text limit (tools/release.py)')
 
     def test_old_fixed_bugs_rotate_into_the_frozen_archive(self):
         live = json.loads(bug_register.DATA.read_text(encoding='utf-8'))

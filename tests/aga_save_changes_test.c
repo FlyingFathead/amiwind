@@ -123,6 +123,17 @@ int main(int argc,char **argv)
      assert(fnv(&sorted)==fnv(&back));}
     assert(AW_SaveDecode(other,n,&decoded));               /* checked, not kept */
     fprintf(o,"roundtrip %08x %d\n",fnv(&back),n);
+    /* object state (v0.0.51): a disabled placement and a door the scripts locked at 50 and another unlocked (0) */
+    {aw_changes_t objects;aw_changes_t read;int k;
+     objects.count=0;
+     objects.entry[objects.count++]=entry(6001,AW_CHANGE_DISABLED,0,0,0,0,0);
+     objects.entry[objects.count++]=entry(6002,AW_CHANGE_LOCK|(50U<<AW_CHANGE_LOCK_SHIFT),0,0,0,0,0);
+     objects.entry[objects.count++]=entry(6003,AW_CHANGE_LOCK|AW_CHANGE_DISABLED,0,0,0,0,0);
+     k=AW_SaveEncodeChanges(other,sizeof(other),&save,&objects);assert(k>0);
+     assert(AW_SaveDecodeChanges(other,k,&decoded,&read) && read.count==3);
+     assert(read.entry[0].flags==AW_CHANGE_DISABLED);
+     assert(read.entry[1].flags==(AW_CHANGE_LOCK|(50U<<AW_CHANGE_LOCK_SHIFT)));
+     assert(read.entry[2].flags==(AW_CHANGE_LOCK|AW_CHANGE_DISABLED));}
     /* a full list fits the cap; one more entry does not */
     list.count=0;
     for(i=0;i<AW_SAVE_CHANGES;i++)list.entry[list.count++]=entry(1000+i,AW_CHANGE_DEAD,0,0,0,0,0);
@@ -135,13 +146,18 @@ int main(int argc,char **argv)
     list.count=2;list.entry[0]=entry(9,AW_CHANGE_DEAD,0,0,0,0,0);list.entry[1]=entry(9,AW_CHANGE_DEAD,0,0,0,0,0);
     assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
     list.entry[1]=entry(0x01000009,AW_CHANGE_DEAD,0,0,0,0,0);assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
-    list.entry[1]=entry(10,128,0,0,0,0,0);assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
+    list.entry[1]=entry(10,0x8000,0,0,0,0,0);assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
+    /* object state (v0.0.51): a lock level needs its flag and stays within 100 */
+    list.entry[1]=entry(10,AW_CHANGE_DISABLED|(5U<<AW_CHANGE_LOCK_SHIFT),0,0,0,0,0);
+    assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
+    list.entry[1]=entry(10,AW_CHANGE_LOCK|(101U<<AW_CHANGE_LOCK_SHIFT),0,0,0,0,0);
+    assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
     list.entry[1]=entry(10,0,0,0,0,0,0);assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
     list.entry[1]=entry(10,AW_CHANGE_DEAD,3,0,0,0,0);assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
     /* a corrupt entry with a good CRC is refused field by field; a bad CRC too */
     list.entry[1]=entry(10,AW_CHANGE_DEAD,0,0,0,0,0);
     n=AW_SaveEncodeChanges(other,sizeof(other),&save,&list);assert(n>0);
-    other[n-AW_CHANGE_ENTRY_BYTES+4]|=0x80;                  /* the second entry's flags: an unknown bit */
+    other[n-AW_CHANGE_ENTRY_BYTES+5]|=0x80;                  /* the second entry's flags: an unknown bit (15) */
     put(other+8,crc32(other+12,n-12));assert(!AW_SaveDecodeChanges(other,n,&decoded,&back));
     other[n-1]^=1;assert(!AW_SaveDecodeChanges(other,n,&decoded,&back));
     fprintf(o,"refusals ok\n");

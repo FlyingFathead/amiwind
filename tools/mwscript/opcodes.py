@@ -45,9 +45,21 @@ OPCODES = {
     'SECONDS': (0x40, ''), 'RANDOM': (0x41, ''), 'MENUMODE': (0x42, ''), 'CELLCHANGED': (0x43, ''),
     'STARTSCRIPT': (0x44, 'H'), 'STOPSCRIPT': (0x45, 'H'), 'SCRIPTRUNNING': (0x46, 'H'), 'DISTANCE': (0x47, 'H'),
     'SQRT': (0x48, ''),
+    # object state (the object REF names, else the script's own): disabled, and a lock's level (Lock pops it; -1 is
+    # "the level it had", as Lock without a number); GETDISABLED and GETLOCKED push a whole number
+    'ENABLE': (0x49, ''), 'DISABLE': (0x4A, ''), 'GETDISABLED': (0x4B, ''),
+    'LOCK': (0x4C, ''), 'UNLOCK': (0x4D, ''), 'GETLOCKED': (0x4E, ''),
+    # activation (the original's rule: a script that reads OnActivate takes over its object's use): ONACTIVATE pushes
+    # 1 once after the player used the object; ACTIVATE carries out the object's own use (a door opens)
+    'ONACTIVATE': (0x4F, ''), 'ACTIVATE': (0x50, ''),
+    # messages: MESSAGEBOX shows a text (its numbers formatted in) with its buttons; GETBUTTONPRESSED pushes the
+    # button the player chose, once (-1 until then)
+    'MESSAGEBOX': (0x51, 'N'), 'GETBUTTONPRESSED': (0x52, ''),
 }
 # NOTYET operands: u16 the function's name (string index), u8 numeric arguments popped (bit 7: pushes a value,
 # bit 6: the value is a number with a fraction), u8 string arguments, then one u16 string index per string argument.
+# MESSAGEBOX has the same layout: u16 the text (string index), u8 numbers popped (each a number with a fraction),
+# u8 buttons, then one u16 string index per button.
 
 # QUERY numbers: the engine facts a condition or a script asks for, with their u16 operand. Shared with the NPC
 # greeting conditions (INFO records' function conditions); 0 means "not available yet" and is logged once.

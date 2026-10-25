@@ -26,6 +26,7 @@ import collections
 import hashlib
 import json
 import math
+import os
 import statistics
 import struct
 import sys
@@ -81,7 +82,7 @@ def _resolve_reach(chunks):
 # face_polygons lives in its own module (the stair walk reads it, and its key holds only the code it runs)
 from chim.faces import face_polygons  # noqa: E402,F401
 from chim.terrain import box_leaves, tree_depth  # noqa: E402
-from chim.visibility import decompress_row, row_to_bits  # noqa: E402
+from chim.visibility import decompress_row  # noqa: E402
 
 
 class Failures(list):
@@ -94,18 +95,40 @@ class Failures(list):
 # ---------------------------------------------------------------- files and FFS rules
 
 def ffs_rules(root, fails):
-    """Names <= 30 characters, few entries per directory, files below the size limit."""
+    """Names <= 30 characters, few entries per directory, files below the size limit. One os.scandir walk: a file's
+    kind comes with its directory entry and its size from one stat (the walk with Path.rglob, is_dir, is_file and
+    two stats per file was 184,236 stat calls, about 6 s of the v0.0.51-dev1 validation's main process;
+    BUILD-CHIM-STAGE-SERIAL-TAIL-36). Directories in the order rglob gave them: the root, then for each directory
+    in depth-first order its sub-directories (the failures keep their order)."""
     sizes = {}
-    for d in [root, *[p for p in root.rglob('*') if p.is_dir()]]:
-        entries = list(d.iterdir())
-        fails.check(len(entries) <= F.FFS_MAX_DIRECTORY_ENTRIES,
-                    'FFS: %s holds %d entries (limit %d)' % (d.name, len(entries), F.FFS_MAX_DIRECTORY_ENTRIES))
-        for e in entries:
+    base = str(root)
+    listed = {}
+
+    def entries(path):
+        if path not in listed:
+            with os.scandir(path) as it:
+                listed[path] = list(it)
+        return listed[path]
+
+    order = [base]
+
+    def visit(path):
+        subs = [e.path for e in entries(path) if e.is_dir()]
+        order.extend(subs)
+        for sub in subs:
+            visit(sub)
+    visit(base)
+    for d in order:
+        here = entries(d)
+        fails.check(len(here) <= F.FFS_MAX_DIRECTORY_ENTRIES,
+                    'FFS: %s holds %d entries (limit %d)' % (os.path.basename(d), len(here), F.FFS_MAX_DIRECTORY_ENTRIES))
+        for e in here:
             fails.check(len(e.name) <= F.FFS_NAME_CHARS, 'FFS: name longer than 30 characters: ' + e.name)
             fails.check(all(32 < ord(ch) < 127 and ch not in ':/' for ch in e.name), 'FFS: unsafe name ' + e.name)
             if e.is_file():
-                sizes[e.relative_to(root).as_posix()] = e.stat().st_size
-                fails.check(e.stat().st_size <= F.FFS_MAX_PACK, 'FFS: %s larger than the 1 GiB pack limit' % e.name)
+                size = e.stat().st_size
+                sizes[os.path.relpath(e.path, base).replace(os.sep, '/')] = size
+                fails.check(size <= F.FFS_MAX_PACK, 'FFS: %s larger than the 1 GiB pack limit' % e.name)
     return sizes
 
 
@@ -975,7 +998,7 @@ def _chunk_checks(task):
             tiles = terrain_coverage(c, box, section, cov) or 0
             samples = hull_seams(c, box, section, seam) or 0
         out.append({'faces': len(lumps[7]) // 20, 'texture_refs': F.read_texture_refs(lumps[2]),
-                    'brush_fails': list(bc), 'refs': refs, 'tree': tree, 'tree_fails': list(tf),
+                    'brush_fails': list(bc), 'refs': refs, 'tree': _packed_tree(tree), 'tree_fails': list(tf),
                     'coverage_fails': list(cov), 'tiles': tiles, 'seam_fails': list(seam), 'samples': samples})
     if key is not None:
         import cache_provenance
@@ -1050,15 +1073,89 @@ def _keyed_pool_map(function, kind, key_of, tasks, jobs, cost, cache):
     return results
 
 
+def set_bits(row, n):
+    """The indexes below N of the set bits of a decompressed visibility row, in order (row_to_bits' True places).
+    Only the non-zero bytes are looked at: the main process decoded every chunk's PVS row bit by bit (308,754 rows,
+    about 6 s of the v0.0.51-dev1 validation; BUILD-CHIM-STAGE-SERIAL-TAIL-36)."""
+    out = []
+    for i, byte in enumerate(row):
+        if byte:
+            base = i << 3
+            for bit in range(8):
+                if byte >> bit & 1 and base + bit < n:
+                    out.append(base + bit)
+    return out
+
+
+class PackedNodes:
+    """A chunk subtree's nodes (world_tree: (normal, dist, front, back) each) held as three arrays: indexed and
+    iterated as that list, but pickled as three arrays instead of one array per node. The chunk trees went
+    between the processes as 441 MB of per-node arrays, 7 of the main process's 9 s packing the cross-check
+    tasks, so the workers waited on it (BUILD-CHIM-STAGE-SERIAL-TAIL-36, v0.0.51-dev1: 4.99 of 22 cores)."""
+    __slots__ = ('normals', 'dists', 'children')
+
+    def __init__(self, normals, dists, children):
+        self.normals, self.dists, self.children = normals, dists, children
+
+    @classmethod
+    def of(cls, nodes):
+        """float32 planes and int32 children: the file's own sizes (the plane lump's '<4f', the node lump's int16
+        children), so no value changes (a float32 read back as a float is the value world_tree made)."""
+        import numpy as np
+        n = len(nodes)
+        return cls(np.array([x[0] for x in nodes], dtype=np.float32).reshape(n, 3),
+                   np.array([x[1] for x in nodes], dtype=np.float32).reshape(n),
+                   np.array([(x[2], x[3]) for x in nodes], dtype=np.int32).reshape(n, 2))
+
+    def __len__(self):
+        return len(self.dists)
+
+    def __getitem__(self, i):
+        if isinstance(i, slice):
+            return [self[k] for k in range(*i.indices(len(self)))]
+        return (self.normals[i].astype(float), float(self.dists[i]), int(self.children[i, 0]),
+                int(self.children[i, 1]))
+
+    def __iter__(self):
+        return (self[i] for i in range(len(self)))
+
+    def tolist(self):
+        """[[normal, dist, front, back], ...] as plain numbers (comparisons and digests)."""
+        return [[[float(v) for v in n], float(d), int(c[0]), int(c[1])]
+                for n, d, c in zip(self.normals, self.dists, self.children)]
+
+    def __eq__(self, other):
+        return isinstance(other, PackedNodes) and self.tolist() == other.tolist()
+
+    __hash__ = None
+
+    def unpack(self):
+        """The plain list world_tree makes (the per-node checks index it many times)."""
+        normals = self.normals.astype(float)
+        return [(normals[i], float(self.dists[i]), int(self.children[i, 0]), int(self.children[i, 1]))
+                for i in range(len(self))]
+
+
+def _packed_tree(tree):
+    nodes, leaves = tree
+    return (nodes if isinstance(nodes, PackedNodes) else PackedNodes.of(nodes)), list(leaves)
+
+
+def _plain_tree(tree):
+    nodes, leaves = tree
+    return (nodes.unpack() if isinstance(nodes, PackedNodes) else nodes), leaves
+
+
 def _tree_to_json(tree):
     nodes, leaves = tree
     return [[[float(v) for v in n[0]], n[1], n[2], n[3]] for n in nodes], list(leaves)
 
 
 def _tree_from_json(value):
-    import numpy as np
+    """A stored tree, packed (PackedNodes): it goes from the lookup worker to the main process and on to the
+    cross-check worker as three arrays."""
     nodes, leaves = value
-    return [(np.array(n[0]), n[1], n[2], n[3]) for n in nodes], list(leaves)
+    return PackedNodes.of(nodes), list(leaves)
 
 
 def _model_checks(task):
@@ -1100,6 +1197,7 @@ def _frame_cross_checks(task):
     placement, chunks per placement, placement rows {cell: pids}, ring {cell: cells})."""
     from world_chunk_estimate import placed_box
     owners, copies, order, trees, vis = task['owners'], task['copies'], task['order'], task['trees'], task['vis']
+    trees = {k: _plain_tree(t) for k, t in trees.items()}     # packed between the processes (PackedNodes)
     g, lx, ly, nx, ny = task['grid']
     nmodels, bounds, hidden, offs = task['models'], task['bounds'], task['hidden'], task['offs']
     fails = Failures()
@@ -1155,11 +1253,11 @@ def _frame_cross_checks(task):
     owned_total = task['owned_total']
     for cell, _, row in task['rows']:
         try:
-            bits = row_to_bits(decompress_row(row, (owned_total + 7) // 8), owned_total)
+            marked = set_bits(decompress_row(row, (owned_total + 7) // 8), owned_total)
         except ValueError as e:
             rows_fails.append('chunk %d,%d: placement row: %s' % (cell[0], cell[1], e))
             continue
-        seen = {base + k for k, b in enumerate(bits) if b}
+        seen = {base + k for k in marked}
         ring = {(cell[0] + dx, cell[1] + dy) for dx, dy in offs}
         cand = {r['pid'] for b in ring if b in records_of for r in records_of[b]}
         near = {r['pid'] for dx in (-1, 0, 1) for dy in (-1, 0, 1)
@@ -1337,7 +1435,7 @@ def validate(out, source=None, palette=None, jobs=1, cross_checks='pool'):
                         'chunk %d,%d: head leaf count differs from its subtree' % (c['cx'], c['cy']))
             try:
                 row = decompress_row(c['pvs'], nbytes)
-                vis[(c['cx'], c['cy'])] = {order[k] for k, b in enumerate(row_to_bits(row, len(order))) if b}
+                vis[(c['cx'], c['cy'])] = {order[k] for k in set_bits(row, len(order))}
             except ValueError as e:
                 part1.append('chunk %d,%d: PVS row: %s' % (c['cx'], c['cy'], e))
                 vis[(c['cx'], c['cy'])] = set()

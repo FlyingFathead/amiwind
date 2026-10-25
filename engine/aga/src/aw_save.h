@@ -20,7 +20,12 @@
 #define AW_CHANGE_FOLLOW 8U      /* following the player (the companion) when it was captured */
 #define AW_CHANGE_PICK 16U       /* PICK holds a levelled list's roll */
 #define AW_CHANGE_SCENE 32U      /* WHERE is a logical scene id (an old AWS4 actor row), else a cell */
-#define AW_CHANGE_FLAGS 63U
+/* Object state (v0.0.51, the scripts' Disable and Lock; aw_mwhost.c): an entry may carry only these. */
+#define AW_CHANGE_DISABLED 64U   /* Disable: hidden and not solid until Enable */
+#define AW_CHANGE_LOCK 128U      /* a script set its lock: the level (0 unlocked .. 100) in AW_CHANGE_LOCK_LEVEL */
+#define AW_CHANGE_LOCK_SHIFT 8
+#define AW_CHANGE_LOCK_LEVEL 0x7F00U
+#define AW_CHANGE_FLAGS (63U|AW_CHANGE_DISABLED|AW_CHANGE_LOCK|AW_CHANGE_LOCK_LEVEL)
 #define AW_CHANGE_ENTRY_BYTES 36
 typedef struct {
     uint32_t key;
@@ -70,6 +75,9 @@ int AW_SaveWrite(int slot);
 int AW_SaveRead(uint32_t profile,int slot);
 int AW_SaveProfiles(uint32_t *ids,char names[][32],int capacity);
 int AW_SaveDescription(uint32_t profile,int slot,char *out,int capacity);
+/* Why a slot has no loadable save (AW25-06: the load menu said "(empty)" for all of them alike). */
+enum {AW_SLOT_EMPTY,AW_SLOT_UNREADABLE,AW_SLOT_OTHER_DATA,AW_SLOT_OK};
+int AW_SaveSlotState(uint32_t profile,int slot);
 int AW_SaveLatest(uint32_t profile,char *label,int capacity);
 uint32_t AW_SaveProfile(void);
 int AW_AutosaveCount(void);
@@ -91,6 +99,10 @@ uint32_t AW_SaveChangeKey(uint32_t reference);
  * a loaded save's changes before the window spawns its actors. */
 extern int (*aw_save_changes_export)(aw_changes_t *changes);
 extern void (*aw_save_changes_import)(const aw_changes_t *changes);
+/* aw_mwhost.c sets these: the object state (AW_CHANGE_DISABLED, AW_CHANGE_LOCK) merged by key into the list the
+ * actors exported (after it), and read from a loaded save's list (after the actors' import). */
+extern int (*aw_save_objects_export)(aw_changes_t *changes);
+extern void (*aw_save_objects_import)(const aw_changes_t *changes);
 /* aw_scene.c AW_SceneSaveEntryRefuse (bound in aw_debug.c; NULL: no check): 1 when the saved scene and position lie
  * in a place marked for more Fast RAM than this start has; the refusal screen is up (CHIM-32MB-SAVE-ENTRY-48). */
 extern int (*aw_save_entry_refuse)(const char *scene,const float *position);

@@ -1,10 +1,12 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.50-dev (24 October 2026)._
+_Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.52 (next), 25 October 2026](#v0052-next-25-october-2026)
+- [v0.0.51: Let There Be More Inner Light, 25 October 2026](#v0051-let-there-be-more-inner-light-25-october-2026)
 - [v0.0.50: The Doors: Riders On The CHIM, 24 October 2026](#v0050-the-doors-riders-on-the-chim-24-october-2026)
 - [Build turnaround first, 24 October 2026](#build-turnaround-first-24-october-2026)
   - [Why the image is bigger than the original game](#why-the-image-is-bigger-than-the-original-game)
@@ -95,6 +97,49 @@ _Last updated with AmiWind v0.0.50-dev (24 October 2026)._
 [CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) — 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
+
+## v0.0.52 (next), 25 October 2026
+
+Decided by the maintainer on 25 October 2026: v0.0.51 ships what its third development build holds, so one update
+does not carry too much; everything else moves here. First: the coloured light of rooms such as the Heart Chamber,
+which the bake takes as brightness only ([INTERIOR-SUNLIGHT-COLOUR-51](BUGS.md)); the census office's own judged
+light ([CENSUS-OFFICE-BRIGHT-32](bugs/CENSUS-OFFICE-BRIGHT-32.md)); a larger CHIM model zone
+([CHIM-ZONE-BUDGET-33](bugs/CHIM-ZONE-BUDGET-33.md)); a builder that reruns only the stages whose inputs changed
+([BUILD-CUTOFF-WHOLE-ANCESTOR-51](bugs/BUILD-CUTOFF-WHOLE-ANCESTOR-51.md)). Then the rest of the v0.0.51 list below.
+
+The light input audit, started for v0.0.51 ([interior lighting](INTERIOR_LIGHTING.md#what-this-taught-us-every-light-input-first-then-any-brightness-knob)),
+goes on in v0.0.52: every light value the game data holds, against what the bake and the engine use. Found so far:
+rooms have no fog, though their cells carry a fog colour and density (the haze of the Dwemer ruins;
+[INTERIOR-FOG-UNUSED-51](BUGS.md)), and the fog distance could also cut drawing in heavy rooms; outdoors, each
+weather's ambient and sun colours are never used, only its sky and fog, so the land under an ash or blight storm
+at Red Mountain keeps a neutral light ([WEATHER-AMBIENT-SUN-UNUSED-51](BUGS.md)). Requested with it: characters
+shielding their eyes in ash and blight storms, as in Ald'ruhn ([ACTOR-STORM-POSE-51](BUGS.md)). Outdoor lights
+without a mesh come later ([CHIM-MESHLESS-LIGHTS-33](bugs/CHIM-MESHLESS-LIGHTS-33.md)).
+
+## v0.0.51: Let There Be More Inner Light, 25 October 2026
+
+v0.0.51 takes up what moved from v0.0.50. First the fixes that could not wait, then the game work.
+
+Done in the v0.0.51 release ([release notes](RELEASE-v0.0.51.md)); the interiors also get the light the original
+gives them from above ([INTERIOR-SUNLIGHT-UNBAKED-51](bugs/INTERIOR-SUNLIGHT-UNBAKED-51.md)), and the interior
+brightness default goes back to 1.0:
+
+- **Builds rebuild less.** An engine edit no longer rebuilds the CHIM world, and a helper added to a shared module no
+  longer does either ([BUILD-ENGINE-SOURCE-KEY-BROAD-36](bugs/BUILD-ENGINE-SOURCE-KEY-BROAD-36.md)).
+- **32 MB is a real 32 MB.** The extra CHIM cache now takes spare Fast RAM from 4 MiB up: Akulakhan's Chamber loads,
+  and the three old towns load with no "zone full" retry ([CHIM-AUTO-BANK-CLIFF-51](bugs/CHIM-AUTO-BANK-CLIFF-51.md)).
+- **The music through loads.** The CHIM world's reads feed the music between slices, and every load reports its
+  longest pause ([AUDIO-LOAD-29](BUGS.md)); the opening is judged on WinUAE.
+- **The game's scripts, object state.** Enable, Disable, locks, OnActivate and Activate run (doors first), kept in
+  saved games; EXPERIMENTAL, off by default ([the game's scripts](MWSCRIPT_BYTECODE.md)).
+- **The game's scripts, message boxes.** MessageBox shows its text with its numbers; a box with buttons waits for
+  the player's choice, and GetButtonPressed reads it (the same experimental switch).
+- **The bug register.** Bugs seen in three releases are listed with why they are not fixed yet, and a release does
+  not ship while one has no reason of record ([register rules](bugs/README.md)).
+
+Moved to v0.0.52, in order: the remaining long-persisting bugs (fixed, or deferred by the maintainer); doors into rooms
+that read the game's locks once a lock can be opened ([DOOR-LOAD-LOCKS-MISSING-51](BUGS.md)); the actor
+sizes; Bloodmoon; the Morrowind-style UI boxes; the old town frames as ordinary CHIM region frames.
 
 ## v0.0.50: The Doors: Riders On The CHIM, 24 October 2026
 

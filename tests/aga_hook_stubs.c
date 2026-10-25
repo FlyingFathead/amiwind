@@ -36,6 +36,11 @@ WEAK int AW_MenuHeaderLines(const char *text,int width,char lines[2][AW_MINIWIND
 }
 /* Demo playback's CHIM hook (aw_scenery.c): fixtures linking cl_parse.c without aw_scenery.c. */
 WEAK void (*aw_demo_map_begin)(void);
+/* The map load step (snd_dma.c, AUDIO-LOAD-29): fixtures linking sv_main.c or cl_parse.c without snd_dma.c. */
+WEAK const char *aw_load_phase = "";
+WEAK void S_LoadingMark(void) {}
+/* The music's dry count (aw_music.c): fixtures linking snd_dma.c without aw_music.c (its load meter reads it). */
+WEAK unsigned long AW_MusicSilentSpans(void) {return 0;}
 /* Region weather (aw_weather.c): fixtures linking r_sky.c without it see no weather table, so the
  * clear sky every earlier sky contract was written against (SKY-REDMOUNTAIN-BLUE-44). */
 WEAK void AW_WeatherInit(void) {}

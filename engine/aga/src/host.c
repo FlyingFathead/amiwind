@@ -692,18 +692,25 @@ void _Host_Frame (float time)
     }
 
 // process console commands
+    /* the parts of a frame, for the "Loading audio" line (AUDIO-LOAD-29); a load step's own mark wins inside */
+    aw_load_phase = "frame: commands";
     AW_SPIKE_STAGE (AW_SP_CBUF, Cbuf_Execute ());
+    if (aw_load_phase[0] == 'f') aw_load_phase = "frame: after the commands";
 
     if(AW_MovieActive()) {
+        aw_load_phase = "frame: movie";S_LoadingMark ();
         S_Update(vec3_origin,vec3_origin,vec3_origin,vec3_origin);
         AW_MovieUpdate();SCR_UpdateScreen();host_framecount++;return;
     }
 
     /* Keep input/audio/presentation time live while world clocks stand still. */
+    aw_load_phase = "frame: modal";S_LoadingMark ();
     AW_ModalFrame();
+    aw_load_phase = "frame: network";S_LoadingMark ();
     NET_Poll();
 
 // if running the server locally, make intentions now
+    aw_load_phase = "frame: send commands";S_LoadingMark ();
     if (sv.active)
         CL_SendCmd ();
 
@@ -714,11 +721,14 @@ void _Host_Frame (float time)
 //-------------------
 
 // check for commands typed to the host
+    aw_load_phase = "frame: console";S_LoadingMark ();
     Host_GetConsoleCommands ();
 
     if (sv.active) {
+        aw_load_phase = "frame: server";S_LoadingMark ();
         AW_Mark(5);AW_SPIKE_STAGE (AW_SP_SERVER, Host_ServerFrame ());AW_EndMark(5);
     }
+    aw_load_phase = "frame: after the server";S_LoadingMark ();
 
 //-------------------
 //
@@ -736,6 +746,7 @@ void _Host_Frame (float time)
 // fetch results from server
     if (cls.state == ca_connected)
     {
+        aw_load_phase = "frame: client";
         AW_SPIKE_STAGE (AW_SP_CLIENT, CL_ReadFromServer ());
     }
 
@@ -747,7 +758,9 @@ void _Host_Frame (float time)
      * Stopping music belongs to an explicit music stop or shutdown. */
     CDAudio_Update();
     S_ExtraUpdate();
+    aw_load_phase = "frame: screen";
     AW_SPIKE_STAGE (AW_SP_SCREEN, SCR_UpdateScreen ());
+    aw_load_phase = "frame: after the screen";
 
     AW_StreamPresented();
 
@@ -765,6 +778,7 @@ void _Host_Frame (float time)
         S_Update (vec3_origin, vec3_origin, vec3_origin, vec3_origin);
 
     AW_EndMark(3);
+    aw_load_phase = "frame: ticks (save, intro, wait)";
     AW_QuickCharTick();
     AW_TestBoxFrame();AW_TestPollFrame();
     if(!AW_ModalWorldFrozen())AW_IntroTick();

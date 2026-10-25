@@ -105,7 +105,14 @@ FIELDS = {'id': str, 'title': str, 'state': str, 'fixed_in': (str, type(None)),
 # Facts every bug found from v0.0.30 on must carry (project requirement, 9 October 2026).
 FACTS = ('reported_by', 'found_date', 'found_in', 'where', 'reproduction', 'duplicate_of', 'persists_in',
          'severity', 'severity_reason', 'family', 'related')
-OPTIONAL = ('tags', 'chim', 'build', 'reports', 'platform', 'platform_reason')
+OPTIONAL = ('tags', 'chim', 'build', 'reports', 'platform', 'platform_reason', 'waiting_on', 'deferred')
+# Why an open bug is not fixed yet (the maintainer, 24 October 2026: "lacks dependency"): waiting_on is "Lacks dependency:
+# <system>" (MWScript function, object state, inventory, journal, combat, jail system, renderer ...), deferred the
+# maintainer's written deferral "YYYY-MM-DD: reason". A bug open in LONG_PERSISTING releases or more needs one of them
+# or a place on that release's TODO list (persisting command, the release guard).
+WAITING_PREFIX = 'Lacks dependency: '
+DEFERRED_RE = re.compile(r'^\d{4}-\d{2}-\d{2}: \S.*$')
+LONG_PERSISTING = 3
 # Platform or emulator a bug was seen on (project requirement, 11 October 2026): "platform" in bugs.json, e.g.
 # "FS-UAE 3.1.66, JIT, A1200 68040 preset", "WinUAE 6.0.1", "A1200 + 68060 accelerator". Required for the maintainer's
 # game-side reports on numbered builds from v0.0.36 on; "unknown" or "not in game" only with platform_reason.
@@ -621,6 +628,7 @@ def validate(bugs, families=None):
         errors += validate_chim(b, where)
         errors += validate_build(b, where)
         errors += validate_platform(b, where)
+        errors += validate_waiting(b, where)
     for b in by_id.values():
         for r in b.get('related') or []:
             other = by_id.get(r)
@@ -633,6 +641,74 @@ def validate(bugs, families=None):
                 errors.append('%s: related %s is in the same family %s; the family already links them, '
                               'so list only bugs from other families' % (b['id'], r, b['family']))
     return errors
+
+
+def validate_waiting(b, where):
+    """waiting_on: "Lacks dependency: <system>"; deferred: "YYYY-MM-DD: reason"; one line each, open bugs only."""
+    errors = []
+    waiting, deferred = b.get('waiting_on'), b.get('deferred')
+    if 'waiting_on' in b and not (isinstance(waiting, str) and waiting.startswith(WAITING_PREFIX)
+                                  and len(waiting) > len(WAITING_PREFIX) and _line_ok(waiting, 120)):
+        errors.append('%s: waiting_on must be one line "%s<system>" of at most 120 characters' % (where, WAITING_PREFIX))
+    if 'deferred' in b and not (isinstance(deferred, str) and DEFERRED_RE.match(deferred) and _line_ok(deferred, 200)):
+        errors.append('%s: deferred must be one line "YYYY-MM-DD: reason" (the maintainer\'s deferral)' % where)
+    if (waiting or deferred) and b.get('state') != 'open':
+        errors.append('%s: waiting_on and deferred belong to open bugs; clear them when it is fixed or closed' % where)
+    return errors
+
+
+def releases_of(b):
+    """The releases (x.y.z, any devN or rcN of one release counted once) a bug persists in."""
+    seen = b.get('persists_in')
+    if not isinstance(seen, list):
+        return []
+    return sorted({re.sub(r'^v|-.*$', '', str(v)) for v in seen}, key=lambda v: [int(x) for x in v.split('.')
+                                                                                if x.isdigit()])
+
+
+def long_persisting(bugs, todo_text=None):
+    """[(bug, reason or None)] of open bugs seen in LONG_PERSISTING releases or more; the reason is why that is not a
+    failure: waiting on a missing dependency, deferred by the maintainer, or on the given TODO list."""
+    out = []
+    for b in sorted(bugs, key=lambda b: (-len(releases_of(b)), b['id'])):
+        if b.get('state') != 'open' or len(releases_of(b)) < LONG_PERSISTING:
+            continue
+        if b.get('waiting_on'):
+            reason = b['waiting_on']
+        elif b.get('deferred'):
+            reason = 'deferred by the maintainer, ' + b['deferred']
+        elif todo_text is not None and re.search(r'(?<![A-Z0-9-])%s(?![A-Z0-9-])' % re.escape(b['id']), todo_text):
+            reason = 'on the release TODO list'
+        else:
+            reason = None
+        out.append((b, reason))
+    return out
+
+
+TITLE_WORD_RE = re.compile(r'[a-z0-9]+')
+TITLE_STOP = frozenset('a an the of in on at to for and or is are be by with from its it as not no that this'.split())
+
+
+def title_words(text):
+    return {w for w in TITLE_WORD_RE.findall(str(text).casefold()) if w not in TITLE_STOP and len(w) > 2}
+
+
+def closest(bugs, title, limit=5):
+    """[(score, bug)] of the open bugs whose title shares the most words with TITLE (Jaccard of significant words)."""
+    words = title_words(title)
+    scored = []
+    for b in bugs:
+        if b.get('state') != 'open':
+            continue
+        other = title_words(b.get('title'))
+        if words and other:
+            score = len(words & other) / len(words | other)
+            if score > 0:
+                scored.append((score, b))
+    return sorted(scored, key=lambda item: (-item[0], item[1]['id']))[:limit]
+
+
+SAME_TITLE = 0.6
 
 
 def report_lines(b):
@@ -712,6 +788,10 @@ def facts_table(b, by_id, families):
             ('Persists in', persists_text(b)),
             ('Severity', '%s: %s' % (b['severity'], b['severity_reason']) if b.get('severity') else 'unknown'),
             ('Family', '%s (`%s`)' % (fam['title'], fam['key']) if fam else 'unknown')]
+    if b.get('waiting_on'):
+        rows.append(('Waiting on', b['waiting_on']))
+    if b.get('deferred'):
+        rows.append(('Deferred by the maintainer', b['deferred']))
     if is_chim(b):
         rows.append(('CHIM', '%s ([CHIM Engine tracker](CHIM_TRACKER.md))' % dict(CHIM_PARTS)[b['chim']]))
     rows += build_rows(b)
@@ -968,12 +1048,13 @@ def table(bugs):
     out = persisting_section(bugs)
     if out:
         out += ['### All bugs', '']
-    out += ['| ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Status |',
-           '| --- | --- | --- | --- | --- | --- | --- | --- |']
+    out += ['| ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Waiting on | Status |',
+           '| --- | --- | --- | --- | --- | --- | --- | --- | --- |']
     for b in sorted(bugs, key=lambda b: (ORDER[b['state']], b['id'])):
-        out.append('| %s | %s | %s | %s | %s | %s | %s | %s |' % (
+        waiting = b.get('waiting_on', '')[len(WAITING_PREFIX):] or ('deferred' if b.get('deferred') else '-')
+        out.append('| %s | %s | %s | %s | %s | %s | %s | %s | %s |' % (
             link(b), b['title'], b.get('severity', '-'), found_in_cell(b), b['state'], b['fixed_in'] or '-',
-            b['owner_accepted'] or '-', b['status']))
+            b['owner_accepted'] or '-', waiting, b['status']))
     for tag in TAGS:
         tagged = [b for b in sorted(bugs, key=lambda b: (ORDER[b['state']], b['id'])) if tag in b.get('tags', [])]
         if tagged:
@@ -1300,10 +1381,19 @@ def main(argv=None):
         x.add_argument('--platform', help='platform or emulator it was seen on, e.g. "FS-UAE 3.1.66, JIT, A1200 '
                                           '68040 preset"; "unknown" or "not in game" with --platform-reason')
         x.add_argument('--platform-reason')
+        x.add_argument('--waiting-on', help='the system the fix needs: "%s<system>" ("none" clears it)'
+                                            % WAITING_PREFIX)
+        x.add_argument('--deferred', help='the maintainer\'s written deferral: "YYYY-MM-DD: reason" ("none" clears it)')
     a = sub.add_parser('add'); a.add_argument('id'); a.add_argument('--title', required=True)
     a.add_argument('--found', required=True); a.add_argument('--status')
+    a.add_argument('--not-duplicate', action='store_true',
+                   help='add although an open bug has nearly the same title (looked up and different)')
     a.add_argument('--tag', action='append', choices=TAGS, default=[])
     facts_args(a, True)
+    pp = sub.add_parser('persisting', help='open bugs seen in %d releases or more, and why each is not fixed yet'
+                                           % LONG_PERSISTING)
+    pp.add_argument('--todo', type=Path, help='the release TODO list: a bug named there counts as scheduled')
+    pp.add_argument('--fail', action='store_true', help='exit 1 when one has no reason of record')
     s = sub.add_parser('set'); s.add_argument('id'); s.add_argument('--state', choices=STATES)
     s.add_argument('--fixed-in'); s.add_argument('--status'); s.add_argument('--owner-accepted')
     s.add_argument('--tag', action='append', choices=TAGS, default=[])
@@ -1313,6 +1403,19 @@ def main(argv=None):
     bugs = load()
     families = load_families()
     by_id = {b['id']: b for b in bugs}
+    if args.cmd == 'persisting':
+        # PERSISTING MUST MEAN SCHEDULED (the maintainer, 24 October 2026): BUILD-ENGINE-SOURCE-KEY-BROAD-36 was seen
+        # in five releases and never repaired. Read only.
+        todo = args.todo.read_text(encoding='utf-8') if args.todo else None
+        rows = long_persisting(bugs, todo)
+        for b, reason in rows:
+            print('%-44s %-8s %s releases (%s): %s' % (b['id'], b.get('severity') or '-', len(releases_of(b)),
+                                                       ', '.join(releases_of(b)), reason or 'NOT SCHEDULED'))
+        missing = [b['id'] for b, reason in rows if reason is None]
+        print('%d open bugs seen in %d releases or more, %d without a reason of record%s' % (
+            len(rows), LONG_PERSISTING, len(missing), '' if todo is not None else ' (no --todo given)'),
+            file=sys.stderr)
+        return 1 if args.fail and missing else 0
 
     def apply_facts(b):
         for opt, key in (('reported_by', 'reported_by'), ('found_date', 'found_date'), ('where', 'where'),
@@ -1340,6 +1443,12 @@ def main(argv=None):
                 b.pop('platform_reason', None)
         if args.platform_reason is not None:
             b['platform_reason'] = args.platform_reason
+        for opt in ('waiting_on', 'deferred'):
+            value = getattr(args, opt, None)
+            if value == 'none':
+                b.pop(opt, None)
+            elif value is not None:
+                b[opt] = value
         apply_build(b)
 
     def apply_build(b):
@@ -1367,6 +1476,16 @@ def main(argv=None):
     if args.cmd == 'add':
         if args.id in by_id:
             raise SystemExit('ID exists: ' + args.id)
+        # look it up first (BUILD-CHIM-KEY-ENGINE-SOURCES-49 was BUILD-ENGINE-SOURCE-KEY-BROAD-36 registered again)
+        near = closest(bugs, args.title)
+        if near:
+            print('closest open bugs (a problem seen again is a report on its entry, bug_register.py report):')
+            for score, other in near:
+                print('  %.2f %-44s %s' % (score, other['id'], other['title']))
+        same = [other['id'] for score, other in near if score >= SAME_TITLE]
+        if same and not args.not_duplicate:
+            raise SystemExit('refused: nearly the same title as open %s; add a report there, or pass --not-duplicate '
+                             'after reading it' % ', '.join(same))
         page = 'bugs/%s.md' % args.id
         b = {'id': args.id, 'title': args.title, 'state': 'open', 'fixed_in': None, 'owner_accepted': None,
              'status': args.status or 'Reported in %s; cause unknown.' % args.found,
@@ -1388,6 +1507,9 @@ def main(argv=None):
             b['state'] = args.state
             if args.state != 'fixed':
                 b['fixed_in'] = None
+            if args.state != 'open':
+                b.pop('waiting_on', None)
+                b.pop('deferred', None)
         if args.fixed_in:
             b['fixed_in'] = args.fixed_in
         if args.status:

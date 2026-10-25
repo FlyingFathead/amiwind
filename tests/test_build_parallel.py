@@ -423,5 +423,47 @@ class ParallelBuildTests(unittest.TestCase):
         self.assertNotIn('marker.write_text', source)
 
 
+class EndProcessTreeTests(unittest.TestCase):
+    """WIN-02: a cancelled stage ends with everything it started, also on Windows (taskkill /T), where terminate()
+    and kill() ended the child only."""
+
+    class Process:
+        pid = 4242
+        def __init__(self):
+            self.calls = []
+        def terminate(self):
+            self.calls.append('terminate')
+        def kill(self):
+            self.calls.append('kill')
+
+    def test_windows_ends_the_tree_politely_then_by_force(self):
+        import build_parallel
+        process, runs = self.Process(), []
+        with patch.object(build_parallel.os, 'name', 'nt'), \
+                patch.object(build_parallel.subprocess, 'run', side_effect=lambda argv, **kw: runs.append(argv)):
+            build_parallel.end_process_tree(process, force=False)
+            build_parallel.end_process_tree(process, force=True)
+        self.assertEqual(runs, [['taskkill', '/T', '/PID', '4242'], ['taskkill', '/T', '/F', '/PID', '4242']])
+        self.assertEqual(process.calls, [])
+
+    def test_windows_without_taskkill_falls_back(self):
+        import build_parallel
+        process = self.Process()
+        with patch.object(build_parallel.os, 'name', 'nt'), \
+                patch.object(build_parallel.subprocess, 'run', side_effect=OSError('no taskkill')):
+            build_parallel.end_process_tree(process, force=False)
+            build_parallel.end_process_tree(process, force=True)
+        self.assertEqual(process.calls, ['terminate', 'kill'])
+
+    @unittest.skipUnless(os.name == 'posix', 'process groups are POSIX')
+    def test_posix_signals_the_group(self):
+        import build_parallel, signal
+        sent = []
+        with patch.object(build_parallel.os, 'killpg', side_effect=lambda pid, sig: sent.append((pid, sig))):
+            build_parallel.end_process_tree(self.Process(), force=False)
+            build_parallel.end_process_tree(self.Process(), force=True)
+        self.assertEqual(sent, [(4242, signal.SIGTERM), (4242, signal.SIGKILL)])
+
+
 if __name__ == '__main__':
     unittest.main()

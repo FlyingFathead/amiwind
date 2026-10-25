@@ -38,6 +38,13 @@ typedef struct {
     void (*journal_set)(int topic,int32_t index,int advance);
     void (*notyet)(int name_string,int script_name_string); /* called once per function name */
     void (*warn)(const char *what,int script_name_string);   /* once per script and kind */
+    /* object state (AWM_ENABLE .. AWM_GETLOCKED as OP): Enable/Disable/Unlock/Lock VALUE (-1: the level it had)
+     * return 0; GetDisabled 1/0, GetLocked the level (0 unlocked) */
+    int32_t (*object)(int instance,int target,int op,int32_t value);
+    /* MessageBox: TEXT a string index, NUMBERS its NUMBER values in order, BUTTONS COUNT string indexes (big-endian
+     * u16 each, as in the code); button() returns the button the player chose once, then -1 until the next choice */
+    void (*message)(int instance,int text,const float *numbers,int number,const unsigned char *buttons,int count);
+    int (*button)(int instance);
 } aw_mwvm_host_t;
 
 typedef struct {
@@ -58,6 +65,7 @@ typedef struct {
 #define AWI_CELLCHANGED 16 /* CellChanged is true on its next run */
 #define AWI_INTERIOR 32    /* in a room: active while the room is loaded */
 #define AWI_ACTIVE 64      /* within the activation range this frame */
+#define AWI_ACTIVATED 128  /* the player used its object and the script took the use: OnActivate reads 1 once */
 
 typedef struct {
     unsigned long frames,runs,skipped_quiet,skipped_far,deferred,ops,max_ops_frame,aborted,notyet_calls;

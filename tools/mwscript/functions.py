@@ -348,7 +348,13 @@ RUN = {'playsound', 'playsoundvp', 'playsound3d', 'playsound3dvp', 'playloopsoun
        'stopsound', 'getsoundplaying', 'say', 'say3d', 'saydone', 'streammusic',
        'journal', 'setjournalindex', 'getjournalindex',
        'getsecondspassed', 'random', 'menumode', 'cellchanged', 'startscript', 'stopscript', 'scriptrunning',
-       'getdistance', 'getsquareroot'}
+       'getdistance', 'getsquareroot',
+       # object state (v0.0.51): an object hidden and not solid, a lock's level
+       'enable', 'disable', 'getdisabled', 'lock', 'unlock', 'getlocked',
+       # activation (v0.0.51): a script that reads OnActivate takes over its object's use; Activate does it
+       'onactivate', 'activate',
+       # messages (v0.0.51): a message box with its buttons, the button the player chose
+       'messagebox', 'getbuttonpressed'}
 
 # Groups the measurement reports as "the engine does not have it yet" (the brief's list), and the rest.
 MISSING_GROUPS = ('ai', 'inventory', 'combat', 'spells', 'position')

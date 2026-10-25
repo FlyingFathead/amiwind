@@ -157,5 +157,48 @@ class ShipLightTests(unittest.TestCase):
         self.assertIn('surf->styles[k] == AW_WARM_STYLE', (src / 'r_surf.c').read_text(encoding='utf-8'))
 
 
+class InteriorSunlightTests(unittest.TestCase):
+    """INTERIOR-SUNLIGHT-UNBAKED-51 (v0.0.51): the cell sunlight (AMBI bytes 4-6) lights an interior as a directional
+    light from the original's one fixed interior direction (OpenMW interiorSunPos (-1, 45 deg, 45 deg) in radians);
+    the bake had left it out, so Akulakhan's Chamber (ambient luma 27, sunlight 174) was near black."""
+    CHAMBER = {'ambient': [20, 30, 30], 'sunlight': [255, 140, 140], 'lights': []}
+
+    def test_the_direction_is_the_originals(self):
+        want = np.array([-1.0, np.pi / 4, np.pi / 4])
+        np.testing.assert_allclose(il.INTERIOR_SUN_DIRECTION, want / np.linalg.norm(want))
+
+    def test_a_face_gets_the_sunlight_by_its_facing(self):
+        ambient = float(np.dot(self.CHAMBER['ambient'], il.LUMA))
+        sun = float(np.dot(self.CHAMBER['sunlight'], il.LUMA))
+        point = np.zeros(3)
+        toward, away = il.INTERIOR_SUN_DIRECTION, -il.INTERIOR_SUN_DIRECTION
+        self.assertAlmostEqual(il.point_light(point, self.CHAMBER, sun_normal=toward), ambient + sun, places=6)
+        self.assertAlmostEqual(il.point_light(point, self.CHAMBER, sun_normal=away), ambient, places=6)
+        floor = np.array([0.0, 0.0, 1.0])
+        self.assertAlmostEqual(il.point_light(point, self.CHAMBER, sun_normal=floor),
+                               ambient + sun * il.INTERIOR_SUN_DIRECTION[2], places=6)
+        # no face (an actor, a placed model): its share of the sunlight, lit from every side
+        self.assertAlmostEqual(il.point_light(point, self.CHAMBER), ambient + sun * il.SUN_ACTOR_SHARE, places=6)
+        # without the term, or without sunlight: the ambient alone, as before
+        self.assertAlmostEqual(il.point_light(point, {**self.CHAMBER, 'sunlight_term': False}, sun_normal=floor),
+                               ambient, places=6)
+        self.assertAlmostEqual(il.point_light(point, {'ambient': [20, 30, 30], 'lights': []}, sun_normal=floor),
+                               ambient, places=6)
+
+    def test_a_baked_floor_carries_it_with_or_without_the_lamps_facing_term(self):
+        poly = np.array([[0., 0, 0], [32, 0, 0], [32, 32, 0], [0, 32, 0]])
+        axes = np.array([[1., 0], [0, 1], [0, 0]])
+        for facing in (False, True):
+            lighting = {**self.CHAMBER, 'facing': facing}
+            value = il.bake_surface(poly, axes, np.zeros(2), np.eye(3), np.zeros(3), lighting)[0]
+            want = np.dot(self.CHAMBER['ambient'], il.LUMA) + np.dot(self.CHAMBER['sunlight'], il.LUMA) \
+                * il.INTERIOR_SUN_DIRECTION[2]
+            self.assertEqual(value, round(want), facing)
+
+    def test_the_judged_ship_keeps_its_light(self):
+        # OPENING-BRIGHT-31 was judged against the original without the term: the ship's profile leaves it out
+        self.assertFalse(il.cell_lighting(SHIP)['sunlight_term'])
+
+
 if __name__ == '__main__':
     unittest.main()

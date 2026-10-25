@@ -208,10 +208,12 @@ class DoorGraphTests(unittest.TestCase):
         mib = 1024 * 1024
         self.assertEqual(limits['zone_room_bytes'], zone - 32 * 1024)
         self.assertEqual(limits['min_fast_ram_mib'], 32)
-        self.assertEqual(limits['room_bytes_min_fast'], zone + 8 * mib - 32 * 1024)
-        # Measured: 16 MiB keeps the 11 MiB heap and no bank (0 MiB free); 32 MiB: heap 13, 14 MiB free, one 8 MiB
-        # bank (FS-UAE, 23 October 2026); 64 and 128 MiB: heaps 20 and 24 (RAM-REQUIREMENT-32MB-48's tests).
-        for fast, heap, bank in ((16, 11, 0), (32, 13, 8), (64, 20, 29), (128, 24, 81)):
+        self.assertEqual(limits['room_bytes_min_fast'], zone + 7 * mib - 32 * 1024)
+        # Measured: 16 MiB keeps the 11 MiB heap and no bank (0 MiB free); 32 MiB: heap 13 and 13 MiB free (the v0.0.50
+        # final, FS-UAE, 24 October 2026: 14 MiB on 23 October), so a 7 MiB budget: one 7 MiB bank since the first bank
+        # needs 4 MiB (none with the 8 MiB of before, CHIM-AUTO-BANK-CLIFF-51); 64 and 128 MiB: heaps 20 and 24
+        # (RAM-REQUIREMENT-32MB-48's tests).
+        for fast, heap, bank in ((16, 11, 0), (32, 13, 7), (64, 20, 28), (128, 24, 80)):
             plan = EL.fast_ram_memory(fast)
             self.assertEqual((plan['heap_mb'], plan['bank_bytes'] // mib), (heap, bank), fast)
         self.assertEqual(EL.fast_ram_memory(32)['free_after_heap_mib'], EL.MEASURED_FAST['free_after_heap_mib'])

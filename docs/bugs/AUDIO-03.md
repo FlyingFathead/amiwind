@@ -12,6 +12,7 @@
 | Persists in | v0.0.29, v0.0.30-rc1, v0.0.31-dev2 (last seen) |
 | Severity | medium: Audible crackle at one scene change; the game continues. |
 | Family | Music and sound (`audio`) |
+| Deferred by the maintainer | 2026-10-25: the maintainer deferred it to v0.0.52; it waits on his WinUAE listen of the post-movie load |
 
 <!-- END GENERATED FACTS -->
 
@@ -78,7 +79,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - AUDIO-EFFECTS-DEFAULT-29 (no report page): Effects volume should default to 75%
 - AUDIO-ENTER-29 (no report page): Sub-second soundtrack cut on Enter to follow the guard
 - [AUDIO-HOST-LOAD-33](AUDIO-HOST-LOAD-33.md): Music and sound crackle when the emulator shares a fully loaded host CPU
-- AUDIO-LOAD-29 (no report page): OST crackles under heavy loading
+- [AUDIO-LOAD-29](AUDIO-LOAD-29.md): OST crackles under heavy loading
 - [AUDIO-LOGO-31](AUDIO-LOGO-31.md): Music crackles while the startup logo plays (WinUAE)
 - [AUDIO-NEWGAME-30](AUDIO-NEWGAME-30.md): Music crackles when confirming New Game (WinUAE)
 - [AUDIO-STOP-CHANNEL-RANGE-39](AUDIO-STOP-CHANNEL-RANGE-39.md): Stopping an entity sound skips half the dynamic mixer slots

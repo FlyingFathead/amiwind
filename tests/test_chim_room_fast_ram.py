@@ -87,10 +87,11 @@ class RoomFastRam(unittest.TestCase):
         self.assertEqual(gate['min_fast_room_bytes'], plan['room_bytes_min_fast'])
         self.assertEqual(gate['block_bytes_min_fast'], plan['block_bytes_min_fast'])
         self.assertEqual(gate['min_fast_ram_mib'], H.SAFE_FAST_MB)
-        # the measured figures (docs/chim/DOOR_GRAPH.md): the 32 MB room holds 15,384,576 bytes; the 16 MB zone alone
-        # (7,012,352 when the plan was made) follows the engine's built heap and the Hunk it keeps, so it is read from
-        # the sources (6,995,968 with the hinged doors' engine), never pinned here
-        self.assertEqual(plan['room_bytes_min_fast'], 15384576)
+        # the measured figures (docs/chim/DOOR_GRAPH.md): the 32 MB room holds 14,336,000 bytes (the zone and the
+        # 7 MiB bank of the v0.0.50 measurement; 15,384,576 with the 8 MiB bank assumed before CHIM-AUTO-BANK-CLIFF-51);
+        # the 16 MB zone alone (7,012,352 when the plan was made) follows the engine's built heap and the Hunk it keeps,
+        # so it is read from the sources (6,995,968 with the hinged doors' engine), never pinned here
+        self.assertEqual(plan['room_bytes_min_fast'], 14336000)
         self.assertTrue(6 << 20 < plan['zone_room_bytes'] < plan['room_bytes_min_fast'], plan['zone_room_bytes'])
         # the door graph's room plan note and the gate's 16 MB test use the same comparison
         need = plan['zone_room_bytes'] + 1

@@ -56,6 +56,7 @@ static void log_event(const char *why) {
     if(events) AW_LogPrintf(AW_LOG_MUSIC_EVENTS,"%ld,%s,%d,%d,%s,%lu,%lu\n",(long)(Sys_FloatTime()*1000),why,mode,current,opened_file,played,total);
 }
 void AW_MusicSceneEvent(const char *why) {log_event(why);}
+unsigned long AW_MusicSilentSpans(void) {return underruns;}
 static void close_music(void) {
     /* An outstanding read is abandoned, never waited for: its reader closes
      * when the late reply arrives (AW_AReadService). */

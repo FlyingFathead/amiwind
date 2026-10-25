@@ -79,7 +79,8 @@ static int operand_bytes(const unsigned char *p,unsigned long left){
     case AWM_NEGI:case AWM_ADDF:case AWM_SUBF:case AWM_MULF:case AWM_DIVF:case AWM_NEGF:case AWM_EQI:case AWM_NEI:
     case AWM_LTI:case AWM_LEI:case AWM_GTI:case AWM_GEI:case AWM_EQF:case AWM_NEF:case AWM_LTF:case AWM_LEF:
     case AWM_GTF:case AWM_GEF:case AWM_POP:case AWM_SAYDONE:case AWM_SECONDS:case AWM_RANDOM:case AWM_MENUMODE:
-    case AWM_CELLCHANGED:case AWM_SQRT:return 0;
+    case AWM_CELLCHANGED:case AWM_SQRT:case AWM_ENABLE:case AWM_DISABLE:case AWM_GETDISABLED:case AWM_LOCK:
+    case AWM_UNLOCK:case AWM_GETLOCKED:case AWM_ONACTIVATE:case AWM_ACTIVATE:case AWM_GETBUTTONPRESSED:return 0;
     case AWM_PUSHB:case AWM_GETL:case AWM_SETL:case AWM_SETLS:return 1;
     case AWM_JMP:case AWM_JZ:case AWM_PUSHW:case AWM_GETG:case AWM_SETG:case AWM_SETGS:case AWM_GETJ:case AWM_SETJ:
     case AWM_JOURNAL:case AWM_REF:case AWM_PLAYSOUND:case AWM_PLAYSOUNDVP:case AWM_PLAYSOUND3D:case AWM_PLAYSOUND3DVP:
@@ -87,7 +88,7 @@ static int operand_bytes(const unsigned char *p,unsigned long left){
     case AWM_STARTSCRIPT:case AWM_STOPSCRIPT:case AWM_SCRIPTRUNNING:case AWM_DISTANCE:return 2;
     case AWM_GETM:case AWM_SETM:case AWM_SETMS:case AWM_QUERY:return 3;
     case AWM_PUSHL:case AWM_PUSHF:case AWM_SAY:return 4;
-    case AWM_NOTYET:return left>=5?4+2*p[4]:-1;
+    case AWM_NOTYET:case AWM_MESSAGEBOX:return left>=5?4+2*p[4]:-1;
     }
     return -1;
 }
@@ -114,6 +115,7 @@ static int check_code(const unsigned char *code,unsigned long n,int nlocals){
         case AWM_STARTSCRIPT:case AWM_STOPSCRIPT:case AWM_SCRIPTRUNNING:if((int)U16(o)>=vm.nscrp)return 0;break;
         case AWM_QUERY:if(o[0]==0 || o[0]>=AWQ_COUNT)return 0;break;
         case AWM_NOTYET:if((o[2]&0x1F)>AW_MWVM_STACK)return 0;break;
+        case AWM_MESSAGEBOX:if(o[2]>0x1F)return 0;break;
         }
         i+=1+k;
     }
@@ -424,6 +426,32 @@ static int run(int k){
             if(r<1)r=1;
             for(i=0;i<20;i++){float n=0.5f*(r+x/r);if(n==r)break;r=n;}
             sp[-1].f=r;break;}
+        /* object state: carried out by the host (aw_mwhost.c), kept by reference in saved games */
+        case AWM_ENABLE:case AWM_DISABLE:case AWM_UNLOCK:
+            if(h && h->object)h->object(k,target,(int)op,0);
+            acted=1;target=AW_MWVM_SELF;break;
+        case AWM_LOCK:
+            --sp;if(h && h->object)h->object(k,target,(int)op,sp->i);
+            acted=1;target=AW_MWVM_SELF;break;
+        case AWM_GETDISABLED:case AWM_GETLOCKED:
+            sp->i=h && h->object?h->object(k,target,(int)op,0):0;sp++;target=AW_MWVM_SELF;break;
+        /* activation: OnActivate is 1 once after the player's use (the instance's AWI_ACTIVATED, set by the host
+         * when it took the use); Activate hands the use back to the object */
+        case AWM_ONACTIVATE:
+            sp->i=0;
+            if(vm.inst[k].flags&AWI_ACTIVATED){vm.inst[k].flags&=~AWI_ACTIVATED;sp->i=1;}
+            sp++;target=AW_MWVM_SELF;break;
+        case AWM_ACTIVATE:
+            if(h && h->object)h->object(k,target,(int)op,0);
+            acted=1;target=AW_MWVM_SELF;break;
+        /* messages: the numbers leave the stack in the order they were pushed */
+        case AWM_MESSAGEBOX:{
+            int number=pc[2],i;float numbers[0x1F];
+            sp-=number;
+            for(i=0;i<number;i++)numbers[i]=sp[i].f;
+            if(h && h->message)h->message(k,(int)U16(pc),numbers,number,pc+4,pc[3]);
+            pc+=4+2*pc[3];acted=1;target=AW_MWVM_SELF;break;}
+        case AWM_GETBUTTONPRESSED:sp->i=h && h->button?h->button(k):-1;sp++;target=AW_MWVM_SELF;break;
         default:goto done;   /* unreachable: every opcode was checked at load */
         }
     }

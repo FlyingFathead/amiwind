@@ -57,10 +57,30 @@ class WiringTests(unittest.TestCase):
         self.assertLess(save.index('AW_SaveFoldActors(&world,&pending_changes)'),
                         save.index('AW_BarrierLoad();AW_OpeningSpawn();'))
         self.assertIn('AW_SaveEncodeChanges(raw,AW_SAVE_BYTES,&world,&save_changes)', save)
+        # object state (v0.0.51, the scripts' Disable and Lock): merged after the actors' export, read after their
+        # import, set by the script host
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        self.assertLess(save.index('aw_save_changes_export(&save_changes)'), save.index('aw_save_objects_export(&save_changes)'))
+        self.assertLess(save.index('aw_save_changes_import(&pending_changes)'),
+                        save.index('aw_save_objects_import(&pending_changes)'))
+        self.assertIn('aw_save_objects_export=objects_export;aw_save_objects_import=objects_import;', host)
         # death stays (no respawn yet), also for an actor a level change spawned again from its map; a load's (or a
         # new map's) changes reach the scene's own actors at the next window tick, after the combat set-up
         self.assertIn('c->dead = c->dead || state == 2;', actors)
         self.assertLess(actors.index('if (apply_pending)\n\t\tApplyLoaded ();'), actors.index('SpawnQueued ();\n\tif (++n % 10)'))
+
+    def test_load_menu_says_why_a_slot_cannot_load(self):
+        # AW25-06: absent, unreadable and other-data saves were all "(empty)"; the slot state is read once at the
+        # menu's refresh (not every frame) and only for a slot without a loadable save
+        menu = (SRC / 'aw_savemenu.c').read_text(encoding='utf-8')
+        save = (SRC / 'aw_save.c').read_text(encoding='utf-8')
+        self.assertIn('int AW_SaveSlotState(uint32_t profile,int slot)', save)
+        for reason in ('" (unreadable)"', '" (other game data or build)"', '" (empty)"'):
+            self.assertIn(reason, menu)
+        refresh = menu[menu.index('static void refresh(void)'):menu.index('static const char *slot_reason')]
+        self.assertIn('AW_SaveSlotState(', refresh)
+        draw = menu[menu.index('void AW_SaveMenuDraw(void)'):]
+        self.assertNotIn('AW_SaveSlotState(', draw)
 
 
 if __name__ == '__main__':

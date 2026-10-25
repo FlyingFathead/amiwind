@@ -136,6 +136,7 @@ void AW_SaveSpawn(void)
          * entries it can place (cells) before the window spawns its actors */
         if(!pending_changes.count)AW_SaveFoldActors(&world,&pending_changes);
         if(aw_save_changes_import)aw_save_changes_import(&pending_changes);
+        if(aw_save_objects_import)aw_save_objects_import(&pending_changes);
         AW_BarrierLoad();AW_OpeningSpawn();
     }
     for(i=1;i<sv.num_edicts;i++){
@@ -234,7 +235,8 @@ int AW_SaveWrite(int slot)
     /* Keep larger serialized storage off the fixed Amiga task stack. */
     raw=(byte *)malloc(AW_SAVE_BYTES);if(!raw)return 0;
     save_changes.count=0;
-    if(aw_save_changes_export && aw_save_changes_export(&save_changes)<0){
+    if((aw_save_changes_export && aw_save_changes_export(&save_changes)<0) ||
+       (aw_save_objects_export && aw_save_objects_export(&save_changes)<0)){
         free(raw);Con_Printf("Save change list incomplete; previous saves retained.\n");return 0;
     }
     n=AW_SaveEncodeChanges(raw,AW_SAVE_BYTES,&world,&save_changes);if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return 0;}
@@ -322,6 +324,22 @@ int AW_SaveDescription(uint32_t profile,int slot,char *out,int capacity)
     /* Load stable character IDs before AWS1/2/3/4 decoding resolves save IDs. */
     if(!AW_CharacterLoad() || newest(profile,slot,&info)<0){out[0]=0;return 0;}
     snprintf(out,capacity,"%s / %s / L%ld",info.story.name,info.scene,(long)info.character.level);return 1;
+}
+/* The best state of a slot's two generations: no file, a file that does not decode (damaged, or a format this build
+ * cannot read), a save of other game data or another build's content, or a loadable save. */
+int AW_SaveSlotState(uint32_t profile,int slot)
+{
+    char filename[384];byte *raw;FILE *f;int n,generation,best=AW_SLOT_EMPTY,state;aw_save_t *info;
+    raw=(byte *)malloc(AW_SAVE_BYTES);info=(aw_save_t *)malloc(sizeof(aw_save_t));
+    if(!raw || !info){free(raw);free(info);return AW_SLOT_EMPTY;}
+    for(generation=0;generation<2;generation++){
+        if(!path(filename,sizeof(filename),profile,slot,generation) || !(f=fopen(filename,"rb")))continue;
+        n=fread(raw,1,AW_SAVE_BYTES,f);fclose(f);
+        if(!AW_SaveDecodeChanges(raw,n,info,NULL) || info->profile!=profile)state=AW_SLOT_UNREADABLE;
+        else state=content() && !memcmp(info->content,content_id,32)?AW_SLOT_OK:AW_SLOT_OTHER_DATA;
+        if(state>best)best=state;
+    }
+    free(raw);free(info);return best;
 }
 static int profile_entry(const char *directory,const char *entry,uint32_t *id,char name[32])
 {

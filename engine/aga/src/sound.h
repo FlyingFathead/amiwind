@@ -107,6 +107,8 @@ double S_SceneVoiceRemaining(void);
 void S_SceneVoiceReport(void);
 void S_Update (vec3_t origin, vec3_t v_forward, vec3_t v_right, vec3_t v_up);
 void S_ExtraUpdate (void);
+void S_LoadingBegin (void);		/* AUDIO-LOAD-29: the mixer's load statistics, begun at the plaque */
+void S_LoadingReport (void);	/* ... and printed at its end */
 
 sfx_t *S_PrecacheSound (char *sample);
 void S_TouchSound (char *sample);

@@ -4,12 +4,23 @@
 static int active,load_mode,profile_count,profile_at,row,confirm;
 static uint32_t profiles[32];
 static char names[32][32],descriptions[21][96],notice[80];
+static unsigned char slot_states[21];
 static void refresh(void)
 {
     int i;
     for(i=0;i<21;i++){
-        descriptions[i][0]=0;
-        if(profile_count)AW_SaveDescription(profiles[profile_at],i,descriptions[i],sizeof(descriptions[i]));
+        descriptions[i][0]=0;slot_states[i]=AW_SLOT_EMPTY;
+        if(profile_count && !AW_SaveDescription(profiles[profile_at],i,descriptions[i],sizeof(descriptions[i])))
+            slot_states[i]=(unsigned char)AW_SaveSlotState(profiles[profile_at],i);
+    }
+}
+/* AW25-06: a slot without a loadable save says why, not "(empty)" for every case. */
+static const char *slot_reason(int i)
+{
+    switch(slot_states[i]){
+    case AW_SLOT_UNREADABLE:return " (unreadable)";
+    case AW_SLOT_OTHER_DATA:return " (other game data or build)";
+    default:return " (empty)";
     }
 }
 int AW_SaveMenuOpen(int loading)
@@ -46,7 +57,10 @@ int AW_SaveMenuKey(int key)
     }
     if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)row=(row+(key==K_UPARROW?slots-1:1))%slots;
     if(key==K_ENTER){
-        if(load_mode){if(profile_count && descriptions[row][0])confirm=1;else strcpy(notice,"No valid compatible save in this slot.");}
+        if(load_mode){if(profile_count && descriptions[row][0])confirm=1;
+            else strcpy(notice,slot_states[row]==AW_SLOT_UNREADABLE?"This save cannot be read (damaged or another format).":
+                               slot_states[row]==AW_SLOT_OTHER_DATA?"This save belongs to other game data or another build.":
+                               "No save in this slot.");}
         else if(profile_count && descriptions[row][0])confirm=1;
         else if(AW_SaveWrite(row)){AW_SaveMenuOpen(0);strcpy(notice,"Saved.");}
         else strcpy(notice,"Save failed. Previous saves retained.");
@@ -68,7 +82,7 @@ void AW_SaveMenuDraw(void)
         y=59+(i-start)*21;
         if(i==row)AW_UIFill(10,y,300,20,AW_UIColor(54,47,32));
         if(i==0)strcpy(line,"Quicksave");else sprintf(line,i<5?"Manual %ld":"Autosave %ld",(long)(i<5?i:i-4));
-        if(!descriptions[i][0])strcat(line," (empty)");
+        if(!descriptions[i][0])strcat(line,slot_reason(i));
         AW_UITextBox(13,y,294,20,line,gold);
     }
     AW_UISmallBegin();

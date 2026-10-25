@@ -1,10 +1,11 @@
 # Earlier README sections
 
-_Last updated with AmiWind v0.0.50 (24 October 2026)._
+_Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.48: Inner CHIM & Actors On Stage](#v0048-inner-chim--actors-on-stage)
 - [v0.0.47: CHIM: The More, The Merrier](#v0047-chim-the-more-the-merrier)
 - [v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes](#v0046-red-mountain-getting-red-a-whole-heap-of-fixes)
 - [v0.0.45: CHIM Streaming Improved, Guard Torches Are Back](#v0045-chim-streaming-improved-guard-torches-are-back)
@@ -45,6 +46,15 @@ _Last updated with AmiWind v0.0.50 (24 October 2026)._
 <!-- contents end -->
 
 The front page ([README](../README.md)) used to carry these sections. They are dated records of earlier releases and of the work around them, kept as written; where one disagrees with the front page, the front page is newer. The release notes of each version are in `docs/RELEASE-v*.md`.
+
+## v0.0.48: Inner CHIM & Actors On Stage
+
+The indoors follow the outdoors onto CHIM: 1,132 of the base game's 1,134 interiors are CHIM rooms, their models and
+textures stored once. The people and creatures the game places in them stand where it puts them, grounded when the
+game is built ([actor placement](ACTOR_PLACEMENT.md)), with their full set of animations and their own voices,
+and the plants in the rooms can be picked. There are a Stats window and a Magic window placeholder, the original
+movement speeds, burning campfires and the original's sound markers. CHIM moves to 0.2.2 with a compatibility table,
+and the builder rebuilds less and keeps more cores busy.
 
 ## v0.0.47: CHIM: The More, The Merrier
 
@@ -1043,7 +1053,7 @@ complete package inclusion remain pending; dev2 has not shipped.
 
 Update (v0.0.44, 19 October 2026): the notes above are from 14 and 15 October 2026 and describe states that have
 since passed. The current state is in
-[Where AmiWind stands](../README.md#where-amiwind-stands-24-october-2026) near the top.
+[Where AmiWind stands](../README.md#where-amiwind-stands-25-october-2026) near the top.
 
 ## Development (as the front page stated it before 20 October 2026)
 

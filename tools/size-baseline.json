@@ -8,7 +8,7 @@
  "drives": [
   {
    "bytes": 4291854336,
-   "file": "AmiWind-v0.0.49.hdf"
+   "file": "AmiWind-v0.0.50.hdf"
   }
  ],
  "groups": {
@@ -29,8 +29,8 @@
    "files": 7106
   },
   "other": {
-   "bytes": 355998084,
-   "files": 3391
+   "bytes": 356003255,
+   "files": 3392
   },
   "progs": {
    "bytes": 1869578486,
@@ -46,10 +46,10 @@
   }
  },
  "labels": [],
- "note": "The v0.0.49 release image's record (the previous release after the v0.0.49 pin)",
- "payload_bytes": 3976762642,
- "run": "2026_10_24_v0.0.49_final_eb8be8d3",
+ "note": "The v0.0.50 release image (run 2026_10_24_v0.0.50_final_ffb87463), the previous release after the v0.0.50 pin",
+ "payload_bytes": 3976767813,
+ "run": "2026_10_24_v0.0.50_final_ffb87463",
  "schema": "amiwind-size-ledger-v1",
  "status": "complete",
- "version": "0.0.49"
+ "version": "0.0.50"
 }

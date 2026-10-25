@@ -107,9 +107,15 @@ edict_t *ED_Alloc (void)
     {
         if (aw_ent_count_exceed_soft_fail.value)
         {
-            Con_Printf("WARNING: entity limit exceeded in %s: %ld/%ld live slots. "
-                       "Ending this session safely; AmiWind remains open.\n",
-                       sv.name, (long)sv.num_edicts, (long)MAX_EDICTS);
+            /* ENTITY-DIAGNOSTIC-009: sv.num_edicts is the high-water mark; freed slots wait in quarantine, so the
+             * live count can be far lower when the table runs out */
+            int live = 0, k;
+            for (k = 0; k < sv.num_edicts; k++)
+                if (!EDICT_NUM(k)->free)
+                    live++;
+            Con_Printf("WARNING: entity limit exceeded in %s: %ld/%ld slots used (%ld live, %ld freed and not yet "
+                       "reusable). Ending this session safely; AmiWind remains open.\n",
+                       sv.name, (long)sv.num_edicts, (long)MAX_EDICTS, (long)live, (long)(sv.num_edicts - live));
             key_dest = key_console;
             Host_Error("Entity limit exceeded in %s (%ld/%ld); no free edicts",
                        sv.name, (long)sv.num_edicts, (long)MAX_EDICTS);
@@ -911,6 +917,10 @@ if (!strcmp(com_token, "light"))
 // keynames with a leading underscore are used for utility comments,
 // and are immediately discarded by quake
 		if (keyname[0] == '_')
+			continue;
+		/* the CHIM frame map's fire rows: the engine reads the light from the entity text itself (chim_chunks.c
+		 * FireKey); no QuakeC field (ENGINE-FLAME-LIGHT-KEY-WARNING-51: ten console lines on every Seyda Neen load) */
+		if (!strcmp (keyname, "aw_flame_light"))
 			continue;
 
 		key = ED_FindField (keyname);

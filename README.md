@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.50 (24 October 2026)._
+_Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,10 +25,11 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (24 October 2026)
+## Where AmiWind stands (25 October 2026)
 
-The newest release is **v0.0.50: The Doors: Riders On The CHIM**: every entrance of the game leads into its
-interior and every way out leads back, running on CHIM Engine v0.2.2 ([release notes](docs/RELEASE-v0.0.50.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
+The newest release is **v0.0.51: Let There Be More Inner Light**: Akulakhan's Chamber loads, every interior is lit with
+the light the original gives it from above, and the music plays on through the CHIM world's loads, running on CHIM
+Engine v0.2.2 ([release notes](docs/RELEASE-v0.0.51.md)). The project's own builds have had every exterior cell of Vvardenfell on CHIM since v0.0.43 (a build from the
 repository does so only from v0.0.47, when the cell list became part of the repository and the default): 1,409
 cells, counting the 61 in the town frames (1,348 are one-cell region frames; 1,292 land cells, 98 sea-floor cells
 and 19 open-sea cells), with no classic region maps left outdoors. What these numbers count:
@@ -37,9 +38,10 @@ and 19 open-sea cells), with no classic region maps left outdoors. What these nu
 prison and the census office) is built as a CHIM room, with the people the game places in them. Solstheim is not
 converted.
 
-What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.51, much smaller actor models (body parts stored once,
-[modular NPCs](docs/MODULAR_NPCS.md)), the game's scripts and object state, and Bloodmoon, along with the open bugs
-from the playtests.
+What comes next is in the [roadmap](docs/ROADMAP.md): in v0.0.52, the coloured light of rooms such as the Heart
+Chamber, the census office's own light, a larger CHIM model zone, much smaller actor models (body parts stored once,
+[modular NPCs](docs/MODULAR_NPCS.md)), more of the game's scripts, and Bloodmoon, along with the open bugs from the
+playtests.
 
 ### Memory: 32 MB of Fast RAM is the safe minimum (23 October 2026)
 
@@ -59,6 +61,16 @@ RAM is used automatically (a larger game heap, CHIM's caches and reading ahead).
 at boot, but loads more often. The emulator presets and the launcher start with 32 MB. Why, with the measured
 numbers: [why 32 MB](docs/REAL_HARDWARE.md#why-32-mb-of-fast-ram).
 
+### What v0.0.51 changed
+
+Akulakhan's Chamber, the game's final room, loads on 32 MB: the engine's first CHIM cache bank needed more memory
+than 32 MB leaves, so the room's models did not fit. Every interior is baked again with its cell's "sunlight", the
+light the original gives a room from one fixed direction above, which our rooms never had: 322 of the 1,335 interior
+cells get at least twice as much of it as their ambient light, so rooms that live on it are no longer dim, and the
+interior brightness default goes back to 1.0. The CHIM world's reads feed the music between small slices, and every
+load prints how long the music waited. The game's scripts (experimental, off by default) can enable, disable, lock
+and unlock objects and show message boxes.
+
 ### What v0.0.50 changed
 
 Every door leads where the game says it does. All of the base game's 3,133 load doors and jail markers go through
@@ -75,16 +87,7 @@ release candidates and finals reuse the caches like development builds. This rel
 development build's caches (39 of 43 stages reused; one more CHIM world build, repaired for v0.0.50). The docs now describe the current game throughout, with the second real-hardware
 figure (an A3000 with a 68060, through RTG on the tester's own modified build). The game is v0.0.48's.
 
-### What v0.0.48 changed
-
-The indoors follow the outdoors onto CHIM: 1,132 of the base game's 1,134 interiors are CHIM rooms, their models and
-textures stored once. The people and creatures the game places in them stand where it puts them, grounded when the
-game is built ([actor placement](docs/ACTOR_PLACEMENT.md)), with their full set of animations and their own voices,
-and the plants in the rooms can be picked. There are a Stats window and a Magic window placeholder, the original
-movement speeds, burning campfires and the original's sound markers. CHIM moves to 0.2.2 with a compatibility table,
-and the builder rebuilds less and keeps more cores busy.
-
-Earlier releases: the [release notes](docs/RELEASE-v0.0.50.md) link back through every version, and the sections the
+Earlier releases: the [release notes](docs/RELEASE-v0.0.51.md) link back through every version, and the sections the
 front page used to carry are kept in [earlier README sections](docs/README_ARCHIVE.md).
 
 ### What works, and the honest limits
@@ -102,8 +105,8 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   mushrooms to pick indoors and out; the original movement speeds; weather by region, and music streamed from disk.
 - **Not yet:** quests, dialogue, services, schedules, weapon and magic combat and most other game logic are
   unfinished, and items and containers in rooms are not live objects yet; the jail markers are in the door table for
-  the jail system to come. Akulakhan's Chamber, the game's final room, cannot be entered yet: it ends the game (fixed
-  first in v0.0.51; [v0.0.50 release notes](docs/RELEASE-v0.0.50.md#known-in-this-build)).
+  the jail system to come. Akulakhan's Chamber loads on 32 MB but is lit grey where the original lights it red
+  ([v0.0.51 release notes](docs/RELEASE-v0.0.51.md#known-in-this-build)).
 - The reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (the safe minimum;
   16 MiB starts with a warning); development and
   every performance figure so far come from emulators and are relative. The first real-hardware figures, from testers
@@ -145,8 +148,8 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
-[`AmiWind-v0.0.50-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.50-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.50-WinUAE.uae`](resources/emulators/AmiWind-v0.0.50-WinUAE.uae).
+[`AmiWind-v0.0.51-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.51-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.51-WinUAE.uae`](resources/emulators/AmiWind-v0.0.51-WinUAE.uae).
 
 ## Where to read more
 

@@ -215,6 +215,7 @@ void CL_ParseServerInfo (void)
 	char	sound_precache[MAX_SOUNDS][MAX_QPATH];
 
 	Con_DPrintf ("Serverinfo packet received.\n");
+	aw_load_phase = "client: server info";
 //
 // wipe the client_state_t struct
 //
@@ -296,6 +297,7 @@ void CL_ParseServerInfo (void)
 // now we try to load everything else until a cache allocation fails
 //
 
+	aw_load_phase = "client: models";
 	for (i=1 ; i<nummodels ; i++)
 	{
 		/* animation kit mover models load only while an actor moves (aw_anim.c) */
@@ -308,6 +310,7 @@ void CL_ParseServerInfo (void)
 		CL_KeepaliveMessage ();
 	}
 
+	aw_load_phase = "client: sounds";
 	S_BeginPrecaching ();
 	for (i=1 ; i<numsounds ; i++)
 	{
@@ -326,7 +329,9 @@ void CL_ParseServerInfo (void)
 	if (cls.demoplayback && !sv.active && aw_demo_map_begin)
 		aw_demo_map_begin ();
 
+	aw_load_phase = "client: new map";
 	R_NewMap ();
+	aw_load_phase = "client: signon";
 
 	Hunk_Check ();		// make sure nothing is hurt
 

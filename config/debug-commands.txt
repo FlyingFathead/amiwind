@@ -97,15 +97,15 @@ SKY / LIGHTING|guardtorch|aw_guardtorch|[on/off/auto] (all guard torches; auto f
 SKY / LIGHTING|headlamp|aw_headlamp_set|[on/off, true/false or 1/0] torch light without holding a torch (not saved)
 SKY / LIGHTING|hlamp|aw_headlamp_set|[on/off, true/false or 1/0] same as headlamp
 SKY / LIGHTING|horizon veil|aw_horizon_veil|0..15 (default 0 off) haze the lowest sky bands into the far fog colour so distant gaps read as haze
-SKY / LIGHTING|indoor luma|aw_interiorluma_set|[0..4] (brightness-enabled builds; static interior multiplier; default 1.2; no argument queries)
-SKY / LIGHTING|interior luma|aw_interiorluma_set|[0..4] (brightness-enabled builds; static interior multiplier; default 1.2; no argument queries)
-SKY / LIGHTING|interiorluma|aw_interiorluma_set|[0..4] (brightness-enabled builds; static interior multiplier; default 1.2; no argument queries)
+SKY / LIGHTING|indoor luma|aw_interiorluma_set|[0..4] (brightness-enabled builds; static interior multiplier; default 1.0; no argument queries)
+SKY / LIGHTING|interior luma|aw_interiorluma_set|[0..4] (brightness-enabled builds; static interior multiplier; default 1.0; no argument queries)
+SKY / LIGHTING|interiorluma|aw_interiorluma_set|[0..4] (brightness-enabled builds; static interior multiplier; default 1.0; no argument queries)
 SKY / LIGHTING|lamp lights|aw_lamp_lights|[0..4] nearest exterior lamps, lanterns, torches and fires lit at night, each a torch's worth (default 2; 0 off)
 SKY / LIGHTING|lamps|aw_lamp_status|status of the night lamps here: map, night, cached and lit lamps, night windows
 SKY / LIGHTING|light hue|aw_light_hue_set|[R G B 0..255] colour of torch, lamp and window light (default 255 210 140); no argument: current
 SKY / LIGHTING|luma|aw_luma_status|no argument: current indoor and outdoor luma, then how to set them
 SKY / LIGHTING|luma exterior|aw_exteriorluma_set|[0..4] no argument: query; original exterior baseline 1.0
-SKY / LIGHTING|luma indoor|aw_interiorluma_set|<0..4> light multiplier indoors (1.0 = original light, default 1.2)
+SKY / LIGHTING|luma indoor|aw_interiorluma_set|<0..4> light multiplier indoors (1.0 = original light, default 1.0)
 SKY / LIGHTING|luma interior|aw_interiorluma_set|[0..4] no argument: query; build must include luma controls
 SKY / LIGHTING|luma outdoor|aw_exteriorluma_set|<0..4> light multiplier outdoors (1.0 = original light, default 1.0)
 SKY / LIGHTING|night light|aw_night_light|1 light-space night (default): lamps, glows and torches keep their light / 0 old whole-frame night remap

@@ -15,6 +15,10 @@
 #include "aw_mwcode.h"
 #include "aw_state.h"
 #include "aw_world.h"
+#include "aw_save.h"
+#include "aw_hinged_door.h"
+#include "aw_actors.h"
+#include "aw_msgbox.h"
 
 #define FILE_NAME "mwscript.awm"
 #define MAX_RESIDENT (1024*1024)
@@ -192,8 +196,160 @@ static void host_warn(const char *what,int script){
     if(script>=0)read_string(script,where,sizeof(where));else strcpy(where,"-");
     Con_Printf("MWScript: %s (%s).\n",what,where);
 }
+/* --- object state (v0.0.51): Disable/Enable and Lock/Unlock by the placement's reference, kept in saved games
+ * (aw_save.h AW_CHANGE_DISABLED, AW_CHANGE_LOCK). A disabled placement with an edict is hidden (no model) and not
+ * solid until Enable; at every map change the new map's edicts are hidden again. Not yet: an actor the CHIM window
+ * spawns after the map change, and a CHIM static without an edict (they keep showing). */
+#define OBJECTS 1024
+typedef struct {
+    uint32_t ref;
+    unsigned char disabled,lock_set,level,last_level;   /* level 0 unlocked .. 100 */
+    int entity,map;                                     /* the edict hidden, on attach number MAP */
+    float model,solid;                                  /* what it had before */
+} object_t;
+static object_t objects[OBJECTS];static int object_count;
+static void object_activate(uint32_t reference);
+static unsigned long objects_hidden,objects_full;
+static object_t *object_find(uint32_t ref,int create){
+    int i;
+    for(i=0;i<object_count;i++)if(objects[i].ref==ref)return &objects[i];
+    if(!create)return NULL;
+    if(object_count==OBJECTS){objects_full++;return NULL;}
+    memset(&objects[object_count],0,sizeof(object_t));objects[object_count].ref=ref;objects[object_count].entity=-1;
+    return &objects[object_count++];
+}
+static uint32_t target_reference(int instance,int target){
+    aw_mwvm_instance_t *in;
+    if(target==AW_MWVM_PLAYER)return 0;      /* the player is never disabled or locked */
+    if(target==AW_MWVM_SELF){in=AW_MwvmInstance(instance);return in?in->reference:0;}
+    return AW_MwvmObjectReference(target);
+}
+static void object_hide(object_t *o){
+    int number=entity_of_reference(o->ref);edict_t *e=edict_of(number);
+    if(!e || e->free)return;
+    if(o->entity!=number || o->map!=attached_map || e->v.modelindex){
+        o->model=e->v.modelindex;o->solid=e->v.solid;o->entity=number;o->map=attached_map;
+    }
+    e->v.modelindex=0;e->v.solid=SOLID_NOT;SV_LinkEdict(e,false);objects_hidden++;
+}
+static void object_show(object_t *o){
+    edict_t *e=edict_of(o->entity);
+    if(!e || e->free || o->map!=attached_map)return;    /* hidden on another map: this one never hid it */
+    e->v.modelindex=o->model;e->v.solid=o->solid;SV_LinkEdict(e,false);o->entity=-1;
+}
+static int32_t host_object(int instance,int target,int op,int32_t value){
+    uint32_t ref=target_reference(instance,target);object_t *o;
+    if(!ref)return 0;
+    switch(op){
+    case AWM_ENABLE:
+        if((o=object_find(ref,0))!=NULL && o->disabled){o->disabled=0;object_show(o);}
+        return 0;
+    case AWM_DISABLE:
+        if((o=object_find(ref,1))!=NULL && !o->disabled){o->disabled=1;object_hide(o);}
+        return 0;
+    case AWM_GETDISABLED:
+        return (o=object_find(ref,0))!=NULL && o->disabled;
+    case AWM_LOCK:
+        if(!(o=object_find(ref,1)))return 0;
+        /* Lock without a number: the level it had last (100 when it never had one), as the original */
+        if(value<0)value=o->last_level?o->last_level:100;
+        if(value>100)value=100;
+        o->lock_set=1;o->level=(unsigned char)value;if(value)o->last_level=(unsigned char)value;
+        return 0;
+    case AWM_UNLOCK:
+        if(!(o=object_find(ref,1)))return 0;
+        if(o->lock_set && o->level)o->last_level=o->level;
+        o->lock_set=1;o->level=0;
+        return 0;
+    case AWM_ACTIVATE:
+        object_activate(ref);
+        return 0;
+    case AWM_GETLOCKED:{
+        /* a door no script has locked: its lock in the game data */
+        int original=AW_HingedDoorOriginalLock(ref);
+        return AW_ObjectLockLevel(ref,original>0?original:0)>0;}
+    }
+    return 0;
+}
+/* Activation (the original's rule): the player's use of an object whose attached script reads OnActivate goes to
+ * the script (OnActivate reads 1 on its next run) and the object does nothing until the script's Activate. Off
+ * with the scripts off; a script the engine carries by hand (the census office) is never attached. */
+static unsigned long intercepted,activated;
+static int object_intercept(unsigned reference){
+    int k,n;
+    if(!mwscript.value || !resident || !reference)return 0;
+    n=AW_MwvmInstanceCount();
+    for(k=0;k<n;k++){
+        aw_mwvm_instance_t *in=AW_MwvmInstance(k);
+        if(!in || !(in->flags&AWI_USED) || (in->flags&AWI_GLOBAL) || in->reference!=reference)continue;
+        if(!(AW_MwvmScriptFlags(in->script)&AWS_ONACTIVATE))continue;
+        in->flags|=AWI_ACTIVATED;in->flags&=~AWI_QUIET;intercepted++;
+        return 1;
+    }
+    return 0;
+}
+static void object_activate(uint32_t reference){
+    activated++;
+    if(AW_HingedDoorActivate(reference))return;
+    AW_SceneActivate(reference);    /* a load door of this map; other objects' own use: not yet */
+}
+int AW_ObjectDisabled(unsigned int reference){object_t *o=object_find(reference,0);return o && o->disabled;}
+int AW_ObjectLockLevel(unsigned int reference,int original){
+    object_t *o=object_find(reference,0);
+    return o && o->lock_set?o->level:original;
+}
+/* Saved games: merged by key into the change list the actors exported. */
+static int objects_export(aw_changes_t *out){
+    int i,j;uint32_t flags,key;
+    for(i=0;i<object_count;i++){
+        const object_t *o=&objects[i];
+        flags=(o->disabled?AW_CHANGE_DISABLED:0)|
+              (o->lock_set?AW_CHANGE_LOCK|((uint32_t)o->level<<AW_CHANGE_LOCK_SHIFT):0);
+        if(!flags || !o->ref || o->ref>0xFFFFFFu)continue;
+        key=AW_SaveChangeKey(o->ref);
+        for(j=0;j<out->count;j++)if(out->entry[j].key==key)break;
+        if(j==out->count){
+            if(out->count==AW_SAVE_CHANGES)return -1;
+            memset(&out->entry[j],0,sizeof(aw_change_t));out->entry[j].key=key;out->count++;
+        }
+        out->entry[j].flags=(out->entry[j].flags&~(AW_CHANGE_DISABLED|AW_CHANGE_LOCK|AW_CHANGE_LOCK_LEVEL))|flags;
+    }
+    return out->count;
+}
+static void objects_import(const aw_changes_t *in){
+    int i;object_t *o;
+    object_count=0;
+    for(i=0;i<in->count;i++){
+        const aw_change_t *e=&in->entry[i];
+        if(!(e->flags&(AW_CHANGE_DISABLED|AW_CHANGE_LOCK)) || (e->key&AW_CHANGE_BUILDER))continue;
+        if(!(o=object_find(e->key,1)))break;
+        o->disabled=(e->flags&AW_CHANGE_DISABLED)?1:0;
+        if(e->flags&AW_CHANGE_LOCK){
+            o->lock_set=1;o->level=(unsigned char)((e->flags&AW_CHANGE_LOCK_LEVEL)>>AW_CHANGE_LOCK_SHIFT);
+            o->last_level=o->level;
+        }
+    }
+    map_model=NULL;   /* the loaded map attaches again: its disabled edicts are hidden there */
+}
+
+/* --- MessageBox (aw_msgbox.c shows it): the text and the buttons read from the file's strings --- */
+static void host_message(int instance,int text,const float *numbers,int number,const unsigned char *buttons,int count){
+    static char format[AW_MSGBOX_TEXT],shown[AW_MSGBOX_TEXT],labels[AW_MSGBOX_BUTTONS][AW_MSGBOX_LABEL];
+    const char *list[AW_MSGBOX_BUTTONS];int i;(void)instance;
+    if(!read_string(text,format,sizeof(format)))return;
+    AW_MsgBoxFormat(shown,sizeof(shown),format,numbers,number);
+    if(count>AW_MSGBOX_BUTTONS)count=AW_MSGBOX_BUTTONS;
+    for(i=0;i<count;i++){
+        if(!read_string((buttons[2*i]<<8)|buttons[2*i+1],labels[i],sizeof(labels[i])))labels[i][0]=0;
+        list[i]=labels[i];
+    }
+    AW_MsgBoxShow(shown,list,count);
+}
+static int host_button(int instance){(void)instance;return AW_MsgBoxPressed();}
+
 static const aw_mwvm_host_t host={host_sound,host_sound_playing,host_say,host_say_done,host_music,host_distance,
-    host_menu_mode,host_query,host_journal_get,host_journal_set,host_notyet,host_warn};
+    host_menu_mode,host_query,host_journal_get,host_journal_set,host_notyet,host_warn,host_object,host_message,
+    host_button};
 
 /* --- loading and the map's objects --- */
 static int load(void){
@@ -256,6 +412,8 @@ static void attach_map(void){
         edict_refs[edict_ref_count].ref=(uint32_t)v->_float;edict_refs[edict_ref_count++].entity=i;
     }
     qsort(edict_refs,edict_ref_count,sizeof(edict_refs[0]),compare_refs);
+    /* the object state: what a script disabled stays hidden on this map too */
+    for(i=0;i<object_count;i++)if(objects[i].disabled){objects[i].entity=-1;object_hide(&objects[i]);}
     if(!AW_MwvmSection("BIND",&offset,&rows,&bytes))return;
     length=COM_FOpenFile(FILE_NAME,&f);if(!f)return;
     base=ftell(f);
@@ -311,11 +469,12 @@ static void attach_map(void){
 }
 void AW_MwscriptTick(float dt){
     int k,n,i;vec3_t player;
-    if(!mwscript.value || !sv.active || cls.signon!=SIGNONS || !sv_player)return;
+    /* no game running (a load, the main menu): a script's message box goes with it */
+    if(!mwscript.value || !sv.active || cls.signon!=SIGNONS || !sv_player){AW_MsgBoxClear();return;}
     if(!load())return;
     if(sv.worldmodel!=map_model || strcmp(sv.name,map_name)){
         map_model=sv.worldmodel;Q_strcpy_bounded(map_name,sv.name,sizeof(map_name));
-        attach_map();attached_map++;
+        attached_map++;attach_map();   /* the count first: what attach hides belongs to this map */
     }
     n=AW_MwvmInstanceCount();
     for(k=0;k<n;k++){
@@ -352,8 +511,17 @@ static void status(void){
                attach_places,attach_rooms,attach_refused,global,active,looping);
     Con_Printf("frames %lu runs %lu quiet-skips %lu far %lu deferred %lu ops %lu (max %lu a frame) aborted %lu not-yet calls %lu\n",
                s->frames,s->runs,s->skipped_quiet,s->skipped_far,s->deferred,s->ops,s->max_ops_frame,s->aborted,s->notyet_calls);
+    {int i,disabled=0,locks=0;
+     for(i=0;i<object_count;i++){disabled+=objects[i].disabled;locks+=objects[i].lock_set;}
+     Con_Printf("object state: %d disabled, %d locks set (%d of %d kept; %lu hidden, %lu over the table); uses taken by "
+                "OnActivate %lu, Activate %lu\n",disabled,locks,object_count,OBJECTS,objects_hidden,objects_full,
+                intercepted,activated);}
 }
 void AW_MwscriptInit(void){
     Cvar_RegisterVariable(&mwscript);
+    aw_save_objects_export=objects_export;aw_save_objects_import=objects_import;
+    aw_object_lock_level=AW_ObjectLockLevel;   /* the doors read a script's Lock and Unlock */
+    aw_scene_intercept=aw_hinged_intercept=object_intercept;   /* OnActivate takes a door's use */
+    aw_actor_disabled=AW_ObjectDisabled;   /* the CHIM window spawns no disabled actor */
     Cmd_AddCommand("aw_mwscript_status",status);
 }

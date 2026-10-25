@@ -7,6 +7,8 @@
 #include "aw_maps.h"
 int (*aw_save_changes_export)(aw_changes_t *changes);
 void (*aw_save_changes_import)(const aw_changes_t *changes);
+int (*aw_save_objects_export)(aw_changes_t *changes);
+void (*aw_save_objects_import)(const aw_changes_t *changes);
 static unsigned char *writing;
 static const unsigned char *reading;
 static int at,end,error;
@@ -246,6 +248,8 @@ static void changes_fields(aw_changes_t *c)
         if(error)return;
         if(!e->key || (e->key&0x7f000000U) || !(e->key&0xffffffU) || (i && e->key<=previous) ||
            !e->flags || (e->flags&~AW_CHANGE_FLAGS) || e->flags>0xffffU ||
+           ((e->flags&AW_CHANGE_LOCK_LEVEL) && !(e->flags&AW_CHANGE_LOCK)) ||
+           ((e->flags&AW_CHANGE_LOCK_LEVEL)>>AW_CHANGE_LOCK_SHIFT)>100U ||
            ((e->flags&AW_CHANGE_PICK)?(e->pick<1 || e->pick>0x8001U):e->pick!=0)){error=1;return;}
         if(e->flags&AW_CHANGE_SCENE){if(e->where<0 || e->where>=AW_SCENE_COUNT || !AW_MapName(e->where)[0]){error=1;return;}}
         else{

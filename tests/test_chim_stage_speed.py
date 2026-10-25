@@ -72,6 +72,88 @@ class ChimStageSpeedTests(unittest.TestCase):
         self.assertEqual(list(serial[0]), list(pooled[0]))
         self.assertEqual(digest(serial[1]), digest(pooled[1]))
 
+    def test_chunk_trees_cross_processes_packed_with_the_same_nodes(self):
+        # BUILD-CHIM-STAGE-SERIAL-TAIL-36 (v0.0.51): a chunk tree goes between the processes as three arrays
+        # (PackedNodes), not one array per node; it indexes, unpacks and answers box_leaves as world_tree's list
+        import pickle
+        from chim import format as F
+        from chim.terrain import box_leaves, tree_depth
+        from chim.validate import PackedNodes, _plain_tree, _tree_from_json, _tree_to_json, world_tree
+        _, _, _, _, _, frames = load_world(self.out, Failures())
+        trees = [world_tree(F.read_brush_image(c['image']), 'chunk', Failures()) for _, _, chunks in frames
+                 for c in chunks]
+        self.assertTrue(any(len(nodes) > 3 for nodes, _ in trees))
+        for nodes, leaves in trees:
+            packed = PackedNodes.of(nodes)
+            self.assertEqual(len(packed), len(nodes))
+            plain = _plain_tree((packed, leaves))[0]
+            for a, b, c in zip(nodes, packed, plain):
+                for x in (b, c):
+                    self.assertEqual(x[0].dtype, a[0].dtype)
+                    self.assertEqual(x[0].tolist(), a[0].tolist())
+                    self.assertEqual(x[1:], a[1:])
+            self.assertEqual(tree_depth(packed), tree_depth(nodes))
+            for lo, hi in (((-4096, -4096, -4096), (4096, 4096, 4096)), ((0, 0, 0), (64, 64, 64))):
+                self.assertEqual(box_leaves(packed, leaves, lo, hi), box_leaves(nodes, leaves, lo, hi))
+            stored = _tree_from_json(json.loads(json.dumps(_tree_to_json((nodes, leaves)))))
+            self.assertEqual(stored[0], packed)
+            again = pickle.loads(pickle.dumps(packed, protocol=pickle.HIGHEST_PROTOCOL))
+            self.assertEqual(again, packed)
+        # smaller once a tree has more than a few nodes (the arrays' fixed header dominates a tiny one); the dev1
+        # world's trees were 441 MB as per-node arrays
+        nodes = max((n for n, _ in trees), key=len)
+        size = lambda v: len(pickle.dumps(v, protocol=pickle.HIGHEST_PROTOCOL))   # noqa: E731
+        self.assertLess(size(PackedNodes.of(nodes)), size(nodes), len(nodes))
+
+    def test_ffs_rules_walk_equals_the_path_walk(self):
+        # BUILD-CHIM-STAGE-SERIAL-TAIL-36 (v0.0.51): the os.scandir walk gives the sizes and failures (in order) of
+        # the Path.rglob walk it replaced, on the fixture world and on a tree that breaks the rules
+        from chim import format as F
+        from chim.validate import ffs_rules
+
+        def path_walk(root, fails):
+            sizes = {}
+            for d in [root, *[p for p in root.rglob('*') if p.is_dir()]]:
+                entries = list(d.iterdir())
+                fails.check(len(entries) <= F.FFS_MAX_DIRECTORY_ENTRIES, 'FFS: %s holds %d entries (limit %d)'
+                            % (d.name, len(entries), F.FFS_MAX_DIRECTORY_ENTRIES))
+                for e in entries:
+                    fails.check(len(e.name) <= F.FFS_NAME_CHARS, 'FFS: name longer than 30 characters: ' + e.name)
+                    fails.check(all(32 < ord(ch) < 127 and ch not in ':/' for ch in e.name), 'FFS: unsafe name '
+                                + e.name)
+                    if e.is_file():
+                        sizes[e.relative_to(root).as_posix()] = e.stat().st_size
+                        fails.check(e.stat().st_size <= F.FFS_MAX_PACK, 'FFS: %s larger than the 1 GiB pack limit'
+                                    % e.name)
+            return sizes
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp)
+            for k in range(3):
+                d = bad / ('d%d' % k) / 'inner'
+                d.mkdir(parents=True)
+                (d / ('f%d.bin' % k)).write_bytes(b'x' * k)
+            (bad / 'd1' / ('long' * 10)).write_bytes(b'')
+            (bad / 'd2' / 'odd name').write_bytes(b'12')
+            with patch.object(F, 'FFS_MAX_DIRECTORY_ENTRIES', 2):
+                for root in (self.out / 'chim', bad):
+                    old, new = Failures(), Failures()
+                    self.assertEqual(ffs_rules(root, new), path_walk(root, old))
+                    self.assertEqual(list(new), list(old))
+            self.assertTrue(list(old))                                 # the broken tree did fail
+
+    def test_set_bits_equals_the_bit_by_bit_decode(self):
+        # BUILD-CHIM-STAGE-SERIAL-TAIL-36 (v0.0.51): the set bits of a row as row_to_bits' True places, below n
+        import random
+        from chim.validate import set_bits
+        from chim.visibility import row_to_bits
+        rng = random.Random(51)
+        for n in (0, 1, 7, 8, 9, 64, 333, 1351):
+            for density in (0.0, 0.01, 0.3, 1.0):
+                row = bytes(sum(1 << b for b in range(8) if rng.random() < density) for _ in range((n + 7) // 8))
+                want = [k for k, b in enumerate(row_to_bits(row, n)) if b]
+                self.assertEqual(set_bits(row, n), want, (n, density))
+        self.assertEqual(set_bits(b'\xff', 3), [0, 1, 2])          # bits past n in the last byte are not counted
+
     def test_a_rerun_with_nothing_changed_recomputes_no_validation_unit(self):
         from pass_cache import PassCache
         with tempfile.TemporaryDirectory() as cache, patch.dict(os.environ, {'AMIWIND_PASS_CACHE': cache}):

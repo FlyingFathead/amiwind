@@ -77,6 +77,19 @@
 #define AWM_SCRIPTRUNNING 0x46
 #define AWM_DISTANCE 0x47      /* u16 object (0xFFFF the player) -> fraction */
 #define AWM_SQRT 0x48
+/* object state (the object REF names, else the script's own; host object()): */
+#define AWM_ENABLE 0x49
+#define AWM_DISABLE 0x4A
+#define AWM_GETDISABLED 0x4B   /* -> whole */
+#define AWM_LOCK 0x4C          /* pops the level (-1: the level it had) */
+#define AWM_UNLOCK 0x4D
+#define AWM_GETLOCKED 0x4E     /* -> whole */
+/* activation (host object()): a script that reads OnActivate takes over its object's use */
+#define AWM_ONACTIVATE 0x4F    /* -> whole: 1 once after the player used the script's object */
+#define AWM_ACTIVATE 0x50      /* the object's own use (a door opens), on REF's object or the script's */
+/* messages (host message() and button()) */
+#define AWM_MESSAGEBOX 0x51    /* u16 text, u8 numbers popped (fractions), u8 buttons, u16 per button (as NOTYET) */
+#define AWM_GETBUTTONPRESSED 0x52 /* -> whole: the button the player chose, once; -1 until then */
 
 /* QUERY numbers (shared with the greeting conditions). */
 #define AWQ_DISPOSITION 1
@@ -113,6 +126,7 @@
 #define AWS_GLOBAL 16
 #define AWS_HANDWRITTEN 32     /* the engine carries this behaviour by hand today (config/mwscript.json) */
 #define AWS_INERT 64           /* nothing it can do today is seen outside its own values: not attached */
+#define AWS_ONACTIVATE 128     /* reads OnActivate: the player's use of its object goes to the script */
 
 /* Binding flags (BIND rows). */
 #define AWB_INTERIOR 1

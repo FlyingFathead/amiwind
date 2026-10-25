@@ -40,7 +40,8 @@ class InteriorLumaTests(unittest.TestCase):
     def test_shipped_default_is_one_multiplicative_setting(self):
         commands = [line.split() for line in (ROOT/'config/game.cfg').read_text().splitlines()
                     if line.strip() and not line.lstrip().startswith('//')]
-        self.assertEqual([row for row in commands if row[0] == 'aw_interiorluma'], [['aw_interiorluma', '1.2']])
+        # 1.0 since v0.0.51: interiors baked with their cell sunlight (INTERIOR-SUNLIGHT-UNBAKED-51)
+        self.assertEqual([row for row in commands if row[0] == 'aw_interiorluma'], [['aw_interiorluma', '1.0']])
 
     def test_disabled_objects_keep_only_explanatory_commands(self):
         with tempfile.TemporaryDirectory() as scratch:

@@ -60,11 +60,15 @@ int ChimZone_HasFree (int bytes);
  * the largest free block (the first leaves 2 MiB of its block), whole MiB,
  * under 2 GiB, at least CHIM_AUTO_FIRST for the first bank and
  * CHIM_AUTO_NEXT for the others; 0 ends. A 16 MiB Fast RAM machine with the
- * 11 MiB heap never reaches a first bank: it plays as without the feature. */
+ * 11 MiB heap never reaches a first bank: it plays as without the feature.
+ * The first bank's least was 8 MiB until v0.0.51: the v0.0.50 build left 13
+ * MiB free on 32 MiB, a 7 MiB budget, so 32 MiB got no bank at all and
+ * Akulakhan's Chamber (10.1 MiB of models) did not load (CHIM-AUTO-BANK-
+ * CLIFF-51). The look-ahead keeps its 8 MiB step (ChimZone_AutoLookahead). */
 #define CHIM_AUTO_MIB		1048576UL
 #define CHIM_AUTO_FLOOR		(2UL*CHIM_AUTO_MIB)
 #define CHIM_AUTO_KEEP		(2UL*CHIM_AUTO_MIB)
-#define CHIM_AUTO_FIRST		(8UL*CHIM_AUTO_MIB)
+#define CHIM_AUTO_FIRST		(4UL*CHIM_AUTO_MIB)
 #define CHIM_AUTO_NEXT		(4UL*CHIM_AUTO_MIB)
 #define CHIM_AUTO_BANK_MAX	(2047UL*CHIM_AUTO_MIB)
 unsigned long ChimZone_AutoMargin (unsigned long total);

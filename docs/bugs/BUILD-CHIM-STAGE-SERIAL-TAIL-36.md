@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 6 times; something has to be done
+## PERSISTING: reported 8 times; something has to be done
 
 - Reported with v0.0.36-dev3 at 2026-10-11 01:43 +0300: maintainer via the Monitor: chim 19.0-29.1 min on about 1 core in the 270-frame coast build; validation 8 min, heap gate and zone walk 1 min each (file times)
 - Reported with v0.0.36-dev4 at 2026-10-11 10:20 +0300: perf guard seed: CHIM heap gate 295 s on 0.94 of 12 cores in the dev4 whole-city Vivec MiniWind (e7a8e82); the chim-speed repair has not reached the line
@@ -10,6 +10,8 @@
 - Reported with v0.0.46-dev1 at 2026-10-20 14:48 +0300: dev1 try 2: validation 8m at 13.6 cores; zone walk 1.0-5.3 of 24 cores for 60-125 s with up to 1351 units queued (many 1-3 s units: batch per worker); stats 1m41s at 1.2 cores
 - Reported with v0.0.48-dev2 at 2026-10-23 (time not recorded): dev2 try8: CHIM validation 468 s on 2.1 of 13.8 cores; cause: the world read decoded each chunk's terrain record again in the parent
 - Reported with v0.0.49-dev1 at 2026-10-24 11:40 +0300: PERSISTING: CHIM validation on 5.45 of 23 cores for 1 min 50 s (perf guard FIX-NOW), and the CHIM world pack on 1 core for 1 min 41 s
+- Reported with v0.0.51-dev1 at 2026-10-25 (time not recorded): dev1 perf guard FIX-NOW: CHIM validation 121 s on 4.99 of 22 usable cores with independent frames (the only failed section; the stages passed)
+- Reported with v0.0.51-dev3 at 2026-10-25 09:25 +0200: dev3 build summary: chim ran under half its cores with units queued (1 time); the CHIM world was rebuilt for the interior sunlight
 
 <!-- END GENERATED PERSISTING -->
 
@@ -25,6 +27,7 @@
 | Persists in | v0.0.36-dev3, v0.0.49-dev1, v0.0.50-dev1 (last seen) |
 | Severity | high: About 10 minutes of one-core work in every chim stage of the coast build, on 24 held workers, redone on every build |
 | Family | Build speed (`build-speed`) |
+| Deferred by the maintainer | 2026-10-25: the maintainer deferred it to v0.0.52 (v0.0.51 ships its dev3, everything else moves to v0.0.52) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.36-dev3 |
 | From commit | source 3b5e7a9, engine 3b5e7a9, CHIM world 3b5e7a9 |
@@ -32,12 +35,13 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.48 (23 October 2026)._
+_Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
+- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
+- [Status: 25 October 2026 (v0.0.51)](#status-25-october-2026-v0051)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 16 October 2026](#status-16-october-2026)
 - [Status: 11 October 2026](#status-11-october-2026)
@@ -52,6 +56,28 @@ _Last updated with AmiWind v0.0.48 (23 October 2026)._
 - [Bugs in the same category](#bugs-in-the-same-category)
 
 <!-- contents end -->
+
+## Status: 25 October 2026 (v0.0.51)
+
+Fixed in part. CHIM validation was timed phase by phase on the v0.0.51-dev1 world (22 cores, 1,351 frames): its
+main process did about 96 s of its 116 s.
+
+- The largest piece was packing the frame cross-check tasks for the workers: 716 MB, 9 s, of which 441 MB were the
+  chunk trees, one small array per node. The workers waited (about 4 cores). The trees now go between the processes
+  as three arrays (float32 planes, int32 children: the file's own sizes, so no value changes): the tasks are 436 MB,
+  the cross-check phase 39 to 18 s, the main process 115 to 76 s of CPU (the same container, no unit cache on either
+  side, 0 failures both).
+- Every chunk's visibility row was decoded bit by bit in the main process (308,754 rows); they are read by their set
+  bits only.
+- The file rules walked the world with 184,236 stat calls; one os.scandir pass took that set-up from about 8 to 5 s.
+
+With a warm unit cache, as a build runs it: 116 s, then 103 s after the packed trees, then 94 s, 0 failures. The
+v0.0.51-dev2 build's perf guard passed (validation on 17.5 of 23 cores with a cold cache, its key having changed).
+
+Left: the cross-check phase's main process is now the in-order map's own scanning of its held futures
+([BUILD-ORDERED-MAP-SCAN-51](../BUGS.md), about 16 s, fixed only behind a key form change); a few
+serial seconds of set-up; and the CHIM world pack on one core (1 min 56 s in dev1: model, texture and terrain ids are
+handed out in the order the walk meets them, so it needs a redesign, profiled first).
 
 ## Status: 23 October 2026 (v0.0.48)
 
@@ -242,6 +268,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-NPCLOD-PATH-ARG-34](BUILD-NPCLOD-PATH-ARG-34.md): The first --npc-lod on build stopped at its area stage: a Path in the command broke build-state.json
 - [BUILD-OPTIMIZER-CACHE-KEY-BROAD-36](BUILD-OPTIMIZER-CACHE-KEY-BROAD-36.md): Regression: the image step's BSP optimizer pass cache reused 13 of 2,658 maps; its key covers the whole image tool, so any image-code change redoes every map
 - [BUILD-OPTION-RECORD-KEYS-STAGES-47](BUILD-OPTION-RECORD-KEYS-STAGES-47.md): A new builder option entry rebuilds the CHIM, town, flora, engine and image stages: their keys counted all of config/
+- BUILD-ORDERED-MAP-SCAN-51 (no report page): The pool map that hands results back in input order scans every held future on each turn: the main process works O(n squared) while large maps run
 - [BUILD-ORDERED-WINDOW-33](BUILD-ORDERED-WINDOW-33.md): The ordered worker pool idles behind one slow item, and hands long items out last
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image
 - [BUILD-PASS-KEY-TOP-BROAD-43](BUILD-PASS-KEY-TOP-BROAD-43.md): A pass key counts a reached module's whole import-time code: a new constant in chim/models.py rekeyed all 1,295 region frame maps
@@ -298,6 +325,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
+- RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored

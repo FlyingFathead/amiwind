@@ -391,6 +391,32 @@ static void queue_and_budget (void)
 	puts ("queue and budget passed");
 }
 
+/* Object state (v0.0.51): a script's Disable keeps an actor of the window from spawning; after Enable it comes
+ * with its cell's next join (aw_mwhost.c sets aw_actor_disabled in the engine). */
+static unsigned disabled_ref;
+static int disabled_stub (unsigned reference)
+{
+	return reference == disabled_ref;
+}
+static void disabled_actor (void)
+{
+	static const float none[2] = {0, 0};
+	reset_level ();
+	command ("budget", "0");
+	disabled_ref = 502;
+	aw_actor_disabled = disabled_stub;
+	chim_actors_join (0, 0, "frame", none);
+	chim_actors_tick ();
+	assert (actors_alive () == 2 && index_of ("spawn progs/a_mid.mdl") < 0);
+	disabled_ref = 0;			/* Enable */
+	chim_actors_join (0, 0, "frame", none);
+	chim_actors_tick ();
+	assert (actors_alive () == 3 && index_of ("spawn progs/a_mid.mdl") >= 0);
+	aw_actor_disabled = NULL;
+	command ("budget", "1");
+	puts ("disabled actor passed");
+}
+
 static void warm_order (int on)
 {
 	static const float none[2] = {0, 0};
@@ -643,6 +669,8 @@ int main (int argc, char **argv)
 		home_frame ();
 	else if (!strcmp (argv[1], "save"))
 		save_round_trip ();
+	else if (!strcmp (argv[1], "disabled"))
+		disabled_actor ();
 	else if (!strcmp (argv[1], "roll"))
 		roll ((unsigned)atoi (argv[4]));
 	else

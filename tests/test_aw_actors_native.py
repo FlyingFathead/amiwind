@@ -82,6 +82,10 @@ class ActorsNativeTests(unittest.TestCase):
     def test_queue_and_budget(self):
         self.assertIn('queue and budget passed', self.run_check('queue'))
 
+    def test_a_disabled_actor_is_not_spawned(self):
+        # v0.0.51 object state: a script's Disable keeps the window from spawning it; Enable lets the next join do it
+        self.assertIn('disabled actor passed', self.run_check('disabled'))
+
     def test_warm_order(self):
         out = self.run_check('warm')
         self.assertIn('warm 0 order passed', out)

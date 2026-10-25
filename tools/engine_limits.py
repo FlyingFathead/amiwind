@@ -82,8 +82,11 @@ def chim_memory(source=SOURCE, heap_mb=None):
 # still starts.
 MIN_FAST_RAM_MIB = 32
 BASELINE_FAST_RAM_MIB = 16
-MEASURED_FAST = {'fast_mib': 32, 'heap_mib': 13, 'free_after_heap_mib': 14, 'bank_mib': 8,
-                 'system_mib': 5, 'run': 'interiors A/B B32, 23 October 2026'}
+# Measured again in FS-UAE (24 October 2026, the v0.0.50 final's 32 MiB door check): "Memory: 13 MiB Fast RAM free of
+# 32 MiB; CHIM cache off (not enough extra Fast RAM, standard memory)" with the 13 MiB heap: 6 MiB before the heap.
+# With the 8 MiB least first bank of then that 7 MiB budget gave no bank (CHIM-AUTO-BANK-CLIFF-51).
+MEASURED_FAST = {'fast_mib': 32, 'heap_mib': 13, 'free_after_heap_mib': 13, 'bank_mib': 0,
+                 'system_mib': 6, 'run': 'v0.0.50 final door check at 32 MiB, 24 October 2026'}
 
 
 def _mib_define(header, name, source=SOURCE):

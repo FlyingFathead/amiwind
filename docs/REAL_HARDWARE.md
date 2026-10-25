@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.50-dev (24 October 2026)._
+_Last updated with AmiWind v0.0.51 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -157,7 +157,8 @@ first, each under 2 GiB, so 2 GiB and more works too.
 
 - **16 MiB of Fast RAM (the least that starts) takes nothing:** with the 11 MiB game heap only about 1 MiB is
   free, under the margin, so the game plays exactly as without this feature. The first cache bank needs at least
-  8 MiB beyond the margin (about 30 MiB of Fast RAM or more).
+  4 MiB beyond the margin (32 MiB of Fast RAM gets a bank of about 7 MiB). Until v0.0.51 it needed 8 MiB, and a
+  32 MiB machine whose free memory fell by 1 MiB got no bank at all.
 - **The console says what happened on every start**, for example
   `Memory: 115 MiB Fast RAM free of 128 MiB; CHIM cache 97 MiB in 2 banks (automatic); look-ahead x3`
   or `Memory: 1 MiB Fast RAM free of 16 MiB; CHIM cache off (not enough extra Fast RAM, standard memory)`.

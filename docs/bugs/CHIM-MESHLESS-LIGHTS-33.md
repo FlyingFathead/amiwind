@@ -93,14 +93,18 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - CHIM-ROOM-LIGHT-FLAT-48 (no report page): CHIM rooms light each placement at one level: Temple arch trims and Rithleen walls look flat and brighter than the room maps baked light
 - [DLIGHT-WALLS-31](DLIGHT-WALLS-31.md): Torches barely light town walls at night
 - [EMISSIVE-UNSHIPPED-31](EMISSIVE-UNSHIPPED-31.md): Glowing lantern glass never reached the shipped maps (only the Temple has it)
+- ENGINE-FLAME-LIGHT-KEY-WARNING-51 (no report page): Every Seyda Neen load prints "aw_flame_light is not a field" ten times: the fire rows key no QuakeC field
 - [FLAME-RANGE-NEAREST-32](FLAME-RANGE-NEAREST-32.md): A hearth fire shows only up close when many candles are nearer
 - GUARD-COLD-28 (no report page): Night-guard torches not admitted on cold visits
 - [GUARD-TORCH-BRIGHT-31](GUARD-TORCH-BRIGHT-31.md): Hlaalu guard torches over-bright at night
 - [GUARD-TORCH-CHIM-FRAMES-44](GUARD-TORCH-CHIM-FRAMES-44.md): Outdoor guards carry no torch at night: the torch step never read the CHIM frame maps
 - GUARD-TORCH-CYCLE-29 (no report page): Guard torch intermittently absent during night-cycle observation
 - [INTERIOR-BAKE-UNIFORM-32](INTERIOR-BAKE-UNIFORM-32.md): Some interior bakes are uniform (lights possibly missing)
+- INTERIOR-FOG-UNUSED-51 (no report page): Interiors have no fog: the cell's fog colour and density are never used, so misty caves and tinted rooms show none
 - [INTERIOR-LIGHT-29](INTERIOR-LIGHT-29.md): Interiors lack convincing local illumination
 - INTERIOR-NPC-LIGHT-29 (no report page): Census Office characters appear too dark under room lighting
+- [INTERIOR-SUNLIGHT-COLOUR-51](INTERIOR-SUNLIGHT-COLOUR-51.md): The cell sunlight is baked as brightness only: Akulakhan's Chamber is lit grey where the original lights it red
+- [INTERIOR-SUNLIGHT-UNBAKED-51](INTERIOR-SUNLIGHT-UNBAKED-51.md): Interiors are baked without their cell sunlight: Akulakhan's Chamber is nearly black where the original is lit red
 - [LAMPS-FLICKER-31](LAMPS-FLICKER-31.md): Night lamps switch on and off while turning or walking
 - [LAMPS-RANGE-31](LAMPS-RANGE-31.md): Only the nearest lamps light up at night
 - [LIGHT-ENTITIES-UNWIRED-33](LIGHT-ENTITIES-UNWIRED-33.md): Morrowind lights are never turned into Quake light entities, so the light compiler bakes nothing
@@ -123,5 +127,6 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - TORCH-LIGHT-29 (no report page): Torch flames look weak and provide little immediate light
 - TORCH-NPC-LIGHT-29 (no report page): Nearby NPCs do not visibly respond to torchlight
 - TORCHTEST-DARKNESS-29 (no report page): Torch test room floor stays dim gray at zero light
+- WEATHER-AMBIENT-SUN-UNUSED-51 (no report page): Exteriors take only the sky and fog colours of the weather: its ambient and sun colours are never used, so the land under an ash or blight storm (Red Mountain) is lit neutral
 
 <!-- END GENERATED CATEGORY -->

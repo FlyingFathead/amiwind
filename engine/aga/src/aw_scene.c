@@ -50,11 +50,27 @@ long aw_fast_ram_found_mb;
 #define FRAME_REFUSED_FIRST "Sorry, but this area cannot be run with 16MB of Fast RAM."
 static int room_refused;
 static const char *refused_text=ROOM_REFUSED_FIRST;
+/* 1 when this start decided on no CHIM cache at all (chim_world.c Memory op 4: 0 KiB); 0 with a cache or when it
+ * is not known (no CHIM, or not decided yet). */
+static int no_cache_bank(void){
+    return aw_chim_memory && aw_chim_memory(4,NULL,NULL,0)==0;
+}
+/* The reason a refused place names: Extra RAM off, the Fast RAM found, or no cache bank taken. */
+static void refused_reason(char *out,int size,long mb){
+    if(!Cvar_VariableValue("aw_autoram"))
+        snprintf(out,size,"Extra RAM is off (Options > Video), the 16 MB baseline");
+    else if(aw_fast_ram_found_mb>0)snprintf(out,size,"this machine has %ld MB",aw_fast_ram_found_mb);
+    else snprintf(out,size,"this start took no CHIM cache bank (not enough extra Fast RAM; %ld MB counts on one)",mb);
+}
 /* The Fast RAM a marked room may count on in this start, in MB: 0 when every room loads (enough Fast RAM or
  * not known), else 16. */
 static int room_fast_have(void){
     if(!Cvar_VariableValue("aw_autoram"))return 16;
-    return aw_fast_ram_found_mb>0?16:0;
+    if(aw_fast_ram_found_mb>0)return 16;
+    /* a marked place counts on the CHIM cache bank of the 32 MB minimum: a start that took none (not enough free
+     * Fast RAM beyond the margin) holds what the 16 MB baseline holds (CHIM-AUTO-BANK-CLIFF-51: the v0.0.50 32 MB
+     * start took none and Akulakhan's Chamber ended the game at its load) */
+    return no_cache_bank()?16:0;
 }
 /* The Fast RAM the map of TARGET needs, in MB, from its worldspawn's mark; 0 for every map without one (BSP room
  * maps, frame maps, the census office). Reads the map's header and the start of its entity lump only. */
@@ -82,12 +98,11 @@ static int map_fast_mb(const char *target,const char *key){
 /* 1 when the door to TARGET is refused here (the screen is up). */
 int AW_SceneRoomRefuse(const char *target){
     int have=room_fast_have(),mb;
+    char why[128];
     if(!have || (mb=AW_SceneRoomFastMb(target))<=have)return 0;
-    if(!Cvar_VariableValue("aw_autoram"))
-        Con_Printf("CHIM room %s needs %ld MB of Fast RAM (its build mark); Extra RAM is off (Options > Video), the 16 MB baseline: refused at the door, nothing loaded.\n",
-            target,(long)mb);
-    else Con_Printf("CHIM room %s needs %ld MB of Fast RAM (its build mark); this machine has %ld MB: refused at the door, nothing loaded.\n",
-            target,(long)mb,aw_fast_ram_found_mb);
+    refused_reason(why,sizeof(why),(long)mb);
+    Con_Printf("CHIM room %s needs %ld MB of Fast RAM (its build mark); %s: refused at the door, nothing loaded.\n",
+        target,(long)mb,why);
     if(aw_hinged_locked_sound)aw_hinged_locked_sound();
     AW_UIRoomRefused(NULL,NULL);
     refused_text=ROOM_REFUSED_FIRST;room_refused=1;key_dest=key_menu;IN_AWClearButtons();
@@ -111,12 +126,11 @@ static int entry_mark(const char *target,const float *point,int *room){
 }
 int AW_SceneEntryRefuse(const char *target,const float *point,int to_menu){
     int have=room_fast_have(),mb,room;
+    char why[128];
     if(!have || !target || !*target || (mb=entry_mark(target,point,&room))<=have)return 0;
-    if(!Cvar_VariableValue("aw_autoram"))
-        Con_Printf("CHIM %s %s needs %ld MB of Fast RAM (its build mark); Extra RAM is off (Options > Video), the 16 MB baseline: refused, nothing loaded.\n",
-            room?"room":"area",target,(long)mb);
-    else Con_Printf("CHIM %s %s needs %ld MB of Fast RAM (its build mark); this machine has %ld MB: refused, nothing loaded.\n",
-            room?"room":"area",target,(long)mb,aw_fast_ram_found_mb);
+    refused_reason(why,sizeof(why),(long)mb);
+    Con_Printf("CHIM %s %s needs %ld MB of Fast RAM (its build mark); %s: refused, nothing loaded.\n",
+        room?"room":"area",target,(long)mb,why);
     AW_UIRoomRefused(NULL,NULL);
     refused_text=room?ROOM_REFUSED_FIRST:FRAME_REFUSED_FIRST;room_refused=1;refused_to_menu=to_menu || !sv.active;
     key_dest=key_menu;IN_AWClearButtons();
@@ -642,11 +656,28 @@ int AW_TravelDraw(void) {
 }
 /* aw_debug_torch.c: the player leaves the census office (the opening hands over control). */
 void (*aw_scene_census_exit)(void);
+/* Object state (v0.0.51, aw_mwhost.c sets it; NULL without the scripts): 1 when a script that reads OnActivate
+ * takes the use of the object REFERENCE (the original's rule); the door then waits for the script's Activate. */
+int (*aw_scene_intercept)(unsigned reference);
+static int use_link(int i);
 int AW_SceneUse(void) {
-    int i;float duration;char path[40];
+    int i;
     if(AW_PlayerDead())return 1;   /* dead: nothing is used (the key is spent) */
     i=0;if(pending || door_ready)return 1;if(travel_use())return 1;if(!npc_hint() && (AW_InventoryUse() || AW_HarvestUse()))return 1;i=aimed_door();
     if(i<0)return aw_hinged_use?aw_hinged_use():0;   /* an ordinary hinged door (aw_hinged_door.c), else nothing here */
+    if(aw_scene_intercept && aw_scene_intercept(links[i].reference))return 1;
+    return use_link(i);
+}
+/* A script's Activate on a load door of this map (aw_mwhost.c): the door's own use, as if the player used it. 0 when
+ * REFERENCE is no door here. */
+int AW_SceneActivate(unsigned reference) {
+    int i;
+    if(AW_PlayerDead() || pending || door_ready)return 0;
+    for(i=0;i<count;i++)if(links[i].reference==reference)return use_link(i);
+    return 0;
+}
+static int use_link(int i) {
+    float duration;char path[40];
     if(!AW_StoryDoor(links[i].reference)){AW_UISubtitle("",links[i].reference==119513?"Finish registration and leave through the courtyard.":links[i].reference==113889?"Check the barrel beside the door first.":"Ask the captain about your duties first.",4);return 1;}
     if(AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE){AW_UISubtitle("","Speak to the dock guard first.",4);return 1;}
     if(!map_valid(links[i].target) || AW_SceneMapSize(links[i].target,path,sizeof(path))<0){

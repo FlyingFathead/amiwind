@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.50-dev (24 October 2026)._
+_Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.51: Let There Be More Inner Light, 25 October 2026](#v0051-let-there-be-more-inner-light-25-october-2026)
 - [v0.0.50: The Doors: Riders On The CHIM, 24 October 2026](#v0050-the-doors-riders-on-the-chim-24-october-2026)
 - [v0.0.49: Build Turnaround, 24 October 2026](#v0049-build-turnaround-24-october-2026)
 - [v0.0.48: Inner CHIM & Actors On Stage, 24 October 2026](#v0048-inner-chim--actors-on-stage-24-october-2026)
@@ -158,6 +159,28 @@ _Last updated with AmiWind v0.0.50-dev (24 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.51: Let There Be More Inner Light, 25 October 2026
+
+- Akulakhan's Chamber, the game's final room, loads on 32 MB: the engine's first automatic CHIM cache bank needs
+  4 MiB instead of 8 MiB beyond the system margin, so 32 MB gets a 7 MiB bank; Seyda Neen, Balmora and Vivec load on
+  32 MB with no "zone full" retry. A place the build marks for 32 MB is refused at its door when a start took no
+  cache bank ([CHIM-AUTO-BANK-CLIFF-51](bugs/CHIM-AUTO-BANK-CLIFF-51.md),
+  [CHIM-ROOM-HEART-CHAMBER-LOAD-50](bugs/CHIM-ROOM-HEART-CHAMBER-LOAD-50.md)).
+- Every interior is baked with its cell's sunlight, a directional light from the original's fixed interior direction,
+  which the bake had always left out; 322 of 1,335 interior cells have at least twice as much of it as ambient light.
+  The interior brightness default goes back from 1.2 to 1.0; the prison ship keeps its judged light
+  ([INTERIOR-SUNLIGHT-UNBAKED-51](bugs/INTERIOR-SUNLIGHT-UNBAKED-51.md)).
+- The CHIM world's reads go in small slices with the music fed between them; every load prints a "Loading audio"
+  line naming the step where the music waited longest, the intro movie left out ([AUDIO-LOAD-29](bugs/AUDIO-LOAD-29.md)).
+- The game's scripts (experimental, `dbg mwscript on`): `Enable`, `Disable`, `GetDisabled`, `Lock`, `Unlock`,
+  `GetLocked`, `OnActivate` and `Activate` on doors, `MessageBox` with buttons and `GetButtonPressed`.
+- Seyda Neen's fires no longer print "'aw_flame_light' is not a field" on every load.
+- Builds: an engine source edit or a helper added to a shared module no longer rebuilds the CHIM world; key reads no
+  longer mark a stage as changed; a change of the key rules fails the tests until the key form is raised; the CHIM
+  world's checks take 94 s instead of 116 s; the engine smoke fails a 32 MB run with a "zone full" wait.
+- The bug register lists open bugs seen in three releases or more with their reason and a "Waiting on" column,
+  refuses a near-duplicate title, and its files warn above 75 % of the text limit and fail above 95 %.
 
 ## v0.0.50: The Doors: Riders On The CHIM, 24 October 2026
 

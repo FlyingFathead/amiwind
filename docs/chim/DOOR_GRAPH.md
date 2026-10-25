@@ -1,6 +1,6 @@
 # Door graph: every load door and every interior
 
-_Last updated with AmiWind v0.0.50-dev (24 October 2026)._
+_Last updated with AmiWind v0.0.51 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -524,10 +524,12 @@ and the bytes were the disk bytes, 17 % under what the engine loads. Counted aga
 | Subdun | 6,291,696 | 7,809,572 | over |
 | Sud | 6,273,784 | 7,803,884 | over |
 
-Bytes; the 32 MB room holds 15,384,576. Of all 1,328 rooms, 72 need more than the 16 MB zone alone: they load on the
-32 MB minimum, not on the 16 MB baseline or with Options > Extra RAM off. One room is close to the one-block limit:
-Akulakhan's Chamber's cave shell is one model of about 7.6 MiB (estimated), which only the 8 MiB bank can hold; two
-thirds of it is collision. What to watch and what comes next: [INTERIOR_SECTIONS.md](../INTERIOR_SECTIONS.md#what-worked-for-the-27-rooms-over-the-size-limit-23-october-2026).
+Bytes; the 32 MB room holds 14,336,000: the zone and the 7 MiB automatic cache bank that 32 MB of Fast RAM gives
+since v0.0.51 (15,384,576 with the 8 MiB bank this table assumed: the v0.0.50 build left a 7 MiB budget, which got no
+bank at all while the first needed 8 MiB, CHIM-AUTO-BANK-CLIFF-51). Of all 1,328 rooms, 72 need more than the 16 MB
+zone alone: they load on the 32 MB minimum, not on the 16 MB baseline or with Options > Extra RAM off. Akulakhan's
+Chamber's cave shell was one model of about 7.6 MiB (estimated) when this table was made; since v0.0.48 it is stored
+as tiles (CHIM-ROOM-CLIPNODE-BUDGET-48), so no block of it comes near the one-block limit. What to watch and what comes next: [INTERIOR_SECTIONS.md](../INTERIOR_SECTIONS.md#what-worked-for-the-27-rooms-over-the-size-limit-23-october-2026).
 Since 23 October 2026 they are in the batches like any room; a room over the 16 MB zone alone has the note
 `zone_over_16mb` (`fits_16mb` false).
 

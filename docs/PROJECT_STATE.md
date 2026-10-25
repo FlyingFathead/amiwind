@@ -1,10 +1,11 @@
 # Current project state
 
-_Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
+_Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [25 October 2026: v0.0.51 - Let There Be More Inner Light](#25-october-2026-v0051---let-there-be-more-inner-light)
 - [21 October 2026: v0.0.47-dev1 - development snapshot](#21-october-2026-v0047-dev1---development-snapshot)
 - [19 October 2026: v0.0.45 - CHIM Streaming Improved, Guard Torches Are Back](#19-october-2026-v0045---chim-streaming-improved-guard-torches-are-back)
 - [19 October 2026: v0.0.44 - By Azura's Trees!](#19-october-2026-v0044---by-azuras-trees)
@@ -28,6 +29,23 @@ _Last updated with AmiWind v0.0.47-dev1 (21 October 2026)._
   - [28 September 15:50 maintainer follow-up](#28-september-1550-maintainer-follow-up)
 
 <!-- contents end -->
+
+## 25 October 2026: v0.0.51 - Let There Be More Inner Light
+
+The newest release is [v0.0.51: Let There Be More Inner Light](RELEASE-v0.0.51.md), running on CHIM Engine v0.2.2.
+Akulakhan's Chamber, the game's final room, loads on 32 MB. Every interior is baked with its cell's sunlight, the
+light the original gives a room from one fixed direction, which the bake had always left out; the interior
+brightness default is back to 1.0 ([interior lighting](INTERIOR_LIGHTING.md)). The music keeps playing through the
+CHIM world's loads, and the game's scripts (experimental) can enable, disable, lock and unlock objects and show
+message boxes.
+
+Since the last section here: v0.0.47 put the whole outdoors in the repository's own builder, v0.0.48 moved 1,132 of
+the 1,134 base-game interiors onto CHIM rooms with their actors, v0.0.49 made a version change rebuild only the
+engine and the image, and v0.0.50 linked every door both ways (the [changelog](CHANGELOG.md) has each).
+
+What is next, in the [roadmap](ROADMAP.md): v0.0.52 continues the light input audit (the colour of the light, the
+fog in rooms, the weather's light outdoors), the census office's own light, a larger CHIM model zone, smaller actor
+models and more of the game's scripts. Open problems are in the [bug register](BUGS.md).
 
 ## 21 October 2026: v0.0.47-dev1 - development snapshot
 

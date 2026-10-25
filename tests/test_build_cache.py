@@ -505,14 +505,27 @@ class FingerprintTests(unittest.TestCase):
             'def work():\n    return 1\n\n\n'
             "if __name__ == '__main__':\n    import deep\n    print(deep.table())\n")
         script, digest = self.stage3('stage_keyed.py', 'from area_tool import resident_unit\nresident_unit()\n')
-        python, data, _ = build_cache.SourceIndex(self.repository, top_format=3).closure(script)
-        self.assertIn('tools/deep.py', data)                 # the keyed script's main reach, counted whole
+        index = build_cache.SourceIndex(self.repository, top_format=3)
+        python, data, _ = index.closure(script)
+        # the keyed script's main reach, by the units it runs (BUILD-KEY-KEYED-REACH-WHOLE-51), as the cache key
+        # itself hashes it (pass_cache.source_digest: index.digest)
+        self.assertIn('tools/deep.py', python)
+        self.assertNotIn('tools/deep.py', data)
+        self.assertIn('table', index.reached_units(script)['tools/deep.py'])
         self.assertIn('config/deep.json', data)
         old = build_cache.SourceIndex(self.repository, top_format=2).closure(script)
         self.assertNotIn('tools/deep.py', old[0] | old[1])
         first = digest()
         (self.repository / 'config' / 'deep.json').write_text('{"a": 2}')
         self.assertNotEqual(first, digest())
+        second = digest()
+        # a helper added to the keyed code's module keeps the key (v0.0.50: map_files.town_map_present rebuilt the
+        # CHIM world); an edit of a function the keyed reach runs changes it
+        deep = (tools / 'deep.py').read_text()
+        (tools / 'deep.py').write_text(deep + '\n\ndef helper():\n    return 2\n')
+        self.assertEqual(second, digest())
+        (tools / 'deep.py').write_text(deep.replace('    return json.loads', '    edited = 1\n    return json.loads'))
+        self.assertNotEqual(second, digest())
         # (module, function): only that function's reach
         script, _ = self.stage3('stage_keyed2.py', 'from area_tool import worker_unit\nworker_unit()\n')
         python, data, _ = build_cache.SourceIndex(self.repository, top_format=3).closure(script)
@@ -1123,6 +1136,11 @@ class ReuseTests(unittest.TestCase):
         manifest = build_cache.load_manifest(fourth, 'delta')
         self.assertFalse(manifest['reusable'])
         self.assertEqual([Path(path).name for path in manifest['reads']['outside']], ['extlib.py'])
+        # the dry run (the entry check's reuse preflight) refuses that record too, as the build will: the
+        # v0.0.51-dev2 entry check printed 0 unexpected rebuilds where the build's preflight found 6
+        predicted = build_cache.predict(fourth, root=self.repository)
+        self.assertTrue(predicted['delta'].startswith('old outputs not reusable: '), predicted['delta'])
+        self.assertEqual([name for name, reason in predicted.items() if reason is None], ['alpha', 'beta', 'gamma'])
 
     @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
     def test_old_schema_runs_and_predict(self):
@@ -1474,6 +1492,14 @@ class DiagnosticOutputTests(unittest.TestCase):
         self.assertEqual(found, [])
 
 
+# The keys of the ReuseCascadeTests fixture per stage key form: [the stage's sources digest, its setting names]
+# (test_key_rules_are_pinned_to_the_key_form, BUILD-KEY-RULE-NO-FORM-51).
+PINNED_KEY_RULES = {
+    3: {'alpha': ['b84d2fd763575b0a', []], 'beta': ['b52506690b85fe52', []], 'delta': ['93d99519ee6e67fe', []],
+        'gamma': ['4e83df8d84b34f8d', []]},
+}
+
+
 class ReuseCascadeTests(unittest.TestCase):
     """BUILD-REUSE-CASCADE-36: a fix that only added functions to a shared module rebuilt most of a build. Causes:
     BUILD-KEY-FUNCTION-DEFAULTS-TOP-36 (a new function changed every importer's key), BUILD-REUSE-RECORD-RETIRED-36
@@ -1519,6 +1545,22 @@ class ReuseCascadeTests(unittest.TestCase):
         self.assertNotEqual(before['alpha'], self.keys(2)['alpha'])  # a default that runs code on import counts
         helper.write_text(HELPER.replace("name + ':'", "name + '='"))
         self.assertNotEqual(before['alpha'], self.keys(2)['alpha'])  # a reached edit still counts
+
+    def test_key_rules_are_pinned_to_the_key_form(self):
+        # BUILD-KEY-RULE-NO-FORM-51: a change of what the stage keys count (the files a stage reaches, how code is
+        # cut into units, the setting names it reads) changed every record's key in place, so unchanged stages
+        # rebuilt once. The keys this fixture gets are pinned per STAGE_TOP_FORMAT: a rule change fails here until
+        # it raises the form and keeps the older form comparable (build_cache.comparable).
+        index = build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT)
+        steps = steps_for(self.repository, self.root / 'run', self.data)
+        components = build_cache.fingerprint_steps(steps, self.root / 'run', metadata(), index)[1]
+        seen = {name: [build_cache.digest_json((parts.get('sources') or {}).get('by_file') or {})[:16],
+                       sorted(parts.get('environment') or {})] for name, parts in sorted(components.items())}
+        pinned = PINNED_KEY_RULES.get(build_cache.STAGE_TOP_FORMAT)
+        self.assertIsNotNone(pinned, 'a new key form: pin its keys here: %s' % json.dumps(seen))
+        self.assertEqual(seen, pinned, 'the stage key rules changed without a new key form: raise STAGE_TOP_FORMAT '
+                         'and keep the older form comparable (or, for an edit of this fixture alone, pin again): '
+                         + json.dumps(seen))
 
     @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
     def test_a_reuse_source_in_the_old_key_form_is_reused_whole(self):
@@ -1955,6 +1997,106 @@ class NarrowedReuseTests(unittest.TestCase):
         record = build_cache.used_record(['tools/narrow.py', '@tools/narrow.py\tfast'], index)
         self.assertFalse(record['complete'])
         self.assertIn('trace form 1', record['why'][0])
+
+
+class KeyWalkListingTests(unittest.TestCase):
+    """BUILD-REUSE-KEY-WALK-LISTED-51: the CHIM world stages' records listed almost every folder of the checkout (the
+    SourceIndex walk behind an in-stage cache key), so a new bug page refused their narrowed reuse. A listing whose
+    innermost checkout frame is an OUTPUT_NEUTRAL module is not a listing of the stage; any other still is."""
+
+    def test_a_listing_by_the_key_code_is_not_the_stages(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as temp:
+            temp = Path(temp)
+            root, run = temp / 'repo', temp / 'run'
+            for folder in ('tools', 'config', 'docs'):
+                (root / folder).mkdir(parents=True)
+            (root / 'tools' / 'build_cache.py').write_text("import os\ndef walk():\n    return os.listdir('config')\n")
+            (root / 'tools' / 'stage.py').write_text(
+                "import os, sys\nsys.path.insert(0, 'tools')\nimport build_cache\nbuild_cache.walk()\n"
+                "print(os.listdir('docs'))\n")
+            self.assertTrue(build_cache.write_trace_hook(run, root))
+            target = run / 'profile' / 'reads' / 'stage.txt'
+            hook = run / 'profile' / build_profile.TRACE_HOOK_FOLDER
+            environment = dict(os.environ, PYTHONPATH=str(hook), **{build_profile.TRACE_ENV: str(target)})
+            subprocess.run([sys.executable, 'tools/stage.py'], cwd=root, env=environment, check=True,
+                           capture_output=True)
+            lines = target.read_text().splitlines()
+        self.assertIn('#Ldocs', lines)
+        self.assertNotIn('#Lconfig', lines)
+
+    def test_an_open_by_the_key_code_is_not_the_stages(self):
+        # BUILD-STAGE-READS-UNFINGERPRINTED-48 (v0.0.51): an in-stage unit cache key hashes the source text it
+        # reaches (SourceIndex in build_cache.py); those opens were stage reads, so the area and room stages were
+        # refused on every reuse. The stage's own opens, and its later real import of a file the key opened, count.
+        import subprocess
+        with tempfile.TemporaryDirectory() as temp:
+            temp = Path(temp)
+            root, run = temp / 'repo', temp / 'run'
+            for folder in ('tools', 'config'):
+                (root / folder).mkdir(parents=True)
+            (root / 'tools' / 'build_cache.py').write_text(
+                "def digest(path):\n    with open(path) as f:\n        return len(f.read())\n")
+            (root / 'tools' / 'hashed.py').write_text("VALUE = 1\n")
+            (root / 'tools' / 'later.py').write_text("VALUE = 2\n")
+            (root / 'config' / 'own.json').write_text("{}\n")
+            (root / 'tools' / 'stage.py').write_text(
+                "import sys\nsys.path.insert(0, 'tools')\nimport build_cache\n"
+                "build_cache.digest('tools/hashed.py')\nbuild_cache.digest('tools/later.py')\n"
+                "open('config/own.json').read()\nimport later\n")
+            self.assertTrue(build_cache.write_trace_hook(run, root))
+            target = run / 'profile' / 'reads' / 'stage.txt'
+            hook = run / 'profile' / build_profile.TRACE_HOOK_FOLDER
+            environment = dict(os.environ, PYTHONPATH=str(hook), **{build_profile.TRACE_ENV: str(target)})
+            subprocess.run([sys.executable, 'tools/stage.py'], cwd=root, env=environment, check=True,
+                           capture_output=True)
+            lines = target.read_text().splitlines()
+        self.assertNotIn('tools/hashed.py', lines)       # hashed by the key code only
+        self.assertIn('config/own.json', lines)          # the stage's own read
+        self.assertIn('tools/later.py', lines)           # hashed, then imported for real by the stage
+
+
+class CompilerReadsTests(unittest.TestCase):
+    """BUILD-CHIM-RECORD-COMPILER-INCOMPLETE-51: a stage that started a C compiler on checkout files had an
+    incomplete record ("started cc with a checkout path"), so it was never reused when only its key's sources changed.
+    The hook now writes what the compiler reads of the checkout ('^': the sources on its command line and their
+    #include "..." closure through its -I folders), and the record counts them as data."""
+
+    @unittest.skipUnless(os.name == 'posix' and shutil.which('cc'), 'a POSIX C compiler')
+    def test_a_compiler_run_is_recorded_with_what_it_reads(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as temp:
+            temp = Path(temp)
+            root, run = temp / 'repo', temp / 'run'
+            for folder in ('tools', 'engine/inc', 'engine/src'):
+                (root / folder).mkdir(parents=True)
+            (root / 'engine/src/zone.c').write_text('#include "zone.h"\nint zone(void){return SIZE;}\n')
+            (root / 'engine/inc/zone.h').write_text('#include "common.h"\n#define SIZE 4\n')
+            (root / 'engine/inc/common.h').write_text('/* nothing */\n')
+            (root / 'engine/src/unrelated.c').write_text('int unrelated;\n')
+            (root / 'tools/stage.py').write_text(
+                "import subprocess, sys\nsubprocess.run(['cc', '-fsyntax-only', '-Iengine/inc', 'engine/src/zone.c'],"
+                " check=True)\n")
+            self.assertTrue(build_cache.write_trace_hook(run, root))
+            target = run / 'profile' / 'reads' / 'stage.txt'
+            hook = run / 'profile' / build_profile.TRACE_HOOK_FOLDER
+            environment = dict(os.environ, PYTHONPATH=str(hook), **{build_profile.TRACE_ENV: str(target)})
+            subprocess.run([sys.executable, 'tools/stage.py'], cwd=root, env=environment, check=True, capture_output=True)
+            lines = target.read_text().splitlines()
+            self.assertIn('^engine/src/zone.c', lines)
+            self.assertIn('^engine/inc/zone.h', lines)
+            self.assertIn('^engine/inc/common.h', lines)
+            self.assertNotIn('^engine/src/unrelated.c', lines)
+            record = build_cache.used_record(lines, build_cache.SourceIndex(root))
+            self.assertTrue(record['complete'], record.get('why'))
+            self.assertEqual(sorted(p for p in record['data'] if p.startswith('engine/')),
+                             ['engine/inc/common.h', 'engine/inc/zone.h', 'engine/src/zone.c'])
+
+    def test_a_process_that_is_no_compiler_still_makes_it_incomplete(self):
+        index = build_cache.SourceIndex(Path(tempfile.gettempdir()))
+        record = build_cache.used_record(['#v2', '$ffmpeg\trepo'], index)
+        self.assertFalse(record['complete'])
+        self.assertIn('started ffmpeg with a checkout path', record['why'][0])
 
 
 class ParallelApplyTests(unittest.TestCase):
