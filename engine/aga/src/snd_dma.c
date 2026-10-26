@@ -1051,6 +1051,8 @@ void S_Update_(void)
             load_gap_start=load_last_mix;load_gap_end=now;load_keep_gap(load_last_mix);}
         load_last_mix=now;load_mix_phase=aw_load_phase;load_updates++;
         load_trace('U');
+        /* the music's own disk reads go on through the load (no frame loop pumps them meanwhile) */
+        if(!movie)AW_MusicLoadPump();
         if(paintedtime<soundtime){load_late++;load_missed+=soundtime-paintedtime;}
     }
 

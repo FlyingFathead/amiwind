@@ -9,6 +9,8 @@
 #include "aw_state.h"
 #include "aw_boolean.h"
 #include "aw_torch.h"
+#include "aw_items.h"
+#include "aw_tryalloc.h"
 #include <stdint.h>
 #ifdef AMIGA
 #include <proto/exec.h>
@@ -161,6 +163,7 @@ static int automatic_night(void)
 }
 /* Night as the guard torches see it; the night lamps share it. */
 int AW_GuardTorchNight(void){return automatic_night();}
+int AW_GuardTorchWanted(void){return override>0 || (override<0 && automatic_night());}
 static guard_asset_t *asset(entity_t *ent,edict_t **actor,int automatic)
 {
     uintptr_t ptr=(uintptr_t)ent,base=(uintptr_t)cl_entities,offset;int index,i;
@@ -213,7 +216,7 @@ static int models(guard_asset_t *a)
         /* The SDK malloc failure path can trap before returning NULL. */
         probe=AllocMem(1024*1024,MEMF_FAST|MEMF_PUBLIC);
 #else
-        probe=malloc(1024*1024);
+        probe=AW_TryMalloc(1024*1024);
 #endif
     }
     if(!probe){
@@ -271,7 +274,7 @@ void AW_GuardTorchUpdate(void)
     last_aliases=last_eligible=last_frames=last_models=last_evicted=0;
     last_lights=last_light_range=last_light_contents=last_light_trace=last_light_untested=0;
     last_gate="inactive";
-    if(!guard_count || !flame_pixels || override==0 || !r_drawentities.value || !sv.active ||
+    if(!flame_pixels || override==0 || !r_drawentities.value || !sv.active ||
         cls.state!=ca_connected || svs.maxclients!=1 || cl.intermission || AW_GalleryActive())return;
     night=automatic_night();
     last_gate="automatic daytime/disabled";if(override<0 && !night)return;
@@ -279,7 +282,24 @@ void AW_GuardTorchUpdate(void)
     initial=cl_numvisedicts;
     for(i=0;i<initial && visible_count<GUARD_VISIBLE && cl_numvisedicts<MAX_VISEDICTS;i++){
         ent=cl_visedicts[i];if(!ent || !ent->model || ent->model->type!=mod_alias)continue;
-        last_aliases++;a=asset(ent,&actor,override<0);if(!a)continue;
+        last_aliases++;
+        {   /* a skeletal guard's torch: a carried item (aw_items.c AW_ItemsCarriedUpdate) whose flame point is in
+             * its own model space; the item entity carries minus its true pitch (aw_items.c AW_ItemsPose), so
+             * the axes are the entity's with the pitch turned back. No proxy models (SKEL-ITEM-TAGS-52). */
+            vec3_t point,turned;
+            if(AW_ItemsLightEmitter(ent->model,point)){
+                last_eligible++;
+                g=&guards[visible_count++];g->original=ent;g->actor=NULL;g->active=1;g->light_test=0;g->light_key=0;
+                g->body=*ent;g->held=*ent;
+                VectorCopy(ent->angles,turned);turned[0]=-turned[0];
+                AngleVectors(turned,forward,right,up);
+                for(j=0;j<3;j++)g->flame[j]=ent->origin[j]+point[0]*forward[j]-point[1]*right[j]+point[2]*up[j];
+                VectorSubtract(g->flame,r_refdef.vieworg,delta);g->distance=DotProduct(delta,delta);
+                continue;
+            }
+        }
+        if(!guard_count)continue;
+        a=asset(ent,&actor,override<0);if(!a)continue;
         last_eligible++;
         if(ent->frame<0 || ent->frame>=a->frames){last_frames++;continue;}
         if(!models(a)){last_models++;continue;}

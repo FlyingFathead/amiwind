@@ -330,16 +330,21 @@ def digest(path):
     with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 
 
+def batch_entries(batch):
+    """A world partition's entries as (source, volume path): a map (written to id1/maps/<name>) or a (source, volume
+    path) pair, a boot unit the compact layout moved off DH0 (tools/layout_plan.py movable_unit), written at its boot
+    path. IMAGE-WORLD-BATCH-PAIRS-52: the pairs were turned into paths first, so the first image whose boot payload
+    overflowed DH0 stopped here."""
+    return [(Path(p[0]),str(p[1])) if isinstance(p,(tuple,list)) else (Path(p),'id1/maps/'+Path(p).name)
+            for p in batch]
+
+
 def _pack_batch(task):
     """Worker: write, check and read back one world partition (independent)."""
     index, batch, out, xdftool = task[:4]
-    batch = [Path(p) for p in batch]
     volume=f'AW_WORLD{index}';part=Path(out)/f'world{index}-partition.hdf'
     if part.exists():raise ValueError('World partitions are immutable')
-    # an entry is a map (written to id1/maps/<name>) or a (source, volume path) pair: a boot unit the compact layout
-    # moved off DH0 (tools/layout_plan.py movable_unit), written at its boot path
-    batch = [(Path(p[0]),str(p[1])) if isinstance(p,(tuple,list)) else (Path(p),'id1/maps/'+Path(p).name)
-             for p in batch]
+    batch = batch_entries(batch)
     payload=sum(p.stat().st_size for p,_ in batch)
     # the compact layout passes its planned size (tools/layout_plan.py); the legacy layout sizes it here
     mib=task[4] if len(task)>4 else partition_mib(payload)

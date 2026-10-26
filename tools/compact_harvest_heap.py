@@ -23,13 +23,13 @@ def runtime_policy(engine):
     checks={
         'aw_harvest.c': [
             'bytes=models*sizeof(aw_harvest_model_t)+nodes*sizeof(aw_harvest_node_t)+edges*sizeof(aw_harvest_edge_t)+plants*sizeof(aw_harvest_plant_t);',
-            'p=(unsignedchar*)calloc(1,bytes);', 'next=(char*)realloc(h->text,bytes);',
+            'p=(unsignedchar*)AW_TryCalloc(1,bytes);', 'next=(char*)AW_TryRealloc(h->text,bytes);',
             'free(h->storage);free(h->text);'],
         'aw_harvest_proxy.c': [
             'allocated_bytes=visible*sizeof(entity_t)+h->plants*(sizeof(*indices)+sizeof(*submitted));',
-            'proxies=(entity_t*)calloc(1,allocated_bytes);', 'free(proxies);'],
+            'proxies=(entity_t*)AW_TryCalloc(1,allocated_bytes);', 'free(proxies);'],
         'aw_harvest_runtime.c': [
-            'plants=(edict_t**)calloc(harvest.plants,sizeof(*plants)+sizeof(*available));',
+            'plants=(edict_t**)AW_TryCalloc(harvest.plants,sizeof(*plants)+sizeof(*available));',
             'AW_HarvestProxyClear();free(plants);plants=NULL;available=NULL;AW_HarvestRelease(&harvest);'],
     }
     expected_calls={'aw_harvest.c':2,'aw_harvest_proxy.c':1,'aw_harvest_runtime.c':1}
@@ -37,7 +37,9 @@ def runtime_policy(engine):
     for name,patterns in checks.items():
         raw=(engine/'src'/name).read_bytes();hashes[name]=hashlib.sha256(raw).hexdigest()
         text=re.sub(r'/\*.*?\*/|//[^\n]*','',raw.decode(),flags=re.S)
-        if len(re.findall(r'\b(?:malloc|calloc|realloc)\s*\(',text))!=expected_calls[name]:
+        # the checked allocators (engine/aga/src/aw_tryalloc.h, SDK-MALLOC-TRAPS-52): the toolchain's own would trap
+        if len(re.findall(r'\bAW_Try(?:Malloc|Calloc|Realloc)\s*\(',text))!=expected_calls[name] or \
+                re.findall(r'\b(?:malloc|calloc|realloc)\s*\(',text):
             raise ValueError('Unrecognized compact harvest allocation policy: '+name)
         text=re.sub(r'\s+','',text)
         if any(pattern not in text for pattern in patterns):

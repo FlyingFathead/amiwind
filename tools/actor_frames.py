@@ -24,7 +24,8 @@ IDLE_FRAMES = 8                     # the previous resident model: the idle cycl
 ACTOR_FRAMES = 21                   # the previous town actor
 ACTOR_GROUPS = {'idle': (0, 8), 'talk': (8, 4), 'blink': (12, 1), 'walk': (13, 8)}
 MAX_FRAMES = 256                    # generated alias model ceiling (npc_geometry.ALIAS_MAX_FRAMES)
-MAX_GROUP_FRAMES = 64               # AW_AnimParse: each ordinary animation group, not the whole model
+MAX_TABLE_FRAMES = 65535            # a shared animation table (engine AW_ITEMS_MAX_SKEL_FRAMES, protocol AWU_FRAME2)
+MAX_GROUP_FRAMES = 64              # AW_AnimParse: each ordinary animation group, not the whole model
 LEGACY_FRAME_COUNTS = (IDLE_FRAMES, ACTOR_FRAMES)
 DEAD_FRAMES = 1                     # an initially dead resident (aw_corpse): its final death pose (prepare_area.py)
 
@@ -78,13 +79,15 @@ def parse(text):
     return groups, mover
 
 
-def of_model(frames, layout=None, intro=False, dead=False):
+def of_model(frames, layout=None, intro=False, dead=False, skeletal=False):
     """The Layout of a model with FRAMES frames and its layout text (None: no <model>.anm).
 
     intro: the model stands in the opening scene; without a layout it must be the 21-frame town actor.
-    dead: an aw_corpse; without a layout a 1-frame death pose is its layout too."""
-    if not isinstance(frames, int) or not 1 <= frames <= MAX_FRAMES:
-        raise ValueError('Actor model frame count outside 1..%d' % MAX_FRAMES)
+    dead: an aw_corpse; without a layout a 1-frame death pose is its layout too.
+    skeletal: FRAMES are a skeletal actor's shared table frames (skeletal_frames), up to MAX_TABLE_FRAMES."""
+    ceiling = MAX_TABLE_FRAMES if skeletal else MAX_FRAMES
+    if not isinstance(frames, int) or not 1 <= frames <= ceiling:
+        raise ValueError('Actor model frame count outside 1..%d' % ceiling)
     if layout is not None:
         groups, mover = parse(layout)
         if 'idle' not in groups:
@@ -125,16 +128,37 @@ def numframes(raw):
     return struct.unpack_from('<i', raw, 68)[0]
 
 
+SKEL_BLOCK_MAGIC, SKEL_BLOCK_HEAD, SKEL_VERT_BYTES = b'AWSB', 76, 16   # tools/skeletal_actor.py (engine aw_skel.h)
+
+
+def skeletal_frames(raw):
+    """The shared animation table's frame count a skeletal actor's layout indexes (its "AWSB" block after the one
+    stored rest frame: big-endian u32 at block + 48), or None for an ordinary model (SKEL-GROUND-LAYOUT-TABLE-52)."""
+    if len(raw) < 84 or numframes(raw) != 1:
+        return None
+    nv = struct.unpack_from('<i', raw, 60)[0]
+    at = len(raw) - SKEL_BLOCK_HEAD - nv * SKEL_VERT_BYTES
+    if nv <= 0 or at < 84 or raw[at:at + 4] != SKEL_BLOCK_MAGIC:
+        return None
+    return struct.unpack_from('>I', raw, at + 48)[0]       # after the magic, two u16, the path, scale, vertices
+
+
+def layout_frames(raw):
+    """The frames a model's layout (<model>.anm) and tag table index: its own, or a skeletal actor's table frames."""
+    return skeletal_frames(raw) or numframes(raw)
+
+
 def of_file(model_path, intro=False):
     """The Layout of a staged model file (its frame count and the layout beside it)."""
     path = Path(model_path)
     return of_model(numframes(path.read_bytes()), layout_text(path), intro)
 
 
-def tag_frames(text):
-    """Rows of a carried-item tag table (<model>.tag, tools/npc_items.py 'AWTG1 FRAMES')."""
+def tag_frames(text, skeletal=False):
+    """Rows of a carried-item tag table (<model>.tag, tools/npc_items.py 'AWTG1 FRAMES'), or the table frames a
+    skeletal actor's tag names ('AWTS1 FRAMES': no rows, posed from the table; SKEL-ITEM-TAGS-52)."""
     words = (text or '').split(None, 2)
-    if len(words) < 2 or words[0] != 'AWTG1':
+    if len(words) < 2 or words[0] != ('AWTS1' if skeletal else 'AWTG1'):
         raise ValueError('Invalid item tag table')
     return int(words[1])
 
@@ -178,11 +202,20 @@ def audit_payload(id1, removed_maps=()):
     id1 = Path(id1)
     removed = set(removed_maps)
     errors, models, frames_of, other = [], {}, {}, 0
+    skeletal_of = {}
 
     def frames(rel):
+        # a skeletal actor's layout and tags index its shared table's frames (SKEL-GROUND-LAYOUT-TABLE-52)
         if rel not in frames_of:
-            frames_of[rel] = numframes((id1 / rel).read_bytes())
+            raw = (id1 / rel).read_bytes()
+            table = skeletal_frames(raw)
+            skeletal_of[rel] = table is not None
+            frames_of[rel] = table if table is not None else numframes(raw)
         return frames_of[rel]
+
+    def skeletal(rel):
+        frames(rel)
+        return skeletal_of[rel]
 
     # every map, CHIM frame maps (x.chim) included: town frames place the residents (tools/map_files.py)
     from map_files import map_files
@@ -202,8 +235,13 @@ def audit_payload(id1, removed_maps=()):
             continue
         for intro, idles, dead in sorted(intros):
             try:
-                layout = of_model(frames(model), layout_text(id1 / p), intro, dead)
-                if idles and layout.idle != (0, IDLE_FRAMES):
+                layout = of_model(frames(model), layout_text(id1 / p), intro, dead, skeletal(model))
+                if idles and skeletal(model):
+                    # the QuakeC idle cycle steps a skeletal actor through table frames 0..7: inside its idle group
+                    if layout.idle[0] != 0 or layout.idle[1] < IDLE_FRAMES:
+                        raise ValueError('a skeletal aw_npc needs its idle group to start at table frame 0 with at '
+                                         'least %d frames, not %d:%d' % ((IDLE_FRAMES,) + tuple(layout.idle)))
+                elif idles and layout.idle != (0, IDLE_FRAMES):
                     # the QuakeC idle cycle (world.qc aw_npc_idle) plays frames 0..7 of every aw_npc model, and
                     # the guard torch companions index the same frames (prepare_guard_torches.py)
                     raise ValueError('an aw_npc model needs its idle group at frames 0..7, not %d:%d' % layout.idle)
@@ -218,7 +256,7 @@ def audit_payload(id1, removed_maps=()):
             continue
         layouts += 1
         try:
-            layout = of_model(frames(rel), anm.read_text(encoding='ascii'))
+            layout = of_model(frames(rel), anm.read_text(encoding='ascii'), skeletal=skeletal(rel))
             if layout.mover:
                 mover = Path(layout.mover)
                 if mover.is_absolute() or '..' in mover.parts or not (id1 / mover).is_file():
@@ -233,9 +271,10 @@ def audit_payload(id1, removed_maps=()):
         rel = model.relative_to(id1).as_posix()
         tags += 1
         try:
-            rows = tag_frames(tag.read_text(encoding='ascii'))
+            text = tag.read_text(encoding='ascii')
             if not model.is_file():
                 raise ValueError('item tags without a model')
+            rows = tag_frames(text, skeletal(rel))
             if rows != frames(rel):
                 raise ValueError('item tags have %d rows for %d model frames' % (rows, frames(rel)))
         except (OSError, ValueError, struct.error) as exc:

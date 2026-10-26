@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.48 (24 October 2026)._
+_Last updated with AmiWind v0.0.52-dev (26 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -20,6 +20,8 @@ _Last updated with AmiWind v0.0.48 (24 October 2026)._
 - [Build side: a parts library and recipes](#build-side-a-parts-library-and-recipes)
 - [Stage 1 in the builder: the gallery from parts](#stage-1-in-the-builder-the-gallery-from-parts)
 - [Joint seams](#joint-seams)
+- [Runtime method C: one shared animation table, posed in the alias renderer](#runtime-method-c-one-shared-animation-table-posed-in-the-alias-renderer)
+- [Getting NPC movement right](#getting-npc-movement-right)
 - [Runtime method A: load-time composition](#runtime-method-a-load-time-composition)
 - [Runtime method B: attached parts as follower entities](#runtime-method-b-attached-parts-as-follower-entities)
 - [Comparison](#comparison)
@@ -36,7 +38,10 @@ parts, the way Morrowind builds them, instead of one complete model per actor.
 Two reasons: the builder wastes most of its NPC time converting the same parts
 again and again, and looting or changing equipment must change an actor's
 appearance, which a model baked whole cannot do. The baked whole-actor models
-stay in the builder as a selectable method (comparison and fallback).
+stay in the builder as an option you compile in on purpose
+(`--npc-anim-type 1`); skeletons are the default (`--npc-anim-type 2`) from
+v0.0.52, since they take a fraction of the space, and release kits carry no
+baked actor frames (a kit check refuses one that does).
 
 Tracked as [NPC-BAKED-WHOLE-DUPLICATION-33](bugs/NPC-BAKED-WHOLE-DUPLICATION-33.md).
 Builds on the [model cache](NPC_MODEL_CACHE.md) ("Next experiment: component
@@ -111,13 +116,16 @@ version; the register entry is
 ## Disk size plan for the actors (v0.0.49)
 
 The goal: the actors take a size that belongs on an Amiga, with every character keeping all of its animation. The
-starting point is the v0.0.48 release candidate: **1,468 MB** of actor models in 4,225 complete models. Each stage is
+starting point is the v0.0.48 release candidate: **1,468 MB** of actor models in 4,225 complete models. Measured again
+on the v0.0.51 release image (25 October 2026, from its readback record): 1,478 MB in the same 4,225 models (2,174
+characters and creatures: 2,077 movers at about 501 KB, 2,148 standing models at about 215 KB), 39% of the 3.70 GB
+image; the store-once layout leaves only 0.01 GB stored twice in the whole image. Each stage is
 built, measured on the same rooms against the stage before it, and kept by a test. A stage that does not pay is
 reverted, not shipped.
 
 | Stage | What changes | Saving (estimate until measured) |
 | --- | --- | --- |
-| 0. Budget | The build's size ledger records the actor payload (frames, skins, files) and fails a build whose actors grew by more than a set margin over the previous release without a stated reason | none: it stops silent growth |
+| 0. Budget | The build's size ledger records the actor payload (frames, skins, files) and fails a build whose actors grew by more than a set margin over the previous release without a stated reason. **Done in source on v0.0.52-dev** (25 October 2026): `tools/size_ledger.py` counts `id1/progs/a_*` and `id1/progs/skins` as the actors group (1.55 GiB of the v0.0.51 image, the release baseline); the size guard's 0.05 GiB margin applies to it | none: it stops silent growth |
 | 1. One model per character | The standing and the mover model become one model holding all animation groups and one skin | about 178 MB of duplicate skins (measured) and half the files |
 | 2. Residents from the parts library | Every resident is a recipe over the parts library (stage 2 of the [staged plan](#recommendation-and-staged-plan)); the builder still writes composed models, so the engine is unchanged | build time; no disk yet |
 | 3. The engine composes at load time | The image ships the parts, each with its own frames on one shared animation clock and its textures as shared files, plus one recipe per character; the engine composes a character into the model cache when it is first needed ([runtime method A](#runtime-method-a-load-time-composition)) | frames from about 990 MB to under 100 MB; textures stored once per part instead of once per character |
@@ -453,6 +461,194 @@ its source vertices, chosen from the rim's own geometry, and lock that subset.
 the island-wide open joint length, the number of appearances with open joints
 or the largest gap exceeds `config/npc-seam-limits.json`. The limits are the
 measured values of today's reduction; each repair lowers them.
+
+## Runtime method C: one shared animation table, posed in the alias renderer
+
+**Decision (the maintainer, 25 October 2026):** every NPC uses a shared animation table, the way Morrowind and OpenMW
+do ("every single NPC should use a shared animation table"), built on the engine's own alias renderer and cheap to
+compute. It replaces the baked frames of methods A and B, whose parts still carried their own vertex frames.
+
+Why it is cheap: the alias renderer already transforms every vertex of a model by one 3 x 4 matrix every frame
+(`r_alias.c`, `R_AliasSetUpTransform` and `R_AliasTransformVerts`). With a skeleton, each vertex names the bone it
+hangs on, and the renderer uses that bone's matrix (bone pose times the model's view matrix) instead of the one model
+matrix. The work per vertex stays what it is today; the new work is one matrix per bone per drawn actor (34 bones,
+a few dozen small multiplies) and, at joints, a blend of two bone positions for the few vertices that need it.
+
+Measured on the base game's data (25 October 2026):
+
+| | |
+| --- | --- |
+| Body-part meshes (`meshes/b`) | 519, of them 479 rigid (the whole part hangs on one bone) and 40 skinned |
+| Skinned vertices | 25,216: 90.3 % on one bone, 7.7 % on two, 2.0 % on three or more (weights of at least 0.05) |
+| The humanoid animation (`xbase_anim.kf`) | 34 bones, 891 animation groups, about 139,000 keys over 356 seconds |
+| Stored once at 16 bits per value | about 1.3 MB for every humanoid in the game |
+| Baked frames today (v0.0.51) | 992 MB of the 1.5 GB of actor models |
+
+What ships and what the engine does:
+
+- **On disk:** each body part once, in its rest pose, with one bone index per vertex (two and a weight for joint
+  vertices); one animation table per skeleton family (the humanoid table and the creatures' own); each actor's recipe
+  (its parts and their skins). The baked frames go.
+- **In RAM:** the animation table of the skeletons in use, each drawn actor's composed parts, and per drawn actor the
+  bone matrices of its current pose. No frames per character, so a crowd costs far less memory than today's 200 to
+  500 KB per character.
+- **Per frame, per drawn actor:** sample the table at the actor's animation time (the group the game logic asks for:
+  idle, walk, run, attack, hit, death), build the bone matrices, transform each vertex by its bone. Actors off screen
+  or past the draw distance are skipped, as today.
+- **Unchanged:** the rasteriser, the skins, the entity, visibility and collision paths, and the frame numbers the game
+  logic uses (they name a group and a time instead of a baked frame).
+
+Every NPC then has every action: the region NPCs that today have only a standing model (ANIMKIT-COVERAGE-35) walk,
+run and fight like the town NPCs. First step: a prototype on one town, measuring the frame time with and without the
+bone transform on the slow-CPU preset and the RAM of the town's actors, against today's baked models.
+
+## Getting NPC movement right
+
+The rules the skeletons follow (the maintainer, 25 October 2026: "if a humanoid can do it, it needs to be in our
+look-up table"; "we do not prebake that"):
+
+**Every action, from one table.** The table holds every animation group of the humanoid skeleton (139 of 139 in the
+base game: idles, walking, running, sneaking, swimming and turning in every direction and weapon stance, jumping,
+every attack set with its phases, spellcasting, blocking, hits, knockdowns, knockouts, deaths, the torch, lockpicking,
+the storm idle, the inventory poses). A build check refuses a table that misses a group of its sources. Walking,
+running, sneaking, swimming and jumping are held in place: the game moves the actor, the animation only moves its body.
+
+**Chosen as the original chooses them.** The game logic picks the group and its speed the way OpenMW's character
+controller does (`mwmechanics/character.cpp`): the movement direction and speed pick walk, run, sneak or swim and the
+playback rate, so the feet do not slide; combat picks the attack set of the weapon in hand and its phases; hits,
+knockdowns and deaths interrupt; the torch and the inventory poses play over the rest. The animation kit's game logic
+(docs/ANIMKIT.md: frame ranges per group, `dbg animkit play`) stays; only where the motion comes from changes.
+That includes AmiWind's own combat presentation ([COMBAT](COMBAT.md)), kept as it is: a swing whose roll missed
+shows why, the target raising its shield (the base game's shield group) or dodging (a quick step aside: the
+walk-left or walk-right loop in place, named `dodgel` and `dodger` in the table over those same frames, while the
+combat code moves the actor 10 units through the collision), one roll per swing, for the player and the NPCs alike.
+
+**As cheap as a baked frame.** Quake's monsters cost little because the renderer transforms each vertex of a stored
+frame once. A skeletal actor must cost the same:
+
+- each vertex is transformed once, by its bone's matrix (the view, model and bone matrices combined once per bone),
+  and the light direction is turned into each bone's space once, so the per-vertex work is today's;
+- an actor is posed only when its frame changes (about 10 times a second), never every drawn frame;
+- actors on the same table frame share the pose; far actors pose less often and skip the joint blend;
+- no division and no float-to-integer conversion per vertex (the 68040 has no instruction for the truncation).
+
+The first working version poses every vertex twice a drawn frame and does both; it is the version to replace
+([SKEL-RUNTIME-COST-52](BUGS.md)).
+
+How it fits the alias renderer (`r_alias.c`, as in AmiQuake): today it picks a stored frame, builds one combined
+matrix (view x model) and runs every vertex through it, then projects and draws. The skeletal path keeps that shape:
+
+- the actor stays one entity: one bounding box test (a box that holds every pose), one world light sample, one
+  dynamic light pass, the existing triangle drawing and clipping;
+- per bone one combined matrix (view x model x bone) and the light direction turned into the bone's space, once per
+  drawn frame; the builder sorts each model's vertices by bone, so the inner loop keeps one matrix for a run of
+  vertices and does the same work per vertex as a baked frame (no blend for a rigid part);
+- the pose (the table's quaternions turned into the 29 bone matrices, parent first) only when the actor's table
+  frame changes, about 8 times a second: a few thousand floating-point operations per actor a second. Matrices
+  ready-made per table frame would save that, but cost 1.9 to 3.8 MB for the common table alone; measured
+  against the vertex loop it is not worth it. Blending between table frames can be switched off (the nearest frame
+  only) where the CPU is short;
+- the vertices are still transformed, projected and drawn every displayed frame: a lower animation rate does not
+  remove that, which is why the vertex loop must stay today's.
+
+A part that looks wrong rigid and too costly blended (a skirt, a robe hem) may keep a small shared baked deformation
+of its own: trading memory for CPU on one piece is fine when measured; baking every actor whole is not.
+
+**Parts carry no motion.** The modular bodies ride the one skeleton; a body part stores no movement of its own.
+479 of the 519 body parts are rigid, each on one bone (a forearm, a helmet, a boot): the renderer draws each with
+that bone's matrix, Quake-style, so a rigid part costs no more than a static model. Only about 40 skin parts bend at
+the joints, and only their vertices take the bone blend. Movement sets kept per part would be baking again, per part
+instead of per character: smaller than 992 MB, but the same mistake. A baked actor cannot change clothes either:
+every outfit would need its own bake. With parts on bones, a part is swapped and the skeleton keeps moving.
+
+**Fewer frames are fine.** The bar is that every NPC moves with a real cycle (walk, run, idle, fight), not that it
+looks perfect: 8 to 10 table frames a second with fewer keys is part of the squeeze when it saves RAM, disk or CPU.
+Like an animator's keyframes, a stretch where little moves (an idle, a held pose) can keep 4 frames a second or
+fewer while a swing keeps 8: a frame is stored only where the motion needs it, and the engine poses an actor only
+when its stored frame changes.
+
+**A stick figure.** The table keeps 29 of the skeleton's 61 nodes: the root, pelvis, chest, neck and head; per side
+the clavicle, upper arm, forearm and hand, the thigh, calf and foot; the weapon and shield bones; and per hand a thumb
+and one unit for the fingers, each with both its joints, so a hand still closes around a weapon. The two lower spine
+links, the attachment nodes and the second finger are left out: their motion is kept in the kept bones' transforms
+(the kept bones move within 0.6 units of the full skeleton's), and a part on a left-out node rides its nearest kept
+bone at the same place. The beast races (Argonians and Khajiit, `base_animkna.nif`: their own walk on the toes, a
+tail) keep their toes and two of the four tail bones (33 bones); the female groups (`base_anim_female.nif`, three
+groups over the common ones) are a table of their own, chosen per actor as OpenMW chooses them. The fidelity bar is
+every animation working, not OpenMW's or the original's smoothness.
+
+**Small enough to ship.** The base game's table was 4.3 MB as first built (version 1: 61 nodes, every one with a
+four-part rotation and a position, 15 frames a second). Version 2 stores a bone that never changes once, a bone that
+only turns (or moves under one unit) without its position, three-part rotations (w >= 0, rebuilt from x, y and z) and
+8 frames a second, blended between. The table also carries the text keys as frames (a group's phases such as
+`self release` or `chop min hit`, and the sound events), which the game logic, and MWScript's PlayGroup later, play
+between (`AW_SkelKeyFrame`). Measured: the common table 549 KB (139 groups, 835 keys), the female 14 KB, the beast
+639 KB (138 groups, 813 keys). Keys only where the motion changes (within an error too small to see) come next
+([SKEL-TABLE-SIZE-52](BUGS.md)). The
+characters themselves come from the parts library (each body part once, about 67 MB for every resident) assembled at
+load, not one baked model each: together the actors go from 1.5 GB to well under 100 MB, held by a budget in the size
+ledger.
+
+**Skeletons by default.** The builder makes skeletal actors (`--npc-anim-type 2`, the default); baked actor frames
+are made only by a build compiled with `--npc-anim-type 1` on purpose, and the project's release kits carry none.
+A debug console switch (planned with the engine posing) turns the skeletal posing on and off in the game (off draws
+the rest pose), never to baked data.
+
+What type 2 builds (v0.0.52): every humanoid resident (towns, Seyda Neen, the rooms) and every actor-library
+model is one rest frame and its skeletal block on the table of its skeleton, made by the resident bake's own
+reduction and atlas (`tools/skeletal_actor.py` `skeletal_resident`, called by `tools/prepare_area.py` and
+`tools/npc_library.py`). Two tables are written once into the image: `progs/humanoid.awsk`, which also holds
+the female groups under an `f:` prefix (`f:walkforward` and her two idles: OpenMW's `NpcAnimation` adds
+`xbase_anim_female` after `xbase_anim` for a female human, and the later source wins for each group it has), and
+`progs/humanoid_kna.awsk` (the beast races alone, as the baked kit has always made them). A female human's model
+names the view `progs/humanoid.awsk|f`: the engine loads the common file once for both, and the view's group
+lookup tries `f:` and the name first; her layout points at her own frames directly. A table of her own repeated
+the common one whole, 561 KB of Fast RAM for three groups. The animation kit's
+layout beside each model names the table's frames ([ANIMKIT](ANIMKIT.md#skeletal-actors-the-layout-from-the-table)),
+with every group of the profile and no mover. The carried weapon and shield hang on the table's weapon and
+shield bones (the `AWTS1` item tag). The type is part of the resident stages' keys (`AMIWIND_NPC_ANIM_TYPE`) and
+of the actor library's appearance keys, so the two types never share a cached model. For now the head is
+reduced to the budget detail, so every actor fits the 2,000 vertices of the alias stream reader
+([SKEL-VERTEX-LIMIT-52](BUGS.md)); an actor that starts dead keeps its one death pose as a one-frame model. A
+guard who carries the original torch has it on the shield bone beside its own shield (the `light` and `emitter`
+lines of its tag: the torch model and the flame's point), shown by the day and night cycle: no baked torch
+companions for a skeletal guard.
+
+Size ledger (26 October 2026, measured on the base game's data: every NPC record placed in a cell of
+`Morrowind.esm`, 2,612 records, baked as the resident stage bakes them with the `react+full` profile; the files
+each writes into the image, before the resident stage shares identical files and without the greeting voices,
+which are the same in both):
+
+| | Type 1 (baked) | Type 2 (skeletal) |
+| --- | --- | --- |
+| Actors baked | 2,515 (97 over the alias budget) | 2,612 |
+| Actor files of the 2,515 both bake | 3,222 MB (models 1,256 MB, movers 1,957 MB, layouts and tags 9 MB) | 512 MB (models 511 MB, layouts and tags 1.5 MB) |
+| Mover models | 2,515 | none |
+| Shared animation tables | | 1.8 MB (`humanoid` 563 KB for 1,424 actors, `humanoid_f` 561 KB for 954, `humanoid_kna` 654 KB for 234); since then the female groups live in `humanoid` (about 1.2 MB in all) |
+| Per actor | about 1,281 KB | about 204 KB |
+
+Type 2 stores the same characters in about a sixth of the bytes (514 MB with the tables against 3,222 MB), with
+every group of the profile on every actor. What is left in a skeletal actor is mostly its own skin and mesh,
+stored once per character: the parts library (each body part once, assembled at load) is the next step down.
+
+**Open to the scripts.** The table keeps Morrowind's own group names, and an actor's animation goes through one
+entry point that the game's NPC logic calls now and MWScript will call later, as OpenMW does
+(`mwscript/animationextensions.cpp`): play a group, loop it a number of times, skip a frame, return to idle. The
+first version may be rough; the interface is what later work plugs into. The same holds for everything else a
+script touches on an actor: its base level, attributes, skills, health, magicka and fatigue, abilities and spells,
+equipped weapon and armour, and inventory live in one record per actor, read from its NPC record at load and changed
+by play; MWScript's actor functions (GetLevel, ModHealth, Get/Set/Mod of a skill or attribute, AddItem, Equip,
+AddSpell, PlayGroup ...) read and write that record only, and an equipment change re-picks the actor's body parts on
+the skeleton. The record comes first; the scripts can come later.
+
+**Seen before the game.** `tools/skeleton_preview.py` draws the shipped tables from your own copy of the game: the
+common and beast skeletons as bones, group after group (`--data-files DIR --out DIR`), or one character dressed as
+the game dresses it, posed exactly as the engine poses it (`--npc "balyn omavel" --palette gfx/palette.lmp`). The
+project ships no game data; the pictures it makes from yours stay with you.
+
+**Proved in the game.** A MiniWind animation stage plays every group on Seyda Neen and Balmora characters, with the
+frame time and memory read on the slow-CPU preset next to today's baked actors
+([SKEL-ANIM-STAGE-52](BUGS.md)).
 
 ## Runtime method A: load-time composition
 

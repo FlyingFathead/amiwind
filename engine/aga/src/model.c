@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_log.h"
 #include "aw_planetype.h"
 #include "r_local.h"
+#include "aw_skel.h"
+#include "aw_tryalloc.h"
 #include <limits.h>
 #include <stddef.h>
 #include <setjmp.h>
@@ -150,7 +152,7 @@ byte *AW_SharedSkinExpand(byte *stored,int *bytes) {
     rest=*bytes-head-4-AW_SKIN_SHARED_REF;
     size=COM_FOpenFile(path,&f);
     if(!f || size!=pixels || pixels>INT_MAX-head-4-rest){if(f)fclose(f);free(stored);return NULL;}
-    full=malloc(head+4+pixels+rest);
+    full=AW_TryMalloc(head+4+pixels+rest);
     if(!full){fclose(f);free(stored);return NULL;}
     memcpy(full,stored,head);*(int *)(full+head)=LittleLong(ALIAS_SKIN_SINGLE);
     if(AW_LoadRead(full+head+4,pixels,f)!=(size_t)pixels){fclose(f);free(full);free(stored);return NULL;}
@@ -162,7 +164,7 @@ static void *AW_AliasFile(char *name) {
     if(strlen(name)<4 || strcmp(name+strlen(name)-4,".mdl"))return NULL;
     aw_alias_file_bytes=0;size=COM_FOpenFile(name,&f);if(!f)return NULL;
     if(size<84 || size>512*1024){fclose(f);return NULL;}
-    data=malloc(size);if(!data){fclose(f);return NULL;}
+    data=AW_TryMalloc(size);if(!data){fclose(f);return NULL;}
     Draw_BeginDisc();
     if(AW_LoadRead(data,size,f)!=(size_t)size || memcmp(data,"IDPO",4)){free(data);data=NULL;}
     fclose(f);
@@ -1497,7 +1499,7 @@ void Mod_LoadNodes (lump_t *l)
     }
     world = AW_PredictRenderPrefix(count);
     /* Optional optimization: scratch allocation failure is safe. */
-    if(world)seen=(byte *)calloc((count+7)/8,1);
+    if(world)seen=(byte *)AW_TryCalloc((count+7)/8,1);
     if(seen){
         mark=AW_BrushMark();
         hull->clipnodes=AW_BrushAlloc(count*sizeof(dclipnode_t),loadname);
@@ -2520,7 +2522,7 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer, int bytes)
 
     total=AW_AliasStageBytes(buffer,bytes);
     if(!total)Sys_Error("Mod_LoadAliasModel: malformed or truncated alias");
-    aw_alias_stage=total<=AW_ALIAS_STAGING_LIMIT?malloc(total):NULL;
+    aw_alias_stage=total<=AW_ALIAS_STAGING_LIMIT?AW_TryMalloc(total):NULL;
     aw_alias_stage_used=0;aw_alias_stage_size=total;
     start = Hunk_LowMark ();
 
@@ -2728,7 +2730,7 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer, int bytes)
         end = Hunk_LowMark ();
         total = end - start;
         /* Allocation failure/large aliases retain the original hunk path. */
-        copy=total<=AW_ALIAS_STAGING_LIMIT?malloc(total):NULL;
+        copy=total<=AW_ALIAS_STAGING_LIMIT?AW_TryMalloc(total):NULL;
         if(copy){memcpy(copy,pheader,total);Hunk_FreeToLowMark(start);}
     }
     Cache_Alloc (&mod->cache, total, loadname);

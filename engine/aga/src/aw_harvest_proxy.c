@@ -6,6 +6,7 @@
 #include "quakedef.h"
 #include "aw_harvest.h"
 #include "aw_harvest_proxy.h"
+#include "aw_tryalloc.h"
 static entity_t *proxies;
 static unsigned short *indices;
 static unsigned char *submitted;
@@ -49,7 +50,7 @@ int AW_HarvestProxySpawn(const aw_harvest_t *h,aw_state_t *s,int level,unsigned 
     catalogue=h;state=s;if(!visible)return 0;
     if(!vid.colormap){Con_Printf("Harvest admission failed: colormap unavailable, %d placements.\n",visible);goto bad;}
     allocated_bytes=visible*sizeof(entity_t)+h->plants*(sizeof(*indices)+sizeof(*submitted));
-    proxies=(entity_t *)calloc(1,allocated_bytes);
+    proxies=(entity_t *)AW_TryCalloc(1,allocated_bytes);
     if(!proxies){Con_Printf("Harvest proxy allocation failed: %u bytes, %d placements.\n",allocated_bytes,visible);goto bad;}
     proxy_count=visible;indices=(unsigned short *)(proxies+visible);
     submitted=(unsigned char *)(indices+h->plants);

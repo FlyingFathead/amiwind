@@ -331,6 +331,7 @@ void D_DrawSurfaces (void)
 				/* world format 0.12: a CHIM placement's own light level (0 for the world
 				 * and every other entity) */
 				r_drawsurf.light = currententity ? currententity->aw_light : 0;
+				r_drawsurf.tint = currententity ? currententity->aw_tint : 0;
 				pcurrentcache = D_CacheSurface (pface, miplevel);
 
 				cacheblock = (pixel_t *)pcurrentcache->data;

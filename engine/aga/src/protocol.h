@@ -42,9 +42,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define	U_SKIN		(1<<12)
 #define	U_EFFECTS	(1<<13)
 #define	U_LONGENTITY	(1<<14)
-/* AmiWind: a live alias entity's instance scale (its aw_scale field, other than 1) follows the angles as
- * a float; the client draws it scaled as statics are (R_SpriteEntityScale, AW_EF_ALIAS_SCALE). */
-#define	U_AW_SCALE	(1<<15)
+/* AmiWind: a byte of AmiWind fields follows the angles; its bits say which follow it, in this order:
+ * AWU_SCALE a live alias entity's instance scale (its aw_scale field, other than 1) as a float, which the
+ * client draws as statics are (R_SpriteEntityScale, AW_EF_ALIAS_SCALE); AWU_FRAME2 the high byte of a frame
+ * over 255 (a frame of a shared animation table, aw_skel.h: the low byte is U_FRAME's). */
+#define	U_AW_EXT	(1<<15)
+#define	AWU_SCALE	(1<<0)
+#define	AWU_FRAME2	(1<<1)
 
 
 #define	SU_VIEWHEIGHT	(1<<0)

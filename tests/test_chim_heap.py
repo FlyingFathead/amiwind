@@ -370,5 +370,39 @@ class LoadRingTests(unittest.TestCase):
         self.assertEqual(r['gated_ring'], 'load')
 
 
+class ImageGateMarksTests(unittest.TestCase):
+    """BUILD-CHIM-HEAP-GATE-LATE-36: the image step's exact frame-map check marks a frame map over the 16 MB budget that
+    fits the 32 MB minimum (as the CHIM stage marks such frames), and stops the build only for one that fits neither."""
+
+    def frame(self, name, ok):
+        return {'map': name + '.chim', 'frame': 'frames/x+01/y+02/frame.ccf', 'ok': ok, 'peak_bytes': 6251840,
+                'budget_bytes': 6242304, 'gated_ring': 'active', 'load_ring': {'peak_bytes': 6251840},
+                'zone_bytes': 7028736, 'heap_mb': 11, 'efrags': {'ok': True}}
+
+    def test_over_16mb_that_fits_32mb_is_marked_not_refused(self):
+        from unittest import mock
+        maps = {'vf0147': self.frame('vf0147', False), 'vf0002': self.frame('vf0002', True)}
+        marked = []
+        with mock.patch.object(heap, 'frame_map_heap', return_value=maps), \
+                mock.patch.object(heap, 'frame_fast_ram', return_value=heap.SAFE_FAST_MB), \
+                mock.patch.object(heap, 'mark_frame_maps', side_effect=lambda id1, cells, maps: marked.append(
+                    (sorted(cells), maps)) or ['vf0147']):
+            report = heap.require_frame_map_heap('world', 'id1', sizes=SIZES, heap_mb=11)
+        self.assertTrue(report['ok'])
+        self.assertEqual(report['marked_32mb_late'], ['vf0147'])
+        self.assertEqual(marked, [([(1, 2)], ['vf0147.chim'])])
+        self.assertEqual((maps['vf0147']['fast_mb'], maps['vf0147']['marked_by_image_gate']), (heap.SAFE_FAST_MB, True))
+
+    def test_a_frame_that_fits_neither_still_stops_the_build(self):
+        from unittest import mock
+        maps = {'vf0147': self.frame('vf0147', False)}
+        with mock.patch.object(heap, 'frame_map_heap', return_value=maps), \
+                mock.patch.object(heap, 'frame_fast_ram', return_value=0), \
+                mock.patch.object(heap, 'mark_frame_maps') as mark:
+            with self.assertRaisesRegex(ValueError, 'vf0147.chim needs 6251840 bytes'):
+                heap.require_frame_map_heap('world', 'id1', sizes=SIZES, heap_mb=11)
+        mark.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()

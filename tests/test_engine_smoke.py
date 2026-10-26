@@ -242,6 +242,23 @@ class ScriptedSessionTests(unittest.TestCase):
         self.assertTrue(lines[-1].startswith('finish PASS script'), done.stdout + done.stderr)
 
     @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_rec_steps_start_and_stop_a_clip(self):
+        """rec NAME / recstop (SKEL-ANIM-STAGE-52): an H.264 clip of the run while the script goes on; finish ends it."""
+        text = engine_smoke.PROBE
+        self.assertIn('-c:v libx264', text)
+        self.assertIn('recstop; cp $R/home/Cache/Logs/fs-uae.log.txt', text)
+        start = text.index('if [ -s $R/script.txt ]; then')
+        block = text[start:text.index('\nfi\n', start) + 4]
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'script.txt').write_text('rec cycle\nwait 1\nrecstop\nshot b\n', encoding='utf-8', newline='\n')
+            stubs = ('R=%s\nlog(){ :; }\nrc(){ :; }\nplay(){ echo "play $1"; }\nrec(){ echo "rec $1"; }\n'
+                     'recstop(){ echo recstop; }\nshot(){ echo "shot $1"; }\n'
+                     'st(){ case "$1" in screen) echo game;; signon) echo 4;; *) echo 1;; esac; }\nalive(){ return 0; }\n'
+                     'finish(){ echo "finish $1"; exit 0; }\nt0=0\n' % Path(tmp).as_posix())
+            done = subprocess.run(['sh', '-c', stubs + block], capture_output=True, text=True, timeout=30, input='')
+        self.assertEqual(done.stdout.splitlines()[:4], ['rec cycle', 'play 1', 'recstop', 'shot b'], done.stderr)
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
     def test_script_rejects_disconnected_game_after_host_error(self):
         text = engine_smoke.PROBE
         start = text.index('if [ -s $R/script.txt ]; then')

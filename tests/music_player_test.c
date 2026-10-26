@@ -103,6 +103,20 @@ int main(int argc,char **argv) {
         assert(reads==initial_reads && sync_fills==0 && errors==0);
         CDAudio_Shutdown();return 0;
     }
+    if(!strcmp(argv[2],"loadpump")) {
+        /* AUDIO-LOAD-29: a track opened as a load begins (the first load after the intro movie) gets no frame
+         * service; the loading screen's mixer updates pump its reads, so the four blocks fill ahead with no
+         * CDAudio_Update and no emergency fill in the painter. */
+        assert(open_track(11,"load-test"));
+        assert(!valid[0] && !valid[1] && !valid[2] && !valid[3]);
+        for(j=0;j<20;j++)AW_MusicLoadPump();
+        assert(valid[0]==8192 && valid[1]==8192 && valid[2]==8192 && valid[3]==8192);
+        for(j=0;j<20000;j++){memset(&sample,0,sizeof(sample));AW_MusicPaint(&sample,1);}
+        assert(sync_fills==0 && underruns==0 && errors==0);
+        /* paused (the movie, the title hold) or switched off: the pump does nothing */
+        CDAudio_Pause();k=(int)reads;for(j=0;j<20;j++)AW_MusicLoadPump();assert((int)reads==k);
+        CDAudio_Shutdown();return 0;
+    }
     if(!strcmp(argv[2],"notifications")) {
         assert(track_notices==0);
         music_next();music_previous();music_mode();assert(track_notices==0);

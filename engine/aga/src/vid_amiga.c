@@ -78,6 +78,7 @@ extern void aw_c2p(void *c2p , struct BitMap *bmp , UBYTE *chunky , ULONG width 
 #include "c2p8_040_amlaukka.h"
 #endif
 #endif
+#include "aw_tryalloc.h"
 
 // Mouse globals for NovaCoder's simplified input handling
 // Mouse globals now defined in sys_amiga.c
@@ -418,11 +419,11 @@ void	VID_Init (unsigned char *palette)
   is_directcgx = (is_cyber_mode && COM_CheckParm ("-directcgx"));
 
   if (!is_directcgx)
-    if ((vid_buffer = (pixel_t *)malloc(sizeof(pixel_t) *
+    if ((vid_buffer = (pixel_t *)AW_TryMalloc(sizeof(pixel_t) *
                                         width * height)) == NULL)
       Sys_Error ("Out of memory");
-  if ((zbuffer = (short *)malloc(sizeof(short) * width * height)) == NULL ||
-      (surfcache = (byte *)malloc(sizeof(byte) *
+  if ((zbuffer = (short *)AW_TryMalloc(sizeof(short) * width * height)) == NULL ||
+      (surfcache = (byte *)AW_TryMalloc(sizeof(byte) *
                                   (width*height/(320*200))*256*1024*2)) == NULL)
     Sys_Error ("Out of memory");
 

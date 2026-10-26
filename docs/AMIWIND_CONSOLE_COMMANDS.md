@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.51._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.52._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -54,7 +54,7 @@ Type: "dbg help" for help.
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
-| `dbg animkit` | - | [on/off / list / play <group> / stop / speed <0.1..4>] animation kit (docs/ANIMKIT.md): on/off = walk, run and swim by speed (off: movers play idle); list = the groups of the NPC under the crosshair and Morrowind's whole table (wired / not wired yet); play forces a group on that NPC until stop; speed scales playback (not saved) |
+| `dbg animkit` | - | [on/off / list / groups / play <group> / cycle [all] / stage [1..8] / stop / speed <0.1..4>] animation kit (docs/ANIMKIT.md): on/off gaits by speed; list/groups: the target's groups; play: a group on it (skeletal: any by name); cycle: all groups in turn; stage: skeletal NPCs before you |
 | `dbg arena` | `dbg arenapit`, `dbg arenatest`, `dbg battlearena` | [opponent / list / next / prev / here/pit/floor / seed N / rematch / setup / exit] Vivec Arena combat minigame (also dbgmode arenapit, testarena): title, fight, result, then Enter rematch / S same seed / N, B next, previous / P pick / Esc leave; opponent = Arena fighter, gallery # or NPC record ID; Ctrl+X returns (not saved) |
 | `dbg aw charplane` | `dbg gallery`, `dbg modelgallery`, `dbg npcgallery` | [number/name/ID; next/previous/body/exit] |
 | `dbg aw hors` | - | 0 (new Hors, Nord / Barbarian / Steed, after Census) |

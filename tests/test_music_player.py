@@ -64,6 +64,8 @@ static void Cvar_SetValue(char *name,float value){cvar_t *v;for(v=test_cvars;v;v
             (p / "music/track11.mws").write_bytes(pack_stream(long_pcm))
             subprocess.run([str(exe), str(p), "buffered"], cwd=p, check=True, timeout=10)
             subprocess.run([str(exe), str(p), "notifications"], cwd=p, check=True, timeout=10)
+            # AUDIO-LOAD-29: the music's reads go on through a load (the first load after the intro movie)
+            subprocess.run([str(exe), str(p), "loadpump"], cwd=p, check=True, timeout=10)
             # HANG-IDLE-DUSK-35: a read that is late or never answered never stops the game loop.
             for case in ("stall-late", "stall-never"):
                 subprocess.run([str(exe), str(p), case], cwd=p, check=True, timeout=10)

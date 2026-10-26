@@ -79,6 +79,9 @@ typedef struct entity_s
      * instead of the ambient (1-255, r_refdef.ambientlight units); 0 for every
      * other entity, which is lit as before (docs/chim/INTERIOR_STORE.md). */
     int aw_light;
+    /* World format 0.13: the colour that light leans toward (0 none, 1-7: the
+     * r_sky.c tint tables, r_tint_colormap); 0 for every other entity. */
+    int aw_tint;
 } entity_t;
 
 float R_SpriteEntityScale(const entity_t *ent);

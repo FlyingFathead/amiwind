@@ -15,6 +15,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = os.environ.get('AMIWIND_RUNTIME_SOURCE', str(ROOT / 'engine/aga'))
+# model.c with what its alias stream calls for skeletal models (aw_skel.c, aw_skel_load.c; docs/MODULAR_NPCS.md method C)
+SKEL_MODEL = ('model.c', 'aw_skel.c', 'aw_skel_load.c')
 
 
 def tree_project_version():
@@ -303,12 +305,12 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_alias_near_quad_clips_every_screen_edge(self):
         self.compile_run('aga_alias_clip_test.c', [Path(SOURCE)/'src'/n for n in
-            ('r_aclip.c','r_alias.c')],
+            ('r_aclip.c','r_alias.c','aw_skel.c')],
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_torch_stride_depth_and_actual_alias_transform(self):
         self.compile_run('aga_viewmodel_bob_test.c', [Path(SOURCE)/'src'/n for n in
-            ('view.c','r_alias.c','r_sprite.c','mathlib.c')],
+            ('view.c','r_alias.c','r_sprite.c','mathlib.c','aw_skel.c')],
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_inventory_atomic_ownership_equipment_and_condition_save(self):
@@ -393,7 +395,7 @@ class NativeSourceTests(unittest.TestCase):
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_sprite_scale_frame_bounds_leaf_membership_and_legacy_messages(self):
-        self.compile_run('aga_sprite_scale_test.c', [Path(SOURCE)/'src'/n for n in ('r_sprite.c','r_efrag.c','model.c','cl_parse.c','mathlib.c')],
+        self.compile_run('aga_sprite_scale_test.c', [Path(SOURCE)/'src'/n for n in ('r_sprite.c','r_efrag.c','model.c','cl_parse.c','mathlib.c','aw_skel.c','aw_skel_load.c')],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_sprite_scaled_authored_origins_match_pixels_and_occlusion(self):
@@ -402,7 +404,7 @@ class NativeSourceTests(unittest.TestCase):
             cflags=['-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_sprite_stream_matches_generic_pixels_groups_and_bounded_pack_member(self):
-        self.compile_run('aga_sprite_stream_test.c', [Path(SOURCE)/'src/model.c'],
+        self.compile_run('aga_sprite_stream_test.c', [Path(SOURCE)/'src'/n for n in SKEL_MODEL],
             cflags=['-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
     def test_sprite_stream_dispatch_precedes_full_file_staging(self):
@@ -412,7 +414,7 @@ class NativeSourceTests(unittest.TestCase):
                         source.index('COM_LoadStackFile (mod->name'))
 
     def test_optional_alias_budget_default_cap_and_invalid_settings(self):
-        self.compile_run('aga_alias_budget_test.c', [Path(SOURCE)/'src/model.c'])
+        self.compile_run('aga_alias_budget_test.c', [Path(SOURCE)/'src'/n for n in SKEL_MODEL])
 
     def test_gallery_lookup_variants_keys_bounds_and_return_scene(self):
         self.compile_run('aga_gallery_test.c', [Path(SOURCE)/'src'/n for n in ('aw_gallery.c','aw_intro.c','aw_story.c','aw_state.c','keys.c','in_amiga.c')],
@@ -524,7 +526,7 @@ class NativeSourceTests(unittest.TestCase):
         for mode in ("texinfo", "particles"):
             with self.subTest(mode=mode):
                 self.compile_run("aga_array_bounds_test.c",
-                    [Path(SOURCE)/"src/model.c", Path(SOURCE)/"src/r_part.c", Path(SOURCE)/"src/mathlib.c"],
+                    [Path(SOURCE)/"src"/n for n in SKEL_MODEL] + [Path(SOURCE)/"src/r_part.c", Path(SOURCE)/"src/mathlib.c"],
                     cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"], arguments=[mode])
 
     def test_ship_ambience_gain_is_local_to_static_prison_channels(self):
@@ -539,14 +541,14 @@ class NativeSourceTests(unittest.TestCase):
             cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_alias_decode_preserves_hot_cache_with_real_allocator(self):
-        self.compile_run("aga_alias_residency_test.c", [Path(SOURCE)/"src/model.c", Path(SOURCE)/"src/mathlib.c"],
+        self.compile_run("aga_alias_residency_test.c", [Path(SOURCE)/"src"/n for n in SKEL_MODEL] + [Path(SOURCE)/"src/mathlib.c"],
                          cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all", "-Wl,--wrap=malloc"])
 
     def test_alias_staging_is_released_before_cache_allocation(self):
-        self.compile_run("aga_alias_cache_test.c", [Path(SOURCE)/"src/model.c",Path(SOURCE)/"src/mathlib.c"])
+        self.compile_run("aga_alias_cache_test.c", [Path(SOURCE)/"src"/n for n in SKEL_MODEL] + [Path(SOURCE)/"src/mathlib.c"])
 
     def test_alias_coarse_frustum_keeps_intersecting_bounds(self):
-        self.compile_run("aga_alias_cull_test.c", [Path(SOURCE)/"src/r_alias.c"])
+        self.compile_run("aga_alias_cull_test.c", [Path(SOURCE)/"src/r_alias.c", Path(SOURCE)/"src/aw_skel.c"])
 
     def test_actor_step_matches_scaled_player_limit(self):
         self.compile_run("aga_actor_step_test.c", [Path(SOURCE)/"src/sv_move.c",Path(SOURCE)/"src/mathlib.c"])
@@ -640,13 +642,13 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run("aga_photo_test.c", [ROOT/"engine/aga/src/aw_photo.c"])
 
     def test_unsigned_face_plane_indices_and_bounds(self):
-        self.compile_run("aga_face_index_test.c", [Path(SOURCE)/"src/model.c"])
+        self.compile_run("aga_face_index_test.c", [Path(SOURCE)/"src"/n for n in SKEL_MODEL])
 
     def test_unsigned_face_texinfo_indices_and_double_precision_extents(self):
-        self.compile_run("aga_face_texinfo_test.c", [Path(SOURCE)/"src/model.c"])
+        self.compile_run("aga_face_texinfo_test.c", [Path(SOURCE)/"src"/n for n in SKEL_MODEL])
 
     def test_unsigned_marksurface_and_leaf_mark_indices(self):
-        self.compile_run("aga_marksurface_index_test.c", [Path(SOURCE)/"src/model.c"])
+        self.compile_run("aga_marksurface_index_test.c", [Path(SOURCE)/"src"/n for n in SKEL_MODEL])
 
     def test_interaction_only_on_game_key_down(self):
         self.compile_run('aga_interact_test.c', [Path(SOURCE)/'src/cl_input.c'])

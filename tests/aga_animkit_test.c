@@ -21,8 +21,31 @@ int main(void) {
     assert(parse("aw_animkit","play","run",&c) && c.kind==AW_ANIMKIT_PLAY && c.group==AW_ANIM_RUN);
     assert(parse("aw_animkit","play","runforward",&c) && c.group==AW_ANIM_RUN);
     assert(parse("aw_animkit","play","death1",&c) && c.group==AW_ANIM_DEATH);
-    assert(!parse("aw_animkit","play","sneakforward",&c) && !strcmp(c.name,"not wired yet"));
-    assert(!parse("aw_animkit","play","moonwalk",&c) && !strcmp(c.name,"unknown group"));
+    /* Any other name is played from a skeletal actor's table by name (SKEL-ANIM-STAGE-52): group -1. */
+    assert(parse("aw_animkit","play","sneakforward",&c) && c.kind==AW_ANIMKIT_PLAY && c.group==-1 && !strcmp(c.name,"sneakforward"));
+    assert(parse("aw_animkit","play","idle2",&c) && c.group==-1);
+    assert(parse("aw_animkit","play","dodgel",&c) && c.group==AW_ANIM_DODGEL);   /* an engine group name */
+    assert(parse("aw_animkit","play","moonwalk",&c) && c.group==-1);
+    assert(!parse("aw_animkit","play","a_group_name_far_longer_than_any_table",&c) && !strcmp(c.name,"unknown group"));
+    /* The animation stage: groups, cycle [all], stage [1..8]. */
+    assert(parse("aw_animkit","groups",NULL,&c) && c.kind==AW_ANIMKIT_GROUPS);
+    assert(parse("aw_animkit","cycle",NULL,&c) && c.kind==AW_ANIMKIT_CYCLE && c.count==0);
+    assert(parse("aw_animkit","cycle","all",&c) && c.kind==AW_ANIMKIT_CYCLE && c.count==1);
+    assert(!parse("aw_animkit","cycle","some",&c));
+    assert(parse("aw_animkit","stage",NULL,&c) && c.kind==AW_ANIMKIT_STAGE && c.count==AW_ANIMKIT_STAGE_MAX);
+    assert(parse("aw_animkit","stage","5",&c) && c.count==5);
+    assert(!parse("aw_animkit","stage","0",&c) && !parse("aw_animkit","stage","9",&c) && !parse("aw_animkit","stage","x",&c));
+    /* A table group played from its first to its last frame: loops wrap, one-shots hold the last and end. */
+    {float t=0;int done=0,f;
+     assert(AW_AnimKitSpanFrame(100,103,8,&t,0,1,&done)==100 && !done);
+     assert(AW_AnimKitSpanFrame(100,103,8,&t,.25f,1,&done)==102 && !done);
+     assert(AW_AnimKitSpanFrame(100,103,8,&t,.25f,1,&done)==100 && !done);   /* 4 frames = .5 s: wrapped */
+     t=0;f=AW_AnimKitSpanFrame(100,103,8,&t,.49f,0,&done);assert(f==103 && !done);
+     f=AW_AnimKitSpanFrame(100,103,8,&t,.02f,0,&done);assert(f==103 && done);
+     t=0;assert(AW_AnimKitSpanFrame(7,7,8,&t,1,0,&done)==7 && done);           /* a one-frame group */
+     t=0;assert(AW_AnimKitSpanFrame(2000,2729,8,&t,90,1,&done)==2000+720 && !done);   /* past frame 255 */
+     t=0;assert(AW_AnimKitSpanFrame(5,9,0,&t,-1,1,&done)==5);                    /* no rate, no time: the first */
+    }
     assert(parse("aw_animkit","speed","0.5",&c) && c.kind==AW_ANIMKIT_SPEED && c.speed==.5f);
     assert(!parse("aw_animkit","speed","9",&c) && !parse("aw_animkit","speed","x",&c));
     assert(!parse("aw_animkit","dance",NULL,&c) && c.kind==AW_ANIMKIT_HELP);

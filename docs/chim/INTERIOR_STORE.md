@@ -1,6 +1,6 @@
 # Interiors on CHIM: CHIM rooms on a shared store
 
-_Last updated with AmiWind v0.0.51 (24 October 2026)._
+_Last updated with AmiWind v0.0.52-dev (25 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -140,6 +140,12 @@ In a placed record (format 0.8 and later) the high byte of the 16-bit flags is t
 at, in the units of `r_refdef.ambientlight` (0 to 255). Bits 0 and 1 keep their meaning; bits 2 to 7 stay 0. A file
 with a light level is written as 0.12; engines before 0.12 refuse it with the usual message.
 
+World format 0.13 adds the light's colour in bits 2 to 4: 0 = none (the plain colour table), 1 = warm (the torch and
+lamp hue, `aw_light_hue`), 2 = red, 3 = orange, 4 = yellow, 5 = green, 6 = cool blue-white, 7 = purple. The engine
+draws the placement's faces through that tint's colour table (16 KB, made from the palette the first time a map
+draws the tint) and keeps a surface cache per tint as it does per level; `aw_warm_light 0` turns every tint off.
+Bits 5 to 7 stay 0. Engines before 0.13 refuse a 0.13 file with the usual message.
+
 ### The interior store
 
 `chimi/world.cwi` and its pack files: the exterior world's index layout (header, settings, file table, model
@@ -180,8 +186,14 @@ Worldspawn of `maps/<room>.chim`: `"_chim_world" "chimi"` (the store folder, at 
    of the built heap less the loading buffer (the 16 MB baseline, or Extra RAM off) and, when they do not fit,
    against what the 32 MB minimum gives a room (its zone and the automatic cache bank, with the largest model within
    one block: the measured room model of [the door graph](DOOR_GRAPH.md), CHIM-ROOM-ESTIMATE-48, 14,336,000 bytes
-   since v0.0.51, CHIM-AUTO-BANK-CLIFF-51;
+   since v0.0.51, CHIM-AUTO-BANK-CLIFF-51; since v0.0.52 also what a room that does not fit them grows into,
+   ROOM-AKULAKHAN-HEAP-52: 4 MiB of the free Fast RAM, then the game heap's rest past the zone, about 20.6 MB in all;
    the same thresholds the room plan uses for its `zone_over_16mb` note, `tests/test_chim_room_fast_ram.py`).
+   The room's need counts the engine's own blocks (the record with its placements, every model and texture, the
+   store index, the prefetch table), and a room past one bank is loaded through the engine's own allocator
+   (`tools/chim/room_zone.py`), so a room whose large models do not pack fails here, not at its door. The
+   `chim-interiors` stage runs the same check on the store as soon as it is written
+   (`chim-room-heap-early.json`, the room map at its smallest): a room that cannot fit stops the build there.
    A room that fits only the second is marked: `"_chim_room_fast_mb" "32"` in its room map's worldspawn; the
    build prints how many. At the door, before the door sound or anything loads, the engine reads the mark
    (`aw_scene.c AW_SceneRoomFastMb`) and, on less than 32 MB of Fast RAM or with Extra RAM off, plays the locked

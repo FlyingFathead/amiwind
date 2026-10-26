@@ -215,6 +215,8 @@ extern cvar_t	chim_release, chim_partial, chim_zone_ends;
 extern unsigned long	chim_release_refused;	/* chim_chunks.c: release plans that found no room (nothing released) */
 float Chim_ViewDistance (void);
 int Chim_LookaheadScale (void);
+/* chim_world.c: a room whose models find no room grows once by each step (ROOM-AKULAKHAN-HEAP-52); 1: grown */
+int Chim_RoomGrow (const char *name);
 int Chim_EdgeReached (const vec3_t origin);
 int Chim_HunkRest (int *stated, int *used, int *measured);
 extern cvar_t	chim_debug;			/* 1: a console line per CHIM stage (map, prime, rebuild) */

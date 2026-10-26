@@ -59,6 +59,10 @@ class GroupingTests(unittest.TestCase):
                  'id1/maps/seyda-chim.far': 'chim-world', 'id1/chim/frames/x-09/y+18/s07.ccs': 'chim-world',
                  'id1/gallery/a.mdl': 'npc-gallery', 'id1/sound/npc/x.wav': 'sound', 'id1/music/track08.mws': 'music',
                  'id1/intro/amiwind.awv': 'video', 'id1/other/clip.awv': 'video', 'id1/progs/body/x.mdl': 'progs',
+                 # stage 0 of the actor disk plan: actor models (standing, mover, their files) and skins
+                 'id1/progs/a_0123456789ab.mdl': 'actors', 'id1/progs/a_0123456789ab_m.mdl': 'actors',
+                 'id1/progs/a_0123456789ab_m.anm': 'actors', 'id1/progs/skins/d176089ce3440b40.awk': 'actors',
+                 'id1/progs/aw_flora/f_x.spr': 'progs', 'id1/progs/body/a_x.mdl': 'progs',
                  'id1/media/catalogue.json': 'other', 'AmiWind': 'other', 'S/startup-sequence': 'other',
                  'id1/doors.txt': 'other'}
         for path, group in cases.items():
@@ -71,7 +75,7 @@ class GroupingTests(unittest.TestCase):
         self.assertEqual(ledger['status'], 'complete', ledger['checks'])
         groups = {name: row['bytes'] for name, row in ledger['groups'].items()}
         self.assertEqual(groups, {'classic-maps': 1500, 'chim-world': 200 + 20 + 30 + 900, 'npc-gallery': 300,
-                                  'sound': 40, 'music': 50, 'video': 60, 'progs': 70, 'other': 116})
+                                  'sound': 40, 'music': 50, 'video': 60, 'actors': 0, 'progs': 70, 'other': 116})
         self.assertEqual(ledger['payload_bytes'], sum(BOOT.values()) + 530 + 900)
         self.assertEqual(ledger['payload_bytes'], ledger['receipt_payload_bytes'])
         self.assertEqual(ledger['drive_bytes'], 5 * GIB - 1)
@@ -255,6 +259,32 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(ledger['guard']['verdict'], 'failed')
         self.assertEqual(ledger['guard']['grown'][0]['group'], 'classic-maps')
         self.assertIn('FAILED', size_ledger.guard_line(ledger['guard']))
+
+    def test_actor_growth_over_the_margin_fails_a_release_build(self):
+        # stage 0 of the actor disk plan: the actors are their own group, so their growth is caught
+        with tempfile.TemporaryDirectory() as folder:
+            base_dir = Path(folder) / 'base'
+            base_dir.mkdir()
+            base = base_dir / 'record.json'
+            base.write_text(json.dumps(size_ledger.collect(make_run(base_dir, BOOT))))
+            boot = dict(BOOT, **{'id1/progs/a_0123456789ab_m.mdl': GIB // 10})
+            ledger = size_ledger.build_ledger(make_run(Path(folder) / 'now', boot), '0.0.52', [base], 'auto', 0.05,
+                                              None, release_baseline=None)
+        self.assertEqual(ledger['guard']['verdict'], 'failed')
+        self.assertEqual([row['group'] for row in ledger['guard']['grown']], ['actors'])
+
+    def test_a_record_without_the_actors_group_does_not_judge_it(self):
+        # a record from before v0.0.52 counted the actors under progs: no false growth of the new group
+        with tempfile.TemporaryDirectory() as folder:
+            base_dir = Path(folder) / 'base'
+            base_dir.mkdir()
+            old = size_ledger.collect(make_run(base_dir, dict(BOOT, **{'id1/progs/a_0123456789ab.mdl': GIB // 10})))
+            old['groups']['progs']['bytes'] += old['groups'].pop('actors')['bytes']
+            base = base_dir / 'record.json'
+            base.write_text(json.dumps(old))
+            run = make_run(Path(folder) / 'now', dict(BOOT, **{'id1/progs/a_0123456789ab.mdl': GIB // 10}))
+            ledger = size_ledger.build_ledger(run, '0.0.52', [base], 'auto', 0.05, None, release_baseline=None)
+        self.assertEqual(ledger['guard']['verdict'], 'passed')
 
     def test_growth_over_the_margin_only_warns_a_dev_build(self):
         with tempfile.TemporaryDirectory() as folder:

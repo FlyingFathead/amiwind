@@ -107,16 +107,80 @@ def _source_digest(scripts, form=PASS_KEY_FORM):
             continue
         value, _, uncertain = index.digest(Path(script).resolve(), exclude)
         parts.append([str(Path(script).name), value, uncertain])
+    if form == PASS_KEY_FORM:
+        _COVERED[tuple(scripts)] = _covered_lines(index, scripts, exclude)
     return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
+
+
+# What a cache's key covers, as stage trace lines (BUILD-KEY-UNIT-RESTORED-CODE-52): a stage that takes a result from
+# a cache has used the code that result comes from, though none of it ran. chim-room-batches restored its residents
+# from the resident unit cache, so its narrowed key (the code its trace saw run) left out the table code they were
+# baked with; it was reused after that code changed and installed actor models of the old tables (dev1-try11). On
+# its first hit in a process a cache appends these lines to the stage's trace: '@path<TAB>unit' for each function its
+# key reaches, '=path' for a file it keys whole (a data file, or every file when the reach is uncertain).
+_COVERED = {}
+_NOTED = set()
+
+
+def _covered_lines(index, scripts, exclude=()):
+    lines = []
+    for script in scripts:
+        if isinstance(script, tuple):
+            python, data, uncertain, units = index.entry_units(Path(script[0]).resolve(), script[1])
+        else:
+            python, data, uncertain = index.closure(Path(script).resolve())
+            units = index.reached_units(script) or {}
+        if uncertain:
+            lines += ['=' + path for path in sorted(index.files) if path not in exclude]
+            continue
+        for path in sorted(python | data):
+            if path in exclude:
+                continue
+            reached = units.get(path)
+            if path.endswith('.py') and path not in data and reached:
+                lines += ['@%s\t%s' % (path, unit) for unit in sorted(reached) if not unit.startswith('<')]
+                lines.append('@%s\t<module>' % path)
+            else:
+                lines.append('=' + path)
+    return sorted(set(lines))
+
+
+def covered_lines(*scripts):
+    """The trace lines of what the cache of these scripts keys (computed with its digest)."""
+    if tuple(scripts) not in _COVERED:
+        _DIGESTS.pop((PASS_KEY_FORM,) + tuple((str(Path(s[0]).resolve()), s[1]) if isinstance(s, tuple)
+                                              else str(Path(s).resolve()) for s in scripts), None)
+        source_digest(*scripts)
+    return _COVERED.get(tuple(scripts), [])
+
+
+def note_covered(lines):
+    """Append a cache's covered lines to this process's stage trace once (nothing outside a traced stage)."""
+    from build_profile import TRACE_ENV
+    path = os.environ.get(TRACE_ENV, '')
+    key = hashlib.sha256('\n'.join(lines).encode()).hexdigest()
+    if not lines or not os.path.isabs(path) or key in _NOTED:
+        return
+    _NOTED.add(key)
+    try:
+        handle = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(handle, ''.join(line + '\n' for line in lines).encode('utf-8', 'surrogateescape'))
+        finally:
+            os.close(handle)
+    except OSError:
+        pass
 
 
 class PassCache:
     """One pass's view of the cache; picklable, so pool workers get it in their task."""
 
-    def __init__(self, name, options, sources, root=None, tally=None, previous=()):
+    def __init__(self, name, options, sources, root=None, tally=None, previous=(), covered=()):
         self.name = name
         self.options = options
         self.sources = sources
+        # the trace lines of the code its key covers, written into the stage's trace on a hit (covered_lines)
+        self.covered = tuple(covered)
         # Source digests of older key forms (previous_digests): looked up on a miss, never written.
         self.previous = tuple(previous)
         self.root = None if root is None else str(root)
@@ -137,7 +201,8 @@ class PassCache:
             tally = tempfile.mkdtemp(prefix=name + '-', dir=Path(root) / '.tally')
         except OSError:
             pass
-        return cls(name, options, source_digest(*scripts), root, tally, previous_digests(*scripts))
+        return cls(name, options, source_digest(*scripts), root, tally, previous_digests(*scripts),
+                   covered=covered_lines(*scripts))
 
     def _count(self, hit):
         if self.tally is None:
@@ -193,6 +258,8 @@ class PassCache:
                 if found is not None:
                     self.store(input_sha256, found[0], found[1])
         self._count(found is not None)
+        if found is not None and getattr(self, 'covered', ()):
+            note_covered(self.covered)          # BUILD-KEY-UNIT-RESTORED-CODE-52
         import cache_provenance
         cache_provenance.reused(self.root, self.name, self.key(input_sha256), found is not None)
         return found
@@ -273,7 +340,7 @@ class UnitCache(PassCache):
         if root is None:
             return None
         return cls(name, dict(options, environment=environment(*scripts)), source_digest(*scripts), root,
-                   previous=previous_digests(*scripts))
+                   previous=previous_digests(*scripts), covered=covered_lines(*scripts))
 
     def _blob(self, sha256):
         return Path(self.root) / self.name / 'files' / sha256[:2] / (sha256 + '.bin')

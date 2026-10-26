@@ -11,6 +11,7 @@
  * closed only when the reply arrives.
  */
 #include "aw_aread.h"
+#include "aw_tryalloc.h"
 #include <string.h>
 
 #ifdef AMIGA
@@ -50,7 +51,7 @@ static int prepare(struct aw_aread_s *r) {
     if(!r->packet)r->packet=(struct DosPacket *)AllocDosObject(DOS_STDPKT,NULL);
     return r->buffer && r->port && r->packet;
 #else
-    if(!r->buffer)r->buffer=(unsigned char *)malloc(AW_AREAD_BUFFER);
+    if(!r->buffer)r->buffer=(unsigned char *)AW_TryMalloc(AW_AREAD_BUFFER);
     return r->buffer!=NULL;
 #endif
 }

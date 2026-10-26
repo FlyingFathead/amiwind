@@ -11,7 +11,7 @@ Models for the exterior actors the town residents do not cover:
 
 Output: OUT/id1/progs (c_*.mdl, n_*.mdl and their .anm layouts), OUT/id1/sound (footstep sounds of the layouts),
 OUT/creature-library.json, OUT/npc-library.json and OUT/actor-library.json (counts, bytes, left out with reasons).
-Scaled references are drawn at their scale by the engine (U_AW_SCALE); --scaled-variants also bakes models at the
+Scaled references are drawn at their scale by the engine (AWU_SCALE); --scaled-variants also bakes models at the
 scales the exterior uses (the method before the engine could scale a live actor).
 """
 import argparse

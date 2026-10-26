@@ -14,7 +14,7 @@ class AliasLocalLightNative(unittest.TestCase):
     def test_local_light_survives_static_clamp_and_night_palette(self):
         self.compile_run('aga_alias_local_light_test.c',
             [Path(native.SOURCE)/'src'/name for name in
-             ('r_alias.c', 'r_aclip.c', 'mathlib.c', 'd_polyse.c',
+             ('r_alias.c', 'aw_skel.c', 'r_aclip.c', 'mathlib.c', 'd_polyse.c',
               'r_sky.c', 'aw_fog.c', 'aw_clock.c', 'aw_state.c')],
             cflags=['-fsanitize=address,undefined,float-cast-overflow',
                     '-fno-sanitize=alignment', '-fno-sanitize-recover=all'])

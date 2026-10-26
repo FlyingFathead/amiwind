@@ -42,6 +42,12 @@ int Cmd_Argc(void){return cmdargc;}
 char *Cmd_Argv(int n){return n<cmdargc?cmdargs[n]:"";}
 void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"playvid"))playvid_command=fn;}
 void Key_ClearStates(void){}
+/* the Fast RAM warning box's drawing (aw_ui.c; RAM-WARNING-BOX-52) */
+int AW_UIHeight(void){return 8;}
+const char *AW_UILine(const char *p,int width,char *line,int size){int n=0;(void)width;while(*p && n<size-1 && n<30)line[n++]=*p++;line[n]=0;return p;}
+int AW_UIColor(int r,int g,int b){return (r+g+b)&255;}
+void AW_UIBox(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;}
+void AW_UITextBox(int x,int y,int w,int h,const char *text,int colour){(void)x;(void)y;(void)w;(void)h;(void)text;(void)colour;}
 void V_UpdatePalette(void){}
 int COM_FOpenFile(char *path,FILE **out){
     if(!strcmp(path,AW_MINIWIND_FILE)){

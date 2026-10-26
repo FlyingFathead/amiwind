@@ -4,7 +4,9 @@
  * <store>/rooms/<room>.crm. As in the original game a room loads on its own:
  * under the loading plaque (SV_SpawnServer, chim_world.c MapBeginWork) the
  * record is read, every model it lists is loaded whole from the store with
- * its textures (chim_models.c, into the map's zone) and locked, and every
+ * its textures (chim_models.c, into the map's zone and the cache banks; a
+ * room they do not fit grows into the free Fast RAM and the Hunk's rest,
+ * ChimRoom_Begin) and locked, and every
  * placed record becomes a run-time placement. Nothing streams while the room
  * runs: no terrain, no frames, no chunk ring. The client links each placement
  * into the room map's own world with efrags (as ChimChunks_Link does), the
@@ -104,14 +106,64 @@ void ChimRoom_End (void)
 	memset (&room, 0, sizeof(room));
 }
 
+/* Why the last try failed (RoomLoad): ChimRoom_Begin says it once it gives up. */
+static const char	*room_why;
+/* The last ChimRoom_Begin's tries and the growth steps between them: each step follows a request the full zone
+ * refused (the zone counts it failed), so a room that grew twice and loaded shows 2 failed requests with every model
+ * in place (CHIM-ROOM-HEART-CHAMBER-LOAD-50); ChimRoom_Report says so. */
+static int	room_tries, room_grown;
+
 static int Fail (const char *why)
 {
-	Con_Printf ("CHIM: room %s: %s\n", room.name, why);
+	room_why = why;
 	ChimRoom_End ();
 	return 0;
 }
 
+static int RoomLoad (const char *name);
+
+/* The room whole, under the loading plaque (RoomLoad). A try that finds the
+ * zone full (its record, a model or one of their textures got no room: the
+ * zone's failure count moved) lets go of what it loaded, the room grows by
+ * the next step of chim_world.c Chim_RoomGrow (the free Fast RAM, then the
+ * Hunk's rest; ROOM-AKULAKHAN-HEAP-52) and it is loaded again. A room that
+ * fits loads once, as before. With nothing more to take, a room that loaded
+ * with an untextured surface loads so once more; one that did not load is
+ * refused (chim_world.c RefuseRoom). */
 int ChimRoom_Begin (const char *name)
+{
+	unsigned long failures;
+	int ok, full, settle = 0;
+	room_tries = room_grown = 0;
+	for (;;)
+	{
+		failures = ChimZone_Failures (NULL);
+		room_why = NULL;
+		room_tries++;
+		ok = RoomLoad (name);
+		full = ChimZone_Failures (NULL) != failures;
+		if (ok && (!full || settle))
+			return 1;
+		if (!full || settle)
+			break;
+		ChimRoom_End ();
+		/* the models this try loaded (one may hold an untextured surface) go; textures stay cached */
+		ChimZone_EvictKind (CHIM_KIND_MODEL, NULL);
+		if (!Chim_RoomGrow (name))
+		{
+			if (!ok)
+				break;
+			settle = 1;
+		}
+		else
+			room_grown++;
+	}
+	Con_Printf ("CHIM: room %s: %s\n", ChimFormat_RoomNameValid (name) ? name : "?", room_why ? room_why :
+		"it does not load");
+	return 0;
+}
+
+static int RoomLoad (const char *name)
 {
 	char path[CHIM_PATH_CHARS+1];
 	chim_pack_t pack;
@@ -128,6 +180,7 @@ int ChimRoom_Begin (const char *name)
 	{
 		Con_Printf ("CHIM: room name \"%s\" refused: 1 to %ld of a-z, 0-9, _ and -\n", name ? name : "",
 			(long)CHIM_ROOM_NAME_CHARS);
+		room_why = "its name is refused";
 		return 0;
 	}
 	strcpy (room.name, name);
@@ -211,6 +264,7 @@ int ChimRoom_Begin (const char *name)
 		ChimPlaced_AnglesMatrix (p->ent.angles, (float (*)[3])(room.rot + 9*i));
 		p->ent.colormap = vid.colormap;
 		p->ent.aw_light = ChimFormat_RecordLight (h.minor, rec.flags);
+		p->ent.aw_tint = ChimFormat_RecordTint (h.minor, rec.flags);
 		p->ent.model = &room.model[j]->model;
 		Q_SinCosDeg (rec.yaw, &p->s, &p->c);
 		for (k=0 ; k<3 ; k++)
@@ -324,4 +378,7 @@ void ChimRoom_Report (void)
 	Con_Printf ("room: %s, %ld placements (%ld linked, %ld efrags, %ld waiting, %ld hinged doors), %ld models %ld KiB, record %ld bytes, loaded in %ld ms\n",
 		room.name, (long)room.count, (long)room.linked, (long)room.efrags, (long)room.waiting, (long)room.doors,
 		(long)room.models, room.model_bytes/1024, room.bytes, (long)(room.seconds*1000));
+	if (room_grown)
+		Con_Printf ("room: loaded whole on try %d; it grew %d time%s, each after a request the full zone refused (counted as failed, then loaded again)\n",
+			room_tries, room_grown, room_grown == 1 ? "" : "s");
 }

@@ -55,7 +55,7 @@ BASES = [
     base('CONT', 'plant_c', 'o\\flora_marshmerrow_01.nif'),
     base('CONT', 'barrel', 'o\\contain_barrel_01.nif'),
     base('NPC_', 'villager'), base('CREA', 'mudcrab'), base('LEVC', 'random_crab'),
-    base('MISC', 'cup'), base('LIGH', 'lamp'), base('DOOR', 'door'), base('ACTI', 'sign', 'x\\sign_01.nif'),
+    base('MISC', 'cup'), base('LIGH', 'lamp'), base('DOOR', 'door'), base('ACTI', 'volcano_steam', 'x\\volcano_steam.nif'),
     base('STAT', 'hook', 'f\\furn_de_shack_hook.nif'), base('CREA', 'rat', 'r\\rat.nif'),
     # A dialogue topic sharing an object's name must not change its category.
     record('DIAL', sub('NAME', z('rock_a'))),
@@ -65,7 +65,7 @@ MASTER = b''.join(BASES + [
          + ref(5, 'grass') + ref(6, 'wall') + ref(7, 'plant_c') + ref(8, 'barrel') + ref(9, 'villager')
          + ref(10, 'mudcrab') + ref(11, 'door') + ref(12, 'cup', deleted=True)),
     cell('', False, 1, 0, ref(20, 'rock_a') + ref(21, 'random_crab') + ref(22, 'wall') + ref(23, 'rock_a')),
-    cell('Town, Shop', True, refs=ref(30, 'cup') + ref(31, 'lamp') + ref(32, 'sign') + ref(33, 'barrel')
+    cell('Town, Shop', True, refs=ref(30, 'cup') + ref(31, 'lamp') + ref(32, 'volcano_steam') + ref(33, 'barrel')
          + ref(34, 'hook') + ref(35, 'rat')),
 ])
 
@@ -115,7 +115,7 @@ class ReportTests(unittest.TestCase):
         # The interior rule outranks "category not implemented" (no creature is placed anywhere).
         self.assertEqual(t['creature']['interior']['deliberately_skipped'], 1)
         self.assertEqual(self.result['skipped'], {'fine dressing deferred': 1, 'small item or actor deferred': 1,
-                                                  'unsupported activator': 1})
+                                                  'liquid or effect activator': 1})
         self.assertEqual(self.result['placed_numbers_not_in_master'], 1)
         self.assertEqual(self.result['converted_cells'], ['exterior:0,0', 'interior:Town, Shop'])
         self.assertEqual(self.result['cells']['exterior:0,0']['rock'], [2, 1])

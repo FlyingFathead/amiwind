@@ -655,6 +655,51 @@ def actor_cache(id1, rows, sizes, gap_bytes, movers=MOVERS_AT_ONCE):
             'note': 'Cache, not the CHIM zone: an overflow evicts least recently used models (recorded, not fatal)'}
 
 
+def skeletal_table(raw):
+    """The animation table path a skeletal actor model names (its "AWSB" block: magic, two u16, the 32-byte path;
+    tools/skeletal_actor.py), without a view suffix ("|f": the same file), or None for an ordinary model."""
+    from actor_frames import SKEL_BLOCK_HEAD, SKEL_BLOCK_MAGIC, SKEL_VERT_BYTES, skeletal_frames
+    try:
+        if skeletal_frames(raw) is None:
+            return None
+    except ValueError:
+        return None
+    import struct
+    at = len(raw) - SKEL_BLOCK_HEAD - struct.unpack_from('<i', raw, 60)[0] * SKEL_VERT_BYTES
+    name = raw[at + 8:at + 40].split(b'\0', 1)[0].decode('ascii', 'replace')
+    return name.split('|', 1)[0] or None
+
+
+def actor_fast_ram(id1, rows, source=None):
+    """The Fast RAM a room's actors take after the room has taken its bank (CHIM-ROOM-HEART-CHAMBER-LOAD-50): the
+    animation tables their skeletal models name (aw_skel_load.c, each once, a malloc of the file) and the large pose
+    cache (r_alias.c AW_POSE_CACHE_LARGE slots of MAXALIASVERTS vertices), each with the checked allocator's spare
+    (aw_tryalloc.h). They load after the room's models (the "after-actors" step), from what the room's bank leaves:
+    CHIM_ROOM_KEEP at the least (chim_zone.c ChimZone_RoomStep). Their alias models live in Quake's Cache (actor_cache)."""
+    from pathlib import Path
+    import engine_limits as EL
+    from chim.frame_map import ACTOR_CLASSES
+    src = source or EL.SOURCE
+    tables = {}
+    for m in sorted({e['model'] for e in rows if e.get('classname') in ACTOR_CLASSES and e.get('model')}):
+        path = Path(id1) / m
+        if not path.is_file():
+            continue
+        name = skeletal_table(path.read_bytes())
+        if name and (Path(id1) / name).is_file():
+            tables[name] = (Path(id1) / name).stat().st_size
+    import re
+    spare = int(re.search(r'#define\s+AW_TRYALLOC_SPARE\s+(\d+)', (Path(src) / 'aw_tryalloc.h').read_text()).group(1))
+    pose = need = 0
+    if tables:
+        # aw_posed_t: two pointers, the frame, the clock, the 6-byte box (24 bytes with padding), the vertices
+        pose = EL.define('r_alias.c', 'AW_POSE_CACHE_LARGE', src) * (24 + 4 * EL.define('r_local.h', 'MAXALIASVERTS', src))
+        need = sum(t + 4 for t in tables.values()) + pose + spare      # malloc's 4-byte head each; the spare once
+    keep = EL._mib_define('chim/chim_zone.h', 'CHIM_ROOM_KEEP', src) * EL.MIB
+    return {'tables': tables, 'table_bytes': sum(tables.values()), 'pose_cache_bytes': pose, 'need_bytes': need,
+            'keep_bytes': keep, 'fits_keep': need <= keep}
+
+
 def frame_map_heap(world_dir, id1, sizes, heap_mb=None, zone_kib=None, pool_kib=None, streamed=None, extra_maps=(),
                    jobs=1, cache_dir=None, world=None):
     """The whole-map CHIM heap of each frame map in id1/maps (found by its "_chim_frame" key, .chim or .bsp:
@@ -739,7 +784,17 @@ def require_frame_map_heap(world_dir, id1, sdk=None, sizes=None, heap_mb=None, r
             sizes = compile_target_sizes(sdk)[0]
         maps = frame_map_heap(world_dir, id1, sizes, heap_mb, extra_maps=extra_maps, jobs=jobs, cache_dir=cache_dir,
                               world=world)
-        report = {'maps': maps, 'ok': all(m['ok'] for m in maps.values()),
+        # A frame map over the 16 MB budget that fits the 32 MB minimum is marked as the CHIM stage marks such frames
+        # (CHIM-FRAME-16MB-REFUSAL-48: 32 MB is the default, the player is kept out on less), not refused: the CHIM
+        # stage's estimate can pass a frame that this exact check finds over (BUILD-CHIM-HEAP-GATE-LATE-36: vf0147,
+        # 9,536 bytes over in the v0.0.52-dev1 build). Only a frame that fits neither stops the build.
+        late = []
+        for name, m in maps.items():
+            if not m['ok'] and m.get('efrags', {'ok': True})['ok'] and frame_fast_ram(m) == SAFE_FAST_MB:
+                if mark_frame_maps(id1, frame_cells([m['frame']]), maps=[m['map']]):
+                    m.update(ok=True, fast_mb=SAFE_FAST_MB, marked_by_image_gate=True)
+                    late.append(name)
+        report = {'maps': maps, 'ok': all(m['ok'] for m in maps.values()), 'marked_32mb_late': late,
                   'method': 'frame map: zone = engine_limits.whole_map_zone(start-up Hunk + frame-map BSP, '
                             '_chim_hunk_rest); rings as the CHIM heap gate with each chunk\'s streamed statics'}
         report['status'] = 'passed' if report['ok'] else 'failed'
@@ -756,39 +811,163 @@ def require_frame_map_heap(world_dir, id1, sdk=None, sizes=None, heap_mb=None, r
     return report
 
 
-def room_zone_limits(before, after, heap_mb=None):
-    """What a CHIM room map with before/after Hunk bytes around its zone gets (the big-rooms model, the same as
-    tools/door_graph.py room_limits when the whole-map rule does not bind): 'zone_bytes' at the built heap (the 16 MB
-    baseline), 'zone_room_bytes' that less the loading buffer (a room map has no frame world, chim_world.c),
-    'min_fast_room_bytes' on the minimum Fast RAM (its heap's zone and the automatic cache bank, which models and
-    textures prefer, chim_zone.c AllocIn, less the buffer; CHIM-ROOM-ESTIMATE-48) and 'block_bytes_min_fast', the
-    largest one model can be there (one block: the larger of that zone less the buffer and the bank)."""
-    from engine_limits import MIN_FAST_RAM_MIB, chim_memory, fast_ram_memory, whole_map_zone
-    memory = chim_memory(heap_mb=heap_mb)
-    safe = fast_ram_memory(MIN_FAST_RAM_MIB)
-    safe_memory = chim_memory(heap_mb=safe['heap_mb'])
-    zone = min(memory['zone_kib'] * 1024, whole_map_zone(before, after, memory))
-    safe_zone = min(safe_memory['zone_kib'] * 1024, whole_map_zone(before, after, safe_memory))
-    return {'heap_mb': memory['heap_mb'], 'zone_bytes': zone, 'zone_room_bytes': zone - safe['buffer_bytes'],
-            'min_fast_ram_mib': MIN_FAST_RAM_MIB,
-            'min_fast_room_bytes': safe_zone + safe['bank_bytes'] - safe['buffer_bytes'],
-            'block_bytes_min_fast': max(safe_zone - safe['buffer_bytes'], safe['bank_bytes'])}
+def room_zone_limits(before, after, heap_mb=None, source=None):
+    """What a CHIM room map with before/after Hunk bytes around its zone gets (tools/door_graph.py room_limits uses
+    the same with the measured start-up Hunk and client allocations). A room map holds nothing but its room
+    (ROOM-AKULAKHAN-HEAP-52): it has no frame world (chim_world.c), and a room its zone and the cache banks do not hold
+    grows (chim_world.c Chim_RoomGrow): a bank of the free Fast RAM, then the Hunk's rest past the zone
+    (engine_limits.room_step, room_hunk_rest). Returns:
+    - 'zone_bytes' at the built heap (the 16 MB baseline; Extra RAM off counts as it), 'hunk_rest_bytes' what the
+      room can take there past it, and 'zone_room_bytes' the two less the loading buffer (no cache bank, no free Fast
+      RAM on 16 MB);
+    - on the minimum Fast RAM (32 MB, engine_limits.fast_ram_memory): 'zone_32mb_zone_bytes' (that heap's zone),
+      'bank_bytes' (the automatic cache bank, which models and textures prefer, chim_zone.c AllocIn),
+      'room_bank_bytes' (the room's bank of free Fast RAM, from the measured largest free block),
+      'hunk_rest_32mb_bytes', and 'min_fast_room_bytes' all of them less the buffer (CHIM-ROOM-ESTIMATE-48);
+    - 'block_bytes_min_fast': the largest one model can be there (one block: the largest of those banks)."""
+    import engine_limits as EL
+    src = source or EL.SOURCE
+    memory = EL.chim_memory(src, heap_mb=heap_mb)
+    safe = EL.fast_ram_memory(EL.MIN_FAST_RAM_MIB, src)
+    safe_memory = EL.chim_memory(src, heap_mb=safe['heap_mb'])
+    # Chim_RoomGrow step 2 keeps the larger of CHIM_ROOM_REST_KIB and the map's statement for what loads after the zone
+    rest = max(int(after), EL.define('chim/chim_zone.h', 'CHIM_ROOM_REST_KIB', src) * 1024)
+    zone = min(memory['zone_kib'] * 1024, EL.whole_map_zone(before, after, memory))
+    safe_zone = min(safe_memory['zone_kib'] * 1024, EL.whole_map_zone(before, after, safe_memory))
+    hunk16 = EL.room_hunk_rest(before, rest, memory, src)
+    hunk32 = EL.room_hunk_rest(before, rest, safe_memory, src)
+    buffer = safe['buffer_bytes']
+    return {'heap_mb': memory['heap_mb'], 'zone_bytes': zone, 'hunk_rest_bytes': hunk16,
+            'zone_room_bytes': zone + hunk16 - buffer, 'buffer_bytes': buffer,
+            'min_fast_ram_mib': EL.MIN_FAST_RAM_MIB, 'heap_32mb_mb': safe['heap_mb'], 'zone_32mb_zone_bytes': safe_zone,
+            'bank_bytes': safe['bank_bytes'], 'room_bank_bytes': safe['room_bank_bytes'],
+            'room_largest_free_bytes': safe['room_largest_bytes'], 'hunk_rest_32mb_bytes': hunk32,
+            'min_fast_room_bytes': safe_zone - buffer + safe['bank_bytes'] + safe['room_bank_bytes'] + hunk32,
+            'block_bytes_min_fast': max(safe_zone - buffer, safe['bank_bytes'], safe['room_bank_bytes'], hunk32)}
 
 
-def room_map_heap(id1, sizes, heap_mb=None, stems=None):
+# The engine's own blocks of a CHIM room map on the target (m68k, 4-byte pointers; ROOM-AKULAKHAN-HEAP-52), kept against
+# the engine source by tests/test_chim_room_heap.py:
+# - chim_zone.c CHIM_HEADER, every block's header: sizeof(chim_block_t) (int, two bytes, short, unsigned, five
+#   pointers: 32 bytes) rounded to 16;
+# - chim_local.h chim_place_t, one per placement in the record block: entity_t and 56 bytes (mins, maxs, s, c, pid,
+#   model, owner, linked, flags, leaves); the block also holds the file, 9 floats a placement and a pointer a model
+#   (chim_room.c RoomLoad);
+# - the store index (chim_world.c ReadIndex): a chim_file_row_t per file (26 bytes on the target, counted 28) and a
+#   chim_asset_t (20 bytes) with its slot pointer per model and texture;
+# - chim_prefetch.c: SLOTS (1 << 12) slot_t of 8 bytes, the prefetch table locked in the cache bank from the first
+#   exterior frame on;
+# - chim_local.h chim_model_t past its model_t: the arena record and five words, counted 64 (as chim/zone_sim.py).
+ROOM_BLOCK_HEADER = 32
+ROOM_PLACE_EXTRA = 56
+ROOM_INDEX_ROW = 28
+ROOM_INDEX_ASSET = 24
+ROOM_PREFETCH_TABLE = (1 << 12) * 8
+ROOM_MODEL_EXTRA = 64
+
+
+def room_block(request):
+    """The zone bytes one request takes on the target: the block header and the data rounded to 16."""
+    return ROOM_BLOCK_HEADER + _a16(request)
+
+
+def room_blocks(id1, room, sizes, index=None, buffer_bytes=None):
+    """The zone requests (bytes without the block header) of one CHIM room (chim.interior.installed_room or its
+    record read with 'store' and 'room'): 'record', 'models' [(id, bytes, texture ids)] in the record's order,
+    'textures' {id: bytes}, 'index' (the store index), 'buffer' (the loading buffer) and 'prefetch_table'. INDEX:
+    the store's chim.format.read_index (read when not given)."""
+    from pathlib import Path
+    from chim import format as F
+    from chim.interior import store_model_images
+    root = Path(id1) / room['store']
+    index = index or F.read_index((root / 'world.cwi').read_bytes())
+    files, directory, textures = index[1], index[2], index[3]
+    images = store_model_images(id1, room['store'], room['models'])
+    models = []
+    for i in room['models']:
+        lumps = F.read_brush_image(images[i])
+        models.append((i, image_bytes(lumps, sizes, point_hull_only=True) - sizes['hunk'] + ROOM_MODEL_EXTRA,
+                       F.read_texture_refs(lumps[2])))
+    used = sorted({t for _, _, refs in models for t in refs})
+    record_file = (root / 'rooms' / (room['room'] + '.crm')).stat().st_size
+    n = len(room['placements'])
+    if buffer_bytes is None:
+        from engine_limits import cvar_default
+        buffer_bytes = cvar_default('chim/chim_world.c', 'chim_buffer_kib') * 1024
+    return {'record': ((record_file + 3) & ~3) + n * (sizes['entity'] + ROOM_PLACE_EXTRA) + 36 * n + 4 * len(models),
+            'record_file_bytes': record_file, 'models': models,
+            'textures': {t: texture_bytes(textures[t]['width'], textures[t]['height'], sizes) - sizes['hunk']
+                         for t in used},
+            'index': len(files) * ROOM_INDEX_ROW + (len(directory) + len(textures)) * ROOM_INDEX_ASSET,
+            'buffer': max(int(buffer_bytes), int(sizes.get('bsp_slice_bytes', 0))),
+            'prefetch_table': ROOM_PREFETCH_TABLE}
+
+
+def room_heap(blocks, limits, walk=True, lib=None):
+    """One room's report from its blocks (room_blocks) and limits (room_zone_limits): the sums and, with WALK, the
+    load through the engine's allocator (chim.room_zone.walk) on the 16 MB baseline and on the 32 MB minimum.
+    need_bytes: what the room holds at 32 MB besides the loading buffer (its record, models and textures, the store
+    index and the prefetch table, each a block); need_16mb_bytes the same without the prefetch table (no cache bank).
+    The walk runs where packing can decide: a fresh bank holds every block its sum holds (no block is freed during a
+    room's first try: large blocks fill it from the low end, small ones from the high end, chim_zone.c TryHigh), so a
+    room within one bank (the zone at 16 MB, the cache bank at 32 MB) fits by its sum; a room past it spreads over
+    banks and grows (Chim_RoomGrow), where the tail of each bank can stay empty: that room is walked ('walk_16mb',
+    'walk_32mb', or 'one bank: the sum decides')."""
+    from engine_limits import cvar_default
+    models = sum(room_block(b) for _, b, _ in blocks['models'])
+    textures = sum(room_block(b) for b in blocks['textures'].values())
+    own = room_block(blocks['record']) + models + textures + room_block(blocks['index'])
+    # the buffer's own block header: the limits take its data off the zone
+    need16 = own + ROOM_BLOCK_HEADER
+    need = need16 + room_block(blocks['prefetch_table'])
+    largest = max([room_block(b) for _, b, _ in blocks['models']] or [0])
+    out = dict(limits, **{
+        'models': len(blocks['models']), 'textures': len(blocks['textures']), 'model_bytes': models,
+        'texture_bytes': textures, 'record_bytes': blocks['record_file_bytes'],
+        'record_block_bytes': room_block(blocks['record']), 'index_block_bytes': room_block(blocks['index']),
+        'need_bytes': need, 'need_16mb_bytes': need16, 'largest_model_bytes': largest,
+        'fits_zone': need16 <= limits['zone_room_bytes'],
+        'ok': need <= limits['min_fast_room_bytes'] and largest <= limits['block_bytes_min_fast']})
+    out['headroom_32mb_bytes'] = limits['min_fast_room_bytes'] - need
+    if walk:
+        from chim.room_zone import walk as room_walk
+        ends = cvar_default('chim/chim_world.c', 'chim_zone_ends') * 1024
+        one = 'one bank: the sum decides'
+        out['walk_16mb'] = out['walk_32mb'] = one
+        # 16 MB: one bank (the zone) unless the room needs the Hunk's rest, and only a room the sum lets in
+        if out['fits_zone'] and need16 > limits['zone_bytes'] - limits['buffer_bytes']:
+            w16 = room_walk(blocks, 0, limits['zone_bytes'],
+                            [('free Fast RAM', 0), ('Hunk rest', limits['hunk_rest_bytes'])], ends, lib)
+            out['walk_16mb'] = w16
+            out['fits_zone'] = w16['ok'] and not w16['untextured']
+        # 32 MB: the models and textures prefer the cache bank (chim_zone.c AllocIn); past it the room spreads
+        if out['ok'] and need > limits['bank_bytes']:
+            w32 = room_walk(blocks, limits['bank_bytes'], limits['zone_32mb_zone_bytes'],
+                            [('free Fast RAM', limits['room_bank_bytes']),
+                             ('Hunk rest', limits['hunk_rest_32mb_bytes'])], ends, lib)
+            out['walk_32mb'] = w32
+            out['ok'] = w32['ok'] and not w32['untextured']
+    return out
+
+
+def room_map_heap(id1, sizes, heap_mb=None, stems=None, walk=True):
     """The zone each CHIM room map needs (IMAGE-ROOM-MAPS-LATE-PASSES-48: the BSP heap estimate of a room map counts
     only its shell world and entities, while the room loads every model of its record, with their textures, into the
-    map's zone: chim/chim_room.c). Per room map: the zone the engine can take (engine_limits.whole_map_zone, as for a
-    frame map: the start-up Hunk and the room map before it, "_chim_hunk_rest" or the measured client allocations
-    after it; never more than chim_zone_kib) against the record block and every listed model and texture once.
+    map's zone: chim/chim_room.c). Per room map: what the engine gives the room (room_zone_limits: the zone by the
+    whole-map rule, engine_limits.whole_map_zone: the start-up Hunk and the room map before it, "_chim_hunk_rest" or
+    the measured client allocations after it, never more than chim_zone_kib; the cache bank; the room's growth) against
+    the engine's own blocks of the room (room_blocks: the record with its placements, every listed model and texture
+    once, the store index, the prefetch table), added up and, with WALK, loaded through the engine's allocator
+    (room_heap). 'actors': the room's actor models in Quake's Cache against the Hunk gap (actor_cache, recorded).
     STEMS: only these room maps (default every one). Returns {room map stem: report}."""
     from pathlib import Path
     from chim import format as F
     from chim.frame_map import HUNK_KEY, entities
-    from chim.interior import installed_room, store_model_images
-    from engine_limits import MEASURED_HUNK
+    from chim.interior import installed_room
+    from engine_limits import MEASURED_HUNK, chim_memory
     from map_files import map_stem, room_maps
     out, indexes = {}, {}
+    gap = chim_memory(heap_mb=heap_mb)['gap_bytes']
     for path in room_maps(Path(id1) / 'maps'):
         if stems is not None and map_stem(path.name) not in stems:
             continue
@@ -796,45 +975,127 @@ def room_map_heap(id1, sizes, heap_mb=None, stems=None):
         rows = entities(data)
         room = installed_room(path)
         if room['store'] not in indexes:
-            indexes[room['store']] = F.read_index((Path(id1) / room['store'] / 'world.cwi').read_bytes())[3]
-        textures = indexes[room['store']]
+            indexes[room['store']] = F.read_index((Path(id1) / room['store'] / 'world.cwi').read_bytes())
         before = MEASURED_HUNK['before_map_bytes'] + _a16(len(data) + sizes['hunk'])
         after = int(rows[0].get(HUNK_KEY, MEASURED_HUNK['client_per_map_bytes']))
         limits = room_zone_limits(before, after, heap_mb)
-        images = store_model_images(id1, room['store'], room['models'])
-        model_bytes, used, largest = 0, set(), 0
-        for i in room['models']:
-            lumps = F.read_brush_image(images[i])
-            one = image_bytes(lumps, sizes, point_hull_only=True)
-            model_bytes += one
-            largest = max(largest, one)
-            used.update(F.read_texture_refs(lumps[2]))
-        texture_total = sum(texture_bytes(textures[t]['width'], textures[t]['height'], sizes) for t in sorted(used))
-        record = (Path(id1) / room['store'] / 'rooms' / (room['room'] + '.crm')).stat().st_size
-        need = model_bytes + texture_total + sizes['hunk'] + _a16(record)
-        # The big-rooms model (room_zone_limits, as tools/door_graph.py room_limits; CHIM-ROOM-ESTIMATE-48)
-        out[map_stem(path.name)] = dict(limits, **{
-            'map': path.name, 'room': room['room'], 'models': len(room['models']), 'textures': len(used),
-            'placements': len(room['placements']), 'model_bytes': model_bytes, 'texture_bytes': texture_total,
-            'record_bytes': record, 'need_bytes': need, 'before_zone_bytes': before, 'after_zone_bytes': after,
-            'fits_zone': need <= limits['zone_room_bytes'], 'largest_model_bytes': largest,
-            'ok': need <= limits['min_fast_room_bytes'] and largest <= limits['block_bytes_min_fast']})
+        report = room_heap(room_blocks(id1, room, sizes, indexes[room['store']]), limits, walk)
+        report.update({'map': path.name, 'room': room['room'], 'placements': len(room['placements']),
+                       'before_zone_bytes': before, 'after_zone_bytes': after,
+                       'actors': actor_cache(id1, rows, sizes, gap)})
+        # a room past the 16 MB zone may take the free Fast RAM down to CHIM_ROOM_KEEP; its actors' tables and posed
+        # frames load from what is left (CHIM-ROOM-HEART-CHAMBER-LOAD-50)
+        report['actor_fast'] = actor_fast_ram(id1, rows)
+        if not report.get('fits_zone') and not report['actor_fast']['fits_keep']:
+            report['ok'] = False
+        out[map_stem(path.name)] = report
     return out
 
 
-# What the 32 MB minimum gives a CHIM room (RAM-REQUIREMENT-32MB-48, CHIM-ROOM-16MB-REFUSAL-48): the measured model of
-# room_map_heap (engine_limits.fast_ram_memory, measured in FS-UAE on 23 October 2026: the 13 MiB heap and one
-# automatic 8 MiB CHIM cache bank, which models and textures prefer, chim_zone.c AllocIn). The 16 MB baseline (or
-# Extra RAM off) has the built heap and no bank: the zone alone, less the loading buffer.
+_STORE_INDEX = {}
+
+
+def _store_room_task(task):
+    """One room of room_store_heap on a pool worker: (room, report)."""
+    from pathlib import Path
+    from chim import format as F
+    from chim.interior import STORE, read_room_record
+    out, name, sizes, limits, walk = task
+    root = Path(out) / STORE
+    if _STORE_INDEX.get('root') != str(root):
+        _STORE_INDEX.update(root=str(root), index=F.read_index((root / 'world.cwi').read_bytes()))
+    room = dict(read_room_record((root / 'rooms' / (name + '.crm')).read_bytes()), store=STORE, room=name)
+    report = room_heap(room_blocks(out, room, sizes, _STORE_INDEX['index']), limits, walk)
+    report.update({'room': name, 'placements': len(room['placements'])})
+    return name, report
+
+
+def room_store_heap(out, sizes, rooms=None, walk=True, jobs=1):
+    """The early room heap check (ROOM-AKULAKHAN-HEAP-52, the chim-interiors stage, tools/chim/interior.py): every room
+    record of the interior store the stage wrote in OUT (OUT/<store>/rooms/<room>.crm), before any room map exists,
+    with the room map at its smallest (the start-up Hunk and the map's Hunk block, no map bytes) and the measured
+    client allocations after it: the most the image's room heap gate (room_map_heap) can give the room, so a room that
+    fails here fails there; never the other way round. ROOMS: only these room names. Rooms side by side on JOBS
+    workers, largest record first. Returns {room: report}."""
+    from pathlib import Path
+    from build_parallel import ordered_map
+    from chim.interior import STORE
+    from engine_limits import MEASURED_HUNK
+    root = Path(out) / STORE
+    before = MEASURED_HUNK['before_map_bytes'] + _a16(sizes['hunk'])
+    after = MEASURED_HUNK['client_per_map_bytes']
+    limits = dict(room_zone_limits(before, after), before_zone_bytes=before, after_zone_bytes=after)
+    names = [p.stem for p in sorted((root / 'rooms').glob('*.crm')) if rooms is None or p.stem in rooms]
+    tasks = [(str(out), n, sizes, limits, walk) for n in names]
+    return dict(ordered_map(_store_room_task, tasks, max(1, int(jobs or 1)),
+                            cost=lambda t: (Path(t[0]) / STORE / 'rooms' / (t[1] + '.crm')).stat().st_size))
+
+
+def require_room_store_heap(out, sdk=None, sizes=None, report_path=None, jobs=1):
+    """The chim-interiors stage's early room heap check (room_store_heap): report_path (JSON); a ValueError names the
+    first room the 32 MB minimum cannot hold even with its room map at its smallest, seconds after the store is
+    written instead of in the image step (the image's gate, require_room_map_heap, stays the check of record)."""
+    import json
+    from pathlib import Path
+    if sizes is None and sdk is None:
+        report = {'ok': None, 'status': 'not run: no Amiga SDK given (--sdk)'}
+    else:
+        if sizes is None:
+            from check_world_map_heap import compile_target_sizes
+            sizes = compile_target_sizes(sdk)[0]
+        rooms = room_store_heap(out, sizes, jobs=jobs)
+        report = {'rooms': rooms, 'ok': all(r['ok'] for r in rooms.values()),
+                  'failed': sorted(n for n, r in rooms.items() if not r['ok']),
+                  'method': 'room_store_heap: the room heap gate of the image step (room_heap) with each room map at '
+                            'its smallest: what fails here fails there'}
+        report['status'] = 'passed' if report['ok'] else 'failed'
+    if report_path:
+        Path(report_path).write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8',
+                                     newline='\n')
+    if report.get('failed'):
+        raise ValueError(room_failure_text('CHIM room heap check (early, before the image)', report['rooms'][report['failed'][0]]))
+    return report
+
+
+def room_failure_text(what, r):
+    """One line naming a room that does not fit the 32 MB minimum, with what it needs and what it has."""
+    walk = r.get('walk_32mb')
+    walk = walk if isinstance(walk, dict) else {}
+    af = r.get('actor_fast') or {}
+    zone_ok = r.get('need_bytes', 0) <= r.get('min_fast_room_bytes', 0) and walk.get('ok', True)
+    if af and not af.get('fits_keep') and not r.get('fits_zone') and zone_ok:
+        return ('%s failed: %s: its actors\' animation tables and posed frames need %d bytes of Fast RAM (tables %s, '
+                'pose cache %d) after the room takes its bank, which leaves %d (CHIM_ROOM_KEEP)'
+                % (what, r.get('map') or r.get('room'), af['need_bytes'], af['tables'], af['pose_cache_bytes'],
+                   af['keep_bytes']))
+    return ('%s failed: %s needs %d bytes for its models, textures, record and index; its zone holds %d (%d MiB heap) '
+            'and the 32 MB minimum %d (zone %d, cache bank %d, free Fast RAM %d, Hunk rest %d, less the buffer); its '
+            'largest model %d bytes, one block %d%s'
+            % (what, r.get('map') or r.get('room'), r['need_bytes'], r.get('zone_bytes', 0), r.get('heap_mb', 0),
+               r.get('min_fast_room_bytes', 0), r.get('zone_32mb_zone_bytes', 0), r.get('bank_bytes', 0),
+               r.get('room_bank_bytes', 0), r.get('hunk_rest_32mb_bytes', 0), r.get('largest_model_bytes', 0),
+               r.get('block_bytes_min_fast', 0),
+               '; the load through the engine\'s allocator: %s did not fit after %s' % (
+                   walk.get('failed'), ', '.join(walk.get('grown') or ['no growth']))
+               if walk and not walk.get('ok') else ''))
+
+
+# What the 32 MB minimum gives a CHIM room (RAM-REQUIREMENT-32MB-48, CHIM-ROOM-16MB-REFUSAL-48, ROOM-AKULAKHAN-HEAP-52):
+# the measured model of room_zone_limits (engine_limits.fast_ram_memory, measured in FS-UAE: the 13 MiB heap, one
+# automatic 7 MiB CHIM cache bank, which models and textures prefer, chim_zone.c AllocIn, and in a room map after a
+# town 5,512 KiB of free Fast RAM in one block, of which a room that needs it takes 3,456 KiB (the largest block less
+# 2 MiB in 64 KiB steps; engine_limits.MEASURED_ROOM), then the Hunk's rest). The 16 MB baseline
+# (or Extra RAM off) has the built heap and no bank: the zone and the Hunk's rest, less the loading buffer.
 SAFE_FAST_MB = 32
 ROOM_FAST_KEY = '_chim_room_fast_mb'    # the room map's worldspawn mark the engine reads at the door (aw_scene.c)
 
 
 def require_room_map_heap(id1, sdk=None, sizes=None, heap_mb=None, report_path=None):
     """The image step's zone gate per CHIM room map (room_map_heap): report_path (JSON). A room that fits the 16 MB
-    baseline's zone alone ('fits_zone', the big-rooms model of tools/door_graph.py: the zone less the loading buffer)
-    is 'fast_mb' 16; one that fits only what the 32 MB minimum gives a room (its zone and the automatic cache bank,
-    'min_fast_room_bytes', with its largest model within one block; CHIM-ROOM-ESTIMATE-48) is 'fast_mb' 32, and its
+    baseline ('fits_zone': the zone and the Hunk rest less the loading buffer, room_zone_limits) is 'fast_mb' 16; one
+    that fits only what the 32 MB minimum gives a room (its zone, the automatic cache bank, the room's bank of free
+    Fast RAM and the Hunk rest, 'min_fast_room_bytes', with its largest model within one block and, past one bank, its
+    load through the engine's allocator; CHIM-ROOM-ESTIMATE-48, ROOM-AKULAKHAN-HEAP-52) is 'fast_mb' 32, and its
     room map is marked (ROOM_FAST_KEY) so the engine refuses it at the door on less (CHIM-ROOM-16MB-REFUSAL-48); a
     ValueError names the first room that fits neither. 'over_16mb_zone' lists the rooms over the 16 MB zone alone,
     the same set as 'marked_32mb' when every room fits."""
@@ -860,22 +1121,23 @@ def require_room_map_heap(id1, sdk=None, sizes=None, heap_mb=None, report_path=N
         report = {'rooms': rooms, 'ok': all(r['ok'] for r in rooms.values()), 'marked_32mb': marked,
                   'over_16mb_zone': sorted(n for n, r in rooms.items() if not r['fits_zone']),
                   'method': 'room map: zone = engine_limits.whole_map_zone(start-up Hunk + room map, '
-                            '_chim_hunk_rest); need = every model of the room record (image_bytes, direct hull 0) '
-                            '+ every texture they use once + the record; 16 MB = need within the zone less the '
-                            'loading buffer; ok = need within the zone and the automatic cache bank at the minimum '
-                            'Fast RAM (engine_limits.fast_ram_memory) and the largest model within one block; a room '
-                            'over the 16 MB zone that is ok carries "%s" "%d"' % (ROOM_FAST_KEY, SAFE_FAST_MB)}
+                            '_chim_hunk_rest), never more than chim_zone_kib; need = the engine\'s blocks of the room '
+                            '(room_blocks: the record with its placements, every model of the record and every texture '
+                            'they use once, the store index, the prefetch table at 32 MB; block headers); 16 MB = need '
+                            'within the zone and the Hunk rest a room can take (engine_limits.room_hunk_rest) less the '
+                            'loading buffer; ok = need within what the minimum Fast RAM gives a room (that heap\'s '
+                            'zone, the automatic cache bank, the room\'s bank of the measured free Fast RAM, the Hunk '
+                            'rest: engine_limits.fast_ram_memory, chim_world.c Chim_RoomGrow) and the largest model '
+                            'within one block, and, for a room past one bank, its load through the engine\'s '
+                            'allocator (chim/room_zone.py); a room over the 16 MB zone that is ok carries "%s" "%d"'
+                            % (ROOM_FAST_KEY, SAFE_FAST_MB)}
         report['status'] = 'passed' if report['ok'] else 'failed'
     if report_path:
         Path(report_path).write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8',
                                      newline='\n')
     bad = [r for r in report.get('rooms', {}).values() if not r['ok']]
     if bad:
-        r = bad[0]
-        raise ValueError('CHIM room heap gate failed: %s needs %d bytes for its models and textures, its zone holds %d '
-                         '(%d MiB heap) and the 32 MB minimum %d; its largest model %d bytes, one block %d'
-                         % (r['map'], r['need_bytes'], r['zone_bytes'], r['heap_mb'], r.get('zone_32mb_bytes', 0),
-                            r.get('largest_model_bytes', 0), r.get('block_bytes_min_fast', 0)))
+        raise ValueError(room_failure_text('CHIM room heap gate', bad[0]))
     return report
 
 

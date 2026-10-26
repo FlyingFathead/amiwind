@@ -16,6 +16,8 @@
 void AW_LampInit(void);
 void AW_LampUpdate(void);
 int AW_GuardTorchNight(void);
+/* Guards carry their torches now: forced on or off (guards torch 1/0) or, by default, at night. */
+int AW_GuardTorchWanted(void);
 extern cvar_t aw_torch_strength,aw_guard_torch_radius;
 /* Renderer-relative intensity, separate from the bounded radius. At 0.7,
  * aliases retain their accepted lighting while surfaces gain a peak of

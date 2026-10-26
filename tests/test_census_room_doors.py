@@ -74,6 +74,22 @@ class CensusOfficeDoors(unittest.TestCase):
             with self.subTest(number=number):
                 self.assertIsNone(omission_reason({'number': number, 'id': identifier, 'type': 'DOOR', 'model': model}))
 
+    def test_activators_are_kept_except_liquids_and_effects(self):
+        # INTERIOR-ACTIVATORS-LEFT-OUT-52: every activator but the beds was left out, the heart of Lorkhan with them
+        for identifier, model in (('heart_akulakhan', 'x\\xbase_heart.nif'), ('furn_de_bar_01', 'f\\furn_de_bar_01.nif'),
+                                  ('furn_shrine_tribunal_cure_01', 'f\\furn_shrine_tribunal.nif'),
+                                  ('active_6th_bell_01', 'f\\active_6th_bell_01.nif'),
+                                  ('active_com_bed_04', 'f\\active_com_bed_04.nif'),
+                                  ('chargen stuff room', 'i\\in_c_plain_room_side.nif'),
+                                  ('furn_alchemist_table', 'f\\furn_alchemist.nif')):
+            with self.subTest(identifier=identifier):
+                self.assertIsNone(omission_reason({'number': 1, 'id': identifier, 'type': 'ACTI', 'model': model}))
+        for identifier in ('in_lava_1024', 'In_Lava_256a', 'act_terrain_lava_ventlg', 'active_bubbles00',
+                           'ex_vivec_waterfall_01', 'ex_waterfall_mist_s_01', 'steam_lavariver', 'volcano_steam'):
+            with self.subTest(identifier=identifier):
+                self.assertEqual(omission_reason({'number': 1, 'id': identifier, 'type': 'ACTI', 'model': 'x\\a.nif'}),
+                                 'liquid or effect activator')
+
     def test_the_hinged_door_table_holds_the_hall_door_and_the_office_door(self):
         bases, rows, sounds = hinged_catalogue(census_master())
         by = {r['reference']: r for r in rows}

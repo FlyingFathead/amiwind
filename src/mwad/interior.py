@@ -1,6 +1,6 @@
 """Bounded base-master interior audit. No script execution or asset redistribution."""
 from pathlib import Path
-import hashlib, math, struct
+import hashlib, math, re, struct
 from .audit import cell_data
 from .esm import is_deleted, records, require, string, subrecords
 from .markers import is_hidden_marker
@@ -172,6 +172,13 @@ def select_geometry(cell, *, harvest_references=(), harvest_master_sha256=None):
     return selected,omitted
 
 
+# Activators the interiors leave out on purpose: the liquids drawn as liquid (the lava pools, tools/lava.py, from the
+# cell's lava geometry) and the effects with no solid shape (waterfalls, mist, steam, bubbles, lava vents). Every other
+# activator is drawn as the original draws it (INTERIOR-ACTIVATORS-LEFT-OUT-52: until v0.0.52 every activator but the
+# beds was left out, the heart of Lorkhan, bar counters, shrines and Dwemer machinery with them).
+EFFECT_ACTIVATOR=re.compile(r'(?:^|_)(?:in_lava|lava_vent|bubbles|waterfall|mist|steam)')
+
+
 def omission_reason(ref,exclusions=()):
     """Why the interior converter leaves one reference out, or None to keep it.
     Needs the reference's number, id, type (base record) and model."""
@@ -181,8 +188,6 @@ def omission_reason(ref,exclusions=()):
     if not model:return 'no static model'
     if 'marker' in model or is_hidden_marker(ref.get('id')):return 'editor marker'
     if ref['type'] not in ('STAT','DOOR','CONT','LIGH','ACTI'):return 'small item or actor deferred'
-    if ref['type']=='ACTI' and 'active_de_bed' not in model and not (
-            ref['id'].casefold()=='chargen stuff room' and
-            model=='i/in_c_plain_room_side.nif'):return 'unsupported activator'
+    if ref['type']=='ACTI' and EFFECT_ACTIVATOR.search(ref['id'].casefold()):return 'liquid or effect activator'
     if any(x in model for x in ('furn_bone','furn_de_rope','shack_hook','shack_basket')):return 'fine dressing deferred'
     return None

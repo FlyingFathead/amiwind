@@ -43,6 +43,55 @@ class LightLevelTests(unittest.TestCase):
             I.with_light(record(), 256)
 
 
+class LightTintTests(unittest.TestCase):
+    """World format 0.13 (INTERIOR-SUNLIGHT-COLOUR-51): the light's tint in flags bits 2-4."""
+
+    def test_tint_goes_into_bits_2_to_4_beside_the_level_and_the_low_bits(self):
+        rec = I.with_light(record(story_hidden=True, leaves=40), 200, 7)
+        flags = struct.unpack_from('>H', rec, I.FLAGS_AT)[0]
+        self.assertEqual(flags >> 8, 200)
+        self.assertEqual((flags >> 2) & 7, 7)
+        self.assertEqual(flags & 3, F.FLAG_OVER_16_LEAVES | F.FLAG_STORY_HIDDEN)
+        self.assertEqual(I.with_light(record(), 9), I.with_light(record(), 9, 0))
+        for bad in (-1, 8):
+            with self.assertRaises(ValueError):
+                I.with_light(record(), 9, bad)
+        with self.assertRaises(ValueError):
+            I.with_light(I.with_light(record(), 0, 2), 0, 1)
+
+    def test_the_room_record_is_0_13_and_reads_its_tints_back(self):
+        self.assertEqual(I.FORMAT_VERSION, (0, 13))
+        recs = [I.with_light(record(pid=i), 50, t) for i, t in enumerate((0, 2, 6))]
+        room = I.read_room_record(I.room_record(((0.0, 0.0, 0.0), (1.0, 1.0, 1.0)), [3], recs))
+        self.assertEqual([p['tint'] for p in room['placements']], [0, 2, 6])
+        self.assertEqual([p['light'] for p in room['placements']], [50, 50, 50])
+
+    def test_light_colours_map_to_the_engine_tints(self):
+        import interior_lighting as il
+        # Akulakhan's Chamber sunlight 255,140,140: red; a lantern (aw_light_hue 255,210,140): warm; a fire: orange
+        self.assertEqual(il.light_tint((255, 140, 140)), 2)
+        self.assertEqual(il.light_tint((255, 210, 140)), 1)
+        self.assertEqual(il.light_tint((255, 170, 100)), 3)
+        self.assertEqual(il.light_tint((255, 240, 120)), 4)
+        self.assertEqual(il.light_tint((120, 255, 120)), 5)
+        self.assertEqual(il.light_tint((140, 180, 255)), 6)
+        self.assertEqual(il.light_tint((200, 120, 255)), 7)
+        # grey or nearly grey light and darkness stay plain
+        for grey in ((128, 128, 128), (200, 180, 160), (0, 0, 0)):
+            self.assertEqual(il.light_tint(grey), 0)
+
+    def test_the_colour_sum_is_the_light_sum_in_colour(self):
+        import numpy as np
+        import interior_lighting as il
+        lighting = {'ambient': [40, 20, 20], 'sunlight': [255, 140, 140], 'falloff': 'original', 'facing': False,
+                    'lights': [{'color': [255, 200, 120], 'radius': 400, 'position': [0, 0, 0], 'flags': 0}],
+                    'zones': [{'box': [[-50, -50, -50], [50, 50, 50]], 'scale': 0.5, 'soft': 10}]}
+        for point in (np.array([0., 0, 0]), np.array([30., 10, 0]), np.array([300., 0, 0])):
+            rgb = il.point_colour(point, lighting)
+            self.assertAlmostEqual(float(np.dot(rgb, [.299, .587, .114])), il.point_light(point, lighting), places=6)
+        self.assertEqual(il.light_tint(il.point_colour(np.array([300., 0, 0]), lighting)), 2)
+
+
 class RoomRecordTests(unittest.TestCase):
     def test_round_trip(self):
         recs = [I.with_light(record(pid=i, model=m), lv) for i, (m, lv) in enumerate([(3, 10), (7, 250), (3, 1)])]

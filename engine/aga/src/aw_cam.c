@@ -30,6 +30,7 @@
 #include "aw_world.h"
 #include "aw_view.h"
 #include "aw_inspect.h"
+#include "aw_tryalloc.h"
 
 extern cvar_t aw_drawdistance;
 extern void AW_SetDrawDistance(int value);
@@ -176,7 +177,7 @@ static void mark_command(const char *name) {
     if(status){Con_Printf("\"%s\" is a public camera mark; choose another name.\n",name);return;}
     if(!(p=player()))return;
     if(!current_shot(p,name,&m) || !AW_CamFormat(&m,line,sizeof(line))){Con_Printf("Camera mark: this shot cannot be written.\n");return;}
-    kept=malloc(AW_CAM_FILE_BYTES);if(!kept){Con_Printf("Camera mark: no memory.\n");return;}
+    kept=AW_TryMalloc(AW_CAM_FILE_BYTES);if(!kept){Con_Printf("Camera mark: no memory.\n");return;}
     kept[0]=0;
     f=open_marks(0,&left,&bad);
     if(!f && bad){free(kept);Con_Printf("Camera mark: the private marks file is invalid; not overwritten.\n");return;}

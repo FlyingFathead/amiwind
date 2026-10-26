@@ -81,6 +81,7 @@ extern void (*chim_actors_tick)(void);
 extern void (*chim_actors_cmd)(void);
 int AW_CompanionEdict (edict_t *e);
 #include "aw_mappath.h"
+#include "aw_tryalloc.h"
 dfunction_t *ED_FindFunction (char *name);
 
 static int IsActor (edict_t *e)
@@ -399,7 +400,7 @@ static int SpawnOne (pending_t *q)
 			VectorCopy (q->rec.origin, v->vector);
 		if ((v = GetEdictFieldValue (ent, "aw_ground_valid")) != NULL)
 			v->_float = (q->rec.flags & CHIM_ACTOR_BAKED) ? 1 : 0;
-		/* the instance scale (version 3): the entity's aw_scale, which the client draws (U_AW_SCALE); not when the
+		/* the instance scale (version 3): the entity's aw_scale, which the client draws (AWU_SCALE); not when the
 		 * base names a model already baked at that scale (record flag CHIM_ACTOR_SCALED_MODEL, the older method) */
 		if (q->scale != 1.0f && !(q->rec.flags & CHIM_ACTOR_SCALED_MODEL) &&
 			(v = GetEdictFieldValue (ent, "aw_scale")) != NULL)
@@ -507,8 +508,8 @@ static int TableLoad (void)
 	{
 		nc = (unsigned long)table.head.cells * CHIM_ACTOR_CELL_BYTES;
 		nb = (unsigned long)table.head.bases * CHIM_ACTOR_BASE_BYTES;
-		table.cells = malloc (nc + 1);
-		table.bases = malloc (nb + 1);
+		table.cells = AW_TryMalloc (nc + 1);
+		table.bases = AW_TryMalloc (nb + 1);
 		table.ok = table.cells && table.bases &&
 			!fseek (f, at + (long)table.head.cells_at, SEEK_SET) && fread (table.cells, 1, nc, f) == nc &&
 			!fseek (f, at + (long)table.head.bases_at, SEEK_SET) && fread (table.bases, 1, nb, f) == nb;
@@ -518,7 +519,7 @@ static int TableLoad (void)
 		/* the levelled creature lists: small (the exterior's 61 lists: about 3 KB), kept whole; version 3: the
 		 * instance scales after them (5 references in the game data) */
 		unsigned long nl = table.head.bytes - table.head.lists_at, nlist = nl;
-		table.lists = malloc (nl + 1);
+		table.lists = AW_TryMalloc (nl + 1);
 		if (table.lists && !fseek (f, at + (long)table.head.lists_at, SEEK_SET) && fread (table.lists, 1, nl, f) == nl &&
 			table.head.version == CHIM_ACTOR_VERSION_SCALES)
 		{
@@ -630,7 +631,7 @@ static void TableJoin (int cx, int cy, const float *offset)
 			continue;
 		}
 		q = &pending[npending];
-		if (!(q->text = malloc (b.bytes + 3)))
+		if (!(q->text = AW_TryMalloc (b.bytes + 3)))
 			break;
 		if (fseek (f, at + (long)table.head.text_at + (long)b.at, SEEK_SET) ||
 			fread (q->text, 1, b.bytes, f) != b.bytes)
@@ -689,7 +690,7 @@ static void Join (int cx, int cy, const char *map, const float *offset)
 	}
 	k = head[4] | (head[5] << 8) | (head[6] << 16) | (head[7] << 24);
 	length = (long)(head[8] | (head[9] << 8) | (head[10] << 16) | ((unsigned long)head[11] << 24));
-	if (k < 0 || length <= 0 || length > 4*1024*1024 || (long)k + length > bytes || !(text = malloc (length + 1)))
+	if (k < 0 || length <= 0 || length > 4*1024*1024 || (long)k + length > bytes || !(text = AW_TryMalloc (length + 1)))
 	{
 		fclose (f);
 		return;
@@ -710,7 +711,7 @@ static void Join (int cx, int cy, const char *map, const float *offset)
 			break;
 		*end = 0;
 		if ((strstr (start, "\"aw_npc\"") || strstr (start, "\"aw_creature\"")) &&
-			(q = &pending[npending], (q->text = malloc (strlen (start) + 3)) != NULL))
+			(q = &pending[npending], (q->text = AW_TryMalloc (strlen (start) + 3)) != NULL))
 		{
 			sprintf (q->text, "%s}", start);
 			q->origin[0] = q->origin[1] = q->origin[2] = 0;

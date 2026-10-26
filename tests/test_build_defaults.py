@@ -273,6 +273,8 @@ OPTIONS = {
     'allow_release_reuse': 'check',
     'fingerprint_scope': 'tooling', 'no_unit_cache': 'debug opt-out', 'no_media_cache': 'debug opt-out',
     'prerendered': 'tooling', 'prerendered_stages': 'tooling', 'storage_pool': 'tooling', 'anim_kit': 'shipped default', 'miniwind_boot': 'mode',
+    # v0.0.52: skeletal actors by default (--npc-anim-type 2); 1 = the baked kit, compiled in on purpose.
+    'npc_anim_type': 'shipped default',
     # CHIM-native towns (CHIM-LEGACY-CHAIN-33): on by default since v0.0.36 (CHIM-native areas); 'off' and --legacy-area
     # are RETIRED since CHIM v0.1.0 (tools/retired_flags.py, BUILD-LEGACY-CHAIN-DEFAULT-36); --override lets one through.
     'chim_native_towns': 'shipped default', 'chim_regions': 'shipped default', 'chim_regions_status': 'shipped default',

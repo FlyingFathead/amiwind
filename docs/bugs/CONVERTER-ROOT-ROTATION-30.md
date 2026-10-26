@@ -76,6 +76,7 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - AW-20260928-06 (no report page): Player can leave pier and become stranded
 - AW-20260928-11 (no report page): Census missing floor and wall / falling into void
 - AW-20260928-20 (no report page): Census clipped outside room near captain wing
+- BALMORA-FLAMES-IN-SKY-51 (no report page): Four fire sprites in Balmora with no fire under them: two float in the air, two stand on the ground
 - [CENSUS-ENTITIES-30](CENSUS-ENTITIES-30.md): Census Office objects misplaced (upright rug, ceiling hole, tapestry)
 - [CHIM-AZURA-DWEMER-RUIN-SHAPES-43](CHIM-AZURA-DWEMER-RUIN-SHAPES-43.md): A Dwemer ruin at Azura's Coast is drawn in the wrong shape
 - [CHIM-AZURA-FLOATING-FLORA-43](CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7)

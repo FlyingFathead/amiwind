@@ -39,6 +39,7 @@
 #include "r_local.h"
 #include "aw_npc_lod.h"
 #include "aw_rcount.h"
+#include "aw_tryalloc.h"
 
 static cvar_t aw_npc_lod = {"aw_npc_lod", "1"};
 static cvar_t aw_npc_lod_bands = {"aw_npc_lod_bands", "64 256 512"};
@@ -212,7 +213,7 @@ static void build_table(void)
         manifest_missing = 1;
         return;
     }
-    if (size < 8 || size > 256 * 1024 || !(text = malloc(size + 1))) {
+    if (size < 8 || size > 256 * 1024 || !(text = AW_TryMalloc(size + 1))) {
         fclose(f);
         return;
     }

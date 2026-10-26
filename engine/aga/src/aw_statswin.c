@@ -18,6 +18,7 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_statswin.h"
+#include "aw_tryalloc.h"
 
 extern int (*aw_title_bar)(int x,int y,int w,const char *title);
 /* aw_worldui.c: the inventory's modal for another window; key returns 0 to close, closed runs on every close. */
@@ -238,7 +239,7 @@ static int magic_key(int key,int mouse_x,int mouse_y){
 static void magic_closed(void){free(magic);magic=NULL;}
 void AW_MagicMenuOpen(void){
     if(!aw_character.valid){Con_Printf("Magic: no character yet.\n");return;}
-    free(magic);magic=(aw_magic_list_t *)calloc(1,sizeof(*magic));
+    free(magic);magic=(aw_magic_list_t *)AW_TryCalloc(1,sizeof(*magic));
     if(!magic){Con_Printf("Magic: not enough memory.\n");return;}
     AW_MagicList(magic);
     if(!AW_WorldUIOpenPanel(magic_draw,magic_key,magic_closed))magic_closed();

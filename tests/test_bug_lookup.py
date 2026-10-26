@@ -61,6 +61,21 @@ class LookupTests(unittest.TestCase):
         self.assertNotIn('CHIM-CAVE21', out)
         self.assertIn('CHIM-CAVE21', self.run_lookup('--found', 'v0.0.48', '--severity', 'low')[1])
 
+    def test_like_ranks_every_state_and_points_at_reopen(self):
+        # REGISTER-REGRESSION-HANDLER-52: the closest titles over open, fixed and archived bugs; a fixed one seen
+        # again is reopened as a regression, never added again
+        code, out, err = self.run_lookup('--like', 'the collision union fails')
+        self.assertEqual(code, 0)
+        # the same title: equal scores, then by ID; the archived fixed bug is found as well as the open one
+        self.assertEqual([line.split()[0] for line in out.splitlines()], ['OLD-FIXED-40', 'TEST-BUG-48'])
+        self.assertIn('reopen OLD-FIXED-40', err)
+        self.assertNotIn('CHIM-CAVE21', out)
+        (self.root / 'docs/bugs/archive/bugs-v0.0.40.json').write_text(json.dumps(
+            [bug(id='OLD-FIXED-40', state='open', found_in='v0.0.40', title='Union of pieces fails again',
+                 regressions=[{'version': 'v0.0.52', 'at': '2026-10-26', 'was': 'fixed', 'fixed_in': 'v0.0.41'}])]),
+            encoding='utf-8')
+        self.assertIn('[came back 1 time]', self.run_lookup('OLD-FIXED-40')[1])
+
     def test_json_and_page(self):
         records = json.loads(self.run_lookup('TEST-BUG-48', '--json')[1])
         self.assertEqual([r['id'] for r in records], ['TEST-BUG-48'])

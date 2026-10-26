@@ -43,9 +43,14 @@ RELEASE_BASELINE = ROOT / 'tools' / 'size-baseline.json'
 GIB = 1024 ** 3
 DEFAULT_MARGIN_GIB = 0.05
 GUARD_EXIT = 4   # the stages passed and their outputs are valid; the size guard failed the build result
-GROUPS = ('classic-maps', 'chim-world', 'npc-gallery', 'sound', 'music', 'video', 'progs', 'other')
+GROUPS = ('classic-maps', 'chim-world', 'npc-gallery', 'sound', 'music', 'video', 'actors', 'progs', 'other')
+# Stage 0 of the actor disk plan (docs/MODULAR_NPCS.md "Disk size plan for the actors"): the actors are their own
+# group, so the size guard stops their silent growth: id1/progs/a_<id>[_m].* (standing and mover models with their
+# animation and tag files) and id1/progs/skins (their skins); 39% of the v0.0.51 image.
+ACTOR_PREFIX = 'a_'
+ACTOR_FOLDERS = ('skins',)
 TITLES = {'classic-maps': 'classic maps', 'chim-world': 'CHIM world', 'npc-gallery': 'NPC gallery',
-          'sound': 'sound', 'music': 'music', 'video': 'video', 'progs': 'progs', 'other': 'other'}
+          'sound': 'sound', 'music': 'music', 'video': 'video', 'actors': 'actors', 'progs': 'progs', 'other': 'other'}
 FOLDERS = {'gallery': 'npc-gallery', 'sound': 'sound', 'music': 'music', 'intro': 'video', 'progs': 'progs',
            'chim': 'chim-world'}
 CHIM_MAP_SUFFIXES = (FRAME_EXT, '.far')   # CHIM frame maps (tools/map_files.py) and their far terrain
@@ -64,6 +69,9 @@ def group_of(path):
     folder = parts[1].lower()
     if folder == 'maps':
         return 'chim-world' if name.endswith(CHIM_MAP_SUFFIXES) else 'classic-maps'
+    if folder == 'progs' and ((len(parts) == 3 and name.startswith(ACTOR_PREFIX))
+                              or (len(parts) > 3 and parts[2].lower() in ACTOR_FOLDERS)):
+        return 'actors'
     return FOLDERS.get(folder, 'other')
 
 
@@ -209,7 +217,9 @@ def compare(current, baseline, margin_bytes, role, source):
         now = current['groups'][name]['bytes']
         then = int((baseline['groups'].get(name) or {}).get('bytes', 0))
         rows.append({'group': name, 'bytes': now, 'baseline_bytes': then, 'delta_bytes': now - then})
-        if same and now - then > margin_bytes:
+        # a group the record does not have (a record made before the group existed, e.g. actors before v0.0.52)
+        # is not judged: its bytes were counted in another group then
+        if same and name in baseline['groups'] and now - then > margin_bytes:
             grown.append(name)
     total = int(baseline.get('payload_bytes') or sum(int((row or {}).get('bytes', 0))
                                                      for row in baseline['groups'].values()))

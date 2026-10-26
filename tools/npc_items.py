@@ -201,12 +201,8 @@ def attach_items(kinds, identifier, appearance):
     return appearance
 
 
-def resident_items(assets, palette, appearance, skeleton, times, mover_times=None):
-    """For build_resident: (tag text, {item path: model bytes}) or (None, {}).
-
-    times: one sample per frame of the model the tag sits beside (aw_items.c refuses a tag whose row
-    count differs from the model's frames). mover_times: an animation kit actor's mover model frames
-    (npc_anim.py, worn while it moves or fights): then (tag, models, mover tag); ANIMKIT-ITEM-TAG-FRAMES-35."""
+def carried_models(assets, palette, appearance, nif):
+    """({kind: item model path}, {item model path: model bytes}) of an actor's carried weapon and shield."""
     parts = appearance.get('carried_parts') or {}
     paths, models = {}, {}
     for kind, _ in BONES:
@@ -214,8 +210,18 @@ def resident_items(assets, palette, appearance, skeleton, times, mover_times=Non
         if not part:
             continue
         path = 'items/' + item_stem(kind, part['mesh']) + '.mdl'
-        models[path] = item_model(assets, part, palette, skeleton.N)
+        models[path] = item_model(assets, part, palette, nif)
         paths[kind] = path
+    return paths, models
+
+
+def resident_items(assets, palette, appearance, skeleton, times, mover_times=None):
+    """For build_resident: (tag text, {item path: model bytes}) or (None, {}).
+
+    times: one sample per frame of the model the tag sits beside (aw_items.c refuses a tag whose row
+    count differs from the model's frames). mover_times: an animation kit actor's mover model frames
+    (npc_anim.py, worn while it moves or fights): then (tag, models, mover tag); ANIMKIT-ITEM-TAG-FRAMES-35."""
+    paths, models = carried_models(assets, palette, appearance, skeleton.N)
     if not paths:
         return (None, {}) if mover_times is None else (None, {}, None)
     rows = bone_tags(skeleton, times, appearance, {k: True for k in paths})

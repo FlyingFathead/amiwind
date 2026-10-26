@@ -105,7 +105,7 @@ FIELDS = {'id': str, 'title': str, 'state': str, 'fixed_in': (str, type(None)),
 # Facts every bug found from v0.0.30 on must carry (project requirement, 9 October 2026).
 FACTS = ('reported_by', 'found_date', 'found_in', 'where', 'reproduction', 'duplicate_of', 'persists_in',
          'severity', 'severity_reason', 'family', 'related')
-OPTIONAL = ('tags', 'chim', 'build', 'reports', 'platform', 'platform_reason', 'waiting_on', 'deferred')
+OPTIONAL = ('tags', 'chim', 'build', 'reports', 'platform', 'platform_reason', 'waiting_on', 'deferred', 'regressions')
 # Why an open bug is not fixed yet (the maintainer, 24 October 2026: "lacks dependency"): waiting_on is "Lacks dependency:
 # <system>" (MWScript function, object state, inventory, journal, combat, jail system, renderer ...), deferred the
 # maintainer's written deferral "YYYY-MM-DD: reason". A bug open in LONG_PERSISTING releases or more needs one of them
@@ -629,6 +629,7 @@ def validate(bugs, families=None):
         errors += validate_build(b, where)
         errors += validate_platform(b, where)
         errors += validate_waiting(b, where)
+        errors += validate_regressions(b, where)
     for b in by_id.values():
         for r in b.get('related') or []:
             other = by_id.get(r)
@@ -667,11 +668,13 @@ def releases_of(b):
 
 
 def long_persisting(bugs, todo_text=None):
-    """[(bug, reason or None)] of open bugs seen in LONG_PERSISTING releases or more; the reason is why that is not a
-    failure: waiting on a missing dependency, deferred by the maintainer, or on the given TODO list."""
+    """[(bug, reason or None)] of open bugs seen in LONG_PERSISTING releases or more, and of every open bug that came
+    back after it was fixed or closed (a regression needs a reason of record at once: REGISTER-REGRESSION-HANDLER-52);
+    the reason is why that is not a failure: waiting on a missing dependency, deferred by the maintainer, or on the
+    given TODO list."""
     out = []
-    for b in sorted(bugs, key=lambda b: (-len(releases_of(b)), b['id'])):
-        if b.get('state') != 'open' or len(releases_of(b)) < LONG_PERSISTING:
+    for b in sorted(bugs, key=lambda b: (not b.get('regressions'), -len(releases_of(b)), b['id'])):
+        if b.get('state') != 'open' or len(releases_of(b)) < LONG_PERSISTING and not b.get('regressions'):
             continue
         if b.get('waiting_on'):
             reason = b['waiting_on']
@@ -693,12 +696,13 @@ def title_words(text):
     return {w for w in TITLE_WORD_RE.findall(str(text).casefold()) if w not in TITLE_STOP and len(w) > 2}
 
 
-def closest(bugs, title, limit=5):
-    """[(score, bug)] of the open bugs whose title shares the most words with TITLE (Jaccard of significant words)."""
+def closest(bugs, title, limit=5, states=('open',)):
+    """[(score, bug)] of the bugs in STATES whose title shares the most words with TITLE (Jaccard of significant
+    words)."""
     words = title_words(title)
     scored = []
     for b in bugs:
-        if b.get('state') != 'open':
+        if b.get('state') not in states:
             continue
         other = title_words(b.get('title'))
         if words and other:
@@ -709,6 +713,62 @@ def closest(bugs, title, limit=5):
 
 
 SAME_TITLE = 0.6
+# A closed bug that comes back is reopened, never registered again (REGISTER-REGRESSION-HANDLER-52, the maintainer,
+# 25 October 2026: "so as to NOT open up old bugs as new ones if it's something that has been closed but has been
+# regressed"): each return is one entry in its regressions list, and the bug goes one severity step up.
+REGRESSION_KEYS = {'version', 'at', 'was', 'fixed_in', 'by', 'note'}
+
+
+def validate_regressions(b, where):
+    """regressions: a time-ordered list of {version, at, was: fixed|closed, fixed_in, optional by and note}."""
+    regs = b.get('regressions')
+    if regs is None:
+        return []
+    if not isinstance(regs, list) or not regs:
+        return ['%s: regressions must be a non-empty list' % where]
+    for r in regs:
+        if not isinstance(r, dict) or set(r) - REGRESSION_KEYS or not {'version', 'at', 'was', 'fixed_in'} <= set(r) \
+                or not REPORT_VERSION_RE.match(str(r.get('version'))) or not REPORT_AT_RE.match(str(r.get('at'))) \
+                or r.get('was') not in ('fixed', 'closed') \
+                or not (r.get('fixed_in') is None or VERSION_RE.match(str(r.get('fixed_in')))) \
+                or any(k in r and not _line_ok(r[k], 200) for k in ('by', 'note')):
+            return ['%s: each regression needs version, at, was (fixed or closed) and fixed_in (or null), optional '
+                    'one-line by and note' % where]
+    ats = [str(r['at']) for r in regs]
+    if ats != sorted(ats):
+        return ['%s: regressions must be in time order' % where]
+    return []
+
+
+def reopen(b, version, at, by=None, note=None):
+    """Reopen a fixed or closed bug as a regression: one entry in regressions, state open, one severity step up."""
+    if b['state'] not in ('fixed', 'closed'):
+        raise ValueError('%s is %s: only a fixed or closed bug can come back' % (b['id'], b['state']))
+    entry = {'version': version, 'at': at, 'was': b['state'], 'fixed_in': b.get('fixed_in')}
+    if by:
+        entry['by'] = by
+    if note:
+        entry['note'] = note
+    b['regressions'] = sorted((b.get('regressions') or []) + [entry], key=lambda r: r['at'])
+    before = 'fixed in %s' % b['fixed_in'] if b.get('fixed_in') else b['state']
+    b['status'] = 'REGRESSED in %s (%s before)%s. Before: %s' % (version, before, ': ' + note if note else '',
+                                                                 b['status'])
+    b['state'], b['fixed_in'], b['owner_accepted'] = 'open', None, None
+    if b.get('severity') in SEVERITIES:
+        raised = SEVERITIES[max(SEVERITIES.index(b['severity']) - 1, 0)]
+        if raised != b['severity']:
+            b['severity_reason'] = 'Regressed in %s (was %s): %s' % (version, b['severity'], b.get('severity_reason'))
+            b['severity'] = raised
+    if has_facts(b):
+        b['persists_in'] = [version]
+    return entry
+
+
+def came_back(b):
+    """'in v0.0.52 (fixed in v0.0.45 before)' for each return of a bug, or None."""
+    regs = b.get('regressions') or []
+    return '; '.join('in %s (%s before)' % (r['version'], 'fixed in %s' % r['fixed_in'] if r['fixed_in'] else r['was'])
+                     for r in regs) or None
 
 
 def report_lines(b):
@@ -792,6 +852,8 @@ def facts_table(b, by_id, families):
         rows.append(('Waiting on', b['waiting_on']))
     if b.get('deferred'):
         rows.append(('Deferred by the maintainer', b['deferred']))
+    if came_back(b):
+        rows.append(('Came back (regression)', came_back(b)))
     if is_chim(b):
         rows.append(('CHIM', '%s ([CHIM Engine tracker](CHIM_TRACKER.md))' % dict(CHIM_PARTS)[b['chim']]))
     rows += build_rows(b)
@@ -967,13 +1029,22 @@ def chim_tracker(bugs, journal_text, version, pages=None):
     return '\n'.join(out) + '\n'
 
 
+OPEN_STATUS_CELL = 500
+
+
 def tracker_status(b):
     """The Status cell of the CHIM tracker: in full for an open bug; its first sentence for a fixed or closed one,
     whose full text stays on its report page and in the register (TRACKER-CHIM-PAGE-SIZE-48: the page reached 75 %
-    of the 256 KiB release text limit at v0.0.48-rc1)."""
+    of the 256 KiB release text limit at v0.0.48-rc1). An open bug's in full up to OPEN_STATUS_CELL characters,
+    else cut at the last sentence end before it (TRACKER-CHIM-PAGE-SIZE-48 persisting at v0.0.52-dev1: the open
+    builder bugs' long statuses took the page to 95 % of the limit and failed the gate)."""
     text = b['status']
     if b['state'] == 'open':
-        return text
+        if len(text) <= OPEN_STATUS_CELL:
+            return text
+        end = max(text.rfind('. ', 0, OPEN_STATUS_CELL), text.rfind('): ', 0, OPEN_STATUS_CELL))
+        cut = end + 1 if end > OPEN_STATUS_CELL // 3 else OPEN_STATUS_CELL
+        return text[:cut].rstrip() + ' (full text: the register)'
     m = re.search(r'\.\s', text)
     cut = min(m.start() + 1 if m else len(text), 300)
     return text if cut >= len(text.rstrip()) else text[:cut].rstrip() + ' (full text: its page)'
@@ -1388,6 +1459,15 @@ def main(argv=None):
     a.add_argument('--found', required=True); a.add_argument('--status')
     a.add_argument('--not-duplicate', action='store_true',
                    help='add although an open bug has nearly the same title (looked up and different)')
+    a.add_argument('--not-regression', action='store_true',
+                   help='add although a fixed or closed bug has nearly the same title (looked up: it is not that '
+                        'bug coming back; a bug that came back is reopened: bug_register.py reopen)')
+    ro = sub.add_parser('reopen', help='a fixed or closed bug came back: reopen it as a regression (never register '
+                                       'it again under a new ID)')
+    ro.add_argument('id'); ro.add_argument('--version', required=True, help='the version it came back in')
+    ro.add_argument('--at', required=True, help='YYYY-MM-DD HH:MM +ZZZZ (host clock), or a date alone')
+    ro.add_argument('--by', help='the change that brought it back (a commit or bug ID), when known')
+    ro.add_argument('--note')
     a.add_argument('--tag', action='append', choices=TAGS, default=[])
     facts_args(a, True)
     pp = sub.add_parser('persisting', help='open bugs seen in %d releases or more, and why each is not fixed yet'
@@ -1409,10 +1489,12 @@ def main(argv=None):
         todo = args.todo.read_text(encoding='utf-8') if args.todo else None
         rows = long_persisting(bugs, todo)
         for b, reason in rows:
-            print('%-44s %-8s %s releases (%s): %s' % (b['id'], b.get('severity') or '-', len(releases_of(b)),
-                                                       ', '.join(releases_of(b)), reason or 'NOT SCHEDULED'))
+            print('%-44s %-8s %s releases (%s)%s: %s' % (
+                b['id'], b.get('severity') or '-', len(releases_of(b)), ', '.join(releases_of(b)),
+                ', REGRESSION: came back %s' % came_back(b) if b.get('regressions') else '',
+                reason or 'NOT SCHEDULED'))
         missing = [b['id'] for b, reason in rows if reason is None]
-        print('%d open bugs seen in %d releases or more, %d without a reason of record%s' % (
+        print('%d open bugs seen in %d releases or more or come back, %d without a reason of record%s' % (
             len(rows), LONG_PERSISTING, len(missing), '' if todo is not None else ' (no --todo given)'),
             file=sys.stderr)
         return 1 if args.fail and missing else 0
@@ -1486,6 +1568,18 @@ def main(argv=None):
         if same and not args.not_duplicate:
             raise SystemExit('refused: nearly the same title as open %s; add a report there, or pass --not-duplicate '
                              'after reading it' % ', '.join(same))
+        before = closest(bugs, args.title, states=('fixed', 'closed'))
+        if before:
+            print('closest fixed or closed bugs (one that came back is a regression, bug_register.py reopen):')
+            for score, other in before:
+                print('  %.2f %-44s %s%s: %s' % (score, other['id'], other['state'],
+                                                 ' in %s' % other['fixed_in'] if other.get('fixed_in') else '',
+                                                 other['title']))
+        gone = [(score, other) for score, other in before if score >= SAME_TITLE]
+        if gone and not args.not_regression:
+            raise SystemExit('refused: nearly the same title as %s, which was fixed or closed: if it came back it is '
+                             'a regression: bug_register.py reopen ID --version V --at TIME; or pass '
+                             '--not-regression after reading it' % ', '.join(o['id'] for _, o in gone))
         page = 'bugs/%s.md' % args.id
         b = {'id': args.id, 'title': args.title, 'state': 'open', 'fixed_in': None, 'owner_accepted': None,
              'status': args.status or 'Reported in %s; cause unknown.' % args.found,
@@ -1535,6 +1629,17 @@ def main(argv=None):
         if entry in (b.get('reports') or []):
             raise SystemExit('report already recorded')
         b['reports'] = sorted((b.get('reports') or []) + [entry], key=lambda r: r['at'])
+    elif args.cmd == 'reopen':
+        b = by_id.get(args.id)
+        if b is None:
+            raise SystemExit('unknown ID: ' + args.id)
+        try:
+            entry = reopen(b, args.version, args.at, args.by, args.note)
+        except ValueError as exc:
+            raise SystemExit(str(exc))
+        print('REGRESSION: %s came back in %s (%s before), now open, severity %s' % (
+            b['id'], entry['version'], 'fixed in %s' % entry['fixed_in'] if entry['fixed_in'] else entry['was'],
+            b.get('severity') or 'unknown'))
     elif args.cmd == 'backfill':
         records = json.loads(Path(args.file).read_text(encoding='utf-8'))
         print('backfill: %d values written' % backfill(bugs, records, args.overwrite, args.pages))
@@ -1564,7 +1669,7 @@ def main(argv=None):
         print('bug register ok: %d bugs (%d live, %d archived), %d with report pages' % (
             len(bugs), len(live), len(old), sum(1 for b in bugs if b['report'])))
         return 0
-    if args.cmd in ('add', 'set', 'backfill', 'report', 'render'):
+    if args.cmd in ('add', 'set', 'backfill', 'report', 'reopen', 'render'):
         save(bugs)
     changed = 0
     for path, text in new.items():

@@ -277,6 +277,7 @@ void AW_GlutExpand(const aw_glut_t *g,int npc,const char *name,const char *p,cha
 #include "quakedef.h"
 #include "aw_anim.h"
 #include "aw_combat.h"
+#include "aw_tryalloc.h"
 
 static cvar_t lut_on={"aw_npc_voice_lut","1",true};   /* 0: the previous method (per-model bark lines only) */
 static aw_glut_t table;
@@ -300,7 +301,7 @@ static int load(void) {
         fclose(f);Con_Printf("Voice table: %s is not AWGL1\n",path);return 0;
     }
     /* once per session, outside the Quake heap (accelerator RAM when there is some) */
-    if(!(resident=(unsigned char *)malloc((size_t)resident_size))){fclose(f);Con_Printf("Voice table: no memory for %ld bytes\n",resident_size);return 0;}
+    if(!(resident=(unsigned char *)AW_TryMalloc((size_t)resident_size))){fclose(f);Con_Printf("Voice table: no memory for %ld bytes\n",resident_size);return 0;}
     memcpy(resident,header,AW_GLUT_HEADER);
     if((long)fread(resident+AW_GLUT_HEADER,1,(size_t)(resident_size-AW_GLUT_HEADER),f)!=resident_size-AW_GLUT_HEADER ||
        !AW_GlutOpen(&table,resident,resident_size,size)){

@@ -138,7 +138,7 @@ class EngineReaders(unittest.TestCase):
     def test_shared_skin_models_decode_like_inline_skins(self):
         import test_aga_native_source as native
         native.NativeSourceTests().compile_run('aga_shared_skin_test.c',
-            [SRC / name for name in ('model.c', 'mathlib.c')],
+            [SRC / name for name in ('model.c', 'aw_skel.c', 'aw_skel_load.c', 'mathlib.c')],
             cflags=['-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-Wl,--wrap=malloc'])
 
 

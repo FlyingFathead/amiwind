@@ -19,6 +19,7 @@
 #include "aw_hinged_door.h"
 #include "aw_actors.h"
 #include "aw_msgbox.h"
+#include "aw_tryalloc.h"
 
 #define FILE_NAME "mwscript.awm"
 #define MAX_RESIDENT (1024*1024)
@@ -360,15 +361,15 @@ static int load(void){
     if(!f){Con_Printf("MWScript: no %s in this image.\n",FILE_NAME);return 0;}
     if(length<16 || fread(head,1,16,f)!=16 || memcmp(head,"AWMS",4)){fclose(f);Con_Printf("MWScript: bad file.\n");return 0;}
     wanted=((uint32_t)head[12]<<24)|((uint32_t)head[13]<<16)|((uint32_t)head[14]<<8)|head[15];
-    if(wanted<16 || wanted>MAX_RESIDENT || wanted>(uint32_t)length || !(resident=(unsigned char *)malloc(wanted))){
+    if(wanted<16 || wanted>MAX_RESIDENT || wanted>(uint32_t)length || !(resident=(unsigned char *)AW_TryMalloc(wanted))){
         fclose(f);Con_Printf("MWScript: cannot keep %lu bytes.\n",(unsigned long)wanted);return 0;}
     memcpy(resident,head,16);
     if(fread(resident+16,1,wanted-16,f)!=wanted-16){fclose(f);free(resident);resident=NULL;return 0;}
     fclose(f);resident_bytes=wanted;
     if(!AW_MwvmLoad(resident,resident_bytes,&host)){free(resident);resident=NULL;Con_Printf("MWScript: refused.\n");return 0;}
     n=AW_MwvmTopicCount();
-    topic_offsets=(int *)malloc(sizeof(int)*(n+1));topic_values=(int32_t *)malloc(sizeof(int32_t)*(n+1));
-    topic_names=(char *)malloc(64*(n+1));
+    topic_offsets=(int *)AW_TryMalloc(sizeof(int)*(n+1));topic_values=(int32_t *)AW_TryMalloc(sizeof(int32_t)*(n+1));
+    topic_names=(char *)AW_TryMalloc(64*(n+1));
     if(!topic_offsets || !topic_values || !topic_names){Con_Printf("MWScript: no memory for the journal names.\n");return 0;}
     f=NULL;length=COM_FOpenFile(FILE_NAME,&f);
     base=f?ftell(f):0;     /* the file's start (inside a PAK it is not 0) */

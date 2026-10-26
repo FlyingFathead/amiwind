@@ -15,6 +15,7 @@
 #include "quakedef.h"
 #include "aw_bounds.h"
 #include "aw_world.h"
+#include "aw_tryalloc.h"
 
 cvar_t aw_world_bounds={"aw_world_bounds","0"};   /* not saved: the builder's default-game.cfg sets it */
 static int attempted;
@@ -26,7 +27,7 @@ static int table(void)
     attempted=1;
     n=AW_WorldRegionCentres(NULL,0);
     if(n<1)return 0;
-    centres=(float *)malloc(sizeof(float)*2*n);
+    centres=(float *)AW_TryMalloc(sizeof(float)*2*n);
     if(!centres)return 0;
     AW_WorldRegionCentres(centres,n);
     if(!AW_BoundsBuild(centres,n))Con_Printf("World bounds: the open-world directory does not fit the table; bounds off.\n");

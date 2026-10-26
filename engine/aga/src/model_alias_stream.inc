@@ -87,7 +87,7 @@ int Mod_TryStreamAlias(model_t *mod) {
     int shared=0;
     aliashdr_t *h;maliasskindesc_t *skin;stvert_t *uv;
     long base;int bytes,nv,nt,nf,width,height,i,j,headeroff,modeloff,uvoff,trioff,skinoff,pixeloff,frameoff;
-    size_t total=0,head=0,skinbytes=0;
+    size_t total=0,head=0,skinbytes=0,standard,skelbytes=0;int skelframes=0;
     memset(&s,0,sizeof(s));s.mod=mod;
     if(r_pixbytes!=1 || strlen(mod->name)<4 || strcmp(mod->name+strlen(mod->name)-4,".mdl"))return 0;
     bytes=COM_FOpenFile(mod->name,&s.file);
@@ -120,6 +120,17 @@ int Mod_TryStreamAlias(model_t *mod) {
         if((size_t)(ref[16]|(ref[17]<<8)|(ref[18]<<16)|((unsigned long)ref[19]<<24))!=skinbytes)
             AW_AliasStreamError(&s,"shared skin size");
     }else if(LittleLong(kind.type)!=ALIAS_SKIN_SINGLE)AW_AliasStreamError(&s,"skin type");
+    /* AmiWind skeletal block (aw_skel.h, docs/MODULAR_NPCS.md method C) after the frames: the bytes past an
+     * ordinary MDL of this header must be exactly one block for nv vertices and the model one rest frame;
+     * any other trailing data is refused, as before. */
+    standard=sizeof(disk)+sizeof(kind)+(shared?sizeof(ref):skinbytes)+(size_t)nv*sizeof(stvert_t)+
+             (size_t)nt*sizeof(dtriangle_t)+(size_t)nf*(sizeof(daliasframetype_t)+sizeof(daliasframe_t)+(size_t)nv*sizeof(trivertx_t));
+    if((size_t)bytes>standard){
+        skelbytes=(size_t)bytes-standard;
+        if(skelbytes!=AW_SKEL_BLOCK_HEAD+(size_t)nv*AW_SKEL_VERT_BYTES || nf!=1)AW_AliasStreamError(&s,"trailing member data");
+        if(!AW_AliasBlock(&total,skelbytes) || total>AW_ALIAS_STREAM_LIMIT)AW_AliasStreamError(&s,"size overflow");
+        s.total=(int)total;
+    }
     if(!aw_alias_single_pass.value){
     if(shared)AW_AliasStreamSharedSkin(&s,ref,-1,skinbytes);else AW_AliasStreamCopy(&s,-1,skinbytes);
     AW_AliasStreamCopy(&s,-1,(size_t)nv*sizeof(stvert_t));
@@ -132,6 +143,7 @@ int Mod_TryStreamAlias(model_t *mod) {
         if(!memchr(frame.name,0,sizeof(frame.name)))AW_AliasStreamError(&s,"frame name");
         AW_AliasStreamCopy(&s,-1,(size_t)nv*sizeof(trivertx_t));
     }
+    if(skelbytes)AW_AliasStreamCopy(&s,-1,skelbytes);
     if(s.left)AW_AliasStreamError(&s,"trailing member data");
     }
     if(fseek(s.file,base,SEEK_SET))AW_AliasStreamError(&s,"member rewind");
@@ -178,9 +190,35 @@ int Mod_TryStreamAlias(model_t *mod) {
         for(j=0;j<3;j++){h->frames[i].bboxmin.v[j]=frame.bboxmin.v[j];h->frames[i].bboxmax.v[j]=frame.bboxmax.v[j];}
         AW_AliasStreamCopy(&s,frameoff,(size_t)nv*sizeof(trivertx_t));
     }
+    if(skelbytes){
+        aw_skel_block_t block;int skeloff=AW_AliasStreamAlloc(&s,skelbytes);
+        AW_AliasStreamCopy(&s,skeloff,skelbytes);
+        if(!AW_SkelBlockParse(AW_AliasStreamData(&s)+skeloff,(long)skelbytes,nv,&block))AW_AliasStreamError(&s,"skeletal block");
+        {
+            /* the table may read a file, and a loading callback may move this cache block: take the block's
+             * address again after it */
+            const aw_skel_table_t *table=AW_SkelTableFor(block.table);
+            h=(aliashdr_t *)AW_AliasStreamData(&s);
+            if(table && table->frames==block.frames &&
+               AW_SkelBlockHead((byte *)h+skeloff,(long)skelbytes,nv,&block) && AW_SkelBlockFits(&block,table->bones)){
+                h->aw_skel=skeloff;h->aw_skel_table=table;skelframes=block.frames;
+            }else{
+                /* said once per model, not on every load of it from the cache (SDK-MALLOC-TRAPS-52: at 16 MB the
+                 * refused beast table repeated it 11 times); mod_known entries live for the session */
+                static const model_t *told[64];static int told_count;int k,seen=0;
+                for(k=0;k<told_count;k++)if(told[k]==mod)seen=1;
+                if(!seen){
+                    if(told_count<64)told[told_count++]=mod;
+                    Con_Printf("Skeletal model %s: animation table %s missing or not matching, rest pose\n",mod->name,block.table);
+                }
+                skelframes=nf;
+            }
+        }
+    }
     if(s.left || s.used!=s.total)AW_AliasStreamError(&s,"decoded size mismatch");
     h=(aliashdr_t *)AW_AliasStreamData(&s);m=(mdl_t *)((byte *)h+modeloff);
-    mod->flags=LittleLong(disk.flags);mod->synctype=LittleLong(disk.synctype);mod->numframes=nf;
+    /* a skeletal model's frames are its animation table's (the kit's layouts index them); one is stored */
+    mod->flags=LittleLong(disk.flags);mod->synctype=LittleLong(disk.synctype);mod->numframes=skelbytes?skelframes:nf;
     for(i=0;i<3;i++){mod->mins[i]=m->scale_origin[i];mod->maxs[i]=m->scale_origin[i]+m->scale[i]*255;}
     mod->radius=RadiusFromBounds(mod->mins,mod->maxs)+0.125f;
     mod->type=mod_alias;mod->needload=NL_PRESENT;fclose(s.file);return 1;

@@ -2968,8 +2968,9 @@ def check_calls(lines, reached, modules, run_inside=None):
 # Trace lines that are not repository reads: '@' code entered, '>' run-folder writes, '<' run-folder diagnostics
 # read, '%' storage pool reads, '#' form and directory listings, '$' processes started (B7), '~' run folders a
 # process the trace does not follow was pointed at (BUILD-REUSE-INTRO-CENSUS-REPLACED-48), '^' the checkout files a C
-# compiler the stage started reads (its sources and their include closure; BUILD-CHIM-RECORD-COMPILER-INCOMPLETE-51).
-TRACE_MARKS = ('@', '>', '<', '%', '#', '$', '~', '^')
+# compiler the stage started reads (its sources and their include closure; BUILD-CHIM-RECORD-COMPILER-INCOMPLETE-51),
+# '=' a file a cache that gave the stage a result keys whole (pass_cache.covered_lines, BUILD-KEY-UNIT-RESTORED-CODE-52).
+TRACE_MARKS = ('@', '>', '<', '%', '#', '$', '~', '^', '=')
 
 
 def check_reads(lines, covered, files, root, run_inside=None):
@@ -3084,9 +3085,15 @@ def used_record(lines, index, run_inside=None, reused=False):
 
     def inside(path):
         return bool(run_inside) and (path == run_inside or path.startswith(run_inside + '/'))
-    called, opened, listed, compiled = {}, set(), {}, set()
+    called, opened, listed, compiled, keyed = {}, set(), {}, set(), set()
     for line in lines:
-        if line.startswith('@'):
+        if line.startswith('='):
+            # a file a cache that gave this stage a result keys whole (pass_cache.covered_lines,
+            # BUILD-KEY-UNIT-RESTORED-CODE-52)
+            path = line[1:].strip()
+            if not (inside(path) or path in OUTPUT_NEUTRAL):
+                keyed.add(path)
+        elif line.startswith('@'):
             path, _, name = line[1:].partition('\t')
             if inside(path) or path in OUTPUT_NEUTRAL or (reused and apply_module(path)):
                 continue
@@ -3152,6 +3159,9 @@ def used_record(lines, index, run_inside=None, reused=False):
             continue          # imported: its code is in units
         if path in index.files:
             data[path] = index.files[path]
+    for path in sorted(keyed):
+        if path in index.files:
+            data[path] = index.files[path]       # whole, also when some of its code ran
     listings = {}
     for path, recursive in sorted(listed.items()):
         if not inside(path):
@@ -3504,6 +3514,10 @@ class Recorder:
                     for field in ('files', 'links'):
                         manifest[field] = {path: value for path, value in manifest[field].items() if path not in shared}
                     manifest['deleted'] = [path for path in manifest['deleted'] if path not in shared]
+                    owner = self.manifests[first if writer == 0 else second]
+                    foreign = foreign_directories(manifest['directories'], [*manifest['files'], *manifest['links']],
+                                                  [*owner['files'], *owner['links']], owner['directories'])
+                    manifest['directories'] = [path for path in manifest['directories'] if path not in foreign]
                     manifest['counts'] = {'files': len(manifest['files']),
                                           'bytes': sum(row['size'] for row in manifest['files'].values())}
                     from unit_tree import of_manifest
@@ -3568,6 +3582,27 @@ def attribute(shared, first_writes, second_writes, first_native=(), second_nativ
     if second == shared and not first:
         return 1
     return None
+
+
+def holding_folders(paths):
+    """Every folder that holds one of PATHS (relative, '/'-separated), at any depth."""
+    folders = set()
+    for path in paths:
+        parts = path.split('/')
+        for end in range(1, len(parts)):
+            folders.add('/'.join(parts[:end]))
+    return folders
+
+
+def foreign_directories(directories, own_paths, other_paths, other_directories=()):
+    """The DIRECTORIES a stage recorded that hold none of its own files or links (OWN_PATHS) and that another stage
+    filled (hold one of OTHER_PATHS) or made (OTHER_DIRECTORIES): seen appearing while that stage ran beside it,
+    never its outputs. Its reuse would make them empty before the other stage runs (BUILD-REUSE-FOREIGN-DIRS-52:
+    chim-room-batches, run beside the area stage, recorded intro-scene/area-work/<room>/...; reusing it made the
+    167 empty folders and the area stage's room build stopped on the folder it creates)."""
+    own = holding_folders(own_paths)
+    other = holding_folders(other_paths) | set(other_directories)
+    return {path for path in directories if path not in own and path in other}
 
 
 def load_manifest(run, name):
@@ -3793,14 +3828,34 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
         return ancestors[name]
 
     plans = {}
+    claims = {}   # stage -> the folders its old record fills or makes
+
+    def claimed(name, record):
+        if name not in claims:
+            claims[name] = holding_folders([*record['files'], *record['links']]) | set(record['directories'])
+        return claims[name]
+
+    def foreign_of(name, manifest):
+        # records made before BUILD-REUSE-FOREIGN-DIRS-52 may list folders another stage of the old run filled
+        own = holding_folders([*manifest['files'], *manifest['links']])
+        stray = {path for path in manifest['directories'] if path not in own}
+        if not stray:
+            return set()
+        found = set()
+        for other, record in old_manifests.items():
+            if other != name:
+                found |= stray & claimed(other, record)
+        return found
+
     for name in names:
         if name not in candidates:
             continue
         manifest = manifests[name]
         files = {path: info for path, info in manifest['files'].items() if path not in skips[name]}
+        foreign = foreign_of(name, manifest)
         plans[name] = {'from': str(old_run), 'fingerprint': fingerprints[name], 'files': files,
                        'links': {path: target for path, target in manifest['links'].items() if path not in skips[name]},
-                       'directories': manifest['directories'],
+                       'directories': [path for path in manifest['directories'] if path not in foreign],
                        # records made before BUILD-REUSE-TMP-RECORDED-DELETED-48 may list another stage's reuse
                        # temporaries as deleted: never replayed
                        'deleted': [path for path in manifest['deleted'] if not reuse_temporary(path)],

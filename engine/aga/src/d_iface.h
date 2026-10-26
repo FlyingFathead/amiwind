@@ -202,6 +202,7 @@ typedef struct
 	int			surfheight;	// in mipmapped texels
 	int			light;		// world format 0.12: the placement light level (0 none);
 							// the caller of D_CacheSurface sets it (d_edge.c)
+	int			tint;		// world format 0.13: the placement light tint (0 none, 1-7), set with light
 } drawsurf_t;
 
 extern drawsurf_t	r_drawsurf;

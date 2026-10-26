@@ -28,7 +28,7 @@
 #define CHIM_FORMAT_H
 
 #define CHIM_FORMAT_MAJOR	0
-#define CHIM_FORMAT_MINOR	12
+#define CHIM_FORMAT_MINOR	13
 #define CHIM_FORMAT_MINOR_OLDEST	4	/* the oldest minor of this major the engine reads */
 
 #define CHIM_HEADER_BYTES		32
@@ -54,6 +54,8 @@
 #define CHIM_RECORD_STORY_HIDDEN	2	/* record flag (0.5): hidden by the opening story */
 #define CHIM_LIGHT_MINOR		12	/* the first minor whose record flags carry a light level (docs/chim/INTERIOR_STORE.md) */
 #define CHIM_RECORD_LIGHT_SHIFT	8	/* 0.12: flags bits 8-15, the placement's light level (0 none, 1-255) */
+#define CHIM_TINT_MINOR		13	/* the first minor whose record flags carry a light tint (docs/chim/INTERIOR_STORE.md) */
+#define CHIM_RECORD_TINT_SHIFT	2	/* 0.13: flags bits 2-4, the placement's light tint (0 none, 1-7; r_sky.c) */
 #define CHIM_INDEX_NAME			"chim/world.cwi"
 #define CHIM_STORE_DEFAULT		"chim"	/* the store folder of the exterior world */
 #define CHIM_STORE_CHARS		8		/* a store folder name: 1-8 of a-z 0-9 _ */
@@ -162,6 +164,8 @@ int ChimFormat_RecordPlaced (const unsigned char *p, chim_record_t *out);
 int ChimFormat_RecordBytes (int minor);
 /* 0.12: a record's light level from its flags (0 before 0.12 or none). */
 int ChimFormat_RecordLight (int minor, int flags);
+/* 0.13: a record's light tint from its flags (0 before 0.13 or none, 1-7). */
+int ChimFormat_RecordTint (int minor, int flags);
 /* A store folder name: 1 when valid (1-8 of a-z 0-9 _). */
 int ChimFormat_StoreNameValid (const char *name);
 /* "<store>/<relative>" into out (size bytes); 0 when the name is invalid or it does not fit. */

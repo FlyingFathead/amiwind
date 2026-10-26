@@ -6,8 +6,9 @@ tools/build.py runs it for every real image build, right after the previous-rele
 - the workspace cache (WORKSPACE/cache: unit caches, pass caches, the storage pool) holds no folder this
   user cannot write and no entry owned by another user (a container that ran as root left such entries
   and a release build failed four minutes in);
-- the workspace's file system has room for the build (AMIWIND_MIN_FREE_GIB, default 20; release candidates
-  and finals stop, development builds warn);
+- the workspace's file system has room for the build (AMIWIND_MIN_FREE_GIB, default 35, the maintainer's
+  figure for starters after a tester's public build filled its disk halfway, BUILD-DISK-NEED-UNKNOWN-52; every
+  build stops before its first stage when there is less);
 - the game data folder exists and holds the master file;
 - every town config's entity and model budget fits the engine's tables (tools/map_engine_limits.py
   budget_room: a config may only tighten the engine's limits, BUILD-BUDGET-ENGINE-LIMITS-35);
@@ -27,7 +28,7 @@ import sys
 from pathlib import Path
 
 MIN_FREE_ENV = 'AMIWIND_MIN_FREE_GIB'
-DEFAULT_MIN_FREE_GIB = 20
+DEFAULT_MIN_FREE_GIB = 35
 SHOWN = 5
 
 

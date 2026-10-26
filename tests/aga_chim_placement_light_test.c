@@ -6,6 +6,7 @@
 #include "r_local.h"
 #include "d_local.h"
 #include "chim/chim_format.h"
+#include "aw_sky.h"
 #include <assert.h>
 client_state_t cl;
 dlight_t cl_dlights[MAX_DLIGHTS];
@@ -42,6 +43,7 @@ static void render(int target)
 {
     /* d_edge.c sets the level from the entity being drawn before D_CacheSurface */
     r_drawsurf.light=currententity?currententity->aw_light:0;
+    r_drawsurf.tint=currententity?currententity->aw_tint:0;
     built=D_CacheSurface(&surface,0);
     memcpy(pixels[target],built->data,1024);
 }
@@ -54,6 +56,12 @@ static void records(void)
     assert(ChimFormat_RecordLight(12,0x0003)==0);
     assert(ChimFormat_RecordLight(12,0xff00)==255);
     assert(ChimFormat_RecordLight(13,0x0100)==1);
+    /* minor 13: bits 2-4 are the light tint, beside the level and the low bits */
+    assert(ChimFormat_RecordTint(12,0x801c)==0);
+    assert(ChimFormat_RecordTint(13,0x801c)==7);
+    assert(ChimFormat_RecordTint(13,0x8007)==1);
+    assert(ChimFormat_RecordTint(13,0xff03)==0);
+    assert(ChimFormat_RecordLight(13,0x801f)==0x80);
 }
 
 static void stores(void)
@@ -129,6 +137,26 @@ int main(void)
     r_lamps=0;r_daylight=64;D_FlushCaches();render(0);
     currententity=&placement;render(2);assert(!memcmp(pixels[0],pixels[2],1024));
     r_lamps=1;r_daylight=256;exterior=0;
-    puts("placement light: record levels 11/12, store names and paths, ambient vs level, cache kept per level and rebuilt on a change, fallback and fullbright, outdoors added to the dimmed ambient passed");
+    /* World format 0.13: a placement's light tint picks its table (r_sky.c builds them; a stand-in here) */
+    {
+        static byte tinted[64*256];
+        extern cvar_t aw_warm_light;
+        memset(tinted,7,sizeof tinted);aw_warm_light.value=1;D_FlushCaches();
+        currententity=&placement;placement.aw_light=64;placement.aw_tint=0;render(0);
+        assert(pixels[0][0]!=7);
+        /* a tint whose table is not built yet draws as before and asks r_sky.c for it */
+        r_tint_wanted=0;placement.aw_tint=3;render(1);
+        assert(r_tint_wanted==1<<3&&!memcmp(pixels[0],pixels[1],1024));
+        /* built (r_sky.c flushes the cache after building): drawn through it */
+        r_tint_colormap[3]=tinted;D_FlushCaches();render(1);
+        for(i=0;i<1024;i++)assert(pixels[1][i]==7);
+        /* the cache keys on the tint: the same model untinted, then tinted again */
+        placement.aw_tint=0;render(2);assert(!memcmp(pixels[0],pixels[2],1024));
+        placement.aw_tint=3;render(2);assert(!memcmp(pixels[1],pixels[2],1024));
+        /* aw_warm_light 0 restores the plain table */
+        aw_warm_light.value=0;D_FlushCaches();render(2);assert(!memcmp(pixels[0],pixels[2],1024));
+        r_tint_colormap[3]=NULL;placement.aw_tint=0;
+    }
+    puts("placement light: record levels 11/12, tints 12/13, store names and paths, ambient vs level, cache kept per level and rebuilt on a change, fallback and fullbright, outdoors added to the dimmed ambient, tint tables and the tint cache key passed");
     return 0;
 }

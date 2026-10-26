@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "aw_harvest.h"
 #include "aw_format.h"
+#include "aw_tryalloc.h"
 #define DONE 0x40000000U
 #define EMPTY 0x80000000U
 #define SEED_MASK 0xfffffU
@@ -24,7 +25,7 @@ int AW_HarvestReserve(aw_harvest_t *h,int models,int nodes,int edges,int plants)
     bytes=models*sizeof(aw_harvest_model_t)+nodes*sizeof(aw_harvest_node_t)+
         edges*sizeof(aw_harvest_edge_t)+plants*sizeof(aw_harvest_plant_t);
     if(bytes){
-        p=(unsigned char *)calloc(1,bytes);if(!p)return 0;
+        p=(unsigned char *)AW_TryCalloc(1,bytes);if(!p)return 0;
         h->storage=p;h->storage_bytes=bytes;
         h->model=(aw_harvest_model_t *)p;p+=models*sizeof(*h->model);
         h->node=(aw_harvest_node_t *)p;p+=nodes*sizeof(*h->node);
@@ -47,7 +48,7 @@ unsigned short AW_HarvestIntern(aw_harvest_t *h,const char *s)
         if(!strcmp(s,h->text+at))return (unsigned short)at;
     at=h->text_bytes?h->text_bytes:1;bytes=at+(unsigned)strlen(s)+1;
     if(bytes>AW_HARVEST_TEXT_BYTES)return AW_HARVEST_BAD_TEXT;
-    next=(char *)realloc(h->text,bytes);if(!next)return AW_HARVEST_BAD_TEXT;
+    next=(char *)AW_TryRealloc(h->text,bytes);if(!next)return AW_HARVEST_BAD_TEXT;
     h->text=next;h->text[0]=0;memcpy(next+at,s,bytes-at);h->text_bytes=bytes;
     return (unsigned short)at;
 }

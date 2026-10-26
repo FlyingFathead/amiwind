@@ -325,7 +325,7 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
     order = used_lists(lists, {b.casefold() for _, b, t, *_ in refs if t == 'LEVC'}) if v2 else []
     list_index = {lid: i for i, lid in enumerate(order)}
     # a scale the library has baked models for (keys 'id@S'): those references name the baked models (and say so
-    # in their flags); without them the engine draws the model at the record's scale (U_AW_SCALE)
+    # in their flags); without them the engine draws the model at the record's scale (AWU_SCALE)
     baked_scales = {k.rpartition('@')[2] for k in library if '@' in k}
     copies = sorted({(lid, scaled[n]) for n, b, t, *_ in refs if t == 'LEVC' and n in scaled
                      and '%.4f' % scaled[n] in baked_scales for lid in used_lists(lists, {b.casefold()})})

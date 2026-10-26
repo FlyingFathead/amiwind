@@ -1,6 +1,6 @@
 # MiniWind: the test ground
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.52-dev (26 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -113,6 +113,7 @@ preset, [Build recipes](BUILD_RECIPES.md)); the builder makes one
 | `vivec-palace` | `--miniwind-vivec-palace` | Palace of Vivec: Vivec meditating, interior creatures |
 | `opening-ship` | `--miniwind-opening-ship` | Opening ship: lantern and ship lighting check |
 | `animkit` | `--miniwind-animkit` | Animation kit: walk and run with a companion and hostiles |
+| `anim-stage` | `--miniwind-anim-stage` | Animation stage: skeletal NPCs play every shared-table group |
 | `seyda-chim` | `--miniwind-seyda-chim` | Seyda Neen on CHIM (CHIM-native): arrival, residents, doors |
 | `lava-pools` | `--miniwind-lava-pools` | Molag Mar lava pools: visibility, contact and damage |
 | `redmountain` | `--miniwind-redmountain` | Red Mountain summit: terrain ceiling, standing, high flight |
@@ -122,7 +123,9 @@ Notes: `balmora-exterior` leaves out the interiors, so every door says
 "Area unavailable". `vivec-arena-chim` and `vivec-city-chim` start at the Arena arrival;
 `vivec-palace` and `vivec-arena-pit` use the interior scope: the Vivec frame and only their start room
 (the Palace of Vivec, `vpi015`, where Vivec meditates; the Arena Pit, `vai000`); every other door says "Area unavailable".
-`opening-ship` shows the quick character screen on arrival. `seyda-chim` (since v0.0.36-dev5: Seyda Neen is
+`opening-ship` shows the quick character screen on arrival. `anim-stage` (v0.0.52) is Balmora's exterior with
+skeletal NPCs: on arrival the guard torches are forced on, a cast of NPCs is lined up in front of you and every group
+of the shared animation tables plays one after another ([ANIMKIT.md](ANIMKIT.md), `dbg animkit stage`). `seyda-chim` (since v0.0.36-dev5: Seyda Neen is
 CHIM-native, so it is a MiniWind town) starts at Seyda Neen's arrival with its houses; the Census office and the
 prison ship are left out. `redmountain` (v0.0.43) is the 3 x 3 cells around Red Mountain's summit, the island's
 highest ground, arriving on the summit: for the terrain ceiling over high ground (standing, the terrain drawn from the

@@ -16,14 +16,17 @@ class InteriorPipelineTests(unittest.TestCase):
    with tempfile.TemporaryDirectory() as tmp:
     p=Path(tmp)/'master.esm';p.write_bytes(b'CELL'+struct.pack('<III',len(body),0,0)+body)
     self.assertEqual(read_interior(p,'Fixture')['water_height'],expected)
- def test_scripted_room_architecture_is_retained_without_admitting_unknown_activators(self):
+ def test_scripted_room_architecture_and_activators_are_retained_but_effects_are_not(self):
+  # INTERIOR-ACTIVATORS-LEFT-OUT-52: activators are kept (until v0.0.52 only known ones were, the heart of Lorkhan
+  # among the left out); liquids and effects, deleted references and editor markers stay out
   from mwad.interior import select_geometry
   room={'number':172861,'id':'CharGen Stuff Room','type':'ACTI','model':'i\\In_C_plain_room_side.NIF'}
-  unknown=dict(room,number=2,id='unknown activator')
+  other=dict(room,number=2,id='furn_de_bar_01')
   deleted=dict(room,number=3,deleted=True)
   wrong_model=dict(room,number=4,model='EditorMarker.NIF')
-  selected,omitted=select_geometry({'refs':[room,unknown,deleted,wrong_model]})
-  self.assertEqual(selected,[room]);self.assertEqual(len(omitted),3)
+  effect=dict(room,number=5,id='steam_lavariver')
+  selected,omitted=select_geometry({'refs':[room,other,deleted,wrong_model,effect]})
+  self.assertEqual(selected,[room,other]);self.assertEqual(len(omitted),3)
  def test_constant_uv_lighting_has_finite_face_sample(self):
   p=np.array([[0.,0,0],[16.,0,0],[0,16.,0]])
   light={'ambient':[80,80,80],'lights':[]}

@@ -186,6 +186,13 @@ def bake_task(task):
     if not shapes:
         raise ValueError('no visible geometry')
     budgets = (profile['budget'],) if profile else BUDGETS
+    if profile and profile.get('encoding') == 'shared-vertex':
+        # the whole original model, as the gallery bakes it (npc_geometry.shared_vertex_mdl: every triangle on the
+        # original vertices, at most 1,999; Dagoth Ur's 2,254 triangles, CREATURE-DAGOTH-UR-ABSENT-52)
+        from npc_geometry import shared_vertex_mdl
+        frames, faces, uv, skin = shared_vertex_mdl(shapes, materials, textures, palette)
+        raw = animated_mdl(frames, faces, uv, skin, vertex_limit=1999)
+        budgets = ()
     for budget in budgets:
         try:
             frames, faces, uv, skin = bake(shapes, materials, textures, palette, budget=budget,

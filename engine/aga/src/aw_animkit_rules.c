@@ -71,11 +71,23 @@ int AW_AnimKitParse(int argc,const char **argv,aw_animkit_cmd_t *out) {
     if(same(w,"off") && argc==2){out->kind=AW_ANIMKIT_OFF;return 1;}
     if(same(w,"list") && argc==2){out->kind=AW_ANIMKIT_LIST;return 1;}
     if(same(w,"stop") && argc==2){out->kind=AW_ANIMKIT_STOP;return 1;}
+    if(same(w,"groups") && argc==2){out->kind=AW_ANIMKIT_GROUPS;return 1;}
+    if(same(w,"cycle") && (argc==2 || (argc==3 && same(argv[2],"all")))){
+        out->kind=AW_ANIMKIT_CYCLE;out->count=argc==3;return 1;
+    }
+    if(same(w,"stage") && argc<=3){
+        int n=AW_ANIMKIT_STAGE_MAX;const char *q;
+        if(argc==3){
+            for(n=0,q=argv[2];*q>='0' && *q<='9' && n<100;q++)n=n*10+(*q-'0');
+            if(q==argv[2] || *q || n<1 || n>AW_ANIMKIT_STAGE_MAX){reason(out,"stage 1..8");return 0;}
+        }
+        out->kind=AW_ANIMKIT_STAGE;out->count=n;return 1;
+    }
     if(same(w,"play") && argc==3){
-        int g=AW_AnimKitEngineGroup(argv[2]);
-        if(g<0){reason(out,AW_AnimKitFind(argv[2])<0?"unknown group":"not wired yet");return 0;}
-        out->kind=AW_ANIMKIT_PLAY;out->group=g;
-        strncpy(out->name,argv[2],sizeof(out->name)-1);
+        /* a wired name plays its engine group; any other is looked up in the target's animation table */
+        if(strlen(argv[2])>=sizeof(out->name) || !argv[2][0]){reason(out,"unknown group");return 0;}
+        out->kind=AW_ANIMKIT_PLAY;out->group=AW_AnimKitEngineGroup(argv[2]);
+        strcpy(out->name,argv[2]);
         return 1;
     }
     if(same(w,"speed") && argc==3){
@@ -88,4 +100,21 @@ int AW_AnimKitParse(int argc,const char **argv,aw_animkit_cmd_t *out) {
     }
     reason(out,"unknown subcommand");
     return 0;
+}
+
+int AW_AnimKitSpanFrame(unsigned first,unsigned last,float rate,float *t,float dt,int loop,int *done) {
+    int frames=last>=first?(int)(last-first)+1:1,f;float span;
+    if(done)*done=0;
+    if(!(rate>0))rate=8;
+    if(!(dt>=0))dt=0;
+    span=(float)frames/rate;
+    *t+=dt;
+    if(*t>=span){
+        if(loop){while(*t>=span)*t-=span;}
+        else{*t=span;if(done)*done=1;return (int)first+frames-1;}
+    }
+    if(*t<0)*t=0;
+    f=(int)(*t*rate);              /* small values only: frames into one group */
+    if(f>=frames)f=frames-1;
+    return (int)first+f;
 }

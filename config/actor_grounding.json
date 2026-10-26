@@ -27,6 +27,10 @@
       "mode": "levitating",
       "reason": "Source creature vivec_god, r/LordVivec.NIF; preserve the maintainer-confirmed levitating pose."
     },
+    "heart_akulakhan": {
+      "mode": "levitating",
+      "reason": "The Heart of Lorkhan hangs where the game places it in Akulakhan's Chamber: its authored position is kept, no floor snap (CREATURE-DAGOTH-UR-ABSENT-52)."
+    },
     "dead orc male_02": {
       "mode": "authored_dead",
       "reason": "Authored initially dead NPC; preserve the converted death pose and placement."
@@ -227,6 +231,8 @@
     "culumaire",
     "cun",
     "daglin selarar",
+    "dagoth_ur_1",
+    "dagoth_ur_2",
     "dakin kuntarnammu",
     "dals sadri",
     "dalse adren",

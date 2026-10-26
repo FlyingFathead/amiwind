@@ -461,7 +461,7 @@ static float SV_AliasScale (edict_t *ent)
 void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 {
     int		e, i;
-    int		bits;
+    int		bits, frame, aw;
     float	scale;
     byte	*pvs;
     vec3_t	org;
@@ -498,7 +498,9 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
         }
 
         scale = SV_AliasScale (ent);
-        if (msg->maxsize - msg->cursize < (scale != 1 ? 20 : 16))
+        frame = (int)ent->v.frame;
+        aw = (scale != 1 ? AWU_SCALE : 0) | (frame > 255 ? AWU_FRAME2 : 0);
+        if (msg->maxsize - msg->cursize < 16 + (aw ? 1 : 0) + (aw & AWU_SCALE ? 4 : 0) + (aw & AWU_FRAME2 ? 1 : 0))
         {
             Con_Printf ("packet overflow\n");
             return;
@@ -526,8 +528,8 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
         if (ent->v.movetype == MOVETYPE_STEP)
             bits |= U_NOLERP;	// don't mess up the step animation
 
-        if (scale != 1)
-            bits |= U_AW_SCALE;
+        if (aw)
+            bits |= U_AW_EXT;
 
         if (ent->baseline.colormap != ent->v.colormap)
             bits |= U_COLORMAP;
@@ -535,7 +537,8 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
         if (ent->baseline.skin != ent->v.skin)
             bits |= U_SKIN;
 
-        if (ent->baseline.frame != ent->v.frame)
+        /* a frame over 255 is always sent whole: the client's baseline holds one byte of it */
+        if (ent->baseline.frame != ent->v.frame || frame > 255)
             bits |= U_FRAME;
 
         if (ent->baseline.effects != ent->v.effects)
@@ -565,7 +568,7 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
         if (bits & U_MODEL)
             MSG_WriteByte (msg,	ent->v.modelindex);
         if (bits & U_FRAME)
-            MSG_WriteByte (msg, ent->v.frame);
+            MSG_WriteByte (msg, frame & 255);
         if (bits & U_COLORMAP)
             MSG_WriteByte (msg, ent->v.colormap);
         if (bits & U_SKIN)
@@ -584,8 +587,14 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
             MSG_WriteCoord (msg, ent->v.origin[2]);
         if (bits & U_ANGLE3)
             MSG_WriteAngle(msg, ent->v.angles[2]);
-        if (bits & U_AW_SCALE)
-            MSG_WriteFloat (msg, scale);
+        if (bits & U_AW_EXT)
+        {
+            MSG_WriteByte (msg, aw);
+            if (aw & AWU_SCALE)
+                MSG_WriteFloat (msg, scale);
+            if (aw & AWU_FRAME2)
+                MSG_WriteByte (msg, (frame >> 8) & 255);
+        }
     }
 }
 

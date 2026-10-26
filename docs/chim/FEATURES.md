@@ -1,6 +1,6 @@
 # CHIM feature tracker
 
-_Generated from `docs/chim/features.json` with AmiWind v0.0.51._
+_Generated from `docs/chim/features.json` with AmiWind v0.0.52._
 
 <!-- Generated whole by tools/chim_features.py render from docs/chim/features.json; do not edit by hand. -->
 

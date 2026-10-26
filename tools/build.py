@@ -216,6 +216,8 @@ def parser():
     p.add_argument('--gallery-seed-run', type=Path, help='Import completed compatible model pairs from a stopped rc9 build run')
     p.add_argument("--anim-kit", choices=("on", "off"), default="on",
                    help="The animation kit (docs/ANIMKIT.md): on (default) = residents get the react+full kit, so companions and fighters walk and run by speed; off = the previous 8 idle frames (--npc-anim idle). --npc-anim picks a profile directly and wins over this switch")
+    p.add_argument("--npc-anim-type", type=int, choices=(1, 2), default=2,
+                   help="Actor motion (docs/ANIMKIT.md): 2 (default) = skeletal, one rest frame on its skeleton's shared table, no movers, no baked frames; 1 = the baked kit as before")
     p.add_argument("--npc-anim", choices=("idle", "react", "move", "full", "react+full"), default=None,
                    help="NPC animation groups per resident model (config/npc-anim-kit.json, docs/ANIMATION.md); default from --anim-kit (on: react+full, off: idle): idle = the previous 8 idle frames; react adds hit and death; move adds walk and run; full adds swim, knockdown and a hand-to-hand attack; react+full (project decision for the next release) = react standing models plus a full model each actor wears only while it moves")
     p.add_argument("--no-npc-gallery", action="store_true", help="DEBUGGING ONLY: omit inspection gallery, never required game NPCs; gallery included by default. The image says so in game: dbg npcgallery and the other gallery commands print a built-without-the-NPC-gallery notice. Same as --exclude npc-gallery")
@@ -1294,6 +1296,9 @@ def chim_interior_commands(args, steps, tool, run, tools, jobs):
         'chim_interiors.py', *[part for s in sources for part in ('--rooms-from', s)],
         '--palette', run / 'intro-scene/id1/gfx/palette.lmp', '--out', run / 'chim-interiors',
         '--qbsp', tools['qbsp'], '--unit-cache', args.workspace / 'cache/chim-units', '--jobs', jobs,
+        # the early room heap check on the store (ROOM-AKULAKHAN-HEAP-52): the target structure sizes, as the image's
+        # room heap gate probes them
+        *(['--sdk', args.sdk] if getattr(args, 'sdk', None) else []),
         # the rooms leave the harvestable plants out; the image places them as harvest entities, as the CHIM world
         # does outdoors (CHIM-ROOM-HARVEST-DOUBLE-48; --no-harvest: no harvest stage, the plants stay placed meshes)
         *(['--harvest', run / 'harvest', '--data-files', args.data_files] if 'harvest' in names else []))))
@@ -1860,6 +1865,8 @@ def commands(args, tools, run):
         steps = build_exclusions.apply(steps, groups, run=run, area_cells=getattr(args, 'closure_cells', None),
                                        data_files=args.data_files,
                                        closure_groups=getattr(args, 'unreferenced_groups', None))
+    if 'chim-interiors' not in dict(steps):  # an exterior MiniWind: no store (MINIWIND-EXTERIOR-CHIM-INTERIORS-52)
+        steps = [(n, _drop_option(c, '--chim-interiors') if n == 'image' else c) for n, c in steps]
     # a filter that left the harvest stage out: the CHIM rooms keep their plants (CHIM-ROOM-HARVEST-DOUBLE-48)
     if not any(name == 'harvest' for name, _ in steps):
         steps = [(name, _drop_option(_drop_option(command, '--harvest'), '--data-files')
@@ -2465,6 +2472,7 @@ def provenance(args, tools):
                                'cells': getattr(args, 'closure_cells', None)}
                               if 'unreferenced' in (getattr(args, 'exclude_groups', None) or []) else None),
         "npc_anim": getattr(args, "npc_anim", "idle"),
+        "npc_anim_type": int(getattr(args, "npc_anim_type", 2) or 2),
         "npc_models": getattr(args, "npc_models", "whole"),
         "stage": args.stage, "hands": args.hands if args.stage == "aga" else None,
         "python": sys.version, "data_files": str(args.data_files), "tools": tools,
@@ -2942,6 +2950,13 @@ def export_option_environment(args, announce=True):
             print(f'NPC animation kit: {args.npc_anim} (docs/ANIMATION.md)', flush=True)
     else:
         os.environ.pop('AMIWIND_NPC_ANIM', None)
+    # Actor animation type (npc_anim.py reads AMIWIND_NPC_ANIM_TYPE; in the resident keys). Default 2: removed.
+    if int(getattr(args, 'npc_anim_type', 2) or 2) == 1:
+        os.environ['AMIWIND_NPC_ANIM_TYPE'] = '1'
+        if announce:
+            print('NPC animation type: 1 (the baked kit)', flush=True)
+    else:
+        os.environ.pop('AMIWIND_NPC_ANIM_TYPE', None)
     # Converter workers read these from the environment (off unless given).
     from scenery_reduce import apply_options as apply_scenery_reduce_options
     apply_scenery_reduce_options(args)
@@ -2967,9 +2982,8 @@ def export_option_environment(args, announce=True):
     STAIR_WALK_ENV = 'AMIWIND_STAIR_WALK'  # tools/stair_walk.py SCOPE_ENV
     stair_scope = stair_walk_scope(VERSION, getattr(args, 'stair_walk', 'auto'))
     os.environ[STAIR_WALK_ENV] = stair_scope
-    # The stair walk's reuse (BUILD-CHIM-STAIR-WALK-UNCACHED-36): bookkeeping only, the rows are the same either way.
-    # tools/stair_walk.py WALK_CACHE_ENV / WALK_SAMPLE_ENV / WALK_SAMPLE_DEFAULT (not imported: it needs numpy,
-    # which the builder must not load before the tools exist; tests/test_chim_stair_cache.py checks they agree)
+    # The stair walk's reuse (BUILD-CHIM-STAIR-WALK-UNCACHED-36): tools/stair_walk.py's names, not imported (numpy);
+    # tests/test_chim_stair_cache.py checks they agree
     WALK_CACHE_ENV, WALK_SAMPLE_ENV, WALK_SAMPLE_DEFAULT = 'AMIWIND_STAIR_WALK_CACHE', 'AMIWIND_STAIR_WALK_SAMPLE', 2
     # end users (no --developer-mode) take the known-good stair records shipped with the source; development builds
     # walk what changed (B14, v0.0.42 plan 1.0b)
@@ -3295,17 +3309,14 @@ def main(argv=None):
                 print(note, flush=True)
             # Seconds-long checks before any stage: cache ownership, free space, game data (build_preflight.py).
             import build_preflight
-            from previous_release import is_release_version
             problems = build_preflight.run(args.workspace, getattr(args, 'data_files', None), space=False)
             preflight_builder = resolve_builder(args)
             if preflight_builder['builder'] == 'chim':
                 problems += build_preflight.grounding_problems(getattr(args, 'data_files', None),
                                                                preflight_builder['chim_areas'])
-            space = build_preflight.free_space_problems(args.workspace)
-            if is_release_version(VERSION):
-                problems += space  # release builds stop; development builds only warn
-            for warning in ([] if is_release_version(VERSION) else space):
-                print('WARNING: build preflight: ' + warning, flush=True)
+            # Every build stops on too little room, before any stage (fail fast: a tester's public build filled its
+            # disk halfway, BUILD-DISK-NEED-UNKNOWN-52); AMIWIND_MIN_FREE_GIB sets the minimum.
+            problems += build_preflight.free_space_problems(args.workspace)
             if problems:
                 raise ValueError('Build preflight failed before any stage:\n  ' + '\n  '.join(problems))
         if getattr(args, 'accept_known_stair_findings', None):

@@ -237,6 +237,15 @@ def shell_room(root, index, refs, entry, label, timings, point_entities, texture
     return report
 
 
+def room_folder(root):
+    """ROOT made for one room build: new, or holding only empty folders (another stage's reuse made them,
+    BUILD-REUSE-FOREIGN-DIRS-52: no earlier room). A file in it stops the room (FileExistsError)."""
+    root = Path(root)
+    if not (root.is_dir() and not any(path.is_file() or path.is_symlink() for path in root.rglob('*'))):
+        root.mkdir(parents=True, exist_ok=False)
+    return root
+
+
 def build_room(task):
     data, scene, entry, qbsp, vis, light, timings = task[:7]
     # Optional (vis threads, vis mode); older 7-field tasks keep -threads 1 -fast.
@@ -252,8 +261,7 @@ def build_room(task):
         # the cell, its lights and arrivals with the offset subtracted, before anything is converted.
         from town_interiors import recentre_cell
         cell = recentre_cell(cell, entry['recentre'])
-    root = scene/'area-work'/slug
-    root.mkdir(parents=True, exist_ok=False)
+    root = room_folder(scene/'area-work'/slug)
     refs, omitted = select_geometry(cell, harvest_references=entry.get('harvest_references', ()),
                                     harvest_master_sha256=entry.get('harvest_master_sha256'))
     profiles = {}
@@ -665,6 +673,75 @@ def anim_fallbacks(models):
             if record.get('anim_fallback')]
 
 
+def greeting_voice(assets,greeting,ffmpeg):
+    """(WAV bytes, seconds) of a resident's greeting: 11025 Hz 8-bit mono, at most 15 seconds."""
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp=Path(tmp);(tmp/'voice.mp3').write_bytes(assets.read('sound/'+greeting['voice']))
+        subprocess.run([ffmpeg,'-v','error','-nostdin','-i',str(tmp/'voice.mp3'),
+                        '-ac','1','-ar','11025','-c:a','pcm_u8',str(tmp/'voice.wav')],check=True)
+        with wave.open(str(tmp/'voice.wav')) as sound:
+            duration=sound.getnframes()/sound.getframerate()
+            if duration>15:raise ValueError('Greeting exceeds 15-second budget')
+        return (tmp/'voice.wav').read_bytes(),duration
+
+
+_resident_guards={}
+
+
+def _guard_torch(key,data,assets,appearance,palette):
+    """A skeletal guard's torch item (prepare_guard_torches.torch_item) when the guard carries the original torch
+    (guard_eligibility: a guard class with a carryable torch light in its inventory), else None. The baked guards
+    (--npc-anim-type 1) get theirs from the image step's guard torch registry instead."""
+    import prepare_guard_torches as G
+    if key not in _resident_guards:
+        npcs,lights,mesh=G.guard_sources(child_ci(data,'Morrowind.esm'))
+        _resident_guards[key]={'npcs':npcs,'lights':lights,'mesh':mesh,'items':{}}
+    guards=_resident_guards[key]
+    fields=guards['npcs'].get(appearance['id'].casefold())
+    if fields is None or not G.guard_eligibility(fields,guards['lights'],guards['mesh'])[1]:
+        return None
+    shade=hashlib.sha256(palette).hexdigest()
+    if shade not in guards['items']:
+        guards['items'][shade]=G.torch_item(assets,guards['mesh'],palette,_resident_rigs[(key,appearance['skeleton'])].N)
+    return guards['items'][shade]
+
+
+def _skeletal_resident(task, profile_name, profile, key, assets):
+    """build_resident's --npc-anim-type 2 bake (skeletal_actor.skeletal_resident): the model, its layout on the
+    table's frames (no mover), its carried items' skeletal tag (AWTS1, SKEL-ITEM-TAGS-52), sounds and voice as the
+    kit bake gives them; the table itself rides along (record['anim']['_table'], written once by npc_anim.publish).
+    No near/far levels: those are baked idle frames (--npc-lod)."""
+    import npc_anim
+    import skeletal_actor
+    data, palette, appearance, greeting, ffmpeg = task[:5]
+    def rig_of(path):
+        rig=(key,path)
+        if rig not in _resident_rigs:_resident_rigs[rig]=Skeleton(assets,path)
+        return _resident_rigs[rig]
+    raw,groups,skel,tag,items=skeletal_actor.skeletal_resident(key,assets,appearance,palette,profile,rig_of,
+                                                               torch=_guard_torch(key,data,assets,appearance,palette))
+    table_bytes,_,_,table_path,_,_=skeletal_actor.game_table(key,appearance,rig_of)
+    foot=appearance.get('foot','bare')
+    if key not in _resident_sounds:
+        _resident_sounds[key]=npc_anim.soun_records(child_ci(data,'Morrowind.esm'))
+    lines={t:[(s,tuple(tuple(x) for x in c) if c else None) for s,c in v] for t,v in (appearance.get('voices') or {}).items()}
+    barks=npc_anim.voice_words(lines)
+    described=[{k:v for k,v in g.items() if k!='events'}|{'events':[list(e) for e in g['events']]} for g in groups]
+    anim={'type':2,'profile':profile_name,'layout':(npc_anim.layout(groups,foot)+' '+barks).strip(),'foot':foot,
+          'voices':{t:[[s,[list(x) for x in c] if c else None] for s,c in v] for t,v in lines.items()},
+          'groups':described,'skeletal':skel,'frame_bytes':0,
+          '_sounds':npc_anim.sound_payload(assets,_resident_sounds[key],npc_anim.needed_sounds(groups,foot)),
+          '_table':(table_path,table_bytes)}
+    voice,duration=greeting_voice(assets,greeting,ffmpeg)
+    lo=np.asarray(skel['model']['box_lo']);hi=lo+255*np.asarray(skel['model']['box_step'])
+    record={'appearance':appearance,'greeting':greeting,
+        'step':float(groups[0]['step']),'triangles':skel['model']['faces'],'frames':skel['table_frames'],
+        'bounds':[lo.tolist(),hi.tolist()],
+        'sha256':hashlib.sha256(raw).hexdigest(),'voice_seconds':duration,'anim':anim,
+        **({'_item_tag':tag,'_items':items} if tag else {})}
+    return appearance['id'],raw,voice,record
+
+
 def _bake_resident(task, profile_name):
     # Optional 6th field: the near/far model settings (tools/npc_lod.py task_settings);
     # older 5-field tasks bake the single model as before.
@@ -679,6 +756,11 @@ def _bake_resident(task, profile_name):
     import npc_anim
     profile=npc_anim.plan_profile(profile_name)
     kit=None
+    if npc_anim.anim_type()==2 and not dead:
+        # --npc-anim-type 2 (the default): one rest frame on the shared table of its skeleton, every group of the
+        # profile played from the table's frames, no mover (docs/MODULAR_NPCS.md "Runtime method C"). An actor that
+        # starts dead keeps its one baked death pose below: one frame, as a static model.
+        return _skeletal_resident(task,profile_name,profile,key,assets)
     if dead:times,step=np.array([skeleton.events['death1: stop']]),0.
     elif profile_name=='idle':times,step=skeleton.idle_times(8)   # the previous method, unchanged
     else:
@@ -759,16 +841,7 @@ def _bake_resident(task, profile_name):
     # models on the hand bones' per-frame tags (tools/npc_items.py; NPC-WEAPON-MESH-33).
     tag,items,mover_tag=(None,{},None) if dead else (npc_items.resident_items(assets,palette,appearance,kit or skeleton,item_times)+(None,)
         if mover_item_times is None else npc_items.resident_items(assets,palette,appearance,kit,item_times,mover_item_times))
-    voice=b'';duration=0.
-    if not dead:
-      with tempfile.TemporaryDirectory() as tmp:
-          tmp=Path(tmp);(tmp/'voice.mp3').write_bytes(assets.read('sound/'+greeting['voice']))
-          subprocess.run([ffmpeg,'-v','error','-nostdin','-i',str(tmp/'voice.mp3'),
-                          '-ac','1','-ar','11025','-c:a','pcm_u8',str(tmp/'voice.wav')],check=True)
-          with wave.open(str(tmp/'voice.wav')) as sound:
-              duration=sound.getnframes()/sound.getframerate()
-              if duration>15:raise ValueError('Greeting exceeds 15-second budget')
-          voice=(tmp/'voice.wav').read_bytes()
+    voice,duration=(b'',0.) if dead else greeting_voice(assets,greeting,ffmpeg)
     record={'appearance':appearance,'greeting':greeting,
         'step':float(step),'triangles':facts['triangles'],'frames':facts['frames'],
         'bounds':facts['bounds'],

@@ -6,6 +6,7 @@
 #include "sound.h"
 #include "aw_miniwind.h"
 #include "aw_testbox.h"
+#include "aw_tryalloc.h"
 /* CHIM's extra-memory step (chim_world.c sets it; NULL without CHIM): op 0
  * measures and takes the memory, 1 fills the notice's two lines (1: shown),
  * 2 skips it for this start (1: done), 3 ends the notice. */
@@ -36,6 +37,11 @@ static int debug_return_dest,debug_music_paused,debug_pending,debug_drain_until;
 static int holding;static byte prompt_colour;
 static long pictures,dropped;
 static double started;
+/* The Fast RAM warning box before the startup logo (draw_ram_warning): up, shown once, its time to go on. */
+static int ram_warning,ram_warning_shown;
+static double ram_warning_until;
+static void draw_ram_warning(void);
+static void ram_warning_done(void);
 static unsigned long be32(byte *p){return ((unsigned long)p[0]<<24)|((unsigned long)p[1]<<16)|((unsigned long)p[2]<<8)|p[3];}
 static void close_movie(void){
     debug_pending=holding=0;
@@ -47,7 +53,7 @@ static void close_movie(void){
     if(opening_card)free(opening_card);
     opening_card=NULL;
 }
-int AW_MovieActive(void){return buffers!=NULL;}
+int AW_MovieActive(void){return buffers!=NULL || ram_warning;}
 int AW_MovieDebugActive(void){return debug_pending || (buffers!=NULL && branding==2);}
 int AW_MovieDebugPending(void){return debug_pending;}
 static int card_visible(void){return buffers && !debug_pending && opening_card && intro_text_overlay.value && shown>=card_first && shown<card_end;}
@@ -58,7 +64,7 @@ static void load_opening_card(void){
     if(n!=16+768+MAX_PIXELS || fread(h,1,16,f)!=16 || memcmp(h,"AWT1",4))goto done;
     card_first=be32(h+4);card_end=be32(h+8);
     if(card_first<0 || card_end<=card_first || card_end>frames || be32(h+12))goto done;
-    opening_card=malloc(768+MAX_PIXELS);
+    opening_card=AW_TryMalloc(768+MAX_PIXELS);
     if(opening_card && fread(opening_card,1,768+MAX_PIXELS,f)!=768+MAX_PIXELS){free(opening_card);opening_card=NULL;}
 done:
     fclose(f);
@@ -133,14 +139,16 @@ static void draw_memory_notice(void){
     char first[48],second[48],row[48];long luma,top=-1;int i,n,extra,y=4;byte colour=0;const char *p;
     if(branding!=1)return;
     extra=aw_chim_memory && aw_chim_memory(1,first,second,sizeof(first));
-    if(!extra && !aw_fast_ram_screen[0])return;
+    /* after the Fast RAM warning box the same news is not said again over the logo (RAM-WARNING-BOX-52: at 16 MB
+     * it ran across the logo's top rows) */
+    if(!extra && (!aw_fast_ram_screen[0] || ram_warning_shown))return;
     for(i=0;i<256;i++){
         luma=buffers->palette[i*3]*299L+buffers->palette[i*3+1]*587L+buffers->palette[i*3+2]*114L;
         if(luma>top){top=luma;colour=(byte)i;}
     }
     if(extra){draw_line(first,4,colour);draw_line(second,14,colour);y=26;}
     /* The Fast RAM note under it, one row per '\n' (never waits for a key). */
-    for(p=aw_fast_ram_screen;*p;y+=10){
+    for(p=ram_warning_shown?"":aw_fast_ram_screen;*p;y+=10){
         for(n=0;p[n] && p[n]!='\n' && n<(int)sizeof(row)-1;n++)row[n]=p[n];
         row[n]=0;draw_line(row,y,colour);
         p+=n;while(*p && *p!='\n')p++;
@@ -166,7 +174,7 @@ static int start_movie(char *path,int brand){
     if(frames<1 || frames>18000 || samples!=(frames*RATE+9)/10)goto invalid;
     expected=DATA_START+frames*pixels+samples;
     if(size!=expected || !shm || shm->speed!=RATE)goto invalid;
-    buffers=malloc(sizeof(*buffers));if(!buffers)goto invalid;
+    buffers=AW_TryMalloc(sizeof(*buffers));if(!buffers)goto invalid;
     if(fread(buffers->palette,1,768,video)!=768 || fread(buffers->frame,1,pixels,video)!=(size_t)pixels)goto invalid;
     audio_size=COM_FOpenFile(path,&audio);
     audio_start=DATA_START+frames*pixels;
@@ -195,10 +203,49 @@ void AW_MovieStartup(void){
     if(AW_TestBootExec())return;
     startup_continue();
 }
+/* Under the 32 MB Fast RAM minimum (RAM-WARNING-BOX-52; the maintainer, 26 October 2026, word for word): a
+ * message box before the startup logo, the text centered; ENTER, Space or Esc goes on, or it goes on by itself
+ * after RAM_WARNING_SECONDS (never a block). Only where the logo is shown: a test start skips both. */
+#define RAM_WARNING_TITLE "WARNING"
+#define RAM_WARNING_TEXT "AmiWind requires at least 32MB of Fast RAM to run properly. Less than 32MB of Fast RAM " \
+    "was detected. This will mean that parts of the game will run incorrectly or not at all."
+#define RAM_WARNING_SECONDS 5
+static void startup_logo(void){
+    if(!start_movie("intro/amiwind.awv",1))Cbuf_AddText((char *)AW_MiniwindAfterLogo());
+}
+static void ram_warning_done(void){
+    ram_warning=0;IN_AWClearButtons();Key_ClearStates();
+    Con_Printf("Fast RAM warning: continued.\n");
+    startup_logo();
+}
+static void draw_ram_warning(void){
+    char line[128];const char *p;int lines=0,lh,w,h,x,y,i,gold,text;
+    if(!vid.buffer)return;
+    /* black around the box: index 0 of the game palette is not black (the 16 MB still showed parchment) */
+    i=AW_UIColor(0,0,0);
+    for(y=0;y<(int)vid.height;y++)memset(vid.buffer+y*vid.rowbytes,i,vid.width);
+    lh=AW_UIHeight();if(lh<8)lh=8;
+    w=vid.width-16<300?vid.width-16:300;
+    for(p=RAM_WARNING_TEXT;*p && lines<12;lines++)p=AW_UILine(p,w-16,line,sizeof(line));
+    h=8+lh+6+lines*lh+8;
+    x=(vid.width-w)/2;y=(vid.height-h)/2;
+    gold=AW_UIColor(223,199,144);text=AW_UIColor(200,184,150);
+    AW_UIBox(x,y,w,h);
+    AW_UITextBox(x,y+8,w,lh,RAM_WARNING_TITLE,gold);
+    for(i=0,p=RAM_WARNING_TEXT;*p && i<lines;i++){
+        p=AW_UILine(p,w-16,line,sizeof(line));
+        AW_UITextBox(x+8,y+8+lh+6+i*lh,w-16,lh,line,text);
+    }
+}
 /* The startup logo, unless a test start-up option or test.cfg already chose (aw_testbox.c). */
 static void startup_continue(void){
     if(AW_TestBootSkipLogo()){if(aw_chim_memory)aw_chim_memory(3,NULL,NULL,0);return;}
-    if(!start_movie("intro/amiwind.awv",1))Cbuf_AddText((char *)AW_MiniwindAfterLogo());
+    if(aw_fast_ram_screen[0] && !ram_warning_shown){
+        ram_warning=ram_warning_shown=1;ram_warning_until=Sys_FloatTime()+RAM_WARNING_SECONDS;
+        Con_Printf("Fast RAM warning: under 32 MB; ENTER goes on (or %d s).\n",RAM_WARNING_SECONDS);
+        return;
+    }
+    startup_logo();
 }
 static int catalogue_path(char *request,char *out,int capacity){
     FILE *f=NULL;char line[128],name[32],file[64],expected[64];int size,id,n,previous=0,wanted=-1,i,numeric=1;
@@ -240,7 +287,9 @@ static void playvid(void){
     IN_AWClearButtons();Key_ClearStates();key_dest=key_game;
 }
 void AW_MovieUpdate(void){
-    long position,frame;if(!buffers)return;
+    long position,frame;
+    if(ram_warning){if(Sys_FloatTime()>=ram_warning_until)ram_warning_done();return;}
+    if(!buffers)return;
     if(debug_pending){
         if(sound_started && shm && snd_blocked<=0 && soundtime<debug_drain_until)return;
         if(sound_started && shm && snd_blocked<=0){if(soundtime>paintedtime)paintedtime=soundtime;S_ClearBuffer();clock_start=soundtime;}
@@ -279,6 +328,7 @@ void AW_MoviePaint(portable_samplepair_t *dst,int count,int first_sample){
 }
 void AW_MovieDraw(void){
     int x,y;byte *row,*src;
+    if(ram_warning){draw_ram_warning();return;}
     if(!buffers || debug_pending || !vid.buffer || vid.width!=320 || vid.height!=200)return;
     for(y=0;y<200;y++){
         row=vid.buffer+y*vid.rowbytes;
@@ -291,6 +341,10 @@ void AW_MovieDraw(void){
     draw_memory_notice();
 }
 int AW_MovieKey(int key,int down){
+    if(ram_warning){
+        if(down && (key==K_ENTER || key==K_SPACE || key==K_ESCAPE || key==K_MOUSE1))ram_warning_done();
+        return 1;
+    }
     if(!buffers)return 0;
     if(debug_pending && down && key==K_ESCAPE){
         close_movie();IN_AWClearButtons();Key_ClearStates();key_dest=debug_return_dest;V_UpdatePalette();

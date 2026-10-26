@@ -389,6 +389,59 @@ def _equipment(assets, appearance, layer, samples, mesh, palette):
     return equipment, emitters
 
 
+def guard_sources(master):
+    """({NPC id: fields}, LIGH records, the torch mesh) of the master, read once: what guard_eligibility needs."""
+    npcs = {}
+    for kind, flags, payload in records(master.read_bytes()):
+        if kind == 'NPC_':
+            fields = list(subrecords(payload))
+            npcs[text(fields, 'NAME').casefold()] = fields
+    lights = _source_records(master)
+    return npcs, lights, text(lights['torch'], 'MODL')
+
+
+def torch_item(assets, mesh, palette, nif):
+    """A skeletal guard's torch (--npc-anim-type 2, SKEL-ITEM-TAGS-52): the carried item in the Shield Bone's own
+    axes, the carried-light rotation and BoneOffset applied (npc_geometry.rigid_attachment, as _equipment poses it),
+    all 238 visible triangles kept, and the 'fire emitter' point in the same axes, unscaled (the engine scales it
+    with the actor). No per-frame bake: the engine poses both from the table's shield bone. Returns (item path,
+    model bytes, emitter [x, y, z])."""
+    from npc_items import _Rest
+    part = {'slot': 10, 'attach': 'Shield Bone', 'filter': '', 'id': 'torch', 'mesh': mesh, 'carried_light': True}
+    shapes, materials, textures = assemble(assets, {'parts': [part], 'weight': 1.0, 'height': 1.0}, _Rest(nif),
+                                           np.zeros(1))
+    shapes = [shape for shape in shapes if 'shadowbox' not in shape['name'].casefold()]
+    protected = {shape['name']: len(shape['faces']) for shape in shapes}
+    if sum(protected.values()) != 238:
+        raise ValueError('Expected all 238 original visible torch triangles')
+    from sky_palette_overlay import BANK
+    quant_palette = bytearray(palette)
+    vivid = all(tuple(palette[index*3:index*3+3]) == target for index, (_, target) in BANK.items())
+    if vivid:
+        for index, (replacement, _) in BANK.items():
+            quant_palette[index*3:index*3+3] = palette[replacement*3:replacement*3+3]
+    positions, faces, uv, skin = bake(shapes, materials, textures, bytes(quant_palette),
+                                      budget=sum(max(4, n) for n in protected.values()), minimum_faces=protected)
+    if vivid:
+        table = list(range(256))
+        for index, (replacement, _) in BANK.items():
+            table[index] = replacement
+        skin = skin.point(table)
+    skin = skin.crop((0, 0, skin.width, ((len(faces)+31)//32)*16))
+    raw = animated_mdl(positions, faces, uv, skin, names=['item00'])
+    nodes = source_nodes(assets.models[normpath('meshes/'+mesh)], nif)
+    offset = rigid_attachment(part, nodes['boneoffset'][0].translation.as_list())
+    emitter = (nodes['fire emitter'][1] @ offset)[3, :3]
+    return 'items/gt_torch_' + sha(raw)[:12] + '.mdl', raw, [float(v) for v in emitter]
+
+
+def skeletal_base_models(id1, entries):
+    """The guard entries whose base model is skeletal (--npc-anim-type 2): they carry their torch as an AWTS1 item
+    (torch_item), so the AWG1 registry (baked body and torch companions per frame) is for baked guards only."""
+    from skeletal_actor import is_skeletal
+    return [e for e in entries if is_skeletal((Path(id1) / e['base_model']).read_bytes())]
+
+
 GUARD_CACHE = 'guard-torch'
 
 
@@ -444,6 +497,11 @@ def prepare(data_files, id1, output_id1=None, jobs=None):
     kinds, _, _ = load_master(master)
     lights = _source_records(master); mesh = text(lights['torch'], 'MODL')
     entries = _guard_models(id1, kinds, lights, mesh, _creature_ids(master))
+    skeletal = skeletal_base_models(id1, entries)
+    if skeletal:
+        print('Guard torches: %d skeletal guard models carry their torch as an item (AWTS1 tag), not in the '
+              'registry' % len(skeletal), flush=True)
+        entries = [e for e in entries if e not in skeletal]
     palette = (id1 / 'gfx/palette.lmp').read_bytes()
     if len(palette) != 768: raise ValueError('Invalid guard palette')
     # One guard model per worker of the shared pool, results in entry order (the image step's guard torches ran one

@@ -7,6 +7,7 @@
 #include <assert.h>
 /* Light-space night symbols owned by r_light.c / d_sprite.c / d_surf.c. */
 int r_daylight=256;unsigned char *r_warm_colormap;const unsigned char *d_nightshade;
+unsigned char *r_tint_colormap[AW_TINTS];int r_tint_wanted;
 void Cvar_Set(char *name,char *value){(void)name;(void)value;}static int flushes;void D_FlushCaches(void){flushes++;}
 extern int r_backgroundsky;
 extern float skytime;

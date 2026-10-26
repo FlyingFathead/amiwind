@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_state.h"
 #include "aw_clock.h"
 #include "aw_weather.h"
+#include "aw_tryalloc.h"
 
 
 int		iskyspeed = 8;
@@ -860,25 +861,53 @@ static void R_LightHue(int *hue)
     if(Q_sscanf(sky_light_hue.string,"%d %d %d",&hue[0],&hue[1],&hue[2])!=3){hue[0]=255;hue[1]=210;hue[2]=140;}
     for(k=0;k<3;k++)hue[k]=hue[k]<0?0:hue[k]>255?255:hue[k];
 }
-static void R_BuildWarmLight(void)
+/* A light table leaning toward hue (R G B 0..255): dark rows copied from the
+ * game's own colormap, brighter rows tinted and matched through the palette grid. */
+static void R_BuildLightTable(const int *hue,byte *table)
 {
-    int hue[3],level,i,k,rgb[3];float lum,t[3],b,w;const byte *plain=(const byte *)vid.colormap;
-    if(!host_basepal || !sky_tints_ready || !plain)return;
-    R_LightHue(hue);
+    int level,i,k,rgb[3];float lum,t[3],b,w;const byte *plain=(const byte *)vid.colormap;
     lum=(hue[0]*299+hue[1]*587+hue[2]*114)/1000.0f;if(lum<1)lum=1;
     for(k=0;k<3;k++)t[k]=hue[k]/lum;
     for(level=0;level<64;level++){
         b=1-level/63.0f;if(b<.15f)b=.15f;
         w=(b-.4f)/.6f;
-        if(!(w>0)){memcpy(warm_table+level*256,plain+level*256,256);continue;}
+        if(!(w>0)){memcpy(table+level*256,plain+level*256,256);continue;}
         if(w>1)w=1;
         for(i=0;i<256;i++){
             for(k=0;k<3;k++){rgb[k]=(int)(host_basepal[3*i+k]*b*(1+w*(t[k]-1))+.5f);if(rgb[k]>255)rgb[k]=255;if(rgb[k]<0)rgb[k]=0;}
-            warm_table[level*256+i]=R_SkyNearest(rgb[0],rgb[1],rgb[2]);
+            table[level*256+i]=R_SkyNearest(rgb[0],rgb[1],rgb[2]);
         }
     }
+}
+static void R_BuildWarmLight(void)
+{
+    int hue[3];
+    if(!host_basepal || !sky_tints_ready || !vid.colormap)return;
+    R_LightHue(hue);
+    R_BuildLightTable(hue,warm_table);
     snprintf(warm_built,sizeof warm_built,"%s",sky_light_hue.string);
     r_warm_colormap=warm_table;
+    r_tint_colormap[1]=warm_table;
+}
+/* Placement light tints 2-7 (world format 0.13; 1 is the warm table above):
+ * red (embers, Daedric), orange (fire), yellow (candles), green, cool blue-white
+ * (magic, moonlight) and purple (Telvanni). 16 KB each, allocated only for the
+ * tints a map draws; a table that cannot be allocated stays plain. */
+static const short tint_hues[AW_TINTS][3]={
+    {0,0,0},{0,0,0},{255,120,90},{255,170,100},{255,230,150},{170,255,160},{160,200,255},{210,160,255}};
+static void R_BuildTints(void)
+{
+    static int failed;
+    int tint,hue[3],k,built=0;
+    if(!host_basepal || !sky_tints_ready || !vid.colormap)return;
+    for(tint=2;tint<AW_TINTS;tint++){
+        if(!(r_tint_wanted&(1<<tint)) || r_tint_colormap[tint] || (failed&(1<<tint)))continue;
+        for(k=0;k<3;k++)hue[k]=tint_hues[tint][k];
+        if((r_tint_colormap[tint]=AW_TryMalloc(64*256))){R_BuildLightTable(hue,r_tint_colormap[tint]);built=1;}
+        else failed|=1<<tint;
+    }
+    r_tint_wanted=0;
+    if(built)D_FlushCaches();
 }
 static void R_LightHueCommand(void)
 {
@@ -1221,6 +1250,8 @@ void R_SetSkyFrame (void)
     }
     /* The warm light table follows aw_light_hue; rebuilt only when it changes. */
     if(sky_tints_ready && strcmp(warm_built,sky_light_hue.string)){R_BuildWarmLight();D_FlushCaches();}
+    /* Placement tints drawn last frame without their table (r_surf.c) */
+    if(r_tint_wanted)R_BuildTints();
     /* Daylight reaches the light only where the day/night tables are in use;
      * a change rebuilds the surface cache once (quantised steps). */
     {

@@ -465,7 +465,7 @@ class ChimWorldTests(unittest.TestCase):
                                           'chim_world.c', 'chim_statics.c', 'chim_far.c', 'chim_cuts.c',
                                           'chim_prefetch.c', 'chim_placed_clip.c', 'chim_terc.c', 'chim_thgt.c',
                                           'chim_room.c')] + \
-        [SRC / n for n in ('aw_scenery.c', 'world.c', 'r_efrag.c', 'mathlib.c', 'aw_format.c', 'aw_harvest.c',
+        [SRC / n for n in ('aw_fastrelease.c', 'aw_scenery.c', 'world.c', 'r_efrag.c', 'mathlib.c', 'aw_format.c', 'aw_harvest.c',
                            'aw_harvest_runtime.c', 'aw_harvest_proxy.c', 'aw_state.c')]
 
     def run_world(self, modes, with_data=True, env=None, big=False, seam=False, first=0, story=(), rows=False,
@@ -825,6 +825,14 @@ class ChimWorldTests(unittest.TestCase):
         # fully open; a room loaded again starts at the door's present pose.
         out = self.run_world(['roomdoor'], placed=True, room=True)[0]
         self.assertIn('roomdoor ok', out)
+
+    def test_a_chim_room_short_of_zone_grows_into_free_fast_ram_then_the_hunk(self):
+        # ROOM-AKULAKHAN-HEAP-52: a room map holds nothing but its room; one whose models do not fit the zone and the
+        # cache banks takes a bank of the free Fast RAM (largest block less 2 MiB), then the Hunk's rest
+        # (chim_reserve_kib kept), both given back at the next map; a room that fits takes neither; nothing to take:
+        # refused at the load as before.
+        out = self.run_world(['roomgrow'], placed=True, room=True)[0]
+        self.assertIn('roomgrow ok', out)
 
     def test_story_hidden_placements_stay_out_while_the_story_hides_them(self):
         out = self.run_world(['story'], story=(0,))[0]

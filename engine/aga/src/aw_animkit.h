@@ -28,12 +28,25 @@ int AW_AnimKitFind(const char *name);
 int AW_AnimKitEngineGroup(const char *name);
 
 enum {AW_ANIMKIT_HELP, AW_ANIMKIT_STATUS, AW_ANIMKIT_ON, AW_ANIMKIT_OFF, AW_ANIMKIT_LIST,
-      AW_ANIMKIT_PLAY, AW_ANIMKIT_STOP, AW_ANIMKIT_SPEED};
-typedef struct {int kind;int group;float speed;char name[32];} aw_animkit_cmd_t;
+      AW_ANIMKIT_PLAY, AW_ANIMKIT_STOP, AW_ANIMKIT_SPEED,
+      /* the animation stage (SKEL-ANIM-STAGE-52): the table's groups of the target, every group one after
+       * another, a cast of skeletal actors lined up in front of the player */
+      AW_ANIMKIT_GROUPS, AW_ANIMKIT_CYCLE, AW_ANIMKIT_STAGE};
+/* group: an engine group (aw_anim.h), or -1 for a group played straight from a skeletal actor's shared table by
+ * name (name); count: stage cast size, or 1 for "cycle all" (every staged or nearby skeletal actor). */
+typedef struct {int kind;int group;float speed;int count;char name[32];} aw_animkit_cmd_t;
+#define AW_ANIMKIT_STAGE_MAX 8
 /* Parse "dbg animkit ..." arguments (argv[0] = the command). Returns 1 and
  * fills out, or 0 with out->kind = AW_ANIMKIT_HELP and a reason in out->name
- * (unknown subcommand, a group that is not wired, a speed outside 0.1..4). */
+ * (unknown subcommand, a group name too long, a speed outside 0.1..4, a stage
+ * size outside 1..8). play takes any name: a wired one plays the engine group,
+ * another is looked up in the target's animation table (skeletal actors). */
 int AW_AnimKitParse(int argc,const char **argv,aw_animkit_cmd_t *out);
+
+/* One group of a shared animation table played from its first to its last frame (inclusive) at rate frames a
+ * second: *t (seconds into the group) advanced by dt; a loop wraps, a one-shot holds the last frame and sets *done
+ * (may be NULL). Returns the table frame. Pure (host-tested). */
+int AW_AnimKitSpanFrame(unsigned first,unsigned last,float rate,float *t,float dt,int loop,int *done);
 
 /* aw_anim.c (pure): 0 = movers play their idle frames (the previous method);
  * the playback rate multiplier of dbg animkit speed. */

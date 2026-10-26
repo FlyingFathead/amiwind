@@ -287,6 +287,12 @@ typedef struct {
 	int					stverts;
 	int					skindesc;
 	int					triangles;
+	/* AmiWind: offset of the skeletal block (aw_skel.h "AWSB": the vertices in bone space, posed from a shared
+	 * animation table each frame); 0 for an ordinary model (every loader zeroes the header) */
+	int					aw_skel;
+	/* its animation table (aw_skel.h aw_skel_table_t), resolved once at load (aw_skel_load.c keeps tables outside
+	 * the cache, so the pointer survives the cache moving this block); NULL: the rest frame draws */
+	const void			*aw_skel_table;
 	maliasframedesc_t	frames[1];
 } aliashdr_t;
 

@@ -22,6 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "r_local.h"
 #include "aw_rcount.h"
+#include "aw_skel.h"
+#include "aw_tryalloc.h"
+#include "aw_items.h"
 #include "d_local.h"	// FIXME: shouldn't be needed (is needed for patch
                         // right now, but that should move)
 
@@ -100,6 +103,28 @@ qboolean AW_AliasSphereVisible(vec3_t origin, float radius)
     return true;
 }
 
+/* The box of a posed frame in the pose cache (below), or 0: a skeletal actor is culled by the box of the pose it
+ * stands in, not by its rest frame's box, which holds every pose of the table (a body lying at full length): that
+ * box let an actor off screen through the cull (SKEL-RUNTIME-COST-52; 3 alias models drawn against 2 baked at the
+ * Balmora pose). */
+static int AW_PoseBox (const model_t *model, const aliashdr_t *hdr, int frame, byte box[6]);
+/* A skeletal entity's pose: its table frame, and while it holds a torch its left arm on the table's torch group
+ * (aw_items.c AW_ItemsTorchLayer; SKEL-ITEM-TAGS-52). Returns the pose's key in the pose cache: the frame, or -1 less
+ * the frame for the torch pose (a frame poses one way or the other). LAYER and ROOT may be NULL. */
+int (*R_AliasTorchLayer)(const struct model_s *m, const void *skel_table, int frame, float *layer_frame, int *root);
+static int AW_SkelEntityKey (const model_t *model, const aliashdr_t *hdr, int frame, float *layer, int *root)
+{
+    float l;
+    int r;
+    if (!R_AliasTorchLayer || !R_AliasTorchLayer (model, hdr->aw_skel_table, frame, &l, &r))
+        return frame;
+    if (layer)
+        *layer = l;
+    if (root)
+        *root = r;
+    return -1 - frame;
+}
+
 qboolean R_AliasCheckBBox (void)
 {
     int					i, flags, frame, numv;
@@ -125,7 +150,9 @@ qboolean R_AliasCheckBBox (void)
     R_AliasSetUpTransform (0);
 
 // construct the base bounding box for this frame
-    frame = currententity->frame;
+// (a skeletal model's frame is a frame of its animation table: its stored rest frame carries a box that holds
+// every pose, written so by the builder)
+    frame = pahdr->aw_skel ? 0 : currententity->frame;
 // TODO: don't repeat this check when drawing?
     if ((frame >= pmdl->numframes) || (frame < 0))
     {
@@ -135,24 +162,25 @@ qboolean R_AliasCheckBBox (void)
     }
 
     pframedesc = &pahdr->frames[frame];
+    {
+        byte box[6];
+        const byte *bmin = pframedesc->bboxmin.v, *bmax = pframedesc->bboxmax.v;
+        if (pahdr->aw_skel && AW_PoseBox (pmodel, pahdr, AW_SkelEntityKey (pmodel, pahdr, currententity->frame, NULL,
+                                                                             NULL), box))
+            bmin = box, bmax = box + 3;
 
 // x worldspace coordinates
-    basepts[0][0] = basepts[1][0] = basepts[2][0] = basepts[3][0] =
-            (float)pframedesc->bboxmin.v[0];
-    basepts[4][0] = basepts[5][0] = basepts[6][0] = basepts[7][0] =
-            (float)pframedesc->bboxmax.v[0];
+        basepts[0][0] = basepts[1][0] = basepts[2][0] = basepts[3][0] = (float)bmin[0];
+        basepts[4][0] = basepts[5][0] = basepts[6][0] = basepts[7][0] = (float)bmax[0];
 
 // y worldspace coordinates
-    basepts[0][1] = basepts[3][1] = basepts[5][1] = basepts[6][1] =
-            (float)pframedesc->bboxmin.v[1];
-    basepts[1][1] = basepts[2][1] = basepts[4][1] = basepts[7][1] =
-            (float)pframedesc->bboxmax.v[1];
+        basepts[0][1] = basepts[3][1] = basepts[5][1] = basepts[6][1] = (float)bmin[1];
+        basepts[1][1] = basepts[2][1] = basepts[4][1] = basepts[7][1] = (float)bmax[1];
 
 // z worldspace coordinates
-    basepts[0][2] = basepts[1][2] = basepts[4][2] = basepts[5][2] =
-            (float)pframedesc->bboxmin.v[2];
-    basepts[2][2] = basepts[3][2] = basepts[6][2] = basepts[7][2] =
-            (float)pframedesc->bboxmax.v[2];
+        basepts[0][2] = basepts[1][2] = basepts[4][2] = basepts[5][2] = (float)bmin[2];
+        basepts[2][2] = basepts[3][2] = basepts[6][2] = basepts[7][2] = (float)bmax[2];
+    }
 
     zclipped = false;
     zfullyclipped = true;
@@ -692,6 +720,136 @@ R_AliasSetupFrame
 set r_apverts
 =================
 */
+/* A skeletal model (aliashdr_t aw_skel, aw_skel.h): its vertices posed from the shared animation table at the
+ * entity's frame (a frame of the table) into a scratch frame; everything after this draws it as any frame.
+ * 0 when the block or its table cannot be used: the rest frame draws. */
+/* Posed frames kept (SKEL-RUNTIME-COST-52): an actor's table frame changes about 8 times a second while it is drawn
+ * 20 to 30 times, and actors of one model on one table frame (guards walking together) pose alike, so a posed frame
+ * is made once per model and table frame and drawn from here until it is pushed out (the least recently used of
+ * AW_POSE_CACHE). The key is the model, its header's place in the cache (a model evicted and loaded again elsewhere
+ * misses, never matches stale bytes) and the frame. */
+#define AW_POSE_CACHE	8		/* 8 x 12 KB; most skeletal models use under half of MAXALIASVERTS */
+typedef struct {
+    const model_t		*model;
+    const aliashdr_t	*hdr;
+    int					frame;
+    unsigned			used;		/* aw_pose_clock when last drawn; 0 empty */
+    byte				box[6];		/* the posed vertices' box (min x y z, max x y z), in the model's bytes */
+    trivertx_t			verts[MAXALIASVERTS];
+} aw_posed_t;
+static aw_posed_t	aw_posed_kept[AW_POSE_CACHE];
+/* With Fast RAM to spare (32 MB and more) AW_POSE_CACHE_LARGE slots, asked once (AW_TryMalloc: refused at 16 MB, the
+ * 8 above then serve): a resident's idle loops through 8 table frames, so three idle actors in view pose every
+ * step with 8 slots and never after their first loop with 32 (SKEL-RUNTIME-COST-52: about 10 ms a pose on the
+ * slow-CPU preset). Held for the session; the C library's pool is freed at exit. */
+#define AW_POSE_CACHE_LARGE	32
+static aw_posed_t	*aw_posed = aw_posed_kept;
+static int			aw_pose_slots = AW_POSE_CACHE, aw_pose_grown;
+static unsigned		aw_pose_clock;	/* counts the cache's uses (its own: no renderer state needed) */
+int	aw_pose_hits, aw_pose_misses;	/* frames drawn from the cache and posed: for a measurement or a dbg line */
+
+static int R_AliasSkelFrame (void)
+{
+    static float		world[AW_SKEL_MAX_BONES][3][4];
+    aw_skel_block_t		block;
+    const aw_skel_table_t	*table = (const aw_skel_table_t *)paliashdr->aw_skel_table;
+    trivertx_t			*rest;
+    aw_posed_t			*slot;
+    int					i, frame = currententity->frame, key, root = -1;
+    float				layer = 0;
+    if (!table || pmdl->numverts > MAXALIASVERTS || paliashdr->frames[0].type != ALIAS_SINGLE)
+        return 0;
+    key = AW_SkelEntityKey (currententity->model, paliashdr, frame, &layer, &root);
+    if (!aw_pose_grown)
+    {
+        aw_posed_t *more = (aw_posed_t *)AW_TryMalloc (AW_POSE_CACHE_LARGE * sizeof(aw_posed_t));
+        aw_pose_grown = 1;
+        if (more)
+        {
+            memset (more, 0, AW_POSE_CACHE_LARGE * sizeof(aw_posed_t));
+            aw_posed = more;
+            aw_pose_slots = AW_POSE_CACHE_LARGE;
+        }
+    }
+    slot = &aw_posed[0];
+    for (i=0 ; i<aw_pose_slots ; i++)
+    {
+        aw_posed_t *p = &aw_posed[i];
+        if (p->used && p->model == currententity->model && p->hdr == paliashdr && p->frame == key)
+        {
+            p->used = ++aw_pose_clock ? aw_pose_clock : ++aw_pose_clock;
+            aw_pose_hits++;
+            r_apverts = p->verts;
+            return 1;
+        }
+        if (p->used < slot->used)
+            slot = p;					/* the empty or least recently drawn one */
+    }
+    if (!AW_SkelBlockHead ((byte *)paliashdr + paliashdr->aw_skel,
+                           AW_SKEL_BLOCK_HEAD + (long)pmdl->numverts * AW_SKEL_VERT_BYTES, pmdl->numverts, &block))
+        return 0;
+    rest = (trivertx_t *)((byte *)paliashdr + paliashdr->frames[0].frame);
+    {
+        double t0;				/* the posing's two halves timed for dbg rcount (its "kp" field) */
+        AW_RT_BEGIN(t0);
+        AW_SkelPoseLayer (table, (float)frame, layer, key < 0 ? root : -1, world);
+        AW_RT_END(RT_SKELPOSE, t0);
+        AW_RT_BEGIN(t0);
+        AW_SkelPoseVerts (block.data, &rest[0].lightnormalindex, sizeof(trivertx_t), pmdl->numverts, block.rest_scale,
+                          (const float (*)[3][4])world, block.pose_origin, block.pose_step, (unsigned char *)slot->verts);
+        AW_RT_END(RT_SKELVERTS, t0);
+    }
+    slot->model = currententity->model;
+    slot->hdr = paliashdr;
+    slot->frame = key;
+    {
+        /* the pose's own box, for the cull of its next draws (AW_PoseBox) */
+        int k, v;
+        for (k=0 ; k<3 ; k++)
+            slot->box[k] = 255, slot->box[3+k] = 0;
+        for (v=0 ; v<pmdl->numverts ; v++)
+            for (k=0 ; k<3 ; k++)
+            {
+                byte b = slot->verts[v].v[k];
+                if (b < slot->box[k])
+                    slot->box[k] = b;
+                if (b > slot->box[3+k])
+                    slot->box[3+k] = b;
+            }
+    }
+    slot->used = ++aw_pose_clock ? aw_pose_clock : ++aw_pose_clock;
+    aw_pose_misses++;
+    r_apverts = slot->verts;
+    return 1;
+}
+
+unsigned long R_AliasPoseCacheRelease (void)
+{
+    unsigned long given = 0;
+    if (aw_posed != aw_posed_kept)
+    {
+        free (aw_posed);
+        given = AW_POSE_CACHE_LARGE * sizeof(aw_posed_t);
+        aw_posed = aw_posed_kept;
+        aw_pose_slots = AW_POSE_CACHE;
+    }
+    aw_pose_grown = 0;			/* asked again at the next skeletal draw, when memory allows */
+    memset (aw_posed_kept, 0, sizeof(aw_posed_kept));	/* their models are flushed: no slot may match a new one */
+    return given;
+}
+
+static int AW_PoseBox (const model_t *model, const aliashdr_t *hdr, int frame, byte box[6])
+{
+    int i;
+    for (i=0 ; i<aw_pose_slots ; i++)
+        if (aw_posed[i].used && aw_posed[i].model == model && aw_posed[i].hdr == hdr && aw_posed[i].frame == frame)
+        {
+            memcpy (box, aw_posed[i].box, 6);
+            return 1;
+        }
+    return 0;
+}
+
 void R_AliasSetupFrame (void)
 {
     int				frame;
@@ -699,6 +857,8 @@ void R_AliasSetupFrame (void)
     maliasgroup_t	*paliasgroup;
     float			*pintervals, fullinterval, targettime, time;
 
+    if (paliashdr->aw_skel && R_AliasSkelFrame ())
+        return;
     frame = currententity->frame;
     if ((frame >= pmdl->numframes) || (frame < 0))
     {

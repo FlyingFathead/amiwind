@@ -2987,6 +2987,18 @@ def finalize_image(args):
             print(f"[chim] frame-map heap {name}: zone {m['zone_bytes']} B (after the map {m['after_zone_bytes']} B), "
                   f"active ring {m['peak_bytes']} / load ring {m['load_ring']['peak_bytes']} of {m['budget_bytes']} B, "
                   f"streamed models {m['streamed_bytes']} B, largest block {m['largest_block_bytes']} B", flush=True)
+        # frame maps the gate marked 32 MB itself (over the 16 MB budget by this exact check, not by the CHIM stage's
+        # estimate; BUILD-CHIM-HEAP-GATE-LATE-36): their records follow the marked file
+        late = set(frame_heap.get('marked_32mb_late') or [])
+        if late:
+            from chim.heap import SAFE_FAST_MB
+            for record in chim_frames['region_maps']:
+                if Path(record['map']).stem in late:
+                    record['fast_mb'] = SAFE_FAST_MB
+                    if 'bytes' in record:
+                        record['bytes'] = (boot/'id1'/record['map']).stat().st_size
+            print('[chim] CHIM frame maps marked 32 MB by the image heap gate (the CHIM stage\'s estimate passed them): '
+                  '%d: %s' % (len(late), ', '.join(sorted(late))), flush=True)
         # the CHIM world read once for the image step is not needed after its last reader (the heap gate)
         chim_world_held.clear()
         chim_world_data = None

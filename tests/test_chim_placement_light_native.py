@@ -37,10 +37,15 @@ class PlacementLightSourceTests(unittest.TestCase):
         render = (SOURCE / 'render.h').read_text()
         body = render[render.index('typedef struct entity_s'):render.index('} entity_t;')]
         # appended: every earlier member keeps the offset the assembly uses
-        self.assertTrue(body.rstrip().endswith('int aw_light;'), body[-200:])
+        self.assertRegex(body.rstrip(), r'(?s)int aw_light;\s*(/\*.*?\*/\s*)?int aw_tint;$', body[-300:])
         chunks = (SOURCE / 'chim/chim_chunks.c').read_text()
         self.assertIn('p->ent.aw_light = ChimFormat_RecordLight (chim_world.minor, r.flags);', chunks)
         self.assertIn('p->ent.aw_light = from->ent.aw_light;', chunks)
+        # 0.13: the tint beside it, in the chunk records, their reach copies and the room records
+        self.assertIn('p->ent.aw_tint = ChimFormat_RecordTint (chim_world.minor, r.flags);', chunks)
+        self.assertIn('p->ent.aw_tint = from->ent.aw_tint;', chunks)
+        self.assertIn('p->ent.aw_tint = ChimFormat_RecordTint (h.minor, rec.flags);',
+                      (SOURCE / 'chim/chim_room.c').read_text())
 
     def test_the_cache_keeps_its_level(self):
         local = (SOURCE / 'd_local.h').read_text()
@@ -52,15 +57,29 @@ class PlacementLightSourceTests(unittest.TestCase):
         surf = (SOURCE / 'd_surf.c').read_text()
         self.assertIn('cache->light == r_drawsurf.light', surf)
         self.assertIn('cache->light = r_drawsurf.light;', surf)
+        self.assertIn('cache->tint == r_drawsurf.tint', surf)
+        self.assertIn('cache->tint = r_drawsurf.tint;', surf)
         # the caller sets the level of the entity being drawn (the world and other entities: 0)
         edge = (SOURCE / 'd_edge.c').read_text()
         self.assertIn('r_drawsurf.light = currententity ? currententity->aw_light : 0;', edge)
+        self.assertIn('r_drawsurf.tint = currententity ? currententity->aw_tint : 0;', edge)
+        self.assertLess(edge.index('r_drawsurf.tint = currententity'), edge.index('D_CacheSurface (pface, miplevel)'))
         self.assertLess(edge.index('r_drawsurf.light = currententity'), edge.index('D_CacheSurface (pface, miplevel)'))
 
     def test_format_gate(self):
         header = (SOURCE / 'chim/chim_format.h').read_text()
         self.assertEqual(int(re.search(r'#define CHIM_LIGHT_MINOR\s+(\d+)', header).group(1)), 12)
-        self.assertGreaterEqual(int(re.search(r'#define CHIM_FORMAT_MINOR\s+(\d+)', header).group(1)), 12)
+        self.assertGreaterEqual(int(re.search(r'#define CHIM_FORMAT_MINOR\s+(\d+)', header).group(1)), 13)
+        self.assertEqual(int(re.search(r'#define CHIM_TINT_MINOR\s+(\d+)', header).group(1)), 13)
+
+    def test_tint_tables_are_built_on_first_use(self):
+        # r_surf.c asks, r_sky.c builds the asked tables only and flushes the cache once they exist
+        surf = (SOURCE / 'r_surf.c').read_text()
+        self.assertIn('r_tint_wanted |= 1 << tint;', surf)
+        self.assertIn('r_block_colormap = R_SurfaceTable (r_drawsurf.surf);', surf)
+        sky = (SOURCE / 'r_sky.c').read_text()
+        self.assertIn('if(r_tint_wanted)R_BuildTints();', sky)
+        self.assertIn('r_tint_colormap[1]=warm_table;', sky)
 
     def test_packs_open_under_the_store(self):
         world = (SOURCE / 'chim/chim_world.c').read_text()

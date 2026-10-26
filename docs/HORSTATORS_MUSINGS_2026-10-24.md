@@ -1,6 +1,9 @@
 # Horstator’s musings (24 Oct 2026): “[C]hunks and [H]eaps in [M]emory”
 
-_Last updated with AmiWind v0.0.48 (24 October 2026)._
+_Last updated with AmiWind v0.0.51 (25 October 2026)._
+
+> Next musings, 25 Oct 2026: why AmiWind is free, and the artisan, the engineer and the door handle. See
+> [[C]raft, [H]andles, [I]ntent and [M]eaning](HORSTATORS_MUSINGS_2026-10-25.md).
 
 It's been almost a month at this, and things are starting to take form. The whole of Vvardenfell is in: every
 exterior on the CHIM engine, the base game's interiors on the shared room store, and the people standing where the

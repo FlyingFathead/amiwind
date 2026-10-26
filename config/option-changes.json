@@ -1042,6 +1042,15 @@
       "to": "list",
       "source": "tools/seyda_entities.py (BUILD-SEYDA-ENTITY-BUS-48)",
       "note": "list (default) = the scene stages and chim-town-seyda read Seyda Neen's entities from the scene entity list SCENE/seyda-entities.json that each writing stage publishes; bsp = the legacy read path, the seyda.bsp carrier's entity lump, kept for A/B; the same bytes either way"
+    },
+    {
+      "version": "0.0.52-dev1",
+      "option": "npc_anim_type",
+      "flag": "--npc-anim-type",
+      "change": "added",
+      "to": 2,
+      "source": "tools/build.py, tools/npc_anim.py, tools/skeletal_actor.py (NPC-BAKED-WHOLE-DUPLICATION-33)",
+      "note": "the maintainer, 2026-10-25: skeletons by default; whoever wants the prebaked frames compiles the game with them. 2 = every humanoid resident and actor-library model is one rest frame on the shared animation table of its skeleton, the kit's layout on the table's frames, no mover models and no baked frames; 1 = the baked kit as before (a standing model and a mover per actor)"
     }
   ],
   "current": {
@@ -1164,6 +1173,7 @@
       "no_tree_sprites": false,
       "no_unit_cache": false,
       "npc_anim": null,
+      "npc_anim_type": 2,
       "npc_face_lod": null,
       "npc_face_lod_list": null,
       "npc_head_detail": null,

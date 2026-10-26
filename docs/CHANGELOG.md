@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.51 (25 October 2026)._
+_Last updated with AmiWind v0.0.52 (26 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026](#v0052-skeletons-of-society-vvardenfell-edition-26-october-2026)
 - [v0.0.51: Let There Be More Inner Light, 25 October 2026](#v0051-let-there-be-more-inner-light-25-october-2026)
 - [v0.0.50: The Doors: Riders On The CHIM, 24 October 2026](#v0050-the-doors-riders-on-the-chim-24-october-2026)
 - [v0.0.49: Build Turnaround, 24 October 2026](#v0049-build-turnaround-24-october-2026)
@@ -159,6 +160,29 @@ _Last updated with AmiWind v0.0.51 (25 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026
+
+- Every character moves by one shared skeleton and one shared action table, as in the original game: each resident,
+  guard and actor is one model in its rest pose, and about 140 action groups on a 29-bone figure at 8 frames a second
+  serve everyone, in two tables (the common one with the women's walk and idles, and the beast races'). 512 MB of
+  character models for the base game's 2,612 placed characters against 3,222 MB baked; the 97 that never fitted the
+  baked budget fit now. Baked characters stay a build option (`--npc-anim-type 1`).
+- A character is posed only when its frame changes, shares its pose with the others of its model on that frame, keeps
+  up to 32 posed frames where Fast RAM allows, and is culled by the box of its own pose: at Balmora's arrival on the
+  slow 68040 preset a frame takes 1,261 ms against 1,272 ms baked; eight characters changing action every frame cost
+  +5.6 % ([SKEL-RUNTIME-COST-52](BUGS.md)).
+- Weapons, shields and the guards' torches ride the hand bones; guards hold their torches up at night again.
+- Dagoth Ur (his whole 2,254-triangle model) stands in the Facility Cavern and in Akulakhan's Chamber, and the Heart
+  of Lorkhan hangs where the game puts it; they do not fight or speak yet.
+- Akulakhan's Chamber loads on 32 MB, also coming from a town: memory that can be made again is given back first and
+  the room's bank grows in 64 KiB steps (after Balmora: 3,456 KiB, 804 KiB of the zone free)
+  ([CHIM-ROOM-HEART-CHAMBER-LOAD-50](bugs/CHIM-ROOM-HEART-CHAMBER-LOAD-50.md)).
+- Every engine allocation asks for its memory first, so a full memory no longer ends in a Software Failure; a WARNING
+  box under 32 MB of Fast RAM shows before the logo for five seconds.
+- Balmora's canal banks without dents; coloured light in the rooms; the music fed through loads.
+- Builds: the reuse checks found three ways to reuse stale or foreign outputs, all fixed; every build stops before its
+  first stage with less than 35 GiB free.
 
 ## v0.0.51: Let There Be More Inner Light, 25 October 2026
 

@@ -496,17 +496,29 @@ void CL_ParseUpdate (int bits)
 	if ( bits & U_NOLERP )
 		ent->forcelink = true;
 
-	/* AmiWind: a live alias entity's instance scale (U_AW_SCALE), drawn as statics are; none = 1 */
-	if (bits & U_AW_SCALE)
+	/* AmiWind fields (U_AW_EXT): a live alias entity's instance scale, drawn as statics are (none = 1), and
+	 * the high byte of a frame over 255 (a shared animation table's frame, aw_skel.h) */
+	ent->aw_sprite_scale = 1;
+	if (bits & U_AW_EXT)
 	{
-		float s = MSG_ReadFloat ();
-		if (!isfinite (s) || s <= 0.01f || s >= 64.0f)
-			Host_Error ("CL_ParseUpdate: invalid entity scale");
-		ent->aw_sprite_scale = s;
-		ent->effects |= AW_EF_ALIAS_SCALE;
+		int aw = MSG_ReadByte ();
+		if (aw & ~(AWU_SCALE | AWU_FRAME2))
+			Host_Error ("CL_ParseUpdate: unknown AmiWind fields %d", aw);
+		if (aw & AWU_SCALE)
+		{
+			float s = MSG_ReadFloat ();
+			if (!isfinite (s) || s <= 0.01f || s >= 64.0f)
+				Host_Error ("CL_ParseUpdate: invalid entity scale");
+			ent->aw_sprite_scale = s;
+			ent->effects |= AW_EF_ALIAS_SCALE;
+		}
+		if (aw & AWU_FRAME2)
+		{
+			if (!(bits & U_FRAME))
+				Host_Error ("CL_ParseUpdate: a frame's high byte without its frame");
+			ent->frame |= MSG_ReadByte () << 8;
+		}
 	}
-	else
-		ent->aw_sprite_scale = 1;
 
 	if ( forcelink )
 	{	// didn't have an update last message

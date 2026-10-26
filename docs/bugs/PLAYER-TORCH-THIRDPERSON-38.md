@@ -25,10 +25,9 @@
 | Where | Third-person player body and equipment |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.38-dev2, v0.0.39-rc1, v0.0.43-dev2, v0.0.44-dev1 (last seen) |
+| Persists in | fixed in v0.0.46 |
 | Severity | medium: Visible player equipment and ready-state feedback are missing. |
 | Family | First-person hands and torch (`torch-hands`) |
-| Deferred by the maintainer | 2026-10-25: the maintainer deferred it to v0.0.52 (v0.0.51 ships its dev3, everything else moves to v0.0.52) |
 | Playtest version | v0.0.38-dev2 |
 | From commit | source c2eaa5a, engine c2eaa5a, CHIM world c2eaa5a |
 | CHIM engine version | CHIM 0.2.0, engine c2eaa5a, world format unknown |

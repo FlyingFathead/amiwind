@@ -11,6 +11,7 @@
 #include "aw_maps.h"
 #include "aw_world.h"
 #include "aw_statswin.h"
+#include "aw_tryalloc.h"
 #include <stdint.h>
 /* AWM1: header, areas, pixels. AWM2 adds the LAVA section (docs/WORLD_MAP_AND_JOURNAL.md "Map file formats"). */
 #define LAVA_POOLS_MAX 2048
@@ -138,7 +139,7 @@ int AW_WorldUIOpenPanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mo
 void AW_InventoryOpen(void){
     int i;
     if(!allowed() || svs.clients[0].edict->v.health<=0)return;
-    inventory=(inventory_panel_t *)calloc(1,sizeof(*inventory));
+    inventory=(inventory_panel_t *)AW_TryCalloc(1,sizeof(*inventory));
     if(!inventory){Con_Printf("Inventory: not enough memory.\n");return;}
     for(i=0;i<INV_VISIBLE;i++)inventory->icon_row[i]=-1;
     inventory->angle=(float)M_PI;opened(3);
@@ -491,7 +492,7 @@ static void open_map(void){
     map_in_game();
     size=COM_FOpenFile("world/map.awm",&f);
     if(!f || size<32 || size>MAP_MAX)goto bad;
-    map_data=(byte *)malloc(size);if(!map_data)goto bad;
+    map_data=(byte *)AW_TryMalloc(size);if(!map_data)goto bad;
     if(fread(map_data,1,size,f)!=(size_t)size)goto bad;
     fclose(f);f=NULL;p=map_data;
     if(!memcmp(p,"AWM1",4))version=1;else if(!memcmp(p,"AWM2",4))version=2;else goto bad;
@@ -712,7 +713,7 @@ static void quest_titles(void){
 }
 static void open_journal(void){
     if(!allowed())return;
-    book=(book_t *)calloc(1,sizeof(*book));if(!book){Con_Printf("Journal reader: not enough memory.\n");return;}
+    book=(book_t *)AW_TryCalloc(1,sizeof(*book));if(!book){Con_Printf("Journal reader: not enough memory.\n");return;}
     quest_titles();book->filter=-1;load_entry(aw_state.journal_count-1);opened(2);
     Con_Printf("Journal: %ld earned entries; reader %ld bytes.\n",(long)aw_state.journal_count,(long)sizeof(*book));
 }

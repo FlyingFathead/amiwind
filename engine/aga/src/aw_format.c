@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "aw_format.h"
+#include "aw_tryalloc.h"
 
 /* Extended precision (68881/68040 96-bit, x86 80-bit) for digit
  * generation; plain double on a soft-float build. */
@@ -1052,7 +1053,7 @@ int __wrap_vfprintf(FILE *f, const char *format, va_list ap)
     va_copy(again, ap);
     n = Q_vsnprintf(local, sizeof local, format, ap);
     if (n >= (int)sizeof local) {
-        text = (char *)malloc((size_t)n + 1);
+        text = (char *)AW_TryMalloc((size_t)n + 1);
         if (text)
             Q_vsnprintf(text, (size_t)n + 1, format, again);
         else {

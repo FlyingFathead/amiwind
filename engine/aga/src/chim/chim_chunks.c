@@ -1112,6 +1112,7 @@ static int LoadCatalogue (int index, long *budget)
 				p->ent.colormap = vid.colormap;
 				p->ent.aw_cut_box = from->ent.aw_cut_box;
 				p->ent.aw_light = from->ent.aw_light;
+				p->ent.aw_tint = from->ent.aw_tint;
 				p->s = from->s;
 				p->c = from->c;
 				VectorCopy (from->mins, p->mins);
@@ -1154,6 +1155,8 @@ static int LoadCatalogue (int index, long *budget)
 		p->ent.aw_cut_box = ChimCuts_Box (r.pid);
 		/* 0.12: the placement's light level (flags bits 8-15); 0 before 0.12 */
 		p->ent.aw_light = ChimFormat_RecordLight (chim_world.minor, r.flags);
+		/* 0.13: the colour of that light (flags bits 2-4); 0 before 0.13 */
+		p->ent.aw_tint = ChimFormat_RecordTint (chim_world.minor, r.flags);
 		Q_SinCosDeg (r.yaw, &p->s, &p->c);
 		/* The record's drawn box (the AW_SceneryCapture box, rounded
 		 * outward) serves efrags and the collision broadphase. */

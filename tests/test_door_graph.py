@@ -208,7 +208,12 @@ class DoorGraphTests(unittest.TestCase):
         mib = 1024 * 1024
         self.assertEqual(limits['zone_room_bytes'], zone - 32 * 1024)
         self.assertEqual(limits['min_fast_ram_mib'], 32)
-        self.assertEqual(limits['room_bytes_min_fast'], zone + 7 * mib - 32 * 1024)
+        # ROOM-AKULAKHAN-HEAP-52: at 32 MiB a room past the zone and the 7 MiB bank also takes 3,456 KiB of the
+        # 5,512 KiB block of free Fast RAM measured after Balmora (CHIM-ROOM-HEART-CHAMBER-LOAD-50) and the Hunk's rest
+        # past the zone (13 MiB heap; the measured start-up bytes before the zone, chim_reserve_kib and
+        # chim_room_rest_kib kept)
+        rest = (13 * mib - 2048 * 1024 - EL.MEASURED_HUNK['before_map_bytes'] - 1553 * 1024 - 64) - zone - 16
+        self.assertEqual(limits['room_bytes_min_fast'], zone + 7 * mib + 3456 * 1024 + (rest & ~15) - 32 * 1024)
         # Measured: 16 MiB keeps the 11 MiB heap and no bank (0 MiB free); 32 MiB: heap 13 and 13 MiB free (the v0.0.50
         # final, FS-UAE, 24 October 2026: 14 MiB on 23 October), so a 7 MiB budget: one 7 MiB bank since the first bank
         # needs 4 MiB (none with the 8 MiB of before, CHIM-AUTO-BANK-CLIFF-51); 64 and 128 MiB: heaps 20 and 24

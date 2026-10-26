@@ -204,6 +204,12 @@ void CDAudio_Update(void) {
     if(title_due>=0 && realtime>=title_due)AW_MusicTitle();
     if(available && !paused)music_pump();
 }
+/* The reads go on while a load holds the frame loop (AUDIO-LOAD-29): the loading screen's mixer updates call this,
+ * so the stream's blocks fill ahead as in play; the first load after the intro movie restarted the track with an
+ * empty buffer and ran dry 1-3 times when only the painter's emergency fill read on. Never waits (music_pump). */
+void AW_MusicLoadPump(void) {
+    if(available && !paused && !muted)music_pump();
+}
 void AW_MusicPaint(portable_samplepair_t *dst,int n) {
     int i,take,l,r,next,gain=(int)(bgmvolume.value*256);
     if(!available || paused || muted)return;

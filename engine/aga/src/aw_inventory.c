@@ -14,6 +14,7 @@ extern int AW_SceneryCount(void);
 #include <math.h>
 #include <limits.h>
 #include "aw_inventory.h"
+#include "aw_tryalloc.h"
 #if AW_STATE_VALUES > 32
 #error Inventory condition bitset requires AW_STATE_VALUES <= 32
 #endif
@@ -266,7 +267,7 @@ int AW_InventoryBootstrap(void){
     if(size<8 || fread(head,1,8,f)!=8 || memcmp(head,"AWST",4)){fclose(f);return 0;}
     n=(int)inv_u32(head+4);
     if(n<0 || n>AW_STATE_VALUES || size!=8+n*72){fclose(f);return 0;}
-    next=(aw_state_t *)malloc(sizeof(*next));if(!next){fclose(f);return 0;}*next=aw_state;
+    next=(aw_state_t *)AW_TryMalloc(sizeof(*next));if(!next){fclose(f);return 0;}*next=aw_state;
     for(i=0;i<n;i++){
         aw_inventory_item_t item;
         if(fread(row,1,72,f)!=72 || !memchr(row,0,64))goto failed;

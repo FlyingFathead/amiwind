@@ -38,6 +38,14 @@ class PreflightTests(unittest.TestCase):
         self.assertIn('GiB needed', problems[0])
         self.assertEqual(build_preflight.free_space_problems(self.workspace / 'not-yet', minimum_gib=0), [])
 
+    def test_too_little_room_stops_every_build(self):
+        # BUILD-DISK-NEED-UNKNOWN-52: a tester's public build filled its disk halfway; every build, development
+        # ones too, stops before its first stage, against at least 35 GiB by default
+        self.assertGreaterEqual(build_preflight.DEFAULT_MIN_FREE_GIB, 35)
+        text = (ROOT / 'tools' / 'build.py').read_text(encoding='utf-8')
+        self.assertIn('problems += build_preflight.free_space_problems(args.workspace)', text)
+        self.assertNotIn('development builds only warn', text)
+
     def test_game_data_checked(self):
         self.assertEqual(build_preflight.data_problems(self.data), [])
         self.assertIn('does not exist', build_preflight.data_problems(self.data / 'missing')[0])

@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.51 (24 October 2026)._
+_Last updated with AmiWind v0.0.52 (26 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -169,6 +169,17 @@ first, each under 2 GiB, so 2 GiB and more works too.
 - **Off for good:** Options > Video > Extra RAM: Off (saved in `config.cfg` as `aw_autoram 0`; takes effect at the next
   start).
 - **If the memory cannot be taken,** the console says so and the game plays on the standard memory.
+- **A big room takes more while you are in it** (from v0.0.52): an interior holds nothing but itself, so a room
+  whose models do not fit its share and the cache (Akulakhan's Chamber, with the Heart and Akulakhan) takes a bank
+  of the Fast RAM still free (its largest block less 2 MiB, in 64 KiB steps; on a 32 MiB machine about 3.4 MiB
+  after a town, 4 MiB when the room is the first map) and then the rest of the game heap past its share, under the
+  loading screen, and gives both back at the next map. Before it measures, the game gives back what it can make
+  again on demand (the shared animation tables and posed frames of the skeletal actors), one console line each
+  (`Fast RAM for a room's models: ... gave back ...`). The console then says `CHIM: room ...: 3456 KiB of the free
+  Fast RAM taken for its models until the next map`; `chim` prints what is free now (`Memory now: ...`) and, for a
+  room that grew, `room: loaded whole on try 3; it grew 2 times, ...`: each growth follows a request the full zone
+  refused, so those requests are counted as failed although every model is in place. With Extra RAM off only the
+  heap's rest is taken.
 - **The game heap grows with the machine** (from v0.0.43, ENGINE-HEAP-FIXED-SIZE-43): the heap is sized at start,
   before CHIM's cache, from the largest free Fast RAM block less the same margin. It stays at the built size
   (11 MiB) unless that room holds the built size plus 8 MiB, then grows by a quarter of the room beyond it, to

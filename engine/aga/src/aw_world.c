@@ -7,6 +7,7 @@
 #include "aw_region.h"
 #include "aw_world.h"
 #include "aw_town.h"
+#include "aw_tryalloc.h"
 #include <stdint.h>
 typedef struct {float origin[3],core[4],cover[4];} terrain_region_t;
 static terrain_region_t *regions;
@@ -114,7 +115,7 @@ static int load_directory(void){
         i=AW_Town(t)->world_slot;if(i<0 || i>1)continue;
         towns[t]=slots[i];town_ready[t]=1;
     }
-    regions=(terrain_region_t *)malloc(n*sizeof(*regions));if(!regions)goto bad;
+    regions=(terrain_region_t *)AW_TryMalloc(n*sizeof(*regions));if(!regions)goto bad;
     for(i=0;i<n;i++){
         if(fread(row,1,52,f)!=52)goto bad;
         sprintf(expected,"vf%04ld",(long)i);if(memcmp(row,expected,7) || row[7])goto bad;

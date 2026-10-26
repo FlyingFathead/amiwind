@@ -98,6 +98,21 @@ def _mib_define(header, name, source=SOURCE):
     return int(match.group(1))
 
 
+# Measured in FS-UAE (25 October 2026, A1200 profile, JIT, 32 MiB Fast RAM; ROOM-AKULAKHAN-HEAP-52): the free Fast RAM
+# in a CHIM room map after the start and the automatic 7 MiB cache bank, the engine's "chim" line "Memory now: 6398 KiB
+# Fast RAM free, largest block 6222 KiB", the same in Seyda Neen and in Akulakhan's Chamber (the room loaded, Dagoth Ur
+# placed). The room's extra bank (chim_world.c Chim_RoomGrow) is taken from that largest block; the start-up model
+# gives 6 MiB there (13 MiB free after the heap less the bank), so what the game takes after the start is counted from
+# this on every other machine (room_largest_bytes).
+# Measured again (26 October 2026, the v0.0.52-dev2 image with the release registry, 32 MiB; CHIM-ROOM-HEART-CHAMBER-
+# LOAD-50) on the worst route, Akulakhan's Chamber after Balmora: the skeletal tables given back first (1,589 KiB) do
+# not join the largest block, so the room step finds "6286 KiB of Fast RAM free, largest block 5512 KiB" (6,222 KiB
+# loaded first). The gate counts the worse figure.
+MEASURED_ROOM = {'fast_mib': 32, 'free_kib': 6286, 'largest_kib': 5512,
+                 'run': 'Akulakhan\'s Chamber after Balmora, the v0.0.52-dev2 image with the release registry engine, '
+                        '32 MiB, 26 October 2026 (first map: 6,398 KiB free, largest 6,222)'}
+
+
 def fast_ram_memory(fast_mib, source=SOURCE, system_mib=None):
     """What a machine with fast_mib MiB of Fast RAM gives a CHIM map, by the engine's own start-up rules: the heap
     (aw_heapsize.c AW_HeapAuto: margin 2 MiB plus an eighth of all Fast RAM; it grows when the room past the margin
@@ -128,9 +143,64 @@ def fast_ram_memory(fast_mib, source=SOURCE, system_mib=None):
     if bank < first_min:
         bank = 0
     memory = chim_memory(source, heap_mb=heap)
+    largest_room = room_largest_bytes(fast_mib, (free - bank) * MIB, source)
     return {'fast_mib': fast_mib, 'system_mib': system, 'heap_mb': heap, 'free_after_heap_mib': free,
             'bank_bytes': bank * 1024 * 1024, 'zone_bytes': memory['zone_kib'] * 1024,
-            'buffer_bytes': cvar_default('chim/chim_world.c', 'chim_buffer_kib', source) * 1024}
+            'buffer_bytes': cvar_default('chim/chim_world.c', 'chim_buffer_kib', source) * 1024,
+            'room_largest_bytes': largest_room, 'room_bank_bytes': room_step(largest_room, source)}
+
+
+MIB = 1024 * 1024
+
+
+def room_step(largest, source=SOURCE):
+    """chim_zone.c ChimZone_RoomStep: the room's bank of free Fast RAM (Chim_RoomGrow step 1) from the largest free
+    block: that less CHIM_ROOM_KEEP, in CHIM_ROOM_GRAIN steps (64 KiB; a whole MiB until v0.0.52,
+    CHIM-ROOM-HEART-CHAMBER-LOAD-50), at most CHIM_AUTO_BANK_MAX; under CHIM_ROOM_LEAST nothing."""
+    keep = _mib_define('chim/chim_zone.h', 'CHIM_ROOM_KEEP', source) * MIB
+    least = _mib_define('chim/chim_zone.h', 'CHIM_ROOM_LEAST', source) * MIB
+    grain = define('chim/chim_zone.h', 'CHIM_ROOM_GRAIN', source)
+    if largest <= keep:
+        return 0
+    size = min(int(largest) - keep, _mib_define('chim/chim_zone.h', 'CHIM_AUTO_BANK_MAX', source) * MIB)
+    size -= size % grain
+    return 0 if size < least else size
+
+
+def room_largest_bytes(fast_mib, model_bytes, source=SOURCE):
+    """The largest free Fast RAM block a CHIM room map finds: the start-up model's free Fast RAM after the heap and the
+    cache bank (MODEL_BYTES, one memory region) less what the game takes after the start, measured at 32 MiB
+    (MEASURED_ROOM: there the measured block itself). Not measured yet: the start-up model."""
+    if MEASURED_ROOM['largest_kib'] is None:
+        return max(0, int(model_bytes))
+    measured = MEASURED_ROOM['largest_kib'] * 1024
+    if fast_mib == MEASURED_ROOM['fast_mib']:
+        return measured
+    at = fast_ram_memory(MEASURED_ROOM['fast_mib'], source)
+    after_start = (at['free_after_heap_mib'] - at['bank_bytes'] // MIB) * MIB - measured
+    return max(0, int(model_bytes) - after_start)
+
+
+def room_hunk_rest(before_zone_bytes, after_zone_bytes, memory=None, source=SOURCE):
+    """chim_world.c Chim_RoomGrow step 2 (ROOM-AKULAKHAN-HEAP-52): the Hunk a CHIM room map takes past its zone when
+    its models do not fit, by the zone's own rule (MapBeginWork: free = Hunk less chim_reserve_kib, what the map holds
+    before the zone and loads after it, and 64 bytes; the zone min(chim_zone_kib, free)); the rest less the zone's Hunk
+    block header (16 bytes), 16-byte aligned; under CHIM_ROOM_HUNK_LEAST nothing. 0 when the zone takes it all (the
+    whole-map rule binds, as on the 16 MiB baseline's 11 MiB heap)."""
+    memory = memory or chim_memory(source)
+    free = (memory['hunk_bytes'] - memory['gap_bytes'] - int(before_zone_bytes) - int(after_zone_bytes)
+            - ZONE_HEADER_BYTES)
+    zone = min(memory['zone_kib'] * 1024, free & ~15)
+    text = (Path(source) / 'chim/chim_local.h').read_text(encoding='utf-8', errors='replace')
+    least = re.search(r'#\s*define\s+CHIM_MIN_ZONE\s+\(\s*(\d+)\s*\*\s*1024\s*\)', text)
+    if not least:
+        raise ValueError('Engine value CHIM_MIN_ZONE not found in chim/chim_local.h')
+    if zone < int(least.group(1)) * 1024:
+        return 0
+    rest = free - zone - 16
+    if rest < define('chim/chim_zone.h', 'CHIM_ROOM_HUNK_LEAST', source):
+        return 0
+    return rest & ~15
 
 
 def whole_map_zone(before_zone_bytes, after_zone_bytes, memory=None):

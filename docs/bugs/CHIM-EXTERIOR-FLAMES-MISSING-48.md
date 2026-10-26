@@ -169,6 +169,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 
 Related bugs in other categories:
 
+- BALMORA-FLAMES-IN-SKY-51 (no report page): Four fire sprites in Balmora with no fire under them: two float in the air, two stand on the ground
 - [CHIM-FRAME-ALONE-FLAMES-48](CHIM-FRAME-ALONE-FLAMES-48.md): A town frame map read alone stops in its flames step: the frame-alone world holds its frames by index, the flames lookup walked them as a list
 - [FLAMES-CAP-31](FLAMES-CAP-31.md): Static flames above 128 per map are silently dropped
 

@@ -18,7 +18,7 @@ class FistNearClipTests(unittest.TestCase):
                     '-fno-sanitize=alignment', '-fno-sanitize-recover=all',
                     '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                     '-I' + str(source), str(ROOT / 'tests/aga_fist_near_clip_test.c'),
-                    *(str(source / name) for name in ('r_alias.c', 'r_aclip.c', 'mathlib.c')),
+                    *(str(source / name) for name in ('r_alias.c', 'aw_skel.c', 'r_aclip.c', 'mathlib.c')),
                     '-lm', '-o', str(exe)]
             subprocess.run(args, check=True, capture_output=True, text=True)
             result = subprocess.run([str(exe)], check=True, capture_output=True, text=True)

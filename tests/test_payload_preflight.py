@@ -174,6 +174,8 @@ class FileFormatTests(unittest.TestCase):
         # CHIM rooms: the room store and room records pass through like the CHIM world (IMAGE-FORMATS-CHIM-ROOMS-48)
         self.assertEqual(unknown_formats(['chimi/world.cwi', 'chimi/p00.ccs', 'chimi/rooms/bmastius.crm',
                                           'maps/bmastius.chim']), [])
+        # the shared animation tables of skeletal actors (SKEL-ANIM-STAGE-52: the stage build stopped on them)
+        self.assertEqual(unknown_formats(['progs/humanoid.awsk', 'progs/humanoid_f.awsk', 'progs/humanoid_kna.awsk']), [])
         with tempfile.TemporaryDirectory() as tmp:
             id1 = Path(tmp)
             (id1 / 'arena').mkdir()

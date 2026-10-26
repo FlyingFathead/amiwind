@@ -8,6 +8,7 @@
 #include "aw_character.h"
 #include "aw_region.h"
 #include "aw_mappath.h"
+#include "aw_tryalloc.h"
 typedef struct {
     int number;char kind[8],model[2][24],id[96],name[96];float size[3];
 } gallery_entry_t;
@@ -106,7 +107,7 @@ static void read_voice(void) {
         seconds=(float)Q_strtod(duration,&end);
         if(*end || !(seconds>0 && seconds<=120) || strlen(path)>95 || strlen(speech)>2047 ||
            strstr(path,"..") || path[0]=='/' || strchr(path,':') || strchr(path,'\\'))break;
-        voice=(gallery_voice_t *)malloc(sizeof(*voice));
+        voice=(gallery_voice_t *)AW_TryMalloc(sizeof(*voice));
         if(voice){strcpy(voice->sound,path);strcpy(voice->text,speech);voice->duration=seconds;}
         break;
     }
@@ -198,7 +199,7 @@ bad:
     page_count=page_total=0;strcpy(notice,"Gallery browser: catalogue unavailable or invalid.");return 0;
 }
 static void open_browser(void) {
-    if(!page)page=(gallery_entry_t *)malloc(sizeof(*page)*GALLERY_PAGE);
+    if(!page)page=(gallery_entry_t *)AW_TryMalloc(sizeof(*page)*GALLERY_PAGE);
     if(!page){strcpy(notice,"Not enough memory for the gallery browser.");return;}
     help=editing=0;filter[0]=0;filtering=1;read_page(0);IN_AWClearButtons();
     mouse_x=vid.width/2;mouse_y=vid.height/2;mouse_visible=1;scroll_drag=0;
@@ -255,7 +256,7 @@ static int capture_game(void) {
             Con_Printf("Start a local game before entering the gallery.\n");return 0;
         }
         if(strlen(sv.name)>=sizeof(back_map)){Con_Printf("Scene name too long.\n");return 0;}
-        back_state=(aw_save_t *)malloc(sizeof(*back_state));
+        back_state=(aw_save_t *)AW_TryMalloc(sizeof(*back_state));
         if(!back_state || !AW_SaveSnapshot(back_state)){
             if(back_state)free(back_state);
             back_state=NULL;

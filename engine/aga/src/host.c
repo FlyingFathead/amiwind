@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_spike.h"
 #include "aw_quickchar.h"
 #include "aw_testbox.h"
+#include "aw_tryalloc.h"
 
 /*
 
@@ -869,12 +870,16 @@ void Host_InitVCR (quakeparms_t *parms)
             Sys_Error("Invalid signature in vcr file\n");
 
         Sys_FileRead (vcrFile, &com_argc, sizeof(int));
-        com_argv = malloc(com_argc * sizeof(char *));
+        com_argv = AW_TryMalloc((com_argc + 1) * sizeof(char *));
+        if (!com_argv)
+            Sys_Error("no memory for the playback file's arguments\n");
         com_argv[0] = parms->argv[0];
         for (i = 0; i < com_argc; i++)
         {
             Sys_FileRead (vcrFile, &len, sizeof(int));
-            p = malloc(len);
+            p = AW_TryMalloc(len);
+            if (!p)
+                Sys_Error("no memory for the playback file's arguments\n");
             Sys_FileRead (vcrFile, p, len);
             com_argv[i+1] = p;
         }

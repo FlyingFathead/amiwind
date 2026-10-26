@@ -24,6 +24,8 @@
 #include "aw_mappath.h"
 #include "aw_spike.h"
 #include "aw_hinged_door.h"
+#include "aw_tryalloc.h"
+#include "aw_fastrelease.h"
 #ifdef AMIGA
 #include <proto/exec.h>
 #include <exec/memory.h>
@@ -130,11 +132,21 @@ static void		*auto_memory[AUTO_BANKS];
 static unsigned long	auto_size[AUTO_BANKS], auto_bytes, memory_free, memory_total;
 static int		auto_banks[AUTO_BANKS], auto_count, memory_decided, memory_notice, cache_manual;
 static const char	*memory_state = "not measured";
+/* A room's extra memory (Chim_RoomGrow, ROOM-AKULAKHAN-HEAP-52): a bank of
+ * the Fast RAM still free and a bank of the Hunk's rest, taken only when the
+ * room's models do not fit, both given back at the next map (RoomGrowEnd). */
+static void		*room_memory;
+static unsigned long	room_size;
+static int		room_bank = -1, room_hunk_bank = -1, room_atexit;
+static long		room_hunk_bytes;
 /* Fast RAM queries: 0 free, 1 largest block, 2 total (exec AvailMem on the
  * Amiga; a native test sets its own; none: no extra memory). */
 unsigned long	(*chim_fast_avail)(int which);
 void		*(*chim_fast_alloc)(unsigned long bytes);
 void		(*chim_fast_free)(void *memory, unsigned long bytes);
+/* Before a large block is sized from the free Fast RAM (the automatic cache banks, -chimcache, a room's growth) the
+ * engine gives back what it holds for the session and can make again on demand: aw_fastrelease.c's releasers (the
+ * skeletal actors' animation tables and posed frames first, aw_skel_release.c; SKEL-ROOM-AFTER-TOWN-52). */
 static void MemoryLine (void);
 static chim_user_t	buffer_user, index_user;
 static chim_pack_t	open_files[CHIM_OPEN_FILES];
@@ -633,6 +645,112 @@ done:
 	return ok;
 }
 
+/* ------------------------------------------------- a room's extra memory */
+
+static void AtExitRoom (void)
+{
+	if (room_memory && chim_fast_free)
+		chim_fast_free (room_memory, room_size);
+	room_memory = NULL;
+}
+
+/* MapEnd, after the transient banks are dropped: the room's Fast RAM goes
+ * back to the system (its Hunk bank goes with the map's Hunk). */
+static void RoomGrowEnd (void)
+{
+	if (room_bank >= 0)
+		ChimZone_DropBank (room_bank);
+	if (room_hunk_bank >= 0)
+		ChimZone_DropBank (room_hunk_bank);
+	AtExitRoom ();
+	room_size = 0;
+	room_bank = room_hunk_bank = -1;
+	room_hunk_bytes = 0;
+}
+
+/* A CHIM room map holds nothing but its room: when its record, a model or a
+ * texture finds no room in the map's zone and the cache banks (chim_room.c),
+ * the room grows once by each of two steps, in this order, and the load is
+ * tried again (ROOM-AKULAKHAN-HEAP-52):
+ * 1. a bank of the Fast RAM still free: its largest block less
+ *    CHIM_ROOM_KEEP, whole MiB (ChimZone_RoomStep), with Extra RAM on
+ *    (aw_autoram 1) and a Fast RAM query; it leaves Quake's cache (actors,
+ *    sounds: the Hunk's gap) as it is;
+ * 2. the rest of the Hunk past the zone, as much as the whole-map rule allows:
+ *    chim_reserve_kib kept, and what the map loads after the zone (the
+ *    larger of CHIM_ROOM_REST_KIB and the map's own statement); the room's
+ *    Hunk gap is then chim_reserve_kib, as every room has on the 16 MiB
+ *    baseline's 11 MiB heap.
+ * Both are transient banks, given back at the next map (RoomGrowEnd). 1: a
+ * step added a bank; 0: nothing more to take. A room that fits takes neither:
+ * the builder's room heap gate (tools/chim/heap.py) counts the same steps. */
+int Chim_RoomGrow (const char *name)
+{
+	unsigned long size;
+	long rest;
+	void *memory;
+
+	/* -1: not tried for this map; -2: tried, nothing taken */
+	if (room_bank == -1)
+	{
+		room_bank = -2;
+		/* the session's re-makeable memory first: at 32 MB Akulakhan's Chamber found only 2 MiB free after Balmora
+		 * (its tables and posed frames held) and failed to load; it takes 4 MiB when loaded first */
+		if (aw_autoram.value)
+		{
+			unsigned long given = AW_FastReleaseAll ("a room's models");
+			if (given)
+				Con_Printf ("CHIM: room %s: %lu KiB of re-makeable session memory given back first\n",
+					name ? name : "?", given/1024);
+		}
+		size = aw_autoram.value && chim_fast_avail && chim_fast_alloc ? ChimZone_RoomStep (chim_fast_avail (1)) : 0;
+		if (aw_autoram.value && chim_fast_avail)
+			Con_Printf ("CHIM: room %s: %lu KiB of Fast RAM free, largest block %lu KiB: a bank of %lu KiB\n",
+				name ? name : "?", chim_fast_avail (0)/1024, chim_fast_avail (1)/1024, size/1024);
+		if (size && (memory = chim_fast_alloc (size)) != NULL)
+		{
+			room_memory = memory;
+			room_size = size;
+			if (!room_atexit)
+				atexit (AtExitRoom);
+			room_atexit = 1;
+			room_bank = ChimZone_AddBank (memory, (int)size, 0);
+			if (room_bank >= 0)
+			{
+				Con_Printf ("CHIM: room %s: %lu KiB of the free Fast RAM taken for its models until the next map\n",
+					name ? name : "?", size/1024);
+				return 1;
+			}
+			room_bank = -2;
+			AtExitRoom ();
+		}
+	}
+	if (room_hunk_bank == -1)
+	{
+		long keep = CHIM_ROOM_REST_KIB * 1024L;
+		if (keep < rest_used)
+			keep = rest_used;
+		room_hunk_bank = -2;
+		rest = (long)host_parms.memsize - Hunk_LowMark () - Hunk_HighMark () - (long)chim_reserve_kib.value*1024
+			- keep - 64;
+		if (rest >= CHIM_ROOM_HUNK_LEAST && rest < 0x7fff0000L)
+		{
+			rest &= ~15L;
+			memory = Hunk_AllocName ((int)rest, "chimroom");
+			room_hunk_bank = ChimZone_AddBank (memory, (int)rest, 0);
+			if (room_hunk_bank >= 0)
+			{
+				room_hunk_bytes = rest;
+				Con_Printf ("CHIM: room %s: %ld KiB more of the Hunk taken for its models (chim_reserve_kib %ld kept)\n",
+					name ? name : "?", rest/1024, (long)chim_reserve_kib.value);
+				return 1;
+			}
+			room_hunk_bank = -2;
+		}
+	}
+	return 0;
+}
+
 /* ---------------------------------------------------------------- map */
 
 static int KeepModel (void *data, unsigned id)
@@ -695,6 +813,7 @@ static void MapEnd (void)
 	ChimZone_EvictKind (CHIM_KIND_MODEL, KeepModel);
 	ChimZone_EvictKind (CHIM_KIND_TEXTURE, KeepPersistent);
 	ChimZone_DropTransient ();
+	RoomGrowEnd ();
 	map_bank = -1;
 	active = primed = 0;
 	tick_frame = -1;
@@ -1427,6 +1546,11 @@ static void Status (void)
 		(long)s.banks, (long)(s.used_bytes/1024), (long)(s.free_bytes/1024), (long)(s.largest_free/1024),
 		(long)s.blocks, (long)s.locked);
 	MemoryLine ();
+	/* What is free now (the room heap gate's measured model, tools/engine_limits.py MEASURED_ROOM) and what a room
+	 * took beyond its zone (Chim_RoomGrow) */
+	if (chim_fast_avail)
+		Con_Printf ("Memory now: %lu KiB Fast RAM free, largest block %lu KiB; room took %lu KiB of Fast RAM and %ld KiB of the Hunk\n",
+			chim_fast_avail (0)/1024, chim_fast_avail (1)/1024, room_size/1024, room_hunk_bytes/1024);
 	Con_Printf ("models %ld (%ld KiB), textures %ld (%ld KiB), chunks %ld (%ld KiB), terrain %ld (%ld KiB)\n",
 		(long)s.kind_blocks[CHIM_KIND_MODEL], (long)(s.kind_bytes[CHIM_KIND_MODEL]/1024),
 		(long)s.kind_blocks[CHIM_KIND_TEXTURE], (long)(s.kind_bytes[CHIM_KIND_TEXTURE]/1024),
@@ -1453,6 +1577,17 @@ static void Status (void)
 		ChimChunks_Pressure (&band, &ring, &partial, &zone_failed, &data_failed);
 		Con_Printf ("zone: largest run without a lock %ld KiB; %lu failed requests, the last %ld bytes\n",
 			(long)(ChimZone_LargestUnlocked ()/1024), failures, (long)last);
+		{
+			/* each failed request named (CHIM-ROOM-HEART-CHAMBER-LOAD-50): its kind and id (a model's store id, a
+			 * static's row) and size, the last first */
+			static const char *kinds[CHIM_KINDS] = {"", "chunk index", "loading buffer", "model", "chunk catalogue",
+				"terrain", "texture", "frame world", "static", "prefetch"};
+			int back, kind, size;
+			unsigned id;
+			for (back=0 ; ChimZone_Failed (back, &kind, &id, &size) ; back++)
+				Con_Printf ("zone failed: %s %lu, %d bytes\n", kind > 0 && kind < CHIM_KINDS ? kinds[kind] : "block",
+					(unsigned long)id, size);
+		}
 		Con_Printf ("full zone: chunk loads failed %lu for room, %lu for bad data; released %lu chunks past the active radius and %lu inside it, %lu releases refused as no help (chim_release %ld); %lu partial activations (chim_partial %ld)\n",
 			zone_failed, data_failed, band, ring, chim_release_refused, (long)chim_release.value, partial, (long)chim_partial.value);
 	}
@@ -1614,6 +1749,7 @@ static void CacheBank (void)
 	cache_bytes = (long)Q_atoi (com_argv[p+1]) * 1024;
 	if (cache_bytes < 256*1024)
 		return;
+	AW_FastReleaseAll ("-chimcache");
 #ifdef AMIGA
 	if ((long)AvailMem (MEMF_FAST|MEMF_LARGEST) < cache_bytes + 512*1024)
 	{
@@ -1624,7 +1760,7 @@ static void CacheBank (void)
 	if (cache_memory)
 		atexit (FreeCache);
 #else
-	cache_memory = malloc ((size_t)cache_bytes);
+	cache_memory = AW_TryMalloc ((size_t)cache_bytes);
 #endif
 	if (cache_memory)
 		cache_bank = ChimZone_AddBank (cache_memory, (int)cache_bytes, 1);
@@ -1714,6 +1850,8 @@ static void Chim_MemoryStart (void)
 		chim_fast_free = FastFree;
 	}
 #endif
+	if (available && !cache_manual && aw_autoram.value)
+		AW_FastReleaseAll ("the CHIM cache banks");	/* before the free Fast RAM is measured */
 	memory_free = chim_fast_avail ? chim_fast_avail (0) : 0;
 	memory_total = chim_fast_avail ? chim_fast_avail (2) : 0;
 	if (memory_total < memory_free)
@@ -1840,6 +1978,10 @@ void Chim_Init (void)
 	Cvar_RegisterVariable (&chim_partial);
 	Cvar_RegisterVariable (&aw_autoram);
 	FreeAuto (0);		/* a second start-up (native tests): the zone is reset below */
+	AtExitRoom ();
+	room_size = 0;
+	room_bank = room_hunk_bank = -1;
+	room_hunk_bytes = 0;
 	memory_decided = memory_notice = cache_manual = 0;
 	cache_bank = -1;	/* CacheBank sets it again (the zone is reset below) */
 	memory_state = "not measured";

@@ -7,6 +7,7 @@
 #include "aw_saved_equipment.h"
 #include "aw_region.h"
 #include "aw_maps.h"
+#include "aw_tryalloc.h"	/* the 256 KB save buffers: malloc would trap on a full machine (SDK-MALLOC-TRAPS-52) */
 #ifdef AMIGA
 #include <proto/dos.h>
 #else
@@ -61,7 +62,7 @@ static int read_file_changes(uint32_t profile,int slot,int generation,aw_save_t 
     char filename[384];byte *raw;FILE *f;int n,extra,ok;
     if(!path(filename,sizeof(filename),profile,slot,generation))return 0;
     f=fopen(filename,"rb");if(!f)return 0;
-    raw=(byte *)malloc(AW_SAVE_BYTES);if(!raw){fclose(f);return 0;}
+    raw=(byte *)AW_TryMalloc(AW_SAVE_BYTES);if(!raw){fclose(f);return 0;}
     n=fread(raw,1,AW_SAVE_BYTES,f);extra=fgetc(f);ok=!ferror(f) && extra==EOF;
     fclose(f);
     ok=ok && AW_SaveDecodeChanges(raw,n,state,changes) && state->profile==profile &&
@@ -233,7 +234,8 @@ int AW_SaveWrite(int slot)
     sprintf(label,slot>=5?"Autosave %ld":slot?"Manual %ld":"Quicksave",(long)(slot>=5?slot-4:slot));
     memset(world.label,0,sizeof(world.label));strcpy(world.label,label);
     /* Keep larger serialized storage off the fixed Amiga task stack. */
-    raw=(byte *)malloc(AW_SAVE_BYTES);if(!raw)return 0;
+    raw=(byte *)AW_TryMalloc(AW_SAVE_BYTES);
+    if(!raw){Con_Printf("Save skipped: not enough free memory for its buffer; previous saves retained.\n");return 0;}
     save_changes.count=0;
     if((aw_save_changes_export && aw_save_changes_export(&save_changes)<0) ||
        (aw_save_objects_export && aw_save_objects_export(&save_changes)<0)){
@@ -330,7 +332,7 @@ int AW_SaveDescription(uint32_t profile,int slot,char *out,int capacity)
 int AW_SaveSlotState(uint32_t profile,int slot)
 {
     char filename[384];byte *raw;FILE *f;int n,generation,best=AW_SLOT_EMPTY,state;aw_save_t *info;
-    raw=(byte *)malloc(AW_SAVE_BYTES);info=(aw_save_t *)malloc(sizeof(aw_save_t));
+    raw=(byte *)AW_TryMalloc(AW_SAVE_BYTES);info=raw?(aw_save_t *)AW_TryMalloc(sizeof(aw_save_t)):NULL;
     if(!raw || !info){free(raw);free(info);return AW_SLOT_EMPTY;}
     for(generation=0;generation<2;generation++){
         if(!path(filename,sizeof(filename),profile,slot,generation) || !(f=fopen(filename,"rb")))continue;

@@ -112,7 +112,9 @@ class BakeRaises(unittest.TestCase):
                         patch.object(npc_anim, 'soun_records', lambda *a: {}),
                         patch.object(PA, 'assemble', lambda *a: ([], [], [])),
                         patch.dict(PA._resident_assets, clear=True), patch.dict(PA._resident_rigs, clear=True),
-                        patch.dict(PA._resident_sounds, clear=True)]
+                        patch.dict(PA._resident_sounds, clear=True),
+                        # the baked kit's ladder (--npc-anim-type 1); skeletal actors have no byte budget fallback
+                        patch.dict('os.environ', {npc_anim.ANIM_TYPE_ENV: '1'})]
         for p in self.patches:
             p.start()
 
@@ -171,7 +173,9 @@ class BakeRaises(unittest.TestCase):
         self.assertEqual(alias_stream_heap.STREAM_LIMIT, npc_anim.ACTOR_BYTE_BUDGET)
         inc = (ROOT / 'engine/aga/src/model_alias_stream.inc').read_text(encoding='utf-8')
         self.assertNotIn('AW_ALIAS_STAGING_LIMIT', inc)
-        self.assertEqual(inc.count('AW_ALIAS_STREAM_LIMIT'), 2)
+        # the file size, the decoded size, and the decoded size again with a skeletal block (docs/MODULAR_NPCS.md
+        # method C: the AWSB block after the rest frame counts in the same limit)
+        self.assertEqual(inc.count('AW_ALIAS_STREAM_LIMIT'), 3)
 
     def test_vertex_budget_at_the_last_rung_is_not_a_fallback(self):
         def bake(*a, budget, **k):

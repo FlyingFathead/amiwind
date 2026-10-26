@@ -2,6 +2,7 @@
 #include "quakedef.h"
 #include "aw_story.h"
 #include "aw_character.h"
+#include "aw_tryalloc.h"
 
 aw_character_t aw_character;
 aw_race_t aw_races[16];
@@ -125,7 +126,7 @@ int AW_CharacterLoad(void)
     size=COM_FOpenFile("character/catalog.awc",&f);
     if(!f)return 0;
     if(size<72 || size>98304){fclose(f);return 0;}
-    raw=malloc(size);
+    raw=AW_TryMalloc(size);
     if(!raw){fclose(f);return 0;}
     ok=fread(raw,1,size,f)==(size_t)size;fclose(f);
     if(ok)ok=AW_CharacterDecode(raw,size);

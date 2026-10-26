@@ -23,6 +23,7 @@ import json
 import re
 import struct
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -37,9 +38,11 @@ from map_files import ROOM_KEY  # noqa: E402
 STORE = 'chimi'
 ROOM_KIND = b'ROOM'
 ROOM_BLOCK = struct.Struct('>6fII')          # bounds mins, maxs; model count; 0
-# World format 0.12: the placement light level in the high byte of a placed record's flags.
-FORMAT_VERSION = (0, 12)
+# World format 0.12: the placement light level in the high byte of a placed record's flags; 0.13: the light's tint
+# in bits 2-4 (interior_lighting.light_tint; the engine's tint tables, r_sky.c).
+FORMAT_VERSION = (0, 13)
 FLAGS_AT = 46                                # the flags' offset in a placed record (chim.format.PLACEMENT)
+TINT_SHIFT = 2
 PACK_BYTES = 64 << 20                        # a pack is closed past this size (classic FFS: files well under 1 GiB)
 if FORMAT_VERSION not in F.READ_VERSIONS:
     F.READ_VERSIONS = F.READ_VERSIONS + (FORMAT_VERSION,)
@@ -58,15 +61,20 @@ def light_level(value):
     return max(1, min(255, int(round(value))))
 
 
-def with_light(record, level):
-    """A placed record with its light level in the flags' high byte (bits 0 and 1 kept)."""
+def with_light(record, level, tint=0):
+    """A placed record with its light level in the flags' high byte and its tint (0-7) in bits 2-4 (bits 0 and 1
+    kept)."""
     if not 0 <= level <= 255:
         raise ValueError('Light level %r outside 0..255' % level)
+    if not 0 <= tint <= 7:
+        raise ValueError('Light tint %r outside 0..7' % tint)
     flags = struct.unpack_from('>H', record, FLAGS_AT)[0]
     if flags & 0xFF00:
         raise ValueError('Placed record flags already use the high byte')
+    if flags & (7 << TINT_SHIFT):
+        raise ValueError('Placed record flags already use bits 2-4')
     out = bytearray(record)
-    struct.pack_into('>H', out, FLAGS_AT, flags | (level << 8))
+    struct.pack_into('>H', out, FLAGS_AT, flags | (level << 8) | (tint << TINT_SHIFT))
     return bytes(out)
 
 
@@ -93,7 +101,9 @@ def read_room_record(data):
         raise ValueError('Room record size does not match its placements')
     records = [P.read_placement(data, at + i * P.PLACEMENT.size) for i in range(head['count'])]
     for i, r in enumerate(records):
-        r['light'] = struct.unpack_from('>H', data, at + i * P.PLACEMENT.size + FLAGS_AT)[0] >> 8
+        flags = struct.unpack_from('>H', data, at + i * P.PLACEMENT.size + FLAGS_AT)[0]
+        r['light'] = flags >> 8
+        r['tint'] = (flags >> TINT_SHIFT) & 7 if head['version'] >= (0, 13) else 0
     return {'bounds': (v[0:3], v[3:6]), 'models': models, 'placements': records}
 
 
@@ -204,7 +214,7 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
     import numpy as np
     from chim.build import frame_input, mesh_fingerprint, mesh_unit
     from chim.units import run_units
-    from interior_lighting import point_light
+    from interior_lighting import light_tint, point_colour, point_light
     from prepare_mesh_bsp import rock_profile
     from surface_flatten import load_profiles, mount_references
     from visual_offsets import apply_visual_offsets
@@ -251,14 +261,16 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
                        terrain_on=False)
     lighting = index.get('lighting') or {}
     by_number = {r['number']: r for r in selected}
-    levels = {}
+    levels, tints = {}, {}
     from chim.cut import source_ref
     for p in spec['placements']:
         # a tile of a model over the image budget has its own number; its light is its source placement's
         ref = by_number[source_ref(p['ref'])]
         centre_point = np.mean(np.array(ref['bounds'], dtype=float), axis=0) * SCALE
         levels[p['ref']] = light_level(point_light(centre_point, lighting)) if lighting else 0
-    out = {'room': work.name, 'spec': spec, 'levels': levels,
+        # 0.13: the colour that light leans toward (INTERIOR-SUNLIGHT-COLOUR-51)
+        tints[p['ref']] = light_tint(point_colour(centre_point, lighting)) if lighting else 0
+    out = {'room': work.name, 'spec': spec, 'levels': levels, 'tints': tints,
            'bounds': (tuple(float(v) for v in lo), tuple(float(v) for v in hi)),
            'cell': index.get('cell'), 'fallbacks': spec['fallbacks']}
     if left_out is not None:
@@ -702,14 +714,15 @@ class Store:
             rec = P.placement(pid, p['ref'], mid, p['origin'], angles, 0, 0, 0,
                               stored_box(*P.placed_box(p['origin'], angles, v['lo'], v['hi'])), 1,
                               p.get('story_hidden', False))
-            records.append(with_light(rec, room['levels'].get(p['ref'], 0)))
+            records.append(with_light(rec, room['levels'].get(p['ref'], 0), room.get('tints', {}).get(p['ref'], 0)))
         if self.current_bytes >= PACK_BYTES:
             self.close_pack()
         data = room_record(room['bounds'], ids, records)
         return data, {'room': room['room'], 'cell': room['cell'], 'placements': len(records), 'models': len(ids),
                       'record_bytes': len(data), 'collision_union_fallbacks': room['fallbacks'],
                       'over_budget_tiles': spec.get('over_budget_tiles', {}),
-                      'light_levels': [min(room['levels'].values() or [0]), max(room['levels'].values() or [0])]}
+                      'light_levels': [min(room['levels'].values() or [0]), max(room['levels'].values() or [0])],
+                      'light_tints': {str(t): n for t, n in sorted(Counter(room.get('tints', {}).values()).items())}}
 
     def write(self, out):
         """Write OUT/chimi/: the index and the packs."""
@@ -928,6 +941,9 @@ def main(argv=None):
                                       "plants out, the image places them as harvest entities; absent: plants stay "
                                       "placed meshes")
     ap.add_argument('--data-files', help='the game data the harvest source was made from (with --harvest)')
+    ap.add_argument('--sdk', help='the Amiga SDK (target structure sizes): the early room heap check '
+                                  '(chim.heap.require_room_store_heap, ROOM-AKULAKHAN-HEAP-52) runs on the store, '
+                                  'OUT/%s; absent: recorded as not run' % EARLY_HEAP_REPORT)
     args = ap.parse_args(argv)
     works = list(args.room_work)
     for folder in args.rooms_from:
@@ -936,6 +952,25 @@ def main(argv=None):
     receipt = build(works, args.palette, args.out, args.qbsp, args.jobs, args.unit_cache, args.harvest,
                     args.data_files)
     print(json.dumps(receipt['store'], indent=1))
+    early_room_heap(args.out, args.sdk, args.jobs)
+
+
+EARLY_HEAP_REPORT = 'chim-room-heap-early.json'
+
+
+def early_room_heap(out, sdk, jobs=1):
+    """The early room heap check on the store this stage wrote (ROOM-AKULAKHAN-HEAP-52: the image's room heap gate
+    stopped a build 39 minutes in): every room against what the 32 MB minimum can give it at most (its room map at its
+    smallest), so a room the image's gate will refuse stops the build here, seconds after the store is written."""
+    import time
+    from chim.heap import require_room_store_heap
+    started = time.time()
+    report = require_room_store_heap(out, sdk, report_path=Path(out) / EARLY_HEAP_REPORT, jobs=jobs)
+    rooms = report.get('rooms', {})
+    _log('room heap (early): %s, %d rooms, %d past one bank at 32 MB, least headroom %s, %.1f s (%s)' % (
+        report['status'], len(rooms), sum(1 for r in rooms.values() if isinstance(r.get('walk_32mb'), dict)),
+        min((r['headroom_32mb_bytes'] for r in rooms.values()), default='-'), time.time() - started, EARLY_HEAP_REPORT))
+    return report
 
 
 if __name__ == '__main__':

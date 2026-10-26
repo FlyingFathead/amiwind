@@ -75,8 +75,10 @@ int main (void)
     assert (!ChimFormat_Room (buf, n, &h, &room));                 /* no kind at all */
     n = Room (7, "ROOM", 2, 3);
     assert (!ChimFormat_Room (buf, n, &h, &room));                 /* before placed records (0.8) */
-    n = Room (13, "ROOM", 2, 3);
+    n = Room (CHIM_FORMAT_MINOR + 1, "ROOM", 2, 3);
     assert (!ChimFormat_Room (buf, n, &h, &room));                 /* newer than this engine */
+    n = Room (13, "ROOM", 2, 3);
+    assert (ChimFormat_Room (buf, n, &h, &room) && h.minor == 13); /* 0.13: light tints */
     n = Room (12, "ROOM", 2, 3);
     U32 (buf + 20, 68);
     assert (!ChimFormat_Room (buf, n, &h, &room));                 /* the model list is not at 64 */

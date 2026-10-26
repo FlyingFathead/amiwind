@@ -27,6 +27,8 @@ int AW_MovieDebugPending(void){return 0;}
 void AW_MoviePaint(portable_samplepair_t *p,int n,int start){assert(movie);}
 void AW_MusicPaint(portable_samplepair_t *p,int n){int i;for(i=0;i<n;i++){p[i].left=321;p[i].right=-321;}frames+=n;}
 unsigned long AW_MusicSilentSpans(void){return 0;}   /* the load meter's music dry count (snd_dma.c S_Update_) */
+static int load_pumps;
+void AW_MusicLoadPump(void){load_pumps++;}           /* the music reads go on during a load (AUDIO-LOAD-29) */
 sfxcache_t *S_LoadSound(sfx_t *s){assert(0);return NULL;}
 void Con_Printf(char *fmt,...){
  char line[512];va_list ap;
@@ -59,11 +61,17 @@ int main(void){
   * movie's own sound): its 530 ms are no gap of the load's music, and the line says what it left out */
  {
   long gap=-1,left=-1;const char *at;
+  int pumps;
   aw_loading_music=true;report[0]=0;S_LoadingBegin();
+  load_pumps=0;
   for(i=0;i<5;i++){clock_now+=.03;S_LoadingUpdate();}
+  assert(load_pumps==5);            /* the music's reads go on through the load, one pump per mixer update */
+  pumps=load_pumps;
   movie=1;clock_now+=.03;S_LoadingUpdate();clock_now+=.5;S_LoadingUpdate();
+  assert(load_pumps==pumps);        /* not under the movie: the music is paused there */
   movie=0;clock_now+=.03;S_LoadingUpdate();
   for(i=0;i<5;i++){clock_now+=.04;S_LoadingUpdate();}
+  assert(load_pumps==pumps+6);
   S_LoadingReport();
   at=strstr(report,"longest gap ");assert(at && sscanf(at,"longest gap %ld ms",&gap)==1);
   assert(gap>=38 && gap<=41);

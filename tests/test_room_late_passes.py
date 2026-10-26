@@ -512,6 +512,25 @@ class RoomHeapTests(Forms):
         with self.assertRaisesRegex(ValueError, 'CHIM room heap gate failed: fixture'):
             require_room_map_heap(images['chim'], sizes=dict(SIZES, model=1 << 30), heap_mb=96)
 
+    def test_the_early_check_reads_the_store_alone_and_agrees(self):
+        """ROOM-AKULAKHAN-HEAP-52: the chim-interiors stage's check (room_store_heap) on the interior store alone, the
+        room map at its smallest: what fails there fails in the image's gate."""
+        from chim.heap import require_room_map_heap, require_room_store_heap, room_map_heap, room_store_heap
+        images = self.both()
+        early = room_store_heap(images['chim'], SIZES)
+        late = room_map_heap(images['chim'], SIZES)
+        self.assertEqual(list(early), ['fixture'])
+        self.assertTrue(early['fixture']['ok'])
+        self.assertEqual(early['fixture']['need_bytes'], late['fixture']['need_bytes'])
+        self.assertGreaterEqual(early['fixture']['min_fast_room_bytes'], late['fixture']['min_fast_room_bytes'])
+        report_path = Path(self.tmp.name) / 'early.json'
+        big = dict(SIZES, model=1 << 30)
+        with self.assertRaisesRegex(ValueError, r'CHIM room heap check \(early, before the image\) failed: fixture'):
+            require_room_store_heap(images['chim'], sizes=big, report_path=report_path)
+        self.assertEqual(json.loads(report_path.read_text())['failed'], ['fixture'])
+        with self.assertRaises(ValueError):
+            require_room_map_heap(images['chim'], sizes=big)
+
 
 if __name__ == '__main__':
     unittest.main()

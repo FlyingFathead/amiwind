@@ -7,6 +7,7 @@
 #include "aw_harvest.h"
 #include "aw_harvest_runtime.h"
 #include "aw_harvest_proxy.h"
+#include "aw_tryalloc.h"
 static aw_harvest_t harvest;
 static edict_t **plants;
 static unsigned char *available;
@@ -97,7 +98,7 @@ void AW_HarvestSpawn(void)
     int i,b,result,level=aw_character.valid?aw_character.level:1;unsigned char duplicate[AW_HARVEST_PLANTS];edict_t *e;
     if(harvest.representation==4){AW_HarvestProxySpawn(&harvest,&aw_state,level,(unsigned)rand());return;}
     free(plants);plants=NULL;available=NULL;if(!harvest.plants)return;
-    plants=(edict_t **)calloc(harvest.plants,sizeof(*plants)+sizeof(*available));
+    plants=(edict_t **)AW_TryCalloc(harvest.plants,sizeof(*plants)+sizeof(*available));
     if(!plants){Con_Printf("Harvest brush allocation failed: %d placements unavailable.\n",harvest.plants);return;}
     available=(unsigned char *)(plants+harvest.plants);memset(duplicate,0,sizeof(duplicate));
     for(i=1;i<sv.num_edicts;i++){

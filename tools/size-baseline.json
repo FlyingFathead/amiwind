@@ -8,16 +8,20 @@
  "drives": [
   {
    "bytes": 4291854336,
-   "file": "AmiWind-v0.0.50.hdf"
+   "file": "AmiWind-v0.0.51.hdf"
   }
  ],
  "groups": {
+  "actors": {
+   "bytes": 1665562982,
+   "files": 11176
+  },
   "chim-world": {
    "bytes": 1115103922,
    "files": 39496
   },
   "classic-maps": {
-   "bytes": 7675980,
+   "bytes": 7696732,
    "files": 1189
   },
   "music": {
@@ -29,12 +33,12 @@
    "files": 7106
   },
   "other": {
-   "bytes": 356003255,
+   "bytes": 356039081,
    "files": 3392
   },
   "progs": {
-   "bytes": 1869578486,
-   "files": 12965
+   "bytes": 204055103,
+   "files": 1792
   },
   "sound": {
    "bytes": 200991172,
@@ -46,10 +50,10 @@
   }
  },
  "labels": [],
- "note": "The v0.0.50 release image (run 2026_10_24_v0.0.50_final_ffb87463), the previous release after the v0.0.50 pin",
- "payload_bytes": 3976767813,
- "run": "2026_10_24_v0.0.50_final_ffb87463",
+ "note": "The v0.0.51 release image (run 2026_10_25_v0.0.51_final_d74cc652), the previous release after the v0.0.51 pin; actors as their own group (stage 0 of the actor disk plan)",
+ "payload_bytes": 3976863990,
+ "run": "2026_10_25_v0.0.51_final_d74cc652",
  "schema": "amiwind-size-ledger-v1",
  "status": "complete",
- "version": "0.0.50"
+ "version": "0.0.51"
 }

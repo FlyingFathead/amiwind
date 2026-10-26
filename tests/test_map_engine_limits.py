@@ -66,12 +66,15 @@ class EngineLimitsTests(unittest.TestCase):
         # command's summoned copy; they are not counted in runtime_edicts yet (the map gate models one frame; the
         # window's edicts are an open item, docs/chim/CELL_CROSSINGS.md "Weak points").
         self.assertEqual(sorted(sites), ['aw_actors.c', 'aw_actors.c', 'aw_arena.c', 'aw_companion.c', 'aw_inventory.c',
-                                         'aw_inventory.c', 'aw_items.c'])
-        # one each for the companion and the arena foe; aw_items.c one per carried item of every hostile
+                                         'aw_inventory.c', 'aw_items.c', 'aw_items.c'])
+        # one each for the companion and the arena foe; aw_items.c one per carried item of every hostile, and one
+        # per carried light of a skeletal guard (its torch, at most AW_ITEMS_CARRIERS: SKEL-ITEM-TAGS-52)
         items = (SRC / 'aw_items.c').read_text()
         self.assertRegex(items, r'for\(k=0;k<AW_ITEMS_KINDS;k\+\+\)\{\s*int i=table\[t\]\.item\[k\];[^}]*ED_Alloc\(\)')
+        self.assertRegex(items, r'e=carriers\[i\]\.light=ED_Alloc\(\)')
+        self.assertIn('static struct {edict_t *actor;edict_t *light;int table;} carriers[CARRIERS];', items)
         self.assertIn('AW_ItemsShow(e,s->item);', (SRC / 'aw_combat.c').read_text())
-        self.assertEqual(mel.runtime_edicts(), 2 + 4 * 2 + 32)
+        self.assertEqual(mel.runtime_edicts(), 2 + 4 * 2 + 32 + 32)
         inventory = (SRC/'aw_inventory.c').read_text()
         self.assertIn('j==AW_INVENTORY_DROPS', inventory)
         self.assertIn('sv.time-e->freetime>.5', inventory)
@@ -156,6 +159,18 @@ class MapCountTests(unittest.TestCase):
             withx = mel.count(bsp(rows), id1=id1)
             self.assertEqual(withx['models'] - plain['models'], 2)      # sword + mover
             self.assertEqual(withx['sounds'] - plain['sounds'], 4)      # three + the mover's
+
+    def test_skeletal_actor_tags_count_their_items_and_light(self):
+        # an AWTS1 tag (SKEL-ITEM-TAGS-52): weapon, shield and a guard's carried light are precached at spawn
+        with tempfile.TemporaryDirectory() as temp:
+            id1 = Path(temp)
+            (id1 / 'progs').mkdir()
+            (id1 / 'progs/g.anm').write_text('IDLE:0:21:0.127')
+            (id1 / 'progs/g.tag').write_text(chr(10).join(['AWTS1 2730', 'weapon items/spear.mdl', 'shield -',
+                                                          'bones 18 9', 'scale 0.25 0.25 0.25', 'light items/torch.mdl',
+                                                          'emitter 0 0 12', '']))
+            rows = world({'classname': 'aw_npc', 'model': 'progs/g.mdl'})
+            self.assertEqual(mel.count(bsp(rows), id1=id1)['models'] - mel.count(bsp(rows))['models'], 2)
 
     def test_too_many_edicts_is_refused_on_a_plain_map(self):
         room = mel.limits()['entity_room']

@@ -5,6 +5,18 @@
     "vivec_god": {
       "reason": "Vivec in the Palace of Vivec: the demigod meditating above the floor in his crossed-leg idle.",
       "source": "CREA vivec_god (model r/LordVivec.NIF, the idle2 group in its text keys; AI_W idle chances: Idle2 60); placed once, Vivec, Palace of Vivec"
+    },
+    "dagoth_ur_2": {
+      "reason": "Dagoth Ur in Akulakhan's Chamber, the final confrontation, as his whole original model (the maintainer: a full poly count, as in the NPC gallery; the room holds nothing else; CREATURE-DAGOTH-UR-ABSENT-52).",
+      "source": "CREA dagoth_ur_2 (model r/dagothr.nif, the gallery profile dagoth-whole-shared-vertex-v1: all 2,254 triangles on 1,741 vertices); placed once, Akulakhan's Chamber"
+    },
+    "dagoth_ur_1": {
+      "reason": "Dagoth Ur in the Facility Cavern, the first meeting before the chamber, the same whole model (CREATURE-DAGOTH-UR-ABSENT-52).",
+      "source": "CREA dagoth_ur_1 (model r/dagothr.nif, profile dagoth-whole-shared-vertex-v1); placed once, Dagoth Ur, Facility Cavern"
+    },
+    "heart_akulakhan": {
+      "reason": "The Heart of Lorkhan in Akulakhan's Chamber, the object of the main quest (the maintainer, TG 2026-10-25: Lorkhan's heart is missing; CREATURE-DAGOTH-UR-ABSENT-52).",
+      "source": "CREA heart_akulakhan (its own model, read from its record); placed once, Akulakhan's Chamber"
     }
   }
 }

@@ -6,8 +6,11 @@ float Q_CosRad(float radians);
 #else
 #include "quakedef.h"
 #include "aw_anim.h"
+#include "aw_skel.h"
+#include "aw_torch.h"
 #endif
 #include "aw_items.h"
+#include "aw_tryalloc.h"
 
 /* A decimal number "-12.345" (the tag writer's %.3f); no library float parsing. */
 static int number(const char **p,float *out) {
@@ -21,13 +24,10 @@ static int number(const char **p,float *out) {
 }
 static const char *line_end(const char *p) {while(*p && *p!='\n')p++;return p;}
 
-int AW_ItemsParse(const char *text,int numframes,float *rows,int maxframes,char paths[AW_ITEMS_KINDS][AW_ITEMS_PATH]) {
+/* The "weapon <path|->" and "shield <path|->" lines of both tag forms. */
+static int item_paths(const char **pp,char paths[AW_ITEMS_KINDS][AW_ITEMS_PATH]) {
     static const char *const kind[AW_ITEMS_KINDS]={"weapon ","shield "};
-    const char *p=text,*e;float f;int frames,i,k,n;
-    if(strncmp(p,"AWTG1 ",6))return 0;
-    p+=6;if(!number(&p,&f) || f<1 || f>AW_ITEMS_MAX_FRAMES || f>maxframes)return 0;
-    frames=(int)f;if(frames!=numframes)return 0;
-    p=line_end(p);if(*p)p++;
+    const char *p=*pp,*e;int i,k,n;
     for(k=0;k<AW_ITEMS_KINDS;k++){
         if(strncmp(p,kind[k],7))return 0;
         p+=7;e=line_end(p);n=(int)(e-p);if(n>0 && p[n-1]=='\r')n--;
@@ -39,11 +39,59 @@ int AW_ItemsParse(const char *text,int numframes,float *rows,int maxframes,char 
         }
         p=*e?e+1:e;
     }
+    *pp=p;return 1;
+}
+
+int AW_ItemsParse(const char *text,int numframes,float *rows,int maxframes,char paths[AW_ITEMS_KINDS][AW_ITEMS_PATH]) {
+    const char *p=text;float f;int frames,i,k;
+    if(strncmp(p,"AWTG1 ",6))return 0;
+    p+=6;if(!number(&p,&f) || f<1 || f>AW_ITEMS_MAX_FRAMES || f>maxframes)return 0;
+    frames=(int)f;if(frames!=numframes)return 0;
+    p=line_end(p);if(*p)p++;
+    if(!item_paths(&p,paths))return 0;
     for(i=0;i<frames;i++){
         for(k=0;k<AW_ITEMS_ROW;k++)if(!number(&p,&rows[i*AW_ITEMS_ROW+k]))return 0;
         while(*p==' ' || *p=='\r')p++;
         if(*p!='\n' && *p)return 0;
         if(*p)p++;
+    }
+    return frames;
+}
+
+int AW_ItemsParseSkel(const char *text,int numframes,char paths[AW_ITEMS_KINDS][AW_ITEMS_PATH],int bones[AW_ITEMS_KINDS],
+                      float scale[3],char light[AW_ITEMS_PATH],float emitter[3],int *has_emitter) {
+    const char *p=text;float f;int frames,k;
+    if(has_emitter)*has_emitter=0;
+    if(light)light[0]=0;
+    if(strncmp(p,"AWTS1 ",6))return 0;
+    p+=6;if(!number(&p,&f) || f<1 || f>AW_ITEMS_MAX_SKEL_FRAMES)return 0;
+    frames=(int)f;if(frames!=numframes)return 0;
+    p=line_end(p);if(*p)p++;
+    if(!item_paths(&p,paths) || strncmp(p,"bones ",6))return 0;
+    p+=6;
+    for(k=0;k<AW_ITEMS_KINDS;k++){
+        if(!number(&p,&f) || f<-1 || f>=AW_ITEMS_MAX_BONES || f!=(float)(int)f)return 0;
+        bones[k]=(int)f;
+    }
+    p=line_end(p);if(*p)p++;
+    if(strncmp(p,"scale ",6))return 0;
+    p+=6;
+    for(k=0;k<3;k++)if(!number(&p,&scale[k]) || !(scale[k]>0))return 0;
+    /* optional: a carried light (a guard's torch; SKEL-ITEM-TAGS-52), its model on the shield bone and its flame
+     * point in that bone's space; it takes the shield hand while torches are carried (night, or forced) */
+    p=line_end(p);if(*p)p++;
+    if(!strncmp(p,"light ",6)){
+        const char *e;float pt[3];int n,i;
+        p+=6;e=line_end(p);n=(int)(e-p);if(n>0 && p[n-1]=='\r')n--;
+        if(n<1 || n>=AW_ITEMS_PATH || bones[1]<0)return 0;
+        for(i=0;i<n;i++)if(p[i]<=' ' || p[i]>'~' || (p[i]=='.' && p[i+1]=='.'))return 0;
+        if(light){memcpy(light,p,(size_t)n);light[n]=0;}
+        p=*e?e+1:e;
+        if(strncmp(p,"emitter ",8))return 0;
+        p+=8;
+        for(k=0;k<3;k++)if(!number(&p,&pt[k]))return 0;
+        if(emitter)for(k=0;k<3;k++)emitter[k]=pt[k];
+        if(has_emitter)*has_emitter=1;
     }
     return frames;
 }
@@ -62,13 +110,17 @@ void AW_ItemsPose(const float *tag6,const float origin[3],float yaw,float out_or
 /* One tag table per actor model in use, reset per level (like aw_anim.c's layouts);
  * rows live on the hunk, which the level owns. */
 #define TABLE 64
-static struct {model_t *model;int frames;float *rows;int item[AW_ITEMS_KINDS];} table[TABLE];
+/* rows: a baked model's tag rows; or skel: a skeletal model's item bones and actor scale (rows NULL). */
+static struct {model_t *model;int frames;float *rows;int item[AW_ITEMS_KINDS];
+               int skel,bone[AW_ITEMS_KINDS];float scale[3];
+               float emitter[3];int has_emitter,light_item;} table[TABLE];   /* a carried light (guard torch) */
 static int used;
 static model_t *level_world;
 static char names[TABLE*AW_ITEMS_KINDS][AW_ITEMS_PATH];   /* precache names live through the level */
 static int named;
 
 static void level_check(void) {
+    R_AliasTorchLayer=AW_ItemsTorchLayer;   /* the renderer poses a torch-holding guard's arm (r_alias.c) */
     if(level_world!=sv.worldmodel){level_world=sv.worldmodel;used=0;named=0;memset(table,0,sizeof(table));}
 }
 static model_t *model_of(edict_t *e) {
@@ -80,6 +132,18 @@ static int entry_of(model_t *m) {
     for(i=0;i<used;i++)if(table[i].model==m)return i;
     return -1;
 }
+/* Carried lights (a guard's torch on a skeletal actor; SKEL-ITEM-TAGS-52): an actor whose tag names a flame point
+ * carries its shield-slot item all the time, not only while it fights (the combat slots then draw its weapon only).
+ * One entity per carrier, made when first needed and moved with the actor every server frame
+ * (AW_ItemsCarriedUpdate); reset per level. */
+#define CARRIERS AW_ITEMS_CARRIERS
+static struct {edict_t *actor;edict_t *light;int table;} carriers[CARRIERS];
+static int carrier_count;
+static model_t *carrier_world;
+static void carriers_check(void) {
+    if(carrier_world!=sv.worldmodel){carrier_world=sv.worldmodel;carrier_count=0;memset(carriers,0,sizeof(carriers));}
+}
+static int carries_light(int t) {return t>=0 && table[t].skel && table[t].has_emitter && table[t].light_item;}
 /* Precache an item model while the level loads (spawn functions only). */
 static int precache(const char *path) {
     int i;model_t *m;
@@ -98,12 +162,33 @@ static void prep(model_t *m,const char *name,int numframes) {
     int mark,n,k,frames,any=0;float *rows,declared;
     if(!m || entry_of(m)>=0 || used>=TABLE)return;
     n=(int)strlen(name);
-    if(n<5 || n>=(int)sizeof(path) || strcmp(name+n-4,".mdl") || numframes<0 || numframes>AW_ITEMS_MAX_FRAMES)return;
+    if(n<5 || n>=(int)sizeof(path) || strcmp(name+n-4,".mdl") || numframes<0 || numframes>AW_ITEMS_MAX_SKEL_FRAMES)
+        return;
     memcpy(path,name,(size_t)(n-4));strcpy(path+n-4,".tag");
     /* The rows stay on the level's hunk; the text is read into temporary memory. */
     mark=Hunk_LowMark();
     text=COM_LoadTempFile(path);
     if(!text){Hunk_FreeToLowMark(mark);return;}
+    if(!strncmp((const char *)text,"AWTS1 ",6)){
+        /* a skeletal model: its items follow the table's bones, posed when drawn (SKEL-ITEM-TAGS-52) */
+        int bones[AW_ITEMS_KINDS];float scale[3];char light[AW_ITEMS_PATH];
+        frames=AW_ItemsParseSkel((const char *)text,numframes,items,bones,scale,light,table[used].emitter,
+                                 &table[used].has_emitter);
+        Hunk_FreeToLowMark(mark);
+        if(!frames){Con_Printf("Item tags %s: invalid, items not drawn\n",path);return;}
+        table[used].model=m;table[used].frames=frames;table[used].rows=NULL;table[used].skel=1;
+        for(k=0;k<3;k++)table[used].scale[k]=scale[k];
+        for(k=0;k<AW_ITEMS_KINDS;k++){
+            table[used].bone[k]=bones[k];
+            table[used].item[k]=items[k][0] && bones[k]>=0?precache(items[k]):0;
+            if(table[used].item[k])any=1;
+        }
+        table[used].light_item=table[used].has_emitter && light[0]?precache(light):0;
+        if(table[used].light_item)any=1;
+        if(any)used++;
+        return;
+    }
+    if(numframes>AW_ITEMS_MAX_FRAMES){Hunk_FreeToLowMark(mark);return;}
     if(!numframes){
         p=(const char *)text;
         if(strncmp(p,"AWTG1 ",6)){Con_Printf("Item tags %s: invalid, items not drawn\n",path);Hunk_FreeToLowMark(mark);return;}
@@ -119,7 +204,7 @@ static void prep(model_t *m,const char *name,int numframes) {
         Con_Printf("Item tags %s: invalid, items not drawn\n",path);
         Hunk_FreeToLowMark(mark);return;
     }
-    table[used].model=m;table[used].frames=frames;table[used].rows=rows;
+    table[used].model=m;table[used].frames=frames;table[used].rows=rows;table[used].skel=0;
     for(k=0;k<AW_ITEMS_KINDS;k++){table[used].item[k]=items[k][0]?precache(items[k]):0;if(table[used].item[k])any=1;}
     if(any)used++;else Hunk_FreeToLowMark(mark);
 }
@@ -128,8 +213,16 @@ void AW_ItemsPrep(edict_t *actor) {
     model_t *m;const aw_anim_t *a;int i;
     level_check();
     if(!actor || !(m=model_of(actor)) || sv.state!=ss_loading)return;
-    if(m->numframes<1 || m->numframes>AW_ITEMS_MAX_FRAMES)return;
+    if(m->numframes<1 || m->numframes>AW_ITEMS_MAX_SKEL_FRAMES)return;
     prep(m,m->name,m->numframes);
+    if(carries_light(entry_of(m))){          /* a guard's torch: carried all the time (AW_ItemsCarriedUpdate) */
+        carriers_check();
+        for(i=0;i<carrier_count && carriers[i].actor!=actor;i++);
+        if(i==carrier_count && carrier_count<CARRIERS){
+            carriers[carrier_count].actor=actor;carriers[carrier_count].light=NULL;
+            carriers[carrier_count++].table=entry_of(m);
+        }
+    }
     /* The full-kit model the actor wears while it moves or fights (aw_anim.c AW_AnimMover) has its own
      * tag table beside it; AW_AnimPrep has registered it by name. */
     a=AW_AnimOf(actor);
@@ -151,7 +244,8 @@ int AW_ItemsShow(edict_t *actor,edict_t *out[AW_ITEMS_KINDS]) {
     if(!actor || actor->free || !frames_match(model_of(actor),t=entry_of(model_of(actor))))return 0;
     for(k=0;k<AW_ITEMS_KINDS;k++){
         int i=table[t].item[k];
-        if(!i || !sv.model_precache[i])continue;
+        /* while torches are carried the torch has the shield hand (AW_ItemsCarriedUpdate) */
+        if(!i || !sv.model_precache[i] || (k==1 && carries_light(t) && AW_GuardTorchWanted()))continue;
         e=ED_Alloc();
         e->v.classname=ED_NewString("aw_item")-pr_strings;
         e->v.model=sv.model_precache[i]-pr_strings;e->v.modelindex=i;
@@ -162,14 +256,98 @@ int AW_ItemsShow(edict_t *actor,edict_t *out[AW_ITEMS_KINDS]) {
     return n;
 }
 
+/* A skeletal model's item rows at one table frame (SKEL-ITEM-TAGS-52): the table posed at the frame and each item
+ * bone made into a tag row. The last pose is kept (an armed actor's items follow it every server frame while its
+ * table frame changes about 8 times a second). 0 when the model has no table. */
+int AW_ItemsTorchLayer(const model_t *m,const void *skel_table,int frame,float *layer_frame,int *root) {
+    const aw_skel_table_t *tab=(const aw_skel_table_t *)skel_table;
+    aw_skel_group_t g;int t,i,span;
+    if(!m || !tab || !AW_GuardTorchWanted())return 0;
+    for(t=0;t<used && table[t].model!=m;t++);
+    if(t==used || !carries_light(t))return 0;
+    if((*root=AW_SkelLeftArmRoot(tab,table[t].bone[1],table[t].bone[0]))<0 || (i=AW_SkelGroup(tab,"torch"))<0)return 0;
+    AW_SkelGroupAt(tab,i,&g);
+    span=(int)(g.last-g.first)+1;
+    if(span<1)return 0;
+    /* the group's frames in turn with the actor's own (the baked guards: its eight phases), so a frame poses alike */
+    *layer_frame=(float)(g.first+(unsigned)(frame<0?0:frame)%(unsigned)span);
+    return 1;
+}
+
+static int skel_rows(int t,int f,float rows[AW_ITEMS_ROW]) {
+    static const aw_skel_table_t *last_table;static int last_frame=-1,last_layered;
+    static float world[AW_SKEL_MAX_BONES][3][4];
+    const aliashdr_t *hdr=(const aliashdr_t *)Mod_Extradata(table[t].model);
+    const aw_skel_table_t *tab=hdr && hdr->aw_skel?(const aw_skel_table_t *)hdr->aw_skel_table:NULL;
+    int k,root=-1,layered;float layer=0;
+    if(!tab)return 0;
+    /* a guard holding his torch has his left arm on the torch group, as he is drawn (AW_ItemsTorchLayer) */
+    layered=AW_ItemsTorchLayer(table[t].model,tab,f,&layer,&root);
+    if(tab!=last_table || f!=last_frame || layered!=last_layered){
+        AW_SkelPoseLayer(tab,(float)f,layer,layered?root:-1,world);last_table=tab;last_frame=f;last_layered=layered;
+    }
+    for(k=0;k<AW_ITEMS_KINDS;k++){
+        int b=table[t].bone[k];
+        if(b>=0 && b<tab->bones)AW_SkelBoneTag((const float (*)[4])world[b],table[t].scale,&rows[k*6]);
+        else memset(&rows[k*6],0,6*sizeof(float));
+    }
+    return 1;
+}
+
 void AW_ItemsUpdate(edict_t *actor,edict_t *items[AW_ITEMS_KINDS]) {
-    int t,k,f;
+    int t,k,f;float skel[AW_ITEMS_ROW];const float *row;
     if(!actor || actor->free || !frames_match(model_of(actor),t=entry_of(model_of(actor)))){AW_ItemsHide(items);return;}
     f=(int)actor->v.frame;if(f<0 || f>=table[t].frames)f=0;
+    if(table[t].skel){
+        if(!skel_rows(t,f,skel)){AW_ItemsHide(items);return;}
+        row=skel;
+    }else row=&table[t].rows[f*AW_ITEMS_ROW];
     for(k=0;k<AW_ITEMS_KINDS;k++){
         edict_t *e=items[k];
         if(!e || e->free)continue;
-        AW_ItemsPose(&table[t].rows[f*AW_ITEMS_ROW+k*6],actor->v.origin,actor->v.angles[1],e->v.origin,e->v.angles);
+        AW_ItemsPose(&row[k*6],actor->v.origin,actor->v.angles[1],e->v.origin,e->v.angles);
+        SV_LinkEdict(e,false);
+    }
+}
+
+/* The shield-slot item's flame point of a carried light model (the torch item's own model space), 1 if it is one.
+ * The tag states it in the shield bone's units (tools/prepare_guard_torches.py torch_item); the item model is that
+ * bone space at the items' own scale, 0.25 (tools/npc_items.py: an item keeps its size, it is not scaled with the
+ * actor), so the point is taken at that scale: unscaled it sat about three torch lengths out, the flame and its light
+ * away from the torch (SKEL-ITEM-TAGS-52). */
+#define AW_ITEMS_ITEM_SCALE 0.25f
+int AW_ItemsLightEmitter(const model_t *item,float out[3]) {
+    int t,k;
+    if(!item)return 0;
+    for(t=0;t<used;t++){
+        int i=table[t].light_item;
+        if(!carries_light(t) || sv.models[i]!=item)continue;
+        for(k=0;k<3;k++)out[k]=table[t].emitter[k]*AW_ITEMS_ITEM_SCALE;
+        return 1;
+    }
+    return 0;
+}
+
+void AW_ItemsCarriedUpdate(void) {
+    int i,t,wanted;float rows[AW_ITEMS_ROW];
+    carriers_check();
+    wanted=AW_GuardTorchWanted();       /* as the baked guard torches: at night, or forced (aw_guard_torch.c) */
+    for(i=0;i<carrier_count;i++){
+        edict_t *a=carriers[i].actor,*e=carriers[i].light;
+        t=carriers[i].table;
+        if(!wanted || !a || a->free || model_of(a)!=table[t].model){
+            if(e && !e->free)ED_Free(e);
+            carriers[i].light=NULL;continue;
+        }
+        if(!e || e->free){
+            int m=table[t].light_item;
+            e=carriers[i].light=ED_Alloc();
+            e->v.classname=ED_NewString("aw_item")-pr_strings;
+            e->v.model=sv.model_precache[m]-pr_strings;e->v.modelindex=m;
+            e->v.movetype=MOVETYPE_NONE;e->v.solid=SOLID_NOT;e->v.frame=0;
+        }
+        if(!skel_rows(t,(int)a->v.frame<0 || (int)a->v.frame>=table[t].frames?0:(int)a->v.frame,rows))continue;
+        AW_ItemsPose(&rows[6],a->v.origin,a->v.angles[1],e->v.origin,e->v.angles);
         SV_LinkEdict(e,false);
     }
 }
@@ -177,6 +355,15 @@ void AW_ItemsUpdate(edict_t *actor,edict_t *items[AW_ITEMS_KINDS]) {
 void AW_ItemsHide(edict_t *items[AW_ITEMS_KINDS]) {
     int k;
     for(k=0;k<AW_ITEMS_KINDS;k++){if(items[k] && !items[k]->free)ED_Free(items[k]);items[k]=NULL;}
+}
+
+int AW_ItemsKinds(edict_t *actor) {
+    int t,k,kinds=0;
+    level_check();
+    if(!actor || actor->free || (t=entry_of(model_of(actor)))<0)return 0;
+    for(k=0;k<AW_ITEMS_KINDS;k++)if(table[t].item[k])kinds|=1<<k;
+    if(carries_light(t))kinds|=AW_ITEMS_LIGHT;
+    return kinds;
 }
 /* A single active player alias: optional per-frame tags use the same parser
  * and bounds as NPC attachments. Storage is released on model/scene change. */
@@ -198,10 +385,10 @@ int AW_ItemsAliasTag(model_t *model,int frame,int kind,float tag[6]){
         strcpy(path,model->name);strcpy(path+n-4,".tag");
         size=COM_FOpenFile(path,&f);
         if(!f || size<20 || size>AW_ITEMS_MAX_FRAMES*AW_ITEMS_ROW*16+256)goto unavailable;
-        text=(char *)malloc(size+1);if(!text)goto unavailable;
+        text=(char *)AW_TryMalloc(size+1);if(!text)goto unavailable;
         if(fread(text,1,size,f)!=(size_t)size){free(text);goto unavailable;}
         fclose(f);f=NULL;text[size]=0;
-        player_tag_rows=(float *)malloc(model->numframes*AW_ITEMS_ROW*sizeof(float));
+        player_tag_rows=(float *)AW_TryMalloc(model->numframes*AW_ITEMS_ROW*sizeof(float));
         if(!player_tag_rows){free(text);goto unavailable;}
         player_tag_frames=AW_ItemsParse(text,model->numframes,player_tag_rows,model->numframes,paths);
         free(text);

@@ -79,6 +79,17 @@ class Config(unittest.TestCase):
         for key in rows:
             self.assertIn(initial_state(key), ('ground', 'flying', 'levitating', 'swimming'))
 
+    def test_dagoth_ur_and_the_heart_are_placed_dagoth_whole(self):
+        # CREATURE-DAGOTH-UR-ABSENT-52: neither Dagoth Ur nor the Heart of Lorkhan was ever placed (creatures not on
+        # the list); Dagoth Ur bakes with the gallery's whole-model profile (every original triangle)
+        from prepare_gallery import quality_profiles
+        rows = cr.listed()
+        for key in ('dagoth_ur_1', 'dagoth_ur_2', 'heart_akulakhan'):
+            self.assertIn(key, rows)
+        self.assertEqual(quality_profiles()['r/dagothr.nif']['encoding'], 'shared-vertex')
+        source = (Path(cr.__file__)).read_text(encoding='utf-8')
+        self.assertIn("if profile and profile.get('encoding') == 'shared-vertex':", source)
+
     def test_vivec_is_levitating_so_ground_check_and_floor_snap_leave_him(self):
         from actor_grounding import fields
         self.assertEqual(fields('vivec_god')['aw_ground_mode'], 1)   # aw_scene.c AW_NPCFloor returns at once

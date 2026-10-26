@@ -44,8 +44,10 @@ enum {
     RC_COUNTERS
 };
 /* RT_SKY: the background sky spans (D_DrawBackground, inside RT_DRAW); RT_FOG: the fog
- * and day/night sky pixel pass (AW_FogDraw, inside RT_VIEW). */
-enum { RT_WORLD, RT_BMODELS, RT_SCAN, RT_DRAW, RT_ALIAS, RT_VIEW, RT_SKY, RT_FOG, RT_TIMERS };
+ * and day/night sky pixel pass (AW_FogDraw, inside RT_VIEW). RT_SKELPOSE / RT_SKELVERTS: a skeletal actor's
+ * posing, the bones from the table (AW_SkelPose) and the vertices (AW_SkelPoseVerts), inside RT_ALIAS
+ * (SKEL-RUNTIME-COST-52); the line's "kp" field, with the poses made and drawn from the pose cache. */
+enum { RT_WORLD, RT_BMODELS, RT_SCAN, RT_DRAW, RT_ALIAS, RT_VIEW, RT_SKY, RT_FOG, RT_SKELPOSE, RT_SKELVERTS, RT_TIMERS };
 
 #ifdef AMIGA
 extern long aw_rcount[RC_COUNTERS];

@@ -1010,10 +1010,11 @@ static void *fake_alloc(unsigned long bytes){
     if(best<0)return NULL;
     fake_region[best]-=bytes;return malloc(bytes);
 }
-static void fake_free(void *p,unsigned long bytes){(void)bytes;free(p);}
+static int fake_frees;
+static void fake_free(void *p,unsigned long bytes){(void)bytes;fake_frees++;free(p);}
 static void fake_machine(unsigned long total_mib,unsigned long free_mib,unsigned long second_mib){
     fake_total=total_mib<<20;fake_region[0]=free_mib<<20;fake_region[1]=second_mib<<20;
-    fake_regions=second_mib?2:1;fake_allocs=0;fake_fail_at=0;
+    fake_regions=second_mib?2:1;fake_allocs=0;fake_fail_at=0;fake_frees=0;
 }
 static void memory_start(void){
     console_used=0;console[0]=0;console_capture=1;
@@ -1537,9 +1538,9 @@ static void set_version(int major,int minor){
     assert(f);b[0]=(byte)(major>>8);b[1]=(byte)major;b[2]=(byte)(minor>>8);b[3]=(byte)minor;
     fseek(f,8,SEEK_SET);assert(fwrite(b,1,4,f)==4);fclose(f);
 }
-/* 0.4 to 0.12 are read; 0.13 and 1.5 are refused whole, with a console line. */
+/* 0.4 to 0.13 are read; 0.14 and 1.5 are refused whole, with a console line. */
 static void formats(void){
-    static const int version[6][2]={{0,4},{0,5},{0,6},{0,7},{0,13},{1,5}};static int k;
+    static const int version[6][2]={{0,4},{0,5},{0,6},{0,7},{0,14},{1,5}};static int k;
     for(k=0;k<6;k++){
         set_version(version[k][0],version[k][1]);
         reset_engine();Chim_Init();
@@ -1556,7 +1557,7 @@ static void formats(void){
             expect_host_error=1;host_error_text[0]=0;
             if(!setjmp(host_error_jump)){begin_map(frame_map);assert(!"the frame map was not refused");}
             expect_host_error=0;console_capture=0;
-            sprintf(said,"world format %d.%d; this engine reads 0.4 to 0.12",version[k][0],version[k][1]);
+            sprintf(said,"world format %d.%d; this engine reads 0.4 to 0.13",version[k][0],version[k][1]);
             assert(!Chim_Active() && strstr(console,said));
             assert(strstr(host_error_text,"cannot be read") && strstr(host_error_text,"not a playable map without its CHIM world"));
         }
@@ -1705,6 +1706,72 @@ static void roomdoor(void){
     }
     chim_hinged_door=NULL;
     printf("roomdoor ok%c",10);
+}
+
+/* A CHIM room whose models do not fit the map's zone and the cache banks
+ * grows (chim_world.c Chim_RoomGrow through chim_room.c ChimRoom_Begin,
+ * ROOM-AKULAKHAN-HEAP-52): first a bank of the free Fast RAM (the largest
+ * block less 2 MiB, whole MiB), then the rest of the Hunk past the zone
+ * (chim_reserve_kib kept); both go at the next map. A room that fits takes
+ * neither; with nothing to take it is refused (Host_Error). The zone is made
+ * short with the loading buffer: measured from a first load, it leaves the
+ * index room and the record, models and textures half their bytes short. */
+static int room_load(void){
+    console_used=0;console[0]=0;console_capture=1;
+    begin_map(room_map);frame_at(64,64,40);
+    chim_command();console_capture=0;
+    return ChimRoom_Active();
+}
+static void roomgrow(void){
+    chim_zone_stats_t s;long after,buffer_kib,reserve_kib;
+    chim_fast_avail=fake_avail;chim_fast_alloc=fake_alloc;chim_fast_free=fake_free;
+    /* 16 MiB Fast RAM with 4 MiB free: no cache bank; the room fits its 128 KiB zone and takes nothing */
+    fake_machine(16,4,0);reset_engine();Chim_Init();memory_start();
+    assert(strstr(console,"CHIM cache off"));
+    set_cvar("chim_zone_kib",128);
+    assert(room_load() && !strstr(console,"taken for its models"));
+    assert(strstr(console,"room took 0 KiB of Fast RAM and 0 KiB of the Hunk"));
+    ChimZone_Stats(&s);assert(s.banks==1 && fake_allocs==0);
+    after=(long)(s.kind_bytes[CHIM_KIND_CHUNK]+s.kind_bytes[CHIM_KIND_MODEL]+s.kind_bytes[CHIM_KIND_TEXTURE]);
+    assert(after>4096);
+    buffer_kib=((long)s.kind_bytes[CHIM_KIND_BUFFER]+(long)s.free_bytes+after/2)/1024;
+    end_map();
+    /* short of room, with free Fast RAM: a 2 MiB bank, given back at the next map */
+    fake_machine(16,4,0);reset_engine();Chim_Init();memory_start();
+    set_cvar("chim_zone_kib",128);set_cvar("chim_buffer_kib",(float)buffer_kib);
+    assert(room_load());
+    assert(strstr(console,"CHIM: room doorroom: 2048 KiB of the free Fast RAM taken for its models until the next map"));
+    /* the free Fast RAM before the step, and the room's line that it grew (CHIM-ROOM-HEART-CHAMBER-LOAD-50) */
+    assert(strstr(console,"KiB of Fast RAM free, largest block 4096 KiB: a bank of 2048 KiB"));
+    assert(strstr(console,"room took 2048 KiB of Fast RAM and 0 KiB of the Hunk") && !strstr(console,"of the Hunk taken"));
+    ChimZone_Stats(&s);assert(s.banks==2 && fake_allocs==1 && s.kind_blocks[CHIM_KIND_MODEL]==2);
+    end_map();
+    ChimZone_Stats(&s);assert(s.banks==0 && fake_frees==1);
+    /* Extra RAM off: the Hunk's rest, chim_reserve_kib kept */
+    fake_machine(16,4,0);reset_engine();Chim_Init();set_cvar("aw_autoram",0);memory_start();
+    set_cvar("chim_zone_kib",128);set_cvar("chim_buffer_kib",(float)buffer_kib);
+    assert(room_load());
+    assert(strstr(console,"KiB more of the Hunk taken for its models (chim_reserve_kib 2048 kept)"));
+    assert(!strstr(console,"of the free Fast RAM taken") && fake_allocs==0);
+    ChimZone_Stats(&s);assert(s.banks==2 && s.kind_blocks[CHIM_KIND_MODEL]==2);
+    /* the Hunk keeps chim_reserve_kib and CHIM_ROOM_REST_KIB (what the map loads after the zone) */
+    assert(HEAP_BYTES-(low+high)>=(2048+1553)*1024 && HEAP_BYTES-(low+high)<(2048+1553)*1024+CHIM_ROOM_HUNK_LEAST);
+    end_map();
+    ChimZone_Stats(&s);assert(s.banks==0);
+    /* nothing to take (Extra RAM off, the Hunk's rest under 64 KiB past a 128 KiB zone): refused */
+    fake_machine(16,4,0);reset_engine();Chim_Init();set_cvar("aw_autoram",0);memory_start();
+    set_cvar("chim_zone_kib",128);set_cvar("chim_buffer_kib",(float)buffer_kib);
+    reserve_kib=(HEAP_BYTES-(long)(low+high)-64-(128+32+1553)*1024)/1024;
+    set_cvar("chim_reserve_kib",(float)reserve_kib);
+    expect_host_error=1;host_error_text[0]=0;console_used=0;console[0]=0;console_capture=1;
+    if(!setjmp(host_error_jump)){begin_map(room_map);assert(!"the room was not refused");}
+    expect_host_error=0;console_capture=0;
+    assert(!ChimRoom_Active() && strstr(host_error_text,"its room record or models cannot be loaded"));
+    assert(strstr(console,"CHIM: room doorroom: ") && !strstr(console,"taken for its models"));
+    end_map();
+    set_cvar("aw_autoram",1);set_cvar("chim_reserve_kib",2048);
+    chim_fast_avail=NULL;chim_fast_alloc=NULL;chim_fast_free=NULL;
+    printf("roomgrow ok%c",10);
 }
 
 /* World format 0.8 (EXPERIMENTAL, tests/test_chim_engine_native.py writes it
@@ -2418,6 +2485,7 @@ int main(int argc,char **argv){
     else if(!strcmp(argv[1],"story"))story();
     else if(!strcmp(argv[1],"door"))door();
     else if(!strcmp(argv[1],"roomdoor"))roomdoor();
+    else if(!strcmp(argv[1],"roomgrow"))roomgrow();
     else if(!strcmp(argv[1],"placed"))placed_world();
     else if(!strcmp(argv[1],"catalogue"))catalogue_dump();
     else if(!strcmp(argv[1],"statics"))statics();

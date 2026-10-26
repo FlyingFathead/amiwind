@@ -33,6 +33,13 @@ extern int r_campfires;
 /* Warm light table built by r_sky.c from aw_light_hue (NULL until built):
  * used per surface for dynamic light and night glow (aw_warm_light, r_surf.c). */
 extern unsigned char *r_warm_colormap;
+/* Light tint tables (world format 0.13, a placement's aw_tint 1-7): 1 is the
+ * warm table, 2-7 fixed hues (r_sky.c). Built on first use: r_surf.c marks a
+ * tint it wanted in r_tint_wanted (bit = tint), r_sky.c builds it next frame
+ * and flushes the surface cache; NULL until then (the plain table is used). */
+#define AW_TINTS 8
+extern unsigned char *r_tint_colormap[AW_TINTS];
+extern int r_tint_wanted;
 /* Dynamic-light slots holding a cool (bluish) lamp this frame (aw_lamps.c):
  * surfaces they light keep the plain table. */
 extern unsigned char r_dlight_cool[32];

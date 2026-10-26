@@ -2,6 +2,7 @@
  * Small UI-only mesh preview. Two fixed slots, no model cache/hunk ownership. */
 #include "quakedef.h"
 #include "aw_character.h"
+#include "aw_tryalloc.h"
 #define HEAD_FACES 480
 static byte mesh[2][6+HEAD_FACES*82];
 static int faces[2],loaded[2]={-1,-1};
@@ -149,7 +150,7 @@ int AW_InventoryPreviewDraw(model_t *model,int frame,int x,int y,int width,int h
     if(count<3 && AW_ViewInventoryHeld(&part[count].model,&part[count].frame)){
         AngleVectors(zero,part[count].forward,part[count].right,part[count].up);count++;
     }
-    if(!inventory_depth)inventory_depth=(short *)malloc(122*168*sizeof(short));
+    if(!inventory_depth)inventory_depth=(short *)AW_TryMalloc(122*168*sizeof(short));
     if(!inventory_depth)return 0;
     for(k=0;k<3;k++){low[k]=32768;high[k]=-32768;}
     for(which=0;which<count;which++){

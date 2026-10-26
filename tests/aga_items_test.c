@@ -28,6 +28,32 @@ int main(void) {
     assert(!AW_ItemsParse("AWTG1 1\nweapon ../x.mdl\nshield -\n0 0 0 0 0 0 0 0 0 0 0 0\n",1,rows,3,paths));   /* no parent paths */
     assert(!AW_ItemsParse("AWTG1 1\nweapon -\nshield -\n0 0 0 0 0 0 0 0 0 0 0\n",1,rows,3,paths));            /* short row */
     assert(!AW_ItemsParse("AWTG1 4\nweapon -\nshield -\n",4,rows,3,paths));                                    /* over the caller's rows */
+    {   /* a skeletal model's tag (SKEL-ITEM-TAGS-52): item bones and the actor scale, no rows */
+        int bones[AW_ITEMS_KINDS],lit=1;float scale[3],flame[3];char light[AW_ITEMS_PATH];
+        const char *skel="AWTS1 2730\nweapon items/w_longsword.mdl\nshield -\nbones 14 -1\nscale 0.275 0.275 0.2375\n";
+        const char *torch="AWTS1 2730\nweapon -\nshield items/a_shield.mdl\nbones -1 9\nscale 0.25 0.25 0.25\n"
+                          "light items/gt_torch_0123456789ab.mdl\nemitter 1.5 -2.25 30.125\n";
+        assert(AW_ItemsParseSkel(skel,2730,paths,bones,scale,light,flame,&lit)==2730 && !lit && !light[0]);
+        assert(!strcmp(paths[0],"items/w_longsword.mdl") && !paths[1][0] && bones[0]==14 && bones[1]==-1);
+        assert(near(scale[0],0.275f) && near(scale[2],0.2375f));
+        /* a guard's torch: its own model beside the shield (the shield by day, the torch at night) */
+        assert(AW_ItemsParseSkel(torch,2730,paths,bones,scale,light,flame,&lit)==2730 && lit);
+        assert(!strcmp(paths[1],"items/a_shield.mdl") && !strcmp(light,"items/gt_torch_0123456789ab.mdl"));
+        assert(near(flame[0],1.5f) && near(flame[1],-2.25f) && near(flame[2],30.125f) && bones[1]==9);
+        assert(AW_ItemsParseSkel(torch,2730,paths,bones,scale,NULL,NULL,NULL)==2730);
+        assert(!AW_ItemsParseSkel("AWTS1 10\nweapon -\nshield -\nbones 1 0\nscale 1 1 1\nlight t.mdl\nemitter 1 2\n",10,
+                                  paths,bones,scale,light,flame,&lit));               /* a short emitter */
+        assert(!AW_ItemsParseSkel("AWTS1 10\nweapon -\nshield -\nbones 1 0\nscale 1 1 1\nlight t.mdl\n",10,
+                                  paths,bones,scale,light,flame,&lit));               /* a light without its flame */
+        assert(!AW_ItemsParseSkel("AWTS1 10\nweapon -\nshield -\nbones 1 -1\nscale 1 1 1\nlight t.mdl\nemitter 1 2 3\n",
+                                  10,paths,bones,scale,light,flame,&lit));            /* a light with no shield bone */
+        assert(!AW_ItemsParseSkel(skel,2729,paths,bones,scale,NULL,NULL,NULL));        /* the table's frame count */
+        assert(!AW_ItemsParse(skel,2730,rows,3,paths));                               /* old reader refuses it */
+        assert(!AW_ItemsParseSkel("AWTS1 10\nweapon -\nshield -\nbones 64 0\nscale 1 1 1\n",10,paths,bones,scale,NULL,NULL,NULL));
+        assert(!AW_ItemsParseSkel("AWTS1 10\nweapon -\nshield -\nbones 1.5 0\nscale 1 1 1\n",10,paths,bones,scale,NULL,NULL,NULL));
+        assert(!AW_ItemsParseSkel("AWTS1 10\nweapon -\nshield -\nbones 1 0\nscale 1 0 1\n",10,paths,bones,scale,NULL,NULL,NULL));
+        assert(!AW_ItemsParseSkel("AWTS1 10\nweapon -\nshield -\nbones 1 0\n",10,paths,bones,scale,NULL,NULL,NULL));
+    }
     {   /* yaw 0: origin + tag, angles = tag; yaw 90: the tag's x turns into +y */
         float origin[3]={100,200,300},tag[6]={10,0,5,1,2,3};
         AW_ItemsPose(tag,origin,0,o,a);assert(near(o[0],110) && near(o[1],200) && near(o[2],305) && near(a[0],-1) && near(a[1],2) && near(a[2],3));   /* pitch negated for r_alias.c */

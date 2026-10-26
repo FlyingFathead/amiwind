@@ -572,9 +572,12 @@ def room_limits(source=None):
     record_max = int(m.group(1))
     reserve = EL.define('chim/chim_local.h', 'CHIM_EFRAG_RESERVE', src)
     efrag_limit = EL.define('client.h', 'AW_EFRAG_LIMIT', src) - reserve
-    zone = EL.chim_memory(src)['zone_kib'] * 1024
+    from chim.heap import room_zone_limits
     small = EL.fast_ram_memory(BASELINE_FAST_RAM_MIB, src)
     safe = EL.fast_ram_memory(MIN_FAST_RAM_MIB, src)
+    # the image's room heap gate's model (chim.heap.room_zone_limits) for a room map before which the Hunk holds the
+    # measured start-up bytes and after which the client's measured per-map allocations load (ROOM-AKULAKHAN-HEAP-52)
+    gate = room_zone_limits(EL.MEASURED_HUNK['before_map_bytes'], EL.MEASURED_HUNK['client_per_map_bytes'], source=src)
     return {'source': 'engine/aga/src: chim/chim_room.c, chim/chim_local.h, client.h, quakedef.h, bspfile.h, '
                       'chim/chim_world.c, chim/chim_zone.h, aw_heapsize.h, sys_amiga.c',
             'placements_record_max': record_max,
@@ -586,12 +589,13 @@ def room_limits(source=None):
             # Every model of the room loads whole (chim_room.c). A room map has no frame world, so it keeps no
             # frame-world pool blocks: the room has the whole zone less the loading buffer (chim_world.c). Models
             # and textures prefer the automatic cache banks (chim_zone.c AllocIn), so with more Fast RAM the room
-            # holds the banks as well (CHIM-ROOM-ESTIMATE-48).
-            'zone_room_bytes': zone - small['buffer_bytes'],
+            # holds the banks as well (CHIM-ROOM-ESTIMATE-48); a room past them grows into the free Fast RAM and the
+            # Hunk's rest (chim_world.c Chim_RoomGrow, ROOM-AKULAKHAN-HEAP-52).
+            'zone_room_bytes': gate['zone_room_bytes'],
             'min_fast_ram_mib': MIN_FAST_RAM_MIB,
-            'room_bytes_min_fast': safe['zone_bytes'] + safe['bank_bytes'] - safe['buffer_bytes'],
-            # one model is one block: the largest a room's model can be is the larger of the zone and one bank
-            'block_bytes_min_fast': max(safe['zone_bytes'] - safe['buffer_bytes'], safe['bank_bytes']),
+            'room_bytes_min_fast': gate['min_fast_room_bytes'],
+            # one model is one block: the largest a room's model can be is the largest of the zone and the banks
+            'block_bytes_min_fast': gate['block_bytes_min_fast'],
             'fast_ram': {str(BASELINE_FAST_RAM_MIB): small, str(MIN_FAST_RAM_MIB): safe}}
 
 

@@ -105,6 +105,13 @@ xdo(){ W=$(win); xdotool windowfocus --sync $W 2>/dev/null; xdotool $1; }
 rc(){ i=0; while [ -e $R/awctl/cmd.txt ] && [ $i -lt 40 ]; do sleep 0.5; i=$((i+1)); done
   printf '%s\n' "$1" > $R/awctl/cmd.txt.tmp && mv $R/awctl/cmd.txt.tmp $R/awctl/cmd.txt; log "cmd $1"; }
 shot(){ ffmpeg -loglevel error -y -f x11grab -draw_mouse 0 -video_size 1024x768 -i :$N -frames:v 1 $R/shots/$1.png 2>/dev/null; }
+# rec NAME / recstop: an H.264 clip of the screen (shots/NAME.mp4, RECFPS frames a second, RECCRF quality; no
+# audio: the emulator's sound goes to the dummy driver) while the script goes on; finish stops it.
+RP=
+rec(){ [ -z "$RP" ] || recstop; ffmpeg -loglevel error -y -f x11grab -draw_mouse 0 -framerate ${RECFPS:-15} -video_size 1024x768 -i :$N \
+  -c:v libx264 -preset veryfast -crf ${RECCRF:-30} -pix_fmt yuv420p -movflags +faststart $R/shots/$1.mp4 < /dev/null > $R/logs/rec-$1.log 2>&1 &
+  RP=$!; log "rec $1"; }
+recstop(){ [ -n "$RP" ] || return 0; kill -INT $RP 2>/dev/null; wait $RP 2>/dev/null; RP=; log "rec stopped"; }
 # st KEY: one value of the game's state file. The game rewrites the file in place, so a read can catch it half
 # written (gate 1907: "realtime 62.10 -> " empty). Only a copy that ends with its "end" line counts; else read again
 # (up to 20 times, 0.2 s apart) before giving up with an empty value.
@@ -121,7 +128,7 @@ finish(){ case "$1" in PASS*) b=$(st efrags_bad); [ -n "$b" ] && [ "$b" != 0 ] &
     z=$(zonefull); [ "${z:-0}" -gt 0 ] && [ "$FASTMB" -ge 32 ] && [ "${ZONEFULL:-fail}" != allow ] && case "$1" in PASS*)
       set -- "FAIL CHIM zone full $z times at $FASTMB MB of Fast RAM (none allowed from 32 MB: CHIM-ZONE-BUDGET-33)";; esac
     [ "$(st screen)" = game ] || set -- "FAIL the run ended outside play: screen $(st screen) (map $(st map))";; esac
-  cp $R/home/Cache/Logs/fs-uae.log.txt $R/logs/fs-uae.log.txt 2>/dev/null
+  recstop; cp $R/home/Cache/Logs/fs-uae.log.txt $R/logs/fs-uae.log.txt 2>/dev/null
   grep -E "Caught illegal|Fault address|Suspicious" $R/logs/fs-uae.log.txt 2>/dev/null | tail -12 > $R/logs/emulator-faults.txt
   cp $R/awctl/console.log $R/logs/console.log 2>/dev/null; alive && shot final
   kill $FP 2>/dev/null; sleep 2; kill $XP 2>/dev/null; log "smoke RESULT $1"; exit 0; }
@@ -160,7 +167,8 @@ inplay "$MAP1"
 play $PLAY "$MAP1 (music on)"; shot map1
 # SCRIPT: a scripted session instead of the music and second-load steps (evidence shots, replays). One step per line:
 # "cmd TEXT" console command, "key NAME" key press, "xdo ARGS" raw xdotool steps (mouse, held keys), "wait S" S seconds of game time (the game must keep running),
-# "shot NAME" screenshot shots/NAME.png, "state KEY" logs that state value; other lines are comments. Ends PASS
+# "shot NAME" screenshot shots/NAME.png, "rec NAME" starts the clip shots/NAME.mp4, "recstop" ends it,
+# "state KEY" logs that state value; other lines are comments. Ends PASS
 # when the game survives the whole script.
 if [ -s $R/script.txt ]; then
   while IFS= read -r line <&3 || [ -n "$line" ]; do  # fd 3: ffmpeg (shot) reads stdin
@@ -170,6 +178,8 @@ if [ -s $R/script.txt ]; then
     xdo\ *) xdo "${line#xdo }"; log "xdo ${line#xdo }";;
     wait\ *) play "${line#wait }" "script ($(st map))";;
     shot\ *) shot "${line#shot }"; log "shot ${line#shot } at local $(st local)";;
+    rec\ *) rec "${line#rec }";;
+    recstop) recstop;;
     state\ *) log "state ${line#state }: $(st ${line#state })";;
     esac
     alive || finish "FAIL emulator exited after script step: $line"
@@ -430,10 +440,12 @@ def main(argv=None):
     shares = ['--cpu-shares', args.cpu_shares] if args.cpu_shares else []
     base = ['run', '--pull', 'never', '--rm', '--network', 'none', *shares]
     scratch = args.scratch.strip('/')
+    # The 4 GiB play copy past the page cache (direct I/O, holes kept): a cached copy filled the 2 GiB prep container
+    # and the kernel killed it, on and off (ENGINE-SMOKE-PREP-KILLED-52)
     prep = f'''set -e
 rm -rf /vol/{scratch}; mkdir -p /vol/{scratch}
 B=$(ls /vol/{args.image_dir}/*.hdf | grep -v world | head -1); [ -n "$B" ]
-cp --sparse=always "$B" /vol/{scratch}/play-boot.hdf; chmod u+w /vol/{scratch}/play-boot.hdf
+dd if="$B" of=/vol/{scratch}/play-boot.hdf bs=4M iflag=direct oflag=direct conv=sparse status=none; chmod u+w /vol/{scratch}/play-boot.hdf
 W=$(ls /vol/{args.image_dir}/*world-01.hdf 2>/dev/null | head -1 || true); echo "world=$(basename "$W" 2>/dev/null)"
 X={XDF}; D=/vol/{scratch}/play-boot.hdf
 $X $D open part=DH0 + delete AmiWind + write /t/engine.AmiWind AmiWind

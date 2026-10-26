@@ -7,6 +7,7 @@
 #include "aw_quickchar.h"
 #include "aw_inventory.h"
 #include "aw_story.h"
+#include "aw_tryalloc.h"
 extern byte *draw_chars;
 extern int scr_copyeverything;
 static byte font_storage[26624],book_font[26624],skin[4104];
@@ -431,7 +432,7 @@ static void load_paper_font(void) {
     if(n<2056 || n>(int)sizeof(book_font)){
         fclose(f);Con_Printf("Paper font invalid; original reading font retained.\n");return;
     }
-    candidate=(byte *)malloc(n);
+    candidate=(byte *)AW_TryMalloc(n);
     if(!candidate){
         fclose(f);Con_Printf("Paper font allocation failed; original reading font retained.\n");return;
     }

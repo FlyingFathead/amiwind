@@ -31,6 +31,15 @@ class WorldVolumeLayoutTests(unittest.TestCase):
             self.assertTrue(all(sum(p.stat().st_size for p in batch) <= 100 for batch in batches))
             self.assertGreater(len(batches), 1)
 
+    def test_a_world_batch_takes_maps_and_moved_boot_units(self):
+        # IMAGE-WORLD-BATCH-PAIRS-52: a boot unit moved off DH0 is a (source, volume path) pair; a map is a path
+        from world_volumes import batch_entries
+        self.assertEqual(batch_entries(['/w/maps/vf0001.bsp', ('/w/boot/id1/chim/rooms.cwi', 'id1/chim/rooms.cwi'),
+                                        ['/w/boot/progs/humanoid.awsk', 'progs/humanoid.awsk']]),
+                         [(Path('/w/maps/vf0001.bsp'), 'id1/maps/vf0001.bsp'),
+                          (Path('/w/boot/id1/chim/rooms.cwi'), 'id1/chim/rooms.cwi'),
+                          (Path('/w/boot/progs/humanoid.awsk'), 'progs/humanoid.awsk')])
+
     def test_drives_include_header_and_keep_all_partitions(self):
         worlds = [dict(bytes=40000, volume=f'AW_WORLD{i}') for i in range(3)]
         groups = hardfile_groups(40000, worlds, 130000)

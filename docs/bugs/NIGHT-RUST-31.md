@@ -9,9 +9,11 @@
 | Where | Night remap tables (engine R_SkyNearest), dark walls and ground |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.50 |
-| Severity | medium: Rust-red speckle on dark surfaces at night. |
+| Persists in | v0.0.51 (last seen) |
+| Severity | high: Regressed in v0.0.51 (was medium): Rust-red speckle on dark surfaces at night. |
 | Family | Lighting, lamps and night (`lighting-night`) |
+| Deferred by the maintainer | 2026-10-26: deferred by the maintainer to v0.0.53 (the v0.0.52 release triage) |
+| Came back (regression) | in v0.0.51 (fixed in v0.0.50 before) |
 
 <!-- END GENERATED FACTS -->
 

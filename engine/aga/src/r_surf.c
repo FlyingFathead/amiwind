@@ -223,6 +223,20 @@ static int R_SurfaceWarm (msurface_t *surf)
 			return 1;
 	return R_NightWindow (surf);
 }
+/* The table a surface is built with: a CHIM placement's own light tint (world
+ * format 0.13, r_drawsurf.tint) first; a tint whose table is not built yet asks
+ * r_sky.c for it and draws as before until then. */
+static unsigned char *R_SurfaceTable (msurface_t *surf)
+{
+	int tint = r_drawsurf.tint;
+	if (tint > 0 && tint < AW_TINTS && aw_warm_light.value)
+	{
+		if (r_tint_colormap[tint])
+			return r_tint_colormap[tint];
+		r_tint_wanted |= 1 << tint;
+	}
+	return R_SurfaceWarm (surf) ? r_warm_colormap : (unsigned char *)vid.colormap;
+}
 #define R_NIGHT_WINDOW_LEVEL 6
 static int R_EmissiveLevel (msurface_t *surf)
 {
@@ -436,7 +450,7 @@ void R_DrawSurface (void)
 	if (r_pixbytes != 1)
 		Sys_Error ("R_DrawSurface: only 8-bit surfaces are supported");
 	pblockdrawer = surfmiptable[r_drawsurf.surfmip];
-	r_block_colormap = R_SurfaceWarm (r_drawsurf.surf) ? r_warm_colormap : (unsigned char *)vid.colormap;
+	r_block_colormap = R_SurfaceTable (r_drawsurf.surf);
 // TODO: only needs to be set when there is a display settings change
 	horzblockstep = blocksize;
 

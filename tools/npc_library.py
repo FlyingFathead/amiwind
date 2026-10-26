@@ -30,8 +30,12 @@ def appearance_key(appearance, profile):
     spec = {k: appearance.get(k) for k in ('parts', 'skeleton', 'height', 'weight', 'female', 'attack_stance',
                                             'initially_dead')}
     # the build's head settings reach the bake through the environment (tools/build.py exports them)
+    import npc_anim
     spec.update(root_rule=appearance.get('root_rule') or get_root_rule(), profile=profile,
                 head_detail=npc_head_detail(), head_reducer=npc_head_reducer())
+    if npc_anim.anim_type() != 1:
+        # --npc-anim-type 2 (skeletal) bakes another model: its own key (type 1 keeps the keys it always had)
+        spec['anim_type'] = npc_anim.anim_type()
     return hashlib.sha256(json.dumps(spec, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
@@ -127,6 +131,8 @@ def _bake_standing(task):
         _rigs[rig] = Skeleton(assets, appearance['skeleton'])
     skeleton = _rigs[rig]
     dead = appearance.get('initially_dead', False)
+    if npc_anim.anim_type() == 2 and not dead:
+        return _skeletal_standing(key, assets, data, palette, appearance, profile_name)
     kit = None
     if dead:
         times, step = np.array([skeleton.events['death1: stop']]), 0.
@@ -182,6 +188,35 @@ def _bake_standing(task):
     return raw, layout, sounds, facts
 
 
+def _skeletal_standing(key, assets, data, palette, appearance, profile_name):
+    """_bake_standing for --npc-anim-type 2: the appearance on its shared animation table (skeletal_actor), every
+    group of the build's profile (the mover's, when it has one) in the layout, on the table's frames; no items, as
+    the baked library has none. facts['_table'] = (game path, bytes), written once by build()."""
+    import npc_anim
+    import skeletal_actor
+    from mwad.paths import child_ci
+    from npc_geometry import Skeleton
+
+    def rig_of(path):
+        rig = (key, path)
+        if rig not in _rigs:
+            _rigs[rig] = Skeleton(assets, path)
+        return _rigs[rig]
+    raw, groups, skel, _, _ = skeletal_actor.skeletal_resident(key, assets, appearance, palette,
+                                                               npc_anim.plan_profile(profile_name), rig_of)
+    table_bytes, _, _, table_path, _, _ = skeletal_actor.game_table(key, appearance, rig_of)
+    foot = appearance.get('foot', 'bare')
+    if key not in _sounds:
+        _sounds[key] = npc_anim.soun_records(child_ci(data, 'Morrowind.esm'))
+    layout = npc_anim.layout(groups, foot)
+    sounds = npc_anim.sound_payload(assets, _sounds[key], npc_anim.needed_sounds(groups, foot))
+    facts = {'bytes': len(raw), 'frames': skel['table_frames'], 'triangles': int(skel['model']['faces']),
+             'vertices': int(skel['model']['vertices']), 'step': float(groups[0]['step']),
+             'sha256': hashlib.sha256(raw).hexdigest(), 'type': 2, 'table': table_path,
+             '_table': (table_path, table_bytes)}
+    return raw, layout, sounds, facts
+
+
 def _unit(task):
     """Worker: one appearance (key, ids, appearance) -> (key, result or None, seconds, error)."""
     import time
@@ -218,6 +253,13 @@ def build(data, palette, ids, out_id1, jobs=1, kinds=None):
             print('NPC library: appearance %s (%s) left out: %s' % (key, groups[key][0], error), flush=True)
             continue
         raw, layout, sounds, facts = result
+        table = facts.pop('_table', None)
+        if table is not None:
+            # the shared animation table of a skeletal model (--npc-anim-type 2), written once
+            t = Path(out_id1) / table[0]
+            t.parent.mkdir(parents=True, exist_ok=True)
+            if not t.exists() or t.read_bytes() != table[1]:
+                t.write_bytes(table[1])
         path = model_path(key)
         target = Path(out_id1) / path
         target.parent.mkdir(parents=True, exist_ok=True)

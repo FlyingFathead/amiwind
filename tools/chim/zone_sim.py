@@ -98,10 +98,14 @@ class Zone:
     EVICT = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_uint)
 
     def __init__(self, lib_path, zone_bytes, ends):
+        """zone_bytes: the map's bank (none: no bank yet, add_bank adds them in the engine's order)."""
         self.lib = ctypes.CDLL(str(lib_path))
         L = self.lib
         L.ChimZone_Alloc.restype = ctypes.c_void_p
         L.ChimZone_Alloc.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+        L.ChimZone_AllocPersistent.restype = ctypes.c_void_p
+        L.ChimZone_AllocPersistent.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+        L.ChimZone_EvictKind.argtypes = [ctypes.c_int, ctypes.c_void_p]
         for name in ('ChimZone_Lock', 'ChimZone_Unlock', 'ChimZone_FreeData', 'ChimZone_Touch'):
             getattr(L, name).argtypes = [ctypes.c_void_p]
         L.ChimZone_AddBank.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
@@ -113,11 +117,30 @@ class Zone:
             raise RuntimeError('zone library: chim_zone_stats_t is %d bytes, Stats %d: update Stats'
                                % (L.ChimZone_StatsSize(), ctypes.sizeof(Stats)))
         L.ChimZone_Reset()
-        self.memory = ctypes.create_string_buffer(zone_bytes + 64)
-        if L.ChimZone_AddBank(ctypes.addressof(self.memory), zone_bytes, 0) < 0:
-            raise RuntimeError('zone bank refused')
+        self.banks = []
+        if zone_bytes:
+            self.memory = ctypes.create_string_buffer(zone_bytes + 64)
+            if L.ChimZone_AddBank(ctypes.addressof(self.memory), zone_bytes, 0) < 0:
+                raise RuntimeError('zone bank refused')
         L.ChimZone_SetEnds(int(ends))       # chim_zone_ends in bytes (0: first fit, the first method)
         self.callbacks = {}
+
+    def add_bank(self, size, persistent):
+        """ChimZone_AddBank of a new bank of SIZE bytes (persistent: a cache bank that survives the map); its number,
+        -1 when refused."""
+        memory = ctypes.create_string_buffer(int(size) + 64)
+        self.banks.append(memory)
+        return self.lib.ChimZone_AddBank(ctypes.addressof(memory), int(size), int(bool(persistent)))
+
+    def alloc_persistent(self, size, kind, ident):
+        return self.lib.ChimZone_AllocPersistent(None, int(size), KIND[kind], ident) or None
+
+    def evict_kind(self, kind):
+        """ChimZone_EvictKind with no keep rule: every unlocked block of the kind goes (its eviction callback runs)."""
+        self.lib.ChimZone_EvictKind(KIND[kind], None)
+
+    def free(self, p):
+        self.lib.ChimZone_FreeData(p)
 
     def on_evict(self, kind, fn):
         cb = self.EVICT(lambda data, ident: fn(data, ident))

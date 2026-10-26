@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // no sound code whatsoever
 
 #include "quakedef.h"
+#include "aw_tryalloc.h"
 
 #include <proto/exec.h>
 #include <proto/graphics.h>
@@ -125,7 +126,7 @@ qboolean SNDDMA_Init(void)
   ULONG clock_constant;
 
 
-    if ((shm = (dma_t *)malloc (sizeof(dma_t))) == NULL) {
+    if ((shm = (dma_t *)AW_TryMalloc (sizeof(dma_t))) == NULL) {
         Sys_Error ("Could not allocate enough memory for sound structure");
     }
 

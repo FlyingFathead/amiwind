@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #else
 #define DWORD	unsigned long
 #endif
+#include "aw_tryalloc.h"
 
 #define	PAINTBUFFER_SIZE	512
 portable_samplepair_t paintbuffer[PAINTBUFFER_SIZE];
@@ -413,7 +414,7 @@ static void *scene_voice_alloc(unsigned bytes)
 #ifdef AMIGA
     return AllocMem((ULONG)bytes,MEMF_FAST|MEMF_PUBLIC);
 #else
-    return malloc(bytes);
+    return AW_TryMalloc(bytes);
 #endif
 }
 static void scene_voice_free(void *sample,unsigned bytes)

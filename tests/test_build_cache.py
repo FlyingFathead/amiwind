@@ -1335,6 +1335,49 @@ class WriteAttributionTests(unittest.TestCase):
                 self.assertFalse(character['reusable'], (character_native, town_native))
                 self.assertFalse(town['reusable'])
 
+    def test_the_writer_owns_the_folders_it_filled(self):
+        """BUILD-REUSE-FOREIGN-DIRS-52: chim-room-batches ran beside the area stage and kept the folders the area
+        stage's rooms were written into (their files went to the area stage); reusing it made them empty before
+        the area stage ran, and its room build stopped on the folder it creates."""
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp) / 'run'
+            steps = [('area', [sys.executable, 'tools/x.py', '--scene', str(run / 'scene')]),
+                     ('batches', [sys.executable, 'tools/y.py', '--scene', str(run / 'scene'), '--out', str(run / 'batches')])]
+            (run / 'scene').mkdir(parents=True)
+            recorder = build_cache.Recorder(run, steps, {})
+            recorder.traced = True
+            recorder.before('area', steps[0][1])
+            recorder.before('batches', steps[1][1])
+            import time
+            time.sleep(0.01)
+            (run / 'scene' / 'area-work' / 'room' / 'source').mkdir(parents=True)
+            (run / 'scene' / 'area-work' / 'room' / 'source' / 'part.bin').write_bytes(b'room')
+            (run / 'scene' / 'mine' / 'empty').mkdir(parents=True)
+            (run / 'batches').mkdir()
+            (run / 'batches' / 'out.json').write_text('{}')
+            traces = {name: run.parent / f'{name}.txt' for name in ('area', 'batches')}
+            traces['area'].write_text('>scene/area-work/room/source/part.bin\ntools/x.py\n')
+            traces['batches'].write_text('>batches/out.json\ntools/y.py\n')
+            recorder.after('batches', {}, traces['batches'])
+            recorder.after('area', {}, traces['area'])
+            recorder.close({'status': 'passed'})
+            area, batches = build_cache.load_manifest(run, 'area'), build_cache.load_manifest(run, 'batches')
+            self.assertTrue(batches['reusable'], batches['reasons'])
+            self.assertIn('scene/area-work/room/source', area['directories'])
+            for folder in ('scene/area-work', 'scene/area-work/room', 'scene/area-work/room/source'):
+                self.assertNotIn(folder, batches['directories'])
+            # an empty folder both saw goes with the writer's record; the observer's own folders stay its own
+            self.assertIn('scene/mine/empty', area['directories'])
+            self.assertNotIn('scene/mine/empty', batches['directories'])
+            self.assertIn('batches', batches['directories'])
+
+    def test_foreign_directories(self):
+        found = build_cache.foreign_directories(
+            ['scene/area-work', 'scene/area-work/room', 'scene/area-work/room/source', 'batches', 'scene/own'],
+            ['batches/out.json', 'scene/own/x.bin'], ['scene/area-work/room/source/part.bin'], ['scene/area-work'])
+        self.assertEqual(found, {'scene/area-work', 'scene/area-work/room', 'scene/area-work/room/source'})
+        self.assertEqual(build_cache.foreign_directories(['a/b'], [], [], []), set())
+
     def test_attribute_reads_native_folders(self):
         shared = ['intro-scene/area-work/bmbalyn/room.prt', 'intro-scene/area-work/bmbalyn/base.bsp']
         writes = {'intro-scene/area-work/bmbalyn/base.bsp'}
@@ -1992,6 +2035,18 @@ class NarrowedReuseTests(unittest.TestCase):
             _, state, _ = self.build('off', reuse_from=first)
         self.assertEqual(self.reused(state), [])
 
+    def test_a_file_a_cache_keyed_counts_whole(self):
+        """BUILD-KEY-UNIT-RESTORED-CODE-52: a stage that took a result from a cache used the code the cache keys,
+        though none of it ran ('=' lines, pass_cache.covered_lines): the file counts whole in its record, also when
+        some of its code did run, so an edit anywhere in it is seen."""
+        index = build_cache.SourceIndex(self.repository)
+        record = build_cache.used_record(['#v2', '@tools/narrow.py\tfast', '=tools/narrow.py'], index)
+        self.assertTrue(record['complete'], record.get('why'))
+        self.assertEqual(record['data'].get('tools/narrow.py'), index.files['tools/narrow.py'])
+        self.assertNotIn('=tools/narrow.py', record['data'])
+        plain = build_cache.used_record(['#v2', '@tools/narrow.py\tfast'], index)
+        self.assertNotIn('tools/narrow.py', plain['data'])
+
     def test_trace_form_one_records_are_never_narrowed(self):
         index = build_cache.SourceIndex(self.repository)
         record = build_cache.used_record(['tools/narrow.py', '@tools/narrow.py\tfast'], index)
@@ -2158,7 +2213,7 @@ class ReusePlanEnvironmentTests(unittest.TestCase):
 
     ARGVS = ([], ['--developer-mode'], ['--builder', 'legacy'], ['--anim-kit', 'off'], ['--npc-root-rule', 'morrowind'],
              ['--actor-search', 'near'], ['--coord-range', 'narrow', '--builder', 'legacy'], ['--stair-walk', 'all'], ['--lava', 'static'],
-             ['--model-hull', 'compiled'], ['--chim-frame-ext', 'bsp'])
+             ['--model-hull', 'compiled'], ['--chim-frame-ext', 'bsp'], ['--npc-anim-type', '1'])
 
     @staticmethod
     def keyed():

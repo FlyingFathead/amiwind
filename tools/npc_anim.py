@@ -98,6 +98,85 @@ def profiles():
     return data['profiles']
 
 
+# How an actor's motion is stored (build.py --npc-anim-type, docs/MODULAR_NPCS.md "Runtime method C"): 2 (the
+# default) = skeletal: one rest frame and the shared animation table of its skeleton (tools/skeletal_actor.py), the
+# layout naming the table's frames, no mover model; 1 = the baked kit: the profile's groups baked into each actor's
+# own vertex frames, standing model and mover. Part of the resident stages' keys through this variable (absent = 2).
+ANIM_TYPE_ENV = 'AMIWIND_NPC_ANIM_TYPE'
+ANIM_TYPES = (1, 2)
+DEFAULT_ANIM_TYPE = 2
+
+
+def anim_type(value=None):
+    """The build's actor animation type (1 baked, 2 skeletal) from VALUE or AMIWIND_NPC_ANIM_TYPE."""
+    raw = value if value is not None else os.environ.get(ANIM_TYPE_ENV, '').strip() or DEFAULT_ANIM_TYPE
+    try:
+        kind = int(raw)
+    except (TypeError, ValueError):
+        kind = None
+    if kind not in ANIM_TYPES:
+        raise ValueError('NPC animation type must be 1 (baked) or 2 (skeletal), not %r' % (raw,))
+    return kind
+
+
+def table_groups(table, groups, attack_stance=None, times=None, prefix=''):
+    """plan()'s groups on a shared animation table's frames (a skeletal model's layout, --npc-anim-type 2): each
+    kit group's start and stop keys looked up among the table's text keys (skeletal_actor.read_table: 'walkforward'
+    'loop start' ...), so the layout's BASE:COUNT are table frames and STEP the table's frame time; own speed and hit
+    fraction stay plan()'s (times in the source file); events are the table's 'soundgen' keys inside the frames. A
+    group the table lacks stands on the idle's first frame (OpenMW falls back to idle), as plan() does. Frame rules
+    are plan()'s: loops and 'once' groups leave out the stop key's frame (it is the start's pose again), 'hold'
+    groups end on it. times: the animation time of every table frame (build_table's report), for each group's own
+    frame time (else the table's rate). prefix: a table view's own groups ('f:', skeletal_actor.table_prefix),
+    played before the table's groups of the same name (a female human's walk and idles)."""
+    names = list(table['groups'])
+    index = {g: i for i, g in enumerate(names)}
+    at = {}
+    for text, gi, frame in table['keys']:
+        at.setdefault((gi, text), frame)
+    step = 1.0 / float(table['rate'])
+
+    def key(line):
+        group, what = (s.strip() for s in line.split(':', 1))
+        # the view's group whole when it has one (its start and stop keys both from it: the table refuses a group
+        # without them)
+        gi = index.get(prefix + group) if prefix and prefix + group in index else index.get(group)
+        return None if gi is None else at.get((gi, what))
+    idle = key(GROUPS['idle'][0])
+    if idle is None:
+        raise ValueError('The animation table has no idle group')
+    out = []
+    for g in groups:
+        start, stop, kind, _ = GROUPS[g['name']]
+        if g['name'] == 'attack' and attack_stance:
+            start, stop = attack_stance + ': chop start', attack_stance + ': chop large follow stop'
+        a, b = key(start), key(stop)
+        entry = {k: v for k, v in g.items() if k not in ('events',)}
+        if a is None or b is None or b < a:
+            out.append(dict(entry, base=idle, count=1, step=step, source='idle', events=[]))
+            continue
+        count = b - a + 1 if kind == 'hold' else max(1, b - a)
+        if count > 64:
+            raise ValueError('Animation group %s is %d table frames: the layout takes at most 64' % (g['name'], count))
+        events = []
+        for text, _, frame in table['keys']:
+            if not a <= frame < a + count or ':' not in text:
+                continue
+            head, rest = (s.strip() for s in text.split(':', 1))
+            if head == 'soundgen' and rest.split():
+                event = rest.split()[0]
+            elif head == 'sound':
+                event = 'sound:' + rest
+            else:
+                continue
+            events.append((frame - a, event))
+        # the table samples each group evenly between its keys at no more than its rate (skeletal_actor.table_frames):
+        # the frame time is the group's own when the frames' times are known
+        own = (times[b] - times[a]) / (b - a) if times is not None and b > a else step
+        out.append(dict(entry, base=a, count=count, step=float(own), events=events, table_frames=(a, b)))
+    return out
+
+
 def selected_profile(name=None):
     """(name, groups to sample) of AMIWIND_NPC_ANIM: a profile, or STANDING+MOVER ('react+full')."""
     name = name or os.environ.get('AMIWIND_NPC_ANIM', '').strip() or 'idle'
@@ -493,6 +572,15 @@ def publish(id1, record):
         return
     sounds = anim.pop('_sounds', {})
     mover = anim.pop('_mover', None)
+    table = anim.pop('_table', None)
+    if table is not None:
+        # a skeletal model's shared animation table (--npc-anim-type 2): one file per skeleton, the same bytes for
+        # every actor on it, so it is written once
+        path, raw = table
+        target = Path(id1) / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.is_file() or target.read_bytes() != raw:
+            target.write_bytes(raw)
     model = Path(id1) / record['model']
     text = anim['layout']
     if mover is not None:

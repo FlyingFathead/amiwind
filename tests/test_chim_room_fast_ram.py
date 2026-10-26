@@ -81,17 +81,22 @@ class RoomFastRam(unittest.TestCase):
         limit) when the whole-map rule does not bind: one model, so the rooms the build marks for 32 MB are the
         plan's rooms with the note 'zone_over_16mb'."""
         import door_graph as G
+        import engine_limits as EL
         plan = G.room_limits()
-        gate = H.room_zone_limits(0, 0)
+        gate = H.room_zone_limits(EL.MEASURED_HUNK['before_map_bytes'], EL.MEASURED_HUNK['client_per_map_bytes'])
         self.assertEqual(gate['zone_room_bytes'], plan['zone_room_bytes'])
         self.assertEqual(gate['min_fast_room_bytes'], plan['room_bytes_min_fast'])
         self.assertEqual(gate['block_bytes_min_fast'], plan['block_bytes_min_fast'])
         self.assertEqual(gate['min_fast_ram_mib'], H.SAFE_FAST_MB)
-        # the measured figures (docs/chim/DOOR_GRAPH.md): the 32 MB room holds 14,336,000 bytes (the zone and the
-        # 7 MiB bank of the v0.0.50 measurement; 15,384,576 with the 8 MiB bank assumed before CHIM-AUTO-BANK-CLIFF-51);
-        # the 16 MB zone alone (7,012,352 when the plan was made) follows the engine's built heap and the Hunk it keeps,
-        # so it is read from the sources (6,995,968 with the hinged doors' engine), never pinned here
-        self.assertEqual(plan['room_bytes_min_fast'], 14336000)
+        # the measured figures (docs/chim/DOOR_GRAPH.md): the 32 MB room holds 20,663,136 bytes: the zone less the
+        # buffer and the 7 MiB bank of the v0.0.50 measurement (14,336,000, before ROOM-AKULAKHAN-HEAP-52), 4 MiB of
+        # the 6,222 KiB of free Fast RAM measured in a room map and the Hunk's rest past the zone (2,132,832 bytes for a
+        # room map of no bytes); the 16 MB zone alone (7,012,352 when the plan was made) follows the engine's built heap
+        # and the Hunk it keeps, so it is read from the sources (6,995,968 with the hinged doors' engine), never pinned
+        # (since CHIM-ROOM-HEART-CHAMBER-LOAD-50: 3,456 KiB of the 5,512 KiB block measured after Balmora, not 4 MiB)
+        self.assertEqual(plan['room_bytes_min_fast'], 20663136 - (4 << 20) + 3456 * 1024)
+        self.assertEqual((gate['bank_bytes'], gate['room_bank_bytes'], gate['hunk_rest_32mb_bytes']),
+                         (7 << 20, 3456 * 1024, 2132832))
         self.assertTrue(6 << 20 < plan['zone_room_bytes'] < plan['room_bytes_min_fast'], plan['zone_room_bytes'])
         # the door graph's room plan note and the gate's 16 MB test use the same comparison
         need = plan['zone_room_bytes'] + 1

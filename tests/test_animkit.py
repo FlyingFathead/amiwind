@@ -54,9 +54,39 @@ class Console(unittest.TestCase):
         self.assertIn('if(!AW_ANIMKIT || !aw_anim_kit_enabled)return AW_ANIM_IDLE;',
                       (SRC / 'aw_anim.c').read_text(encoding='utf-8'))
 
+    def test_animation_stage_plays_table_groups(self):
+        # SKEL-ANIM-STAGE-52: a skeletal actor plays any group of its shared table by name (AW_SkelGroup), the
+        # cycle walks every group (AW_SkelGroupAt, AW_AnimKitSpanFrame), a forced actor's resident idle think is
+        # held (it would step the frame) and given back, and the stage preset boots into the cycle.
+        source = (SRC / 'aw_animkit.c').read_text(encoding='utf-8')
+        for item in ('AW_SkelGroup(f->table,name)', 'AW_SkelGroupAt(lead->table,cycle.index,&g)',
+                     'AW_AnimKitSpanFrame(g.first,g.last,f->table->rate', 'e->v.nextthink=0;',
+                     'e->v.nextthink=f->home_nextthink>0?(float)sv.time+.1f:0;', 'AW_ItemsShow(e,f->items);',
+                     'AW_ItemsKinds(e)', "t->prefix[0]=='f'", '"progs/humanoid_kna.awsk"'):
+            self.assertIn(item, source)
+        self.assertIn('int AW_ItemsKinds(edict_t *actor) {', (SRC / 'aw_items.c').read_text(encoding='utf-8'))
+        import miniwind_presets
+        row = miniwind_presets.find('anim-stage')
+        self.assertEqual(row['start'], 'balmora')
+        self.assertEqual(row['boot_commands'], ['dbg guardtorch on', 'dbg animkit stage', 'dbg animkit cycle all'])
+        doc = (ROOT / 'docs/ANIMKIT.md').read_text(encoding='utf-8')
+        for item in ('dbg animkit stage', 'dbg animkit cycle', '--miniwind-anim-stage', 'dbg animkit groups'):
+            self.assertIn(item, doc)
+
+    def test_an_exterior_miniwind_image_installs_no_interior_store(self):
+        # MINIWIND-EXTERIOR-CHIM-INTERIORS-52: the stage build's image asked for chim-interiors/chim-rooms-receipt.json
+        # although the exterior MiniWind leaves the CHIM interiors stage out
+        from test_actor_library import steps
+        full = dict(steps())
+        self.assertIn('chim-interiors', full)
+        self.assertIn('--chim-interiors', [str(x) for x in full['image']])
+        sandbox = dict(steps('--miniwind', '--miniwind-scope', 'exterior'))
+        self.assertNotIn('chim-interiors', sandbox)
+        self.assertNotIn('--chim-interiors', [str(x) for x in sandbox['image']])
+
     def test_command_is_registered_catalogued_and_ticked(self):
         catalogue = (ROOT / 'config/debug-commands.txt').read_text(encoding='utf-8')
-        self.assertRegex(catalogue, r'(?m)^PLAYTESTING\|animkit\|aw_animkit_cmd\|\[on/off / list / play <group> / stop')
+        self.assertRegex(catalogue, r'(?m)^PLAYTESTING\|animkit\|aw_animkit_cmd\|\[on/off / list / groups / play <group> / cycle \[all\] / stage \[1\.\.8\] / stop')
         self.assertIn('Cmd_AddCommand("aw_animkit_cmd",command);', (SRC / 'aw_animkit.c').read_text(encoding='utf-8'))
         self.assertIn('AW_AnimKitInit();', (SRC / 'aw_debug.c').read_text(encoding='utf-8'))
         self.assertIn('AW_AnimKitTick();', (SRC / 'host.c').read_text(encoding='utf-8'))

@@ -9,9 +9,11 @@
 | Where | tools/chim_build.py --validate: gate order |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.36 |
-| Severity | high: Hold-level class (a check that runs late): a seconds-long check ran after a 69-minute walk in a 1h48m stage |
+| Persists in | v0.0.52-dev1 (last seen) |
+| Severity | critical: Regressed in v0.0.52-dev1 (was high): Hold-level class (a check that runs late): a seconds-long check ran after a 69-minute walk in a 1h48m stage |
 | Family | CHIM world streamer (`chim-streamer`) |
+| Deferred by the maintainer | 2026-10-26: deferred by the maintainer to v0.0.53 (the v0.0.52 release triage) |
+| Came back (regression) | in v0.0.52-dev1 (fixed in v0.0.36 before) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.36-dev3 |
 | From commit | source 5184581, engine 5184581, CHIM world 5184581 |
@@ -174,6 +176,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-ROOM-EFRAG-LIMIT-48](CHIM-ROOM-EFRAG-LIMIT-48.md): The efrag pool limit can leave CHIM room placements undrawn in large rooms
 - [CHIM-ROOM-ESTIMATE-48](CHIM-ROOM-ESTIMATE-48.md): 27 rooms set aside as too large for a CHIM room by a wrong estimate
 - [CHIM-ROOM-HARVEST-DOUBLE-48](CHIM-ROOM-HARVEST-DOUBLE-48.md): CHIM rooms kept harvestable mushrooms in their room records: the image stopped on addamasartus (8 record placements not in the room map), and batch rooms had unpickable mushrooms
+- [CHIM-ROOM-POPIN-51](CHIM-ROOM-POPIN-51.md): Some large interiors, in Vivec above all, are still loading in after the player has arrived: models appear while you look
 - [CHIM-ROOM-STORE-SWITCH-DROPS-MODELS-48](CHIM-ROOM-STORE-SWITCH-DROPS-MODELS-48.md): Switching CHIM room stores drops the kept models
 - [CHIM-ROOM-SURFCACHE-LIGHT-48](CHIM-ROOM-SURFCACHE-LIGHT-48.md): The surface cache must rebuild when the same model is drawn at different room light levels
 - [CHIM-ROOMS-WATER-LAVA-48](CHIM-ROOMS-WATER-LAVA-48.md): Rooms with water or lava are not converted to CHIM rooms yet

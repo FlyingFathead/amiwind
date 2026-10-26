@@ -13,6 +13,9 @@ BANK={222:(223,(100,69,138)),133:(113,(52,73,110)),95:(94,(210,50,34)),
 # .aww: region weather (tools/prepare_world_ui.region_weather): chances and RGB colours, no palette indices.
 OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.awn','.awq','.awr','.awt','.awg','.awl',
         '.anm','.tag','.aww',
+        # .awsk: a shared animation table of skeletal actors (tools/skeletal_actor.py write_table, engine aw_skel.h):
+        # bone rotations and positions, no pixels (SKEL-ANIM-STAGE-52, the stage build's image stop)
+        '.awsk',
         # CHIM rooms (tools/chim/interior.py, docs/chim/INTERIOR_STORE.md): the room store's index and packs and the room
         # records, written by the same CHIM pipeline as the world partition, which is never overlaid either.
         '.cwi','.ccs','.crm'}

@@ -273,6 +273,11 @@ int ChimFormat_RecordLight (int minor, int flags)
 	return minor >= CHIM_LIGHT_MINOR ? (flags >> CHIM_RECORD_LIGHT_SHIFT) & 255 : 0;
 }
 
+int ChimFormat_RecordTint (int minor, int flags)
+{
+	return minor >= CHIM_TINT_MINOR ? (flags >> CHIM_RECORD_TINT_SHIFT) & 7 : 0;
+}
+
 int ChimFormat_StoreNameValid (const char *name)
 {
 	int n;

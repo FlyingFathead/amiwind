@@ -414,7 +414,26 @@ class FastRamSafeMinimumTests(unittest.TestCase):
         self.assertIn('if (aw_fast_ram_short_mb)\n        Con_Printf(AW_FAST_RAM_NOTE "\\n", aw_fast_ram_short_mb);', text)
         movie = (ROOT / 'engine/aga/src/aw_movie.c').read_text(encoding='utf-8')
         self.assertIn('char aw_fast_ram_screen[256];', movie)
-        self.assertIn('for(p=aw_fast_ram_screen;*p;y+=10)', movie)
+        # once the warning box has said it, the note is not drawn over the logo again (RAM-WARNING-BOX-52)
+        self.assertIn('for(p=ram_warning_shown?"":aw_fast_ram_screen;*p;y+=10)', movie)
+        self.assertIn('if(!extra && (!aw_fast_ram_screen[0] || ram_warning_shown))return;', movie)
+
+    def test_a_warning_box_before_the_logo_in_the_maintainers_words(self):
+        # RAM-WARNING-BOX-52 (the maintainer, 26 October 2026): under 32 MB a message box before the AmiWind logo,
+        # centered, for a few seconds; ENTER goes on; only where the logo is shown (a test start skips both)
+        movie = (ROOT / 'engine/aga/src/aw_movie.c').read_text(encoding='utf-8')
+        text = re.search(r'#define RAM_WARNING_TEXT ((?:"[^"]*"\s*\\?\s*)+)', movie).group(1)
+        joined = ''.join(re.findall(r'"([^"]*)"', text))
+        self.assertEqual(joined, 'AmiWind requires at least 32MB of Fast RAM to run properly. Less than 32MB of Fast '
+                                 'RAM was detected. This will mean that parts of the game will run incorrectly or not '
+                                 'at all.')
+        self.assertIn('#define RAM_WARNING_TITLE "WARNING"', movie)
+        self.assertIn('#define RAM_WARNING_SECONDS 5', movie)
+        start = movie.split('static void startup_continue(void){', 1)[1].split('\n}', 1)[0]
+        self.assertLess(start.index('AW_TestBootSkipLogo()'), start.index('aw_fast_ram_screen[0] && !ram_warning_shown'))
+        self.assertIn('int AW_MovieActive(void){return buffers!=NULL || ram_warning;}', movie)
+        self.assertIn('if(ram_warning){draw_ram_warning();return;}', movie)
+        self.assertIn('if(ram_warning){if(Sys_FloatTime()>=ram_warning_until)ram_warning_done();return;}', movie)
 
 
 @unittest.skipUnless(shutil.which('cc'), 'host C compiler required')

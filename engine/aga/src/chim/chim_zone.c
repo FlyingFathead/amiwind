@@ -35,6 +35,9 @@ static int			numbanks;
 static chim_block_t	lru;		/* sentinel: lru.lru_next is the most recent */
 static void			(*evict_callbacks[CHIM_KINDS])(void *data, unsigned id);
 static unsigned long	allocations, evictions, failures, trims;
+/* the last CHIM_ZONE_FAILED failed requests (ChimZone_Failed) */
+static int			failed_kind[CHIM_ZONE_FAILED], failed_size[CHIM_ZONE_FAILED], failed_next;
+static unsigned		failed_id[CHIM_ZONE_FAILED];
 static unsigned long	unsatisfiable;
 static int			last_failed_need;	/* the last failed request, header included */
 static int			small_high;		/* ChimZone_SetEnds: blocks below this size come from the high end */
@@ -191,6 +194,19 @@ unsigned long ChimZone_AutoStep (unsigned long largest, unsigned long *budget, i
 		return 0;
 	*budget -= size;
 	return size;
+}
+
+/* A room's bank of free Fast RAM (chim_zone.h CHIM_ROOM_KEEP). */
+unsigned long ChimZone_RoomStep (unsigned long largest)
+{
+	unsigned long size;
+	if (largest <= CHIM_ROOM_KEEP)
+		return 0;
+	size = largest - CHIM_ROOM_KEEP;
+	if (size > CHIM_AUTO_BANK_MAX)
+		size = CHIM_AUTO_BANK_MAX;
+	size &= ~((unsigned long)CHIM_ROOM_GRAIN - 1);
+	return size < CHIM_ROOM_LEAST ? 0 : size;
 }
 
 /* Chunks fetched ahead in the direction of travel, in prefetch margins: one
@@ -407,7 +423,25 @@ static void *AllocIn (chim_user_t *user, int size, int kind, unsigned id, int on
 	}
 	failures++;
 	last_failed_need = need;
+	/* which request failed (CHIM-ROOM-HEART-CHAMBER-LOAD-50: two failed requests in Akulakhan's Chamber at 32 MB
+	 * were known only by count): kept for the chim command's report (ChimZone_Failed) */
+	failed_kind[failed_next] = kind;
+	failed_id[failed_next] = id;
+	failed_size[failed_next] = size;
+	failed_next = (failed_next + 1) % CHIM_ZONE_FAILED;
 	return NULL;
+}
+
+int ChimZone_Failed (int back, int *kind, unsigned *id, int *size)
+{
+	int i;
+	if (back < 0 || back >= CHIM_ZONE_FAILED || (unsigned long)back >= failures)
+		return 0;
+	i = (failed_next + CHIM_ZONE_FAILED - 1 - back) % CHIM_ZONE_FAILED;
+	*kind = failed_kind[i];
+	*id = failed_id[i];
+	*size = failed_size[i];
+	return 1;
 }
 
 /* Failed requests no eviction could have satisfied (nothing was evicted for them). */

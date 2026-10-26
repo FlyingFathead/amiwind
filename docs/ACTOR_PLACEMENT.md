@@ -1,6 +1,6 @@
 # Actor placement: how actors stand, fly, swim and float
 
-_Last updated with AmiWind v0.0.48-rc1 (23 October 2026)._
+_Last updated with AmiWind v0.0.52-dev (26 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -172,4 +172,5 @@ Stationary actors are grounded at build time now. Moving actors get fuller runti
 
 [ROOM-ACTORS-FLOATING-48](bugs/ROOM-ACTORS-FLOATING-48.md) holds the regression, the numbers (1,662 residents of batch
 CHIM rooms), the acceptance criteria and the decision. It stays open until a packaged build passes. See also
-[NPC ground contact](NPC_GROUND_CONTACT.md) and [character states](CHARACTER_STATES.md).
+[NPC ground contact](NPC_GROUND_CONTACT.md) and [character states](CHARACTER_STATES.md). The scripted creatures of the
+main quest (Dagoth Ur, the Heart of Lorkhan) and Vivec: [scripted actors](SCRIPTED_ACTORS.md).

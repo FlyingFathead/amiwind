@@ -363,6 +363,7 @@ void AW_C2PRows(int rows, int height);
 void AW_AudioLate(int missed);
 void AW_MusicPaint(portable_samplepair_t *dst,int count);
 unsigned long AW_MusicSilentSpans(void);	/* the music blocks that ran dry so far (AUDIO-LOAD-29: per load) */
+void AW_MusicLoadPump(void);	/* the music stream's reads go on during a load (aw_music.c; never waits) */
 void AW_FogInit(void);
 void AW_FogDraw(void);
 

@@ -9,6 +9,7 @@ client_static_t cls;client_state_t cl;server_t sv;refdef_t r_refdef;vec3_t vpn={
 dlight_t cl_dlights[MAX_DLIGHTS];
 int r_lamps=1,r_daylight=256,r_campfires=1;
 unsigned char *r_warm_colormap;
+unsigned char *r_tint_colormap[AW_TINTS];int r_tint_wanted;
 int R_SkyExterior(void){return 1;}
 static void (*lamp_status_command)(void);
 void Cmd_AddCommand(char *n,void (*f)(void)){assert(!strcmp(n,"aw_lamp_status"));lamp_status_command=f;}

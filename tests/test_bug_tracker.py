@@ -270,6 +270,7 @@ class BugTrackerTest(unittest.TestCase):
             # the optional rows the register writes after Family (bug_register fact_rows; TEST-FACT-ROWS-WAITING-51)
             expected += ['Waiting on'] if b.get('waiting_on') else []
             expected += ['Deferred by the maintainer'] if b.get('deferred') else []
+            expected += ['Came back (regression)'] if b.get('regressions') else []
             expected += ['CHIM'] if 'chim' in b else []
             if build:
                 expected += ['Playtest version', 'From commit', 'CHIM engine version']
@@ -613,6 +614,12 @@ class BugTrackerTest(unittest.TestCase):
         self.assertEqual(len(bug_register.tracker_status({'state': 'fixed', 'status': 'x' * 900})), 300 + 22)
         self.assertEqual(bug_register.tracker_status({'state': 'open', 'status': long}), long)
         self.assertEqual(bug_register.tracker_status({'state': 'closed', 'status': 'Closed.'}), 'Closed.')
+        # persisting at v0.0.52-dev1 (95 % of the limit): an open status past 500 characters ends at a sentence
+        sentence = 'Open (26 October 2026): the cause is known. ' + 'Details follow here. ' * 30
+        cell = bug_register.tracker_status({'state': 'open', 'status': sentence})
+        self.assertTrue(cell.endswith('. (full text: the register)'), cell)
+        self.assertLessEqual(len(cell), 500 + 26)
+        self.assertEqual(len(bug_register.tracker_status({'state': 'open', 'status': 'x' * 900})), 500 + 26)
 
     # Project requirement, 9 October 2026: every bug says which build it was found in.
     def test_playtest_bugs_must_name_their_build(self):

@@ -219,6 +219,44 @@ def point_light(point, lighting, normal=None, sun_normal=None):
     return value
 
 
+def point_colour(point, lighting, normal=None, sun_normal=None):
+    """point_light's terms with their colours: the light at a point as R, G, B (0..255 each before clamping). Its
+    luma is point_light (INTERIOR-SUNLIGHT-COLOUR-51: the bake kept the luma only)."""
+    value=np.array(lighting['ambient'][:3],dtype=float)
+    zones=lighting.get('zones',())
+    ambient_zones=[z for z in zones if z.get('scope','all')=='ambient']
+    if ambient_zones:value*=zone_scale(point,ambient_zones)
+    sun=lighting.get('sunlight')
+    if sun and lighting.get('sunlight_term',True):
+        share=SUN_ACTOR_SHARE if sun_normal is None else max(0.0,float(np.dot(sun_normal,INTERIOR_SUN_DIRECTION)))
+        value=value+np.array(sun[:3],dtype=float)*share
+    for light in lighting['lights']:
+        weight=light_weight(light,point,lighting,normal)
+        if weight:value=value+np.array(light['color'][:3],dtype=float)*weight
+    zones=[z for z in zones if z.get('scope','all')=='all']
+    if zones:value*=zone_scale(point,zones)
+    return value
+
+
+# Light tints (world format 0.13, the engine's tint tables in r_sky.c): 0 plain, 1 warm (the torch and lamp hue,
+# aw_light_hue), 2 red, 3 orange, 4 yellow, 5 green, 6 cool blue-white, 7 purple. A light is tinted when its
+# strongest channel is at least TINT_MIN_RATIO times its weakest (the 25 October 2026 census counted 1.5 as tinted;
+# a placement's light mixes the grey ambient in, so a little less here). TINT_HUES: (hue in degrees below, tint).
+TINT_MIN_RATIO = 1.4
+TINT_HUES = ((18, 2), (32, 3), (50, 1), (75, 4), (165, 5), (250, 6), (330, 7), (361, 2))
+
+
+def light_tint(rgb):
+    """The tint index (0-7) of a light colour (R, G, B)."""
+    r,g,b=(float(v) for v in rgb[:3]);hi=max(r,g,b);lo=min(r,g,b)
+    if hi<=0 or hi<TINT_MIN_RATIO*lo:return 0
+    if hi==r:hue=60*((g-b)/(hi-lo))
+    elif hi==g:hue=60*((b-r)/(hi-lo))+120
+    else:hue=60*((r-g)/(hi-lo))+240
+    hue%=360
+    return next(tint for below,tint in TINT_HUES if hue<below)
+
+
 def surface_style(polygon, rotation, origin, lighting):
     """Lightstyle for a baked face: WARM_STYLE when lighting['warm_style'] is
     set and warm lights add at least WARM_MIN_LIGHT at the face centre (after

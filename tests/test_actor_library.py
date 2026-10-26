@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The actor library (EXPERIMENTAL, --chim-actor-table on only): its stage in the build plan, the image option, the
 stage order, the NPC standing library's keys and base texts, the installation into an image with the actor table's
-base texts, and the engine's live-entity scale (U_AW_SCALE) in the protocol (CHIM-EXTERIOR-ACTORS-MISSING-46).
+base texts, and the engine's live-entity scale (U_AW_EXT, AWU_SCALE) in the protocol (CHIM-EXTERIOR-ACTORS-MISSING-46).
 
 Checked: with the option off (the default) the plan has no actor-library stage and the image no --actor-library
 option (the default stage list is unchanged); with it on the stage runs after the census and the CHIM towns and
@@ -223,18 +223,27 @@ class LeftOutTests(unittest.TestCase):
 
 class ScaleProtocolTests(unittest.TestCase):
     def test_bit_and_order(self):
-        """U_AW_SCALE is bit 15 (sent in the second bits byte, free before); the server writes the float after the
-        third angle and the client reads it after the third angle; the client draws it as statics are scaled."""
+        """U_AW_EXT is bit 15 (the second bits byte): after the third angle a byte of AmiWind fields, then the scale
+        float (AWU_SCALE) and the high byte of a frame over 255 (AWU_FRAME2, the shared animation tables); the client
+        reads them in the same place and order and draws the scale as statics are scaled."""
         proto = (SRC / 'protocol.h').read_text(encoding='utf-8')
-        self.assertIn('#define	U_AW_SCALE	(1<<15)', proto)
+        self.assertIn('#define	U_AW_EXT	(1<<15)', proto)
         self.assertEqual(proto.count('(1<<15)'), 1)
+        self.assertIn('#define	AWU_SCALE	(1<<0)', proto)
+        self.assertIn('#define	AWU_FRAME2	(1<<1)', proto)
         sv = (SRC / 'sv_main.c').read_text(encoding='utf-8')
         write = sv[sv.index('void SV_WriteEntitiesToClient'):]
-        self.assertLess(write.index('MSG_WriteAngle(msg, ent->v.angles[2]);'), write.index('MSG_WriteFloat (msg, scale);'))
-        self.assertIn('if (scale != 1)\n            bits |= U_AW_SCALE;', write)
+        self.assertLess(write.index('MSG_WriteAngle(msg, ent->v.angles[2]);'), write.index('MSG_WriteByte (msg, aw);'))
+        self.assertLess(write.index('MSG_WriteByte (msg, aw);'), write.index('MSG_WriteFloat (msg, scale);'))
+        self.assertLess(write.index('MSG_WriteFloat (msg, scale);'), write.index('MSG_WriteByte (msg, (frame >> 8) & 255);'))
+        self.assertIn('aw = (scale != 1 ? AWU_SCALE : 0) | (frame > 255 ? AWU_FRAME2 : 0);', write)
+        self.assertIn('if (ent->baseline.frame != ent->v.frame || frame > 255)', write)
+        self.assertIn('MSG_WriteByte (msg, frame & 255);', write)
         cl = (SRC / 'cl_parse.c').read_text(encoding='utf-8')
         parse = cl[cl.index('void CL_ParseUpdate'):cl.index('void CL_ParseBaseline')]
-        self.assertLess(parse.index('ent->msg_angles[0][2] = MSG_ReadAngle();'), parse.index('if (bits & U_AW_SCALE)'))
+        self.assertLess(parse.index('ent->msg_angles[0][2] = MSG_ReadAngle();'), parse.index('if (bits & U_AW_EXT)'))
+        self.assertLess(parse.index('if (aw & AWU_SCALE)'), parse.index('if (aw & AWU_FRAME2)'))
+        self.assertIn('ent->frame |= MSG_ReadByte () << 8;', parse)
         self.assertIn('ent->effects |= AW_EF_ALIAS_SCALE;', parse)
         self.assertIn('ent->aw_sprite_scale = 1;', parse)
 

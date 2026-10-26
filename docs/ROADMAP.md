@@ -1,11 +1,13 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.51 (25 October 2026)._
+_Last updated with AmiWind v0.0.52 (26 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.52 (next), 25 October 2026](#v0052-next-25-october-2026)
+- [v0.0.53 (next), 26 October 2026](#v0053-next-26-october-2026)
+- [v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026](#v0052-skeletons-of-society-vvardenfell-edition-26-october-2026)
+- [Near-term: magic effects as sprites and bitmap planes, 25 October 2026](#near-term-magic-effects-as-sprites-and-bitmap-planes-25-october-2026)
 - [v0.0.51: Let There Be More Inner Light, 25 October 2026](#v0051-let-there-be-more-inner-light-25-october-2026)
 - [v0.0.50: The Doors: Riders On The CHIM, 24 October 2026](#v0050-the-doors-riders-on-the-chim-24-october-2026)
 - [Build turnaround first, 24 October 2026](#build-turnaround-first-24-october-2026)
@@ -98,7 +100,25 @@ _Last updated with AmiWind v0.0.51 (25 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.52 (next), 25 October 2026
+## v0.0.53 (next), 26 October 2026
+
+v0.0.53 takes up what moved from v0.0.52. In order:
+
+- **Doors after a streamed crossing.** Walking across a frame border into another region frame leaves that frame's
+  doors unusable until the next load: the engine reads only the start frame's door bank (830 of 1,102 entrances)
+  ([DOOR-BANK-STREAMED-FRAME-51](BUGS.md)). The first fix of v0.0.53.
+- **Characters that live by their records.** NPCs and creatures wander, idle and attack on sight by what their own
+  record holds (its wander and travel packages, its Fight value), as the original game does ([ACTOR-WANDER-AGGRO-52](BUGS.md)).
+- **Dagoth Ur's fight and voice**, his whole original model kept ([scripted actors](SCRIPTED_ACTORS.md)).
+- **Full-detail heads** on skeletal characters where the rooms have room ([SKEL-VERTEX-LIMIT-52](BUGS.md)).
+- **Creatures on skeletons**, as the humanoids are since v0.0.52
+  ([modular NPCs](MODULAR_NPCS.md#getting-npc-movement-right)).
+
+Then the v0.0.51 playtest findings still open (entrances, silt striders, the crosshair, the night speckle, loose fire
+sprites), the rooms that are still loading in on arrival ([CHIM-ROOM-POPIN-51](BUGS.md)), and the rest of the
+v0.0.52 list below.
+
+## v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026
 
 Decided by the maintainer on 25 October 2026: v0.0.51 ships what its third development build holds, so one update
 does not carry too much; everything else moves here. First: the coloured light of rooms such as the Heart Chamber,
@@ -115,6 +135,52 @@ weather's ambient and sun colours are never used, only its sky and fog, so the l
 at Red Mountain keeps a neutral light ([WEATHER-AMBIENT-SUN-UNUSED-51](BUGS.md)). Requested with it: characters
 shielding their eyes in ash and blight storms, as in Ald'ruhn ([ACTOR-STORM-POSE-51](BUGS.md)). Outdoor lights
 without a mesh come later ([CHIM-MESHLESS-LIGHTS-33](bugs/CHIM-MESHLESS-LIGHTS-33.md)).
+
+Done in the v0.0.52 release ([release notes](RELEASE-v0.0.52.md)), which the maintainer named "Skeletons Of Society,
+Vvardenfell Edition":
+
+- **One skeleton for everyone.** Every humanoid moves by one shared skeleton and one shared table of every action a
+  humanoid can do, as in the original game: 512 MB of character models against 3,222 MB baked
+  ([modular NPCs](MODULAR_NPCS.md#getting-npc-movement-right)). On a slow 68040 a town frame draws as fast as with
+  baked characters ([SKEL-RUNTIME-COST-52](BUGS.md)).
+- **Dagoth Ur and the Heart of Lorkhan** in Akulakhan's Chamber, and the chamber on 32 MB, also coming from a town
+  ([CHIM-ROOM-HEART-CHAMBER-LOAD-50](bugs/CHIM-ROOM-HEART-CHAMBER-LOAD-50.md)).
+- **Coloured light in the rooms**: Akulakhan's Chamber is lit red as in the original
+  ([INTERIOR-SUNLIGHT-COLOUR-51](bugs/INTERIOR-SUNLIGHT-COLOUR-51.md)).
+- **No Software Failure from a full memory**, and a WARNING box under 32 MB of Fast RAM.
+
+Moved to v0.0.53, after its own list above: the census office's own judged light; the reuse cutoff by the files a
+stage reads; the light input audit (room fog, the weather's ambient and sun colours, the storm pose); the remaining
+long-persisting bugs; doors into rooms that read the game's locks; Bloodmoon; the Morrowind-style UI boxes; the old
+town frames as ordinary CHIM region frames.
+
+## Near-term: magic effects as sprites and bitmap planes, 25 October 2026
+
+Maintainer request, 25 October 2026: the magic graphics belong on the near-term list (v0.0.53 if they fit, else the
+release after). Morrowind draws spells with a peculiar set of its own: the glow on the casting hands, a bolt per
+school of magic with its hit and area bursts, and the auras on characters (shields and force fields, light,
+levitation), besides the spell icons in the HUD and the menus.
+
+To research first, in the spirit of [effects to investigate](#effects-to-investigate-quake-machinery-first-16-october-2026):
+Quake's sprites and flat bitmap planes rather than models. A sprite is one camera-facing picture, a plane one
+textured quad, and either can be animated by a few frames and drawn additive or see-through; they cost a quad where
+a model costs every vertex. So:
+
+- [ ] Survey what the game data holds for each effect (the effect meshes and their textures, the icons) and how
+  OpenMW draws it (`mwrender/effectmanager.cpp`, `mwmechanics/spellcasting.cpp`).
+- [ ] What AmiQuake already draws, cheaply, before anything new: its fireball (the rocket's flight with its smoke and
+  fire trail, the explosion sprite and burst of particles), the lava ball, sparks (the particle bursts where a nail
+  or a shot hits a wall), the lightning beam (segments drawn between two points), the teleport splash and the
+  blood and slime spurts. Fire damage spells, shock bolts, frost and hit sparks map onto these with Morrowind's own
+  colours and textures, through the code paths the engine already has (`r_part.c` particles, `cl_tent.c`
+  temporary effects and beams, the sprite renderer).
+- [ ] The casting glow as a small animated sprite on each hand (the hands are bones of the
+  [shared skeleton](MODULAR_NPCS.md#getting-npc-movement-right), so the sprite follows the hand).
+- [ ] Bolts as animated sprites in flight, the hit and area bursts as a few expanding sprites or planes.
+- [ ] Shields and force fields as a see-through plane or shell around the character, its texture scrolled or
+  warped (as the Ghostfence uses Quake's turbulent surface).
+- [ ] Each one A/B'd against the original at the same pose before it is adopted, and its cost read on the slow-CPU
+  preset.
 
 ## v0.0.51: Let There Be More Inner Light, 25 October 2026
 
@@ -2019,6 +2085,23 @@ engine already carries an inherited, untested CyberGraphX path. The emulators' v
 makes it testable without hardware. Possible scope: choose an RTG screen at startup when one is present (AGA
 otherwise), the palette and double buffering, the HUD, menus and video, and a measured comparison with AGA. A
 future path to look into, not a planned release item ([FAQ](FAQ.md#why-not-use-pistorm32-rtg-and-minigl)).
+
+Notes from Amiga developers, 26 October 2026:
+
+- **No texture memory on the card.** A graphics card's memory is not a place to keep the textures for the software
+  renderer: the CPU cannot texture from it, and without a 3D chip the card only shows the finished picture. So an
+  RTG path saves the chunky-to-planar conversion and nothing more; the hope that 8 or 16 MB of card memory could hold
+  the textures holds only with hardware 3D (Warp3D, below).
+- **The real gain is the machines.** On RTG the game runs on Amigas without AGA (an A3000 with a graphics card, for
+  example); skipping the conversion is a small speed-up beside that.
+- **Testing.** Amiberry emulates Picasso96 graphics cards (a Piccolo, for one) and is kept more up to date than
+  FS-UAE; a P96 RTG screen has been seen to start there.
+- **A model to follow.** The ADoom sources on Aminet show one display layer serving RTG, AGA and OCS/ECS, and the
+  RTG ports of Quake do the same: draw the chunky frame, then either convert it for the chipset or hand it to the
+  card as it is.
+- **Hardware 3D stays marginal,** but it exists: the CyberVision 64/3D (Zorro), the CyberVisionPPC and
+  BlizzardVisionPPC (on the PPC accelerators), Voodoo 3 to 5 through PCI busboards, and newer options for the
+  PiStorm, which is fast enough already.
 
 ### Research: hardware 3D through Warp3D (v0.0.50 study, 24 October 2026)
 

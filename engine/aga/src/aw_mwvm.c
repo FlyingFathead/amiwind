@@ -13,6 +13,7 @@
 #include <string.h>
 #include "aw_mwvm.h"
 #include "aw_mwcode.h"
+#include "aw_tryalloc.h"
 
 #define MAX_SCRIPTS 2048
 #define MAX_GLOBALS 512
@@ -132,7 +133,7 @@ void AW_MwvmReset(void){if(vmp)memset(vmp,0,sizeof(*vmp));}
 int AW_MwvmLoaded(void){return vmp && vm.loaded;}
 int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host_t *host){
     const unsigned char *conf;int rows,i;unsigned long len;
-    if(!vmp && !(vmp=(vm_t *)malloc(sizeof(vm_t))))return 0;   /* once, at load; never while running */
+    if(!vmp && !(vmp=(vm_t *)AW_TryMalloc(sizeof(vm_t))))return 0;   /* once, at load; never while running */
     AW_MwvmReset();
     if(!data || bytes<16 || memcmp(data,"AWMS",4) || U16(data+4)!=1)return 0;
     if(u32(data+12)>bytes || bytes<16+16*(unsigned long)U16(data+6))return 0;

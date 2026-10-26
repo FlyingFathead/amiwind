@@ -414,6 +414,31 @@ class PassKeyFormTests(unittest.TestCase):
         self.edit('pass_cache.py', "return 'key'", "return 'key'" + chr(10) + chr(10) + chr(10) + 'PASS_KEY_FORM = 2')
         self.assertEqual(stair_records.walker_sources(self.root, 'tools/pass_b.py')[0], self.keys()[0])
 
+    def test_a_hit_writes_what_the_key_covers_into_the_stage_trace(self):
+        """BUILD-KEY-UNIT-RESTORED-CODE-52: a cache hit tells the stage's trace which code its result comes from
+        ('@path<TAB>unit' for each reached function), once per process; a miss and an untraced process write
+        nothing."""
+        import build_profile
+        script = self.root / 'tools' / 'pass_b.py'
+        with patch.multiple(pass_cache, _COVERED={}, _NOTED=set()):
+            lines = pass_cache.covered_lines((script, 'worker'))
+            self.assertIn('@tools/helper.py\tshared', lines)
+            self.assertIn('@tools/pass_b.py\tworker', lines)
+            self.assertNotIn('@tools/pass_b.py\tmain', lines)                 # the worker never reaches main
+            self.assertFalse(any('pass_cache.py' in line for line in lines))  # the key code is neutral
+            with tempfile.TemporaryDirectory() as temp:
+                trace = Path(temp) / 'trace.txt'
+                cache = pass_cache.PassCache('p', {}, 'k', temp, covered=lines)
+                cache.store('in', {'x': 1}, b'out')
+                with patch.dict(os.environ, {build_profile.TRACE_ENV: str(trace)}):
+                    self.assertIsNone(cache.load('missing'))
+                    self.assertFalse(trace.exists())
+                    cache.load('in')
+                    cache.load('in')
+                self.assertEqual(trace.read_text().splitlines(), lines)        # once
+                with patch.dict(os.environ, {build_profile.TRACE_ENV: ''}):
+                    pass_cache.PassCache('q', {}, 'k', temp, covered=['=x']).load('in')
+
     def test_previous_digests_name_the_older_form(self):
         script = self.root / 'tools' / 'pass_b.py'
         self.assertEqual(pass_cache.previous_digests(script), (pass_cache.source_digest(script, form=1),))

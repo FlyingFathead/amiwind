@@ -50,8 +50,30 @@ def model_frames(raw):
             xyz=struct.unpack_from('<3B',raw,at+i*4)
             points.append(tuple(xyz[k]*h[2+k]+h[5+k] for k in range(3)))
         at+=nv*4;frames.append(points)
-    if at!=len(raw):raise ValueError('Actor model length mismatch')
+    if at!=len(raw):
+        # a skeletal actor (tools/skeletal_actor.py): one rest frame, then its "AWSB" block; the rest frame is the idle
+        # pose the actor stands in, so it is the one grounded (the engine streams the block, model_alias_stream.inc)
+        from skeletal_actor import BLOCK_HEAD, BLOCK_MAGIC, VERT_BYTES
+        if not (nf==1 and raw[at:at+4]==BLOCK_MAGIC and len(raw)==at+BLOCK_HEAD+nv*VERT_BYTES):
+            raise ValueError('Actor model length mismatch')
+        return RestFrame(frames)
     return frames
+
+
+class RestFrame(list):
+    """A skeletal actor's poses as the ground check sees them: its one stored rest frame. Its layout (<model>.anm)
+    names frames of the shared animation table, not of the model, so the rest frame is its idle pose to ground
+    (SKEL-GROUND-LAYOUT-TABLE-52)."""
+    skeletal = True
+
+
+def idle_poses(frames, layout=None, intro=False):
+    """The poses of FRAMES (model_frames) an actor stands in at its start: its layout's idle group, or the rest
+    frame of a skeletal actor."""
+    if getattr(frames, 'skeletal', False):
+        return list(frames)
+    from actor_frames import of_model
+    return [frames[i] for i in of_model(len(frames), layout, intro).idle_range()]
 
 
 def owner(maps, name, point):
@@ -81,9 +103,7 @@ def resident_frames(raw, layout=None, intro=False):
     """A resident model's standing poses to check for ground contact: its idle group, as the model's
     frame layout declares it (tools/actor_frames.py: an animation kit layout <model>.anm beside the model,
     else the previous 8-frame idle or 21-frame town actor layout; anything else is refused)."""
-    from actor_frames import of_model
-    frames = model_frames(raw)
-    return [frames[i] for i in of_model(len(frames), layout, intro).idle_range()]
+    return idle_poses(model_frames(raw), layout, intro)
 
 
 def layout_of(model_path):
@@ -100,8 +120,7 @@ def contact_samples(frames, angles, intro=False, layout=None):
     eight idle poses followed by talk/walk poses). An undeclared layout is refused, never skipped.
     This tests low mesh contact, not semantic left/right foot IK or all animation.
     """
-    from actor_frames import of_model
-    frames=[frames[i] for i in of_model(len(frames), layout, intro).idle_range()]
+    frames=idle_poses(frames, layout, intro)
     basis=axes(angles);samples={}
     for fi,points in enumerate(frames):
         low=min(p[2] for p in points)

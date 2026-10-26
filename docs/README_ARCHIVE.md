@@ -1,10 +1,11 @@
 # Earlier README sections
 
-_Last updated with AmiWind v0.0.51 (25 October 2026)._
+_Last updated with AmiWind v0.0.52 (26 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.49: Build Turnaround](#v0049-build-turnaround)
 - [v0.0.48: Inner CHIM & Actors On Stage](#v0048-inner-chim--actors-on-stage)
 - [v0.0.47: CHIM: The More, The Merrier](#v0047-chim-the-more-the-merrier)
 - [v0.0.46: Red Mountain Getting Red: A Whole Heap Of Fixes](#v0046-red-mountain-getting-red-a-whole-heap-of-fixes)
@@ -46,6 +47,13 @@ _Last updated with AmiWind v0.0.51 (25 October 2026)._
 <!-- contents end -->
 
 The front page ([README](../README.md)) used to carry these sections. They are dated records of earlier releases and of the work around them, kept as written; where one disagrees with the front page, the front page is newer. The release notes of each version are in `docs/RELEASE-v*.md`.
+
+## v0.0.49: Build Turnaround
+
+The builder: a new version number no longer rebuilds the CHIM world, only the engine and the image that show it, and
+release candidates and finals reuse the caches like development builds. This release's final was built from its
+development build's caches (39 of 43 stages reused; one more CHIM world build, repaired for v0.0.50). The docs now describe the current game throughout, with the second real-hardware
+figure (an A3000 with a 68060, through RTG on the tester's own modified build). The game is v0.0.48's.
 
 ## v0.0.48: Inner CHIM & Actors On Stage
 
@@ -1053,7 +1061,7 @@ complete package inclusion remain pending; dev2 has not shipped.
 
 Update (v0.0.44, 19 October 2026): the notes above are from 14 and 15 October 2026 and describe states that have
 since passed. The current state is in
-[Where AmiWind stands](../README.md#where-amiwind-stands-25-october-2026) near the top.
+[Where AmiWind stands](../README.md#where-amiwind-stands-26-october-2026) near the top.
 
 ## Development (as the front page stated it before 20 October 2026)
 

@@ -8,8 +8,13 @@ import struct
 # Updated for aw_alias_single_pass (one read while decoding; same cache block, no staging), then for shared
 # actor skins (IMAGE-ACTOR-SKIN-REPEATS-46: the pixels read from progs/skins/ through the same 4 KiB scratch
 # into the same cache block; no allocation added), then for the 32 MB actor budget (ALIAS-BUDGET-32MB-48: the stream
-# takes aliases up to AW_ALIAS_STREAM_LIMIT, the malloc staging keeps AW_ALIAS_STAGING_LIMIT; no allocation added).
-STREAM_SHA256='ba597f98811c4bb6348b07d5f9f24188ab5c721c8a20045711164e63f3e14025'
+# takes aliases up to AW_ALIAS_STREAM_LIMIT, the malloc staging keeps AW_ALIAS_STAGING_LIMIT; no allocation added),
+# then for the skeletal block (25 October 2026, docs/MODULAR_NPCS.md method C: an "AWSB" block after a skeletal
+# model's one rest frame goes into the same cache block, counted in its total, inside AW_ALIAS_STREAM_LIMIT; the
+# model's animation table is held outside the cache by aw_skel_load.c, one malloc per table for the session), then for
+# the refused table's message said once per model (26 October 2026, SDK-MALLOC-TRAPS-52: a static list of 64 model
+# pointers, no allocation added).
+STREAM_SHA256='e078ca236c9e14c58df7496d4c46eca4c051d1f02c1a60ba27b5cd25bde8cd3a'
 STREAM_LIMIT=768*1024          # model.c AW_ALIAS_STREAM_LIMIT (tools/npc_anim.py ALIAS_BYTE_BUDGET)
 
 def runtime_policy(source):
@@ -35,7 +40,11 @@ def eligible(raw,decoded):
     skins,w,h,nv,nt,nf=struct.unpack_from('<6i',raw,48)
     if skins!=1 or w<=0 or w%4 or not 0<h<=480 or not 0<nv<=2000 or nt<=0 or nf<=0:return False
     at=88+w*h+nv*12+nt*16
-    if at+nf*(28+nv*4)!=len(raw) or struct.unpack_from('<i',raw,84)[0]:return False
+    end=at+nf*(28+nv*4)
+    # a skeletal actor (tools/skeletal_actor.py) has one rest frame and its "AWSB" block after the frames: the stream
+    # reader takes it (model_alias_stream.inc), so it streams like any other model
+    skeletal=nf==1 and raw[end:end+4]==b'AWSB' and len(raw)==end+76+nv*16
+    if (end!=len(raw) and not skeletal) or struct.unpack_from('<i',raw,84)[0]:return False
     triangles=88+w*h+nv*12
     for i in range(nt):
         if any(v<0 or v>=nv for v in struct.unpack_from('<3i',raw,triangles+i*16+4)):return False

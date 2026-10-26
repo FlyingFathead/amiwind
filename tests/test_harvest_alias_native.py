@@ -23,7 +23,7 @@ class SharedHarvestNativeTests(unittest.TestCase):
 
     def test_real_model_slot_admission_preserves_active_cache_and_lru(self):
         native.NativeSourceTests().compile_run('aga_harvest_model_slots_test.c',
-            [Path(native.SOURCE)/'src'/name for name in ('model.c','mathlib.c')],
+            [Path(native.SOURCE)/'src'/name for name in (*native.SKEL_MODEL,'mathlib.c')],
             cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all', '-Wl,--wrap=malloc'])
 
     def test_actual_runtime_scaled_pick_occlusion_empty_and_inventory_retry(self):
@@ -50,7 +50,7 @@ class SharedHarvestNativeTests(unittest.TestCase):
                             lines.append(' '.join('%.9g'%v for v in (*origin,pitch,yaw,roll,scale,*point,*expected)))
         with tempfile.TemporaryDirectory() as temp:
             path=Path(temp)/'poses.txt';path.write_text('\n'.join(lines)+'\n')
-            self.compile('aga_harvest_alias_pose_test.c', ['r_alias.c','r_sprite.c','mathlib.c'], [str(path)])
+            self.compile('aga_harvest_alias_pose_test.c', ['r_alias.c','aw_skel.c','r_sprite.c','mathlib.c'], [str(path)])
 
 
 if __name__=='__main__':

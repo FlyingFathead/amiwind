@@ -76,6 +76,27 @@ unsigned long ChimZone_AutoBudget (unsigned long free_bytes, unsigned long total
 unsigned long ChimZone_AutoStep (unsigned long largest, unsigned long *budget, int first);
 int ChimZone_AutoLookahead (unsigned long auto_bytes);
 
+/* A CHIM room map holds nothing but its room (ROOM-AKULAKHAN-HEAP-52): when
+ * its models and textures do not fit the map's zone and the cache banks, the
+ * room takes, under the loading plaque, one more bank of the Fast RAM still
+ * free (the largest block less CHIM_ROOM_KEEP, in CHIM_ROOM_GRAIN steps, at
+ * least CHIM_ROOM_LEAST), then the rest of the Hunk the whole-map rule leaves
+ * (chim_world.c Chim_RoomGrow); both go back at the next map. Rooms that fit
+ * take neither. 0: no step. The grain was a whole MiB until v0.0.52, which
+ * left up to 1023 KiB of the block unused: after Balmora at 32 MB Akulakhan's
+ * Chamber took 3 MiB of a block just short of 6 MiB and had 420 KiB to spare
+ * (CHIM-ROOM-HEART-CHAMBER-LOAD-50). */
+#define CHIM_ROOM_KEEP		(2UL*CHIM_AUTO_MIB)
+#define CHIM_ROOM_LEAST		(1UL*CHIM_AUTO_MIB)
+#define CHIM_ROOM_GRAIN		65536
+#define CHIM_ROOM_HUNK_LEAST	65536
+/* What a room taking the Hunk's rest leaves for what its map loads after the
+ * zone (its entities, the client's per-map allocations) when the map states
+ * less: the measured 1,589,344 bytes (tools/engine_limits.py MEASURED_HUNK),
+ * in KiB, rounded up. */
+#define CHIM_ROOM_REST_KIB	1553
+unsigned long ChimZone_RoomStep (unsigned long largest);
+
 void *ChimZone_Alloc (chim_user_t *user, int size, int kind, unsigned id);
 /* Only from banks that survive a map change (none: NULL, nothing evicted
  * elsewhere); for the prefetch and what it keeps across maps. */
@@ -96,6 +117,10 @@ void ChimZone_EvictKind (int kind, int (*keep)(void *data, unsigned id));
 void ChimZone_SetEvict (int kind, void (*evicted)(void *data, unsigned id));
 void ChimZone_ForEach (int kind, void (*visit)(void *data, unsigned id));
 void ChimZone_Stats (chim_zone_stats_t *stats);
+/* The failed request BACK steps before the last (0: the last): its kind, id and size; 0 when there is none. The
+ * chim command names them (CHIM-ROOM-HEART-CHAMBER-LOAD-50). */
+#define CHIM_ZONE_FAILED	8
+int ChimZone_Failed (int back, int *kind, unsigned *id, int *size);
 long ChimZone_LockedPeak (int which, int reset);
 int ChimZone_Check_Integrity (void);
 unsigned long ChimZone_Failures (int *last_need);

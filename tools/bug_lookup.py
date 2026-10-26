@@ -10,9 +10,11 @@
     python3 tools/bug_lookup.py --persists                  bugs seen again in a later version
     python3 tools/bug_lookup.py ROOM-ACTORS-FLOATING-48 --page   print the report page too
     python3 tools/bug_lookup.py --json ...                  the matching records as JSON
+    python3 tools/bug_lookup.py --like "Balmora chunks leave holes"   closest titles, open, fixed and closed
 
 Before registering a bug, look it up: a problem seen again is marked PERSISTING on its existing entry, never added
-twice. Added for v0.0.48 at the maintainer's request (24 October 2026); docs/bugs/README.md has the register's rules."""
+twice; a fixed or closed bug seen again is a regression, reopened with tools/bug_register.py reopen
+(REGISTER-REGRESSION-HANDLER-52). Added for v0.0.48 at the maintainer's request (24 October 2026); docs/bugs/README.md has the register's rules."""
 import argparse
 import json
 import sys
@@ -76,20 +78,35 @@ def main(argv=None):
     parser.add_argument('--limit', type=int, default=40)
     parser.add_argument('--json', action='store_true')
     parser.add_argument('--page', action='store_true', help='print each report page too')
+    parser.add_argument('--like', metavar='TITLE', help='rank every bug (open, fixed, closed, archived) by how many '
+                                                        'title words it shares with TITLE, closest first')
     parser.add_argument('--root', type=Path, default=ROOT, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     found = [bug for bug in load(args.root) if matches(bug, args)]
+    if args.like:
+        # the register's own title score, the one bug_register.py add refuses on
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import bug_register
+        found = [bug for _, bug in bug_register.closest(found, args.like, limit=args.limit,
+                                                        states=bug_register.STATES)]
     shown = found[:args.limit]
     if args.json:
         print(json.dumps(shown, indent=2, ensure_ascii=False))
         return 0 if found else 1
     for bug in shown:
         title = bug.get('title') or ''
-        print('%-44s %-6s %-8s %-14s %s' % (bug.get('id'), bug.get('state'), bug.get('severity') or '-',
-                                            bug.get('found_in') or '-', title if len(title) <= 90 else title[:87] + '...'))
+        back = ' [came back %d time%s]' % (len(bug['regressions']), '' if len(bug['regressions']) == 1 else 's') \
+            if bug.get('regressions') else ''
+        print('%-44s %-6s %-8s %-14s %s%s' % (bug.get('id'), bug.get('state'), bug.get('severity') or '-',
+                                              bug.get('found_in') or '-',
+                                              title if len(title) <= 90 else title[:87] + '...', back))
         page = Path(args.root) / 'docs' / 'bugs' / ('%s.md' % bug.get('id'))
         if args.page and page.is_file():
             print(page.read_text(encoding='utf-8'))
+    gone = [bug['id'] for bug in shown[:3] if bug.get('state') in ('fixed', 'closed')]
+    if gone and (args.like or len(shown) <= 3):
+        print('fixed or closed: if one of these is seen again it is a regression, reopened, never added again: '
+              'tools/bug_register.py reopen %s --version vX --at TIME' % gone[0], file=sys.stderr)
     more = len(found) - len(shown)
     print('%d bug%s%s' % (len(found), '' if len(found) == 1 else 's', ' (%d more: --limit)' % more if more > 0 else ''),
           file=sys.stderr)

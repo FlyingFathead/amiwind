@@ -1,0 +1,17 @@
+{
+  "schema": "build-recipe-1",
+  "name": "anim-stage",
+  "description": "MiniWind preset --miniwind-anim-stage: Animation stage: skeletal NPCs play every shared-table group",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Animation stage: skeletal NPCs play every shared-table group",
+    "direct_to_game_map": "balmora",
+    "exclude_unreferenced": "voice,npcs",
+    "miniwind_boot": "dbg guardtorch on;dbg animkit stage;dbg animkit cycle all"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

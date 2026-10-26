@@ -1,6 +1,6 @@
 # Door graph: every load door and every interior
 
-_Last updated with AmiWind v0.0.51 (24 October 2026)._
+_Last updated with AmiWind v0.0.52 (26 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -524,9 +524,13 @@ and the bytes were the disk bytes, 17 % under what the engine loads. Counted aga
 | Subdun | 6,291,696 | 7,809,572 | over |
 | Sud | 6,273,784 | 7,803,884 | over |
 
-Bytes; the 32 MB room holds 14,336,000: the zone and the 7 MiB automatic cache bank that 32 MB of Fast RAM gives
+Bytes; the 32 MB room holds 14,336,000 in the zone and the 7 MiB automatic cache bank that 32 MB of Fast RAM gives
 since v0.0.51 (15,384,576 with the 8 MiB bank this table assumed: the v0.0.50 build left a 7 MiB budget, which got no
-bank at all while the first needed 8 MiB, CHIM-AUTO-BANK-CLIFF-51). Of all 1,328 rooms, 72 need more than the 16 MB
+bank at all while the first needed 8 MiB, CHIM-AUTO-BANK-CLIFF-51). Since v0.0.52 a room that does not fit them grows
+(ROOM-AKULAKHAN-HEAP-52): a room map holds nothing but its room, so it takes a bank of the free Fast RAM (its largest
+block less 2 MiB, in 64 KiB steps: 3,456 KiB of the 5,512 KiB block measured in Akulakhan's Chamber after Balmora at
+32 MB, CHIM-ROOM-HEART-CHAMBER-LOAD-50) and then the rest of the game heap past its zone, about 20.0 MB in all;
+the room plan's `room_bytes_min_fast` (20,007,776 for a room map of no bytes) is the image gate's model. Of all 1,328 rooms, 72 need more than the 16 MB
 zone alone: they load on the 32 MB minimum, not on the 16 MB baseline or with Options > Extra RAM off. Akulakhan's
 Chamber's cave shell was one model of about 7.6 MiB (estimated) when this table was made; since v0.0.48 it is stored
 as tiles (CHIM-ROOM-CLIPNODE-BUDGET-48), so no block of it comes near the one-block limit. What to watch and what comes next: [INTERIOR_SECTIONS.md](../INTERIOR_SECTIONS.md#what-worked-for-the-27-rooms-over-the-size-limit-23-october-2026).

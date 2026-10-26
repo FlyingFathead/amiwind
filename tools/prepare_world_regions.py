@@ -35,6 +35,7 @@ from vis_options import add_vis_option, light_args, map_threads, vis_args
 
 SCALE = .25
 STEP = 128
+SHORE_TOLERANCE = 8.0   # a refined tile's ground keeps every interior sample to within this (map units, 1/4 sample step)
 OVERLAP = 896
 _terrain = None
 ROOT = Path(__file__).resolve().parents[1]
@@ -263,7 +264,8 @@ def terrain_triangles(terrain, x, y, required_edge_samples=(), full_detail=False
         return
     corners = [point(x+dx, y+dy) for dx, dy in ((0,0),(STEP,0),(STEP,STEP),(0,STEP))]
     triangles = [[corners[i] for i in ids] for ids in ((0,1,2),(0,2,3))]
-    if not required_edge_samples and not terrain.shoreline_detail(x, y):
+    shore = terrain.shoreline_detail(x, y)
+    if not required_edge_samples and not shore:
         yield from triangles
         return
 
@@ -310,6 +312,23 @@ def terrain_triangles(terrain, x, y, required_edge_samples=(), full_detail=False
                 break
         if not added:
             break
+    # BALMORA-GROUND-DENTS-51: the samples above keep land and water apart, but between two of them on a steep bank
+    # the ground fell back to the coarse plane, notching V-shaped dents into the bank top (Balmora's canal). Interior
+    # samples further than SHORE_TOLERANCE from the ground are added, the furthest first; the edges keep their own rule
+    # above, decided from the edge's heights alone, so both tiles of an edge still agree. Only in a shoreline tile: a
+    # tile here for a neighbour's required edge keeps its interior as before.
+    def ground_error(p):
+        for tri in triangles:
+            w = weights(p, tri)
+            if min(w) >= -1e-8:
+                return abs(p[2] - sum(w[i]*tri[i][2] for i in range(3)))
+        return 0.0
+    interior = [point(x+dx,y+dy) for dy in (32,64,96) for dx in (32,64,96)]
+    while shore:
+        worst = max(interior, key=ground_error)
+        if ground_error(worst) <= SHORE_TOLERANCE:
+            break
+        insert(worst)
     yield from triangles
 
 

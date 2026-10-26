@@ -52,7 +52,8 @@ CLIENT_SLOTS = 1            # host.c Host_FindMaxClients: single player has one 
 def runtime_edicts(source=None):
     src = source or engine_limits.SOURCE
     return (2 + engine_limits.define('aw_combat.c', 'SLOTS', src) * engine_limits.define('aw_items.h', 'AW_ITEMS_KINDS', src)
-            + engine_limits.define('aw_state.h', 'AW_INVENTORY_DROPS', src))
+            + engine_limits.define('aw_state.h', 'AW_INVENTORY_DROPS', src)
+            + engine_limits.define('aw_items.h', 'AW_ITEMS_CARRIERS', src))     # skeletal guards' torches
 
 
 # Inventory retains up to AW_INVENTORY_DROPS persistent world entities.
@@ -206,6 +207,13 @@ def model_extras(id1, model, cache=None):
             for line in lines[1:3]:
                 kind, _, path = line.rstrip('\r').partition(' ')
                 if kind in ('weapon', 'shield') and path and path != '-':
+                    items.add(path)
+        elif lines and lines[0].startswith('AWTS1 '):
+            # a skeletal actor's tag (SKEL-ITEM-TAGS-52): its weapon and shield, and a carried light's model
+            # ("light PATH"), each precached at spawn (aw_items.c AW_ItemsPrep)
+            for line in lines[1:]:
+                kind, _, path = line.rstrip('\r').partition(' ')
+                if kind in ('weapon', 'shield', 'light') and path and path != '-':
                     items.add(path)
     except OSError:
         pass

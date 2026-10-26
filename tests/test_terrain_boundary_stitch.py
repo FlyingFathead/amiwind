@@ -29,6 +29,23 @@ class TerrainBoundaryStitchTests(unittest.TestCase):
   tris=list(terrain_triangles(terrain,0,0,required_edge_samples={1}))
   self.assertIn((128.,64.,30.),edge_points(tris,0,128,0,128))
   self.assertGreater(len(tris),2)
+ def test_a_steep_bank_keeps_its_top_without_dents(self):
+  # BALMORA-GROUND-DENTS-51: Balmora's canal bank (cell -3,-2): the tile's west column lies in the water, the bank
+  # rises inside it and the east columns are the street. Only the land/water flips were added, so the bank top sagged
+  # to the coarse plane between them; every interior sample now lies within SHORE_TOLERANCE of the ground.
+  from prepare_world_regions import SHORE_TOLERANCE
+  terrain=flat()
+  for iy in range(65):
+   for ix,h in enumerate((-200.,-120.,40. if iy%2 else 100.,168.,168.)):terrain.heights[0,iy,ix]=h
+  tris=list(terrain_triangles(terrain,0,0))
+  def ground(x,y):
+   for a,b,c in tris:
+    den=(b[1]-c[1])*(a[0]-c[0])+(c[0]-b[0])*(a[1]-c[1])
+    u=((b[1]-c[1])*(x-c[0])+(c[0]-b[0])*(y-c[1]))/den;v=((c[1]-a[1])*(x-c[0])+(a[0]-c[0])*(y-c[1]))/den
+    if min(u,v,1-u-v)>=-1e-8:return u*a[2]+v*b[2]+(1-u-v)*c[2]
+  for dy in (32,64,96):
+   for dx in (32,64,96):
+    self.assertLessEqual(abs(ground(dx,dy)-terrain.heights[0,dy//32,dx//32]*.25),SHORE_TOLERANCE+1e-9,(dx,dy))
  def test_invalid_edge_is_rejected(self):
   for edges in [{-1},{4},{True},{1.5}]:
    with self.assertRaises(ValueError):list(terrain_triangles(flat(),0,0,required_edge_samples=edges))

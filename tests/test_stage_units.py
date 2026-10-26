@@ -184,5 +184,22 @@ class RebuildUnitTests(unittest.TestCase):
             self.assertEqual([(r[0], r[1], r[3], r[4]) for r in rows], [('interior-room', 'bmtemple', 1, 1)])
 
 
+class RoomFolderTests(unittest.TestCase):
+    """BUILD-REUSE-FOREIGN-DIRS-52: dev1-try9's area stage stopped on intro-scene/area-work/tradehouse, an empty
+    folder another stage's reuse had made; a folder with a file in it is still an earlier room."""
+
+    def test_new_or_empty_folders_are_taken_a_file_stops_the_room(self):
+        import prepare_area
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'area-work' / 'tradehouse'
+            self.assertEqual(prepare_area.room_folder(root), root)
+            self.assertTrue(root.is_dir())
+            (root / 'source' / 'deeper').mkdir(parents=True)
+            self.assertEqual(prepare_area.room_folder(root), root)
+            (root / 'source' / 'room.map').write_text('{}')
+            with self.assertRaises(FileExistsError):
+                prepare_area.room_folder(root)
+
+
 if __name__ == '__main__':
     unittest.main()

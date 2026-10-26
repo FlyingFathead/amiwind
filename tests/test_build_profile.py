@@ -120,8 +120,11 @@ class MeasuredStageTests(unittest.TestCase):
             # Samples are rounded cores over jittered intervals, so the error grows with the CPU and
             # the host load: allow max(0.2 s, 10 %) over the exact CPU (TEST-PROFILE-TIMELINE-BOUND-33:
             # 0.1 failed by 0.00006 s on a busy host; persisting 2026-10-20 gate 3336: over by 0.016 s
-            # at 2.16 s CPU).
-            self.assertLess(sum(seconds), burn['cpu'] + max(0.2, 0.1 * burn['cpu']))
+            # at 2.16 s CPU). TEST-PROFILE-STAGE-WALL-32, 25 October 2026: over by 0.03 and 0.12 s (16 %) beside a
+            # 24-core build, failing gates 3920 and 3927. The bound is there to catch double counting (a sampler
+            # counting the children twice lands near 2x), so it allows 35 %: real load stays well under it, and
+            # double counting stays well over it.
+            self.assertLess(sum(seconds), burn['cpu'] + max(0.4, 0.35 * burn['cpu']))
             self.assertLess(max(seconds), 0.5 * sum(seconds))
             self.assertGreater(burn['peak_tree_rss_bytes'], 3 * 1024 * 1024)
             state = json.loads((root / 'run' / 'build-state.json').read_text())
