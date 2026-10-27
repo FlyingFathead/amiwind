@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.52-dev (26 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -603,7 +603,9 @@ the female groups under an `f:` prefix (`f:walkforward` and her two idles: OpenM
 `progs/humanoid_kna.awsk` (the beast races alone, as the baked kit has always made them). A female human's model
 names the view `progs/humanoid.awsk|f`: the engine loads the common file once for both, and the view's group
 lookup tries `f:` and the name first; her layout points at her own frames directly. A table of her own repeated
-the common one whole, 561 KB of Fast RAM for three groups. The animation kit's
+the common one whole, 561 KB of Fast RAM for three groups. An NPC whose record names an animation file of its
+own (the Suran dancers' `anim_dancingGirl.nif`) gets that file's groups the same way, under `d:`, and the view
+`progs/humanoid.awsk|d|f` ([ANIMKIT](ANIMKIT.md#an-npcs-own-animation-file)). The animation kit's
 layout beside each model names the table's frames ([ANIMKIT](ANIMKIT.md#skeletal-actors-the-layout-from-the-table)),
 with every group of the profile and no mover. The carried weapon and shield hang on the table's weapon and
 shield bones (the `AWTS1` item tag). The type is part of the resident stages' keys (`AMIWIND_NPC_ANIM_TYPE`) and

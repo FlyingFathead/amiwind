@@ -99,8 +99,21 @@ def main(argv=None):
     try:
         receipt['image_inspect'] = json.loads(subprocess.check_output(
             docker + ['image', 'inspect', args.image], text=True))[0]
+        # Free space first, before the game data is copied (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52): the build's
+        # volume, checked inside the builder image, with the game data it is about to take; without a copy, right after
+        # the input checks and before the build container is made.
+        def check_space(game_data=0):
+            import disk_need
+            roomy, text = disk_need.docker_volume_check(docker, args.volume, args.image, game_data)
+            print(text, flush=True)
+            receipt['disk_need'] = text
+            if not roomy:
+                raise ValueError('Too little free space for this build; nothing was copied:\n' + text)
         input_volume = args.input_volume
-        if data and args.stage_inputs:
+        staging = bool(data and args.stage_inputs)
+        if staging:
+            import disk_need
+            check_space(disk_need.tree_bytes([data]))
             input_volume = 'amiwind-input-' + args.name
             receipt['staging_seconds'] = stage_inputs(
                 docker, data, input_volume, args.image, output / 'input-staging.log')
@@ -117,6 +130,8 @@ def main(argv=None):
             if ',' in str(data):
                 raise ValueError('Docker bind-mount paths cannot contain commas; use --stage-inputs')
             mount = f'type=bind,source={data},target=/input,readonly'
+        if not staging:
+            check_space()
         command = docker + ['create', '--name', container, '--network', 'none',
                    '--mount', mount, '--mount',
                    f'type=volume,source={args.volume},target=/work', args.image,

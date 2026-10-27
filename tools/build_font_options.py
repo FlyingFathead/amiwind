@@ -58,7 +58,9 @@ KNOWN_KEYS = {"bitmap_paper_ink", "follow_original_stair_rules", "builder", "chi
               # NPC model levels of detail: validated and resolved by tools/npc_lod.py.
               "npc_lod", "npc_lod_levels", "npc_face_lod", "npc_lod_disk_mib",
               # The image's disk layout: validated and resolved by tools/layout_plan.py.
-              "disk_layout", "partition_headroom_mib", "boot_partition_headroom_mib"}
+              "disk_layout", "partition_headroom_mib", "boot_partition_headroom_mib",
+              # The free space a build needs (tools/disk_need.py): machine settings, in no stage key.
+              "min_free_gib", "disk_margin_percent"}
 
 
 def add_disk_layout_options(parser):
@@ -72,6 +74,14 @@ def add_disk_layout_options(parser):
     parser.add_argument("--boot-partition-headroom-mib", type=int, default=None, metavar="MIB",
                         help="Free space the boot partition keeps for saves and settings (default: the partition "
                              "headroom, config boot_partition_headroom_mib)")
+    # The free space a build needs (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52): machine settings, in no stage
+    # key and no recipe; they set AMIWIND_MIN_FREE_GIB / AMIWIND_DISK_MARGIN_PERCENT for the checks.
+    parser.add_argument("--min-free-gib", type=float, default=None, metavar="GIB",
+                        help="The least free space a build asks for on its workspace's file system (default 35, "
+                             "config min_free_gib); the need is the last known good build's figure plus the margin")
+    parser.add_argument("--disk-margin-percent", type=float, default=None, metavar="PERCENT",
+                        help="The margin over the last known good build's disk figure (default 30, config "
+                             "disk_margin_percent)")
 
 
 def add_font_options(parser):

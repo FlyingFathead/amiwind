@@ -21,5 +21,7 @@
   "npc_head_reducer": "locked",
   "disk_layout": "compact",
   "partition_headroom_mib": 100,
-  "boot_partition_headroom_mib": null
+  "boot_partition_headroom_mib": null,
+  "min_free_gib": 35,
+  "disk_margin_percent": 30
 }

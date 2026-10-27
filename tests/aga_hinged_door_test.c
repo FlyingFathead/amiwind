@@ -265,6 +265,24 @@ static void chim_mode(void){
     yaw=0;assert(AW_HingedDoorPlacement(7,100,chim_door->v.origin,32.2f,&yaw) && yaw==-90);
     /* a window recentre moves the door with the frame */
     AW_HingedDoorRecentre(d);argv1="list";door_command();argv1=NULL;
+    /* DOOR-BANK-STREAMED-FRAME-51, hinged doors: after a streamed crossing the running map keeps its coordinates and
+     * CHIM places the frame the player walked into at its window slot's offset (chim_chunks.c: dx, dy), in the same
+     * coordinates as the player, so its doors are picked and turned with no shift of their own (unlike the load
+     * doors' banks, which are in each frame's own coordinates). A door 2048 east and 1024 north of the start frame's
+     * origin: picked and opened from there; the same eye at the start frame's origin finds nothing. */
+    {
+        static box_hull_t far0,far1;vec3_t lo,hi,o={2048,1024,0};
+        VectorCopy(o,chim_door->v.origin);chim_door->v.angles[1]=0;
+        VectorAdd(dlo,o,lo);VectorAdd(dhi,o,hi);box_hull(&world.hulls[0],&far0,lo,hi,NULL);
+        VectorAdd(lo,pmins,lo);VectorAdd(hi,pmaxs,hi);box_hull(&world.hulls[1],&far1,lo,hi,pmins);
+        yaw=0;AW_HingedDoorMapBegin();
+        assert(AW_HingedDoorPlacement(7,100,chim_door->v.origin,32.2f,&yaw) && yaw==0);
+        place_player(o[0]+40,o[1]+16,180);
+        assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Open: E"));
+        n=chim_turns;assert(AW_HingedDoorUse());tick(.1,10);assert(chim_turns>n && chim_door->v.angles[1]==-90);
+        place_player(40,16,180);assert(!AW_HingedDoorHint(&name,&action));
+        world.hulls[0]=door.hulls[0];world.hulls[1]=door.hulls[1];VectorCopy(vec3_origin,chim_door->v.origin);
+    }
     /* A locked placement door (reference 200, lock level 50; a CHIM room's or a frame's: the same hooks) stays
      * shut: the prompt says Locked, the use plays the locked sound and nothing is turned. */
     chim_door->v.angles[1]=0;yaw=0;AW_HingedDoorMapBegin();

@@ -1,6 +1,6 @@
 # Development and source packaging
 
-_Last updated with AmiWind v0.0.46 (20 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -157,6 +157,9 @@ error, unexpected success, crashed or timed-out module (`--module-timeout`).
 `--skip-allowlist FILE` (lines `test id | exact reason | why`) also fails on any
 other skip. `--record-timings tests/module-timings.json` refreshes the records,
 `--json FILE` saves the report and `--list` prints the discovered test IDs.
+`--shard I/N` runs one of N suite shards, as the hosted CI's parallel test jobs
+do: whole modules, balanced by the recorded seconds; shards 1 to N together run
+every module exactly once (see [CI_DRY_RUN.md](CI_DRY_RUN.md)).
 Tests must not depend on running in the same process as another module, and
 must keep temporary files under unique temporary directories, because modules
 run at the same time.

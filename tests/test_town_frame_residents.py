@@ -104,7 +104,8 @@ class ResidentLandDetail(unittest.TestCase):
 
 
 class WideSupportSearch(unittest.TestCase):
-    """The wide ring (32 to 48 units) runs only after the 32-unit search (project decision, CHIM-VIVEC-FRAME-WIDE-41)."""
+    """The wide ring (32 to 64 units since v0.0.53: ACTOR-FRAME-FIT-MARGINAL-53) runs only after the 32-unit search
+    (project decision, CHIM-VIVEC-FRAME-WIDE-41)."""
 
     def fitter(self, fits):
         import actor_grounding
@@ -139,7 +140,8 @@ class WideSupportSearch(unittest.TestCase):
 
     def test_the_ring_follows_the_32_unit_search(self):
         import actor_grounding as g
-        self.assertTrue(all(32 < math.hypot(*p) <= 48 for p in g.WIDE_RING))
+        self.assertTrue(all(32 < math.hypot(*p) <= 64 for p in g.WIDE_RING))
+        self.assertIn((46.5, 12.0), g.WIDE_RING)   # Mivul Urvon's spot in the Vivec frame, 48.02 units away
         self.assertFalse(set(g.WIDE_RING) & set(g.OFFSETS))
         self.assertEqual(g.WIDE_RING, sorted(g.WIDE_RING, key=lambda p: (p[0]*p[0]+p[1]*p[1], p)))
         from unittest.mock import patch

@@ -84,6 +84,10 @@ void() aw_hands_update = {
 .string aw_voice;
 .string aw_line;
 .float aw_idle_step;
+/* An NPC's own idle loop (DANCER-OWN-ANIM-IGNORED-53, tools/npc_anim.py own_idle): COUNT frames of its shared
+ * table from BASE (the Suran dancers' dance, idle9 of their own animation file); 0 = the 8 idle frames. */
+.float aw_idle_base;
+.float aw_idle_count;
 .float aw_intro_role;
 .float aw_ref;
 .float aw_ground_mode; // 0 ground resident; 1 authored airborne/scripted exception
@@ -164,7 +168,10 @@ void() aw_npc_idle = {
     self.nextthink = time + 0.125;
     if (!self.aw_moving && time >= self.aw_next_pose) {
         self.frame = self.frame + 1;
-        if (self.frame >= 8) self.frame = 0;
+        if (self.aw_idle_count > 0) {
+            if (self.frame < self.aw_idle_base || self.frame >= self.aw_idle_base + self.aw_idle_count)
+                self.frame = self.aw_idle_base;
+        } else if (self.frame >= 8) self.frame = 0;
         self.aw_next_pose = time + self.aw_idle_step;
     }
     if (aw_player == world || self.aw_intro_role) return;

@@ -156,9 +156,12 @@ OFFSETS = sorted(((x*.5, y*.5) for x in range(-64, 65) for y in range(-64, 65)
 # The wide ring (CHIM-VIVEC-FRAME-WIDE-41, project decision 2026-10-16): offsets past the 32-unit search, up to 48
 # units, nearest first. Tried only after every OFFSETS spot failed, so an actor the 32-unit search places never
 # moves; it serves ground residents on slopes too steep for any spot within 32 units (the Vivec frame's Dreamer,
-# reference 297836, on a 28-degree slope: nearest fitting spot 37.5 units away).
-WIDE_RING = sorted(((x*.5, y*.5) for x in range(-96, 97) for y in range(-96, 97)
-                    if 4096 < x*x+y*y <= 9216), key=lambda p: (p[0]*p[0]+p[1]*p[1], p))
+# reference 297836, on a 28-degree slope: nearest fitting spot 37.5 units away). Up to 64 units since v0.0.53
+# (ACTOR-FRAME-FIT-MARGINAL-53): the Vivec frame's Mivul Urvon (reference 135239) fitted 47.5 units away while his
+# sole samples moved by about 0.01 unit when the shared table grew, and his nearest fitting spot became 48.02 units
+# away, just outside the ring; the spots tried before 48 units keep their order, so no actor fitted before moves.
+WIDE_RING = sorted(((x*.5, y*.5) for x in range(-128, 129) for y in range(-128, 129)
+                    if 4096 < x*x+y*y <= 16384), key=lambda p: (p[0]*p[0]+p[1]*p[1], p))
 SEARCH_ENV = 'AMIWIND_ACTOR_SEARCH'
 SEARCH_MODES = ('wide', 'near')
 

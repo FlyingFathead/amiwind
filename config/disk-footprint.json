@@ -1,0 +1,153 @@
+{
+  "schema": "amiwind-disk-footprint-1",
+  "version": "0.0.53-dev3",
+  "build": "2026_10_27_v0.0.53-dev3_dev3_2b155706",
+  "measured": "2026-10-27",
+  "bytes": {
+    "run": 19845779456,
+    "scratch": 2836971520,
+    "cache": 30966747464,
+    "pool": 0,
+    "game_data": 1926864896,
+    "builder_image": 2146901118
+  },
+  "file_systems": [
+    {
+      "role": "workspace",
+      "peak_growth": 22289727488,
+      "growth": 19452755968
+    }
+  ],
+  "stages": {
+    "actor-contact": {
+      "workspace": 79331328
+    },
+    "actor-library": {
+      "workspace": 678645760
+    },
+    "area": {
+      "workspace": 1004199936
+    },
+    "balmora-interiors": {
+      "workspace": 1265823744
+    },
+    "bsp": {
+      "workspace": 294912
+    },
+    "cell-progress": {
+      "workspace": 71217152
+    },
+    "census": {
+      "workspace": 8634368
+    },
+    "character": {
+      "workspace": 4554752
+    },
+    "chim": {
+      "workspace": 13514534912
+    },
+    "chim-interiors": {
+      "workspace": 365322240
+    },
+    "chim-room-batches": {
+      "workspace": 12289122304
+    },
+    "chim-rooms-vivec_city": {
+      "workspace": 678641664
+    },
+    "chim-town-balmora": {
+      "workspace": 81870848
+    },
+    "chim-town-seyda": {
+      "workspace": 77643776
+    },
+    "chim-town-vivec_city": {
+      "workspace": 86671360
+    },
+    "dialogue-lookup": {
+      "workspace": 208896
+    },
+    "door-audio": {
+      "workspace": 2387968
+    },
+    "engine": {
+      "workspace": 59383808
+    },
+    "hand-catalog": {
+      "workspace": 557056
+    },
+    "hands": {
+      "workspace": 212992
+    },
+    "harvest": {
+      "workspace": 454656
+    },
+    "image": {
+      "workspace": 7672291328
+    },
+    "interior": {
+      "workspace": 344064
+    },
+    "intro": {
+      "workspace": 118882304
+    },
+    "media": {
+      "workspace": 45780992
+    },
+    "music": {
+      "workspace": 2826240
+    },
+    "mwscript": {
+      "workspace": 5242880
+    },
+    "npc-gallery": {
+      "workspace": 423993344
+    },
+    "npcs": {
+      "workspace": 1888256
+    },
+    "opening-references": {
+      "workspace": 1363968
+    },
+    "reading": {
+      "workspace": 3153920
+    },
+    "scene": {
+      "workspace": 499712
+    },
+    "scenery": {
+      "workspace": 229376
+    },
+    "seam-audit": {
+      "workspace": 229376
+    },
+    "setup": {
+      "workspace": 110592
+    },
+    "terrain": {
+      "workspace": 270336
+    },
+    "world-flora": {
+      "workspace": 102727680
+    },
+    "world-flora-assets": {
+      "workspace": 528384
+    },
+    "world-scenery": {
+      "workspace": 47919104
+    },
+    "world-scenery-assets": {
+      "workspace": 290816
+    },
+    "world-survey": {
+      "workspace": 7897088
+    },
+    "world-terrain": {
+      "workspace": 625078272
+    },
+    "world-ui": {
+      "workspace": 3457024
+    }
+  },
+  "note": "The last known good build's disk figure (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52): bytes on disk, each file once. Written by tools/disk_need.py ship RUN. v0.0.53: run, scratch and the stage figures measured by the v0.0.53-dev3 build; that build reused 28 of 43 stages and added only 387,022,848 bytes of cache, so cache keeps the larger figure of the v0.0.52 final (a fresh build writes all of it)."
+}

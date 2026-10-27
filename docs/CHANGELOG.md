@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.52 (26 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.53: Super Freak Halloween Update, 27 October 2026](#v0053-super-freak-halloween-update-27-october-2026)
 - [v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026](#v0052-skeletons-of-society-vvardenfell-edition-26-october-2026)
 - [v0.0.51: Let There Be More Inner Light, 25 October 2026](#v0051-let-there-be-more-inner-light-25-october-2026)
 - [v0.0.50: The Doors: Riders On The CHIM, 24 October 2026](#v0050-the-doors-riders-on-the-chim-24-october-2026)
@@ -160,6 +161,34 @@ _Last updated with AmiWind v0.0.52 (26 October 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.53: Super Freak Halloween Update, 27 October 2026
+
+- Doors work after a walk across a frame border: the engine read only the start frame's door bank, so 830 of the 1,102
+  exterior entrances were dead once walked into; a script's Activate on a load door uses the current frame too
+  ([DOOR-BANK-STREAMED-FRAME-51](bugs/DOOR-BANK-STREAMED-FRAME-51.md)).
+- Every build runs the door check: the engine's own door code over all 1,102 entrances (prompt, use key, the way back,
+  the wall between the player and the door), 1,102 of 1,102 working after a walk over a frame border; the count may
+  only go up ([DOOR-ENTRANCE-AUDIT-51](BUGS.md)). `dbg door roulette [SEED]` loads one random room at its own start.
+- A doorway slack lets the use ray meet the entrance's own doorway collision up to 16 units before the door: the
+  stricter wall-traced check counts 1,067 entrances usable, up 31; the 35 left (24 Daedric shrines, 7 raised
+  trapdoors, 2 Dwemer doors, a Redoran hut door, the Unmarked Shipwreck's upper trapdoor) move to v0.0.54
+  ([DOOR-USE-BLOCKED-53](BUGS.md), [DOOR-USE-COLLISION-FILLED-53](BUGS.md)).
+- The four characters of the base game with an animation file of their own, among them Desele's dancers in Suran,
+  dance it from the shared table ([DANCER-OWN-ANIM-IGNORED-53](BUGS.md)).
+- The Halloween scene: the game's skeletons, the Suran dancers and Dagoth Ur dancing on the animation stage to a beat,
+  with a camera director; `aw bench halloween` (aliases `aw halloweenbench`, `dbg halloween bench`) is the standard
+  benchmark, the same 600 frames on every machine ([HALLOWEEN-SCENE-53](BUGS.md), [HALLOWEEN.md](HALLOWEEN.md)). Both
+  need a build with the cast (`--miniwind-halloween`); the cast joins the default build in a follow-up.
+- The custom OST slot: one track of your own packed into your image only, played by `aw music custom play`/`stop`
+  while the game's playlist waits; public builds ship no song ([CUSTOM-OST-SLOT-53](BUGS.md)).
+- Builds check the free disk first: the last known good footprint plus 30 %, never below 35 GiB, again before each
+  stage; changing the settings rebuilds nothing ([BUILD-DISK-NEED-UNKNOWN-52](BUGS.md)).
+- The GitHub checks run in parallel jobs with the tools cached and the suite in six shards
+  ([CI-SOURCE-JOB-TIMEOUT-52](BUGS.md)).
+- A version-only change after a development build refuses no stage record, so it rebuilds only the engine and the
+  image ([BUILD-STAGE-READS-UNFINGERPRINTED-48](BUGS.md)); a maintainer deferral to a version stops counting at that
+  version ([REGISTER-DEFERRAL-EXPIRES-53](BUGS.md)).
 
 ## v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026
 

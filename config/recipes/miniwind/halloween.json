@@ -1,0 +1,18 @@
+{
+  "schema": "build-recipe-1",
+  "name": "halloween",
+  "description": "MiniWind preset --miniwind-halloween: Halloween: skeletons, dancers and Dagoth Ur dance on the beat",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Halloween: skeletons, dancers and Dagoth Ur dance on the beat",
+    "direct_to_game_map": "balmora",
+    "exclude_unreferenced": "voice,npcs",
+    "miniwind_boot": "dbg halloween",
+    "halloween": true
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

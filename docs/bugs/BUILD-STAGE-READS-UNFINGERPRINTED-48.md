@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.51-dev2 at 2026-10-25 03:06 +0200: dev2 preflight refused the dev1 records of area, balmora-interiors, chim-rooms-vivec_city, chim-room-batches (5 files hashed by their unit cache keys); 6 UNEXPECTED rebuilds with intro and census
 - Reported with v0.0.52-dev3 at 2026-10-26 13:23 +0200: PERSISTING: dev3 refused 3 dev2 records: room stages ran 29 unfingerprinted functions (src/mwad/audit.py:decode_heights first), character 2 (tools/file_cache.py:digest_json)
+- Reported with v0.0.52 at 2026-10-26 14:53 +0200: PERSISTING: the v0.0.52 final refused 7 dev3 records (chim world, both room stages, area, character; intro and census after them): a VERSION-only final rebuilt the CHIM world (imperative 19)
 
 <!-- END GENERATED PERSISTING -->
 
@@ -18,7 +19,7 @@
 | Where | stage fingerprints of mwscript and chim-room-batches |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.48-dev2 (last seen) |
+| Persists in | fixed in v0.0.53 |
 | Severity | medium: unexpected reruns on every reuse build |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -28,7 +29,48 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.52 (26 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Fixed in source: 26 October 2026](#fixed-in-source-26-october-2026)
+- [Status: 26 October 2026](#status-26-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [Why it persists](#why-it-persists)
+- [Hypotheses (26 October 2026)](#hypotheses-26-october-2026)
+- [What has to be done](#what-has-to-be-done)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Fixed in source: 26 October 2026
+
+The functions were never run by the stages. A cache that gives a stage a result writes what its key covers into the
+stage's read trace (the fix of BUILD-KEY-UNIT-RESTORED-CODE-52, `pass_cache.covered_lines`): one `@file<TAB>function`
+line per function. Those lines came from the cache key's own form (2), in which a module's import-time code holds
+every class body, so the reach named every function any class method of an imported module calls. The stage keys
+are form 3: each class is a unit of its own, and a class the stage never names is not reached. The trace check read
+the cache's lines as functions the stage ran, found them outside its key, and refused the record.
+
+Proof from the v0.0.52-dev3 build (the records the final refused): computing the form 2 lines of the caches each
+stage keys, against the form 3 stage reach, gives exactly the refused lists: `tools/chim/validate.py` (the chim
+stage's validation cache) 12, with `tools/chim/stitch.py:LEGACY_STAGES` first; `tools/prepare_area.py` (the room
+and resident unit caches of area and both room stages) 29, with `src/mwad/audit.py:decode_heights` first;
+`tools/prepare_character.py` (the character head cache) 2, `tools/file_cache.py:digest_json` and `sha256_file`. In
+the traces these lines sit together in the sorted block a hit appends (after the `=` lines of the same block).
+
+The fix: a hit now writes the stage key's own view of the code it hands to the cache (form 3,
+`SourceIndex.keyed_coverage`, the same function the stage key counts that code with); the cache key itself stays in
+form 2. The stage key also follows code that keyed code hands to a cache key in turn, and the files a hit names whole
+(`=` lines) are checked like reads, so a cache result from a file the key leaves out still refuses the record. No
+stage key of the current tree changes (all 386 tools scripts compared). Tests: `CacheHitCoverageTests` in
+tests/test_build_cache.py (a record with a cache hit is kept, and a VERSION-only build after it reuses it), and
+`test_a_cache_hit_in_a_stage_refuses_no_record` in tests/test_stage_version_key.py (every stage script of the
+builder, every cache it keys). Proof still to come: the next VERSION-only build after a development build made with
+the fix refuses no record.
 
 ## Status: 26 October 2026
 
@@ -56,6 +98,34 @@ leaves; the room stages reach `src/mwad/audit.py` through the room readers, `cha
 
 Each fix so far closed the one path it was found with. A stage's declared sources are written by hand, so any new
 import path the stage takes is missed until a reuse build refuses it.
+
+## Hypotheses (26 October 2026)
+
+Written before the proof, after the v0.0.52 final rebuilt the CHIM world; each checked against the traces and records
+of the v0.0.52-dev3 build (the records the final refused).
+
+1. **Covered unit code, counted by the check but not by the key (commit 519c5d72, BUILD-KEY-UNIT-RESTORED-CODE-52).**
+   Since that commit a cache hit writes the code its key covers into the stage trace. If the stage key does not count
+   those lines while the record check reads them as code the stage ran, every stage with a cache hit is refused.
+   **Proven, with one correction.** The refused names come from the `@file<TAB>function` lines a hit writes, not
+   from the `=` lines, and the stage key does count the code it hands to the cache, but in its own form (3), while
+   the lines were written in the cache key's form (2), whose import-time code holds every class body. The form 2
+   lines of the caches each stage keys, minus the form 3 stage reach, are exactly the refused lists: 12 for chim
+   (`tools/chim/validate.py` cache), 29 for area and both room stages (`tools/prepare_area.py` caches), 2 for
+   character (`tools/prepare_character.py` cache). In the character trace the two `tools/file_cache.py` lines sit in
+   the sorted block a hit appends (`=` lines, then `@` lines); in the chim trace each stitch.py line appears 24 times,
+   once per worker process that had a hit. A regression of 519c5d72: v0.0.52-dev2 was the first build with it.
+2. **A module constant reached through an import the key walker does not follow.** **Disproven.**
+   `tools/chim/stitch.py:LEGACY_STAGES` (and `tools/world_chunk_estimate.py:NUM`, `tools/actor_frames.py:ACTOR_GROUPS`,
+   `tools/actor_grounding.py:SEARCH_MODES`, `tools/world_estimate_data.py:MASTERS`) are literal tables, units of
+   their own in the key (BUILD-SCHEDULER-TABLE-KEY-35). No code runs for a table, so the trace hook can never name
+   one: they reached the trace only through the covered lines of hypothesis 1, where the form 2 import-time code of
+   stitch.py names them. The chim refusal has the same single cause.
+3. **Imports inside functions, or code chosen at run time (dispatch tables, getattr).** **Disproven for these
+   refusals:** every refused name is in the covered lines of hypothesis 1; no name came from code the static reach
+   missed.
+4. **Helper scripts started as separate processes.** **Disproven for these refusals,** for the same reason; the five
+   records are complete (no process started without the trace) and name no file read outside the key.
 
 ## What has to be done
 

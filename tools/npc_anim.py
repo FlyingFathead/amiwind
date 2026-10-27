@@ -127,10 +127,12 @@ def table_groups(table, groups, attack_stance=None, times=None, prefix=''):
     group the table lacks stands on the idle's first frame (OpenMW falls back to idle), as plan() does. Frame rules
     are plan()'s: loops and 'once' groups leave out the stop key's frame (it is the start's pose again), 'hold'
     groups end on it. times: the animation time of every table frame (build_table's report), for each group's own
-    frame time (else the table's rate). prefix: a table view's own groups ('f:', skeletal_actor.table_prefix),
-    played before the table's groups of the same name (a female human's walk and idles)."""
+    frame time (else the table's rate). prefix: a table view's own groups ('f:', skeletal_actor.table_prefix), or
+    its prefixes in order (['d:', 'f:'], skeletal_actor.table_prefixes), played before the table's groups of the
+    same name (a female human's walk and idles; an NPC's own animation file's groups first)."""
     names = list(table['groups'])
     index = {g: i for i, g in enumerate(names)}
+    prefixes = [p for p in ([prefix] if isinstance(prefix, str) else prefix) if p]
     at = {}
     for text, gi, frame in table['keys']:
         at.setdefault((gi, text), frame)
@@ -139,8 +141,8 @@ def table_groups(table, groups, attack_stance=None, times=None, prefix=''):
     def key(line):
         group, what = (s.strip() for s in line.split(':', 1))
         # the view's group whole when it has one (its start and stop keys both from it: the table refuses a group
-        # without them)
-        gi = index.get(prefix + group) if prefix and prefix + group in index else index.get(group)
+        # without them), its first prefix first
+        gi = next((index[p + group] for p in prefixes if p + group in index), index.get(group))
         return None if gi is None else at.get((gi, what))
     idle = key(GROUPS['idle'][0])
     if idle is None:
@@ -175,6 +177,40 @@ def table_groups(table, groups, attack_stance=None, times=None, prefix=''):
         own = (times[b] - times[a]) / (b - a) if times is not None and b > a else step
         out.append(dict(entry, base=a, count=count, step=float(own), events=events, table_frames=(a, b)))
     return out
+
+
+IDLE_VARIANTS = tuple('idle%d' % n for n in range(2, 10))     # the eight idle chances of AI_W: Idle2 to Idle9
+
+
+def own_idle(table, times, appearance, own):
+    """The idle an NPC with its own animation file loops while it stands (DANCER-OWN-ANIM-IGNORED-53), or None.
+    own: the prefix of its own file's groups in the table ('d:', skeletal_actor.own_animation), or None. The idle
+    variant (idle2 to idle9) its own file carries whose AI_W chance is the highest of the NPC's eight (OpenMW's
+    AiWander picks a standing actor's idle by those chances: the Suran dancers' idle9, the dance, is 80 against 20
+    or less, so they dance; Yakov's is 5 against 40, so he stands as before). Returns {'group', 'base', 'count',
+    'step'}: COUNT table frames from BASE, the stop key's frame left out (it is the start's pose again: a loop), STEP
+    its own frame time (times: the table frames' animation times, build_table's report). The engine loops it while
+    the actor stands (engine/aga/qc/world.qc aw_npc_idle: the entity's aw_idle_base and aw_idle_count)."""
+    chances = list(appearance.get('idle_chances') or ())
+    if not own or len(chances) != len(IDLE_VARIANTS) or max(chances) <= 0:
+        return None
+    names = table['groups']
+    for name, chance in zip(IDLE_VARIANTS, chances):
+        if chance == max(chances) and own + name in names:
+            a, b = names[own + name]
+            step = (times[b] - times[a]) / (b - a) if times is not None and b > a else 1.0 / float(table['rate'])
+            return {'group': own + name, 'base': int(a), 'count': int(max(1, b - a)), 'step': float(step)}
+    return None
+
+
+def own_idle_fields(record):
+    """The entity keys of a resident that loops its own idle (own_idle, in record['anim']['skeletal']['own_idle'],
+    skeletal_actor.skeletal_resident's report): aw_idle_base, aw_idle_count and its own aw_idle_step (the idle think
+    starts the loop at its base); {} for every other resident."""
+    own = ((record.get('anim') or {}).get('skeletal') or {}).get('own_idle')
+    if not own:
+        return {}
+    return {'aw_idle_base': own['base'], 'aw_idle_count': own['count'], 'aw_idle_step': '%.7f' % own['step']}
 
 
 def selected_profile(name=None):

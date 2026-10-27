@@ -21,7 +21,7 @@
 | Persists in | v0.0.33-dev, v0.0.49, v0.0.50 (last seen) |
 | Severity | medium: The active ring of Seyda Neen and Balmora's south-west corner exceeds the default CHIM zone. |
 | Family | Map heap and memory budget (`heap-memory`) |
-| Deferred by the maintainer | 2026-10-25: the maintainer deferred it to v0.0.52 (v0.0.51 ships its dev3, everything else moves to v0.0.52) |
+| Deferred by the maintainer | 2026-10-27: deferred by the maintainer to v0.0.54 (the v0.0.53 release triage) |
 | CHIM | Performance ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source fca02e9, engine fca02e9, CHIM world unknown |

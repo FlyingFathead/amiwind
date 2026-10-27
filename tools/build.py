@@ -51,6 +51,7 @@ import json
 import os
 from pathlib import Path
 import re
+import halloween_cast
 import shlex
 import shutil
 import subprocess
@@ -485,6 +486,7 @@ def parser():
     p.add_argument('--miniwind-boot', metavar='CMD[;CMD]',
                    help='With --miniwind: dbg console commands the sandbox runs once on arrival, separated by ";" '
                         '(a preset row\'s boot_commands; docs/MINIWIND.md)')
+    halloween_cast.add_options(p)
     p.add_argument('--quick-character', metavar='RACE,CLASS[,NAME]',
                    help='The ready-made character of a direct start or MiniWind build (default: the Hors preset, '
                         'Nord Barbarian); RACE and CLASS must be playable in your game files')
@@ -2052,6 +2054,7 @@ def miniwind_commands(args, steps):
                        '--miniwind', '--miniwind-features', feature_line,
                        *(['--miniwind-description', description] if description else []),
                        *(['--miniwind-boot', args.miniwind_boot] if getattr(args, 'miniwind_boot', None) else []),
+        *halloween_cast.image_args(args),
                        # only a non-default scope adds an option: the full scope's command stays as it was
                        *([miniwind.SCOPE_OPTION, scope] if scope != miniwind.DEFAULT_SCOPE else []),
                        *([miniwind.TOWN_OPTION, town] if town != miniwind.TOWN else []),
@@ -3176,6 +3179,9 @@ def main(argv=None):
         args.build_recipe_effective = build_recipe.effective_options(parser, args)
     except ValueError as exc:
         p.exit(1, f'Error: {exc}\n')
+    halloween_cast.check(args, p)
+    # Free space first: an image build stops here when short (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52)
+    __import__('disk_need').entry(args, p, storage_pool_dir)
     # Retired flags (tools/retired_flags.py, BUILD-LEGACY-CHAIN-DEFAULT-36): before any stage, refused in
     # developer mode unless named with --override NAME; elsewhere a loud warning. Recorded in every receipt.
     args.retired_flags_record, retired_errors, retired_warnings = retired_flags.check(args)
@@ -3307,16 +3313,13 @@ def main(argv=None):
             note = require_previous_release(ROOT, VERSION)
             if note:
                 print(note, flush=True)
-            # Seconds-long checks before any stage: cache ownership, free space, game data (build_preflight.py).
+            # Seconds-long checks before any stage: cache ownership, game data (build_preflight.py).
             import build_preflight
             problems = build_preflight.run(args.workspace, getattr(args, 'data_files', None), space=False)
             preflight_builder = resolve_builder(args)
             if preflight_builder['builder'] == 'chim':
                 problems += build_preflight.grounding_problems(getattr(args, 'data_files', None),
                                                                preflight_builder['chim_areas'])
-            # Every build stops on too little room, before any stage (fail fast: a tester's public build filled its
-            # disk halfway, BUILD-DISK-NEED-UNKNOWN-52); AMIWIND_MIN_FREE_GIB sets the minimum.
-            problems += build_preflight.free_space_problems(args.workspace)
             if problems:
                 raise ValueError('Build preflight failed before any stage:\n  ' + '\n  '.join(problems))
         if getattr(args, 'accept_known_stair_findings', None):

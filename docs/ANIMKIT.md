@@ -1,6 +1,6 @@
 # Animation kit
 
-_Last updated with AmiWind v0.0.52-dev (26 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -65,7 +65,21 @@ groups under `f:`: her walk and two idles from `base_anim_female.nif`, which Ope
 her model names the view `progs/humanoid.awsk|f`, one loaded table for both), `progs/humanoid_kna.awsk`
 (Argonians and Khajiit, their own walk and
 tail; a beast female plays it alone, as the baked kit does). An actor that starts dead keeps its one death pose
-as a one-frame model. The carried weapon and shield hang on the table's weapon and shield bones (the item tag
+as a one-frame model.
+
+### An NPC's own animation file
+
+An NPC record can name an animation file of its own (its model field). The base game has one,
+`anim_dancingGirl.nif`, named by the three dancers of Desele's House of Earthly Delights in Suran and by Yakov
+of the Suran slave market. Its only group is `idle9`: the dance. As OpenMW does, its groups play over the common
+and female ones. The builder appends the file's groups to `progs/humanoid.awsk` under `d:` (`d:idle9`, about
+115 frames), built from your own game data like the rest of the table, and the NPC's model names the view
+`progs/humanoid.awsk|d`, or `progs/humanoid.awsk|d|f` for a woman: her own file's groups first, then the female
+ones, then the common ones. The original picks a standing NPC's idle by the eight idle chances of its wander
+package. The dancers' `idle9` chance is 80 against 20 or less, so they loop the dance while they stand (the
+entity's `aw_idle_base` and `aw_idle_count`). Yakov's is 5 against 40, so he stands as before.
+`dbg animkit play idle9` (or `d:idle9` on any humanoid) plays the dance. The files the table appends are listed
+in `tools/skeletal_actor.py` (`OWN_ANIMATIONS`). An NPC naming a file that is not listed plays the common table. The carried weapon and shield hang on the table's weapon and shield bones (the item tag
 `AWTS1` beside the model: the item models, the two bone indices and the actor's scale).
 
 ## Console: dbg animkit

@@ -1,6 +1,6 @@
 # Docker builder
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -109,6 +109,19 @@ a read-only bind mount; `--stage-inputs` selects the same volume-copy method.
 `--no-stage-inputs` avoids copying, but Windows file access can be much slower.
 Original files are never changed. Copies remain private runtime storage and
 never become image layers. Retain enough host disk space for the copy.
+
+**Free space (from v0.0.53).** Where Docker keeps its images and volumes, a
+first full build needs about **63 GiB** free: the builder image (2.1 GiB), the
+game data copy (1.8 GiB) and the last known good build's measured figure
+(`config/disk-footprint.json`, 44.3 GiB for v0.0.52), plus 30 %. A volume that
+already holds a passing build's caches and pool needs only the run's share with
+the margin, and never less than 35 GiB. `build_docker.py build` checks this
+before it builds the image (when Docker's storage folder is visible from the
+host; Docker Desktop keeps it in its own virtual machine), `run_docker.py`
+checks the build volume inside the image before it copies any game data, and
+the build itself checks again first and before each stage. The minimum and the
+margin are `min_free_gib` and `disk_margin_percent` in
+`config/build-defaults.json`; changing them rebuilds nothing.
 
 A staged copy can be reused through `--input-volume <name>` instead of
 `--data-files`; the helper refuses a missing or already-existing staging volume.

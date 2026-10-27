@@ -785,6 +785,7 @@ void _Host_Frame (float time)
     if(!AW_ModalWorldFrozen())AW_IntroTick();
     if(!AW_ModalWorldFrozen())AW_WaitTick();
     AW_AnimKitTick();
+    AW_HalloweenTick();
     AW_SPIKE_STAGE (AW_SP_SAVE, AW_SaveTick());
     if(!AW_ModalWorldFrozen())AW_SPIKE_STAGE (AW_SP_SCENE, AW_SceneTick());
     /* Compiled game scripts (experimental, aw_mwscript): MenuMode scripts still run under a modal screen. */

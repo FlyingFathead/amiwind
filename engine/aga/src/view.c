@@ -1181,6 +1181,7 @@ extern vrect_t	scr_vrect;
 void V_RenderCameraView(void)
 {
     vec3_t origin,angles;int preview;
+    AW_HalloweenCamera(r_refdef.vieworg,r_refdef.viewangles);     /* dbg halloween's camera director */
     VectorCopy(r_refdef.vieworg,origin);VectorCopy(r_refdef.viewangles,angles);
     preview=AW_DayGalleryView(r_refdef.vieworg,r_refdef.viewangles);
     R_RenderView ();

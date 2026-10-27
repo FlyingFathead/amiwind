@@ -18,6 +18,7 @@ class EnvGuardTests(unittest.TestCase):
     def test_suite_does_not_depend_on_host_free_space(self):
         # Builder entry-point tests on temporary workspaces: no free-space minimum (gate 1335).
         self.assertEqual(os.environ.get('AMIWIND_MIN_FREE_GIB'), '0')
+        self.assertEqual(os.environ.get('AMIWIND_DISK_WATCH'), 'off')     # tools/disk_need.py
 
     def test_leaking_test_fails_and_environment_is_restored(self):
         key = 'AMIWIND_ENV_GUARD_PROBE'

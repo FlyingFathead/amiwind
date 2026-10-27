@@ -34,7 +34,9 @@
 #define AW_SKEL_KEY_TEXT	32		/* "slash large follow start" is 24 */
 #define AW_SKEL_KEY_BYTES	(AW_SKEL_KEY_TEXT + 8)
 #define AW_SKEL_NO_GROUP	0xFFFF
-#define AW_SKEL_PREFIX		4		/* a view's group prefix with its NUL: "f:" (SKEL-TABLE-SHARED-FEMALE-52) */
+/* a view's group prefixes with their NUL: "f:" (SKEL-TABLE-SHARED-FEMALE-52), "d:f:" (an NPC's own animation file
+ * and a woman's groups, in that order: DANCER-OWN-ANIM-IGNORED-53) */
+#define AW_SKEL_PREFIX		8
 #define AW_SKEL_BASE_BYTES	12
 #define AW_SKEL_STILL		0
 #define AW_SKEL_TURNS		1
@@ -56,7 +58,7 @@ typedef struct {
 	const unsigned char	*key_data;		/* keys_count x AW_SKEL_KEY_BYTES */
 	const unsigned char	*base;			/* bones x AW_SKEL_BASE_BYTES */
 	const unsigned char	*keys;			/* frames x row */
-	char		prefix[AW_SKEL_PREFIX];	/* a view's own groups ("f:"), looked up first by name; "" for a table */
+	char		prefix[AW_SKEL_PREFIX];	/* a view's own groups ("f:", "d:f:" in order), looked up first by name; "" for a table */
 } aw_skel_table_t;
 
 /* 1 and *out filled when data[0..size) is a valid table (sizes, parents before children, groups inside the

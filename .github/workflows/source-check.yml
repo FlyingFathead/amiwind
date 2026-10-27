@@ -1,5 +1,15 @@
 name: Source checks and asset-free Amiga build
 
+# Layout (from v0.0.53; CI-SOURCE-JOB-TIMEOUT-52: one job did everything in a row and outgrew its limit):
+#   tools               bootstraps every public tool from nothing into an empty directory when the installer's
+#                       inputs change (tools/ci_tools.py key), else restores that bootstrap from the cache and checks
+#                       it file by file against the manifest written when it was made
+#   source-checks       the source allowlist and the quick checks, beside the tests
+#   tests               the whole suite in TEST_SHARDS parallel jobs: run_tests.py --shard I/N, whole modules
+#                       balanced by tests/module-timings.json; the shards together run every module exactly once
+#   dry-run             after the tests: the asset-free engine compile, boot-notice image and package
+#   tools-from-nothing  tags, the weekly schedule and manual runs: the from-nothing bootstrap and the dry-run image
+#                       with those fresh tools, without any cache
 on:
   push:
     paths-ignore:
@@ -9,10 +19,16 @@ on:
     paths-ignore:
       - '**/*.md'
       - 'docs/images/**'
+  schedule:
+    - cron: '17 4 * * 1'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  TEST_SHARDS: "6"
 
 jobs:
   host-launcher-parity:
@@ -44,12 +60,53 @@ jobs:
           python -B -m unittest discover -s tests -p test_host_asset_formats.py -v
           exit $LASTEXITCODE
 
-  source-and-dry-run:
+  tools:
     runs-on: ubuntu-24.04
-    # 90 from v0.0.52: run 129 was cancelled at 25 minutes, run 130 needed 44m 20s of its 45
-    timeout-minutes: 90
+    # A cache hit takes about a minute; a key change bootstraps from nothing (the old job's first step)
+    timeout-minutes: 30
     env:
-      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/tools
+    outputs:
+      key: ${{ steps.key.outputs.key }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Key of the tools (the installer's code, pins and download lists; the runner image)
+        id: key
+        run: |
+          python tools/ci_tools.py inputs
+          echo "key=$(python tools/ci_tools.py key)" | tee -a "$GITHUB_OUTPUT"
+      - name: Restore the tools bootstrapped under this key
+        id: cache
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}/amiwind-clean-tools
+          key: ${{ steps.key.outputs.key }}
+      - name: Bootstrap all public tools into an empty directory
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          test ! -e "$RUNNER_TEMP/amiwind-clean-tools"
+          python tools/build.py --autoinstall --install-dependencies --yes --tools-dir "$RUNNER_TEMP/amiwind-clean-tools"
+          python tools/ci_tools.py record "$RUNNER_TEMP/amiwind-clean-tools"
+      - name: Check the restored tools against their bootstrap, file by file
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: python tools/ci_tools.py verify "$RUNNER_TEMP/amiwind-clean-tools"
+      - name: Keep this bootstrap for the next runs
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}/amiwind-clean-tools
+          key: ${{ steps.key.outputs.key }}
+
+  source-checks:
+    needs: tools
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
       PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/tools
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,21 +115,81 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-      - name: Bootstrap all public tools into an empty directory
+      - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}/amiwind-clean-tools
+          key: ${{ needs.tools.outputs.key }}
+          fail-on-cache-miss: true
+      - name: Use the bootstrapped tools (checked file by file; the installer adds only missing host packages)
         run: |
-          test ! -e "$RUNNER_TEMP/amiwind-clean-tools"
+          python tools/ci_tools.py verify "$RUNNER_TEMP/amiwind-clean-tools"
+          python tools/build.py --autoinstall --install-dependencies --yes --tools-dir "$RUNNER_TEMP/amiwind-clean-tools"
+          echo "$RUNNER_TEMP/amiwind-clean-tools/venv/bin" >> "$GITHUB_PATH"
+      - name: Source allowlist and quick checks
+        run: |
+          python tools/release.py --check
+          python -c 'from prepare_scenery import check_nif_reader; check_nif_reader()'
+          python tools/build.py --install-dependencies --plan
+
+  tests:
+    needs: tools
+    runs-on: ubuntu-24.04
+    # One shard is about a sixth of the suite; the limit leaves room for the whole suite's growth
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/tools
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}/amiwind-clean-tools
+          key: ${{ needs.tools.outputs.key }}
+          fail-on-cache-miss: true
+      - name: Use the bootstrapped tools (checked file by file; the installer adds only missing host packages)
+        run: |
+          python tools/ci_tools.py verify "$RUNNER_TEMP/amiwind-clean-tools"
           python tools/build.py --autoinstall --install-dependencies --yes --tools-dir "$RUNNER_TEMP/amiwind-clean-tools"
           echo "$RUNNER_TEMP/amiwind-clean-tools/venv/bin" >> "$GITHUB_PATH"
           echo "QCC_PATH=$RUNNER_TEMP/amiwind-clean-tools/Quake-Tools/qcc-host" >> "$GITHUB_ENV"
           echo "AMIWIND_TEST_QBSP=$RUNNER_TEMP/amiwind-clean-tools/ericw/bin/qbsp" >> "$GITHUB_ENV"
-      - name: Source allowlist and synthetic regression checks
+      - name: Synthetic regression checks, suite shard ${{ matrix.shard }}
         run: |
           grep -m1 'model name' /proc/cpuinfo
           python -c 'import numpy; print("numpy", numpy.__version__, numpy.__config__.CONFIG["Build Dependencies"]["blas"].get("openblas configuration"))'
-          python tools/release.py --check
-          python -c 'from prepare_scenery import check_nif_reader; check_nif_reader()'
-          python tools/run_tests.py -v --module-timeout 900
-          python tools/build.py --install-dependencies --plan
+          python tools/run_tests.py -v --module-timeout 900 --shard "${{ matrix.shard }}/$TEST_SHARDS"
+
+  dry-run:
+    needs: [tools, source-checks, tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/tools
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}/amiwind-clean-tools
+          key: ${{ needs.tools.outputs.key }}
+          fail-on-cache-miss: true
+      - name: Use the bootstrapped tools (checked file by file; the installer adds only missing host packages)
+        run: |
+          python tools/ci_tools.py verify "$RUNNER_TEMP/amiwind-clean-tools"
+          python tools/build.py --autoinstall --install-dependencies --yes --tools-dir "$RUNNER_TEMP/amiwind-clean-tools"
+          echo "$RUNNER_TEMP/amiwind-clean-tools/venv/bin" >> "$GITHUB_PATH"
       - name: Compile the engine and create a boot-notice image
         run: python tools/build.py --dry-run --tools-dir "$RUNNER_TEMP/amiwind-clean-tools" --name ci
       - name: Package the test image and corresponding source
@@ -95,6 +212,37 @@ jobs:
             out/artifacts/AmiWind-*-dry-run.zip.sha256
           if-no-files-found: error
           retention-days: 14
+
+  tools-from-nothing:
+    # The proof that the public sources still bootstrap: no cache, an empty directory, then the dry-run image
+    # built with those fresh tools. Every tag (release), every Monday and on request; a key change also
+    # bootstraps from nothing in the tools job of that very run.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/tools
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Bootstrap all public tools into an empty directory
+        run: |
+          test ! -e "$RUNNER_TEMP/amiwind-clean-tools"
+          python tools/build.py --autoinstall --install-dependencies --yes --tools-dir "$RUNNER_TEMP/amiwind-clean-tools"
+          python tools/ci_tools.py record "$RUNNER_TEMP/amiwind-clean-tools"
+          echo "$RUNNER_TEMP/amiwind-clean-tools/venv/bin" >> "$GITHUB_PATH"
+      - name: Quick checks with the fresh tools
+        run: |
+          python -c 'from prepare_scenery import check_nif_reader; check_nif_reader()'
+          python tools/build.py --install-dependencies --plan
+      - name: Compile the engine and create a boot-notice image with the fresh tools
+        run: python tools/build.py --dry-run --tools-dir "$RUNNER_TEMP/amiwind-clean-tools" --name ci-from-nothing
+      - name: Package the test image and corresponding source
+        run: python tools/package_dry_run.py --image-dir out/build/ci-from-nothing/image --out out/artifacts
 
   docker-builder:
     runs-on: ubuntu-24.04

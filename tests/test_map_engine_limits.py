@@ -65,8 +65,11 @@ class EngineLimitsTests(unittest.TestCase):
         # PROTOTYPE (branch v0.0.46-type1-stateful): aw_actors.c spawns a joining window frame's actors and the test
         # command's summoned copy; they are not counted in runtime_edicts yet (the map gate models one frame; the
         # window's edicts are an open item, docs/chim/CELL_CROSSINGS.md "Weak points").
-        self.assertEqual(sorted(sites), ['aw_actors.c', 'aw_actors.c', 'aw_arena.c', 'aw_companion.c', 'aw_inventory.c',
-                                         'aw_inventory.c', 'aw_items.c', 'aw_items.c'])
+        # The Halloween scene (aw_halloween.c, HALLOWEEN-SCENE-53; a MiniWind test scene) takes no reserved slot: it
+        # checks for a free edict before each actor and leaves the rest out when the map is full.
+        self.assertEqual(sorted(sites), ['aw_actors.c', 'aw_actors.c', 'aw_arena.c', 'aw_companion.c', 'aw_halloween.c',
+                                         'aw_inventory.c', 'aw_inventory.c', 'aw_items.c', 'aw_items.c'])
+        self.assertIn('if(!edict_available()){', (SRC / 'aw_halloween.c').read_text())
         # one each for the companion and the arena foe; aw_items.c one per carried item of every hostile, and one
         # per carried light of a skeletal guard (its torch, at most AW_ITEMS_CARRIERS: SKEL-ITEM-TAGS-52)
         items = (SRC / 'aw_items.c').read_text()
@@ -88,7 +91,11 @@ class EngineLimitsTests(unittest.TestCase):
                 continue
             if re.search(r'sv\.model_precache\[\w+\]\s*=', path.read_text(encoding='utf-8', errors='replace')):
                 writers.add(path.name)
-        self.assertEqual(writers, {'aw_arena.c', 'aw_items.c', 'aw_anim.c', 'aw_inventory.c'})
+        # aw_halloween.c (HALLOWEEN-SCENE-53) admits its cast's models only into free slots and leaves a model out
+        # when the table is full (no reserved slot, as the arena's model reports "model table full")
+        self.assertEqual(writers, {'aw_arena.c', 'aw_items.c', 'aw_anim.c', 'aw_inventory.c', 'aw_halloween.c'})
+        self.assertIn('if(i>=MAX_MODELS || model_names_used>=AW_HALLOWEEN_MAX_ROWS)return 0;',
+                      (SRC / 'aw_halloween.c').read_text())
         # aw_anim.c registers a layout's mover model only while the map loads (model_extras reads '>PATH')
         self.assertIn("sv.state!=ss_loading || lazies>=MOVERS", (SRC / 'aw_anim.c').read_text())
         # aw_items.c precaches only while the map loads, from the .tag files model_extras reads

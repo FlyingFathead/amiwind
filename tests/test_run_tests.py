@@ -441,5 +441,82 @@ class SchedulingTests(RunnerCase):
         self.assertTrue(all(value >= 0 for value in timings.values()))
 
 
+class SuiteShardTests(RunnerCase):
+    """--shard I/N for parallel CI jobs (CI-SOURCE-JOB-TIMEOUT-52): whole modules, each in exactly one shard."""
+
+    def test_shard_text(self):
+        self.assertEqual(run_tests.parse_shard('2/6'), (2, 6))
+        self.assertEqual(run_tests.parse_shard('1/1'), (1, 1))
+        for bad in ('0/3', '4/3', '3', '/3', '1/0', 'a/b', '-1/3', '1/3/4', ''):
+            with self.assertRaises(ValueError, msg=bad):
+                run_tests.parse_shard(bad)
+
+    def test_every_module_once_balanced_and_stable(self):
+        modules = collections.OrderedDict(('m%02d' % n, ['m%02d.T.t%d' % (n, k) for k in range(n % 5 + 1)])
+                                          for n in range(23))
+        modules['empty'] = []
+        timings = {'m%02d' % n: float((n * 7) % 13 + 1) for n in range(0, 23, 2)}
+        estimate = run_tests.estimates(modules, timings)
+        for count in range(1, 30):
+            shards = run_tests.shard_modules(modules, timings, count)
+            self.assertEqual(len(shards), count)
+            flat = [m for shard in shards for m in shard]
+            self.assertEqual(sorted(flat), sorted(modules))
+            self.assertEqual(len(flat), len(set(flat)))
+            for shard in shards:  # discovery order inside a shard
+                self.assertEqual(shard, [m for m in modules if m in shard])
+            loads = [sum(estimate[m] for m in shard) for shard in shards]
+            self.assertLessEqual(max(loads) - min(loads), max(estimate.values()) + 1e-9)
+            # The same input gives the same split, whatever order the dictionary was built in.
+            reordered = collections.OrderedDict(reversed(list(modules.items())))
+            self.assertEqual([sorted(s) for s in run_tests.shard_modules(reordered, timings, count)],
+                             [sorted(s) for s in shards])
+        with self.assertRaises(ValueError):
+            run_tests.shard_modules(modules, timings, 0)
+
+    def test_a_split_that_misses_or_repeats_a_module_is_refused(self):
+        modules = {'a': ['a.T.t'], 'b': ['b.T.t'], 'c': ['c.T.t']}
+        run_tests.check_shards(modules, [['a', 'c'], ['b']])
+        for shards in ([['a'], ['b']], [['a', 'b'], ['b', 'c']], [['a', 'b', 'c', 'd']]):
+            with self.assertRaises(RuntimeError, msg=shards):
+                run_tests.check_shards(modules, shards)
+
+    def test_shards_together_give_the_whole_run(self):
+        start = self.tree('fx', MODULES)
+        _, whole = self.runner(start, '--jobs', '2')
+        results, modules, discovered = [], [], 0
+        for index in (1, 2, 3):
+            result, report = self.runner(start, '--jobs', '2', '--shard', '%d/3' % index)
+            self.assertIn('Suite shard %d/3' % index, result.stdout)
+            self.assertEqual(report['shard']['index'], index)
+            results += report['results']
+            modules += report['shard']['modules']
+            discovered += report['discovered']
+            listed = subprocess.run([sys.executable, str(RUNNER), '-s', str(start), '--list', '--shard',
+                                     '%d/3' % index], cwd=self.tmp, capture_output=True, text=True, timeout=120)
+            self.assertEqual(listed.returncode, 0, listed.stderr)
+            self.assertEqual(len(listed.stdout.split()), report['discovered'])
+        self.assertEqual(sorted(results, key=lambda r: (r['test'], r['status'])), whole['results'])
+        self.assertEqual(sorted(modules), sorted(whole_modules(start)))
+        self.assertEqual(len(modules), len(set(modules)))
+        self.assertEqual(discovered, whole['discovered'])
+
+    def test_bad_shard_option_is_refused(self):
+        start = self.tree('fx', {'test_fx_one.py': 'import unittest\nclass T(unittest.TestCase):\n'
+                                                   '    def test_a(self):\n        pass\n'})
+        for bad in ('0/2', '3/2', 'x'):
+            result, report = self.runner(start, '--shard', bad)
+            self.assertEqual(result.returncode, 2, bad)
+            self.assertIsNone(report)
+
+
+def whole_modules(start):
+    script = ('import json, sys; sys.path.insert(0, sys.argv[1]); import run_tests; '
+              'print(json.dumps(list(run_tests.discover(sys.argv[2]))))')
+    result = subprocess.run([sys.executable, '-c', script, str(ROOT / 'tools'), str(start)],
+                            cwd=str(start.parent), capture_output=True, text=True, timeout=300)
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
 if __name__ == '__main__':
     unittest.main()

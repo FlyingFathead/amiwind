@@ -18,6 +18,7 @@
 #include "aw_items.h"
 
 static cvar_t animkit={"aw_animkit","1",true};
+void AW_SkelCastSound(edict_t *e,const aw_skel_table_t *t,int group,int from,int to);    /* aw_halloween.c */
 /* A forced actor: an engine group of its layout (kit >= 0), or a group of its shared table (table, group). While
  * forced its think is held (the resident idle would step the frame) and a staged actor stands where the stage put
  * it, with its carried items shown; stop gives everything back. */
@@ -51,6 +52,7 @@ static const aw_skel_table_t *table_of(edict_t *e) {
     return h && h->aw_skel?(const aw_skel_table_t *)h->aw_skel_table:NULL;
 }
 static const char *table_name(const aw_skel_table_t *t) {
+    if(t && t->prefix[0] && t->prefix[0]!='f')return "own animation";  /* progs/humanoid.awsk|d(|f): DANCER-OWN-ANIM-IGNORED-53 */
     if(t && t->prefix[0]=='f')return "female";        /* the view progs/humanoid.awsk|f */
     if(t && t==AW_SkelTableFor("progs/humanoid_kna.awsk"))return "beast";
     if(t && t==AW_SkelTableFor("progs/humanoid.awsk"))return "common";
@@ -287,9 +289,11 @@ void AW_AnimKitTick(void) {
         if(f->kit>=0){
             e->v.frame=(float)AW_AnimAdvance(AW_AnimOf(e),&f->play,f->kit,dt,aw_anim_kit_speed,NULL);
         }else if(f->table && f->group>=0){
-            aw_skel_group_t g;group_at(f,&g);
+            aw_skel_group_t g;int was=(int)e->v.frame;group_at(f,&g);
             /* the cycle's lead plays its group once; every other forced group loops */
             e->v.frame=(float)AW_AnimKitSpanFrame(g.first,g.last,f->table->rate,&f->t,dt*aw_anim_kit_speed,!(cycle.on && i==0),&done);
+            /* a cast plays its whoosh on its own release keys (aw_halloween.c) */
+            AW_SkelCastSound(e,f->table,f->group,was,(int)e->v.frame);
             if(cycle.on && i==0 && done)cycle_next();
         }else if(cycle.on && i==0)cycle_next();
         if(f->staged)AW_ItemsUpdate(e,f->items);

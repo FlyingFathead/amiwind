@@ -1,6 +1,6 @@
 # MiniWind playtest builds
 
-_Last updated with AmiWind v0.0.36 (11 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 A MiniWind build is a quick partial-area test of Balmora on the CHIM engine,
 for development versions only. The build type itself (`--miniwind`,
@@ -43,6 +43,16 @@ builder makes one option per preset.
 | `vivec-arena-pit` (`--miniwind-vivec-arena-pit`) | Vivec Arena Pit: combat test | starts in `interior:Vivec, Arena Pit`, no NPC gallery, only what the room references |
 | `vivec-arena-chim` (`--miniwind-vivec-arena-chim`) | Vivec Arena on CHIM: arrival, walkways, frame edge | Vivec on CHIM stage A: starts at the Arena's arrival point (`vivec_arena`), the Arena exterior and its rooms, no NPC gallery; the start makes it a Vivec Arena build (no `--miniwind-town` needed) |
 | `opening-ship` (`--miniwind-opening-ship`) | Opening ship: lantern and ship lighting check | exterior scope, starts in `interior:Imperial Prison Ship`, no NPC gallery, shows the quick character screen |
+| `halloween` (`--miniwind-halloween`) | Halloween: skeletons, dancers and Dagoth Ur dance on the beat | the Balmora exterior with the Halloween scene's cast (`--halloween`); on arrival `dbg halloween` ([HALLOWEEN.md](../../HALLOWEEN.md)) |
+
+Any build, the Halloween preset among them, takes one track of your own: `--custom-ost FILE` (the custom OST slot;
+also the machine setting `AMIWIND_CUSTOM_OST`), any audio or video file you own. Its audio is converted into the
+game's music format and put into your image only; the Halloween scene plays it with the dance, on its measured beat
+([HALLOWEEN.md](../../HALLOWEEN.md#your-own-soundtrack-the-custom-ost-slot)):
+
+```sh
+./build.sh --data-files "/path/to/Morrowind" --miniwind-halloween --custom-ost "/path/to/my-song.mp3"
+```
 
 The description is the startup screen's `Scene:` line. Options you give
 yourself win over the preset's (for example `--miniwind-description`).

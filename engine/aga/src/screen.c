@@ -1036,6 +1036,7 @@ void SCR_UpdateScreen (void)
         if ((!AW_PhotoModeActive() && !vanity) || AW_PhotoNoticeShowing())
             AW_UIDraw();
         AW_IntroDraw();
+        AW_HalloweenDraw();		/* dbg halloween: its FPS counter and greeting box, photo mode or not */
         if (aw_view_draw)
             aw_view_draw ();
         if (aw_msgbox_draw)

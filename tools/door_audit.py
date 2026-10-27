@@ -12,9 +12,12 @@ follows the engine's path (engine/aga/src/aw_scene.c):
   - aimed_door: only rows whose source is the running map, a ray from the eye within 56 units of the row's box, in
     the running map's coordinates;
   - with "chim crossing 1" (default-game.cfg, the default since v0.0.47) a crossing between two region frames streams
-    (chim_chunks.c window): the running map keeps the frame the map started on, so only that frame's bank is read.
-    A region frame's door is then usable only when the player came into its frame by a level change (a door out of a
-    room, a teleport, a load, a crossing from a town), never after walking in from another region frame.
+    (chim_chunks.c window): the running map keeps the frame the map started on. Up to v0.0.52 only that frame's bank
+    was read: a region frame's door was usable only when the player came into its frame by a level change (a door out
+    of a room, a teleport, a load, a crossing from a town), never after walking in from another region frame. Since
+    v0.0.53 the engine reads the bank of the frame the player stands in (door_scene(), DOOR-BANK-STREAMED-FRAME-51);
+    the audit tells the two apart by the engine source (logical_doors). tools/door_engine_check.py runs the engine's
+    own door code over the image.
 Per door: its number, id and model; its exterior cell and position; the interior it leads to; the original lock level
 and key; the CHIM region or town frame that holds it; whether that frame places the door (CHIM source); whether the
 holder's bank has an engine-valid row for it whose box holds the placed door; whether the target is a map the engine
@@ -154,6 +157,13 @@ def parse_bank(text, names):
                              'reference': ref, 'mins': mins, 'maxs': maxs, 'arrival': arrival, 'yaw': yaw,
                              'label': label})
     return out
+
+
+def logical_doors(scene_source):
+    """1 when an engine's aw_scene.c reads the door bank of the frame the player stands in after a streamed crossing
+    (door_scene(), DOOR-BANK-STREAMED-FRAME-51, v0.0.53), 0 when it reads the running map's only (v0.0.52 and
+    earlier)."""
+    return int('read_links_for(door_scene())' in scene_source)
 
 
 def crossing_mode(cfg_text):
@@ -340,6 +350,8 @@ class Image:
                                       (src / 'aw_town_table.h').read_text(encoding='utf-8', errors='replace'))
         cfg = self.id1 / 'default-game.cfg'
         self.crossing = crossing_mode(cfg.read_text(encoding='cp1252', errors='replace')) if cfg.is_file() else 0
+        self.logical_doors = logical_doors((src / 'aw_scene.c').read_text(encoding='utf-8', errors='replace')
+                                           if (src / 'aw_scene.c').is_file() else '')
         self.directory = world_directory(self.id1) if (self.id1 / 'world/regions.awr').is_file() else []
         self.frames = source_frames(Path(world_dir) / 'chim-source.json', jobs) if world_dir else []
         table = Path(world_dir) / 'chim-regions.json' if world_dir else None
@@ -583,7 +595,8 @@ def check_door(door, world_row, image, exits, world_rows, transforms, region='')
     paper = all(checks[k] in ('yes', 'not checked') for k in checks) and not problems
     row['usable_on_arrival'] = 'yes' if paper else 'no'
     if paper:
-        row['walk_in'] = LEVEL_CHANGE_ONLY if kind == 'region' and image.crossing == 1 else WALK_IN
+        row['walk_in'] = LEVEL_CHANGE_ONLY if kind == 'region' and image.crossing == 1 and \
+            not getattr(image, 'logical_doors', False) else WALK_IN
     return row
 
 
@@ -624,6 +637,12 @@ def explain_spot(spot, doors, rows_by_ref, image):
     reasons = []
     if running is None:
         reasons.append('the running map is not a region frame of the directory')
+    elif row and row.get('holder') != running and getattr(image, 'logical_doors', False):
+        # the engine reads the door bank of the frame the player stands in (DOOR-BANK-STREAMED-FRAME-51, v0.0.53)
+        out['logical_frame'] = row.get('holder')
+        if not row.get('problems'):
+            reasons.append('none in the door tables: the running map is %s, the engine reads the door bank of the '
+                           'frame the player stands in (%s) since v0.0.53' % (running, row.get('holder')))
     elif row and row.get('holder') != running:
         file, bank = image.bank(running)
         has = bank is not None and any(x['reference'] == door['number'] for x in bank['links'])

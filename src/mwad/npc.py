@@ -96,6 +96,8 @@ def carried_parts(kinds, carried, female):
                       'mesh':mesh or text(fields,'MODL'),'carried':'shield'})
     return parts
 
+OWN_ANIMATION_BASES=('base_anim.nif','base_animkna.nif','base_anim_female.nif')
+
 def outfit(kinds, actor_id, seed=0, equipped=True, carried=None):
     """One deterministic humanoid appearance, no inventory simulation.
 
@@ -178,7 +180,14 @@ def outfit(kinds, actor_id, seed=0, equipped=True, carried=None):
                           'filter':PART_NAMES[slot],'id':identifier,
                           'mesh':text(kinds['BODY'][identifier],'MODL')})
     if carried:parts+=carried_parts(kinds,carried,female)
-    return {'id':actor_id,'name':text(npc,'FNAM'),'race':race,'female':female,
+    # Its own animation file (MODL other than the base skeletons; DANCER-OWN-ANIM-IGNORED-53: the Suran dancers'
+    # anim_dancingGirl.nif) and its wander package's eight idle chances (AI_W Idle2..Idle9), which pick its idles;
+    # only for such an NPC, so every other appearance stays as it was.
+    own={};model=text(npc,'MODL').replace('\\','/').casefold()
+    if model and model.rsplit('/',1)[-1] not in OWN_ANIMATION_BASES:
+        aiw=first(npc,'AI_W')
+        own={'animation':'meshes/'+model,'idle_chances':list(aiw[5:13]) if len(aiw)>=13 else []}
+    return {**own,'id':actor_id,'name':text(npc,'FNAM'),'race':race,'female':female,
             'class':text(npc,'CNAM'),'faction':text(npc,'ANAM'),'height':height,'weight':weight,
             'skeleton':'meshes/base_animkna.nif' if flags&2 else 'meshes/base_anim.nif',
             'parts':parts,'equipment':equipment,'seed':seed,'level':level}

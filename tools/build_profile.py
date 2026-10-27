@@ -1349,14 +1349,18 @@ class Session:
 
 
 def start(run, steps, metadata, dependencies=None):
-    """The builder's profiling session (a no-op session when profiling is off)."""
+    """The builder's profiling session (a no-op session when profiling is off), with the disk watch of an image build
+    (tools/disk_need.py: each stage's last figure checked before it starts, the build's figure written when it passes;
+    BUILD-DISK-NEED-UNKNOWN-52), profiled or not."""
+    import disk_need
     if not enabled(metadata):
-        return NullSession()
+        return disk_need.watched(NullSession(), run, metadata)
     try:
-        return Session(run, steps, metadata, dependencies)
+        session = Session(run, steps, metadata, dependencies)
     except Exception as exc:  # noqa: BLE001
         print(f'[warning] Build profiling disabled: {exc}', flush=True)
-        return NullSession()
+        session = NullSession()
+    return disk_need.watched(session, run, metadata)
 
 
 # --------------------------------------------------------------------------

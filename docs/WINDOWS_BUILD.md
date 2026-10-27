@@ -1,6 +1,6 @@
 # Windows build entry points and WSL notes
 
-_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -254,6 +254,18 @@ After the asset-free compile and QCC checks succeed, the same pipeline accepts:
 Use your actual installation path. `--jobs 4` is a conservative first trial,
 not a measured recommendation for every machine. Keep all gallery/content
 defaults and validation gates enabled. Test the resulting HDF separately in WinUAE.
+
+**Free space (from v0.0.53).** A first build in a new workspace needs about
+**58 GiB** free on the workspace's drive: the last known good build's measured
+figure (`config/disk-footprint.json`, 44.3 GiB for v0.0.52) plus 30 %. A
+workspace that already holds a passing build's caches and pool needs only the
+run's share with the margin, and never less than 35 GiB. `build.cmd` checks
+this first, right after reading its options, and each stage checks its own last
+measured need before it starts; a short build stops with the numbers. The
+minimum and the margin are `min_free_gib` and `disk_margin_percent` in
+`config/build-defaults.json` (or `--min-free-gib` / `--disk-margin-percent`);
+changing them rebuilds nothing. Under WSL the same check runs inside Ubuntu,
+and the Windows volume holding the distro's virtual disk needs that room too.
 
 ### Linux and Windows parity
 

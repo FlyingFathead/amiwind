@@ -6,7 +6,7 @@
 //   AmiWindToolkitHeader.mount('World Map', '#pagetitle')   adds the header at the top of the page, hides the old title
 // The logo address can be replaced before mount (window.AW_LOGO_SRC), as the standalone inspector export does with a data URI.
 (function (root) {
-  const VERSION_TEXT = 'Last updated with AmiWind v0.0.52';     // set by hand when the Toolkit is next updated, as in index.html
+  const VERSION_TEXT = 'Last updated with AmiWind v0.0.53';     // set by hand when the Toolkit is next updated, as in index.html
   const LOGO = '../resources/media/AmiWind_logo_name_only.png';
   const NOTE = 'Everything here runs in your browser. Views of the world are made from your own Morrowind files and build output ' +
     'on your machine; nothing is uploaded.';

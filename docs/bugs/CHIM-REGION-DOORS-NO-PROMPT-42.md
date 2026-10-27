@@ -9,7 +9,7 @@
 | Where | CHIM region frames: door entities and door links (Khuul, West Gash) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.42-dev1 (last seen) |
+| Persists in | fixed in v0.0.53 |
 | Severity | medium: no way to see that a building has an entrance, even where its interior exists |
 | Family | Menus, HUD, map screen and text (`ui-text`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -113,6 +113,9 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 
 Related bugs in other categories:
 
+- DOOR-USE-BLOCKED-53 (no report page): 50 region-frame entrances cannot be used from where a player can stand: the use ray meets the entrance structure or the ground before the door, or there is no standing spot at it
+- [DOOR-USE-COLLISION-FILLED-53](DOOR-USE-COLLISION-FILLED-53.md): 35 region-frame entrances cannot be reached through their converted collision: 24 Daedric shrine steps the player slides off, raised trapdoors under their tower hulls, Dwemer doors inside the terrain chunk
 - [IMPORT-TOWN-NO-INTERIORS-32](IMPORT-TOWN-NO-INTERIORS-32.md): The town importer converts no interiors; all Vivec Arena doors say "Interior unavailable"
+- [INSPECT-PIN-LOAD-DOOR-51](INSPECT-PIN-LOAD-DOOR-51.md): The inspect pin at an exterior load door names the building shell around it, not the door: the drawn door looks absent
 
 <!-- END GENERATED CATEGORY -->

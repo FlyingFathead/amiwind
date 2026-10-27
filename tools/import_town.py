@@ -34,7 +34,7 @@ from prepare_mesh_bsp import append_meshes, _prepare_model
 from prepare_quake import box, brush, miptex, wad
 from prepare_area import build_resident, entity, TalkGreetings
 import npc_lod
-from npc_anim import foot_class, publish as publish_anim, voices_of
+from npc_anim import foot_class, own_idle_fields, publish as publish_anim, voices_of
 import npc_items
 from player_hull import lumps, pack_lumps, rebuild_world_hull
 from surface_flatten import load_profiles
@@ -554,7 +554,7 @@ def resident_entities(cast, models, settings, talk=None):
             'netname': record['appearance']['name'], 'aw_voice': record['voice'],
             'aw_line': record['greeting']['text'], 'aw_idle_step': record['step'],
             'aw_hello_distance': greeting['distance'], 'aw_hello_reset': greeting['reset_distance'],
-            'aw_greet_duration': greeting['duration'],
+            'aw_greet_duration': greeting['duration'], **own_idle_fields(record),
             **(talk.fields(ref['id'], talk.exterior_name(ref['position'])) if talk and record['voice'] else {})}))
     return entities
 

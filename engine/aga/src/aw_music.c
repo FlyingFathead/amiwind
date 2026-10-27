@@ -49,6 +49,9 @@ static char opened_file[12]="none";
  * stream is opened and no read sent until it is on again. */
 static cvar_t music_switch={"aw_music","1"};
 static int muted;
+/* The custom OST player's hold (AW_MusicCustomHold, below): no playlist track at all while it has the music; only
+ * the custom track, never followed by the playlist (at its end, silence). */
+static int scene_hold;
 static unsigned long be32(byte *p) { return ((unsigned long)p[0]<<24)|((unsigned long)p[1]<<16)|((unsigned long)p[2]<<8)|p[3]; }
 static int random_bounded(int n) { rng=rng*1664525U+1013904223U;return (rng>>16)%n; }
 static void log_event(const char *why) {
@@ -115,6 +118,7 @@ static int shuffled(void) {
 static int advance(const char *reason) {
     int id,tries;
     if(muted)return 0;   /* off is not a failure: the music stays available */
+    if(scene_hold)return 0;   /* the custom OST player has the music: no playlist track, at its end silence */
     if(title_playing){if(open_track(title_track,reason))return 1;available=0;return 0;}
     for(tries=0;tries<counts[mode];tries++) {
         if(cursor[mode]+1<length[mode])id=history[mode][++cursor[mode]];
@@ -433,10 +437,50 @@ void AW_MusicHold(void) {
     held=1;paused=1;title_due=-1;title_playing=0;close_music();log_event("hold");
 }
 int CDAudio_IsPaused(void) {return paused!=0;}
+
+/* ---- the custom OST player (CUSTOM-OST-SLOT-53; docs/HALLOWEEN.md "Your own soundtrack") ----
+ * One routine for the user's own track, separate from the playlist: the builder's custom slot (--custom-ost FILE)
+ * is one more special track of the image, catalogued as "custom". Hold: the playlist and its auto-advance stop
+ * (silence). Play: the custom track alone, never followed by a playlist track (at its end, silence). Stop: the
+ * playlist back. An image without the custom track stays silent and says so: never the OST in its place. */
+static int custom_track_id=-1;
+void AW_MusicCustomHold(void) {
+    scene_hold=1;held=1;paused=1;title_due=-1;title_playing=0;close_music();custom_track_id=-1;log_event("custom-hold");
+}
+/* The custom track's id now playing, or -1. */
+int AW_MusicCustomPlaying(void) {return scene_hold && music && !paused && custom_track_id>=0 && current==custom_track_id?current:-1;}
+int AW_MusicCustomPlay(void) {
+    int g,id;
+    AW_MusicCustomHold();
+    if(muted){Con_Printf("Custom OST: background music is off (dbg music on); silence.\n");return -1;}
+    id=manual_lookup("custom",&g);
+    if(id<0 || !manual_preflight(id)){Con_Printf("Custom OST: no custom track in this image (built with --custom-ost FILE); silence.\n");return -1;}
+    if(!open_track(id,"custom")){Con_Printf("Custom OST: the custom track did not open; silence.\n");return -1;}
+    custom_track_id=id;available=1;paused=0;fade=128;
+    return id;
+}
+void AW_MusicCustomStop(void) {
+    if(!scene_hold)return;
+    scene_hold=0;held=0;custom_track_id=-1;close_music();paused=0;fade=128;log_event("custom-stop");
+    if(available && !muted)advance("custom-stop");
+}
+static void music_custom(void) {
+    const char *w=Cmd_Argc()>1?Cmd_Argv(1):"";
+    if(!Q_strcasecmp((char *)w,"play")){int id=AW_MusicCustomPlay();if(id>=0)Con_Printf("Custom OST: track %02ld playing (custom); the playlist waits.\n",(long)id);return;}
+    if(!Q_strcasecmp((char *)w,"stop")){AW_MusicCustomStop();Con_Printf("Custom OST stopped; the playlist is back.\n");return;}
+    if(!*w){
+        int id=AW_MusicCustomPlaying();
+        if(id>=0)Con_Printf("Custom OST: track %02ld playing.\n",(long)id);
+        else Con_Printf("Custom OST: %s.\n",scene_hold?"holding the playlist, nothing playing":"not playing");
+        return;
+    }
+    Con_Printf("Usage: aw music custom [play / stop]\n");
+}
 int CDAudio_Init(void) {
     FILE *f;char path[MAX_OSPATH+64];int g,n,i,j,id;
     /* Registered first: dbg music answers even when the disk has no soundtrack. */
     Cvar_RegisterVariable(&music_switch);Cmd_AddCommand("aw_music_status",music_status);
+    Cmd_AddCommand("aw_music_custom",music_custom);
     sprintf(path,"%s/music/playlist.txt",com_gamedir);f=fopen(path,"r");if(!f)return -1;
     for(g=0;g<2;g++) {
         if(Q_fscanf(f,"%d",&n)!=1 || n<1 || n>99){fclose(f);return -1;}

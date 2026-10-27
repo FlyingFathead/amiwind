@@ -1,6 +1,6 @@
 # Docker builder roadmap
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -97,14 +97,17 @@ another HDF. Final HDF readback currently reads files into memory; it does not
 require another complete on-disk readback copy. Temporary partitions are removed
 after successful final verification, so final retained size understates peak use.
 
-**Initially reserve 40 GiB free for a container build**, beyond
-an existing mounted game installation. Use this starting budget provisionally; reduce it only after measuring
-a complete build. It is a conservative planning allowance
-for conversions, staging, images, dependencies and Docker image/build caches,
-not a measured Docker minimum or a claimed container download size. Multiple
-retained builds, toolchain versions and Docker VM storage can require more.
-Replace the allowance with measured cold-build peak usage before publishing
-installation requirements. Do not promise that containerization reduces space.
+**Measured since v0.0.53 (replaces the earlier 40 GiB allowance).** Every
+passing build records what it took (its run folder, the scratch it used on the
+way, the caches and pool entries it added); the release ships the last known
+good figure as `config/disk-footprint.json` (v0.0.52: 44.3 GiB, plus the 2.1
+GiB builder image and the 1.8 GiB game data copy in Docker). A build needs that
+figure plus 30 %, never less than 35 GiB (`min_free_gib` and
+`disk_margin_percent` in `config/build-defaults.json`), and checks it before
+the image build, before the game data copy, first in the build and before each
+stage ([Docker builder](DOCKER_BUILD.md)). Multiple retained builds, toolchain
+versions and Docker VM storage can require more. Do not promise that
+containerization reduces space.
 
 ## Implementation and acceptance
 

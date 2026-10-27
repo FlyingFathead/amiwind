@@ -414,6 +414,7 @@ void AW_PhotoInit(void);
 int AW_PhotoModeActive(void);
 int AW_PhotoModeAvailable(void);
 int AW_PhotoModeSet(int on);
+int AW_PhotoModeSetQuiet(int on);
 void AW_PhotoConfigRestore(void);
 void AW_PhotoDraw(void);
 int AW_PhotoNoticeShowing(void);
@@ -487,6 +488,12 @@ int AW_MusicStartTrack(int id);
 void AW_MusicTitle(void);
 void AW_MusicTitleAfter(double seconds);
 void AW_MusicHold(void);
+/* aw_music.c: the custom OST player (CUSTOM-OST-SLOT-53): hold the playlist (silence), play the custom track (its id
+ * or -1: none built in, music off), stop (the playlist back), what custom track is playing (-1 none). */
+void AW_MusicCustomHold(void);
+int AW_MusicCustomPlay(void);
+void AW_MusicCustomStop(void);
+int AW_MusicCustomPlaying(void);
 
 #ifndef AMIWIND_SPRITE_HANDS
 #define AMIWIND_SPRITE_HANDS 0
@@ -652,7 +659,11 @@ qboolean AW_ActorStep(edict_t *,vec3_t,double);
 void AW_AnimInit(void);
 void AW_AnimKitInit(void);
 void AW_AnimKitTick(void);
-/* Debug companion (aw_companion.c). */
+/* The Halloween scene (aw_halloween.c, aw_halloween.h). */
+void AW_HalloweenInit(void);
+void AW_HalloweenTick(void);
+void AW_HalloweenDraw(void);
+int AW_HalloweenCamera(float origin[3],float angles[3]);/* Debug companion (aw_companion.c). */
 void AW_CompanionInit(void);
 void AW_CompanionPhysics(void);
 void AW_CompanionSceneSpawn(edict_t *player);

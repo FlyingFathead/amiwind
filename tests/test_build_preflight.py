@@ -41,9 +41,11 @@ class PreflightTests(unittest.TestCase):
     def test_too_little_room_stops_every_build(self):
         # BUILD-DISK-NEED-UNKNOWN-52: a tester's public build filled its disk halfway; every build, development
         # ones too, stops before its first stage, against at least 35 GiB by default
+        # (v0.0.53: the need is the last known good build's figure plus the margin, checked right after the options are
+        # read: tools/disk_need.py, tests/test_disk_need.py)
         self.assertGreaterEqual(build_preflight.DEFAULT_MIN_FREE_GIB, 35)
         text = (ROOT / 'tools' / 'build.py').read_text(encoding='utf-8')
-        self.assertIn('problems += build_preflight.free_space_problems(args.workspace)', text)
+        self.assertIn("__import__('disk_need').entry(args, p, storage_pool_dir)", text)
         self.assertNotIn('development builds only warn', text)
 
     def test_game_data_checked(self):

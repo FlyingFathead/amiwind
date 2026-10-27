@@ -105,6 +105,11 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(used+7>capacity)return 0;
         strcpy(out+used," grant");used+=6;
     }
+    /* dbg door roulette [SEED]: the teleport command's roulette, no resident command of its own */
+    if(!strcmp(r->command,"aw_teleport") && !strcmp(r->words,"door roulette")){
+        if(used+10>capacity)return 0;
+        strcpy(out+used," roulette");used+=9;
+    }
     if(!strcmp(r->command,"aw_quickchar_set") &&
        (!strcmp(r->words,"set race") || !strcmp(r->words,"set playerrace"))){
         if(used+13>capacity)return 0;
@@ -144,7 +149,8 @@ int AW_DebugTranslate(int argc,char **argv,char *out,int capacity) {
     if(!Q_strcasecmp(argv[0],"amiwind")){
         if(argc<2 || Q_strcasecmp(argv[1],"debug"))return 0;
         start=2;
-    }else if(Q_strcasecmp(argv[0],"debug") && Q_strcasecmp(argv[0],"dbg"))return 0;
+    }else if(Q_strcasecmp(argv[0],"debug") && Q_strcasecmp(argv[0],"dbg") && Q_strcasecmp(argv[0],"aw"))return 0;
+    /* "aw" is the same prefix (aw bench halloween, aw halloweenbench: the benchmark testers type) */
     if(argc==start || (argc==start+1 && !Q_strcasecmp(argv[start],"help")))return 2;
     f=catalogue_open(&left,line);if(!f)return -1;
     while((status=catalogue_line(f,&left,line))>0){
@@ -277,7 +283,7 @@ static void heap_audit(void){AW_HeapAuditReport(sv.worldmodel?sv.worldmodel->nam
 void AW_ConsoleInit(void) {
     Cvar_RegisterVariable(&colour);
     Cmd_AddCommand("aw_heap_audit",heap_audit);
-    Cmd_AddCommand("debug",dispatch);Cmd_AddCommand("dbg",dispatch);
+    Cmd_AddCommand("debug",dispatch);Cmd_AddCommand("dbg",dispatch);Cmd_AddCommand("aw",dispatch);
     Cmd_AddCommand("amiwind",dispatch);
     Cmd_AddCommand("aw_console_color",set_colour);
     Cmd_AddCommand("aw_console_font",set_font);

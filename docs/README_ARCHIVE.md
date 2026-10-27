@@ -1,10 +1,11 @@
 # Earlier README sections
 
-_Last updated with AmiWind v0.0.52 (26 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.50: The Doors: Riders On The CHIM](#v0050-the-doors-riders-on-the-chim)
 - [v0.0.49: Build Turnaround](#v0049-build-turnaround)
 - [v0.0.48: Inner CHIM & Actors On Stage](#v0048-inner-chim--actors-on-stage)
 - [v0.0.47: CHIM: The More, The Merrier](#v0047-chim-the-more-the-merrier)
@@ -47,6 +48,15 @@ _Last updated with AmiWind v0.0.52 (26 October 2026)._
 <!-- contents end -->
 
 The front page ([README](../README.md)) used to carry these sections. They are dated records of earlier releases and of the work around them, kept as written; where one disagrees with the front page, the front page is newer. The release notes of each version are in `docs/RELEASE-v*.md`.
+
+## v0.0.50: The Doors: Riders On The CHIM
+
+Every door leads where the game says it does. All of the base game's 3,133 load doors and jail markers go through
+one door table built from the game's own door records, and the image no longer builds when one does not lead
+anywhere. The ways out of the rooms around Vivec and Ebonheart, Pelagiad's houses and the caves, tombs and the
+shipwreck near Seyda Neen open now; the opening's prison ship, pier and census office keep the doors the opening
+scene gives them. A new version number now rebuilds only the
+engine and the image, proven by a build where only the version changed.
 
 ## v0.0.49: Build Turnaround
 
@@ -1061,7 +1071,7 @@ complete package inclusion remain pending; dev2 has not shipped.
 
 Update (v0.0.44, 19 October 2026): the notes above are from 14 and 15 October 2026 and describe states that have
 since passed. The current state is in
-[Where AmiWind stands](../README.md#where-amiwind-stands-26-october-2026) near the top.
+[Where AmiWind stands](../README.md#where-amiwind-stands-27-october-2026) near the top.
 
 ## Development (as the front page stated it before 20 October 2026)
 

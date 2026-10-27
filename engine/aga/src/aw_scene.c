@@ -185,6 +185,13 @@ int AW_SceneMapRefuse(const char *name){
     return AW_SceneEntryRefuse(name,NULL,0);
 }
 static char links_map[16];
+/* The frame whose door table the player uses, and the shift from the running map's coordinates into its own: after a
+ * streamed crossing the logical frame (DOOR-BANK-STREAMED-FRAME-51: its doors were never read, 830 of 1,102 exterior
+ * entrances dead after walking in), else the running map with no shift. */
+static const char *door_scene(void);
+static void door_shift(vec3_t shift);
+/* A script's Activate after a streamed crossing: only the logical frame's own rows (1 for every row otherwise). */
+static int door_in_frame(const aw_scene_link_t *r);
 static double door_ready;
 static aw_scene_link_t opening_door;
 static unsigned door_close;
@@ -448,7 +455,6 @@ static void read_links_for(const char *map) {
     }
     fclose(f);
 }
-static void read_links(void){read_links_for(sv.name);}
 static void load_scene(aw_scene_link_t *link,int immediate) {
     edict_t *p=svs.clients[0].edict;char command[32];
     if(pending || !map_valid(link->target))return;
@@ -563,17 +569,24 @@ static int door_hit(aw_scene_link_t *r,vec3_t eye,vec3_t forward,vec3_t hit) {
     for(axis=0;axis<3;axis++)hit[axis]=eye[axis]+forward[axis]*near;
     return 1;
 }
+/* The doorway a door is set in (DOOR-USE-BLOCKED-53): the use ray may meet a surface this near before the door's use
+ * box and still reach the door. The converted collision of an entrance (the Daedric shrines' oval doorways, the fort
+ * and ship doors) closes the doorway 1 to 11 units in front of the door model; the original activates the door
+ * there. 21 region-frame entrances were refused at 1 unit (tools/door_engine_check.py reads this value). */
+#define DOOR_USE_SLACK 16.0f
 static int aimed_door(void) {
-    int i,best=-1;edict_t *p;vec3_t eye,delta,hit,forward,right,up;float distance,closest=57;trace_t tr;
+    int i,best=-1;edict_t *p;vec3_t eye,local,shift,delta,hit,forward,right,up;float distance,closest=57;trace_t tr;
     if(!sv.active || svs.maxclients!=1 || cls.state!=ca_connected)return -1;
     p=svs.clients[0].edict;if(p->v.movetype!=MOVETYPE_WALK)return -1;
-    read_links();VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
+    read_links_for(door_scene());door_shift(shift);
+    VectorAdd(p->v.origin,p->v.view_ofs,eye);VectorSubtract(eye,shift,local);AngleVectors(cl.viewangles,forward,right,up);
     for(i=0;i<count;i++) {
         if(aw_story.ship_disabled && !strcmp(links[i].target,"prison"))continue;
-        if(strcmp(sv.name,links[i].source) || !door_hit(&links[i],eye,forward,hit))continue;
+        if(strcmp(door_scene(),links[i].source) || !door_hit(&links[i],local,forward,hit))continue;
+        VectorAdd(hit,shift,hit);       /* back into the running map for the wall trace */
         VectorSubtract(hit,eye,delta);distance=Length(delta);if(distance>=closest)continue;
         tr=SV_Move(eye,vec3_origin,vec3_origin,hit,MOVE_NOMONSTERS,p);
-        if(tr.startsolid || (1-tr.fraction)*distance>(links[i].bounds?1.0f:12.0f))continue;
+        if(tr.startsolid || (1-tr.fraction)*distance>(links[i].bounds?DOOR_USE_SLACK:12.0f))continue;
         closest=distance;best=i;
     }
     return best;
@@ -673,7 +686,9 @@ int AW_SceneUse(void) {
 int AW_SceneActivate(unsigned reference) {
     int i;
     if(AW_PlayerDead() || pending || door_ready)return 0;
-    for(i=0;i<count;i++)if(links[i].reference==reference)return use_link(i);
+    /* the table of the frame the player stands in, not the one read last (DOOR-BANK-STREAMED-FRAME-51) */
+    read_links_for(door_scene());
+    for(i=0;i<count;i++)if(links[i].reference==reference && door_in_frame(&links[i]))return use_link(i);
     return 0;
 }
 static int use_link(int i) {
@@ -736,14 +751,15 @@ void AW_SceneDraw(void) {
     scr_copyeverything=1;
 }
 static void door_status(void) {
-    int i;vec3_t eye,forward,right,up,hit,delta;trace_t tr;edict_t *p;
+    int i;vec3_t eye,local,shift,forward,right,up,hit,delta;trace_t tr;edict_t *p;
     if(!sv.active)return;
-    read_links();p=svs.clients[0].edict;
-    VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
-    Con_Printf("Doors %ld / aimed %ld / eye %ld %ld %ld / pitch %ld\n",(long)count,
+    read_links_for(door_scene());door_shift(shift);p=svs.clients[0].edict;
+    VectorAdd(p->v.origin,p->v.view_ofs,eye);VectorSubtract(eye,shift,local);AngleVectors(cl.viewangles,forward,right,up);
+    Con_Printf("Doors %ld of %s / aimed %ld / eye %ld %ld %ld / pitch %ld\n",(long)count,door_scene(),
         (long)aimed_door(),(long)eye[0],(long)eye[1],(long)eye[2],(long)cl.viewangles[0]);
-    for(i=0;i<count;i++)if(!strcmp(sv.name,links[i].source)) {
-        if(!door_hit(&links[i],eye,forward,hit)){Con_Printf("Door %ld outside aim/reach\n",(long)i);continue;}
+    for(i=0;i<count;i++)if(!strcmp(door_scene(),links[i].source)) {
+        if(!door_hit(&links[i],local,forward,hit)){Con_Printf("Door %ld outside aim/reach\n",(long)i);continue;}
+        VectorAdd(hit,shift,hit);
         VectorSubtract(hit,eye,delta);tr=SV_Move(eye,vec3_origin,vec3_origin,hit,MOVE_NOMONSTERS,p);
         Con_Printf("Door %ld hit %ld %ld %ld distance100 %ld clear1000 %ld solid %ld\n",
             (long)i,(long)hit[0],(long)hit[1],(long)hit[2],(long)(Length(delta)*100),
@@ -883,6 +899,12 @@ static int logical_used;		/* a streamed crossing since the map started */
 /* The scene the player stands in: the logical frame after a streamed
  * crossing, else the running map (aw_remote.c's state file). */
 const char *AW_SceneName(void){return logical_map[0]?logical_map:sv.active?sv.name:"none";}
+static const char *door_scene(void){return logical_map[0]?logical_map:sv.name;}
+static void door_shift(vec3_t shift){
+    if(logical_map[0]){VectorCopy(logical_offset,shift);}
+    else {VectorCopy(vec3_origin,shift);}
+}
+static int door_in_frame(const aw_scene_link_t *r){return !logical_map[0] || !strcmp(logical_map,r->source);}
 /* The walk log's map column (aw_profile.c) after a streamed crossing:
  * maps/<scene>; NULL: the client's world model as before. */
 const char *AW_SceneWalkModel(void){
@@ -1013,7 +1035,7 @@ void AW_SceneTick(void) {
         AW_StreamTick(AW_CellChangeMethod()==2?AW_RegionAhead(p->v.origin,p->v.velocity,
             intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE,AW_StreamLookahead()):NULL);
     if(door_ready){
-        if(!sv.active || strcmp(sv.name,opening_door.source)){door_ready=0;return;}
+        if(!sv.active || strcmp(door_scene(),opening_door.source)){door_ready=0;return;}
         if(realtime>=door_ready){door_ready=0;door_close=opening_door.reference;load_scene(&opening_door,0);}
         return;
     }
@@ -1267,8 +1289,10 @@ int AW_SceneMapMarker(float *source) {
     source[1]=(float)AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:map:marker:y");
     source[2]=0;return 1;
 }
+static void roulette_command(int first);
 static void teleport_command(void) {
     vec3_t source;
+    if(Cmd_Argc()>=2 && !strcmp(Cmd_Argv(1),"roulette")){roulette_command(2);return;}   /* dbg door roulette [SEED] */
     if(Cmd_Argc()==2 && (!strcmp(Cmd_Argv(1),"mark") || !strcmp(Cmd_Argv(1),"marker"))) {
         if(!AW_SceneMapMarker(source)){Con_Printf("no map marker set\n");return;}
         if(!AW_MapTeleportAt(source,0))
@@ -1302,6 +1326,86 @@ static void teleport_command(void) {
 
     if(Cmd_Argc()==1 && sv.active){Cbuf_InsertText("aw_scene_menu\n");return;}
     scene_command();
+}
+/* dbg door roulette [SEED] (the maintainer, v0.0.53: random tests of interior loading): one random room of this
+ * disk, loaded straight away at the room's own start (its info_player_start), the way a door loads it; the console
+ * says which (its name, map id and cell number) and the seed, which repeats the same choice. The rooms are every
+ * interior the engine names (aw_maps.h: the fixed rooms, the room maps, the town interiors, the room batches) whose
+ * map is on this disk and has a start; one draw at a time, a room missing from the disk is drawn again. */
+static int roulette_total(void){return AW_MAP_COUNT+AW_INTERIOR_MAP_COUNT+AW_TOWN_INTERIOR_COUNT+AW_ROOM_BATCH_COUNT;}
+static const char *roulette_name(int k){
+    if(k<AW_MAP_COUNT)return AW_TownFind(AW_MapName(k))>=0?"":AW_MapName(k);   /* a town is no room */
+    k-=AW_MAP_COUNT;if(k<AW_INTERIOR_MAP_COUNT)return AW_InteriorMapName(k);
+    k-=AW_INTERIOR_MAP_COUNT;if(k<AW_TOWN_INTERIOR_COUNT)return AW_TownInteriorName(k);
+    return AW_RoomBatchName(k-AW_TOWN_INTERIOR_COUNT);
+}
+/* A key's value in one entity's text (START..END), copied into OUT; 0 without it. */
+static int entity_value(const char *start,const char *end,const char *key,char *out,int size){
+    const char *p=start,*q;int n;
+    while((p=strstr(p,key))!=NULL && p<end){
+        p+=strlen(key);while(*p==' ' || *p=='\t')p++;
+        if(*p!='"')continue;
+        q=strchr(++p,'"');if(!q || q>end)return 0;
+        n=(int)(q-p);if(n>=size)n=size-1;
+        memcpy(out,p,n);out[n]=0;return 1;
+    }
+    return 0;
+}
+/* Room NAME's start (its map's info_player_start: origin and angle) into R, its title (the worldspawn's
+ * _aw_cell_id, else message, else NAME) and cell number (_aw_cell_int, -1 without); 0 when the map is not on this
+ * disk or has no start. Reads the map's header and the start of its entity lump only. */
+static int roulette_room(const char *name,aw_scene_link_t *r,char *title,int size,long *cell){
+    static char text[2048];char path[MAX_QPATH+24],value[96];FILE *f=NULL;unsigned char h[12];long base,at,len;int n=0;
+    const char *world_end,*start,*start_end;
+    if(!name || !*name || !map_valid(name) || AW_SceneMapSize(name,path,sizeof(path))<124)return 0;
+    if(COM_FOpenFile(path,&f)<0 || !f)return 0;
+    base=ftell(f);
+    if(fread(h,1,12,f)==12){
+        at=(long)h[4]|((long)h[5]<<8)|((long)h[6]<<16)|((long)h[7]<<24);
+        len=(long)h[8]|((long)h[9]<<8)|((long)h[10]<<16)|((long)h[11]<<24);
+        if(at>=124 && len>0 && !fseek(f,base+at,SEEK_SET))
+            n=(int)fread(text,1,len<(long)sizeof(text)-1?(size_t)len:sizeof(text)-1,f);
+    }
+    fclose(f);text[n<0?0:n]=0;
+    if(!(world_end=strchr(text,'}')) || !(start=strstr(world_end,"\"info_player_start\"")))return 0;
+    if(!(start_end=strchr(start,'}')))return 0;
+    memset(r,0,sizeof(*r));copy_name(r->target,sizeof(r->target),name);
+    if(!entity_value(start,start_end,"\"origin\"",value,sizeof(value)) ||
+       Q_sscanf(value,"%f %f %f",&r->arrival[0],&r->arrival[1],&r->arrival[2])!=3 ||
+       !(fabs(r->arrival[0])<32768 && fabs(r->arrival[1])<32768 && fabs(r->arrival[2])<32768))return 0;
+    if(!entity_value(start,start_end,"\"angle\"",value,sizeof(value)) || Q_sscanf(value,"%f",&r->yaw)!=1 ||
+       !(r->yaw>-36000 && r->yaw<36000))r->yaw=0;
+    while(r->yaw<0)r->yaw+=360;
+    while(r->yaw>=360)r->yaw-=360;
+    if(!entity_value(text,world_end,"\"_aw_cell_id\"",title,size) && !entity_value(text,world_end,"\"message\"",title,size))
+        copy_name(title,size,name);
+    if(!entity_value(text,world_end,"\"_aw_cell_int\"",value,sizeof(value)) || Q_sscanf(value,"%ld",cell)!=1)*cell=-1;
+    copy_name(r->label,sizeof(r->label),title);
+    return 1;
+}
+/* FIRST: the argument index of the seed (aw_teleport roulette [SEED], routed from dbg door roulette by aw_console.c,
+ * so the roulette needs no resident command of its own). */
+static void roulette_command(int first){
+    unsigned long seed=0,state;int total=roulette_total(),tries;aw_scene_link_t r;char title[96];long cell;
+    const char *arg=Cmd_Argv(first),*p;
+    if(Cmd_Argc()>first+1){Con_Printf("Usage: dbg door roulette [SEED] (a number; the same seed loads the same room)\n");return;}
+    if(Cmd_Argc()==first+1){
+        for(p=arg;*p;p++)if(*p<'0' || *p>'9' || p-arg>=10)break;
+        if(*p || !*arg){Con_Printf("Usage: dbg door roulette [SEED] (a number; the same seed loads the same room)\n");return;}
+        for(p=arg;*p;p++)seed=(seed*10+(unsigned long)(*p-'0'))&0xffffffffUL;
+    }else seed=((unsigned long)(Sys_FloatTime()*1000.0)^(unsigned long)(realtime*7919.0))&0xffffffffUL;
+    if(!sv.active || pending || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict){
+        Con_Printf("dbg door roulette needs a game running: New Game first.\n");return;}
+    state=seed;
+    for(tries=0;tries<total*4;tries++){
+        state=(state*1103515245UL+12345UL)&0xffffffffUL;
+        if(roulette_room(roulette_name((int)((state>>8)%(unsigned long)total)),&r,title,sizeof(title),&cell)){
+            door_ready=0;door_close=0;
+            Con_Printf("Door roulette (seed %lu): %s [%s, cell %ld]\n",seed,title,r.target,cell);
+            load_scene(&r,1);return;
+        }
+    }
+    Con_Printf("Door roulette (seed %lu): no room of this disk found.\n",seed);
 }
 /* aw_quick_start [town] [NAME] | map MAP X Y Z YAW: a fresh game straight in a town
  * (default: the partial-area build's town or start line, aw_miniwind.c), as the

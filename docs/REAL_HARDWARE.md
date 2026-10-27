@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.52 (26 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -139,7 +139,21 @@ number another machine can be compared with, record a short walk once and play i
 3. `timedemo bench` plays it back as fast as the machine can draw it, prints the frames per second and the
    renderer counters, and appends a line to `saves/timedemo-results.txt`.
 
-Send that file with the settings you had on and where you recorded. A standard demo that every image ships, run by
+Send that file with the settings you had on and where you recorded.
+
+**The standard test (v0.0.53): `aw bench halloween`.** In an image built with the Halloween scene
+(`--miniwind-halloween`, [HALLOWEEN.md](HALLOWEEN.md)), stand where the image starts you and type
+`aw bench halloween` (or `aw bench halloween skeletons` for the lighter cast; `aw halloweenbench` and
+`dbg halloween bench` are the same command). The scene plays 600 frames with its
+clock stepping a tenth of a second each frame, the same camera path and the same dance every time, so every machine
+draws exactly the same frames; at the end the console shows one line to copy, for example:
+
+```
+HALLOWEEN BENCH dagoth: avg 12.3 fps, min 7.9, 1% low 8.4, 600 frames, 48.8 s, Fast RAM 128 MB, CPU 68060, AmiWind v0.0.53 ...
+```
+
+The average is the frames over their time, the minimum is the slowest frame, the 1 % low is the slowest 1 % of the
+frames taken together. Send the line with the machine (accelerator, its clock) and the screen mode. A standard demo that every image ships, run by
 one command, is planned for v0.0.49 ([roadmap](ROADMAP.md#one-standard-timedemo-for-real-amigas-v0049)). `dbg rcount`
 (what each frame draws) and `dbg logs live on` (writes frame stalls, cell load times and a walk profile to log
 files) give the numbers that matter most ([console commands](AMIWIND_CONSOLE_COMMANDS.md)).

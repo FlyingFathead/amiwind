@@ -197,6 +197,19 @@ class DoorRows(unittest.TestCase):
         report = door_audit.audit(doors, rows, FakeImage(banks, frames, crossing=0))
         self.assertEqual(report['rows'][0]['walk_in'], door_audit.WALK_IN)
 
+    def test_an_engine_that_reads_the_logical_frames_bank_uses_it_after_walking_in(self):
+        # DOOR-BANK-STREAMED-FRAME-51 (v0.0.53): aw_scene.c reads the bank of the frame the player stands in
+        doors, rows, banks, frames = world()
+        image = FakeImage(banks, frames)
+        image.logical_doors = 1
+        report = door_audit.audit(doors, rows, image, {(1, 0): 'Test Region'})
+        self.assertEqual(report['rows'][0]['walk_in'], door_audit.WALK_IN)
+        self.assertEqual(report['counts']['walk_in'], 1)
+        self.assertEqual(report['counts']['level_change_only'], 0)
+        self.assertEqual(door_audit.logical_doors((ROOT / 'engine/aga/src/aw_scene.c').read_text(encoding='utf-8')), 1)
+        self.assertEqual(door_audit.logical_doors('static void read_links_for(const char *map);\n'
+                                                  'read_links_for(sv.name);\n'), 0)
+
     def test_each_missing_piece_is_named(self):
         doors, rows, banks, frames = world()
         frames[0]['selected'], frames[0]['owned'] = set(), {}

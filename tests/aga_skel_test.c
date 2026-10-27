@@ -147,6 +147,13 @@ int main (int argc, char **argv)
 		assert (AW_SkelGroup (&t, "kforward") == -1);
 		assert (AW_SkelGroup (&v, "KFORWARD") == AW_SkelGroup (&t, "walkforward"));
 		assert (AW_SkelGroup (&v, "idle") == AW_SkelGroup (&t, "idle"));
+		/* several prefixes in order (DANCER-OWN-ANIM-IGNORED-53: "d:f:"): the first that names a group wins,
+		 * then the next, then the table's own */
+		strcpy (v.prefix, "x:wal");
+		assert (AW_SkelGroup (&v, "kforward") == AW_SkelGroup (&t, "walkforward"));
+		assert (AW_SkelGroup (&v, "idle") == AW_SkelGroup (&t, "idle"));
+		strcpy (v.prefix, "wal:x:");
+		assert (AW_SkelGroup (&v, "kforward") == -1);
 	}
 	AW_SkelGroupAt (&t, AW_SkelGroup (&t, "walkforward"), &g);
 	printf ("group %s %u %u\n", g.name, g.first, g.last);

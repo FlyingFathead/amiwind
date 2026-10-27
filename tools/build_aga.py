@@ -2017,6 +2017,16 @@ def image(args):
     print('Converting original inventory metadata and selected item resources...',flush=True)
     inventory_report=prepare_inventory(args.data_files,boot/'id1',jobs=jobs)
     (out/'inventory-data.json').write_text(json.dumps(inventory_report,indent=2)+'\n',encoding='utf-8',newline='\n')
+    # The Halloween scene (dbg halloween, docs/HALLOWEEN.md): its cast on their shared tables, a MiniWind image only
+    import halloween_cast
+    if halloween_cast.custom_ost(args) and 'music' in excluded:
+        raise ValueError('--custom-ost needs the music (drop --exclude music)')
+    if getattr(args,'halloween',False):
+        if not getattr(args,'miniwind',False):
+            raise ValueError('--halloween is a MiniWind option')
+        print('Halloween scene: the cast (skeletons, dancers, Dagoth Ur) on their animation tables...',flush=True)
+        halloween_report=halloween_cast.prepare(args.data_files,boot/'id1',jobs=jobs)
+        (out/'halloween-cast.json').write_text(json.dumps(halloween_report,indent=2,default=str)+'\n',encoding='utf-8',newline='\n')
     from prepare_world_ui import validate as validate_world_ui
     if world_ui is not None:world_ui.result()
     validate_world_ui(boot/'id1')
@@ -2346,6 +2356,44 @@ def write_world_doors(args, id1, out, chim_frames):
         raise ValueError('World doors: %d door(s) or marker(s) do not resolve (every entrance and every way out must be '
                          'linked, CHIM-REGION-DOORS-NO-ROOMS-48):\n  ' % len(problems) + '\n  '.join(problems[:40]))
     return receipt
+
+
+def write_door_check(args, id1, out):
+    """The door check of the image (DOOR-ENTRANCE-AUDIT-51): the door audit (tools/door_audit.py: door, then
+    entrance, then interior, and the way back, as the image holds them, with the original's locks) and the door engine
+    check (tools/door_engine_check.py: the engine's own door code, compiled for the host, over this id1: every
+    exterior entrance after a walk over a frame border into its frame, its prompt, its use and a script's Activate
+    into the room, and the way back out; for region-frame doors also the wall between the player and the door in the
+    CHIM world's own collision). Writes OUT/door-audit.{json,md}, OUT/door-checklist.csv and
+    OUT/door-engine-check.{json,md} (private: from your game data). Raises when a whole-world image uses fewer
+    entrances than config/door-check-baseline.json: the usable count only goes up from build to build. Returns the
+    receipt."""
+    import door_audit
+    import door_engine_check
+    from mwad.interior import original_doors
+    from mwad.paths import child_ci
+    jobs = resolve_jobs(getattr(args, 'jobs', None))
+    id1, out = Path(id1), Path(out)
+    engine_src = ROOT/'engine'/'aga'/'src'
+    doors = original_doors(child_ci(args.data_files, 'Morrowind.esm').read_bytes())
+    world_rows = json.loads((out/'world-doors.json').read_text(encoding='utf-8'))['rows']
+    stores = [p for p in (getattr(args, 'chim_interiors', None),) if p]
+    image = door_audit.Image(id1, engine_src, args.chim_world, jobs, stores)
+    audit = door_audit.audit(doors, world_rows, image, door_audit.regions_by_cell(args.data_files, jobs))
+    door_audit.write_outputs(audit, out)
+    # the literal file name: a path built from a variable reads as the whole config/ folder to the stage keys
+    baseline = ROOT/'config'/'door-check-baseline.json'
+    report, problem = door_engine_check.run(id1=id1, engine_src=engine_src, audit_rows=audit['rows'], out=out,
+                                            baseline=baseline if baseline.is_file() else None, jobs=jobs,
+                                            chim_world=args.chim_world)
+    a, c = audit['counts'], report['counts']
+    print('Door check: %d exterior entrances; the audit: %d usable on arrival, %d locked, %d with a problem; the '
+          'engine after walking in: %d usable, %d both ways, %d with the wall traced (door-audit.md, '
+          'door-engine-check.md)' % (a['doors'], a['usable_on_arrival'], a['locked'], a['with_problems'],
+                                     c['usable_after_crossing'], c['both_ways'], c['reachable']), flush=True)
+    if problem:
+        raise ValueError('Door check: ' + problem)
+    return {'audit': a, 'engine': c}
 
 
 def write_room_batch_links(args, id1, out, chim_frames):
@@ -2955,6 +3003,10 @@ def finalize_image(args):
             # Every door and marker of the game through one table, the towns' included; the image fails when one
             # does not resolve (v0.0.50 The Doors, CHIM-REGION-DOORS-NO-ROOMS-48).
             write_world_doors(args, boot/'id1', out, chim_frames)
+            # every exterior entrance through the engine's own door code, the usable count only going up
+            # (DOOR-ENTRANCE-AUDIT-51, config/door-check-baseline.json)
+            if getattr(args, 'chim_world', None):
+                write_door_check(args, boot/'id1', out)
         if getattr(args, 'harvest', None):
             # The final payload: every harvestable plant the CHIM world leaves out is in a shipped catalogue,
             # each CHIM region cell's in its own frame map's (HARVEST-CHIM-REGION-LOSS-41).
@@ -3118,6 +3170,13 @@ def finalize_image(args):
             if digest(source)!=track['sha256']:raise ValueError('Music manifest mismatch')
             shutil.copyfile(source,target/track['file'])
         shutil.copyfile(music/'soundtrack.json',target/'soundtrack.json')
+        import halloween_cast
+        if halloween_cast.custom_ost(args):
+            # the custom OST slot (CUSTOM-OST-SLOT-53): the user's own track, one more special track of this image
+            # only; with the Halloween cast in the image the dance takes its measured beat
+            track,bpm=halloween_cast.soundtrack(halloween_cast.custom_ost(args),target)
+            halloween_cast.set_beat(boot/'id1',bpm)
+            print('Custom OST: %s, %.0f s, %.1f BPM (this image only)'%(track['file'],track['seconds'],bpm),flush=True)
         from music_catalogue import write_catalogue
         music_catalogue = write_catalogue(target/'soundtrack.json', target/'catalogue.txt')
         (target/'playlist.txt').write_text('\n'.join(' '.join(map(str,[len(groups[g]),*groups[g]])) for g in ['explore','battle'])+'\n'+str(groups['title'])+'\n', newline='\n')
@@ -3387,6 +3446,8 @@ def main():
     i.add_argument('--miniwind-features',help='With --miniwind: the boot notice feature line tools/build.py generated from its stage plan ("FEATURES ONLY: ...")')
     i.add_argument('--miniwind-description',help='With --miniwind: optional "Scene:" line of the startup screen')
     i.add_argument('--miniwind-boot',metavar='CMD[;CMD]',help='With --miniwind: dbg commands run once on arrival')
+    i.add_argument('--halloween',action='store_true',help='With --miniwind: the Halloween scene\'s cast (tools/halloween_cast.py, dbg halloween)')
+    i.add_argument('--custom-ost','--halloween-soundtrack',dest='custom_ost',type=Path,metavar='FILE',help='The custom OST slot: the user\'s own audio or video file, its audio converted into this image\'s music (also AMIWIND_CUSTOM_OST; docs/HALLOWEEN.md)')
     i.add_argument('--miniwind-town',help='With --miniwind: the town the image holds and boots into (default balmora)')
     i.add_argument('--miniwind-map-inspection',action='store_true',help='With --miniwind: direct inspection with god, noclip and debug HUD')
     i.add_argument('--miniwind-debug',action='store_true',help='With --miniwind: a DEBUG ONLY image, not a playtest')

@@ -2449,3 +2449,167 @@ class ChimLabelKeyTests(unittest.TestCase):
         for path, unit in build_cache.CHIM_LABEL_SHOWN_UNITS | build_cache.CHIM_LABEL_HIDDEN_UNITS:
             self.assertIn(unit, index._module_symbols(path)['units'], (path, unit))
         self.assertEqual({path for path, _ in build_cache.CHIM_LABEL_SHOWN_UNITS}, build_cache.CHIM_LABEL_SHOWN)
+
+
+# BUILD-STAGE-READS-UNFINGERPRINTED-48: a stage that hands code to a cache key and takes a result from that cache
+SHARED_K = '''
+def digest_json(value):
+    return 'digest'
+
+
+def bake():
+    return 'baked'
+
+
+class Store:
+    def key(self):
+        return digest_json(1)
+'''
+KEYED_TOOL = '''
+import shared
+
+
+def open_cache():
+    from pass_cache import PassCache
+    return PassCache.open('k', {}, (__file__, 'work'))
+
+
+def work():
+    return shared.bake()
+'''
+STAGE_K = '''
+import os
+import sys
+from pathlib import Path
+import keyed_tool
+opener = keyed_tool.open_cache     # hands keyed_tool.work to a cache key (the stage never opens it here)
+covered = Path(sys.argv[sys.argv.index('--covered') + 1]).read_text()
+trace = os.environ.get('AMIWIND_STAGE_TRACE', '')
+if covered and os.path.isabs(trace):
+    # what pass_cache.note_covered appends to the stage's trace on a cache hit
+    handle = os.open(trace, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    os.write(handle, covered.encode())
+    os.close(handle)
+out = Path(sys.argv[sys.argv.index('--out') + 1]); out.mkdir(parents=True)
+(out / 'k.txt').write_text(keyed_tool.work())
+'''
+
+
+@unittest.skipUnless(MANIFESTS, 'stage wrapper, trace and manifests are exercised on POSIX')
+class CacheHitCoverageTests(unittest.TestCase):
+    """BUILD-STAGE-READS-UNFINGERPRINTED-48: a cache hit writes what the cache keys into the stage's trace
+    (pass_cache.covered_lines, BUILD-KEY-UNIT-RESTORED-CODE-52). Those lines were in the cache key's own form (2),
+    whose import-time code holds every class body, so they named functions the stage key (form 3) leaves out: the
+    trace check refused the record of every stage with a hit (chim 12, area and the room stages 29, character 2), and
+    the v0.0.52 final, a VERSION-only build, rebuilt the CHIM world. The lines are now the stage key's own view of the
+    keyed code, so the record is kept and the next build reuses it."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.repository = self.root / 'repo'
+        make_repository(self.repository)
+        tools = self.repository / 'tools'
+        for name, text in (('shared.py', SHARED_K), ('keyed_tool.py', KEYED_TOOL), ('stage_k.py', STAGE_K)):
+            (tools / name).write_text(text)
+        (self.repository / 'VERSION').write_text('0.0.53-dev1\n')
+        self.covered = self.root / 'data' / 'covered.txt'
+        self.covered.parent.mkdir()
+        self.covered.write_text('')
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def lines(self, top_format):
+        """The trace lines a hit of keyed_tool.work's cache writes (pass_cache._covered_lines), in TOP_FORMAT."""
+        import pass_cache
+        index = build_cache.SourceIndex(self.repository, top_format=top_format)
+        return pass_cache._covered_lines(index, [(self.repository / 'tools' / 'keyed_tool.py', 'work')],
+                                         pass_cache.PASS_KEY_NEUTRAL)
+
+    def build(self, name, reuse_from=None):
+        run = self.root / 'workspace' / name
+        meta = dict(metadata(), runtime_version='0.0.53-dev1')
+        steps = [('keyed', [sys.executable, str(self.repository / 'tools' / 'stage_k.py'), '--covered',
+                            str(self.covered), '--out', str(run / 'keyed')])]
+        with contextlib.redirect_stdout(io.StringIO()):
+            steps = build_cache.prepare(steps, run, meta, reuse_from, 'copy',
+                                        build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT))
+            build.execute(steps, run, meta)
+        state = json.loads((run / 'build-state.json').read_text())
+        self.assertEqual(state['status'], 'passed')
+        return run, state
+
+    def test_the_cache_key_form_names_code_the_stage_key_leaves_out(self):
+        # the cause: form 2 counts the class body (Store.key -> digest_json) as import-time code of shared.py
+        self.assertIn('@tools/shared.py\tdigest_json', self.lines(2))
+        index = build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT)
+        script = self.repository / 'tools' / 'stage_k.py'
+        self.assertNotIn('digest_json', index.reached_units(script)['tools/shared.py'])
+        steps = [('keyed', [sys.executable, str(script)])]
+        reached, modules = build_cache.stage_units(steps, index)
+        self.assertEqual(build_cache.check_calls(self.lines(2), reached['keyed'], modules),
+                         ['tools/shared.py:digest_json'])
+        # the fix: a hit names the stage key's own view of the code it handed to the cache
+        lines = self.lines(build_cache.STAGE_TOP_FORMAT)
+        self.assertIn('@tools/shared.py\tbake', lines)
+        self.assertIn('@tools/keyed_tool.py\twork', lines)
+        self.assertNotIn('@tools/shared.py\tdigest_json', lines)
+        self.assertEqual(build_cache.check_calls(lines, reached['keyed'], modules), [])
+
+    def test_a_record_with_a_cache_hit_is_kept_and_a_version_only_build_reuses_it(self):
+        import pass_cache
+        with patch.multiple(pass_cache, ROOT=self.repository, _DIGESTS={}, _COVERED={}):
+            lines = pass_cache.covered_lines((self.repository / 'tools' / 'keyed_tool.py', 'work'))
+        self.assertEqual(lines, self.lines(build_cache.STAGE_TOP_FORMAT))
+        self.covered.write_text(''.join(line + '\n' for line in lines))
+        first, _ = self.build('dev1')
+        manifest = build_cache.load_manifest(first, 'keyed')
+        self.assertTrue(manifest['reusable'], manifest.get('reasons'))
+        self.assertIn('tools/shared.py', manifest['used']['units'])
+        # a VERSION-only change (dev to rc to final) refuses no record and reruns nothing
+        (self.repository / 'VERSION').write_text('0.0.53\n')
+        second, state = self.build('final', reuse_from=first)
+        self.assertEqual(sorted(state['stage_cache']['reused']), ['keyed'])
+        self.assertFalse([name for name, row in state['stage_cache']['reused'].items() if row.get('refused')])
+        self.assertEqual((second / 'keyed' / 'k.txt').read_text(), 'baked')
+        # the old lines (the cache key's form 2) refuse it, as in the v0.0.52 final
+        self.covered.write_text(''.join(line + '\n' for line in self.lines(2)))
+        third, _ = self.build('form2')
+        manifest = build_cache.load_manifest(third, 'keyed')
+        self.assertFalse(manifest['reusable'])
+        self.assertIn('ran 1 repository functions its fingerprint left out (first: tools/shared.py:digest_json)',
+                      manifest['reasons'])
+
+    def test_a_file_a_hit_keys_whole_must_be_in_the_stage_key(self):
+        # '=' lines are checked like reads: a cache that gave a result from a file the stage key leaves out
+        self.covered.write_text('=config/hidden.json\n')
+        run, _ = self.build('hidden')
+        manifest = build_cache.load_manifest(run, 'keyed')
+        self.assertFalse(manifest['reusable'])
+        self.assertIn('read 1 repository files its fingerprint left out (first: config/hidden.json)', manifest['reasons'])
+
+    def test_code_the_keyed_code_hands_to_a_cache_key_counts_too(self):
+        # keyed_tool.work keys inner.run in turn: the stage key follows it (keyed_coverage), and a hit of either
+        # cache names only what that key counts
+        tools = self.repository / 'tools'
+        (tools / 'inner.py').write_text("from pathlib import Path\n\n\ndef run():\n"
+                                        "    return (Path(__file__).resolve().parents[1] / 'config' / 'inner.json').read_text()\n"
+                                        "\n\ndef spare():\n    return 2\n")
+        (self.repository / 'config' / 'inner.json').write_text('{}')
+        (tools / 'keyed_tool.py').write_text(KEYED_TOOL.replace(
+            "    return shared.bake()\n",
+            "    import inner\n    from pass_cache import PassCache\n"
+            "    PassCache.open('i', {}, (inner.__file__, 'run'))\n    return shared.bake()\n"))
+        index = build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT)
+        script = tools / 'stage_k.py'
+        python, data, uncertain = index.closure(script)
+        self.assertFalse(uncertain)
+        self.assertIn('run', index.reached_units(script)['tools/inner.py'])
+        self.assertNotIn('spare', index.reached_units(script)['tools/inner.py'])
+        self.assertIn('config/inner.json', data)
+        reached, modules = build_cache.stage_units([('keyed', [sys.executable, str(script)])], index)
+        lines = self.lines(build_cache.STAGE_TOP_FORMAT)
+        self.assertIn('@tools/inner.py\trun', lines)
+        self.assertEqual(build_cache.check_calls(lines, reached['keyed'], modules), [])
+        self.assertEqual([line for line in lines if line.startswith('=') and line[1:] not in python | data], [])

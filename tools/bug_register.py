@@ -72,7 +72,11 @@ ARCHIVES = ((ARCHIVE_DIR / 'bugs-to-v0.0.31.json', 31),
             # 2026-10-24 00:42 +0300 / 2026-10-23 21:42 UTC: the dev2 try 14 and rc1 findings took bugs.json to 75.4 %
             # (790,329 bytes); up to v0.0.44 left 74.5 % and up to v0.0.46 74.0 %, so the rotation moves on to v0.0.47,
             # the last release (TRACKER-REGISTER-SIZE-36)
-            (ARCHIVE_DIR / 'bugs-v0.0.43-v0.0.47.json', 47))
+            (ARCHIVE_DIR / 'bugs-v0.0.43-v0.0.47.json', 47),
+            # 2026-10-26 22:30 +0200 / 2026-10-26 20:30 UTC: v0.0.53-dev alone stood at 95.0 % of the 1 MiB limit
+            # (996,295 bytes) and the door check's register lines took bugs.json over the 95 % line (gate 4061); the
+            # rotation moves on to v0.0.51, a release before the last (TRACKER-REGISTER-SIZE-36)
+            (ARCHIVE_DIR / 'bugs-v0.0.48-v0.0.51.json', 51))
 ARCHIVE_UP_TO = ARCHIVES[-1][1]   # fixed or closed bugs first found in v0.0.40 or earlier rotate into an archive
 # Archive files of earlier layouts: still read when present, emptied into ARCHIVES and removed by render.
 RETIRED_ARCHIVES = (ARCHIVE_DIR / 'bugs-v0.0.29-v0.0.33.json',)
@@ -667,7 +671,27 @@ def releases_of(b):
                                                                                 if x.isdigit()])
 
 
-def long_persisting(bugs, todo_text=None):
+DEFERRAL_TARGET_RE = re.compile(r'\bto v(\d+)\.(\d+)\.(\d+)\b')
+
+
+def _version_tuple(text):
+    m = re.match(r'^v?(\d+)\.(\d+)\.(\d+)', str(text or ''))
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
+def deferral_expired(b, version):
+    """The target of a maintainer deferral that no longer counts, or None. A deferral naming a version ("deferred ...
+    to v0.0.52") counts only while VERSION (devN/rcN suffix ignored) is older than that target; at or past it the
+    bug needs a new triage (REGISTER-DEFERRAL-EXPIRES-53). Without a named target, or without VERSION, it stands."""
+    now = _version_tuple(version)
+    m = DEFERRAL_TARGET_RE.search(str(b.get('deferred') or ''))
+    if now is None or not m:
+        return None
+    target = tuple(int(x) for x in m.groups())
+    return 'v%d.%d.%d' % target if now >= target else None
+
+
+def long_persisting(bugs, todo_text=None, version=None):
     """[(bug, reason or None)] of open bugs seen in LONG_PERSISTING releases or more, and of every open bug that came
     back after it was fixed or closed (a regression needs a reason of record at once: REGISTER-REGRESSION-HANDLER-52);
     the reason is why that is not a failure: waiting on a missing dependency, deferred by the maintainer, or on the
@@ -678,7 +702,7 @@ def long_persisting(bugs, todo_text=None):
             continue
         if b.get('waiting_on'):
             reason = b['waiting_on']
-        elif b.get('deferred'):
+        elif b.get('deferred') and not deferral_expired(b, version):
             reason = 'deferred by the maintainer, ' + b['deferred']
         elif todo_text is not None and re.search(r'(?<![A-Z0-9-])%s(?![A-Z0-9-])' % re.escape(b['id']), todo_text):
             reason = 'on the release TODO list'
@@ -1487,12 +1511,15 @@ def main(argv=None):
         # PERSISTING MUST MEAN SCHEDULED (the maintainer, 24 October 2026): BUILD-ENGINE-SOURCE-KEY-BROAD-36 was seen
         # in five releases and never repaired. Read only.
         todo = args.todo.read_text(encoding='utf-8') if args.todo else None
-        rows = long_persisting(bugs, todo)
+        vfile = ROOT / 'VERSION'
+        version = vfile.read_text(encoding='utf-8').strip() if vfile.is_file() else None
+        rows = long_persisting(bugs, todo, version)
         for b, reason in rows:
+            expired = deferral_expired(b, version) if reason is None else None
             print('%-44s %-8s %s releases (%s)%s: %s' % (
                 b['id'], b.get('severity') or '-', len(releases_of(b)), ', '.join(releases_of(b)),
                 ', REGRESSION: came back %s' % came_back(b) if b.get('regressions') else '',
-                reason or 'NOT SCHEDULED'))
+                reason or 'NOT SCHEDULED' + (' (deferral to %s expired: re-triage)' % expired if expired else '')))
         missing = [b['id'] for b, reason in rows if reason is None]
         print('%d open bugs seen in %d releases or more or come back, %d without a reason of record%s' % (
             len(rows), LONG_PERSISTING, len(missing), '' if todo is not None else ' (no --todo given)'),

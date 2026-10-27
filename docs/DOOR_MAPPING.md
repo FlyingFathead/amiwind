@@ -1,6 +1,6 @@
 # Original door mapping
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 The converter reads base DOOR records and their placed CELL references from the
 maintainer's Morrowind.esm. A door's model/name/script and open/close sound IDs belong
@@ -214,6 +214,42 @@ first a new game meets.
    room: no change while it is still.
 
 Original transition sound IDs of load doors are played by the door-audio catalogue (`id1/door-sounds.txt`).
+
+## The door check in every build (v0.0.53)
+
+Every exterior entrance of the original (1,102 load doors from an exterior cell into an interior) is checked by the
+image step of a whole-world build, door, then entrance, then interior, and the way back out:
+
+- the door audit (`tools/door_audit.py`): the frame or town that holds the door, whether its CHIM frame places the
+  door model, its row in that frame's door bank as the engine keeps it, its use box against the placed door, the room
+  it leads to, the arrival inside that room, the room's exit back to the right exterior, and the original lock (level
+  and key). It writes `door-audit.md`, `door-audit.json` and the per-door checklist `door-checklist.csv` beside the
+  image (private: made from your game data);
+- the door engine check (`tools/door_engine_check.py` with `tools/door_engine_check.c`): the engine's own door code
+  (`aw_scene.c` with the files the scene test links) compiled for the host and run over the image's door banks,
+  open-world directory and maps. A region frame's door is reached by a walk over a frame border from a neighbouring
+  frame (the streamed crossing of `chim crossing 1`), a town's door in its town; at the spot where the game puts a
+  player who walks out of that room, facing the door, the prompt must read `(Enter: E)`, the use key and a script's
+  Activate must each load the door's room, and in the room the exit must lead back out. It takes seconds for all
+  1,102 and writes `door-engine-check.md` and `door-engine-check.json`;
+- the wall in the way (the same check, region-frame doors): the CHIM world's own collision (`chim.collision`, the
+  frame's chunk terrain and the hulls of everything it places) gives where a player stands in front of the door
+  (straight out from its face, 12 units to either side of that line and on the way to the room's way-out arrival, at
+  the use reach and nearer, up to 80 units over the threshold, on a floor the player does not slide off; on and
+  beside a trapdoor), and the engine's wall trace from the eye to the door's middle,
+  upper and lower part. The engine refuses the use when a surface lies more than the doorway slack (`DOOR_USE_SLACK` in
+  `aw_scene.c`, 16 units) before the use box: the converted collision of an entrance may close the doorway a few units
+  in front of the door, which the original still opens. Town doors are not traced yet.
+
+The usable counts only go up: `config/door-check-baseline.json` holds the last counts (from v0.0.53-dev2: 1,102 usable
+after walking in, 1,102 both ways, 1,067 with the wall traced: the other 35, most of them Daedric shrines whose steps
+the player slides off, are DOOR-USE-COLLISION-FILLED-53, for v0.0.54), and a whole-world image that uses fewer stops the
+build. A build that uses more raises the numbers in that file. The same check with the v0.0.52 scene code over the same image finds 272: the
+other 830 region-frame entrances were dead after walking in (DOOR-BANK-STREAMED-FRAME-51).
+
+`dbg door roulette [SEED]` loads the player straight into a random room of the disk, at the room's own start, and
+prints its name, map id and cell number with the seed; the same seed loads the same room again (random tests of
+interior loading).
 
 Reference: [OpenMW, Doors and Connecting Cells](https://openmw.readthedocs.io/en/latest/reference/modding/doors-and-teleports.html)
 corroborates the interior-name/exterior-coordinate distinction. The owned master

@@ -469,19 +469,20 @@ class BugTrackerTest(unittest.TestCase):
         self.assertTrue(bug_register.archivable(base))
         self.assertTrue(bug_register.archivable(dict(base, state='closed')))
         self.assertFalse(bug_register.archivable(dict(base, state='open')))
-        # the rotation reaches v0.0.47 since the v0.0.48-rc1 build findings, 24 October 2026 (bugs-v0.0.43-v0.0.47.json);
+        # the rotation reaches v0.0.51 since the v0.0.53 door check, 26 October 2026 (bugs-v0.0.48-v0.0.51.json);
         # later series stay live
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.36')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.40')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.42')))
         self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.47')))
-        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.48')))
+        self.assertTrue(bug_register.archivable(dict(base, found_in='v0.0.51')))
+        self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.52')))
         self.assertFalse(bug_register.archivable(dict(base, found_in='v0.0.36'), up_to=35))
         self.assertFalse(bug_register.archivable(dict(base, found_in='unknown', id='AW-20261010-01')))
         two = [{'version': 'v0.0.33', 'at': '2026-10-09'}, {'version': 'v0.0.36-dev3', 'at': '2026-10-11'}]
         self.assertFalse(bug_register.archivable(dict(base, reports=two)), 'a persisting bug stays in bugs.json')
-        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-48', found_in='v0.0.48')])
-        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-48'])
+        live, old = bug_register.split([base, dict(base, id='BUILD-ROT-52', found_in='v0.0.52')])
+        self.assertEqual([b['id'] for b in live], ['BUILD-ROT-52'])
         self.assertEqual([b['id'] for b in old], ['BUILD-ROT-33'])
 
     def test_whitespace_baselines_get_the_named_limit(self):
@@ -738,6 +739,31 @@ class BugTrackerTest(unittest.TestCase):
         self.assertEqual(len(got), 10)
         self.assertEqual([g[0] for g in got[:2]], ['Entry 1, 9 October 2026', 'Entry 3, 9 October 2026'])
         self.assertEqual(got[0][1:], ('entry-1-9-october-2026', ['CHIM-A-33']))
+
+    def test_a_deferral_to_a_version_expires_with_it(self):
+        # REGISTER-DEFERRAL-EXPIRES-53: "deferred ... to v0.0.52" is no reason inside v0.0.52 or later
+        def late(identifier, deferred):
+            return {'id': identifier, 'title': identifier, 'state': 'open', 'deferred': deferred,
+                    'persists_in': ['v0.0.40', 'v0.0.45', 'v0.0.50']}
+        bugs = [late('NOW-01', '2026-10-20: deferred to v0.0.53, after the doors'),
+                late('PAST-01', '2026-10-20: deferred to v0.0.52, after the doors'),
+                late('NEXT-01', '2026-10-20: deferred to v0.0.54, after the doors'),
+                late('NONE-01', '2026-10-20: after the doors')]
+        for version in ('0.0.53-dev2', '0.0.53-rc1', '0.0.53', 'v0.0.53'):
+            rows = {b['id']: r for b, r in bug_register.long_persisting(bugs, None, version)}
+            self.assertIsNone(rows['NOW-01'], version)
+            self.assertIsNone(rows['PAST-01'], version)
+            self.assertIn('deferred by the maintainer', rows['NEXT-01'])
+            self.assertIn('deferred by the maintainer', rows['NONE-01'])
+        self.assertEqual(bug_register.deferral_expired(bugs[0], '0.0.53-dev1'), 'v0.0.53')
+        # an earlier version, or no version given, keeps the deferral
+        rows = {b['id']: r for b, r in bug_register.long_persisting(bugs, None, '0.0.52-dev3')}
+        self.assertIsNone(rows['PAST-01'])
+        self.assertIn('deferred by the maintainer', rows['NOW-01'])
+        self.assertTrue(all(r for _, r in bug_register.long_persisting(bugs)))
+        # a place on the release TODO list still counts
+        rows = {b['id']: r for b, r in bug_register.long_persisting(bugs, '- [ ] NOW-01 re-triage', '0.0.53')}
+        self.assertEqual(rows['NOW-01'], 'on the release TODO list')
 
     def test_frozen_trackers_are_marked(self):
         for p in FROZEN:

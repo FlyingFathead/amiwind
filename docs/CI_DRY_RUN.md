@@ -1,12 +1,47 @@
 # Asset-free compilation and boot image
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 The GitHub Actions workflow `.github/workflows/source-check.yml` runs on pushes,
-pull requests and manual dispatch. It uses an Ubuntu 24.04 runner and Python 3.12,
-installs public host/Python dependencies, checks the source allowlist, runs the
-synthetic tests (including host-compiled native harnesses), fetches the pinned
-Amiga SDK, compiles the engine/preflight program and builds a small boot-notice HDF.
+pull requests, tags, a weekly schedule and manual dispatch. It uses Ubuntu 24.04
+runners and Python 3.12, installs public host/Python dependencies, checks the
+source allowlist, runs the synthetic tests (including host-compiled native
+harnesses), fetches the pinned Amiga SDK, compiles the engine/preflight program
+and builds a small boot-notice HDF.
+
+From v0.0.53 the work is split into jobs that run side by side (before, one job
+did all of it in a row and outgrew its time limit):
+
+| Job | What it does |
+| --- | --- |
+| `tools` | Bootstraps every public tool into an empty directory (`tools/build.py --autoinstall --install-dependencies`) when anything the installer reads has changed, and keeps that directory in the Actions cache. Otherwise it restores the kept copy and checks it file by file. |
+| `source-checks` | The source allowlist, the NIF reader check and the setup plan. |
+| `tests` | The whole test suite, in parallel jobs (`tools/run_tests.py --shard I/N`). |
+| `dry-run` | After the tests pass: the engine compile, the boot-notice image and its package. |
+| `tools-from-nothing` | On tags, every Monday and on request: the bootstrap into an empty directory with no cache, then the dry-run image built with those fresh tools. |
+| `host-launcher-parity`, `docker-builder` | The host launcher checks on Linux and Windows, and the Linux container builder. |
+
+**The tools cache.** Its key (`python tools/ci_tools.py key`) is a hash of the
+installer's own code: the modules the setup imports, found from their import
+statements, which also hold the pinned versions and download lists of the SDK,
+the map tools, the QuakeC source, the Python packages and the host packages. The
+key also names the runner image and its Python version. Any change to one of
+these bootstraps again from nothing in that same run. A finished bootstrap
+writes a manifest of every file (SHA-256, size, executable bit, link target);
+each job that uses a restored copy checks it against that manifest before
+anything runs, then runs the same installer, which only adds host packages the
+runner lacks. `python tools/ci_tools.py inputs` lists the files the key covers.
+One import is left out on purpose: after building the reference QuakeC compiler,
+the installer test-compiles our QuakeC with it (`build_aga.check_quakec`); that
+checks the compiler and adds nothing to the tools, and the tests compile the
+same sources again.
+
+**The test shards.** `tools/run_tests.py --shard I/N` runs whole test modules,
+spread over the N shards by the recorded module times in
+`tests/module-timings.json`, longest first to the lightest shard. The split
+depends only on the commit, so all shards of one run agree on it, and the runner
+checks that every module is in exactly one shard before it starts.
+`--list --shard I/N` prints the tests of one shard.
 
 No Morrowind installation, game assets, Kickstart ROM, Workbench files or private
 recovery archives are inputs to this workflow. It does not run an emulator or

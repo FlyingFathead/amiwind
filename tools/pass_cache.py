@@ -108,7 +108,10 @@ def _source_digest(scripts, form=PASS_KEY_FORM):
         value, _, uncertain = index.digest(Path(script).resolve(), exclude)
         parts.append([str(Path(script).name), value, uncertain])
     if form == PASS_KEY_FORM:
-        _COVERED[tuple(scripts)] = _covered_lines(index, scripts, exclude)
+        from build_cache import STAGE_TOP_FORMAT
+        stage = SourceIndex(ROOT, top_format=STAGE_TOP_FORMAT)
+        stage._files = index.files            # the same checkout: its file hashes once
+        _COVERED[tuple(scripts)] = _covered_lines(stage, scripts, exclude)
     return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
 
 
@@ -118,30 +121,38 @@ def _source_digest(scripts, form=PASS_KEY_FORM):
 # baked with; it was reused after that code changed and installed actor models of the old tables (dev1-try11). On
 # its first hit in a process a cache appends these lines to the stage's trace: '@path<TAB>unit' for each function its
 # key reaches, '=path' for a file it keys whole (a data file, or every file when the reach is uncertain).
+# The lines are the stage key's view of that code (form 3, build_cache.SourceIndex.keyed_coverage: what a stage key
+# counts for code it hands to a cache key), not the cache key's own form 2: form 2 counts every class body as
+# import-time code, so its reach named functions no stage key counts, and the trace check refused every record of a
+# stage that had a hit (BUILD-STAGE-READS-UNFINGERPRINTED-48: chim, area, both room stages and character). The cache
+# key itself stays in form 2: it may count more than the stage key, never less.
 _COVERED = {}
 _NOTED = set()
 
 
 def _covered_lines(index, scripts, exclude=()):
-    lines = []
+    """The trace lines of SCRIPTS (paths, or (path, function)) as INDEX (stage form) keys them in a stage key."""
+    root = index.root.resolve()
+    keyed = []
     for script in scripts:
-        if isinstance(script, tuple):
-            python, data, uncertain, units = index.entry_units(Path(script[0]).resolve(), script[1])
-        else:
-            python, data, uncertain = index.closure(Path(script).resolve())
-            units = index.reached_units(script) or {}
-        if uncertain:
-            lines += ['=' + path for path in sorted(index.files) if path not in exclude]
+        path, function = script if isinstance(script, tuple) else (script, None)
+        try:
+            keyed.append((Path(path).resolve().relative_to(root).as_posix(), function))
+        except ValueError:     # code outside the checkout: no reach to name, so every file counts
+            return sorted('=' + path for path in index.files if path not in exclude)
+    python, data, uncertain, _, units = index.keyed_coverage(keyed)
+    if uncertain:
+        return sorted('=' + path for path in index.files if path not in exclude)
+    lines = []
+    for path in sorted(python | data):
+        if path in exclude:
             continue
-        for path in sorted(python | data):
-            if path in exclude:
-                continue
-            reached = units.get(path)
-            if path.endswith('.py') and path not in data and reached:
-                lines += ['@%s\t%s' % (path, unit) for unit in sorted(reached) if not unit.startswith('<')]
-                lines.append('@%s\t<module>' % path)
-            else:
-                lines.append('=' + path)
+        reached = units.get(path)
+        if path.endswith('.py') and path not in data and reached:
+            lines += ['@%s\t%s' % (path, unit) for unit in sorted(reached) if not unit.startswith('<')]
+            lines.append('@%s\t<module>' % path)
+        else:
+            lines.append('=' + path)
     return sorted(set(lines))
 
 

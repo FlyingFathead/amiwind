@@ -275,6 +275,8 @@ OPTIONS = {
     'prerendered': 'tooling', 'prerendered_stages': 'tooling', 'storage_pool': 'tooling', 'anim_kit': 'shipped default', 'miniwind_boot': 'mode',
     # v0.0.52: skeletal actors by default (--npc-anim-type 2); 1 = the baked kit, compiled in on purpose.
     'npc_anim_type': 'shipped default',
+    # v0.0.53: the Halloween scene's cast and the user's own soundtrack, MiniWind only (docs/HALLOWEEN.md)
+    'halloween': 'mode', 'custom_ost': 'mode',
     # CHIM-native towns (CHIM-LEGACY-CHAIN-33): on by default since v0.0.36 (CHIM-native areas); 'off' and --legacy-area
     # are RETIRED since CHIM v0.1.0 (tools/retired_flags.py, BUILD-LEGACY-CHAIN-DEFAULT-36); --override lets one through.
     'chim_native_towns': 'shipped default', 'chim_regions': 'shipped default', 'chim_regions_status': 'shipped default',
@@ -289,6 +291,8 @@ OPTIONS = {
     'file_aliases': 'shipped default', 'shared_skins': 'shipped default',
     # Modular NPCs (docs/MODULAR_NPCS.md): EXPERIMENTAL, whole by default
     'npc_models': 'mode', 'npc_parts_face_cap': 'tooling', 'npc_parts_policy': 'tooling', 'parts_cache': 'tooling', 'storage_pool_dir': 'tooling', 'stair_walk': 'check',
+    # The free space a build needs (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52): machine settings
+    'min_free_gib': 'tooling', 'disk_margin_percent': 'tooling',
 }
 
 

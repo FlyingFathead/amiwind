@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE_IMAGE = 'ubuntu@sha256:a853f94d226358a79c740cfc7bce0c289748f3fe3488d921d038ccd752c61b60'
 IMAGE = 'amiwind-builder:local'
 # `check` runs these short test modules in the image (its tools, paths and builder entry points); the full
-# suite runs once per revision in the source-and-dry-run CI job, or here with --full-suite.
+# suite runs once per revision in the CI tests jobs (one suite shard each), or here with --full-suite.
 SMOKE_TESTS = ('test_build_docker', 'test_build_host', 'test_build', 'test_release',
                'test_collision_bsp', 'test_engine_hulls')
 DOCKERFILE = f'''FROM {BASE_IMAGE}
@@ -143,6 +143,17 @@ def main(argv=None):
         receipt['source_sha256'] = prepare_context(context)
         if args.action != 'context':
             docker = docker_command(args)
+            # Free space first, before the image build (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52): the image and,
+            # for a builder image (build), the full build after it, where Docker keeps its storage
+            import disk_need
+            root = disk_need.docker_root(docker)
+            problems, need, free = disk_need.docker_problems(root, build=args.action == 'build')
+            receipt['disk_need'] = {'docker_root': root, 'need_bytes': need, 'free_bytes': free}
+            print(f'Free space: {disk_need.gib(free)} free, {disk_need.gib(need)} needed at {root}' if free is not None
+                  else f'Free space: Docker storage not visible from this host ({root}); tools/run_docker.py checks '
+                       f'the build volume before the game data copy', flush=True)
+            if problems:
+                raise ValueError(problems[0])
             logged(docker + ['build', '--progress=plain', '-t', args.image, str(context)],
                    output / 'image-build.log')
             if args.action == 'check':

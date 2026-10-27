@@ -12,7 +12,7 @@
 | Persists in | v0.0.52-dev1 (last seen) |
 | Severity | critical: Regressed in v0.0.52-dev1 (was high): Hold-level class (a check that runs late): a seconds-long check ran after a 69-minute walk in a 1h48m stage |
 | Family | CHIM world streamer (`chim-streamer`) |
-| Deferred by the maintainer | 2026-10-26: deferred by the maintainer to v0.0.53 (the v0.0.52 release triage) |
+| Deferred by the maintainer | 2026-10-27: deferred by the maintainer to v0.0.54 (the v0.0.53 release triage) |
 | Came back (regression) | in v0.0.52-dev1 (fixed in v0.0.36 before) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.36-dev3 |

@@ -70,8 +70,10 @@ const aw_skel_table_t *AW_SkelTableFor (const char *name)
 		{
 			char file[AW_SKEL_TABLE_NAME];
 			const aw_skel_table_t *of;
-			int n = (int)(bar - name);
-			if (n <= 0 || n >= AW_SKEL_TABLE_NAME || !bar[1] || strlen (bar + 1) + 2 > AW_SKEL_PREFIX)
+			int n = (int)(bar - name), k;
+			/* "progs/humanoid.awsk|d|f": several prefixes in order (DANCER-OWN-ANIM-IGNORED-53), "d:f:" */
+			if (n <= 0 || n >= AW_SKEL_TABLE_NAME || !bar[1] || strstr (bar, "||") || bar[strlen (bar) - 1] == '|' ||
+				strlen (bar + 1) + 2 > AW_SKEL_PREFIX || strchr (bar, ':'))
 			{
 				tables[i].failed = 1;
 				Con_Printf ("Animation table %s: not a table view\n", name);
@@ -85,8 +87,21 @@ const aw_skel_table_t *AW_SkelTableFor (const char *name)
 				return NULL;
 			}
 			tables[i].table = *of;
-			strcpy (tables[i].table.prefix, bar + 1);
-			strcat (tables[i].table.prefix, ":");
+			tables[i].table.prefix[0] = 0;
+			for (k=1 ; ; k++)
+			{
+				if (!bar[k] || bar[k] == '|')
+				{
+					strcat (tables[i].table.prefix, ":");
+					if (!bar[k])
+						break;
+					continue;
+				}
+				{
+					char c[2] = {bar[k], 0};
+					strcat (tables[i].table.prefix, c);
+				}
+			}
 			return &tables[i].table;
 		}
 	}

@@ -24,6 +24,9 @@ static cvar_t photo_noclip={"aw_photomode_noclip","1",true};
 /* 0 (default): first-person hands, weapon and torch hidden (Quake's
  * r_drawviewmodel). The torch's eye light is not part of the model: it stays. */
 static cvar_t photo_hands={"aw_photomode_hands","0",true};
+/* 1 (default): photo mode's own notice box and hints; 0: none of them (saved; dbg photomode ui; the Halloween scene
+ * turns them off while it runs). */
+static cvar_t photo_ui={"aw_photomode_ui","1",true};
 /* Settings photo mode switches off on entry; restored as text on exit. */
 static const char *const saved_names[]={"crosshair","aw_fog","_aw_debug_all","_aw_debug_coords",
     "aw_ui_hud","aw_compass","aw_ui_frame","r_drawviewmodel","aw_noclipwobble"};
@@ -54,7 +57,7 @@ static int toggle_word(const char *s,int *on) {
     if(!Q_strcasecmp((char *)s,"off") || !Q_strcasecmp((char *)s,"false") || !strcmp(s,"0")){*on=0;return 1;}
     return 0;
 }
-static void notice(const char *text,float seconds){pending=text;pending_seconds=seconds;}
+static void notice(const char *text,float seconds){if(!photo_ui.value)return;pending=text;pending_seconds=seconds;}
 /* Gameplay only: the box's clock runs while the console is open. */
 static void show(const char *text,float seconds) {
     AW_UISubtitle("",text,seconds);shown=text;shown_until=realtime+seconds;scr_copyeverything=1;
@@ -86,7 +89,7 @@ static int enter(void) {
         p->v.movetype=MOVETYPE_NOCLIP;noclip_anglehack=true;placed=1;
     }
     active=1;refresh();notice(NOTICE,4);
-    Con_Printf(REMINDER);
+    if(photo_ui.value)Con_Printf(REMINDER);
     return 1;
 }
 /* Put the player back where photo mode started: same map, exact pose; after a
@@ -134,6 +137,12 @@ int AW_PhotoModeSet(int on) {
     leave(1);notice("Photo mode off",1.5f);Con_Printf("Photo mode off.\n");
     return 1;
 }
+/* Photo mode without its notice box (dbg halloween: nothing but the greeting in the middle of the screen). */
+int AW_PhotoModeSetQuiet(int on) {
+    if(on){int r=active?1:enter();pending=NULL;return r;}
+    leave(1);
+    return 1;
+}
 /* Ends photo mode before config.cfg is written, so it keeps the player's values. */
 void AW_PhotoConfigRestore(void){leave(0);}
 /* Gameplay draws only: a notice issued from the console starts when it closes. */
@@ -141,7 +150,7 @@ void AW_PhotoDraw(void) {
     if(!pending || key_dest!=key_game)return;
     show(pending,pending_seconds);pending=NULL;
 }
-void AW_PhotoConsoleReminder(void){if(AW_PhotoModeActive())Con_Printf(REMINDER);}
+void AW_PhotoConsoleReminder(void){if(AW_PhotoModeActive() && photo_ui.value)Con_Printf(REMINDER);}
 /* Ctrl+F / Ctrl+H, photo mode only; outside it Ctrl and F keep their bindings. */
 int AW_PhotoKey(int key) {
     int on;
@@ -283,6 +292,7 @@ static void sensitivity_command(void) {
 }
 void AW_PhotoInit(void) {
     Cvar_RegisterVariable(&photo_nofog);Cvar_RegisterVariable(&photo_noclip);Cvar_RegisterVariable(&photo_hands);
+    Cvar_RegisterVariable(&photo_ui);
     Cvar_RegisterVariable(&crosshair_colour);Cvar_RegisterVariable(&crosshair_shape);
     Cmd_AddCommand("aw_photomode",photo_command);
     Cmd_AddCommand("aw_crosshair",crosshair_command);

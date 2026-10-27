@@ -40,7 +40,10 @@ def _check(before):
 # workspaces, so the build preflight's free-space minimum (tools/build_preflight.py, fatal for release
 # versions) must not depend on the host's disk; its own tests pass explicit minima. Origin: gate 1335, the
 # first suite with VERSION 0.0.35 (a final version) stopped seven entry-point tests on 1.9 GiB free in /tmp.
-SUITE_ENV = {'AMIWIND_MIN_FREE_GIB': '0'}
+# The free space a build needs (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52) is the last known good build's figure,
+# far more than a test's temporary workspace has room for on a small runner: no checks and no figure in the suite
+# (AMIWIND_DISK_WATCH=off); tests/test_disk_need.py tests them with the setting removed.
+SUITE_ENV = {'AMIWIND_MIN_FREE_GIB': '0', 'AMIWIND_DISK_WATCH': 'off'}
 
 
 def install():

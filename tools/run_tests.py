@@ -14,6 +14,12 @@ record. A module whose recorded time exceeds --split-above and that has no
 module- or class-level fixtures is split into shards of its own tests, each
 shard again in a fresh process, so one long module does not set the wall time.
 
+--shard I/N runs one suite shard of N for parallel CI jobs: whole modules,
+spread over the shards by the same estimates, longest first to the lightest
+shard. The split is a pure function of the commit, so the N jobs of one CI run
+agree on it, and every discovered module lands in exactly one shard (checked
+before anything runs).
+
 One merged report follows: tests run, failures, errors, skips (with names and
 reasons) and per-module timings. The exit status is nonzero on any failure,
 error, unexpected success, crashed or timed-out module, discovery mismatch, or
@@ -247,6 +253,55 @@ def load_timings(path):
     return {str(k): float(v) for k, v in modules.items() if isinstance(v, (int, float))}
 
 
+def estimates(modules, timings):
+    """{module: estimated seconds}: the recorded time, else its test count at the mean recorded rate."""
+    known = [(timings[m], len(ids)) for m, ids in modules.items() if m in timings and ids]
+    rate = (sum(s for s, _ in known) / max(1, sum(n for _, n in known))) if known else 0.1
+    return {module: timings.get(module, len(ids) * rate) for module, ids in modules.items()}
+
+
+def parse_shard(text):
+    """'I/N' (1-based, 1 <= I <= N) -> (I, N)."""
+    index, slash, count = str(text).partition('/')
+    if not (slash and index.isdigit() and count.isdigit()) or not 1 <= int(index) <= int(count):
+        raise ValueError('a shard is I/N with 1 <= I <= N, e.g. 2/6: %r' % (text,))
+    return int(index), int(count)
+
+
+def shard_modules(modules, timings, count):
+    """Split the discovered modules into ``count`` disjoint shards of near-equal estimated time.
+
+    Whole modules only (a module never spans two shards, so its fixtures and its
+    discovery check stay as they are). Longest first, each module to the shard
+    with the least estimated time so far (ties: the lowest shard). The result
+    depends only on the module names, their test counts and the timings file,
+    all part of the commit, so every shard of one run computes the same split.
+    Returns ``count`` lists of module names, each in discovery order.
+    """
+    if count < 1:
+        raise ValueError('the shard count must be at least 1')
+    estimate = estimates(modules, timings)
+    load, members = [0.0] * count, [set() for _ in range(count)]
+    for module in sorted(modules, key=lambda m: (-estimate[m], m)):
+        target = min(range(count), key=lambda i: (load[i], i))
+        load[target] += estimate[module]
+        members[target].add(module)
+    shards = [[m for m in modules if m in chosen] for chosen in members]
+    check_shards(modules, shards)
+    return shards
+
+
+def check_shards(modules, shards):
+    """Every discovered module in exactly one shard, and nothing else; RuntimeError otherwise."""
+    seen = collections.Counter(m for shard in shards for m in shard)
+    twice = sorted(m for m, n in seen.items() if n > 1)
+    missing = sorted(set(modules) - set(seen))
+    unknown = sorted(set(seen) - set(modules))
+    if twice or missing or unknown:
+        raise RuntimeError('shards do not cover the suite exactly once: in two shards %s; in none %s; '
+                           'not discovered %s' % (twice, missing, unknown))
+
+
 def plan_tasks(modules, splittable, timings, jobs, split_above):
     """Longest-first list of (module, shard, shards, ids or None, estimate).
 
@@ -254,13 +309,12 @@ def plan_tasks(modules, splittable, timings, jobs, split_above):
     recorded rate. Only recorded, fixture-free modules longer than split_above
     seconds are split, into at most ``jobs`` shards of round-robin test IDs.
     """
-    known = [(timings[m], len(ids)) for m, ids in modules.items() if m in timings and ids]
-    rate = (sum(s for s, _ in known) / max(1, sum(n for _, n in known))) if known else 0.1
+    estimate_of = estimates(modules, timings)
     tasks = []
     for module, ids in modules.items():
         if not ids:
             continue  # Nothing to run; a load failure is itself a (synthetic) test.
-        estimate = timings.get(module, len(ids) * rate)
+        estimate = estimate_of[module]
         shards = 1
         if split_above and module in timings and module in splittable:
             shards = max(1, min(len(ids), jobs, math.ceil(estimate / split_above)))
@@ -425,11 +479,24 @@ def print_report(report, outcomes, verbose, stream=None):
     (stream or sys.stdout).flush()
 
 
+def select_shard(modules, timings, shard):
+    """The discovered modules of suite shard (I, N), in discovery order, and the shard record for the report."""
+    index, count = shard
+    shards = shard_modules(modules, timings, count)
+    estimate = estimates(modules, timings)
+    chosen = shards[index - 1]
+    record = dict(index=index, count=count, modules=chosen,
+                  estimated_seconds=round(sum(estimate[m] for m in chosen), 1),
+                  estimated_seconds_all=[round(sum(estimate[m] for m in s), 1) for s in shards])
+    return collections.OrderedDict((m, modules[m]) for m in chosen), record
+
+
 def run(start_dir='tests', pattern=DEFAULT_PATTERN, jobs=1, timings=None, split_above=0,
-        module_timeout=0, allowlist=None, progress=None):
+        module_timeout=0, allowlist=None, progress=None, shard=None):
     """Discover, run in parallel and return (report, outcomes).
 
     ``timings`` is a path; None reads the timings file in start_dir when present.
+    ``shard`` is (I, N): run only suite shard I of N (shard_modules); None runs everything.
     """
     if jobs < 1:
         raise ValueError('jobs must be at least 1')
@@ -438,7 +505,15 @@ def run(start_dir='tests', pattern=DEFAULT_PATTERN, jobs=1, timings=None, split_
     modules, splittable = discover_modules(start_dir, pattern)
     if timings is None:
         timings = os.path.join(start_dir, TIMINGS_NAME)
-    tasks = plan_tasks(modules, splittable, load_timings(timings), jobs, split_above)
+    recorded = load_timings(timings)
+    shard_record = None
+    if shard is not None:
+        modules, shard_record = select_shard(modules, recorded, shard)
+        if allow is not None:
+            # A skip allowlist names tests of the whole suite: in one shard only that shard's entries apply.
+            ids = {i for module_ids in modules.values() for i in module_ids}
+            allow = {test: reason for test, reason in allow.items() if test in ids}
+    tasks = plan_tasks(modules, splittable, recorded, jobs, split_above)
     python_flags = ['-B'] if sys.dont_write_bytecode else []
     outcomes = []
     scratch = tempfile.mkdtemp(prefix='amiwind-tests-')
@@ -456,6 +531,8 @@ def run(start_dir='tests', pattern=DEFAULT_PATTERN, jobs=1, timings=None, split_
     report.update(jobs=jobs, seconds=round(time.monotonic() - began, 3), modules=len(modules),
                   discovered=sum(len(ids) for ids in modules.values()), processes=len(tasks),
                   split={t[0]: t[2] for t in tasks if t[2] > 1})
+    if shard_record is not None:
+        report['shard'] = shard_record
     return report, outcomes
 
 
@@ -503,6 +580,9 @@ def main(argv=None):
     parser.add_argument('--module-timeout', type=float, default=0, metavar='SECONDS',
                         help='Kill a worker process after this long (default: no limit)')
     parser.add_argument('--list', action='store_true', help='Print discovered test IDs and exit')
+    parser.add_argument('--shard', metavar='I/N',
+                        help='Run only suite shard I of N: whole modules, balanced by the recorded timings; '
+                             'shards 1..N together run every module exactly once (with --list: list its IDs)')
     sys.path.insert(1, HERE)
     try:
         from build_jobs import add_jobs, resolve_jobs
@@ -512,8 +592,18 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.split_above < 0:
         parser.error('--split-above must not be negative')
+    shard = None
+    if args.shard is not None:
+        try:
+            shard = parse_shard(args.shard)
+        except ValueError as exc:
+            parser.error(str(exc))
     if args.list:
-        for ids in discover(args.start_dir, args.pattern).values():
+        modules = discover(args.start_dir, args.pattern)
+        if shard is not None:
+            timings = args.timings or os.path.join(args.start_dir, TIMINGS_NAME)
+            modules = select_shard(modules, load_timings(timings), shard)[0]
+        for ids in modules.values():
             for test in ids:
                 print(test)
         return 0
@@ -526,8 +616,14 @@ def main(argv=None):
               flush=True)
 
     report, outcomes = run(args.start_dir, args.pattern, jobs, args.timings, args.split_above,
-                           args.module_timeout, args.skip_allowlist, progress)
+                           args.module_timeout, args.skip_allowlist, progress, shard)
     print_report(report, outcomes, args.verbose)
+    if shard is not None:
+        record = report['shard']
+        print('Suite shard %d/%d: %d of the discovered modules, %d tests; estimated %.1f s of the shards\' %s s '
+              '(every module in exactly one shard: checked)' % (
+                  record['index'], record['count'], len(record['modules']), report['discovered'],
+                  record['estimated_seconds'], record['estimated_seconds_all']))
     if args.json:
         args.json.write_text(json.dumps(report, indent=1) + '\n', encoding='utf-8', newline='\n')
     if args.record_timings:

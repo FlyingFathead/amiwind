@@ -1051,6 +1051,42 @@
       "to": 2,
       "source": "tools/build.py, tools/npc_anim.py, tools/skeletal_actor.py (NPC-BAKED-WHOLE-DUPLICATION-33)",
       "note": "the maintainer, 2026-10-25: skeletons by default; whoever wants the prebaked frames compiles the game with them. 2 = every humanoid resident and actor-library model is one rest frame on the shared animation table of its skeleton, the kit's layout on the table's frames, no mover models and no baked frames; 1 = the baked kit as before (a standing model and a mover per actor)"
+    },
+    {
+      "version": "0.0.53-dev1",
+      "option": "min_free_gib",
+      "flag": "--min-free-gib",
+      "change": "added",
+      "to": 35,
+      "source": "config/build-defaults.json, tools/disk_need.py (BUILD-DISK-NEED-UNKNOWN-52)",
+      "note": "the least free space a build asks for on its workspace's file system, GiB (AMIWIND_MIN_FREE_GIB, 35 since v0.0.52); a machine setting, in no stage key and no recipe"
+    },
+    {
+      "version": "0.0.53-dev1",
+      "option": "disk_margin_percent",
+      "flag": "--disk-margin-percent",
+      "change": "added",
+      "to": 30,
+      "source": "config/build-defaults.json, tools/disk_need.py (BUILD-DISK-NEED-UNKNOWN-52)",
+      "note": "the margin over the last known good build's disk figure (config/disk-footprint.json), percent; a machine setting, in no stage key and no recipe"
+    },
+    {
+      "version": "0.0.53-dev2",
+      "option": "halloween",
+      "flag": "--halloween",
+      "change": "added",
+      "to": false,
+      "source": "tools/halloween_cast.py (HALLOWEEN-SCENE-53)",
+      "note": "MiniWind only: the Halloween scene's cast in the image (dbg halloween; the preset --miniwind-halloween sets it)"
+    },
+    {
+      "version": "0.0.53-dev2",
+      "option": "custom_ost",
+      "flag": "--custom-ost",
+      "change": "added",
+      "to": null,
+      "source": "tools/halloween_cast.py (CUSTOM-OST-SLOT-53, HALLOWEEN-SCENE-53)",
+      "note": "the custom OST slot (alias --halloween-soundtrack; machine setting AMIWIND_CUSTOM_OST): the user's own audio or video file, its audio converted into that user's image only; empty without it"
     }
   ],
   "current": {
@@ -1067,8 +1103,10 @@
       "chim_stream_statics": true,
       "chim_texture_effects": [],
       "disk_layout": "compact",
+      "disk_margin_percent": 30,
       "follow_original_stair_rules": true,
       "lava": "quake",
+      "min_free_gib": 35,
       "model_hull": "chain",
       "npc_face_lod": "all",
       "npc_head_detail": "auto",
@@ -1126,6 +1164,7 @@
       "collision_source": null,
       "collision_underside": null,
       "coord_range": "wide",
+      "custom_ost": null,
       "death_retry": null,
       "direct_to_game_map": null,
       "disk_layout": null,
@@ -1141,6 +1180,7 @@
       "file_aliases": "on",
       "follow_original_stair_rules": true,
       "game_data_policy": "warn",
+      "halloween": false,
       "hands": "3d",
       "harvest_interiors": "on",
       "heap_mb": null,

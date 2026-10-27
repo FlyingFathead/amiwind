@@ -76,6 +76,7 @@ static void every_entry_translates(void){
   /* dbg fog rule / dbg cut groups print aw_cull with no argument (switch bits) */
   snprintf(expect,sizeof expect,"%s%s\n",handler,
        !strcmp(bar1+1,"characterchange")?" appearance":!strcmp(bar1+1,"inventory grant")?" grant":
+       !strcmp(bar1+1,"door roulette")?" roulette":
        (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
   if(AW_DebugTranslate(argc,argv,output,sizeof(output))!=1 || strcmp(output,expect)){
    printf("catalogue entry does not reach its handler: dbg %s -> %s (got %s)\n",bar1+1,handler,output);assert(0);
@@ -382,6 +383,13 @@ int main(int count,char **values){
   assert(AW_DebugTranslate(3,all,output,sizeof(output))==1 && !strcmp(output,"aw_quickchar all\n"));
   assert(AW_DebugTranslate(5,grant,output,sizeof(output))==1 && !strcmp(output,"aw_inventory grant \"steel longsword\" 1\n"));
   grant[3]="steel;quit";assert(!AW_DebugTranslate(5,grant,output,sizeof(output)));
+  { /* dbg door roulette [SEED]: the teleport command's roulette, no resident command of its own; plain dbg door
+     * stays the hinged door */
+   char *roulette[]={"dbg","door","roulette","1234"},*door[]={"dbg","door","status"};
+   assert(AW_DebugTranslate(4,roulette,output,sizeof(output))==1 && !strcmp(output,"aw_teleport roulette 1234\n"));
+   assert(AW_DebugTranslate(3,roulette,output,sizeof(output))==1 && !strcmp(output,"aw_teleport roulette\n"));
+   assert(AW_DebugTranslate(3,door,output,sizeof(output))==1 && !strcmp(output,"aw_hinged_door status\n"));
+  }
   grant[3]="steel\"quit";assert(!AW_DebugTranslate(5,grant,output,sizeof(output)));
  }
  i=catalogue_opens;

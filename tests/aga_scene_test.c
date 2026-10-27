@@ -4,6 +4,7 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_region.h"
+#include "aw_world.h"
 #include "chim/chim.h"
 #include "aw_harvest_runtime.h"
 aw_character_t aw_character;
@@ -120,6 +121,19 @@ static const char *balmora_frame(const char *town){return strcmp(town,"balmora")
 void AW_UISubtitle(const char *name,const char *text,double duration){strcpy(notice,text);}
 void AW_UIPickupNotice(const char *text,double duration){AW_UISubtitle("",text,duration);}
 void Cvar_RegisterVariable(cvar_t *c){if(!strcmp(c->name,"aw_target_names"))names_option=c;else demo_option=c;c->value=atof(c->string);}
+/* dbg door roulette: the rooms this fixture's disk holds (bmcaius, census; 2 also mi5b8154939f7aa without a start) */
+static int roulette_fixture;
+/* dbg door roulette [SEED] as the console routes it (aw_console.c): aw_teleport roulette [SEED]; the test sets
+ * command_args[1..] as the roulette's own arguments */
+static void roulette(void){
+ char *saved[8];int n=command_argc,i;
+ for(i=0;i<8;i++)saved[i]=command_args[i];
+ command_args[0]="aw_teleport";command_args[1]="roulette";
+ for(i=1;i<n && i+1<8;i++)command_args[i+1]=saved[i];
+ command_argc=n+1;teleport();
+ for(i=0;i<8;i++)command_args[i]=saved[i];
+ command_argc=n;
+}
 void Cmd_AddCommand(char *name,void(*fn)(void)){if(!strcmp(name,"aw_demo_start"))start_demo=fn;else if(!strcmp(name,"aw_teleport"))teleport=fn;else if(!strcmp(name,"aw_scene"))scene=fn;else if(!strcmp(name,"aw_shroompicker"))shroompicker=fn;else if(!strcmp(name,"aw_quick_start"))quick=fn;}
 int Cmd_Argc(void){return command_argc;}
 char *Cmd_Argv(int i){return i<command_argc?command_args[i]:"";}
@@ -154,6 +168,27 @@ static int room_map(const char *name,FILE **f){
  *f=tmpfile();assert(*f);fwrite(h,1,sizeof(h),*f);fputs(text,*f);rewind(*f);return (int)(124+n);
 }
 int COM_FOpenFile(char *name,FILE **f){
+#ifdef AW_DOOR_ENGINE_CHECK
+ /* tools/door_engine_check.c: the files of a built image instead of this fixture's (DOOR-ENTRANCE-AUDIT-51) */
+ return door_check_open(name,f);
+#endif
+ if(roulette_fixture){
+  /* room maps with a worldspawn and a start (BSP29 header, entity lump), the only maps on this disk */
+  const char *text=!strcmp(name,"maps/bmcaius.bsp")?
+   "{\n\"classname\" \"worldspawn\"\n\"message\" \"Caius Cosades' House\"\n\"_aw_cell_int\" \"187\"\n"
+   "\"_aw_cell_id\" \"Balmora, Caius Cosades' House\"\n}\n"
+   "{\n\"classname\" \"info_player_start\"\n\"origin\" \"40.5 -57.25 64.875\"\n\"angle\" \"-90\"\n}\n":
+   !strcmp(name,"maps/census.bsp")?
+   "{\n\"classname\" \"worldspawn\"\n\"message\" \"Census and Excise Office\"\n}\n"
+   "{\n\"classname\" \"info_player_start\"\n\"origin\" \"12 34 77\"\n}\n":
+   roulette_fixture==2 && !strcmp(name,"maps/mi5b8154939f7aa.bsp")?"{\n\"classname\" \"worldspawn\"\n}\n":NULL;
+  unsigned char h[124];long n;
+  if(!strncmp(name,"maps/",5)){
+   if(!text){*f=NULL;return -1;}
+   n=(long)strlen(text);memset(h,0,sizeof(h));h[0]=29;h[4]=124;h[8]=(unsigned char)n;h[9]=(unsigned char)(n>>8);
+   *f=tmpfile();assert(*f);fwrite(h,1,sizeof(h),*f);fputs(text,*f);rewind(*f);return (int)(124+n);
+  }
+ }
  if(room_maps && census_marked && !strcmp(name,"maps/census.chim"))return room_map("maps/bigroom.chim",f);
  if(room_maps &&(!strcmp(name,"maps/bigroom.chim") || !strcmp(name,"maps/smallroom.chim") ||
                   !strcmp(name,"maps/bigframe.chim") || !strcmp(name,"maps/smallframe.chim")))return room_map(name,f);
@@ -265,6 +300,13 @@ static void recover_prime(vec3_t v){recover_primes++;VectorCopy(v,recover_last);
 qboolean AW_PlacePlayer(edict_t *p,vec3_t v){recover_legacy++;return false;}
 void SV_LinkEdict(edict_t *p,qboolean touch){}
 static int all_solid,water_feet,calls_mark;
+/* The door wall trace (MOVE_NOMONSTERS): its ends, to see which map's coordinates it ran in. */
+static int door_traces;static vec3_t door_trace_from,door_trace_to;
+/* DOOR-USE-BLOCKED-53: a surface this far before the door's use box on the wall trace (the doorway it is set in) */
+static float door_wall;
+/* A streamed crossing (type 1): CHIM moved its window, the running map stays (aw_chim_world.c's hook). */
+static int stream_crossings;
+static int stream_cross_hook(const float *origin,int *cx,int *cy){(void)origin;*cx=-2;*cy=-9;stream_crossings++;return 1;}
 int SV_PointContents(vec3_t p){return water_feet?CONTENTS_WATER:CONTENTS_EMPTY;}
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
@@ -272,7 +314,9 @@ trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  if(travel_trace){t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(target_trace){assert(type==MOVE_NORMAL);assert(fabs((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2])-72*72)<.1);t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(harvest_fixture && occluded){t.fraction=.1f;return t;}
- if(type==MOVE_NOMONSTERS){if(occluded)t.fraction=.3f;return t;}
+ if(type==MOVE_NOMONSTERS){door_traces++;VectorCopy(a,door_trace_from);VectorCopy(b,door_trace_to);if(occluded)t.fraction=.3f;
+  else if(door_wall>0){vec3_t d;VectorSubtract(b,a,d);t.fraction=1-door_wall/Length(d);}
+  return t;}
  if(narrow_room){
   if(a[2]>88 || a[2]<66){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
   if(b[2]<66){t.fraction=(a[2]-66)/(a[2]-b[2]);t.endpos[2]=66;t.plane.normal[2]=1;}
@@ -291,8 +335,11 @@ int main(void){
  cl.viewangles[1]=0;assert(!AW_SceneUse());cl.viewangles[1]=90;
  p.v.origin[1]=-100;assert(!AW_SceneUse());p.v.origin[1]=0;
  occluded=1;assert(!AW_SceneUse());occluded=0;
+ /* DOOR-USE-BLOCKED-53: the doorway's own collision 8 units before the door still lets the use through (the Daedric
+  * shrines, the fort and ship doors); a wall 24 units before it does not */
+ door_wall=24;assert(!AW_SceneUse());door_wall=8;
  door_duration=.4f;realtime=10;
- assert(AW_SceneUse());assert(!queued[0] && !clear_buttons && audio_open==1);
+ assert(AW_SceneUse());assert(!queued[0] && !clear_buttons && audio_open==1);door_wall=0;
  assert(AW_SceneUse());assert(audio_open==1); /* held use during opening */
  realtime=10.39;AW_SceneTick();assert(!queued[0]);
  realtime=10.41;AW_SceneTick();assert(!strcmp(queued,"map seyda\n") && clear_buttons==1);
@@ -624,6 +671,50 @@ int main(void){
   assert(p.v.origin[0]==12 && p.v.origin[1]==34);
   assert(clear_buttons==before+2 && scene_voice_begins==begins);section_doors=0;
  }
+ /* DOOR-BANK-STREAMED-FRAME-51: after a streamed crossing (type 1) the running map stays seyda while the player
+  * stands in vf0000. The doors are the logical frame's (vf0000's table, not seyda's), picked in vf0000's coordinates
+  * (the eye shifted by the crossing's offset), the wall trace runs from the eye to the hit shifted back into the
+  * running map, and a timed door opens because its ready check asks the same frame. Before the fix the running
+  * map's table was read with unshifted coordinates: 830 of 1,102 exterior entrances were dead after walking in. */
+ {
+  extern int (*aw_chim_cross)(const float *origin,int *cx,int *cy);
+  float arrival[3],offset[3];char target_map[32];int k;
+  section_doors=1;door_duration=0;occluded=target_trace=travel_trace=0;
+  AW_SceneCancelTransition();CL_ClearState();strcpy(sv.name,"seyda");AW_SceneSpawn(&p);finish_signon(&p);
+  memset(p.v.origin,0,sizeof(p.v.origin));p.v.origin[1]=300;p.v.movetype=MOVETYPE_WALK;p.v.health=100;
+  assert(AW_RegionSelect("seyda",p.v.origin,0));AW_RegionWorldModel("seyda",0);
+  p.v.origin[0]=2200;
+  assert(AW_WorldDestination("seyda",p.v.origin,target_map,arrival) && !strcmp(target_map,"vf0000"));
+  aw_chim_cross=stream_cross_hook;cls.state=ca_connected;cls.signon=SIGNONS;key_dest=key_game;
+  /* a use with no door in reach, before the crossing: seyda's table is the one read last */
+  queued[0]=0;assert(!AW_SceneUse() && !queued[0]);
+  queued[0]=0;AW_SceneTick();
+  assert(stream_crossings==1 && !queued[0] && !strcmp(sv.name,"seyda") && !strcmp(AW_SceneName(),"vf0000"));
+  /* A script's Activate on a load door (aw_mwhost.c object_activate) with no pick since the crossing: vf0000's
+   * table, read for it, and only vf0000's rows. Before the fix it looped over the table read last (seyda's): its
+   * Registration entrance (113893) opened from vf0000 and vf0000's own mine entrance (222000) was no door. */
+  door_duration=.4f;realtime=300;audio_open=0;
+  assert(!AW_SceneActivate(113893) && audio_open==0 && !queued[0]);
+  assert(AW_SceneActivate(222000) && audio_open==1 && !queued[0]);
+  AW_SceneCancelTransition();audio_open=0;   /* the timed door's ready check is the pick's below */
+  for(k=0;k<3;k++)offset[k]=p.v.origin[k]-arrival[k];
+  assert(offset[0]!=0);   /* the frames' coordinates differ: an unshifted pick misses */
+  /* At vf0000's (0,0,0), facing its mine entrance (y 35..45, z 25..35) from 35 units away. */
+  VectorCopy(offset,p.v.origin);p.v.view_ofs[2]=30;cl.viewangles[0]=0;cl.viewangles[1]=90;
+  door_traces=0;door_duration=.4f;realtime=400;audio_open=0;
+  assert(AW_SceneUse() && !queued[0] && audio_open==1);
+  assert(door_traces>0);
+  for(k=0;k<3;k++)assert(fabs(door_trace_from[k]-(p.v.origin[k]+p.v.view_ofs[k]))<.01);   /* the running map's eye */
+  assert(fabs(door_trace_to[1]-(offset[1]+35))<.01 && fabs(door_trace_to[0]-offset[0])<.01);   /* hit, shifted back */
+  assert(door_trace_to[2]>=offset[2]+25 && door_trace_to[2]<=offset[2]+35);
+  realtime=401;AW_SceneTick();assert(!strcmp(queued,"map mi5b8154939f7aa\n"));   /* the same frame's ready check */
+  /* The same eye in seyda's own coordinates (no crossing) picks no vf0000 door. */
+  AW_SceneCancelTransition();CL_ClearState();strcpy(sv.name,"seyda");AW_SceneSpawn(&p);finish_signon(&p);
+  VectorCopy(offset,p.v.origin);cls.state=ca_connected;queued[0]=0;door_duration=0;
+  assert(!AW_SceneUse() || !strstr(queued,"mi5b8154939f7aa"));
+  aw_chim_cross=NULL;section_doors=0;door_duration=0;
+  AW_SceneCancelTransition();CL_ClearState();strcpy(sv.name,"vf0000");AW_SceneSpawn(&p);finish_signon(&p);
+ }
  /* Original plant FNAM and the Talk-style action row share actual pickup
   * eligibility, and vanish after the transaction. */
  harvest_fixture=1;target_trace=travel_trace=0;occluded=0;narrow_room=0;
@@ -927,6 +1018,40 @@ int main(void){
   aw_fast_ram_found_mb=16;assert(!AW_SceneMapRefuse("census") && key_dest==key_game);
   AW_SceneCancelTransition();
   sv.active=true;aw_fast_ram_found_mb=0;room_maps=0;aw_chim_world=0;census_marked=0;command_argc=1;
+ }
+ /* dbg door roulette [SEED] (v0.0.53, the maintainer): one random room of the disk, loaded at the room's own start
+  * (its info_player_start), the same seed the same room; a room whose map is missing or has no start is never
+  * drawn; a bad seed or no game loads nothing. */
+ {
+  char first[32],seed_text[16],caius_seed[16]="";int seed,seen_caius=0,seen_census=0;
+  assert(teleport);roulette_fixture=1;occluded=target_trace=travel_trace=0;door_duration=0;
+  AW_SceneCancelTransition();CL_ClearState();strcpy(sv.name,"seyda");sv.active=true;AW_SceneSpawn(&p);finish_signon(&p);
+  p.v.movetype=MOVETYPE_WALK;p.v.health=73;cls.state=ca_connected;key_dest=key_game;
+  command_args[0]="dbg";command_args[1]="1234";command_argc=2;queued[0]=0;roulette();
+  assert(!strcmp(queued,"map bmcaius\n") || !strcmp(queued,"map census\n"));strcpy(first,queued);
+  AW_SceneCancelTransition();queued[0]=0;roulette();assert(!strcmp(queued,first));   /* the same seed, the same room */
+  for(roulette_fixture=1;roulette_fixture<=2;roulette_fixture++)for(seed=0;seed<64;seed++){
+   sprintf(seed_text,"%d",seed);command_args[1]=seed_text;AW_SceneCancelTransition();queued[0]=0;roulette();
+   assert(!strcmp(queued,"map bmcaius\n") || !strcmp(queued,"map census\n"));   /* never the room without a start */
+   if(!strcmp(queued,"map bmcaius\n")){seen_caius++;if(!caius_seed[0])strcpy(caius_seed,seed_text);}else seen_census++;
+  }
+  assert(seen_caius && seen_census);
+  /* the arrival is the room's start, facing its angle */
+  roulette_fixture=1;command_args[1]=caius_seed;AW_SceneCancelTransition();queued[0]=0;roulette();
+  assert(!strcmp(queued,"map bmcaius\n"));
+  CL_ClearState();strcpy(sv.name,"bmcaius");AW_SceneSpawn(&p);finish_signon(&p);
+  assert(p.v.origin[0]==40.5f && p.v.origin[1]==-57.25f && p.v.angles[1]==270 && p.v.health==73);
+  /* bad seeds, extra words, no game: nothing loads */
+  {const char *bad[]={"12x","-5","","12345678901"," 7"};unsigned i;
+   for(i=0;i<sizeof(bad)/sizeof(bad[0]);i++){
+    command_args[1]=(char *)bad[i];command_argc=2;AW_SceneCancelTransition();queued[0]=0;roulette();assert(!queued[0]);
+   }}
+  command_argc=3;command_args[1]="1";command_args[2]="2";queued[0]=0;roulette();assert(!queued[0]);
+  sv.active=false;command_argc=1;queued[0]=0;roulette();assert(!queued[0]);sv.active=true;
+  /* no seed: one of its own, a room all the same */
+  command_argc=1;AW_SceneCancelTransition();queued[0]=0;roulette();
+  assert(!strcmp(queued,"map bmcaius\n") || !strcmp(queued,"map census\n"));
+  AW_SceneCancelTransition();roulette_fixture=0;command_argc=1;
  }
  puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");
  return 0;

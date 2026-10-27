@@ -177,18 +177,23 @@ static int same_name (const char *a, const char *b)
 int AW_SkelGroup (const aw_skel_table_t *t, const char *name)
 {
 	int i;
-	if (t->prefix[0])
+	const char *p = t->prefix;
+	/* the view's prefixes in order, each up to and with its ':' ("d:f:" is "d:" then "f:"; DANCER-OWN-ANIM-
+	 * IGNORED-53: an NPC's own animation file's groups first, then a woman's, then the table's) */
+	while (*p)
 	{
 		char own[AW_SKEL_NAME];
-		int n = (int)strlen (t->prefix);
+		const char *colon = strchr (p, ':');
+		int n = colon ? (int)(colon - p) + 1 : (int)strlen (p);
 		if (n + (int)strlen (name) < AW_SKEL_NAME)
 		{
-			memcpy (own, t->prefix, n);
+			memcpy (own, p, n);
 			strcpy (own + n, name);
 			for (i=0 ; i<t->groups ; i++)
 				if (same_name ((const char *)(t->group_data + i*AW_SKEL_GROUP_BYTES), own))
 					return i;
 		}
+		p += n;
 	}
 	for (i=0 ; i<t->groups ; i++)
 		if (same_name ((const char *)(t->group_data + i*AW_SKEL_GROUP_BYTES), name))

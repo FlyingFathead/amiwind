@@ -98,7 +98,8 @@ class Table(unittest.TestCase):
     def test_every_preset_parses(self):
         rows = mp.presets()
         self.assertEqual(sorted(row['name'] for row in rows),
-                         ['anim-stage', 'animkit', 'balmora', 'balmora-exterior', 'lava-pools', 'opening-ship', 'redmountain',
+                         ['anim-stage', 'animkit', 'balmora', 'balmora-exterior', 'halloween', 'lava-pools', 'opening-ship',
+                          'redmountain',
                           'seyda-chim', 'vivec-arena-chim', 'vivec-arena-pit', 'vivec-city-chim', 'vivec-city-exterior',
                           'vivec-palace'])
         # v0.0.43: Red Mountain's summit, the raised terrain ceiling (CHIM-RED-MOUNTAIN-SOLID-SKY-43)

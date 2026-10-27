@@ -3,13 +3,13 @@
  "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, maintainer-approved reason.",
  "totals": {
   "commands": {
-   "count": 278,
-   "hunk_bytes": 8896
+   "count": 283,
+   "hunk_bytes": 9056
   },
   "cvars": {
-   "count": 341,
-   "static_bytes": 8184,
-   "zone_bytes": 11136
+   "count": 342,
+   "static_bytes": 8208,
+   "zone_bytes": 11168
   },
   "tables": {
    "count": 0,
@@ -42,6 +42,9 @@
   "2026-10-23: CHIM-EXTERIOR-FLAMES-MISSING-48, the maintainer (desktop chat 2026-10-23, on the fires' light): \"set it on by default but add some dbg command like dbg campfires on|off\": aw_campfires, one cvar (24 structure bytes, 32 zone bytes; default 1, not saved; aw_lamps.c); dbg campfires reuses the on-disk catalogue, no command. The fire light table it switches (chim_chunks.c, 128 fires x 20 bytes = 2,560 bytes of BSS) holds numbers, not names.",
   "2026-10-22: dbg sensitivity, the console half of the maintainer's request (desktop chat 22 October 2026: mouse sensitivity configurable both from the debug menu and from the game options); OPTIONS-MOUSE-SENSITIVITY-48",
   "2026-10-23: aw_step_rules, the OpenMW step and slope rules prototype the maintainer asked for (approved in the desktop chat, 23 October 2026: yeah it's ok); STEP-MOVEMENT-OPENMW-RULES-48",
+  "2026-10-26: the custom OST player the maintainer asked for (desktop chat, about 23:00 +0200: a custom OST audio player routine): one command record, aw_music_custom (aw music custom play/stop; 32 hunk bytes) (CUSTOM-OST-SLOT-53)",
+  "2026-10-26: the maintainer's evening requests (via the coordinator): aw bench halloween, the standard benchmark command for testers, with the alias aw halloweenbench (one command record aw_bench, and the aw prefix as one more dbg dispatcher record: 64 hunk bytes), and a config flag that hides photo mode's own notice box and hints (the cvar aw_photomode_ui: 24 structure bytes, 32 zone bytes) (HALLOWEEN-SCENE-53)",
+  "2026-10-26: dbg halloween and its alias dbg halloweentest, the Halloween scene the maintainer asked for (TG 2026-10-26 10:21-10:22 +0200: the command and the alias by name; later the same day: the FPS counter off in the show, on in the test alias): two command records, aw_halloween and aw_halloweentest (64 hunk bytes); no cvars, the cast is read from disk on the command only (HALLOWEEN-SCENE-53)",
   "2026-10-23: dbg door, for testing the hinged doors the maintainer asked for (approved in the desktop chat, 23 October 2026); AW-20260928-12",
   "2026-10-23: merge of v0.0.48-merge-dev-doors (sensitivity, step rules, hinged doors) into the interiors line (voice table, MWScript, player speed, Stats and Magic windows, campfires): both sides' approved raises recorded separately above; the totals are their union (no new setting)"
  ],
@@ -100,10 +103,12 @@
    "amiwind_debug_showfps",
    "amiwind_debug_showram",
    "amiwind_show_debug",
+   "aw",
    "aw_24hrcycle",
    "aw_aim",
    "aw_animkit_cmd",
    "aw_arenapit",
+   "aw_bench",
    "aw_blockers",
    "aw_cam",
    "aw_camera",
@@ -141,6 +146,8 @@
    "aw_gallery_migrate",
    "aw_godmode",
    "aw_guardtorch",
+   "aw_halloween",
+   "aw_halloweentest",
    "aw_hands",
    "aw_headlamp_set",
    "aw_heap_audit",
@@ -163,6 +170,7 @@
    "aw_magic",
    "aw_magicmenu",
    "aw_main_menu",
+   "aw_music_custom",
    "aw_music_mode",
    "aw_music_next",
    "aw_music_play",
@@ -459,6 +467,7 @@
    "aw_photomode_hands",
    "aw_photomode_noclip",
    "aw_photomode_nofog",
+   "aw_photomode_ui",
    "aw_player_body",
    "aw_poly_budget_over_cap",
    "aw_quickchar_voice",

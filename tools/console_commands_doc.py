@@ -18,6 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CATALOGUE = ROOT / 'config' / 'debug-commands.txt'
 PAGE = ROOT / 'docs' / 'AMIWIND_CONSOLE_COMMANDS.md'
+LINE_MAX = 382      # engine/aga/src/aw_console.c DEBUG_LINE 384, less the line end and its NUL
 
 
 def entries(text):
@@ -28,6 +29,9 @@ def entries(text):
     for n, line in enumerate(lines[1:], 2):
         if not line or line.startswith('#'):
             continue
+        if len(line.encode('utf-8')) > LINE_MAX:
+            # the engine reads a line into DEBUG_LINE bytes (aw_console.c): a longer one breaks every dbg command
+            raise ValueError('line %d: %d bytes, the engine reads at most %d' % (n, len(line.encode('utf-8')), LINE_MAX))
         parts = line.split('|')
         if len(parts) != 4 or not all(p.strip() for p in parts[:3]):
             raise ValueError('line %d: expected GROUP|words|handler|help' % n)
@@ -81,8 +85,9 @@ def new_stamp(version=None):
 
 
 # Routes that share a handler but are commands of their own: the translator (aw_console.c route_format) turns
-# them into a different value of that handler (switch bits of aw_cull), so they are no aliases of it.
-OWN_ROUTES = {('aw_cull', 'fog rule'), ('aw_cull', 'cut groups')}
+# them into a different value of that handler (switch bits of aw_cull; the teleport command's roulette), so they are
+# no aliases of it.
+OWN_ROUTES = {('aw_cull', 'fog rule'), ('aw_cull', 'cut groups'), ('aw_teleport', 'door roulette')}
 
 
 def render(text, stamp=None):

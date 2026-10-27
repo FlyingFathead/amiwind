@@ -143,7 +143,10 @@ IGNORED_ENV = {'AMIWIND_BUILD_JOBS', 'AMIWIND_INPUTS_LOCK', 'AMIWIND_PROFILE_SEC
                'AMIWIND_RUN_NAME', 'AMIWIND_RUN_COMMIT', 'AMIWIND_RUN_VERSION', 'AMIWIND_AW_REQUEST',
                # who wrote any cache entry (tools/cache_provenance.py): provenance, not an input (CACHE-NO-PROVENANCE-36)
                'AMIWIND_RUN_JOB', 'AMIWIND_RUN_TOOLS_SHA256', 'AMIWIND_RUN_CHIM_VERSION', 'AMIWIND_RUN_WORLD_FORMAT',
-               'AMIWIND_RUN_KIND'}
+               'AMIWIND_RUN_KIND',
+               # how much free space the machine must have and the disk watch (tools/disk_need.py,
+               # BUILD-DISK-NEED-UNKNOWN-52): machine settings, never an output's input
+               'AMIWIND_MIN_FREE_GIB', 'AMIWIND_DISK_MARGIN_PERCENT', 'AMIWIND_DISK_WATCH'}
 SEPARATORS = '/' + os.sep
 EXTERNAL_DIRECTORY_LIMIT = 512 * 1024 ** 2
 SKIP_DIRECTORIES = {'.git', '__pycache__', 'out', 'tests', 'node_modules'}
@@ -394,6 +397,26 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
+# Machine settings in the build defaults (BUILD-DISK-NEED-UNKNOWN-52): how much free space this machine must have
+# (tools/disk_need.py MACHINE_SETTINGS, the same names; tests/test_disk_need.py) changes no output, so the file counts
+# in every key without them: the digest of the file as written without those settings (json indent 2), which is the
+# digest of its bytes before they existed. Changing the minimum or the margin re-keys nothing.
+MACHINE_SETTINGS_FILE = 'config/build-defaults.json'
+MACHINE_SETTINGS = frozenset({'min_free_gib', 'disk_margin_percent'})
+
+
+def machine_neutral_digest(path):
+    raw = Path(path).read_bytes()
+    try:
+        values = json.loads(raw)
+    except ValueError:
+        values = None
+    if not isinstance(values, dict) or not MACHINE_SETTINGS & set(values):
+        return hashlib.sha256(raw).hexdigest()
+    kept = {key: value for key, value in values.items() if key not in MACHINE_SETTINGS}
+    return hashlib.sha256((json.dumps(kept, indent=2) + '\n').encode('utf-8')).hexdigest()
+
+
 def digest_json(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
@@ -434,7 +457,8 @@ class FileHashes(MutableMapping):
 
     def __getitem__(self, key):
         if key not in self._hashes:
-            self._hashes[key] = sha256_file(self._paths[key])
+            self._hashes[key] = (machine_neutral_digest(self._paths[key]) if key == MACHINE_SETTINGS_FILE
+                                 else sha256_file(self._paths[key]))
         return self._hashes[key]
 
     def __setitem__(self, key, value):
@@ -679,32 +703,72 @@ class SourceIndex:
             else:
                 python, data, uncertain, constants = self._closure_symbols(start, key)
             names = environment_names(constants, uncertain)
-            for target, function in sorted(self._keyed.get(key) or (), key=lambda item: (item[0], item[1] or '')):
+            if self.stage_form and self.scope == 'units':
                 # a cache key computed from that code reads it (pass_cache.source_digest, environment): its reach
                 # counts in the stage key (BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48). Stage form with units: by the
                 # units that reach runs, as the cache key itself hashes them (index.digest, entry_digest); counted
                 # whole, a helper added to a shared module rebuilt the CHIM world (BUILD-KEY-KEYED-REACH-WHOLE-51).
-                # Units no reach can name (a function missing from its module) still count whole.
-                if self.stage_form and self.scope == 'units':
-                    k_python, k_data, k_uncertain, k_names, k_units = self._keyed_units(target, function)
-                    python = set(python) | k_python
-                    reached = self._reached.setdefault(key, {})
-                    for path, units in k_units.items():
-                        reached[path] = set(reached.get(path, ())) | set(units)
-                    # a label module the keyed code reaches still counts whole: shows_chim_label reads it as shown
-                    data = set(data) | (k_python - set(k_units)) | (k_python & CHIM_LABEL_SHOWN) | k_data
-                else:
-                    k_python, k_data, k_uncertain, k_names = self.companion()._keyed_reach(target, function)
-                    data = set(data) | k_python | k_data
+                # Units no reach can name (a function missing from its module) still count whole. The code the
+                # keyed code itself hands to a cache key counts too (keyed_coverage follows them all).
+                k_python, k_data, k_uncertain, k_names, k_units = self.keyed_coverage(self._keyed.get(key) or ())
+                python = set(python) | k_python
+                reached = self._reached.setdefault(key, {})
+                for path, units in k_units.items():
+                    reached[path] = set(reached.get(path, ())) | set(units)
+                data = set(data) | k_data
                 uncertain = uncertain or k_uncertain
                 names = names | k_names
+            else:
+                for target, function in sorted(self._keyed.get(key) or (), key=lambda item: (item[0], item[1] or '')):
+                    k_python, k_data, k_uncertain, k_names = self.companion()._keyed_reach(target, function)
+                    data = set(data) | k_python | k_data
+                    uncertain = uncertain or k_uncertain
+                    names = names | k_names
             self._closures[key] = (python, data, uncertain, names if not uncertain else {ENV_ANY})
         return self._closures[key]
+
+    def keyed_coverage(self, keyed):
+        """(python files, data files, uncertain, AMIWIND_* names, {python file: units}) a stage key counts for the
+        code handed to cache keys, KEYED: [(repository path, function or None for the whole script)]. Stage form
+        with units (_analysis): each one by the units its reach runs (_keyed_units), and, transitively, the code that
+        reach itself hands to a cache key. Data files: what the reaches name, each module no reach can name a unit of
+        (counted whole), and a CHIM label module (shows_chim_label reads it as shown).
+
+        The same lines are what a cache that gave a stage a result writes into the stage's trace
+        (pass_cache.covered_lines), so a hit names only code the stage key counts: written from the cache's own
+        key form (2), whose import-time code holds every class body, the hits named 43 functions of the chim, room,
+        area and character stages that their form 3 keys leave out, and their records were refused on every reuse
+        (BUILD-STAGE-READS-UNFINGERPRINTED-48)."""
+        python, data, uncertain, names, units = set(), set(), False, set(), {}
+        pending = sorted(set(keyed), key=lambda item: (item[0], item[1] or ''))
+        done = set()
+        while pending:
+            target, function = pending.pop(0)
+            if (target, function) in done:
+                continue
+            done.add((target, function))
+            k_python, k_data, k_uncertain, k_names, k_units = self._keyed_units(target, function)
+            python |= k_python
+            for path, reached in k_units.items():
+                units[path] = set(units.get(path, ())) | set(reached)
+            # a label module the keyed code reaches still counts whole: shows_chim_label reads it as shown
+            data |= (k_python - set(k_units)) | (k_python & CHIM_LABEL_SHOWN) | k_data
+            uncertain = uncertain or k_uncertain
+            names |= k_names
+            nested = self._keyed.get(self._keyed_key(target, function)) or ()
+            pending.extend(sorted((item for item in nested if item not in done),
+                                  key=lambda item: (item[0], item[1] or '')))
+        return python, data, uncertain, names, units
+
+    def _keyed_key(self, relative, function=None):
+        """The closure key _keyed_units reaches RELATIVE (or its FUNCTION) under."""
+        script = Path(self.root / relative).resolve()
+        return '%s::keyed' % script if function is None else '%s::%s' % (script, function)
 
     def _keyed_units(self, relative, function=None):
         """(python files, data files, uncertain, AMIWIND_* names, {python file: units}) of the code a cache key
         computed from RELATIVE (as a script, or its FUNCTION's reach) reads, in this index's form, with the units it
-        runs (stage keys, _analysis). The keyed code's own keyed scripts are not followed, as before."""
+        runs (stage keys, _analysis). The code it hands to a cache key in turn: keyed_coverage."""
         script = self.root / relative
         if function is None:
             key = '%s::keyed' % Path(script).resolve()
@@ -3276,7 +3340,10 @@ class Recorder:
         except ValueError:
             run_inside = None
         pool_problems, pool_summary = pool_read_problems(lines)
-        misses, uncovered, outside = check_reads([line for line in lines if not line.startswith(TRACE_MARKS)],
+        # '=' a file a cache that gave the stage a result keys whole: used like a read (pass_cache.covered_lines name
+        # only what the stage key counts for the code it hands to that cache, BUILD-STAGE-READS-UNFINGERPRINTED-48)
+        misses, uncovered, outside = check_reads([line[1:] if line.startswith('=') else line for line in lines
+                                                  if line.startswith('=') or not line.startswith(TRACE_MARKS)],
                                                  self.closures['stages'][name], set(self.closures['files']),
                                                  root, run_inside)
         if (self.cache.get('reused') or {}).get(name):

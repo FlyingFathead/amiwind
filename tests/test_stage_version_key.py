@@ -60,6 +60,33 @@ class RepositoryVersionKeyTests(unittest.TestCase):
                 self.assertFalse(self.keys_version(script), script)
                 self.assertFalse(self.index.names_version(ROOT / 'tools' / script), script)
 
+    def test_a_cache_hit_in_a_stage_refuses_no_record(self):
+        # BUILD-STAGE-READS-UNFINGERPRINTED-48: the v0.0.52 final, a VERSION-only build, refused 7 records of the dev3
+        # build it reused and rebuilt the CHIM world: a cache hit in a stage writes what the cache keys into the stage's
+        # trace (pass_cache.covered_lines), and those lines named 43 functions the stage keys left out. A VERSION-only
+        # build reuses every record its development build kept; for each stage script, every cache it hands code to
+        # must name, on a hit, only units and files its key counts (Recorder.check_trace: check_calls, check_reads).
+        import pass_cache
+        found = []
+        for script in stage_scripts():
+            path = ROOT / 'tools' / script
+            if not path.is_file():
+                continue
+            python, data, uncertain = self.index.closure(path)
+            if uncertain:
+                continue
+            closure = set(python) | set(data)
+            reached, modules = build_cache.stage_units([(script, ['python3', str(path)])], self.index)
+            keyed = self.index._keyed.get(str(path.resolve())) or ()
+            for target, function in sorted(keyed, key=lambda item: (item[0], item[1] or '')):
+                entry = (ROOT / target,) if function is None else ((ROOT / target, function),)
+                lines = pass_cache.covered_lines(*entry)       # as PassCache.open and UnitCache.open make them
+                found += ['%s: %s' % (script, miss) for miss in
+                          build_cache.check_calls(lines, reached.get(script, {}), modules)]
+                found += ['%s: %s' % (script, line) for line in lines
+                          if line.startswith('=') and line[1:] not in closure]
+        self.assertEqual(found, [], 'a cache hit would refuse these stage records')
+
     def test_the_tracker_still_keys_the_version_it_shows(self):
         self.assertTrue(self.keys_version('cell_progress_build.py'))
 

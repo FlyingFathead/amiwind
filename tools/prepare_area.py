@@ -1029,13 +1029,14 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
             record=models[ref['id'].casefold()];settings=record['settings']
             pos=[(v-(CENTRE[a] if slug=='seyda' and a<2 else 0))*SCALE for a,v in enumerate(ref['position'])]
             from actor_grounding import fields as grounding_fields
+            from npc_anim import own_idle_fields
             fields={**grounding_fields(ref['id'],ref['number']),'classname':'aw_corpse' if record['appearance'].get('initially_dead') else 'aw_npc','aw_ref':ref['number'],'model':record['model'],
                     'origin':' '.join(f'{v:.5f}' for v in pos),
                     'angles':f"0 {-math.degrees(ref['rotation_radians'][2]):.5f} 0",
                     'netname':display_text(record['appearance']['name']),'aw_voice':record['voice'],
                     'aw_line':display_text(record['greeting']['text']),'aw_idle_step':record['step'],
                     'aw_hello_distance':settings['distance'],'aw_hello_reset':settings['reset_distance'],
-                    'aw_greet_duration':settings['duration']}
+                    'aw_greet_duration':settings['duration'],**own_idle_fields(record)}
             if fields['classname']=='aw_npc' and record['voice']:
                 fields.update(talk.fields(ref['id'],talk.exterior_name(ref['position']) if slug=='seyda'
                                           else rooms[slug].get('name')))

@@ -49,6 +49,11 @@ WEAK int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out){(voi
 /* The animation kit console (aw_animkit.c): nothing to drive in fixtures without it. */
 WEAK void AW_AnimKitTick(void) {}
 WEAK void AW_AnimKitInit(void) {}
+/* The Halloween scene (aw_halloween.c): nothing runs in fixtures without it. */
+WEAK void AW_HalloweenInit(void) {}
+WEAK void AW_HalloweenTick(void) {}
+WEAK void AW_HalloweenDraw(void) {}
+WEAK int AW_HalloweenCamera(float origin[3],float angles[3]) {(void)origin;(void)angles;return 0;}
 
 /* Inventory dependencies are inactive only in fixtures which omit that module.
  * Dedicated inventory fixtures link its real rules/UI/decoder instead. */

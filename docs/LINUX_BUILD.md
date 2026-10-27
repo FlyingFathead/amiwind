@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -56,6 +56,25 @@ filesystem and any quota before starting. Scratch space in RAM counts against
 the process or container memory budget; it is not extra disk. If space is
 short, the fix is more capacity before the long conversion starts, not leaving
 out NPC models or the gallery.
+
+**How much free space a build needs (from v0.0.53).** About **58 GiB** on the
+workspace's file system for a first build in a new workspace: the last known
+good build's measured figure (`config/disk-footprint.json`, 44.3 GiB for
+v0.0.52: a 15.5 GiB run folder plus the caches and the storage pool it wrote)
+plus a 30 % margin. A workspace that already holds a passing build's caches and
+pool needs only the run's share with the margin, and never less than 35 GiB.
+Every image build checks this first, right after reading its options and before
+any setup, copy or stage, and stops with the numbers when a file system is
+short. Each stage also checks its own last measured need before it starts, so a
+build stops before a stage instead of filling the disk halfway; free space and
+resume with `--reuse-from`. The minimum and the margin are `min_free_gib` (35)
+and `disk_margin_percent` (30) in `config/build-defaults.json`, or
+`--min-free-gib` / `--disk-margin-percent` (`AMIWIND_MIN_FREE_GIB`,
+`AMIWIND_DISK_MARGIN_PERCENT`). They are machine settings: changing them
+rebuilds nothing. Every passing build writes its own measured figure to
+`disk-footprint.json` in its run folder, and later checks in that workspace take
+the larger of it and the shipped one. `python3 tools/disk_need.py check
+--workspace DIR` prints the need without building.
 
 The guided builder converts a bounded Seyda Neen proof of concept and builds
 an experimental AGA HDF. It does not convert the complete game or promise stock

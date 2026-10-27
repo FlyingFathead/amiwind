@@ -581,33 +581,43 @@ def layered_spans(skeleton, over=None):
     return out, missing + [g for g in over_missing if g not in missing]
 
 
-def appended_spans(skeleton, over, prefix):
+def appended_spans(skeleton, over, prefix, more=()):
     """[(span, source skeleton, its ranges)] in table order: every span of the skeleton, then every span of OVER
     under PREFIX + its name ('f:walkforward'), so one table holds both and a view of it plays OVER's groups first
-    (SKEL-TABLE-SHARED-FEMALE-52). Returns (spans, missing)."""
+    (SKEL-TABLE-SHARED-FEMALE-52); then each of MORE [(skeleton, prefix)] the same way (an NPC's own animation file,
+    'd:idle9': DANCER-OWN-ANIM-IGNORED-53). Returns (spans, missing)."""
     ordered, ranges, missing = source_spans(skeleton)
-    over_ordered, over_ranges, over_missing = source_spans(over)
-    prefixed = {prefix + g: r for g, r in over_ranges.items()}
-    return ([(g, skeleton, ranges) for g in ordered] + [(prefix + h, over, prefixed) for h in over_ordered],
-            missing + [prefix + g for g in over_missing])
+    spans = [(g, skeleton, ranges) for g in ordered]
+    for source, pre in ((over, prefix),) + tuple(more):
+        own_ordered, own_ranges, own_missing = source_spans(source)
+        prefixed = {pre + g: r for g, r in own_ranges.items()}
+        spans += [(pre + h, source, prefixed) for h in own_ordered]
+        missing = missing + [pre + g for g in own_missing]
+    return spans, missing
 
 
-def build_table(skeleton, bones=None, rate=TABLE_RATE, tolerance=0.0, resolved=False, over=None, append=None):
+def build_table(skeleton, bones=None, rate=TABLE_RATE, tolerance=0.0, resolved=False, over=None, append=None,
+                more=()):
     """The whole table of one skeleton (npc_geometry.Skeleton): every group of its text keys, sampled at rate, the
     groups' frames one after another. over: a second skeleton of the same bones whose groups replace the first's
     (layered_spans: the female human groups over the common ones), or with APPEND (a group name prefix, 'f:') are
-    added after them under that prefix (appended_spans). Returns (table bytes, report {'groups',
+    added after them under that prefix (appended_spans); more [(skeleton, prefix)]: further skeletons of the same
+    bones appended after those the same way (the NPCs' own animation files, OWN_ANIMATIONS; with APPEND only).
+    Returns (table bytes, report {'groups',
     'missing', 'frames', 'bones', 'bytes', 'names', 'bone_names', 'times', 'over'}): 'missing' names the groups
     whose start or stop key is absent (a build check refuses them); 'bone_names' the table's bones in its order (a
     skeletal model's bone indices); 'times' the animation time of every table frame (in its source's file); 'over'
     the spans taken from OVER."""
-    spans, missing = appended_spans(skeleton, over, append) if over is not None and append else \
+    if more and not (over is not None and append):
+        raise ValueError('More appended skeletons need an appended OVER')
+    spans, missing = appended_spans(skeleton, over, append, more) if over is not None and append else \
         layered_spans(skeleton, over)
     if bones is None:
         bones = bone_order(skeleton.parents, list(skeleton.nodes))
     parents = [-1 if skeleton.parents[b] is None else bones.index(skeleton.parents[b]) for b in bones]
-    if over is not None and [over.parents.get(b, 0) for b in bones] != [skeleton.parents[b] for b in bones]:
-        raise ValueError('The layered skeleton does not have the same bones')
+    for other in ([over] if over is not None else []) + [s for s, _ in more]:
+        if [other.parents.get(b, 0) for b in bones] != [skeleton.parents[b] for b in bones]:
+            raise ValueError('The layered skeleton does not have the same bones')
     times, groups = [], {}
     for g, _, ranges in spans:
         frames = table_frames(*ranges[g], rate=rate)
@@ -617,7 +627,10 @@ def build_table(skeleton, bones=None, rate=TABLE_RATE, tolerance=0.0, resolved=F
     pos = np.zeros((len(times), len(bones), 3))
     keys = []
     names = list(groups)
-    for source in (skeleton, over):
+    prefix_of = {id(s): pre for s, pre in more}
+    if append and over is not None:
+        prefix_of[id(over)] = append
+    for source in (skeleton, over) + tuple(s for s, _ in more):
         if source is None:
             continue
         mine = [(g, r) for g, s, r in spans if s is source]
@@ -627,7 +640,8 @@ def build_table(skeleton, bones=None, rate=TABLE_RATE, tolerance=0.0, resolved=F
         r, p = sample_table(source, bones, [times[f] for f in rows])
         rot[rows], pos[rows] = r, p
         # the source's own group names for its keys (an appended span 'f:walkforward' holds 'walkforward: ...')
-        own = (lambda g: g[len(append):]) if append and source is over else (lambda g: g)
+        cut = len(prefix_of.get(id(source), '')) if source is not skeleton else 0
+        own = (lambda g, cut=cut: g[cut:])
         sub = {own(g): groups[g] for g, _ in mine}
         local = [g for g, _ in mine]
         keys.extend((text, names.index(local[gi]) if gi != NO_GROUP else NO_GROUP, frame)
@@ -742,15 +756,17 @@ def onto_kept(src, parents, keep, rest_world):
 BEAST_BONES = ('bip01 l toe0', 'bip01 r toe0', 'bip01 tail', 'bip01 tail2')
 
 
-def stick_table(skeleton, rate=TABLE_RATE, resolved=False, over=None, append=None):
+def stick_table(skeleton, rate=TABLE_RATE, resolved=False, over=None, append=None, more=()):
     """The table the game ships for a skeleton: the stick figure (KeptSkeleton, STICK_BONES, and BEAST_BONES where
     the skeleton has them) at rate, bones that hardly move stored without positions (POSITION_TOLERANCE). The game
     has three (GAME_TABLES): the common humanoid (base_anim.nif), the female groups layered over it (over =
-    base_anim_female.nif) and the beast races (base_animkna.nif), chosen per actor by table_choice. Returns
+    base_anim_female.nif) and the beast races (base_animkna.nif), chosen per actor by table_choice. more
+    [(skeleton, prefix)]: the NPCs' own animation files appended under their prefixes (OWN_ANIMATIONS). Returns
     build_table's (bytes, report)."""
     keep = STICK_BONES + tuple(b for b in BEAST_BONES if b in skeleton.parents)
     return build_table(KeptSkeleton(skeleton, keep), rate=rate, tolerance=POSITION_TOLERANCE, resolved=resolved,
-                       over=None if over is None else KeptSkeleton(over, keep), append=append)
+                       over=None if over is None else KeptSkeleton(over, keep), append=append,
+                       more=tuple((KeptSkeleton(s, keep), p) for s, p in more))
 
 
 # The tables a build ships (--npc-anim-type 2) and which actor plays which, as OpenMW chooses the animation sources
@@ -770,6 +786,17 @@ GAME_TABLES = {('meshes/base_anim.nif', None): 'progs/humanoid.awsk',     # SKEL
                ('meshes/base_animkna.nif', None): 'progs/humanoid_kna.awsk'}
 # a skeleton whose table carries a second skeleton's groups appended under a prefix
 APPENDED = {'meshes/base_anim.nif': (FEMALE_SKELETON, FEMALE_PREFIX)}
+# An NPC's own animation (DANCER-OWN-ANIM-IGNORED-53): an NPC record's MODL can name an animation file of its own
+# (mwad.npc.outfit 'animation'); OpenMW's NpcAnimation adds that file's groups after base_anim's (and the female
+# groups), and a later source wins for each group it has. The base game has one, anim_dancingGirl.nif, named by
+# the three dancers of Desele's House of Earthly Delights in Suran and by Yakov of the Suran slave market: its only
+# group is idle9, the dance, which their wander packages (AI_W) pick as an idle. Each such file is appended to the
+# common table under its prefix ('d:idle9'), when the user's data has it, as the female groups are (a few KB, no
+# second table in Fast RAM); the NPC's model names the view 'progs/humanoid.awsk|d' ('|d|f' for a woman: her own
+# file's groups first, then hers, then the common ones). {file: prefix without ':'}; an NPC naming a file not
+# listed here plays the common table (the residents report says so).
+OWN_ANIMATIONS = {'meshes/anim_dancinggirl.nif': 'd'}
+TABLE_NAME_MAX = BLOCK_TABLE_NAME - 1
 
 
 def table_file(name):
@@ -777,20 +804,46 @@ def table_file(name):
     return name.split(TABLE_VIEW, 1)[0]
 
 
+def table_prefixes(name):
+    """The group prefixes a table name's view plays first, in order ('progs/humanoid.awsk|d|f' -> ['d:', 'f:'])."""
+    return [p + ':' for p in name.split(TABLE_VIEW)[1:]]
+
+
 def table_prefix(name):
     """The group prefix a table name's view plays first ('f:'), or ''."""
-    return name.split(TABLE_VIEW, 1)[1] + ':' if TABLE_VIEW in name else ''
+    return (table_prefixes(name) or [''])[0]
+
+
+def own_animation(appearance):
+    """The prefix (without ':') of an appearance's own animation file in its table (OWN_ANIMATIONS), or None: none
+    named, a beast's (the beast table carries none), or a file the table does not carry."""
+    name = appearance.get('animation')
+    if not name or appearance['skeleton'] != 'meshes/base_anim.nif':
+        return None
+    return OWN_ANIMATIONS.get(name.replace('\\', '/').casefold())
 
 
 def table_choice(appearance):
     """(skeleton file, over skeleton file or None, the table name the model gives) of one appearance
-    (mwad.npc.outfit)."""
+    (mwad.npc.outfit): with an own animation file (own_animation) its view first ('progs/humanoid.awsk|d|f')."""
     skeleton = appearance['skeleton']
     over = FEMALE_SKELETON if appearance.get('female') and skeleton == 'meshes/base_anim.nif' else None
     path = GAME_TABLES.get((skeleton, over))
     if path is None:
         raise ValueError('No shared animation table for skeleton %s' % skeleton)
+    own = own_animation(appearance)
+    if own:
+        path = table_file(path) + TABLE_VIEW + own + path[len(table_file(path)):]
+    if len(path.encode('ascii')) > TABLE_NAME_MAX:
+        raise ValueError('Animation table name %s is over %d characters' % (path, TABLE_NAME_MAX))
     return skeleton, over, path
+
+
+def table_view(path, names):
+    """PATH without the view prefixes whose groups the table (its group NAMES) does not hold (an own animation file
+    the user's data lacks), so a model names only what its table has."""
+    keep = [p for p in path.split(TABLE_VIEW)[1:] if any(n.startswith(p + ':') for n in names)]
+    return TABLE_VIEW.join([table_file(path)] + keep)
 
 
 # Carried items of a skeletal actor (SKEL-ITEM-TAGS-52): the tag names the item models and the table bones they
@@ -865,6 +918,19 @@ RESIDENT_HEAD_DETAIL = 'budget'
 _tables = {}
 
 
+def own_sources(skeleton_of):
+    """[(skeleton, prefix)] of the OWN_ANIMATIONS files the user's data has, in file order (the common table appends
+    them): the same for every caller, so the table is one file whatever actor builds it first."""
+    out = []
+    for name in sorted(OWN_ANIMATIONS):
+        try:
+            skeleton = skeleton_of(name)
+        except (KeyError, FileNotFoundError, OSError):
+            continue                # not in this data: its NPCs play the common table (table_view)
+        out.append((skeleton, OWN_ANIMATIONS[name] + ':'))
+    return out
+
+
 def game_table(data_key, appearance, skeleton_of):
     """(table bytes, build report, read_table, the table file's game path, skeleton, over skeleton) of an
     appearance's table, built once per process and data folder (a female human's view and the common table are one
@@ -876,7 +942,7 @@ def game_table(data_key, appearance, skeleton_of):
         if over is not None and appended != over:
             raise ValueError('Animation table %s: %s is not the skeleton its table appends' % (path, over))
         data, report = stick_table(skeleton_of(name), over=skeleton_of(appended) if appended else None,
-                                   append=prefix)
+                                   append=prefix, more=own_sources(skeleton_of) if appended else ())
         if report['missing']:
             raise ValueError('Animation table %s: groups without start or stop keys: %s'
                              % (table_file(path), report['missing']))
@@ -897,11 +963,15 @@ def skeletal_resident(data_key, assets, appearance, palette, profile, skeleton_o
     import npc_anim
     import npc_items
     data, report, table, _, skeleton, over = game_table(data_key, appearance, skeleton_of)
-    path = table_choice(appearance)[2]      # the name the model gives: a view for a female human
+    # the name the model gives: a view for a female human or an NPC with its own animation file
+    path = table_view(table_choice(appearance)[2], list(table['groups']))
     poser, groups = npc_anim.plan(skeleton, profile, over, appearance.get('weight', 1.),
                                   attack_stance=appearance.get('attack_stance'))
     kit = npc_anim.table_groups(table, groups, appearance.get('attack_stance'), report['times'],
-                                prefix=table_prefix(path))
+                                prefix=table_prefixes(path))
+    own = own_animation(appearance)
+    own_idle = npc_anim.own_idle(table, report['times'], appearance,
+                                 own + ':' if own and own + ':' in table_prefixes(path) else None)
     # reduced from the baked kit's own poses (SKEL-GROUND-SOLES-52); its first sample is the idle start, the rest pose
     raw, facts = skeletal_model(assets, appearance, skeleton, palette, data, report['bone_names'],
                                 times=npc_anim.idle_compatible_times(groups), poser=poser,
@@ -916,7 +986,8 @@ def skeletal_resident(data_key, assets, appearance, palette, profile, skeleton_o
         if paths or light else None
     model = {k: v for k, v in facts.items() if k not in ('shape_of', 'distance', 'nearest', 'rest_model')}
     return raw, kit, {'table': path, 'table_bytes': len(data), 'table_sha256': hashlib.sha256(data).hexdigest(),
-                      'table_frames': table['frames'], 'model': model}, tag, items
+                      'table_frames': table['frames'], 'model': model,
+                      **({'own_idle': own_idle} if own_idle else {})}, tag, items
 
 
 def table_files():

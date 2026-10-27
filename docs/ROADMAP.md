@@ -1,11 +1,12 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.52 (26 October 2026)._
+_Last updated with AmiWind v0.0.53 (27 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.53 (next), 26 October 2026](#v0053-next-26-october-2026)
+- [v0.0.54 (next), 26 October 2026](#v0054-next-26-october-2026)
+- [v0.0.53: Super Freak Halloween Update, 27 October 2026](#v0053-super-freak-halloween-update-27-october-2026)
 - [v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026](#v0052-skeletons-of-society-vvardenfell-edition-26-october-2026)
 - [Near-term: magic effects as sprites and bitmap planes, 25 October 2026](#near-term-magic-effects-as-sprites-and-bitmap-planes-25-october-2026)
 - [v0.0.51: Let There Be More Inner Light, 25 October 2026](#v0051-let-there-be-more-inner-light-25-october-2026)
@@ -100,23 +101,51 @@ _Last updated with AmiWind v0.0.52 (26 October 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.53 (next), 26 October 2026
+## v0.0.54 (next), 26 October 2026
 
-v0.0.53 takes up what moved from v0.0.52. In order:
+What did not make v0.0.53 moves here, in order:
 
-- **Doors after a streamed crossing.** Walking across a frame border into another region frame leaves that frame's
-  doors unusable until the next load: the engine reads only the start frame's door bank (830 of 1,102 entrances)
-  ([DOOR-BANK-STREAMED-FRAME-51](BUGS.md)). The first fix of v0.0.53.
 - **Characters that live by their records.** NPCs and creatures wander, idle and attack on sight by what their own
   record holds (its wander and travel packages, its Fight value), as the original game does ([ACTOR-WANDER-AGGRO-52](BUGS.md)).
 - **Dagoth Ur's fight and voice**, his whole original model kept ([scripted actors](SCRIPTED_ACTORS.md)).
 - **Full-detail heads** on skeletal characters where the rooms have room ([SKEL-VERTEX-LIMIT-52](BUGS.md)).
-- **Creatures on skeletons**, as the humanoids are since v0.0.52
-  ([modular NPCs](MODULAR_NPCS.md#getting-npc-movement-right)).
+- **Creatures on skeletons of their own files**, as the humanoids are since v0.0.52 and the four characters with an
+  animation file of their own are since v0.0.53 ([modular NPCs](MODULAR_NPCS.md#getting-npc-movement-right)).
+- **The 35 entrances whose collision still keeps the use key out of reach**, left from the door check of v0.0.53: 24
+  Daedric shrines whose steps the player slides off, 7 raised trapdoors, 2 Dwemer doors, a Redoran hut door and the
+  Unmarked Shipwreck's upper trapdoor; the fix is in the CHIM world's collision
+  ([DOOR-USE-COLLISION-FILLED-53](BUGS.md)).
 
-Then the v0.0.51 playtest findings still open (entrances, silt striders, the crosshair, the night speckle, loose fire
-sprites), the rooms that are still loading in on arrival ([CHIM-ROOM-POPIN-51](BUGS.md)), and the rest of the
-v0.0.52 list below.
+Then the v0.0.51 playtest findings still open (travel, the crosshair, the night speckle, loose fire sprites), the
+rooms that are still loading in on arrival ([CHIM-ROOM-POPIN-51](BUGS.md)), streaming ideas (the player's speed capped
+by the measured stream rate, reading ahead along the heading), and the RTG display path.
+
+## v0.0.53: Super Freak Halloween Update, 27 October 2026
+
+Done in the v0.0.53 release ([release notes](RELEASE-v0.0.53.md)), which the maintainer named "Super Freak Halloween
+Update":
+
+- **Doors after a streamed crossing.** Walking across a frame border into another region frame left that frame's
+  doors unusable until the next load: the engine read only the start frame's door bank (830 of 1,102 entrances).
+  Fixed ([DOOR-BANK-STREAMED-FRAME-51](bugs/DOOR-BANK-STREAMED-FRAME-51.md)); every build now checks all 1,102 entrances
+  with the engine's own door code, and `dbg door roulette` loads a random room.
+  A doorway slack fixed the use of 31 more entrances in the stricter wall-traced check (1,067 usable)
+  ([DOOR-USE-BLOCKED-53](BUGS.md)).
+- **The dancers' own dance.** The four characters of the base game with an animation file of their own, among them
+  Desele's dancers in Suran, play it from the shared table ([DANCER-OWN-ANIM-IGNORED-53](BUGS.md)).
+- **The free space a build needs, known and checked first.** Every build checks, before anything else and again
+  before each stage, the last known good build's measured footprint plus 30 % (never below 35 GiB; both settings in
+  the build defaults, changing them rebuilds nothing), and every passing build records its own; the release ships the
+  last figure ([BUILD-DISK-NEED-UNKNOWN-52](BUGS.md)).
+- **Faster GitHub checks**, a **version-only change that rebuilds nothing but the engine and the image**, and
+  **maintainer deferrals that expire** at the version they name.
+- **The Halloween scene** ([HALLOWEEN.md](HALLOWEEN.md), [HALLOWEEN-SCENE-53](BUGS.md)): `dbg halloween` on the
+  animation stage's roof in Balmora, the game's skeletons, Desele's dancers and Dagoth Ur dancing on the beat, in two
+  versions (Dagoth Ur in the centre, or the skeletons alone), filmed by a small camera director, opening on a black
+  greeting; a MiniWind preset; the custom OST slot, a builder option and a player routine for one track of your own
+  (public builds ship no song) ([CUSTOM-OST-SLOT-53](BUGS.md)); and `aw bench halloween` (aliases `aw halloweenbench`
+  and `dbg halloween bench`), the standard benchmark for real Amigas ([BENCH-NO-STANDARD-DEMO-48](BUGS.md)). The first
+  creatures on skeletons: the skeleton on the shared humanoid table, Dagoth Ur on a table of his own.
 
 ## v0.0.52: Skeletons Of Society, Vvardenfell Edition, 26 October 2026
 
